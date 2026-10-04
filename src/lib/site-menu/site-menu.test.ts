@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PLANS } from "@/lib/billing/plans";
+import snapshot from "./main-nav.snapshot.json";
 import { platformCanAccess } from "@/lib/platform-access";
 import { defaultSiteMenu } from "./defaults";
 import { blankFeatured, blankGroup as blankGroupForTest, blankItem, moveInArray, moveItem } from "./editor-model";
@@ -30,14 +30,15 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
   it("hatasız doğrulanır ve bugünkü grup/bağlantı sayılarını taşır", () => {
     expect(hasErrors(issues)).toBe(false);
     expect(cfg.groups.map((g) => [g.id, g.kind, g.items.length])).toEqual([
-      ["urun", "menu", 8],
-      ["cozum", "menu", 5],
-      ["fiyatlandirma", "link", 0],
+      ["urun", "menu", 11],
+      ["cozum", "menu", 6],
       ["kaynak", "menu", 6],
+      ["fiyat", "menu", 4],
     ]);
-    expect(cfg.groups[0].columns).toBe(2);
     expect(cfg.footer.map((c) => c.title)).toEqual(["Ürün", "Paketler", "Kaynaklar", "Yasal", "İletişim"]);
-    expect(cfg.footer[1].links).toHaveLength(PLANS.length + 1);
+    // Paket bağlantıları sabit değil: sütun `autoPlans` ile etkin plan tanımlarından beslenir.
+    expect(cfg.footer[1]).toMatchObject({ autoPlans: true });
+    expect(cfg.footer[1].links).toHaveLength(1);
     expect(cfg.announcement.enabled).toBe(false);
   });
 
@@ -48,13 +49,45 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
   it("açık görünüm: tüm öğeler görünür, duyuru yok, dış bağlantı yok", () => {
     const pub = toPublicMenu(cfg, 0);
     expect(pub.groups).toHaveLength(4);
-    expect(pub.groups.flatMap((g) => g.items).some((i) => i.external)).toBe(false);
+    expect(pub.groups.flatMap((g) => g.columns.flatMap((c) => c.items)).some((i) => i.external)).toBe(false);
     expect(pub.announcement).toBeNull();
     expect(pub.footer).toHaveLength(5);
   });
 
-  it("her varsayılan ikon kontrollü listede vardır", () => {
-    for (const g of cfg.groups) for (const it of g.items) if (it.icon.kind === "lucide") expect(isMenuIconName(it.icon.name), it.label).toBe(true);
+  it("her varsayılan ikon (bağlantı ve öne çıkan kart) kontrollü listede vardır", () => {
+    for (const g of cfg.groups) {
+      for (const it of g.items) if (it.icon.kind === "lucide") expect(isMenuIconName(it.icon.name), it.label).toBe(true);
+      if (g.featured?.icon.kind === "lucide") expect(isMenuIconName(g.featured.icon.name), g.id).toBe(true);
+    }
+  });
+
+  it("ana sayfa mega menüsüyle BİREBİR aynı: gruplar, sütun başlıkları, bağlantılar, ikonlar, öne çıkan kartlar", () => {
+    expect(cfg.groups.map((g) => g.id)).toEqual(snapshot.map((g) => g.id));
+    snapshot.forEach((sg, gi) => {
+      const g = cfg.groups[gi];
+      expect(g.label).toBe(sg.label);
+      const expected = sg.columns.flatMap((c) => c.items.map((it) => ({ section: c.title, label: it.label, text: it.text, href: it.href, icon: it.icon })));
+      const actual = g.items.map((it) => ({ section: it.section, label: it.label, text: it.text, href: it.href, icon: it.icon.kind === "lucide" ? it.icon.name : "" }));
+      expect(actual).toEqual(expected);
+      expect(g.featured).toMatchObject({
+        eyebrow: sg.featured.eyebrow,
+        title: sg.featured.title,
+        text: sg.featured.text,
+        href: sg.featured.href,
+        ctaLabel: sg.featured.cta,
+        icon: { kind: "lucide", name: sg.featured.icon },
+        media: null,
+      });
+    });
+  });
+
+  it("açık görünümde sütunlar ana sayfa menüsündeki gibi bölünür", () => {
+    expect(toPublicMenu(cfg, 0).groups.map((g) => g.columns.map((c) => c.title))).toEqual([
+      ["Satış ve kazanç", "Otomasyon ve ofis"],
+      ["Ofis büyüklüğüne göre", "Karar vermek için"],
+      ["Öğrenin", "Yasal ve destek"],
+      ["Fiyatlandırma"],
+    ]);
   });
 });
 
@@ -108,6 +141,7 @@ describe("anlamsal doğrulama", () => {
   it("boş grup ve yinelenen hedef uyarı verir (hata değil)", () => {
     const c = base();
     c.groups[1].items.forEach((i) => (i.hidden = true));
+    c.groups[1].featured = null;
     c.groups[3].items[0].href = c.groups[3].items[1].href;
     const { issues } = validateSiteMenu(c);
     expect(issues.some((i) => i.level === "warn" && i.path === "groups.1")).toBe(true);
@@ -172,11 +206,12 @@ describe("herkese açık görünüm", () => {
     c.groups[0].items[0].hidden = true;
     c.groups[1].hidden = true;
     c.groups[3].items.forEach((i) => (i.hidden = true));
+    c.groups[3].featured = null;
     c.footer[0].hidden = true;
     c.groups[0].items[1].href = "javascript:alert(1)";
     const pub = toPublicMenu(c, 0);
-    expect(pub.groups.map((g) => g.id)).toEqual(["urun", "fiyatlandirma"]);
-    expect(pub.groups[0].items).toHaveLength(6);
+    expect(pub.groups.map((g) => g.id)).toEqual(["urun", "kaynak"]);
+    expect(pub.groups[0].columns.flatMap((c) => c.items)).toHaveLength(9);
     expect(pub.footer.map((f) => f.id)).not.toContain("urun");
   });
 
@@ -185,8 +220,7 @@ describe("herkese açık görünüm", () => {
     c.groups[1].items[0] = { ...c.groups[1].items[0], href: "https://example.com/x", badge: "yeni" };
     c.groups[1].featured = { ...blankFeatured(), media: { mediaId: "aaaaaaaaaaaa", kind: "animated", posterId: "bbbbbbbbbbbb", ratio: "4:3", alt: "a" } };
     const g = toPublicMenu(c, 0).groups.find((x) => x.id === "cozum")!;
-    expect(g.items[0]).toMatchObject({ external: true, badge: "yeni" });
-    expect(g.wide).toBe(true);
+    expect(g.columns[0].items[0]).toMatchObject({ external: true, badge: "yeni" });
     expect(g.featured?.media).toMatchObject({ src: "/site-menu-asset/aaaaaaaaaaaa", posterSrc: "/site-menu-asset/bbbbbbbbbbbb", ratio: "4:3" });
   });
 
@@ -205,12 +239,14 @@ describe("editör modeli", () => {
   it("moveInArray ve moveItem (grup içi ve gruplar arası)", () => {
     expect(moveInArray([1, 2, 3], 0, 2)).toEqual([2, 3, 1]);
     const c = defaultSiteMenu();
-    const within = moveItem(c, "urun-tur", { kind: "item", id: "urun-ai" });
+    const within = moveItem(c, "urun-tur", { kind: "item", id: "urun-ai-asistan" });
     expect(within.groups[0].items[6].id).toBe("urun-tur");
     const across = moveItem(c, "urun-tur", { kind: "group", id: "kaynak" });
-    expect(across.groups[0].items).toHaveLength(7);
-    expect(across.groups[3].items.at(-1)?.id).toBe("urun-tur");
-    expect(moveItem(c, "urun-tur", { kind: "group", id: "fiyatlandirma" })).toBe(c); // doğrudan bağlantı grubuna bırakılamaz
+    expect(across.groups[0].items).toHaveLength(10);
+    expect(across.groups[2].items.at(-1)?.id).toBe("urun-tur");
+    const withLink = structuredClone(c);
+    withLink.groups.push({ ...blankGroupForTest("lnk"), kind: "link", href: "/fiyatlar" });
+    expect(moveItem(withLink, "urun-tur", { kind: "group", id: "lnk" })).toBe(withLink); // doğrudan bağlantı grubuna bırakılamaz
     expect(c.groups[0].items[0].id).toBe("urun-tur"); // girdi değişmedi
   });
 });

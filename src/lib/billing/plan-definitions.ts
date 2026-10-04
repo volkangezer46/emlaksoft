@@ -4,10 +4,11 @@ import {
   PLAN_DEFINITIONS_SETTING_KEY,
   applyPlanOverrides,
   effectiveMonthlyTry,
-  parsePlanCatalogSettings,
+  resolveCatalogSettings,
   type PlanCampaignSettings,
   type PlanCatalogSettings,
 } from "@/lib/billing/plan-overrides";
+import { SEAT_SETTINGS_KEY, parseSeatSettings, type SeatSettings } from "@/lib/billing/seat-settings";
 import { PLANS, planAmountOf, visiblePlans, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { getFoundersStatus, getEffectiveTrialDays, type FoundersStatus } from "@/lib/billing/plan-support";
 
@@ -20,6 +21,7 @@ import { getFoundersStatus, getEffectiveTrialDays, type FoundersStatus } from "@
  *  getPlanCatalog(): Promise<PlanCatalogSettings>  düzenlemeler + kampanya ayarı + istenen deneme günü
  *  getPlanAmountTry(id, cycle): Promise<number> liste fiyatından dönem tutarı (KDV hariç)
  *  quotePlan(id, cycle, tenantId?): Promise<PlanQuote> kampanya/kilitli fiyat dahil ödenecek tutar
+ *  getSeatSettings(): Promise<SeatSettings>     koltuk doluluk uyarı eşiği (admin ayarı; varsayılan %80)
  *  getFoundersStatus(): Promise<FoundersStatus> kampanya durumu (gerçek abonelik sayımı; şema yoksa available=false)
  *  getEffectiveTrialDays(): Promise<number>     gerçekten verilen deneme günü (migration yoksa 14)
  *
@@ -32,11 +34,22 @@ export const PLAN_DEFINITIONS_TAG = "plan-definitions";
 const loadCatalog = unstable_cache(
   async (): Promise<PlanCatalogSettings> => {
     const raw = await getPlatformSetting(PLAN_DEFINITIONS_SETTING_KEY);
-    return parsePlanCatalogSettings(raw);
+    return resolveCatalogSettings(raw);
   },
-  ["plan-catalog-v2"],
+  ["plan-catalog-v3"],
   { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
 );
+
+const loadSeatSettings = unstable_cache(
+  async (): Promise<SeatSettings> => parseSeatSettings(await getPlatformSetting(SEAT_SETTINGS_KEY)),
+  ["seat-settings-v1"],
+  { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
+);
+
+/** Ek kullanıcı (koltuk) genel ayarları; kayıt yoksa varsayılan. */
+export async function getSeatSettings(): Promise<SeatSettings> {
+  return loadSeatSettings();
+}
 
 export async function getPlanCatalog(): Promise<PlanCatalogSettings> {
   return loadCatalog();

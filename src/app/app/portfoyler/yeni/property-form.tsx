@@ -16,6 +16,8 @@ import { useToast } from "@/components/app/toast-provider";
 import { clearFormDraft } from "@/components/app/use-form-draft";
 import { commissionSummary, parseLooseNumber } from "@/lib/form-tabs";
 import { formatTry } from "@/lib/utils";
+import { evaluateOwnerInfo, parseOwnerInfoForm } from "@/lib/property-owner/info";
+import { OwnerInfoSection } from "./owner-info-section";
 import { FACADE_OPTIONS, HEATING_OPTIONS } from "./property-options";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_FORM_ID, PROPERTY_TABS } from "./property-tabs";
 
@@ -27,7 +29,7 @@ const TAB_ICONS = {
   konum: TI.konum,
   fiyat: TI.fiyat,
   ozellikler: TI.ozellikler,
-  ek: TI.ek,
+  sahip: TI.taraflar,
 } as const;
 
 const FIELD_LABELS = {
@@ -75,12 +77,14 @@ export function PropertyForm({
   propertyTypes,
   transactionTypes,
   userId,
+  poolEnabled = false,
 }: {
   provinces: Province[];
   branches: Branch[];
   propertyTypes: string[];
   transactionTypes: string[];
   userId: string;
+  poolEnabled?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -94,7 +98,10 @@ export function PropertyForm({
     const result = await createProperty(formData);
     if (result.ok) {
       clearFormDraft(userId, PROPERTY_FORM_ID);
-      push("Portföy taslak olarak oluşturuldu", "ok");
+      if (result.pooled) push("Portföy taslak olarak oluşturuldu ve ilan havuzuna gönderildi", "ok");
+      else if (result.ownerMissing && result.ownerMissing.length > 0) {
+        push(`Portföy taslak olarak oluşturuldu. İlan sahibi bilgisi %${result.ownerInfoScore ?? 0} tamam: yayın için ${result.ownerMissing.length} eksik var`, "info");
+      } else push("Portföy taslak olarak oluşturuldu", "ok");
       if (intent === "new") {
         // "Kaydet ve yenisini ekle": aynı sayfa temiz açılsın — tam yükleme.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bilinçli tam yükleme: form durumu sıfırlanır
@@ -198,23 +205,7 @@ export function PropertyForm({
         </FormField>
       </>
     ),
-    ek: (
-      <div className="sm:col-span-2">
-        <p className="text-sm text-text-muted">
-          Portföy <strong className="font-semibold text-ink-950">taslak</strong> olarak açılır. Kaydettikten sonra detay sayfasında şunları tamamlarsınız:
-        </p>
-        <ul className="mt-3 space-y-2 text-sm text-ink-950">
-          {["Fotoğraflar ve ilan açıklaması", "Fiyat sağlığı (emsal karşılaştırması)", "Portal ve vitrin yayını"].map((item) => (
-            <li key={item} className="flex items-center gap-2">
-              <span aria-hidden="true" className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-brand-600/10 text-brand-700">
-                <Check className="h-3 w-3" strokeWidth={3} />
-              </span>
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
-    ),
+    sahip: <OwnerInfoSection poolEnabled={poolEnabled} />,
   };
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
@@ -225,6 +216,8 @@ export function PropertyForm({
     const calc = commissionSummary(values.list_price, values.commission_rate, values.sqm);
     const province = provinces.find((p) => p.id === values.province_id)?.name;
     const branch = branches.find((b) => b.id === values.branch_id)?.name;
+    // Önizleme: seçilen mevcut müşterinin telefonu kayıtlıysa karşılanmış sayılır (sunucu kesin kararı verir).
+    const owner = evaluateOwnerInfo({ ...parseOwnerInfoForm((n) => values[n]).value, existingOwnerHasPhone: true });
     const chips = [values.transaction_type, values.property_type, (values.rooms ?? "").trim(), sqm ? `${formatNumber(sqm)} m²` : ""].filter(Boolean);
     return (
       <>
@@ -251,6 +244,18 @@ export function PropertyForm({
           <SummaryRow label="Mahalle" value={display.neighborhood_id ?? "Seçilmedi"} muted={!display.neighborhood_id} tab="konum" field="neighborhood_id" />
           <SummaryRow label="Adres" value={(values.address_line ?? "").trim() || "Girilmedi"} muted={!(values.address_line ?? "").trim()} tab="konum" field="address_line" />
           {branches.length > 0 ? <SummaryRow label="Şube" value={branch ?? "Atanmadı"} muted={!branch} tab="temel" field="branch_id" /> : null}
+        </SummaryGroup>
+        <SummaryGroup title="İlan sahibi bilgi tamamlama">
+          <SummaryRow label="Tamamlama" value={`%${owner.score}`} muted={!owner.complete} tab="sahip" />
+          <SummaryRow
+            label="Yayına alınabilir mi"
+            value={owner.complete ? "Evet" : `Hayır · ${owner.missing.length} eksik`}
+            muted={!owner.complete}
+            tab="sahip"
+          />
+          {owner.missing.slice(0, 3).map((m) => (
+            <SummaryRow key={m.key} label="Eksik" value={m.label} muted tab="sahip" />
+          ))}
         </SummaryGroup>
       </>
     );

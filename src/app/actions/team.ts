@@ -16,7 +16,7 @@ import {
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { getPlan } from "@/lib/billing/plans";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
@@ -64,7 +64,7 @@ async function ensureSeatAvailable(
     return { ok: false, error: "Askıdaki veya iptal edilmiş ofise üye eklenemez." };
   }
 
-  const limit = getPlan(String(tenant.plan)).limits.seats;
+  const limit = (await getPlanDefinition(String(tenant.plan))).limits.seats;
   if ((count ?? 0) >= limit) {
     return {
       ok: false,

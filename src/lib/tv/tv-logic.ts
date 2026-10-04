@@ -27,6 +27,14 @@ export function shortName(full: string | null | undefined): string {
 /* -------------------------------------------------------------------------- */
 
 export const ROTATION_SECONDS = 12;
+/** Ayarlanabilir rotasyon süreleri (sn): uzaktan okunacak kısa/uzun bekleme seçenekleri. */
+export const ROTATION_OPTIONS = [8, 12, 20, 30] as const;
+
+/** Saklanan rotasyon süresi güvenli aralığa iner (yalnız izinli değerler; aksi halde varsayılan). */
+export function parseRotationSeconds(v: unknown): number {
+  const n = Number(v);
+  return (ROTATION_OPTIONS as readonly number[]).includes(n) ? n : ROTATION_SECONDS;
+}
 
 export function pageCount(total: number, perPage: number): number {
   if (!Number.isFinite(total) || total <= 0 || perPage <= 0) return 1;
@@ -44,7 +52,7 @@ export function pageAt<T>(items: readonly T[], perPage: number, tick: number): {
 /* Bölümler, şablonlar, ayarlar                                                */
 /* -------------------------------------------------------------------------- */
 
-export const TV_SECTIONS = ["appointments", "goal", "league", "properties", "stats", "alerts", "events", "ticker"] as const;
+export const TV_SECTIONS = ["appointments", "goal", "league", "properties", "stats", "leads", "alerts", "events", "ticker"] as const;
 export type TvSection = (typeof TV_SECTIONS)[number];
 
 export const TV_SECTION_LABELS: Record<TvSection, string> = {
@@ -53,6 +61,7 @@ export const TV_SECTION_LABELS: Record<TvSection, string> = {
   league: "Danışman ligi",
   properties: "Yeni portföyler",
   stats: "Talep ve müşteri",
+  leads: "Yeni talepler",
   alerts: "Geciken / riskli",
   events: "Canlı akış",
   ticker: "Duyuru şeridi",
@@ -75,6 +84,8 @@ export type TvSettings = {
   theme: TvTheme;
   /** Kapalı bölümler. */
   hidden: TvSection[];
+  /** Liste sayfaları ve dönen kartlar arası bekleme (sn). */
+  rotationSec: number;
   /** Rotasyon duraklatıldı mı (yalnız oturum içi; saklanmaz). */
   paused?: boolean;
 };
@@ -85,6 +96,7 @@ export const DEFAULT_TV_SETTINGS: TvSettings = {
   ticker: true,
   theme: "auto",
   hidden: [],
+  rotationSec: ROTATION_SECONDS,
 };
 
 /** Saklanan (güvenilmeyen) değeri güvenli ayara çevirir. */
@@ -110,6 +122,7 @@ export function parseTvSettings(raw: unknown): TvSettings {
     ticker: o.ticker !== false,
     theme,
     hidden,
+    rotationSec: parseRotationSeconds(o.rotationSec),
   };
 }
 
@@ -117,9 +130,9 @@ export function parseTvSettings(raw: unknown): TvSettings {
 export function templateSections(template: TvTemplate): TvSection[] {
   switch (template) {
     case "satis":
-      return ["goal", "league", "properties", "stats", "alerts", "events", "ticker"];
+      return ["goal", "league", "properties", "stats", "leads", "alerts", "events", "ticker"];
     case "randevu":
-      return ["appointments", "stats", "alerts", "events", "properties", "ticker"];
+      return ["appointments", "stats", "leads", "alerts", "events", "properties", "ticker"];
     default:
       return [...TV_SECTIONS];
   }
@@ -168,6 +181,34 @@ export function buildTvEvents(
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .slice(0, limit)
     .map((r) => ({ id: `${r.kind}:${r.id}`, kind: r.kind, label: TV_EVENT_LABELS[r.kind], at: r.at }));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Yeni talepler (kişisel veri YOK: yalnız kısa ad + kaynak etiketi + zaman)   */
+/* -------------------------------------------------------------------------- */
+
+const LEAD_SOURCE_LABELS: Record<string, string> = {
+  web: "Web sitesi",
+  web_sitesi: "Web sitesi",
+  referral: "Referans",
+  tavsiye: "Referans",
+  phone: "Telefon",
+  telefon: "Telefon",
+  walk_in: "Ofis ziyareti",
+  ofis_ziyareti: "Ofis ziyareti",
+  social: "Sosyal medya",
+  sosyal_medya: "Sosyal medya",
+  portal: "Portal",
+  portal_sahibinden: "Portal",
+  portal_hepsiemlak: "Portal",
+  portal_zingat: "Portal",
+  portal_emlakjet: "Portal",
+};
+
+/** Müşteri kaynağı → TV etiketi; bilinmeyen/boş kaynak null (satırda gösterilmez). */
+export function leadSourceLabel(source: string | null | undefined): string | null {
+  const key = String(source ?? "").trim().toLowerCase();
+  return key ? (LEAD_SOURCE_LABELS[key] ?? null) : null;
 }
 
 /* -------------------------------------------------------------------------- */

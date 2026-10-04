@@ -34,6 +34,10 @@ export function FooterTab({ cfg, update, issues, readOnly }: Props) {
               </div>
             </div>
             <FieldIssue issues={issues} path={cp} />
+            <label className="mt-2 flex items-center gap-2 text-sm font-semibold text-ink-950">
+              <input type="checkbox" className="h-4 w-4" checked={c.autoPlans} disabled={readOnly} onChange={(e) => update((d) => { d.footer[ci].autoPlans = e.target.checked; })} />
+              Otomatik (planlardan): paket bağlantıları etkin paket tanımlarından eklenir
+            </label>
             <ul className="mt-3 space-y-2" aria-label={`${c.title} bağlantıları`}>
               {c.links.map((l, li) => {
                 const lp = `${cp}.links.${li}`;

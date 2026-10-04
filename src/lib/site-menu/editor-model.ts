@@ -35,19 +35,19 @@ export function moveInArray<T>(list: readonly T[], from: number, to: number): T[
 }
 
 export function blankItem(id: string): MenuItem {
-  return { id, label: "Yeni bağlantı", text: "", href: "/", icon: { kind: "lucide", name: "Sparkles" }, badge: null, hidden: false };
+  return { id, section: "", label: "Yeni bağlantı", text: "", href: "/", icon: { kind: "lucide", name: "Sparkles" }, badge: null, hidden: false };
 }
 
 export function blankGroup(id: string): MenuGroup {
-  return { id, kind: "menu", label: "Yeni grup", href: "", hidden: false, columns: 1, items: [], featured: null };
+  return { id, kind: "menu", label: "Yeni grup", href: "", hidden: false, items: [], featured: null };
 }
 
 export function blankFeatured(): NonNullable<MenuGroup["featured"]> {
-  return { title: "Öne çıkan", text: "", ctaLabel: "Göz at", href: "/", hidden: false, media: null };
+  return { eyebrow: "", icon: { kind: "none" }, title: "Öne çıkan", text: "", ctaLabel: "Göz at", href: "/", hidden: false, media: null };
 }
 
 export function blankFooterColumn(id: string): FooterColumn {
-  return { id, title: "Yeni sütun", hidden: false, links: [] };
+  return { id, title: "Yeni sütun", hidden: false, autoPlans: false, links: [] };
 }
 
 export function blankFooterLink(id: string): FooterLink {

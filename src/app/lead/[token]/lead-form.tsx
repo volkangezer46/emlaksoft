@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
+import { LEAD_FORM_CONSENT_TEXT } from "@/lib/legal-copy";
 
 type Province = { id: string; name: string };
 
@@ -138,7 +139,7 @@ export function LeadForm({
           className="mt-0.5 h-4 w-4 shrink-0 accent-mint-400"
         />
         <span>
-          Kişisel verilerimin tanıtım amacıyla işlenmesine onay veriyorum.{" "}
+          {LEAD_FORM_CONSENT_TEXT}{" "}
           <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
             Aydınlatma metni
           </Link>

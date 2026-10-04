@@ -8,6 +8,8 @@ import {
   requireExternalSuccess,
 } from "@/lib/external-fetch";
 import { Redactor, type RedactCounts } from "@/lib/ai/redact";
+import { chargeAiUsage } from "@/lib/ai/credits/meter";
+import { estimateTokensFromChars } from "@/lib/ai/credits/cost";
 
 // ---------------------------------------------------------------------------
 // TEK OpenAI istemcisi. Kaynakta api.openai.com'a başka hiçbir yerden istek
@@ -152,6 +154,34 @@ async function writeAudit(
  * (başarı doğrulanmış) döner. Stream tüketicileri için tek giriş noktası.
  */
 export async function openAiChatRequest(opts: OpenAiRequestOptions): Promise<OpenAiRawResult> {
+  const result = await openAiChatRequestCore(opts);
+  // Akış tüketicilerinde gerçek jeton sayısı yok: gönderilen gövdeden TAHMİN (çıktı için üst sınırın yarısı).
+  const maxOut = typeof opts.body.max_tokens === "number" ? opts.body.max_tokens : 600;
+  await meterUsage(opts, opts.body.model, estimateTokensFromChars(JSON.stringify(opts.body).length), Math.ceil(maxOut / 2));
+  return result;
+}
+
+/**
+ * Kredi ölçümü: yalnız tenant bağlamı (audit.tenantId) olan çağrılar sayılır. FAIL-OPEN —
+ * ölçüm hatası asla çağrıyı bozmaz. Deftere yalnız özellik adı, model ve jeton sayısı gider.
+ */
+async function meterUsage(opts: OpenAiRequestOptions, model: unknown, tokensIn: number, tokensOut: number): Promise<void> {
+  if (!opts.audit?.tenantId) return;
+  try {
+    await chargeAiUsage({
+      tenantId: opts.audit.tenantId,
+      actorId: opts.audit.actorId ?? null,
+      feature: opts.purpose,
+      model: typeof model === "string" ? model : null,
+      tokensIn,
+      tokensOut,
+    });
+  } catch (e) {
+    console.error("openai-client meterUsage", e instanceof Error ? e.message : "bilinmeyen hata");
+  }
+}
+
+async function openAiChatRequestCore(opts: OpenAiRequestOptions): Promise<OpenAiRawResult> {
   const redactor = opts.redactor ?? new Redactor({ names: opts.names });
   const safeBody = redactor.redactDeep(opts.body);
   const payload = JSON.stringify(safeBody);
@@ -201,10 +231,18 @@ export type OpenAiChatResult = {
 
 /** Akışsız chat/completions: yanıt içeriğini geri çevrilmiş olarak döner. */
 export async function openAiChat(opts: OpenAiRequestOptions): Promise<OpenAiChatResult> {
-  const { response, redactor } = await openAiChatRequest(opts);
-  const json = await readExternalJson<{ choices?: { message?: { content?: unknown } }[] }>(
-    response,
-    opts.maxResponseBytes,
+  const { response, redactor } = await openAiChatRequestCore(opts);
+  const json = await readExternalJson<{
+    choices?: { message?: { content?: unknown } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  }>(response, opts.maxResponseBytes);
+  const pt = json?.usage?.prompt_tokens;
+  const ct = json?.usage?.completion_tokens;
+  await meterUsage(
+    opts,
+    opts.body.model,
+    typeof pt === "number" ? pt : estimateTokensFromChars(JSON.stringify(opts.body).length),
+    typeof ct === "number" ? ct : 300,
   );
   const raw = json?.choices?.[0]?.message?.content;
   const content = typeof raw === "string" && raw ? redactor.restoreText(raw) : null;

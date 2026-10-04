@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
+import { vitrinSignatureHref } from "@/lib/growth/attribution";
 import { ArrowRight, Building2, Calculator, MapPin, Ruler, BedDouble, Search, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
@@ -17,6 +18,8 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
+import { toTelHref } from "@/lib/phone";
+import { loadVitrinSettings } from "@/lib/vitrin-settings";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
 function isNewListing(publishedAt: string | null): boolean {
@@ -69,6 +72,9 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
+  // Ofis ayarı (sütun yoksa varsayılan: açık, tanıtım yok).
+  const { settings: vitrinCfg } = await loadVitrinSettings(admin, tenant.id);
+  if (!vitrinCfg.enabled) return { title: "Vitrin bulunamadı" };
 
   const { count } = await admin
     .from("properties")
@@ -79,7 +85,9 @@ export async function generateMetadata({
     .eq("is_sample", false);
 
   const title = `${tenant.name} | Portföy Vitrini`;
-  const description = `${tenant.name} güncel portföy vitrini — ${count ?? 0} aktif ilan. Satılık ve kiralık portföyleri inceleyin, yerinde inceleme için talep bırakın.`;
+  const description =
+    vitrinCfg.intro?.replace(/s+/g, " ").slice(0, 200) ??
+    `${tenant.name} güncel portföy vitrini — ${count ?? 0} aktif ilan. Satılık ve kiralık portföyleri inceleyin, yerinde inceleme için talep bırakın.`;
 
   return {
     title: { absolute: title },
@@ -120,6 +128,9 @@ export default async function VitrinPage({
 
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
+  // Ofis vitrin ayarları (ayrı sorgu: sütun yoksa varsayılan = bugünkü davranış).
+  const { settings: vitrinCfg, available: vitrinCfgAvailable } = await loadVitrinSettings(admin, tenant.id);
+  if (!vitrinCfg.enabled) notFound();
 
   const q = (sp.q ?? "").trim();
   const min = parseMoneyParam(sp.min);
@@ -271,7 +282,7 @@ export default async function VitrinPage({
         name: tenant.name,
         url: `${siteUrl}/vitrin/${slug}`,
         ...(tenant.logo_url ? { logo: tenant.logo_url } : {}),
-        ...(tenant.phone ? { telephone: tenant.phone } : {}),
+        ...(tenant.phone && vitrinCfg.showPhone ? { telephone: tenant.phone } : {}),
       },
       {
         "@type": "ItemList",
@@ -324,6 +335,17 @@ export default async function VitrinPage({
           <h1 className="mt-6 max-w-2xl font-display text-3xl font-extrabold leading-tight sm:text-4xl">
             Güncel ve doğrulanmış portföyler
           </h1>
+          {vitrinCfg.intro ? (
+            <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-white/80">{vitrinCfg.intro}</p>
+          ) : null}
+          {vitrinCfgAvailable && vitrinCfg.showPhone && tenant.phone && toTelHref(tenant.phone) ? (
+            <a
+              href={toTelHref(tenant.phone) ?? undefined}
+              className="focus-ring mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
+            >
+              Ofisi ara: {tenant.phone}
+            </a>
+          ) : null}
           <p className="mt-2 max-w-xl text-sm text-white/60">
             {properties.length} aktif ilan · yerinde inceleme ve fiyat bilgisi için hemen talep bırakın.
           </p>
@@ -525,6 +547,7 @@ export default async function VitrinPage({
         <CompareBar />
 
         {/* Değerleme CTA — satıcı lead hunisi girişi */}
+        {vitrinCfg.showValuation ? (
         <section className="mt-10">
           <Link
             href={`/vitrin/${slug}/degerleme`}
@@ -546,11 +569,13 @@ export default async function VitrinPage({
             </span>
           </Link>
         </section>
+        ) : null}
 
         {/* Kayıtlı arama — kriter + telefon bırakılır, cron yeni ilanla eşleşince ofis arar */}
         <SavedSearchBox slug={slug} provinces={provinces ?? []} roomOptions={roomOptions} />
 
         {/* Lead form */}
+        {vitrinCfg.showLeadForm ? (
         <section className="mt-12 overflow-hidden rounded-[var(--radius-hero)] border border-line bg-surface shadow-[var(--shadow-xs)]">
           <div className="grid gap-0 lg:grid-cols-[1fr_1.1fr]">
             <div className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] p-8 text-white">
@@ -572,13 +597,18 @@ export default async function VitrinPage({
             </div>
           </div>
         </section>
+        ) : null}
       </main>
 
       <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
-        <Link href="/" className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline">
-          Powered by EmlakSoft
+        <Link
+          href={vitrinSignatureHref(slug)}
+          rel="nofollow"
+          className="font-semibold underline-offset-2 transition hover:text-brand-600 hover:underline"
+        >
+          EmlakSoft ile hazırlandı
         </Link>{" "}
-        — Türkiye&apos;nin emlak işletim sistemi
+        — siz de ofisiniz için ücretsiz deneyin
       </footer>
     </div>
   );

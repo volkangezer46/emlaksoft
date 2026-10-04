@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Home, MapPin, Pencil, Ruler } from "lucide-react";
+import { FileText, Home, MapPin, Pencil, Ruler, Sparkles } from "lucide-react";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { updateProperty } from "@/app/actions/properties";
+import { generatePropertyContent } from "@/app/actions/ai-content";
+import { PROPERTY_DESCRIPTION_MAX } from "@/lib/property-description";
 import { useToast } from "@/components/app/toast-provider";
 import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
@@ -37,6 +39,7 @@ type Props = {
       heating?: string | null;
       building_age?: number | string | null;
       facade?: string | null;
+      description?: string | null;
     };
   };
   provinces: Province[];
@@ -61,6 +64,21 @@ export function EditPropertyDialog({
   const [error, setError] = useState<string | null>(null);
   const { push } = useToast();
   const router = useRouter();
+  // İlan açıklaması: tek depo features.description; AI üretimi bu alanı doldurur, kayıt formla yapılır.
+  const [description, setDescription] = useState(property.features.description ?? "");
+  const [aiPending, startAi] = useTransition();
+
+  function generateDescription() {
+    startAi(async () => {
+      const res = await generatePropertyContent(property.id, "listing");
+      if (res.error || !res.text) {
+        push(res.error ?? "Açıklama üretilemedi.", "err");
+        return;
+      }
+      setDescription(res.text.slice(0, PROPERTY_DESCRIPTION_MAX));
+      push(res.source === "ai" ? "AI açıklamayı hazırladı; kaydetmek için Kaydet'e basın." : "Şablon açıklama hazırlandı; kaydetmek için Kaydet'e basın.", "ok");
+    });
+  }
 
   function submit(fd: FormData) {
     fd.set("id", property.id);
@@ -93,7 +111,7 @@ export function EditPropertyDialog({
         title: "Başlık", transaction_type: "İşlem", property_type: "Tür", list_price: "Liste fiyatı",
         min_price: "Min. fiyat", commission_rate: "Komisyon %", rooms: "Oda", sqm: "m²", floor: "Kat",
         heating: "Isınma", building_age: "Bina yaşı", facade: "Cephe", parcel_block: "Tapu ada",
-        parcel_lot: "Tapu parsel", address_line: "Adres",
+        parcel_lot: "Tapu parsel", address_line: "Adres", description: "İlan açıklaması",
       }}
       trigger={({ onClick, ...aria }) => (
         <button
@@ -109,6 +127,7 @@ export function EditPropertyDialog({
         { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "min_price", "commission_rate"] },
         { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade"] },
         { id: "konum", label: "Konum ve tapu", icon: MapPin, fields: ["address_line", "parcel_block", "parcel_lot"] },
+        { id: "aciklama", label: "Açıklama", icon: FileText, fields: ["description"] },
       ]}
       panels={{
         temel: (
@@ -179,6 +198,35 @@ export function EditPropertyDialog({
               </select>
             </label>
           </>
+        ),
+        aciklama: (
+          <div className="sm:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="property-description" className="text-xs font-medium text-text-muted">
+                İlan açıklaması (vitrinde ve portal metninde görünür)
+              </label>
+              <button
+                type="button"
+                onClick={generateDescription}
+                disabled={aiPending}
+                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-60"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-cyan-600" /> {aiPending ? "Hazırlanıyor…" : "AI ile yaz"}
+              </button>
+            </div>
+            <textarea
+              id="property-description"
+              name="description"
+              rows={10}
+              maxLength={PROPERTY_DESCRIPTION_MAX}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className={field}
+            />
+            <p className="mt-1 text-right text-xs text-text-faint">
+              {description.length}/{PROPERTY_DESCRIPTION_MAX}
+            </p>
+          </div>
         ),
         konum: (
           <>

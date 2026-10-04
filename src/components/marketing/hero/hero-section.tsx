@@ -2,9 +2,10 @@ import Link from "next/link";
 import { ArrowRight, CalendarCheck, Check, Zap } from "lucide-react";
 import { HeroScene } from "./hero-scene";
 import { PortalStrip } from "../portal-strip";
+import { trialCtaLabel } from "@/lib/marketing-copy";
 
 /** Hero: sol metin bloğu + sağ ürün sahnesi. Sunucu bileşeni, istemci JS yok. */
-export function HeroSection() {
+export function HeroSection({ trialDays }: { trialDays?: number }) {
   return (
     <section className="mk-hero" aria-labelledby="hero-baslik">
       <div className="mk-hero-bg" aria-hidden="true" />
@@ -18,7 +19,7 @@ export function HeroSection() {
             Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve 27 otomatik görev ofisinizle birlikte çalışır.
           </p>
           <div className="mk-cta-row">
-            <Link href="/kayit" className="mk-btn mk-btn-grad btn-shine">14 gün ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
+            <Link href="/kayit" className="mk-btn mk-btn-grad btn-shine">{trialCtaLabel(trialDays)} <ArrowRight size={18} aria-hidden="true" /></Link>
             <Link href="/demo" className="mk-btn mk-btn-ghost"><CalendarCheck size={18} aria-hidden="true" />Demo görüşmesi planla</Link>
           </div>
           <ul className="mk-checks">

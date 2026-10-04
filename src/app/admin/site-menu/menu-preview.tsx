@@ -20,7 +20,12 @@ export function MenuPreview({ cfg }: { cfg: SiteMenuConfig }) {
   const [mode, setMode] = useState<"desktop" | "mobile">("desktop");
   const menu = useMemo(() => toPublicMenu(cfg, now()), [cfg]);
   const groups: ClientGroup[] = useMemo(
-    () => menu.groups.map((g) => ({ ...g, items: g.items.map(({ icon, ...it }) => ({ ...it, iconNode: renderMenuIcon(icon) })) })),
+    () =>
+      menu.groups.map((g) => ({
+        ...g,
+        columns: g.columns.map((c) => ({ title: c.title, items: c.items.map(({ icon, ...it }) => ({ ...it, iconNode: renderMenuIcon(icon) })) })),
+        featured: g.featured ? { ...g.featured, iconNode: renderMenuIcon(g.featured.icon, 22) } : null,
+      })),
     [menu],
   );
   const ann = menu.announcement;

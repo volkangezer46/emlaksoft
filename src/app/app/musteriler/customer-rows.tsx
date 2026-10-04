@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { CalendarPlus, Eye, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
-import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
@@ -15,6 +14,7 @@ import {
   type PillTone,
 } from "@/components/ui/list-kit";
 import { CustomerRowCheckbox, CustomerSelectAllCheckbox } from "./customer-bulk-actions";
+import { CustomerPortalLinkButton } from "./customer-portal-panel";
 import { CustomerRowDelete } from "./customer-row-delete";
 import { customerTypeTone } from "./customer-list-logic";
 
@@ -81,7 +81,7 @@ function HeatCell({ c }: { c: CustomerVM }) {
       ) : null}
       {c.lead ? (
         <span
-          title={`Lead skoru: ${c.lead.score}`}
+          title={`Aday skoru: ${c.lead.score}`}
           className={`numeric rounded-full px-1.5 text-xs font-semibold ${c.lead.hot ? "tone-warning" : "bg-canvas text-text-faint"}`}
         >
           {c.lead.score}

@@ -111,10 +111,10 @@ export const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
  * vermez; bu yüzden listede yok. Yetki kapısı ayrıca `commissions:edit` ister,
  * yani rol listesi TEK başına yetmez (bkz. actions/approvals.ts).
  */
-export const MANAGER_ROLES: readonly string[] = MANAGEMENT_TIER_ROLES;
+export const APPROVAL_DECIDER_ROLES: readonly string[] = MANAGEMENT_TIER_ROLES;
 
-export function isManagerRole(role: string | null | undefined): boolean {
-  return MANAGER_ROLES.includes(String(role ?? ""));
+export function isApprovalDeciderRole(role: string | null | undefined): boolean {
+  return APPROVAL_DECIDER_ROLES.includes(String(role ?? ""));
 }
 
 /**
@@ -135,7 +135,7 @@ export function canDecide(input: {
   requestedBy: string | null;
   userId: string;
 }): { ok: true } | { ok: false; error: string } {
-  if (!isManagerRole(input.role)) {
+  if (!isApprovalDeciderRole(input.role)) {
     return { ok: false, error: "Onay/ret kararı yalnızca yönetici rolleri tarafından verilebilir." };
   }
   if (input.status !== "bekliyor") {

@@ -5,7 +5,7 @@ import {
   Layers, LayoutDashboard, LifeBuoy, Link2, ListChecks, Lock, Mail, MapPin, MapPinned, Medal, MessageSquare,
   MessageSquareText, MessagesSquare, Network, Percent, Phone, PiggyBank, Presentation, RadioTower, Receipt, Rocket, Route,
   Scale, ScrollText, Search, Send, Settings, ShieldAlert, ShieldCheck, Siren, Smile, Sparkles, Store, Tag, Target,
-  TrendingUp, Trophy, UserRound, Users, UsersRound, Wallet, Workflow, Wrench, Zap,
+  TrendingUp, Trophy, HandCoins, ToggleRight, Tv, UserRound, Users, UsersRound, Wallet, Workflow, Wrench, Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +44,7 @@ const DEFS = {
   Flag: { Icon: Flag, label: "Bayrak", keywords: "işaret hedef" },
   Gauge: { Icon: Gauge, label: "Gösterge", keywords: "hız ölçüm" },
   Globe: { Icon: Globe, label: "Küre", keywords: "vitrin web internet" },
+  HandCoins: { Icon: HandCoins, label: "Eldeki para", keywords: "komisyon hakediş hesap" },
   Handshake: { Icon: Handshake, label: "El sıkışma", keywords: "anlaşma ortaklık" },
   HeartHandshake: { Icon: HeartHandshake, label: "Güven eli", keywords: "müşteri ilişki" },
   House: { Icon: House, label: "Ev", keywords: "konut ana sayfa emlak" },
@@ -87,6 +88,8 @@ const DEFS = {
   Tag: { Icon: Tag, label: "Etiket", keywords: "fiyat" },
   Target: { Icon: Target, label: "Hedef", keywords: "talep" },
   TrendingUp: { Icon: TrendingUp, label: "Yükselen trend", keywords: "büyüme artış" },
+  ToggleRight: { Icon: ToggleRight, label: "Anahtar (açık)", keywords: "modül aç kapa ayar" },
+  Tv: { Icon: Tv, label: "Ekran", keywords: "tv pano ofis ekranı" },
   Trophy: { Icon: Trophy, label: "Kupa", keywords: "birincilik" },
   UserRound: { Icon: UserRound, label: "Kişi", keywords: "danışman kullanıcı" },
   Users: { Icon: Users, label: "Kişiler", keywords: "müşteri ekip" },

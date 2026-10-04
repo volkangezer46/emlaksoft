@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Heart } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { FavorilerClient } from "./favoriler-client";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
@@ -22,8 +23,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("name, status").eq("slug", slug).maybeSingle();
+  const { data: tenant } = await admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
+  if (!(await isVitrinEnabled(admin, tenant.id))) return { title: "Vitrin bulunamadı" };
   const title = `Favorilerim | ${tenant.name}`;
   return {
     title: { absolute: title },
@@ -44,6 +46,7 @@ export default async function VitrinFavorilerPage({ params }: { params: Promise<
     .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
+  if (!(await isVitrinEnabled(admin, tenant.id))) notFound();
 
   return (
     <div className="min-h-screen bg-canvas">

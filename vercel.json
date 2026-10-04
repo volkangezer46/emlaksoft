@@ -71,6 +71,10 @@
       "schedule": "30 10 * * *"
     },
     {
+      "path": "/api/cron/anket-gorevleri",
+      "schedule": "20 6 * * *"
+    },
+    {
       "path": "/api/cron/anahtar-gecikme",
       "schedule": "0 9 * * *"
     },
@@ -113,6 +117,10 @@
     {
       "path": "/api/cron/seo-robot",
       "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/cron/havuz-atama",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

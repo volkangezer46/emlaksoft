@@ -7,6 +7,7 @@ import {
   Fingerprint,
   IdCard,
   PalmtreeIcon,
+  FileWarning,
   ShieldCheck,
   UserPlus,
   UserRound,
@@ -21,7 +22,8 @@ import { AddBranchPanel, AddBranchTrigger } from "./team-panels";
 import { BranchCard } from "./branch-card";
 import { formatTurkishPhone } from "@/lib/phone";
 import { relativeTimeTR } from "@/lib/admin-format";
-import { now } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
+import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
 import { TR_OFFSET_MIN } from "@/lib/booking-slots";
 import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import type { CSSProperties } from "react";
@@ -29,6 +31,7 @@ import type { CSSProperties } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
@@ -50,14 +53,14 @@ type Member = {
 };
 
 const roleMeta: Record<string, { label: string; cls: string }> = {
-  owner: { label: "Ofis sahibi", cls: "bg-amber-400/15 text-amber-600" },
-  gm: { label: "Genel müdür", cls: "bg-brand-600/10 text-brand-600" },
-  branch_manager: { label: "Şube müdürü", cls: "bg-brand-600/10 text-brand-600" },
-  team_lead: { label: "Takım lideri", cls: "bg-cyan-400/12 text-cyan-600" },
-  advisor: { label: "Danışman", cls: "bg-mint-500/12 text-mint-600" },
-  call_center: { label: "Çağrı merkezi", cls: "bg-cyan-400/12 text-cyan-600" },
-  accounting: { label: "Muhasebe", cls: "bg-amber-400/15 text-amber-600" },
-  readonly: { label: "Salt okunur", cls: "bg-ink-950/8 text-text-muted" },
+  owner: { label: ROLE_LABELS.owner, cls: "bg-amber-400/15 text-amber-600" },
+  gm: { label: ROLE_LABELS.gm, cls: "bg-brand-600/10 text-brand-600" },
+  branch_manager: { label: ROLE_LABELS.branch_manager, cls: "bg-brand-600/10 text-brand-600" },
+  team_lead: { label: ROLE_LABELS.team_lead, cls: "bg-cyan-400/12 text-cyan-600" },
+  advisor: { label: ROLE_LABELS.advisor, cls: "bg-mint-500/12 text-mint-600" },
+  call_center: { label: ROLE_LABELS.call_center, cls: "bg-cyan-400/12 text-cyan-600" },
+  accounting: { label: ROLE_LABELS.accounting, cls: "bg-amber-400/15 text-amber-600" },
+  readonly: { label: ROLE_LABELS.readonly, cls: "bg-ink-950/8 text-text-muted" },
 };
 
 
@@ -113,6 +116,7 @@ export default async function TeamPage() {
     { data: advisorCounts },
     { data: leaveRows },
     loginRows,
+    docAlerts,
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches!profiles_branch_id_fkey(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
@@ -129,6 +133,10 @@ export default async function TeamPage() {
       .gte("ends_on", todayKey)
       .limit(200),
     loginPromise,
+    // Belge bitiş uyarıları — yalnız ofis sahibi / genel müdür görür; şema yoksa kart gösterilmez.
+    tenantId && (viewerRole === "owner" || viewerRole === "gm")
+      ? loadOfficeDocAlerts(supabase, tenantId, trDayKey(now()))
+      : Promise.resolve(null),
   ]);
 
   const members = (membersData ?? []) as Member[];
@@ -186,6 +194,24 @@ export default async function TeamPage() {
     { label: "Şube", value: branches.length, icon: Building2, href: "#subeler" },
   ];
 
+  // Belge uyarısı: süresi dolan + 30 gün içinde bitenler. Sayı her zaman filtreli hedefe gider
+  // (dolmuş varsa onlara, yoksa yaklaşanlara; hiç yoksa belge takibi sayfasına).
+  const docList = docAlerts && docAlerts.available ? docAlerts.data : null;
+  const docExpired = docList ? docList.filter((a) => a.state === "expired").length : 0;
+  const docTotal = docList ? docList.length : 0;
+  const docHref =
+    docExpired > 0
+      ? "/app/ekip/belgeler?durum=suresi_doldu"
+      : docTotal > 0
+        ? "/app/ekip/belgeler?durum=30"
+        : "/app/ekip/belgeler";
+  const docHint =
+    docExpired > 0
+      ? `${docExpired} belgenin süresi dolmuş`
+      : docTotal > 0
+        ? "30 gün içinde bitecek belgeler var"
+        : "Tüm yetki ve SPK belgeleri güncel";
+
   return (
     <div className="space-y-6">
       {/* premium header */}
@@ -208,6 +234,21 @@ export default async function TeamPage() {
           <KpiTile key={k.label} label={k.label} value={k.value} icon={k.icon} href={k.href} tone="brand" dim={k.value === 0} />
         ))}
       </KpiGrid>
+
+      {docList ? (
+        <div className="max-w-sm">
+          <KpiTile
+            label="Süresi dolan / yaklaşan belgeler"
+            value={docTotal}
+            icon={FileWarning}
+            href={docHref}
+            tone={docExpired > 0 ? "danger" : "brand"}
+            attention={docExpired > 0}
+            dim={docTotal === 0}
+            hint={docHint}
+          />
+        </div>
+      ) : null}
 
       <DashboardGrid>
         <DashCell span={{ md: 6, xl: loadRows.length > 0 ? 5 : 12 }}>

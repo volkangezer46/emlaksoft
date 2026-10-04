@@ -9,6 +9,9 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { requirePermission } from "@/lib/require-permission";
+import { notifyTenant } from "@/lib/notify";
+import { emailSchema } from "@/lib/validation/contact";
+import { maskEmail } from "@/lib/account/email-change";
 import { authorizeMemberManagement } from "@/lib/team/member-admin";
 
 export type MemberAdminResult = { ok?: boolean; error?: string; message?: string };
@@ -20,7 +23,8 @@ function revalidateMember(id: string) {
 
 /**
  * Üyenin ad, telefon ve unvanını düzeltir (P0-11). E-posta (auth kimliği) BU akışta değişmez:
- * doğrulama e-postalı güvenli e-posta değişimi henüz yok.
+ * yönetici başkasının e-postasını doğrudan yazamaz; bkz. requestMemberEmailChange (üyeye bildirim,
+ * değişimi üye kendi hesabında parola onayı + doğrulama bağlantısıyla yapar).
  */
 export async function updateMemberProfile(
   _prev: MemberAdminResult,
@@ -151,4 +155,63 @@ export async function resendMemberInvite(
   const gate = await requirePermission("team", "edit");
   if (!gate.ok) return { error: gate.error };
   return sendAccessMail(formData, "invite");
+}
+
+/**
+ * Yöneticinin başka bir üye için e-posta değişikliği İSTEMESİ. E-posta burada YAZILMAZ: üyeye uygulama içi
+ * bildirim gider; üye Hesabım > Profil > "E-posta adresini değiştir" ile parola onayı ve yeni adrese
+ * doğrulama bağlantısıyla değiştirir (onaylanana kadar eski adres geçerli). Platformda işlemsel e-posta
+ * altyapısı olmadığından yeni adrese yönetici adına doğrulama gönderilemez.
+ * Kapı: team.edit + yönetici rolü + canManageRole (authorizeMemberManagement); ofis sahibi hedef olamaz.
+ */
+export async function requestMemberEmailChange(
+  _prev: MemberAdminResult,
+  formData: FormData,
+): Promise<MemberAdminResult> {
+  const gate = await requirePermission("team", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const id = String(formData.get("id") ?? "").trim();
+  const ctx = await authorizeMemberManagement(id);
+  if (!ctx.ok) return { error: ctx.error };
+  if (!ctx.target.is_active) return { error: "Pasif üyeye istek gönderilemez; önce aktifleştirin." };
+
+  const parsed = emailSchema.safeParse(formData.get("new_email"));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Geçerli bir e-posta adresi girin" };
+  const newEmail = parsed.data;
+
+  const [byActor, byTarget] = await Promise.all([
+    checkRateLimit(`member-email-change:actor:${ctx.actorId}`, { limit: 20, windowSec: 3600, failurePolicy: "deny" }),
+    checkRateLimit(`member-email-change:target:${id}`, { limit: 2, windowSec: 86400, failurePolicy: "deny" }),
+  ]);
+  if (!byActor.allowed || !byTarget.allowed) {
+    return { error: "Bu üye için çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin." };
+  }
+
+  try {
+    await notifyTenant({
+      tenantId: ctx.tenantId,
+      userId: id,
+      title: "E-posta adresinizi güncellemeniz istendi",
+      body: `Yöneticiniz giriş e-postanızı ${newEmail} olarak değiştirmenizi istiyor. Hesabım sayfasından parolanızı doğrulayıp yeni adresi onaylayın.`,
+      href: "/app/hesabim",
+      kind: "warning",
+    });
+  } catch (e) {
+    console.error("requestMemberEmailChange", e);
+    return { error: "İstek üyeye iletilemedi. Lütfen tekrar deneyin." };
+  }
+
+  await logActivity({
+    tenantId: ctx.tenantId,
+    actorId: ctx.actorId,
+    action: "team.member_email_change_requested",
+    entityType: "profile",
+    entityId: id,
+    newValue: { member: ctx.target.full_name, requested_email_masked: maskEmail(newEmail) },
+  });
+  revalidateMember(id);
+  return {
+    ok: true,
+    message: "Üyeye bildirim gönderildi. E-posta, üye kendi hesabında doğrulama bağlantısını onaylayınca değişir.",
+  };
 }

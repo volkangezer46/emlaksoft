@@ -35,14 +35,18 @@ import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections
 import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
 import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activity-timeline";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
+import { CustomerOwnedListings } from "@/components/app/customer-owned-listings";
 import { Wallet } from "lucide-react";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
 import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
+import { CustomerIntelCard } from "./customer-intel-card";
+import { OwnedPropertiesCard } from "./owned-properties-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
-import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
+import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
+import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -98,7 +102,7 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId } = await requireModulePage("customers");
+  const { perms, userId, tenantId } = await requireModulePage("customers");
   const stageNames = stageLabelMap(await getStageLabels());
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -141,7 +145,7 @@ export default async function CustomerDetailPage({
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, full_name, phone, email, customer_types, tags, branch_id, assigned_to, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, is_sample, full_name, phone, email, customer_types, tags, branch_id, assigned_to, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -420,6 +424,7 @@ export default async function CustomerDetailPage({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-2xl font-extrabold text-white md:text-3xl">{customer.full_name}</h1>
+                <SampleRecordBadge show={customer.is_sample === true} />
                 {customer.blacklist ? (
                   <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Kara liste</span>
                 ) : (
@@ -505,11 +510,7 @@ export default async function CustomerDetailPage({
                   />
                 ) : null}
                 {customer.phone && canEdit ? (
-                  <SmsDialog
-                    customerId={customer.id}
-                    customerName={customer.full_name}
-                    consentGranted={smsConsentGranted}
-                  />
+                  <SmsPanelTrigger />
                 ) : null}
                 {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
                 <a
@@ -587,7 +588,13 @@ export default async function CustomerDetailPage({
 
       </section>
 
+      {customer.phone && canEdit ? (
+        <SmsPanel customerId={customer.id} customerName={customer.full_name} consentGranted={smsConsentGranted} />
+      ) : null}
+
       <KpiStrip items={kpis} label="Müşteri özeti" />
+
+      {tenantId ? <CustomerOwnedListings tenantId={tenantId} customerId={customer.id} /> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
@@ -699,6 +706,17 @@ export default async function CustomerDetailPage({
             </section>
           )}
           {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
+          <OwnedPropertiesCard customerId={customer.id} tenantId={tenantId} />
+          <CustomerIntelCard
+            customerId={customer.id}
+            tenantId={tenantId}
+            createdAt={customer.created_at}
+            blacklist={Boolean(customer.blacklist)}
+            comms={(commsData ?? []) as { channel: string; direction: string; created_at: string }[]}
+            calls={calls}
+            openDemands={activeDemandCount}
+            hasOpenOfferOrDeal={(dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost") || (offersData ?? []).some((o) => o.status === "submitted")}
+          />
         </aside>
       </div>
     </div>

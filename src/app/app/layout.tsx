@@ -17,6 +17,7 @@ import { ThemeController } from "@/components/theme-controller";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
 import { AppPrefetcher } from "@/components/app/app-prefetcher";
+import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
 import { SectionTabs } from "@/components/app/section-tabs";
@@ -74,6 +75,7 @@ const NAV_MODULES: AppModule[] = [
   "rentals",
   "projects",
   "network",
+  "surveys",
 ];
 
 type OfficeSummary = {
@@ -255,6 +257,8 @@ async function AppShell({
         ) : null}
         <div className={`flex min-h-screen bg-canvas${brandColor ? " brand-scope" : ""}`}>
           <AppPrefetcher tenantId={tenantId} />
+          {/* Rol bazlı ürün turları: sayfalar arasında gezdiği için layout'ta bir kez bağlanır (kod yalnız gerekince iner). */}
+          <ProductTourLazy role={platformStaffFullAccess || impersonating ? "" : effectiveRole} accessible={accessibleModules} />
           <RealtimeRefresh tenantId={tenantId} />
           {/* Klavye kisayollari: komut paleti (Ctrl+K) zaten vardi ama tek
               kisayol oydu. "g" onekli iki tusluk dizi bilincli — tek harf,

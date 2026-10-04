@@ -3,7 +3,7 @@ import { RegisterForm } from "./register-form";
 import { isRegistrationOpen } from "@/lib/platform-flags";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
-import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPublicPricing } from "@/lib/billing/public-pricing";
 
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
@@ -15,7 +15,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; cycle?: string }>;
+  searchParams: Promise<{
+    plan?: string;
+    cycle?: string;
+    ref?: string;
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  }>;
 }) {
   const params = await searchParams;
   if (!(await isRegistrationOpen())) {
@@ -34,12 +41,20 @@ export default async function RegisterPage({
       </main>
     );
   }
-  const plans = await getPublicPlanDefinitions();
+  const { plans, trialDays, offers } = await getPublicPricing();
   return (
     <RegisterForm
       plans={plans}
+      trialDays={trialDays}
+      offers={offers}
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
+      attribution={{
+        ref: params.ref,
+        utm_source: params.utm_source,
+        utm_medium: params.utm_medium,
+        utm_campaign: params.utm_campaign,
+      }}
     />
   );
 }

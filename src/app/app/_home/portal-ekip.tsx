@@ -66,7 +66,7 @@ export async function PortalSagligi() {
 }
 
 export async function Ekip({ ctx }: { ctx: HomeCtx }) {
-  const [deals, profiles] = await Promise.all([loadDeals(), loadProfiles()]);
+  const [deals, profiles] = await Promise.all([loadDeals(ctx), loadProfiles()]);
   const team = teamLeaders(deals, profiles);
 
   return (

@@ -36,8 +36,9 @@ import { BillingHome } from "./_dashboards/billing-home";
 import { SupportHome } from "./_dashboards/support-home";
 import { GlassSkeleton, KpiGridSkeleton, adminEyebrow, adminGreeting, firstNameOf } from "./_dashboards/shared";
 import { auditActionLabel, moneyTRY, relativeTimeTR } from "@/lib/admin-format";
-import { planLabel as catalogPlanLabel, PLANS } from "@/lib/billing/plans";
-import { exactMrr, exactTrendMrr, monthlyPrice, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { exactMrr, exactTrendMrr, monthlyPrice, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 
 /**
@@ -76,11 +77,14 @@ const getAdminDashboardData = unstable_cache(
 );
 
 /** Aynı istek içinde hero, KPI ve ayrıntı bölümleri tek yükü paylaşır. */
-const loadDashboard = cache((period: number) => getAdminDashboardData(period));
+const loadDashboard = cache(async (period: number) => {
+  const [data, planDefs] = await Promise.all([getAdminDashboardData(period), getPlanDefinitions()]);
+  return { ...data, planDefs };
+});
 
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
-type Data = Awaited<ReturnType<typeof getAdminDashboardData>>;
+type Data = Awaited<ReturnType<typeof loadDashboard>>;
 
 function derive(data: Data) {
   const { aggregate } = data;
@@ -99,7 +103,7 @@ function derive(data: Data) {
     soon: Number(summary.trials_ending_7d),
     demoCount: Number(summary.new_demo_count),
     members: Number(summary.member_count),
-    mrr: exactMrr(aggregate.plan_stats),
+    mrr: exactMrr(aggregate.plan_stats, priceMapOf(data.planDefs)),
     conversion: totalTenants ? Math.round((active / totalTenants) * 100) : 0,
   };
 }
@@ -129,7 +133,7 @@ async function HeroKpis({ period }: { period: Period }) {
         sub={`Yıllık ${moneyTRY(d.mrr * 12)}`}
         href="/admin/billing"
         icon={Wallet}
-        series={data.aggregate.mrr_trend.map(exactTrendMrr)}
+        series={data.aggregate.mrr_trend.map((row) => exactTrendMrr(row, priceMapOf(data.planDefs)))}
         seriesUnit="ay"
         seriesLabel="Son 12 ay aylık yinelenen gelir"
       />
@@ -181,7 +185,7 @@ async function Overview({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const d = derive(data);
   const mrrRows = data.aggregate.mrr_trend;
-  const mrrSeries = mrrRows.map((r) => ({ label: monthLabel(r.month_start), value: exactTrendMrr(r) }));
+  const mrrSeries = mrrRows.map((r) => ({ label: monthLabel(r.month_start), value: exactTrendMrr(r, priceMapOf(data.planDefs)) }));
   const last = mrrSeries.length >= 2 ? mrrSeries[mrrSeries.length - 1]!.value : null;
   const prev = mrrSeries.length >= 2 ? mrrSeries[mrrSeries.length - 2]!.value : null;
   const trend = last !== null && prev !== null ? computeTrend(last, prev) : null;
@@ -340,7 +344,11 @@ async function Details({ period }: { period: Period }) {
   }));
   const thisWeek = weeklySeries.length ? weeklySeries[weeklySeries.length - 1]!.value : 0;
 
-  const planCounts = PLANS.map((plan) => ({
+  // Gizli planlar (örn. Business) dahil: bu planda ofisi olan hiçbir satır sessizce düşmez.
+  const shownPlans = data.planDefs.filter(
+    (p) => !p.hidden || Number(aggregate.plan_stats.find((r) => r.plan === p.id)?.tenant_count ?? 0) > 0,
+  );
+  const planCounts = shownPlans.map((plan) => ({
     label: plan.name,
     value: Number(aggregate.plan_stats.find((row) => row.plan === plan.id)?.tenant_count ?? 0),
     href: `/admin/tenants?plan=${plan.id}`,
@@ -348,13 +356,13 @@ async function Details({ period }: { period: Period }) {
   const hasPlans = planCounts.some((p) => p.value > 0);
 
   // Plan bazında MRR: gerçek abonelik MRR'ı + aboneliği eksik aktif ofisler için katalog fiyatı (exactMrr ile aynı kural).
-  const planMrr = PLANS.map((plan) => {
+  const planMrr = shownPlans.map((plan) => {
     const row = aggregate.plan_stats.find((r) => r.plan === plan.id);
     const missing = row ? Math.max(0, Number(row.active_count) - Number(row.subscription_count)) : 0;
     return {
       id: plan.id,
       label: plan.name,
-      mrr: row ? Math.round(Number(row.subscription_mrr) + missing * monthlyPrice(plan.id)) : 0,
+      mrr: row ? Math.round(Number(row.subscription_mrr) + missing * monthlyPrice(plan.id, priceMapOf(data.planDefs))): 0,
       offices: row ? Number(row.tenant_count) : 0,
     };
   });

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, Input } from "@/components/ui/input";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
-import { now } from "@/lib/clock";
+import { now, trMonthKey } from "@/lib/clock";
 
 type Member = { id: string; full_name: string };
 
@@ -65,7 +65,7 @@ function TargetCreateForm({ members, onDone }: { members: Member[]; onDone: () =
     },
     {},
   );
-  const defaultMonth = new Date(now()).toISOString().slice(0, 7);
+  const defaultMonth = trMonthKey(now());
 
   return (
     <form action={formAction} className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">

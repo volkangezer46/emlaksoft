@@ -3,11 +3,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getBaseUrl } from "@/lib/base-url";
 import { filterSafeEntries, staticSitemapEntries, tenantInSitemap, chunkEntries, type SitemapEntry } from "./sitemap-rules";
 import { SEO_CACHE_TAG, getSeoSettings } from "./store";
+import { resolveOptInSlugs } from "@/lib/vitrin-settings-logic";
 
 /**
  * Sitemap veri yükleyici (sunucu). Kurallar:
  *  - Statik sayfalar/araçlar: registry + admin override (noindex olanlar girmez).
- *  - Vitrin ofisi/ilanı/danışman: yalnız aktif ofis + (varsayılan) opt-in listesindekiler.
+ *  - Vitrin ofisi/ilanı/danışman: yalnız aktif ofis + (varsayılan) opt-in verenler. Opt-in TEK kaynağı ofisin
+ *    kendi ayarıdır (tenants.vitrin_seo_optin, /app/ayarlar/vitrin); sütun yoksa eski elle slug listesi geçerli kalır.
  *  - İlanlar: yalnız status=live, silinmemiş, is_sample=false. Token'lı portallar HİÇ girmez.
  *  - lastModified: yalnız gerçek updated_at; yoksa alan yazılmaz (sahte "bugün" yok).
  * Veritabanı yoksa/başarısızsa statik kısım yine döner (sitemap kırılmaz).
@@ -55,10 +57,37 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
             .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown }>,
         5000,
       );
+      // Opt-in: ofis ayarı (tek kaynak). Sütun yoksa sorgu hata verir -> elle liste geri dönüş olarak kalır.
+      const optinRes = await admin
+        .from("tenants")
+        .select("slug, vitrin_seo_optin")
+        .in("status", ["trial", "active", "past_due"])
+        .eq("vitrin_seo_optin", true)
+        .limit(5000);
+      const optInSlugs = resolveOptInSlugs({
+        columnAvailable: !optinRes.error,
+        manualSlugs: sm.optInTenantSlugs,
+        tenants: ((optinRes.data ?? []) as unknown as { slug: string | null; vitrin_seo_optin: boolean | null }[]).map((r) => ({
+          slug: r.slug,
+          seoOptin: r.vitrin_seo_optin === true,
+        })),
+      });
+      const smEff = { ...sm, optInTenantSlugs: optInSlugs };
+      // Vitrinini kapatan ofis (vitrin_enabled=false) sitemap'e HİÇ girmez (sayfa 404 verir). Sütun yoksa (sorgu hata
+      // verir) süzgeç uygulanmaz: bugünkü davranış. Tek sorgu: kapalı ofis kimlikleri.
+      const closedRes = await admin
+        .from("tenants")
+        .select("id")
+        .eq("vitrin_enabled", false)
+        .limit(5000);
+      const vitrinClosedIds = new Set<string>(
+        closedRes.error ? [] : ((closedRes.data ?? []) as unknown as { id: string }[]).map((r) => String(r.id)),
+      );
       const included = new Map<string, string>(); // tenant_id -> slug
       for (const t of tenants ?? []) {
         const slug = typeof t.slug === "string" ? t.slug : "";
-        if (!slug || !tenantInSitemap(sm, slug)) continue;
+        if (!slug || !tenantInSitemap(smEff, slug)) continue;
+        if (vitrinClosedIds.has(String(t.id))) continue;
         included.set(String(t.id), slug);
         if (sm.vitrinOffices) {
           entries.push({ url: `${base}/vitrin/${slug}`, lastModified: iso(t.updated_at), changeFrequency: "daily", priority: 0.7 });
@@ -95,6 +124,7 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
               .select("public_slug, tenant_id")
               .eq("is_public", true)
               .eq("is_active", true)
+              .eq("is_sample", false)
               .not("public_slug", "is", null)
               .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown }>,
           10000,

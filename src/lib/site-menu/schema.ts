@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isMenuIconName } from "./icon-registry";
-import { isHomeAnchor, isKnownPublicPath } from "./known-routes";
+import { isKnownAnchor, isKnownPublicPath } from "./known-routes";
 
 /**
  * Site menüsü yapılandırması (üst menü + alt bilgi + duyuru şeridi): tür, sınırlar ve doğrulama.
@@ -21,6 +21,9 @@ export const LIMITS = {
   featuredText: 140,
   featuredCta: 24,
   featuredAlt: 100,
+  featuredEyebrow: 24,
+  sectionTitle: 28,
+  maxSectionsPerGroup: 3,
   footerTitle: 24,
   footerLabel: 48,
   announcementText: 140,
@@ -51,6 +54,8 @@ const text = (max: number, msg: string) => z.string().trim().max(max, `${msg} en
 
 const itemSchema = z.strictObject({
   id,
+  /** Panelde sütun başlığı; aynı başlıklı bağlantılar bir sütunda toplanır (boş: başlıksız sütun). */
+  section: text(LIMITS.sectionTitle, "Sütun başlığı"),
   label: text(LIMITS.itemLabel, "Başlık"),
   text: text(LIMITS.itemText, "Açıklama"),
   href: z.string().trim().max(LIMITS.href, "Bağlantı çok uzun."),
@@ -60,6 +65,8 @@ const itemSchema = z.strictObject({
 });
 
 const featuredSchema = z.strictObject({
+  eyebrow: text(LIMITS.featuredEyebrow, "Üst başlık"),
+  icon: z.discriminatedUnion("kind", [z.strictObject({ kind: z.literal("none") }), z.strictObject({ kind: z.literal("lucide"), name: z.string().max(40) })]),
   title: text(LIMITS.featuredTitle, "Kart başlığı"),
   text: text(LIMITS.featuredText, "Kart açıklaması"),
   ctaLabel: text(LIMITS.featuredCta, "Düğme metni"),
@@ -82,7 +89,6 @@ const groupSchema = z.strictObject({
   label: text(LIMITS.groupLabel, "Grup adı"),
   href: z.string().trim().max(LIMITS.href, "Bağlantı çok uzun."),
   hidden: z.boolean(),
-  columns: z.union([z.literal(1), z.literal(2)]),
   items: z.array(itemSchema).max(LIMITS.maxItemsPerGroup, `Bir grupta en fazla ${LIMITS.maxItemsPerGroup} bağlantı olabilir.`),
   featured: featuredSchema.nullable(),
 });
@@ -98,6 +104,8 @@ const footerColumnSchema = z.strictObject({
   id,
   title: text(LIMITS.footerTitle, "Sütun başlığı"),
   hidden: z.boolean(),
+  /** Açıksa etkin paket tanımlarından üretilen paket bağlantıları sütunun başına otomatik eklenir. */
+  autoPlans: z.boolean(),
   links: z.array(footerLinkSchema).max(LIMITS.maxFooterLinksPerColumn, `Bir sütunda en fazla ${LIMITS.maxFooterLinksPerColumn} bağlantı olabilir.`),
 });
 
@@ -156,8 +164,7 @@ export function checkHref(raw: string): HrefCheck {
     if (!isKnownPublicPath(path)) return { ok: false, message: `"${path}" sitede bulunan bir sayfa değil.` };
     if (query && !/^[A-Za-z0-9_=&.%-]+$/.test(query)) return { ok: false, message: "Sorgu parametresi geçersiz." };
     if (hashAt !== -1) {
-      if (path === "/" && !isHomeAnchor(hash)) return { ok: false, message: `Ana sayfada "#${hash}" bölümü yok.` };
-      if (path !== "/" && !/^[a-z0-9-]{1,40}$/.test(hash)) return { ok: false, message: "Bölüm bağlantısı geçersiz." };
+      if (!isKnownAnchor(path, hash)) return { ok: false, message: `"${path}" sayfasında "#${hash}" bölümü yok.` };
     }
     return { ok: true, kind: "internal" };
   }
@@ -238,7 +245,6 @@ export function validateSiteMenu(input: unknown, ctx: ValidationContext = { medi
   };
 
   let totalItems = 0;
-  const targets = new Map<string, string>();
   const mediaRef = (mid: string, path: string, allow: (m: MediaInfo) => boolean, hint: string) => {
     const m = media.get(mid);
     if (!m) issues.push({ level: "error", path, message: "Medya dosyası bulunamadı; yeniden yükleyin." });
@@ -259,6 +265,10 @@ export function validateSiteMenu(input: unknown, ctx: ValidationContext = { medi
       issues.push({ level: "warn", path: gp, message: `"${g.label || "Grup"}" menüsünde görünen öğe yok; grup boş açılır.` });
     }
     totalItems += g.items.length;
+    const sections = new Set(g.items.map((it) => it.section.trim()));
+    if (sections.size > LIMITS.maxSectionsPerGroup) {
+      issues.push({ level: "error", path: gp, message: `Bir grupta en fazla ${LIMITS.maxSectionsPerGroup} farklı sütun başlığı olabilir.` });
+    }
     const groupTargets = new Set<string>();
     g.items.forEach((it, ii) => {
       const ip = `${gp}.items.${ii}`;
@@ -275,16 +285,12 @@ export function validateSiteMenu(input: unknown, ctx: ValidationContext = { medi
         const t = normalizedTarget(it.href);
         if (groupTargets.has(t)) issues.push({ level: "warn", path: `${ip}.href`, message: "Bu grupta aynı hedefe giden başka bir bağlantı var." });
         groupTargets.add(t);
-        if (!g.hidden) {
-          const prev = targets.get(t);
-          if (prev && prev !== g.id) issues.push({ level: "warn", path: `${ip}.href`, message: "Aynı hedef başka bir grupta da var." });
-          else targets.set(t, g.id);
-        }
       }
     });
     if (g.featured) {
       const f = g.featured;
       const fp = `${gp}.featured`;
+      if (f.icon.kind === "lucide" && !isMenuIconName(f.icon.name)) issues.push({ level: "error", path: `${fp}.icon`, message: "Seçilen ikon listede yok." });
       if (!f.title) issues.push({ level: "error", path: `${fp}.title`, message: "Öne çıkan kart başlığı boş olamaz." });
       if (!f.ctaLabel) issues.push({ level: "error", path: `${fp}.ctaLabel`, message: "Düğme metni boş olamaz." });
       hrefIssues(f.href, `${fp}.href`, issues);
@@ -311,7 +317,7 @@ export function validateSiteMenu(input: unknown, ctx: ValidationContext = { medi
     const cp = `footer.${ci}`;
     dupId(c.id, `${cp}.id`);
     if (!c.title) issues.push({ level: "error", path: `${cp}.title`, message: "Sütun başlığı boş olamaz." });
-    if (!c.hidden && c.links.every((l) => l.hidden)) issues.push({ level: "warn", path: cp, message: `"${c.title || "Sütun"}" sütununda görünen bağlantı yok.` });
+    if (!c.hidden && !c.autoPlans && c.links.every((l) => l.hidden)) issues.push({ level: "warn", path: cp, message: `"${c.title || "Sütun"}" sütununda görünen bağlantı yok.` });
     footerLinks += c.links.length;
     const colTargets = new Set<string>();
     c.links.forEach((l, li) => {

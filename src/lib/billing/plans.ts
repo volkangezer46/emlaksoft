@@ -11,6 +11,12 @@ export type PlanLimits = {
   branches: number | null;
 };
 
+/** Ek kullanıcı kademesi; sıra "ek kullanıcı" sırasıdır (1 = ilk ek kullanıcı). toSeat null = sınırsız (son kademe). */
+export type SeatTier = { fromSeat: number; toSeat: number | null; monthlyTry: number };
+
+/** Ek kullanıcı birim fiyatı yuvarlama düzeni: x9 (…9 ile biter), x0 (onluk) ya da yok. */
+export type SeatRounding = "none" | "x9" | "x0";
+
 export type PlanDef = {
   id: PlanId;
   name: string;
@@ -24,6 +30,12 @@ export type PlanDef = {
   yearlyPaidMonths?: number;
   /** Ek kullanıcı aylık fiyatı (KDV hariç); yoksa ek kullanıcı satılmaz. */
   extraSeatMonthlyTry?: number | null;
+  /** Kademeli (marjinal) ek kullanıcı fiyatı; doluysa extraSeatMonthlyTry'yi ezer. Bkz. seat-pricing.ts. */
+  extraSeatTiers?: SeatTier[] | null;
+  /** Bu pakette satılabilecek en yüksek TOPLAM kullanıcı; aşımı için zorunlu yükseltme/Kurumsal. */
+  maxSeats?: number | null;
+  /** Ek kullanıcı birim fiyatı yuvarlama düzeni (doğrulayıcı kontrol eder). */
+  seatRounding?: SeatRounding | null;
   /** Aylık AI kredi kotası (yalnız alan; ölçüm altyapısı ayrı paketle gelir). */
   aiCreditsMonthly?: number | null;
   /** Aylık profesyonel değerleme raporu kotası (yalnız alan). */
@@ -88,7 +100,6 @@ export const PLANS: readonly PlanDef[] = [
       "Danışman KPI, lig ve hedefler",
       "Otomasyon, iş akışı ve onay akışları",
       "KVKK uyum ve ofisler arası ağ",
-      "Öncelikli destek",
     ],
     limits: { seats: 20, customers: null, activeProperties: null, branches: 10 },
   },
@@ -103,8 +114,6 @@ export const PLANS: readonly PlanDef[] = [
       "Sınırsız şube",
       "Proje satışı ve franchise BI",
       "Merkezi rol ve denetim yönetimi",
-      "Özel onboarding",
-      "Sözleşmeli destek SLA'sı",
     ],
     limits: { seats: 50, customers: null, activeProperties: null, branches: null },
   },
@@ -183,7 +192,7 @@ export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
   monthlyTry: 8990,
   blurb: "Çok şubeli büyük ofis",
   eyebrow: "BÜYÜME",
-  features: ["40 kullanıcıya kadar", "Profesyonel paketin tüm özellikleri", "Öncelikli destek"],
+  features: ["40 kullanıcıya kadar", "Profesyonel paketin tüm özellikleri"],
   limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
   hidden: true,
   order: 35,

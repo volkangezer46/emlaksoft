@@ -19,6 +19,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import { planLabel } from "@/lib/billing/plans";
+import { closureDownloadAllowed } from "@/lib/admin/office-closure";
+import { ClosureDataPanel } from "./closure-data-panel";
 
 
 const nf = new Intl.NumberFormat("tr-TR");
@@ -35,7 +37,7 @@ export default async function SuspendedPage() {
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("full_name, tenants(name, status, plan, created_at)")
+        .select("full_name, role, tenants(name, status, plan, created_at)")
         .eq("id", user.id)
         .maybeSingle()
     : { data: null };
@@ -48,6 +50,15 @@ export default async function SuspendedPage() {
   const office = (Array.isArray(tenant) ? tenant[0] : tenant) ?? undefined;
   const staff = await getPlatformStaff();
   const isCancelled = office?.status === "cancelled";
+  // Arşivlenmiş ofisin sahibi: kapatma talebi sonrası veri paketi (CSV) sunulur.
+  let showClosureData = false;
+  if (isCancelled && profile?.role === "owner") {
+    const { data: closureRequests } = await supabase
+      .from("kvkk_requests")
+      .select("status")
+      .in("request_type", ["account_closure", "data_export"]);
+    showClosureData = closureDownloadAllowed(office?.status, (closureRequests ?? []).map((r) => String(r.status)));
+  }
 
   // Korunan veri hacmi — abonelik dondurulsa da kayıtlar silinmez; sayılar
   // gerçek sorgudan gelir. RLS erişim vermezse count null döner, kart gizlenir.
@@ -149,6 +160,8 @@ export default async function SuspendedPage() {
           </Link>
         ))}
       </div>
+
+      {showClosureData ? <ClosureDataPanel /> : null}
 
       <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         {/* Geri dönüş adımları */}

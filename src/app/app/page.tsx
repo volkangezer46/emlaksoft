@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { createClient } from "@/lib/supabase/server";
+import { loadSampleKpiScope } from "@/lib/sample-scope";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getClosedFeatures } from "@/lib/modules/state";
 import type { FeatureKey } from "@/lib/modules/registry";
@@ -11,7 +13,6 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { DashboardGrid, DashCell, DashboardStack, KpiGrid } from "@/components/ui/dashboard-grid";
 import { Skeleton } from "@/components/app/skeleton";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
-import { ProductTourLazy } from "./product-tour-lazy";
 import { DashboardWidgetProvider } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
@@ -92,6 +93,7 @@ export default async function AppHomePage({
     canSeeRentals: (perms.rentals ?? []).includes("view") && !off("rentals"),
     canSeeProjects: (perms.projects ?? []).includes("view") && !off("projects"),
     canSeeProperties: (perms.properties ?? []).includes("view"),
+    sample: await loadSampleKpiScope(await createClient(), tenantId),
     period: parsePeriod(donem),
     fullName,
     firstName: fullName.split(" ")[0] || "hoş geldiniz",
@@ -217,11 +219,11 @@ export default async function AppHomePage({
         ),
         cell(12, <Suspense fallback={null}><PortfoySeridi ctx={ctx} /></Suspense>, "portfoy", "empty:hidden"),
         cell(12, <Suspense fallback={null}><KiralamaProje ctx={ctx} /></Suspense>, "kiralama", "empty:hidden"),
-        cell(5, <Suspense fallback={<BlokIskelet className="h-80" />}><Huni /></Suspense>, "huni"),
+        cell(5, <Suspense fallback={<BlokIskelet className="h-80" />}><Huni ctx={ctx} /></Suspense>, "huni"),
         cell(7, <Suspense fallback={<BlokIskelet className="h-80" />}><CanliAkis ctx={ctx} /></Suspense>, "canli"),
         ...(off("portals") ? [] : [cell(4, <Suspense fallback={<PanelIskelet />}><PortalSagligi /></Suspense>, "portal")]),
         cell(4, <Suspense fallback={<PanelIskelet />}><Ekip ctx={ctx} /></Suspense>, "ekip"),
-        cell(4, <Suspense fallback={<PanelIskelet />}><KaynakDagilimi /></Suspense>, "kaynak"),
+        cell(4, <Suspense fallback={<PanelIskelet />}><KaynakDagilimi ctx={ctx} /></Suspense>, "kaynak"),
         ...(tvMode ? [] : [cell(12, <HizliAksiyonlar />, "hizli")]),
       ]
     : [
@@ -243,9 +245,6 @@ export default async function AppHomePage({
   return (
     <DashboardWidgetProvider>
       <DashboardStack className={tvMode ? "tv-zoom" : undefined}>
-        {/* İlk giriş ürün turu — TV modunda hiç mount edilmez (bileşen içinde de kontrol var) */}
-        {!tvMode && <ProductTourLazy />}
-
         {/* Rol bazlı ilk blok: yönetimde "Bugün karar bekleyenler", diğerlerinde "Sıradaki en iyi eylem". */}
         {!tvMode &&
           (isManagement ? (

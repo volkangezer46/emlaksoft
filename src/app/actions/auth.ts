@@ -19,6 +19,7 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isRegistrationOpen } from "@/lib/platform-flags";
+import { recordSignupAttributionFromRequest } from "@/lib/growth/capture";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -415,6 +416,8 @@ export async function signUp(
     if (cleanupError) console.error("signUp auth compensation", cleanupError);
     return { error: "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin." };
   }
+
+  await recordSignupAttributionFromRequest(tenantId, formData); // büyüme atfı: en iyi çaba, asla fırlatmaz
 
   const supabase = await createClient();
   const { error: signInError } = await supabase.auth.signInWithPassword({

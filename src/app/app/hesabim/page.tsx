@@ -11,7 +11,9 @@ import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { formatDateTimeTr } from "@/lib/format";
-import { OtherDevicesForm, PasswordForm, ProfileForm } from "./account-forms";
+import { deviceLabel, summarizeDevices } from "@/lib/account/device-label";
+import { Alert } from "@/components/ui/alert";
+import { EmailChangeForm, OtherDevicesForm, PasswordForm, ProfileForm } from "./account-forms";
 
 export const metadata = { title: "Hesabım" };
 
@@ -53,12 +55,13 @@ export default async function AccountPage({
       ? ((
           await supabase
             .from("login_events")
-            .select("id, ip, result, created_at")
+            .select("id, ip, user_agent, result, created_at")
             .eq("user_id", auth.userId)
             .order("created_at", { ascending: false })
-            .limit(8)
+            .limit(40)
         ).data ?? [])
       : [];
+  const devices = summarizeDevices(events);
   const prefs = active === "bildirimler" ? await getNotificationPrefs() : undefined;
 
   return (
@@ -69,6 +72,10 @@ export default async function AccountPage({
         className="mb-0"
       />
       <DetailTabs basePath="/app/hesabim" tabs={TABS} active={active} label="Hesap sekmeleri" />
+
+      {active === "profil" && sp.eposta === "onay" ? (
+        <Alert tone="success">E-posta değişikliği onaylandı. Bir sonraki girişinizde yeni adresinizi kullanın.</Alert>
+      ) : null}
 
       {active === "profil" ? (
         <Card>
@@ -86,6 +93,20 @@ export default async function AccountPage({
               email={user?.email ?? ""}
               twoFactorOn={Boolean(profile?.two_factor_sms)}
             />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {active === "profil" ? (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>E-posta adresini değiştir</CardTitle>
+              <CardDescription>Doğrulama bağlantılı güvenli akış; e-posta doğrudan yazılmaz.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <EmailChangeForm email={user?.email ?? ""} />
           </CardContent>
         </Card>
       ) : null}
@@ -128,13 +149,27 @@ export default async function AccountPage({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>Açık oturumlar</CardTitle>
+                <CardTitle>Oturum açtığınız cihazlar</CardTitle>
                 <CardDescription>
-                  Tarayıcı oturumlarının tek tek listesi mevcut değil; bu cihaz dışındakileri toplu kapatabilirsiniz.
+                  Tekil açık oturum listesi sunulamıyor (kimlik servisi vermiyor); aşağıda giriş kayıtlarından
+                  türetilen cihaz özeti var. Bu cihaz dışındakileri toplu kapatabilirsiniz.
                 </CardDescription>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {devices.length > 0 ? (
+                <ul className="divide-y divide-line rounded-[var(--radius-control)] border border-line">
+                  {devices.map((d) => (
+                    <li key={d.label} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                      <span className="font-medium text-text">{d.label}</span>
+                      <span className="text-right text-xs text-text-muted">
+                        Son giriş {formatDateTimeTr(d.lastSeenAt, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        {d.lastIp ? ` · ${d.lastIp}` : ""} · {d.successCount} giriş
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <OtherDevicesForm />
             </CardContent>
           </Card>
@@ -150,13 +185,16 @@ export default async function AccountPage({
                 <p className="text-sm text-text-muted">Henüz giriş kaydı yok.</p>
               ) : (
                 <ul className="divide-y divide-line">
-                  {events.map((e) => {
+                  {events.slice(0, 8).map((e) => {
                     const badge = RESULT_BADGE[e.result] ?? { label: e.result, variant: "default" as BadgeVariant };
                     return (
                       <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                         <span className="text-text">
                           {formatDateTimeTr(e.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          {e.ip ? <span className="ml-2 text-xs text-text-muted">{e.ip}</span> : null}
+                          <span className="ml-2 text-xs text-text-muted">
+                            {deviceLabel(e.user_agent)}
+                            {e.ip ? ` · ${e.ip}` : ""}
+                          </span>
                         </span>
                         <Badge variant={badge.variant}>{badge.label}</Badge>
                       </li>

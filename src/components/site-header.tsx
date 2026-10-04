@@ -20,7 +20,8 @@ export async function SiteHeader() {
   const menu = toPublicMenu(await getLiveSiteMenu(), now());
   const groups: ClientGroup[] = menu.groups.map((g) => ({
     ...g,
-    items: g.items.map(({ icon, ...it }) => ({ ...it, iconNode: renderMenuIcon(icon) })),
+    columns: g.columns.map((c) => ({ title: c.title, items: c.items.map(({ icon, ...it }) => ({ ...it, iconNode: renderMenuIcon(icon) })) })),
+    featured: g.featured ? { ...g.featured, iconNode: renderMenuIcon(g.featured.icon, 22) } : null,
   }));
   const ann = menu.announcement;
 

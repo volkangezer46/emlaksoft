@@ -38,7 +38,15 @@ export const HOME_ANCHORS = [
   "fiyat",
   "sss",
   "guvenlik",
+  "komisyon",
+  "tv-modu",
+  "moduller",
+  "uyum",
+  "portallar",
 ] as const;
+
+/** /fiyatlar sayfasındaki bölüm kimlikleri. */
+export const PRICING_ANCHORS = ["karsilastirma", "kacan-komisyon", "sss"] as const;
 
 export function knownPublicPaths(): string[] {
   return [...STATIC_PUBLIC_PATHS, ...publishedTools().map((t) => `/araclar/${t.slug}`)];
@@ -50,4 +58,11 @@ export function isKnownPublicPath(path: string): boolean {
 
 export function isHomeAnchor(id: string): boolean {
   return (HOME_ANCHORS as readonly string[]).includes(id);
+}
+
+/** Yol başına izinli bölüm kimlikleri; listede olmayan yola `#bölüm` eklenemez. */
+export function isKnownAnchor(path: string, id: string): boolean {
+  if (path === "/") return isHomeAnchor(id);
+  if (path === "/fiyatlar") return (PRICING_ANCHORS as readonly string[]).includes(id);
+  return false;
 }

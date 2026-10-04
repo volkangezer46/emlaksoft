@@ -1,20 +1,26 @@
 import { Check, X } from "lucide-react";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { gateBadge } from "@/lib/marketing-plan-badge";
 import { Em, SectionHeading } from "./section-heading";
 
 /**
  * Dürüst karşılaştırma: rakip adı veya rakip iddiası YOK; yalnızca "Excel + WhatsApp + defter" gibi genel eski yöntemle kıyas.
  * Sağ sütun yalnız ürünün bugün yaptığı şeyleri söyler (plans.ts ile uyumlu paket notları).
  */
-const ROWS = [
+function buildRows(plans: readonly { id: string; name: string }[]) {
+  const at = (path: string) => { const b = gateBadge(path, plans); return b ? ` (${b})` : ""; };
+  return [
   { topic: "Müşteri ve talep", old: "Dosyalara ve sohbetlere dağılmış kayıtlar; talep unutulabilir.", now: "Tek müşteri kartı; talep ve portföy eşleşmesi aynı akışta." },
   { topic: "Takip ve hatırlatma", old: "Hatırlatma sizin hafızanızda ve not defterinizde.", now: "Görev ve randevu hatırlatmaları otomatik görevlerle gelir." },
-  { topic: "Kaçan fırsat", old: "Bir ilanın neden kaybedildiği çoğu zaman bilinmez.", now: "Zorunlu kapanış formu ve kaçak karnesi (Profesyonel)." },
+  { topic: "Kaçan fırsat", old: "Bir ilanın neden kaybedildiği çoğu zaman bilinmez.", now: `Zorunlu kapanış formu ve kaçak karnesi${at("/app/kayip-kacak")}.` },
   { topic: "Komisyon", old: "Elle hesap; bölüşümde ve hakedişte tartışma çıkar.", now: "Bölüşüm, hakediş ve onay durumu kayıt altında." },
   { topic: "Ekip erişimi", old: "Dosyaya ulaşan herkes her şeyi görür.", now: "Rol ve izin matrisi; ofis verisi ayrı tutulur." },
-  { topic: "Sözleşme ve imza", old: "Kâğıt, fotoğraf ve mesajlaşma ile onay.", now: "SMS onaylı dijital imza akışı (Ofis ve üstü)." },
-];
+  { topic: "Sözleşme ve imza", old: "Kâğıt, fotoğraf ve mesajlaşma ile onay.", now: `SMS onaylı dijital imza akışı${at("/app/sozlesmeler")}.` },
+  ];
+}
 
-export function Why() {
+export async function Why() {
+  const ROWS = buildRows(await getPublicPlanDefinitions());
   return (
     <section id="neden" className="mk-section mk-alt" aria-labelledby="neden-baslik">
       <div className="mk-wrap">

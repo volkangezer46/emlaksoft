@@ -3,7 +3,7 @@ import {
   averageDecisionHours,
   canDecide,
   formatDelta,
-  isManagerRole,
+  isApprovalDeciderRole,
   isOverdue,
   kindMeta,
   slaHours,
@@ -89,13 +89,13 @@ describe("slaHours / isOverdue", () => {
   });
 });
 
-describe("isManagerRole", () => {
+describe("isApprovalDeciderRole", () => {
   it("yalnız yönetim kademesini kabul eder", () => {
     for (const r of ["owner", "gm", "branch_manager", "team_lead"]) {
-      expect(isManagerRole(r)).toBe(true);
+      expect(isApprovalDeciderRole(r)).toBe(true);
     }
     for (const r of ["advisor", "accounting", "call_center", "readonly", "", null, undefined]) {
-      expect(isManagerRole(r)).toBe(false);
+      expect(isApprovalDeciderRole(r)).toBe(false);
     }
   });
 });

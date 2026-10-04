@@ -16,7 +16,7 @@ export async function KayipKacak({ ctx }: { ctx: HomeCtx }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radar className="h-4 w-4 text-danger-500" />
-            <h2 className="font-display font-bold text-ink-950">Kayıp-kaçak</h2>
+            <h2 className="font-display font-bold text-ink-950">Kaçan komisyonlar</h2>
           </div>
           <PanelLink href="/app/kayip-kacak">Detay</PanelLink>
         </div>

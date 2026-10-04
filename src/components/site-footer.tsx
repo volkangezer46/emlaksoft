@@ -1,16 +1,24 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { now, trParts } from "@/lib/clock";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
 
 /**
  * Alt bilgi sütunları admin'den (Site menüsü > Alt bilgi) yönetilir; yayın yoksa varsayılan içerik kullanılır
- * (src/lib/site-menu/defaults.ts). Sunucu bileşeni: istemciye JS göndermez.
+ * (src/lib/site-menu/defaults.ts). Sunucu bileşeni: istemciye JS göndermez. `autoPlans` sütununa (varsayılan: "Paketler")
+ * paket bağlantıları etkin plan tanımlarından (fiyat okuyucu) eklenir.
  */
 export async function SiteFooter() {
-  const columns = toPublicMenu(await getLiveSiteMenu(), now()).footer;
+  const menuColumns = toPublicMenu(await getLiveSiteMenu(), now()).footer;
+  const plans = menuColumns.some((c) => c.autoPlans) ? await getPublicPlanDefinitions() : [];
+  const columns = menuColumns.map((c) =>
+    c.autoPlans
+      ? { ...c, links: [...plans.map((p) => ({ id: `plan-${p.id}`, label: p.name, href: `/kayit?plan=${p.id}`, external: false })), ...c.links] }
+      : c,
+  );
   return (
     <footer className="mk-foot">
       <div className="mk-wrap" style={{ paddingBlock: "clamp(3rem, 2rem + 4vw, 5rem)" }}>
@@ -28,7 +36,7 @@ export async function SiteFooter() {
               <li><FileSignature size={15} aria-hidden="true" />SMS onaylı imza</li>
             </ul>
             <Link href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
-              14 gün ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
+              Ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
           {columns.map((col) => (
@@ -59,7 +67,7 @@ export async function SiteFooter() {
         </div>
       </div>
       <div className="mk-sticky-cta">
-        <Link href="/kayit" className="mk-btn mk-btn-grad">14 gün ücretsiz dene</Link>
+        <Link href="/kayit" className="mk-btn mk-btn-grad">Ücretsiz dene</Link>
       </div>
     </footer>
   );

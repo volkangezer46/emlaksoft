@@ -18,7 +18,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { now as nowMs } from "@/lib/clock";
+import { now as nowMs, trMonthStartIso } from "@/lib/clock";
 import { EmptyState } from "@/components/app/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import {
@@ -28,7 +28,7 @@ import {
   formatDelta,
   isApprovalKind,
   isApprovalStatus,
-  isManagerRole,
+  isApprovalDeciderRole,
   isOverdue,
   kindMeta,
   slaHours,
@@ -39,6 +39,11 @@ import { ButtonLink } from "@/components/ui/button";
 import { ApprovalCommentForm, CancelApprovalButton, DecisionDialog } from "./approval-actions";
 
 const PAGE_SIZE = 20;
+
+/** Ofis Kontrol Merkezi'nin otomatik açtığı talepler açıklamanın başında "[oversight:...]" izi taşır. */
+const RULE_TAG = /^\[oversight:[^\]]*\]\s*/;
+const isOfficeRule = (d: string) => RULE_TAG.test(d);
+const stripRuleTag = (d: string) => d.replace(RULE_TAG, "");
 
 /** `kindMeta.icon` string → bileşen. Sözlük saf kalsın diye eşleme burada. */
 const ICONS: Record<string, LucideIcon> = {
@@ -114,7 +119,7 @@ export default async function OnaylarPage({
   const kim = params.kim === "benim" || params.kim === "bana" ? params.kim : "";
   const sayfa = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
 
-  const manager = isManagerRole(role);
+  const manager = isApprovalDeciderRole(role);
   const supabase = await createClient();
   const t = nowMs();
 
@@ -147,8 +152,8 @@ export default async function OnaylarPage({
   else if (kim === "bana") listQuery = listQuery.neq("requested_by", userId);
 
   // Ayın ilk günü — "bu ay onaylanan/reddedilen" KPI'ları için.
-  const d = new Date(t);
-  const ayBasi = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
+  // Türkiye takvimine göre ay başı (UTC ay sınırı ayın ilk 3 saatini önceki aya yazardı).
+  const ayBasi = trMonthStartIso(t);
 
   const [
     { data: rows, count: total },
@@ -222,7 +227,16 @@ export default async function OnaylarPage({
         title="Onaylar"
         icon={<span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-700"><ShieldCheck className="h-5 w-5" /></span>}
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
-        actions={<ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {manager ? (
+              <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
+                Onay kuralları
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>
+          </div>
+        }
       />
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
@@ -415,7 +429,12 @@ export default async function OnaylarPage({
                   {/* Detay — açıklama + karar geçmişi + yorum akışı */}
                   <div className="mt-3 space-y-3 border-t border-line pt-3 pl-12">
                     {r.description ? (
-                      <p className="whitespace-pre-line text-sm text-text-muted">{r.description}</p>
+                      <p className="whitespace-pre-line text-sm text-text-muted">
+                        {isOfficeRule(r.description) ? (
+                          <span className="mr-1.5 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-700">Ofis kuralı</span>
+                        ) : null}
+                        {stripRuleTag(r.description)}
+                      </p>
                     ) : (
                       <p className="text-sm text-text-faint">Açıklama girilmemiş.</p>
                     )}

@@ -19,6 +19,8 @@ export type PublicItem = {
 };
 
 export type PublicFeatured = {
+  eyebrow: string;
+  icon: IconRef;
   title: string;
   text: string;
   ctaLabel: string;
@@ -33,13 +35,12 @@ export type PublicGroup = {
   label: string;
   href: string;
   external: boolean;
-  wide: boolean;
-  columns: 1 | 2;
-  items: PublicItem[];
+  /** Sütunlar: `section` başlığına göre gruplanmış bağlantılar (başlıksız bağlantılar tek sütunda). */
+  columns: Array<{ title: string; items: PublicItem[] }>;
   featured: PublicFeatured | null;
 };
 
-export type PublicFooterColumn = { id: string; title: string; links: Array<{ id: string; label: string; href: string; external: boolean }> };
+export type PublicFooterColumn = { id: string; title: string; autoPlans: boolean; links: Array<{ id: string; label: string; href: string; external: boolean }> };
 
 export type PublicAnnouncement = {
   key: string;
@@ -69,7 +70,7 @@ export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu
     if (g.hidden) continue;
     if (g.kind === "link") {
       if (!ok(g.href)) continue;
-      groups.push({ id: g.id, kind: "link", label: g.label, href: g.href, external: isExternalHref(g.href), wide: false, columns: 1, items: [], featured: null });
+      groups.push({ id: g.id, kind: "link", label: g.label, href: g.href, external: isExternalHref(g.href), columns: [], featured: null });
       continue;
     }
     const items: PublicItem[] = g.items
@@ -85,17 +86,24 @@ export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu
       }));
     const f = g.featured && !g.featured.hidden && g.featured.title && g.featured.ctaLabel && ok(g.featured.href) ? g.featured : null;
     if (items.length === 0 && !f) continue;
+    const bySection = new Map<string, PublicItem[]>();
+    g.items.forEach((it) => {
+      const pub = items.find((x) => x.id === it.id);
+      if (!pub) return;
+      const key = it.section.trim();
+      bySection.set(key, [...(bySection.get(key) ?? []), pub]);
+    });
     groups.push({
       id: g.id,
       kind: "menu",
       label: g.label,
       href: "",
       external: false,
-      wide: g.columns === 2 || !!f,
-      columns: g.columns,
-      items,
+      columns: [...bySection.entries()].map(([title, list]) => ({ title, items: list })),
       featured: f
         ? {
+            eyebrow: f.eyebrow,
+            icon: f.icon,
             title: f.title,
             text: f.text,
             ctaLabel: f.ctaLabel,
@@ -119,7 +127,7 @@ export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu
   for (const c of cfg.footer) {
     if (c.hidden) continue;
     const links = c.links.filter((l) => !l.hidden && l.label && ok(l.href)).map((l) => ({ id: l.id, label: l.label, href: l.href, external: isExternalHref(l.href) }));
-    if (links.length) footer.push({ id: c.id, title: c.title, links });
+    if (links.length || c.autoPlans) footer.push({ id: c.id, title: c.title, autoPlans: c.autoPlans, links });
   }
 
   const a = cfg.announcement;

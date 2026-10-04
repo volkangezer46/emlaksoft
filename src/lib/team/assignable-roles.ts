@@ -26,6 +26,16 @@ export function hasOfficeWideDataScope(role: string | null | undefined): boolean
 }
 
 export const MANAGEMENT_TIER_ROLES: readonly TeamRole[] = [...MANAGER_ROLES, "team_lead"];
+/**
+ * Onay kapısı (ofis kontrol) muafiyeti: yalnız owner/gm kendi işlemini bekletmeden yapar (HAFIZA.md §7).
+ * branch_manager ve team_lead muaf DEĞİLDİR; onay talebi açarlar. Karar verebilen roller AYRI kümedir:
+ * `APPROVAL_DECIDER_ROLES` (@/lib/approvals).
+ */
+export const APPROVAL_EXEMPT_ROLES: readonly TeamRole[] = ["owner", "gm"];
+export function isApprovalExemptRole(role: string | null | undefined): boolean {
+  return APPROVAL_EXEMPT_ROLES.includes(role as TeamRole);
+}
+
 /** İzin matrisini/istisnalarını düzenleyebilen roller (owner, gm). */
 export const PERMISSION_EDITOR_ROLES: readonly TeamRole[] = ["owner", "gm"];
 

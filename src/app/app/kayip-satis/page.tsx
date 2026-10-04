@@ -205,7 +205,7 @@ export default async function KayipSatisPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <PageHeader title="Kayıp nedenleri" eyebrow="Risk altındaki müşteriler ve kaybedilen anlaşmalar" description="Uzun süredir iletişim kurulmamış, portföy gönderilmemiş veya hareketsiz kalan müşteriler. Hemen arayın, kayıp önleyin." actions={
+      <PageHeader title="Risk altındaki müşteriler" eyebrow="Müşteri riski ve kaybedilen anlaşmalar" description="Uzun süredir iletişim kurulmamış, portföy gönderilmemiş veya hareketsiz kalan müşteriler. Hemen arayın, müşteriyi kaybetmeyin." actions={
 <div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* KPI'lar ilgili bölüm çapalarına iner */}
           <div className="flex gap-3">
             <Link

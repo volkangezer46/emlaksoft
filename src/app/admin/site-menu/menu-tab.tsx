@@ -136,10 +136,14 @@ function ItemRow({
           </button>
         </div>
       </div>
-      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_9rem_auto]">
+      <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_12rem_9rem_auto]">
         <Field label="Kısa açıklama">
           <Input value={item.text} disabled={readOnly} maxLength={LIMITS.itemText + 20} onChange={(e) => set((it) => { it.text = e.target.value; })} />
           <FieldIssue issues={issues} path={`${base}.text`} />
+        </Field>
+        <Field label="Sütun başlığı" hint="Aynı başlıklı bağlantılar bir sütunda toplanır.">
+          <Input list={`sections-${gi}`} value={item.section} disabled={readOnly} maxLength={LIMITS.sectionTitle + 10} onChange={(e) => set((it) => { it.section = e.target.value; })} />
+          <FieldIssue issues={issues} path={`${base}.section`} />
         </Field>
         <Field label="Rozet">
           <select className={selectCls} disabled={readOnly} value={item.badge ?? ""} onChange={(e) => set((it) => { it.badge = e.target.value === "yeni" || e.target.value === "populer" ? e.target.value : null; })}>
@@ -209,6 +213,15 @@ function FeaturedEditor({
         </div>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <Field label="Üst başlık (ör. En çok bakılan)">
+          <Input value={f.eyebrow} disabled={readOnly} maxLength={LIMITS.featuredEyebrow + 10} onChange={(e) => set((x) => { x.eyebrow = e.target.value; })} />
+          <FieldIssue issues={issues} path={`${base}.eyebrow`} />
+        </Field>
+        <div>
+          <span className="mb-1 block text-xs font-semibold text-ink-950">Kart ikonu</span>
+          <IconPicker value={f.icon} onChange={(v) => set((x) => { x.icon = v.kind === "lucide" ? v : { kind: "none" }; })} onMedia={addMedia} disabled={readOnly} readOnlyMediaOk={false} />
+          <FieldIssue issues={issues} path={`${base}.icon`} />
+        </div>
         <Field label="Başlık">
           <Input value={f.title} disabled={readOnly} onChange={(e) => set((x) => { x.title = e.target.value; })} />
           <FieldIssue issues={issues} path={`${base}.title`} />
@@ -328,16 +341,7 @@ function GroupCard({
             </select>
           </Field>
         </div>
-        {g.kind === "menu" ? (
-          <div className="w-32">
-            <Field label="Sütun">
-              <select className={selectCls} disabled={readOnly} value={g.columns} onChange={(e) => set((x) => { x.columns = e.target.value === "2" ? 2 : 1; })}>
-                <option value="1">1 sütun</option>
-                <option value="2">2 sütun</option>
-              </select>
-            </Field>
-          </div>
-        ) : (
+        {g.kind === "menu" ? null : (
           <div className="min-w-[10rem] flex-1">
             <Field label="Hedef">
               <Input list="site-menu-targets" value={g.href} disabled={readOnly} onChange={(e) => set((x) => { x.href = e.target.value; })} />
@@ -362,6 +366,9 @@ function GroupCard({
 
       {g.kind === "menu" ? (
         <div className="mt-3 space-y-3">
+          <datalist id={`sections-${gi}`}>
+            {[...new Set(g.items.map((i) => i.section).filter(Boolean))].map((t) => <option key={t} value={t} />)}
+          </datalist>
           <ul
             ref={setGroupDropRef}
             aria-label={`${g.label} bağlantıları`}

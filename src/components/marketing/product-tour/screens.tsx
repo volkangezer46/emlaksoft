@@ -210,7 +210,7 @@ export function ReportsScreen() {
       <Card x={X0} y={322} w={380} h={218} title="Yeni müşteri trendi" right="9 ay">
         <Line x={20} y={54} w={340} h={130} vals={[20, 26, 24, 33, 38, 36, 47, 52, 61]} />
       </Card>
-      <Card x={606} y={322} w={370} h={218} title="Kayıp-kaçak özeti" right="Profesyonel">
+      <Card x={606} y={322} w={370} h={218} title="Kayıp-kaçak özeti" right="Örnek">
         <Donut cx={96} cy={128} r={48} parts={[[11, "#e5484d"], [5, "#e5a23a"], [26, "#d6dcea"]]} center="16" sub="kapanış" />
         {[["Rakibe gitti", "#e5484d", "11"], ["Sahibi vazgeçti", "#e5a23a", "5"], ["Diğer", "#c9d2e6", "26"]].map(([l, c, v], i) => (
           <g key={l} transform={`translate(176 ${92 + i * 30})`}>

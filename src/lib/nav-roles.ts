@@ -65,6 +65,7 @@ export const MANAGEMENT_ONLY_HREFS: readonly string[] = [
   "/app/uyum",
   "/app/belgeler",
   "/app/denetim",
+  "/app/buyume",
   "/app/ayarlar",
   "/app/ekip",
 ];

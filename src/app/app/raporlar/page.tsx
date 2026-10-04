@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
+import { SAMPLE_DATA_LABEL, loadSampleKpiScope } from "@/lib/sample-scope";
+import { SampleDataBadge } from "@/components/ui/sample-data-badge";
 import { getDefinitionsOrDefault, getLossReasonOptions, toLabelMap } from "@/lib/definitions";
 import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
 import { defaultLabelMap } from "@/lib/definition-defaults";
@@ -110,11 +112,15 @@ export default async function ReportsPage() {
   // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
   const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
   // Ağır toplulaştırma: kısa TTL tenant-tag cache (src/lib/reporting/cache.ts).
-  const [aggregateResult, sourceDefs, lossOptions] = await Promise.all([
+  const [aggregateResult, sourceDefs, lossOptions, sample] = await Promise.all([
     getTenantReportingAggregates(supabase, tenantId, clockNow()),
     sourceDefsPromise,
     getLossReasonOptions(),
+    loadSampleKpiScope(supabase, tenantId),
   ]);
+  // Rapor özetleri veritabanında toplanır (tenant_reporting_aggregates) ve is_sample süzmez: örnek veri yüklüyse
+  // eşiğe bakılmaksızın etiketlenir (eşik süzgeci için SQL değişikliği gerekir, bkz. docs/DURUM.md).
+  const sampleLabel = sample.seeded ? SAMPLE_DATA_LABEL : null;
   const aggregate = requireReportingData(
     "tenant-reporting-aggregates",
     aggregateResult,
@@ -238,6 +244,7 @@ export default async function ReportsPage() {
       <PageHeader
         eyebrow="Rapor merkezi"
         title="Ofis sağlık & performans"
+        meta={<SampleDataBadge label={sampleLabel} />}
         description="Gerçek toplulaştırma · sahte satış hattı yok."
         actions={
           <details className="rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
@@ -268,7 +275,7 @@ export default async function ReportsPage() {
       <div className="list-stagger mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Aylık komisyon", value: money(commissionTotal), icon: ICONS.komisyon, tone: "text-amber-700", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
-          { label: "Tahmini kayıp", value: money(lost), icon: ICONS.alarm, tone: "text-danger-500", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
+          { label: "Kaçan komisyon (tahmini)", value: money(lost), icon: ICONS.alarm, tone: "text-danger-500", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
           // Gecikmiş teyit anlık (stok) bir metrik; geçmiş anlık görüntüsü
           // tutulmadığından dürüst bir dönem kıyası üretilemiyor — rozetsiz.
           // "Gecikmiş teyit" /app/portallar'a gidiyor; portal kavramı ICONS.portal.
@@ -503,10 +510,10 @@ export default async function ReportsPage() {
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
           <TrendingDown className="h-4 w-4 text-danger-500" />
-          <h2 className="font-display font-bold text-ink-950">Kayıp nedeni analizi</h2>
+          <h2 className="font-display font-bold text-ink-950">Kaybedilen anlaşmalar: kayıp nedeni analizi</h2>
           {lostCount > 0 ? (
             <span className="ml-auto text-xs text-text-muted">
-              {lostCount} kayıp · {money(lostValue)} kaybedilen değer · en yüksek 8 neden
+              {lostCount} kaybedilen anlaşma · {money(lostValue)} kaybedilen değer · en yüksek 8 neden
             </span>
           ) : null}
         </div>
@@ -562,7 +569,7 @@ export default async function ReportsPage() {
         </Link>
         <Link href="/app/kayip-kacak" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <ICONS.alarm className="h-4 w-4 text-danger-500" />
-          <p className="mt-2 font-display font-bold">Kayıp-kaçak</p>
+          <p className="mt-2 font-display font-bold">Kaçan komisyonlar</p>
           <p className="text-xs text-text-muted">Teyit ve kapanış analizi</p>
         </Link>
         <Link href="/app/eslestirme" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
