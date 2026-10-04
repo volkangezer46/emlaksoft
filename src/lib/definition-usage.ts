@@ -28,6 +28,8 @@ export const DEFINITION_USAGE_REFS: Record<
   loss_reason: [{ table: "deals", column: "loss_reason", prefixed: true }],
   // Yalnız görünen etiket: hiçbir kayıtta saklanmaz (aşama anahtarı deals.stage'de kalır).
   deal_stage_label: [],
+  // Danışman uzmanlık satırında (kind='segment') değer olarak saklanır; tablo uygulanmamışsa sayım null döner (silme güvenli tarafta engellenir).
+  advisor_segment: [{ table: "advisor_specialties", column: "value" }],
 };
 
 /**

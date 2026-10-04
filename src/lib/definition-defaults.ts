@@ -21,6 +21,7 @@ export const DEFINITION_CATEGORIES = [
   { key: "ticket_category", label: "Destek kategorisi" },
   { key: "loss_reason", label: "Kayıp nedeni" },
   { key: "deal_stage_label", label: "Aşama adları" },
+  { key: "advisor_segment", label: "Danışman uzmanlık segmenti" },
 ] as const;
 
 export type DefinitionCategory = (typeof DEFINITION_CATEGORIES)[number]["key"];
@@ -125,6 +126,16 @@ export const DEFAULT_DEFINITIONS: Record<DefinitionCategory, readonly DefaultDef
     { value: "won", label: "Kazanıldı" },
     { value: "lost", label: "Kaybedildi" },
   ],
+  // Danışman uzmanlık segmenti (advisor_specialties.kind='segment'); migration 20260816001400 global seed'iyle birebir.
+  advisor_segment: [
+    "Lüks konut",
+    "Yatırımlık",
+    "Yeni proje",
+    "Kentsel dönüşüm",
+    "Tarım arazisi",
+    "Sanayi / lojistik",
+    "Yabancıya satış",
+  ].map((v) => ({ value: v, label: v })),
 };
 
 /**
@@ -144,6 +155,7 @@ export const SYSTEM_DEFINITION_VALUES: Record<DefinitionCategory, readonly strin
   ticket_category: ["general"], // varsayılan destek kategorisi
   loss_reason: ["diger"], // not zorunluluğu bu anahtara dallanır (loss-reason.ts)
   deal_stage_label: ["won", "lost"], // kazanma/kayıp anlamı kodda sabit: silinemez (ad/renk değişebilir)
+  advisor_segment: [], // serbest: ofis kendi segmentlerini ekler/gizler
 };
 
 export function isSystemDefinitionValue(category: string, value: string): boolean {
