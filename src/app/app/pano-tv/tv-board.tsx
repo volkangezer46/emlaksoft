@@ -302,6 +302,8 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
         <div className="tv-overlay" role="alert">
           <h2>Oturum süresi doldu</h2>
           <p>Panoyu sürdürmek için yeniden giriş yapın.</p>
+          {/* Oturum bittiği için tam sayfa yenileme isteniyor; Link ile istemci geçişi oturumu tazelemez. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a className="tv-btn" data-primary="true" href="/giris?next=/app/pano-tv">
             Yeniden giriş yap
           </a>
