@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSampleScope, sampleValues } from "@/lib/sample-scope";
 import {
   computeAgentScores,
   computeStreak,
@@ -151,6 +152,9 @@ export async function loadLeagueData(
 
   // Seri penceresi: 400 gün geriye — "Maratoncu" (30 gün) için fazlasıyla
   // yeterli, tek danışman için satır sayısı yönetilebilir kalır.
+  // Demo kayıtlar yalnız ofiste gerçek kayıt eşiği altındayken lige girer (sample-scope).
+  const sampleVals = sampleValues((await getSampleScope(client, tenantId)).include);
+
   const streakSince = new Date(Date.parse(`${opts.todayIso.slice(0, 10)}T00:00:00.000Z`) - 400 * 86_400_000).toISOString();
 
   const [
@@ -173,13 +177,13 @@ export async function loadLeagueData(
       .eq("tenant_id", tenantId).eq("is_active", true).limit(200),
 
     // ── Dönem içi puan kaynakları ────────────────────────────────────────
-    client.from("deals").select("assigned_to, updated_at").eq("tenant_id", tenantId).eq("stage", "won")
+    client.from("deals").select("assigned_to, updated_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won")
       .gte("updated_at", startIso).lt("updated_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).is("deleted_at", null)
+    client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
       .gte("created_at", startIso).lt("created_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("appointments").select("assigned_to, scheduled_at").eq("tenant_id", tenantId).eq("status", "completed")
+    client.from("appointments").select("assigned_to, scheduled_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed")
       .gte("scheduled_at", startIso).lt("scheduled_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("tasks").select("assigned_to, completed_at").eq("tenant_id", tenantId).eq("status", "done")
+    client.from("tasks").select("assigned_to, completed_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done")
       .gte("completed_at", startIso).lt("completed_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
     client.from("surveys").select("agent_id, answered_at, score").eq("tenant_id", tenantId).eq("status", "answered")
       .gte("score", 9).gte("answered_at", startIso).lt("answered_at", endIso).not("agent_id", "is", null).limit(ROW_LIMIT),
@@ -187,21 +191,21 @@ export async function loadLeagueData(
       .gte("created_at", startIso).lt("created_at", endIso).not("created_by", "is", null).limit(ROW_LIMIT),
 
     // ── Ömür boyu rozet sayaçları ────────────────────────────────────────
-    client.from("deals").select("assigned_to").eq("tenant_id", tenantId).eq("stage", "won")
+    client.from("deals").select("assigned_to").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won")
       .not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("properties").select("assigned_to").eq("tenant_id", tenantId).is("deleted_at", null)
+    client.from("properties").select("assigned_to").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
       .not("assigned_to", "is", null).limit(ROW_LIMIT),
     client.from("network_listings").select("created_by").eq("tenant_id", tenantId)
       .not("created_by", "is", null).limit(ROW_LIMIT),
 
     // ── Seri (streak) pencereleri: yalnız tarih kolonları ────────────────
-    client.from("deals").select("assigned_to, updated_at").eq("tenant_id", tenantId).eq("stage", "won")
+    client.from("deals").select("assigned_to, updated_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won")
       .gte("updated_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("appointments").select("assigned_to, scheduled_at").eq("tenant_id", tenantId).eq("status", "completed")
+    client.from("appointments").select("assigned_to, scheduled_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed")
       .gte("scheduled_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("tasks").select("assigned_to, completed_at").eq("tenant_id", tenantId).eq("status", "done")
+    client.from("tasks").select("assigned_to, completed_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done")
       .gte("completed_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).is("deleted_at", null)
+    client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
       .gte("created_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
   ]);
 

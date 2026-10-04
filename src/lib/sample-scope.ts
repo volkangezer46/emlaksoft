@@ -59,9 +59,63 @@ export function applySampleScope<Q>(query: Q, include: boolean): Q {
   return include ? query : notSample(query);
 }
 
+/**
+ * `.in("is_sample", sampleValues(include))` — koşullu süzgeci zincire satır içi ekler:
+ * include=true → [false,true] (demo dahil), false → [false] (demo dışlanır).
+ */
+export function sampleValues(include: boolean): boolean[] {
+  return include ? [false, true] : [false];
+}
+
 /** Dış gönderim son savunması: kayıt demo mu? (`is_sample === true`) */
 export function isSampleRecipient(row: { is_sample?: boolean | null } | null | undefined): boolean {
   return row?.is_sample === true;
+}
+
+/** Gönderim günlüğünde kullanılan sabit neden kodu. */
+export const DEMO_BLOCKED = "demo_blocked";
+
+type SelectClient = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (c: string, v: string) => {
+        maybeSingle: () => PromiseLike<{ data: unknown; error: unknown }>;
+      };
+    };
+  };
+};
+
+/**
+ * Dış gönderim son savunması: müşteri kaydı demo (is_sample=true) mi?
+ * Sorgu hatasında false döner (mevcut davranış korunur, gerçek ofis bloklanmaz).
+ */
+export async function isSampleCustomer(
+  client: unknown,
+  customerId: string | null | undefined,
+): Promise<boolean> {
+  if (!customerId) return false;
+  const res = await (client as SelectClient)
+    .from("customers")
+    .select("is_sample")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (res.error) return false;
+  return isSampleRecipient(res.data as { is_sample?: boolean | null } | null);
+}
+
+/** Kampanya alıcısı (campaign_recipients.customer_id) demo müşteriye mi bağlı? */
+export async function isSampleCampaignRecipient(
+  client: unknown,
+  recipientId: string,
+): Promise<boolean> {
+  const res = await (client as SelectClient)
+    .from("campaign_recipients")
+    .select("customer_id")
+    .eq("id", recipientId)
+    .maybeSingle();
+  if (res.error) return false;
+  const customerId = (res.data as { customer_id?: string | null } | null)?.customer_id;
+  return isSampleCustomer(client, customerId);
 }
 
 type CountClient = {

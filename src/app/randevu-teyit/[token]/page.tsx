@@ -57,6 +57,7 @@ export default async function AppointmentConfirmPage({
       "id, appointment_type, scheduled_at, duration_min, status, customer_response, customer:customers!appointments_customer_id_fkey(full_name), tenant:tenants(name, status, logo_url, brand_color, phone)",
     )
     .eq("confirm_token", token)
+    .eq("is_sample", false)
     .maybeSingle();
 
   if (!appt) notFound();
