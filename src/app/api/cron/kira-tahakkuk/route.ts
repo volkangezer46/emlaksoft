@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { computeLegalIncrease } from "@/lib/tufe";
-import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -226,7 +226,7 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat(
     "kira-tahakkuk",
     "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${skippedTenantsNote(disabledModules, "rentals")}`,
   );
 
   return NextResponse.json({ ok: true, created, overdue: overdueCount, renewals: renewalNotified });

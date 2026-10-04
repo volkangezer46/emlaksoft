@@ -63,6 +63,19 @@ export async function getDisabledModulesByTenant(client: SupabaseClient): Promis
   return out;
 }
 
+/** Modülü kapalı olan ofis kimlikleri (cron atlama listesi). */
+export function tenantsDisabledFor(map: Map<string, Set<FeatureKey>>, key: FeatureKey): string[] {
+  const out: string[] = [];
+  for (const [tenantId, set] of map) if (set.has(key)) out.push(tenantId);
+  return out;
+}
+
+/** Heartbeat özetine eklenen "N ofis atlandı" notu (atlanan yoksa boş). */
+export function skippedTenantsNote(map: Map<string, Set<FeatureKey>>, key: FeatureKey): string {
+  const n = tenantsDisabledFor(map, key).length;
+  return n > 0 ? ` · ${n} ofis atlandı (modül kapalı)` : "";
+}
+
 /** Cron yardımcısı: ofis `key` modülünü kapatmış mı? */
 export function isDisabledFor(map: Map<string, Set<FeatureKey>>, tenantId: string, key: FeatureKey): boolean {
   return map.get(tenantId)?.has(key) ?? false;

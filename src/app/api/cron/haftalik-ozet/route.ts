@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 
 /**
  * Haftalık yönetici özeti — her aktif tenant için GEÇEN haftanın (Pzt–Paz)
@@ -70,12 +71,14 @@ export async function GET(req: NextRequest) {
     .in("status", ["active", "trial", "past_due"])
     .limit(500);
 
+  const disabledModules = await getDisabledModulesByTenant(admin);
   let sent = 0;
   let skippedEmpty = 0;
   let skippedDone = 0;
   let skippedPrefs = 0;
 
   for (const t of tenants ?? []) {
+    if (isDisabledFor(disabledModules, String(t.id), "reports")) continue;
     // Bu hafta için zaten gönderilmiş mi? (marker'lı href varlık kontrolü)
     const { count: already } = await admin
       .from("notifications")
@@ -199,7 +202,7 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat(
     "haftalik-ozet",
     "ok",
-    `${sent} özet gönderildi, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı`,
+    `${sent} özet gönderildi, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
   );
 
   return NextResponse.json({ ok: true, sent, skippedEmpty, skippedDone, skippedPrefs });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { notifyTenant } from "@/lib/notify";
 import { formatTurkishPhone } from "@/lib/phone";
 
@@ -98,7 +99,9 @@ export async function GET(req: NextRequest) {
 
   let notified = 0;
 
+  const disabledModules = await getDisabledModulesByTenant(admin);
   for (const [tenantId, tenantSearches] of byTenant) {
+    if (isDisabledFor(disabledModules, tenantId, "vitrin")) continue;
     const { data: props } = await admin
       .from("properties")
       .select("id, title, property_code, transaction_type, list_price, province_id, district_id, features")
@@ -133,6 +136,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  await recordHeartbeat("vitrin-eslesme", "ok", `${notified} eşleşme bildirimi`);
+  await recordHeartbeat("vitrin-eslesme", "ok", `${notified} eşleşme bildirimi${skippedTenantsNote(disabledModules, "vitrin")}`);
   return NextResponse.json({ ok: true, notified, searches: searches.length });
 }

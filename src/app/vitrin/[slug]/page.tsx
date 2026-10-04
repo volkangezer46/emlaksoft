@@ -14,6 +14,8 @@ import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
@@ -117,6 +119,7 @@ export default async function VitrinPage({
   ]);
 
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
 
   const q = (sp.q ?? "").trim();
   const min = parseMoneyParam(sp.min);

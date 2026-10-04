@@ -5,6 +5,8 @@ import { ArrowLeft, Calculator, Clock3, ShieldCheck, Sparkles } from "lucide-rea
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ValuationFunnel } from "@/components/public/valuation-funnel";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { defaultDefinitionValues } from "@/lib/definition-defaults";
 
 // ISR: vitrin gibi herkese açık — CDN önbellekli, 2 dk tazelenir.
@@ -61,6 +63,7 @@ export default async function VitrinDegerlemePage({
     .maybeSingle();
 
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
 
   // provinces + mülk tipi tanımları tenant'tan bağımsız değil ama paralel çekilebilir.
   // Tanımlar: global (tenant_id null) + ofise özel; aynı value'da ofis kazanır

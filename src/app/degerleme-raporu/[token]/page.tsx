@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Building2, Gauge, Info, Scale, ShieldCheck, TrendingUp } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 
 export const dynamic = "force-dynamic";
 import {
@@ -93,6 +95,7 @@ export default async function PublicValuationReportPage({
       : Promise.resolve({ data: null }),
   ]);
   if (!office || !isPublicTenantActive(office.status)) notFound();
+  if (await isPublicFeatureClosed(admin, valuation.tenant_id, "valuation")) return <PublicModuleClosed officeName={office.name} />;
 
   const officeName = office?.name ?? "Emlak ofisi";
   // Emsal anlık görüntüsü sources jsonb'sinde saklanıyor; listelere sızmasın.

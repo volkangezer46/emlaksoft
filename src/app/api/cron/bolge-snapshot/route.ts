@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 
 /**
  * Aylık bölge istatistik fotoğrafı cron'u.
@@ -60,11 +61,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "db", detail: tenantsError.message }, { status: 500 });
   }
 
+  const disabledModules = await getDisabledModulesByTenant(admin);
   let upserted = 0;
   let failed = 0;
   let tenantsWithData = 0;
 
   for (const t of tenants ?? []) {
+    if (isDisabledFor(disabledModules, String(t.id), "reports")) continue;
     // Üç varyant birbirinden bağımsız — paralel çekilebilir
     const results = await Promise.all(
       TX_VARIANTS.map(async (v) => {
@@ -107,7 +110,7 @@ export async function GET(req: NextRequest) {
     tenantsWithData += 1;
   }
 
-  const detail = `${period}: ${tenantsWithData} ofis, ${upserted} satır${failed ? `, ${failed} hata` : ""}`;
+  const detail = `${period}: ${tenantsWithData} ofis, ${upserted} satır${failed ? `, ${failed} hata` : ""}${skippedTenantsNote(disabledModules, "reports")}`;
   await recordHeartbeat("bolge-snapshot", failed > 0 ? "error" : "ok", detail);
 
   return NextResponse.json({
