@@ -17,10 +17,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
-import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
+import { getStageLabels } from "@/lib/definitions";
 import { daysAgoIso, msSince } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import { DealBoard, type BoardDeal } from "./deal-board";
+import type { BoardDeal } from "./deal-board";
+import { DealBoard } from "./deal-board-lazy";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDealsCsv } from "@/app/actions/export";
@@ -166,13 +167,9 @@ export default async function DealsPage({
 
   const dealsP = Promise.resolve(search.empty ? { data: [], count: 0 } : listQuery);
   const relatedP = dealsP.then(async (res) => {
-    const rows = (res.data ?? []) as unknown as Array<{ id: string; customer_id: string | null }>;
-    const customerIds = [...new Set(rows.map((d) => d.customer_id).filter((v): v is string => Boolean(v)))];
+    const rows = (res.data ?? []) as unknown as Array<{ id: string }>;
     const ids = rows.map((d) => d.id);
     return Promise.all([
-      gorunum === "pano" && customerIds.length
-        ? supabase.from("iys_consents").select("customer_id, status").eq("channel", "sms").in("customer_id", customerIds)
-        : Promise.resolve({ data: [] as { customer_id: string; status: string }[] }),
       ids.length
         ? supabase.from("deal_checklist_items").select("deal_id, is_required, is_done").in("deal_id", ids).eq("is_required", true)
         : Promise.resolve({ data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] }),
@@ -182,9 +179,8 @@ export default async function DealsPage({
   const [
     { data: dealsRaw, count: dealCount },
     { data: members },
-    [{ data: smsConsents }, { data: checklistRows }],
+    [{ data: checklistRows }],
     stageLabels,
-    lossReasons,
     savedViews,
     sumScan,
     newRes,
@@ -198,7 +194,6 @@ export default async function DealsPage({
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     relatedP,
     getStageLabels(),
-    getLossReasonOptions(),
     savedViewsPromise,
     supabase.from("deals").select("stage, deal_value, probability").match(scope).limit(SUM_SCAN_LIMIT),
     head().eq("stage", "new"),
@@ -209,7 +204,6 @@ export default async function DealsPage({
     head().not("stage", "in", "(won,lost)").lt("updated_at", staleIso),
   ]);
 
-  const smsGranted = new Set((smsConsents ?? []).filter((c) => c.status === "granted").map((c) => c.customer_id));
   const checklistByDeal = new Map<string, { done: number; total: number }>();
   for (const r of checklistRows ?? []) {
     const agg = checklistByDeal.get(r.deal_id) ?? { done: 0, total: 0 };
@@ -236,7 +230,7 @@ export default async function DealsPage({
   };
   const rawRows = (dealsRaw ?? []) as unknown as RawDeal[];
   type PropRel = { id?: string; title?: string; property_code?: string };
-  type CustRel = { id?: string; full_name?: string; phone?: string | null };
+  type CustRel = { id?: string; full_name?: string };
 
   const deals: BoardDeal[] = rawRows.map((d) => {
     const p = one(d.property as PropRel | PropRel[] | null);
@@ -255,8 +249,6 @@ export default async function DealsPage({
       property_id: p?.id ?? d.property_id,
       customer_name: c?.full_name ?? null,
       customer_id: c?.id ?? d.customer_id,
-      customer_phone: c?.phone ?? null,
-      sms_consent: smsGranted.has(c?.id ?? d.customer_id ?? ""),
       note_count: Number(noteAgg?.[0]?.count ?? 0),
       checklist_done: checklistByDeal.get(d.id)?.done ?? 0,
       checklist_total: checklistByDeal.get(d.id)?.total ?? 0,
@@ -633,7 +625,10 @@ export default async function DealsPage({
               ) : null}
 
               <div className="flex items-center gap-2 text-xs font-semibold text-text-muted">
-                <Filter className="h-3.5 w-3.5" /> Tahta — sürükleyerek veya aşama butonlarıyla taşıyın
+                <Filter className="h-3.5 w-3.5 shrink-0" />
+                {canEdit
+                  ? "Tahta: kartı sürükleyin, tutamaçta klavyeyle taşıyın veya aşama düğmelerini kullanın"
+                  : "Tahta: aşama düğmelerini kullanın"}
               </div>
               <ListLimitNotice
                 shown={deals.length}
@@ -646,7 +641,6 @@ export default async function DealsPage({
                 deals={deals}
                 canEdit={canEdit}
                 members={members ?? []}
-                lossReasons={lossReasons.map(({ value, label }) => ({ value, label }))}
                 stageLabels={stageLabels}
               />
             </>

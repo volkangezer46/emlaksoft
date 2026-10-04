@@ -41,6 +41,7 @@ import {
   NotesSkeleton,
 } from "./sections";
 import { KapanisPanel } from "./kapanis-panel";
+import { parseOutcomeParam } from "./kapanis-model";
 /*
  * Anket üretme + link kopyalama client bileşenleri memnuniyet raporunda zaten
  * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
@@ -446,6 +447,7 @@ export default async function DealDetailPage({
                   ? { url: surveyUrl, answered: surveyAnswered, score: surveyRow.score }
                   : null
               }
+              requestedOutcome={parseOutcomeParam(sp.sonuc)}
             />
           ) : null}
 
