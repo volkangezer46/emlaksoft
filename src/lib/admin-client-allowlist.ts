@@ -37,6 +37,8 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/campaigns.ts", fn: "createCampaign", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/campaigns.ts", fn: "sendCampaign", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/compliance.ts", fn: "upsertIysConsent", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/contract-signers.ts", fn: "resendSignerSms", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/contract-signers.ts", fn: "updateContractSigner", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/contracts.ts", fn: "cancelContract", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/contracts.ts", fn: "requestSignatureOtp", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/contracts.ts", fn: "sendContractForSigning", calls: 1, tenantFilter: "var" },

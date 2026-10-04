@@ -16,6 +16,8 @@ import {
   type TabbedSummaryContext,
 } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
+import { Combobox } from "@/components/ui/combobox";
+import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { CONTRACT_DRAFT_FIELDS, CONTRACT_FORM_ID, CONTRACT_TABS } from "./contract-tabs";
 import {
@@ -309,6 +311,33 @@ export function NewContractForm({
       <>
         {prefillCustomer ? <input type="hidden" name="customer_id" value={prefillCustomer} /> : null}
         {prefillProperty ? <input type="hidden" name="property_id" value={prefillProperty} /> : null}
+        {/* Ön dolgu yoksa müşteri / portföy aramalı seçiciyle bağlanabilir (bağsız sözleşme kalmasın). */}
+        {!prefillCustomer ? (
+          <FormField label="Müşteri (opsiyonel)" htmlFor="sozl-customer">
+            <Combobox
+              name="customer_id"
+              aria-label="Müşteri"
+              placeholder="Seçiniz"
+              searchPlaceholder="Müşteri ara…"
+              emptyText="Eşleşen müşteri yok"
+              onSearch={searchCustomers}
+              options={[]}
+            />
+          </FormField>
+        ) : null}
+        {!prefillProperty ? (
+          <FormField label="Portföy (opsiyonel)" htmlFor="sozl-property">
+            <Combobox
+              name="property_id"
+              aria-label="Portföy"
+              placeholder="Seçiniz"
+              searchPlaceholder="Portföy ara…"
+              emptyText="Eşleşen portföy yok"
+              onSearch={searchProperties}
+              options={[]}
+            />
+          </FormField>
+        ) : null}
         {prefillCustomer || prefillProperty ? (
           <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700 sm:col-span-2">
             {isYerGosterme
