@@ -40,6 +40,11 @@ import { ApprovalCommentForm, CancelApprovalButton, DecisionDialog } from "./app
 
 const PAGE_SIZE = 20;
 
+/** Ofis Kontrol Merkezi'nin otomatik açtığı talepler açıklamanın başında "[oversight:...]" izi taşır. */
+const RULE_TAG = /^\[oversight:[^\]]*\]\s*/;
+const isOfficeRule = (d: string) => RULE_TAG.test(d);
+const stripRuleTag = (d: string) => d.replace(RULE_TAG, "");
+
 /** `kindMeta.icon` string → bileşen. Sözlük saf kalsın diye eşleme burada. */
 const ICONS: Record<string, LucideIcon> = {
   Percent,
@@ -222,7 +227,16 @@ export default async function OnaylarPage({
         title="Onaylar"
         icon={<span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-700"><ShieldCheck className="h-5 w-5" /></span>}
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
-        actions={<ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {manager ? (
+              <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
+                Onay kuralları
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href="/app/onaylar/yeni" icon={Plus}>Yeni onay talebi</ButtonLink>
+          </div>
+        }
       />
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
@@ -415,7 +429,12 @@ export default async function OnaylarPage({
                   {/* Detay — açıklama + karar geçmişi + yorum akışı */}
                   <div className="mt-3 space-y-3 border-t border-line pt-3 pl-12">
                     {r.description ? (
-                      <p className="whitespace-pre-line text-sm text-text-muted">{r.description}</p>
+                      <p className="whitespace-pre-line text-sm text-text-muted">
+                        {isOfficeRule(r.description) ? (
+                          <span className="mr-1.5 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-semibold text-brand-700">Ofis kuralı</span>
+                        ) : null}
+                        {stripRuleTag(r.description)}
+                      </p>
                     ) : (
                       <p className="text-sm text-text-faint">Açıklama girilmemiş.</p>
                     )}
