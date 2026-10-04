@@ -40,6 +40,32 @@ export function outcomeForStage(stage: string): ClosingOutcome | null {
   return null;
 }
 
+/**
+ * Pano ve "Geçiş" menüsü kapanışı popup ile değil bu sekmeyle yapar: `?sekme=kapanis&sonuc=<değer>`.
+ * `sonuc` yalnız sihirbazın hangi akışla açılacağını seçer; aşama, sihirbazda onaylanınca değişir.
+ */
+export const OUTCOME_PARAM: Readonly<Record<ClosingOutcome, string>> = { won: "kazanildi", lost: "kaybedildi" };
+
+export function closingTabHref(dealId: string, outcome: ClosingOutcome): string {
+  return `/app/anlasmalar/${dealId}?sekme=kapanis&sonuc=${OUTCOME_PARAM[outcome]}`;
+}
+
+/** URL'deki `sonuc` değerini sihirbaz sonucuna çevirir; boş veya tanınmayan değer null. */
+export function parseOutcomeParam(raw: string | string[] | null | undefined): ClosingOutcome | null {
+  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim().toLowerCase();
+  if (value === OUTCOME_PARAM.won) return "won";
+  if (value === OUTCOME_PARAM.lost) return "lost";
+  return null;
+}
+
+/**
+ * Sihirbazın açılış sonucu. Kapanmış anlaşmada aşama belirler (URL'deki istek yok sayılır);
+ * açık anlaşmada URL'den gelen istek ön seçilir, istek yoksa seçim ekranı (null) açılır.
+ */
+export function initialOutcome(stage: string, requested: ClosingOutcome | null | undefined): ClosingOutcome | null {
+  return outcomeForStage(stage) ?? requested ?? null;
+}
+
 /** Kazanılmış anlaşmada ilk adım "paylar"; kapanmamışta ilk adım; kayıpta özet/takip. */
 export function initialStep(outcome: ClosingOutcome | null, stage: string): ClosingStep {
   if (outcome === "won") return stage === "won" ? "paylar" : "tutar";
