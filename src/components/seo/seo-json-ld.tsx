@@ -7,7 +7,7 @@ import { getSeoSettings } from "@/lib/seo/store";
 /**
  * Sayfa yapılandırılmış verisi (JSON-LD). Türler: sayfa kaydı varsayılanı, /admin/seo "Sayfalar" ile değiştirilebilir.
  * - FAQPage yalnız çağıranın geçirdiği GÖRÜNEN SSS listesinden üretilir.
- * - Fiyatlar plans.ts'teki gerçek KDV hariç aylık tutarlardır; AggregateRating/Review ASLA üretilmez.
+ * - Fiyatlar admin paket tanımlarındaki (plan-definitions) gerçek KDV hariç aylık tutarlardır; AggregateRating/Review ASLA üretilmez.
  * - Çıktı serializeJsonLd ile kaçışlıdır (HTML/XSS yok).
  */
 export async function SeoJsonLd({

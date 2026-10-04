@@ -111,7 +111,7 @@
 .mk-nav-link:hover, .mk-dd[data-open="true"] > .mk-nav-link { background: rgba(29, 92, 255, 0.08); color: var(--mk-blue-text); }
 .mk-nav-link svg { transition: transform var(--motion-base) var(--mk-ease); }
 .mk-dd[data-open="true"] > .mk-nav-link svg { transform: rotate(180deg); }
-.mk-dd { position: relative; }
+.mk-dd { position: static; }
 .mk-panel { position: absolute; left: 0; top: 100%; padding-top: 0.5rem; min-width: 19rem; z-index: 5; }
 .mk-panel[hidden] { display: none; }
 .mk-panel > ul { list-style: none; margin: 0; padding: 0.5rem; display: grid; gap: 0.125rem; background: #fff; border: 1px solid var(--mk-line); border-radius: 18px; box-shadow: var(--mk-sh-3); animation: mk-drop var(--motion-base) var(--mk-ease); }

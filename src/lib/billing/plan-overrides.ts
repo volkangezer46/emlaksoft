@@ -155,6 +155,17 @@ export function parsePlanCatalogSettings(raw: string | null | undefined): PlanCa
   }
 }
 
+/**
+ * Etkin katalog ayarı: panel hiç kayıt yazmadıysa (ham değer yok/boş) sahibin onayladığı
+ * önerilen katalog varsayılan olur; kayıt varsa (boş `plans` dahil) yalnız o kayıt geçerlidir.
+ * Böylece fiyat sayfaları, kayıt ve ödeme tek tutarlı katalogdan okur; panel değiştirdikçe o geçerli olur.
+ */
+export function resolveCatalogSettings(raw: string | null | undefined): PlanCatalogSettings {
+  const parsed = parsePlanCatalogSettings(raw);
+  if (raw && raw.trim().length > 0) return parsed;
+  return { ...parsed, overrides: RECOMMENDED_CATALOG_OVERRIDES };
+}
+
 /** Eski çağıranlar için: yalnız plan düzenlemeleri. */
 export function parsePlanOverrides(raw: string | null | undefined): PlanOverrides {
   return parsePlanCatalogSettings(raw).overrides;

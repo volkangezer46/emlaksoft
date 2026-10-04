@@ -32,14 +32,14 @@ export function ToolsCta({ slug }: { slug: string }) {
           Bunların hepsi Emlaksoft&apos;ta otomatik
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-text-muted">
-          Komisyon, masraf ve ödeme takibi müşteri, portföy ve anlaşma kayıtlarınızla birlikte tek panelde hesaplanır. 14 gün ücretsiz deneyin; kredi kartı gerekmez.
+          Komisyon, masraf ve ödeme takibi müşteri, portföy ve anlaşma kayıtlarınızla birlikte tek panelde hesaplanır. Ücretsiz deneyin; kredi kartı gerekmez.
         </p>
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href={`/kayit?kaynak=arac-${slug}`}
             className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-brand-600 px-5 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            14 gün ücretsiz başla <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
+            Ücretsiz başla <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
           </Link>
           <Link
             href="/demo"

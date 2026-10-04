@@ -79,7 +79,7 @@ export async function SiteFooter() {
               <li><FileSignature size={15} aria-hidden="true" />SMS onaylı imza</li>
             </ul>
             <Link href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
-              14 gün ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
+              Ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
           {columns.map((col) => (
@@ -99,7 +99,7 @@ export async function SiteFooter() {
         </div>
       </div>
       <div className="mk-sticky-cta">
-        <Link href="/kayit" className="mk-btn mk-btn-grad">14 gün ücretsiz dene</Link>
+        <Link href="/kayit" className="mk-btn mk-btn-grad">Ücretsiz dene</Link>
       </div>
     </footer>
   );

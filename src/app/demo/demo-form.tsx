@@ -27,7 +27,7 @@ export function DemoForm() {
         <div className="mt-6 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-4 text-left">
           <p className="text-sm font-bold text-ink-950">Beklerken kendiniz deneyin</p>
           <p className="mt-0.5 text-xs text-text-muted">
-            14 gün ücretsiz, kredi kartsız · ofisinizi hemen kurup gezinmeye başlayın.
+            Ücretsiz deneme, kredi kartsız · ofisinizi hemen kurup gezinmeye başlayın.
           </p>
           <Link
             href="/kayit"

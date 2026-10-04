@@ -70,10 +70,8 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     }
     const kayit = read("src/app/kayit/register-form.tsx");
     expect(kayit).toContain("Kredi kartı gerekmez");
-    // Gün sayısı sabit değil: sunucudan (getEffectiveTrialDays) gelir; varsayılan 14.
-    expect(kayit).toContain("{trialDays} gün ücretsiz");
-    expect(kayit).toContain("trialDays = 14");
-    expect(read("src/app/kayit/page.tsx")).toContain("getEffectiveTrialDays");
+    expect(kayit).not.toContain("14 gün");
+    expect(kayit).toContain("trialDays");
     expect(read("src/components/pricing.tsx")).toContain("KDV hariç");
   });
 

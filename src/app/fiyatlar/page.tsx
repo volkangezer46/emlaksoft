@@ -4,9 +4,9 @@ import { ArrowRight, FileSignature, ShieldAlert, Sparkles } from "lucide-react";
 import { Pricing } from "@/components/pricing";
 import { SeoJsonLd } from "@/components/seo/seo-json-ld";
 import { buildMetadata } from "@/lib/seo/store";
-import { getEffectiveTrialDays, getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
-import type { PlanDef } from "@/lib/billing/plans";
-import { buildFaq, lostCommissionPlanName, yearlyDiscountPercent } from "@/lib/pricing-page-model";
+import { getPublicPricing } from "@/lib/billing/public-pricing";
+import { yearlyOfferLabel } from "@/lib/billing/plans";
+import { buildFaq, lostCommissionPlanName, trialPhrase, yearlyDiscountPercent } from "@/lib/pricing-page-model";
 import { ComparisonTable } from "@/components/pricing-page/comparison-table";
 import { PricingShell, Section } from "@/components/pricing-page/page-shell";
 import { RoiCalculator } from "@/components/pricing-page/roi-calculator";
@@ -16,13 +16,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FiyatlarPage() {
-  const plans: PlanDef[] = await getPublicPlanDefinitions();
-  const trialDays = await getEffectiveTrialDays();
-  const faq = buildFaq({ plans, trialDays });
+  const { plans, trialDays, offers, founders } = await getPublicPricing();
+  const faq = buildFaq({ trialDays, plans });
   const discount = yearlyDiscountPercent(plans);
   const lost = lostCommissionPlanName();
-  const roiPlans = plans.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }));
-  const defaultPlanId = (plans.find((p) => p.popular) ?? plans[0]!).id;
+  const trial = trialPhrase(trialDays);
+  const firstPriced = plans.find((p) => !p.customPricing);
+  const startLabel = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
+  // Özel fiyatlı paketin tutarı hesaplayıcıya girmez; kampanya açıksa etkin aylık fiyat kullanılır.
+  const roiPlans = plans
+    .filter((p) => !p.customPricing)
+    .map((p) => ({ id: p.id, name: p.name, monthlyTry: offers[p.id]?.monthlyTry ?? p.monthlyTry, seats: p.limits.seats }));
+  const defaultPlanId = (roiPlans.find((p) => plans.find((x) => x.id === p.id)?.popular) ?? roiPlans[0] ?? { id: plans[0]!.id }).id;
 
   return (
     <PricingShell>
@@ -35,14 +40,15 @@ export default async function FiyatlarPage() {
             Açık fiyat, paket paket net kapsam
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
-            Deneme boyunca tüm özellikler açık, kredi kartı gerekmez. Tutarlar KDV hariçtir; yıllık ödemede %{discount} indirim uygulanır.
+            Deneme boyunca tüm özellikler açık, kredi kartı gerekmez. Tutarlar KDV hariçtir
+            {discount > 0 && firstPriced ? `; yıllık ödemede %${discount} indirim uygulanır (${yearlyOfferLabel(firstPriced)}).` : "."}
           </p>
           <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href={`/kayit?plan=${defaultPlanId}`}
               className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-white px-5 text-sm font-semibold text-[#071a38] hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
-              {trialDays} gün ücretsiz başla <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
+              {startLabel} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
             </Link>
             <Link
               href="/demo"
@@ -55,13 +61,13 @@ export default async function FiyatlarPage() {
       </div>
 
       <section aria-label="Paketler" className="mx-auto max-w-6xl px-4 pb-4 pt-6 sm:px-6">
-        <Pricing plans={plans} trialDays={trialDays} />
+        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} />
       </section>
 
       <section aria-label="Bilmeniz gerekenler" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <ul className="grid gap-4 md:grid-cols-3">
           <Note icon={<Sparkles aria-hidden className="h-5 w-5" />} title="Deneme boyunca her şey açık">
-            {trialDays} gün ücretsiz deneme; tüm paketlerin özellikleri açıktır ve kredi kartı gerekmez.
+            {trial}; tüm paketlerin özellikleri açıktır ve kredi kartı gerekmez.
           </Note>
           <Note icon={<FileSignature aria-hidden className="h-5 w-5" />} title="SMS onaylı dijital imza">
             Sözleşmeler SMS onayıyla imzalanır. Bu, nitelikli elektronik imza (e-imza) değildir.
@@ -102,7 +108,7 @@ export default async function FiyatlarPage() {
         <div className="rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-8 text-center sm:p-12">
           <div className="theme-dark">
             <h2 className="font-display text-2xl font-extrabold text-white sm:text-3xl">Ofisinizle denemeye başlayın</h2>
-            <p className="mx-auto mt-2 max-w-xl text-white/80">{trialDays} gün ücretsiz, kredi kartı gerekmez.</p>
+            <p className="mx-auto mt-2 max-w-xl text-white/80">{trial}, kredi kartı gerekmez.</p>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href={`/kayit?plan=${defaultPlanId}`}
