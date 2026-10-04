@@ -23,7 +23,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("name, status").eq("slug", slug).maybeSingle();
+  const { data: tenant } = await admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
   if (!(await isVitrinEnabled(admin, tenant.id))) return { title: "Vitrin bulunamadı" };
   const title = `Favorilerim | ${tenant.name}`;
