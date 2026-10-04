@@ -5,6 +5,7 @@ import type { RefObject } from "react";
 import { AlertCircle, Check, ChevronDown, CircleCheck, Ellipsis, Loader2, Save, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { isDirty, serializeEntries } from "@/lib/form-dirty";
 import { setSubmitIntent } from "@/lib/form-submit-intent";
 import { formatClock } from "@/lib/form-tabs";
@@ -316,21 +317,21 @@ export function FormActionBar({
             ) : null}
             {shortcuts ? (
               <span className="hidden min-w-0 truncate text-xs text-text-faint lg:inline">
-                <kbd className="rounded border border-line bg-canvas px-1 font-sans">Ctrl</kbd>
+                <Kbd mod />
                 {" + "}
-                <kbd className="rounded border border-line bg-canvas px-1 font-sans">Enter</kbd> ile kaydet
+                <Kbd>Enter</Kbd> ile kaydet
                 {shortcuts === "save-tabs" ? (
                   <>
                     {" · "}
-                    <kbd className="rounded border border-line bg-canvas px-1 font-sans">Alt</kbd>
+                    <Kbd>Alt</Kbd>
                     {" + "}
-                    <kbd className="rounded border border-line bg-canvas px-1 font-sans">↑↓</kbd> sekme
+                    <Kbd>↑↓</Kbd> sekme
                   </>
                 ) : null}
                 {shortcuts === "save-esc" ? (
                   <>
                     {" · "}
-                    <kbd className="rounded border border-line bg-canvas px-1 font-sans">Esc</kbd> kapat
+                    <Kbd>Esc</Kbd> kapat
                   </>
                 ) : null}
               </span>

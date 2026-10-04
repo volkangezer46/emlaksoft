@@ -36,6 +36,7 @@ import { getHrefStore } from "@/lib/nav-memory";
 import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
+import { KbdCombo } from "@/components/ui/kbd";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 type Item = {
@@ -205,7 +206,7 @@ export function AdminSidebar({
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden />
           <span className="sb-label flex-1 truncate text-sm text-white/75">Ara…</span>
-          <kbd className="sb-label rounded-md border border-white/15 bg-white/8 px-1.5 py-0.5 text-xs font-semibold text-white/80">⌘K</kbd>
+          <KbdCombo keys={["mod", "K"]} className="sb-label !border-white/15 !bg-white/8 !text-white/80" />
         </button>
       </div>
 

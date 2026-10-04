@@ -18,6 +18,8 @@ import {
   LifeBuoy,
   ListChecks,
   Loader2,
+  Palette,
+  Check,
   Search,
   Sparkles,
   Target,
@@ -25,15 +27,21 @@ import {
   X,
 } from "lucide-react";
 import { ShortcutHint } from "./shortcut-hint";
+import { Kbd, KbdCombo } from "@/components/ui/kbd";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { evaluatePaletteInput } from "@/lib/palette-calc";
 import { useToast } from "@/components/app/toast-provider";
 import type { AppModule } from "@/lib/permissions";
+import { readAccentPref, readThemePref, subscribeTheme } from "@/lib/theme";
+import { readUiPrefsCookie } from "@/lib/ui-prefs";
 import {
   createRecentsStore,
   getAppActions,
   getAppGoItems,
+  getAppearanceCommands,
   OPEN_PALETTE_EVENT,
+  runAppearanceCommand,
+  type AppearanceEntry,
   type PaletteEntry,
   type RecentItem,
 } from "@/lib/palette-core";
@@ -83,6 +91,7 @@ export function CommandSearchPanel({
   lockedHrefs,
   initialOpen = false,
   storageScope,
+  uiPrefCookie,
 }: {
   accessibleModules: AppModule[];
   /** "create" yetkisi olan modüller; verilmezse erişilebilir modüller kullanılır. */
@@ -92,6 +101,8 @@ export function CommandSearchPanel({
   initialOpen?: boolean;
   /** `${tenantId}:${userId}` — son görülenlerin yerel depolama anahtarı. */
   storageScope?: string;
+  /** Yazı boyutu / sade görünüm çerezinin adı; yoksa bu iki komut paletten gizlenir. */
+  uiPrefCookie?: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -112,6 +123,21 @@ export function CommandSearchPanel({
     [accessibleModules, creatableModules, lockedHrefs, q],
   );
   const goItems = useMemo(() => getAppGoItems(accessibleModules, q), [accessibleModules, q]);
+  // Görünüm komutları: güncel tercih tarayıcıdan okunur (sunucu çıktısı sabit "||" anlık görüntüsü).
+  const appearanceSnap = useSyncExternalStore(
+    subscribeTheme,
+    () => `${readThemePref()}|${readAccentPref()}|${uiPrefCookie ? JSON.stringify(readUiPrefsCookie(uiPrefCookie)) : ""}`,
+    () => "||",
+  );
+  const appearance = useMemo<AppearanceEntry[]>(() => {
+    const [theme, accent, ui] = appearanceSnap.split("|");
+    if (!theme) return [];
+    return getAppearanceCommands(q, {
+      theme: theme as ReturnType<typeof readThemePref>,
+      accent: accent as ReturnType<typeof readAccentPref>,
+      ui: ui ? JSON.parse(ui) : null,
+    });
+  }, [appearanceSnap, q]);
   const visibleRecents = useMemo(() => {
     const pageHrefs = new Set([
       ...getAppActions(creatableModules ?? accessibleModules, "", lockedHrefs ?? []).map((a) => a.href),
@@ -222,7 +248,7 @@ export function CommandSearchPanel({
   const allHref = `/app/arama-sonuclari?q=${encodeURIComponent(trimmed)}`;
 
   // Gezinilebilir satır sırası: [hesap] → [son kullanılanlar → hızlı eylemler | sonuçlar] → [tüm sonuçlar] → [AI]
-  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length + goItems.length : hits.length;
+  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length + goItems.length : hits.length + appearance.length;
   const allIndex = baseCount;
   const askIndex = baseCount + (allVisible ? 1 : 0);
   const maxIndex = baseCount + (allVisible ? 1 : 0) + (askVisible ? 1 : 0) - 1;
@@ -243,6 +269,20 @@ export function CommandSearchPanel({
 
   function go(hit: SearchHit) {
     goRecent({ label: hit.title, href: hit.href, kind: hit.kind });
+  }
+
+  function runAppearance(entry: AppearanceEntry) {
+    const result = runAppearanceCommand(
+      entry.action,
+      uiPrefCookie ? { cookieName: uiPrefCookie, current: readUiPrefsCookie(uiPrefCookie) } : null,
+    );
+    setOpen(false);
+    setQ("");
+    setHits([]);
+    setActive(0);
+    if (!result.applied) return;
+    toast.push(entry.done);
+    if (result.refresh) router.refresh();
   }
 
   function copyCalc() {
@@ -272,6 +312,10 @@ export function CommandSearchPanel({
     }
     if (!calcVisible && !showQuick && hits[i]) {
       go(hits[i]!);
+      return;
+    }
+    if (!calcVisible && !showQuick && i >= hits.length && appearance[i - hits.length]) {
+      runAppearance(appearance[i - hits.length]!);
       return;
     }
     if (allVisible && i === allIndex) {
@@ -513,10 +557,8 @@ export function CommandSearchPanel({
                                   </span>
                                   <span className="flex-1 truncate text-sm font-semibold text-ink-950">{action.label}</span>
                                   {action.shortcut ? (
-                                    <span className="ml-2 flex shrink-0 items-center gap-1" aria-label={`Kısayol ${action.shortcut}`}>
-                                      {action.shortcut.split(" ").map((k) => (
-                                        <kbd key={k} className="rounded-sm border border-hairline bg-canvas px-1.5 py-0.5 text-xs font-semibold uppercase text-text-muted">{k}</kbd>
-                                      ))}
+                                    <span className="ml-2 shrink-0" aria-label={`Kısayol ${action.shortcut}`}>
+                                      <KbdCombo keys={action.shortcut.split(" ")} className="uppercase" />
                                     </span>
                                   ) : null}
                                 </button>
@@ -532,7 +574,7 @@ export function CommandSearchPanel({
                     Kayıt aramak için en az 2 karakter yazın: müşteri, portföy, talep, anlaşma, görev, destek.
                   </p>
                 </div>
-              ) : hits.length === 0 && !pending ? (
+              ) : hits.length === 0 && appearance.length === 0 && !pending ? (
                 <div>
                   <p className="px-3 py-8 text-center text-sm text-text-muted">Sonuç bulunamadı.</p>
                   {askRow ? <div className="border-t border-line pt-1">{askRow}</div> : null}
@@ -570,6 +612,45 @@ export function CommandSearchPanel({
                       </li>
                     );
                   })}
+                  {appearance.length > 0 ? (
+                    <li role="group" aria-label="Görünüm" className="mt-1 border-t border-line pt-1">
+                      <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Görünüm</p>
+                      <ul className="space-y-1">
+                        {appearance.map((entry, i) => {
+                          const idx = hits.length + i;
+                          return (
+                            <li key={entry.id}>
+                              <button
+                                id={`app-command-option-${idx}`}
+                                role="option"
+                                aria-selected={idx === active}
+                                type="button"
+                                onClick={() => runAppearance(entry)}
+                                onMouseEnter={() => setActive(idx)}
+                                className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
+                                  idx === active ? "bg-brand-600/8" : "hover:bg-canvas"
+                                }`}
+                              >
+                                <span
+                                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
+                                    idx === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
+                                  }`}
+                                >
+                                  <Palette className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">{entry.label}</span>
+                                {entry.current ? (
+                                  <span className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-600/10 px-1.5 py-0.5 text-xs font-bold text-brand-600">
+                                    <Check className="h-3 w-3" aria-hidden /> Seçili
+                                  </span>
+                                ) : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  ) : null}
                   {allRow ? <li className="mt-1 border-t border-line pt-1">{allRow}</li> : null}
                   {askRow ? <li className={allRow ? "" : "mt-1 border-t border-line pt-1"}>{askRow}</li> : null}
                 </ul>
@@ -579,14 +660,14 @@ export function CommandSearchPanel({
             {/* Klavye ipuçları çubuğu */}
             <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-1">
-                <kbd className="rounded-sm border border-hairline bg-canvas px-1 py-0.5 text-xs">↑↓</kbd> gezin
+                <Kbd>↑↓</Kbd> gezin
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded-sm border border-hairline bg-canvas px-1 py-0.5 text-xs">Enter</kbd>
+                <Kbd>Enter</Kbd>
                 {calcVisible ? "kopyala" : "aç"}
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded-sm border border-hairline bg-canvas px-1 py-0.5 text-xs">Esc</kbd> kapat
+                <Kbd>Esc</Kbd> kapat
               </span>
             </div>
           </div>
