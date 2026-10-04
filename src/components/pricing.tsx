@@ -18,6 +18,7 @@ const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
   advisor: UserRound,
   office: Building2,
   professional: BriefcaseBusiness,
+  business: Building2,
   enterprise: Crown,
 };
 
