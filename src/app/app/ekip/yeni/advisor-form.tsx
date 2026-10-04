@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Check, Copy, Info, KeyRound, Mail, UserCheck } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createAdvisor, type CreateAdvisorResult } from "../invite-actions";
+import { saveAdvisorExtras } from "@/app/actions/advisor-profile";
 import { clearFormDraft } from "@/components/app/use-form-draft";
 import { useToast } from "@/components/app/toast-provider";
 import { MODULE_LABELS } from "@/app/app/ayarlar/roller/role-permissions-matrix";
@@ -19,7 +20,16 @@ import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSum
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import type { AppModule } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-import { ADVISOR_DRAFT_FIELDS, ADVISOR_FORM_ID, ADVISOR_TABS, type InviteMode } from "./advisor-tabs";
+import type { SpecialtyOptions } from "@/lib/advisor/advisor-profile";
+import {
+  ADVISOR_DRAFT_FIELDS,
+  ADVISOR_EXTRA_FIELD_NAMES,
+  ADVISOR_EXTRA_TABS,
+  ADVISOR_FORM_ID,
+  ADVISOR_TABS,
+  type InviteMode,
+} from "./advisor-tabs";
+import { EmploymentFields, PersonalFields, RegionsField, SpecialtiesField } from "./advisor-extra-fields";
 
 export type RolePermissionSummary = {
   role: string;
@@ -29,11 +39,29 @@ export type RolePermissionSummary = {
 
 type Branch = { id: string; name: string };
 
+/**
+ * Danışman profili ek sekmeleri (kimlik, istihdam, uzmanlık, bölge). Şema uygulanmamışsa ya da kullanıcı ofis sahibi /
+ * genel müdür değilse ilgili sekmeler gizlenir ve `notice` açıklar; mevcut form aynen çalışır.
+ */
+export type AdvisorExtras = {
+  private: boolean;
+  work: boolean;
+  specialty: boolean;
+  piiEnabled: boolean;
+  provinces: { id: string; name: string }[];
+  options: SpecialtyOptions;
+  notice: string | null;
+};
+
 const TAB_ICONS = {
   kimlik: TI.kisi,
   yetki: TI.yetki,
   atama: TI.taraflar,
   hedef: TI.hedef,
+  kisisel: TI.guvenlik,
+  istihdam: TI.sozlesme,
+  uzmanlik: TI.rol,
+  bolge: TI.bolge,
   davet: TI.kanal,
 } as const;
 
@@ -67,6 +95,7 @@ export function AdvisorForm({
   rolePermissions,
   seats,
   canSetTargets,
+  extras,
 }: {
   userId: string;
   officeName: string;
@@ -74,6 +103,7 @@ export function AdvisorForm({
   rolePermissions: RolePermissionSummary[];
   seats: { used: number; limit: number } | null;
   canSetTargets: boolean;
+  extras: AdvisorExtras;
 }) {
   const roles = rolePermissions.map((r) => r.role);
   const [role, setRole] = useState(roles.includes("advisor") ? "advisor" : (roles[0] ?? ""));
@@ -89,9 +119,13 @@ export function AdvisorForm({
   const seatsFull = seats !== null && seats.used >= seats.limit;
   const selected = rolePermissions.find((r) => r.role === role) ?? null;
 
+  const extrasOn = extras.private || extras.work || extras.specialty;
   const tabs: FormTab[] = useMemo(
     () =>
-      ADVISOR_TABS.map((t) => ({
+      ADVISOR_TABS.filter((t) => {
+        const feature = ADVISOR_EXTRA_TABS[t.id];
+        return feature === undefined || extras[feature];
+      }).map((t) => ({
         id: t.id,
         label: t.label,
         description: t.description,
@@ -99,23 +133,35 @@ export function AdvisorForm({
         fields: [...t.fields],
         required: [...t.required],
       })),
-    [],
+    [extras],
   );
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (seatsFull) return;
-    const fd = new FormData(event.currentTarget);
+    const all = new FormData(event.currentTarget);
+    // Hesap açma (mevcut akış) yalnız eski alanları görür; kimlik/profil alanları ayrı sunucu eylemine gider.
+    const fd = new FormData();
+    const extraData = new FormData();
+    for (const [key, value] of all.entries()) {
+      if (ADVISOR_EXTRA_FIELD_NAMES.has(key)) extraData.append(key, value);
+      else if (!key.startsWith("rgn_")) fd.append(key, value);
+    }
     startTransition(async () => {
       const result = await createAdvisor(fd);
       if (!result.ok) {
         setError(result.error ?? "Danışman eklenemedi.");
         return;
       }
+      let warnings = result.warnings ?? [];
+      if (extrasOn && result.id) {
+        const extra = await saveAdvisorExtras(result.id, extraData);
+        warnings = [...warnings, ...(extra.warnings ?? []), ...(extra.error ? [extra.error] : [])];
+      }
       setError(null);
       clearFormDraft(userId, ADVISOR_FORM_ID);
       push("Danışman eklendi", "ok");
-      setDone(result);
+      setDone({ ...result, warnings: warnings.length ? warnings : undefined });
     });
   }
 
@@ -286,6 +332,10 @@ export function AdvisorForm({
         </p>
       </>
     ),
+    kisisel: <PersonalFields provinces={extras.provinces} piiEnabled={extras.piiEnabled} />,
+    istihdam: <EmploymentFields />,
+    uzmanlik: <SpecialtiesField options={extras.options} />,
+    bolge: <RegionsField provinces={extras.provinces} />,
     davet: (
       <>
         <fieldset className="sm:col-span-2">
@@ -422,14 +472,19 @@ export function AdvisorForm({
       pending={pending}
       error={error}
       notice={
-        seatsFull ? (
-          <Alert
-            tone="danger"
-            title="Kullanıcı limitine ulaşıldı"
-            action={<ButtonLink href="/app/abonelik" size="sm">Paketi yükselt</ButtonLink>}
-          >
-            Paketiniz en fazla {seats?.limit} aktif kullanıcı destekliyor.
-          </Alert>
+        seatsFull || extras.notice ? (
+        <div className="space-y-2">
+          {seatsFull ? (
+            <Alert
+              tone="danger"
+              title="Kullanıcı limitine ulaşıldı"
+              action={<ButtonLink href="/app/abonelik" size="sm">Paketi yükselt</ButtonLink>}
+            >
+              Paketiniz en fazla {seats?.limit} aktif kullanıcı destekliyor.
+            </Alert>
+          ) : null}
+          {extras.notice ? <Alert tone="info">{extras.notice}</Alert> : null}
+        </div>
         ) : null
       }
       onSubmit={onSubmit}

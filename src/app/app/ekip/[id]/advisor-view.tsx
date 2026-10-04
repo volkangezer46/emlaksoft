@@ -1,15 +1,21 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Activity, ArrowLeft, UserCog, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
+import { Activity, ArrowLeft, BadgeCheck, MapPinned, UserCog, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
-import { now } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
 import { effectiveCanAccessModule, type EffectivePermissions } from "@/lib/permissions-effective";
 import { handoffEditableScopes } from "@/lib/team/handoff";
 import { canManageRole } from "@/lib/team/assignable-roles";
 import { loadMemberAccess } from "@/lib/team/member-admin";
 import { MemberInfoPanel } from "./member-info-panel";
+import { Alert } from "@/components/ui/alert";
+import { loadWorkProfile, probeAdvisorPrivateSchema, probeAdvisorSpecialtySchema } from "@/lib/advisor/advisor-store";
+import { collectDocAlerts, DOC_KIND_LABEL } from "@/lib/advisor/advisor-profile";
+import { ActivityExtra } from "./activity-extra";
+import { ProfileTab, docFilterHref } from "./profil-tab";
+import { SpecialtyTab } from "./uzmanlik-tab";
 import { canSeeAllEarnings, canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { trMonthContext } from "@/lib/team/scorecard";
@@ -111,6 +117,23 @@ export async function AdvisorDetailView({
     member.role !== "owner" &&
     canManageRole(role, member.role);
 
+  // Danışman profili (migration 20260816001300/001400) uygulanmamışsa ilgili sekmeler gizlenir (sıfır hata, mevcut sekmeler aynen).
+  const todayKey = trDayKey(nowMs);
+  const [workRes, specialtyReady, privateReady] = await Promise.all([
+    tenantId ? loadWorkProfile(supabase, tenantId, id) : Promise.resolve({ available: false as const, data: null }),
+    tenantId ? probeAdvisorSpecialtySchema(supabase) : Promise.resolve(false),
+    tenantId ? probeAdvisorPrivateSchema(supabase) : Promise.resolve(false),
+  ]);
+  const work = workRes.available ? workRes.data : null;
+  const isManager = role === "owner" || role === "gm";
+  const profileTabVisible = workRes.available || privateReady;
+  const docAlerts = work
+    ? collectDocAlerts(
+        [{ profile_id: id, authority_cert_expires_on: work.authority_cert_expires_on, spk_cert_expires_on: work.spk_cert_expires_on }],
+        todayKey,
+      )
+    : [];
+
   const tabs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
     { id: "aktivite", label: "Aktivite", icon: Activity },
@@ -119,6 +142,8 @@ export async function AdvisorDetailView({
     { id: "hedef", label: "Hedef", icon: Target, hidden: !effectiveCanAccessModule(perms, "targets") },
     { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings },
     { id: "kosluk", label: "Koçluk", icon: Sparkles },
+    { id: "profil", label: "Profil ve belgeler", icon: BadgeCheck, hidden: !profileTabVisible || !tenantId },
+    { id: "uzmanlik", label: "Uzmanlık ve bölgeler", icon: MapPinned, hidden: !specialtyReady || !tenantId },
     { id: "bilgi", label: "Bilgiler", icon: UserCog, hidden: !canEditInfo },
   ];
   const visible = tabs.filter((t) => !t.hidden).map((t) => t.id);
@@ -189,15 +214,47 @@ export async function AdvisorDetailView({
         }
       />
 
+      {isManager && docAlerts.length > 0 ? (
+        <Alert
+          tone={docAlerts.some((a) => a.state !== "month") ? "danger" : "warning"}
+          title="Danışman belgesi için uyarı"
+          action={
+            <Link href={`${basePath}?sekme=profil`} className="focus-ring text-sm font-semibold underline">
+              Belgeleri aç
+            </Link>
+          }
+        >
+          {docAlerts.map((a) => (
+            <Link key={a.kind} href={docFilterHref(a.state === "month" ? "month" : a.state === "week" ? "week" : "expired", a.kind) ?? "/app/ekip/belgeler"} className="mr-3 inline-block font-semibold underline">
+              {DOC_KIND_LABEL[a.kind]}: {a.state === "expired" ? "süresi doldu" : a.daysLeft === 0 ? "bugün bitiyor" : `${a.daysLeft} gün kaldı`}
+            </Link>
+          ))}
+        </Alert>
+      ) : null}
+
       <DetailTabs basePath={basePath} tabs={tabs} active={active} label="Danışman 360 sekmeleri" />
 
       {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} /> : null}
       {active === "aktivite" ? <ActivityTab ctx={ctx} /> : null}
+      {active === "aktivite" ? <ActivityExtra supabase={supabase} id={id} /> : null}
       {active === "oncul" ? <LeadTab ctx={ctx} /> : null}
       {active === "pipeline" ? <PipelineTab ctx={ctx} /> : null}
       {active === "hedef" ? <TargetTab ctx={ctx} /> : null}
       {active === "kazanc" ? <EarningsTab ctx={ctx} year={year} /> : null}
       {active === "kosluk" ? <CoachTab ctx={ctx} /> : null}
+      {active === "profil" && tenantId ? (
+        <ProfileTab
+          supabase={supabase}
+          tenantId={tenantId}
+          memberId={id}
+          viewerId={userId}
+          viewerRole={role}
+          work={work}
+          workAvailable={workRes.available}
+          todayKey={todayKey}
+        />
+      ) : null}
+      {active === "uzmanlik" && tenantId ? <SpecialtyTab supabase={supabase} tenantId={tenantId} memberId={id} viewerRole={role} /> : null}
       {active === "bilgi" && canEditInfo ? (
         <MemberInfoPanel
           memberId={id}
