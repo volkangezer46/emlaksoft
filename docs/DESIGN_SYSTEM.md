@@ -132,6 +132,14 @@ Sistemin tamamında telefon ve e-posta girişi tek tiptir; yeni formlarda da ayn
   (örn. `+4915123456789`). E-posta normalize (kırpılmış, küçük harf). Görüntüleme: `formatPhoneDisplay`
   (`0532 123 45 67`, `+49 151 2345 6789`). Dış servisler: `toWhatsAppLink`, `toWhatsAppMsisdn`, `toTelHref`,
   `toE164Phone` yabancı numaraları da doğru işler. Ham `type="tel"`/`type="email"` input yazma.
+- **Ülke kuralı (tek merkez):** `src/lib/phone-rules.ts` (libphonenumber-js/min). PhoneInput onu dinamik import eder
+  (ilk yük JS'ine girmez); yüklenene kadar `phone-countries.ts` tablo sınırları geçerlidir. Davranış: ülkeye göre canlı
+  biçim (TR `0544 634 64 44`), ülkenin en uzun uzunluğunu aşan rakam yazılmaz (yapıştırma kırpılır, `role="status"`
+  uyarısı: "Türkiye numarası en fazla 10 hane olabilir (başındaki 0 hariç); fazlası silindi"), harf atılır ("Yalnız rakam
+  girilebilir"), ülke değişiminde numara korunur, uyumsuzsa ülkeye özel hata gösterilir.
+  Dar kolonda sarma (container query) korunur; bileşeni kopyalama.
+- **Sunucu kapısı:** telefon kaydeden her action `parsePhoneStrict` (veya `phoneSchema`/`optionalPhoneSchema`) kullanır; TR'de
+  11+ hane, harf, geçersiz alan kodu reddedilir. İçe aktarma (`import-rows.ts`) aynı kuralla satır hatası üretir.
 - **Sunucu doğrulayıcıları:** `src/lib/validation/contact.ts` — `phoneSchema`, `optionalPhoneSchema`, `emailSchema`,
   `optionalEmailSchema` (zod; telefon çıktısı saklama biçimi, boş isteğe bağlı -> `null`). Her action telefon/e-postayı
   bunlarla (veya `parsePhone`/`isValidPhone`/`normalizeEmail`/`isValidEmail` ile) doğrular; `formData.get("phone")`

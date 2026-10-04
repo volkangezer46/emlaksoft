@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { DEFAULT_PHONE_COUNTRY } from "@/lib/phone-countries";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 /**
  * Zod sarmalayıcıları (parsePhone / normalizeEmail üstünde). NOT: mevcut server action'lar bugün doğrudan
@@ -20,7 +21,7 @@ export function phoneSchemaFor(defaultCountry: string = DEFAULT_PHONE_COUNTRY) {
     .trim()
     .min(1, "Telefon numarası girin")
     .transform((value, ctx) => {
-      const p = parsePhone(value, defaultCountry);
+      const p = parsePhoneStrict(value, defaultCountry);
       if (!p.ok) {
         ctx.addIssue({ code: "custom", message: p.error ?? PHONE_ERROR_MESSAGE });
         return z.NEVER;
@@ -36,7 +37,7 @@ export function optionalPhoneSchemaFor(defaultCountry: string = DEFAULT_PHONE_CO
     .transform((value, ctx): string | null => {
       const raw = (value ?? "").trim();
       if (!raw) return null;
-      const p = parsePhone(raw, defaultCountry);
+      const p = parsePhoneStrict(raw, defaultCountry);
       if (!p.ok) {
         ctx.addIssue({ code: "custom", message: p.error ?? PHONE_ERROR_MESSAGE });
         return z.NEVER;

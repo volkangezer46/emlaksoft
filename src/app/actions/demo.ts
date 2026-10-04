@@ -4,7 +4,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 export type DemoResult = {
@@ -42,7 +43,7 @@ export async function requestDemo(
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
   if (fullName.length > 120) return { error: "Ad soyad en fazla 120 karakter olabilir." };
-  const phoneParsed = parsePhone(rawPhone);
+  const phoneParsed = parsePhoneStrict(rawPhone);
   if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   if (email && !isValidEmail(email)) {
     return { error: EMAIL_ERROR_MESSAGE };

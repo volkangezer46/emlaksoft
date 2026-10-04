@@ -16,7 +16,7 @@ import {
   isSignerSmsAvailable,
   sendSignerSms,
 } from "@/app/imza/_lib/sms";
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 
 type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
@@ -203,11 +203,11 @@ export async function sendContractForSigning(
   if (normalized.some((signer) => signer.email && !isValidEmail(signer.email))) {
     return { error: "İmzalayan e-posta adreslerinden biri geçersiz." };
   }
-  if (normalized.some((signer) => signer.phone && !parsePhone(signer.phone).ok)) {
+  if (normalized.some((signer) => signer.phone && !parsePhoneStrict(signer.phone).ok)) {
     return { error: "İmzalayan telefon numaralarından biri geçersiz." };
   }
   for (const signer of normalized) {
-    if (signer.phone) signer.phone = parsePhone(signer.phone).stored;
+    if (signer.phone) signer.phone = parsePhoneStrict(signer.phone).stored;
   }
   const identities = normalized.map((signer) =>
     signer.email || signer.phone?.replace(/\D/g, "") || signer.full_name.toLocaleLowerCase("tr-TR"),

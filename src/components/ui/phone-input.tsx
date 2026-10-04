@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import type * as PhoneRules from "@/lib/phone-rules";
 import {
   capNational,
   formatTurkishPhone,
@@ -44,6 +45,22 @@ type PhoneInputProps = (UncontrolledProps | ControlledProps) & {
 };
 
 type Entry = { country: string; digits: string };
+
+type RulesModule = typeof PhoneRules;
+
+/**
+ * Ülke kuralları (libphonenumber-js metadata'sı) /app ilk yük JS'ine girmesin diye dinamik yüklenir;
+ * yüklenene kadar `@/lib/phone` tablo kuralları geçerlidir. Sunucu her durumda `parsePhoneStrict` ile doğrular.
+ */
+let rulesPromise: Promise<RulesModule> | null = null;
+let rulesCache: RulesModule | null = null;
+function loadRules(): Promise<RulesModule> {
+  rulesPromise ??= import("@/lib/phone-rules").then((m) => {
+    rulesCache = m;
+    return m;
+  });
+  return rulesPromise;
+}
 
 /** Saklama biçiminden (veya eski ham rakamlardan) ülke + ulusal rakamları çıkarır. */
 function fromStored(value: string | null | undefined, fallbackCountry: string): Entry {
@@ -103,6 +120,9 @@ export function PhoneInput(props: PhoneInputProps) {
   // '+4' gibi henüz tamamlanmamış ülke kodu taslağı.
   const [draft, setDraft] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  const [rules, setRules] = useState<RulesModule | null>(rulesCache);
+  // Hafif uyarı: fazla hane kırpıldı / harf atıldı / ülke değişiminde numara kırpıldı.
+  const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const entry: Entry = isControlled
@@ -111,11 +131,31 @@ export function PhoneInput(props: PhoneInputProps) {
 
   const stored = toStoredValue(entry);
   const incomplete = draft !== null && draft !== "";
-  const invalid = incomplete || (stored !== "" && !parsePhone(stored).ok);
+  const parsed = stored === "" ? null : rules ? rules.parsePhoneStrict(stored) : parsePhone(stored);
+  const invalid = incomplete || (parsed !== null && !parsed.ok);
+  const errorMessage = !incomplete && parsed && !parsed.ok ? (parsed.error ?? PHONE_ERROR_MESSAGE) : PHONE_ERROR_MESSAGE;
 
   useEffect(() => {
-    inputRef.current?.setCustomValidity(invalid ? PHONE_ERROR_MESSAGE : "");
-  }, [invalid]);
+    let alive = true;
+    void loadRules().then((m) => {
+      if (alive) setRules(m);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    inputRef.current?.setCustomValidity(invalid ? errorMessage : "");
+  }, [invalid, errorMessage]);
+
+  function noticeFor(r: { trimmed: boolean; rejectedChars: boolean; maxDigits: number | null; country: string }) {
+    if (r.rejectedChars) return "Yalnız rakam girilebilir";
+    if (!r.trimmed) return null;
+    const ad = getPhoneCountry(r.country)?.ad ?? "Bu ülke";
+    if (!r.maxDigits) return `${ad} için fazla haneler silindi`;
+    return `${ad} numarası en fazla ${r.maxDigits} hane olabilir${r.country === "TR" ? " (başındaki 0 hariç)" : ""}; fazlası silindi`;
+  }
 
   function commit(next: Entry) {
     if (isControlled) {
@@ -126,7 +166,8 @@ export function PhoneInput(props: PhoneInputProps) {
     }
   }
 
-  const shown = draft !== null ? `+${draft}` : displayDigits(entry);
+  const shown =
+    draft !== null ? `+${draft}` : rules ? rules.formatNationalLive(entry.country, entry.digits) : displayDigits(entry);
   const country = getPhoneCountry(entry.country) ?? PHONE_COUNTRIES[0];
   const isTr = entry.country === "TR";
   const effectivePlaceholder = isTr ? (placeholder ?? TR_MOBILE_PLACEHOLDER) : country.example;
@@ -158,7 +199,15 @@ export function PhoneInput(props: PhoneInputProps) {
           value={entry.country}
           onChange={(event) => {
             setDraft(null);
-            commit({ country: event.target.value, digits: capNational(event.target.value, entry.digits) });
+            const nextIso = event.target.value;
+            const nextDigits = rules ? rules.capNationalStrict(nextIso, entry.digits) : capNational(nextIso, entry.digits);
+            const lead = (iso: string, d: string) => (iso === "TR" ? d.replace(/^0/, "") : d);
+            setNotice(
+              lead(nextIso, nextDigits).length < lead(entry.country, entry.digits).length
+                ? `${getPhoneCountry(nextIso)?.ad ?? "Seçilen ülke"} için fazla haneler silindi`
+                : null,
+            );
+            commit({ country: nextIso, digits: nextDigits });
             inputRef.current?.focus();
           }}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
@@ -181,7 +230,10 @@ export function PhoneInput(props: PhoneInputProps) {
         required={required}
         value={shown}
         onChange={(event) => {
-          const next = interpretPhoneEntry(event.target.value, entry.country);
+          const next = rules
+            ? rules.interpretPhoneEntryStrict(event.target.value, entry.country)
+            : { ...interpretPhoneEntry(event.target.value, entry.country), trimmed: false, rejectedChars: false, maxDigits: null };
+          setNotice(noticeFor(next));
           setDraft(next.pending);
           if (next.pending !== null) return;
           commit({ country: next.country, digits: next.digits });
@@ -194,7 +246,12 @@ export function PhoneInput(props: PhoneInputProps) {
     </div>
     {showError ? (
       <p id={hintId} className="mt-1 text-xs font-medium text-danger-strong">
-        {PHONE_ERROR_MESSAGE}
+        {errorMessage}
+      </p>
+    ) : null}
+    {notice ? (
+      <p role="status" className="mt-1 text-xs text-muted">
+        {notice}
       </p>
     ) : null}
     </div>

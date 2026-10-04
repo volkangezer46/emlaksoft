@@ -1,5 +1,5 @@
 import { isValidEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 export type CheckoutBuyerDraft = {
   id: string;
@@ -64,7 +64,7 @@ export function validateCheckoutBuyer(input: CheckoutBuyerDraft): ValidatedCheck
   const fullName = clean(input.fullName, 120);
   const nameParts = fullName.split(" ").filter(Boolean);
   const email = normalizeEmail(clean(input.email, 254));
-  const parsedPhone = parsePhone(input.phone);
+  const parsedPhone = parsePhoneStrict(input.phone);
   const gsmNumber = parsedPhone.ok ? parsedPhone.e164 : "";
   const identityNumber = normalizeBuyerIdentityNumber(input.identityNumber);
   const address = clean(input.address, 250);

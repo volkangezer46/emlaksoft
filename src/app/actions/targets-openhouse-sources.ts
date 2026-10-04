@@ -5,7 +5,8 @@ import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { validateTenantReferences } from "@/lib/tenant-references";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 
 export type TargetResult = { ok?: boolean; error?: string; id?: string };
@@ -260,7 +261,7 @@ export async function registerOpenHouseVisitor(
 
   const fullName = String(visitor.full_name ?? "").trim();
   const rawPhone = String(visitor.phone ?? "").trim();
-  const parsedPhone = rawPhone ? parsePhone(rawPhone) : null;
+  const parsedPhone = rawPhone ? parsePhoneStrict(rawPhone) : null;
   const phone = parsedPhone?.ok ? parsedPhone.stored : null;
   const email = normalizeEmail(String(visitor.email ?? "")) || null;
   const notes = String(visitor.notes ?? "").trim() || null;
