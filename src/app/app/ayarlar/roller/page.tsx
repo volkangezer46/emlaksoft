@@ -51,6 +51,7 @@ const MODULES: AppModule[] = [
   "rentals",
   "projects",
   "network",
+  "surveys",
   "earnings_all",
 ];
 

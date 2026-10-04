@@ -6,6 +6,19 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { getBaseUrl } from "@/lib/base-url";
+import { parsePhoneStrict } from "@/lib/phone-rules";
+import { canWorkTask, resolveWorkerAccess } from "@/lib/surveys/access";
+import { applyAttemptOutcome, pickBalancedAssignee, sanitizeQuestionDrafts, validateAnswers } from "@/lib/surveys/logic";
+import {
+  completeSurveyTask,
+  isSurveySchemaMissing,
+  loadAssigneeIds,
+  loadOpenLoad,
+  loadSurveySettings,
+  loadTemplateQuestions,
+  type CompletableTask,
+} from "@/lib/surveys/server";
+import { SURVEY_ASSIGNMENT_MODES, isSurveyEventType, type SurveyAssignmentMode, type SurveyOutcome } from "@/lib/surveys/types";
 
 export type SurveyResult = { error?: string; ok?: boolean; id?: string; url?: string };
 
@@ -117,4 +130,480 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
 
   revalidatePath("/app/raporlar/memnuniyet");
   return { ok: true, id: data.id, url };
+}
+
+/* ====================================================================
+ * ANKET MODÜLÜ (anketör kuyruğu) — yukarıdaki kapanış anketi AYNEN kalır.
+ * Yapılandırma (tetikleyici, şablon, ayar, anketör ataması) `surveys` modülünde SİLME düzeyi izin ister
+ * (varsayılan: ofis sahibi ve genel müdür); kuyruk işlemleri anketör ataması veya yönetici yetkisiyle yapılır.
+ * ==================================================================== */
+
+export type SurveyOpResult = { ok?: boolean; error?: string; message?: string };
+
+const SURVEYS_HREF = "/app/anketler";
+
+function revalidateSurveys() {
+  revalidatePath(SURVEYS_HREF);
+  revalidatePath(`${SURVEYS_HREF}/kuyruk`);
+  revalidatePath(`${SURVEYS_HREF}/ayarlar`);
+}
+
+function schemaError(error: { code?: string | null; message?: string | null } | null, fallback: string): string {
+  if (isSurveySchemaMissing(error)) return "Anket modülü bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor).";
+  console.error("surveys action", error);
+  return fallback;
+}
+
+/** Tetikleyiciyi aç/kapat; bekleme günü ve en çok deneme sayısı. Açılış anı kaydedilir (geriye dönük anket yok). */
+export async function saveSurveyTrigger(input: {
+  event: string;
+  enabled: boolean;
+  delayDays: number;
+  maxAttempts: number;
+}): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "delete");
+  if (!gate.ok) return { error: gate.error };
+  if (!isSurveyEventType(input.event)) return { error: "Geçersiz olay türü." };
+  const delay = Math.trunc(Number(input.delayDays));
+  const attempts = Math.trunc(Number(input.maxAttempts));
+  if (!Number.isFinite(delay) || delay < 0 || delay > 60) return { error: "Bekleme süresi 0 ile 60 gün arasında olmalı." };
+  if (!Number.isFinite(attempts) || attempts < 1 || attempts > 10) return { error: "Deneme sayısı 1 ile 10 arasında olmalı." };
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("survey_triggers")
+    .select("enabled, enabled_since")
+    .eq("tenant_id", gate.tenantId)
+    .eq("event_type", input.event)
+    .maybeSingle();
+  const nowIso = new Date().toISOString();
+  // Kapalıdan açığa geçişte (ya da hiç açılmamışsa) açılış anı yenilenir.
+  const since = input.enabled
+    ? existing?.enabled && existing.enabled_since
+      ? (existing.enabled_since as string)
+      : nowIso
+    : ((existing?.enabled_since as string | null | undefined) ?? null);
+  const { error } = await supabase.from("survey_triggers").upsert(
+    {
+      tenant_id: gate.tenantId,
+      event_type: input.event,
+      enabled: input.enabled === true,
+      delay_days: delay,
+      max_attempts: attempts,
+      enabled_since: since,
+      updated_by: gate.userId,
+      updated_at: nowIso,
+    },
+    { onConflict: "tenant_id,event_type" },
+  );
+  if (error) return { error: schemaError(error, "Tetikleyici kaydedilemedi.") };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "survey.trigger",
+    entityType: "survey_trigger",
+    entityId: gate.tenantId,
+    newValue: { event: input.event, enabled: input.enabled, delay, attempts },
+  });
+  revalidateSurveys();
+  return { ok: true };
+}
+
+/** Atama modu, gecikme eşiği, yeniden deneme saati ve düşük puan sınırı. */
+export async function saveSurveySettings(input: {
+  assignmentMode: string;
+  fixedAssignee: string | null;
+  overdueHours: number;
+  retryHours: number;
+  lowScoreMax: number;
+}): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "delete");
+  if (!gate.ok) return { error: gate.error };
+  if (!(SURVEY_ASSIGNMENT_MODES as readonly string[]).includes(input.assignmentMode)) return { error: "Geçersiz atama modu." };
+  const mode = input.assignmentMode as SurveyAssignmentMode;
+  const overdue = Math.trunc(Number(input.overdueHours));
+  const retry = Math.trunc(Number(input.retryHours));
+  const low = Math.trunc(Number(input.lowScoreMax));
+  if (!(overdue >= 1 && overdue <= 720)) return { error: "Gecikme eşiği 1 ile 720 saat arasında olmalı." };
+  if (!(retry >= 1 && retry <= 336)) return { error: "Yeniden deneme aralığı 1 ile 336 saat arasında olmalı." };
+  if (!(low >= 1 && low <= 9)) return { error: "Düşük puan sınırı 1 ile 9 arasında olmalı." };
+
+  const supabase = await createClient();
+  let fixed: string | null = null;
+  if (mode === "selected") {
+    const assignees = await loadAssigneeIds(supabase, gate.tenantId);
+    if (!input.fixedAssignee || !assignees.includes(input.fixedAssignee)) {
+      return { error: "Seçili anketör, atanmış anketörler arasında olmalı." };
+    }
+    fixed = input.fixedAssignee;
+  }
+  const { error } = await supabase.from("survey_settings").upsert(
+    {
+      tenant_id: gate.tenantId,
+      assignment_mode: mode,
+      fixed_assignee: fixed,
+      overdue_hours: overdue,
+      retry_hours: retry,
+      low_score_max: low,
+      updated_by: gate.userId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "tenant_id" },
+  );
+  if (error) return { error: schemaError(error, "Ayarlar kaydedilemedi.") };
+  revalidateSurveys();
+  return { ok: true };
+}
+
+/** Kullanıcıyı anketör yapar / görevden alır (rol değişmez). */
+export async function setSurveyAssignee(userId: string, on: boolean): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "delete");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(userId)) return { error: "Geçersiz kullanıcı." };
+  const supabase = await createClient();
+  if (on) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .eq("tenant_id", gate.tenantId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!profile) return { error: "Kullanıcı bu ofise ait değil veya pasif." };
+    const { error } = await supabase
+      .from("survey_assignees")
+      .upsert({ tenant_id: gate.tenantId, user_id: userId, created_by: gate.userId }, { onConflict: "tenant_id,user_id", ignoreDuplicates: true });
+    if (error) return { error: schemaError(error, "Anketör atanamadı.") };
+  } else {
+    const { error } = await supabase.from("survey_assignees").delete().eq("tenant_id", gate.tenantId).eq("user_id", userId);
+    if (error) return { error: schemaError(error, "Anketör görevden alınamadı.") };
+    // Görevden alınan anketörün bekleyen işleri atanmamışa döner (yönetici yeniden dağıtır).
+    await supabase.from("survey_tasks").update({ assigned_to: null }).eq("tenant_id", gate.tenantId).eq("assigned_to", userId).eq("status", "pending");
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: on ? "survey.assignee_add" : "survey.assignee_remove",
+    entityType: "survey_assignee",
+    entityId: userId,
+  });
+  revalidateSurveys();
+  return { ok: true };
+}
+
+/** Şablonu (ad, aktiflik, sorular) kaydeder. Mevcut soru kimlikleri korunur; kaldırılan sorunun eski cevapları metniyle kalır. */
+export async function saveSurveyTemplate(input: {
+  templateId: string;
+  name: string;
+  active: boolean;
+  questions: unknown;
+}): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "delete");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(input.templateId)) return { error: "Geçersiz şablon." };
+  const name = String(input.name ?? "").trim().slice(0, 120);
+  if (name.length < 2) return { error: "Şablon adı en az 2 karakter olmalı." };
+  const drafts = sanitizeQuestionDrafts(input.questions);
+  if ("error" in drafts) return { error: drafts.error };
+
+  const supabase = await createClient();
+  const { data: tpl } = await supabase
+    .from("survey_templates")
+    .select("id")
+    .eq("id", input.templateId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!tpl) return { error: "Şablon bulunamadı." };
+
+  const { data: existing } = await supabase
+    .from("survey_questions")
+    .select("id")
+    .eq("tenant_id", gate.tenantId)
+    .eq("template_id", tpl.id);
+  const existingIds = new Set((existing ?? []).map((q) => String(q.id)));
+  const keepIds = new Set(drafts.filter((q) => q.id && existingIds.has(q.id)).map((q) => q.id as string));
+
+  for (let i = 0; i < drafts.length; i++) {
+    const q = drafts[i]!;
+    const row = { position: i, kind: q.kind, label: q.label, options: q.options, required: q.required, tag: q.tag };
+    if (q.id && existingIds.has(q.id)) {
+      const { error } = await supabase.from("survey_questions").update(row).eq("id", q.id).eq("tenant_id", gate.tenantId);
+      if (error) return { error: schemaError(error, "Sorular kaydedilemedi.") };
+    } else {
+      const { error } = await supabase.from("survey_questions").insert({ ...row, tenant_id: gate.tenantId, template_id: tpl.id });
+      if (error) return { error: schemaError(error, "Sorular kaydedilemedi.") };
+    }
+  }
+  const removed = [...existingIds].filter((id) => !keepIds.has(id));
+  if (removed.length > 0) {
+    await supabase.from("survey_questions").delete().eq("tenant_id", gate.tenantId).in("id", removed);
+  }
+  const { error } = await supabase
+    .from("survey_templates")
+    .update({ name, active: input.active === true, updated_at: new Date().toISOString() })
+    .eq("id", tpl.id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) return { error: schemaError(error, "Şablon kaydedilemedi.") };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "survey.template",
+    entityType: "survey_template",
+    entityId: tpl.id,
+    newValue: { name, questions: drafts.length },
+  });
+  revalidateSurveys();
+  return { ok: true };
+}
+
+/** Görevi bir anketöre atar (boş = atamayı kaldır). Yalnız yönetici. */
+export async function assignSurveyTask(taskId: string, userId: string | null): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId) || (userId !== null && !UUID_RE.test(userId))) return { error: "Geçersiz istek." };
+  const supabase = await createClient();
+  if (userId) {
+    const assignees = await loadAssigneeIds(supabase, gate.tenantId);
+    if (!assignees.includes(userId)) return { error: "Seçilen kişi anketör olarak atanmamış." };
+  }
+  const { data, error } = await supabase
+    .from("survey_tasks")
+    .update({ assigned_to: userId })
+    .eq("id", taskId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: schemaError(error, "Atama yapılamadı.") };
+  if (!data) return { error: "Görev bulunamadı veya artık bekleyen durumda değil." };
+  await supabase
+    .from("survey_attempts")
+    .insert({ tenant_id: gate.tenantId, task_id: taskId, user_id: gate.userId, outcome: "reassigned", note: userId ? "yeniden atandı" : "atama kaldırıldı" });
+  revalidateSurveys();
+  return { ok: true };
+}
+
+/** Atanmamış bekleyen görevleri anketörlere dengeli dağıtır. */
+export async function distributeSurveyTasks(): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const [assignees, load, { data: open }] = await Promise.all([
+    loadAssigneeIds(supabase, gate.tenantId),
+    loadOpenLoad(supabase, gate.tenantId),
+    supabase
+      .from("survey_tasks")
+      .select("id")
+      .eq("tenant_id", gate.tenantId)
+      .eq("status", "pending")
+      .is("assigned_to", null)
+      .order("due_at")
+      .limit(500),
+  ]);
+  if (assignees.length === 0) return { error: "Önce Ayarlar bölümünden en az bir anketör atayın." };
+  let n = 0;
+  for (const t of open ?? []) {
+    const who = pickBalancedAssignee(assignees, load);
+    if (!who) break;
+    const { error } = await supabase
+      .from("survey_tasks")
+      .update({ assigned_to: who })
+      .eq("id", t.id)
+      .eq("tenant_id", gate.tenantId)
+      .is("assigned_to", null);
+    if (error) continue;
+    load.set(who, (load.get(who) ?? 0) + 1);
+    n += 1;
+  }
+  revalidateSurveys();
+  return { ok: true, message: n === 0 ? "Dağıtılacak atanmamış görev yok." : `${n} görev dengeli dağıtıldı.` };
+}
+
+/** Bekleyen görevi iptal eder (ör. artık anlamsız). Yalnız yönetici. */
+export async function cancelSurveyTask(taskId: string): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId)) return { error: "Geçersiz görev." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("survey_tasks")
+    .update({ status: "cancelled", next_attempt_at: null })
+    .eq("id", taskId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: schemaError(error, "Görev iptal edilemedi.") };
+  if (!data) return { error: "Görev bulunamadı veya artık bekleyen durumda değil." };
+  revalidateSurveys();
+  return { ok: true };
+}
+
+type TaskRow = CompletableTask & { assigned_to: string | null; max_attempts: number; status: string; template_id: string | null };
+
+async function loadWorkableTask(taskId: string, tenantId: string, userId: string, access: { canManage: boolean }) {
+  const supabase = await createClient();
+  const { data: task } = await supabase
+    .from("survey_tasks")
+    .select("id, tenant_id, event_type, audience, customer_id, property_id, deal_id, agent_id, contact_name, attempts, assigned_to, max_attempts, status, template_id")
+    .eq("id", taskId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (!task) return { error: "Görev bulunamadı." } as const;
+  if (!canWorkTask(access, userId, (task.assigned_to as string | null) ?? null)) {
+    return { error: "Bu görev size atanmamış." } as const;
+  }
+  return { supabase, task: task as TaskRow } as const;
+}
+
+/**
+ * Arama sonucunu kaydeder: açmadı/meşgul (otomatik yeniden planlama, en çok N deneme), yanlış numara, reddetti.
+ * "Tamamlandı" `completeSurveyByPhone` ile cevaplarla birlikte kaydedilir.
+ */
+export async function logSurveyAttempt(taskId: string, outcome: string, note?: string): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId)) return { error: "Geçersiz görev." };
+  if (outcome !== "no_answer" && outcome !== "busy" && outcome !== "wrong_number" && outcome !== "refused") {
+    return { error: "Geçersiz arama sonucu." };
+  }
+  const supabase0 = await createClient();
+  const access = await resolveWorkerAccess(supabase0, gate);
+  if (!access.ok) return { error: access.error };
+  const loaded = await loadWorkableTask(taskId, gate.tenantId, gate.userId, access);
+  if ("error" in loaded) return { error: loaded.error };
+  const { supabase, task } = loaded;
+  if (task.status !== "pending") return { error: "Görev artık bekleyen durumda değil." };
+
+  const settings = await loadSurveySettings(supabase, gate.tenantId);
+  const result = applyAttemptOutcome(outcome, { attempts: task.attempts, maxAttempts: task.max_attempts }, Date.now(), settings.retry_hours);
+  const { data, error } = await supabase
+    .from("survey_tasks")
+    .update({
+      status: result.status,
+      attempts: result.attempts,
+      next_attempt_at: result.nextAttemptAt,
+      last_outcome: result.lastOutcome,
+    })
+    .eq("id", taskId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: schemaError(error, "Arama sonucu kaydedilemedi.") };
+  if (!data) return { error: "Görev az önce başka biri tarafından güncellendi." };
+  await supabase.from("survey_attempts").insert({
+    tenant_id: gate.tenantId,
+    task_id: taskId,
+    user_id: gate.userId,
+    outcome: outcome as SurveyOutcome,
+    note: (note ?? "").trim().slice(0, 500) || null,
+  });
+  revalidateSurveys();
+  const message =
+    result.status === "pending"
+      ? `${settings.retry_hours} saat sonrasına yeniden planlandı (deneme ${result.attempts}/${task.max_attempts}).`
+      : result.status === "refused"
+        ? "Müşteri anketi reddetti olarak kapatıldı."
+        : "Ulaşılamadı olarak kapatıldı.";
+  return { ok: true, message };
+}
+
+/** Arama sırasında doldurulan soru-cevap formunu kaydedip görevi tamamlar. `answers`: soru kimliği -> cevap. */
+export async function completeSurveyByPhone(taskId: string, answers: Record<string, string>): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId)) return { error: "Geçersiz görev." };
+  const supabase0 = await createClient();
+  const access = await resolveWorkerAccess(supabase0, gate);
+  if (!access.ok) return { error: access.error };
+  const loaded = await loadWorkableTask(taskId, gate.tenantId, gate.userId, access);
+  if ("error" in loaded) return { error: loaded.error };
+  const { supabase, task } = loaded;
+  if (task.status !== "pending") return { error: "Görev artık bekleyen durumda değil." };
+  if (!task.template_id) return { error: "Görevin şablonu bulunamadı." };
+
+  const questions = await loadTemplateQuestions(supabase, gate.tenantId, task.template_id);
+  const check = validateAnswers(questions, answers && typeof answers === "object" ? answers : {});
+  if (!check.ok) return { error: check.error };
+
+  let customerName = task.contact_name ?? "";
+  if (task.customer_id) {
+    const { data: c } = await supabase
+      .from("customers")
+      .select("full_name")
+      .eq("id", task.customer_id)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (c?.full_name) customerName = String(c.full_name);
+  }
+  const settings = await loadSurveySettings(supabase, gate.tenantId);
+  try {
+    const done = await completeSurveyTask(supabase, task, {
+      answers: check.answers,
+      score: check.score,
+      comment: check.comment,
+      via: "phone",
+      userId: gate.userId,
+      lowScoreMax: settings.low_score_max,
+      customerName,
+    });
+    if (!done) return { error: "Görev az önce başka biri tarafından kapatıldı." };
+  } catch {
+    return { error: "Cevaplar kaydedilemedi. Lütfen tekrar deneyin." };
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "survey.complete",
+    entityType: "survey_task",
+    entityId: taskId,
+    newValue: { event: task.event_type, score: check.score },
+  });
+  revalidateSurveys();
+  return { ok: true, message: "Anket kaydedildi." };
+}
+
+/** Müşteri kaydı olmayan muhatabın (ör. malik) adını ve telefonunu günceller; telefon sıkı doğrulanır. */
+export async function updateSurveyTaskContact(taskId: string, name: string, phone: string): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId)) return { error: "Geçersiz görev." };
+  const supabase0 = await createClient();
+  const access = await resolveWorkerAccess(supabase0, gate);
+  if (!access.ok) return { error: access.error };
+  const loaded = await loadWorkableTask(taskId, gate.tenantId, gate.userId, access);
+  if ("error" in loaded) return { error: loaded.error };
+  const { supabase, task } = loaded;
+  if (task.customer_id) return { error: "Müşteri kayıtlı görevlerde iletişim bilgisi müşteri kartından düzenlenir." };
+  const cleanName = String(name ?? "").trim().slice(0, 120);
+  const parsed = parsePhoneStrict(phone);
+  if (!parsed.ok) return { error: parsed.error ?? "Geçerli bir telefon numarası girin." };
+  const { error } = await supabase
+    .from("survey_tasks")
+    .update({ contact_name: cleanName || null, contact_phone: parsed.stored })
+    .eq("id", taskId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) return { error: schemaError(error, "İletişim bilgisi kaydedilemedi.") };
+  revalidateSurveys();
+  return { ok: true };
+}
+
+/** Görev için müşteriye iletilecek bağlı anket adresi (SMS gönderilmez; panelde kopyalanır). */
+export async function getSurveyTaskLink(taskId: string): Promise<SurveyResult> {
+  const gate = await requirePermission("surveys", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId)) return { error: "Geçersiz görev." };
+  const supabase = await createClient();
+  const access = await resolveWorkerAccess(supabase, gate);
+  if (!access.ok) return { error: access.error };
+  const { data } = await supabase
+    .from("survey_tasks")
+    .select("public_token, assigned_to")
+    .eq("id", taskId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!data) return { error: "Görev bulunamadı." };
+  if (!canWorkTask(access, gate.userId, (data.assigned_to as string | null) ?? null)) return { error: "Bu görev size atanmamış." };
+  return { ok: true, url: `${appUrl()}/anket/${data.public_token}` };
 }

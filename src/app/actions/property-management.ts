@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { isDefinitionCategory, isSystemDefinitionValue } from "@/lib/definition-defaults";
 import { addDefinition, deleteDefinition, renameDefinition } from "@/app/actions/definitions";
+import { queueAuthorityExtensionSurvey } from "@/lib/surveys/events";
 
 const MANUAL_STATUSES = [
   "draft", "pending_docs", "pending_auth", "photo_needed", "ready", "active",
@@ -85,6 +86,13 @@ export async function updatePropertyAuthorization(
   if (!gate.ok) return { error: gate.error };
 
   const supabase = await createClient();
+  // Anket modülü: yetki bitiş tarihi İLERİ alınırsa "neden devam ediyorsunuz" anketi için önceki tarih gerekir.
+  const { data: before } = await supabase
+    .from("properties")
+    .select("authorization_end")
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
   const { error } = await supabase
     .from("properties")
     .update({
@@ -98,6 +106,9 @@ export async function updatePropertyAuthorization(
     .eq("tenant_id", gate.tenantId);
 
   if (error) return { error: "Yetki belgesi güncellenemedi." };
+
+  // Yalnız tarih gerçekten uzatıldıysa (önceki bitiş vardı ve yenisi daha ileri). Hata asıl işlemi etkilemez.
+  await queueAuthorityExtensionSurvey(supabase, gate.tenantId, propertyId, (before?.authorization_end as string | null) ?? null, data.authEnd || null);
 
   revalidatePath(`/app/portfoyler/${propertyId}`);
   return { ok: true };

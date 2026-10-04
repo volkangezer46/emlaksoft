@@ -81,6 +81,7 @@ const MUAF: Record<string, string> = {
   "owner-portal-offers.ts::respondToOfferByToken": "Malik portalinda teklif onay/ret; token ile.",
   "customer-portal-feedback.ts::submitMatchFeedbackByToken": "Musteri portali begen/gec geri bildirimi; token ile.",
   "survey-public.ts::submitSurveyByToken": "NPS memnuniyet anketi; token ankete sabit.",
+  "survey-public.ts::submitSurveyTaskByToken": "Anketör görevi bağlı linki; UUID token tek göreve sabit, IP hız sınırı (deny), honeypot, modül ve ofis aktiflik denetimi, tenant filtreli yazım.",
   "referral-public.ts::submitReferralByToken": "Tavsiye formu; token referral_links kaydina sabit.",
   "vitrin-alerts.ts::createVitrinPriceAlert": "Vitrin fiyat alarmi; yayindaki ilana sabit, ofis ici bildirim uretir.",
   "vitrin.ts::createVitrinSavedSearch": "Vitrin kayitli arama; ziyaretci oturum acmaz.",

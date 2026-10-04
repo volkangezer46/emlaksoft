@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { getBaseUrl } from "@/lib/base-url";
 import { CopySurveyLinkButton, CreateSurveyButton } from "./survey-actions";
 import { formatDateTr } from "@/lib/format";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 
 function appUrl() {
   return getBaseUrl();
@@ -72,7 +73,7 @@ function ScoreBadge({ score }: { score: number }) {
  * ekleme yok — o alan başka modülün; kapanan anlaşmalar burada listelenir).
  */
 export default async function SatisfactionReportPage() {
-  await requireModulePage("reports", "/app/raporlar");
+  const ctx = await requireModulePage("reports", "/app/raporlar");
   const supabase = await createClient();
 
   const [{ data: surveys }, { data: wonDeals }, { data: profiles }] = await Promise.all([
@@ -139,6 +140,15 @@ export default async function SatisfactionReportPage() {
         title="Müşteri memnuniyeti (NPS)"
         description="Kapanış sonrası 0-10 puan anketi · NPS = %destekleyen (9-10) − %kötüleyen (0-6)"
       />
+      {effectiveCanAccessModule(ctx.perms, "surveys") ? (
+        <p className="-mt-3 mb-4 text-xs text-text-muted">
+          Yayından kalkan, uzayan ve kaybedilen işlemler için anketör aramaları ayrı izlenir:{" "}
+          <Link href="/app/anketler" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
+            Anketler ve anketör kuyruğu
+          </Link>
+          . Anketörün telefonla aldığı kapanış cevapları bu NPS raporuna da yansır.
+        </p>
+      ) : null}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {

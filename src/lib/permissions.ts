@@ -36,6 +36,7 @@ export type AppModule =
   | "rentals"
   | "projects"
   | "network"
+  | "surveys"
   | "earnings_all";
 
 export type AppAction = "view" | "create" | "edit" | "delete";
@@ -82,6 +83,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
         "rentals",
         "projects",
         "network",
+        "surveys",
         "earnings_all",
       ] as AppModule[]
     ).map((m) => [m, ALL]),
@@ -114,6 +116,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     rentals:      ALL,
     projects:     ALL,
     network:      ALL,
+    surveys:      ALL,
     // Başkasının kazancını görme (belge 3e). DB permission_defaults seed: Faz 2 migration.
     earnings_all: VIEW,
   },
@@ -137,6 +140,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     contracts:    CRUD_NO_DEL,
     rentals:      CRUD_NO_DEL,
     network:      CRUD_NO_DEL,
+    surveys:      CRUD_NO_DEL,
     // DB seed'i (20260726000075) ile senkron: proje satış şube müdüründe tam yetki
     projects:     ALL,
   },
@@ -155,6 +159,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     valuation:    VIEW,
     campaigns:    VIEW,
     contracts:    CRUD_NO_DEL,
+    surveys:      VIEW,
   },
   advisor: {
     dashboard:    VIEW,
@@ -177,6 +182,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     contracts:    CRUD_NO_DEL,
     rentals:      VIEW,
     network:      VIEW,
+    surveys:      VIEW,
     // DB seed'i (20260726000075) ile senkron
     projects:     CRUD_NO_DEL,
   },
@@ -188,6 +194,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     appointments: CRUD_NO_DEL,
     tasks: CRUD_NO_DEL,
     support: VIEW,
+    surveys: VIEW,
   },
   accounting: {
     dashboard: VIEW,
@@ -196,6 +203,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     billing: CRUD_NO_DEL,
     reports: VIEW,
     support: VIEW,
+    surveys: VIEW,
     earnings_all: VIEW,
   },
   readonly: {
@@ -212,6 +220,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     tasks: VIEW,
     reports: VIEW,
     valuation: VIEW,
+    surveys: VIEW,
   },
 };
 

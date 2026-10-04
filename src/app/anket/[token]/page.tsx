@@ -4,7 +4,11 @@ import { CheckCircle2, Star } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicStateBox, PublicTokenPage } from "@/components/public/token-page";
+import { isFeatureEnabledIn } from "@/lib/modules/logic";
+import { loadTenantModuleState } from "@/lib/modules/state";
+import { loadTemplateQuestions } from "@/lib/surveys/server";
 import { SurveyForm } from "./survey-form";
+import { TaskSurveyForm } from "./task-survey-form";
 
 // Anket linkleri kişiye özeldir → arama motorlarına kapalı (randevu-teyit deseni).
 export const metadata: Metadata = {
@@ -43,7 +47,7 @@ export default async function SurveyPage({
     .eq("public_token", token)
     .maybeSingle();
 
-  if (!survey) notFound();
+  if (!survey) return renderTaskSurvey(admin, token);
 
   type TenantShape = {
     name?: string;
@@ -59,6 +63,7 @@ export default async function SurveyPage({
     .select("id")
     .eq("id", survey.customer_id)
     .eq("tenant_id", survey.tenant_id)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
   if (!customer) notFound();
@@ -85,6 +90,65 @@ export default async function SurveyPage({
         />
       ) : (
         <SurveyForm token={token} office={office} officePhone={officePhone} />
+      )}
+    </PublicTokenPage>
+  );
+}
+
+/**
+ * Anketör görevi için bağlı link (anket modülü). Kapanış anketi bulunamayınca görev token'ı denenir; tablolar yoksa
+ * ya da görev bulunamazsa 404. Müşteri/malik adı ve işlem ayrıntısı gösterilmez, yalnız şablon soruları.
+ */
+async function renderTaskSurvey(admin: ReturnType<typeof createAdminClient>, token: string) {
+  const { data: task, error } = await admin
+    .from("survey_tasks")
+    .select("id, tenant_id, status, template_id, customer_id, property_id, tenant:tenants(name, status, phone, logo_url, brand_color)")
+    .eq("public_token", token)
+    .maybeSingle();
+  if (error || !task || !task.template_id) notFound();
+
+  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null };
+  const tenant = rel(task.tenant as TenantShape | TenantShape[] | null);
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  const tenantId = String(task.tenant_id);
+
+  // Örnek (is_sample) kayıtlara bağlı görev herkese açık yüzde gösterilmez.
+  if (task.customer_id) {
+    const { data: c } = await admin.from("customers").select("id").eq("id", task.customer_id).eq("tenant_id", tenantId).eq("is_sample", false).is("deleted_at", null).maybeSingle();
+    if (!c) notFound();
+  }
+  if (task.property_id) {
+    const { data: p } = await admin.from("properties").select("id").eq("id", task.property_id).eq("tenant_id", tenantId).eq("is_sample", false).maybeSingle();
+    if (!p) notFound();
+  }
+
+  const moduleState = await loadTenantModuleState(admin, tenantId);
+  const office = tenant.name ?? "Emlak ofisi";
+  const closed = !isFeatureEnabledIn(moduleState, "surveys");
+  const answered = task.status === "completed";
+  const questions = closed || answered ? [] : await loadTemplateQuestions(admin, tenantId, String(task.template_id));
+
+  return (
+    <PublicTokenPage
+      office={office}
+      logoUrl={tenant.logo_url ?? null}
+      brandColor={tenant.brand_color ?? null}
+      icon={Star}
+      title="Geri bildirim anketi"
+      subtitle="Görüşünüz bizim için çok değerli — birkaç soruyu cevaplamanız yeterli."
+      purpose="Bu sayfa yalnızca geri bildirim anketi içindir"
+    >
+      {closed ? (
+        <PublicStateBox icon={CheckCircle2} tone="success" title="Anket şu an kapalı." description="Bu anket ofis tarafından geçici olarak kapatıldı." />
+      ) : answered ? (
+        <PublicStateBox icon={CheckCircle2} tone="success" title="Yanıtınız alınmış." description="Bu anket daha önce cevaplandı. Değerlendirmeniz için teşekkür ederiz." />
+      ) : task.status === "refused" || task.status === "cancelled" ? (
+        <PublicStateBox icon={CheckCircle2} tone="success" title="Bu anket kapatılmış." description="Anket artık yanıt almıyor. İlginiz için teşekkür ederiz." />
+      ) : (
+        <TaskSurveyForm
+          token={token}
+          questions={questions.map((q) => ({ id: q.id, kind: q.kind, label: q.label, options: q.options, required: q.required }))}
+        />
       )}
     </PublicTokenPage>
   );
