@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { daysAgoIso, daysFromNowIso, trDayKey } from "@/lib/clock";
+import { daysAgoIso, daysFromNowIso, now, trDayKey } from "@/lib/clock";
 import {
   mapAppointment, mapAudit, mapCommission, mapContract, mapCustomer, mapDealWith, mapDemand, mapDue, mapExpense,
   mapOffer, mapPortalListing, mapProject, mapProperty, mapReferral, relOne, toCsv,
@@ -13,6 +13,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { logActivity } from "@/lib/activity";
+import { scoreCustomerHeat } from "@/lib/customer-heat";
 import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
 
 export type ExportResult = {
@@ -55,6 +56,70 @@ async function exportResult(
   return { csv, filename, truncated, rowCount: rows.length, entity };
 }
 
+const CUSTOMER_EXPORT_COLS = "full_name, phone, email, customer_types, tags, source, created_at";
+
+/** Segment filtresi: havuz (EXPORT_LIMIT) skorlanır, eşleşenlerin tam kolonları çekilir. */
+async function filterCustomersByHeatSegment(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gate: { tenantId: string; userId: string; role: string },
+  filters: CustomerListFilters,
+  segment: string,
+): Promise<{ rows: Record<string, unknown>[]; error?: unknown }> {
+  const scoped = <Q,>(q: Q): Q => (hasOfficeWideDataScope(gate.role) ? q : (q as unknown as { eq: (c: string, v: string) => Q }).eq("assigned_to", gate.userId));
+  const { data: pool, error } = await scoped(
+    applyCustomerFilters(
+      supabase
+        .from("customers")
+        .select("id, created_at, blacklist")
+        .eq("tenant_id", gate.tenantId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(EXPORT_LIMIT),
+      filters,
+    ),
+  );
+  if (error) return { rows: [], error };
+  const poolRows = (pool ?? []) as { id: string; created_at: string; blacklist: boolean | null }[];
+  const signals = new Map<string, { last_contact: string | null; open_demands: number; urgent_demands: number; portal_likes_30d: number; open_offers: number; open_deals: number }>();
+  for (let i = 0; i < poolRows.length; i += 500) {
+    const ids = poolRows.slice(i, i + 500).map((r) => r.id);
+    const res = await supabase.rpc("customer_heat_signals", { p_tenant_id: gate.tenantId, p_customer_ids: ids });
+    if (res.error) return { rows: [], error: res.error };
+    for (const s of (res.data ?? []) as { customer_id: string; last_contact: string | null; open_demands: number; urgent_demands: number; portal_likes_30d: number; open_offers: number; open_deals: number }[]) signals.set(s.customer_id, s);
+  }
+  const nowMs = now();
+  const matching = poolRows.filter((r) => {
+    const s = signals.get(r.id);
+    return (
+      scoreCustomerHeat(
+        {
+          lastContactAt: s?.last_contact ?? null,
+          openDemands: s?.open_demands ?? 0,
+          urgentDemands: s?.urgent_demands ?? 0,
+          portalLikes30d: s?.portal_likes_30d ?? 0,
+          hasOpenOfferOrDeal: (s?.open_offers ?? 0) > 0 || (s?.open_deals ?? 0) > 0,
+          createdAt: r.created_at,
+          blacklist: Boolean(r.blacklist),
+        },
+        nowMs,
+      ).segment === segment
+    );
+  });
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < matching.length; i += 200) {
+    const ids = matching.slice(i, i + 200).map((r) => r.id);
+    const { data, error: e2 } = await supabase
+      .from("customers")
+      .select(CUSTOMER_EXPORT_COLS)
+      .eq("tenant_id", gate.tenantId)
+      .in("id", ids);
+    if (e2) return { rows: [], error: e2 };
+    rows.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+  }
+  rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  return { rows };
+}
+
 /** Müşteri CSV'si ekrandaki filtreyi uygular (ortak kurucu: src/lib/customer-list-filters.ts). */
 export async function exportCustomersCsv(filters: Partial<CustomerListFilters> = {}): Promise<ExportResult> {
   const gate = await requirePermission("customers", "view");
@@ -71,13 +136,28 @@ export async function exportCustomersCsv(filters: Partial<CustomerListFilters> =
     normalizeCustomerFilters(filters),
   );
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
-  const { data, error } = await q;
+  let { data, error } = await q;
+  const normalized = normalizeCustomerFilters(filters);
+  let segmentApplied = false;
+  if (!error && normalized.segment) {
+    // Sıcaklık segmenti: ekranla aynı skorlama (scoreCustomerHeat + customer_heat_signals), tüm liste sınırı (EXPORT_LIMIT) içinde.
+    segmentApplied = true;
+    const picked = await filterCustomersByHeatSegment(supabase, gate, normalized, normalized.segment);
+    if (picked.error) {
+      console.error("exportCustomersCsv segment", picked.error);
+      error = picked.error as unknown as typeof error;
+    } else {
+      data = picked.rows as unknown as typeof data;
+    }
+  }
   if (error) {
     console.error("exportCustomersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapCustomer(r));
-  return exportResult(gate, "musteriler", rows, `musteriler-${trDayKey()}.csv`);
+  const result = await exportResult(gate, "musteriler", rows, `musteriler-${trDayKey()}.csv`);
+  // Segmentli dışa aktarmada tam akış (segment bilmez) önerilmez: yalnız filtreyi daraltma uyarısı kalır.
+  return segmentApplied ? { ...result, entity: undefined } : result;
 }
 
 export async function exportCommissionsCsv(): Promise<ExportResult> {

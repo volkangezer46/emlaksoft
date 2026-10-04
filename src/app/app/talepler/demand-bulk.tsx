@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, useTransition } from "react";
-import { CheckCircle2, RotateCcw, X } from "lucide-react";
+import { CheckCircle2, RotateCcw, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import { bulkSetDemandStatus } from "@/app/actions/demands";
+import { bulkDeleteDemands, bulkSetDemandStatus, getDemandDeleteImpact, type DemandDeleteImpact } from "@/app/actions/demands";
 import { useToast } from "@/components/app/toast-provider";
 
 /**
@@ -79,10 +80,11 @@ export function DemandRowCheckbox({ id, name }: { id: string; name: string }) {
   );
 }
 
-export function DemandBulkBar() {
+export function DemandBulkBar({ canDelete = false }: { canDelete?: boolean }) {
   const { selected, clear } = useSelection();
   const [error, setError] = useState<string | null>(null);
   const { push } = useToast();
+  const [impact, setImpact] = useState<DemandDeleteImpact | null>(null);
   const [pending, startTransition] = useTransition();
 
   if (selected.size === 0) return null;
@@ -110,6 +112,30 @@ export function DemandBulkBar() {
       <Button size="sm" variant="secondary" loading={pending} onClick={() => run("closed", "kapatıldı")}>
         <CheckCircle2 className="h-3.5 w-3.5" /> Kapat
       </Button>
+      {canDelete ? (
+        <ConfirmDialog
+          trigger={
+            <Button size="sm" variant="danger" onClick={() => void getDemandDeleteImpact(ids).then(setImpact)}>
+              <Trash2 className="h-3.5 w-3.5" /> Sil
+            </Button>
+          }
+          title={`${ids.length} talep kalıcı silinsin mi?`}
+          description={
+            `Talepler çöp kutusuna girmez, geri alınamaz.` +
+            (impact && impact.openDemands > 0 ? ` ${impact.openDemands} tanesi hâlâ açık (kapatmak için "Kapat" kullanabilirsiniz).` : "") +
+            (impact && impact.networkShares > 0 ? ` ${impact.networkShares} talebin ağ paylaşımı da kalkar.` : "")
+          }
+          confirmLabel="Kalıcı sil"
+          onConfirm={async () => {
+            const res = await bulkDeleteDemands(ids);
+            if (res.error) setError(res.error);
+            else {
+              clear();
+              push(`${res.deletedCount ?? 0} talep silindi`, "ok");
+            }
+          }}
+        />
+      ) : null}
       {error ? (
         <span className="text-xs font-semibold text-danger-500" role="alert">
           {error}

@@ -12,7 +12,11 @@ export type CustomerListFilters = {
   assigned: string;
   from: string;
   to: string;
+  /** Sıcaklık segmenti (skor bellekte hesaplanır; sorguya uygulanmaz): sicak | ilgili | soguk | uykuda */
+  segment: string;
 };
+
+export const HEAT_SEGMENT_KEYS = ["sicak", "ilgili", "soguk", "uykuda"] as const;
 
 export const EMPTY_CUSTOMER_FILTERS: CustomerListFilters = {
   q: "",
@@ -22,6 +26,7 @@ export const EMPTY_CUSTOMER_FILTERS: CustomerListFilters = {
   assigned: "",
   from: "",
   to: "",
+  segment: "",
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,6 +51,7 @@ export function normalizeCustomerFilters(sp: Raw | Partial<CustomerListFilters>)
     // Yalnız YYYY-MM-DD: bozuk tarih sorguyu sessizce boşaltmasın
     from: ISO_DATE.test(from) ? from : "",
     to: ISO_DATE.test(to) ? to : "",
+    segment: (HEAT_SEGMENT_KEYS as readonly string[]).includes(one(r.segment)) ? one(r.segment) : "",
   };
 }
 
@@ -55,7 +61,7 @@ export function customerSearchTerm(q: string): string {
 }
 
 export function hasCustomerFilters(f: CustomerListFilters): boolean {
-  return Boolean(f.type || f.etiket || f.source || f.assigned || f.from || f.to || customerSearchTerm(f.q));
+  return Boolean(f.segment || f.type || f.etiket || f.source || f.assigned || f.from || f.to || customerSearchTerm(f.q));
 }
 
 type Chainable = {

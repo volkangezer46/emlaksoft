@@ -361,6 +361,19 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkCustomerRe
     entityType: "customer",
     newValue: { ids: validIds, count: validIds.length },
   });
+  // Çöp kutusunda "Silen" görünsün: her müşteri için kayıt kimlikli denetim satırı (özet satırı korunur)
+  await Promise.all(
+    validIds.map((cid) =>
+      logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "customer.delete",
+        entityType: "customer",
+        entityId: cid,
+        newValue: { bulk: true },
+      }),
+    ),
+  );
 
   revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
