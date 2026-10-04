@@ -891,7 +891,7 @@ export default async function CustomersPage({
               createdSort: columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined,
             }}
           />
-          <CustomerMobileList rows={viewModels} />
+          <CustomerMobileList rows={viewModels} canBulk={canBulk} canEdit={canEdit} canDelete={canDelete} />
         </CustomerBulkProvider>
       )}
 

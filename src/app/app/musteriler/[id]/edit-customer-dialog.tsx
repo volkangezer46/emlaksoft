@@ -2,7 +2,7 @@
 
 import { useActionState, useState, startTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarHeart, MapPin, Pencil, UserRound } from "lucide-react";
+import { CalendarHeart, MapPin, Pencil, UserCog, UserRound } from "lucide-react";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { GeoSelect } from "@/components/app/geo-select";
 import { updateCustomer, type CustomerResult } from "@/app/actions/customers";
@@ -18,6 +18,9 @@ export function EditCustomerDialog({
   customer,
   provinces,
   types = DEFAULT_TYPES,
+  branches = [],
+  advisors = [],
+  sources = [],
 }: {
   customer: {
     id: string;
@@ -31,13 +34,23 @@ export function EditCustomerDialog({
     birth_date: string | null;
     anniversary_date: string | null;
     anniversary_note: string | null;
+    branch_id?: string | null;
+    assigned_to?: string | null;
+    source?: string | null;
+    lead_source_detail?: string | null;
+    blacklist?: boolean;
   };
   provinces: Province[];
   types?: string[];
+  branches?: { id: string; name: string }[];
+  advisors?: { id: string; full_name: string }[];
+  sources?: { value: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const defaultType = customer.customer_types?.[0] ?? "Alıcı";
+  const currentTypes = customer.customer_types && customer.customer_types.length > 0 ? customer.customer_types : ["Alıcı"];
+  // Mevcut türler tanım listesinde yoksa da seçili görünür (veri kaybı olmaz)
+  const typeOptions = [...new Set([...types, ...currentTypes])];
 
   const [state, action, pending] = useActionState(async (prev: CustomerResult, formData: FormData) => {
     const result = await updateCustomer(prev, formData);
@@ -64,7 +77,7 @@ export function EditCustomerDialog({
       pending={pending}
       error={state.error}
       hiddenFields={<input type="hidden" name="id" value={customer.id} />}
-      fieldLabels={{ full_name: "Ad soyad", phone: "Telefon", email: "E-posta", type: "Tür", birth_date: "Doğum tarihi", anniversary_date: "Yıldönümü", anniversary_note: "Yıldönümü notu", notes: "Not" }}
+      fieldLabels={{ branch_id: "Şube", assigned_to: "Danışman", source: "Kaynak", lead_source_detail: "Kaynak detayı", full_name: "Ad soyad", phone: "Telefon", email: "E-posta", type: "Tür", birth_date: "Doğum tarihi", anniversary_date: "Yıldönümü", anniversary_note: "Yıldönümü notu", notes: "Not" }}
       trigger={({ onClick, ...aria }) => (
         <button
           type="button"
@@ -78,6 +91,7 @@ export function EditCustomerDialog({
       tabs={[
         { id: "kimlik", label: "Kimlik ve iletişim", icon: UserRound, fields: ["full_name", "phone", "email", "type"] },
         { id: "konum", label: "Bölge", icon: MapPin, fields: [] },
+        { id: "kayit", label: "Kayıt ve atama", icon: UserCog, fields: ["branch_id", "assigned_to", "source", "lead_source_detail"] },
         { id: "ozel", label: "Özel günler ve not", icon: CalendarHeart, fields: ["birth_date", "anniversary_date", "anniversary_note", "notes"] },
       ]}
       panels={{
@@ -95,12 +109,17 @@ export function EditCustomerDialog({
               <label className={lbl} htmlFor="edit-email">E-posta</label>
               <EmailInput id="edit-email" name="email" defaultValue={customer.email ?? ""} className={input} />
             </div>
-            <div>
-              <label className={lbl} htmlFor="edit-type">Tür</label>
-              <select id="edit-type" name="type" defaultValue={defaultType} className={input}>
-                {types.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
+            <fieldset className="sm:col-span-2">
+              <legend className={lbl}>Müşteri türü (birden fazla seçilebilir)</legend>
+              <div className="flex flex-wrap gap-2">
+                {typeOptions.map((t) => (
+                  <label key={t} className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm">
+                    <input type="checkbox" name="type" value={t} defaultChecked={currentTypes.includes(t)} className="h-4 w-4 accent-brand-600" />
+                    {t}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </>
         ),
         konum: (
@@ -112,6 +131,48 @@ export function EditCustomerDialog({
               defaultDistrictId={customer.district_id}
             />
           </div>
+        ),
+        kayit: (
+          <>
+            <input type="hidden" name="blacklist_present" value="1" />
+            {branches.length > 0 ? (
+              <div>
+                <label className={lbl} htmlFor="edit-branch">Şube</label>
+                <select id="edit-branch" name="branch_id" defaultValue={customer.branch_id ?? ""} className={input}>
+                  <option value="">Şube atanmadı</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            ) : null}
+            {advisors.length > 0 ? (
+              <div>
+                <label className={lbl} htmlFor="edit-assigned">Danışman</label>
+                <select id="edit-assigned" name="assigned_to" defaultValue={customer.assigned_to ?? ""} className={input}>
+                  <option value="">Danışmansız</option>
+                  {advisors.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                </select>
+              </div>
+            ) : null}
+            <div>
+              <label className={lbl} htmlFor="edit-source">Kaynak</label>
+              <select id="edit-source" name="source" defaultValue={customer.source ?? ""} className={input}>
+                <option value="">Belirtilmedi</option>
+                {customer.source && !sources.some((x) => x.value === customer.source) ? <option value={customer.source}>{customer.source}</option> : null}
+                {sources.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl} htmlFor="edit-source-detail">Kaynak detayı</label>
+              <input id="edit-source-detail" name="lead_source_detail" defaultValue={customer.lead_source_detail ?? ""} placeholder="Örn. tavsiye eden kişi, ilan numarası" className={input} />
+            </div>
+            <label className="inline-flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" name="blacklist" defaultChecked={customer.blacklist} className="mt-0.5 h-4 w-4 accent-danger-500" />
+              <span>
+                <span className="font-semibold text-ink-950">Kara liste</span>
+                <span className="block text-xs text-text-muted">İşaretli müşteriye kampanya gönderilmez ve eylem önerilmez.</span>
+              </span>
+            </label>
+          </>
         ),
         ozel: (
           <>
