@@ -137,6 +137,126 @@ export async function endRental(id: string): Promise<RentalResult> {
   return { ok: true };
 }
 
+/**
+ * Kira sözleşmesi düzenleme (P0-5): vade günü, bitiş tarihi, depozito ve not.
+ * Aylık tutar `applyRentIncrease` ile, durum `endRental` ile değişir (atomik akışlar).
+ * Tahakkuk cron'una dokunulmaz; o her gün güncel `rentals` satırını okur — bitiş uzatılınca
+ * ve vade günü değişince sonraki tahakkuklar kendiliğinden doğru üretilir.
+ */
+export async function updateRental(_prev: RentalResult, fd: FormData): Promise<RentalResult> {
+  const gate = await requirePermission("rentals", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(fd.get("rental_id") ?? "").trim();
+  if (!id) return { error: "Kira kaydı bulunamadı." };
+  const dueDay = parseInt(String(fd.get("due_day") ?? "0"), 10);
+  const endDate = String(fd.get("end_date") ?? "").trim() || null;
+  const depositResult = parseMoneyInput(fd.get("deposit"), { allowZero: true, max: 1_000_000_000 });
+  const notes = String(fd.get("notes") ?? "").trim() || null;
+
+  if (isNaN(dueDay) || dueDay < 1 || dueDay > 28) return { error: "Vade günü 1-28 arasında olmalı." };
+  if (endDate && !isIsoDate(endDate)) return { error: "Geçerli bir bitiş tarihi girin." };
+  if (!depositResult.ok) return { error: "Geçerli bir depozito tutarı girin." };
+  if (notes && notes.length > 5000) return { error: "Not en fazla 5000 karakter olabilir." };
+
+  const supabase = await createClient();
+  const { data: rental } = await supabase
+    .from("rentals")
+    .select("id, status, start_date, due_day, end_date, deposit, notes")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!rental) return { error: "Kira kaydı bulunamadı." };
+  if (rental.status !== "active") return { error: "Yalnızca aktif kira kaydı düzenlenebilir." };
+  if (endDate && endDate <= String(rental.start_date)) return { error: "Bitiş tarihi başlangıçtan sonra olmalı." };
+
+  const patch = { due_day: dueDay, end_date: endDate, deposit: depositResult.value, notes };
+  const admin = createAdminClient();
+  const { data: updated, error } = await admin
+    .from("rentals")
+    .update(patch)
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("updateRental", error);
+    return { error: "Kira kaydı güncellenemedi." };
+  }
+  if (!updated) return { error: "Kira kaydı bu sırada değişti; sayfayı yenileyin." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "rental.update",
+    entityType: "rental",
+    entityId: id,
+    oldValue: { due_day: rental.due_day, end_date: rental.end_date, deposit: rental.deposit },
+    newValue: { due_day: dueDay, end_date: endDate, deposit: depositResult.value },
+  });
+  revalidatePath("/app/kiralama");
+  revalidatePath(`/app/kiralama/${id}`);
+  return { ok: true, id };
+}
+
+/**
+ * Kira sözleşmesini uzatır / yeniler (P0-5): yeni bitiş tarihi mevcut bitişten sonra olmalı;
+ * boş bırakılırsa sözleşme süresiz olur. Opsiyonel `monthly_rent` yalnız "artış" ise
+ * `applyRentIncrease` kullanılmalıdır; burada tutar değişmez.
+ */
+export async function extendRental(id: string, newEndDate: string | null): Promise<RentalResult> {
+  const gate = await requirePermission("rentals", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (newEndDate && !isIsoDate(newEndDate)) return { error: "Geçerli bir bitiş tarihi girin." };
+
+  const supabase = await createClient();
+  const { data: rental } = await supabase
+    .from("rentals")
+    .select("id, status, start_date, end_date")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!rental) return { error: "Kira kaydı bulunamadı." };
+  if (rental.status !== "active") return { error: "Yalnızca aktif kira uzatılabilir; sonlanmış kira için yeni kira kaydı açın." };
+  if (newEndDate) {
+    if (newEndDate <= String(rental.start_date)) return { error: "Bitiş tarihi başlangıçtan sonra olmalı." };
+    if (rental.end_date && newEndDate <= String(rental.end_date)) {
+      return { error: "Yeni bitiş tarihi mevcut bitiş tarihinden sonra olmalı." };
+    }
+  } else if (!rental.end_date) {
+    return { ok: true, id };
+  }
+
+  const admin = createAdminClient();
+  const { data: updated, error } = await admin
+    .from("rentals")
+    .update({ end_date: newEndDate })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("extendRental", error);
+    return { error: "Kira uzatılamadı." };
+  }
+  if (!updated) return { error: "Kira kaydı bu sırada değişti; sayfayı yenileyin." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "rental.extend",
+    entityType: "rental",
+    entityId: id,
+    oldValue: { end_date: rental.end_date },
+    newValue: { end_date: newEndDate },
+  });
+  revalidatePath("/app/kiralama");
+  revalidatePath(`/app/kiralama/${id}`);
+  return { ok: true, id };
+}
+
 /** Depozito iadesi işaretle (C.3) — kira bitince depozitonun kiracıya iade
  *  edildiğini kaydeder. Geri almak için `returned=false` gönderilebilir. */
 export async function markDepositReturned(id: string, returned = true): Promise<RentalResult> {

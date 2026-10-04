@@ -163,7 +163,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     return { error: "Komisyon tahsil edilmiş. Önce Komisyon ekranından tahsilatı geri alın." };
   }
   if (outcome === "payment_in_progress") {
-    return { error: "Bağlı ödeme bağlantısı varken anlaşma geri açılamaz; önce finans ekibiyle bağlantıyı kapatın." };
+    return { error: "Bağlı ödeme bağlantısı varken anlaşma geri açılamaz; önce Komisyon ekranında satırın \"Linkler\" bölümünden açık ödeme bağlantısını iptal edin." };
   }
   if (outcome === "rental_lifecycle_required") {
     return { error: "Kiralama kaydına bağlı anlaşma buradan geri açılamaz; Kiralama ekranındaki yaşam döngüsünü kullanın." };

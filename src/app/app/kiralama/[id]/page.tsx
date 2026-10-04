@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChargesPanel } from "./charges-panel";
 import { MaintenancePanel } from "./maintenance-panel";
 import { EndRentalButton } from "./end-rental-button";
+import { RentalEditPanel } from "./rental-edit-panel";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -112,6 +113,18 @@ export default async function KiraDetayPage({
             <Badge variant={active ? "success" : "outline"} className={active ? "" : "text-white/70 ring-white/25"}>
               {active ? "Aktif" : "Bitti"}
             </Badge>
+            {canEdit && active ? (
+              <RentalEditPanel
+                rental={{
+                  id: rental.id,
+                  due_day: rental.due_day,
+                  start_date: String(rental.start_date).slice(0, 10),
+                  end_date: rental.end_date ? String(rental.end_date).slice(0, 10) : null,
+                  deposit: rental.deposit != null ? Number(rental.deposit) : null,
+                  notes: rental.notes ?? null,
+                }}
+              />
+            ) : null}
             {canEdit && active ? <EndRentalButton rentalId={rental.id} /> : null}
           </div></div>
 } />
