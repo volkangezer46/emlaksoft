@@ -116,8 +116,18 @@ describe("tema paleti", () => {
     }
   });
 
-  it("6 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
-    expect(ACCENTS.map((a) => a.value)).toEqual(["ocean", "emerald", "indigo", "amber", "graphite", "gold"]);
+  it("9 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
+    expect(ACCENTS.map((a) => a.value)).toEqual([
+      "ocean",
+      "emerald",
+      "indigo",
+      "amber",
+      "graphite",
+      "gold",
+      "burgundy",
+      "petrol",
+      "olive",
+    ]);
     for (const a of ACCENTS.filter((x) => x.value !== "ocean")) {
       const light = block(themesCss, `html[data-accent="${a.value}"]`);
       const dark = block(themesCss, `html[data-theme="dark"][data-accent="${a.value}"]`);
@@ -153,7 +163,10 @@ describe("tema paleti", () => {
 
   it("açılış script'i vurgu anahtarını okur, yalnız bilinen vurguları uygular", () => {
     expect(THEME_BOOT_SCRIPT).toContain("es-accent");
-    expect(THEME_BOOT_SCRIPT).toContain("emerald|indigo|amber|graphite|gold");
+    // Varsayılan (ocean) öznitelik gerektirmez; diğer 8 vurgu ACCENTS'ten üretilir.
+    expect(THEME_BOOT_SCRIPT).toContain("/^(emerald|indigo|amber|graphite|gold|burgundy|petrol|olive)$/");
+    expect(THEME_BOOT_SCRIPT).not.toContain("ocean");
+    expect(() => new Function(THEME_BOOT_SCRIPT)).not.toThrow();
   });
 
   it("themes.css ve theme-dark.css public sayfaya uygulanmaz: öznitelik yalnız tema script'iyle gelir", () => {
