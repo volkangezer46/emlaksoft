@@ -60,7 +60,7 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
     for (const p of [
       "src/app/app/danisman-kpi/page.tsx",
       "src/app/app/ekip/kiyas/page.tsx",
-      "src/app/app/pano-tv/page.tsx",
+      "src/lib/tv/tv-data.ts",
       "src/app/app/lig/page.tsx",
       "src/app/app/ekip/[id]/advisor-view.tsx",
     ]) {
