@@ -92,6 +92,7 @@ export default async function SupportPage({
   searchParams?: Promise<{ durum?: string; kategori?: string; ara?: string; sayfa?: string; yeni?: string }>;
 }) {
   const gate = await requireModulePage("support");
+  const canCreateTicket = (gate.perms.support ?? []).includes("create");
   const sp = (await searchParams) ?? {};
   if (sp.yeni) redirect("/app/destek/yeni");
   const requestedStatus = sp.durum ?? "";
@@ -269,7 +270,7 @@ export default async function SupportPage({
   return (
     <div className="space-y-6">
       <PageHeader title="Talepleriniz" eyebrow="Yardım ve Destek" description="EmlakSoft ekibine fatura, kurulum ve teknik taleplerinizi iletin." actions={
-<ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep</ButtonLink>
+canCreateTicket ? <ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep</ButtonLink> : undefined
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
@@ -491,7 +492,7 @@ export default async function SupportPage({
               ilk destek talebinizi oluşturun; ekibimiz en geç 1 iş günü içinde döner.
             </p>
             <div className="relative mt-5">
-              <ButtonLink href="/app/destek/yeni" variant="secondary" icon={LifeBuoy}>Yeni talep</ButtonLink>
+              {canCreateTicket ? <ButtonLink href="/app/destek/yeni" variant="secondary" icon={LifeBuoy}>Yeni talep</ButtonLink> : <p className="text-xs text-text-muted">Talep açma yetkiniz yok; ofis yöneticinizden isteyin.</p>}
             </div>
           </div>
         ) : pageRows.length === 0 ? (
