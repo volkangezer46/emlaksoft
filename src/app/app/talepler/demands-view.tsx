@@ -37,6 +37,7 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { DemandMobileList, DemandTable, type DemandVM } from "./demand-rows";
+import { DemandBulkBar, DemandBulkProvider } from "./demand-bulk";
 import {
   AGING_DAYS,
   BUDGET_BANDS,
@@ -116,6 +117,7 @@ export async function DemandsView({
 }) {
   const { perms } = await requireModulePage("demands");
   const canCreate = (perms.demands ?? []).includes("create");
+  const canEdit = (perms.demands ?? []).includes("edit");
   const sp = await searchParams;
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
@@ -581,8 +583,11 @@ async function DemandList({
         />
       ) : (
         <>
-          <DemandTable rows={viewModels} density={density} />
-          <DemandMobileList rows={viewModels} />
+          <DemandBulkProvider key={viewModels.map((v) => v.id).join(",")}>
+            {canEdit ? <DemandBulkBar /> : null}
+            <DemandTable rows={viewModels} density={density} canBulk={canEdit} />
+            <DemandMobileList rows={viewModels} canBulk={canEdit} />
+          </DemandBulkProvider>
         </>
       )}
       <ListPager pathname={PATH} params={urlParams} window={win} total={total} />
