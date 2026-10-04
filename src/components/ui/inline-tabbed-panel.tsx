@@ -338,7 +338,7 @@ function PanelBody({
                     key={f}
                     type="button"
                     onClick={() => goTo(tab.id, f)}
-                    className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-1.5 py-1 text-left text-xs transition-colors hover:bg-surface"
+                    className="focus-ring flex min-h-8 w-full items-baseline gap-3 rounded-[var(--radius-control)] px-1.5 py-1 text-left text-xs transition-colors hover:bg-surface-hover"
                   >
                     <span className="shrink-0 text-text-muted">{fieldLabels?.[f] ?? i.label ?? f}</span>
                     <span
@@ -386,7 +386,7 @@ function PanelBody({
           type="button"
           onClick={requestClose}
           aria-label="Paneli kapat"
-          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-canvas hover:text-ink-950"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed"
         >
           <X className="h-5 w-5" aria-hidden="true" />
         </button>

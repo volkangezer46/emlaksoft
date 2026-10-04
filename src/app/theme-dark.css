@@ -94,6 +94,21 @@ html[data-theme="dark"] {
   --inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* ---- Rol adlı etkileşim token'ları (--surface-hover / -pressed / -selected,
+   --border-interactive / -strong) -----------------------------------------------
+   Formül tokens.css'te TEK yerdedir ve --text / --brand-600'dan türediği için koyu
+   temada kendiliğinden açık tona döner; burada yeniden yazılmaz. Bu blok yalnız
+   color-mix(in oklch) desteklemeyen tarayıcı içindir (düz renk yedeği).
+   --surface-selected yedeği --brand-50'dir ve o da koyu değerini yukarıdan alır. */
+@supports not (color: color-mix(in oklch, #000 50%, transparent)) {
+  html[data-theme="dark"] {
+    --surface-hover: rgba(232, 237, 247, 0.04);
+    --surface-pressed: rgba(232, 237, 247, 0.08);
+    --border-interactive: rgba(232, 237, 247, 0.22);
+    --border-strong: rgba(232, 237, 247, 0.32);
+  }
+}
+
 /* ---- Token'a bağlı olmayan ham sınıflar ------------------------------------ */
 
 html[data-theme="dark"] .bg-white:not(.theme-dark *) {

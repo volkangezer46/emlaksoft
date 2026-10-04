@@ -228,7 +228,8 @@ export function FormActionBar({
     <div
       data-kb={keyboardOpen ? "1" : undefined}
       className={cn(
-        "fab-bar relative z-10 rounded-[var(--radius-card)] border border-line bg-surface/95 shadow-[var(--elev-2)] backdrop-blur",
+        // Cam bütçesi: yapışkan alt çubuk opak (cam yalnız sabit üst çubukta).
+        "fab-bar relative z-10 rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--elev-2)]",
         mode === "sticky" &&
           "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-2 lg:pb-0",
         mode === "inline" && "mt-5",

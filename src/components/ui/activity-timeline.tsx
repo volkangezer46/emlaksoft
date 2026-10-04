@@ -126,8 +126,8 @@ export function ActivityTimeline({
                 className={cn(
                   "focus-ring press inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-sm font-semibold transition",
                   on
-                    ? "bg-brand-600/10 text-brand-700 ring-1 ring-inset ring-brand-600/25"
-                    : "text-text-muted hover:bg-surface-2 hover:text-text",
+                    ? "bg-surface-selected text-brand-700 ring-1 ring-inset ring-brand-600/25"
+                    : "text-text-muted hover:bg-surface-hover hover:text-text active:bg-surface-pressed",
                 )}
               >
                 {c.label}
@@ -183,7 +183,7 @@ export function ActivityTimeline({
                   return (
                     <li key={e.id}>
                       {e.href ? (
-                        <Link href={e.href} className="focus-ring group flex gap-3 rounded-[var(--radius-card)] transition hover:bg-surface-2/60">
+                        <Link href={e.href} className="focus-ring group flex gap-3 rounded-[var(--radius-card)] transition hover:bg-surface-hover">
                           {body}
                         </Link>
                       ) : (

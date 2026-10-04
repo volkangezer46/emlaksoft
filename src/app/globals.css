@@ -215,6 +215,13 @@ aside::-webkit-scrollbar-thumb,
 .press { transition: transform 0.12s ease, box-shadow 0.18s ease; }
 .press:active { transform: translateY(1px) scale(0.98); }
 
+/* Opak zeminli denetim (ikincil düğme, sayfalama düğmesi, istatistik kutusu): rol
+   token'ları yarı saydam olduğundan hover/basılı tonu zemin renginin ÜSTÜNE bindirilir
+   (zemin rengi yerinde kalır). Saydam zeminli öğelerde (hayalet düğme, satır, çip)
+   doğrudan `hover:bg-surface-hover active:bg-surface-pressed` kullanılır. */
+.surface-interactive:hover { background-image: linear-gradient(var(--surface-hover), var(--surface-hover)); }
+.surface-interactive:active { background-image: linear-gradient(var(--surface-pressed), var(--surface-pressed)); }
+
 /* Hover'da yükselme — kart/satır için. Gölge ve konum birlikte değişir,
    yalnızca renk değiştirmek "tıklanabilir" hissi vermiyor. */
 .lift-hover { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease; }
@@ -1052,7 +1059,7 @@ p {
   inset: 1px;
   border-radius: inherit;
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(2px);
+  /* cam bütçesi: tekrar eden kart ikonunda 2px bulanıklık kaldırıldı (görsel fark yok). */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1609,15 +1616,27 @@ p {
 .type-caption { font-size: var(--fs-caption); line-height: 1.35; letter-spacing: 0.01em; color: var(--text-muted); }
 .type-display, .type-h1, [data-numeric] { font-variant-numeric: tabular-nums; }
 
-/* Cam efekti YALNIZ üst bar ve komut paletinde (başka yerde kullanma). */
+/* ---- CAM YÜZEY BÜTÇESİ (docs/DESIGN_SYSTEM.md "Cam yüzey bütçesi") ----------------
+   backdrop-filter pahalıdır: altındaki her piksel değişiminde (kaydırma, animasyon)
+   yeniden hesaplanır. Sayfa başına cam yalnız şuralarda serbesttir:
+     1) sabit üst çubuk            .glass-bar (/app, /admin), .mk-nav::before (ana sayfa)
+     2) TEK vurgu yüzeyi           .pm-glass (hero cam KPI), .mk-portals (ana sayfa)
+     3) geçici modal örtüsü        .dialog-overlay, .mega-backdrop (açıkken sayfa durağan)
+   Kaydırılan içerikte tekrar eden öğe (kart, satır, rozet, harita işareti, grafik
+   ipucu) ve alt çubuklar cam OLAMAZ: opak ya da düz yarı saydam zemin kullanılır.
+   Opak yedekler (backdrop-filter desteği yok / saydamlığı azalt / yüksek kontrast)
+   a11y.css'tedir. Sözleşme: src/lib/glass-budget-contract.test.ts. */
 .glass-bar {
   background: var(--surface-overlay);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   backdrop-filter: blur(14px) saturate(1.4);
   border-bottom: 1px solid var(--hairline);
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass-bar { background: var(--surface); }
+/* Bütçe kilidi: içerik alanındaki (<main>) Tailwind backdrop-blur-* yardımcıları etkisizdir.
+   Katmansız kural yardımcı sınıfı ezer; öğenin kendi yarı saydam zemini yerinde kalır. */
+main [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* Basılı geri bildirimi: bağımsız `scale` özelliği — Tailwind transform

@@ -107,7 +107,7 @@ export function FilterBar({
         ) : null}
         <button
           type="submit"
-          className="focus-ring min-h-9 touch:min-h-11 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring min-h-9 touch:min-h-11 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-accent-hover"
         >
           Uygula
         </button>
@@ -137,7 +137,7 @@ export function FilterBar({
                 aria-current={on ? "page" : undefined}
                 className={cn(
                   "focus-ring inline-flex min-h-8 touch:min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition",
-                  on ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-2 hover:text-text",
+                  on ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-hover hover:text-text active:bg-surface-pressed",
                 )}
               >
                 {t.label}

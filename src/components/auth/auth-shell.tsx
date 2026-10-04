@@ -52,7 +52,7 @@ export function AuthShell({
             </ul>
           </div>
 
-          <p className="max-w-md rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-5 text-sm leading-relaxed text-white/80 backdrop-blur">
+          <p className="max-w-md rounded-[var(--radius-panel)] border border-white/10 bg-white/[0.05] p-5 text-sm leading-relaxed text-white/80">
             Portal ilanlarının nerede kapandığını, kaçan komisyonu ve kimin aranması gerektiğini tek ekranda görürsünüz.
           </p>
         </div>

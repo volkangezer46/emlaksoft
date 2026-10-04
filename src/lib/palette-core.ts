@@ -1,10 +1,13 @@
 import { ICONS } from "@/lib/icons";
 import { visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
+import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
+import { UI_FONTS, writeUiPrefsCookie, type UiFont, type UiPrefs } from "@/lib/ui-prefs";
 
 /**
  * Komut paletleri (/app ve /admin) için ortak mantık: arama süzgeci, yetkiye göre
- * "Git" / "Eylemler" listeleri ve localStorage destekli "Son görülenler" deposu.
+ * "Git" / "Eylemler" listeleri, "Görünüm" komutları (tema, vurgu rengi, yazı boyutu,
+ * sade görünüm) ve localStorage destekli "Son görülenler" deposu.
  * İki palet farklı arama kaynaklarına sahip olduğundan görünüm ayrı kalır;
  * veri ve davranış burada tek yerdedir.
  */
@@ -69,6 +72,148 @@ export function getAppGoItems(accessible: readonly AppModule[], q = ""): Palette
     .flatMap((i) => (i.tabs && i.tabs.length > 1 ? i.tabs : [i]))
     .filter((i) => matchesQuery(i.label, q))
     .map(({ label, href, icon }) => ({ label, href, icon }));
+}
+
+/* ------------------------------ Görünüm komutları ------------------------------ */
+
+/**
+ * Komut paletinin "Görünüm" grubu: bir sayfaya GİTMEZ, tercihi anında uygular.
+ * TEK kaynak burasıdır; seçenekler mevcut tablolardan üretilir (ACCENTS, UI_FONTS),
+ * böylece yeni vurgu teması ya da yazı boyutu eklenince palet kendiliğinden güncellenir.
+ * Kalıcılık MEVCUT mekanizmalardadır: tema/vurgu `lib/theme.ts` (localStorage + çerez),
+ * yazı boyutu/sade görünüm `lib/ui-prefs.ts` (ofis+kullanıcı kapsamlı çerez). Yeni depolama yok.
+ */
+export type AppearanceAction =
+  | { kind: "theme"; value: ThemePref }
+  | { kind: "accent"; value: AccentPref }
+  | { kind: "font"; value: UiFont }
+  | { kind: "simple"; value: boolean };
+
+export type AppearanceCommand = {
+  /** Kararlı kimlik (liste anahtarı): "tema:dark", "vurgu:burgundy", "yazi:xlarge", "sade:on". */
+  id: string;
+  label: string;
+  /** Etikette geçmeyen arama sözcükleri ("karanlık", "font" ...). */
+  keywords: string;
+  /** Uygulandıktan sonra gösterilen onay metni (toast; ekran okuyucuya da duyurulur). */
+  done: string;
+  action: AppearanceAction;
+};
+
+const THEME_COMMANDS: { value: ThemePref; label: string; keywords: string }[] = [
+  { value: "light", label: "Açık", keywords: "görünüm aydınlık gündüz beyaz" },
+  { value: "dark", label: "Koyu", keywords: "görünüm karanlık gece siyah" },
+  { value: "system", label: "Sistem", keywords: "görünüm otomatik cihaz" },
+];
+
+export const APPEARANCE_COMMANDS: readonly AppearanceCommand[] = [
+  ...THEME_COMMANDS.map((t) => ({
+    id: `tema:${t.value}`,
+    label: `Tema: ${t.label}`,
+    keywords: t.keywords,
+    done: `Tema: ${t.label} uygulandı`,
+    action: { kind: "theme", value: t.value } as const,
+  })),
+  ...ACCENTS.map((a) => ({
+    id: `vurgu:${a.value}`,
+    label: `Vurgu rengi: ${a.label}`,
+    keywords: `tema renk ${a.hint}`,
+    done: `Vurgu rengi: ${a.label} uygulandı`,
+    action: { kind: "accent", value: a.value } as const,
+  })),
+  ...UI_FONTS.map((f) => ({
+    id: `yazi:${f.value}`,
+    label: `Yazı boyutu: ${f.label}`,
+    keywords: "font metin harf büyüklük punto okunabilirlik",
+    done: `Yazı boyutu: ${f.label} uygulandı`,
+    action: { kind: "font", value: f.value } as const,
+  })),
+  {
+    id: "sade:on",
+    label: "Sade görünümü aç",
+    keywords: "menü basit sık kullanılan",
+    done: "Sade görünüm açıldı",
+    action: { kind: "simple", value: true },
+  },
+  {
+    id: "sade:off",
+    label: "Sade görünümü kapat",
+    keywords: "menü tüm sayfalar",
+    done: "Sade görünüm kapatıldı",
+    action: { kind: "simple", value: false },
+  },
+];
+
+/** Paletin o anki tercihleri: işaretleme ("Seçili") ve uygun komutların süzülmesi için. */
+export type AppearanceState = {
+  theme?: ThemePref;
+  accent?: AccentPref;
+  /** Yazı boyutu + sade görünüm; çerez adı yoksa (ör. /admin) null: bu komutlar gösterilmez. */
+  ui?: UiPrefs | null;
+};
+
+export type AppearanceEntry = AppearanceCommand & { current: boolean };
+
+/** Sorgudaki HER sözcük etikette ya da anahtar sözcüklerde geçmeli ("koyu tema" = "Tema: Koyu"). */
+export function matchesAllWords(haystack: string, q: string): boolean {
+  const text = haystack.toLocaleLowerCase("tr-TR");
+  return q
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .split(/\s+/)
+    .every((word) => text.includes(word));
+}
+
+function isCurrent(action: AppearanceAction, state: AppearanceState): boolean {
+  if (action.kind === "theme") return state.theme === action.value;
+  if (action.kind === "accent") return state.accent === action.value;
+  if (action.kind === "font") return state.ui?.font === action.value;
+  return false;
+}
+
+/**
+ * Sorguya uyan görünüm komutları. En az 2 karakter ister (kayıt aramasıyla aynı eşik):
+ * boş palette 16 satırlık bir liste açılmaz. "Sade görünüm" yalnız uygulanabilir yönüyle
+ * (açıkken "kapat", kapalıyken "aç") listelenir.
+ */
+export function getAppearanceCommands(q: string, state: AppearanceState = {}): AppearanceEntry[] {
+  if (q.trim().length < 2) return [];
+  return APPEARANCE_COMMANDS.filter((c) => {
+    const { action } = c;
+    if ((action.kind === "font" || action.kind === "simple") && !state.ui) return false;
+    if (action.kind === "simple" && state.ui && action.value === state.ui.simple) return false;
+    return matchesAllWords(`${c.label} ${c.keywords}`, q);
+  }).map((c) => ({ ...c, current: isCurrent(c.action, state) }));
+}
+
+/** Yazı boyutu / sade görünüm komutundan sonraki tercih; diğer komutlarda değişmez. */
+export function nextUiPrefs(current: UiPrefs, action: AppearanceAction): UiPrefs {
+  if (action.kind === "font") return { ...current, font: action.value };
+  if (action.kind === "simple") return { ...current, simple: action.value };
+  return current;
+}
+
+/**
+ * Komutu uygular (yalnız tarayıcıda çağrılır). Tema ve vurgu anında geçerlidir
+ * (ThemeController olayı dinler). Yazı boyutu ve sade görünüm sunucuda uygulanır:
+ * çerez yazılır ve `refresh: true` döner; çağıran `router.refresh()` yapar.
+ * Çerez adı yoksa yazı/sade komutu uygulanmaz (`applied: false`).
+ */
+export function runAppearanceCommand(
+  action: AppearanceAction,
+  ui: { cookieName: string; current: UiPrefs } | null = null,
+): { applied: boolean; refresh: boolean } {
+  if (action.kind === "theme") {
+    writeThemePref(action.value);
+    return { applied: true, refresh: false };
+  }
+  if (action.kind === "accent") {
+    writeAccentPref(action.value);
+    return { applied: true, refresh: false };
+  }
+  if (!ui) return { applied: false, refresh: false };
+  writeUiPrefsCookie(ui.cookieName, nextUiPrefs(ui.current, action));
+  return { applied: true, refresh: true };
 }
 
 /* ------------------------------ Son görülenler ------------------------------ */
