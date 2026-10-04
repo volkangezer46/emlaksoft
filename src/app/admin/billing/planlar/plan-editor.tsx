@@ -199,7 +199,7 @@ export function CampaignForm({
         <p className="text-xs text-warn-600">Kampanya gizli: kilitli fiyat şeması (20260817000220) henüz uygulanmadı; sayaç ve uygulama kapalı.</p>
       )}
       {!trialEffective ? (
-        <p className="text-xs text-warn-600">Deneme günü 20260817000220 uygulanana kadar fiilen 14 gündür; sitedeki metinler 14 gün der.</p>
+        <p className="text-xs text-warn-600">Deneme günü, 20260816010100 migration&apos;ı uygulanana kadar fiilen 14 gündür; sitedeki metinler gerçekte verilen süreyi söyler.</p>
       ) : null}
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">

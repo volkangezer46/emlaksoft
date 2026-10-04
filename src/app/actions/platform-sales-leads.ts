@@ -6,7 +6,8 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 export type LeadResult = { ok?: boolean; error?: string };
 
@@ -30,7 +31,7 @@ function parseLeadFields(formData: FormData): { fields: LeadFields } | { error: 
   if (!rawPhone && !email) return { error: "Telefon veya e-posta girin." };
   let phone: string | null = null;
   if (rawPhone) {
-    const parsed = parsePhone(rawPhone);
+    const parsed = parsePhoneStrict(rawPhone);
     if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
     phone = parsed.stored;
   }

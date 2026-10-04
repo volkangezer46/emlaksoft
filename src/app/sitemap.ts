@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { getBaseUrl } from "@/lib/base-url";
+import { publishedTools } from "@/lib/tools/registry";
 const BASE_URL = getBaseUrl();
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -9,6 +10,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "", priority: 1, freq: "weekly" as const },
     { path: "/kayit", priority: 0.9, freq: "monthly" as const },
     { path: "/fiyatlar", priority: 0.8, freq: "monthly" as const },
+    { path: "/araclar", priority: 0.6, freq: "monthly" as const },
+    ...publishedTools().map((t) => ({ path: `/araclar/${t.slug}`, priority: 0.6, freq: "monthly" as const })),
     { path: "/giris", priority: 0.5, freq: "monthly" as const },
     { path: "/demo", priority: 0.8, freq: "monthly" as const },
     { path: "/gizlilik", priority: 0.3, freq: "yearly" as const },
@@ -53,6 +56,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .select("id, tenant_id, updated_at")
       .eq("status", "live")
       .is("deleted_at", null)
+      .eq("is_sample", false)
       .order("updated_at", { ascending: false })
       .limit(10000);
     for (const l of listings ?? []) {

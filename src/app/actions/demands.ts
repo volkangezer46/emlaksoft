@@ -279,6 +279,46 @@ export async function updateDemand(
   return { ok: true, id };
 }
 
+const DEMAND_BULK_LIMIT = 200;
+
+/** Seçili talepleri tek durumda toplar (ör. kapat / aktif yap). Yalnız aynı ofisin talepleri güncellenir. */
+export async function bulkSetDemandStatus(ids: string[], status: string): Promise<DemandResult & { updatedCount?: number }> {
+  const gate = await requirePermission("demands", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!isDemandStatus(status)) return { error: "Geçersiz durum." };
+  const list = [...new Set((ids ?? []).map((i) => String(i).trim()).filter(Boolean))];
+  if (list.length === 0) return { error: "Talep seçilmedi." };
+  if (list.length > DEMAND_BULK_LIMIT) return { error: `Tek seferde en fazla ${DEMAND_BULK_LIMIT} talep güncellenebilir.` };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customer_demands")
+    .update({ status })
+    .in("id", list)
+    .eq("tenant_id", gate.tenantId)
+    .select("id, customer_id");
+  if (error) {
+    console.error("bulkSetDemandStatus", error);
+    return { error: "Talepler güncellenemedi." };
+  }
+  const rows = data ?? [];
+  if (rows.length === 0) return { error: "Güncellenecek talep bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "demand.bulk_status",
+    entityType: "demand",
+    newValue: { ids: rows.map((r) => r.id), status, count: rows.length },
+  });
+  revalidatePath("/app/talepler");
+  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/musteriler");
+  for (const cid of new Set(rows.map((r) => r.customer_id))) revalidatePath(`/app/musteriler/${cid}`);
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, updatedCount: rows.length };
+}
+
 export async function setDemandStatus(formData: FormData): Promise<DemandResult> {
   const gate = await requirePermission("demands", "edit");
   if (!gate.ok) return { error: gate.error };

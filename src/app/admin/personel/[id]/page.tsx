@@ -10,6 +10,7 @@ import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { deactivateStaff, reactivateStaff, updateStaffRole } from "@/app/actions/platform-staff";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { PLATFORM_ROLES, roleSummary } from "../staff-model";
+import { StaffAccountPanel } from "./staff-account-panel";
 
 type Member = {
   id: string;
@@ -19,6 +20,7 @@ type Member = {
   is_active: boolean;
   created_at: string;
   last_sign_in_at: string | null;
+  must_change_password?: boolean;
 };
 type Activity = {
   id: string;
@@ -40,6 +42,7 @@ function metaText(m: Activity["meta"]): string | null {
   if (m.old_role || m.new_role) parts.push(`${role(m.old_role) ?? "—"} → ${role(m.new_role) ?? "—"}`);
   else if (m.role) parts.push(`Rol: ${role(m.role)}`);
   if (m.temp_password) parts.push("Geçici parola ile açıldı");
+  if (m.must_change_password) parts.push("İlk girişte parola değişimi zorunlu");
   return parts.length ? parts.join(" · ") : null;
 }
 
@@ -141,6 +144,14 @@ export default function PersonelDetayPage() {
       </section>
 
       {err ? <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{err}</p> : null}
+
+      <StaffAccountPanel
+        id={id}
+        fullName={member.full_name}
+        email={member.email}
+        mustChangePassword={member.must_change_password === true}
+        onChanged={load}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">

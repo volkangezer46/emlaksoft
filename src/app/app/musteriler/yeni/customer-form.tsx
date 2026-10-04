@@ -46,11 +46,17 @@ export function CustomerForm({
   branches,
   types,
   userId,
+  initialPhone = "",
+  linkRef = "",
   canCreateDemand,
   transactionTypes,
   propertyTypes,
   urgencyOptions,
 }: {
+  /** Gelen kutusundan gelen telefon (saklama biçiminde); boşsa alan boş açılır. */
+  initialPhone?: string;
+  /** Müşteri oluşunca bağlanacak çağrı / iletişim kaydı (`a-<id>` | `c-<id>`). */
+  linkRef?: string;
   provinces: Province[];
   branches: Branch[];
   types: string[];
@@ -114,7 +120,8 @@ export function CustomerForm({
     iletisim: (
       <>
         <FormField label="Telefon" htmlFor="phone">
-          <PhoneInput name="phone" className={fieldClass} />
+          <PhoneInput name="phone" className={fieldClass} defaultValue={initialPhone || undefined} />
+          {linkRef ? <input type="hidden" name={"link_ref"} value={linkRef} /> : null}
         </FormField>
         <FormField label="E-posta" htmlFor="email">
           <EmailInput name="email" />

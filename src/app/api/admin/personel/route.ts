@@ -56,7 +56,14 @@ export async function GET(req: Request) {
       .slice(0, 40)
       .map((r) => ({ ...r, direction: r.actor_id === id ? "by" : "about" }));
 
-    return NextResponse.json({ member: { ...member, last_sign_in_at: logins.get(id) ?? null }, activity });
+    // Zorunlu parola değişimi bekliyor mu (auth user_metadata). Okunamazsa false: yalnız bilgi amaçlı.
+    const authUser = await admin.auth.admin.getUserById(id).then((r) => r.data?.user ?? null).catch(() => null);
+    const mustChangePassword = authUser?.user_metadata?.must_change_password === true;
+
+    return NextResponse.json({
+      member: { ...member, last_sign_in_at: logins.get(id) ?? null, must_change_password: mustChangePassword },
+      activity,
+    });
   }
 
   const [{ data, error }, logins] = await Promise.all([

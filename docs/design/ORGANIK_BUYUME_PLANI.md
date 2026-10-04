@@ -87,7 +87,7 @@ K2: plan fiyatı, kupon, Founders kampanyası, bitiş/kota. Bu plan yalnız şun
 
 ### 3.1 Ortak altyapı: tek hesap kredisi defteri
 - `account_credit_ledger`: ekleme-yalnız (append-only), `tenant_id`, `unit` ('try' = abonelik kredisi, TL değerinde; 'ai' = ileride AI kredi ölçümü), `entry_type` (grant/hold_release/spend/expire/adjust/reverse), `amount`, `source` (referral/partner/manual/campaign), `source_id`, `idempotency_key` UNIQUE, `available_at`, `expires_at`, `created_by`. Bakiye = SUM(...) görünümü; negatif bakiye yok (kısıt).
-- Neden tek defter: AI kredi paketi geldiğinde ayrı tablo yazılmaz; `unit` ayrımıyla aynı defter kullanılır. AI ajanı farklı bir defter tasarlarsa `unit='ai'` kısmı onunla birleştirilir, 'try' kısmı bu şemada kalır. Taslak: `supabase/proposed/20260816001200_growth_referral_partner_attribution.sql` (UYGULANMADI).
+- Neden tek defter: AI kredi paketi geldiğinde ayrı tablo yazılmaz; `unit` ayrımıyla aynı defter kullanılır. AI ajanı farklı bir defter tasarlarsa `unit='ai'` kısmı onunla birleştirilir, 'try' kısmı bu şemada kalır. Taslak: `supabase/proposed/20260819000100_growth_referral_partner_attribution.sql` (UYGULANMADI).
 - Ödül kuralı admin'de: `growth_reward_rules` (tür referral|partner, ödül tipi sabit TL | yüzde, tutar, süre ay, bekleme günü, tavan, aktif, geçerlilik tarihleri). Kod içine sabit oran yazılmaz.
 - Ödül tetikleyici: abonelik ilk başarılı ücretli ödemeden sonra BEKLEME gün (öneri 30; iade/itiraz riski) geçince `hold_release`. Deneme kaydı ödül vermez.
 - Denetim: her yazım `platform_audit_logs`'a (mevcut) düşer; defter satırı silinmez/güncellenmez (düzeltme ters kayıtla).
@@ -248,4 +248,4 @@ Portal entegrasyonu görüşmeleri ve e-imza/BSP gelir paylaşımı bu 90 günde
 Her adımda: `requirePermission`, RLS, `admin-client-allowlist` envanteri, `check:cron` (benchmark cron'u), Türkçe metin, koyu tema yalnız /app ve /admin.
 
 ## 10. Migration taslağı notu
-`supabase/proposed/20260816001200_growth_referral_partner_attribution.sql` ve `rollbacks` karşılığı taslaktır; `supabase/migrations`'a TAŞINMADI çünkü `db:migrate` ve ledger/checksum denetimi `migrations` klasörünü uygulanabilir sayar ve paralel ajanların numara çakışması riski vardır. Uygulamadan önce: numara güncellenir, `check:migrations` + dry-run, restore edilebilir yedek, mevcut kayıt RPC'sine `p_ref` eklemesi ayrı dosya.
+`supabase/proposed/20260819000100_growth_referral_partner_attribution.sql` ve `rollbacks` karşılığı taslaktır; `supabase/migrations`'a TAŞINMADI çünkü `db:migrate` ve ledger/checksum denetimi `migrations` klasörünü uygulanabilir sayar ve paralel ajanların numara çakışması riski vardır. Uygulamadan önce: numara güncellenir, `check:migrations` + dry-run, restore edilebilir yedek, mevcut kayıt RPC'sine `p_ref` eklemesi ayrı dosya.

@@ -56,6 +56,7 @@ describe("external provider request contract", () => {
       "src/app/admin/personel/page.tsx",
       "src/app/app/asistan/advisor-chat.tsx",
       "src/app/app/destek/ticket-attachment-input.tsx",
+      "src/app/app/pano-tv/tv-hooks.ts",
       "src/app/lead/[token]/lead-form.tsx",
       "src/app/vitrin/[slug]/favoriler/favoriler-client.tsx",
       "src/components/admin/command-palette.tsx",

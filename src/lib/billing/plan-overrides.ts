@@ -60,8 +60,6 @@ export const DEFAULT_CAMPAIGN: PlanCampaignSettings = { name: "Founders", quota:
 export type PlanCatalogSettings = {
   overrides: PlanOverrides;
   campaign: PlanCampaignSettings;
-  /** Panel ayarı olarak istenen deneme günü; etkin gün sayısı migration'a bağlıdır (getEffectiveTrialDays). */
-  trialDays: number;
 };
 
 function isInt(n: unknown, min: number, max: number): n is number {
@@ -142,19 +140,16 @@ export function sanitizeCampaign(raw: unknown): PlanCampaignSettings {
 }
 
 export function parsePlanCatalogSettings(raw: string | null | undefined): PlanCatalogSettings {
-  const empty: PlanCatalogSettings = { overrides: {}, campaign: DEFAULT_CAMPAIGN, trialDays: 14 };
+  const empty: PlanCatalogSettings = { overrides: {}, campaign: DEFAULT_CAMPAIGN };
   if (!raw) return empty;
   try {
-    const parsed = JSON.parse(raw) as { plans?: Record<string, unknown>; campaign?: unknown; trialDays?: unknown };
+    const parsed = JSON.parse(raw) as { plans?: Record<string, unknown>; campaign?: unknown };
     const overrides: PlanOverrides = {};
     for (const id of ALL_PLAN_IDS) {
       const o = sanitizePlanOverride(parsed?.plans?.[id]);
       if (Object.keys(o).length > 0) overrides[id] = o;
     }
-    const trialDays = isInt(parsed?.trialDays, PLAN_FIELD_LIMITS.trialDaysMin, PLAN_FIELD_LIMITS.trialDaysMax)
-      ? (parsed.trialDays as number)
-      : 14;
-    return { overrides, campaign: sanitizeCampaign(parsed?.campaign), trialDays };
+    return { overrides, campaign: sanitizeCampaign(parsed?.campaign) };
   } catch {
     return empty;
   }
@@ -166,11 +161,11 @@ export function parsePlanOverrides(raw: string | null | undefined): PlanOverride
 }
 
 export function serializePlanCatalogSettings(settings: PlanCatalogSettings): string {
-  return JSON.stringify({ v: 2, plans: settings.overrides, campaign: settings.campaign, trialDays: settings.trialDays });
+  return JSON.stringify({ v: 2, plans: settings.overrides, campaign: settings.campaign });
 }
 
 export function serializePlanOverrides(overrides: PlanOverrides): string {
-  return serializePlanCatalogSettings({ overrides, campaign: DEFAULT_CAMPAIGN, trialDays: 14 });
+  return serializePlanCatalogSettings({ overrides, campaign: DEFAULT_CAMPAIGN });
 }
 
 /** Varsayılan katalog: veritabanı sözleşmeli PLANS + gizli Business şablonu. */

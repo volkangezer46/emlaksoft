@@ -44,7 +44,6 @@ const KANAL_FILTERS = [
   { label: "Tüm kanallar", value: "" },
   { label: "SMS", value: "sms" },
   { label: "WhatsApp", value: "whatsapp" },
-  { label: "E-posta", value: "email" },
 ] as const;
 
 function filterHref(durum: string, kanal: string) {

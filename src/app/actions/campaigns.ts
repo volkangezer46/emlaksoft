@@ -111,6 +111,68 @@ export async function createCampaign(
 }
 
 // ---------------------------------------------------------------------------
+// Taslak kampanyayı düzenle (başlık + mesaj / WhatsApp şablonu)
+// ---------------------------------------------------------------------------
+
+/**
+ * Yalnız TASLAK kampanya düzenlenir. Kanal ve hedef kitle alıcı kuyruğunu belirlediği için
+ * değişmez (değiştirmek için yeni kampanya açılır); başlık, mesaj ve WhatsApp şablonu değişir.
+ */
+export async function updateCampaign(_prev: CampaignResult, fd: FormData): Promise<CampaignResult> {
+  const gate = await requirePermission("campaigns", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(fd.get("id") ?? "").trim();
+  const title = String(fd.get("title") ?? "").trim();
+  const message = String(fd.get("message") ?? "").trim();
+  const whatsappTemplateName = String(fd.get("whatsappTemplateName") ?? "").trim();
+  const whatsappTemplateLanguage = String(fd.get("whatsappTemplateLanguage") ?? "").trim();
+  if (!id) return { error: "Kampanya bulunamadı." };
+  if (!title) return { error: "Kampanya başlığı zorunludur." };
+  if (message.length > 612) return { error: "Mesaj en fazla 612 karakter olabilir." };
+
+  const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("campaigns")
+    .select("id, channel, status")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!current) return { error: "Kampanya bulunamadı." };
+  if (current.status !== "draft") return { error: "Yalnız taslak kampanya düzenlenebilir." };
+
+  const patch: Record<string, unknown> = { title, message };
+  if (current.channel === "sms") {
+    if (!message) return { error: "SMS mesaj metni zorunludur." };
+  } else if (current.channel === "whatsapp") {
+    if (!WHATSAPP_TEMPLATE_NAME_RE.test(whatsappTemplateName) || !WHATSAPP_TEMPLATE_LANGUAGE_RE.test(whatsappTemplateLanguage)) {
+      return { error: "WhatsApp kampanyası için Meta tarafından onaylanmış şablon adı ve geçerli dil kodu zorunludur." };
+    }
+    patch.whatsapp_template_name = whatsappTemplateName;
+    patch.whatsapp_template_language = whatsappTemplateLanguage;
+  } else {
+    return { error: "Bu kampanya kanalı düzenlenemez." };
+  }
+
+  const { data: updated, error } = await supabase
+    .from("campaigns")
+    .update(patch)
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "draft")
+    .select("id");
+  if (error) {
+    console.error("updateCampaign", error);
+    return { error: "Kampanya güncellenemedi." };
+  }
+  if (!updated || updated.length === 0) return { error: "Kampanya artık taslak değil; düzenlenemedi." };
+
+  revalidatePath("/app/kampanyalar");
+  revalidatePath(`/app/kampanyalar/${id}`);
+  return { ok: true, id };
+}
+
+// ---------------------------------------------------------------------------
 // Kampanya gönder: yalnız kuyruğa alır; provider I/O cron worker'dadır.
 // ---------------------------------------------------------------------------
 

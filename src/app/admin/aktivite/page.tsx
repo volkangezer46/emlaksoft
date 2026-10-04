@@ -1,19 +1,20 @@
-import { Activity, ArrowUpRight, ChevronDown, ShieldCheck, UserCog } from "lucide-react";
+import { Activity, ArrowUpRight, ChevronDown, Search, ShieldCheck, UserCog, X } from "lucide-react";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { daysAgoIso } from "@/lib/clock";
 import { PAGE_SIZE, Pagination, parsePage } from "@/app/admin/_components/pagination";
+import {
+  activityHref,
+  hasActivityFilter,
+  parseActivityFilters,
+  queryActivity,
+  resolveActorNames,
+  type ActivityFilters,
+} from "@/lib/admin/activity-query";
+import { ActivityExportButton } from "./activity-export-button";
 
-function buildHref(p: { kaynak?: string; gun?: string; sayfa?: number }) {
-  const sp = new URLSearchParams();
-  if (p.kaynak) sp.set("kaynak", p.kaynak);
-  if (p.gun) sp.set("gun", p.gun);
-  if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
-  const s = sp.toString();
-  return s ? `/admin/aktivite?${s}` : "/admin/aktivite";
-}
 
 function pretty(v: unknown): string {
   if (v === null || v === undefined) return "—";
@@ -81,15 +82,89 @@ function DiffPanel({ oldValue, newValue }: { oldValue: unknown; newValue: unknow
   );
 }
 
+const INPUT_CLS =
+  "focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400";
+
+const FILTER_LABELS: Record<string, string> = {
+  q: "Arama",
+  islem: "İşlem",
+  kisi: "Kişi",
+  ofis: "Ofis",
+  baslangic: "Başlangıç",
+  bitis: "Bitiş",
+};
+
+/** Sunucu süzgeci: GET formu (URL tek doğruluk kaynağı) + aktif süzgeç çipleri + CSV. */
+function ActivityFilterBar({ filters, total }: { filters: ActivityFilters; total: number }) {
+  const chips = (Object.keys(FILTER_LABELS) as (keyof ActivityFilters)[]).filter((k) => filters[k]);
+  return (
+    <form action="/admin/aktivite" role="search" className="space-y-3 rounded-[var(--radius-card)] border border-line bg-surface p-4">
+      {filters.kaynak ? <input type="hidden" name="kaynak" value={filters.kaynak} /> : null}
+      {filters.gun ? <input type="hidden" name="gun" value={filters.gun} /> : null}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="relative block">
+          <span className="mb-1 block text-xs font-semibold text-text-muted">Arama (işlem veya varlık)</span>
+          <Search className="pointer-events-none absolute bottom-2.5 left-3 h-3.5 w-3.5 text-text-faint" aria-hidden />
+          <input type="search" name="q" defaultValue={filters.q} placeholder="ör. ticket, personel" className={`${INPUT_CLS} pl-9`} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-text-muted">İşlem türü</span>
+          <input type="text" name="islem" defaultValue={filters.islem} placeholder="ör. platform_staff.role_change" className={INPUT_CLS} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-text-muted">Kişi (ad)</span>
+          <input type="text" name="kisi" defaultValue={filters.kisi} placeholder="İşlemi yapan" className={INPUT_CLS} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-text-muted">Ofis (ad)</span>
+          <input type="text" name="ofis" defaultValue={filters.ofis} placeholder="Yalnız ofis kayıtları" className={INPUT_CLS} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-text-muted">Başlangıç tarihi</span>
+          <input type="date" name="baslangic" defaultValue={filters.baslangic} className={INPUT_CLS} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-text-muted">Bitiş tarihi</span>
+          <input type="date" name="bitis" defaultValue={filters.bitis} className={INPUT_CLS} />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-semibold text-white">
+          Filtrele
+        </button>
+        {hasActivityFilter(filters) ? (
+          <Link href="/admin/aktivite" className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:text-ink-950">
+            Tümünü temizle
+          </Link>
+        ) : null}
+        {chips.map((k) => (
+          <Link
+            key={k}
+            href={activityHref({ ...filters, [k]: undefined })}
+            className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600"
+          >
+            {FILTER_LABELS[k]}: {filters[k]} <X className="h-3 w-3" />
+          </Link>
+        ))}
+        <span className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-text-faint">{total} kayıt eşleşiyor</span>
+          <ActivityExportButton params={{ ...filters }} />
+        </span>
+      </div>
+    </form>
+  );
+}
+
 export default async function AdminActivityPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kaynak?: string; gun?: string; sayfa?: string }>;
+  searchParams?: Promise<Record<string, string | undefined>>;
 }) {
   await requirePlatformModule("activity");
   const sp = (await searchParams) ?? {};
-  const kaynak = sp.kaynak === "platform" || sp.kaynak === "tenant" ? sp.kaynak : undefined;
-  const gun = sp.gun === "bugun" ? sp.gun : undefined;
+  const filters = parseActivityFilters(sp);
+  const { kaynak, gun } = filters;
+  const filtered = hasActivityFilter(filters);
   const sayfa = parsePage(sp.sayfa);
 
   const admin = createAdminClient();
@@ -100,45 +175,29 @@ export default async function AdminActivityPage({
    * Sayfalama için her kaynaktan `sayfa * 50` kayıt çekilir; birleşik listenin
    * ilk `sayfa * 50` kaydı her zaman bu iki dilimin içindedir — merge sonrası
    * dilimlemek doğru sonucu verir. Toplam, iki kaynağın exact count toplamı.
+   * Süzgeç (işlem, kişi, ofis, arama, tarih aralığı) sunucuda `queryActivity` ile uygulanır;
+   * CSV dışa aktarma aynı fonksiyonu kullanır.
    */
-  const includeTenant = kaynak !== "platform";
-  const includePlatform = kaynak !== "tenant";
   const fetchEnd = sayfa * PAGE_SIZE - 1;
-
-  let tenantQ = admin
-    .from("audit_logs")
-    .select("id, action, entity_type, entity_id, actor_id, tenant_id, old_value, new_value, created_at, tenant:tenants(name)", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(0, fetchEnd);
-  if (gun) tenantQ = tenantQ.gte("created_at", daySince);
-
-  let platformQ = admin
-    .from("platform_audit_logs")
-    .select("id, action, entity_type, entity_id, actor_id, meta, created_at", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(0, fetchEnd);
-  if (gun) platformQ = platformQ.gte("created_at", daySince);
 
   // Sayaçlar her zaman tüm kaydı gösterir; filtre yalnızca listeyi daraltır
   const [
-    tenantRes,
-    platformRes,
+    activity,
     { count: tenantTotal },
     { count: platformTotal },
     { count: tenantToday },
     { count: platformToday },
   ] = await Promise.all([
-    includeTenant ? tenantQ : Promise.resolve({ data: null, count: 0 }),
-    includePlatform ? platformQ : Promise.resolve({ data: null, count: 0 }),
+    queryActivity(filters, fetchEnd),
     admin.from("audit_logs").select("id", { count: "exact", head: true }),
     admin.from("platform_audit_logs").select("id", { count: "exact", head: true }),
     admin.from("audit_logs").select("id", { count: "exact", head: true }).gte("created_at", daySince),
     admin.from("platform_audit_logs").select("id", { count: "exact", head: true }).gte("created_at", daySince),
   ]);
 
-  const tenantRows = tenantRes.data ?? [];
-  const platformRows = platformRes.data ?? [];
-  const totalFiltered = (includeTenant ? (tenantRes.count ?? 0) : 0) + (includePlatform ? (platformRes.count ?? 0) : 0);
+  const tenantRows = activity.tenantRows;
+  const platformRows = activity.platformRows;
+  const totalFiltered = activity.tenantCount + activity.platformCount;
 
   // İsim çözümleme — platform staff + tenant actor sorguları bağımsız, tek turda
   const platformActorIds = [
@@ -148,19 +207,7 @@ export default async function AdminActivityPage({
     ...new Set((tenantRows ?? []).map((r) => r.actor_id).filter(Boolean)),
   ] as string[];
 
-  const [{ data: staffList }, { data: profiles }] = await Promise.all([
-    platformActorIds.length
-      ? admin.from("platform_staff").select("id, full_name").in("id", platformActorIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-    tenantActorIds.length
-      ? admin.from("profiles").select("id, full_name").in("id", tenantActorIds)
-      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
-  ]);
-
-  const platformNames = new Map<string, string>();
-  for (const s of staffList ?? []) platformNames.set(s.id, s.full_name);
-  const tenantNames = new Map<string, string>();
-  for (const p of profiles ?? []) tenantNames.set(p.id, p.full_name);
+  const { platform: platformNames, tenant: tenantNames } = await resolveActorNames(platformActorIds, tenantActorIds);
 
   // İki listeyi birleştir ve tarihe göre sırala
   type UnifiedRow = {
@@ -218,20 +265,20 @@ export default async function AdminActivityPage({
     {
       label: "Bugün",
       value: (tenantToday ?? 0) + (platformToday ?? 0),
-      href: buildHref({ kaynak, gun: gun === "bugun" ? undefined : "bugun" }),
+      href: activityHref({ ...filters, gun: gun === "bugun" ? undefined : "bugun" }),
       active: gun === "bugun",
     },
     {
       label: "Platform işlemi",
       value: platformTotal ?? 0,
-      href: buildHref({ kaynak: kaynak === "platform" ? undefined : "platform", gun }),
+      href: activityHref({ ...filters, kaynak: kaynak === "platform" ? undefined : "platform" }),
       active: kaynak === "platform",
     },
     {
       label: "Toplam kayıt",
       value: (tenantTotal ?? 0) + (platformTotal ?? 0),
       href: "/admin/aktivite",
-      active: !kaynak && !gun,
+      active: !filtered,
     },
   ];
 
@@ -250,7 +297,7 @@ export default async function AdminActivityPage({
               Tüm kritik işlemler, personel hareketleri ve operasyon kayıtları kronolojik sırayla.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-stretch gap-3">
             {counters.map((c) => (
               <Link
                 key={c.label}
@@ -270,19 +317,21 @@ export default async function AdminActivityPage({
         </div>
       </section>
 
+      <ActivityFilterBar filters={filters} total={totalFiltered} />
+
       <section className="dashboard-panel overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950">
             <Activity className="h-4 w-4 text-brand-600" /> Hareketler
           </p>
           <span className="text-xs text-text-faint">
-            {kaynak || gun ? `Filtrede ${totalFiltered} kayıt` : `${totalFiltered} kayıt`}
+            {filtered ? `Filtrede ${totalFiltered} kayıt` : `${totalFiltered} kayıt`}
           </span>
         </div>
 
         {unified.length === 0 ? (
           <p className="py-16 text-center text-sm text-text-muted">
-            {kaynak || gun ? "Filtreyle eşleşen aktivite kaydı yok." : "Henüz aktivite kaydı yok."}
+            {filtered ? "Filtreyle eşleşen aktivite kaydı yok." : "Henüz aktivite kaydı yok."}
           </p>
         ) : (
           <div className="divide-y divide-line">
@@ -343,7 +392,7 @@ export default async function AdminActivityPage({
       <Pagination
         page={sayfa}
         total={totalFiltered}
-        hrefFor={(p) => buildHref({ kaynak, gun, sayfa: p })}
+        hrefFor={(p) => activityHref(filters, { sayfa: p })}
       />
     </div>
   );

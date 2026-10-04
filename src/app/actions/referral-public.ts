@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicReferralResult = {
@@ -38,7 +39,7 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
 
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
   if (!name) return { error: "Tanıdığınızın adı zorunludur." };
-  const phoneParsed = parsePhone(phoneRaw);
+  const phoneParsed = parsePhoneStrict(phoneRaw);
   if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   if (!kvkk) return { error: "Devam etmek için onay kutusunu işaretlemeniz gerekir." };
 

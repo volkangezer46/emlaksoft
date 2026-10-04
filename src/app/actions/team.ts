@@ -13,7 +13,8 @@ import {
   parseHandoffInput,
   type HandoffScope,
 } from "@/lib/team/handoff";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { getPlan } from "@/lib/billing/plans";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -105,7 +106,7 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
 
   if (!fullName || !email) return { error: "Ad ve e-posta zorunlu." };
   if (!isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   if (!ASSIGNABLE_ROLES.includes(role)) return { error: "Geçerli bir rol seçin." };
   if (password.length < 8) return { error: "Geçici şifre en az 8 karakter olmalı." };

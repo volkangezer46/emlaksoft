@@ -26,6 +26,7 @@ import { SavedViews } from "@/components/app/saved-views";
 import { SmsDialog } from "./sms-dialog";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { RowQuickActions } from "./row-actions";
+import { LinkToCustomer } from "./link-to-customer";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -495,6 +496,13 @@ export async function InboxView({
                     ) : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-text-muted">{item.summary}</p>
+                  {!item.customerId && (item.key.startsWith("a-") || item.key.startsWith("c-")) ? (
+                    <LinkToCustomer
+                      kind={item.key.startsWith("a-") ? "call" : "comm"}
+                      recordId={item.key.slice(2)}
+                      phone={item.phone}
+                    />
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/* İkincil eylemler overlay'in üstünde kalmalı → relative z-10 */}

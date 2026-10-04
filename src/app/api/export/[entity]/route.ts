@@ -23,7 +23,7 @@ function jsonError(error: string, status: number, headers?: Record<string, strin
  * burada requirePermission ile kurulur). Yetki, tenant ve aktör kapsamı
  * `export.ts` ile aynıdır; veri RLS'li oturum client'ıyla okunur.
  */
-export async function GET(_req: Request, { params }: { params: Promise<{ entity: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ entity: string }> }) {
   const { entity } = await params;
   if (!isFullExportEntity(entity)) return jsonError("Bilinmeyen dışa aktarma türü.", 404);
   const def = EXPORT_ENTITIES[entity]!;
@@ -56,6 +56,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ entity:
     gate: { tenantId: gate.tenantId, userId: gate.userId, role: gate.role, seeAllEarnings },
     def,
     buildQuery: EXPORT_QUERIES[entity]!,
+    params: new URL(req.url).searchParams,
     onDone: async (summary) => {
       await logActivity({
         tenantId: gate.tenantId,

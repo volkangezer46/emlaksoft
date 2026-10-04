@@ -24,7 +24,9 @@ function formatDate(iso: string): string {
  * Kalıcı silme bilinçli olarak yok.
  */
 export default async function TrashPage() {
-  const ctx = await requireModulePage("settings");
+  // Kapı müşteri modülüdür (ayar yetkisi aranmaz): kaydı silen danışman kendi kaydını geri alabilir.
+  // Geri alma yetkisi her varlıkta kendi modülünün silme izniyle action içinde de doğrulanır.
+  const ctx = await requireModulePage("customers");
   const canRestoreCustomers = effectiveHasPermission(ctx.perms, "customers", "delete");
   const canRestoreProperties = effectiveHasPermission(ctx.perms, "properties", "delete");
 
@@ -49,6 +51,29 @@ export default async function TrashPage() {
 
   const customers = customerRows ?? [];
   const properties = propertyRows ?? [];
+
+  // Kim sildi: denetim kaydından (okuma yetkisi yoksa boş kalır, sayfa bozulmaz)
+  const ids = [...customers.map((c) => c.id), ...properties.map((p) => p.id)];
+  const deleters = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data: logs } = await supabase
+      .from("audit_logs")
+      .select("entity_id, actor_id, created_at")
+      .in("action", ["customer.delete", "customer.bulk_delete", "property.delete"])
+      .in("entity_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const actorIds = [...new Set((logs ?? []).map((l) => l.actor_id).filter(Boolean))] as string[];
+    const names = new Map<string, string>();
+    if (actorIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", actorIds);
+      for (const pr of profs ?? []) names.set(pr.id, pr.full_name);
+    }
+    for (const l of logs ?? []) {
+      if (l.entity_id && l.actor_id && !deleters.has(l.entity_id)) deleters.set(l.entity_id, names.get(l.actor_id) ?? "");
+    }
+  }
+  const byLine = (id: string) => (deleters.get(id) ? ` · Silen: ${deleters.get(id)}` : "");
 
   return (
     <div className="space-y-6">
@@ -85,7 +110,7 @@ export default async function TrashPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950">{c.full_name || "İsimsiz müşteri"}</p>
                   <p className="text-xs text-text-muted">
-                    {c.phone ? `${c.phone} · ` : ""}Silinme: {c.deleted_at ? formatDate(c.deleted_at) : "—"}
+                    {c.phone ? `${c.phone} · ` : ""}Silinme: {c.deleted_at ? formatDate(c.deleted_at) : "—"}{byLine(c.id)}
                   </p>
                 </div>
                 {canRestoreCustomers ? (
@@ -125,7 +150,7 @@ export default async function TrashPage() {
                     {p.title || p.property_code || "Başlıksız portföy"}
                   </p>
                   <p className="text-xs text-text-muted">
-                    {p.property_code ? `${p.property_code} · ` : ""}Silinme: {p.deleted_at ? formatDate(p.deleted_at) : "—"}
+                    {p.property_code ? `${p.property_code} · ` : ""}Silinme: {p.deleted_at ? formatDate(p.deleted_at) : "—"}{byLine(p.id)}
                   </p>
                 </div>
                 {canRestoreProperties ? (

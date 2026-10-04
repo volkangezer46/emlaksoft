@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PublicBookingResult = {
@@ -40,7 +41,7 @@ export async function createPublicBooking(fd: FormData): Promise<PublicBookingRe
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
   if (!fullName) return { error: "Ad soyad zorunludur." };
   if (fullName.length > 160) return { error: "Ad soyad en fazla 160 karakter olabilir." };
-  const phoneParsed = parsePhone(phoneRaw);
+  const phoneParsed = parsePhoneStrict(phoneRaw);
   if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   // create_public_booking_atomic RPC'si şu an yalnız TR cep (05XXXXXXXXX) kabul eder.
   if (phoneParsed.country !== "TR" || phoneParsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE };

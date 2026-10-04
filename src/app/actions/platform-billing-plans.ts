@@ -198,8 +198,9 @@ export async function saveCampaignSettings(formData: FormData): Promise<PlanOpRe
   const next: PlanCatalogSettings = {
     ...settings,
     campaign: { name, quota: Number(quotaRaw), active, lockPrice },
-    trialDays: Number(trialRaw),
   };
+  // Deneme süresi: plan başına değil, TEK platform ayarı (K1: default_trial_days).
+  if (!(await setPlatformSetting("default_trial_days", trialRaw, g.staff.id))) return { error: "Deneme süresi kaydedilemedi." };
   if (!(await persist(next, g.staff.id))) return { error: "Ayar kaydedilemedi." };
   updateTag(PLAN_SUPPORT_TAG);
   await logPlatformActivity({
@@ -212,6 +213,6 @@ export async function saveCampaignSettings(formData: FormData): Promise<PlanOpRe
     ok: true,
     notice: support.trialSetting
       ? "Kaydedildi."
-      : "Kaydedildi. Deneme günü, 20260817000220 migration'ı uygulanana kadar 14 gün olarak verilir.",
+      : "Kaydedildi. Deneme günü, 20260816010100 migration'ı uygulanana kadar 14 gün olarak verilir.",
   };
 }

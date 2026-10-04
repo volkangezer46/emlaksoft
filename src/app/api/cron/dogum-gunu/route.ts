@@ -29,6 +29,7 @@ export async function GET(req: Request) {
   const { data: birthdays } = await admin
     .from("customers")
     .select("id, full_name, tenant_id, birth_date, phone")
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .not("birth_date", "is", null)
     .filter("birth_date", "not.is", null);
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
   const { data: anniversaries } = await admin
     .from("customers")
     .select("id, full_name, tenant_id, anniversary_date, anniversary_note")
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .not("anniversary_date", "is", null);
 

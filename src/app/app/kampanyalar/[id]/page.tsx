@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Pencil, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getCampaign, listCampaignRecipients } from "@/app/actions/campaigns";
 import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 
@@ -91,7 +92,8 @@ export default async function CampaignDetailPage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ durum?: string }>;
 }) {
-  await requireModulePage("campaigns", "/app/kampanyalar");
+  const { perms } = await requireModulePage("campaigns", "/app/kampanyalar");
+  const canEdit = (perms.campaigns ?? []).includes("edit");
   const { id } = await params;
   const { durum = "" } = (await searchParams) ?? {};
 
@@ -146,7 +148,7 @@ export default async function CampaignDetailPage({
         <ArrowLeft className="h-4 w-4" /> Kampanyalara dön
       </Link>
 
-      <PageHeader title={campaign.title} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
+      <PageHeader actions={canEdit && campaign.status === "draft" ? <ButtonLink href={`/app/kampanyalar/${id}/duzenle`} variant="secondary" size="sm" icon={Pencil}>Taslağı düzenle</ButtonLink> : undefined} title={campaign.title} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[

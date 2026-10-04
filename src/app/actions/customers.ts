@@ -9,7 +9,8 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { daysFromNowIso } from "@/lib/clock";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -50,7 +51,7 @@ export async function createCustomer(
   const anniversaryNote = String(formData.get("anniversary_note") ?? "").trim();
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
@@ -137,7 +138,7 @@ export async function updateCustomer(
   const fullName = String(formData.get("full_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const email = normalizeEmail(String(formData.get("email") ?? ""));
-  const type = String(formData.get("type") ?? "").trim();
+  const types = [...new Set(formData.getAll("type").map((t) => String(t).trim()).filter(Boolean))];
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const districtId = String(formData.get("district_id") ?? "").trim();
   const branchId = String(formData.get("branch_id") ?? "").trim();
@@ -148,7 +149,7 @@ export async function updateCustomer(
 
   if (!id) return { error: "Müşteri bulunamadı." };
   if (!fullName) return { error: "Ad soyad zorunlu." };
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
@@ -160,7 +161,7 @@ export async function updateCustomer(
     full_name: fullName,
     phone: normalizedPhone || null,
     email: email || null,
-    customer_types: type ? [type] : [],
+    customer_types: types,
     province_id: provinceId || null,
     district_id: districtId || null,
     notes: notes || null,
@@ -169,6 +170,11 @@ export async function updateCustomer(
     anniversary_note: anniversaryNote || null,
   };
   if (formData.has("branch_id")) updatePatch.branch_id = branchId || null;
+  // Kayıt ve atama alanları: yalnız form gönderdiyse yazılır (diğer çağıranlar etkilenmez)
+  if (formData.has("source")) updatePatch.source = String(formData.get("source") ?? "").trim() || null;
+  if (formData.has("lead_source_detail")) updatePatch.lead_source_detail = String(formData.get("lead_source_detail") ?? "").trim() || null;
+  if (formData.has("assigned_to")) updatePatch.assigned_to = String(formData.get("assigned_to") ?? "").trim() || null;
+  if (formData.has("blacklist_present")) updatePatch.blacklist = formData.get("blacklist") === "on";
 
   const { error } = await supabase
     .from("customers")
@@ -196,6 +202,45 @@ export async function updateCustomer(
   return { ok: true, id };
 }
 
+export type CustomerDeleteImpact = {
+  ok?: boolean;
+  error?: string;
+  openDeals: number;
+  openDemands: number;
+  openTasks: number;
+  activeAppointments: number;
+  contracts: number;
+};
+
+/**
+ * Silmeden önce bağlı kayıt özeti: açık anlaşma, aktif talep, açık görev, bekleyen/onaylı randevu, sözleşme.
+ * Silme yumuşaktır (çöp kutusundan geri alınır) ama bağlı kayıtlar sahipsiz kalır; kullanıcı bunu görerek onaylar.
+ */
+export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDeleteImpact> {
+  const empty: CustomerDeleteImpact = { openDeals: 0, openDemands: 0, openTasks: 0, activeAppointments: 0, contracts: 0 };
+  const gate = await requirePermission("customers", "delete");
+  if (!gate.ok) return { ...empty, error: gate.error };
+  const list = [...new Set((ids ?? []).map((i) => String(i).trim()).filter(Boolean))].slice(0, BULK_LIMIT);
+  if (!list.length) return { ...empty, ok: true };
+  const supabase = await createClient();
+  const head = { count: "exact" as const, head: true };
+  const [deals, demands, tasks, appts, contracts] = await Promise.all([
+    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("stage", ["new", "qualified", "negotiation"]),
+    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "active"),
+    supabase.from("tasks").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "open"),
+    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["pending", "confirmed"]),
+    supabase.from("contracts").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list),
+  ]);
+  return {
+    ok: true,
+    openDeals: deals.count ?? 0,
+    openDemands: demands.count ?? 0,
+    openTasks: tasks.count ?? 0,
+    activeAppointments: appts.count ?? 0,
+    contracts: contracts.count ?? 0,
+  };
+}
+
 export async function deleteCustomer(formData: FormData): Promise<void> {
   const gate = await requirePermission("customers", "delete");
   if (!gate.ok) return;
@@ -203,6 +248,11 @@ export async function deleteCustomer(formData: FormData): Promise<void> {
   const redirectTo = String(formData.get("redirect_to") ?? "").trim();
   if (!id) return;
   const supabase = await createClient();
+  // Açık anlaşması olan müşteri, bağlı kayıt özeti gösterilip onaylanmadan (confirm_linked=1) silinmez.
+  if (String(formData.get("confirm_linked") ?? "") !== "1") {
+    const impact = await getCustomerDeleteImpact([id]);
+    if (impact.openDeals > 0) return;
+  }
   const { error } = await supabase
     .from("customers")
     .update({ deleted_at: new Date().toISOString() })

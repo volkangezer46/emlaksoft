@@ -59,7 +59,9 @@ export default async function AppHomePage({
   searchParams?: Promise<{ tv?: string; donem?: string; kapsam?: string; daha?: string }>;
 }) {
   const { tv = "", donem, kapsam, daha } = (await searchParams) ?? {};
-  const tvMode = tv === "1";
+  // Eski `/app?tv=1` bağlantıları tek TV rotasına gider (kabuksuz, canlı, tam ekran).
+  if (tv === "1") redirect("/app/pano-tv");
+  const tvMode = false;
 
   const { tenantId, perms, role, userId } = await requireModulePage("dashboard");
   // Yeni danışman ilk girişinde kısa "Hoş geldin" akışına yönlenir (bir kez; çerez tercihi).

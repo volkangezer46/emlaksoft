@@ -69,6 +69,7 @@ export default async function ReferralPage({
     .select("full_name")
     .eq("id", link.customer_id)
     .eq("tenant_id", link.tenant_id)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
   if (!customer) notFound();

@@ -100,6 +100,7 @@ export default async function MalikPortaliPage({
       .select("assigned_to, tenant:tenants(phone)")
       .eq("id", property.id)
       .eq("tenant_id", tenant.id)
+      .eq("is_sample", false)
       .is("deleted_at", null)
       .maybeSingle(),
     admin

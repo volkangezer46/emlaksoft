@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     .gte("scheduled_at", from.toISOString())
     .lte("scheduled_at", to.toISOString())
     .neq("status", "cancelled")
+    .eq("is_sample", false)
     .limit(200);
 
   const windowStart = new Date(Date.now() - 20 * 3600_000).toISOString();

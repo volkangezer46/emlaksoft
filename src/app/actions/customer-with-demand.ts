@@ -3,7 +3,7 @@
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { normalizeEmail } from "@/lib/email";
 import {
   demandValuesFromFormData,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/demand-criteria";
 import { createCustomer } from "@/app/actions/customers";
 import { createDemand } from "@/app/actions/demands";
+import { linkRecordToCustomer } from "@/app/actions/communications";
 import { findCustomerDuplicates } from "@/lib/duplicate-finders";
 
 export type CustomerWithDemandResult = {
@@ -32,7 +33,7 @@ async function findRecentDuplicateCustomer(formData: FormData): Promise<string |
   const gate = await requirePermission("customers", "create");
   if (!gate.ok) return null; // asıl hata createCustomer'da döner
   const phoneRaw = String(formData.get("phone") ?? "").trim();
-  const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
+  const parsedPhone = phoneRaw ? parsePhoneStrict(phoneRaw) : null;
   const phone = parsedPhone && parsedPhone.ok ? parsedPhone.stored : "";
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const fullName = String(formData.get("full_name") ?? "").trim();
@@ -108,6 +109,12 @@ export async function createCustomerWithDemand(
 
   const customer = await createCustomer({}, formData);
   if (!customer.ok || !customer.id) return { error: customer.error ?? "Müşteri eklenemedi." };
+  // Gelen kutusu / çağrı kaydından açıldıysa kaynak kayıt yeni müşteriye bağlanır (hata müşteri kaydını bozmaz).
+  const linkRef = String(formData.get("link_ref") ?? "").trim();
+  const linkMatch = /^([ac])-([0-9a-f-]{36})$/i.exec(linkRef);
+  if (linkMatch) {
+    await linkRecordToCustomer(linkMatch[1].toLowerCase() === "a" ? "call" : "comm", linkMatch[2], customer.id);
+  }
   if (!wantsDemand) return { ok: true, id: customer.id };
 
   const demandForm = new FormData();

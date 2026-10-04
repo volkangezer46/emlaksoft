@@ -5,7 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isPast } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 
 export type PublicCheckinResult = {
@@ -42,7 +43,7 @@ export async function registerOpenHouseVisitorByToken(fd: FormData): Promise<Pub
 
   if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
   if (!fullName || fullName.length > 160) return { error: "Geçerli bir ad soyad girin." };
-  const phoneParsed = parsePhone(phoneRaw);
+  const phoneParsed = parsePhoneStrict(phoneRaw);
   if (!phoneParsed.ok) return { error: phoneParsed.error ?? PHONE_ERROR_MESSAGE };
   if (!kvkk) return { error: "Devam etmek için KVKK onayı gereklidir." };
 

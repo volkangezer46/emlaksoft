@@ -78,7 +78,7 @@ async function fetchDescription(
   id: string,
   features: unknown,
 ): Promise<string | null> {
-  const { data } = await admin.from("properties").select("description").eq("id", id).maybeSingle();
+  const { data } = await admin.from("properties").select("description").eq("id", id).eq("is_sample", false).maybeSingle();
   const col = (data as { description?: string | null } | null)?.description;
   const feat = ((features ?? {}) as Feat).description;
   const text = String(col ?? feat ?? "").trim();
@@ -122,6 +122,7 @@ export async function generateMetadata({
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
     .is("deleted_at", null)
+    .eq("is_sample", false)
     .maybeSingle();
   if (!property) return { title: "İlan bulunamadı" };
 
@@ -186,6 +187,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
     .is("deleted_at", null)
+    .eq("is_sample", false)
     .maybeSingle();
   if (!property) notFound();
 
@@ -203,6 +205,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
     .is("deleted_at", null)
+    .eq("is_sample", false)
     .neq("id", property.id)
     .eq("transaction_type", property.transaction_type)
     .order("created_at", { ascending: false })
@@ -241,6 +244,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         .eq("tenant_id", tenant.id)
         .eq("status", "live")
         .is("deleted_at", null)
+        .eq("is_sample", false)
         .eq("district_id", property.district_id)
         .eq("transaction_type", property.transaction_type)
         .neq("id", property.id)

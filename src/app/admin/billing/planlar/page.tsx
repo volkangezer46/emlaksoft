@@ -49,7 +49,7 @@ export default async function PlansAdminPage() {
       {isSuper ? (
         <CampaignForm
           campaign={catalog.campaign}
-          trialDays={catalog.trialDays}
+          trialDays={support.trialDays}
           founders={founders}
           trialEffective={support.trialSetting}
           priceLockReady={support.priceLock}

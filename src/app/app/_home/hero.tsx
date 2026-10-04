@@ -133,7 +133,7 @@ export function AnaHero({
           </Link>
           <WidgetEditToggle className="border-white/20 bg-white/8 text-white hover:bg-white/14" />
           <Link
-            href="/app?tv=1"
+            href="/app/pano-tv"
             title="TV modu — büyük ekran görünümü"
             aria-label="TV modunu aç"
             className="pm-hero-btn pm-hero-btn-ghost focus-ring"

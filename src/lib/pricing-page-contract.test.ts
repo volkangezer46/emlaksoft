@@ -56,13 +56,18 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
   });
 
   it("14 gün deneme ve kartsız kayıt iddiası kayıt akışında doğrulanır", () => {
-    // Deneme günü: ilk migration sabit 14 gün; 20260817000220 ayardan okur (varsayılan 14).
-    // Kod migration uygulanana kadar 14 söyler (getEffectiveTrialDays), uygulanınca panel ayarını.
+    // Deneme günü: ilk migration sabit 14 gün; K1'in 20260816010100 migration'ı süreyi
+    // platform_default_trial_days() (varsayılan 14) üzerinden okutur. Kod, migration uygulanana kadar
+    // 14 söyler (getEffectiveTrialDays), uygulanınca panel ayarını. K2 migration'ları bu fonksiyonlara dokunmaz.
     expect(read("supabase/migrations/20260731000140_atomic_registration_provisioning.sql")).toContain("interval '14 days'");
-    const trialMigration = read("supabase/migrations/20260817000220_trial_days_setting_and_price_lock.sql");
-    expect(trialMigration).toContain("public.billing_trial_days()");
-    expect(trialMigration).toMatch(/return 14;/);
-    expect(trialMigration).not.toContain("interval '14 days'");
+    const trialMigration = read("supabase/migrations/20260816010100_default_trial_days_setting.sql");
+    expect(trialMigration).toContain("platform_default_trial_days()");
+    expect(trialMigration).toMatch(/\n    14\n/);
+    for (const f of ["20260817000210_plan_business_and_pricing_support", "20260817000220_subscription_price_lock", "20260817000230_coupons"]) {
+      const sql = read(`supabase/migrations/${f}.sql`);
+      expect(sql).not.toContain("provision_registration");
+      expect(sql).not.toContain("convert_demo_request_to_tenant");
+    }
     const kayit = read("src/app/kayit/register-form.tsx");
     expect(kayit).toContain("Kredi kartı gerekmez");
     expect(kayit).toContain("14 gün ücretsiz");

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Clock3, Crosshair, Eye, MapPin, Sparkles, User } from "lucide-react";
+import { DemandRowCheckbox, DemandSelectAllCheckbox } from "./demand-bulk";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
@@ -74,13 +75,18 @@ function CriteriaPills({ items }: { items: string[] }) {
 }
 
 /** md+ tablo görünümü. */
-export function DemandTable({ rows, density }: { rows: DemandVM[]; density: Density }) {
+export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM[]; density: Density; canBulk?: boolean }) {
   return (
     <div className="hidden md:block">
       <TableFrame minWidth={960} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
+              {canBulk ? (
+                <TH className="w-10">
+                  <DemandSelectAllCheckbox ids={rows.map((d) => d.id)} />
+                </TH>
+              ) : null}
               <TH>Müşteri · talep</TH>
               <TH align="right">Bütçe</TH>
               <TH className="hidden lg:table-cell">Konum · kriter</TH>
@@ -96,6 +102,11 @@ export function DemandTable({ rows, density }: { rows: DemandVM[]; density: Dens
           <TBody>
             {rows.map((d) => (
               <TR key={d.id} interactive>
+                {canBulk ? (
+                  <TD className="w-10">
+                    <DemandRowCheckbox id={d.id} name={d.customerName ?? "Talep"} />
+                  </TD>
+                ) : null}
                 <TD>
                   <IntentLink
                     href={d.href}
@@ -169,12 +180,17 @@ export function DemandTable({ rows, density }: { rows: DemandVM[]; density: Dens
 }
 
 /** <md: tablo yerine kart listesi. */
-export function DemandMobileList({ rows }: { rows: DemandVM[] }) {
+export function DemandMobileList({ rows, canBulk = false }: { rows: DemandVM[]; canBulk?: boolean }) {
   return (
     <MobileCardList>
       {rows.map((d) => (
         <MobileCard key={d.id}>
           <div className="flex items-start gap-3">
+            {canBulk ? (
+              <span className="mt-1 grid min-h-9 min-w-6 place-items-center">
+                <DemandRowCheckbox id={d.id} name={d.customerName ?? "Talep"} />
+              </span>
+            ) : null}
             <EntityThumb alt="" name={d.customerName ?? "Talep"} size="sm" />
             <div className="min-w-0 flex-1">
               <Link href={d.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
@@ -197,6 +213,11 @@ export function DemandMobileList({ rows }: { rows: DemandVM[] }) {
               <div className="relative z-10 mt-2 flex flex-wrap items-center gap-2">
                 <MatchPill d={d} />
                 <span className="text-xs text-text-faint">{d.ageLabel}</span>
+              </div>
+              <div className="relative z-10 mt-2 flex flex-wrap items-center gap-1 border-t border-line pt-2">
+                <RowActionLink href={d.href} label="Talep detayını aç" icon={Eye} />
+                {d.customerId ? <RowActionLink href={`/app/musteriler/${d.customerId}`} label={`${d.customerName ?? "Müşteri"} kartını aç`} icon={User} /> : null}
+                <RowActionLink href={`/app/eslestirme?demand=${d.id}`} label="Bu talebi eşleştir" icon={Crosshair} />
               </div>
             </div>
           </div>
