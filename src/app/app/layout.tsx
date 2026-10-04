@@ -307,7 +307,10 @@ async function AppShell({
                 initials={initials}
                 name={fullName}
                 subtitle={`${planLabel(office?.plan ?? "office")} plan`}
-                links={accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []}
+                links={[
+                  { href: "/app/hesabim", label: "Hesabım", iconName: "account" as const },
+                  ...(accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),
+                ]}
                 viewPrefs={uiPrefCookie ? { cookieName: uiPrefCookie, initial: uiPrefs } : undefined}
               />
             </div>

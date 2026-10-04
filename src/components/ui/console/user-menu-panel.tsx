@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut, Map as MapIcon, Settings, Undo2 } from "lucide-react";
+import { ChevronDown, LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { clearTourDone, TOUR_RESTART_HREF } from "@/lib/product-tour-storage";
@@ -18,7 +18,7 @@ import { ViewPrefs } from "@/components/ui/console/view-prefs";
 import type { UiPrefs } from "@/lib/ui-prefs";
 import type { UserMenuLink } from "./user-menu";
 
-const NAMED_ICONS: Record<"settings" | "back", LucideIcon> = { settings: Settings, back: Undo2 };
+const NAMED_ICONS: Record<"settings" | "back" | "account", LucideIcon> = { settings: Settings, back: Undo2, account: UserRound };
 
 /** Menü gövdesi (Radix DropdownMenu) — user-menu.tsx tarafından ilk etkileşimde yüklenir. */
 export function UserMenuPanel({

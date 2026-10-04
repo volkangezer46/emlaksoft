@@ -271,6 +271,7 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
   }
 
   revalidatePath("/app/ekip");
+  revalidatePath(`/app/ekip/${id}`);
   return { ok: true };
 }
 

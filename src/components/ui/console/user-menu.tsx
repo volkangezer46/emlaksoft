@@ -8,7 +8,7 @@ import type { UiPrefs } from "@/lib/ui-prefs";
 
 export type UserMenuLink = { href: string; label: string } & (
   | { icon: LucideIcon; iconName?: never }
-  | { iconName: "settings" | "back"; icon?: never }
+  | { iconName: "settings" | "back" | "account"; icon?: never }
 );
 
 
