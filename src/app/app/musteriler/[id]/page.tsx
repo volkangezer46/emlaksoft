@@ -42,7 +42,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
-import { SmsDialog } from "../../gelen-kutusu/sms-dialog";
+import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -505,11 +505,7 @@ export default async function CustomerDetailPage({
                   />
                 ) : null}
                 {customer.phone && canEdit ? (
-                  <SmsDialog
-                    customerId={customer.id}
-                    customerName={customer.full_name}
-                    consentGranted={smsConsentGranted}
-                  />
+                  <SmsPanelTrigger />
                 ) : null}
                 {/* vCard 3.0 indirme — route: ./vcard/route.ts */}
                 <a
@@ -586,6 +582,10 @@ export default async function CustomerDetailPage({
         </div>
 
       </section>
+
+      {customer.phone && canEdit ? (
+        <SmsPanel customerId={customer.id} customerName={customer.full_name} consentGranted={smsConsentGranted} />
+      ) : null}
 
       <KpiStrip items={kpis} label="Müşteri özeti" />
 

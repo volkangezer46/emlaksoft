@@ -2,15 +2,12 @@ import "server-only";
 import type { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
 import { scoreCustomerHeat } from "@/lib/customer-heat";
-import { applyCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
+import { applyCustomerFilters, HEAT_POOL_LIMIT, HEAT_RPC_CHUNK, type CustomerListFilters } from "@/lib/customer-list-filters";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
-
-/** Dışa aktarma üst sınırı (export.ts EXPORT_LIMIT ile aynı). */
-const EXPORT_LIMIT = 2000;
 
 const CUSTOMER_EXPORT_COLS = "full_name, phone, email, customer_types, tags, source, created_at";
 
-/** Segment filtresi: havuz (EXPORT_LIMIT) skorlanır, eşleşenlerin tam kolonları çekilir. */
+/** Segment filtresi: havuz (HEAT_POOL_LIMIT, ekranla aynı) skorlanır, eşleşenlerin tam kolonları çekilir. */
 export async function filterCustomersByHeatSegment(
   supabase: Awaited<ReturnType<typeof createClient>>,
   gate: { tenantId: string; userId: string; role: string },
@@ -26,15 +23,15 @@ export async function filterCustomersByHeatSegment(
         .eq("tenant_id", gate.tenantId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
-        .limit(EXPORT_LIMIT),
+        .limit(HEAT_POOL_LIMIT),
       filters,
     ),
   );
   if (error) return { rows: [], error };
   const poolRows = (pool ?? []) as { id: string; created_at: string; blacklist: boolean | null }[];
   const signals = new Map<string, { last_contact: string | null; open_demands: number; urgent_demands: number; portal_likes_30d: number; open_offers: number; open_deals: number }>();
-  for (let i = 0; i < poolRows.length; i += 500) {
-    const ids = poolRows.slice(i, i + 500).map((r) => r.id);
+  for (let i = 0; i < poolRows.length; i += HEAT_RPC_CHUNK) {
+    const ids = poolRows.slice(i, i + HEAT_RPC_CHUNK).map((r) => r.id);
     const res = await supabase.rpc("customer_heat_signals", { p_tenant_id: gate.tenantId, p_customer_ids: ids });
     if (res.error) return { rows: [], error: res.error };
     for (const s of (res.data ?? []) as { customer_id: string; last_contact: string | null; open_demands: number; urgent_demands: number; portal_likes_30d: number; open_offers: number; open_deals: number }[]) signals.set(s.customer_id, s);

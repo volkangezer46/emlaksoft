@@ -28,7 +28,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatLeadSource } from "@/lib/lead-sources";
 import { exportCustomersCsv } from "@/app/actions/export";
-import { applyCustomerFilters, customerSearchTerm, hasCustomerFilters, normalizeCustomerFilters } from "@/lib/customer-list-filters";
+import { applyCustomerFilters, customerSearchTerm, HEAT_POOL_LIMIT, HEAT_RPC_CHUNK, hasCustomerFilters, normalizeCustomerFilters } from "@/lib/customer-list-filters";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
@@ -57,6 +57,7 @@ import {
   densityOf,
   type KpiItem,
 } from "@/components/ui/list-kit";
+import { CustomerPortalPanel } from "./customer-portal-panel";
 import { CustomerMobileList, CustomerTable, type CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
@@ -103,12 +104,10 @@ type OccasionRow = {
 const PAGE_SIZE = 50;
 
 /**
- * Sıcaklık segmenti havuz sınırı: segment DB'de değil TS'te (skor formülü)
- * hesaplandığından, segment sayıları ve ?segment filtresi filtrelenmiş listenin
- * İLK 500 kaydı üzerinden yürür. 500+ kayıtlı ofislerde UI bunu açıkça söyler;
- * pratikte filtre (danışman/tip/etiket) daraltıldığında havuz tamamı kapsar.
+ * Sıcaklık segmenti havuz sınırı (HEAT_POOL_LIMIT, lib/customer-list-filters): segment DB'de değil TS'te
+ * (skor formülü) hesaplandığından, segment sayıları ve ?segment filtresi filtrelenmiş listenin
+ * İLK N kaydı üzerinden yürür. CSV dışa aktarma AYNI sınırı kullanır; aşılırsa UI bunu açıkça söyler.
  */
-const HEAT_POOL_LIMIT = 500;
 /** Tip çipi sayaçları için taranan azami kayıt; aşılırsa sayaçlar gizlenir (yaklaşık sayı gösterilmez). */
 const TYPE_SCAN_LIMIT = 2000;
 
@@ -306,8 +305,12 @@ export default async function CustomersPage({
       ]),
     ];
     if (!tenantId || ids.length === 0) return { data: [] };
-    const res = await supabase.rpc("customer_heat_signals", { p_tenant_id: tenantId, p_customer_ids: ids });
-    return { data: res.data as HeatSignalRow[] | null };
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += HEAT_RPC_CHUNK) chunks.push(ids.slice(i, i + HEAT_RPC_CHUNK));
+    const results = await Promise.all(
+      chunks.map((c) => supabase.rpc("customer_heat_signals", { p_tenant_id: tenantId, p_customer_ids: c })),
+    );
+    return { data: results.flatMap((r) => (r.data as HeatSignalRow[] | null) ?? []) };
   })();
   const intentP: Promise<[IntentRows, IntentRows] | null> = segmentF
     ? Promise.resolve(null)
@@ -630,7 +633,7 @@ export default async function CustomersPage({
       icon: <Flame />,
       tone: "warning",
       href: hrefWith({ segment: "sicak", sayfa: undefined }),
-      hint: poolLimited ? "yaklaşık (ilk 500 kayıt)" : "şu an en canlı",
+      hint: poolLimited ? `yaklaşık (ilk ${HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kayıt)` : "şu an en canlı",
     },
   ];
 
@@ -856,6 +859,7 @@ export default async function CustomersPage({
           {canBulk ? (
             <CustomerBulkBar advisors={advisorList} tagSuggestions={tenantTags} canEdit={canEdit} canDelete={canDelete} />
           ) : null}
+          {canEdit ? <CustomerPortalPanel /> : null}
           <CustomerTable
             rows={viewModels}
             ids={pageIds}
