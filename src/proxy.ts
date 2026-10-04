@@ -6,8 +6,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Yalnızca kimlik-doğrulama mantığının gerektiği yollarda çalış.
-  // Public/marketing/vitrin/token/api sayfaları her istekte gereksiz
-  // getUser() ağ çağrısı yapmasın — public trafikte büyük gecikme kazancı.
-  matcher: ["/app/:path*", "/admin/:path*", "/giris/:path*", "/kayit"],
+  // Kimlik-doğrulama yalnız /app, /admin, /giris, /kayit için çözülür (getUser() ağ çağrısı);
+  // diğer public sayfalarda yalnız bakım modu bayrağı (30 sn bellek önbellekli) okunur.
+  // API (cron, webhook, health), _next ve uzantılı statik dosyalar proxy dışındadır.
+  matcher: ["/((?!api/|_next/|.*\\..*).*)"],
 };

@@ -271,6 +271,7 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
   }
 
   revalidatePath("/app/ekip");
+  revalidatePath(`/app/ekip/${id}`);
   return { ok: true };
 }
 
@@ -291,18 +292,63 @@ export async function createBranch(_prev: TeamResult, formData: FormData): Promi
   const name = String(formData.get("name") ?? "").trim();
   const provinceId = String(formData.get("province_id") ?? "").trim();
   if (!name) return { error: "Şube adı zorunlu." };
+  if (name.length > 120) return { error: "Şube adı en fazla 120 karakter olabilir." };
+
+  const extra = await parseBranchExtras(supabase, tenantId, formData);
+  if ("error" in extra) return { error: extra.error };
 
   const { error } = await supabase.from("branches").insert({
     tenant_id: tenantId,
     name,
     province_id: provinceId || null,
+    ...extra.patch,
   });
   const planError = planLimitErrorMessage(error);
   if (planError) return { error: planError };
   if (error) return { error: "Şube oluşturulamadı." };
 
   revalidatePath("/app/ekip");
+  revalidatePath("/app/ekip/subeler");
   return { ok: true };
+}
+
+/**
+ * Şube müdürü (aynı ofisin aktif üyesi) ve telefon (yalnız alan formda varsa; `branches.phone`
+ * şeması uygulanmadıysa form alanı hiç gönderilmez). Boş değer alanı temizler.
+ */
+async function parseBranchExtras(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  formData: FormData,
+): Promise<{ patch: Record<string, unknown> } | { error: string }> {
+  const patch: Record<string, unknown> = {};
+  if (formData.has("manager_user_id")) {
+    const managerId = String(formData.get("manager_user_id") ?? "").trim();
+    if (managerId) {
+      const { data: m } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", managerId)
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!m) return { error: "Şube müdürü bu ofisin aktif bir üyesi olmalı." };
+      patch.manager_user_id = managerId;
+    } else {
+      patch.manager_user_id = null;
+    }
+  }
+  if (formData.has("phone")) {
+    const raw = String(formData.get("phone") ?? "").trim();
+    if (raw) {
+      const parsed = parsePhoneStrict(raw);
+      if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
+      patch.phone = parsed.stored;
+    } else {
+      patch.phone = null;
+    }
+  }
+  return { patch };
 }
 
 export async function updateBranch(formData: FormData): Promise<TeamResult> {
@@ -319,6 +365,9 @@ export async function updateBranch(formData: FormData): Promise<TeamResult> {
   const patch: Record<string, unknown> = { name };
   if (formData.has("province_id")) patch.province_id = provinceId || null;
   if (formData.has("is_active")) patch.is_active = String(formData.get("is_active")) === "true";
+  const extra = await parseBranchExtras(supabase, tenantId, formData);
+  if ("error" in extra) return { error: extra.error };
+  Object.assign(patch, extra.patch);
 
   const { error } = await supabase.from("branches").update(patch).eq("id", id).eq("tenant_id", tenantId);
   const planError = planLimitErrorMessage(error);
@@ -326,6 +375,7 @@ export async function updateBranch(formData: FormData): Promise<TeamResult> {
   if (error) return { error: "Şube güncellenemedi." };
 
   revalidatePath("/app/ekip");
+  revalidatePath("/app/ekip/subeler");
   return { ok: true };
 }
 

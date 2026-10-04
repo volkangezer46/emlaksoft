@@ -18,6 +18,8 @@ import { sendSms } from "@/lib/messaging/netgsm";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { isRegistrationOpen } from "@/lib/platform-flags";
+import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -310,6 +312,12 @@ export async function signUp(
   _prev: AuthResult,
   formData: FormData,
 ): Promise<AuthResult> {
+  // Platform ayarı: yeni ofis kaydı kapalıysa hiçbir şey oluşturulmaz (mevcut kullanıcı girişi açık).
+  // Okuma hatasında güvenli varsayılan "kayıt açık" (platform-flags).
+  if (!(await isRegistrationOpen())) {
+    return { error: REGISTRATION_CLOSED_MESSAGE };
+  }
+
   const fullName = String(formData.get("name") ?? "").trim();
   const rawPhone = String(formData.get("phone") ?? "").trim();
   const email = normalizeEmail(String(formData.get("email") ?? ""));

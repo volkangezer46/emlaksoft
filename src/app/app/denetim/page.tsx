@@ -9,68 +9,24 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { exportAuditCsv } from "@/app/actions/export";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { AuditExportButton } from "./audit-export-button";
+import {
+  actionLabel,
+  HIGH_RISK_ACTIONS,
+  riskOf,
+  type RiskLevel,
+} from "@/lib/audit-labels";
+import {
+  applyAuditFilters,
+  auditFiltersToParams,
+  hasAuditFilter,
+  normalizeAuditFilters,
+} from "@/lib/audit-filters";
 import { daysAgoIso, now } from "@/lib/clock";
 
 import { PageHeader } from "@/components/ui/page-header";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
-const actionLabel: Record<string, string> = {
-  "workflow.deal_won": "Satış kapandı",
-  "commission.paid": "Komisyon tahsil",
-  "commission.from_pipeline": "Satış hattı komisyonu",
-  "deal.create": "Anlaşma oluşturuldu",
-  "deal.stage": "Anlaşma aşaması",
-  "deal.update": "Anlaşma güncellendi",
-  "payment_link.create": "Ödeme linki",
-  "share.create": "Paylaşım linki",
-  "ops.impersonate.start": "Ofis önizleme başladı",
-  "ops.impersonate.stop": "Ofis önizleme bitti",
-  "customer.create": "Müşteri eklendi",
-  "customer.update": "Müşteri güncellendi",
-  "customer.delete": "Müşteri silindi",
-  "customer.reassign": "Müşteri devri",
-  "customer_file.upload": "Müşteri dosyası yüklendi",
-  "customer_file.delete": "Müşteri dosyası silindi",
-  "match.save": "Eşleştirme kaydı",
-  "demo.request": "Demo talebi",
-  "demand.create": "Talep oluşturuldu",
-  "demand.update": "Talep güncellendi",
-  "property.create": "Portföy oluşturuldu",
-  "property.update": "Portföy güncellendi",
-  "property.status": "Portföy durumu değişti",
-  "property.delete": "Portföy silindi",
-  "property.reassign": "Portföy devri",
-  "property.bulk_status": "Toplu portföy durumu",
-  "property_media.upload": "Portföy medyası yüklendi",
-  "valuation.create": "Değerleme oluşturuldu",
-  "iys.upsert": "İYS izin kaydı",
-  "task.create": "Görev oluşturuldu",
-  "task.update": "Görev güncellendi",
-  "task.complete": "Görev tamamlandı",
-  "call.create": "Arama kaydı",
-  "appointment.create": "Randevu oluşturuldu",
-  "appointment.update": "Randevu güncellendi",
-  "settings.update": "Ayarlar güncellendi",
-  "portal.close": "Portal ilanı kapatıldı",
-  "lead.capture.toggle": "Lead formu aç/kapat",
-  "lead.capture.regenerate_token": "Lead form bağlantısı yenilendi",
-  "kvkk.erasure": "KVKK silme talebi",
-  "kvkk.purge": "KVKK verisi imha edildi",
-  "integration.endeksa.save": "Endeksa entegrasyonu kaydedildi",
-  "integration.endeksa.clear": "Endeksa entegrasyonu kaldırıldı",
-  "integration.tapusor.save": "TapuSor entegrasyonu kaydedildi",
-  "integration.tapusor.clear": "TapuSor entegrasyonu kaldırıldı",
-  "platform_staff.add": "Platform ekibine eklendi",
-  "platform_staff.invite": "Platform ekip daveti",
-  "platform_staff.role_change": "Platform rol değişikliği",
-  "platform_staff.deactivate": "Platform üyesi pasifleştirildi",
-  "platform_staff.reactivate": "Platform üyesi aktifleştirildi",
-  "sales.status": "Satış kaydı durumu",
-  "sales.assign": "Satış kaydı ataması",
-  "sales.convert": "Satış kaydı dönüştürüldü",
-};
 
 /**
  * Risk sınıflandırması — aksiyon koduna göre.
@@ -78,41 +34,6 @@ const actionLabel: Record<string, string> = {
  * Orta: yapılandırma, devir ve erişim biçimini değiştiren işlemler.
  * Kalanı rutin operasyon (düşük).
  */
-const HIGH_RISK_ACTIONS = [
-  "customer.delete",
-  "property.delete",
-  "customer_file.delete",
-  "kvkk.erasure",
-  "kvkk.purge",
-  "ops.impersonate.start",
-  "ops.impersonate.stop",
-  "platform_staff.role_change",
-  "platform_staff.deactivate",
-] as const;
-const MED_RISK_ACTIONS = [
-  "settings.update",
-  "customer.reassign",
-  "property.reassign",
-  "property.bulk_status",
-  "portal.close",
-  "lead.capture.toggle",
-  "lead.capture.regenerate_token",
-  "integration.endeksa.save",
-  "integration.endeksa.clear",
-  "integration.tapusor.save",
-  "integration.tapusor.clear",
-  "platform_staff.add",
-  "platform_staff.invite",
-  "platform_staff.reactivate",
-  "sales.assign",
-] as const;
-
-type RiskLevel = "yuksek" | "orta" | "dusuk";
-function riskOf(action: string): RiskLevel {
-  if ((HIGH_RISK_ACTIONS as readonly string[]).includes(action)) return "yuksek";
-  if ((MED_RISK_ACTIONS as readonly string[]).includes(action)) return "orta";
-  return "dusuk";
-}
 const riskChip: Record<Exclude<RiskLevel, "dusuk">, { label: string; cls: string }> = {
   yuksek: { label: "Yüksek risk", cls: "bg-danger-500/10 text-danger-500" },
   orta: { label: "Orta risk", cls: "bg-amber-400/15 text-amber-600" },
@@ -145,26 +66,18 @@ function diffPreview(oldValue: unknown, newValue: unknown) {
 
 const PAGE_SIZE = 60;
 
-/** YYYY-MM-DD biçimindeyse döndür, aksi halde boş — sorguya ham girdi gitmesin. */
-function safeDate(value: string | undefined) {
-  const v = (value ?? "").trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "";
-}
-
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string }>;
+  searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string; tur?: string; ara?: string }>;
 }) {
   await requireModulePage("settings", "/app/denetim");
   const params = (await searchParams) ?? {};
-  const fromF = safeDate(params.from);
-  const toF = safeDate(params.to);
-  const aktorF = (params.aktor ?? "").trim();
-  const riskF: RiskLevel | "" = params.risk === "yuksek" || params.risk === "orta" ? params.risk : "";
+  const filters = normalizeAuditFilters(params);
+  const { from: fromF, to: toF, aktor: aktorF, risk: riskF, tur: turF, ara: araF } = filters;
   const pageParam = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
   const offset = (pageParam - 1) * PAGE_SIZE;
-  const hasFilter = Boolean(fromF || toF || aktorF || riskF);
+  const hasFilter = hasAuditFilter(filters);
 
   const supabase = await createClient();
   // Sayfalama + tarih aralığı + aktör filtresi tamamen sunucu tarafında.
@@ -178,12 +91,8 @@ export default async function AuditPage({
       { count: "exact" },
     )
     .order("created_at", { ascending: false });
-  if (fromF) logQuery = logQuery.gte("created_at", fromF);
-  if (toF) logQuery = logQuery.lte("created_at", `${toF}T23:59:59.999`);
-  if (aktorF) logQuery = logQuery.eq("actor_id", aktorF);
-  // Risk filtresi sunucu tarafında: seviye, sonlu aksiyon listesine çevrilir.
-  if (riskF === "yuksek") logQuery = logQuery.in("action", [...HIGH_RISK_ACTIONS]);
-  if (riskF === "orta") logQuery = logQuery.in("action", [...MED_RISK_ACTIONS]);
+  // Tarih, aktör, risk, işlem türü ve metin araması sunucu tarafında (CSV aynı süzgeci kullanır).
+  logQuery = applyAuditFilters(logQuery, filters);
   const [{ data: logs, count: logTotal }, { count: highCount }, { count: last24Count }] = await Promise.all([
     logQuery.range(offset, offset + PAGE_SIZE - 1),
     // KPI'lar gerçek sayım: sayfadaki 60 kayıt değil, tüm günlük.
@@ -210,12 +119,7 @@ export default async function AuditPage({
 
   /** Filtreleri koruyarak sayfa linki üretir. */
   const pageHref = (sayfa: number) => {
-    const sp = new URLSearchParams();
-    if (fromF) sp.set("from", fromF);
-    if (toF) sp.set("to", toF);
-    if (aktorF) sp.set("aktor", aktorF);
-    if (riskF) sp.set("risk", riskF);
-    if (sayfa > 1) sp.set("sayfa", String(sayfa));
+    const sp = auditFiltersToParams(filters, sayfa);
     const qs = sp.toString();
     return qs ? `/app/denetim?${qs}` : "/app/denetim";
   };
@@ -295,7 +199,7 @@ export default async function AuditPage({
               Zaman çizelgesi · aktör + değişiklik · ofis izole{totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
             </p>
           </div>
-          <ExportCsvButton label="CSV dışa aktar" action={exportAuditCsv} />
+          <AuditExportButton filters={filters} filtered={hasFilter} />
         </div>
         {/* ?from=&to=&aktor= — sunucu tarafı filtre formu; submit sayfayı 1'e döndürür */}
         <form method="get" action="/app/denetim" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
@@ -336,6 +240,27 @@ export default async function AuditPage({
             <option value="yuksek">Yüksek risk</option>
             <option value="orta">Orta risk</option>
           </select>
+          <select
+            name="tur"
+            defaultValue={turF}
+            aria-label="İşlem türü"
+            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+          >
+            <option value="">Tüm işlemler</option>
+            {Object.entries(actionLabel)
+              .sort((a, b) => a[1].localeCompare(b[1], "tr-TR"))
+              .map(([code, label]) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+          </select>
+          <input
+            name="ara"
+            type="search"
+            defaultValue={araF}
+            placeholder="İşlem veya kayıt türü ara"
+            aria-label="Metin ara"
+            className="min-w-44 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+          />
           <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
             Filtrele
           </button>
@@ -413,9 +338,25 @@ export default async function AuditPage({
                       <p className="mt-0.5 text-xs text-text-muted">{entityLine}</p>
                     )}
                   </div>
-                  <p className="truncate text-xs text-text-muted" title={diffPreview(r.old_value, r.new_value)}>
-                    {diffPreview(r.old_value, r.new_value)}
-                  </p>
+                  {r.old_value || r.new_value ? (
+                    <details className="group min-w-0 text-xs text-text-muted">
+                      <summary className="cursor-pointer list-none truncate hover:text-brand-600">
+                        {diffPreview(r.old_value, r.new_value)}
+                      </summary>
+                      <div className="mt-2 grid gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-2.5 sm:grid-cols-2">
+                        <div>
+                          <p className="mb-1 font-bold uppercase tracking-[0.06em] text-text-faint">Önce</p>
+                          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs">{r.old_value ? JSON.stringify(r.old_value, null, 2) : "—"}</pre>
+                        </div>
+                        <div>
+                          <p className="mb-1 font-bold uppercase tracking-[0.06em] text-text-faint">Sonra</p>
+                          <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words text-xs">{r.new_value ? JSON.stringify(r.new_value, null, 2) : "—"}</pre>
+                        </div>
+                      </div>
+                    </details>
+                  ) : (
+                    <p className="text-xs text-text-muted">—</p>
+                  )}
                   {actorName && r.actor_id ? (
                     <Link
                       href={`/app/ekip/${r.actor_id}`}

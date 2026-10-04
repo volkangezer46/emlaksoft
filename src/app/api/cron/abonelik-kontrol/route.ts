@@ -44,7 +44,31 @@ export async function GET(req: NextRequest) {
   }
 
   const updated = subIds.length;
-  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi`);
 
-  return NextResponse.json({ ok: true, updated });
+  // Dönem sonunda iptal talepleri (K5): dönem bitince abonelik ve ofis "cancelled" olur.
+  // Kolon henüz yoksa (migration uygulanmadı) sorgu hata verir; sessizce atlanır.
+  let cancelled = 0;
+  const { data: dueCancel, error: cancelReadError } = await admin
+    .from("subscriptions")
+    .select("id, tenant_id")
+    .eq("cancel_at_period_end", true)
+    .neq("status", "cancelled")
+    .lt("current_period_end", now)
+    .limit(100);
+  if (!cancelReadError && dueCancel && dueCancel.length > 0) {
+    const cancelSubIds = dueCancel.map((s) => s.id);
+    const cancelTenantIds = [...new Set(dueCancel.map((s) => s.tenant_id))];
+    await Promise.all([
+      admin
+        .from("subscriptions")
+        .update({ status: "cancelled", cancelled_at: now, updated_at: now })
+        .in("id", cancelSubIds),
+      admin.from("tenants").update({ status: "cancelled", updated_at: now }).in("id", cancelTenantIds),
+    ]);
+    cancelled = cancelSubIds.length;
+  }
+
+  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi, ${cancelled} iptal tamamlandı`);
+
+  return NextResponse.json({ ok: true, updated, cancelled });
 }

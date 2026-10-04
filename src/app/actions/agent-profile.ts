@@ -32,8 +32,13 @@ const PHOTO_ALLOWED = ["image/jpeg", "image/png", "image/webp"];
  * Hedef her zaman aynı kiracıda olmalı; aksi halde kiracı sınırı delinirdi.
  */
 async function gateForTarget(rawTargetId: string | null) {
-  const viewGate = await requirePermission("team", "view");
+  // P1-B4: kendi kartı için ekip modülü gerekmez (danışmanda `team` yok); her aktif, salt-okunur
+  // olmayan ofis üyesi kendi kartını düzenler. Başkasının kartı aşağıda `team:edit` ister.
+  const viewGate = await requirePermission("dashboard", "view");
   if (!viewGate.ok) return { ok: false as const, error: viewGate.error };
+  if (viewGate.role === "readonly") {
+    return { ok: false as const, error: "Salt okunur rolde kartvizit düzenlenemez." };
+  }
 
   const targetId = (rawTargetId ?? "").trim() || viewGate.userId;
   if (targetId !== viewGate.userId) {

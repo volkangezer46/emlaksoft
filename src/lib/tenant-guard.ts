@@ -24,6 +24,11 @@ type CanonicalProfile = {
 
 const BLOCKED = new Set(["suspended", "cancelled"]);
 
+/** Askıdaki ofis ödeme yapıp kendini açabilir; iptal edilmiş ofis destek yoluna gider. */
+export function isSuspendedPaymentAllowed(status: string): boolean {
+  return status === "suspended";
+}
+
 async function twoFactorSatisfiedForProfile(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -79,7 +84,7 @@ export async function twoFactorSatisfied(userId: string): Promise<boolean> {
  * birden çok kez tetikleyebiliyor — React `cache()` ile istek başına tek
  * DB round-trip grubu (getRequestUser deseni, bkz. auth-cache.ts).
  */
-export const requireActiveTenant = cache(async (): Promise<ActiveTenantResult> => {
+async function resolveActiveTenant(allowSuspended: boolean): Promise<ActiveTenantResult> {
   const user = await getRequestUser();
   if (!user) return { ok: false, error: "Oturum bulunamadı." };
 
@@ -152,6 +157,16 @@ export const requireActiveTenant = cache(async (): Promise<ActiveTenantResult> =
     .maybeSingle();
   if (tenantError || !tenant) return { ok: false, error: "Ofis bulunamadı." };
   if (BLOCKED.has(tenant.status) && !(staff && !impersonating)) {
+    // P0-12: askıdaki (iptal edilmemiş) ofis yalnız ödeme akışına girebilir.
+    if (allowSuspended && isSuspendedPaymentAllowed(tenant.status)) {
+      return {
+        ok: true,
+        userId: user.id,
+        tenantId,
+        role: profile?.role ?? claimedRole,
+        impersonating,
+      };
+    }
     return { ok: false, error: "Hesap askıda veya iptal. Bu işlem yapılamaz." };
   }
 
@@ -162,4 +177,13 @@ export const requireActiveTenant = cache(async (): Promise<ActiveTenantResult> =
     role: impersonating ? "readonly" : (profile?.role ?? claimedRole),
     impersonating,
   };
-});
+}
+
+/** Normal kapı: askıda/iptal ofis bloklanır. */
+export const requireActiveTenant = cache(() => resolveActiveTenant(false));
+
+/**
+ * Ödeme kapısı: yalnız "suspended" ofis geçer (iptal edilmiş geçmez). Yalnız abonelik
+ * ödeme/yükseltme action'ları kullanır; başka hiçbir kapıyı gevşetmez.
+ */
+export const requireTenantForPayment = cache(() => resolveActiveTenant(true));
