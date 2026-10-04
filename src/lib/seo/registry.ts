@@ -264,5 +264,7 @@ export const ALWAYS_DISALLOW = [
   "/anket/",
   "/lead/",
   "/acik-ev-kayit/",
+  "/r/",
+  "/p/",
   "/vitrin/*/favoriler",
 ] as const;

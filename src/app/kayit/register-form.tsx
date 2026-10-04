@@ -29,6 +29,8 @@ import {
   type RegistrationTeamSize,
 } from "@/lib/billing/registration-plan";
 
+import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
+
 const initial: AuthResult = {};
 
 const STEPS = [
@@ -60,6 +62,7 @@ export function RegisterForm({
   plans = PLANS,
   trialDays,
   offers,
+  attribution,
 }: {
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
@@ -68,6 +71,7 @@ export function RegisterForm({
   trialDays?: number;
   /** Etkin aylık fiyat (kampanya dahil), plan kimliğine göre. */
   offers?: Record<string, { monthlyTry: number }>;
+  attribution?: SignupAttributionFields;
 }) {
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
@@ -163,6 +167,7 @@ export function RegisterForm({
         <form action={action} className="mt-7">
           <input type="hidden" name="plan" value={selectedPlanId} />
           <input type="hidden" name="cycle" value={initialCycle} />
+          <AttributionFields attribution={attribution} />
           {/* ADIM 1 — Hesap bilgileri */}
           <div ref={step1Ref} className={step === 1 ? "space-y-4" : "hidden"}>
             <div>

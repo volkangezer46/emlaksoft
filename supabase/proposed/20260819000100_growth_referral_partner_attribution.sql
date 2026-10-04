@@ -56,13 +56,12 @@ create table if not exists public.signup_attributions (
   utm_campaign  text,
   landing_path  text,
   first_seen_at timestamptz,
-  signup_ip_hash text,
-  created_at    timestamptz not null default now(),
+  -- KVKK: IP/cihaz izi (signup_ip_hash) bilerek YOK; uygulama kodu kişisel veri toplamaz.
+  created_at   timestamptz not null default now(),
   check (referrer_tenant_id is null or referrer_tenant_id <> tenant_id)
 );
 create index if not exists idx_signup_attr_partner on public.signup_attributions(partner_id) where partner_id is not null;
 create index if not exists idx_signup_attr_referrer on public.signup_attributions(referrer_tenant_id) where referrer_tenant_id is not null;
-create index if not exists idx_signup_attr_ip on public.signup_attributions(signup_ip_hash, created_at desc) where signup_ip_hash is not null;
 
 -- 5) Ödül kuyruğu (admin onay/ret, kötüye kullanım bayrakları).
 create table if not exists public.growth_reward_claims (

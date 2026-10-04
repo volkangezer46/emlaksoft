@@ -79,6 +79,7 @@ import {
   Gauge,
   Handshake,
   HeartHandshake,
+  UserPlus,
   Inbox,
   KeyRound,
   Layers,
@@ -222,6 +223,8 @@ export const ICONS = {
   proje: Layers,
   /** Tavsiye / referans zinciri. */
   tavsiye: HeartHandshake,
+  /** Meslektaş daveti (Arkadaşını getir). */
+  davet: UserPlus,
   /** Otomasyon / tetikleyici. */
   otomasyon: Zap,
   /** Hızlı kayıt (sahada tek ekranda müşteri / görüşme / randevu). */

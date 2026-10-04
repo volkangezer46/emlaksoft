@@ -25,6 +25,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Sprout,
   Users,
   X,
 } from "lucide-react";
@@ -63,6 +64,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Satış",
     items: [
       { href: "/admin/satis", label: "Demo & aday", icon: Handshake, hint: "Satış hunisi", module: "sales", badgeKey: "sales" },
+      { href: "/admin/growth", label: "Büyüme", icon: Sprout, hint: "Davet, ortak, kaynak", module: "sales" },
     ],
   },
   {

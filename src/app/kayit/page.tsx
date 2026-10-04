@@ -15,7 +15,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RegisterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; cycle?: string }>;
+  searchParams: Promise<{
+    plan?: string;
+    cycle?: string;
+    ref?: string;
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  }>;
 }) {
   const params = await searchParams;
   if (!(await isRegistrationOpen())) {
@@ -42,6 +49,12 @@ export default async function RegisterPage({
       offers={offers}
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
+      attribution={{
+        ref: params.ref,
+        utm_source: params.utm_source,
+        utm_medium: params.utm_medium,
+        utm_campaign: params.utm_campaign,
+      }}
     />
   );
 }
