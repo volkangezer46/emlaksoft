@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "Kullanım Şartları",
-  description: "EmlakSoft üyelik ve kullanım şartları.",
-  alternates: { canonical: "/kullanim-sartlari" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/kullanim-sartlari");
+}
 
 export default function KullanimSartlariPage() {
   return (

@@ -327,6 +327,17 @@ export default async function CompliancePage({
       {/* KVKK yasam dongusu: `deleted_at` isaretli musteriler HIC temizlenmiyordu,
           yani "silinmis" bir musterinin adi/telefonu/e-postasi veritabaninda
           sonsuza kadar duruyordu. */}
+      <Link
+        href="/app/uyum/talepler"
+        className="focus-ring press lift group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 transition hover:border-brand-300"
+      >
+        <span>
+          <span className="block font-display font-bold text-ink-950">KVKK talepleri</span>
+          <span className="block text-xs text-text-muted">Erişim, taşınabilirlik, düzeltme, itiraz, silme; ofis hesabı kapatma ve veri indirme talepleri süresiyle takip edilir.</span>
+        </span>
+        <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
+      </Link>
+
       <div id="kvkk" className="scroll-mt-24">
         <KvkkPanel initialLog={erasureLog as Parameters<typeof KvkkPanel>[0]["initialLog"]} canErase={canErase} />
       </div>

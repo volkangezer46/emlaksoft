@@ -21,7 +21,8 @@ export default async function KartvizitimPage({
 }: {
   searchParams?: Promise<{ uye?: string }>;
 }) {
-  const { userId, perms, tenantId } = await requireModulePage("team");
+  // Kendi kartı her rolde açık (salt-okunur hariç, action kapısı da reddeder); başkasınınki team:edit ister.
+  const { userId, perms, tenantId } = await requireModulePage("dashboard");
   const sp = (await searchParams) ?? {};
   const canEditOthers = (perms.team ?? []).includes("edit");
 

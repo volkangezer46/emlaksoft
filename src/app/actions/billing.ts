@@ -37,7 +37,7 @@ function appUrl() {
 }
 
 export async function startPlanCheckout(formData: FormData): Promise<CheckoutResult> {
-  const gate = await requirePermission("billing", "edit");
+  const gate = await requirePermission("billing", "edit", { allowSuspended: true });
   if (!gate.ok) return { error: gate.error };
 
   const plan = String(formData.get("plan") ?? "").trim() as PlanId;

@@ -109,7 +109,7 @@ const PUBLIC_FILES = [
   "src/app/vitrin/[slug]/opengraph-image.tsx",
   "src/app/vitrin/[slug]/[id]/page.tsx",
   "src/app/vitrin/[slug]/[id]/opengraph-image.tsx",
-  "src/app/sitemap.ts",
+  "src/lib/seo/sitemap-data.ts",
   "src/app/sunum/[token]/page.tsx",
   "src/app/paylas/[token]/page.tsx",
   "src/app/danisman/[slug]/page.tsx",

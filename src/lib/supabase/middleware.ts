@@ -7,9 +7,45 @@ import {
 } from "@/lib/two-factor";
 import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
+import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform-flags-cache";
+import { isSuspendedAllowedPath } from "@/lib/suspended-access";
+
+/** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
+function maintenanceResponse(request: NextRequest) {
+  const rewrite = request.nextUrl.clone();
+  rewrite.pathname = "/bakim";
+  rewrite.search = "";
+  const res = NextResponse.rewrite(rewrite, { status: 503 });
+  res.headers.set("Retry-After", "600");
+  res.headers.set("Cache-Control", "no-store");
+  res.headers.set("X-Robots-Tag", "noindex");
+  return res;
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+
+  // Bakım modu (K5): kısa TTL önbellekli hafif okuma; okuma hatasında site AÇIK kalır.
+  // /app yolları kimlik çözüldükten sonra denetlenir (platform personeli geçer).
+  const requestPath = request.nextUrl.pathname;
+  let maintenanceOn = false;
+  if (!isMaintenanceExemptPath(requestPath)) {
+    maintenanceOn = (await readPlatformFlagsCached()).maintenanceMode;
+    if (maintenanceOn && !requestPath.startsWith("/app")) {
+      return maintenanceResponse(request);
+    }
+  }
+
+  // Kimlik gerektirmeyen public yollar: oturum çözümü (getUser) yapılmaz.
+  const needsAuthResolution =
+    requestPath === "/app" ||
+    requestPath.startsWith("/app/") ||
+    requestPath === "/admin" ||
+    requestPath.startsWith("/admin/") ||
+    requestPath === "/giris" ||
+    requestPath.startsWith("/giris/") ||
+    requestPath === "/kayit";
+  if (!needsAuthResolution) return supabaseResponse;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = resolveSupabasePublicKey();
@@ -101,6 +137,10 @@ export async function updateSession(request: NextRequest) {
       user.app_metadata?.impersonation_session_id === sessionId,
     );
     const canonicalPlatformStaff = Boolean(staff && !impersonating);
+
+    if (maintenanceOn && isApp && !staff) {
+      return maintenanceResponse(request);
+    }
     const canonicalIdentity = isAdmin
       ? canonicalPlatformStaff
       : canonicalTenantUser || canonicalImpersonation;
@@ -149,7 +189,7 @@ export async function updateSession(request: NextRequest) {
       if (
         blocked &&
         !(staff && !impersonating) &&
-        !path.startsWith("/app/askida")
+        !isSuspendedAllowedPath(path, tenant?.status)
       ) {
         const redirect = request.nextUrl.clone();
         redirect.pathname = "/app/askida";

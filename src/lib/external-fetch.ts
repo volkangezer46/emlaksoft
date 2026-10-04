@@ -61,6 +61,24 @@ export async function fetchExternal(
   });
 }
 
+/**
+ * KENDİ alan adımızı denetleyen SEO robotu için: yönlendirmeyi İZLEMEDEN (manual) durum kodunu okur,
+ * böylece 301/308 sitemap bulgusu üretilebilir. Kimlik bilgisi/Authorization taşımamalıdır ve yalnız
+ * kendi origin'imize çağrılarda kullanılır (src/lib/seo/audit-runner.ts). Süre sınırı zorunludur.
+ */
+export async function fetchOwnOriginInspect(
+  input: Parameters<typeof fetch>[0],
+  init: RequestInit,
+  options: ExternalFetchOptions,
+): Promise<Response> {
+  const signal = composeExternalAbortSignal(options.timeoutMs, init.signal, options.signal);
+  return fetch(input, {
+    ...init,
+    redirect: "manual",
+    signal,
+  });
+}
+
 async function cancelBody(response: Response): Promise<void> {
   try {
     await response.body?.cancel();

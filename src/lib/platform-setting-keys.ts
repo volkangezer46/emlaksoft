@@ -9,6 +9,10 @@ export const PLATFORM_SETTING_KEYS = {
   defaultTrialDays: "default_trial_days",
 } as const;
 
+/** Kayıt kapalıyken /kayit ve signUp'ın gösterdiği mesaj. */
+export const REGISTRATION_CLOSED_MESSAGE =
+  "Yeni ofis kayıtları şu anda geçici olarak kapalı. Mevcut hesabınızla giriş yapabilirsiniz.";
+
 export const DEFAULT_TRIAL_DAYS = 14;
 export const MIN_TRIAL_DAYS = 1;
 export const MAX_TRIAL_DAYS = 90;

@@ -82,6 +82,12 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // IndexNow anahtar dosyası kökte `/<32 hex>.txt` olmalıdır; route handler /api/indexnow-key/[key] altındadır.
+  // Desen yalnız 32 haneli küçük hex + .txt eşleşir (robots.txt, llms.txt vb. etkilenmez); IndexNow kapalıysa 404.
+  async rewrites() {
+    return [{ source: "/:key([a-f0-9]{32}).txt", destination: "/api/indexnow-key/:key" }];
+  },
+
   async headers() {
     return [
       // The worker is security-sensitive executable code. Every check must hit
