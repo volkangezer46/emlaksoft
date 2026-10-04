@@ -9,7 +9,8 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { daysFromNowIso } from "@/lib/clock";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -50,7 +51,7 @@ export async function createCustomer(
   const anniversaryNote = String(formData.get("anniversary_note") ?? "").trim();
 
   if (!fullName) return { error: "Ad soyad zorunlu." };
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
@@ -148,7 +149,7 @@ export async function updateCustomer(
 
   if (!id) return { error: "Müşteri bulunamadı." };
   if (!fullName) return { error: "Ad soyad zorunlu." };
-  const parsedPhone = phone ? parsePhone(phone) : null;
+  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
   if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };

@@ -3,7 +3,7 @@
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { normalizeEmail } from "@/lib/email";
 import {
   demandValuesFromFormData,
@@ -32,7 +32,7 @@ async function findRecentDuplicateCustomer(formData: FormData): Promise<string |
   const gate = await requirePermission("customers", "create");
   if (!gate.ok) return null; // asıl hata createCustomer'da döner
   const phoneRaw = String(formData.get("phone") ?? "").trim();
-  const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
+  const parsedPhone = phoneRaw ? parsePhoneStrict(phoneRaw) : null;
   const phone = parsedPhone && parsedPhone.ok ? parsedPhone.stored : "";
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const fullName = String(formData.get("full_name") ?? "").trim();

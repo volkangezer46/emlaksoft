@@ -8,7 +8,8 @@ import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity";
 import { now, trDayKey } from "@/lib/clock";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { createTeamMember } from "@/app/actions/team";
 import { canManageRole } from "@/lib/team/assignable-roles";
@@ -99,7 +100,7 @@ export async function createAdvisor(formData: FormData): Promise<CreateAdvisorRe
   if (!email) return { error: "E-posta zorunlu." };
   if (!isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   if (phoneRaw) {
-    const parsed = parsePhone(phoneRaw);
+    const parsed = parsePhoneStrict(phoneRaw);
     if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
   }
 

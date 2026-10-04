@@ -10,7 +10,7 @@
  * değerleri `parseDemandValues` ile doğrulanır (iletişim sözleşmesi).
  */
 
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { DEFAULT_DEFINITIONS, defaultLabelMap } from "@/lib/definition-defaults";
 import { parseDemandValues, type DemandColumns, type DemandCriteria } from "@/lib/demand-criteria";
@@ -165,7 +165,7 @@ export function validateCustomerRow(r: ImportRow): { data?: NormalizedCustomer; 
   const phoneRaw = clean(r.phone);
   const email = normalizeEmail(clean(r.email));
   if (!fullName) issues.push({ level: "error", message: "Ad soyad boş." });
-  const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
+  const parsedPhone = phoneRaw ? parsePhoneStrict(phoneRaw) : null;
   if (parsedPhone && !parsedPhone.ok) {
     issues.push({
       level: "error",
@@ -502,7 +502,7 @@ export function validateDemandRow(r: ImportRow): { data?: NormalizedDemand; issu
   const issues: RowIssue[] = [];
   const phoneRaw = clean(r.customer_phone);
   const email = normalizeEmail(clean(r.customer_email));
-  const parsedPhone = phoneRaw ? parsePhone(phoneRaw) : null;
+  const parsedPhone = phoneRaw ? parsePhoneStrict(phoneRaw) : null;
   if (parsedPhone && !parsedPhone.ok) {
     issues.push({ level: "error", message: `Müşteri telefonu geçersiz: "${phoneRaw}" (${parsedPhone.error ?? "geçersiz numara"}).` });
   }

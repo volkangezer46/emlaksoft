@@ -12,7 +12,8 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { validateCheckoutBuyer } from "@/lib/billing/buyer";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { getBaseUrl } from "@/lib/base-url";
 import { parseMoneyInput } from "@/lib/money-input";
 
@@ -159,7 +160,7 @@ export async function startPaymentLinkCheckout(token: string, formData: FormData
 
   const buyerEmail = normalizeEmail(String(formData.get("email") ?? ""));
   if (!isValidEmail(buyerEmail)) return { error: EMAIL_ERROR_MESSAGE };
-  const buyerPhone = parsePhone(String(formData.get("phone") ?? ""));
+  const buyerPhone = parsePhoneStrict(String(formData.get("phone") ?? ""));
   if (!buyerPhone.ok) return { error: buyerPhone.error ?? PHONE_ERROR_MESSAGE };
 
   let checkoutBuyer;

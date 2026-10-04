@@ -2,7 +2,7 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EMAIL_ERROR_MESSAGE, isValidOptionalEmail, normalizeEmail } from "@/lib/email";
-import { parsePhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { notifyTenant } from "@/lib/notify";
 import { buildLeadCommunication } from "@/lib/lead-message";
 import { isPublicTenantActive } from "@/lib/public-tenant";
@@ -89,7 +89,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
   const fullName = input.fullName?.trim();
   if (!fullName) return { ok: false, error: "Ad soyad zorunlu.", status: 400 };
   // customers.phone DB'de yalnız TR cep (05XXXXXXXXX) kabul eder; yabancı numara için migration gerekir.
-  const phoneParsed = input.phone?.trim() ? parsePhone(input.phone) : null;
+  const phoneParsed = input.phone?.trim() ? parsePhoneStrict(input.phone) : null;
   if (phoneParsed && (!phoneParsed.ok || phoneParsed.country !== "TR" || phoneParsed.kind !== "mobile")) {
     return { ok: false, error: "Geçerli bir Türk cep telefonu girin.", status: 400 };
   }

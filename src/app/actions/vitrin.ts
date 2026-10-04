@@ -4,7 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
-import { formatPhoneDisplay, parsePhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { formatPhoneDisplay, PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPast } from "@/lib/clock";
 
 /**
@@ -47,7 +48,7 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
 
   const slug = (input.slug ?? "").trim();
   const txType = input.txType === "kiralik" ? "kiralik" : input.txType === "satilik" ? "satilik" : null;
-  const phoneParsed = parsePhone(input.phone);
+  const phoneParsed = parsePhoneStrict(input.phone);
   const phone = phoneParsed.stored;
 
   if (!slug || !txType || !input.provinceId) {
