@@ -74,6 +74,7 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
   const retry = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revenueRef = useRef(revenueRequested);
+  const loadRef = useRef<() => Promise<void>>(async () => undefined);
   useEffect(() => {
     revenueRef.current = revenueRequested;
   }, [revenueRequested]);
@@ -105,13 +106,18 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
       retry.current += 1;
       const wait = Math.min(60_000, 5_000 * 2 ** (retry.current - 1));
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void load(), wait);
+      timer.current = setTimeout(() => void loadRef.current(), wait);
     }
   }, []);
 
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+
   // İlk yükleme + gelir ayarı değişince hemen tazele
   useEffect(() => {
-    void load();
+    const id = setTimeout(() => void load(), 0);
+    return () => clearTimeout(id);
   }, [load, revenueRequested]);
 
   // Yedek yoklama + sekme görünür olunca / ağ dönünce tazele

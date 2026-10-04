@@ -106,7 +106,7 @@ describe("olay akışı kişisel veri taşımaz", () => {
     }));
     const ev = buildTvEvents(raw);
     expect(ev).toHaveLength(10);
-    expect(ev[0].id).toBe("property:13");
+    expect(ev[0].id).toBe("appointment:13");
     expect(Object.keys(ev[0]).sort()).toEqual(["at", "id", "kind", "label"]);
     expect(ev.map((e) => e.label).join(" ")).not.toMatch(/\d{10}|@/);
   });
