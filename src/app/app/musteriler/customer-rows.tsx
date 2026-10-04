@@ -5,6 +5,8 @@ import { CustomerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
+  MobileCard,
+  MobileCardList,
   RowActionAnchor,
   RowActionLink,
   RowActions,
@@ -216,9 +218,9 @@ export function CustomerMobileList({
   canDelete?: boolean;
 }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((c) => (
-        <li key={c.id} className="surface-card relative rounded-[var(--radius-card)] p-3">
+        <MobileCard key={c.id}>
           <div className="flex items-start gap-3">
             {canBulk ? (
               <span className="mt-1 grid min-h-9 min-w-6 place-items-center">
@@ -250,8 +252,8 @@ export function CustomerMobileList({
               <span className="numeric ml-auto text-xs text-text-muted">{c.phoneDisplay}</span>
             </div>
           ) : null}
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

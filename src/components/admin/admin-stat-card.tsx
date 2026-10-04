@@ -54,7 +54,7 @@ export function AdminStatCard({
   const empty = value === null;
 
   const shell = dark
-    ? "border-white/12 bg-white/8 backdrop-blur hover:border-white/25 hover:bg-white/12"
+    ? "border-white/12 bg-white/8 hover:border-white/25 hover:bg-white/12"
     : "border-line bg-surface hover:border-brand-300";
 
   const cls = [

@@ -131,9 +131,10 @@ export function TR({
       className={cn(
         "hairline-b transition-colors last:border-0",
         // Hover'da yalnızca zemin değil, sol kenarda ince marka vurgusu:
-        // gözün "hangi satırdayım" sorusunu anında cevaplar.
+        // gözün "hangi satırdayım" sorusunu anında cevaplar. Zemin rol token'ından
+        // (--surface-hover): açık/koyu ve her yüzeyde aynı formül.
         interactive &&
-          "group relative cursor-pointer hover:bg-brand-600/[0.035] hover:shadow-[inset_2px_0_0_0_var(--brand-500)]",
+          "group relative cursor-pointer hover:bg-surface-hover hover:shadow-[inset_2px_0_0_0_var(--brand-500)]",
         className,
       )}
     />

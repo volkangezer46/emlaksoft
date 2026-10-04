@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 function source(file: string): string {
@@ -6,9 +6,9 @@ function source(file: string): string {
 }
 
 const convertedDialogs = [
+  // Pano: yalnız "Anlaşmayı düzenle" diyaloğu. Kazanma ve kayıp diyalogları kaldırıldı; kapanış artık
+  // anlaşma detayındaki Kapanış sekmesidir (aşağıdaki "anlaşma kapanışı" sözleşmesi bunu korur).
   { file: "src/app/app/anlasmalar/deal-board.tsx", count: 1 },
-  { file: "src/app/app/anlasmalar/loss-reason-dialog.tsx", count: 1 },
-  { file: "src/app/app/anlasmalar/win-celebration-dialog.tsx", count: 1 },
   { file: "src/app/app/portfoyler/[id]/property-media-manager.tsx", count: 1 },
 ] as const;
 
@@ -124,5 +124,49 @@ describe("inline panel (popup yerine sayfa içi sekme alanı) sözleşmesi", () 
     expect(panel).not.toContain("aria-modal");
     expect(panel).toContain("Ctrl/⌘+Enter");
     expect(source("src/app/app/layout.tsx")).toContain('id="inline-panel-host"');
+  });
+});
+
+describe("anlaşma kapanışı (popup yerine Kapanış sekmesi) sözleşmesi", () => {
+  const dealsDir = "src/app/app/anlasmalar";
+
+  it("kazanma ve kayıp popup'ları geri gelmez", () => {
+    expect(existsSync(`${dealsDir}/loss-reason-dialog.tsx`)).toBe(false);
+    expect(existsSync(`${dealsDir}/win-celebration-dialog.tsx`)).toBe(false);
+    for (const entry of readdirSync(dealsDir)) {
+      if (!/\.tsx?$/.test(entry)) continue;
+      expect(source(`${dealsDir}/${entry}`), entry).not.toMatch(/WinCelebrationDialog|LossReasonDialog/);
+    }
+  });
+
+  it("pano ve Geçiş menüsü Kazanıldı/Kaybedildi için Kapanış sekmesine yönlendirir", () => {
+    const board = source(`${dealsDir}/deal-board.tsx`);
+    const logic = source(`${dealsDir}/board-logic.ts`);
+    const transition = source(`${dealsDir}/status-transition.tsx`);
+    const model = source(`${dealsDir}/[id]/kapanis-model.ts`);
+
+    // Karar saf mantıktadır: kapanış aşaması `updateDealStage` değil yönlendirme üretir.
+    expect(logic).toContain("href: closingTabHref(deal.id, to)");
+    expect(model).toContain("?sekme=kapanis&sonuc=");
+    expect(board).toContain("resolveBoardDrop(");
+    expect(board).toContain("router.push(action.href)");
+    expect(transition).toContain("router.push(closingTabHref(dealId, to))");
+    // Panoda kayıp nedeni formu yok: neden yalnız sihirbazda sorulur, sunucu aynen doğrular.
+    expect(board).not.toContain("loss_reason");
+    expect(transition).not.toContain("loss_reason");
+    expect(source("src/app/actions/deals.ts")).toContain("validateLossReason(");
+  });
+
+  it("kapanış sihirbazı sayfa içi sekmedir: sonuc parametresini okur, diyalog kullanmaz", () => {
+    const wizard = source(`${dealsDir}/[id]/kapanis-sihirbazi.tsx`);
+    const page = source(`${dealsDir}/[id]/page.tsx`);
+
+    expect(wizard).not.toContain("@/components/ui/dialog");
+    expect(wizard).not.toContain("<DialogContent");
+    expect(wizard).not.toContain("createPortal");
+    expect(wizard).toContain("initialOutcome(props.stage, props.requestedOutcome)");
+    expect(wizard).toContain('fd.set("loss_reason", reason);');
+    expect(page).toContain("requestedOutcome={parseOutcomeParam(sp.sonuc)}");
+    expect(page).toContain('tab === "kapanis"');
   });
 });

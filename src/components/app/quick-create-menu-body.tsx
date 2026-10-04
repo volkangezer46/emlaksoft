@@ -1,5 +1,6 @@
 "use client";
 
+import { KbdCombo } from "@/components/ui/kbd";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import {
@@ -58,12 +59,8 @@ export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatab
                   <a.icon aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{a.label}</span>
                   {a.shortcut ? (
-                    <span className="ml-auto flex shrink-0 items-center gap-1" aria-label={`Kısayol ${a.shortcut}`}>
-                      {a.shortcut.split(" ").map((k) => (
-                        <kbd key={k} className="rounded-sm border border-hairline bg-canvas px-1.5 py-0.5 text-xs font-semibold uppercase text-text-muted">
-                          {k}
-                        </kbd>
-                      ))}
+                    <span className="ml-auto shrink-0" aria-label={`Kısayol ${a.shortcut}`}>
+                      <KbdCombo keys={a.shortcut.split(" ")} className="uppercase" />
                     </span>
                   ) : null}
                 </Link>

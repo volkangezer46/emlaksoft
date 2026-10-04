@@ -4,6 +4,8 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
+  MobileCard,
+  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -99,9 +101,9 @@ export function OfferTable({ rows, density }: { rows: OfferVM[]; density: Densit
 /** <md: tablo yerine kart listesi. */
 export function OfferMobileList({ rows }: { rows: OfferVM[] }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((o) => (
-        <li key={o.id} className="surface-card relative rounded-[var(--radius-card)] p-3">
+        <MobileCard key={o.id}>
           <div className="flex items-start gap-3">
             <EntityThumb alt="" icon={Building2} size="sm" />
             <div className="min-w-0 flex-1">
@@ -118,8 +120,8 @@ export function OfferMobileList({ rows }: { rows: OfferVM[] }) {
               </div>
             </div>
           </div>
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

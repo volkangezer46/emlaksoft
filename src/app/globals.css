@@ -15,10 +15,6 @@
   33% { transform: translate3d(3%, -4%, 0) scale(1.08); opacity: 1; }
   66% { transform: translate3d(-3%, 3%, 0) scale(0.96); opacity: 0.85; }
 }
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -94,7 +90,7 @@ body {
   font-size: 0.875rem;
   font-weight: 600;
   box-shadow: var(--shadow-lg);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-fast) var(--ease-out);
 }
 .skip-link:focus {
   transform: translateY(0);
@@ -211,13 +207,33 @@ aside::-webkit-scrollbar-thumb,
 }
 
 /* Basma geri bildirimi — tıklamanın fiziksel hissi. 1px'lik iniş yeterli;
-   fazlası oyuncak gibi durur. */
-.press { transition: transform 0.12s ease, box-shadow 0.18s ease; }
-.press:active { transform: translateY(1px) scale(0.98); }
+   fazlası oyuncak gibi durur. Bırakınca yay easing'iyle döner; renk geçişleri de
+   burada (bu sınıf Tailwind `transition` yardımcısını ezdiği için birlikte tanımlı). */
+.press {
+  transition:
+    transform var(--motion-base) var(--ease-spring),
+    box-shadow var(--motion-base) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    color var(--motion-fast) var(--ease-out),
+    opacity var(--motion-fast) var(--ease-out);
+}
+.press:active {
+  transform: translateY(1px) scale(0.98);
+  transition-duration: var(--motion-exit-fast);
+  transition-timing-function: var(--ease-out);
+}
+
+/* Opak zeminli denetim (ikincil düğme, sayfalama düğmesi, istatistik kutusu): rol
+   token'ları yarı saydam olduğundan hover/basılı tonu zemin renginin ÜSTÜNE bindirilir
+   (zemin rengi yerinde kalır). Saydam zeminli öğelerde (hayalet düğme, satır, çip)
+   doğrudan `hover:bg-surface-hover active:bg-surface-pressed` kullanılır. */
+.surface-interactive:hover { background-image: linear-gradient(var(--surface-hover), var(--surface-hover)); }
+.surface-interactive:active { background-image: linear-gradient(var(--surface-pressed), var(--surface-pressed)); }
 
 /* Hover'da yükselme — kart/satır için. Gölge ve konum birlikte değişir,
    yalnızca renk değiştirmek "tıklanabilir" hissi vermiyor. */
-.lift-hover { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease; }
+.lift-hover { transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out); }
 .lift-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--inner-top), var(--elev-3);
@@ -291,7 +307,7 @@ p {
 }
 
 .card-hover {
-  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+  transition: transform var(--motion-slow) var(--ease-out-expo), box-shadow var(--motion-slow) var(--ease-out), border-color var(--motion-slow) var(--ease-out);
 }
 .card-hover:hover {
   transform: translateY(-4px);
@@ -364,13 +380,6 @@ p {
 }
 .btn-shine:hover::after { left: 150%; }
 
-/* animated shimmer bg (skeleton / accent lines) */
-.shimmer {
-  background: linear-gradient(90deg, transparent, rgba(20, 99, 255, 0.14), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 2.4s linear infinite;
-}
-
 /* marquee */
 .marquee { overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); }
 .marquee-track { display: flex; width: max-content; animation: marquee 32s linear infinite; }
@@ -421,7 +430,7 @@ p {
   height: 2px;
   width: 0;
   background: var(--grad-brand);
-  transition: width 0.3s ease;
+  transition: width var(--motion-slow) var(--ease-out);
 }
 .nav-link:hover::after { width: 100%; }
 
@@ -479,14 +488,14 @@ p {
    Büyük sıçramalar (-6/-8px) oyuncaksı duruyordu; premium ürünler
    1-3px + gölge adımıyla yetinir. Vitrin kartları için .lift-lg (-4px). */
 .lift {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
 }
 .lift:hover {
   transform: translateY(-2px);
   box-shadow: var(--inner-top), var(--elev-3);
 }
 .lift-lg {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
 }
 .lift-lg:hover {
   transform: translateY(-4px);
@@ -504,14 +513,16 @@ p {
   animation: spin-conic 6s linear infinite;
 }
 
-.dropdown-in { animation: dropIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.dropdown-in { animation: dropIn var(--motion-base) var(--ease-out-expo) both; }
 @keyframes dropIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
 /* ------------------------------------------------------------
    Radix durum animasyonları (dialog / select / menü / tooltip)
    src/components/ui/* bileşenleri bu sınıfları kullanır.
-   Giriş yumuşak; çıkış 120-140ms kısa fade — anlık kapanış "kesik"
-   hissettiriyordu, kısa çıkış hız algısını koruyarak yumuşatır.
+   Giriş yumuşak; çıkış girişten ~%30 kısa (motion.css --motion-exit-*) —
+   anlık kapanış "kesik" hissettiriyordu, kısa çıkış hız algısını koruyarak yumuşatır.
+   Radix Presence çıkışı `animationend` ile beklediği için burada keyframe kalır
+   (transition + @starting-style çıkışı beklenmez).
    prefers-reduced-motion bloğu dosya sonundaki global kural ile karşılanıyor.
    ------------------------------------------------------------ */
 @keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
@@ -525,7 +536,7 @@ p {
   to { opacity: 0; transform: translateY(4px) scale(0.99); }
 }
 @keyframes tour-fade { from { opacity: 0; } to { opacity: 1; } }
-.tour-fade { animation: tour-fade 0.2s ease-out both; }
+.tour-fade { animation: tour-fade var(--motion-base) var(--ease-out) both; }
 @media (prefers-reduced-motion: reduce) { .tour-fade { animation: none; } }
 @keyframes popover-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
@@ -535,13 +546,13 @@ p {
   from { opacity: 1; transform: none; }
   to { opacity: 0; transform: translateY(-4px) scale(0.98); }
 }
-.dialog-overlay[data-state="open"] { animation: overlay-in 0.18s ease both; }
-.dialog-overlay[data-state="closed"] { animation: overlay-out 0.14s ease both; }
-.dialog-content[data-state="open"] { animation: dialog-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.dialog-content[data-state="closed"] { animation: dialog-out 0.14s ease both; }
+.dialog-overlay[data-state="open"] { animation: overlay-in var(--motion-base) var(--ease-out) both; }
+.dialog-overlay[data-state="closed"] { animation: overlay-out var(--motion-exit-base) var(--ease-in) both; }
+.dialog-content[data-state="open"] { animation: dialog-in var(--motion-base) var(--ease-out-expo) both; }
+.dialog-content[data-state="closed"] { animation: dialog-out var(--motion-exit-base) var(--ease-in) both; }
 .popover-in[data-state="open"],
-.popover-in[data-state="delayed-open"] { animation: popover-in 0.16s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.popover-in[data-state="closed"] { animation: popover-out 0.12s ease both; }
+.popover-in[data-state="delayed-open"] { animation: popover-in var(--motion-fast) var(--ease-out-expo) both; }
+.popover-in[data-state="closed"] { animation: popover-out var(--motion-exit-fast) var(--ease-in) both; }
 
 /* Toast giriş/çıkış — spring hissi veren easing ile */
 @keyframes toast-in {
@@ -552,8 +563,8 @@ p {
   from { opacity: 1; transform: none; }
   to { opacity: 0; transform: translateY(6px); }
 }
-.toast-in { animation: toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.toast-out { animation: toast-out 0.16s ease both; }
+.toast-in { animation: toast-in var(--motion-slow) var(--ease-out-expo) both; }
+.toast-out { animation: toast-out var(--motion-exit-base) var(--ease-in) both; } /* <= toast-provider EXIT_MS */
 
 .mega-surface {
   background:
@@ -573,7 +584,7 @@ p {
     radial-gradient(circle at 50% 0%, rgba(20, 99, 255, 0.12), transparent 42%);
   -webkit-backdrop-filter: blur(6px) saturate(80%);
   backdrop-filter: blur(6px) saturate(80%);
-  animation: backdrop-in 0.22s ease both;
+  animation: backdrop-in var(--motion-base) var(--ease-out) both;
 }
 
 @keyframes backdrop-in {
@@ -731,9 +742,9 @@ p {
 .property-card {
   position: relative;
   transition:
-    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.45s ease,
-    box-shadow 0.45s ease;
+    transform var(--motion-slow) var(--ease-out-expo),
+    border-color var(--motion-slow) var(--ease-out),
+    box-shadow var(--motion-slow) var(--ease-out);
 }
 
 .property-card::after {
@@ -748,7 +759,7 @@ p {
   mask-composite: exclude;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.45s ease;
+  transition: opacity var(--motion-slow) var(--ease-out);
 }
 
 .property-card:hover {
@@ -781,7 +792,7 @@ p {
     radial-gradient(circle at 0% 0%, rgba(20, 99, 255, 0.075), transparent 34%),
     radial-gradient(circle at 100% 100%, rgba(16, 185, 163, 0.045), transparent 32%);
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity var(--motion-slow) var(--ease-out);
 }
 
 .workflow-card:hover::before,
@@ -794,9 +805,9 @@ p {
 .workflow-card {
   box-shadow: 0 12px 36px -30px rgba(7, 26, 56, 0.48);
   transition:
-    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.35s ease,
-    box-shadow 0.35s ease;
+    transform var(--motion-slow) var(--ease-out-expo),
+    border-color var(--motion-slow) var(--ease-out),
+    box-shadow var(--motion-slow) var(--ease-out);
 }
 
 .workflow-card:hover {
@@ -856,9 +867,9 @@ p {
 .dashboard-panel {
   box-shadow: 0 14px 42px -36px rgba(7, 26, 56, 0.58);
   transition:
-    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-    border-color 0.32s ease,
-    box-shadow 0.32s ease;
+    transform var(--motion-base) var(--ease-out-expo),
+    border-color var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out);
 }
 
 .dashboard-panel:hover {
@@ -1043,7 +1054,7 @@ p {
   background: conic-gradient(from 0deg, transparent 0 66%, rgba(52, 211, 189, 0.7) 80%, rgba(34, 211, 238, 0.7) 92%, transparent 100%);
   animation: ring-rotate 5s linear infinite;
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transition: opacity var(--motion-slow) var(--ease-out);
 }
 .group:hover .shield-ring::before { opacity: 1; }
 .shield-ring::after {
@@ -1052,7 +1063,7 @@ p {
   inset: 1px;
   border-radius: inherit;
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(2px);
+  /* cam bütçesi: tekrar eden kart ikonunda 2px bulanıklık kaldırıldı (görsel fark yok). */
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1072,7 +1083,7 @@ p {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
 }
-.page-in { animation: page-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.page-in { animation: page-in var(--motion-nav) var(--ease-out-expo) both; }
 @media (prefers-reduced-motion: reduce) {
   .page-in { animation: none; }
 }
@@ -1173,9 +1184,9 @@ p {
 .tilt-card {
   transform-style: preserve-3d;
   transition:
-    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.28s ease,
-    border-color 0.2s ease;
+    transform var(--motion-base) var(--ease-out-expo),
+    box-shadow var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out);
 }
 .tilt-card:hover {
   transform: perspective(900px) translateY(-3px) rotateX(1.6deg) rotateY(-1.2deg);
@@ -1207,7 +1218,7 @@ p {
   background: var(--kpi-glow, rgba(20, 99, 255, 0.38));
   filter: blur(18px);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--motion-slow) var(--ease-out);
   z-index: -1;
   pointer-events: none;
 }
@@ -1220,23 +1231,7 @@ p {
 .kpi-glow-warn { --kpi-glow: rgba(245, 165, 36, 0.38); }
 .kpi-glow-danger { --kpi-glow: rgba(229, 72, 77, 0.36); }
 
-/* Stagger giriş — kart grid'i, 25ms adım, maks 12 öğe */
-@keyframes stagger-in {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: none; }
-}
-.stagger-grid > * { animation: stagger-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.stagger-grid > *:nth-child(2) { animation-delay: 25ms; }
-.stagger-grid > *:nth-child(3) { animation-delay: 50ms; }
-.stagger-grid > *:nth-child(4) { animation-delay: 75ms; }
-.stagger-grid > *:nth-child(5) { animation-delay: 100ms; }
-.stagger-grid > *:nth-child(6) { animation-delay: 125ms; }
-.stagger-grid > *:nth-child(7) { animation-delay: 150ms; }
-.stagger-grid > *:nth-child(8) { animation-delay: 175ms; }
-.stagger-grid > *:nth-child(9) { animation-delay: 200ms; }
-.stagger-grid > *:nth-child(10) { animation-delay: 225ms; }
-.stagger-grid > *:nth-child(11) { animation-delay: 250ms; }
-.stagger-grid > *:nth-child(12) { animation-delay: 275ms; }
+/* Kart ızgarası stagger girişi: motion.css `.list-stagger` (tek tanım). */
 
 /* Odometre — dikey kayan basamak (OdometerNumber komponenti) */
 .odometer {
@@ -1273,7 +1268,6 @@ p {
 @media (prefers-reduced-motion: reduce) {
   .tilt-card:hover,
   .tilt-card:nth-child(even):hover { transform: none; }
-  .stagger-grid > * { animation: none; }
   .odometer-track { animation: none; }
 }
 
@@ -1283,26 +1277,26 @@ p {
    Desteklemeyen tarayıcıda bu bloklar yok sayılır; görünüm bugünkü ile aynı.
    ============================================================ */
 
-/* ---- 1) VIEW TRANSITIONS (experimental.viewTransition + app/template.tsx) ----
-   Root snapshot'ın varsayılan cross-fade'ini 180ms'e çeker (150ms); panel içeriği
-   (React <ViewTransition default="page-fade">) aynı süreyle uyumlu (≤150ms: gezinme hızlı hissedilsin). */
+/* ---- 1) VIEW TRANSITIONS (React <ViewTransition>, app/template.tsx) ----
+   Root snapshot'ın varsayılan cross-fade'i ve panel içeriği (React
+   <ViewTransition default="page-fade">) aynı sürede: --motion-nav (150 ms; gezinme hızlı
+   hissedilsin). Eski/yeni süreleri EŞİT tutulur; aksi halde cross-fade'de zemin sızar.
+   VT desteklemeyen tarayıcıda yedek: motion.css `.motion-page` (fade + 4px). */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 150ms;
+  animation-duration: var(--motion-nav);
   animation-timing-function: ease;
 }
 ::view-transition-group(.page-fade),
 ::view-transition-old(.page-fade),
 ::view-transition-new(.page-fade) {
-  animation-duration: 150ms;
+  animation-duration: var(--motion-nav);
   animation-timing-function: ease;
 }
-
-/* Çakışma önleme: VT destekli tarayıcıda panel template'inin .page-in
-   keyframe'i kapatılır (yalnız .vt-page — admin template'i VT kullanmadığı
-   için .page-in oradan aynen çalışmaya devam eder). */
-@supports (view-transition-name: root) {
-  .vt-page.page-in { animation: none; }
+/* Geçiş sürerken canlı sayfa tıklanabilir kalır (Next docs: view-transitions,
+   "Keeping the page interactive"). */
+::view-transition {
+  pointer-events: none;
 }
 
 /* Reduced-motion: ::view-transition pseudo'larına global `*` kuralı ulaşmaz,
@@ -1440,18 +1434,9 @@ p {
   --neutral-strong: var(--text);
   --neutral-line: var(--hairline-strong);
 
-  /* ---- 3) Easing token'lari ------------------------------------------------
-     Tum yeni animasyonlar bu ucunu kullanir; kod tabaninda dagimik duran
-     cubic-bezier(0.16, 1, 0.3, 1) tekrarinin adi --ease-out-expo'dur. */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
-
-  /* Sure olcegi — 120-320ms bandi. Daha uzunu "yavas yazilim" hissi verir. */
-  --dur-1: 120ms;
-  --dur-2: 180ms;
-  --dur-3: 240ms;
-  --dur-4: 320ms;
+  /* ---- 3) Easing ve sure token'lari: TEK KAYNAK src/app/motion.css ----------
+     (--motion-fast/base/slow, --motion-exit-*, --ease-out, --ease-out-expo,
+     --ease-out-quart, --ease-spring). Eski --dur-1..4 adlari orada takma addir. */
 }
 
 @theme inline {
@@ -1545,8 +1530,8 @@ p {
   55% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
 }
 
-.anim-rise { animation: anim-rise var(--dur-3) var(--ease-out-expo) both; }
-.anim-pop { animation: anim-pop var(--dur-2) var(--ease-spring) both; }
+.anim-rise { animation: anim-rise var(--motion-base) var(--ease-out-expo) both; }
+.anim-pop { animation: anim-pop var(--motion-base) var(--ease-spring) both; }
 /* Dikkat cekilmesi gereken TEK oge icin (or. onay bekleyen sayac). Surekli
    dongu oldugu icin sayfada birden fazla kullanilmamali. */
 .anim-pulse-soft { animation: anim-pulse-soft 2s var(--ease-out-quart) infinite; }
@@ -1557,19 +1542,7 @@ p {
 .anim-d3 { animation-delay: 120ms; }
 .anim-d4 { animation-delay: 160ms; }
 
-/* Iskelet yuzeyi — mevcut `.shimmer` saydam bir parlama katmanidir ve kendi
-   taban rengi yoktur; `.skeleton` tabani + parlamayi birlikte verir. */
-@keyframes skeleton-sweep {
-  0% { background-position: -180% 0; }
-  100% { background-position: 180% 0; }
-}
-.skeleton {
-  background-color: color-mix(in srgb, var(--ink-950) 7%, #ffffff);
-  background-image: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.72) 50%, transparent 100%);
-  background-size: 180% 100%;
-  background-repeat: no-repeat;
-  animation: skeleton-sweep 1.4s linear infinite;
-}
+/* Iskelet yuzeyi (`.skeleton`): tek tanim src/app/motion.css icindedir. */
 
 /* ---- 7) REDUCED MOTION — v2 katmaninin tamami kapanir --------------------
    Global `*` kurali sureleri 0.01ms'e cekiyor; burada ayrica animasyonlari
@@ -1578,14 +1551,12 @@ p {
 @media (prefers-reduced-motion: reduce) {
   .anim-rise,
   .anim-pop,
-  .anim-pulse-soft,
-  .skeleton {
+  .anim-pulse-soft {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
   .anim-pulse-soft { box-shadow: none !important; }
-  .skeleton { background-image: none; }
   .anim-d1, .anim-d2, .anim-d3, .anim-d4 { animation-delay: 0ms !important; }
 }
 
@@ -1609,15 +1580,27 @@ p {
 .type-caption { font-size: var(--fs-caption); line-height: 1.35; letter-spacing: 0.01em; color: var(--text-muted); }
 .type-display, .type-h1, [data-numeric] { font-variant-numeric: tabular-nums; }
 
-/* Cam efekti YALNIZ üst bar ve komut paletinde (başka yerde kullanma). */
+/* ---- CAM YÜZEY BÜTÇESİ (docs/DESIGN_SYSTEM.md "Cam yüzey bütçesi") ----------------
+   backdrop-filter pahalıdır: altındaki her piksel değişiminde (kaydırma, animasyon)
+   yeniden hesaplanır. Sayfa başına cam yalnız şuralarda serbesttir:
+     1) sabit üst çubuk            .glass-bar (/app, /admin), .mk-nav::before (ana sayfa)
+     2) TEK vurgu yüzeyi           .pm-glass (hero cam KPI), .mk-portals (ana sayfa)
+     3) geçici modal örtüsü        .dialog-overlay, .mega-backdrop (açıkken sayfa durağan)
+   Kaydırılan içerikte tekrar eden öğe (kart, satır, rozet, harita işareti, grafik
+   ipucu) ve alt çubuklar cam OLAMAZ: opak ya da düz yarı saydam zemin kullanılır.
+   Opak yedekler (backdrop-filter desteği yok / saydamlığı azalt / yüksek kontrast)
+   a11y.css'tedir. Sözleşme: src/lib/glass-budget-contract.test.ts. */
 .glass-bar {
   background: var(--surface-overlay);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   backdrop-filter: blur(14px) saturate(1.4);
   border-bottom: 1px solid var(--hairline);
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass-bar { background: var(--surface); }
+/* Bütçe kilidi: içerik alanındaki (<main>) Tailwind backdrop-blur-* yardımcıları etkisizdir.
+   Katmansız kural yardımcı sınıfı ezer; öğenin kendi yarı saydam zemini yerinde kalır. */
+main [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* Basılı geri bildirimi: bağımsız `scale` özelliği — Tailwind transform

@@ -5,6 +5,8 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
+  MobileCard,
+  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -180,9 +182,9 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
 /** <md: tablo yerine kart listesi. */
 export function DemandMobileList({ rows, canBulk = false }: { rows: DemandVM[]; canBulk?: boolean }) {
   return (
-    <ul className="space-y-2.5 md:hidden">
+    <MobileCardList>
       {rows.map((d) => (
-        <li key={d.id} className="surface-card relative rounded-[var(--radius-card)] p-3">
+        <MobileCard key={d.id}>
           <div className="flex items-start gap-3">
             {canBulk ? (
               <span className="mt-1 grid min-h-9 min-w-6 place-items-center">
@@ -219,8 +221,8 @@ export function DemandMobileList({ rows, canBulk = false }: { rows: DemandVM[]; 
               </div>
             </div>
           </div>
-        </li>
+        </MobileCard>
       ))}
-    </ul>
+    </MobileCardList>
   );
 }

@@ -19,6 +19,7 @@ import { PRESENTATION_DRAFT_FIELDS, PRESENTATION_TABS } from "@/app/app/portfoyl
 import { ADVISOR_DRAFT_FIELDS, ADVISOR_TABS } from "@/app/app/ekip/yeni/advisor-tabs";
 import { BROADCAST_DRAFT_FIELDS, BROADCAST_TABS } from "@/app/admin/duyuru/broadcast-tabs";
 import { STAFF_DRAFT_FIELDS, STAFF_TABS } from "@/app/admin/personel/yeni/staff-tabs";
+import { OFFICE_CREATE_TABS, OFFICE_DRAFT_FIELDS } from "@/app/admin/tenants/yeni/office-tabs";
 import { isSensitiveFieldName } from "./form-tabs";
 import { TAB_ICONS } from "./icons";
 
@@ -174,6 +175,12 @@ const FORMS = [
     source: "src/app/admin/personel/yeni/staff-form.tsx",
     tabs: STAFF_TABS as readonly TabLike[],
     draft: STAFF_DRAFT_FIELDS as readonly string[],
+  },
+  {
+    name: "yeni ofis (platform)",
+    source: "src/app/admin/tenants/yeni/office-form.tsx",
+    tabs: OFFICE_CREATE_TABS as readonly TabLike[],
+    draft: OFFICE_DRAFT_FIELDS as readonly string[],
   },
 ];
 

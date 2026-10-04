@@ -701,7 +701,7 @@ export default async function PropertiesPage({
               <PropertyMobileList rows={viewModels} />
             </PropertyBulkProvider>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="list-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {rows.map((property, i) => {
                 const vm = viewModels[i]!;
                 const portals = property.portal_listings ?? [];
@@ -720,7 +720,7 @@ export default async function PropertiesPage({
                   >
                     <IntentLink
                       href={vm.href}
-                      className="group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-1 hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
+                      className="hover-lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)] hover:border-brand-300 hover:shadow-[var(--shadow-card)]"
                     >
                       <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
                         {vm.coverSrc ? (

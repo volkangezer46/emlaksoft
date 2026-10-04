@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { calculateRoi, formatNum, formatTry, type RoiRaw } from "@/lib/roi-calculator";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
 export type RoiPlanOption = { id: string; name: string; monthlyTry: number; seats: number };
 
@@ -108,9 +109,9 @@ export function RoiCalculator({ plans, defaultPlanId }: { plans: RoiPlanOption[]
               <div>
                 <p className="text-sm text-text-muted">Takip edilmeyen taleplerden tahmini kaçan komisyon</p>
                 <p className="font-display text-3xl font-bold tabular-nums text-ink-950 sm:text-4xl">
-                  {formatTry(result.missedMonthly)} <span className="text-base font-semibold text-text-muted">/ ay</span>
+                  <AnimatedNumber value={result.missedMonthly} kind="currency" /> <span className="text-base font-semibold text-text-muted">/ ay</span>
                 </p>
-                <p className="text-sm tabular-nums text-text-muted">Yılda yaklaşık {formatTry(result.missedYearly)} (KDV hariç)</p>
+                <p className="text-sm tabular-nums text-text-muted">Yılda yaklaşık <AnimatedNumber value={result.missedYearly} kind="currency" /> (KDV hariç)</p>
               </div>
               <dl className="space-y-2 border-t border-line pt-4 text-sm">
                 <Row dt={`${plan.name} paketinin aylık bedeli`} dd={`${formatTry(result.planMonthly)} (KDV hariç)`} />
