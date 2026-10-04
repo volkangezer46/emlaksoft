@@ -6,6 +6,7 @@ import {
 } from "@/lib/permissions-effective";
 import {
   requireActiveTenant,
+  requireTenantForPayment,
   type ActiveTenantResult,
 } from "@/lib/tenant-guard";
 
@@ -21,8 +22,11 @@ export type PermissionGate =
 export async function requirePermission(
   mod: AppModule,
   action: AppAction,
+  opts?: { allowSuspended?: boolean },
 ): Promise<PermissionGate> {
-  const gate: ActiveTenantResult = await requireActiveTenant();
+  const gate: ActiveTenantResult = opts?.allowSuspended
+    ? await requireTenantForPayment()
+    : await requireActiveTenant();
   if (!gate.ok) return gate;
 
   const role = gate.role;
