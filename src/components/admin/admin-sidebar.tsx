@@ -67,6 +67,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Operasyon",
     items: [
       { href: "/admin/tenants", label: "Ofisler", icon: Building2, hint: "Ofis envanteri", module: "tenants", badgeKey: "risk" },
+      { href: "/admin/tenants/yeni", label: "Yeni ofis", icon: Building2, hint: "Ofis aç ve sahibine erişim ver", module: "sales" },
       { href: "/admin/members", label: "Üyeler", icon: Users, hint: "Platform kullanıcıları", module: "members" },
       { href: "/admin/personel", label: "Personel", icon: ShieldCheck, hint: "EmlakSoft çalışanları", module: "personel" },
       { href: "/admin/duyuru", label: "Toplu duyuru", icon: Megaphone, hint: "Ofislere mesaj gönder", module: "broadcast" },
@@ -106,7 +107,12 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
   },
 ];
 
-const isActive = (pathname: string, href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
+const isActive = (pathname: string, href: string) =>
+  href === "/admin"
+    ? pathname === "/admin"
+    : href === "/admin/tenants"
+      ? pathname.startsWith(href) && !pathname.startsWith("/admin/tenants/yeni")
+      : pathname.startsWith(href);
 
 export function AdminSidebar({
   staffName,

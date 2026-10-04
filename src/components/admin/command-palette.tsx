@@ -36,6 +36,7 @@ const ALL_NAV: NavCmd[] = [
   { label: "Kontrol paneli", href: "/admin", icon: LayoutDashboard, module: "dashboard" },
   { label: "Demo & aday", href: "/admin/satis", icon: Handshake, module: "sales" },
   { label: "Ofisler", href: "/admin/tenants", icon: Building2, module: "tenants" },
+  { label: "Yeni ofis", href: "/admin/tenants/yeni", icon: Building2, module: "sales" },
   { label: "Üyeler", href: "/admin/members", icon: Users, module: "members" },
   { label: "Abonelik & fatura", href: "/admin/billing", icon: CreditCard, module: "billing" },
   { label: "Destek talepleri", href: "/admin/tickets", icon: LifeBuoy, module: "tickets" },
