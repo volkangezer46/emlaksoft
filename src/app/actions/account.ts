@@ -11,6 +11,9 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { validateNewPassword } from "@/lib/account/password-rules";
+import { emailSchema } from "@/lib/validation/contact";
+import { getBaseUrl } from "@/lib/base-url";
+import { maskEmail } from "@/lib/account/email-change";
 
 export type AccountResult = { ok?: boolean; error?: string; message?: string };
 
@@ -21,7 +24,7 @@ async function ownerCtx() {
   return { gate } as const;
 }
 
-/** Kullanıcının kendi adı, telefonu ve unvanı (P1-F1). E-posta bu ekranda değişmez. */
+/** Kullanıcının kendi adı, telefonu ve unvanı (P1-F1). E-posta bu formdan değişmez (bkz. requestMyEmailChange). */
 export async function updateMyProfile(_prev: AccountResult, formData: FormData): Promise<AccountResult> {
   const ctx = await ownerCtx();
   if ("error" in ctx) return { error: ctx.error };
@@ -168,4 +171,66 @@ export async function signOutOtherDevices(_prev: AccountResult, _formData: FormD
     entityId: gate.userId,
   });
   return { ok: true, message: "Bu cihaz dışındaki tüm oturumlar kapatıldı." };
+}
+
+/**
+ * Kendi e-postanı değiştirme (güvenli akış): parola yeniden doğrulanır, Supabase Auth yeni adrese doğrulama
+ * bağlantısı yollar; bağlantı onaylanana kadar ESKİ e-posta geçerli kalır ve giriş kimliği değişmez.
+ * E-posta hiçbir yerde doğrudan yazılmaz. Başkasının e-postası bu action ile değişmez.
+ */
+export async function requestMyEmailChange(_prev: AccountResult, formData: FormData): Promise<AccountResult> {
+  const ctx = await ownerCtx();
+  if ("error" in ctx) return { error: ctx.error };
+  const { gate } = ctx;
+
+  const parsed = emailSchema.safeParse(formData.get("new_email"));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Geçerli bir e-posta adresi girin" };
+  const newEmail = parsed.data;
+  const password = String(formData.get("current_password") ?? "");
+  if (!password) return { error: "Onay için mevcut parolanızı girin." };
+
+  const { allowed } = await checkRateLimit(`emailchange:${gate.userId}`, {
+    limit: 3,
+    windowSec: 3600,
+    failurePolicy: "deny",
+  });
+  if (!allowed) return { error: "Çok fazla deneme yapıldı. Bir saat sonra tekrar deneyin." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email || user.id !== gate.userId) return { error: "Oturum doğrulanamadı." };
+  if (user.email.toLowerCase() === newEmail) return { error: "Bu zaten mevcut e-posta adresiniz." };
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = resolveSupabasePublicKey();
+  if (!url || !key) return { error: "Kimlik servisi yapılandırılmamış." };
+  const verifier = createJsClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { error: verifyError } = await verifier.auth.signInWithPassword({ email: user.email, password });
+  if (verifyError) return { error: "Mevcut parola hatalı." };
+
+  const { error } = await supabase.auth.updateUser(
+    { email: newEmail },
+    { emailRedirectTo: `${getBaseUrl()}/app/hesabim?eposta=onay` },
+  );
+  if (error) {
+    // Adres başkasında kayıtlı olsa bile hesap varlığı ele verilmez: nötr hata.
+    console.error("requestMyEmailChange", error.message);
+    return { error: "E-posta değişikliği başlatılamadı. Başka bir adres deneyin veya biraz sonra tekrar deneyin." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "account.email_change_requested",
+    entityType: "profile",
+    entityId: gate.userId,
+    newValue: { new_email_masked: maskEmail(newEmail) },
+  });
+  revalidatePath("/app/hesabim");
+  return {
+    ok: true,
+    message: `${newEmail} adresine doğrulama bağlantısı gönderildi. Bağlantıyı onaylayana kadar giriş e-postanız değişmez (ayarlara göre eski adrese de onay e-postası gelebilir).`,
+  };
 }

@@ -4,13 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Eraser, Info, ShieldCheck, Trash2 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { purgeStaleCustomers, requestCustomerErasure } from "@/app/actions/kvkk";
 import { searchCustomers } from "@/app/actions/lookup";
 import type { ComboboxOption } from "@/components/ui/combobox";
@@ -40,6 +33,7 @@ function tarih(iso: string) {
 export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canErase: boolean }) {
   const router = useRouter();
   const [acik, setAcik] = useState(false);
+  const [temizlikOnay, setTemizlikOnay] = useState(false);
   const [musteriId, setMusteriId] = useState("");
   const [neden, setNeden] = useState("");
   const [hata, setHata] = useState<string | null>(null);
@@ -73,6 +67,7 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
 
   function temizle() {
     setTemizlikSonuc(null);
+    setTemizlikOnay(false);
     startTransition(async () => {
       const fd = new FormData();
       fd.set("days", "1095");
@@ -98,31 +93,68 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={temizle}
+              aria-expanded={temizlikOnay}
+              onClick={() => setTemizlikOnay((v) => !v)}
               disabled={pending}
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-60"
             >
               <Trash2 className="h-3.5 w-3.5" /> Saklama süresi dolanları temizle
             </button>
 
-            <Dialog open={acik} onOpenChange={setAcik}>
-              <DialogTrigger asChild>
-                <button
-                  type="button"
-                  className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-danger-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-danger-700"
-                >
-                  <Eraser className="h-3.5 w-3.5" /> Silme talebi işle
-                </button>
-              </DialogTrigger>
+            <button
+              type="button"
+              aria-expanded={acik}
+              onClick={() => setAcik((v) => !v)}
+              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-danger-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-danger-700"
+            >
+              <Eraser className="h-3.5 w-3.5" /> Silme talebi işle
+            </button>
+          </div>
+        ) : null}
+      </div>
 
-              <DialogContent size="sm">
-                <DialogHeader
-                  tone="danger"
-                  icon={<Eraser />}
-                  title="KVKK silme talebi"
-                  description="Bu işlem geri alınamaz."
-                />
-                <div className="grid gap-4 p-6">
+      {temizlikOnay && canErase ? (
+        <div
+          role="group"
+          aria-label="Saklama süresi temizliği onayı"
+          className="mt-4 space-y-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.07] p-4"
+        >
+          <p className="text-sm text-ink-950">
+            3 yıldan eski silinmiş müşteri kayıtları anonimleştirilecek. Bu işlem <strong>geri alınamaz</strong>.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={temizle}
+              disabled={pending}
+              className="btn-shine focus-ring press rounded-[var(--radius-control)] bg-danger-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-danger-700 disabled:opacity-60"
+            >
+              {pending ? "İşleniyor…" : "Evet, anonimleştir (geri alınamaz)"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTemizlikOnay(false)}
+              className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-xs font-medium text-ink-950 transition hover:bg-canvas"
+            >
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {acik && canErase ? (
+        <div
+          role="group"
+          aria-label="KVKK silme talebi"
+          className="mt-4 space-y-4 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 p-5"
+        >
+          <div>
+            <p className="flex items-center gap-2 text-sm font-bold text-ink-950">
+              <Eraser className="h-4 w-4 text-danger-600" /> KVKK silme talebi
+            </p>
+            <p className="text-xs text-text-muted">Bu işlem geri alınamaz.</p>
+          </div>
+          <div className="grid gap-4">
                   <div>
                     <span className="mb-1.5 block text-sm text-text-muted">Müşteri *</span>
                     <Combobox
@@ -175,14 +207,13 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                   ) : null}
 
                   <div className="hairline-t flex justify-end gap-2 pt-4">
-                    <DialogClose asChild>
-                      <button
+                    <button
                         type="button"
+                        onClick={() => setAcik(false)}
                         className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-medium text-ink-950 transition hover:bg-canvas"
                       >
                         Vazgeç
                       </button>
-                    </DialogClose>
                     <button
                       type="button"
                       onClick={anonimlestir}
@@ -193,11 +224,8 @@ export function KvkkPanel({ initialLog, canErase }: { initialLog: LogRow[]; canE
                     </button>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {sonuc ? (
         <p className="mt-3 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/[0.06] px-4 py-2.5 text-sm text-mint-600" role="status">
