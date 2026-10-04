@@ -271,7 +271,7 @@ export function InteractiveChart({
             {/* Tooltip balonu — surface-card dili, takip eder */}
             {hover !== null && active ? (
               <div
-                className="pointer-events-none absolute z-10 min-w-[140px] -translate-x-1/2 -translate-y-full rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm"
+                className="pointer-events-none absolute z-10 min-w-[140px] -translate-x-1/2 -translate-y-full rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-2 shadow-[var(--inner-top),var(--elev-4)]"
                 style={{ left: tipLeft, top: tipTop, transition: "left 120ms ease-out, top 120ms ease-out" }}
               >
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">{active.label}</p>

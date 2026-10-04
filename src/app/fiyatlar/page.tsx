@@ -103,7 +103,7 @@ export default async function FiyatlarPage() {
       <Section id="sss" title="Fiyatlarla ilgili sık sorulanlar">
         <div className="divide-y divide-line rounded-[var(--radius-panel)] border border-line bg-surface">
           {faq.map((f) => (
-            <details key={f.q} className="group px-5 py-1">
+            <details key={f.q} className="motion-details group px-5 py-1">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-3 font-semibold text-ink-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
                 {f.q}
                 <span aria-hidden className="text-xl leading-none text-brand-700 transition-transform group-open:rotate-45 motion-reduce:transition-none">+</span>

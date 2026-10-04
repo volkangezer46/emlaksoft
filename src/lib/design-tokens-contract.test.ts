@@ -38,6 +38,17 @@ describe("tasarım token sözleşmesi", () => {
     expect(bad(/text-zinc-/)).toEqual([]);
   });
 
+  it("src/components/ui: dağınık hover/seçili zemin sınıfı yok (rol token'ları: surface-hover/pressed/selected)", () => {
+    const ui = FILES.filter((f) => f.split("\\").join("/").startsWith("src/components/ui/"));
+    const bad = (re: RegExp) => ui.filter((f) => re.test(readFileSync(f, "utf8"))).map((f) => f.split("\\").join("/"));
+    // Saydam zeminde hover: bg-surface-hover; opak zeminde: surface-interactive.
+    expect(bad(/hover:bg-(?:canvas|surface-2)(?![\w-])/)).toEqual([]);
+    // Menü/seçenek vurgusu ve seçili satır: bg-surface-selected.
+    expect(bad(/data-\[highlighted\]:bg-brand-/)).toEqual([]);
+    // Birincil düğme hover'ı: bg-accent-hover (koyuda --brand-700 açık metin tonudur; beyaz yazı okunmaz).
+    expect(bad(/hover:bg-brand-700(?![\w-])/)).toEqual([]);
+  });
+
   it("koyu tema yalnız /app ve /admin için tanımlı ve kök layout'ta açılış script'i var", () => {
     const layout = readFileSync("src/app/layout.tsx", "utf8");
     expect(layout).toContain("THEME_BOOT_SCRIPT");
@@ -116,8 +127,18 @@ describe("tema paleti", () => {
     }
   });
 
-  it("6 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
-    expect(ACCENTS.map((a) => a.value)).toEqual(["ocean", "emerald", "indigo", "amber", "graphite", "gold"]);
+  it("9 vurgu teması var ve varsayılan dışındakilerin CSS bloğu iki temada tanımlı", () => {
+    expect(ACCENTS.map((a) => a.value)).toEqual([
+      "ocean",
+      "emerald",
+      "indigo",
+      "amber",
+      "graphite",
+      "gold",
+      "burgundy",
+      "petrol",
+      "olive",
+    ]);
     for (const a of ACCENTS.filter((x) => x.value !== "ocean")) {
       const light = block(themesCss, `html[data-accent="${a.value}"]`);
       const dark = block(themesCss, `html[data-theme="dark"][data-accent="${a.value}"]`);
@@ -153,7 +174,10 @@ describe("tema paleti", () => {
 
   it("açılış script'i vurgu anahtarını okur, yalnız bilinen vurguları uygular", () => {
     expect(THEME_BOOT_SCRIPT).toContain("es-accent");
-    expect(THEME_BOOT_SCRIPT).toContain("emerald|indigo|amber|graphite|gold");
+    // Varsayılan (ocean) öznitelik gerektirmez; diğer 8 vurgu ACCENTS'ten üretilir.
+    expect(THEME_BOOT_SCRIPT).toContain("/^(emerald|indigo|amber|graphite|gold|burgundy|petrol|olive)$/");
+    expect(THEME_BOOT_SCRIPT).not.toContain("ocean");
+    expect(() => new Function(THEME_BOOT_SCRIPT)).not.toThrow();
   });
 
   it("themes.css ve theme-dark.css public sayfaya uygulanmaz: öznitelik yalnız tema script'iyle gelir", () => {

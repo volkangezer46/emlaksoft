@@ -28,7 +28,7 @@ export function Progress({
       aria-valuenow={Math.round(pct)}
       className={cn("h-1.5 w-full overflow-hidden rounded-full bg-line", className)}
     >
-      <div className={cn("motion-progress-fill h-full rounded-full transition-[width] duration-300", fill)} style={{ width: `${pct}%` }} />
+      <div className={cn("motion-progress-fill h-full rounded-full transition-[width] duration-(--motion-slow)", fill)} style={{ width: `${pct}%` }} />
     </div>
   );
 }

@@ -91,7 +91,7 @@ export function SelectItem({
       {...props}
       className={cn(
         "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-3 pr-8 text-sm text-ink-950 outline-none transition",
-        "data-[highlighted]:bg-brand-600/[0.07] data-[highlighted]:text-brand-700",
+        "data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}

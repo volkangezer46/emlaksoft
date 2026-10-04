@@ -23,7 +23,8 @@ export function ThemeToggle() {
       >
         <Current className="h-4 w-4" aria-hidden />
       </PopoverTrigger>
-      <PopoverContent align="end" aria-label="Görünüm">
+      {/* 9 vurgu kartı kısa ekranda taşabilir: panel kullanılabilir yüksekliğe sığar, gerekirse kayar. */}
+      <PopoverContent align="end" aria-label="Görünüm" className="max-h-[var(--radix-popover-content-available-height)] overflow-y-auto">
         <Suspense fallback={<div className="h-40 w-64" aria-hidden />}>
           <AppearancePanel />
         </Suspense>

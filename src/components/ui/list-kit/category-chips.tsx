@@ -46,8 +46,8 @@ export function CategoryChips({
           className={cn(
             "focus-ring press inline-flex min-h-9 touch:min-h-11 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition",
             c.active
-              ? "bg-brand-600/10 text-brand-700 ring-1 ring-inset ring-brand-600/25"
-              : "text-text-muted hover:bg-surface-2 hover:text-text",
+              ? "bg-surface-selected text-brand-700 ring-1 ring-inset ring-brand-600/25"
+              : "text-text-muted hover:bg-surface-hover hover:text-text active:bg-surface-pressed",
           )}
         >
           {c.label}

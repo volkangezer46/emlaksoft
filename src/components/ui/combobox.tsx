@@ -243,7 +243,7 @@ export function Combobox({
                   e.stopPropagation();
                   commit("");
                 }}
-                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-text-faint transition hover:bg-ink-950/[0.06] hover:text-ink-950"
+                className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-text-faint transition hover:bg-surface-hover hover:text-ink-950"
               >
                 <X className="h-3.5 w-3.5" />
               </span>
@@ -307,7 +307,7 @@ export function Combobox({
                     onMouseMove={() => setActive(i)}
                     className={cn(
                       "flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm transition",
-                      i === active ? "bg-brand-600/[0.07] text-brand-700" : "text-ink-950",
+                      i === active ? "bg-surface-selected text-brand-700" : "text-ink-950",
                       opt.disabled && "pointer-events-none opacity-50",
                     )}
                   >

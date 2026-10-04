@@ -123,7 +123,7 @@ export function PortalContactBar({
 }) {
   if (!telHref && !whatsAppHref) return null;
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:hidden">
       <div
         className={`mx-auto grid max-w-3xl gap-2.5 ${telHref && whatsAppHref ? "grid-cols-2" : "grid-cols-1"}`}
       >

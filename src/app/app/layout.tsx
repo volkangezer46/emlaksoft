@@ -273,7 +273,7 @@ async function AppShell({
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
           <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
             <AppBreadcrumb accessibleModules={accessibleModules} />
-            <CommandSearch accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} />
+            <CommandSearch accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} uiPrefCookie={uiPrefCookie} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               <ThemeToggle />
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}

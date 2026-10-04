@@ -39,6 +39,15 @@ export function parseUiPrefs(raw: string | null | undefined): UiPrefs {
   };
 }
 
+/**
+ * İstemci: çerezdeki güncel tercihi okur (çerez yoksa varsayılan). Komut paleti gibi, tercihi
+ * kendi durumunda tutmayan çağıranlar bir alanı değiştirirken diğerini korumak için kullanır.
+ */
+export function readUiPrefsCookie(name: string): UiPrefs {
+  const match = document.cookie.split("; ").find((c) => c.startsWith(`${name}=`));
+  return parseUiPrefs(match ? match.slice(name.length + 1) : undefined);
+}
+
 /** İstemci: çerezi yazar (çağıran ardından router.refresh() ile sunucu çıktısını yeniler). */
 export function writeUiPrefsCookie(name: string, p: UiPrefs): void {
   document.cookie = `${name}=${serializeUiPrefs(p)}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Split, Trash2 } from "lucide-react";
 import {
@@ -11,8 +11,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { updateCommissionSplits } from "@/app/actions/commissions";
+import { useAutoAnimate } from "@/components/ui/auto-animate";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 
-type Row = { label: string; rate: string };
+/** `id`: yalnız istemci tarafı kararlı satır anahtarı (animasyon + odak korunur); sunucuya gitmez. */
+type Row = { id: number; label: string; rate: string };
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -31,9 +34,12 @@ export function CommissionSplitEditor({
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>(
     initial && initial.length > 0
-      ? initial.map((s) => ({ label: s.label ?? "", rate: String(s.rate ?? "") }))
-      : [{ label: "Danışman", rate: "60" }, { label: "Ofis", rate: "40" }],
+      ? initial.map((s, i) => ({ id: i, label: s.label ?? "", rate: String(s.rate ?? "") }))
+      : [{ id: 0, label: "Danışman", rate: "60" }, { id: 1, label: "Ofis", rate: "40" }],
   );
+  const nextId = useRef(Math.max(2, initial?.length ?? 0));
+  // Pay satırı eklenince/silinince yumuşak geçiş.
+  const rowsRef = useAutoAnimate<HTMLDivElement>();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -44,7 +50,9 @@ export function CommissionSplitEditor({
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
   function addRow() {
-    setRows((rs) => [...rs, { label: "", rate: "" }]);
+    const id = nextId.current;
+    nextId.current += 1;
+    setRows((rs) => [...rs, { id, label: "", rate: "" }]);
   }
   function removeRow(i: number) {
     setRows((rs) => rs.filter((_, idx) => idx !== i));
@@ -86,11 +94,11 @@ export function CommissionSplitEditor({
         <div className="p-6">
               <p className="mb-3 text-sm text-text-muted">Brüt komisyon: <span className="font-bold text-ink-950">{money(gross)}</span></p>
 
-              <div className="space-y-2">
+              <div ref={rowsRef} className="space-y-2">
                 {rows.map((r, i) => {
                   const amt = Math.round(gross * ((Number(r.rate) || 0) / 100));
                   return (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={r.id} className="flex items-center gap-2">
                       <input
                         value={r.label}
                         onChange={(e) => update(i, { label: e.target.value })}
@@ -107,7 +115,7 @@ export function CommissionSplitEditor({
                         />
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-faint">%</span>
                       </div>
-                      <span className="w-24 shrink-0 text-right text-xs font-semibold tabular-nums text-ink-950">{money(amt)}</span>
+                      <span className="w-24 shrink-0 text-right text-xs font-semibold tabular-nums text-ink-950"><AnimatedNumber value={amt} kind="currency" /></span>
                       <button type="button" onClick={() => removeRow(i)} aria-label="Sil" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint hover:bg-danger-500/10 hover:text-danger-500">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
