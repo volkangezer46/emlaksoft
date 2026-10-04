@@ -150,3 +150,31 @@ export function formatTrTime(value: DateInput): string {
   const p = trParts(value);
   return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 }
+
+/** Verilen anın TR takvim ayı anahtarı: "YYYY-MM". Argümansız: bu ay (TR). */
+export function trMonthKey(value: DateInput = Date.now()): string {
+  const p = trParts(value);
+  return `${p.year}-${String(p.month + 1).padStart(2, "0")}`;
+}
+
+/** Verilen anın TR ay başlangıcı (gerçek an, epoch ms): ayın 1'i 00:00 TR. */
+export function trMonthStartMs(value: DateInput = Date.now()): number {
+  const p = trParts(value);
+  return Date.UTC(p.year, p.month, 1) - TR_OFFSET_MS;
+}
+
+/** Bir sonraki TR ayının başlangıcı (epoch ms) — kota penceresi üst sınırı (hariç). */
+export function trNextMonthStartMs(value: DateInput = Date.now()): number {
+  const p = trParts(value);
+  return Date.UTC(p.year, p.month + 1, 1) - TR_OFFSET_MS;
+}
+
+/** TR ay başlangıcının ISO karşılığı — `gte` filtreleri için. */
+export function trMonthStartIso(value: DateInput = Date.now()): string {
+  return new Date(trMonthStartMs(value)).toISOString();
+}
+
+/** Bir sonraki TR ayının başlangıcının ISO karşılığı — `lt` filtreleri için. */
+export function trNextMonthStartIso(value: DateInput = Date.now()): string {
+  return new Date(trNextMonthStartMs(value)).toISOString();
+}

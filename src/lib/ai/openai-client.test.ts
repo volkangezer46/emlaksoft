@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const logActivity = vi.fn().mockResolvedValue({ ok: true });
+vi.mock("@/lib/ai/credits/meter", () => ({ chargeAiUsage: vi.fn().mockResolvedValue({ metered: false, balance: null, credits: 0 }) }));
 vi.mock("@/lib/activity", () => ({ logActivity: (i: unknown) => logActivity(i) }));
 
 import { classifyOpenAiError, openAiChat, openAiChatRequest } from "./openai-client";
