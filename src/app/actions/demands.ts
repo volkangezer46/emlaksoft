@@ -319,6 +319,70 @@ export async function bulkSetDemandStatus(ids: string[], status: string): Promis
   return { ok: true, updatedCount: rows.length };
 }
 
+export type DemandDeleteImpact = {
+  ok?: boolean;
+  error?: string;
+  total: number;
+  /** Kapalı olmayan (hâlâ aranan) talepler. */
+  openDemands: number;
+  /** Ağda paylaşılan talepler: silinince paylaşım da kalkar (cascade). */
+  networkShares: number;
+};
+
+/** Silme öncesi bağlı kayıt özeti (kalıcı silme: talepler çöp kutusuna girmez). */
+export async function getDemandDeleteImpact(ids: string[]): Promise<DemandDeleteImpact> {
+  const empty: DemandDeleteImpact = { total: 0, openDemands: 0, networkShares: 0 };
+  const gate = await requirePermission("demands", "delete");
+  if (!gate.ok) return { ...empty, error: gate.error };
+  const list = [...new Set((ids ?? []).map((i) => String(i).trim()).filter(Boolean))].slice(0, DEMAND_BULK_LIMIT);
+  if (list.length === 0) return { ...empty, ok: true };
+  const supabase = await createClient();
+  const head = { count: "exact" as const, head: true };
+  const [all, open, shares] = await Promise.all([
+    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("id", list),
+    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("id", list).neq("status", "closed"),
+    supabase.from("network_demands").select("id", head).eq("tenant_id", gate.tenantId).in("demand_id", list),
+  ]);
+  return { ok: true, total: all.count ?? 0, openDemands: open.count ?? 0, networkShares: shares.count ?? 0 };
+}
+
+/** Seçili talepleri KALICI siler (geri alınamaz; arayüz özetle onay ister). */
+export async function bulkDeleteDemands(ids: string[]): Promise<DemandResult & { deletedCount?: number }> {
+  const gate = await requirePermission("demands", "delete");
+  if (!gate.ok) return { error: gate.error };
+  const list = [...new Set((ids ?? []).map((i) => String(i).trim()).filter(Boolean))];
+  if (list.length === 0) return { error: "Talep seçilmedi." };
+  if (list.length > DEMAND_BULK_LIMIT) return { error: `Tek seferde en fazla ${DEMAND_BULK_LIMIT} talep silinebilir.` };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customer_demands")
+    .delete()
+    .in("id", list)
+    .eq("tenant_id", gate.tenantId)
+    .select("id, customer_id");
+  if (error) {
+    console.error("bulkDeleteDemands", error);
+    return { error: "Talepler silinemedi." };
+  }
+  const rows = data ?? [];
+  if (rows.length === 0) return { error: "Silinecek talep bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "demand.bulk_delete",
+    entityType: "demand",
+    newValue: { ids: rows.map((r) => r.id), count: rows.length },
+  });
+  revalidatePath("/app/talepler");
+  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/musteriler");
+  for (const cid of new Set(rows.map((r) => r.customer_id))) revalidatePath(`/app/musteriler/${cid}`);
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, deletedCount: rows.length };
+}
+
 export async function setDemandStatus(formData: FormData): Promise<DemandResult> {
   const gate = await requirePermission("demands", "edit");
   if (!gate.ok) return { error: gate.error };

@@ -118,6 +118,7 @@ export async function DemandsView({
   const { perms } = await requireModulePage("demands");
   const canCreate = (perms.demands ?? []).includes("create");
   const canEdit = (perms.demands ?? []).includes("edit");
+  const canDelete = (perms.demands ?? []).includes("delete");
   const sp = await searchParams;
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
@@ -456,6 +457,7 @@ export async function DemandsView({
               page={page}
               advisorName={advisorName}
               canEdit={canEdit}
+              canDelete={canDelete}
             />
           </Suspense>
         </>
@@ -535,8 +537,10 @@ async function DemandList({
   page,
   advisorName,
   canEdit,
+  canDelete,
 }: {
   canEdit: boolean;
+  canDelete: boolean;
   pending: Pending;
   urlParams: Record<string, string>;
   density: Density;
@@ -587,7 +591,7 @@ async function DemandList({
       ) : (
         <>
           <DemandBulkProvider key={viewModels.map((v) => v.id).join(",")}>
-            {canEdit ? <DemandBulkBar /> : null}
+            {canEdit ? <DemandBulkBar canDelete={canDelete} /> : null}
             <DemandTable rows={viewModels} density={density} canBulk={canEdit} />
             <DemandMobileList rows={viewModels} canBulk={canEdit} />
           </DemandBulkProvider>

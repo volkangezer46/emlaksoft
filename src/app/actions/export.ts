@@ -13,6 +13,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { logActivity } from "@/lib/activity";
+import { filterCustomersByHeatSegment } from "@/lib/customer-heat-export";
 import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
 
 export type ExportResult = {
@@ -38,6 +39,7 @@ async function exportResult(
   entity: string,
   rows: Record<string, unknown>[],
   filename: string,
+  omitFullDownload = false,
 ): Promise<ExportResult> {
   const truncated = rows.length >= EXPORT_LIMIT;
   let csv = toCsv(rows);
@@ -52,7 +54,7 @@ async function exportResult(
     entityType: entity,
     newValue: { rows: rows.length, truncated, filename },
   });
-  return { csv, filename, truncated, rowCount: rows.length, entity };
+  return { csv, filename, truncated, rowCount: rows.length, entity: omitFullDownload ? undefined : entity };
 }
 
 /** Müşteri CSV'si ekrandaki filtreyi uygular (ortak kurucu: src/lib/customer-list-filters.ts). */
@@ -71,13 +73,27 @@ export async function exportCustomersCsv(filters: Partial<CustomerListFilters> =
     normalizeCustomerFilters(filters),
   );
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
-  const { data, error } = await q;
+  let { data, error } = await q;
+  const normalized = normalizeCustomerFilters(filters);
+  let segmentApplied = false;
+  if (!error && normalized.segment) {
+    // Sıcaklık segmenti: ekranla aynı skorlama (scoreCustomerHeat + customer_heat_signals), tüm liste sınırı (EXPORT_LIMIT) içinde.
+    segmentApplied = true;
+    const picked = await filterCustomersByHeatSegment(supabase, gate, normalized, normalized.segment);
+    if (picked.error) {
+      console.error("exportCustomersCsv segment", picked.error);
+      error = picked.error as unknown as typeof error;
+    } else {
+      data = picked.rows as unknown as typeof data;
+    }
+  }
   if (error) {
     console.error("exportCustomersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const rows = (data ?? []).map((r) => mapCustomer(r));
-  return exportResult(gate, "musteriler", rows, `musteriler-${trDayKey()}.csv`);
+  // Segmentli dışa aktarmada tam akış (segment bilmez) önerilmez: yalnız filtreyi daraltma uyarısı kalır.
+  return exportResult(gate, "musteriler", rows, `musteriler-${trDayKey()}.csv`, segmentApplied);
 }
 
 export async function exportCommissionsCsv(): Promise<ExportResult> {

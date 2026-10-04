@@ -16,6 +16,7 @@ import {
   Sparkles,
   Square,
   Trash2,
+  Tags,
   Users2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -60,6 +61,7 @@ const cards: SettingCard[] = [
   { title: "Mesaj şablonları", desc: "WhatsApp için hazır metinler — değişkenler tek tıkla dolar.", icon: MessageSquareText, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/mesaj-sablonlari" },
   { title: "Sözleşme şablonları", desc: "Hazır sözleşme metinlerini ekleyin, düzenleyin, pasife alın.", icon: FileText, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/sozlesme-sablonlari" },
   { title: "Güvenlik", desc: "SMS ile iki adımlı doğrulama ve giriş geçmişi.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/guvenlik" },
+  { title: "Müşteri etiketleri", desc: "Etiketleri yeniden adlandırın, birleştirin ya da kaldırın.", icon: Tags, tone: "bg-brand-600/10 text-brand-600", href: "/app/ayarlar/etiketler" },
   { title: "Çöp kutusu", desc: "Silinen müşteri ve portföyleri 90 gün içinde geri alın.", icon: Trash2, tone: "bg-danger-500/10 text-danger-500", href: "/app/ayarlar/cop-kutusu" },
   { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
   { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
