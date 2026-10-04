@@ -71,6 +71,8 @@ import {
   KeysSkeleton,
   MediaSection,
   MediaSkeleton,
+  OwnerPortalSection,
+  OwnerPortalSkeleton,
   PriceHistorySection,
   PriceHistorySkeleton,
   PublishSection,
@@ -914,6 +916,15 @@ export default async function PropertyDetailPage({
             emptyHint="QR kodu için önce ofis vitrin adresi (slug) tanımlanmalı (Ayarlar)."
             fileName={`tabela-qr-${(property.property_code ?? "ilan").replace(/[^A-Za-z0-9-]/g, "") || "ilan"}.png`}
           />
+
+          {/* Malik portalı: oluştur, iptal, süre uzat (sayfa içi panel) */}
+          <Suspense fallback={<OwnerPortalSkeleton />}>
+            <OwnerPortalSection
+              propertyId={property.id}
+              propertyLabel={property.title ?? property.property_code}
+              canEdit={canEdit}
+            />
+          </Suspense>
             </div>
           ) : null}
 
