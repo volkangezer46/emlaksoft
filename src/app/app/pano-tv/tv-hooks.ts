@@ -161,14 +161,14 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
 /* Küçük yardımcılar                                                           */
 /* -------------------------------------------------------------------------- */
 
-/** Rotasyon sayacı: her `ROTATION_SECONDS` sn'de +1 (duraklatılınca durur). */
-export function useRotation(paused: boolean): number {
+/** Rotasyon sayacı: her `seconds` sn'de +1 (duraklatılınca durur; süre değişince sayaç yeniden kurulur). */
+export function useRotation(paused: boolean, seconds: number = ROTATION_SECONDS): number {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (paused) return;
-    const id = setInterval(() => setTick((t) => t + 1), ROTATION_SECONDS * 1000);
+    const id = setInterval(() => setTick((t) => t + 1), seconds * 1000);
     return () => clearInterval(id);
-  }, [paused]);
+  }, [paused, seconds]);
   return tick;
 }
 

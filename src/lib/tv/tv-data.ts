@@ -10,7 +10,7 @@ import { DAY_MS, formatTrTime, trDayStartMs, trParts } from "@/lib/clock";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { OPEN_DEMAND_STATUSES } from "@/lib/team/advisor-360";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
-import { buildTvEvents, shortName, type TvEvent } from "@/lib/tv/tv-logic";
+import { buildTvEvents, leadSourceLabel, shortName, type TvEvent } from "@/lib/tv/tv-logic";
 
 export type TvAppointment = {
   id: string;
@@ -40,8 +40,19 @@ export type TvProperty = {
   coverSrc: string | null;
 };
 
+export type TvLead = {
+  id: string;
+  /** Kısaltılmış ad ("A. Yılmaz"); tam ad istemciye gitmez. */
+  name: string;
+  /** Kaynak etiketi (Web sitesi, Portal...); bilinmiyorsa null. */
+  source: string | null;
+  at: string;
+};
+
 export type TvData = {
   at: string;
+  /** Ofiste örnek (demo) kayıt var: TV rakamları demo içerebilir; başlıkta etiket gösterilir. */
+  sampleIncluded: boolean;
   revenueVisible: boolean;
   /** Temel sorgulardan biri hata verdi: sayılar eksik olabilir. */
   degraded: boolean;
@@ -72,6 +83,8 @@ export type TvData = {
   };
   announcements: string[];
   events: TvEvent[];
+  /** Son eklenen müşteri/talepler (kişisel veri yok). */
+  leads: TvLead[];
 };
 
 type Viewer = { userId: string; role: string; perms: EffectivePermissions };
@@ -113,6 +126,7 @@ export async function loadTvData(
     evAppts,
     evOffers,
     evProps,
+    sampleRes,
   ] = await Promise.all([
     loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs, withTargets: true, withLeadSignals: true }),
     tq(supabase.from("appointments").select("id, scheduled_at, status, assigned_to, appointment_type, customer:customers!appointments_customer_id_fkey(full_name)"))
@@ -143,10 +157,12 @@ export async function loadTvData(
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(8),
-    tq(supabase.from("customers").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
+    tq(supabase.from("customers").select("id, created_at, full_name, source")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
     tq(supabase.from("appointments").select("id, updated_at")).eq("status", "completed").order("updated_at", { ascending: false }).limit(10),
     tq(supabase.from("offers").select("id, created_at")).eq("status", "accepted").order("created_at", { ascending: false }).limit(10),
     tq(supabase.from("properties").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
+    // Örnek kayıt var mı (sütun yoksa hata → false; demo etiketi yalnız gerçekten varsa çıkar)
+    tq(supabase.from("customers").select("id", { count: "exact", head: true })).eq("is_sample", true),
   ]);
 
   const revenueVisible = opts.revenueRequested && metrics.seeAllEarnings;
@@ -212,9 +228,19 @@ export async function loadTvData(
     ...rows(evProps).map((r) => ({ id: String(r.id), kind: "property" as const, at: r.created_at as string })),
   ]);
 
+  const leads: TvLead[] = rows(evCustomers)
+    .slice(0, 8)
+    .map((r) => ({
+      id: String(r.id),
+      name: shortName(String(r.full_name ?? "")),
+      source: leadSourceLabel(r.source as string | null),
+      at: String(r.created_at),
+    }));
+
   const p = trParts(nowMs);
   return {
     at: nowIso,
+    sampleIncluded: !sampleRes.error && (sampleRes.count ?? 0) > 0,
     revenueVisible,
     degraded: metrics.failed || metrics.partial,
     monthLabel: `${MONTHS_TR[p.month]} ${p.year}`,
@@ -243,5 +269,6 @@ export async function loadTvData(
     },
     announcements: rows(annRes).map((a) => String(a.title ?? "")).filter(Boolean),
     events,
+    leads,
   };
 }

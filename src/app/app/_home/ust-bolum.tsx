@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, Sparkles } from "lucide-react";
-import { clearSampleDataForm } from "@/app/actions/sample-data";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { AlertTriangle } from "lucide-react";
+import { DemoModeBanner } from "@/components/app/demo-mode-banner";
+import { createClient } from "@/lib/supabase/server";
+import { loadSampleStatus } from "@/lib/sample-status";
 import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { TvAutoRefresh, TvClock } from "../tv-mode";
@@ -45,39 +46,24 @@ export async function TvUst({ ctx }: { ctx: HomeCtx }) {
 }
 
 /**
- * Örnek veri onboarding'i — boş ofiste (müşteri+portföy 0, hiç yüklenmemiş) CTA;
- * yüklüyken ince amber şerit (bkz. actions/sample-data.ts). TV modunda hiç gösterilmez.
+ * Demo modu bandı: örnek veri yüklüyken ana ekranın üstünde "Demo modundasınız — gerçek kullanıma başla"
+ * şeridi (kapatılabilir; gerçek veri girildikçe öneri değişir). Onay satır içi panelde, sayılarla; bkz.
+ * actions/sample-data.ts. TV modunda hiç gösterilmez. Sorgular hata verirse bant gösterilmez (sahte durum yok).
  */
 export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
   const tenant = await loadTenantRow(ctx);
   const sampleSeededAt = tenant?.sample_seeded_at ?? null;
-
-  if (sampleSeededAt) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.08] px-4 py-2.5">
-        <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
-          Örnek verilerle geziyorsunuz — hazır olduğunuzda temizleyip kendi kayıtlarınızı ekleyin.
-        </p>
-        <ConfirmDialog
-          trigger={
-            <button
-              type="button"
-              className="focus-ring press shrink-0 rounded-[var(--radius-control)] border border-amber-400/50 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-400/20"
-            >
-              Temizle
-            </button>
-          }
-          title="Örnek veriler silinsin mi?"
-          description="Tüm örnek müşteri, portföy, talep, görev, randevu ve anlaşma kayıtları kalıcı olarak silinir. Gerçek kayıtlarınıza dokunulmaz."
-          confirmLabel="Kalıcı sil"
-          formAction={clearSampleDataForm}
-        />
-      </div>
-    );
-  }
-  // Boş ofis: örnek veri eylemi artık "Başlayalım" kartında (bkz. baslayalim.tsx).
-  return null;
+  if (!ctx.tenantId) return null;
+  const status = await loadSampleStatus(await createClient(), ctx.tenantId, sampleSeededAt).catch(() => null);
+  if (!status || !status.active || status.total === 0) return null;
+  return (
+    <DemoModeBanner
+      variant={status.variant}
+      rows={status.rows.map((r) => ({ label: r.label, count: r.count }))}
+      total={status.total}
+      canClear={ctx.isManagement}
+    />
+  );
 }
 
 /** Yetki belgesi uyarı kartı (kaynak: properties.authorization_end) — sadece yaklaşan kayıt varsa görünür. */
