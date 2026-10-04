@@ -1,5 +1,6 @@
-import type { PlanDef, PlanLimits } from "@/lib/billing/plans";
-import { PLAN_FIELD_LIMITS } from "@/lib/billing/plan-overrides";
+import type { PlanDef, PlanLimits, SeatTier } from "@/lib/billing/plans";
+import { PLAN_FIELD_LIMITS, sanitizeSeatTiers } from "@/lib/billing/plan-overrides";
+import { validateSeatTiers } from "@/lib/billing/seat-pricing";
 
 type Fields = Record<string, string | undefined>;
 
@@ -42,6 +43,23 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
   const campaignPrice = intField(f.campaign_monthly_try, "Kampanya fiyatı", { min: 1, max: PLAN_FIELD_LIMITS.priceMax, nullable: true });
   if ("error" in campaignPrice) return campaignPrice;
   if (campaignPrice.value !== null && campaignPrice.value >= (price.value as number)) return { error: "Kampanya fiyatı liste fiyatından düşük olmalı." };
+  const maxSeats = intField(f.max_seats, "Azami kullanıcı (boş = kademelere göre)", { min: 1, max: PLAN_FIELD_LIMITS.maxSeatsMax, nullable: true });
+  if ("error" in maxSeats) return maxSeats;
+  const roundingRaw = trim(f.seat_rounding) || "none";
+  if (roundingRaw !== "none" && roundingRaw !== "x9" && roundingRaw !== "x0") return { error: "Yuvarlama düzeni geçersiz." };
+  let seatTiers: SeatTier[] | null = null;
+  const tiersRaw = (f.seat_tiers_json ?? "").trim();
+  if (tiersRaw) {
+    let parsedTiers: unknown;
+    try {
+      parsedTiers = JSON.parse(tiersRaw);
+    } catch {
+      return { error: "Kademe verisi okunamadı." };
+    }
+    const clean = sanitizeSeatTiers(parsedTiers);
+    if (clean === undefined) return { error: "Kademeler geçersiz (tam sayı, en fazla 12 kademe)." };
+    seatTiers = clean;
+  }
   const ai = intField(f.ai_credits_monthly, "AI kredi kotası", { min: 0, max: PLAN_FIELD_LIMITS.quotaMax, nullable: true });
   if ("error" in ai) return ai;
   const valuation = intField(f.valuation_reports_monthly, "Değerleme raporu kotası", { min: 0, max: PLAN_FIELD_LIMITS.quotaMax, nullable: true });
@@ -83,6 +101,9 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
     monthlyTry: price.value as number,
     yearlyPaidMonths: months.value as number,
     extraSeatMonthlyTry: seatPrice.value,
+    extraSeatTiers: seatTiers,
+    maxSeats: maxSeats.value,
+    seatRounding: roundingRaw === "none" ? null : roundingRaw,
     campaignMonthlyTry: campaignPrice.value,
     aiCreditsMonthly: ai.value,
     valuationReportsMonthly: valuation.value,
@@ -91,6 +112,8 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
     customPricing,
     hidden: f.hidden === "on",
   };
+  const seatErrors = validateSeatTiers({ ...plan, limits });
+  if (seatErrors.length > 0) return { error: seatErrors[0]! };
   if (f.popular === "on") plan.popular = true;
   else delete plan.popular;
   if (order.value !== null) plan.order = order.value;

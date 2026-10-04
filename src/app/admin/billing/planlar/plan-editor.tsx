@@ -10,6 +10,8 @@ import {
 } from "@/app/actions/platform-billing-plans";
 import { planAmountOf, type PlanDef } from "@/lib/billing/plans";
 import { opFieldClass } from "../inline-op";
+import { useSeatDraft } from "./seat-draft";
+import { SeatTierEditor } from "./seat-tier-editor";
 
 const lbl = "block text-xs font-semibold text-text-muted";
 const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
@@ -45,8 +47,11 @@ export function PlanEditor({
   customized,
   subscribers,
   businessReady,
+  plans,
 }: {
   plan: PlanDef;
+  /** Katalogun tamamı: kademe doğrulaması ve çapraz nokta uyarıları için. */
+  plans: PlanDef[];
   customized: boolean;
   subscribers: number;
   businessReady: boolean;
@@ -54,6 +59,7 @@ export function PlanEditor({
   const [open, setOpen] = useState(false);
   const { pending, msg, run } = useOp();
   const yearly = planAmountOf(plan, "yearly");
+  const draft = useSeatDraft(plan, plans);
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface">
@@ -93,11 +99,16 @@ export function PlanEditor({
 
           <fieldset className="grid gap-3 sm:grid-cols-4">
             <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Fiyat (KDV hariç, TRY)</legend>
-            <label className={lbl}>Aylık fiyat<input name="monthly_try" required inputMode="numeric" defaultValue={plan.monthlyTry} className={`mt-1 w-full ${opFieldClass}`} /></label>
+            <label className={lbl}>Aylık fiyat<input name="monthly_try" required inputMode="numeric" value={draft.price} onChange={(e) => draft.setPrice(e.target.value)} className={`mt-1 w-full ${opFieldClass}`} /></label>
             <label className={lbl}>Yıllıkta ödenen ay<input name="yearly_paid_months" required inputMode="numeric" defaultValue={plan.yearlyPaidMonths ?? 10} className={`mt-1 w-full ${opFieldClass}`} /></label>
-            <label className={lbl}>Ek kullanıcı (aylık)<input name="extra_seat_monthly_try" inputMode="numeric" defaultValue={num(plan.extraSeatMonthlyTry)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} /></label>
+            <label className={lbl}>Ek kullanıcı (tek fiyat, aylık)<input name="extra_seat_monthly_try" inputMode="numeric" value={draft.extraPrice} onChange={(e) => draft.setExtraPrice(e.target.value)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} /></label>
             <label className={lbl}>Kampanya fiyatı (aylık)<input name="campaign_monthly_try" inputMode="numeric" defaultValue={num(plan.campaignMonthlyTry)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} /></label>
           </fieldset>
+
+          <input type="hidden" name="seat_tiers_json" value={draft.tiersJson} />
+          <input type="hidden" name="max_seats" value={draft.maxSeats} />
+          <input type="hidden" name="seat_rounding" value={draft.rounding} />
+          <SeatTierEditor plan={plan} draft={draft} />
 
           <fieldset className="grid gap-3 sm:grid-cols-4">
             <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Limitler (kota tablosuyla senkron)</legend>
@@ -131,7 +142,7 @@ export function PlanEditor({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={pending} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+            <button type="submit" disabled={pending || draft.report.errors.length > 0} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
               {pending ? "Kaydediliyor…" : "Paketi kaydet"}
             </button>
             {customized ? (
