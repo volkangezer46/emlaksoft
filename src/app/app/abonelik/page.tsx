@@ -15,7 +15,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msUntil } from "@/lib/clock";
-import { PLANS, getPlan, planAmountTry, planLabel, type BillingCycle } from "@/lib/billing/plans";
+import { planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
+import { getPlanDefinition, getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPlanSupport } from "@/lib/billing/plan-support";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
@@ -118,7 +120,17 @@ export default async function BillingPage({
     { id: "iptal", label: "İptal", hidden: !cancelSupported },
   ];
 
-  const currentPlanDef = getPlan(currentPlan);
+  const [publicPlans, currentPlanDef, planSupport] = await Promise.all([
+    getPublicPlanDefinitions(),
+    getPlanDefinition(currentPlan),
+    getPlanSupport(),
+  ]);
+  const planLabel = (id: string) =>
+    publicPlans.find((p) => p.id === id)?.name ?? (id === currentPlanDef.id ? currentPlanDef.name : id);
+  // Gizli plandaki mevcut abone kendi paketini de görür; yeni satışa açık olanlar listelenir.
+  const listedPlans = publicPlans.some((p) => p.id === currentPlanDef.id)
+    ? publicPlans
+    : [currentPlanDef, ...publicPlans];
   const usage = [
     { label: "Kullanıcı", value: memberCount ?? 0, limit: currentPlanDef.limits.seats, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
     { label: "Aktif portföy", value: propertyCount ?? 0, limit: currentPlanDef.limits.activeProperties, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
@@ -279,7 +291,7 @@ export default async function BillingPage({
           href="/app/abonelik?cycle=yearly"
           className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${cycle === "yearly" ? "bg-brand-600 text-white" : "border border-line bg-surface text-text-muted"}`}
         >
-          Yıllık · 10 öde 12 kullan
+          Yıllık · {yearlyOfferLabel(publicPlans.find((p) => !p.customPricing) ?? {})}
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />
@@ -288,8 +300,9 @@ export default async function BillingPage({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {PLANS.map((plan) => {
-          const amount = planAmountTry(plan.id, cycle);
+        {listedPlans.map((plan) => {
+          const amount = planAmountOf(plan, cycle);
+          const sellable = !plan.hidden && !plan.customPricing;
           const current = plan.id === currentPlan;
           return (
             <article
@@ -306,14 +319,18 @@ export default async function BillingPage({
               <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
               <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950">{plan.name}</h2>
               <p className="mt-3 font-display text-3xl font-extrabold text-ink-950">
-                {money(amount)}
-                <span className="ml-1 text-sm font-semibold text-text-muted">
-                  /{cycle === "yearly" ? "yıl" : "ay"}
-                </span>
+                {plan.customPricing ? "Özel teklif" : money(amount)}
+                {plan.customPricing ? null : (
+                  <span className="ml-1 text-sm font-semibold text-text-muted">
+                    /{cycle === "yearly" ? "yıl" : "ay"}
+                  </span>
+                )}
               </p>
               <p className="mt-1 text-xs text-text-faint">
-                KDV hariç
-                {cycle === "yearly" ? ` · aylık ${money(Math.round(amount / 12))}'ye gelir` : ""}
+                {plan.customPricing ? "Ekibinize göre hazırlanır" : "KDV hariç"}
+                {!plan.customPricing && cycle === "yearly"
+                  ? ` · ${plan.yearlyPaidMonths ?? 10} ay ödenir, aylık ${money(Math.round(amount / 12))}'ye gelir`
+                  : ""}
               </p>
               <ul className="mt-4 flex-1 space-y-2">
                 {plan.features.map((f) => (
@@ -324,12 +341,26 @@ export default async function BillingPage({
                 ))}
               </ul>
               <div className="mt-5">
-                <CheckoutButton
-                  plan={plan.id}
-                  cycle={cycle}
-                  label={current ? (configured ? "Yenile / öde" : "Demo yenile") : configured ? "Bu pakete geç" : "Demo ile seç"}
-                  variant={current ? "ghost" : "primary"}
-                />
+                {sellable ? (
+                  <CheckoutButton
+                    plan={plan.id}
+                    cycle={cycle}
+                    label={current ? (configured ? "Yenile / öde" : "Demo yenile") : configured ? "Bu pakete geç" : "Demo ile seç"}
+                    variant={current ? "ghost" : "primary"}
+                    couponsEnabled={planSupport.coupons}
+                  />
+                ) : plan.customPricing ? (
+                  <Link
+                    href="/demo"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400"
+                  >
+                    Bize ulaşın
+                  </Link>
+                ) : (
+                  <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
+                    Bu paket yeni satışa kapalı; mevcut aboneliğiniz değişmez.
+                  </p>
+                )}
               </div>
             </article>
           );
