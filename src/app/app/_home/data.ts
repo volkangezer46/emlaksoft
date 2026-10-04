@@ -14,6 +14,7 @@ import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from "@/lib/clock";
 import type { Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
+import type { SampleKpiScope } from "@/lib/sample-scope";
 import {
   commissionSummaryFromAggregate,
   type CommissionAggregate,
@@ -39,6 +40,8 @@ export type HomeCtx = {
   canSeeRentals: boolean;
   canSeeProjects: boolean;
   canSeeProperties: boolean;
+  /** Örnek (demo) veri KPI kapsamı, tek karar noktası: `lib/sample-scope` (eşik altında dahil + etiket, üstünde dışlanır). */
+  sample: SampleKpiScope;
   fullName: string;
   firstName: string;
   /** Dönem seçici (?donem=7|30|90): yalnız dönem-duyarlı hero özeti ve kartlar kullanır. */
@@ -113,16 +116,16 @@ export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
   const days = ctx.period;
   const curStart = daysAgoIso(days);
   const prevStart = daysAgoIso(days * 2);
-  const customers = () => supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null);
-  const demands = () => supabase.from("customer_demands").select("id", { count: "exact", head: true });
+  const customers = () => ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null));
+  const demands = () => ctx.sample.apply(supabase.from("customer_demands").select("id", { count: "exact", head: true }));
   const results = await Promise.all([
     customers().gte("created_at", curStart),
     customers().gte("created_at", prevStart).lt("created_at", curStart),
     demands().gte("created_at", curStart),
     demands().gte("created_at", prevStart).lt("created_at", curStart),
-    supabase.from("customers").select("created_at").is("deleted_at", null)
+    ctx.sample.apply(supabase.from("customers").select("created_at").is("deleted_at", null))
       .gte("created_at", curStart).order("created_at", { ascending: false }).limit(PERIOD_SERIES_LIMIT),
-    supabase.from("customer_demands").select("created_at")
+    ctx.sample.apply(supabase.from("customer_demands").select("created_at"))
       .gte("created_at", curStart).order("created_at", { ascending: false }).limit(PERIOD_SERIES_LIMIT),
   ]);
   assertQueryBatchSucceeded(
@@ -148,13 +151,13 @@ export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // Danışman kapsamı: yalnız bana atanan görevler (ofis görünümünde süzgeç yok).
   // Bugün vadesi gelen açık görevler (yalnız sayaç)
-  let dueQ = supabase.from("tasks").select("id", { count: "exact", head: true })
+  let dueQ = ctx.sample.apply(supabase.from("tasks").select("id", { count: "exact", head: true }))
     .eq("status", "open").gte("due_at", ctx.dayStartIso).lt("due_at", ctx.dayEndIso);
   // Vadesi geçmiş (bugünden önce) açık görevler (yalnız sayaç)
-  let overdueQ = supabase.from("tasks").select("id", { count: "exact", head: true })
+  let overdueQ = ctx.sample.apply(supabase.from("tasks").select("id", { count: "exact", head: true }))
     .eq("status", "open").lt("due_at", ctx.dayStartIso);
   // Bugünün gerçek görevleri (gecikmiş dahil) — hover'da tek tıkla tamamlanır
-  let openQ = supabase.from("tasks").select("id, title, due_at, priority")
+  let openQ = ctx.sample.apply(supabase.from("tasks").select("id, title, due_at, priority"))
     .eq("status", "open").lt("due_at", ctx.dayEndIso)
     .order("due_at", { ascending: true }).limit(5);
   if (ctx.scopeMine) {
@@ -175,9 +178,9 @@ export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
 export const loadTodayAppointments = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // count: brifingde gerçek toplam gerekir. Açık ilişki adı ipucu korunur.
-  let apptQ = supabase
+  let apptQ = ctx.sample.apply(supabase
     .from("appointments")
-    .select("id, appointment_type, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)", { count: "exact" })
+    .select("id, appointment_type, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)", { count: "exact" }))
     .gte("scheduled_at", ctx.dayStartIso).lt("scheduled_at", ctx.dayEndIso)
     .order("scheduled_at", { ascending: true }).limit(5);
   if (ctx.scopeMine) apptQ = apptQ.eq("assigned_to", ctx.userId);
@@ -194,7 +197,7 @@ export type HotLead = { id: string; fullName: string; phone: string | null; scor
  */
 export const loadHotLeads = cache(async (ctx: HomeCtx): Promise<HotLead[]> => {
   const supabase = await createClient();
-  let custQ = supabase.from("customers").select("id, full_name, phone, email, source, blacklist, created_at")
+  let custQ = ctx.sample.apply(supabase.from("customers").select("id, full_name, phone, email, source, blacklist, created_at"))
     .is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
   if (ctx.scopeMine) custQ = custQ.eq("assigned_to", ctx.userId);
   const results = await Promise.all([
@@ -293,9 +296,9 @@ export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
   // Kazanç gizliliği: ofis geneli toplam (RPC) yalnız `earnings_all` ile; diğer roller yalnız
   // kendi anlaşmalarının komisyonunu görür (bkz. /app/komisyon, earnings-bypass-contract).
   if (!ctx.seeAllEarnings) {
-    const own = await supabase
+    const own = await ctx.sample.apply(supabase
       .from("commissions")
-      .select("gross_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)")
+      .select("gross_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(assigned_to)"))
       .eq("deal.assigned_to", ctx.userId)
       .gte("created_at", ctx.sixMonthsAgoIso)
       .order("created_at", { ascending: false })
@@ -319,11 +322,11 @@ export const loadCommissionSummary = cache(async (ctx: HomeCtx) => {
 });
 
 /** KPI sparkline: yalnız son 7 haftanın komisyon oluşturma tarihleri (tek kolon). */
-export const loadCommissionWeekDates = cache(async () => {
+export const loadCommissionWeekDates = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
-  const result = await supabase
+  const result = await ctx.sample.apply(supabase
     .from("commissions")
-    .select("created_at")
+    .select("created_at"))
     .gte("created_at", daysAgoIso(49))
     .order("created_at", { ascending: false })
     .limit(500);
@@ -353,21 +356,21 @@ export const loadClosures = cache(async (ctx: HomeCtx) => {
 });
 
 /** Talep durumları: ham satır çekmek yerine üç sayaç (200 satır sınırı sayıyı kırpıyordu). */
-export const loadDemandCounts = cache(async (): Promise<DemandCounts> => {
+export const loadDemandCounts = cache(async (ctx: HomeCtx): Promise<DemandCounts> => {
   const supabase = await createClient();
   const count = (status: string) =>
-    supabase.from("customer_demands").select("id", { count: "exact", head: true }).eq("status", status);
+    ctx.sample.apply(supabase.from("customer_demands").select("id", { count: "exact", head: true })).eq("status", status);
   const results = await Promise.all([count("new"), count("active"), count("matched")]);
   assertQueryBatchSucceeded(results, ["demands-new", "demands-active", "demands-matched"], "Ana panel");
   return { new: results[0].count ?? 0, active: results[1].count ?? 0, matched: results[2].count ?? 0 };
 });
 
-export const loadDeals = cache(async () => {
+export const loadDeals = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // Son 3 ay
-  const result = await supabase
+  const result = await ctx.sample.apply(supabase
     .from("deals")
-    .select("stage, deal_value, assigned_to, updated_at")
+    .select("stage, deal_value, assigned_to, updated_at"))
     .gte("updated_at", daysAgoIso(90))
     .order("updated_at", { ascending: false }) // kırpma belirleyici: en yeni anlaşmalar
     .limit(1000);
@@ -386,19 +389,19 @@ export const loadProfiles = cache(async () => {
 
 export const loadKpiCounts = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
-  const liveCustomers = () => supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null);
+  const liveCustomers = () => ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null));
   const results = await Promise.all([
     liveCustomers(),
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("calls").select("id", { count: "exact", head: true }).gte("started_at", ctx.dayStartIso),
+    ctx.sample.apply(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)),
+    ctx.sample.apply(supabase.from("calls").select("id", { count: "exact", head: true })).gte("started_at", ctx.dayStartIso),
     liveCustomers().gte("created_at", ctx.monthStartIso),
     liveCustomers().gte("created_at", ctx.prevMonthStartIso).lt("created_at", ctx.monthStartIso),
-    supabase.from("calls").select("id", { count: "exact", head: true })
+    ctx.sample.apply(supabase.from("calls").select("id", { count: "exact", head: true }))
       .gte("started_at", ctx.yesterdayStartIso).lt("started_at", ctx.dayStartIso),
     // Sparkline: yalnız 7 haftalık pencere, yalnız tarih kolonu
-    supabase.from("calls").select("started_at").gte("started_at", daysAgoIso(49))
+    ctx.sample.apply(supabase.from("calls").select("started_at")).gte("started_at", daysAgoIso(49))
       .order("started_at", { ascending: false }).limit(100),
-    supabase.from("customers").select("created_at").is("deleted_at", null)
+    ctx.sample.apply(supabase.from("customers").select("created_at").is("deleted_at", null))
       .gte("created_at", daysAgoIso(49)).order("created_at", { ascending: false }).limit(100),
   ]);
   assertQueryBatchSucceeded(
@@ -473,9 +476,9 @@ export const loadRentalsAndProjects = cache(async (ctx: HomeCtx) => {
  * döner (kırpık dağılım çizilmez — uydurma yüzde yok).
  */
 const SOURCE_ROW_LIMIT = 2000;
-export const loadCustomerSources = cache(async () => {
+export const loadCustomerSources = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
-  const result = await supabase.from("customers").select("source").is("deleted_at", null).limit(SOURCE_ROW_LIMIT);
+  const result = await ctx.sample.apply(supabase.from("customers").select("source").is("deleted_at", null)).limit(SOURCE_ROW_LIMIT);
   assertQueryBatchSucceeded([result], ["customer-sources"], "Ana panel");
   const rows = (result.data ?? []) as { source: string | null }[];
   if (rows.length >= SOURCE_ROW_LIMIT) return null;
@@ -637,7 +640,7 @@ export const loadDecisions = cache(async (ctx: HomeCtx) => {
   const [approvals, advisors, deals, closures, rentals] = await Promise.all([
     ctx.canSeeCommissions ? approvalsQ : Promise.resolve(null),
     supabase.from("profiles").select("id, created_at").eq("is_active", true).in("role", ["advisor", "team_lead"]).limit(200),
-    loadDeals(),
+    loadDeals(ctx),
     ctx.seeAllEarnings ? loadClosures(ctx) : Promise.resolve(null),
     ctx.canSeeRentals ? loadRentalsAndProjects(ctx) : Promise.resolve(null),
   ]);

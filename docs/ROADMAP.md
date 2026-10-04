@@ -35,7 +35,9 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 | [x] | PostgREST PGRST201: 113 gömülü sorguya FK kısıtlama adı | 175aa01, 980d95e |
 | [x] | Dışa aktarma: 2000 satır kesintisi bildirimi + audit_logs kaydı | 5c71df8 |
 | [x] | Production demo girişi için açık opt-in bayrakları (varsayılan kapalı) | bc0f170 |
-| [x] | Migration zinciri canlıda (kullanıcı bildirimi: 176; depoda 177 dosya — fark için `docs/DURUM.md`) | `npm run check:migrations -- --database` ile doğrulanmalı |
+| [x] | Migration zinciri canlıda (depoda 206 dosya; canlı ledger farkı için `docs/DURUM.md`) | `npm run check:migrations -- --database` ile doğrulanmalı |
+| [x] | Modül sistemi (ofis bazlı aç/kapat), SEO merkezi + robotu, plan okuyucu, kupon, K5 hesap/abonelik/ekip/şube/uyum, bakım modu, TV modu, telefon tek merkez | `docs/DURUM.md` "2026-10-03/04 turu"; `docs/MIMARI.md` |
+| [x] | Dalga 1 tutarlılık: örnek veri KPI eşiği tek yardımcı, TR ay sınırları, rol etiketi tek kaynak, terim sözlüğü, "kayıp" üç kavram | `sample-scope.ts`, `clock.ts`, `role-labels.ts`, `terminology.ts` + sözleşme testleri |
 
 ## 2. Açık işler
 
@@ -82,8 +84,8 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 
 ## 4. Çelişkiler / doğrulanması gerekenler
 
-- Proje talimatları (`CLAUDE.md`) "dark mode YOK" der; tasarım sistemi v3 çalışması "koyu tema" olarak anıldı ve
-  `src/app/theme-dark.css` mevcut. Kod incelendiğinde `.theme-dark` bölüm sınıfı olarak kullanılıyor görünüyor
-  (sayfa geneli tema anahtarı olup olmadığı doğrulanmadı). Karar sahibe aittir.
-- `CLAUDE.md` "13 cron route" yazar; `vercel.json` 28 zamanlama ve `src/app/api/cron` altında 28 route içerir.
+- ÇÖZÜLDÜ: `CLAUDE.md` artık koyu temayı tanımlar (yalnız /app ve /admin, `html[data-theme="dark"]`, `src/app/theme-dark.css`, tercih sistem/açık/koyu; vitrin ve portallar hep açık). Eski "dark mode YOK" notu geçersizdir.
+- ÇÖZÜLDÜ: cron sayısı `CLAUDE.md`, `vercel.json` ve `src/app/api/cron` altında 28'dir (28. cron `seo-robot`); `npm run check:cron` doğrular.
+- AÇIK: `tenant_reporting_aggregates` ve `tenant_commission_aggregates` RPC'leri `is_sample` süzmez (örnek veri KPI eşiği bunlara uygulanamıyor, yalnız etiketlenir); süzgeç için migration gerekir. Ayrıntı: `docs/DURUM.md` "Açık riskler".
+- AÇIK: musteriler paketindeki "Lead skoru" metinleri ve modül kayıt defterindeki "Kayıp nedenleri" etiketi (`src/lib/modules/registry.ts`, `lost_sales`) yeni adlara ("Aday skoru", "Risk altındaki müşteriler") sahiplerinin birleşiminde çekilmeli.
 - Eski devir belgeleri "secret rotasyonu bitmeden deploy yok" der; uygulama bu arada canlıya alınmış. Rotasyon açık (P0).

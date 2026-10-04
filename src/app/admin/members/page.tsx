@@ -11,17 +11,9 @@ import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card
 import { AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { DataTable, ROW_HREF, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
-const roleLabel: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-  call_center: "Çağrı merkezi",
-  accounting: "Muhasebe",
-  readonly: "Salt okunur",
-};
+const roleLabel: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
 
 /** Rol etiketleri rozet haritasına türetiliyor — tek kaynak `roleLabel`. */
 const ROLE_BADGES: DataTableColumn["badges"] = Object.fromEntries(

@@ -18,7 +18,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { now as nowMs } from "@/lib/clock";
+import { now as nowMs, trMonthStartIso } from "@/lib/clock";
 import { EmptyState } from "@/components/app/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import {
@@ -147,8 +147,8 @@ export default async function OnaylarPage({
   else if (kim === "bana") listQuery = listQuery.neq("requested_by", userId);
 
   // Ayın ilk günü — "bu ay onaylanan/reddedilen" KPI'ları için.
-  const d = new Date(t);
-  const ayBasi = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString();
+  // Türkiye takvimine göre ay başı (UTC ay sınırı ayın ilk 3 saatini önceki aya yazardı).
+  const ayBasi = trMonthStartIso(t);
 
   const [
     { data: rows, count: total },

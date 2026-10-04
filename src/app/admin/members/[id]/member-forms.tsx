@@ -15,6 +15,7 @@ import {
 import { EmailInput } from "@/components/ui/email-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
 
@@ -92,13 +93,13 @@ export function MemberInfoForm({
 }
 
 const ROLE_OPTIONS: { value: string; label: string }[] = [
-  { value: "gm", label: "Genel müdür" },
-  { value: "branch_manager", label: "Şube müdürü" },
-  { value: "team_lead", label: "Takım lideri" },
-  { value: "advisor", label: "Danışman" },
-  { value: "call_center", label: "Çağrı merkezi" },
-  { value: "accounting", label: "Muhasebe" },
-  { value: "readonly", label: "Salt okunur" },
+  { value: "gm", label: ROLE_LABELS.gm },
+  { value: "branch_manager", label: ROLE_LABELS.branch_manager },
+  { value: "team_lead", label: ROLE_LABELS.team_lead },
+  { value: "advisor", label: ROLE_LABELS.advisor },
+  { value: "call_center", label: ROLE_LABELS.call_center },
+  { value: "accounting", label: ROLE_LABELS.accounting },
+  { value: "readonly", label: ROLE_LABELS.readonly },
 ];
 
 type Pending = "deactivate" | "signout" | null;

@@ -21,22 +21,14 @@ import {
   type TeamMember,
   type TicketRow,
 } from "@/lib/admin/office-360";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 const fmt = (iso: string | null | undefined) =>
   iso ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—";
 const fmtDay = (iso: string | null | undefined) =>
   iso ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(iso)) : "—";
 
-const ROLE_LABEL: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-  call_center: "Çağrı merkezi",
-  accounting: "Muhasebe",
-  readonly: "Salt okunur",
-};
+const ROLE_LABEL: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
 const SUB_STATUS_LABEL: Record<string, string> = {
   trialing: "Deneme",
   active: "Aktif",

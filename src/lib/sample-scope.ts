@@ -156,3 +156,68 @@ export async function getSampleScope(
   const counts = { realCustomers, realProperties };
   return { include: includeSample(counts), counts };
 }
+
+/** KPI ekranlarında örnek veri dahilken gösterilen sabit etiket (ana ekran, rapor, TV, ekip). */
+export const SAMPLE_DATA_LABEL = "Örnek veri dahil";
+
+/** Etiketin açıklaması: neden dahil, ne zaman çıkar. */
+export function sampleDataHint(threshold: number = SAMPLE_KPI_THRESHOLD): string {
+  return `Gerçek müşteri veya portföy sayınız ${threshold} olana kadar rakamlara örnek (demo) kayıtlar da dahildir; sonrasında otomatik dışlanır.`;
+}
+
+/**
+ * KPI kapsamı — TEK karar noktası. Ana ekran, danışman metrikleri, pano-tv, ofis raporları
+ * ve ofis skoru AYNI nesneyi kullanır; eşik/süzgeç mantığı başka yerde kopyalanmaz.
+ */
+export type SampleKpiScope = {
+  /** Örnek kayıtlar rakamlara girer mi (eşik altı). */
+  include: boolean;
+  counts: SampleCounts;
+  /** Ofiste örnek veri yüklenmiş mi (`tenants.sample_seeded_at`). */
+  seeded: boolean;
+  /** Örnek veri gerçekten rakamlara karışıyorsa gösterilecek etiket, aksi halde null. */
+  label: string | null;
+  /** `.in("is_sample", values)` için. */
+  values: boolean[];
+  /** Sorguya kapsamı uygular (include=false → is_sample=false). */
+  apply: <Q>(query: Q) => Q;
+};
+
+/** Saf kurucu: sayımlar ve tohum bilgisinden kapsam üretir. */
+export function buildSampleKpiScope(
+  counts: SampleCounts,
+  seeded: boolean,
+  threshold: number = SAMPLE_KPI_THRESHOLD,
+): SampleKpiScope {
+  const include = includeSample(counts, threshold);
+  return {
+    include,
+    counts,
+    seeded,
+    label: include && seeded ? SAMPLE_DATA_LABEL : null,
+    values: sampleValues(include),
+    apply: <Q>(query: Q) => applySampleScope(query, include),
+  };
+}
+
+type SeedClient = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (c: string, v: string) => { maybeSingle: () => PromiseLike<{ data: unknown }> };
+      limit: (n: number) => { maybeSingle: () => PromiseLike<{ data: unknown }> };
+    };
+  };
+};
+
+/**
+ * Ofisin KPI kapsamını yükler: gerçek müşteri/portföy sayısı + örnek veri yüklenmiş mi.
+ * `tenantId` yoksa (RLS'li oturum istemcisi) tenants satırı RLS ile tek satıra iner.
+ */
+export async function loadSampleKpiScope(client: unknown, tenantId?: string | null): Promise<SampleKpiScope> {
+  const tid = tenantId || undefined;
+  const sel = (client as SeedClient).from("tenants").select("sample_seeded_at");
+  const seedQuery = tid ? sel.eq("id", tid).maybeSingle() : sel.limit(1).maybeSingle();
+  const [{ counts }, seedRes] = await Promise.all([getSampleScope(client, tid), Promise.resolve(seedQuery)]);
+  const seeded = Boolean((seedRes?.data as { sample_seeded_at?: string | null } | null)?.sample_seeded_at);
+  return buildSampleKpiScope(counts, seeded);
+}

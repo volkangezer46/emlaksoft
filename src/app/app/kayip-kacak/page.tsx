@@ -16,7 +16,7 @@ import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { moneyTry } from "@/lib/leak-shield";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { CSSProperties } from "react";
-import { now } from "@/lib/clock";
+import { now, trMonthStartMs } from "@/lib/clock";
 import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton";
 
 export const metadata = { title: "Kayıp-kaçak kalkanı" };
@@ -297,11 +297,10 @@ async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
   const { rangeActive, filterHref } = ctx;
   const [rows, live, totalClosuresCount] = await Promise.all([pending.closuresP, pending.liveP, pending.totalP]);
   const nowMs = now();
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
+  // Ay başı Türkiye takvimine göre (UTC sunucuda ayın ilk 3 saati önceki aya yazılmasın).
+  const monthStartMs = trMonthStartMs(nowMs);
   const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
-  const monthRows = rows.filter((r) => new Date(r.created_at) >= monthStart);
+  const monthRows = rows.filter((r) => new Date(r.created_at).getTime() >= monthStartMs);
   const lostMonth = monthRows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
   const lostAll = rows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
   const competitor = rows.filter((r) => r.competitor_closed).length;
@@ -310,11 +309,11 @@ async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
               {[
                 // Tarih aralığı seçiliyken KPI'lar o aralıktan hesaplanır
                 rangeActive
-                  ? { label: "Aralıkta kayıp", value: moneyTry(lostAll), tone: "text-danger-400", href: filterHref({}) }
-                  : { label: "Bu ay kayıp", value: moneyTry(lostMonth), tone: "text-danger-400", href: "/app/kayip-kacak#kapanislar" },
+                  ? { label: "Aralıkta kaçan komisyon", value: moneyTry(lostAll), tone: "text-danger-400", href: filterHref({}) }
+                  : { label: "Bu ay kaçan komisyon", value: moneyTry(lostMonth), tone: "text-danger-400", href: "/app/kayip-kacak#kapanislar" },
                 rangeActive
                   ? { label: "Aralıkta kapanış", value: String(totalClosuresCount), tone: "", href: filterHref({}) }
-                  : { label: "Toplam kayıp", value: moneyTry(lostAll), tone: "", href: "/app/kayip-kacak#kapanislar" },
+                  : { label: "Toplam kaçan komisyon", value: moneyTry(lostAll), tone: "", href: "/app/kayip-kacak#kapanislar" },
                 { label: "Rakip kapanış", value: String(competitor), tone: "text-amber-300", href: filterHref({ tip: "rakip" }) },
                 { label: "Teyit gecikmiş", value: String(overdue.length), tone: "text-warn-500", href: "/app/portallar?durum=teyit" },
               ].map((k) => (
@@ -354,7 +353,7 @@ async function HeroTrend({ pending }: { pending: Pending }) {
           <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
-                <TrendingDown className="h-3.5 w-3.5 text-danger-400" /> Kayıp trend · 8 hafta
+                <TrendingDown className="h-3.5 w-3.5 text-danger-400" /> Kaçan komisyon trendi · 8 hafta
               </p>
               <span className="rounded-full bg-danger-500/15 px-2 py-0.5 text-xs font-bold text-danger-300">
                 {moneyTry(buckets[7] ?? 0)}
@@ -364,7 +363,7 @@ async function HeroTrend({ pending }: { pending: Pending }) {
             <InteractiveChart
               className="mt-3"
               data={trendWeeks}
-              name="Kayıp"
+              name="Kaçan komisyon"
               color="var(--danger-500)"
               format="money"
               height={96}
@@ -754,7 +753,7 @@ async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending })
         </div>
         {totalClosuresCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
-            Henüz kapanış yok. Yayından kalkan ilanı “Kapat” ile kaydedin — kayıp-kaçak burada oluşur.
+            Henüz kapanış yok. Yayından kalkan ilanı “Kapat” ile kaydedin — kaçan komisyon burada oluşur.
           </p>
         ) : listCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
@@ -822,7 +821,7 @@ async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending })
                   </div>
                   <div className="text-right">
                     <p className={`font-display text-base font-extrabold ${lost > 0 ? "text-danger-500" : "text-mint-600"}`}>
-                      {lost > 0 ? `−${moneyTry(lost)}` : "Kayıp yok"}
+                      {lost > 0 ? `−${moneyTry(lost)}` : "Kaçan komisyon yok"}
                     </p>
                     <p className="text-xs text-text-faint">
                       {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(r.created_at))}

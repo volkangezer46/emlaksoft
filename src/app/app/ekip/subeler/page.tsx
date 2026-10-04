@@ -3,20 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
+import { ROLE_LABELS } from "@/lib/role-labels";
 import { BranchManager, type BranchRow, type ManagerOption } from "./branch-manager";
 
 export const metadata = { title: "Şubeler" };
-
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-  call_center: "Çağrı merkezi",
-  accounting: "Muhasebe",
-  readonly: "Salt okunur",
-};
 
 type ProvinceRel = { name?: string } | { name?: string }[] | null;
 

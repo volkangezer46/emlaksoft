@@ -6,6 +6,8 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { daysAgoIso } from "@/lib/clock";
+import { loadSampleKpiScope } from "@/lib/sample-scope";
 
 export type OfficeScoreInputs = {
   openDemands: number;
@@ -53,9 +55,10 @@ export const getCachedOfficeScore = cache(async () => {
  *  (RLS'siz ortamda, ör. unstable_cache içinde çalışabilmesi için). */
 async function loadOfficeScoreInputsForTenant(tenantId: string): Promise<OfficeScoreInputs> {
   const admin = createAdminClient();
-  const now = Date.now();
-  const d7 = new Date(now - 7 * 86_400_000).toISOString();
-  const d30 = new Date(now - 30 * 86_400_000).toISOString();
+  const d7 = daysAgoIso(7);
+  const d30 = daysAgoIso(30);
+  // Örnek veri kapsamı: ana ekran/ekip/TV/raporlarla AYNI tek karar noktası (lib/sample-scope).
+  const sample = await loadSampleKpiScope(admin, tenantId);
 
   const [
     { count: openDemands },
@@ -64,11 +67,11 @@ async function loadOfficeScoreInputsForTenant(tenantId: string): Promise<OfficeS
     { count: appointments7d },
     { count: calls7d },
   ] = await Promise.all([
-    admin.from("customer_demands").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).in("status", ["new", "active", "matched"]),
+    sample.apply(admin.from("customer_demands").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)).in("status", ["new", "active", "matched"]),
     admin.from("portal_listings").select("id, status, last_confirmed_at").eq("tenant_id", tenantId).eq("status", "live").limit(500),
     admin.from("listing_closures").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("created_at", d30),
-    admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("scheduled_at", d7),
-    admin.from("calls").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).gte("started_at", d7),
+    sample.apply(admin.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)).gte("scheduled_at", d7),
+    sample.apply(admin.from("calls").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId)).gte("started_at", d7),
   ]);
 
   const livePortals = portals?.length ?? 0;
@@ -104,10 +107,10 @@ export async function loadOfficeScoreInputs(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
 ): Promise<OfficeScoreInputs> {
-  const now = Date.now();
-  const d7 = new Date(now - 7 * 86_400_000).toISOString();
-  const d30 = new Date(now - 30 * 86_400_000).toISOString();
-  const confirmDue = new Date(now - 7 * 86_400_000).toISOString();
+  const d7 = daysAgoIso(7);
+  const d30 = daysAgoIso(30);
+  const confirmDue = d7;
+  const sample = await loadSampleKpiScope(supabase, null);
 
   const [
     { count: openDemands },
@@ -116,9 +119,8 @@ export async function loadOfficeScoreInputs(
     { count: appointments7d },
     { count: calls7d },
   ] = await Promise.all([
-    supabase
-      .from("customer_demands")
-      .select("id", { count: "exact", head: true })
+    sample
+      .apply(supabase.from("customer_demands").select("id", { count: "exact", head: true }))
       .in("status", ["new", "active", "matched"]),
     supabase
       .from("portal_listings")
@@ -129,13 +131,11 @@ export async function loadOfficeScoreInputs(
       .from("listing_closures")
       .select("id", { count: "exact", head: true })
       .gte("created_at", d30),
-    supabase
-      .from("appointments")
-      .select("id", { count: "exact", head: true })
+    sample
+      .apply(supabase.from("appointments").select("id", { count: "exact", head: true }))
       .gte("scheduled_at", d7),
-    supabase
-      .from("calls")
-      .select("id", { count: "exact", head: true })
+    sample
+      .apply(supabase.from("calls").select("id", { count: "exact", head: true }))
       .gte("started_at", d7),
   ]);
 

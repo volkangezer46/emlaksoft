@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, Gauge, Rocket, Trash2, TrendingUp, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { now } from "@/lib/clock";
+import { now, shiftMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
 import { targetPeriodRange } from "@/lib/team/target-actuals";
 import { loadTargetActualsLive } from "@/lib/team/advisor-metrics";
 import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
@@ -27,12 +27,13 @@ function pct(actual: number, target: number) {
 
 /** Dönemin yüzde kaçı geçti (0–100). Dönem henüz başlamadıysa 0, bittiyse 100. */
 function elapsedPct(periodStart: string, period: string) {
-  const start = new Date(periodStart);
-  const end = new Date(start);
-  end.setMonth(end.getMonth() + (period === "yearly" ? 12 : period === "quarterly" ? 3 : 1));
-  const total = end.getTime() - start.getTime();
-  if (total <= 0) return 100;
-  const elapsed = now() - start.getTime();
+  // Dönem sınırları Türkiye takvimine göre (period_start "YYYY-AA-01" date; UTC gece yarısı DEĞİL).
+  const key = periodStart.slice(0, 7);
+  const startMs = trMonthStartMsFromKey(key);
+  const endMs = trMonthStartMsFromKey(shiftMonthKey(key, period === "yearly" ? 12 : period === "quarterly" ? 3 : 1) ?? "");
+  const total = endMs - startMs;
+  if (!(total > 0)) return 100;
+  const elapsed = now() - startMs;
   return Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)));
 }
 

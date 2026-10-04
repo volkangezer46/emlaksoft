@@ -21,17 +21,9 @@ import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { formatDateTimeTr } from "@/lib/format";
 import { PageTabs } from "@/components/app/page-tabs";
 import { MemberAccessPanel, MemberInfoForm } from "./member-forms";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
-const roleLabel: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-  call_center: "Çağrı merkezi",
-  accounting: "Muhasebe",
-  readonly: "Salt okunur",
-};
+const roleLabel: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
 
 type Rel = { name?: string } | { name?: string }[] | null;
 

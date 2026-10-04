@@ -29,6 +29,7 @@ import type { CSSProperties } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
@@ -50,14 +51,14 @@ type Member = {
 };
 
 const roleMeta: Record<string, { label: string; cls: string }> = {
-  owner: { label: "Ofis sahibi", cls: "bg-amber-400/15 text-amber-600" },
-  gm: { label: "Genel müdür", cls: "bg-brand-600/10 text-brand-600" },
-  branch_manager: { label: "Şube müdürü", cls: "bg-brand-600/10 text-brand-600" },
-  team_lead: { label: "Takım lideri", cls: "bg-cyan-400/12 text-cyan-600" },
-  advisor: { label: "Danışman", cls: "bg-mint-500/12 text-mint-600" },
-  call_center: { label: "Çağrı merkezi", cls: "bg-cyan-400/12 text-cyan-600" },
-  accounting: { label: "Muhasebe", cls: "bg-amber-400/15 text-amber-600" },
-  readonly: { label: "Salt okunur", cls: "bg-ink-950/8 text-text-muted" },
+  owner: { label: ROLE_LABELS.owner, cls: "bg-amber-400/15 text-amber-600" },
+  gm: { label: ROLE_LABELS.gm, cls: "bg-brand-600/10 text-brand-600" },
+  branch_manager: { label: ROLE_LABELS.branch_manager, cls: "bg-brand-600/10 text-brand-600" },
+  team_lead: { label: ROLE_LABELS.team_lead, cls: "bg-cyan-400/12 text-cyan-600" },
+  advisor: { label: ROLE_LABELS.advisor, cls: "bg-mint-500/12 text-mint-600" },
+  call_center: { label: ROLE_LABELS.call_center, cls: "bg-cyan-400/12 text-cyan-600" },
+  accounting: { label: ROLE_LABELS.accounting, cls: "bg-amber-400/15 text-amber-600" },
+  readonly: { label: ROLE_LABELS.readonly, cls: "bg-ink-950/8 text-text-muted" },
 };
 
 

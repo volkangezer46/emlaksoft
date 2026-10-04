@@ -134,7 +134,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "commissions",
         tabs: [
           { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
-          { href: "/app/kayip-satis", label: "Kayıp nedenleri", icon: ICONS.dusus, module: "customers" },
+          { href: "/app/kayip-satis", label: "Risk altındaki müşteriler", icon: ICONS.dusus, module: "customers" },
         ],
         needsItemModule: true,
         tier: "core",
