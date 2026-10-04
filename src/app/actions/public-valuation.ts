@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { intakeLead } from "@/lib/lead-intake";
@@ -112,7 +113,7 @@ export async function estimatePublicValuation(
       .maybeSingle(),
   ]);
 
-  if (!tenant || !isPublicTenantActive(tenant.status)) {
+  if (!tenant || !isPublicTenantActive(tenant.status) || !(await isVitrinEnabled(admin, tenant.id))) {
     return { ok: false, error: "Ofis bulunamadı." };
   }
   if (!district || district.province_id !== input.provinceId) {
@@ -223,7 +224,8 @@ export async function submitValuationLead(
   if (
     !tenant?.lead_capture_token ||
     !isPublicTenantActive(tenant.status) ||
-    tenant.lead_capture_enabled === false
+    tenant.lead_capture_enabled === false ||
+    !(await isVitrinEnabled(admin, tenant.id))
   ) {
     return { ok: false, error: "Talep formu şu anda kapalı." };
   }

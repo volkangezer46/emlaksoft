@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
       .eq("slug", slug)
       .maybeSingle();
     if (tenantError) return databaseUnavailable(operation, tenantError);
-    if (!tenant || !isPublicTenantActive(tenant.status)) {
+    if (!tenant || !isPublicTenantActive(tenant.status) || !(await isVitrinEnabled(admin, tenant.id))) {
       return NextResponse.json({ error: "Ofis bulunamadı." }, { status: 404 });
     }
 

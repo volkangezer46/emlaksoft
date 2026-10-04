@@ -20,6 +20,8 @@ export type ClosureRequestRow = {
   dueAt: string;
   note: string | null;
   createdAt: string;
+  /** Talebi acan kullanici (kvkk_requests.created_by) ve guncel rolu/durumu; bulunamazsa null. */
+  requestedBy: { id: string; fullName: string | null; role: string; isActive: boolean } | null;
 };
 
 export type OfficeManagementData = {
@@ -85,7 +87,7 @@ export async function loadOfficeManagement(
     // Ofis düzeyi açık talepler (müşteri verisi içermez); tablo henüz yoksa sessizce boş döner.
     admin
       .from("kvkk_requests")
-      .select("id, request_type, status, due_at, note, created_at")
+      .select("id, request_type, status, due_at, note, created_at, created_by")
       .eq("tenant_id", tenantId)
       .in("request_type", ["account_closure", "data_export"])
       .in("status", ["open", "in_progress"])
@@ -111,11 +113,21 @@ export async function loadOfficeManagement(
     return text ? [{ id: n.id, note: text, createdAt: n.created_at, author: n.actor_id ? (staffNames.get(n.actor_id) ?? null) : null }] : [];
   });
 
-  const closureRequests = ((closure.data ?? []) as { id: string; request_type: string; status: string; due_at: string; note: string | null; created_at: string }[]).flatMap((r) =>
-    r.request_type === "account_closure" || r.request_type === "data_export"
-      ? [{ id: r.id, type: r.request_type, status: r.status, dueAt: r.due_at, note: r.note, createdAt: r.created_at } as ClosureRequestRow]
-      : [],
-  );
+  const closureRequests = ((closure.data ?? []) as { id: string; request_type: string; status: string; due_at: string; note: string | null; created_at: string; created_by: string | null }[]).flatMap((r) => {
+    if (r.request_type !== "account_closure" && r.request_type !== "data_export") return [];
+    const by = r.created_by ? members.find((m) => m.id === r.created_by) : undefined;
+    return [
+      {
+        id: r.id,
+        type: r.request_type,
+        status: r.status,
+        dueAt: r.due_at,
+        note: r.note,
+        createdAt: r.created_at,
+        requestedBy: by ? { id: by.id, fullName: by.fullName, role: by.role, isActive: by.isActive } : null,
+      } as ClosureRequestRow,
+    ];
+  });
 
   return {
     closureRequests,

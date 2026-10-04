@@ -19,9 +19,12 @@ describe("planClosure", () => {
 });
 
 describe("closureDownloadAllowed", () => {
-  it("yalnız arşivdeki ofiste ve reddedilmemiş talep varken izin verir", () => {
+  it("yalnız arşivdeki ofiste ve platformun tamamladığı talep varken izin verir", () => {
     expect(closureDownloadAllowed("cancelled", ["completed"])).toBe(true);
     expect(closureDownloadAllowed("cancelled", ["rejected"])).toBe(false);
+    expect(closureDownloadAllowed("cancelled", ["open"])).toBe(false);
+    expect(closureDownloadAllowed("cancelled", ["in_progress", "rejected"])).toBe(false);
+    expect(closureDownloadAllowed("cancelled", ["open", "completed"])).toBe(true);
     expect(closureDownloadAllowed("cancelled", [])).toBe(false);
     expect(closureDownloadAllowed("active", ["open"])).toBe(false);
     expect(closureDownloadAllowed(null, ["open"])).toBe(false);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  approvalCovers,
   evaluateApprovalRule,
   requestApprovalIfNeeded,
   type ApprovalGateStore,
@@ -61,7 +62,9 @@ describe("normalizeApprovalRules", () => {
   });
 });
 
-function fakeStore(over: Partial<{ rules: ApprovalRules; manager: boolean; open: OpenApprovalRow | null; consumed: boolean }> = {}) {
+function fakeStore(
+  over: Partial<{ rules: ApprovalRules; manager: boolean; open: OpenApprovalRow | null; consumed: boolean; consumeOk: boolean }> = {},
+) {
   const calls = { created: 0, consumed: 0 };
   const store: ApprovalGateStore = {
     loadRules: async () => over.rules ?? defaultApprovalRules(),
@@ -70,6 +73,7 @@ function fakeStore(over: Partial<{ rules: ApprovalRules; manager: boolean; open:
     isConsumed: async () => over.consumed ?? false,
     consume: async () => {
       calls.consumed += 1;
+      return over.consumeOk ?? true;
     },
     create: async () => {
       calls.created += 1;
@@ -112,7 +116,7 @@ describe("requestApprovalIfNeeded", () => {
   });
 
   it("onaylı talep tek kullanımlıktır ve 48 saatte sona erer", async () => {
-    const fresh = { id: "a1", status: "onaylandi" as const, decidedAt: "2026-10-04T08:00:00Z" };
+    const fresh = { id: "a1", status: "onaylandi" as const, decidedAt: "2026-10-04T08:00:00Z", requestedValue: 500, currentValue: 1000 };
     const a = fakeStore({ rules: RULES, open: fresh });
     expect((await requestApprovalIfNeeded("t", "u", "price_drop", BIG, a.store, NOW)).status).toBe("approved");
     expect(a.calls.consumed).toBe(1);
@@ -122,6 +126,64 @@ describe("requestApprovalIfNeeded", () => {
 
     const old = fakeStore({ rules: RULES, open: { ...fresh, decidedAt: "2026-09-30T08:00:00Z" } });
     expect((await requestApprovalIfNeeded("t", "u", "price_drop", BIG, old.store, NOW)).status).toBe("requested");
+  });
+
+  it("onay değere bağlıdır: onaylanandan DAHA DERİN fiyat düşüşü onay sayılmaz, yeni talep açılır", async () => {
+    const approved = { id: "a1", status: "onaylandi" as const, decidedAt: "2026-10-04T08:00:00Z", requestedValue: 900, currentValue: 1000 };
+    // %10 onaylandı (900) -> 1 TL'ye düşürme
+    const deep = fakeStore({ rules: RULES, open: approved });
+    const r = await requestApprovalIfNeeded("t", "u", "price_drop", { oldPrice: 1000, newPrice: 1, entityId: "p1" }, deep.store, NOW);
+    expect(r.status).toBe("requested");
+    expect(deep.calls.consumed).toBe(0);
+    expect(deep.calls.created).toBe(1);
+    // onaylanan değerin kendisi veya daha hafifi serbest
+    const same = fakeStore({ rules: RULES, open: approved });
+    expect((await requestApprovalIfNeeded("t", "u", "price_drop", { oldPrice: 1000, newPrice: 900, entityId: "p1" }, same.store, NOW)).status).toBe("approved");
+  });
+
+  it("export onayı satır sayısına bağlıdır: onaylanandan fazla satır yeni onay ister", async () => {
+    const rules = on({ bulk_export: { enabled: true, threshold: 100 } });
+    const approved = { id: "a1", status: "onaylandi" as const, decidedAt: "2026-10-04T08:00:00Z", requestedValue: 500, currentValue: 100 };
+    const more = fakeStore({ rules, open: approved });
+    expect((await requestApprovalIfNeeded("t", "u", "bulk_export", { rows: 600, exportEntity: "musteriler", channel: "quick" }, more.store, NOW)).status).toBe("requested");
+    const fewer = fakeStore({ rules, open: approved });
+    expect((await requestApprovalIfNeeded("t", "u", "bulk_export", { rows: 400, exportEntity: "musteriler", channel: "quick" }, fewer.store, NOW)).status).toBe("approved");
+  });
+
+  it("parmak izi kanalı ayırır: hızlı export onayı tam akışta kullanılamaz", () => {
+    const rules = on({ bulk_export: { enabled: true, threshold: 100 } });
+    const quick = evaluateApprovalRule(rules, "bulk_export", { rows: 500, exportEntity: "musteriler", channel: "quick" });
+    const full = evaluateApprovalRule(rules, "bulk_export", { rows: 500, exportEntity: "musteriler", channel: "full" });
+    expect(quick.required && full.required).toBe(true);
+    if (quick.required && full.required) {
+      expect(quick.fingerprint).not.toBe(full.fingerprint);
+      expect(quick.fingerprint.endsWith(":quick")).toBe(true);
+      expect(full.fingerprint.endsWith(":full")).toBe(true);
+    }
+  });
+
+  it("approvalCovers: ilan silmede değer aranmaz; onaylı değer yoksa kapsamaz", () => {
+    const d = { required: true as const, reason: "", kind: "ozel_izin" as const, title: "", currentValue: null, requestedValue: null, fingerprint: "x" };
+    expect(approvalCovers("listing_delete", d, {})).toBe(true);
+    expect(approvalCovers("price_drop", { ...d, requestedValue: 10 }, { requestedValue: null })).toBe(false);
+    expect(approvalCovers("commission_discount", { ...d, requestedValue: 2 }, { requestedValue: 2 })).toBe(true);
+    expect(approvalCovers("commission_discount", { ...d, requestedValue: 1 }, { requestedValue: 2 })).toBe(false);
+  });
+
+  it("tüketim atomik: yarışı kaybeden / denetim kaydı yazamayan çağrı işlemi REDDEDER", async () => {
+    const fresh = { id: "a1", status: "onaylandi" as const, decidedAt: "2026-10-04T08:00:00Z", requestedValue: 500, currentValue: 1000 };
+    const lost = fakeStore({ rules: RULES, open: fresh, consumeOk: false });
+    const r = await requestApprovalIfNeeded("t", "u", "price_drop", BIG, lost.store, NOW);
+    expect(r.status).toBe("error");
+    expect(lost.calls.consumed).toBe(1);
+  });
+
+  it("kural okuma HATASINDA kapı fail-open olmaz (error); tablo yokluğunu depo çözer", async () => {
+    const { store } = fakeStore({ rules: RULES });
+    store.loadRules = async () => {
+      throw new Error("timeout");
+    };
+    expect((await requestApprovalIfNeeded("t", "u", "price_drop", BIG, store, NOW)).status).toBe("error");
   });
 
   it("depo hatasında işlemi sessizce serbest bırakmaz", async () => {

@@ -79,17 +79,12 @@ describe("kapi varsayilan kapali (mantik)", () => {
     isManager: async () => false,
     findOpen: async () => null,
     isConsumed: async () => false,
-    consume: async () => {},
+    consume: async () => true,
     create: async () => ({ id: "x" }),
   };
 
-  it("ayar/sema yokken (kural yuklenemez) dort islem de not_required", async () => {
-    const store: ApprovalGateStore = {
-      ...base,
-      loadRules: async () => {
-        throw new Error("relation does not exist");
-      },
-    };
+  it("ayar tablosu yokken (depo varsayilan kapaliya duser) dort islem de not_required", async () => {
+    const store: ApprovalGateStore = { ...base, loadRules: async () => defaultApprovalRules() };
     for (const [type, payload] of [
       ["price_drop", { oldPrice: 1000, newPrice: 100, entityId: "p" }],
       ["commission_discount", { standardRate: 3, requestedRate: 1 }],
@@ -98,6 +93,17 @@ describe("kapi varsayilan kapali (mantik)", () => {
     ] as const) {
       expect((await requestApprovalIfNeeded("t", "u", type, payload, store)).status).toBe("not_required");
     }
+  });
+
+  it("kural okuma HATASI (tablo yoklugu degil) dort islemi de durdurur (fail-open yok)", async () => {
+    const store: ApprovalGateStore = {
+      ...base,
+      loadRules: async () => {
+        throw new Error("connection reset");
+      },
+    };
+    expect((await requestApprovalIfNeeded("t", "u", "listing_delete", { entityId: "p" }, store)).status).toBe("error");
+    expect((await requestApprovalIfNeeded("t", "u", "bulk_export", { rows: 5000 }, store)).status).toBe("error");
   });
 
   it("kural aciksa ve talep acilamazsa error doner (cagiran durdurur)", async () => {

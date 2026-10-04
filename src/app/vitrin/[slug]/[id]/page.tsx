@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import dynamicImport from "next/dynamic";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
@@ -114,6 +115,7 @@ export async function generateMetadata({
       .maybeSingle(),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
+  if (!(await isVitrinEnabled(admin, tenant.id))) return { title: "İlan bulunamadı" };
 
   const { data: property } = await admin
     .from("properties")
@@ -180,6 +182,8 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
+  // Ofis vitrinini kapattıysa (vitrin_enabled=false; sütun yoksa açık) ilan detayı da 404.
+  if (!(await isVitrinEnabled(admin, tenant.id))) notFound();
 
   const { data: property } = await admin
     .from("properties")

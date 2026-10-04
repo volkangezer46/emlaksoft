@@ -51,7 +51,11 @@ export async function loadApprovalRules(supabase: SupabaseClient, tenantId: stri
     .select("approval_rules")
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  if (error) return defaultApprovalRules();
+  if (error) {
+    // Yalniz TABLO YOKSA varsayilan "kapali"ya dus. Baska okuma hatasi fail-open olamaz: firlat, kapi `error` doner.
+    if (isMissingTable(error)) return defaultApprovalRules();
+    throw new Error(`oversight_settings okunamadi: ${error.code ?? ""} ${error.message ?? ""}`.trim());
+  }
   return normalizeApprovalRules(data?.approval_rules);
 }
 

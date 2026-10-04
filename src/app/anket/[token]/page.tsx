@@ -7,6 +7,8 @@ import { PublicStateBox, PublicTokenPage } from "@/components/public/token-page"
 import { isFeatureEnabledIn } from "@/lib/modules/logic";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import { loadTemplateQuestions } from "@/lib/surveys/server";
+import { isSurveyTaskLinkExpired } from "@/lib/surveys/task-expiry";
+import { now } from "@/lib/clock";
 import { SurveyForm } from "./survey-form";
 import { TaskSurveyForm } from "./task-survey-form";
 
@@ -102,7 +104,7 @@ export default async function SurveyPage({
 async function renderTaskSurvey(admin: ReturnType<typeof createAdminClient>, token: string) {
   const { data: task, error } = await admin
     .from("survey_tasks")
-    .select("id, tenant_id, status, template_id, customer_id, property_id, tenant:tenants(name, status, phone, logo_url, brand_color)")
+    .select("id, tenant_id, status, template_id, customer_id, property_id, due_at, tenant:tenants(name, status, phone, logo_url, brand_color)")
     .eq("public_token", token)
     .maybeSingle();
   if (error || !task || !task.template_id) notFound();
@@ -126,6 +128,8 @@ async function renderTaskSurvey(admin: ReturnType<typeof createAdminClient>, tok
   const office = tenant.name ?? "Emlak ofisi";
   const closed = !isFeatureEnabledIn(moduleState, "surveys");
   const answered = task.status === "completed";
+  // Süresi dolan görev bağlantısı (due_at + SURVEY_TASK_LINK_VALID_DAYS) cevap almaz.
+  if (!answered && isSurveyTaskLinkExpired(task.due_at as string | null, now())) notFound();
   const questions = closed || answered ? [] : await loadTemplateQuestions(admin, tenantId, String(task.template_id));
 
   return (
