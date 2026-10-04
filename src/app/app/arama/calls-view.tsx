@@ -12,6 +12,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { CallConsole } from "./call-console";
 import { CallAiSummary } from "./call-ai-summary";
+import { LinkToCustomer } from "../gelen-kutusu/link-to-customer";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { isAiConfigured } from "@/lib/ai-advisor";
 
@@ -314,12 +315,7 @@ export async function CallsView({
                         <p className="text-xs tabular-nums text-text-muted">{formatTurkishPhone(call.phone)}</p>
                       )}
                       {!custId ? (
-                        <Link
-                          href="/app/musteriler"
-                          className="relative z-10 mt-0.5 block text-xs font-semibold text-brand-600 underline-offset-2 hover:underline"
-                        >
-                          Müşteri oluştur
-                        </Link>
+                        <span className="mt-0.5 inline-flex rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Eşleşmemiş</span>
                       ) : null}
                     </div>
                   </div>
@@ -328,6 +324,7 @@ export async function CallsView({
                   <div className="text-xs text-text-muted">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(call.started_at))}</div>
                   {/* AI özet — yalnız notu olan çağrılarda ve anahtar server'da doğrulanınca */}
                   {aiEnabled && call.notes?.trim() ? <CallAiSummary callId={call.id} /> : null}
+                  {!custId ? <div className="md:col-span-4"><LinkToCustomer kind="call" recordId={call.id} phone={call.phone} /></div> : null}
                 </article>
               );
             })}

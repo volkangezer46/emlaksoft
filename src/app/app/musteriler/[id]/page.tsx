@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getDefinitions, getStageLabels } from "@/lib/definitions";
+import { getDefinitions, getDefinitionsOrDefault, getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { EditCustomerDialog } from "./edit-customer-dialog";
 import { CustomerTagChips } from "./customer-tag-chips";
@@ -141,7 +141,7 @@ export default async function CustomerDetailPage({
   ] = await Promise.all([
     supabase
       .from("customers")
-      .select("id, full_name, phone, email, customer_types, tags, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
+      .select("id, full_name, phone, email, customer_types, tags, branch_id, assigned_to, source, lead_source, lead_source_detail, notes, blacklist, created_at, province_id, district_id, birth_date, anniversary_date, anniversary_note, is_foreign, nationality, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
@@ -174,7 +174,7 @@ export default async function CustomerDetailPage({
       .select("id, channel, status, granted_at")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
-    tab === "dosyalar"
+    tab === "belgeler"
       ? supabase
           .from("customer_files")
           .select("id, file_name, file_size, file_type, storage_path, label, created_at, uploader:profiles!customer_files_uploaded_by_fkey(full_name)")
@@ -238,9 +238,13 @@ export default async function CustomerDetailPage({
   if (!customer) notFound();
 
   // WhatsApp şablon değişkenleri — {ofis} ve {danisman} için iki hafif sorgu
-  const [{ data: waTenant }, { data: waAdvisor }] = await Promise.all([
+  const [{ data: waTenant }, { data: waAdvisor }, { data: editBranches }, { data: editAdvisors }, sourceDefs] = await Promise.all([
     supabase.from("tenants").select("name, phone").limit(1).maybeSingle(),
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+    // Düzenleme paneli seçenekleri (yalnız düzenleme yetkisi varsa gerekir)
+    canEdit ? supabase.from("branches").select("id, name").eq("is_active", true).order("name") : noRows,
+    canEdit ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name") : noRows,
+    canEdit ? getDefinitionsOrDefault("customer_source") : Promise.resolve([]),
   ]);
 
   const customerTypeOptions = customerTypeDefs.length ? customerTypeDefs.map((d) => d.value) : undefined;
@@ -537,9 +541,17 @@ export default async function CustomerDetailPage({
                       birth_date: customer.birth_date,
                       anniversary_date: customer.anniversary_date,
                       anniversary_note: customer.anniversary_note,
+                      branch_id: customer.branch_id,
+                      assigned_to: customer.assigned_to,
+                      source: customer.source,
+                      lead_source_detail: customer.lead_source_detail,
+                      blacklist: Boolean(customer.blacklist),
                     }}
                     provinces={provinces ?? []}
                     types={customerTypeOptions}
+                    branches={(editBranches ?? []) as { id: string; name: string }[]}
+                    advisors={(editAdvisors ?? []) as { id: string; full_name: string }[]}
+                    sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
                   />
                 ) : null}
                 {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}

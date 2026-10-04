@@ -5,6 +5,7 @@
  * kaçışı `export-entities.ts`'ten gelir; tenant + aktör kapsamı export.ts ile
  * birebir aynıdır (bkz. export-full.test.ts drift korumaları).
  */
+import { applyCustomerFilters, normalizeCustomerFilters } from "@/lib/customer-list-filters";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
@@ -27,20 +28,23 @@ export type ExportGate = {
 type PageResult = PromiseLike<{ data: unknown[] | null; error: unknown }>;
 /** `.range()` çağrılabilir sorgu (PostgREST builder). */
 export type PagedQuery = { range: (from: number, to: number) => PageResult };
-type Builder = (sb: SupabaseClient, gate: ExportGate) => PagedQuery;
+/** `params`: tam dışa aktarma isteğinin URL parametreleri (ekran filtresi; yalnız filtre destekleyen varlıklar okur). */
+type Builder = (sb: SupabaseClient, gate: ExportGate, params?: URLSearchParams) => PagedQuery;
 
 /** Sayfalar arası kayma/yinelenmeyi önlemek için ikincil sıra anahtarı `id`. */
 const ID_ORDER = { ascending: true } as const;
 
 export const EXPORT_QUERIES: Record<string, Builder> = {
-  musteriler: (sb, gate) => {
-    let q = sb
+  musteriler: (sb, gate, params) => {
+    const query = sb
       .from("customers")
       .select("full_name, phone, email, customer_types, tags, source, created_at")
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .order("id", ID_ORDER);
+    // Ekrandaki müşteri filtresi (ortak kurucu: src/lib/customer-list-filters.ts)
+    let q = params ? applyCustomerFilters(query, normalizeCustomerFilters(Object.fromEntries(params))) : query;
     if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
     return q;
   },
@@ -215,6 +219,8 @@ export type FullExportOptions = {
   gate: ExportGate;
   def: ExportEntityDef;
   buildQuery: Builder;
+  /** İstek URL parametreleri (ekran filtresi) — buildQuery'ye iletilir. */
+  params?: URLSearchParams;
   maxRows?: number;
   maxMs?: number;
   pageSize?: number;
@@ -245,7 +251,7 @@ async function resolveNames(
 export async function openFullCsvStream(
   opts: FullExportOptions,
 ): Promise<{ ok: true; stream: ReadableStream<Uint8Array> } | { ok: false }> {
-  const { supabase, gate, def, buildQuery, onDone } = opts;
+  const { supabase, gate, def, buildQuery, onDone, params } = opts;
   const maxRows = opts.maxRows ?? FULL_EXPORT_MAX_ROWS;
   const maxMs = opts.maxMs ?? FULL_EXPORT_MAX_MS;
   const pageSize = opts.pageSize ?? FULL_EXPORT_PAGE_SIZE;
@@ -255,7 +261,7 @@ export async function openFullCsvStream(
 
   const fetchPage = async (offset: number) => {
     // Her sayfa için taze builder: paylaşılan URL/parametre durumu sızmasın.
-    const { data, error } = await buildQuery(supabase, gate).range(offset, offset + pageSize - 1);
+    const { data, error } = await buildQuery(supabase, gate, params).range(offset, offset + pageSize - 1);
     if (error) throw error;
     const rows = (data ?? []) as RawRow[];
     await resolveNames(supabase, gate, def, rows, names);

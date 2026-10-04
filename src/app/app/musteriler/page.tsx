@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Copy,
+  Upload,
   Flame,
   Gift,
   Moon,
@@ -27,6 +28,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatLeadSource } from "@/lib/lead-sources";
 import { exportCustomersCsv } from "@/app/actions/export";
+import { applyCustomerFilters, customerSearchTerm, hasCustomerFilters, normalizeCustomerFilters } from "@/lib/customer-list-filters";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
@@ -224,16 +226,9 @@ export default async function CustomersPage({
   const sp = await searchParams;
   // Eski popup adresi (?yeni=1; komut paleti, kısayollar) → tam sayfa form.
   if (sp.yeni === "1") redirect("/app/musteriler/yeni");
-  const q        = sp.q        ?? "";
-  const typeF    = sp.type     ?? "";
-  const sourceF  = sp.source   ?? "";
-  const etiketF  = (sp.etiket ?? "").trim();
-  // Yalnız YYYY-MM-DD kabul edilir — bozuk tarih paramı sorguya sızıp
-  // tüm listeyi sessizce boşaltmasın (Supabase hatası → data null → "0 sonuç").
-  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-  const fromF    = ISO_DATE.test(sp.from ?? "") ? sp.from! : "";
-  const toF      = ISO_DATE.test(sp.to ?? "")   ? sp.to!   : "";
-  const assignedF = sp.assigned ?? "";
+  // Filtre kontratı: ekran ve CSV aynı normalleştirici + kurucuyu kullanır (src/lib/customer-list-filters.ts).
+  const filters = normalizeCustomerFilters(sp);
+  const { q, type: typeF, source: sourceF, etiket: etiketF, from: fromF, to: toF, assigned: assignedF } = filters;
   const sortF    = sp.sort     ?? "";
   const density  = densityOf(sp.yogunluk);
   // Sıcaklık segmenti filtresi — yalnız bilinen değerler
@@ -255,32 +250,11 @@ export default async function CustomersPage({
   // arama "kayıt yok" diyordu. Artık tüm filtreler Supabase sorgusunda.
   // Ad/telefon/e-posta araması — .or() sözdizimini bozan karakterler ayıklanır.
   // (İl adı araması DB'ye taşınmadı: join'li kolonda ilike desteklenmiyor.)
-  const term = q.trim().replace(/[%_,()]/g, " ").trim();
+  const term = customerSearchTerm(q);
 
-  // Aynı filtre seti hem ana listeye hem sıcaklık havuzuna uygulanır —
-  // tek doğruluk kaynağı bu kurucu (filtre eklerken iki yeri unutma riski yok).
-  const buildFilteredQuery = (select: string, opts?: { count: "exact" }) => {
-    let query = supabase.from("customers").select(select, opts).is("deleted_at", null);
-    if (typeF)     query = query.contains("customer_types", [typeF]);
-    if (etiketF)   query = query.contains("tags", [etiketF]);
-    if (sourceF)   query = query.eq("source", sourceF);
-    if (assignedF) query = query.eq("assigned_to", assignedF);
-    if (fromF)     query = query.gte("created_at", fromF);
-    if (toF)       query = query.lte("created_at", `${toF}T23:59:59.999`);
-    if (term) {
-      const pattern = `%${term}%`;
-      const orParts = [
-        `full_name.ilike.${pattern}`,
-        `phone.ilike.${pattern}`,
-        `email.ilike.${pattern}`,
-      ];
-      // "0532 111 22 33" gibi biçimli girdiler normalize kayıtla eşleşsin
-      const digits = term.replace(/\D/g, "");
-      if (digits.length >= 3 && digits !== term) orParts.push(`phone.ilike.%${digits}%`);
-      query = query.or(orParts.join(","));
-    }
-    return query;
-  };
+  // Aynı filtre seti hem ana listeye hem sıcaklık havuzuna uygulanır.
+  const buildFilteredQuery = (select: string, opts?: { count: "exact" }) =>
+    applyCustomerFilters(supabase.from("customers").select(select, opts).is("deleted_at", null), filters);
 
   // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister;
   // sayı aynı yanıtta gelir, ek gidiş-dönüş yok.
@@ -689,7 +663,16 @@ export default async function CustomersPage({
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>
               Çift kayıt kontrolü
             </ButtonLink>
-            <ExportCsvButton action={exportCustomersCsv} label="Dışa aktar" />
+            {canCreate ? (
+              <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
+                İçe aktar
+              </ButtonLink>
+            ) : null}
+            <ExportCsvButton
+              action={exportCustomersCsv.bind(null, filters)}
+              fullQuery={new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString()}
+              label={hasCustomerFilters(filters) ? "Filtreyi dışa aktar" : "Dışa aktar"}
+            />
             {canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null}
           </>
         }
@@ -891,7 +874,7 @@ export default async function CustomersPage({
               createdSort: columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined,
             }}
           />
-          <CustomerMobileList rows={viewModels} />
+          <CustomerMobileList rows={viewModels} canBulk={canBulk} canEdit={canEdit} canDelete={canDelete} />
         </CustomerBulkProvider>
       )}
 
