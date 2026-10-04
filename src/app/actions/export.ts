@@ -13,6 +13,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { logActivity } from "@/lib/activity";
+import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
 
 export type ExportResult = {
   error?: string;
@@ -54,17 +55,21 @@ async function exportResult(
   return { csv, filename, truncated, rowCount: rows.length, entity };
 }
 
-export async function exportCustomersCsv(): Promise<ExportResult> {
+/** Müşteri CSV'si ekrandaki filtreyi uygular (ortak kurucu: src/lib/customer-list-filters.ts). */
+export async function exportCustomersCsv(filters: Partial<CustomerListFilters> = {}): Promise<ExportResult> {
   const gate = await requirePermission("customers", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
-  let q = supabase
-    .from("customers")
-    .select("full_name, phone, email, customer_types, tags, source, created_at")
-    .eq("tenant_id", gate.tenantId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(EXPORT_LIMIT);
+  let q = applyCustomerFilters(
+    supabase
+      .from("customers")
+      .select("full_name, phone, email, customer_types, tags, source, created_at")
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(EXPORT_LIMIT),
+    normalizeCustomerFilters(filters),
+  );
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
   const { data, error } = await q;
   if (error) {

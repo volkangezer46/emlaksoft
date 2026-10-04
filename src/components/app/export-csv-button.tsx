@@ -11,11 +11,14 @@ export function ExportCsvButton({
   action,
   className,
   iconOnly = false,
+  fullQuery = "",
 }: {
   label?: string;
   action: () => Promise<ExportResult>;
   className?: string;
   iconOnly?: boolean;
+  /** "Tümünü indir" bağlantısına eklenen ekran filtresi (URL sorgu dizesi, başında ? olmadan). */
+  fullQuery?: string;
 }) {
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
@@ -61,7 +64,7 @@ export function ExportCsvButton({
     <>
     {fullEntity ? (
       <a
-        href={`/api/export/${fullEntity}`}
+        href={fullQuery ? `/api/export/${fullEntity}?${fullQuery}` : `/api/export/${fullEntity}`}
         download
         className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-brand-300 bg-surface px-3 py-2 text-xs font-semibold text-brand-600 transition hover:bg-brand-50"
       >
