@@ -226,11 +226,15 @@ export async function signOutMemberSessions(fd: FormData): Promise<MemberActionR
   const target = await loadTarget(admin, id);
   if (!target) return { error: "Üye bulunamadı." };
 
-  const { error } = await admin.rpc("revoke_team_member_sessions", {
-    p_user_id: id,
-    p_tenant_id: target.tenant_id,
-  });
-  if (error) return { error: "Oturumlar kapatılamadı." };
+  // revoke_team_member_sessions yalnız pasif üyede çalışır; aktif hesap için platform_revoke_user_sessions (migration 20260816010200).
+  const { error } = await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
+  if (error) {
+    return {
+      error: /could not find|schema cache|PGRST202/i.test(error.message + (error.code ?? ""))
+        ? "Oturum kapatma veritabanı fonksiyonu henüz uygulanmamış (migration 20260816010200)."
+        : "Oturumlar kapatılamadı.",
+    };
+  }
 
   await logPlatformActivity({
     actorId: gate.staff.id,

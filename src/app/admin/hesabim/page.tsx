@@ -1,7 +1,7 @@
 import { KeyRound, UserRound } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PageTabs } from "@/components/app/page-tabs";
-import { requirePlatformStaff } from "@/lib/platform";
+import { requirePlatformStaffForAccount } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS } from "@/lib/platform-access";
 import { OwnPasswordForm, OwnProfileForm } from "./account-forms";
 
@@ -21,7 +21,7 @@ export default async function AdminAccountPage({
 }: {
   searchParams?: Promise<{ sekme?: string }>;
 }) {
-  const staff = await requirePlatformStaff();
+  const staff = await requirePlatformStaffForAccount();
   const sekme = (await searchParams)?.sekme;
   const active = sekme === "parola" ? "parola" : "profil";
 

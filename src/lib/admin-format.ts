@@ -67,6 +67,7 @@ export function auditActionLabel(action: string): string {
     "platform_staff.reset_link":     "Personel için sıfırlama bağlantısı üretildi",
     "platform_staff.password_reset": "Personel parolası sıfırlandı",
     "platform_staff.password_change": "Personel kendi parolasını değiştirdi",
+    "platform_staff.sessions_revoke": "Personelin oturumları kapatıldı",
     "platform_staff.self_update":    "Personel kendi adını güncelledi",
     // Platform: üye (ofis kullanıcısı) yönetimi
     "platform_member.update":           "Üye bilgileri güncellendi",

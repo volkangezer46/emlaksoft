@@ -365,12 +365,48 @@ export async function resetStaffPassword(fd: FormData): Promise<StaffActionResul
   });
   if (error) return { error: error.message || "Parola sıfırlanamadı." };
 
+  // Eski oturumlar eski parolayla sürmesin (fonksiyon henüz uygulanmamışsa sessizce atlanır).
+  await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
+
   await logPlatformActivity({
     actorId: gate.staff.id,
     action: "platform_staff.password_reset",
     entityType: "platform_staff",
     entityId: id,
     meta: { email: target.email, must_change_password: true },
+  });
+  revalidatePath(`/admin/personel/${id}`);
+  return { ok: true };
+}
+
+/** Personelin tüm açık oturumlarını kapat (süper admin). Kendi oturumunu bu yolla kapatamaz. */
+export async function signOutStaffSessions(fd: FormData): Promise<StaffActionResult> {
+  const gate = await guardPlatformAction({ module: "personel", roles: ["super_admin"], rate: STAFF_RATE });
+  if ("error" in gate) return { error: gate.error };
+
+  const id = (fd.get("id") as string | null)?.trim() ?? "";
+  if (!UUID_RE.test(id)) return { error: "Personel ID gerekli." };
+  if (id === gate.staff.id) return { error: "Kendi oturumunuzu bu ekrandan kapatamazsınız; çıkış yapın." };
+
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("platform_staff").select("email").eq("id", id).maybeSingle();
+  if (!target) return { error: "Personel bulunamadı." };
+
+  const { error } = await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
+  if (error) {
+    return {
+      error: /could not find|schema cache|PGRST202/i.test(error.message + (error.code ?? ""))
+        ? "Oturum kapatma veritabanı fonksiyonu henüz uygulanmamış (migration 20260816010200)."
+        : "Oturumlar kapatılamadı.",
+    };
+  }
+
+  await logPlatformActivity({
+    actorId: gate.staff.id,
+    action: "platform_staff.sessions_revoke",
+    entityType: "platform_staff",
+    entityId: id,
+    meta: { email: target.email },
   });
   revalidatePath(`/admin/personel/${id}`);
   return { ok: true };

@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
-import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, RefreshCw, Save } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, LogOut, RefreshCw, Save } from "lucide-react";
 import {
   generateStaffResetLink,
   resetStaffPassword,
+  signOutStaffSessions,
   updateStaffProfile,
 } from "@/app/actions/platform-staff";
 import { EmailInput } from "@/components/ui/email-input";
@@ -64,6 +65,7 @@ export function StaffAccountPanel({
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [confirmPw, setConfirmPw] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   function onProfile(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -107,6 +109,18 @@ export function StaffAccountPanel({
         setNotice({ tone: "ok", text: "Geçici parola atandı. Personel ilk girişte parolasını değiştirmek zorundadır." });
         await onChanged();
       }
+    });
+  }
+
+  function signOutAll() {
+    const fd = new FormData();
+    fd.set("id", id);
+    setNotice(null);
+    setConfirmSignOut(false);
+    start(async () => {
+      const res = await signOutStaffSessions(fd);
+      if (res.error) setNotice({ tone: "error", text: res.error });
+      else setNotice({ tone: "ok", text: "Personelin açık oturumları kapatıldı." });
     });
   }
 
@@ -163,6 +177,21 @@ export function StaffAccountPanel({
             </button>
           </div>
         ) : null}
+      </div>
+
+      <div className="space-y-3 border-t border-line pt-4">
+        <p className="text-sm font-semibold text-ink-950">Açık oturumlar</p>
+        {confirmSignOut ? (
+          <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
+            Personelin tüm açık oturumları kapatılsın mı?
+            <button type="button" onClick={signOutAll} className={`${btn} bg-ink-950 text-white`}>Evet, kapat</button>
+            <button type="button" onClick={() => setConfirmSignOut(false)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+          </span>
+        ) : (
+          <button type="button" disabled={pending} onClick={() => setConfirmSignOut(true)} className={`${btn} border border-line text-ink-950`}>
+            <LogOut className="h-3.5 w-3.5" /> Oturumları kapat
+          </button>
+        )}
       </div>
 
       <div className="space-y-3 border-t border-line pt-4">
