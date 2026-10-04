@@ -216,7 +216,7 @@ export default async function BillingPage({
           href="/app/abonelik?cycle=yearly"
           className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${cycle === "yearly" ? "bg-brand-600 text-white" : "border border-line bg-surface text-text-muted"}`}
         >
-          Yıllık · ~%20 indirim
+          Yıllık · 10 öde 12 kullan
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />

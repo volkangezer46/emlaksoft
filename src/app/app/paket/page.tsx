@@ -50,7 +50,7 @@ export default async function UpgradePage({
               </CardTitle>
               {plan ? (
                 <p className="mt-0.5 text-xs text-text-muted">
-                  {formatTry(plan.monthlyTry)} / ay + KDV · yıllıkta yaklaşık %20 indirim
+                  {formatTry(plan.monthlyTry)} / ay + KDV · yıllıkta 10 öde 12 kullan
                 </p>
               ) : null}
             </div>

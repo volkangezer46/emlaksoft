@@ -16,7 +16,7 @@ export function FinalCta() {
         </div>
         <ul className="mk-final-checks">
           <li><Lock size={16} aria-hidden="true" />KVKK süreç desteği</li>
-          <li><TrendingUp size={16} aria-hidden="true" />Yıllık ödemede %20 indirim</li>
+          <li><TrendingUp size={16} aria-hidden="true" />Yıllık ödemede 10 öde 12 kullan</li>
           <li><Check size={16} aria-hidden="true" />Taahhütsüz</li>
         </ul>
       </div>

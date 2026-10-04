@@ -174,7 +174,7 @@ export function planLimit(planId: string, key: keyof PlanLimits): number | null 
 /**
  * "Business" paketi şablonu. PLANS (veritabanı sözleşmeli kimlikler) içinde DEĞİLDİR:
  * `plan` CHECK kısıtı ve plan_entitlements satırı forward-only migration
- * (20260816000210_plan_business_and_pricing_support.sql) uygulanana kadar satılamaz.
+ * (20260817000210_plan_business_and_pricing_support.sql) uygulanana kadar satılamaz.
  * Yalnız okuyucu ve panel düzenleyicisi bunu "gizli" başlangıç tanımı olarak bilir.
  */
 export const BUSINESS_PLAN_TEMPLATE: PlanDef = {

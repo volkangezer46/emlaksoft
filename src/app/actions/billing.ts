@@ -4,8 +4,8 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { PLANS, type BillingCycle, type PlanId } from "@/lib/billing/plans";
-import { getPlanAmountTry } from "@/lib/billing/plan-definitions";
+import { PLANS, planAmountOf, type BillingCycle, type PlanId } from "@/lib/billing/plans";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
 import {
   IYZICO_CURRENCY,
   initializeCheckoutForm,
@@ -68,7 +68,11 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     return { error: error instanceof Error ? error.message : "Paket kapasitesi doğrulanamadı." };
   }
 
-  const amountTry = await getPlanAmountTry(plan, cycle);
+  const planDef = await getPlanDefinition(plan);
+  if (planDef.hidden || planDef.customPricing) {
+    return { error: "Bu paket çevrimiçi satın alınamıyor. Lütfen bizimle iletişime geçin." };
+  }
+  const amountTry = planAmountOf(planDef, cycle);
   const invoiceAmounts = invoiceAmountsTry(amountTry);
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
   const configured = isIyzicoConfigured();

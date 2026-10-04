@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **303** (177 dosya) — risk: P0=0, P1=15, P2=288
-- Tenant filtresi: var=201, yok=35, uygulanamaz=59, param=6, devir=2
-- Kapı türü: public-token=34, platform=80, dosya-duzeyi=37, oturum-izin=70, belirsiz=48, elle-dogrulandi=10, cron=21, webhook-imza=3
-- Filtresiz (yok+devir): **37**; RLS'li client'a taşıma adayı: **59**
+- Toplam birim: **309** (179 dosya) — risk: P0=2, P1=15, P2=292
+- Tenant filtresi: var=205, yok=37, uygulanamaz=59, param=6, devir=2
+- Kapı türü: public-token=34, platform=80, dosya-duzeyi=41, oturum-izin=70, belirsiz=50, elle-dogrulandi=10, cron=21, webhook-imza=3
+- Filtresiz (yok+devir): **39**; RLS'li client'a taşıma adayı: **59**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -18,7 +18,10 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 
 ## P0 — filtresiz VE kapısı belirsiz (ÖNCE bunlar elle incelenmeli)
 
-Yok.
+| Dosya:satır | İşlev | Neden admin | Kapı türü | Tenant filtresi | Risk |
+|---|---|---|---|---|---|
+| `src/lib/billing/plan-support.ts:88` | `getFoundersStatus` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
+| `src/lib/billing/plan-support.ts:34` | `getPlanSupport` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 
 ## P1
 
@@ -105,6 +108,10 @@ Yok.
 | `src/app/actions/owner-portal.ts:151` | `getOwnerPortalData` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/payment-links.ts:82` | `createPaymentLink` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/payment-links.ts:121` | `startPaymentLinkCheckout` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:44` | `markInvoicePaid` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:142` | `recordInvoiceRefund` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:205` | `resolveCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/actions/platform-billing.ts:106` | `voidInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/platform-export.ts:68` | `exportDemoRequestsCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/platform-export.ts:115` | `exportInvoicesCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/platform-export.ts:137` | `exportMembersCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |

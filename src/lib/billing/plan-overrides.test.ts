@@ -6,12 +6,15 @@ import {
   sanitizePlanOverride,
   serializePlanOverrides,
 } from "./plan-overrides";
-import { PLANS, planAmountOf } from "./plans";
+import { BUSINESS_PLAN_TEMPLATE, PLANS, planAmountOf } from "./plans";
 
 describe("plan overrides", () => {
   it("kayıt yoksa veya bozuksa varsayılan katalog döner", () => {
-    expect(applyPlanOverrides(parsePlanOverrides(null))).toEqual([...PLANS]);
-    expect(applyPlanOverrides(parsePlanOverrides("{bozuk"))).toEqual([...PLANS]);
+    const defs = applyPlanOverrides(parsePlanOverrides(null));
+    expect(defs.map((p) => p.id)).toEqual(["advisor", "office", "professional", "business", "enterprise"]);
+    for (const p of PLANS) expect(defs.find((d) => d.id === p.id)).toEqual(p);
+    expect(defs.find((d) => d.id === "business")).toEqual(BUSINESS_PLAN_TEMPLATE);
+    expect(applyPlanOverrides(parsePlanOverrides("{bozuk"))).toEqual(defs);
   });
 
   it("fiyat ve limit düzenlemesini bindirir, diğer alanları korur", () => {
@@ -22,7 +25,7 @@ describe("plan overrides", () => {
     expect(office.limits.seats).toBe(8);
     expect(office.limits.branches).toBe(3);
     expect(office.name).toBe("Ofis");
-    expect(planAmountOf(office, "yearly")).toBe(Math.round(2990 * 12 * 0.8));
+    expect(planAmountOf(office, "yearly")).toBe(2990 * 10);
   });
 
   it("negatif, ondalık ve aşırı değerleri reddeder", () => {

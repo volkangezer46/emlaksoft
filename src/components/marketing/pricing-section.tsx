@@ -1,10 +1,10 @@
 import { Pricing } from "@/components/pricing";
-import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { Em, SectionHeading } from "./section-heading";
 
 /** Fiyatlar ve paket içerikleri her zaman plans.ts'ten okunur (Pricing bileşeni). */
 export async function PricingSection() {
-  const plans = await getPlanDefinitions();
+  const plans = await getPublicPlanDefinitions();
   return (
     <section id="fiyat" className="mk-section" aria-labelledby="fiyat-baslik">
       <div className="mk-wrap">

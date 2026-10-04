@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ComponentType } from "react";
-import { PLANS, planAmountOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { PLANS, planAmountOf, yearlyOfferLabel, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -25,7 +25,7 @@ const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
 const formatTL = formatNumberTr;
 
 /** `plans`: sunucudan gelen etkin (panelden düzenlenebilir) tanımlar; verilmezse plans.ts varsayılanı. */
-export function Pricing({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) {
+export function Pricing({ plans = PLANS, trialDays = 14 }: { plans?: readonly PlanDef[]; trialDays?: number } = {}) {
   const [yearly, setYearly] = useState(false);
 
   return (
@@ -62,7 +62,7 @@ export function Pricing({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) 
         >
           Yıllık
           <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-semibold text-mint-600">
-            %20 indirim
+            {yearlyOfferLabel(plans.find((p) => !p.customPricing) ?? plans[0] ?? {})}
           </span>
         </span>
       </div>
@@ -122,8 +122,9 @@ export function Pricing({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) 
                     plan.popular ? "text-white" : "text-ink-950"
                   }`}
                 >
-                  {formatTL(price)} ₺
+                  {plan.customPricing ? "Özel teklif" : `${formatTL(price)} ₺`}
                 </span>
+                {plan.customPricing ? null : (
                 <span
                   className={`mb-1 text-sm ${
                     plan.popular ? "text-white/60" : "text-text-muted"
@@ -131,17 +132,18 @@ export function Pricing({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) 
                 >
                   /ay
                 </span>
+                )}
               </div>
               <p
                 className={`mt-1 text-xs ${
                   plan.popular ? "text-white/50" : "text-text-faint"
                 }`}
               >
-                {yearly ? "Yıllık faturalandırılır · KDV hariç" : "KDV hariç"}
+                {plan.customPricing ? "Ekibinize göre hazırlanır" : yearly ? "Yıllık faturalandırılır · KDV hariç" : "KDV hariç"}
               </p>
-              {yearly ? (
+              {yearly && !plan.customPricing ? (
                 <p className={`mt-2 text-xs font-semibold ${plan.popular ? "text-mint-400" : "text-mint-600"}`}>
-                  Yılda {formatTL(plan.monthlyTry * 12 * 0.2)} ₺ tasarruf
+                  Yılda {formatTL(plan.monthlyTry * 12 - planAmountOf(plan, "yearly"))} ₺ tasarruf
                 </p>
               ) : null}
 
@@ -171,14 +173,14 @@ export function Pricing({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) 
               </ul>
 
               <Link
-                href={`/kayit?plan=${plan.id}&cycle=${yearly ? "yearly" : "monthly"}`}
+                href={plan.customPricing ? "/demo" : `/kayit?plan=${plan.id}&cycle=${yearly ? "yearly" : "monthly"}`}
                 className={`btn-shine mt-7 inline-flex w-full items-center justify-center rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition ${
                   plan.popular
                     ? "bg-white text-ink-950 hover:bg-white/90"
                     : "bg-brand-600 text-white hover:bg-brand-700"
                 }`}
               >
-                14 gün ücretsiz başla <ArrowRight className="ml-2 h-4 w-4" />
+                {plan.customPricing ? "Bize ulaşın" : `${trialDays} gün ücretsiz başla`} <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
               <p className={`mt-3 flex items-center justify-center gap-1.5 text-xs ${plan.popular ? "text-white/45" : "text-text-faint"}`}>
                 <ShieldCheck className="h-3.5 w-3.5" /> Demo çalışma alanıyla özellikleri keşfedin

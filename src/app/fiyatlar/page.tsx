@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileSignature, ShieldAlert, Sparkles } from "lucide-react";
 import { Pricing } from "@/components/pricing";
-import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import type { PlanDef } from "@/lib/billing/plans";
 import { buildFaq, lostCommissionPlanName, yearlyDiscountPercent } from "@/lib/pricing-page-model";
 import { ComparisonTable } from "@/components/pricing-page/comparison-table";
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export default async function FiyatlarPage() {
-  const plans: PlanDef[] = await getPlanDefinitions();
+  const plans: PlanDef[] = await getPublicPlanDefinitions();
   const faq = buildFaq();
   const discount = yearlyDiscountPercent();
   const lost = lostCommissionPlanName();

@@ -1,6 +1,6 @@
 import { RegisterForm } from "./register-form";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
-import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 
 export const metadata = {
   title: "Ofisinizi Ücretsiz Oluşturun",
@@ -20,7 +20,7 @@ export default async function RegisterPage({
   searchParams: Promise<{ plan?: string; cycle?: string }>;
 }) {
   const params = await searchParams;
-  const plans = await getPlanDefinitions();
+  const plans = await getPublicPlanDefinitions();
   return (
     <RegisterForm
       plans={plans}
