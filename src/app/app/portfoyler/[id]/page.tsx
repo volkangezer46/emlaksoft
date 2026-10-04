@@ -556,6 +556,11 @@ export default async function PropertyDetailPage({
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
+          {sp.silme === "engellendi" ? (
+            <p role="alert" className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/[0.06] px-4 py-3 text-sm font-semibold text-danger-600">
+              Portföy silinemedi: açık anlaşma, canlı portal ilanı, dışarıdaki anahtar veya planlı açık ev var. Önce bunları kapatın.
+            </p>
+          ) : null}
           <DetailTabs basePath={`/app/portfoyler/${property.id}`} tabs={tabDefs} active={tab} label="Portföy sekmeleri" />
 
           {tab === "ozet" ? (
