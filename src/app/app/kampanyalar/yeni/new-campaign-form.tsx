@@ -118,7 +118,6 @@ export function NewCampaignForm({ userId }: { userId: string }) {
           >
             <option value="sms">SMS (Netgsm)</option>
             <option value="whatsapp">WhatsApp</option>
-            <option value="email" disabled>E-posta (yakında)</option>
           </FormSelect>
         </FormField>
 
