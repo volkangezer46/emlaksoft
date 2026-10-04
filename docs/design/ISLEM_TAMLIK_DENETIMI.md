@@ -27,8 +27,8 @@ işlemlerinin arayüzde gerçekten var olup olmadığını koddan okuyarak çık
 |---|---|
 | Denetlenen varlık / ekran satırı | /admin 30, /app 105 |
 | P0 (akış tamamlanamıyor ya da veri yanlış yere çıkıyor) | 12 (+ ofis ekleme: başka ajanda) |
-| P1 (sık ihtiyaç) | 72 |
-| P2 (nadir) | 78 |
+| P1 (sık ihtiyaç) | 59 (Bölüm 3.2) |
+| P2 (nadir) | yaklaşık 45 madde (Bölüm 3.3, gruplanmış) |
 | Hâlâ popup olan ekle / düzenle akışı | 24 dosya (Bölüm 2.2) |
 | Çöp kutusunun kapsadığı varlık | 2 (müşteri, portföy); kalıcı silinen 25+ varlık türü |
 | Telefon / e-posta bileşeni ihlali | 1 (`src/components/app/portal-link-dialog.tsx:278`) |
@@ -493,10 +493,188 @@ Engel olmayanlar: `opacity-0 group-hover:opacity-100` taşıyan 96 kullanımın 
 var (`deal-board.tsx:370-446`). /admin tarafında mobilde yapılamayan işlem bulunmadı (tablolar yatay kayıyor, toplu işlem çubuğu
 alt gezinmenin üstünde).
 
-<!--EKSIKLER-->
+## 3. Eksik işlemler
 
-<!--PAKETLER-->
+Efor: S ≤ yarım gün, M 1-2 gün, L 3-5 gün. Çözüm kuralı: ekle/düzenle popup olmaz; sekmeli sayfa ya da satır içi panel.
+"Şema" sütunu yeni migration gerekir mi. "Mükerrer" sütunu: aynı işi yapan ikinci bir ekran/action doğma ihtimali
+(Bölüm 4'teki paket sahipliği bunu önler). "Muhtemelen" yazılan şema kararları canlı şema görülmeden verilemedi (Bölüm 5).
 
-<!--DOGRULANAMADI-->
+### 3.1 P0 (iş akışını engeller ya da veri yanlış yere çıkar)
 
-<!--KANIT-->
+| # | Ne eksik | Etki | Çözüm | Dosyalar | Şema | Efor | Mükerrer |
+|---|---|---|---|---|---|---|---|
+| P0-1 | Müşteri dosyaları listelenmiyor (sekme kimliği `belgeler`, sorgu koşulu `dosyalar`) | Yüklenen dosya görünmez, indirilemez, silinemez | Koşulu sekme kimliğiyle eşle; sabiti tek yere al; test ekle | `app/musteriler/[id]/page.tsx:177`, `customer-360-tabs.tsx:79,89` | Hayır | S | Yok |
+| P0-2 | Eşleşmemiş çağrı / gelen kutusu öğesi müşteriye bağlanamaz | Telefon kaydı sahipsiz kalır, kayıp-kaçak sayısı şişer | Satıra "Müşteriye bağla" (aramalı seçici, satır içi panel) ve "Bu telefonla müşteri oluştur" (telefonu taşıyan `yeni?phone=`); action `linkCommunicationToCustomer` | `app/arama/calls-view.tsx:316-322`, `gelen-kutusu/inbox-view.tsx:501-515`, `actions/communications.ts` | Hayır | M | `reassignCustomer` ile karıştırma |
+| P0-3 | Anlaşmaya portföy / müşteri sonradan bağlanamaz; kazanma ikisini şart koşar | Portföysüz açılan anlaşma kazanılamaz, komisyon doğmaz | Anlaşma detayına tam sayfa "Düzenle" (`[id]/duzenle`): müşteri, portföy, tutar, olasılık, tür, danışman. Pano popup'ı (başka ajan) sonradan bu sayfaya bağlanır | `app/anlasmalar/[id]/page.tsx`, yeni `[id]/duzenle/*`, `actions/deals.ts:299-303` | Hayır | M | `deal-board.tsx` popup'ıyla çift düzenleme; pano ajanıyla koordinasyon |
+| P0-4 | Ödeme linki iptal edilemez, ofis listesi yok; açık link "kazanmayı geri al"ı kilitler | Yanlış tutarlı link kalıcı, geri alma tıkanır | Komisyon satırında "Ödeme linkleri" satır içi panel: liste, iptal, süre uzat; link üretmeye onay | `app/komisyon/commission-actions.tsx:107`, `actions/payment-links.ts`, `anlasmalar/status-transition.tsx:117-126` | Muhtemelen yok (`status` değeri yeter) | M | Yok |
+| P0-5 | Kira sözleşmesi düzenlenemez ve uzatılamaz; bitişte tahakkuk durur | Yanlış kira düzeltilemez, uzayan kira muhasebeden düşer | `kiralama/[id]/duzenle` (vade günü, bitiş, depozito, not, kiracı) + "Uzat / yenile" action'ları | `app/kiralama/[id]/page.tsx:179`, `actions/rentals.ts:204-206`, `api/cron/kira-tahakkuk/route.ts:104` | Hayır | M | Kira artışı popup'ıyla birleşir |
+| P0-6 | Proje düzenlenemez, durumu değişmez | Yanlış ad / adres / teslim tarihi kalıcı; biten proje "planlanan" kalır | `projeler/[id]` "Bilgiler" sekmesi + durum seçici (`updateProject`) | `app/projeler/[id]/page.tsx:27`, `actions/projects.ts` | Hayır | M | Yok |
+| P0-7 | Daire düzenlenemez (fiyat, oda, m²); fiyatsız daire satılamaz, ödeme planı "önce fiyat girin" diyor | Toplu üretilen daireler kilitli kalır | Daire satırında satır içi düzenleme; `updateUnit`; `add-units-dialog` ve `units-board` popup'ları aynı turda satır içine alınır | `projeler/[id]/units-board.tsx:300`, `add-units-dialog.tsx`, `unit-payment-plan.tsx:263` | Hayır | L | Yok |
+| P0-8 | Yetki belgesi kaydediliyor ama sayfada okunmuyor | Form hep boş, ikinci kayıtta eski değer silinir; süre uyarısı güvensiz | Detay select'ine `authorization_*` ekle, formu doldur, geçerlilik rozeti | `pf/[id]/page.tsx:171,890-905`, `property-extras.tsx:130` | Hayır | S | Yok |
+| P0-9 | Tapu / yetki belgesi görseli galeriye karışıp public paylaşımda görünür | Gizli belge sızar (KVKK) | Medya kaydına tür ayrımı (`belge`); public sorguda belge türlerini dışla; PDF destekli belge sekmesi | `paylas/[token]/page.tsx:169-174`, `pf/[id]/property-media-manager.tsx`, `lib/direct-file-uploads.ts:63-66` | Evet (tür sütunu + geriye dönük işaretleme) | M | P0-8 ile aynı sekme, aynı paket |
+| P0-10 | Randevu başkası adına açılamaz, danışman değiştirilemez | Sekreter / yönetici takvim kuramaz | Formlara danışman seçici; düzenlemede danışman, müşteri, portföy | `actions/appointments.ts:149`, `randevular/appointment-edit-dialog.tsx:47`, yeni randevu formu | Hayır | S | Toplu devirle karıştırma |
+| P0-11 | Üyenin ad, telefon, e-posta bilgisi düzeltilemez (ne kendisi ne yönetici) | Yanlış isim / e-posta kalıcı; giriş e-postası değişmez | `ekip/[id]` sekmeli düzenleme (ad, `PhoneInput`, `EmailInput`, auth e-postası güncelleme) ve "Profilim" (P1-F1) | `app/ekip/[id]/page.tsx`, `actions/team.ts`, `ekip/page.tsx:373-392` | Hayır | M | Profil sayfasıyla aynı action |
+| P0-12 | Askıdaki ofis ödeme sayfasına ulaşamaz | "Ödemeyi tamamla" döngüsü; ofis kendini açamaz | Ara katmanda askıda `/app/abonelik` + ödeme action'ına izin; action kilidini ödeme için gevşet | `lib/supabase/middleware.ts:148-157`, `lib/tenant-guard.ts:154`, `app/askida/page.tsx:101` | Hayır | S | Yok |
+| P0-13 | /admin Ofisler: ofis ekleme bağlantısı yok | Sahibin bulduğu eksik | BAŞKA AJAN (`admin/tenants/**`); denetlenmedi | - | - | - | - |
+
+### 3.2 P1 (sık ihtiyaç)
+
+Gruplar: A = /admin, B = ekip ve ayarlar, C = müşteri / iletişim, D = portföy / proje / portal, E = anlaşma / finans / kira / iş takibi, F = hesap / uyum.
+
+| # | Ne eksik | Etki | Çözüm | Dosyalar | Şema | Efor | Mükerrer |
+|---|---|---|---|---|---|---|---|
+| P1-A1 | Admin üyelerde düzenleme, pasifleştirme, rol, parola sıfırlama, oturum kapatma yok | Destek, ofis adına kullanıcıyı kurtaramaz | `admin/members/[id]` sekmeleri: Bilgiler / Erişim; denetim kaydı | `admin/members/[id]/page.tsx:53`, yeni `actions/platform-members.ts` | Hayır | M | `actions/team.ts` mantığını paylaş |
+| P1-A2 | Faturada "ödendi işaretle", elle fatura, iptal, iade yok; mutabakat kuyruğunda "manuel inceleme / iade gerekli" satırları düğmesiz | Havale ile ödeyen ofis kapatılamaz, kuyruk ölü | `admin/billing/faturalar/[id]` detay: durum, ödeme kaydı, iptal; kuyrukta "çözüldü / iade edildi" | `admin/billing/page.tsx:319-353,556`, `actions/platform*.ts` | Muhtemelen (`paid_at`, yöntem) | L | Ofis tarafı fatura listesi |
+| P1-A3 | Kupon / indirim yok | Satış kampanyası yapılamaz | Kupon tablosu + admin sayfası + checkout'ta uygulama | `admin/billing/*`, `actions/billing.ts` | Evet | L | - |
+| P1-A4 | Plan tanımları kodda sabit | Fiyat / limit değişimi yayın ister | `plan_definitions` + admin düzenleme; `plans.ts` okuyucu; `plan_entitlements` ile tek kaynak | `lib/billing/plans.ts:27-92`, `admin/billing/planlar` | Evet | L | Yüksek: kota RPC ile çifte kaynak |
+| P1-A5 | Platform genel ayarları ekranı yok (bakım modu, kayıt açık/kapalı, varsayılan deneme süresi) | Deneme süresi SQL'de sabit 14 gün | `admin/ayarlar`, `platform_settings` anahtarları; kayıt akışı ve SQL okur | `lib/supabase/middleware.ts`, kayıt action'ı, deneme SQL fonksiyonları | Evet | L | `admin/sistem` anahtar formlarıyla |
+| P1-A6 | Platform SMS / WhatsApp sağlayıcı formu yok | Yedek hesap yalnız ortam değişkeni / elle SQL | `admin/sistem` altına Netgsm / WhatsApp formu (maskeli) | `lib/messaging/netgsm.ts:56-58`, `admin/sistem/integration-keys-form.tsx` | Hayır | S | Aynı form ailesi |
+| P1-A7 | Cron elle tetikleme, çalışma geçmişi yok | Takılan iş beklenir | Süper admin "Şimdi çalıştır" + son 20 çalışma | `admin/sistem/system-view.tsx:255-287` | Opsiyonel | M | - |
+| P1-A8 | Hata kayıtları: yeniden aç, toplu çöz, arama / ofis filtresi yok | Gürültüde iş yapılamaz | Filtre çubuğu + toplu çözüldü | `admin/hatalar/errors-view.tsx`, `resolve-button.tsx` | Hayır | M | - |
+| P1-A9 | Aktivite / denetim: kullanıcı, ofis, işlem türü, tarih aralığı, arama, CSV yok | Olay incelenemez | Sunucu filtre + `exportActivityCsv` | `admin/aktivite/page.tsx:108-120` | Hayır | M | - |
+| P1-A10 | Demo adayı: ekleme, düzenleme, silme (spam) yok; "erişim bağlantısını yeniden gönder" sayfa yenilenince kaybolur | Telefonla gelen aday girilemez | `admin/satis/yeni` tam sayfa; kartta düzenle / sil (onaylı); bağlantı yeniden gönder kalıcı | `admin/satis/*`, `actions/platform-sales.ts` | Hayır | M | `requestDemo` doğrulamasını paylaş |
+| P1-A11 | Toplu duyuru: düzenle, sil, zamanla, gövde görüntüle, sayfalama yok | Hatalı gönderi geri alınamaz | Taslak + zamanlama; sayfalı liste, satır detay | `admin/duyuru/page.tsx:56-208`, `actions/platform-notifications.ts:61` | Evet (`scheduled_at`, durum) | M | - |
+| P1-A12 | Personel: ad / e-posta düzenle, daveti yinele, parola sıfırla; `must_change_password` hiç okunmaz | İlk girişte parola değiştirmez | Düzenle sekmesi + zorunlu parola değiştirme | `actions/platform-staff.ts:95`, `admin/personel/[id]` | Hayır | M | Parola formu P1-F1 ile paylaşılır |
+| P1-A13 | Personelin kendi hesabı (profil, parola) yok | Admin parolasını değiştiremez | `admin/hesabim` | `components/admin/admin-topbar.tsx:148-153` | Hayır | S | P1-F1 bileşeni |
+| P1-A14 | Destek: ofis adına talep popup; hazır yanıtlar yalnız yan panelde, düzenle yok | Makro bakımı zor | Yeni talep tam sayfa; `admin/tickets/makrolar` (düzenle) | `admin/tickets/new-admin-ticket-dialog.tsx:245`, `ticket-macro-manager.tsx` | Hayır | M | - |
+| P1-B1 | Roller: denetim kaydı yok, sıfırlama onaysız | İzin değişikliği izlenemez | Denetime yaz, `ConfirmDialog` | `app/ayarlar/roller/role-permissions-matrix.tsx:77,130` | Hayır | S | - |
+| P1-B2 | Ekip: rol listesi atanamayacak rolleri sunar; pasifleştirme onaysız ve devirsiz; koltuk hatası görünmez | Üye yanlışlıkla kilitlenir, kayıtlar pasif üyede kalır | Rolleri aktöre göre süz; pasifleştirmede devir önerisi; sonucu göster | `app/ekip/page.tsx:63,76,386-392`, `actions/team.ts:156-283` | Hayır | M | `ekip/devir` |
+| P1-B3 | Giriş yapmış üye için parola sıfırlama yok; davet yeniden gönder sessiz | Yönetici üyeyi kurtaramaz | `ekip/[id]` Erişim sekmesi: sıfırlama, daveti yinele, sonuç mesajı | `ekip/invite-actions.ts:23-55,176` | Hayır | S | P1-A1 aynı mantık |
+| P1-B4 | Danışman kendi kartvizitine giremez (`team` modülü yok) | Rol matrisi hatası | Kendi kaydı için kapıyı gevşet | `app/ekip/kartvizitim/page.tsx:24`, `lib/permissions.ts:159-182` | Hayır | S | - |
+| P1-B5 | Şubeler: menüde / sekmede yok (ekip sayfasının altında), aktif/pasif, müdür ataması, telefon / il-ilçe alanları yok | Ekle-düzenle-sil var ama bulunamıyor | `ekip/subeler` sekmesi + `nav-config`; müdür ve telefon (`PhoneInput`); bağlı kayıt sayısı | `app/ekip/page.tsx:405-427`, `team-panels.tsx:42`, `branch-card.tsx:55,101`, `actions/team.ts:320-348` | Muhtemelen (`branches.phone`) | M | Franchise ekranı |
+| P1-B6 | Sözleşme şablonu yönetimi ekranı yok | Şablon düzenlenemez, kapatılamaz | `ayarlar/sozlesme-sablonlari` (liste, düzenle, aktif/pasif, sil) | `sozlesmeler/yeni/new-contract-form.tsx:268,371` | Hayır (`is_active` var) | M | - |
+| P1-B7 | Aday yakalama: vaat edilen atama kuralı yok; gelen aday listesi yok | Atama elle | Atama kuralı + liste | `app/ayarlar/lead/page.tsx:54`, `ayarlar/page.tsx:60` | Muhtemelen | M | - |
+| P1-B8 | Ofis duyurusu: başlangıç zamanlama (`starts_at`) yok | Planlı duyuru yok | Başlangıç alanı | `ayarlar/duyurular/announcements-manager.tsx:111,238` | Hayır | S | - |
+| P1-B9 | Netgsm bağlantı testi yok | Hatalı anahtar fark edilmez | "Deneme SMS" | `ayarlar/entegrasyonlar/integrations-form.tsx:94-331` | Hayır | S | - |
+| P1-B10 | Ayarlar formları yetkisiz rolde görünür, action reddeder | Sessiz hata | `canEdit` ile salt okunur | `app/ayarlar/**` | Hayır | M | - |
+| P1-C1 | Müşteri düzenleme eksik alanlar (şube, kaynak, kara liste, danışman, çoklu tip); silmede bağlı kayıt uyarısı yok | Açık anlaşmalı müşteri uyarısız silinir | Düzenleme panelini genişlet; silmeden önce bağlı kayıt özeti | `edit-customer-dialog.tsx:43`, `actions/customers.ts:163,199-225` | Hayır | M | - |
+| P1-C2 | Tekil müşteri devri arayüzsüz (`reassignCustomer`) | Tek müşteri için toplu yol zorunlu | Detayda "Danışmanı değiştir" satır içi | `actions/customers.ts:860`, `musteriler/[id]/page.tsx` | Hayır | S | `bulkAssignCustomers` |
+| P1-C3 | Kara liste yazan action yok | Rozet okunuyor, işaretlenemiyor | `setCustomerBlacklist` + detay anahtarı | `actions/customers.ts` | Hayır | S | - |
+| P1-C4 | Dışa aktarma ekrandaki filtreyi yok sayar (müşteri, talep, portföy, randevu, teklif, komisyon, gider) | Yanlış / fazla veri | `exportXCsv(searchParams)` ortak filtre yardımcısı | `actions/export.ts:57-146` | Hayır | M | Ortak yardımcı tek yerde |
+| P1-C5 | İçe aktarma girişi listede ve menüde yok | Sihirbaz bulunamaz | Listelerde "İçe aktar" | `app/ice-aktarma`, liste sayfaları | Hayır | S | - |
+| P1-C6 | Mobilde müşteri / portföy / talep toplu ve satır eylemleri yok | Telefondan işlem yok | Kart seçimi + eylem menüsü | `musteriler/customer-rows.tsx:207-240`, `pf/property-rows.tsx:147-170`, `talepler/demand-rows.tsx:170-205` | Hayır | M | - |
+| P1-C7 | Kampanya: taslak düzenleme, zamanlama, iptal, yeniden dene, kitle önizleme yok; "E-posta (yakında)" | Taslak değiştirilemez | `kampanyalar/[id]/duzenle`; `scheduled_at`; "yakında" seçeneğini kaldır | `new-campaign-form.tsx:18-23,121` | Hayır (`scheduled_at` var) | L | - |
+| P1-C8 | Etiket yönetim ekranı yok; yalnız Enter ile ekleme | Yeniden adlandır / birleştir yok | `ayarlar/etiketler` | `customer-tag-chips.tsx` | Hayır | M | - |
+| P1-C9 | Çöp kutusu yalnız müşteri + portföy; silen kendi kaydını geri alamaz (`settings` kapısı) | Danışman geri alamaz | Kapıyı `customers` / `properties` yetkisine taşı | `cop-kutusu/page.tsx:33-48`, `actions.ts:9-52` | Hayır | S | - |
+| P1-D1 | Portföy düzenleme eksik alanlar (açıklama, şube, gizli fiyat, yabancıya uygunluk); "detayda açıklamayı tamamlarsınız" vaadi | İlan açıklaması hiçbir yerde yazılamaz | Düzenleme paneline alanlar | `edit-property-dialog.tsx:69`, `pf/yeni/property-form.tsx:204` | Hayır | M | - |
+| P1-D2 | Portföy silmede bağlı kayıt kontrolü yok (anlaşma, portal ilanı, anahtar, açık ev) | Canlı ilan sahipsiz kalır | Silmeden önce özet, engelle / uyar | `actions/properties.ts:533-562` | Hayır | S | - |
+| P1-D3 | Malik portalı: detayda ve mobilde giriş yok, süre uzatma yok, telefon `PhoneInput` değil (tek ihlal) | Link yönetimi dağınık | Portföy detayında "Portallar" sekmesi (oluştur, iptal, süre uzat) | `components/app/portal-link-dialog.tsx:129,278`, `actions/owner-portal.ts:61` | Hayır | M | `shared-portals.tsx` ile birleşsin |
+| P1-D4 | Anahtar: panodan ekleme, düzenleme, "kayıp → bulundu", zimmetteyken silme engeli yok | Zimmetli anahtar silinir | Pano "Yeni anahtar" satır içi; kontrol | `pf/anahtarlar/page.tsx:317`, `actions/property-keys.ts:424-428` | Hayır | M | - |
+| P1-D5 | Açık ev etkinliği düzenlenemez, silinemez | Yanlış tarih kalıcı | `acik-ev/[id]` düzenleme sekmesi | `app/acik-ev/[id]/page.tsx:59` | Hayır | S | - |
+| P1-D6 | Portal ilanı: yeniden aç yok; kapanış formu popup | Kapalı ilan geri açılmaz | Satır içi kapanış paneli, "yeniden aç" | `portallar/portal-dialogs.tsx:165-264`, `portallar/page.tsx:413` | Hayır | M | - |
+| P1-D7 | Sunum, değerleme: düzenle yok, sayfalama yok; değerleme paylaşımı geri alınamaz | Düzeltme yeni kayıt ister | Düzenle + paylaşımı kapat | `pf/sunumlar/presentation-actions.tsx:36`, `degerleme/page.tsx:74` | Hayır | M | - |
+| P1-D8 | Belge merkezine yükleme yok | Belgeler başka yerden gelir | "Belge yükle" satır içi | `app/belgeler/page.tsx:842` | Hayır | S | P0-9 belge depolamasıyla aynı |
+| P1-E1 | Teklif: durum geçişi onaysız ve geri alınamaz; seçiciler aramasız (200 / 300 sınır) | Yanlış kabul geri alınmaz | `ConfirmDialog`, aramalı seçici | `teklifler/offer-status-actions.tsx:43-67`, `yeni/page.tsx:31,37` | Hayır | M | Ortak seçici |
+| P1-E2 | Sözleşme: yeni formda müşteri / portföy seçici yok; imzacı düzeltme ve SMS yeniden gönder yok | URL'siz açılan sözleşme bağsız | Seçici alanlar; imzacı düzenle | `sozlesmeler/yeni/new-contract-form.tsx:310-311`, `contract-sign-panel.tsx:63-111` | Hayır | M | - |
+| P1-E3 | Komisyon: "elle ekleyin" karşılıksız; hakediş ödemesi (`cuzdan`) salt okunur | Danışman hakedişi kapanamaz | Elle ekleme satır içi; hakediş ödeme kaydı | `komisyon/page.tsx:549`, `cuzdan/page.tsx:348`, `anlasmalar/[id]/page.tsx:323` | Muhtemelen (ödeme tablosu) | L | - |
+| P1-E4 | Gider: düzenleme portföy bağını siler; 200 tavan; mobilde silme yok | Veri kaybı | Hatayı düzelt, sayfalama | `actions/expenses.ts:69,123`, `expenses-table.tsx:152` | Hayır | S | - |
+| P1-E5 | Aidat: düzenleme, not, mobil eylemler yok | - | Düzenleme paneli | `aidat/dues-client.tsx:231-319` | Hayır | S | - |
+| P1-E6 | Kira: kısmi ödeme / gerçek tarih, depozito kısmi iade, arıza genel listesi, kira artışı popup | Muhasebe eksik | Ödeme alanları; `kiralama/arizalar` | `charges-panel.tsx:136-149`, `deposit-return.tsx:41`, `apply-increase-dialog.tsx` | Evet | L | - |
+| P1-E7 | Anlaşma silme / arşiv yok; detayda aşama geçişi yok | Yanlış kayıt silinemez | Arşivle + detayda aşama seçici | `anlasmalar/[id]/page.tsx` | Evet (`archived_at`) | M | `deal-board` ajanı |
+| P1-E8 | Randevu: iptal onaysız, geri alınamaz; "İmza eksik" KPI'ı hiç dolmaz; tamamlama popup | Yanlış iptal | Onay + geri al | `appointment-rows.tsx:92`, `complete-appointment-dialog.tsx:67`, `page.tsx:642` | Hayır | S | - |
+| P1-E9 | Görev: atanan kişi alanı, danışman filtresi, mobil hızlı görev düğmesi yok | Görev devredilemez | Forma `assigned_to` | `gorevler/yeni/task-form.tsx:56`, `quick-task.tsx:45-61`, `actions/tasks.ts:204,228` | Hayır | S | - |
+| P1-E10 | Otomasyon düzenleme popup | Kural düzenleme kısıtlı | Tam sayfa `[id]/duzenle` | `automation-wizard.tsx:525` | Hayır | M | - |
+| P1-F1 | Kullanıcı profili ve uygulama içi parola değiştirme yok | Kullanıcı kendi adını, telefonunu, parolasını değiştiremez | `app/hesabim` (profil, parola, 2FA, oturumlar); menü bağlantısı | `components/ui/console/user-menu-panel.tsx:63-99`, `ayarlar/guvenlik/*` | Hayır | M | P0-11, P1-A13 |
+| P1-F2 | Abonelik: iptal, duraklat, oransal yükseltme, fatura detayı / PDF yok | Ofis aboneliğini yönetemez | `abonelik` sekmeleri: Plan / Faturalar / İptal | `app/abonelik/page.tsx:71,227`, `actions/billing.ts` | Muhtemelen | L | Admin faturalama |
+| P1-F3 | Aktif oturum listesi ve "tüm cihazlardan çık" yok | Çalınan oturum kapatılamaz | `hesabim` oturum bölümü | `ayarlar/guvenlik/page.tsx:58` | Hayır | M | - |
+| P1-F4 | Ofis destek: yetkisiz rolde "Yeni talep" görünür; konu / öncelik düzenleme yok | Sessiz hata | Düğmeyi yetkiyle gizle | `app/destek/page.tsx:272`, `actions/tickets.ts:161` | Hayır | S | - |
+| P1-F5 | KVKK: silme talebi popup; veri sahibi erişim / taşınabilirlik talebi yok; süre sabit | Yasal yükümlülük | Tam sayfa talep, tür, süre alanı | `uyum/kvkk-panel.tsx:78,108-255` | Muhtemelen | M | - |
+| P1-F6 | Hesap kapatma, tüm veriyi indirme, sahiplik devri yok | Ofis çıkamaz | Ayarlar "Hesap" sekmesi | `app/ayarlar/*` | Evet | L | KVKK ile |
+| P1-F7 | Vitrin ayarları ekranı yok (adres kısaltması, tanıtım, aç/kapa) | Vitrin kontrolü yok | `ayarlar/vitrin` | `app/ayarlar/*` | Muhtemelen | M | - |
+| P1-F8 | Denetim kaydı: işlem türü / metin araması, tam fark görünümü yok; CSV filtresiz | İz sürülemez | Filtre + fark paneli | `app/denetim/page.tsx:174,416` | Hayır | M | - |
+
+### 3.3 P2 (nadir)
+
+Her biri küçük, ilgili paketin sonuna eklenir; kanıt ilgili matris satırındadır.
+
+- Admin: personel bildirim tercihleri, platform bildirimi silme, plan değişim geçmişi, abonelik tutar / dönem düzenleme, entegrasyon anahtarı bağlantı testi, aday notu düzenleme, destek talebi birleştirme, ilçe / mahalle toplu işlem.
+- Müşteri: dosya etiketi, iletişim kaydı düzenleme / tam görünüm, özel akıllı liste, kayıtlı görünüm yeniden adlandır, tavsiye bağlantısı düzenle, çağrı düzenleme, gelen kutusu toplu işlem, çift kayıt "mükerrer değil" kalıcı, eşleşme kaydı (`saveMatchAndNotify` yalnız durum yapar).
+- Portföy / proje: ödeme planı tek taksit, açık ev ziyaretçisi düzenle, portföy paylaşım linki yönetimi, medya sıralama düğmeleri (mobil), ağ paylaşımı toplu işlem, proje birimi geçmişi.
+- Finans: teklif turu ve komisyon paylaşımı popup'ları, deal checklist dosya eki, anlaşma maliyeti düzenleme, kira arıza ustası, ödeme yöntemi yönetimi.
+- Ekip / ayarlar: özel rol, hedef toplu kopya, izin gerekçeli ret, ofis profili e-posta ve il-ilçe seçici, 3 yerel `confirm()` yerine `ConfirmDialog`, ofis geneli bildirimde kişi başı okundu, yumuşak silme (görev, gider, kampanya vb.).
+- Mobil: anlaşma notu ve kayıtlı görünüm silme (hover-only), gider / aidat işlem sütunu, rol matrisi sabit sütun, denetim ayrıntısı.
+
+## 4. Uygulama paketleri
+
+Altı paket, dosya sahipliği çakışmaz. Hiçbiri şu alanlara dokunmaz: `src/app/admin/tenants/**`, `src/app/app/anlasmalar/deal-board*`,
+`motion.css` ve animasyon bileşenleri (`src/components/ui` içindeki animasyon dosyaları), `themes.css` ve tema dosyaları, `palette-core`.
+Ortak dosya kuralı: `src/lib/nav-config.ts`, `src/lib/permissions.ts`, `src/components/admin/admin-sidebar.tsx`, `src/lib/supabase/middleware.ts`,
+`src/lib/tenant-guard.ts` yalnız yazılı sahibi tarafından değiştirilir; diğer paketler gereksinimini sahibine not düşer.
+Migration: her paket kendi zaman damgası aralığını kullanır (K1 …01xx, K2 …02xx, ... K6 …06xx, aynı gün öneki), enum ADD VALUE ayrı dosyada.
+Hepsinde: ekle/düzenle popup olmaz, her sayı tıklanabilir, `PhoneInput` / `EmailInput`, sonuç mesajı gösterilir, yıkıcı işlem `ConfirmDialog` + denetim kaydı,
+yeni action `requirePermission`, yeni `createAdminClient` kullanımı kabul listesine eklenir, mobilde yapılabilir.
+
+### K1. Platform yönetimi (admin: kullanıcı, personel, sistem, denetim)
+- Sahiplik: `src/app/admin/members/**`, `admin/personel/**`, `admin/sistem/**`, `admin/hatalar/**`, `admin/aktivite/**`, `admin/bildirimler/**`, yeni `admin/ayarlar/**`, yeni `admin/hesabim/**`, `components/admin/admin-sidebar.tsx`, `components/admin/admin-topbar.tsx`, `actions/platform-staff.ts`, yeni `actions/platform-members.ts`, `actions/platform-settings*.ts`.
+- Yapılacaklar: P1-A1, A5, A6, A7, A8, A9, A12, A13; personel zorunlu parola değiştirme sayfası; yan menüye "Ayarlar" girişi.
+- Kabul: süper admin üyeyi düzenler / pasifleştirir / sıfırlama bağlantısı üretir; bakım modu ve kayıt kapama çalışır; deneme süresi panelden okunur; cron elle tetiklenir ve kayda düşer; aktivite sunucu filtreli ve CSV'lidir; `must_change_password` okunur.
+
+### K2. Faturalama, satış, destek, duyuru (admin)
+- Sahiplik: `admin/billing/**`, `admin/satis/**`, `admin/tickets/**`, `admin/duyuru/**`, `admin/raporlar/**`, `actions/platform-sales.ts`, `actions/admin-ticket-ops.ts`, `actions/platform-notifications.ts`, `lib/billing/plans.ts` (yalnız okuyucu katmanı), yeni `actions/platform-billing*.ts`.
+- Yapılacaklar: P1-A2, A3, A4, A10, A11, A14.
+- Kabul: havale ödemesi faturada "ödendi" işaretlenir; mutabakat kuyruğundaki her satırda eylem vardır; kupon tanımlanır ve checkout'ta uygulanır; plan fiyatı panelden değişir ve kota ile tutarlıdır (tek kaynak); demo adayı elle eklenir, düzenlenir, silinir; duyuru zamanlanır, düzenlenir.
+- Not: `lib/billing/plans.ts` okuyucusu K5'in abonelik ekranını etkiler; arayüzü değişmez.
+
+### K3. Müşteri, talep, iletişim
+- Sahiplik: `app/musteriler/**`, `talepler/**`, `arama/**`, `gelen-kutusu/**`, `kampanyalar/**`, `tavsiyeler/**`, `akilli-listeler/**`, `cop-kutusu/**`, `ice-aktarma/**`, `eslestirme/**`, `kayip-satis/**`, `components/app/communication-timeline.tsx`, `components/app/saved-views.tsx`, `actions/customers.ts`, `demands.ts`, `communications.ts`, `campaigns.ts`, `export.ts`, `import-*.ts`, `saved-views.ts`, `notifications.ts`.
+- Yapılacaklar: P0-1, P0-2; P1-C1 ... C9; P2 müşteri satırları; ortak `export` filtre yardımcısı (tüm modüllerin CSV'si buraya bağlanır, diğer paketler yalnız çağırır).
+- Kabul: dosya yükleyince listede görünür; eşleşmemiş çağrı ve mesaj müşteriye bağlanır; müşteri silmeden önce bağlı kayıt özeti çıkar; CSV ekrandaki filtreyi uygular; mobilde toplu işlem yapılır.
+
+### K4. Portföy, proje, portal
+- Sahiplik: `app/portfoyler/**`, `projeler/**`, `acik-ev/**`, `portallar/**`, `kayip-kacak/**`, `degerleme/**`, `belgeler/**`, `ag/**`, `src/app/paylas/**` (public), `components/app/portal-link-dialog.tsx`, `actions/properties.ts`, `property-*.ts`, `projects.ts`, `portal-listings.ts`, `owner-portal.ts`, `open-house.ts`, `network.ts`, `documents.ts`, `presentations.ts`, `targets-openhouse-sources.ts`.
+- Yapılacaklar: P0-6, P0-7, P0-8, P0-9; P1-D1 ... D8; `portal-link-dialog` telefon alanını `PhoneInput` + sunucu doğrulamasına geçir (tek ihlal).
+- Kabul: proje ve daire düzenlenir, durum değişir, fiyatsız daire fiyat alır; yetki belgesi gösterilir; belge görseli public paylaşımda görünmez (test); malik portalı detaydan yönetilir.
+
+### K5. Ofis hesabı, abonelik, ekip
+- Sahiplik: `app/ekip/**`, `abonelik/**`, `askida/**`, `uyum/**`, `denetim/**`, `destek/**`, `bildirimler/**` (ofis), yeni `app/hesabim/**`, `ayarlar/guvenlik/**`, `lib/nav-config.ts`, `lib/permissions.ts`, `lib/supabase/middleware.ts`, `lib/tenant-guard.ts`, `components/ui/console/user-menu-panel.tsx`, `actions/team.ts`, `billing.ts`, `tickets.ts`, `staff-leaves.ts`, `compliance*.ts`, `onboarding-setup.ts`, `actions/password-reset.ts`.
+- Yapılacaklar: P0-11, P0-12; P1-B2, B3, B4, B5, F1, F2, F3, F4, F5, F6, F8; şubeler sekmesi + menü kaydı.
+- Kabul: askıdaki ofis ödeme yapıp açılır; üye bilgisi düzenlenir; kullanıcı profilinden parola değiştirir; Şubeler menüden bulunur (ekle, düzenle, pasif, müdür); abonelik iptali dönem sonunda geçerli olur.
+
+### K6. Ayarlar, iş takibi, finans
+- Sahiplik: `app/ayarlar/**` (güvenlik hariç), `randevular/**`, `gorevler/**`, `hedefler/**`, `otomasyonlar/**`, `anlasmalar/**` (deal-board* hariç), `teklifler/**`, `sozlesmeler/**`, `komisyon/**`, `giderler/**`, `aidat/**`, `kiralama/**`, `cuzdan/**`, `onaylar/**`, `actions/deals.ts`, `offers.ts`, `contracts.ts`, `commissions.ts`, `expenses.ts`, `dues.ts`, `rentals.ts`, `payment-links.ts`, `appointments.ts`, `tasks.ts`, `automations.ts`, `settings.ts`, `announcements.ts`, `message-templates.ts`, `definitions.ts`.
+- Yapılacaklar: P0-3, P0-4, P0-5, P0-10; P1-B1, B6 ... B10, E1 ... E10, F7.
+- Kabul: portföysüz anlaşmaya portföy bağlanır ve kazanılır; ödeme linki iptal edilir; kira düzenlenir ve uzatılır; randevu danışman seçer; sözleşme şablonu yönetilir.
+- Koordinasyon: `anlasmalar/[id]/duzenle` yeni dosyadır; `deal-board.tsx` popup'ı başka ajanda bittiğinde tek bağlantıya indirilir.
+
+Sıra önerisi: önce tüm P0 küçükleri (K3 P0-1, K4 P0-8, K5 P0-12, K6 P0-10) tek günde; ardından paketler paralel. K2 ve K5 abonelik / plan okuyucusunda birbirine bağımlıdır (K2 önce).
+
+## 5. Doğrulanamadı
+
+- Uygulama çalıştırılmadı; hiçbir hücre tarayıcıda denenmedi. Mobil bulgular sınıf adlarından çıkarıldı (Bölüm 2.5).
+- Canlı şema görülmedi: "Muhtemelen" şema kararları (`invoices` ödeme alanları, ödeme linki iptal durumu, `branches.phone`, hakediş ödeme tablosu, `cancel_at_period_end`, KVKK talep türü) migration dosyalarından okundu, canlı veritabanıyla karşılaştırılmadı.
+- `admin/tenants/**` denetlenmedi (başka ajan). Matristeki "NOT" satırı yalnız gözlem; ofis ekleme, ofis düzenleme, kimliğe bürünme ve ofis silme / arşiv durumu bilinmiyor.
+- Rol bazlı görünürlük (hangi rol hangi düğmeyi görür) yalnız `permissions.ts` matrisi ile kod koşullarından çıkarıldı; çalışma zamanında doğrulanmadı.
+- Supabase Auth e-posta şablonları ve Supabase panosundaki ayarlar (davet / sıfırlama metni) depoda yok; panelde ne olduğu bilinmiyor.
+- `src/app/app/**` içinde dinamik menü ögeleri (`nav-config.ts` paket kilidi `page-gates.ts`) yalnız okundu; pakete göre gizlenen ekranlar ayrıca sayılmadı.
+- Cron envanterinde (`vercel.json`) elle tetikleme için bir rota-içi yardımcı olup olmadığı (K1/P1-A7 uygulanabilirliği) denenmedi.
+- Başka ajanların açık işleri (deal-board, tenants, animasyon, tema) bu belgeyle aynı anda değişiyor olabilir; çakışan satırlar (P0-3, P1-E7) için son durum kontrol edilmeli.
+
+## 6. Kanıt: her YOK için arama
+
+Desenler `src/` içinde (test hariç) arandı; "0" sonuç anlamına gelir. Yol kökü `src/app/actions` (= `act/`) ya da belirtilen klasör.
+
+| Kod | Aranan | Desen / klasör | Sonuç |
+|---|---|---|---|
+| G-01 | Kupon / indirim | `coupon\|kupon` tüm `src/` | 0 |
+| G-02 | Bakım modu, kayıt kapama | `maintenance_mode\|bakim_modu\|registration_open` tüm `src/` | 0 |
+| G-03 | Silme / arşiv action'ı (anlaşma, teklif, sözleşme, randevu, talep, çağrı, kira, proje, daire, açık ev, değerleme, portal ilanı) | `export async function (delete\|remove\|archive)(Deal\|Offer\|Contract\|Appointment\|Demand\|Call\|Rental\|Project\|Unit\|OpenHouse\|Valuation\|PortalListing)\b` `act/` | 0 |
+| G-04 | Proje, daire, kira, açık ev düzenleme action'ı | `export async function (update\|edit)(Project\|Unit\|Rental\|OpenHouse)` `act/` | yalnız `updateOpenHouseStatus` (durum) |
+| G-05 | Uygulama içi parola değiştirme | `updateUser\(\{ *password` `src/` | yalnız `app/sifre-yenile/*` |
+| G-06 | Oturum kapatma (tüm cihaz) | `signOut\(\{ *scope` `src/` | 0 |
+| G-07 | E-posta gönderimi (şablon) | `sendEmail\|nodemailer\|smtp\|api\.resend\.com` `src/` | 0; davet / sıfırlama `resetPasswordForEmail` (`ekip/invite-actions.ts:48,176`, `act/password-reset.ts`) |
+| G-08 | Parola zorunlu değişimi okunuyor mu | `must_change_password` `src/` | tek sonuç `act/platform-staff.ts` (yazma) |
+| G-09 | Abonelik iptali | `cancelSubscription\|cancel_at_period_end` `src/` | 0 |
+| G-10 | Elle fatura kesme | `createInvoice\|insert\(.*invoices` `src/` | yalnız `lib/efatura.ts` (e-fatura entegrasyonu, panel yok) |
+| G-11 | Platform SMS yazma formu | `netgsm_` `src/` | yalnız `lib/messaging/netgsm.ts` (okuma) |
+| G-12 | Cron elle tetikleme | `admin/sistem/*` içinde "tetikle\|Çalıştır\|trigger" | düğme yok (`system-view.tsx:255-287` yalnız durum) |
+| G-13 | Çöp kutusu kapsamı | `deleted_at` `supabase/migrations` | yalnız customers, properties, support_ticket_attachments |
+| G-14 | İşlevsiz düğme / vaat | `[Yy]akında\|coming soon\|TODO\|FIXME\|href="#"` `src/` | yalnız kampanya "E-posta (yakında)" |
+| G-15 | Telefon / e-posta ham input | `type="tel"\|type="email"\|inputMode="tel"` `src/` | yalnız bileşenler ve `portal-link-dialog.tsx:278` |
+| G-16 | Kullanıcı profil sayfası | klasör `src/app/app/` (`profil`, `hesabim` yok), `user-menu-panel.tsx:63-99` | yok |
+| G-17 | Şube müdürü kullanımı | `manager_user_id` `src/` | 0 (şemada var) |
+| G-18 | Kupon / plan tablosu panelde | `plan_definitions` `src/`, `supabase/migrations` | 0 (yalnız `plan_entitlements`) |
+| G-19 | Açık ev, proje, kira "düzenle" sayfası | klasör `app/acik-ev/[id]`, `projeler/[id]`, `kiralama/[id]` içinde `duzenle` | yok |
+| G-20 | Müşteriye bağlama (çağrı) | `act/communications.ts` içinde `link\|attach\|bind` | yok |
+
+Mekanik "arayüzü olmayan action" listesi Bölüm 2.1.3'te: 458 `export async function` içinde çağıranı olmayan 22 adet.
+Matristeki diğer YOK hücrelerinin kanıtı ilgili satırın dosya:satır referansıdır (ekranın okunup ilgili düğmenin bulunmadığı yer).
