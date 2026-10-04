@@ -31,6 +31,8 @@ import { InvestmentPanel } from "./investment-panel";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 import { normalizeExternalHref } from "@/lib/external-href";
 
@@ -177,6 +179,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
 
   const { data: property } = await admin
     .from("properties")

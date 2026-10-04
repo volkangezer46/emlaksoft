@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
 
 function authorized(req: NextRequest) {
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
     console.error("portal-teyit refreshPriceHealth", e);
   }
 
-  await recordHeartbeat("portal-teyit", "ok", `${notified} teyit uyarısı · ${priceHealthUpdated} fiyat sağlığı`);
+  await recordHeartbeat("portal-teyit", "ok", `${notified} teyit uyarısı · ${priceHealthUpdated} fiyat sağlığı${skippedTenantsNote(disabledModules, "portals")}`);
 
   return NextResponse.json({ ok: true, notified, priceHealthUpdated });
 }

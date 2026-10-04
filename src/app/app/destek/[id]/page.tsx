@@ -195,7 +195,11 @@ export default async function SupportTicketDetailPage({ params }: { params: Prom
 
           <TicketThread ticketId={ticket.id} initial={rows} names={names} attachments={attachments} audience="tenant" currentUserId={gate.userId} />
 
-          {!terminal ? (
+          {!(gate.perms.support ?? []).includes("edit") ? (
+            <section className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-5 py-4 text-sm text-text-muted">
+              Bu talebe yanıt yazma, kapatma ve yeniden açma yetkiniz yok; ofis yöneticiniz veya talebi açan kişi sürdürebilir.
+            </section>
+          ) : !terminal ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><h2 className="font-display font-bold text-ink-950">Destek ekibine yanıt ver</h2><p className="mt-1 text-xs text-text-muted">Ayrıntı ve güvenli dosya ekleyerek konuşmayı sürdürebilirsiniz.</p></div>

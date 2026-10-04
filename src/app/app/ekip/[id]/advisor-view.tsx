@@ -1,12 +1,15 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Activity, ArrowLeft, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
+import { Activity, ArrowLeft, UserCog, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
 import { now } from "@/lib/clock";
 import { effectiveCanAccessModule, type EffectivePermissions } from "@/lib/permissions-effective";
 import { handoffEditableScopes } from "@/lib/team/handoff";
+import { canManageRole } from "@/lib/team/assignable-roles";
+import { loadMemberAccess } from "@/lib/team/member-admin";
+import { MemberInfoPanel } from "./member-info-panel";
 import { canSeeAllEarnings, canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { trMonthContext } from "@/lib/team/scorecard";
@@ -67,7 +70,7 @@ export async function AdvisorDetailView({
 
   const { data: member } = await supabase
     .from("profiles")
-    .select("id, full_name, phone, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)")
+    .select("id, full_name, phone, title, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)")
     .eq("id", id)
     .maybeSingle();
   if (!member) notFound();
@@ -94,6 +97,13 @@ export async function AdvisorDetailView({
   const commissions = commissionRes.rows;
   const monthCollected = month.revenue.cur ?? 0;
 
+  // P0-11: yönetici üyenin ad/telefon/unvanını düzeltir, erişim bağlantısı gönderir, pasifleştirir.
+  const canEditInfo =
+    (perms.team ?? []).includes("edit") &&
+    id !== userId &&
+    member.role !== "owner" &&
+    canManageRole(role, member.role);
+
   const tabs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
     { id: "aktivite", label: "Aktivite", icon: Activity },
@@ -102,6 +112,7 @@ export async function AdvisorDetailView({
     { id: "hedef", label: "Hedef", icon: Target, hidden: !effectiveCanAccessModule(perms, "targets") },
     { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings },
     { id: "kosluk", label: "Koçluk", icon: Sparkles },
+    { id: "bilgi", label: "Bilgiler", icon: UserCog, hidden: !canEditInfo },
   ];
   const visible = tabs.filter((t) => !t.hidden).map((t) => t.id);
   const active = resolveTab(searchParams, visible, "ozet");
@@ -118,6 +129,7 @@ export async function AdvisorDetailView({
     month,
   };
   const branch = relName(member.branch);
+  const access = active === "bilgi" && canEditInfo && tenantId ? await loadMemberAccess(tenantId, id) : null;
 
   return (
     <div className="space-y-6">
@@ -179,6 +191,18 @@ export async function AdvisorDetailView({
       {active === "hedef" ? <TargetTab ctx={ctx} /> : null}
       {active === "kazanc" ? <EarningsTab ctx={ctx} year={year} /> : null}
       {active === "kosluk" ? <CoachTab ctx={ctx} /> : null}
+      {active === "bilgi" && canEditInfo ? (
+        <MemberInfoPanel
+          memberId={id}
+          fullName={member.full_name}
+          phone={member.phone}
+          title={member.title}
+          isActive={member.is_active}
+          email={access?.email ?? null}
+          lastSignInAt={access?.lastSignInAt ?? null}
+          neverSignedIn={access?.neverSignedIn ?? false}
+        />
+      ) : null}
     </div>
   );
 }

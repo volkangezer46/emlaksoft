@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "Mesafeli Satış Sözleşmesi",
-  description: "6502 sayılı Kanun ve Mesafeli Sözleşmeler Yönetmeliği kapsamında mesafeli satış sözleşmesi.",
-  alternates: { canonical: "/mesafeli-satis" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/mesafeli-satis");
+}
 
 export default function MesafeliSatisPage() {
   return (

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "Gizlilik Politikası",
-  description: "EmlakSoft gizlilik politikası — verileriniz nasıl korunur.",
-  alternates: { canonical: "/gizlilik" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/gizlilik");
+}
 
 export default function GizlilikPage() {
   return (

@@ -3,19 +3,11 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ToolsShell } from "@/components/tools/tools-shell";
 import { publishedTools } from "@/lib/tools/registry";
+import { buildMetadata } from "@/lib/seo/store";
 
-export const metadata: Metadata = {
-  title: "Ücretsiz emlak hesaplama araçları",
-  description:
-    "Komisyon, tapu ve alım masrafı, kira getirisi ve konut kredisi taksit hesaplayıcıları. Ücretsiz, kayıt gerekmez; veriler tarayıcınızda hesaplanır.",
-  alternates: { canonical: "/araclar" },
-  openGraph: {
-    title: "Ücretsiz emlak hesaplama araçları | EmlakSoft",
-    description: "Komisyon, alım masrafı, kira getirisi ve kredi taksiti için ücretsiz hesaplayıcılar.",
-    url: "/araclar",
-    type: "website",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/araclar");
+}
 
 export default function ToolsIndexPage() {
   const tools = publishedTools();

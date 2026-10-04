@@ -112,6 +112,14 @@ const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: str
   "src/lib/webhooks/netgsm-inbound.ts::claimEvent": {
     evidence: "yalnız ingestNetgsmInbound <- src/app/api/webhooks/netgsm-sms/route.ts:92 NETGSM_WEBHOOK_SECRET eşleşmesi",
   },
+  "src/lib/seo/store.ts::logNotFound": {
+    tenantFilter: "uygulanamaz",
+    evidence: "yalnız src/app/[...slug]/page.tsx (herkese açık 404 yolu) çağırır; seo_log_404 RPC'si tenant verisi okumaz/yazmaz, yalnız yol sayacı (IP/sorgu yok); migration 20260816001790",
+  },
+  "src/lib/seo/store.ts::prune404": {
+    tenantFilter: "uygulanamaz",
+    evidence: "tek çağıran src/lib/seo/robot.ts executeSeoRobot <- api/cron/seo-robot (CRON_SECRET) ve runSeoRobotNow (requirePlatformModule seo + süper admin); yalnız seo_404_hits temizliği, tenant verisi yok",
+  },
   "src/lib/geo-province-sync.ts::failClaimedJob": {
     tenantFilter: "uygulanamaz",
     evidence: "yalnız runGeoProvinceSyncWorker <- api/cron/geo-province-sync (CRON_SECRET dosya düzeyi çıkarım); global il/ilçe iş kuyruğu (RPC gövdesi doğrulanmadı)",

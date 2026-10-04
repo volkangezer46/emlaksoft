@@ -1,36 +1,16 @@
 import type { MetadataRoute } from "next";
 
 import { getBaseUrl } from "@/lib/base-url";
-const BASE_URL = getBaseUrl();
+import { buildRobots } from "@/lib/seo/robots-rules";
+import { getSeoSettings } from "@/lib/seo/store";
 
-export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow: [
-          "/app/",
-          "/admin/",
-          "/api/",
-          "/odeme-link/",
-          // Token'lı kişiye özel portallar — zaten noindex; tarama da kapatılır.
-          "/malik-portali/",
-          "/musteri-portali/",
-          "/randevu-teyit/",
-          "/randevu-al/",
-          "/paylas/",
-          "/sunum/",
-          "/tavsiye/",
-          "/imza/",
-          "/degerleme-raporu/",
-          "/anket/",
-          "/lead/",
-          "/acik-ev-kayit/",
-          "/vitrin/*/favoriler",
-        ],
-      },
-    ],
-    sitemap: `${BASE_URL}/sitemap.xml`,
-  };
+/**
+ * robots.txt — kurallar /admin/seo "Sitemap ve robots" sekmesinden (seo.robots).
+ * Güvenlik yolları (portallar, /app, /admin, /api...) koddadır (ALWAYS_DISALLOW) ve panelden çıkarılamaz.
+ */
+export const revalidate = 3600;
+
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const s = await getSeoSettings();
+  return buildRobots(getBaseUrl(), s.robots);
 }

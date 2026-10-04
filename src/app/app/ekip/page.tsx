@@ -15,8 +15,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
-import { setMemberActive, setMemberRole } from "@/app/actions/team";
-import { resendInvite } from "./invite-actions";
+import { setMemberRole } from "@/app/actions/team";
+import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import { AddBranchPanel, AddBranchTrigger } from "./team-panels";
 import { BranchCard } from "./branch-card";
 import { formatTurkishPhone } from "@/lib/phone";
@@ -61,7 +61,6 @@ const roleMeta: Record<string, { label: string; cls: string }> = {
   readonly: { label: ROLE_LABELS.readonly, cls: "bg-ink-950/8 text-text-muted" },
 };
 
-const assignableRoles = ["advisor", "team_lead", "branch_manager", "gm", "call_center", "accounting", "readonly"];
 
 function relName(value: Rel) {
   if (!value) return null;
@@ -73,7 +72,8 @@ function initials(name: string) {
 }
 
 export default async function TeamPage() {
-  const { perms, tenantId } = await requireModulePage("team", "/app/ekip");
+  const { perms, tenantId, role: viewerRole } = await requireModulePage("team", "/app/ekip");
+  const assignableRoles = assignableRolesFor(viewerRole);
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
 
@@ -345,15 +345,12 @@ export default async function TeamPage() {
                       <>
                         <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Hiç giriş yapmadı</span>
                         {canManage && !isOwner ? (
-                          <form action={resendInvite}>
-                            <input type="hidden" name="id" value={m.id} />
-                            <button
-                              type="submit"
-                              className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
-                            >
-                              Daveti yinele
-                            </button>
-                          </form>
+                          <Link
+                            href={`/app/ekip/${m.id}?sekme=bilgi`}
+                            className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                          >
+                            Daveti yinele
+                          </Link>
                         ) : null}
                       </>
                     )
@@ -384,13 +381,13 @@ export default async function TeamPage() {
                         ) : null}
                         <button type="submit" className="rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">Uygula</button>
                       </form>
-                      <form action={setMemberActive}>
-                        <input type="hidden" name="id" value={m.id} />
-                        <input type="hidden" name="is_active" value={(!m.is_active).toString()} />
-                        <button type="submit" className={`rounded-[var(--radius-control)] border px-2.5 py-1.5 text-xs font-semibold transition ${m.is_active ? "border-line text-text-muted hover:border-danger-500/40 hover:text-danger-500" : "border-mint-500/30 text-mint-600 hover:bg-mint-500/8"}`}>
-                          {m.is_active ? "Pasifleştir" : "Aktifleştir"}
-                        </button>
-                      </form>
+                      {/* Pasifleştirme / aktifleştirme onay ve sonuç mesajıyla üye kartındaki Bilgiler sekmesindedir. */}
+                      <Link
+                        href={`/app/ekip/${m.id}?sekme=bilgi`}
+                        className={`rounded-[var(--radius-control)] border px-2.5 py-1.5 text-xs font-semibold transition ${m.is_active ? "border-line text-text-muted hover:border-brand-300 hover:text-brand-600" : "border-mint-500/30 text-mint-600 hover:bg-mint-500/8"}`}
+                      >
+                        {m.is_active ? "Düzenle / pasifleştir" : "Aktifleştir"}
+                      </Link>
                     </>
                   ) : (
                     <span className="text-xs text-text-faint">{isOwner ? "Ofis sahibi" : "—"}</span>
@@ -406,7 +403,12 @@ export default async function TeamPage() {
       <section id="subeler" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Building2 className="h-4 w-4 text-brand-600" /> Şubeler</h2>
-          {canManage ? <AddBranchTrigger /> : null}
+          <div className="flex items-center gap-2">
+            <Link href="/app/ekip/subeler" className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              Şubeleri yönet <ArrowUpRight className="h-3 w-3" />
+            </Link>
+            {canManage ? <AddBranchTrigger /> : null}
+          </div>
         </div>
         {canManage ? <AddBranchPanel provinces={provinces} /> : null}
         {branches.length === 0 ? (

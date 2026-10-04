@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { notifyTenant } from "@/lib/notify";
 import { evaluateBadges, BADGE_BY_CODE } from "@/lib/gamification";
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
@@ -65,9 +66,11 @@ export async function GET(req: NextRequest) {
   let notified = 0;
   let failed = 0;
   let tenantsWithData = 0;
+  const disabledModules = await getDisabledModulesByTenant(admin);
 
   for (const t of tenants ?? []) {
     const tenantId = String(t.id);
+    if (isDisabledFor(disabledModules, tenantId, "team_perf")) continue;
     try {
       const league = await loadLeagueData(admin, { period, tenantId, todayIso: lastDayOfPeriod });
 
@@ -175,7 +178,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const detail = `${period}: ${tenantsWithData} ofis, ${snapshots} skor, ${badges} rozet, ${notified} bildirim${failed ? `, ${failed} hata` : ""}`;
+  const detail = `${period}: ${tenantsWithData} ofis, ${snapshots} skor, ${badges} rozet, ${notified} bildirim${failed ? `, ${failed} hata` : ""}${skippedTenantsNote(disabledModules, "team_perf")}`;
   await recordHeartbeat("lig-snapshot", failed > 0 ? "error" : "ok", detail);
 
   return NextResponse.json({

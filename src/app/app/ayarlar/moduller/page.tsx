@@ -5,7 +5,9 @@ import { getTenantGateContext } from "@/lib/cache/request";
 import { canManageModules } from "@/lib/modules/permissions";
 import { modulePlanInfo, planLockedKeys } from "@/lib/modules/plan";
 import { MODULES, getModuleDef, type FeatureKey } from "@/lib/modules/registry";
+import { loadPendingByModule } from "@/lib/modules/pending";
 import { getTenantModuleState } from "@/lib/modules/state";
+import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ModulesBoard, type ModuleCardData } from "./modules-board";
 
@@ -22,6 +24,11 @@ export default async function ModulesPage() {
 
   const [state, planCtx] = await Promise.all([getTenantModuleState(tenantId), getTenantGateContext(tenantId)]);
   const planLocked = planLockedKeys(planCtx);
+  const supabase = await createClient();
+  const pending = await loadPendingByModule(
+    supabase,
+    MODULES.map((m) => m.key).filter((k) => !state.closed.includes(k)),
+  );
 
   const cards: ModuleCardData[] = MODULES.map((m) => {
     const info = modulePlanInfo(m.key, planCtx);
@@ -71,7 +78,7 @@ export default async function ModulesPage() {
         </p>
       ) : null}
 
-      <ModulesBoard cards={cards} closed={state.closed} locked={state.locked} planLocked={planLocked} canEdit={writable} />
+      <ModulesBoard cards={cards} closed={state.closed} locked={state.locked} planLocked={planLocked} pendingWork={pending} canEdit={writable} />
     </div>
   );
 }

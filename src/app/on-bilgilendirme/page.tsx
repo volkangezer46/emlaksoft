@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
+import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
-export const metadata: Metadata = {
-  title: "Ön Bilgilendirme Formu",
-  description: "Mesafeli Sözleşmeler Yönetmeliği m.5 kapsamında ön bilgilendirme formu.",
-  alternates: { canonical: "/on-bilgilendirme" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/on-bilgilendirme");
+}
 
 export default function OnBilgilendirmePage() {
   return (

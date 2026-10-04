@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileSignature, ShieldAlert, Sparkles } from "lucide-react";
 import { Pricing } from "@/components/pricing";
+import { SeoJsonLd } from "@/components/seo/seo-json-ld";
+import { buildMetadata } from "@/lib/seo/store";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import type { PlanDef } from "@/lib/billing/plans";
 import { buildFaq, lostCommissionPlanName, yearlyDiscountPercent } from "@/lib/pricing-page-model";
@@ -9,18 +11,9 @@ import { ComparisonTable } from "@/components/pricing-page/comparison-table";
 import { PricingShell, Section } from "@/components/pricing-page/page-shell";
 import { RoiCalculator } from "@/components/pricing-page/roi-calculator";
 
-export const metadata: Metadata = {
-  title: "Fiyatlar",
-  description:
-    "EmlakSoft paketleri, aylık ve yıllık fiyatlar, kullanıcı ve portföy limitleri ile özellik karşılaştırması. 14 gün ücretsiz deneme, kredi kartı gerekmez.",
-  alternates: { canonical: "/fiyatlar" },
-  openGraph: {
-    title: "EmlakSoft Fiyatlar",
-    description: "Açık fiyatlar, paket limitleri ve karşılaştırma tablosu. 14 gün ücretsiz deneme, kredi kartı gerekmez.",
-    url: "/fiyatlar",
-    type: "website",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildMetadata("/fiyatlar");
+}
 
 export default async function FiyatlarPage() {
   const plans: PlanDef[] = await getPublicPlanDefinitions();
@@ -30,19 +23,9 @@ export default async function FiyatlarPage() {
   const roiPlans = plans.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }));
   const defaultPlanId = (plans.find((p) => p.popular) ?? plans[0]!).id;
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: faq.map((f) => ({
-      "@type": "Question",
-      name: f.q,
-      acceptedAnswer: { "@type": "Answer", text: f.a },
-    })),
-  };
-
   return (
     <PricingShell>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <SeoJsonLd path="/fiyatlar" faq={faq} />
 
       <div className="bg-[image:var(--grad-ink)]">
         <div className="theme-dark mx-auto max-w-6xl px-4 py-14 text-center sm:px-6 sm:py-20">

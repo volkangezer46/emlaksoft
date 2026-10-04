@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { keyOverdueDays } from "@/lib/key-overdue";
-import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     const disabledModules = await getDisabledModulesByTenant(admin);
     const rows = ((data ?? []) as unknown as OverdueKey[]).filter((r) => !isDisabledFor(disabledModules, r.tenant_id, "keys"));
     if (rows.length === 0) {
-      await recordHeartbeat("anahtar-gecikme", "ok", "geciken anahtar yok");
+      await recordHeartbeat("anahtar-gecikme", "ok", "geciken anahtar yok" + skippedTenantsNote(disabledModules, "keys"));
       return NextResponse.json({ ok: true, overdue: 0, notified: 0 });
     }
 
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
     await recordHeartbeat(
       "anahtar-gecikme",
       "ok",
-      `${overdue} geciken anahtar, ${notified} bildirim`,
+      `${overdue} geciken anahtar, ${notified} bildirim${skippedTenantsNote(disabledModules, "keys")}`,
     );
     return NextResponse.json({ ok: true, overdue, notified });
   } catch (e) {

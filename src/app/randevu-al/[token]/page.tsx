@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { CalendarClock, CalendarX2, UserRound } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import {
   PublicBrandButton,
   PublicStateBox,
@@ -65,6 +67,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
       .maybeSingle(),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status) || !staff) notFound();
+  if (await isPublicFeatureClosed(admin, setting.tenant_id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
 
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = (tenant?.phone as string | null) ?? null;

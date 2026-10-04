@@ -169,6 +169,8 @@ export function SiteHeader() {
               </details>
             ))}
             <Link href="/fiyatlar" className="mk-sheet-link" onClick={close}>Fiyatlandırma</Link>
+            {/* Sert gezinme bilerek: kök [...slug] rotası eklenince kural uyarır; davranış değişmez. */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/giris" className="mk-sheet-link" onClick={close}>Giriş yap</a>
           </div>
           <div className="mk-sheet-cta">
