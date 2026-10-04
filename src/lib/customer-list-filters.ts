@@ -92,3 +92,11 @@ export function applyCustomerFilters<Q>(query: Q, f: CustomerListFilters): Q {
   }
   return b as unknown as Q;
 }
+
+/**
+ * Sıcaklık segmenti havuz sınırı — TEK KAYNAK. Ekrandaki segment sayıları/filtre ile CSV dışa aktarma
+ * (customer-heat-export) aynı filtrelenmiş listenin aynı ilk N kaydını skorlar; böylece ekran ve dosya tutarlı kalır.
+ */
+export const HEAT_POOL_LIMIT = 2000;
+/** Isı sinyali RPC'sine tek çağrıda gönderilen azami müşteri kimliği. */
+export const HEAT_RPC_CHUNK = 500;

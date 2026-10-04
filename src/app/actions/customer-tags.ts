@@ -5,23 +5,24 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import {
+  TAG_MAX_LEN,
+  TAG_UPDATE_CHUNK,
+  chunkArray,
+  describeTagRewrite,
+  normalizeTag,
+  rewriteTagList,
+  tagKey,
+} from "@/lib/customer-tags-logic";
 
 /**
  * Etiket yönetimi (ayarlar/etiketler): ofis genelinde listele, yeniden adlandır (mevcutsa birleştir), kaldır.
  * Tek müşteriye etiket ekleme/çıkarma `actions/customers.ts` içinde kalır.
  */
 
-export type TagManageResult = { ok?: boolean; error?: string; affected?: number };
+export type TagManageResult = { ok?: boolean; error?: string; affected?: number; failed?: number; message?: string };
 
-const TAG_MAX_LEN = 30;
 const TAG_MANAGE_LIMIT = 5000;
-
-function normalizeTag(raw: string): string {
-  return String(raw ?? "").trim().replace(/\s+/g, " ");
-}
-function tagKey(tag: string): string {
-  return tag.toLocaleLowerCase("tr-TR");
-}
 
 /** Etiket → müşteri sayısı (ofis genelinde, silinmemiş müşteriler). */
 export async function listTagCounts(): Promise<{ tag: string; count: number }[]> {
@@ -71,37 +72,40 @@ async function rewriteTag(from: string, to: string | null): Promise<TagManageRes
     console.error("rewriteTag load", error);
     return { error: "Etiketler yüklenemedi. Lütfen tekrar deneyin." };
   }
-  let affected = 0;
+  // Parçalı toplu güncelleme: değişecek müşteriler hesaplanır, TAG_UPDATE_CHUNK'lık dilimlerle paralel yazılır.
+  // Bir dilimdeki hata diğerlerini durdurmaz; sonda kaç müşterinin güncellendiği/başarısız olduğu raporlanır.
+  // İşlem idempotenttir: tekrar çalıştırmak yalnız hâlâ eski etiketi taşıyanları işler.
+  const pending: { id: string; tags: string[] }[] = [];
   for (const row of (data ?? []) as { id: string; tags: string[] | null }[]) {
-    const tags = row.tags ?? [];
-    if (!tags.some((t) => tagKey(normalizeTag(t)) === tagKey(src))) continue;
-    const next: string[] = [];
-    for (const t of tags) {
-      const n = tagKey(normalizeTag(t)) === tagKey(src) ? dst : t;
-      if (n && !next.some((x) => tagKey(x) === tagKey(n))) next.push(n);
+    const next = rewriteTagList(row.tags ?? [], src, dst);
+    if (next) pending.push({ id: row.id, tags: next });
+  }
+  let affected = 0;
+  let failed = 0;
+  for (const part of chunkArray(pending, TAG_UPDATE_CHUNK)) {
+    const results = await Promise.all(
+      part.map((r) => supabase.from("customers").update({ tags: r.tags }).eq("id", r.id).eq("tenant_id", gate.tenantId)),
+    );
+    for (const r of results) {
+      if (r.error) {
+        console.error("rewriteTag update", r.error);
+        failed += 1;
+      } else affected += 1;
     }
-    const { error: upErr } = await supabase
-      .from("customers")
-      .update({ tags: next })
-      .eq("id", row.id)
-      .eq("tenant_id", gate.tenantId);
-    if (upErr) {
-      console.error("rewriteTag update", upErr);
-      return { error: "Etiket güncellenirken hata oluştu; işlem yarım kalmış olabilir, tekrar deneyin.", affected };
-    }
-    affected += 1;
   }
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: dst === null ? "customer.tag_delete_all" : "customer.tag_rename",
     entityType: "customer",
-    newValue: { from: src, to: dst, affected },
+    newValue: { from: src, to: dst, affected, failed },
   });
   revalidatePath("/app/musteriler");
   revalidatePath("/app/ayarlar/etiketler");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, affected };
+  const message = describeTagRewrite(affected, failed, pending.length);
+  if (failed > 0) return { error: message, affected, failed, message };
+  return { ok: true, affected, failed, message };
 }
 
 export async function renameCustomerTag(from: string, to: string): Promise<TagManageResult> {

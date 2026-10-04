@@ -438,6 +438,7 @@ export default async function PropertyDetailPage({
                       heating?: string | null;
                       building_age?: number | string | null;
                       facade?: string | null;
+                      description?: string | null;
                     },
                   }}
                   provinces={provinces ?? []}
@@ -625,7 +626,7 @@ export default async function PropertyDetailPage({
             </Suspense>
           </div>
 
-          <AiContentPanel propertyId={property.id} />
+          <AiContentPanel propertyId={property.id} canEdit={canEdit} />
             </div>
           ) : null}
 

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Check, Copy, Mail, MessageCircle, Share2, Sparkles, Wand2 } from "lucide-react";
-import { generatePropertyContent } from "@/app/actions/ai-content";
+import { generatePropertyContent, savePropertyDescription } from "@/app/actions/ai-content";
+import { useToast } from "@/components/app/toast-provider";
 import type { ContentKind } from "@/lib/ai/content";
 
 const TABS: { key: ContentKind; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -12,13 +13,24 @@ const TABS: { key: ContentKind; label: string; icon: React.ComponentType<{ class
   { key: "email", label: "E-posta", icon: Mail },
 ];
 
-export function AiContentPanel({ propertyId }: { propertyId: string }) {
+export function AiContentPanel({ propertyId, canEdit = false }: { propertyId: string; canEdit?: boolean }) {
   const [tab, setTab] = useState<ContentKind>("listing");
   const [text, setText] = useState("");
   const [source, setSource] = useState<"ai" | "template" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [saving, startSave] = useTransition();
+  const { push } = useToast();
+
+  // Tek akış: metin düzenleme panelindeki "Açıklama" alanıyla aynı depoya (features.description) yazılır.
+  function saveAsDescription() {
+    startSave(async () => {
+      const res = await savePropertyDescription(propertyId, text);
+      if (res.error) push(res.error, "err");
+      else push("Portföy açıklaması güncellendi", "ok");
+    });
+  }
 
   function run(kind: ContentKind) {
     setTab(kind);
@@ -93,6 +105,16 @@ export function AiContentPanel({ propertyId }: { propertyId: string }) {
               {copied ? <Check className="h-4 w-4 text-mint-400" /> : <Copy className="h-4 w-4" />}
               {copied ? "Kopyalandı" : "Kopyala"}
             </button>
+            {tab === "listing" && canEdit ? (
+              <button
+                type="button"
+                onClick={saveAsDescription}
+                disabled={saving || !text.trim()}
+                className="ml-2 mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-cyan-400/50 bg-cyan-400/10 px-4 py-2.5 text-sm font-semibold text-cyan-700 hover:bg-cyan-400/15 disabled:opacity-60"
+              >
+                {saving ? "Kaydediliyor…" : "Portföy açıklamasına kaydet"}
+              </button>
+            ) : null}
           </div>
         ) : (
           <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-canvas/50 px-4 py-8 text-center text-sm text-text-muted">

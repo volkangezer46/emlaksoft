@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, Copy, ExternalLink, Link2, MessageCircle, Share2 } from "lucide-react";
-import { createCustomerPortalToken } from "@/app/actions/customer-portal";
 import { createOwnerPortalToken } from "@/app/actions/owner-portal";
 import { toWhatsAppLink } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
@@ -18,8 +17,8 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * Portal linki üretme diyaloğu — müşteri portalı (/musteri-portali/[token]) ve
- * malik portalı (/malik-portali/[token]) için tek bileşen.
+ * Malik portalı (/malik-portali/[token]) link diyaloğu. Müşteri portalı artık sayfa içi panel:
+ * `app/musteriler/customer-portal-panel.tsx` (ResultPanel ve WA_CUSTOMER buradan paylaşılır).
  *
  * Bu ekran olmadan `createCustomerPortalToken` / `createOwnerPortalToken`
  * server action'larının repoda HİÇBİR çağıranı yoktu: public portal sayfaları
@@ -32,13 +31,13 @@ import {
  * açar. Üretilen link kopyalanır ve (telefon varsa) WhatsApp'tan gönderilir.
  */
 
-const WA_CUSTOMER = (name: string, url: string) =>
+export const WA_CUSTOMER = (name: string, url: string) =>
   `Merhaba ${name}, size özel müşteri portalınız hazır. Taleplerinizi, randevularınızı ve size uygun portföyleri buradan takip edebilirsiniz: ${url}`;
 
 const WA_OWNER = (name: string, label: string, url: string) =>
   `Merhaba ${name}, ${label} için mülk sahibi portalınız hazır. İlan durumunu, gelen teklifleri ve randevuları buradan izleyebilirsiniz: ${url}`;
 
-function ResultPanel({
+export function ResultPanel({
   url,
   waHref,
   onReset,
@@ -105,93 +104,6 @@ function ResultPanel({
         Paylaşılan portallar listesi →
       </Link>
     </div>
-  );
-}
-
-/** Müşteri portalı linki — /app/musteriler satır aksiyonu. */
-export function CustomerPortalLinkButton({
-  customerId,
-  customerName,
-  phone,
-}: {
-  customerId: string;
-  customerName: string;
-  phone: string | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const generate = () => {
-    setError(null);
-    startTransition(async () => {
-      const res = await createCustomerPortalToken(customerId);
-      if (res.error || !res.url) setError(res.error ?? "Link üretilemedi.");
-      else setUrl(res.url);
-    });
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          setUrl(null);
-          setError(null);
-        }
-      }}
-    >
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
-          aria-label={`${customerName} için müşteri portalı linki üret`}
-          title="Müşteri portalı linki"
-        >
-          <Share2 className="h-4 w-4" />
-        </button>
-      </DialogTrigger>
-      <DialogContent size="md">
-        <DialogHeader
-          icon={<Link2 />}
-          title="Müşteri portalı linki"
-          description={`${customerName} kendi taleplerini, randevularını ve eşleşen portföyleri bu linkten görür.`}
-        />
-        <DialogBody>
-          {url ? (
-            <ResultPanel
-              url={url}
-              waHref={toWhatsAppLink(phone, WA_CUSTOMER(customerName, url))}
-              onReset={() => setOpen(false)}
-            />
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm leading-relaxed text-text-muted">
-                Müşteri portalda önerilen portföyleri <strong className="text-ink-950">beğenir ya da
-                eler</strong>; bu geri bildirim eşleştirme ekranındaki skoru besler (beğenilen +10 puan
-                ve 💚 rozeti alır, elenen listeden gizlenir).
-              </p>
-              <p className="text-xs text-text-faint">
-                Aynı müşteri için geçerli bir link zaten varsa yenisi üretilmez — mevcut link döner.
-              </p>
-              {error ? <p className="text-sm font-semibold text-danger-500">{error}</p> : null}
-            </div>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="secondary">Kapat</Button>
-          </DialogClose>
-          {url ? null : (
-            <Button type="button" onClick={generate} loading={pending}>
-              Linki üret
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
