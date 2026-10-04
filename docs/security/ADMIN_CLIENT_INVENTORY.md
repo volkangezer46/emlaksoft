@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **324** (184 dosya) — risk: P0=0, P1=16, P2=308
-- Tenant filtresi: var=213, yok=39, uygulanamaz=64, param=6, devir=2
-- Kapı türü: public-token=34, platform=84, dosya-duzeyi=43, oturum-izin=76, belirsiz=53, elle-dogrulandi=10, cron=21, webhook-imza=3
-- Filtresiz (yok+devir): **41**; RLS'li client'a taşıma adayı: **65**
+- Toplam birim: **350** (196 dosya) — risk: P0=3, P1=21, P2=326
+- Tenant filtresi: var=222, uygulanamaz=74, yok=46, param=6, devir=2
+- Kapı türü: public-token=34, platform=91, dosya-duzeyi=56, oturum-izin=76, belirsiz=59, elle-dogrulandi=10, cron=21, webhook-imza=3
+- Filtresiz (yok+devir): **48**; RLS'li client'a taşıma adayı: **65**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -18,7 +18,11 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 
 ## P0 — filtresiz VE kapısı belirsiz (ÖNCE bunlar elle incelenmeli)
 
-Yok.
+| Dosya:satır | İşlev | Neden admin | Kapı türü | Tenant filtresi | Risk |
+|---|---|---|---|---|---|
+| `src/app/admin/_dashboards/support-home.tsx:40` | `SupportHome` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
+| `src/lib/billing/plan-support.ts:85` | `getFoundersStatus` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
+| `src/lib/billing/plan-support.ts:31` | `getPlanSupport` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 
 ## P1
 
@@ -32,6 +36,11 @@ Yok.
 | `src/app/actions/appointments.ts:204` | `regenerateCalendarToken` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | yok (yazma) | P1 |
 | `src/app/actions/contracts.ts:504` | `verifySignatureOtp` | Oturumsuz token'lı public yüzey. | public-token | yok (yazma) | P1 |
 | `src/app/actions/owner-portal-offers.ts:37` | `respondToOfferByToken` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
+| `src/app/actions/platform-staff.ts:355` | `resetStaffPassword` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/app/actions/platform-staff.ts:391` | `signOutStaffSessions` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/app/admin/_dashboards/billing-home.tsx:43` | `BillingHome` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
+| `src/app/admin/ayarlar/page.tsx:14` | `trialFunctionApplied` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/app/admin/sistem/schema-checks.ts:55` | `probeSchema` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/app/api/property-media/[id]/private/route.ts:54` | `GET` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
 | `src/app/app/sozlesmeler/[id]/page.tsx:85` | `ContractDetailPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | yok | P1 |
 | `src/app/randevu-teyit/[token]/page.tsx:53` | `AppointmentConfirmPage` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
@@ -46,6 +55,8 @@ Yok.
 | Dosya:satır | İşlev | Neden admin | Kapı türü | Tenant filtresi | Risk |
 |---|---|---|---|---|---|
 | `src/app/acik-ev-kayit/[token]/page.tsx:51` | `OpenHouseCheckinPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/actions/admin-ticket-extra.ts:18` | `searchTicketTenants` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/admin-ticket-extra.ts:43` | `updateTicketMacro` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/admin-ticket-ops.ts:216` | `bulkUpdateTickets` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/admin-ticket-ops.ts:243` | `createTicketMacro` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/admin-ticket-ops.ts:258` | `deleteTicketMacro` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
@@ -71,7 +82,7 @@ Yok.
 | `src/app/actions/contracts.ts:105` | `updateContractDraftAtomic` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/actions/customer-portal-feedback.ts:46` | `submitMatchFeedbackByToken` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/customer-portal.ts:160` | `getCustomerPortalData` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/actions/customers.ts:883` | `mergeCustomers` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/customers.ts:896` | `mergeCustomers` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/deals.ts:122` | `updateDealStage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/demo-login.ts:96` | `ensureDemoTenant` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/demo-login.ts:145` | `ensurePersona` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
@@ -113,7 +124,16 @@ Yok.
 | `src/app/actions/payment-link-manage.ts:126` | `extendPaymentLink` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/payment-links.ts:83` | `createPaymentLink` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/payment-links.ts:122` | `startPaymentLinkCheckout` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/actions/platform-account.ts:38` | `updateOwnProfile` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-account.ts:38` | `updateOwnProfile` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-billing-plans.ts:64` | `syncEntitlements` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:44` | `markInvoicePaid` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:146` | `recordInvoiceRefund` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:209` | `resolveCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/actions/platform-billing.ts:106` | `voidInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-coupons.ts:38` | `createCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-coupons.ts:120` | `deleteCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-coupons.ts:106` | `setCouponActive` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-coupons.ts:70` | `updateCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-export.ts:68` | `exportDemoRequestsCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/platform-export.ts:115` | `exportInvoicesCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/platform-export.ts:137` | `exportMembersCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
@@ -121,16 +141,21 @@ Yok.
 | `src/app/actions/platform-export.ts:43` | `exportSubscriptionsCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/actions/platform-export.ts:24` | `exportTenantsCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/platform-export.ts:157` | `exportTicketsCsv` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/actions/platform-members.ts:259` | `generateMemberResetLink` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/app/actions/platform-members.ts:263` | `generateMemberResetLink` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/actions/platform-members.ts:137` | `setMemberActiveAsStaff` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/platform-members.ts:91` | `setMemberRoleAsStaff` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/platform-members.ts:225` | `signOutMemberSessions` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/actions/platform-members.ts:47` | `updateMemberProfile` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:133` | `listRecentBroadcasts` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/actions/platform-notifications.ts:25` | `markAllPlatformNotificationsRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:12` | `markPlatformNotificationRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:155` | `searchTenantsBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/actions/platform-notifications.ts:84` | `sendBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-members.ts:47` | `updateMemberProfile` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:273` | `deleteBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:144` | `listRecentBroadcasts` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/actions/platform-notifications.ts:27` | `markAllPlatformNotificationsRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:14` | `markPlatformNotificationRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:166` | `searchTenantsBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/platform-notifications.ts:89` | `sendBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:231` | `updateBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-sales-leads.ts:67` | `createDemoLead` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok (yazma) | P2 |
+| `src/app/actions/platform-sales-leads.ts:128` | `deleteDemoLead` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-sales-leads.ts:101` | `updateDemoLead` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok (yazma) | P2 |
 | `src/app/actions/platform-sales.ts:244` | `addDemoNote` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok (yazma) | P2 |
 | `src/app/actions/platform-sales.ts:215` | `assignDemo` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-sales.ts:276` | `convertDemoToTenant` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
@@ -140,7 +165,6 @@ Yok.
 | `src/app/actions/platform-staff.ts:188` | `deactivateStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-staff.ts:318` | `generateStaffResetLink` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/app/actions/platform-staff.ts:232` | `reactivateStaff` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-staff.ts:355` | `resetStaffPassword` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/app/actions/platform-staff.ts:274` | `updateStaffProfile` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-staff.ts:136` | `updateStaffRole` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-tenants.ts:1163` | `addTenantPlatformNote` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
@@ -202,29 +226,30 @@ Yok.
 | `src/app/actions/vitrin.ts:69` | `createVitrinSavedSearch` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/vitrin.ts:160` | `likePublicShare` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/actions/workflow.ts:69` | `convertWorkflow` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
-| `src/app/admin/_dashboards/billing-home.tsx:43` | `BillingHome` | Platform personeli: kiracılar arası yönetim paneli. | platform | param | P2 |
-| `src/app/admin/_dashboards/support-home.tsx:40` | `SupportHome` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/aktivite/page.tsx:170` | `AdminActivityPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/ayarlar/page.tsx:14` | `trialFunctionApplied` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/bildirimler/page.tsx:57` | `AdminNotificationsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/admin/billing/page.tsx:87` | `AdminBillingPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/duyuru/page.tsx:34` | `BroadcastPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/billing/faturalar/[id]/page.tsx:28` | `InvoiceDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/billing/kuponlar/page.tsx:18` | `CouponsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/admin/billing/page.tsx:89` | `AdminBillingPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/billing/planlar/page.tsx:18` | `PlansAdminPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
+| `src/app/admin/duyuru/page.tsx:40` | `BroadcastPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/geo/[provinceId]/[districtId]/page.tsx:23` | `AdminGeoDistrictPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/geo/[provinceId]/page.tsx:21` | `AdminGeoProvincePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/geo/page.tsx:16` | `AdminGeoPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/hatalar/errors-view.tsx:107` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/hatalar/errors-view.tsx:94` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/[id]/page.tsx:74` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/page.tsx:78` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/page.tsx:52` | `getAdminDashboardData` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/page.tsx:52` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/admin/raporlar/page.tsx:44` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/satis/[id]/page.tsx:24` | `AdminLeadDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/satis/page.tsx:49` | `AdminSalesPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/sistem/schema-checks.ts:55` | `probeSchema` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
+| `src/app/admin/satis/page.tsx:50` | `AdminSalesPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/sistem/system-view.tsx:75` | `SystemView` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/tenants/[id]/page.tsx:96` | `AdminTenantDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tenants/page.tsx:67` | `AdminTenantsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/[id]/page.tsx:139` | `AdminTicketDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/tickets/page.tsx:240` | `AdminTicketsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/tickets/makrolar/page.tsx:10` | `MacrosPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/admin/tickets/page.tsx:233` | `AdminTicketsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/tickets/yeni/page.tsx:11` | `NewAdminTicketPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/anket/[token]/page.tsx:39` | `SurveyPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/api/admin/notifications/route.ts:10` | `GET` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/api/admin/personel/route.ts:27` | `GET` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
@@ -301,6 +326,8 @@ Yok.
 | `src/lib/admin/activity-query.ts:104` | `queryActivity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/automation-engine.ts:503` | `dispatchAutomationEvent` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/automation-engine.ts:689` | `runScheduledAutomations` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/billing/coupon-server.ts:16` | `quoteCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
+| `src/lib/billing/coupon-server.ts:44` | `redeemCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/billing/fulfillment.ts:299` | `assertBillingPlanPreflight` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/billing/fulfillment.ts:221` | `createCheckoutInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/billing/fulfillment.ts:103` | `fulfillBillingPaymentAtomic` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
