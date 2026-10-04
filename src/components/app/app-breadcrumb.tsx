@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
+import { useClosedModules } from "@/components/app/closed-modules-context";
 import { resolveActiveNav, visibleSections } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 
@@ -12,7 +13,8 @@ import type { AppModule } from "@/lib/permissions";
  */
 export function AppBreadcrumb({ accessibleModules }: { accessibleModules: AppModule[] }) {
   const pathname = usePathname();
-  const sections = useMemo(() => visibleSections(accessibleModules), [accessibleModules]);
+  const closedModules = useClosedModules();
+  const sections = useMemo(() => visibleSections(accessibleModules, { closed: closedModules }), [accessibleModules, closedModules]);
   const { section, href } = resolveActiveNav(pathname, sections);
   if (!section || !href) return null;
   const item = section.items.find((i) => i.href === href);

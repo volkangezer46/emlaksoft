@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Building2, CalendarClock, CalendarX2, DoorOpen } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { isPast } from "@/lib/clock";
 import {
   PublicDetailList,
@@ -60,6 +62,7 @@ export default async function OpenHouseCheckinPage({
   type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null };
   const tenant = rel(event.tenant as TenantShape | TenantShape[] | null);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, event.tenant_id, "open_house")) return <PublicModuleClosed officeName={tenant.name} />;
   const { data: property } = await admin
     .from("properties")
     .select("title, property_code")

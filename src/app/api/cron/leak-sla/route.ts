@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -52,8 +53,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
 
+  // Modül kapısı: "Kaçan komisyonlar" (ya da bağlı olduğu Portal Kontrol) kapalı ofis için uyarı üretilmez.
+  const disabledModules = await getDisabledModulesByTenant(admin);
   let sent = 0;
   for (const c of (closures ?? []) as ClosureRow[]) {
+    if (isDisabledFor(disabledModules, c.tenant_id, "leak")) continue;
     const daysOpen = Math.floor((now - new Date(c.created_at).getTime()) / 86_400_000);
     const amount = c.estimated_lost_commission != null ? Number(c.estimated_lost_commission) : c.deal_amount != null ? Number(c.deal_amount) : null;
     const severity = leakSeverity(amount, daysOpen);

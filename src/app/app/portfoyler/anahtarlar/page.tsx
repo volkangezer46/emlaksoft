@@ -74,7 +74,7 @@ export default async function PropertyKeysBoardPage({
 }: {
   searchParams?: Promise<{ durum?: string; danisman?: string; q?: string; sayfa?: string }>;
 }) {
-  await requireModulePage("properties");
+  await requireModulePage("properties", "/app/portfoyler/anahtarlar");
   const { durum = "", danisman = "", q = "", sayfa = "" } = (await searchParams) ?? {};
   const query = q.trim();
   const supabase = await createClient();

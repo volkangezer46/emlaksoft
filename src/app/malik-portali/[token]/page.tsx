@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { getOwnerPortalData } from "@/app/actions/owner-portal";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { OfferActions } from "./offer-actions";
 import {
@@ -94,6 +96,7 @@ export default async function MalikPortaliPage({
   // kapak görseli + atanmış danışman ve ofis telefonu (Ara / WhatsApp için)
   // + liste fiyatı geçmişi (yalnızca list_price — min/gizli fiyat malike sızmaz).
   const admin = createAdminClient();
+  if (await isPublicFeatureClosed(admin, tenant.id, "client_portals")) return <PublicModuleClosed officeName={tenant.name} />;
   const [{ data: propertyRel }, { data: coverRow }, { data: priceRows }] = await Promise.all([
     admin
       .from("properties")

@@ -25,7 +25,7 @@ export default async function CalculatorsPage({
 }: {
   searchParams: Promise<CalculatorSearchParams & InvestmentSearchParams>;
 }) {
-  await requireModulePage("valuation");
+  await requireModulePage("valuation", "/app/hesaplayici");
   const sp = await searchParams;
   const active = sp.sekme === "yatirim" ? "yatirim" : "maliyet";
 

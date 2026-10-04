@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTenant } from "@/lib/notify";
 import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
+import { getDisabledModulesByTenant, isDisabledFor, loadTenantModuleState } from "@/lib/modules/state";
+import type { FeatureKey } from "@/lib/modules/registry";
 
 /**
  * Otomasyon motoru — `automations` tablosundaki kuralları fiilen ÇALIŞTIRAN katman.
@@ -43,6 +45,11 @@ export type AutomationEventTrigger =
   | "offer_received"
   | "deal_won"
   | "deal_lost";
+
+/** Tetikleyicisi kapatılabilir bir modüle ait olaylar: modül kapalıyken tetiklenmez. */
+const EVENT_TRIGGER_FEATURE: Partial<Record<AutomationEventTrigger, FeatureKey>> = {
+  offer_received: "offers",
+};
 
 export type AutomationScheduledTrigger =
   | "no_contact_days"
@@ -494,6 +501,11 @@ export async function dispatchAutomationEvent(
 ): Promise<void> {
   try {
     const admin = createAdminClient();
+    // Modül kapısı: "Otomasyon" (ya da tetikleyicinin ait olduğu modül) kapalıysa kural çalıştırılmaz (silinmez).
+    const moduleState = await loadTenantModuleState(admin, tenantId);
+    if (moduleState.closed.includes("automation")) return;
+    const triggerFeature = EVENT_TRIGGER_FEATURE[trigger];
+    if (triggerFeature && moduleState.closed.includes(triggerFeature)) return;
     const { data, error } = await admin
       .from("automations")
       .select("id, tenant_id, name, trigger_type, trigger_config, conditions, actions, run_count")
@@ -694,7 +706,10 @@ export async function runScheduledAutomations(): Promise<ScheduledRunSummary> {
     return summary;
   }
 
+  // Modül kapısı: "Otomasyon" kapalı ofislerin kuralları taranmaz (silinmez).
+  const disabledModules = await getDisabledModulesByTenant(admin);
   for (const row of (automations ?? []) as AutomationRow[]) {
+    if (isDisabledFor(disabledModules, row.tenant_id, "automation")) continue;
     summary.automationsEvaluated += 1;
     try {
       const [candidates, alreadyFired] = await Promise.all([

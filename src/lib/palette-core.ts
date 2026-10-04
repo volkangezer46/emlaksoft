@@ -1,4 +1,5 @@
 import { ICONS } from "@/lib/icons";
+import { featureForHref } from "@/lib/modules/registry";
 import { visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
@@ -53,21 +54,34 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Görüşme kaydet", href: "/app/arama", icon: ICONS.telefon, module: "calls" },
 ];
 
+/** Ofisin kapattığı modüle ait adres mi? (Eylemler listesinden elenir; "Git" listesi menü süzgecini kullanır) */
+function isClosedFeatureHref(href: string, closed: readonly string[]): boolean {
+  if (closed.length === 0) return false;
+  const key = featureForHref(href);
+  return key !== null && closed.includes(key);
+}
+
 /**
  * "Eylemler" grubu: erişilebilen modüllerin hızlı oluşturma bağlantıları.
  * `locked`: pakete dahil olmayan sayfalar (yükseltme sayfasına düşmesin diye elenir).
  */
-export function getAppActions(accessible: readonly AppModule[], q = "", locked: readonly string[] = []): PaletteEntry[] {
+export function getAppActions(
+  accessible: readonly AppModule[],
+  q = "",
+  locked: readonly string[] = [],
+  closed: readonly string[] = [],
+): PaletteEntry[] {
   return APP_ACTIONS.filter(
     (a) =>
       accessible.includes(a.module) &&
+      !isClosedFeatureHref(a.href, closed) &&
       !locked.some((l) => a.href === l || a.href.startsWith(`${l}/`)) &&
       matchesQuery(a.label, q),
   ).map(({ label, href, icon, shortcut }) => ({ label, href, icon, shortcut }));
 }
 /** "Git" grubu: nav-config'teki yetkili sayfalar (menüyle birebir aynı süzgeç). */
-export function getAppGoItems(accessible: readonly AppModule[], q = ""): PaletteEntry[] {
-  return visibleSections(accessible)
+export function getAppGoItems(accessible: readonly AppModule[], q = "", closed: readonly string[] = []): PaletteEntry[] {
+  return visibleSections(accessible, { closed })
     .flatMap((s) => s.items)
     .flatMap((i) => (i.tabs && i.tabs.length > 1 ? i.tabs : [i]))
     .filter((i) => matchesQuery(i.label, q))

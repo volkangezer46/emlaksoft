@@ -33,7 +33,7 @@ type Signal = {
 const daysOf = (iso: string | null) => (iso ? Math.floor(msSince(iso) / DAY_MS) : null);
 
 export default async function AkilliListelerPage() {
-  const { tenantId } = await requireModulePage("customers");
+  const { tenantId } = await requireModulePage("customers", "/app/akilli-listeler");
   const supabase = await createClient();
 
   const [{ data: custData }, { data: signalData }, { data: upcomingData }] = await Promise.all([

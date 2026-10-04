@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira Artış Hesaplama" };
 
 export default async function KiraArtisPage() {
-  await requireModulePage("valuation");
+  await requireModulePage("valuation", "/app/kira-artis");
   // Resmi verili aylar + resmi oranı henüz açıklanmamış (2026) aylar birlikte;
   // en yeni ay üstte. 2026 ayları seçilince hesaplayıcı manuel giriş ister.
   const months = [...Object.keys(TUFE_12M_AVG), ...TUFE_PENDING_MONTHS].sort().reverse();

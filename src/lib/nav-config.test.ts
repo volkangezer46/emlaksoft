@@ -74,7 +74,10 @@ describe("menü yapısı", () => {
     expect(resolveActiveNav("/app/musteriler/abc", sections).section?.id).toBe("musteriler");
     expect(resolveActiveNav("/app/ekip/izinler", sections).href).toBe("/app/ekip");
     expect(resolveActiveNav("/app/ayarlar/filigran", sections).href).toBe("/app/ayarlar");
-    expect(resolveActiveNav("/app/portfoyler/anahtarlar", sections).href).toBe("/app/portfoyler/anahtarlar");
+    // Anahtar Takibi ve Sunumlar Portföyler öğesinin sekmesidir (yol aynı, menü öğesi Portföyler).
+    expect(resolveActiveNav("/app/portfoyler/anahtarlar", sections).href).toBe("/app/portfoyler");
+    expect(resolveActiveNav("/app/akilli-listeler", sections).href).toBe("/app/musteriler");
+    expect(resolveActiveNav("/app/kayip-satis", sections).href).toBe("/app/anlasmalar");
     expect(resolveActiveNav("/app/portfoyler/42", sections).href).toBe("/app/portfoyler");
   });
 

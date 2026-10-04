@@ -64,6 +64,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/kvkk.ts", fn: "purgeStaleCustomers", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/kvkk.ts", fn: "requestCustomerErasure", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/lead-intake.ts", fn: "regenerateLeadToken", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/modules.ts", fn: "setTenantModuleByAdmin", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/network.ts", fn: "decideDemandResponse", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/network.ts", fn: "listMyDemandResponses", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/network.ts", fn: "listMyNetworkDemands", calls: 1, tenantFilter: "var" },

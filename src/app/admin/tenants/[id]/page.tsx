@@ -43,6 +43,8 @@ import {
 } from "@/lib/admin/office-360";
 import { loadOfficeManagement, officeAdminCanMap } from "@/lib/admin/office-management";
 import { OfficeManagement } from "./office-management";
+import { ModulePanel } from "./module-panel";
+import { loadTenantModuleState } from "@/lib/modules/state";
 import { SubscriptionPanel } from "./subscription-panel";
 import { CORE_MODULES, moduleForAction } from "./module-map";
 import {
@@ -154,7 +156,9 @@ export default async function AdminTenantDetailPage({
   if (active === "yonetim") {
     const can = officeAdminCanMap(staff.role);
     const mgmt = await loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note });
+    const moduleState = await loadTenantModuleState(admin, id);
     content = (
+      <>
       <OfficeManagement
         tenant={{
           id: tenant.id,
@@ -184,6 +188,14 @@ export default async function AdminTenantDetailPage({
         minTrialDate={daysFromNowIso(1).slice(0, 10)}
         legalHref={tabHref("yasal")}
       />
+      <ModulePanel
+        tenantId={tenant.id}
+        closed={moduleState.closed}
+        locked={moduleState.locked}
+        status={moduleState.status}
+        canEdit={can.plan_status}
+      />
+      </>
     );
   } else if (active === "zaman" || active === "yasal") {
     const tdata = await loadOfficeTimeline(admin, { id, name: tenant.name, created_at: tenant.created_at }, access, kpiData.sub);

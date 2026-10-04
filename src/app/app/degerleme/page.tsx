@@ -58,7 +58,7 @@ export default async function ValuationPage({
 }: {
   searchParams: Promise<{ property?: string }>;
 }) {
-  await requireModulePage("valuation");
+  await requireModulePage("valuation", "/app/degerleme");
   const { property: preselectedPropertyId } = await searchParams;
   const supabase = await createClient();
   const [

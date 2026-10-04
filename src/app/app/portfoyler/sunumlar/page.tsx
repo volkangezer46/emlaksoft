@@ -42,7 +42,7 @@ export default async function PresentationsPage({
 }: {
   searchParams?: Promise<{ portfoy?: string; musteri?: string }>;
 }) {
-  const { perms } = await requireModulePage("properties");
+  const { perms } = await requireModulePage("properties", "/app/portfoyler/sunumlar");
   const canDelete = (perms.properties ?? []).includes("edit");
   // Müşteri seçici yalnız müşteri görebilenlere; göremeyene liste sızmasın.
   const canSeeCustomers = (perms.customers ?? []).includes("view");

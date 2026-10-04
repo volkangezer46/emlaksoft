@@ -18,6 +18,8 @@ import {
   UserRound,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PublicModuleClosed } from "@/components/modules/public-module-closed";
+import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { PrintButton } from "./print-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
@@ -103,6 +105,7 @@ export default async function PublicPresentationPage({
       : Promise.resolve({ data: [] }),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, pres.tenant_id, "presentations")) return <PublicModuleClosed officeName={tenant.name} />;
 
   // Sunum sonrası taslağa çekilen/silinen portföyler linke sızmasın
   // (public medya API'siyle aynı çizgi); seçim sırası korunur.

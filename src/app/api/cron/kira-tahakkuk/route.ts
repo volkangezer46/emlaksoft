@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { computeLegalIncrease } from "@/lib/tufe";
+import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -69,11 +70,14 @@ export async function GET(req: NextRequest) {
   const period = `${today.slice(0, 7)}-01`;
 
   // ---- 1) Bu ayın eksik tahakkuklarını oluştur ----
-  const { data: rentals, error: rentalsErr } = await admin
+  // Modül kapısı: "Kiralama" kapalı ofislerde tahakkuk/gecikme/yenileme üretilmez (veri silinmez).
+  const disabledModules = await getDisabledModulesByTenant(admin);
+  const { data: allRentals, error: rentalsErr } = await admin
     .from("rentals")
     .select("id, tenant_id, monthly_rent, due_day, start_date, end_date, property:properties!rentals_property_id_fkey(property_code, title)")
     .eq("status", "active")
     .limit(2000);
+  const rentals = (allRentals ?? []).filter((r) => !isDisabledFor(disabledModules, String(r.tenant_id), "rentals"));
 
   if (rentalsErr) {
     console.error("kira-tahakkuk cron rentals", rentalsErr);
@@ -137,6 +141,7 @@ export async function GET(req: NextRequest) {
   let overdueCount = 0;
 
   for (const c of ((pending ?? []) as ChargeRow[])) {
+    if (isDisabledFor(disabledModules, c.tenant_id, "rentals")) continue;
     const rentalRel = Array.isArray(c.rental) ? c.rental[0] : c.rental;
     const dueDay = rentalRel?.due_day ?? 1;
     const due = dueDateOf(String(c.period).slice(0, 10), dueDay);
