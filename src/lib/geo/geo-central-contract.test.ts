@@ -20,7 +20,7 @@ const FROM_EXCEPTIONS: Record<string, string> = {};
 /** (c) dosya -> gerekçe (rollout bekleyen serbest metin alanları). */
 const FREE_TEXT_EXCEPTIONS: Record<string, string> = {
   "src/app/admin/satis/lead-panel.tsx":
-    "ROLLOUT BEKLİYOR: platform ön satış potansiyel müşterisinin şehri (ofis değil, coğrafya kaydına bağlanmaz); demo_requests.province_id taslağı (supabase/proposed/20260820000100) sonrası çevrilecek",
+    "ROLLOUT BEKLİYOR: platform ön satış potansiyel müşterisinin şehri (ofis değil, coğrafya kaydına bağlanmaz); demo_requests.province_id taslağı (supabase/proposed/20261005000600) sonrası çevrilecek",
   "src/app/odeme-link/[token]/pay-buttons.tsx":
     "ROLLOUT BEKLİYOR: ödeme alıcısı fatura adresi sağlayıcıya serbest metin gider (lib/billing/buyer.ts sözleşmesi); ödeme akışı bu görev dışı",
 };

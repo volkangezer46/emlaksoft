@@ -57,6 +57,8 @@ import {
   type ViewOption,
 } from "@/components/ui/list-kit";
 import { buildHref } from "@/lib/ui/filter-params";
+import { applyPropertyNlFilters, hasPropertyNlFilters, normalizePropertyNlParams, propertyNlUrlParams } from "@/lib/nl-search/property-filters";
+import { fetchPhotoGapIds } from "@/lib/photo-quality/load";
 import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
@@ -186,6 +188,19 @@ export default async function PropertiesPage({
     yogunluk?: string;
     yeni?: string;
     danisman?: string;
+    // Doğal dil arama (F2) + foto denetimi (F3) filtreleri — bkz. src/lib/nl-search/property-filters.ts
+    islem?: string;
+    oda?: string;
+    fiyat_min?: string;
+    fiyat_max?: string;
+    m2_min?: string;
+    m2_max?: string;
+    kat_min?: string;
+    kat_max?: string;
+    il?: string;
+    ilce?: string;
+    mahalle?: string;
+    foto?: string;
   }>;
 }) {
   const { perms } = await requireModulePage("properties");
@@ -207,6 +222,9 @@ export default async function PropertiesPage({
   const danismanF = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.danisman ?? "") ? params.danisman! : "";
   const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
+  const nlFilters = normalizePropertyNlParams(params);
+  // "Foto eksik" (F3): sayı + kapak kuralıyla eksik portföy id'leri (en çok PHOTO_GAP_ID_CAP).
+  const photoGap = nlFilters.fotoEksik ? await fetchPhotoGapIds(supabase) : null;
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews(PATH);
 
@@ -219,6 +237,7 @@ export default async function PropertiesPage({
   if (kategoriF) urlParams.kategori = kategoriF;
   if (danismanF) urlParams.danisman = danismanF;
   if (eklenenDays) urlParams.eklenen = String(eklenenDays);
+  Object.assign(urlParams, propertyNlUrlParams(nlFilters));
   if (siralaF) urlParams.sirala = siralaF;
   if (view !== "liste") urlParams.gorunum = view;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
@@ -273,6 +292,8 @@ export default async function PropertiesPage({
     if (addedSince) query = query.gte("created_at", addedSince);
     if (qOrClause) query = query.or(qOrClause);
     if (danismanF) query = query.eq("assigned_to", danismanF);
+    query = applyPropertyNlFilters(query, nlFilters);
+    if (photoGap) query = query.in("id", photoGap.ids.length > 0 ? photoGap.ids : ["00000000-0000-0000-0000-000000000000"]);
     return query;
   };
   const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
@@ -281,7 +302,7 @@ export default async function PropertiesPage({
     return query;
   };
 
-  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF;
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !hasPropertyNlFilters(nlFilters);
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
@@ -551,6 +572,18 @@ export default async function PropertiesPage({
     { key: "saglik", label: "Fiyat sağlığı", format: (v) => SAGLIK_FILTERS.find((f) => f.value === v)?.label ?? v },
     { key: "kategori", label: "Tip" },
     { key: "eklenen", label: "Eklenme", format: (v) => `son ${v} gün` },
+    { key: "islem", label: "İşlem" },
+    { key: "oda", label: "Oda", format: (v) => v.split(",").join(" / ") },
+    { key: "fiyat_min", label: "Fiyat en az", format: (v) => `${Number(v).toLocaleString("tr-TR")} TL` },
+    { key: "fiyat_max", label: "Fiyat en çok", format: (v) => `${Number(v).toLocaleString("tr-TR")} TL` },
+    { key: "m2_min", label: "Alan en az", format: (v) => `${v} m²` },
+    { key: "m2_max", label: "Alan en çok", format: (v) => `${v} m²` },
+    { key: "kat_min", label: "Kat en az" },
+    { key: "kat_max", label: "Kat en çok" },
+    { key: "il", label: "İl", format: () => "seçili" },
+    { key: "ilce", label: "İlçe", format: () => "seçili" },
+    { key: "mahalle", label: "Mahalle", format: () => "seçili" },
+    { key: "foto", label: "Fotoğraf", format: () => "eksik" },
   ]);
   const anyFilter = chips.length > 0;
 
@@ -576,7 +609,23 @@ export default async function PropertiesPage({
         <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
         <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
         <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
+        <ButtonLink
+          href={hrefWith({ foto: nlFilters.fotoEksik ? "" : "eksik", sayfa: "" })}
+          variant={nlFilters.fotoEksik ? "secondary" : "ghost"}
+          size="sm"
+        >
+          Foto eksik{photoGap?.enabled ? ` (${photoGap.total})` : ""}
+        </ButtonLink>
+        <ButtonLink href="/app/mahalle-notlari" variant="ghost" size="sm">Mahalle notları</ButtonLink>
       </div>
+      {photoGap && !photoGap.enabled ? (
+        <p className="text-xs text-text-muted">Foto denetimi etkin değil: medya kayıtları okunamadı.</p>
+      ) : null}
+      {photoGap?.truncated ? (
+        <p className="text-xs text-text-muted">
+          Fotoğrafı eksik {photoGap.total} portföy var; en yeni {photoGap.ids.length} tanesi listeleniyor. Diğer filtrelerle daraltın.
+        </p>
+      ) : null}
 
       {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden */}
       <KpiStrip items={kpis} />

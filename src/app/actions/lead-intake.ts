@@ -45,7 +45,7 @@ export async function regenerateLeadToken(): Promise<void> {
   });
   if (error) {
     console.error("regenerateLeadToken", { code: error.code });
-    throw new Error("Lead bağlantı anahtarı yenilenemedi.");
+    throw new Error("Aday bağlantı anahtarı yenilenemedi.");
   }
 
   await logActivity({

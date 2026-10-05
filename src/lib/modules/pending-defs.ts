@@ -23,6 +23,7 @@ export const PENDING_DEFS: readonly PendingDef[] = [
   { id: "approval-open", module: "approvals", label: "bekleyen onay", table: "approval_requests",column: "status", values: ["bekliyor"], href: "/app/onaylar" },
   { id: "offer-submitted", module: "offers", label: "yanıt bekleyen teklif", table: "offers", column: "status", values: ["submitted"], href: "/app/teklifler?durum=submitted" },
   { id: "offer-countered", module: "offers", label: "karşı teklif aşamasındaki teklif", table: "offers", column: "status", values: ["countered"], href: "/app/teklifler?durum=countered" },
+  { id: "survey-pending", module: "surveys", label: "yanıt bekleyen anket görevi", table: "survey_tasks", column: "status", values: ["pending"], href: "/app/anketler/kuyruk?durum=bekleyen" },
   { id: "automation-active", module: "automation", label: "aktif otomasyon kuralı", table: "automations", column: "status", values: ["active"], href: "/app/otomasyonlar?durum=aktif" },
 ];
 

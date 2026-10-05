@@ -1,185 +1,205 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react";
-import { TOUR_PARAM, TOUR_STORAGE_KEY } from "@/lib/product-tour-storage";
+import { useClosedModules } from "@/components/app/closed-modules-context";
 import {
   Dialog,
   DialogDescription,
   DialogFullscreenContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { now } from "@/lib/clock";
+import type { AppModule } from "@/lib/permissions";
+import { TOURS, getTour, resolveTourSteps, tourIdForRole, type TourId, type TourStepDef } from "@/lib/product-tour-data";
+import { TOUR_PARAM, isTourDone, markTourDone } from "@/lib/product-tour-storage";
 
 /**
- * İlk giriş ürün turu — ölçümü yerel, modal davranışı ortak Radix altyapısında
- * çalışan spotlight.
+ * Rol bazlı ürün turları — ölçümü yerel, modal davranışı ortak Radix altyapısında çalışan spotlight.
+ * Turların içeriği TEK veri dosyasındadır: `src/lib/product-tour-data.ts`.
  *
- * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran overlay
- * içinde hedef boyutunda şeffaf bir "delik" div'i konumlanır ve devasa bir
- * box-shadow (0 0 0 9999px) geri kalan her yeri karartır. Konum transform ile
- * verilir, adımlar arasında opacity geçişi vardır (CLS üretmez).
+ * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran katman içinde hedef boyutunda şeffaf bir
+ * "delik" konumlanır ve devasa bir box-shadow geri kalanı karartır. Konum yalnız transform ile verilir,
+ * adımlar arasında opacity geçişi vardır (CLS üretmez). Adım başka bir sayfadaysa router ile oraya gidilir;
+ * hedef 3 sn içinde görünmezse adım sessizce atlanır.
  *
  * KURALLAR:
- * - localStorage "emlaksoft:tour-done" → bir kez gösterilir (tur başlar
- *   başlamaz yazılır; yarıda navigasyon olsa da tekrar rahatsız etmez).
- * - /app?tur=1 → daha önce görülmüş olsa bile yeniden başlar (Yardım sayfası
- *   ve kullanıcı menüsündeki "Turu yeniden başlat").
- * - Dar ekranda (telefon) da çalışır: balon ekranın altına sabitlenir.
- * - ?tv=1 (TV modu) ve prefers-reduced-motion'da (yeniden başlatma hariç) hiç başlamaz.
- * - SSR güvenli: yalnız effect sonrası (DOM ölçülebilirken) render edilir.
- * - Bulunamayan / görünmeyen hedefin adımı sessizce atlanır (ör. komut
- *   paleti butonu ya da brifing kartı o an DOM'da yoksa).
+ * - Otomatik başlama yalnız ana ekranda, rolün turu daha önce görülmediyse (localStorage, try/catch) ve
+ *   prefers-reduced-motion KAPALIYSA olur. Depolama yoksa "bir kez" garantisi verilemez → otomatik başlamaz.
+ * - /app?tur=1 → rolün turu; /app?tur=<tur-kimliği> → o tur (Yardım sayfası ve kullanıcı menüsü).
+ *   Yeniden başlatma, hareket azaltma açık olsa bile çalışır.
+ * - Klavye: sağ/sol ok = ileri/geri, Esc = kapat, düğmeler odaklanabilir. Dar ekranda balon alta sabitlenir.
+ * - ?tv=1 ve TV panosunda hiç başlamaz. SSR güvenli: yalnız effect sonrası render edilir.
  */
 
-const STORAGE_KEY = TOUR_STORAGE_KEY;
 const PAD = 8; // delik ile hedef arası nefes payı (px)
 const CARD_W = 336; // balon kart genişliği (px)
 const CARD_H = 250; // yerleşim hesabı için tahmini kart yüksekliği (px)
 const GAP = 12; // delik ile kart arası boşluk (px)
-
-type TourStep = { selector: string; title: string; desc: string; descMobile?: string };
-
-const STEPS: TourStep[] = [
-  {
-    selector: '[data-tour="brifing"]',
-    title: "Bugünkü işleriniz",
-    desc: "Bugün yapmanız gereken randevular, görevler ve aranacak müşteriler burada özetlenir.",
-  },
-  {
-    selector: '[data-tour="kpi"]',
-    title: "Ofisinizin rakamları",
-    desc: "Müşteri, talep ve komisyon sayılarını görürsünüz. Bir rakama dokunursanız o kayıtların listesi açılır.",
-  },
-  {
-    selector: '[data-tour="aksiyonlar"]',
-    title: "Görevleriniz",
-    desc: "Bir kaydı açıp görevi tamamlayabilir veya müşteriyi arayabilirsiniz.",
-  },
-  {
-    selector: '[data-tour="arama"]',
-    title: "Arama kutusu",
-    desc: "Müşteri adı, ilan numarası veya görev yazın; hepsi tek kutudan bulunur. Bilgisayarda Ctrl+K kısayolu da açar.",
-    descMobile: "Üstteki Arama simgesine dokunun; müşteri adı, ilan numarası veya görev yazın, hepsi tek kutudan bulunur.",
-  },
-  {
-    selector: "aside",
-    title: "Menü",
-    desc: "Tüm sayfalar solda başlıklar altında durur. Yalnızca yetkiniz olan sayfalar görünür.",
-  },
-];
+const FIND_TRIES = 30; // 30 x 100 ms = 3 sn hedef bekleme
 
 type Rect = { top: number; left: number; width: number; height: number };
 type Phase = "idle" | "run" | "final" | "off";
 
-/** Seçiciyle eşleşen ilk *görünür* elementi döndürür (mobilde gizli aside vb. elenir). */
-function findTarget(selector: string): HTMLElement | null {
-  const all = document.querySelectorAll<HTMLElement>(selector);
-  for (const el of all) {
-    const r = el.getBoundingClientRect();
-    if (r.width > 4 && r.height > 4) return el;
+/** Seçicilerden ilk *görünür* elementi döndürür (mobilde gizli aside vb. elenir). */
+function findTarget(selectors: readonly string[]): HTMLElement | null {
+  for (const selector of selectors) {
+    for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4) return el;
+    }
   }
   return null;
 }
 
-export function ProductTour() {
+export function ProductTour({ role, accessible }: { role: string; accessible: readonly AppModule[] }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const closed = useClosedModules();
   const [phase, setPhase] = useState<Phase>("idle");
-  const [activeSteps, setActiveSteps] = useState<TourStep[]>([]);
+  const [tourId, setTourId] = useState<TourId | null>(null);
+  const [steps, setSteps] = useState<TourStepDef[]>([]);
   const [index, setIndex] = useState(0);
-  const [rect, setRect] = useState<Rect | null>(null);
+  const [measured, setMeasured] = useState<{ index: number; rect: Rect } | null>(null);
   const [mobile, setMobile] = useState(false);
+  const dirRef = useRef<1 | -1>(1);
+
+  // Başlatıcıların her render'da yeniden kurulmaması için en güncel bağlam ref'te tutulur.
+  const ctxRef = useRef({ role, accessible, closed });
+  useEffect(() => {
+    ctxRef.current = { role, accessible, closed };
+  }, [role, accessible, closed]);
+
+  const begin = useCallback((id: TourId): boolean => {
+    const c = ctxRef.current;
+    const resolved = resolveTourSteps(id, { accessible: c.accessible, closed: c.closed, role: c.role });
+    if (resolved.length === 0) return false;
+    markTourDone(id, new Date(now()).toISOString());
+    dirRef.current = 1;
+    setMobile(window.innerWidth < 768);
+    setTourId(id);
+    setSteps(resolved);
+    setIndex(0);
+    setMeasured(null);
+    setPhase("run");
+    return true;
+  }, []);
 
   // Başlatma koşulları — yalnız effect'te (SSR güvenli)
   useEffect(() => {
-    let done = false;
+    if (phase === "run" || phase === "final" || !role) return;
     const params = new URLSearchParams(window.location.search);
-    const forced = params.get(TOUR_PARAM) === "1";
-    if (params.get("tv") === "1") return;
-    if (!forced) {
-      try {
-        done = Boolean(window.localStorage.getItem(STORAGE_KEY));
-      } catch {
-        return; // localStorage yoksa "bir kez" garantisi verilemez → hiç gösterme
-      }
-      if (done) return;
+    if (params.get("tv") === "1" || pathname.startsWith("/app/pano-tv")) return;
+    const raw = params.get(TOUR_PARAM);
+    let id: TourId;
+    if (raw) {
+      id = getTour(raw)?.id ?? tourIdForRole(role);
+    } else {
+      if (pathname !== "/app") return;
+      id = tourIdForRole(role);
+      if (isTourDone(id) !== false) return; // görüldü ya da depolama yok → rahatsız etme
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     }
-
     // Giriş animasyonları otursun, sayfa ölçülebilir olsun
     const t = window.setTimeout(() => {
-      const found = STEPS.filter((s) => findTarget(s.selector));
-      if (found.length === 0) return;
-      try {
-        window.localStorage.setItem(STORAGE_KEY, "1");
-      } catch {
-        /* yazılamazsa yine de bu oturumda göster */
-      }
-      if (forced) {
-        // Adres çubuğunda ?tur=1 kalmasın: sayfa yenilenince tur tekrar açılmasın.
+      if (raw) {
+        // Adres çubuğunda ?tur=… kalmasın: sayfa yenilenince tur tekrar açılmasın.
         params.delete(TOUR_PARAM);
         const qs = params.toString();
         window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
       }
-      setMobile(window.innerWidth < 768);
-      setActiveSteps(found);
-      setIndex(0);
-      setPhase("run");
+      begin(id);
     }, 800);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [pathname, phase, role, begin]);
 
   const close = useCallback(() => setPhase("off"), []);
 
   const next = useCallback(() => {
+    dirRef.current = 1;
     setIndex((i) => {
-      if (i + 1 >= activeSteps.length) {
+      if (i + 1 >= steps.length) {
         setPhase("final");
         return i;
       }
       return i + 1;
     });
-  }, [activeSteps.length]);
+  }, [steps.length]);
 
-  const prev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+  const prev = useCallback(() => {
+    dirRef.current = -1;
+    setIndex((i) => Math.max(0, i - 1));
+  }, []);
 
-  // Aktif adımın hedefini ölç; resize/scroll'da pozisyonu güncelle
+  // Aktif adım: gerekirse sayfaya git, hedefi bekle, ölç; resize/scroll'da pozisyonu güncelle
   useEffect(() => {
     if (phase !== "run") return;
-    const step = activeSteps[index];
+    const step = steps[index];
     if (!step) return;
-    const el = findTarget(step.selector);
-    if (!el) {
-      // Hedef bu arada kaybolduysa adımı sessizce atla — setState'i
-      // senkron değil mikro-gecikmeyle yap (react-hooks/set-state-in-effect)
-      const skip = setTimeout(() => {
-        if (index + 1 >= activeSteps.length) setPhase("final");
-        else setIndex(index + 1);
-      }, 0);
-      return () => clearTimeout(skip);
-    }
-    el.scrollIntoView({ block: mobile ? "start" : "center", behavior: "smooth" });
-    const update = () => {
-      const r = el.getBoundingClientRect();
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-    };
-    update();
+    let cancelled = false;
+    let poll: number | undefined;
     let raf = 0;
-    const onMove = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(update);
+    let detach: (() => void) | undefined;
+
+    // Hedef bulunamazsa adımı sessizce atla (geri giderken geriye, yoksa ileriye)
+    const skip = () => {
+      if (dirRef.current === -1 && index > 0) setIndex(index - 1);
+      else if (index + 1 >= steps.length) setPhase("final");
+      else {
+        dirRef.current = 1;
+        setIndex(index + 1);
+      }
     };
-    window.addEventListener("resize", onMove);
-    window.addEventListener("scroll", onMove, true);
+
+    const attach = (el: HTMLElement) => {
+      el.scrollIntoView({ block: mobile ? "start" : "center", behavior: "smooth" });
+      const update = () => {
+        const r = el.getBoundingClientRect();
+        setMeasured({ index, rect: { top: r.top, left: r.left, width: r.width, height: r.height } });
+      };
+      update();
+      const onMove = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(update);
+      };
+      window.addEventListener("resize", onMove);
+      window.addEventListener("scroll", onMove, true);
+      detach = () => {
+        window.removeEventListener("resize", onMove);
+        window.removeEventListener("scroll", onMove, true);
+      };
+    };
+
+    let tries = 0;
+    const look = () => {
+      if (cancelled) return;
+      const el = findTarget(step.selectors);
+      if (el) return attach(el);
+      if (++tries > FIND_TRIES) return skip();
+      poll = window.setTimeout(look, 100);
+    };
+    // Sayfa değişimi ve ilk ölçüm mikro-gecikmeyle (react-hooks/set-state-in-effect)
+    poll = window.setTimeout(() => {
+      if (cancelled) return;
+      if (window.location.pathname !== step.path) router.push(step.path);
+      look();
+    }, 0);
+
     return () => {
+      cancelled = true;
+      if (poll !== undefined) window.clearTimeout(poll);
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onMove);
-      window.removeEventListener("scroll", onMove, true);
+      detach?.();
     };
-  }, [phase, index, activeSteps, mobile]);
+  }, [phase, index, steps, mobile, router]);
 
   if (phase === "idle" || phase === "off") return null;
 
   // ---- Bitiş ekranı: delik yok, ortalanmış kart ----
   if (phase === "final") {
+    const tour = tourId ? getTour(tourId) : null;
+    const others = TOURS.filter((t) => t.id !== tourId && resolveTourSteps(t.id, { accessible, closed, role }).length > 0);
     return (
       <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
         <DialogFullscreenContent
@@ -197,9 +217,24 @@ export function ProductTour() {
           </DialogTitle>
           <DialogDescription asChild>
             <p className="mt-1 text-sm text-text-muted">
-              Tur bitti. Takıldığınızda soldaki menüden Yardım ve Destek sayfasını açın; turu oradan istediğiniz zaman yeniden başlatabilirsiniz.
+              {tour ? `${tour.label} bitti. ` : "Tur bitti. "}
+              Takıldığınızda soldaki menüden Yardım ve Destek sayfasını açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz.
             </p>
           </DialogDescription>
+          {others.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Başka turlar">
+              {others.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => begin(t.id)}
+                  className="focus-ring press min-h-11 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={close}
@@ -214,7 +249,8 @@ export function ProductTour() {
   }
 
   // ---- Spotlight adımı ----
-  const step = activeSteps[index];
+  const step = steps[index];
+  const rect = measured && measured.index === index ? measured.rect : null;
   if (!step || !rect) return null;
 
   const vw = document.documentElement.clientWidth;
@@ -250,6 +286,7 @@ export function ProductTour() {
   }
   cardLeft = mobile ? 16 : Math.max(16, Math.min(cardLeft, vw - CARD_W - 16));
   cardTop = Math.max(16, cardTop);
+  const tourLabel = tourId ? (getTour(tourId)?.label ?? "Tur") : "Tur";
 
   return (
     <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
@@ -287,7 +324,7 @@ export function ProductTour() {
       >
         <div className="flex items-start justify-between gap-3">
           <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-600">
-            Adım {index + 1} / {activeSteps.length}
+            {tourLabel} · Adım {index + 1} / {steps.length}
           </span>
           <button
             type="button"
@@ -297,6 +334,16 @@ export function ProductTour() {
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Tur ilerlemesi"
+          aria-valuemin={1}
+          aria-valuemax={steps.length}
+          aria-valuenow={index + 1}
+          className="mt-2 h-1 w-full overflow-hidden rounded-full bg-line"
+        >
+          <div className="h-full origin-left rounded-full bg-brand-600" style={{ transform: `scaleX(${(index + 1) / steps.length})` }} />
         </div>
         <DialogTitle asChild>
           <h2 className="mt-2 font-display text-base font-bold text-ink-950">{step.title}</h2>
@@ -326,7 +373,7 @@ export function ProductTour() {
               onClick={next}
               className="focus-ring press inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-1.5 text-sm font-bold text-white transition hover:bg-brand-700"
             >
-              {index + 1 >= activeSteps.length ? "Bitir" : "İleri"} <ArrowRight className="h-3.5 w-3.5" />
+              {index + 1 >= steps.length ? "Bitir" : "İleri"} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

@@ -1,15 +1,17 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { KeyRound, LogOut, Save } from "lucide-react";
+import { KeyRound, LogOut, Mail, Save } from "lucide-react";
 import {
   changeMyPassword,
+  requestMyEmailChange,
   signOutOtherDevices,
   updateMyProfile,
   type AccountResult,
 } from "@/app/actions/account";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { EmailInput } from "@/components/ui/email-input";
 import { FormField, FormInput } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 
@@ -50,7 +52,7 @@ export function ProfileForm({
       <FormField label="Unvan" htmlFor="hs-title" hint="Kartvizit ve ekip listesinde görünür.">
         <FormInput id="hs-title" name="title" maxLength={80} defaultValue={title ?? ""} />
       </FormField>
-      <FormField label="E-posta (giriş kimliği)" htmlFor="hs-giris" hint="E-posta değişikliği için destek ile iletişime geçin.">
+      <FormField label="E-posta (giriş kimliği)" htmlFor="hs-giris" hint="Değiştirmek için aşağıdaki E-posta adresini değiştir kartını kullanın.">
         <FormInput id="hs-giris" value={email} readOnly disabled />
       </FormField>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
@@ -101,5 +103,28 @@ export function OtherDevicesForm() {
       )}
       <Result state={state} />
     </div>
+  );
+}
+
+/** Güvenli e-posta değişimi: parola onayı + yeni adrese doğrulama bağlantısı; onaya kadar eski adres geçerli. */
+export function EmailChangeForm({ email }: { email: string }) {
+  const [state, action, pending] = useActionState(requestMyEmailChange, initial);
+  return (
+    <form action={action} className="grid max-w-xl gap-4">
+      <p className="text-sm text-text-muted">
+        Şu anki giriş e-postanız: <span className="font-semibold text-text">{email}</span>. Yeni adrese bir doğrulama
+        bağlantısı gönderilir; bağlantıyı onaylayana kadar eski adresiniz geçerli kalır.
+      </p>
+      <FormField label="Yeni e-posta" htmlFor="em-new" required>
+        <EmailInput id="em-new" name="new_email" required />
+      </FormField>
+      <FormField label="Mevcut parola" htmlFor="em-pw" required hint="Güvenlik için parolanız yeniden doğrulanır.">
+        <FormInput id="em-pw" name="current_password" type="password" required autoComplete="current-password" />
+      </FormField>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" icon={Mail} loading={pending}>Doğrulama bağlantısı gönder</Button>
+        <Result state={state} />
+      </div>
+    </form>
   );
 }

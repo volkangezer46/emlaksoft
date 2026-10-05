@@ -37,7 +37,10 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     for (const gate of PLAN_GATES) expect(labels).toContain(gate.title);
     for (const row of groups.flatMap((g) => g.rows)) expect(row.cells).toHaveLength(PLANS.length);
     const monthly = groups[0]!.rows[0]!.cells.map((c) => c.text);
-    PLANS.forEach((p, i) => expect(monthly[i]).toContain(p.monthlyTry.toLocaleString("tr-TR")));
+    // Özel fiyatlı paket (Kurumsal) tutar yerine "Özel teklif" gösterir; diğerleri liste fiyatını.
+    PLANS.forEach((p, i) =>
+      expect(monthly[i]).toContain(p.customPricing ? "Özel teklif" : p.monthlyTry.toLocaleString("tr-TR")),
+    );
   });
 
   it("kayıp-kaçak yalnız Profesyonel ve üzeri, yıllık indirim plans.ts ile tutarlı", () => {
@@ -70,14 +73,15 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     }
     const kayit = read("src/app/kayit/register-form.tsx");
     expect(kayit).toContain("Kredi kartı gerekmez");
-    expect(kayit).toContain("14 gün ücretsiz");
+    expect(kayit).not.toContain("14 gün");
+    expect(kayit).toContain("trialDays");
     expect(read("src/components/pricing.tsx")).toContain("KDV hariç");
   });
 
   it("FAQ JSON-LD yalnız görünen SSS'den üretilir", () => {
     const page = read("src/app/fiyatlar/page.tsx");
     expect(page).toContain("faq.map");
-    expect(page.match(/const faq = buildFaq\(\)/g)).toHaveLength(1);
+    expect(page.match(/const faq = buildFaq\(/g)).toHaveLength(1);
   });
 
   it("hesaplayıcı commission.ts'i yeniden kullanır ve sektör verisi yoktur", () => {

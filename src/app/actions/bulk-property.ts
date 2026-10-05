@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { createClient } from "@/lib/supabase/server";
+import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
+import { publishBlockReason } from "@/lib/property-owner/server";
 
 const MANUAL_STATUSES = ["draft", "live", "reserved", "passive", "withdrawn", "archived"] as const;
 
@@ -28,8 +31,40 @@ export async function bulkUpdatePropertyStatus(
   if (!(MANUAL_STATUSES as readonly string[]).includes(newStatus)) {
     return { error: "Satıldı/kiralandı durumları yalnız anlaşma ve kiralama akışından seçilebilir." };
   }
-  const uniqueIds = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
+  let uniqueIds = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
   if (!uniqueIds.length) return { error: "Güncellenecek portföy seçilmedi." };
+
+  // Yayın kapısı: havuzda bekleyen veya eksik ilan sahibi bilgisi olan ilan yayına alınamaz.
+  if (newStatus === "live") {
+    const supabase = await createClient();
+    for (const id of uniqueIds) {
+      const blocked = await publishBlockReason(supabase, gate.tenantId, id);
+      if (blocked) return { error: blocked };
+    }
+  }
+
+  // Ofis kontrol onay kapisi (varsayilan kapali): arsive alma = ilan silme kapisi (listing_delete).
+  // Kapi YALNIZ uygulama katmanidir (bkz. oversight/approval-store.ts). Onayi gecen ilanlar arsivlenir,
+  // bekleyen/hata verenler atlanir ve kullaniciya bildirilir (onay tek kullanimlik oldugu icin kismi uygulama).
+  let blockedMessage: string | null = null;
+  let blockedCount = 0;
+  if (newStatus === "archived") {
+    const passed: string[] = [];
+    for (const id of uniqueIds) {
+      const approval = await requestApprovalIfNeeded(gate.tenantId, gate.userId, "listing_delete", {
+        entityId: id,
+        entityType: "property",
+      });
+      if (approval.status !== "not_required" && approval.status !== "approved") {
+        blockedCount += 1;
+        blockedMessage ??= approval.message;
+      } else {
+        passed.push(id);
+      }
+    }
+    if (!passed.length) return { error: blockedMessage ?? "Onay kapısı işlemi durdurdu." };
+    uniqueIds = passed;
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("transition_property_status_atomic", {
@@ -49,5 +84,9 @@ export async function bulkUpdatePropertyStatus(
 
   revalidatePath("/app/portfoyler");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, updatedCount: Number(result.updated_count ?? 0) };
+  const updatedCount = Number(result.updated_count ?? 0);
+  if (blockedCount > 0) {
+    return { error: `${updatedCount} ilan arşivlendi; ${blockedCount} ilan yönetici onayı bekliyor. ${blockedMessage ?? ""}`.trim(), updatedCount };
+  }
+  return { ok: true, updatedCount };
 }

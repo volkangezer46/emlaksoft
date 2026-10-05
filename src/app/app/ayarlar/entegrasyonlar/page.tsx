@@ -8,7 +8,7 @@ export const metadata = { title: "Entegrasyonlar" };
 
 const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; sub: string }[] = [
   { key: "resmi", label: "Resmi kayıt & kamu", icon: Landmark, sub: "Yerel sistemlere bağlanmak rakiplerin geçemeyeceği hendek." },
-  { key: "iletisim", label: "İletişim kanalları", icon: MessageSquare, sub: "Türkiye'nin fiili kanalı WhatsApp + sosyal lead yakalama." },
+  { key: "iletisim", label: "İletişim kanalları", icon: MessageSquare, sub: "Türkiye'nin fiili kanalı WhatsApp + sosyal aday yakalama." },
   { key: "degerleme", label: "Değerleme & finans", icon: LineChart, sub: "Emsal motorunu ve finansmanı gerçek veriyle besle." },
   { key: "medya", label: "Medya & AI", icon: ImageIcon, sub: "Görsel kalitesini yapay zekâ ile yükselt." },
   { key: "operasyon", label: "Ödeme, fatura & yayın", icon: CreditCard, sub: "Para ve ilan akışlarını doğrulanmış sağlayıcı sözleşmeleriyle yürüt." },

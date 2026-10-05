@@ -21,12 +21,15 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
-import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { formatNumberTr } from "@/lib/format";
+import { PLANS, getPlan, planAmountOf, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import {
   defaultTeamSizeForPlan,
   registrationPlanForTeamSize,
   type RegistrationTeamSize,
 } from "@/lib/billing/registration-plan";
+
+import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
 
 const initial: AuthResult = {};
 
@@ -57,10 +60,18 @@ export function RegisterForm({
   initialPlan = "office",
   initialCycle = "monthly",
   plans = PLANS,
+  trialDays,
+  offers,
+  attribution,
 }: {
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
   plans?: readonly PlanDef[];
+  /** Gerçekte verilen deneme günü (sunucuda getEffectiveTrialDays); yoksa sayı yazılmaz. */
+  trialDays?: number;
+  /** Etkin aylık fiyat (kampanya dahil), plan kimliğine göre. */
+  offers?: Record<string, { monthlyTry: number }>;
+  attribution?: SignupAttributionFields;
 }) {
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
@@ -75,6 +86,12 @@ export function RegisterForm({
   const errorTargetStep = state.error ? errorStep(state.error) : null;
   const selectedPlanId = registrationPlanForTeamSize(initialPlan, teamSize);
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? getPlan(selectedPlanId);
+  // Fiyat yalnız sunucudan gelen etkin teklifle gösterilir (sabit tutar yok); özel fiyatlı pakette gösterilmez.
+  const offerMonthly = offers?.[selectedPlan.id]?.monthlyTry;
+  const planPriceText =
+    offerMonthly && !selectedPlan.customPricing
+      ? ` · ${formatNumberTr(planAmountOf({ ...selectedPlan, monthlyTry: offerMonthly }, initialCycle))} ₺ ${initialCycle === "yearly" ? "/yıl" : "/ay"} + KDV`
+      : "";
 
   function validateStep(ref: React.RefObject<HTMLDivElement | null>) {
     const inputs = ref.current?.querySelectorAll<HTMLInputElement>("input");
@@ -97,7 +114,7 @@ export function RegisterForm({
   return (
     <AuthShell
       panelTitle="Ofisinizi 2 dakikada dijitalleştirin"
-      panelDesc="14 gün ücretsiz, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur."
+      panelDesc={`${trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme"}, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.`}
     >
       <div className="mt-8 lg:mt-0">
         <h1 className="font-display text-3xl font-extrabold text-ink-950">Ücretsiz başlayın</h1>
@@ -106,7 +123,7 @@ export function RegisterForm({
           className="mt-3 inline-flex rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-700"
           aria-live="polite"
         >
-          {selectedPlan.name} · {initialCycle === "yearly" ? "Yıllık" : "Aylık"} plan seçimi
+          {selectedPlan.name} · {initialCycle === "yearly" ? "Yıllık" : "Aylık"} plan seçimi{planPriceText}
         </p>
 
         {/* Adım göstergesi — tamamlanmış adımlar tıklanarak geri dönülebilir */}
@@ -150,6 +167,7 @@ export function RegisterForm({
         <form action={action} className="mt-7">
           <input type="hidden" name="plan" value={selectedPlanId} />
           <input type="hidden" name="cycle" value={initialCycle} />
+          <AttributionFields attribution={attribution} />
           {/* ADIM 1 — Hesap bilgileri */}
           <div ref={step1Ref} className={step === 1 ? "space-y-4" : "hidden"}>
             <div>
@@ -302,7 +320,7 @@ export function RegisterForm({
                 )}
               </button>
             </div>
-            <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · 14 gün ücretsiz · Taahhütsüz</p>
+            <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · {trialDays ? `${trialDays} gün ` : ""}ücretsiz deneme · Taahhütsüz</p>
           </div>
         </form>
 

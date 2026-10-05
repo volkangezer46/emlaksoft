@@ -2,7 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { revalidatePath } from "next/cache";
 import { generateContent, type ContentKind } from "@/lib/ai/content";
+import { logActivity } from "@/lib/activity";
+import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 
 export type AiContentResult = { text?: string; source?: "ai" | "template"; error?: string };
 
@@ -54,4 +57,50 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
   }, { tenantId: gate.tenantId, actorId: gate.userId });
 
   return { text, source };
+}
+
+export type SaveDescriptionResult = { ok?: boolean; error?: string };
+
+/**
+ * AI içerik panelinden üretilen (ve düzenlenen) ilan metnini portföyün açıklamasına yazar.
+ * Düzenleme panelindeki "Açıklama" alanıyla AYNI depo ve AYNI doğrulama (lib/property-description.ts):
+ * tek akış, mükerrer yazma yeri yok. Yalnız features.description değişir; diğer anahtarlar korunur.
+ */
+export async function savePropertyDescription(propertyId: string, text: string): Promise<SaveDescriptionResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const parsed = parsePropertyDescription(text);
+  if (!parsed.ok) return { error: parsed.error };
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("properties")
+    .select("features")
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!existing) return { error: "Portföy bulunamadı." };
+
+  const features = withDescription((existing.features ?? {}) as Record<string, unknown>, parsed.value);
+  const { error } = await supabase
+    .from("properties")
+    .update({ features })
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("savePropertyDescription", error);
+    return { error: "Açıklama kaydedilemedi. Lütfen tekrar deneyin." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "property.description_update",
+    entityType: "property",
+    entityId: propertyId,
+    newValue: { length: parsed.value?.length ?? 0 },
+  });
+  revalidatePath(`/app/portfoyler/${propertyId}`);
+  revalidatePath("/vitrin/[slug]/[id]", "page");
+  return { ok: true };
 }

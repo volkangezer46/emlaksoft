@@ -5,6 +5,10 @@ const updated: Record<string, unknown>[] = [];
 const importExisting: string[][] = [];
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/billing/plan-definitions", async () => {
+  const { getPlan } = await import("@/lib/billing/plans");
+  return { getPlanDefinition: vi.fn(async (id: string) => getPlan(id)) };
+});
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("@/lib/revalidate", () => ({ revalidateTenantData: vi.fn() }));
 vi.mock("@/lib/activity", () => ({ logActivity: vi.fn(async () => ({ ok: true })) }));

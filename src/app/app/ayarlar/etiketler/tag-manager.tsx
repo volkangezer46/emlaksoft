@@ -31,9 +31,10 @@ export function TagManager({ tags, canEdit }: { tags: { tag: string; count: numb
       const res = await renameCustomerTag(from, value);
       if (res.error) {
         setError(res.error);
+        if ((res.affected ?? 0) > 0) router.refresh();
         return;
       }
-      push(`${res.affected ?? 0} müşteride güncellendi`, "ok");
+      push(res.message ?? `${res.affected ?? 0} müşteride güncellendi`, "ok");
       setEditing(null);
       router.refresh();
     });
@@ -41,6 +42,11 @@ export function TagManager({ tags, canEdit }: { tags: { tag: string; count: numb
 
   return (
     <section className="surface-card rounded-[var(--radius-panel)] p-4 md:p-6">
+      {pending ? (
+        <p role="status" className="mb-3 text-sm text-text-muted">
+          Müşteri kayıtları parça parça güncelleniyor, lütfen sayfayı kapatmayın…
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="mb-3 text-sm font-semibold text-danger-500">
           {error}
@@ -108,8 +114,10 @@ export function TagManager({ tags, canEdit }: { tags: { tag: string; count: numb
                       confirmLabel="Kaldır"
                       onConfirm={async () => {
                         const res = await deleteCustomerTagEverywhere(tag);
-                        if (res.error) setError(res.error);
-                        else {
+                        if (res.error) {
+                          setError(res.error);
+                          if ((res.affected ?? 0) > 0) router.refresh();
+                        } else {
                           push(`${res.affected ?? 0} müşteriden kaldırıldı`, "ok");
                           router.refresh();
                         }

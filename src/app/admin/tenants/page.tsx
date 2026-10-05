@@ -10,7 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import type { CSSProperties } from "react";
-import { isPlanId, planLabel, PLANS } from "@/lib/billing/plans";
+import { isPlanId, planLabel } from "@/lib/billing/plans";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -124,11 +125,16 @@ export default async function AdminTenantsPage({
   });
   const activeRate = stats.filter((t) => t.status === "active").length / total;
 
-  const planCounts = PLANS.map((catalogPlan) => ({
-    key: catalogPlan.id,
-    label: catalogPlan.name,
-    count: stats.filter((t) => t.plan === catalogPlan.id).length,
-  }));
+  // Gizli planlar (örn. Business) yalnız bu planda ofis varsa listelenir; sayım hiçbir ofisi düşürmez.
+  const planDefs = await getPlanDefinitions();
+  const planCounts = planDefs
+    .map((catalogPlan) => ({
+      key: catalogPlan.id,
+      label: catalogPlan.name,
+      hidden: Boolean(catalogPlan.hidden),
+      count: stats.filter((t) => t.plan === catalogPlan.id).length,
+    }))
+    .filter((p) => !p.hidden || p.count > 0);
   const maxPlan = Math.max(1, ...planCounts.map((p) => p.count));
 
   return (
@@ -371,7 +377,9 @@ export default async function AdminTenantsPage({
                   tenantName={t.name}
                   currentPlan={t.plan}
                   currentStatus={t.status}
-                  planOptions={PLANS.map((catalogPlan) => [catalogPlan.id, catalogPlan.name] as [string, string])}
+                  planOptions={planDefs
+                    .filter((catalogPlan) => !catalogPlan.hidden || catalogPlan.id === t.plan)
+                    .map((catalogPlan) => [catalogPlan.id, catalogPlan.name] as [string, string])}
                   statusOptions={Object.entries(statusLabel)}
                 />
                 <Link

@@ -409,7 +409,7 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
       }
       if (input.seedSample) {
         try {
-          await insertSampleRecords(admin, tenantId, ownerId);
+          await insertSampleRecords(admin, tenantId, ownerId, { extrasDb: admin });
           const { error: markError } = await admin
             .from("tenants")
             .update({ sample_seeded_at: new Date().toISOString() })

@@ -14,7 +14,7 @@ export async function HedefKarti({ ctx }: { ctx: HomeCtx }) {
   const [officeTarget, commissionSummary, deals] = await Promise.all([
     loadOfficeTarget(ctx),
     loadCommissionSummary(ctx),
-    loadDeals(),
+    loadDeals(ctx),
   ]);
 
   const targetRevenue = Number(officeTarget?.target_revenue ?? 0);

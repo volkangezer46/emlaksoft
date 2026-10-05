@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { OG_SIZE, renderVitrinOg } from "@/lib/vitrin-og";
 
@@ -16,7 +17,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     .select("id, name, status, logo_url, brand_color")
     .eq("slug", slug)
     .maybeSingle();
-  if (!tenant || !isPublicTenantActive(tenant.status)) {
+  if (!tenant || !isPublicTenantActive(tenant.status) || !(await isVitrinEnabled(admin, tenant.id))) {
     return renderVitrinOg({ office: "EmlakSoft", title: "Vitrin bulunamadı" });
   }
   const { count } = await admin

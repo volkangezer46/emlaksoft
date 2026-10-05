@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { updateTenantPlanStatus } from "@/app/actions/platform";
+import { processOfficeClosureRequestByAdmin } from "@/app/actions/platform-tenant-closure";
 import {
   addTenantPlatformNote,
   addTenantUserByAdmin,
@@ -58,7 +59,8 @@ import {
   OFFICE_STATUS_LABELS,
   OFFICE_USER_ROLES,
 } from "@/lib/admin/office-create-rules";
-import type { ManagementMember, ManagementNote, OfficeAdminCanMap } from "@/lib/admin/office-management";
+import { roleLabel } from "@/lib/role-labels";
+import type { ClosureRequestRow, ManagementMember, ManagementNote, OfficeAdminCanMap } from "@/lib/admin/office-management";
 import { OFFICE_SLUG_MAX, sanitizeSlugTyping, validateOfficeSlug } from "@/lib/admin/office-slug";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { formatPhoneDisplay } from "@/lib/phone";
@@ -104,6 +106,7 @@ export type OfficeManagementProps = {
   /** Deneme uzatma tarih alanının en küçük değeri (yarın, TR; YYYY-AA-GG). */
   minTrialDate: string;
   legalHref: string;
+  closureRequests: { id: string; type: "account_closure" | "data_export"; status: string; dueLabel: string; note: string | null; requestedBy: ClosureRequestRow["requestedBy"] }[];
 };
 
 type ActionState = { error?: string; message?: string } | null;
@@ -1032,7 +1035,7 @@ function NotesSection({ tenantId, notes }: { tenantId: string; notes: OfficeMana
 // Erişim ve arşiv (askıya al / etkinleştir / arşivle / geri yükle) + veri paketi
 // ---------------------------------------------------------------------------
 
-function LifecycleSection({ tenant, can, legalHref }: OfficeManagementProps) {
+function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeManagementProps) {
   const [mode, setMode] = useState<"none" | "suspend" | "reactivate" | "archive" | "restore">("none");
   const act = useOfficeAction(setTenantLifecycleByAdmin, () => setMode("none"));
   const suspended = tenant.status === "suspended";
@@ -1130,6 +1133,8 @@ function LifecycleSection({ tenant, can, legalHref }: OfficeManagementProps) {
 
       <Feedback state={act.state} />
 
+      {can.archive && closureRequests.length > 0 ? <ClosureRequests tenant={tenant} requests={closureRequests} /> : null}
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-xs text-text-muted">
         {can.export_vault ? (
           <a href={`/api/admin/tenants/${tenant.id}/export`} className="inline-flex items-center gap-1.5 font-semibold text-brand-600 hover:underline">
@@ -1142,5 +1147,63 @@ function LifecycleSection({ tenant, can, legalHref }: OfficeManagementProps) {
         <span>Kalıcı silme yalnız KVKK süreciyle, ayrı bir talep olarak yürütülür.</span>
       </div>
     </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ofis sahibinin kapatma / veri indirme talepleri (satır içi onay; veri silinmez)
+// ---------------------------------------------------------------------------
+
+function ClosureRequests({ tenant, requests }: { tenant: ManagedTenant; requests: OfficeManagementProps["closureRequests"] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const act = useOfficeAction(processOfficeClosureRequestByAdmin, () => setOpenId(null));
+  return (
+    <InlineArea title={`Ofis sahibinin talepleri (${requests.length})`}>
+      <p className="text-xs text-text-muted">
+        Hesap kapatma talebi işlenince ofis arşivlenir (veri silinmez, geri yüklenebilir) ve talep tamamlanır. Ofis sahibi
+        arşiv sonrası Askıda sayfasından kendi veri paketini indirebilir.
+      </p>
+      <ul className="divide-y divide-line">
+        {requests.map((r) => (
+          <li key={r.id} className="space-y-2 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="font-semibold text-ink-950">
+                {r.type === "account_closure" ? "Ofis hesabını kapatma" : "Ofis verisini indirme"}
+                <span className="ml-2 text-xs font-normal text-text-muted">son tarih {r.dueLabel}</span>
+              </span>
+              <button type="button" className={btn} aria-expanded={openId === r.id} onClick={() => { act.clear(); setOpenId(openId === r.id ? null : r.id); }}>
+                Talebi işle
+              </button>
+            </div>
+            <p className="text-xs text-text-muted">
+              Talebi açan:{" "}
+              {r.requestedBy
+                ? `${r.requestedBy.fullName ?? "Adsız kullanıcı"} (${roleLabel(r.requestedBy.role)}${r.requestedBy.isActive ? "" : ", pasif"})`
+                : "bilinmiyor"}
+              {!r.requestedBy || !r.requestedBy.isActive || (r.requestedBy.role !== "owner" && r.requestedBy.role !== "gm")
+                ? " — bu kullanıcı artık aktif sahip/genel müdür değil; talep işlenemez."
+                : ""}
+            </p>
+            {r.note ? <p className="text-xs text-text-muted">Not: {r.note}</p> : null}
+            {openId === r.id ? (
+              <form onSubmit={(e) => act.run(formDataOf(e, tenant.id, { request_id: r.id }))} className="grid gap-3">
+                <FormField label="Gerekçe" htmlFor={`mgmt-closure-reason-${r.id}`} required hint="Denetim kaydına ve talep çözüm notuna yazılır.">
+                  <FormTextarea id={`mgmt-closure-reason-${r.id}`} name="reason" rows={2} required minLength={5} maxLength={500} />
+                </FormField>
+                <ConfirmName name={tenant.name} inputId={`mgmt-closure-confirm-${r.id}`} />
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" className={r.type === "account_closure" ? btnDanger : btnPrimary} disabled={act.pending}>
+                    {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
+                    {r.type === "account_closure" ? "Ofisi arşivle ve talebi tamamla" : "Talebi tamamla"}
+                  </button>
+                  <button type="button" className={btn} onClick={() => setOpenId(null)}>Vazgeç</button>
+                </div>
+              </form>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <Feedback state={act.state} />
+    </InlineArea>
   );
 }

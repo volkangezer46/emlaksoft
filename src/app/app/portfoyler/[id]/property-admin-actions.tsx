@@ -6,12 +6,21 @@ import { deleteProperty, reassignProperty } from "@/app/actions/properties";
 
 export function DeletePropertyButton({ propertyId }: { propertyId: string }) {
   const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function archive(fd: FormData) {
+    const r = await deleteProperty(fd);
+    if (r && r.error) {
+      setError(r.error);
+      setConfirming(false);
+    }
+  }
 
   if (confirming) {
     return (
       <div className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-1.5">
         <span className="text-xs font-semibold text-danger-100">Arşivlensin mi?</span>
-        <form action={deleteProperty}>
+        <form action={archive}>
           <input type="hidden" name="id" value={propertyId} />
           <input type="hidden" name="redirect_to" value="/app/portfoyler" />
           <button type="submit" className="rounded-[var(--radius-control)] bg-danger-500 px-2.5 py-1 text-xs font-bold text-white hover:bg-danger-600">
@@ -26,13 +35,23 @@ export function DeletePropertyButton({ propertyId }: { propertyId: string }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setConfirming(true)}
-      className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white/80 transition hover:border-danger-500/40 hover:bg-danger-500/10 hover:text-danger-300"
-    >
-      <Trash2 className="h-4 w-4" /> Arşivle
-    </button>
+    <div className="flex flex-col items-start gap-1.5">
+      <button
+        type="button"
+        onClick={() => {
+          setError(null);
+          setConfirming(true);
+        }}
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white/80 transition hover:border-danger-500/40 hover:bg-danger-500/10 hover:text-danger-300"
+      >
+        <Trash2 className="h-4 w-4" /> Arşivle
+      </button>
+      {error ? (
+        <p role="alert" className="max-w-xs text-xs font-semibold text-danger-300">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

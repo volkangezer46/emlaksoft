@@ -168,6 +168,13 @@ export default async function AuditPage({
               Belge merkezi — müşteri dosyaları, portföy medyası, sözleşmeler ve evraklar tek listede
               <ArrowUpRight className="h-4 w-4" />
             </Link>
+            <Link
+              href="/app/ofis-kontrol"
+              className="focus-ring press mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-mint-400 transition hover:text-mint-300"
+            >
+              Ofis Kontrol Merkezi — danışman bazlı işlem akışı, uyarılar ve onay kuralları
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
                 { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },

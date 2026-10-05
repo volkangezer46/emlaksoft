@@ -463,6 +463,15 @@ export function ImportWizard({
               (UTF-8 / Windows-1254) otomatik algılanır. En fazla {nf.format(IMPORT_ROW_LIMIT)} satır; büyük dosyalar
               {" "}{IMPORT_CHUNK_SIZE}&apos;lik parçalarla işlenir.
             </p>
+            <div className="mt-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-50/60 px-4 py-3 text-xs text-text-muted" data-testid="excel-csv-guide">
+              <p className="font-semibold text-ink-950">Excel&apos;den CSV olarak kaydedip yükleyin</p>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                <li>Excel&apos;de dosyanızı açın: Dosya, Farklı Kaydet.</li>
+                <li>Türü &quot;CSV UTF-8 (virgülle ayrılmış)&quot; seçip kaydedin.</li>
+                <li>Oluşan .csv dosyasını aşağıdan yükleyin. .xlsx / .xls doğrudan yüklenemez.</li>
+              </ol>
+              <p className="mt-1.5">Kolonları nasıl düzenleyeceğinizi görmek için aşağıdaki örnek şablonlardan birini indirin.</p>
+            </div>
             <label className="mt-3 block cursor-pointer rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas px-6 py-10 text-center transition hover:border-brand-400">
               <input
                 ref={fileRef}

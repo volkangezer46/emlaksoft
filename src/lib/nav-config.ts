@@ -100,6 +100,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
           { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties" },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties" },
+          { href: "/app/ilan-havuzu", label: "İlan Havuzu", icon: ICONS.ilanHavuzu, module: "properties" },
         ],
         tier: "core",
       },
@@ -134,7 +135,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "commissions",
         tabs: [
           { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
-          { href: "/app/kayip-satis", label: "Kayıp nedenleri", icon: ICONS.dusus, module: "customers" },
+          { href: "/app/kayip-satis", label: "Risk altındaki müşteriler", icon: ICONS.dusus, module: "customers" },
         ],
         needsItemModule: true,
         tier: "core",
@@ -194,6 +195,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/bolge-analizi", label: "Bölge", icon: ICONS.bolge, module: "reports" },
           { href: "/app/raporlar/talep-arz", label: "Talep-arz", icon: ICONS.talepArz, module: "reports" },
           { href: "/app/raporlar/memnuniyet", label: "Memnuniyet", icon: ICONS.memnuniyet, module: "reports" },
+          { href: "/app/anketler", label: "Anketler", icon: ICONS.anketor, module: "surveys" },
+          { href: "/app/raporlar/lead-hizi", label: "Aday hızı", icon: ICONS.leadHizi, module: "reports" },
           { href: "/app/franchise", label: "Şube", icon: ICONS.sube, module: "reports" },
         ],
         tier: "core",
@@ -253,8 +256,20 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       { href: "/app/uyum", label: "Uyum", icon: ICONS.uyum, module: "compliance", tier: "more" },
       { href: "/app/belgeler", label: "Belge Merkezi", icon: ICONS.belge, module: "settings", tier: "more" },
-      { href: "/app/denetim", label: "Denetim", icon: ICONS.denetim, module: "settings", tier: "more" },
+      {
+        // Denetim kaydı + Ofis Kontrol Merkezi (danışman işlem akışı, uyarılar, onay kuralları) tek menü öğesi.
+        href: "/app/denetim",
+        label: "Denetim",
+        icon: ICONS.denetim,
+        module: "settings",
+        tabs: [
+          { href: "/app/denetim", label: "Denetim kaydı", icon: ICONS.denetim, module: "settings" },
+          { href: "/app/ofis-kontrol", label: "Ofis Kontrol", icon: ICONS.denetim, module: "team" },
+        ],
+        tier: "more",
+      },
       { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing", tier: "core" },
+      { href: "/app/buyume", label: "Arkadaşını getir", icon: ICONS.davet, module: "settings", tier: "more" },
       {
         // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.
         href: "/app/yardim",

@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -436,6 +438,10 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
         </section>
 
         <div className="space-y-4">
+          {/* Mahalle notları (F5): talebin mahallesi için ofis içi saha notları */}
+          <Suspense fallback={null}>
+            <NeighborhoodNotesPanel neighborhoodId={demand.neighborhood_id} neighborhoodName={neighborhoodName} />
+          </Suspense>
           {/* ── Müşteri kartı ─────────────────────────────────────────────── */}
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">

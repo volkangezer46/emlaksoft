@@ -13,6 +13,10 @@ import {
   type MetricsFacts,
 } from "./advisor-metrics";
 import { summarizeAdvisorEarning } from "./advisor-share";
+import { buildSampleKpiScope } from "@/lib/sample-scope";
+
+/** Gerçek kayıt eşikte: örnek veri dışlanır (sahte istemci is_sample süzgecini kayıt eder, satır süzmez). */
+const SAMPLE = buildSampleKpiScope({ realCustomers: 99, realProperties: 99 }, false);
 
 /* ------------------------------------------------------------------ */
 /* Sahte Supabase istemcisi: tablo başına sabit veri, filtreleri kaydeder */
@@ -140,7 +144,7 @@ describe("dönem sınırları (TR takvimi)", () => {
 describe("loadAdvisorMetrics: tek kaynak", () => {
   it("ofis geneli rol tüm ekibi görür; gelir = tahsil edilen komisyon PAYI, ofis komisyonu (brüt) ayrı", async () => {
     const { client } = fakeClient(fixture);
-    const res = await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW });
+    const res = await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
     expect(res.scope).toBe("office");
     const u1 = res.rows.find((r) => r.id === "u1")!;
     const u2 = res.rows.find((r) => r.id === "u2")!;
@@ -160,8 +164,8 @@ describe("loadAdvisorMetrics: tek kaynak", () => {
 
   it("aynı girdiyle sayfalar arası tutarlılık: ekip listesi, tek kişi (360), Kazanç ve Hedefler aynı geliri verir", async () => {
     const { client } = fakeClient(fixture);
-    const team = await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW });
-    const single = await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, subjectIds: ["u1"] });
+    const team = await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
+    const single = await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE, subjectIds: ["u1"] });
     const t1 = team.rows.find((r) => r.id === "u1")!;
     const s1 = single.rows[0];
     expect(s1).toEqual({ ...t1 }); // Kıyas / KPI / Lig satırı ile 360 özeti birebir aynı
@@ -186,6 +190,7 @@ describe("loadAdvisorMetrics: tek kaynak", () => {
         { id: "tg0", period: "monthly", period_start: "2026-03-01", profile_id: null },
       ],
       names: new Map([["u1", "Ayşe Yılmaz"]]),
+      sample: SAMPLE,
     });
     // sahte offers tablosunda created_at yok: anlaşma sayısı hedef tarafında zaman filtresiyle 0 olabilir; gelir aynı olmalı
     expect(actuals.get("tg1")!.revenue).toBe(t1.revenue);
@@ -194,17 +199,17 @@ describe("loadAdvisorMetrics: tek kaynak", () => {
 
   it("ofis geneli kapsamı olmayan rol yalnız kendini görür (başkasının satırı listelenmez)", async () => {
     const { client } = fakeClient(fixture);
-    const res = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW });
+    const res = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
     expect(res.scope).toBe("self");
     expect(res.rows.map((r) => r.id)).toEqual(["u1"]);
     // subjectIds ile başkasını istese bile kapsam dışıdır
-    const other = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW, subjectIds: ["u2"] });
+    const other = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE, subjectIds: ["u2"] });
     expect(other.rows).toEqual([]);
   });
 
   it("earnings_all yoksa başkasının komisyon satırı sunucudan HİÇ çekilmez ve başkasının geliri null döner", async () => {
     const { client, commissionQueries } = fakeClient(fixture);
-    const res = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW });
+    const res = await loadAdvisorMetrics(client, { viewer: advisor1, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
     expect(commissionQueries.length).toBeGreaterThan(0);
     expect(commissionQueries.every((q) => q.kind !== "all")).toBe(true);
     expect(commissionQueries.every((q) => q.viewer === "u1")).toBe(true);
@@ -215,7 +220,7 @@ describe("loadAdvisorMetrics: tek kaynak", () => {
 
     // Yönetici (earnings_all yok: şube müdürü) tüm ekibi listeler ama yalnız kendi gelirini görür
     const bm = { userId: "u2", role: "branch_manager", perms: permsOf("branch_manager") };
-    const bmRes = await loadAdvisorMetrics(client, { viewer: bm, tenantId: "t1", period: PERIOD, nowMs: NOW });
+    const bmRes = await loadAdvisorMetrics(client, { viewer: bm, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
     expect(bmRes.scope).toBe("office");
     expect(bmRes.rows.find((r) => r.id === "u1")!.revenue).toBeNull();
     expect(bmRes.rows.find((r) => r.id === "u1")!.pendingRevenue).toBeNull();
@@ -226,7 +231,7 @@ describe("loadAdvisorMetrics: tek kaynak", () => {
 
   it("earnings_all olan rol komisyon satırlarını tek (filtresiz) sorguyla okur", async () => {
     const { client, commissionQueries } = fakeClient(fixture);
-    await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW });
+    await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
     expect(commissionQueries).toEqual([{ kind: "all" }]);
   });
 });

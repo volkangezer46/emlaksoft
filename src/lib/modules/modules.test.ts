@@ -47,8 +47,8 @@ function allHrefs(sections: ReturnType<typeof visibleSections>) {
 }
 
 describe("modül kayıt defteri", () => {
-  it("26 kapatılabilir modül, anahtarlar benzersiz ve DB biçimine uyar", () => {
-    expect(PERMISSION_MODULES_SOURCE.length).toBe(26);
+  it("27 kapatılabilir modül, anahtarlar benzersiz ve DB biçimine uyar", () => {
+    expect(PERMISSION_MODULES_SOURCE.length).toBe(27);
     expect(new Set(FEATURE_KEYS).size).toBe(FEATURE_KEYS.length);
     for (const key of FEATURE_KEYS) expect(key).toMatch(/^[a-z][a-z0-9_]{1,40}$/);
   });
@@ -231,9 +231,9 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 });
 
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
-  it("menü öğesi sayısı 36 (9 başlık)", () => {
+  it("menü öğesi sayısı 37 (9 başlık; 36 + Arkadaşını getir)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(36);
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(37);
   });
 
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {
@@ -245,7 +245,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
     expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/kayip-satis"]);
-    expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar"]);
+    expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu"]);
   });
 
   it("kapalı modül menüden, sekmelerden ve Daha fazla listesinden çıkar; çekirdek kalır", () => {

@@ -109,7 +109,7 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
         <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
           Hesabınız yok mu?{" "}
           <Link href="/kayit" className="font-semibold text-brand-600 hover:underline">
-            14 gün ücretsiz deneyin
+            Ücretsiz deneyin
           </Link>
         </p>
       </div>

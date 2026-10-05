@@ -110,7 +110,7 @@ export default async function DuplicateCustomersPage({
         <ArrowLeft className="h-4 w-4" /> Müşterilere dön
       </Link>
 
-      <PageHeader title="Çift kayıt kontrolü" eyebrow="Veri kalitesi" description="Aynı kişinin birden çok kez girilmesi lead istatistiklerini böler ve müşterinin iki danışman tarafından aranmasına yol açar." />
+      <PageHeader title="Çift kayıt kontrolü" eyebrow="Veri kalitesi" description="Aynı kişinin birden çok kez girilmesi aday istatistiklerini böler ve müşterinin iki danışman tarafından aranmasına yol açar." />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               { label: "Etkilenen kayıt", value: String(etkilenen), icon: UserRound, href: "/app/musteriler/cift-kayit" },
@@ -168,7 +168,7 @@ export default async function DuplicateCustomersPage({
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">Çift kayıt bulunamadı</h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-text-muted">
             Telefon, e-posta ve ad soyad üzerinden yapılan taramada birden çok kez girilmiş müşteri
-            yok. Bu sayfayı zaman zaman kontrol edin — portal lead&apos;leri ve elle girişler zamanla
+            yok. Bu sayfayı zaman zaman kontrol edin — portal adayları ve elle girişler zamanla
             çakışabilir.
           </p>
         </div>

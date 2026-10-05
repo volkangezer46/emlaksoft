@@ -9,8 +9,9 @@ import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card
 import { moneyTRY } from "@/lib/admin-format";
 import { now as clockNow } from "@/lib/clock";
 import type { CSSProperties } from "react";
-import { planLabel as catalogPlanLabel, PLANS } from "@/lib/billing/plans";
-import { exactMrr, exactTrendMrr, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { exactMrr, exactTrendMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingData } from "@/lib/reporting/result";
 
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
@@ -61,7 +62,9 @@ export default async function AdminReportsPage({
 
   const active = Number(summary.active_count);
   const cancelled = Number(summary.cancelled_count);
-  const mrr = exactMrr(aggregate.plan_stats);
+  const planDefs = await getPlanDefinitions();
+  const prices = priceMapOf(planDefs);
+  const mrr = exactMrr(aggregate.plan_stats, prices);
   const arpa = active ? Math.round(mrr / active) : 0;
   const tenantCount = Number(summary.tenant_count);
   const churnRate = tenantCount ? Math.round((cancelled / tenantCount) * 100) : 0;
@@ -71,7 +74,7 @@ export default async function AdminReportsPage({
     const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
     return { label: d.toLocaleDateString("tr-TR", { month: "short" }) };
   });
-  const trendFallback = aggregate.mrr_trend.map(exactTrendMrr);
+  const trendFallback = aggregate.mrr_trend.map((row) => exactTrendMrr(row, prices));
   const maxTrend = Math.max(1, ...trendFallback);
   const W = 560, H = 130;
   const pts = trendFallback.map((v, i) => ({ x: (i / 11) * W, y: H - (v / maxTrend) * (H - 16) - 8 }));
@@ -79,7 +82,10 @@ export default async function AdminReportsPage({
   const area = `0,${H} ${line} ${W},${H}`;
 
   // Plan geliri
-  const planRevenue = PLANS.map((plan) => {
+  // Gizli planlar yalnız ofisi varsa listelenir; kayıtlı abonelik MRR'ı değişmez, katalog yalnız aboneliği eksik ofiste kullanılır.
+  const planRevenue = planDefs
+    .filter((plan) => !plan.hidden || Number(aggregate.plan_stats.find((item) => item.plan === plan.id)?.tenant_count ?? 0) > 0)
+    .map((plan) => {
     const row = aggregate.plan_stats.find((item) => item.plan === plan.id);
     return {
       key: plan.id,
@@ -101,7 +107,7 @@ export default async function AdminReportsPage({
 
   // Top tenant (plan değerine göre)
   const topTenants = aggregate.top_tenants
-    .map((tenant) => ({ ...tenant, value: PLANS.find((plan) => plan.id === tenant.plan)?.monthlyTry ?? 0 }))
+    .map((tenant) => ({ ...tenant, value: prices.get(tenant.plan) ?? 0 }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 

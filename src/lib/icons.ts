@@ -29,6 +29,7 @@ import {
   ArrowLeftRight,
   ArrowUpDown,
   Smile,
+  Timer,
   Award,
   BadgeCheck,
   Banknote,
@@ -59,6 +60,7 @@ import {
   CalendarRange,
   ClipboardCheck,
   ClipboardList,
+  Headphones,
   Clock,
   Files,
   Info,
@@ -77,10 +79,12 @@ import {
   Gauge,
   Handshake,
   HeartHandshake,
+  UserPlus,
   Inbox,
   KeyRound,
   Layers,
   LayoutDashboard,
+  Waypoints,
   LifeBuoy,
   ListChecks,
   Mail,
@@ -149,6 +153,8 @@ export const ICONS = {
   teklif: Tag,
   /** Gelen kutusu (form/portal başvuruları). */
   gelenKutusu: Inbox,
+  /** İlan havuzu: atanmamış ilanların uzmanlığa göre dağıtımı. */
+  ilanHavuzu: Waypoints,
 
   // --- Finans ---------------------------------------------------------------
   /** Komisyon / hakediş. */
@@ -217,6 +223,8 @@ export const ICONS = {
   proje: Layers,
   /** Tavsiye / referans zinciri. */
   tavsiye: HeartHandshake,
+  /** Meslektaş daveti (Arkadaşını getir). */
+  davet: UserPlus,
   /** Otomasyon / tetikleyici. */
   otomasyon: Zap,
   /** Hızlı kayıt (sahada tek ekranda müşteri / görüşme / randevu). */
@@ -247,6 +255,9 @@ export const ICONS = {
   /** Raporlar sekmeleri: talep-arz dengesi, memnuniyet anketi. */
   talepArz: ArrowUpDown,
   memnuniyet: Smile,
+  /** Raporlar sekmesi: anketör kuyruğu ve anket sonuçları. */
+  anketor: Headphones,
+  leadHizi: Timer,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

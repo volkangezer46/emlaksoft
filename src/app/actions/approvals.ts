@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
-import { canDecide, isApprovalKind, kindMeta, MANAGER_ROLES } from "@/lib/approvals";
+import { canDecide, isApprovalKind, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
 
 export type ApprovalResult = { ok?: boolean; error?: string; id?: string };
 
@@ -90,7 +90,7 @@ export async function createApprovalRequest(
     .from("profiles")
     .select("id")
     .eq("tenant_id", gate.tenantId)
-    .in("role", [...MANAGER_ROLES]);
+    .in("role", [...APPROVAL_DECIDER_ROLES]);
 
   await Promise.all(
     (managers ?? [])
@@ -116,7 +116,7 @@ export async function createApprovalRequest(
  *
  * ÜÇ KAPI birden:
  *  1. `commissions:edit` — modül yetkisi (tenant override'ları dahil)
- *  2. `isManagerRole(gate.role)` — kademe kontrolü. accounting rolü commissions'ta
+ *  2. `isApprovalDeciderRole(gate.role)` — kademe kontrolü. accounting rolü commissions'ta
  *     tam CRUD'a sahip ama indirim politikasına karar veremez.
  *  3. `requested_by !== userId` — KENDİ TALEBİNİ ONAYLAYAMAZ. Bu kural olmadan
  *     modülün tamamı anlamsız: yönetici kendi indirimini kendi onaylarsa kayıt

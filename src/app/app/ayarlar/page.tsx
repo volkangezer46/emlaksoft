@@ -5,6 +5,7 @@ import {
   Crosshair,
   Droplets,
   MapPin,
+  Globe,
   Fingerprint,
   Layers,
   FileText,
@@ -23,8 +24,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { clearSampleDataForm } from "@/app/actions/sample-data";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { RealUsePanel } from "@/components/app/real-use-panel";
+import { loadSampleStatus } from "@/lib/sample-status";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
@@ -68,6 +69,8 @@ const cards: SettingCard[] = [
   { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
   { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
   { title: "Modüller", desc: "Kullanmadığınız alanları kapatın, menü sadeleşsin. Verileriniz silinmez.", icon: Layers, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/moduller" },
+  { title: "Ofis vitrini", desc: "Vitrinde görünecek bölümler, tanıtım metni ve arama motorlarında görünme onayı.", icon: Globe, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/vitrin" },
+  { title: "AI kullanımı", desc: "Aylık AI kredisi, kalan hak ve kimin ne kadar kullandığı.", icon: Sparkles, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/ai-kullanim" },
   { title: "Fotoğraf filigranı", desc: "İlan fotoğraflarına ofis logosu/adı otomatik basılsın — ilan çalınmasına karşı.", icon: Droplets, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/filigran" },
   { title: "Bölge bildirimi", desc: "Eksik ya da yanlış mahalleyi platform ekibine bildirin.", icon: MapPin, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ayarlar/cografya-bildir" },
 ];
@@ -76,7 +79,7 @@ export default async function SettingsPage() {
   const { tenantId, role, perms } = await requireModulePage("settings");
   const canEditSettings = (perms.settings ?? []).includes("edit");
   // Modüller kartı yalnız ofis sahibi ve genel müdür içindir.
-  const visibleCards = cards.filter((c) => c.href !== "/app/ayarlar/moduller" || canManageModules(role));
+  const visibleCards = cards.filter((c) => (c.href !== "/app/ayarlar/moduller" && c.href !== "/app/ayarlar/ai-kullanim") || canManageModules(role));
   const supabase = await createClient();
   const provinces = await getProvinceOptions();
 
@@ -104,6 +107,9 @@ export default async function SettingsPage() {
 
   const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, province_id: null, district_id: null, logo_url: null, website: null, sample_seeded_at: null };
   const sampleSeededAt = (tenant as { sample_seeded_at?: string | null }).sample_seeded_at ?? null;
+  const sampleStatus = tenantId
+    ? await loadSampleStatus(supabase, tenantId, sampleSeededAt).catch(() => null)
+    : null;
   // matching_weights null = varsayılan set kullanılıyor; form başlangıcı için güvenli ayrıştır.
   const rawMatchingWeights = (tenant as { matching_weights?: unknown }).matching_weights ?? null;
   const matchingWeights: MatchingWeights | null = rawMatchingWeights
@@ -361,23 +367,10 @@ export default async function SettingsPage() {
             </p>
           </div>
         </div>
-        {sampleSeededAt ? (
-          <div className="flex items-center gap-3">
-            <span className="rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">Yüklü</span>
-            <ConfirmDialog
-              trigger={
-                <button
-                  type="button"
-                  className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-4 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/15"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Örnek verileri temizle
-                </button>
-              }
-              title="Örnek veriler silinsin mi?"
-              description="Tüm örnek müşteri, portföy, talep, görev, randevu ve anlaşma kayıtları kalıcı olarak silinir. Gerçek kayıtlarınıza dokunulmaz."
-              confirmLabel="Kalıcı sil"
-              formAction={clearSampleDataForm}
-            />
+        {sampleStatus && sampleStatus.total > 0 ? (
+          <div className="flex w-full flex-col gap-3">
+            <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">Yüklü · {sampleStatus.total} kayıt</span>
+            <RealUsePanel rows={sampleStatus.rows} total={sampleStatus.total} canClear={canEditSettings} />
           </div>
         ) : (
           <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-xs font-bold text-text-muted">Yüklü değil</span>

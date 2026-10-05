@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { countValuationReport } from "@/lib/ai/credits/meter";
 import { logActivity } from "@/lib/activity";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { comparablesSourceEntry, listComparableDetails } from "@/lib/comparables";
@@ -231,6 +232,9 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     entityId: data.id,
     newValue: { mid: est.mid },
   });
+
+  // Aylık değerleme raporu kotası sayacı: fail-open, rapor akışını asla bozmaz.
+  await countValuationReport({ tenantId: gate.tenantId, actorId: gate.userId, valuationId: data.id });
 
   revalidatePath("/app/degerleme");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);

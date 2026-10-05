@@ -243,6 +243,30 @@ export async function getGeoTotals(): Promise<{ provinces: number; districts: nu
   return { provinces: p.length, districts: d.length, neighborhoods: count ?? null };
 }
 
+/** Kimlik listesiyle mahalle okuma (yinelenmeyen, sınırlı). Bilinmeyen kimlik sonuçta yok. */
+export async function getNeighborhoodsByIds(ids: Iterable<string>): Promise<GeoNeighborhood[]> {
+  const list = [...new Set([...ids].filter(Boolean))];
+  const out: GeoNeighborhood[] = [];
+  const admin = createAdminClient();
+  for (let i = 0; i < list.length; i += 200) {
+    const { data } = await admin.from("geo_neighborhoods").select("id, name, district_id, is_active").in("id", list.slice(i, i + 200));
+    for (const r of (data ?? []) as NeighborhoodRow[]) out.push({ id: r.id, name: r.name, districtId: r.district_id, isActive: r.is_active });
+  }
+  return out;
+}
+
+export async function getDistrictsByIds(ids: Iterable<string>): Promise<GeoDistrict[]> {
+  const want = new Set(ids);
+  if (want.size === 0) return [];
+  return (await loadDistricts()).filter((d) => want.has(d.id));
+}
+
+export async function getProvincesByIds(ids: Iterable<string>): Promise<GeoProvince[]> {
+  const want = new Set(ids);
+  if (want.size === 0) return [];
+  return (await loadProvinces()).filter((p) => want.has(p.id));
+}
+
 /** Toplam kayıt sayısı (aktif+pasif) — sistem durumu ekranı: `{ count }` biçimi. */
 export async function geoRowCount(level: "province" | "district" | "neighborhood"): Promise<{ count: number | null }> {
   const admin = createAdminClient();

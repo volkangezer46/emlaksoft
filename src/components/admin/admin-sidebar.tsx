@@ -25,6 +25,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Sprout,
   Users,
   X,
 } from "lucide-react";
@@ -63,6 +64,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Satış",
     items: [
       { href: "/admin/satis", label: "Demo & aday", icon: Handshake, hint: "Satış hunisi", module: "sales", badgeKey: "sales" },
+      { href: "/admin/growth", label: "Büyüme", icon: Sprout, hint: "Davet, ortak, kaynak", module: "sales" },
     ],
   },
   {
@@ -97,6 +99,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     items: [
       { href: "/admin/danisman", label: "Yapay zeka danışmanı", icon: Sparkles, hint: "Verilerden içgörü", module: "advisor" },
       { href: "/admin/raporlar", label: "Raporlar", icon: BarChart3, hint: "Platform analizi", module: "reports" },
+      { href: "/admin/ai-kullanim", label: "AI kullanımı", icon: Sparkles, hint: "Kredi ve rapor kotası", module: "billing" },
       { href: "/admin/aktivite", label: "Aktivite kaydı", icon: Activity, hint: "Denetim izi", module: "activity" },
     ],
   },

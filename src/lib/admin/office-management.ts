@@ -14,7 +14,19 @@ export type ManagementMember = { id: string; fullName: string | null; role: stri
 
 export type ManagementNote = { id: string; note: string; createdAt: string; author: string | null };
 
+export type ClosureRequestRow = {
+  id: string;
+  type: "account_closure" | "data_export";
+  status: string;
+  dueAt: string;
+  note: string | null;
+  createdAt: string;
+  /** Talebi acan kullanici (kvkk_requests.created_by) ve guncel rolu/durumu; bulunamazsa null. */
+  requestedBy: { id: string; fullName: string | null; role: string; isActive: boolean } | null;
+};
+
 export type OfficeManagementData = {
+  closureRequests: ClosureRequestRow[];
   owner: { id: string; fullName: string | null; email: string | null; isActive: boolean } | null;
   ownerCount: number;
   members: ManagementMember[];
@@ -56,7 +68,7 @@ export async function loadOfficeManagement(
   tenantId: string,
   opts: { withMembers: boolean; withNotes: boolean },
 ): Promise<OfficeManagementData> {
-  const [profiles, notes, provinces, staff] = await Promise.all([
+  const [profiles, notes, provinces, closure, staff] = await Promise.all([
     admin
       .from("profiles")
       .select("id, full_name, role, is_active, created_at")
@@ -73,6 +85,15 @@ export async function loadOfficeManagement(
           .limit(50)
       : Promise.resolve({ data: [] as NoteRow[] }),
     provinceOptionsResult(),
+    // Ofis düzeyi açık talepler (müşteri verisi içermez); tablo henüz yoksa sessizce boş döner.
+    admin
+      .from("kvkk_requests")
+      .select("id, request_type, status, due_at, note, created_at, created_by")
+      .eq("tenant_id", tenantId)
+      .in("request_type", ["account_closure", "data_export"])
+      .in("status", ["open", "in_progress"])
+      .order("created_at", { ascending: true })
+      .limit(20),
     opts.withNotes ? admin.from("platform_staff").select("id, full_name").limit(300) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ]);
 
@@ -93,7 +114,24 @@ export async function loadOfficeManagement(
     return text ? [{ id: n.id, note: text, createdAt: n.created_at, author: n.actor_id ? (staffNames.get(n.actor_id) ?? null) : null }] : [];
   });
 
+  const closureRequests = ((closure.data ?? []) as { id: string; request_type: string; status: string; due_at: string; note: string | null; created_at: string; created_by: string | null }[]).flatMap((r) => {
+    if (r.request_type !== "account_closure" && r.request_type !== "data_export") return [];
+    const by = r.created_by ? members.find((m) => m.id === r.created_by) : undefined;
+    return [
+      {
+        id: r.id,
+        type: r.request_type,
+        status: r.status,
+        dueAt: r.due_at,
+        note: r.note,
+        createdAt: r.created_at,
+        requestedBy: by ? { id: by.id, fullName: by.fullName, role: by.role, isActive: by.isActive } : null,
+      } as ClosureRequestRow,
+    ];
+  });
+
   return {
+    closureRequests,
     owner: ownerRow ? { id: ownerRow.id, fullName: ownerRow.fullName, email: ownerEmail, isActive: ownerRow.isActive } : null,
     ownerCount: owners.length,
     members: opts.withMembers ? sortManagementMembers(members) : [],

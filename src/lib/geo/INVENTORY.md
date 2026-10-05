@@ -20,7 +20,7 @@ Veri kapsamı (kod yorumları / runbook'a göre canlı): 81 il, 973 ilçe, ≈31
 sonra il bazlı tarama çalışanı). Seed: `scripts/geo-sync.ts` (`npm run geo:sync`), `20260721000001_geo_seed.sql` (pilot il/ilçeler).
 Güncel kaynak (2025 veri seti, 2026-05-21): 81 il, 973 ilçe, 32.279 mahalle (bkz. `DATA_SOURCES.md`).
 
-Bu görevin eklediği TASLAK şema: `supabase/proposed/20260820000100_geo_central_management.sql` (UYGULANMADI):
+Bu görevin eklediği TASLAK şema: `supabase/proposed/20261005000600_geo_central_management.sql` (UYGULANMADI):
 `geo_data_versions`, `geo_aliases`, `geo_change_requests`, ek sütunlar (`description`, `deactivated_at`, `source`, `version_id`),
 `demo_requests.province_id/district_id`, RPC'ler `geo_usage_counts/_totals/_rows`, `geo_merge`, `geo_merge_undo`, `geo_move`.
 Tablolar yokken her şey bugünkü gibi çalışır (okuyucular yalnız mevcut sütunları seçer; yönetim ekranları "etkin değil" der).

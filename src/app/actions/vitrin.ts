@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
@@ -70,6 +71,7 @@ export async function createVitrinSavedSearch(input: SavedSearchInput): Promise<
   const admin = createAdminClient();
   const { data: tenant } = await admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { ok: false, error: "Ofis bulunamadı." };
+  if (!(await isVitrinEnabled(admin, tenant.id))) return { ok: false, error: "Ofis bulunamadı." };
 
   // il/ilçe tutarlılığı — ilçe seçildiyse seçilen ile ait olmalı
   const province = await getProvince(input.provinceId);

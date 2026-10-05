@@ -7,9 +7,24 @@ import { requirePermission } from "@/lib/require-permission";
 import { effectiveHasPermission, getEffectivePermissions } from "@/lib/permissions-effective";
 import type { AppAction, AppModule } from "@/lib/permissions";
 import { logActivity } from "@/lib/activity";
-import { insertSampleRecords, SAMPLE_DATA_COUNTS } from "@/lib/sample-data-seed";
+import { now } from "@/lib/clock";
+import {
+  insertSampleRecords,
+  SAMPLE_DATA_COUNTS,
+  SAMPLE_PACKS,
+  type SamplePack,
+  type SampleSeedReport,
+} from "@/lib/sample-data-seed";
+import { deleteSampleRecords, type SampleClearReport } from "@/lib/sample-clear";
 
-export type SampleDataResult = { error?: string; ok?: boolean };
+export type SampleDataResult = {
+  error?: string;
+  ok?: boolean;
+  /** Yükleme özeti (yüklenen / atlanan / hata veren gruplar). */
+  seed?: SampleSeedReport;
+  /** Temizleme özeti; `complete=false` ise yarım kaldı, tekrar denenebilir. */
+  clear?: SampleClearReport;
+};
 
 const SAMPLE_DATA_MODULES = [
   "customers",
@@ -31,13 +46,14 @@ async function canMutateEverySampleModule(input: {
 }
 
 /**
- * Örnek veri onboarding'i — yeni ofis boş panel yerine tek tıkla küçük,
- * gerçekçi bir Türkçe set görür (aktivasyon artırıcı, bkz. migration
- * 20260726000086_sample_data.sql). Tüm kayıtlar is_sample=true ile işaretlenir;
- * temizleme yalnız bu bayrağı taşıyanları KALICI siler, gerçek veriye dokunmaz.
+ * Örnek veri onboarding'i — yeni ofis boş panel yerine tek tıkla TAM demo ofis görür: müşteri, talep,
+ * portföy (satılık/kiralık/arsa/lüks/ticari), randevu, görev, teklif, kazanılmış anlaşma + komisyon,
+ * kira/tahakkuk, gider, arama, bildirim (bkz. src/lib/sample-data-seed.ts). Tüm kayıtlar is_sample=true
+ * ile işaretlenir; temizleme yalnız bu bayrağı taşıyanları KALICI siler, gerçek veriye dokunmaz.
+ * `input.pack` (konut | ticari | arsa) ofis tipi damgasıdır; geçersizse "konut".
  */
 
-export async function seedSampleData(): Promise<SampleDataResult> {
+export async function seedSampleData(input?: { pack?: string }): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
   if (!(await canMutateEverySampleModule({ ...gate, action: "create" }))) {
@@ -47,6 +63,9 @@ export async function seedSampleData(): Promise<SampleDataResult> {
   }
   const tenantId = gate.tenantId;
   const userId = gate.userId;
+  const pack: SamplePack = (SAMPLE_PACKS as readonly string[]).includes(String(input?.pack))
+    ? (input?.pack as SamplePack)
+    : "konut";
 
   const supabase = await createClient();
 
@@ -64,18 +83,22 @@ export async function seedSampleData(): Promise<SampleDataResult> {
     return { error: "Örnek veriler zaten yüklü." };
   }
 
+  let seed: SampleSeedReport;
   try {
-    // Kayıt seti tek kaynaktan gelir (src/lib/sample-data-seed.ts); platform yönetimi de aynısını kullanır.
-    await insertSampleRecords(supabase, tenantId, userId);
-
-    // tenants güncellemesi kullanıcı RLS'ine takılmasın diye admin client
-    // (yalnız kendi tenant'ı, tek kolon — logActivity ile aynı desen)
+    // tenants güncellemesi kullanıcı RLS'ine takılmasın ve ek katman (kazanılmış anlaşma, komisyon, kira:
+    // atomik iş akışı tetikleyicileri oturumlu kullanıcıya kapalı) yazılabilsin diye admin client
+    // (yalnız kendi tenant'ı — logActivity ile aynı desen).
     const admin = createAdminClient();
+    // Kayıt seti tek kaynaktan gelir (src/lib/sample-data-seed.ts); platform yönetimi de aynısını kullanır.
+    seed = await insertSampleRecords(supabase, tenantId, userId, { extrasDb: admin, pack });
+
     const { error: markErr } = await admin
       .from("tenants")
-      .update({ sample_seeded_at: new Date().toISOString() })
+      .update({ sample_seeded_at: new Date(now()).toISOString() })
       .eq("id", tenantId);
     if (markErr) throw markErr;
+    // Demo paketi damgası: genişletme migration'ı uygulanmamışsa sütun yoktur — sessizce atla.
+    await admin.from("tenants").update({ sample_pack: pack, sample_cleared_at: null }).eq("id", tenantId);
   } catch (e) {
     console.error("seedSampleData", e);
     return { error: "Örnek veriler yüklenemedi. Lütfen tekrar deneyin." };
@@ -87,18 +110,26 @@ export async function seedSampleData(): Promise<SampleDataResult> {
     action: "sample_data.seed",
     entityType: "tenant",
     entityId: tenantId,
-    newValue: { ...SAMPLE_DATA_COUNTS },
+    newValue: {
+      ...SAMPLE_DATA_COUNTS,
+      pack,
+      loaded: seed.counts,
+      skipped: seed.skipped.map((x) => x.group),
+      failed: seed.failed.map((x) => x.group),
+    },
   });
 
   revalidatePath("/app");
   revalidatePath("/app/ayarlar");
-  return { ok: true };
+  revalidatePath("/app/baslangic");
+  return { ok: true, seed };
 }
 
 /**
- * Örnek verileri KALICI siler (soft delete değil) — yalnız is_sample=true
- * kayıtlar; gerçek kayıtlara asla dokunmaz. FK sırası gereği anlaşmalar
- * müşteri/portföyden ÖNCE silinir (hepsi doğrudan is_sample filtresiyle).
+ * "Gerçek kullanıma başla" — örnek verileri KALICI siler (soft delete değil, GERİ ALINAMAZ).
+ * Yalnız is_sample=true kayıtlar; ofisin gerçek kayıtlarına asla dokunulmaz. Silme sırası ve kısmi hata
+ * davranışı `src/lib/sample-clear.ts`'tedir: bir tablo takılırsa diğerleri denenir, `clear.complete=false`
+ * döner ve işlem tekrar denenebilir (idempotent). `sample_seeded_at` yalnız TAM temizlikte sıfırlanır.
  */
 export async function clearSampleData(): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
@@ -110,34 +141,24 @@ export async function clearSampleData(): Promise<SampleDataResult> {
   }
   const tenantId = gate.tenantId;
 
-  const supabase = await createClient();
-
+  let report: SampleClearReport;
   try {
-    // Tüm tablolar aynı doğrudan is_sample filtresiyle silinir; FK sırası:
-    // anlaşma → görev/randevu/talep → portföy → müşteri (deals ÖNCE —
-    // komisyonlar cascade, gerçek kayıtlara asla dokunulmaz)
-    const del = (table: string) =>
-      supabase.from(table).delete().eq("tenant_id", tenantId).eq("is_sample", true);
-    const { error: dealErr } = await del("deals");
-    if (dealErr) throw dealErr;
-    const { error: taskErr } = await del("tasks");
-    if (taskErr) throw taskErr;
-    const { error: apptErr } = await del("appointments");
-    if (apptErr) throw apptErr;
-    const { error: demandErr } = await del("customer_demands");
-    if (demandErr) throw demandErr;
-
-    const { error: propErr } = await del("properties");
-    if (propErr) throw propErr;
-    const { error: custErr } = await del("customers");
-    if (custErr) throw custErr;
-
+    // Kazanılmış anlaşma/komisyon/kira silmesi çekirdek iş akışı tetikleyicilerince yalnız service_role'e
+    // açıktır; her sorgu açık tenant_id + is_sample=true süzgeciyle sınırlıdır.
     const admin = createAdminClient();
-    const { error: markErr } = await admin
-      .from("tenants")
-      .update({ sample_seeded_at: null })
-      .eq("id", tenantId);
-    if (markErr) throw markErr;
+    report = await deleteSampleRecords(admin, tenantId);
+    if (report.complete) {
+      const { error: markErr } = await admin
+        .from("tenants")
+        .update({ sample_seeded_at: null })
+        .eq("id", tenantId);
+      if (markErr) throw markErr;
+      // Genişletme migration'ı uygulanmamışsa bu sütunlar yoktur — sessizce atla.
+      await admin
+        .from("tenants")
+        .update({ sample_pack: null, sample_cleared_at: new Date(now()).toISOString() })
+        .eq("id", tenantId);
+    }
   } catch (e) {
     console.error("clearSampleData", e);
     return { error: "Örnek veriler temizlenemedi. Lütfen tekrar deneyin." };
@@ -146,14 +167,22 @@ export async function clearSampleData(): Promise<SampleDataResult> {
   await logActivity({
     tenantId,
     actorId: gate.userId,
-    action: "sample_data.clear",
+    action: report.complete ? "sample_data.clear" : "sample_data.clear_partial",
     entityType: "tenant",
     entityId: tenantId,
+    newValue: { deleted: report.deleted, total: report.totalDeleted, failed: report.failed.map((f) => f.table) },
   });
 
   revalidatePath("/app");
   revalidatePath("/app/ayarlar");
-  return { ok: true };
+  revalidatePath("/app/baslangic");
+  if (!report.complete) {
+    return {
+      error: `Temizlik yarım kaldı (${report.failed.map((f) => f.label).join(", ")}). Silinenler geri gelmez; tekrar deneyebilirsiniz.`,
+      clear: report,
+    };
+  }
+  return { ok: true, clear: report };
 }
 
 /** ConfirmDialog `formAction` uyumu için void sarmalayıcı (hata logda kalır). */

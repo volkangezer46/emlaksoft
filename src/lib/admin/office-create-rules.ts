@@ -1,5 +1,6 @@
 import type { PlanId } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan, type RegistrationTeamSize } from "@/lib/billing/registration-plan";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 /**
  * Platform yönetiminden ofis açma kuralları (saf; form ve sunucu action'ı ortak kullanır, zod içermez).
@@ -53,16 +54,7 @@ export function trialEndIso(fromMs: number, days: number): string {
 export const OFFICE_USER_ROLES = ["gm", "branch_manager", "team_lead", "advisor", "call_center", "accounting", "readonly"] as const;
 export type OfficeUserRole = (typeof OFFICE_USER_ROLES)[number];
 
-export const OFFICE_ROLE_LABELS: Record<string, string> = {
-  owner: "Ofis sahibi",
-  gm: "Genel müdür",
-  branch_manager: "Şube müdürü",
-  team_lead: "Takım lideri",
-  advisor: "Danışman",
-  call_center: "Çağrı merkezi",
-  accounting: "Muhasebe",
-  readonly: "Salt okunur",
-};
+export const OFFICE_ROLE_LABELS: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
 
 /** Ofis durumu etiketleri (tenants.status). "cancelled" arşiv anlamında kullanılır: veri silinmez. */
 export const OFFICE_STATUS_LABELS: Record<string, string> = {

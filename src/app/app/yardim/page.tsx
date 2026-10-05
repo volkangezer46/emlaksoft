@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { requireModulePage } from "@/lib/require-module-page";
 import { FIRST_30_INTRO, GLOSSARY, GUIDES, HELP_TABS, resolveHelpTab, type HelpTab } from "@/lib/help-content";
 import { loadOnboardingState, type HomeCtx } from "../_home/data";
-import { RestartTourButton } from "./restart-tour-button";
+import { RestartTourButton, TourPicker } from "./restart-tour-button";
 
 export const metadata = { title: "Yardım ve Destek" };
 
@@ -52,6 +52,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
         ))}
       </nav>
 
+      {tab === "baslangic" ? <TourPicker /> : null}
       {tab === "baslangic" ? <StartTab tenantId={tenantId} /> : null}
       {tab === "rehberler" ? <GuidesTab /> : null}
       {tab === "sozluk" ? <GlossaryTab /> : null}

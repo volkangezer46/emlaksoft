@@ -50,13 +50,19 @@ export default async function OnboardingPage({
   const current = resolveWizardStep(adim, state);
   const showSampleData =
     counts.customers === 0 && counts.properties === 0 && !tenant?.sample_seeded_at && counts.sampleCustomers === 0;
+  // Demo yükleme yetkisi: seedSampleData ile aynı altı modülde oluşturma (actions/sample-data.ts).
+  const canSeedSample = (["customers", "properties", "demands", "tasks", "appointments", "commissions"] as const).every((m) =>
+    effectiveHasPermission(perms, m, "create"),
+  );
+  // Başlangıç tercihi paneli: yalnız boş ofiste ve henüz ofis tipi/tanım girilmemişken.
+  const showStartChoice = showSampleData && !state.steps.find((st) => st.id === "defs")?.done;
 
   return (
     <div className="mx-auto w-full max-w-3xl">
       <PageHeader
         eyebrow="Başlangıç"
         title="Ofis kurulumu"
-        description="Altı kısa adımda ofisinizi çalışır hale getirin. Her adımı atlayabilir, istediğiniz zaman geri dönebilirsiniz."
+        description="Önce ofis tipinizi seçip dolu demo ya da boş başlayın; sonra altı kısa adımda ofisinizi çalışır hale getirin. Her adımı atlayabilir, istediğiniz zaman geri dönebilirsiniz."
         breadcrumbs={crumbs}
       />
       <SetupWizard
@@ -66,6 +72,8 @@ export default async function OnboardingPage({
         canEditSettings={effectiveHasPermission(perms, "settings", "edit")}
         canInvite={effectiveHasPermission(perms, "team", "create")}
         showSampleData={showSampleData}
+        showStartChoice={showStartChoice}
+        canSeedSample={canSeedSample}
         office={{
           name: tenant?.name ?? "",
           phone: tenant?.phone ?? "",

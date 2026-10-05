@@ -19,6 +19,8 @@ import type { GeoOption } from "@/lib/geo/types";
 import { TeamStep } from "./team-step";
 import { QuickLossReason } from "./defs-step";
 import { SkipButton } from "./skip-button";
+import { StartChoice } from "./start-choice";
+import { FinishTourStarter } from "./finish-tour";
 
 export type SetupWizardProps = {
   state: OnboardingState;
@@ -27,6 +29,9 @@ export type SetupWizardProps = {
   canEditSettings: boolean;
   canInvite: boolean;
   showSampleData: boolean;
+  /** Bos ofis ve tanim girilmemis: "Nasil baslamak istersiniz?" paneli (ofis tipi + demo/bos). */
+  showStartChoice: boolean;
+  canSeedSample: boolean;
   office: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; logoUrl: string | null };
   lossReasons: { value: string; label: string }[];
   stageLabels: { key: string; label: string }[];
@@ -50,7 +55,10 @@ export function SetupWizard(props: SetupWizardProps) {
   const nextHref = href(next ?? FINISH_STEP);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="kurulum">
+      {props.showStartChoice && current === "office" ? (
+        <StartChoice canEdit={props.canEditSettings} canSeed={props.canSeedSample} />
+      ) : null}
       <Card>
         <CardContent className="space-y-3">
           <div className="flex items-baseline justify-between gap-3">
@@ -165,7 +173,7 @@ function StepBody(props: SetupWizardProps & { id: OnboardingStepId; done: boolea
           </p>
           {props.showSampleData && props.canEditSettings ? (
             <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3">
-              <p className="min-w-0 flex-1 text-sm text-text-muted">Önce sistemi denemek ister misiniz? Örnek veri tek tıkla temizlenir.</p>
+              <p className="min-w-0 flex-1 text-sm text-text-muted">Önce sistemi denemek ister misiniz? Dolu demo ofis yüklenir; hazır olunca tek tuşla tamamı silinir.</p>
               <SampleSeedButton />
             </div>
           ) : null}
@@ -306,6 +314,7 @@ function FinishPanel({ state, skipped }: SetupWizardProps) {
       {!state.complete && pendingSteps.length > 0 ? (
         <Alert tone="info">Ana ekranda kurulum şeridi, sonra yapılacak olmayan sıradaki adımı size hatırlatır.</Alert>
       ) : null}
+      {state.complete ? <FinishTourStarter /> : null}
       <ButtonLink href="/app" iconRight={ArrowRight}>
         Bugün ekranına git
       </ButtonLink>

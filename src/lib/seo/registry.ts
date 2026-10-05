@@ -49,9 +49,9 @@ const BASE_PAGES: SeoPageDef[] = [
     group: "ana",
     title: "Fiyatlar",
     description:
-      "EmlakSoft paketleri, aylık ve yıllık fiyatlar, kullanıcı ve portföy limitleri ile özellik karşılaştırması. 14 gün ücretsiz deneme, kredi kartı gerekmez.",
+      "EmlakSoft paketleri, aylık ve yıllık fiyatlar, kullanıcı ve portföy limitleri ile özellik karşılaştırması. Ücretsiz deneme, kredi kartı gerekmez.",
     ogTitle: "EmlakSoft Fiyatlar",
-    ogDescription: "Açık fiyatlar, paket limitleri ve karşılaştırma tablosu. 14 gün ücretsiz deneme, kredi kartı gerekmez.",
+    ogDescription: "Açık fiyatlar, paket limitleri ve karşılaştırma tablosu. Ücretsiz deneme, kredi kartı gerekmez.",
     index: true,
     canIndex: true,
     sitemap: { include: true, priority: 0.8, freq: "monthly" },
@@ -77,9 +77,9 @@ const BASE_PAGES: SeoPageDef[] = [
     group: "hesap",
     title: "Ofisinizi Ücretsiz Oluşturun",
     description:
-      "14 gün ücretsiz deneme ile EmlakSoft'a başlayın. Kredi kartı gerekmez. Deneme boyunca tüm paketlerin özellikleri açıktır. Portföy, müşteri ve komisyon yönetimi tek platformda.",
+      "Ücretsiz deneme ile EmlakSoft'a başlayın. Kredi kartı gerekmez. Deneme boyunca tüm paketlerin özellikleri açıktır. Portföy, müşteri ve komisyon yönetimi tek platformda.",
     ogTitle: "EmlakSoft — Ücretsiz Başla",
-    ogDescription: "14 gün ücretsiz deneme. Emlak ofisinizi bugün dijitalleştirin.",
+    ogDescription: "Ücretsiz deneme. Emlak ofisinizi bugün dijitalleştirin.",
     index: true,
     canIndex: true,
     sitemap: { include: true, priority: 0.9, freq: "monthly" },
@@ -264,5 +264,7 @@ export const ALWAYS_DISALLOW = [
   "/anket/",
   "/lead/",
   "/acik-ev-kayit/",
+  "/r/",
+  "/p/",
   "/vitrin/*/favoriler",
 ] as const;

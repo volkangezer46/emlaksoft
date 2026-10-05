@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSampleScope, sampleValues } from "@/lib/sample-scope";
+import { shiftMonthKey, trMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
 import {
   computeAgentScores,
   computeStreak,
@@ -46,38 +47,36 @@ export type PeriodRange = {
 /**
  * "YYYY-MM" → kapalı-açık aralık [ay başı, sonraki ay başı).
  *
- * UTC sınırları bilinçli: sunucu (Vercel) UTC çalışır ve snapshot cron'u da
- * UTC saatinde tetiklenir; ay sınırını yerel saate bırakmak dönemin son
- * gününde 3 saatlik kaymaya yol açardı.
+ * Sınırlar Türkiye takvimine göre (UTC+3, `clock.ts` ay yardımcıları): sunucu UTC çalışsa da
+ * ayın ilk 3 saati (00:00-03:00 TRT) önceki aya yazılmaz. Sayfa ve snapshot cron'u AYNI
+ * fonksiyonu kullandığı için ekrandaki dönem ile arşivlenen dönem ayrışmaz.
  */
 export function periodRange(period: string): PeriodRange {
   const m = /^(\d{4})-(\d{2})$/.exec(period);
   const year = m ? Number(m[1]) : NaN;
   const month = m ? Number(m[2]) : NaN;
   const valid = m !== null && month >= 1 && month <= 12;
-  const y = valid ? year : new Date().getUTCFullYear();
-  const mo = valid ? month : new Date().getUTCMonth() + 1;
-
-  const start = new Date(Date.UTC(y, mo - 1, 1));
-  const end = new Date(Date.UTC(y, mo, 1));
+  const key = valid ? `${year}-${String(month).padStart(2, "0")}` : trMonthKey();
+  const next = shiftMonthKey(key, 1) as string;
+  const start = new Date(trMonthStartMsFromKey(key));
+  const end = new Date(trMonthStartMsFromKey(next));
   return {
-    period: `${y}-${String(mo).padStart(2, "0")}`,
+    period: key,
     startIso: start.toISOString(),
     endIso: end.toISOString(),
-    label: new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "UTC" }).format(start),
+    // TR ay başı (UTC+3) = önceki günün 21:00'ı; etiket TR saat diliminde biçimlenir.
+    label: new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(start),
   };
 }
 
 /** Verilen tarihten (varsayılan: şimdi) dönem anahtarı. */
 export function periodOf(date: Date): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+  return trMonthKey(date);
 }
 
 /** Bir önceki dönem anahtarı ("2026-01" → "2025-12"). */
 export function previousPeriod(period: string): string {
-  const { startIso } = periodRange(period);
-  const d = new Date(startIso);
-  return periodOf(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)));
+  return shiftMonthKey(periodRange(period).period, -1) as string;
 }
 
 export type LeagueAgent = {

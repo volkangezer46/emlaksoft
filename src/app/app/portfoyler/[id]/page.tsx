@@ -42,9 +42,12 @@ import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
 import { PropertyAuthorizationPanel } from "./property-extras";
+import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { TapuInquiryPanel } from "./tapu-inquiry-panel";
 import { PropertyMap } from "@/components/app/property-map";
+import { PhotoQualityCard } from "@/components/app/photo-quality-card";
+import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
 import { computePriceHealth } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
 import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
@@ -80,6 +83,7 @@ import { stageLabelMap } from "@/lib/deal-stage-labels";
 import type { CSSProperties } from "react";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
 const RING_C = 2 * Math.PI * 42;
 
@@ -169,7 +173,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -343,6 +347,7 @@ export default async function PropertyDetailPage({
     { id: "anahtarlar", label: "Anahtarlar", icon: KeyRound },
     { id: "belgeler", label: "Belgeler & sağlık", icon: FileCheck2 },
     { id: "konum", label: "Konum", icon: MapPin },
+    { id: "sahip", label: "İlan sahibi", icon: UserRound },
     { id: "zaman", label: "Zaman çizelgesi", icon: History },
   ];
 
@@ -365,6 +370,7 @@ export default async function PropertyDetailPage({
                 Fiyat {priceHealthLabel(property.price_health)}
               </span>
               <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
+              <SampleRecordBadge show={property.is_sample === true} />
             </div>
             <h1 className="mt-3 font-display text-2xl font-extrabold text-white md:text-3xl">
               {property.title ?? property.property_code}
@@ -439,6 +445,7 @@ export default async function PropertyDetailPage({
                       heating?: string | null;
                       building_age?: number | string | null;
                       facade?: string | null;
+                      description?: string | null;
                     },
                   }}
                   provinces={provinces ?? []}
@@ -606,6 +613,11 @@ export default async function PropertyDetailPage({
             </section>
           </div>
 
+          {/* Mahalle notları (F5): ofis içi saha notları, vitrine çıkmaz */}
+          <Suspense fallback={null}>
+            <NeighborhoodNotesPanel neighborhoodId={property.neighborhood_id} />
+          </Suspense>
+
           {/* Benzer portföyler */}
           <Suspense fallback={<RelatedSkeleton />}>
             <RelatedPropertiesWidget
@@ -626,7 +638,12 @@ export default async function PropertyDetailPage({
             </Suspense>
           </div>
 
-          <AiContentPanel propertyId={property.id} />
+          {/* Foto kalite kartı (F3): kural tabanlı, puansız */}
+          <Suspense fallback={null}>
+            <PhotoQualityCard propertyId={property.id} />
+          </Suspense>
+
+          <AiContentPanel propertyId={property.id} canEdit={canEdit} />
             </div>
           ) : null}
 
@@ -931,6 +948,8 @@ export default async function PropertyDetailPage({
           </section>
             </div>
           ) : null}
+
+          {tab === "sahip" && tenantId ? <PropertyOwnerCard tenantId={tenantId} propertyId={property.id} /> : null}
 
           {tab === "zaman" ? (
             <Suspense fallback={<TimelineSkeleton />}>

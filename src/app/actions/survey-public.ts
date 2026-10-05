@@ -4,6 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { isFeatureEnabledIn } from "@/lib/modules/logic";
+import { loadTenantModuleState } from "@/lib/modules/state";
+import { validateAnswers } from "@/lib/surveys/logic";
+import { isSurveyTaskLinkExpired } from "@/lib/surveys/task-expiry";
+import { now } from "@/lib/clock";
+import { completeSurveyTask, loadSurveySettings, loadTemplateQuestions } from "@/lib/surveys/server";
 
 export type PublicSurveyResult = {
   ok?: boolean;
@@ -142,5 +148,99 @@ export async function submitSurveyByToken(fd: FormData): Promise<PublicSurveyRes
     }
   }
 
+  return { ok: true };
+}
+
+/**
+ * Anketör görevi için bağlı link cevabı (/anket/[token], görev token'ı). Müşteri isterse telefona gerek kalmadan
+ * aynı şablonu kendisi doldurur. Auth YOK — token yeterli; tek cevap kuralı: kapanmış görev bir daha yazılmaz
+ * ("ulaşılamadı" görevi müşteri cevaplayabilir). Ofis "Anketler" modülünü kapattıysa cevap alınmaz.
+ * `answers`: soru kimliği -> ham cevap (sunucuda şablona göre doğrulanır).
+ */
+export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurveyResult> {
+  const token = String(fd.get("token") ?? "").trim();
+  if (String(fd.get("website") ?? "").trim()) return { ok: true };
+  if (!UUID_RE.test(token)) return { error: "Geçersiz bağlantı." };
+
+  let raw: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(String(fd.get("answers") ?? "{}"));
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
+  } catch {
+    return { error: "Cevaplar okunamadı." };
+  }
+
+  const ip = await clientIp();
+  const { allowed } = await checkRateLimit(`anket:${ip}`, { limit: 10, windowSec: 60, failurePolicy: "deny" });
+  if (!allowed) return { error: "Çok fazla istek. Lütfen biraz sonra tekrar deneyin." };
+
+  const admin = createAdminClient();
+  const { data: task } = await admin
+    .from("survey_tasks")
+    .select("id, tenant_id, event_type, audience, customer_id, property_id, deal_id, agent_id, contact_name, attempts, status, template_id, due_at")
+    .eq("public_token", token)
+    .maybeSingle();
+  const invalid = { error: "Bağlantı geçersiz veya anket bulunamadı." };
+  if (!task || !task.template_id) return invalid;
+
+  const tenantId = String(task.tenant_id);
+  const { data: tenant } = await admin.from("tenants").select("status").eq("id", tenantId).maybeSingle();
+  if (!tenant || !isPublicTenantActive(tenant.status)) return invalid;
+  const moduleState = await loadTenantModuleState(admin, tenantId);
+  if (!isFeatureEnabledIn(moduleState, "surveys")) return invalid;
+  if (task.status === "completed") return { ok: true, alreadyAnswered: true };
+  if (task.status !== "pending" && task.status !== "unreachable") return invalid;
+  // Görev token'ı süresiz değildir: due_at + SURVEY_TASK_LINK_VALID_DAYS gün sonra bağlantı kapanır.
+  if (isSurveyTaskLinkExpired(task.due_at as string | null, now())) return invalid;
+  // Örnek (is_sample) ilana bağlı görev public yüzde cevap almaz (anket sayfasıyla aynı kural).
+  if (task.property_id) {
+    const { data: p } = await admin
+      .from("properties")
+      .select("id")
+      .eq("id", task.property_id)
+      .eq("tenant_id", tenantId)
+      .eq("is_sample", false)
+      .maybeSingle();
+    if (!p) return invalid;
+  }
+
+  const questions = await loadTemplateQuestions(admin, tenantId, String(task.template_id));
+  const check = validateAnswers(questions, raw);
+  if (!check.ok) return { error: check.error };
+
+  let customerName = (task.contact_name as string | null) ?? "";
+  if (task.customer_id) {
+    const { data: c } = await admin
+      .from("customers")
+      .select("full_name, is_sample")
+      .eq("id", task.customer_id)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!c || c.is_sample) return invalid;
+    if (c.full_name) customerName = String(c.full_name);
+  }
+  const settings = await loadSurveySettings(admin, tenantId);
+  try {
+    const done = await completeSurveyTask(
+      admin,
+      {
+        id: String(task.id),
+        tenant_id: tenantId,
+        event_type: String(task.event_type),
+        audience: String(task.audience),
+        customer_id: (task.customer_id as string | null) ?? null,
+        property_id: (task.property_id as string | null) ?? null,
+        deal_id: (task.deal_id as string | null) ?? null,
+        agent_id: (task.agent_id as string | null) ?? null,
+        contact_name: (task.contact_name as string | null) ?? null,
+        attempts: Number(task.attempts) || 0,
+      },
+      { answers: check.answers, score: check.score, comment: check.comment, via: "link", userId: null, lowScoreMax: settings.low_score_max, customerName },
+    );
+    if (!done) return { ok: true, alreadyAnswered: true };
+  } catch {
+    return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
+  }
   return { ok: true };
 }

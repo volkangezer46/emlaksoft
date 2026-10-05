@@ -6,10 +6,13 @@ import {
   burnInOffset,
   canShowRevenue,
   canViewTv,
+  ROTATION_OPTIONS,
   isSectionVisible,
+  leadSourceLabel,
   newIds,
   pageAt,
   pageCount,
+  parseRotationSeconds,
   parseTvSettings,
   resolveTvDark,
   shortName,
@@ -135,5 +138,35 @@ describe("burn-in kayması", () => {
       expect(Math.abs(x)).toBeLessThanOrEqual(2);
       expect(Math.abs(y)).toBeLessThanOrEqual(2);
     }
+  });
+});
+
+describe("rotasyon süresi ayarı", () => {
+  it("yalnız izinli değerler kabul edilir, aksi halde varsayılan 12 sn", () => {
+    for (const sec of ROTATION_OPTIONS) expect(parseRotationSeconds(sec)).toBe(sec);
+    expect(parseRotationSeconds(3)).toBe(12);
+    expect(parseRotationSeconds("20")).toBe(20);
+    expect(parseRotationSeconds("zzz")).toBe(12);
+    expect(parseRotationSeconds(undefined)).toBe(12);
+  });
+  it("saklanan ayarda süre korunur, varsayılan 12", () => {
+    expect(DEFAULT_TV_SETTINGS.rotationSec).toBe(12);
+    expect(parseTvSettings(JSON.stringify({ rotationSec: 30 })).rotationSec).toBe(30);
+    expect(parseTvSettings({ rotationSec: 7 }).rotationSec).toBe(12);
+  });
+});
+
+describe("yeni talepler bölümü", () => {
+  it("varsayılan, satış ve randevu şablonlarında görünür", () => {
+    expect(isSectionVisible(DEFAULT_TV_SETTINGS, "leads")).toBe(true);
+    expect(templateSections("satis")).toContain("leads");
+    expect(templateSections("randevu")).toContain("leads");
+  });
+  it("kaynak etiketi: bilinen etiket, bilinmeyen/boş null", () => {
+    expect(leadSourceLabel("web")).toBe("Web sitesi");
+    expect(leadSourceLabel("PORTAL_zingat")).toBe("Portal");
+    expect(leadSourceLabel("bilinmeyen_kaynak")).toBeNull();
+    expect(leadSourceLabel(null)).toBeNull();
+    expect(leadSourceLabel("")).toBeNull();
   });
 });

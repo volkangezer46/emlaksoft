@@ -41,6 +41,7 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/ekip", title: "Ekip yönetimi", minPlan: "office", pitch: "Danışman ekleyin, rol ve izinleri yönetin, izin takvimini tutun.", except: ["/app/ekip/kartvizitim", "/app/ekip/kazanc", "/app/ekip/[id]"] },
   { href: "/app/yabanci-satis", title: "Yabancıya Satış", minPlan: "office", pitch: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi." },
   { href: "/app/denetim", title: "Denetim kaydı", minPlan: "office", pitch: "Kim ne zaman neyi değiştirdi veya indirdi, tam denetim izi." },
+  { href: "/app/anketler", title: "Anketler ve anketör", minPlan: "office", pitch: "Yayından kalkan, uzayan ve işlem gören işlemler için anketör aramaları, şablonlar ve neden analizi." },
   { href: "/app/raporlar", title: "Raporlar", minPlan: "office", pitch: "Ofis performansı, kaynak ROI'si ve komisyon raporları." },
   // Profesyonel
   { href: "/app/kayip-kacak", title: "Kayıp-kaçak komisyon motoru", minPlan: "professional", pitch: "Portal ilanlarınızdan rakibe kapanan satışları otomatik bulur ve kaçan komisyonu tahmin eder." },

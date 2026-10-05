@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { formatTurkishPhone } from "@/lib/phone";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 export type BranchRow = {
   id: string;
@@ -51,7 +52,7 @@ function Fields({
           ))}
         </FormSelect>
       </FormField>
-      <FormField label="Şube müdürü" htmlFor={`${idPrefix}-mgr`} hint="Ofisin aktif üyelerinden seçilir.">
+      <FormField label={ROLE_LABELS.branch_manager} htmlFor={`${idPrefix}-mgr`} hint="Ofisin aktif üyelerinden seçilir.">
         <FormSelect id={`${idPrefix}-mgr`} name="manager_user_id" defaultValue={branch?.manager_user_id ?? ""}>
           <option value="">Atanmadı</option>
           {managers.map((m) => (
