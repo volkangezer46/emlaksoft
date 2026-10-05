@@ -29,7 +29,7 @@ import {
   moveItem,
   newId,
 } from "@/lib/site-menu/editor-model";
-import { FEATURED_RATIOS, LIMITS, type Issue, type MenuGroup, type MenuItem, type SiteMenuConfig } from "@/lib/site-menu/schema";
+import { FEATURED_PREVIEWS, FEATURED_RATIOS, LIMITS, type Issue, type MenuGroup, type MenuItem, type SiteMenuConfig } from "@/lib/site-menu/schema";
 import type { MediaEntry } from "@/lib/site-menu/store";
 import {
   Field,
@@ -54,6 +54,14 @@ type Props = {
   media: readonly MediaEntry[];
   addMedia: (m: MediaEntry) => void;
   readOnly: boolean;
+};
+
+const PREVIEW_LABELS: Record<(typeof FEATURED_PREVIEWS)[number], string> = {
+  leak: "Kayıp-kaçak zaman çizgisi",
+  valuation: "Emsal değer aralığı",
+  signature: "Dijital imza akışı",
+  plans: "Paket karşılaştırma",
+  assistant: "AI asistan sohbeti",
 };
 
 const selectCls =
@@ -242,6 +250,15 @@ function FeaturedEditor({
             <FieldIssue issues={issues} path={`${base}.href`} />
           </Field>
         </div>
+      </div>
+
+      <div className="mt-3 sm:max-w-xs">
+        <Field label="Mini ürün önizlemesi" hint="Medya yoksa kartta animasyonlu örnek ekran gösterilir; medya varsa medya öncelikli olur.">
+          <select className={selectCls} disabled={readOnly} value={f.preview ?? ""} onChange={(e) => set((x) => { x.preview = (FEATURED_PREVIEWS as readonly string[]).includes(e.target.value) ? (e.target.value as (typeof FEATURED_PREVIEWS)[number]) : null; })}>
+            <option value="">Yok</option>
+            {FEATURED_PREVIEWS.map((k) => <option key={k} value={k}>{PREVIEW_LABELS[k]}</option>)}
+          </select>
+        </Field>
       </div>
 
       <div className="mt-3 rounded-[var(--radius-control)] border border-line bg-surface p-3">

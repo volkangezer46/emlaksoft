@@ -18,10 +18,12 @@ import { getLiveSiteContent } from "@/lib/site-content/store";
 import { ValuationSection } from "@/components/marketing/valuation-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { LandingJsonLd } from "@/components/marketing/landing-jsonld";
+import { MotionRoot } from "@/components/marketing/motion-root";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import "./marketing.css";
 import "./marketing-sections.css";
+import "./marketing-motion.css";
 
 // Canonical "/" burada verilir (kökte yok); başlık/açıklama/OG ayarlardan, ayar yokken layout varsayılanı.
 export async function generateMetadata(): Promise<Metadata> {
@@ -30,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Ana sayfa yalnızca bölümleri birleştirir ("Kurumsal Parlak"). Statik sayfa: çerez/başlık okuması yok;
- * hero'da istemci JS yok. Public sayfa her zaman açık temadır.
+ * hero sunucu bileşenidir; tek istemci kodu MotionRoot (markup eklemez: giriş animasyonu ve gösterim duraklatma). Public sayfa her zaman açık temadır.
  */
 export default async function HomePage() {
   // Metinler yönetim panelinden (Site içeriği); yayın yoksa bugünkü metin. Okuma sunucuda, etiketli önbellekten (sayfa statik kalır).
@@ -41,6 +43,7 @@ export default async function HomePage() {
   return (
     <div className="mk">
       <LandingJsonLd faq={faqForJsonLd(faqs)} />
+      <MotionRoot />
       <SiteHeader />
       <main id="main-content">
         <HeroSection trialDays={trialDays} plans={plans} content={content.hero} />

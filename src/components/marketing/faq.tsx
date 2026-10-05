@@ -35,9 +35,9 @@ export const FAQS: readonly { q: string; a: string }[] = buildHomeFaqs({ plans: 
 export function Faq({ items, heading = defaultSiteContent().sections.sss }: { items: readonly { q: string; a: string }[]; heading?: Heading }) {
   return (
     <section id="sss" className="mk-section mk-alt" aria-labelledby="sss-baslik">
-      <div className="mk-wrap" style={{ maxWidth: "52rem" }}>
+      <div className="mk-wrap mk-wrap-faq">
         <SectionHeading center eyebrow={heading.eyebrow} title={<span id="sss-baslik"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></span>} />
-        <div className="mk-faq mk-stagger" style={{ marginTop: "2.5rem" }}>
+        <div className="mk-faq mk-stagger">
           {items.map((f, i) => (
             <details key={`${i}-${f.q}`} className="motion-details" style={{ "--i": i } as React.CSSProperties}>
               <summary>
@@ -48,8 +48,8 @@ export function Faq({ items, heading = defaultSiteContent().sections.sss }: { it
             </details>
           ))}
         </div>
-        <p style={{ marginTop: "1.5rem", textAlign: "center", fontSize: "0.9375rem", color: "var(--mk-muted)" }}>
-          Sorunuz hâlâ mı var? <a href="mailto:destek@emlaksoft.com.tr" style={{ color: "var(--mk-accent-text)", fontWeight: 600 }}>destek@emlaksoft.com.tr</a>
+        <p className="mk-faq-note">
+          Sorunuz hâlâ mı var? <a href="mailto:destek@emlaksoft.com.tr">destek@emlaksoft.com.tr</a>
         </p>
       </div>
     </section>

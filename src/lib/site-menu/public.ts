@@ -1,4 +1,4 @@
-import { checkHref, isExternalHref, type FeaturedRatio, type IconRef, type MediaKind, type SiteMenuConfig } from "./schema";
+import { checkHref, isExternalHref, type FeaturedPreviewKind, type FeaturedRatio, type IconRef, type MediaKind, type SiteMenuConfig } from "./schema";
 
 /**
  * Yapılandırmadan herkese açık görünüme: gizlenenler, geçersiz bağlantılar ve süresi dolan duyuru ayıklanır;
@@ -26,6 +26,8 @@ export type PublicFeatured = {
   ctaLabel: string;
   href: string;
   external: boolean;
+  /** Medya yoksa gösterilen mini ürün önizlemesi (medya varsa o öncelikli). */
+  preview: FeaturedPreviewKind | null;
   media: { kind: MediaKind; src: string; posterSrc: string | null; ratio: FeaturedRatio; alt: string } | null;
 };
 
@@ -109,6 +111,7 @@ export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu
             ctaLabel: f.ctaLabel,
             href: f.href,
             external: isExternalHref(f.href),
+            preview: f.preview ?? null,
             media: f.media
               ? {
                   kind: f.media.kind,

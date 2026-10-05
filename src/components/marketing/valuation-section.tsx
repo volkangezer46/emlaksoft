@@ -50,13 +50,13 @@ export function ValuationSection({
           title={<span id="degerleme-baslik"><RichTitle title={content.title} em={content.em} tail={content.tail} /></span>}
           text={content.text ? tx(content.text, ctx) : undefined}
         />
-        <p style={{ textAlign: "center", marginTop: "1rem", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0.5rem", alignItems: "center" }}>
+        <p className="mk-val-claim">
           {badge ? <span className={`mk-tag ${live ? "mk-tag-plan" : "mk-example"}`} data-ef-status={status}>{badge}</span> : null}
           {content.claim.hidden || !content.claim.text ? null : <strong>{content.claim.text}</strong>}
-          {content.claimConcrete ? <span style={{ color: "var(--mk-muted)" }}>{content.claimConcrete}</span> : null}
+          {content.claimConcrete ? <span className="mk-val-concrete">{content.claimConcrete}</span> : null}
         </p>
-        <div className="mk-split" style={{ marginTop: "2rem", alignItems: "start" }}>
-          <ul className="mk-hl-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(14rem, 1fr))" }}>
+        <div className="mk-split mk-val-split">
+          <ul className="mk-hl-grid mk-val-points">
             {points.map((p) => (
               <li key={p.id} className="mk-hl">
                 <div className="mk-hl-head"><span className="mk-value-ico mk-tint-blue"><p.icon size={24} aria-hidden="true" /></span></div>
@@ -65,10 +65,10 @@ export function ValuationSection({
               </li>
             ))}
           </ul>
-          <ExampleReport />
+          <ExampleReport className="mk-val-aside" />
         </div>
         {before.length || after.length ? (
-          <div className="mk-hl-grid" style={{ marginTop: "2rem", gridTemplateColumns: "repeat(auto-fit, minmax(16rem, 1fr))" }}>
+          <div className="mk-hl-grid mk-val-compare">
             <div className="mk-hl">
               <h3 className="mk-h3">{content.compare.beforeTitle}</h3>
               <ul className="mk-list">{before.map((c) => <li key={c.id}><X size={16} aria-hidden="true" />{tx(c.text, ctx)}</li>)}</ul>
@@ -79,7 +79,7 @@ export function ValuationSection({
             </div>
           </div>
         ) : null}
-        <div className="mk-cta-row" style={{ justifyContent: "center", marginTop: "2rem" }}>
+        <div className="mk-cta-row mk-cta-center">
           <ContentLink href={cta.href} className="mk-btn mk-btn-grad btn-shine">{tx(cta.label, ctx)} <ArrowRight size={18} aria-hidden="true" /></ContentLink>
         </div>
         {content.note ? <p className="mk-fine">{tx(content.note, ctx)}</p> : null}

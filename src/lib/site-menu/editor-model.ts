@@ -43,7 +43,7 @@ export function blankGroup(id: string): MenuGroup {
 }
 
 export function blankFeatured(): NonNullable<MenuGroup["featured"]> {
-  return { eyebrow: "", icon: { kind: "none" }, title: "Öne çıkan", text: "", ctaLabel: "Göz at", href: "/", hidden: false, media: null };
+  return { eyebrow: "", icon: { kind: "none" }, title: "Öne çıkan", text: "", ctaLabel: "Göz at", href: "/", hidden: false, preview: null, media: null };
 }
 
 export function blankFooterColumn(id: string): FooterColumn {

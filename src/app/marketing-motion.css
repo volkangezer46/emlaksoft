@@ -1,0 +1,105 @@
+/* Ana sayfa HAREKET katmanı (marketing.css / marketing-sections.css'ten SONRA yüklenir). Sözleşme: src/lib/marketing-motion-contract.test.ts.
+   KURALLAR: yalnız transform/opacity (+ SVG stroke-dashoffset; tek istisna sayaç özel özelliği --mk-n: küçük HTML alt ağacı);
+   süreler motion.css token'ları; her keyframe `prefers-reduced-motion: no-preference` içinde; TEMEL CSS = SON KARE
+   (JS yok / reduce / otomasyon tarayıcısında hiçbir şey gizli ya da yarım kalmaz). Hareket yalnız MotionRoot'un koyduğu
+   .mk[data-motion="on"] altında oynar. Gizleme yalnız .js-reveal altında ve yalnız viewport ALTINDAKİ .mk-reveal öğelerine uygulanır.
+   Fare/imleç takibi yok. Sonsuz döngü yok; uzun hareket (.mk-demo, ~14 sn) tek sefer oynar, ekran dışı/sekme gizli/kullanıcı
+   duraklattığında data-paused="true" ile durur. */
+
+.mk {
+  --mk-demo-loop: 14s; /* hero zaman çizelgesi uzunluğu (son ~3-4 sn duraklama) */
+  --mk-reveal-y: 12px;
+}
+
+/* Sayaç özel özelliği (hero KPI katmanı). Desteklenmezse sayı sonuç değerinde kalır / yarıda atlar, bozulmaz. */
+@property --mk-n { syntax: "<integer>"; inherits: true; initial-value: 0; }
+
+/* ---- temel (son kare) yardımcıları ---- */
+.mk-a-fillx { transform-box: fill-box; transform-origin: 0 50%; }
+.mk-a-bar { transform-box: fill-box; transform-origin: 50% 100%; }
+.mk-a-pop, .mk-a-dot { transform-box: fill-box; transform-origin: 50% 50%; }
+.mk-a-swap-from { opacity: 0; } /* rozet çifti: başlangıç yüzü temelde gizli, SON KARE = "to" */
+
+/* hero KPI sayaç katmanı: temelde yok, SVG metni görünür */
+.mk-dash-ov { position: absolute; inset: 0.55cqw; container-type: inline-size; pointer-events: none; display: none; }
+.mk-ov-n {
+  position: absolute; left: calc(var(--x) * 100cqw / 900); top: calc(128.9 * 100cqw / 900);
+  font: 800 calc(29 * 100cqw / 900) / 1 var(--font-inter), system-ui, sans-serif; color: #0a1736; white-space: pre;
+  --mk-n: var(--v); counter-reset: mk-n var(--mk-n);
+}
+.mk-ov-n::after { content: var(--pre) counter(mk-n) var(--suf); }
+
+/* duraklat / oynat (WCAG 2.2.2): yalnız MotionRoot hareket açıkken ekler */
+.mk-pause {
+  position: absolute; z-index: 6; left: 30%; bottom: -2.8%; min-height: 2rem; padding: 0.25rem 0.75rem; border-radius: 999px;
+  border: 1px solid var(--mk-line); background: #fff; color: var(--mk-ink); font: 700 0.75rem / 1.2 var(--font-inter), system-ui, sans-serif; cursor: pointer;
+  box-shadow: var(--mk-sh-1); transition: border-color var(--motion-fast), color var(--motion-fast);
+}
+.mk-pause:hover { border-color: var(--mk-blue); color: var(--mk-blue-text); }
+@media (max-width: 559px) { .mk-pause { left: 3%; bottom: -3.4%; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ===== keyframe'ler ===== */
+  @keyframes mk-rev { from { opacity: 0; transform: translateY(var(--mk-reveal-y)); } }
+  @keyframes mk-tab-in { from { opacity: 0; transform: translateY(4px); } }
+  @keyframes mk-line-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+  @keyframes mk-fillx { from { transform: scaleX(0); } }
+  @keyframes mk-bar-up { from { transform: scaleY(0); } }
+  @keyframes mk-pop { from { opacity: 0; transform: scale(0.6); } }
+  @keyframes mk-rise { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes mk-slide { from { opacity: 0; transform: translateX(-192px); } }
+  @keyframes mk-swap-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes mk-swap-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes mk-count { from { --mk-n: 0; } }
+  @keyframes mk-line-x { from { transform: scaleX(0); } }
+  @keyframes mk-line-y { from { transform: scaleY(0); } }
+  /* Bildirim kartları: her an en çok 2 kart; yalnız SON KARE (>= %70) üçü birlikte görünür (reduce ile aynı). */
+  @keyframes mk-card-1 { 0%, 9% { opacity: 0; transform: translateX(28px); } 13%, 30% { opacity: 1; transform: none; } 34%, 62% { opacity: 0; transform: translateX(28px); } 66%, 100% { opacity: 1; transform: none; } }
+  @keyframes mk-card-2 { 0%, 15% { opacity: 0; transform: translateX(28px); } 19%, 45% { opacity: 1; transform: none; } 49%, 66% { opacity: 0; transform: translateX(28px); } 70%, 100% { opacity: 1; transform: none; } }
+  @keyframes mk-card-3 { 0%, 34% { opacity: 0; transform: translateX(28px); } 38%, 100% { opacity: 1; transform: none; } }
+
+  /* ===== kaydırmayla giriş (yalnız .js-reveal: ekran altındaki öğeler) ===== */
+  .mk.js-reveal .mk-reveal:not([data-in]) { opacity: 0; transform: translateY(var(--mk-reveal-y)); }
+  .mk[data-motion="on"] .mk-reveal[data-in="1"] { animation: mk-rev var(--motion-slow) var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * var(--motion-stagger)); }
+  .mk[data-motion="on"] .mk-bento > .mk-reveal[data-in="1"]:nth-child(even) { animation-delay: 80ms; }
+  .mk[data-motion="on"] .mk-steps > .mk-reveal[data-in="1"] { animation-delay: calc(var(--i, 0) * 120ms); }
+
+  /* ===== HERO tek zaman çizelgesi (.mk-demo) ===== */
+  .mk[data-motion="on"] .mk-demo .mk-kpi-v { visibility: hidden; }
+  .mk[data-motion="on"] .mk-demo .mk-dash-ov { display: block; }
+  .mk[data-motion="on"] .mk-demo .mk-ov-n { animation: mk-count 1.1s var(--ease-out) both; }
+  .mk[data-motion="on"] .mk-demo .mk-a-line { stroke-dasharray: 1; animation: mk-line-draw 1.5s var(--ease-out-quart) 0.9s both; }
+  .mk[data-motion="on"] .mk-demo .mk-a-area { animation: mk-swap-in 700ms var(--ease-out) 1.9s both; }
+  .mk[data-motion="on"] .mk-demo .mk-a-dot { animation: mk-pop var(--motion-base) var(--ease-out) 2.3s both; }
+  .mk[data-motion="on"] .mk-demo .mk-a-bar { animation: mk-bar-up var(--motion-draw) var(--ease-out) both; animation-delay: calc(1.1s + var(--i, 0) * 70ms); }
+  .mk[data-motion="on"] .mk-demo .mk-float-1 { animation: mk-card-1 var(--mk-demo-loop) var(--ease-out) both; }
+  .mk[data-motion="on"] .mk-demo .mk-float-2 { animation: mk-card-2 var(--mk-demo-loop) var(--ease-out) both; }
+  .mk[data-motion="on"] .mk-demo .mk-float-3 { animation: mk-card-3 var(--mk-demo-loop) var(--ease-out) both; }
+  /* ekran dışı / sekme gizli / kullanıcı duraklattı */
+  .mk-demo[data-paused="true"], .mk-demo[data-paused="true"] *, .mk-demo[data-paused="true"] *::before, .mk-demo[data-paused="true"] *::after { animation-play-state: paused !important; }
+
+  /* rozet çaprazlama (hero + tur + bento): gecikme satır içi */
+  .mk[data-motion="on"] :is(.mk-demo, .mk-reveal[data-in]) .mk-a-swap-from { animation: mk-swap-out var(--motion-base) var(--ease-out) both; }
+  .mk[data-motion="on"] :is(.mk-demo, .mk-reveal[data-in]) .mk-a-swap-to { animation: mk-swap-in var(--motion-base) var(--ease-out) both; }
+
+  /* ===== ürün turu + bento + örnek rapor: kart/sekme görününce BİR kez ===== */
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-fillx { animation: mk-fillx var(--motion-draw) var(--ease-out) both; animation-delay: calc(0.3s + var(--i, 0) * 90ms); }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-bar { animation: mk-bar-up var(--motion-draw) var(--ease-out) both; animation-delay: calc(0.3s + var(--i, 0) * 70ms); }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-pop { animation: mk-pop var(--motion-base) var(--ease-out) both; animation-delay: calc(0.35s + var(--i, 0) * 90ms); }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-tickico { animation: mk-pop var(--motion-base) var(--ease-out) both; animation-delay: calc(0.3s + var(--i, 0) * 110ms); }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-tick { stroke-dasharray: 1; animation: mk-line-draw var(--motion-draw) var(--ease-out) both; animation-delay: calc(0.4s + var(--i, 0) * 350ms); }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-sign { stroke-dasharray: 1; animation: mk-line-draw 1.1s var(--ease-out-quart) 0.9s both; }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-bub { animation: mk-rise var(--motion-slow) var(--ease-out) both; animation-delay: calc(0.2s + var(--i, 0) * 900ms); }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-rise { animation: mk-rise var(--motion-slow) var(--ease-out) 0.5s both; }
+  .mk[data-motion="on"] .mk-reveal[data-in] .mk-a-slide { animation: mk-slide var(--motion-slow) var(--ease-out) 0.5s both; }
+  /* örnek rapor: bant önce çizilir, orta işaret ve güven segmentleri sonra */
+  .mk[data-motion="on"] .mk-rep[data-in] .mk-rep-track .mk-a-pop { animation-delay: 0.9s; }
+  .mk[data-motion="on"] .mk-rep[data-in] .mk-rep-conf .mk-a-pop { animation-delay: calc(0.7s + var(--i, 0) * 160ms); }
+
+  /* ===== adım bağlantı çizgileri + bölüm üst çizgisi: görününce bir kez ===== */
+  .mk[data-motion="on"] .mk-step.mk-reveal[data-in]:not(:last-child)::after { transform-origin: left center; animation: mk-line-x var(--motion-draw) var(--ease-out) both; animation-delay: calc(0.35s + var(--i, 0) * 140ms); }
+  @media (max-width: 899px) {
+    .mk[data-motion="on"] .mk-step.mk-reveal[data-in]:not(:last-child)::after { transform-origin: center top; animation-name: mk-line-y; }
+  }
+  .mk[data-motion="on"] .mk-alt[data-in="1"]::before { transform-origin: left center; animation: mk-line-x var(--motion-draw) var(--ease-out-expo) both; }
+}

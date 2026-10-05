@@ -23,9 +23,9 @@ export function FinalCta({
     <section className="mk-dark mk-final" aria-labelledby="son-cta">
       <div className="mk-grid-bg-dark" aria-hidden="true" />
       <div className="mk-glow-dark" aria-hidden="true" />
-      <div className="mk-wrap mk-reveal" style={{ maxWidth: "52rem" }}>
+      <div className="mk-wrap mk-wrap-final mk-reveal">
         <h2 id="son-cta" className="mk-h2"><RichTitle title={content.title} em={content.em} tail={content.tail} /></h2>
-        <p className="mk-lead" style={{ marginTop: "1rem" }}><Lines text={tx(content.text, ctx)} /></p>
+        <p className="mk-lead"><Lines text={tx(content.text, ctx)} /></p>
         <div className="mk-cta-row">
           <ContentLink href={content.primary.href} className="mk-btn mk-btn-light btn-shine">{tx(content.primary.label, ctx)} <ArrowRight size={18} aria-hidden="true" /></ContentLink>
           <ContentLink href={content.secondary.href} className="mk-btn mk-btn-outline-light">{tx(content.secondary.label, ctx)}</ContentLink>
