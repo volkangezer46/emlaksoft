@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   EF_DEFAULT_TARIFF,
+  EF_WELCOME_DEFAULT_UNITS,
+  parseEfWelcomeUnits,
   EF_RPC,
   efIdempotencyKey,
   efPackUnitPriceTry,
@@ -76,5 +78,21 @@ describe("ef-credits config: sözleşme sabitleri", () => {
       grant: "ef_credit_grant",
       sweep: "ef_credit_sweep",
     });
+  });
+});
+
+describe("ef-credits config: hoş geldin kontörü", () => {
+  it("varsayılan 10; geçersiz değer varsayılana düşer; 0 kapalı demektir", () => {
+    expect(parseEfWelcomeUnits(null)).toBe(EF_WELCOME_DEFAULT_UNITS);
+    expect(parseEfWelcomeUnits("")).toBe(10);
+    expect(parseEfWelcomeUnits("25")).toBe(25);
+    expect(parseEfWelcomeUnits("0")).toBe(0);
+    expect(parseEfWelcomeUnits("-3")).toBe(10);
+    expect(parseEfWelcomeUnits("1.5")).toBe(10);
+    expect(parseEfWelcomeUnits("abc")).toBe(10);
+    expect(parseEfWelcomeUnits("5000")).toBe(10);
+  });
+  it("varsayılan tarife: değerleme 5, ilk PDF 2 (EmlakFiyati PRO = 20 değerleme + 10 PDF = 120 kontör)", () => {
+    expect(EF_DEFAULT_TARIFF.valuationArsa * 20 + EF_DEFAULT_TARIFF.pdfFirst * 10).toBe(120);
   });
 });

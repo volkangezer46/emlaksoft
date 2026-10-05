@@ -17,6 +17,16 @@ export const EF_ORTAK_PROBE_OK_SETTING_KEY = "emlakfiyati_ortak_probe_ok_at";
 
 export const EF_UNIT = "ef" as const;
 
+/** Yeni ofise TEK SEFER verilen hoş geldin kontörü (EmlakFiyati "ilk değerleme ücretsiz" karşılığı); 0 = kapalı. */
+export const EF_WELCOME_SETTING_KEY = "ef.welcome_units";
+export const EF_WELCOME_DEFAULT_UNITS = 10;
+
+export function parseEfWelcomeUnits(raw: string | null | undefined): number {
+  if (raw == null || raw === "") return EF_WELCOME_DEFAULT_UNITS;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 1000 ? n : EF_WELCOME_DEFAULT_UNITS;
+}
+
 // ---------------------------------------------------------------------------
 // Tarife: hangi işlem kaç kontör (admin düzenler)
 // ---------------------------------------------------------------------------
@@ -33,7 +43,7 @@ export const efTariffSchema = z.object({
 export type EfTariff = z.infer<typeof efTariffSchema>;
 
 /** Varsayılan tarife (sahibin kararı olarak admin'den değiştirilir). */
-export const EF_DEFAULT_TARIFF: EfTariff = { valuationArsa: 5, valuationKonut: 5, pdfFirst: 3, reportDetail: 0 };
+export const EF_DEFAULT_TARIFF: EfTariff = { valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0 };
 
 export type EfItem = "valuation_arsa" | "valuation_konut" | "pdf_first" | "report_detail";
 
