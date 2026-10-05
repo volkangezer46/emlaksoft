@@ -94,17 +94,18 @@ export function LeadForm({
         aria-hidden="true"
         className="absolute left-[-9999px] h-0 w-0 opacity-0"
       />
-      <input name="full_name" required placeholder="Ad soyad *" className={inputCls} />
-      <PhoneInput name="phone" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX)" />
-      <EmailInput name="email" placeholder="E-posta (opsiyonel)" className={inputCls} />
+      <input name="full_name" required aria-label="Ad soyad" autoComplete="name" placeholder="Ad soyad *" className={inputCls} />
+      <label htmlFor="lead-phone" className="sr-only">Cep telefonu</label>
+      <PhoneInput id="lead-phone" name="phone" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX)" />
+      <EmailInput name="email" aria-label="E-posta" placeholder="E-posta (opsiyonel)" className={inputCls} />
 
       <div className="grid grid-cols-2 gap-3">
-        <select name="transaction_type" defaultValue="" className={inputCls}>
+        <select name="transaction_type" aria-label="İşlem türü" defaultValue="" className={inputCls}>
           <option value="" className="bg-ink-950">İşlem türü</option>
           <option value="satilik" className="bg-ink-950">Satılık</option>
           <option value="kiralik" className="bg-ink-950">Kiralık</option>
         </select>
-        <select name="property_type" defaultValue="" className={inputCls}>
+        <select name="property_type" aria-label="Mülk türü" defaultValue="" className={inputCls}>
           <option value="" className="bg-ink-950">Mülk türü</option>
           <option value="daire" className="bg-ink-950">Daire</option>
           <option value="villa" className="bg-ink-950">Villa</option>
@@ -113,7 +114,7 @@ export function LeadForm({
         </select>
       </div>
 
-      <select name="province_id" defaultValue="" className={inputCls}>
+      <select name="province_id" aria-label="İl" defaultValue="" className={inputCls}>
         <option value="" className="bg-ink-950">İl (opsiyonel)</option>
         {provinces.map((p) => (
           <option key={p.id} value={p.id} className="bg-ink-950">
@@ -123,11 +124,11 @@ export function LeadForm({
       </select>
 
       <div className="grid grid-cols-2 gap-3">
-        <input name="budget_min" inputMode="numeric" placeholder="Min bütçe ₺" className={inputCls} />
-        <input name="budget_max" inputMode="numeric" placeholder="Max bütçe ₺" className={inputCls} />
+        <input name="budget_min" aria-label="Minimum bütçe (₺)" inputMode="numeric" placeholder="Min bütçe ₺" className={inputCls} />
+        <input name="budget_max" aria-label="Maksimum bütçe (₺)" inputMode="numeric" placeholder="Max bütçe ₺" className={inputCls} />
       </div>
 
-      <textarea name="message" rows={3} placeholder="Aradığınız mülkü kısaca anlatın (opsiyonel)" className={inputCls} />
+      <textarea name="message" aria-label="Aradığınız mülk" rows={3} placeholder="Aradığınız mülkü kısaca anlatın (opsiyonel)" className={inputCls} />
 
       <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
         <input
@@ -146,7 +147,7 @@ export function LeadForm({
         </span>
       </label>
 
-      {error && <p className="text-sm font-medium text-danger-300">{error}</p>}
+      {error && <p role="alert" className="text-sm font-medium text-danger-300">{error}</p>}
 
       <button
         type="submit"

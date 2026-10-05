@@ -164,9 +164,9 @@ export function TicketDetailControls({
   return (
     <div className="space-y-3.5">
       <div>
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Durum</label>
+        <label htmlFor="ticket-status" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Durum</label>
         <Select value={selectedStatus} onValueChange={onStatusChange}>
-          <SelectTrigger aria-label="Durum güncelle" disabled={statusPending} className={cn("font-semibold", statusPending && "opacity-70")}>
+          <SelectTrigger id="ticket-status" aria-label="Durum güncelle" disabled={statusPending} className={cn("font-semibold", statusPending && "opacity-70")}>
             <span className="flex min-w-0 items-center gap-2">
               {statusPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-text-faint" /> : <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[selectedStatus] ?? STATUS_DOT.closed)} aria-hidden />}
               <span className="truncate">{statusLabelOf.get(selectedStatus) ?? selectedStatus}</span>
@@ -210,9 +210,9 @@ export function TicketDetailControls({
 
       <div className="grid grid-cols-2 gap-2.5">
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Öncelik</label>
+          <label htmlFor="ticket-priority" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Öncelik</label>
           <Select value={priority} onValueChange={(next) => onTicketFieldChange("priority", next)}>
-            <SelectTrigger aria-label="Öncelik güncelle" disabled={fieldPending} className="text-xs font-semibold">
+            <SelectTrigger id="ticket-priority" aria-label="Öncelik güncelle" disabled={fieldPending} className="text-xs font-semibold">
               <span className="truncate">{PRIORITY_LABEL[priority] ?? priority}</span>
             </SelectTrigger>
             <SelectContent>
@@ -224,9 +224,9 @@ export function TicketDetailControls({
           </Select>
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Kategori</label>
+          <label htmlFor="ticket-category" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Kategori</label>
           <Select value={category} onValueChange={(next) => onTicketFieldChange("category", next)}>
-            <SelectTrigger aria-label="Kategori güncelle" disabled={fieldPending} className="text-xs font-semibold"><span className="truncate">{categoryOptions.find((option) => option.value === category)?.label ?? category}</span></SelectTrigger>
+            <SelectTrigger id="ticket-category" aria-label="Kategori güncelle" disabled={fieldPending} className="text-xs font-semibold"><span className="truncate">{categoryOptions.find((option) => option.value === category)?.label ?? category}</span></SelectTrigger>
             <SelectContent>
               {categoryOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
             </SelectContent>
@@ -235,9 +235,9 @@ export function TicketDetailControls({
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Atanan personel</label>
+        <label htmlFor="ticket-assignee" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Atanan personel</label>
         <Select value={assignValue} onValueChange={onAssignChange}>
-          <SelectTrigger aria-label="Personel ata" disabled={assignPending} className={cn("font-semibold", assignPending && "opacity-70")}>
+          <SelectTrigger id="ticket-assignee" aria-label="Personel ata" disabled={assignPending} className={cn("font-semibold", assignPending && "opacity-70")}>
             <span className="flex min-w-0 items-center gap-2">
               {assignPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-text-faint" /> : assignedId ? <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cyan-500/15 text-xs font-bold text-cyan-700">{initials(staffNameOf.get(assignedId) ?? "?")}</span> : <UserRound className="h-4 w-4 shrink-0 text-text-faint" aria-hidden />}
               <span className="truncate">{assignedId ? (staffNameOf.get(assignedId) ?? "Personel") : "Atanmadı"}</span>

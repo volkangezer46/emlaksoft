@@ -137,7 +137,7 @@ export function PayButtons({
           {pending ? "İşleniyor…" : "Ödemeyi tamamla (demo)"}
         </button>
       )}
-      {error ? <p className="text-xs font-medium text-danger-600">{error}</p> : null}
+      {error ? <p role="alert" className="text-xs font-medium text-danger-600">{error}</p> : null}
     </div>
   );
 }

@@ -53,8 +53,8 @@ export function IysForm({ customers }: { customers: { id: string; full_name: str
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">Kanal</label>
-            <select name="channel" defaultValue="sms" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
+            <label htmlFor="iys-channel" className="mb-1.5 block text-sm text-text-muted">Kanal</label>
+            <select id="iys-channel" name="channel" defaultValue="sms" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <option value="sms">SMS</option>
               <option value="email">E-posta</option>
               <option value="whatsapp">WhatsApp</option>
@@ -62,8 +62,8 @@ export function IysForm({ customers }: { customers: { id: string; full_name: str
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-text-muted">Durum</label>
-            <select name="status" defaultValue="granted" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
+            <label htmlFor="iys-status" className="mb-1.5 block text-sm text-text-muted">Durum</label>
+            <select id="iys-status" name="status" defaultValue="granted" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <option value="granted">İzinli</option>
               <option value="denied">Ret</option>
               <option value="pending">Bekliyor</option>
