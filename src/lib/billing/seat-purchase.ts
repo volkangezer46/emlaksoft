@@ -9,6 +9,7 @@ import { now } from "@/lib/clock";
 import { getPlanDefinition, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { seatUtilization } from "@/lib/billing/seat-pricing";
 import { warnRatioOf } from "@/lib/billing/seat-settings";
+import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
 
 /**
  * EK KULLANICI (KOLTUK) SATIN ALMA: SUNUCU KATMANI.
@@ -173,7 +174,9 @@ export async function createSeatInvoice(input: {
   toExtraSeats: number;
   targetTotalSeats: number;
   quotedPeriodTry: number;
-}): Promise<{ invoiceId: string; totalTry: number }> {
+  /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
+  walletCredit?: WalletCreditRequest | null;
+}): Promise<{ invoiceId: string; totalTry: number; credit: AppliedWalletCredit | null }> {
   const admin = createAdminClient();
   const amounts = invoiceAmountsTry(input.chargeNetTry);
   const expiresAt = new Date(now() + 2 * 60 * 60 * 1000);
@@ -212,7 +215,24 @@ export async function createSeatInvoice(input: {
     console.error("createSeatInvoice", error);
     throw new Error("Koltuk faturası oluşturulamadı.");
   }
-  return { invoiceId: data.id as string, totalTry: amounts.totalTry };
+  const invoiceId = data.id as string;
+  if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };
+  const applied = await applyWalletCreditToInvoice(admin, {
+    tenantId: input.tenantId,
+    invoiceId,
+    totalTry: amounts.totalTry,
+    request: input.walletCredit,
+  });
+  if (!applied.ok) {
+    await admin
+      .from("invoices")
+      .update({ checkout_status: "initialization_failed" })
+      .eq("id", invoiceId)
+      .eq("tenant_id", input.tenantId)
+      .eq("status", "draft");
+    throw new Error(applied.error);
+  }
+  return { invoiceId, totalTry: amounts.totalTry, credit: applied.applied };
 }
 
 export type SeatUsageSummary = {

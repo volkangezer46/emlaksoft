@@ -36,6 +36,14 @@ kontör süresiz, `ef_credit_ready()` SQL editöründe false) → `2026082600020
 (fulfill/v2 `credit_pack`; taban 000600 gövdesi bayt bayt, md5 kanıtı `src/lib/ef-credits/ef-wallet-sql-contract.test.ts`).
 Sıra/sorgular `YAYIN_PENCERESI_2.md` §7; prova `npm run db:rehearse -- --yes-i-understand-locks --ef` (koşulmadı). TS kontör akışı YOK.
 
+**PB10 TL HESAP KREDİSİ (HAZIRLANDI, UYGULANMADI):** `20260826000400_try_credit_wallet` (defter `try` birimi, `try_credit_reservations`, service_role RPC'ler:
+`try_credit_balance/grant/reserve/commit/release/reverse`, ofis okuma `try_credit_my_overview()` + `try_credit_movements` görünümü; bakiye = defter TEKRAR OYNATMA, vade FIFO,
+clawback eksiye düşebilir ama harcanamaz) → `20260826000500_try_credit_invoice_payment` (`try_credit_fulfill_invoice` fulfill/v2'yi İÇERDEN çağırır, fulfill gövdelerine DOKUNMAZ;
+`try_credit_invoice_hold/release_invoice/release_dead/refund_invoice`, `try_credit_ready()`). Sıra: 000100 (source CHECK refund/bonus + meta) SONRA. TS: `src/lib/try-credits/*`
+(sözleşme `config.ts`, testler `try-wallet-sql-contract.test.ts` + pglite'lı `try-wallet-sql-exec.test.ts`: `npm i --no-save @electric-sql/pglite`). Ödeme: faturada "Hesap kredimi kullan"
+(`use_credit=1`), tek faturada en fazla `platform_settings.try_credit.max_invoice_share` (varsayılan 0.5; 1 = tam kredi/iyzico'suz), iyzico yalnız nakit kalanı; iade önce nakitten düşer, artan kredi geri yazılır.
+`/app/abonelik?sekme=cuzdan` Cüzdan bölümü. Ortaklık/tavsiye işi `try_credit_grant/reverse`'e bağlanır (kind: referral|partner|campaign|manual|bonus|refund).
+
 (Eski not) Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
 Sıra: yedek/PITR doğrula → `npm run check:migrations -- --database` → `npm run db:migrate -- --dry-run` → `npm run db:migrate` → `npm run db:rls-audit`.
 

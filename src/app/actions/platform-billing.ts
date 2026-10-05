@@ -5,6 +5,8 @@ import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { creditRestoreForRefund } from "@/lib/try-credits/invoice-credit";
+import { tryRefundIdem, tryRefundInvoice, tryReleaseInvoice } from "@/lib/try-credits/wallet";
 import { parseMoneyTry, validateRefundAmount, MANUAL_PAYMENT_METHODS, type ManualPaymentMethod } from "@/lib/billing/invoice-ops";
 
 export type BillingOpResult = { ok?: boolean; error?: string; notice?: string };
@@ -120,6 +122,8 @@ export async function voidInvoice(formData: FormData): Promise<BillingOpResult> 
     return { error: "Fatura iptal edilemedi." };
   }
   if (!updated) return { error: "Fatura iptal edilemez: ödenmiş ya da zaten iptal." };
+  // TL hesap kredisi: iptal edilen faturaya ayrılmış kredi rezervi serbest kalır (rezerv yoksa/şema eskiyse etkisiz).
+  await tryReleaseInvoice(admin, updated.tenant_id as string, invoiceId, "invoice_void");
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.invoice.void",
@@ -157,6 +161,29 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
 
   const amount = validateRefundAmount(String(formData.get("amount_try") ?? ""), Number(inv.total_try));
   if ("error" in amount) return { error: amount.error };
+
+  // TL hesap kredisi: iade ÖNCE nakit kısmından düşer; artan kısım krediye geri yazılır (idempotent, harcanan krediyi
+  // aşamaz). Geri yazma başarısızsa iade kaydı DÜŞÜLMEZ: yönetici aynı işlemi tekrar eder (aynı idem anahtarı).
+  const creditUsedTry = Number(meta.walletCreditTry ?? 0);
+  if (creditUsedTry > 0) {
+    const restore = creditRestoreForRefund({
+      refundTry: amount.value,
+      cashPaidTry: Number(meta.walletCashTry ?? 0),
+      creditUsedTry,
+    });
+    if (restore > 0) {
+      const restored = await tryRefundInvoice(admin, {
+        tenantId: inv.tenant_id as string,
+        invoiceId,
+        amountTry: restore,
+        idem: tryRefundIdem(invoiceId, "admin"),
+        reason: reason.slice(0, 200),
+      });
+      if (!restored || (!restored.ok && restored.code !== "no_credit_used")) {
+        return { error: "Kullanılan hesap kredisi geri yazılamadı; iade kaydı düşülmedi. Tekrar deneyin." };
+      }
+    }
+  }
 
   const { data: updated, error } = await admin
     .from("invoices")

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { startPlanCheckout } from "@/app/actions/billing";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 export function CheckoutButton({
   plan,
@@ -11,7 +12,13 @@ export function CheckoutButton({
   label,
   variant = "primary",
   couponsEnabled = false,
+  wallet = null,
+  totalTry = null,
 }: {
+  /** TL hesap kredisi cüzdanı (null: etkin değil → onay kutusu gösterilmez). */
+  wallet?: WalletCheckoutInfo | null;
+  /** KDV dahil tahmini toplam (yalnız ön izleme; asıl hesap sunucuda). */
+  totalTry?: number | null;
   plan: PlanId;
   cycle: BillingCycle;
   label: string;
@@ -22,6 +29,7 @@ export function CheckoutButton({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coupon, setCoupon] = useState("");
+  const [useCredit, setUseCredit] = useState(false);
 
   async function onClick() {
     setPending(true);
@@ -30,6 +38,7 @@ export function CheckoutButton({
     fd.set("plan", plan);
     fd.set("cycle", cycle);
     if (couponsEnabled && coupon.trim()) fd.set("coupon", coupon.trim());
+    if (useCredit && wallet) fd.set("use_credit", "1");
     const result = await startPlanCheckout(fd);
     if (result.checkoutUrl) {
       window.location.href = result.checkoutUrl;
@@ -56,6 +65,16 @@ export function CheckoutButton({
           />
         </div>
       ) : null}
+      <div className="mb-2">
+        <WalletCreditToggle
+          wallet={wallet}
+          checked={useCredit}
+          onChange={setUseCredit}
+          totalTry={totalTry}
+          disabled={pending}
+          idPrefix={`plan-${plan}`}
+        />
+      </div>
       <button
         type="button"
         disabled={pending}

@@ -6,6 +6,7 @@ import { ArrowUpRight, Loader2, Minus, Plus, ShieldAlert, Users2 } from "lucide-
 import { startSeatPurchase } from "@/app/actions/billing";
 import type { PlanDef, SeatTier } from "@/lib/billing/plans";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
+import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -36,6 +37,8 @@ export type SeatPanelProps = {
   subscriptionActive: boolean;
   /** Eşik (%); admin ayarı. */
   warnPercent: number;
+  /** TL hesap kredisi cüzdanı (yoksa/etkin değilse null: onay kutusu gösterilmez). */
+  wallet?: WalletCheckoutInfo | null;
 };
 
 export function SeatPanel(props: SeatPanelProps) {
@@ -48,6 +51,7 @@ export function SeatPanel(props: SeatPanelProps) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useCredit, setUseCredit] = useState(false);
 
   const locks = useMemo(
     () => ({ baseMonthlyTry: lockedBaseMonthlyTry, tiers: lockedTiers }),
@@ -88,6 +92,7 @@ export function SeatPanel(props: SeatPanelProps) {
     const fd = new FormData();
     fd.set("target_seats", String(target));
     fd.set("confirm_try", String(ev.immediateChargeTry));
+    if (useCredit && props.wallet) fd.set("use_credit", "1");
     const result = await startSeatPurchase(fd);
     if (result.checkoutUrl) {
       window.location.href = result.checkoutUrl;
@@ -302,6 +307,14 @@ export function SeatPanel(props: SeatPanelProps) {
                 <li>Yenilemeden itibaren aylık toplam {tl(q.totalMonthlyTry)} ({tl(q.totalForCycleTry)} / {periodWord}).</li>
                 <li>Koltuk azaltma dönem sonunda geçerli olur; iade yapılmaz.</li>
               </ul>
+              <WalletCreditToggle
+                wallet={props.wallet}
+                checked={useCredit}
+                onChange={setUseCredit}
+                totalTry={Math.round(ev.immediateChargeTry * 1.2 * 100) / 100}
+                disabled={pending}
+                idPrefix="seat"
+              />
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"

@@ -8,7 +8,7 @@
 ## Özet
 
 - Toplam birim: **435** (225 dosya) — risk: P0=12, P1=40, P2=383
-- Tenant filtresi: var=255, uygulanamaz=93, yok=67, param=14, devir=6
+- Tenant filtresi: var=255, uygulanamaz=93, yok=66, param=14, devir=7
 - Kapı türü: public-token=35, dosya-duzeyi=99, platform=87, oturum-izin=80, belirsiz=95, elle-dogrulandi=12, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **73**; RLS'li client'a taşıma adayı: **66**
 
@@ -58,8 +58,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/randevu-teyit/[token]/page.tsx:53` | `AppointmentConfirmPage` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
 | `src/lib/admin/activity-query.ts:186` | `resolveActorNames` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/ai-advisor.ts:46` | `buildAdvisorContext` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
-| `src/lib/billing/fulfillment.ts:65` | `transitionCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
-| `src/lib/billing/reconciliation.ts:172` | `runBillingReconciliation` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/lib/billing/fulfillment.ts:72` | `transitionCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
+| `src/lib/billing/reconciliation.ts:173` | `runBillingReconciliation` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir | P1 |
 | `src/lib/ef-credits/credit-reader.ts:81` | `readEfBalance` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
 | `src/lib/ef-credits/wallet.ts:51` | `efBalance` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
 | `src/lib/ef-credits/wallet.ts:81` | `efCommit` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
@@ -94,9 +94,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/ai-advisor.ts:117` | `listAdvisorSessions` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/ai-advisor.ts:149` | `loadAdvisorSession` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/actions/appointments-suggest.ts:46` | `suggestAlternativeTimesByToken` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/actions/auth.ts:97` | `signIn` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/actions/auth.ts:454` | `signOut` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
-| `src/app/actions/auth.ts:368` | `signUp` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | param (yazma) | P2 |
+| `src/app/actions/auth.ts:98` | `signIn` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
+| `src/app/actions/auth.ts:461` | `signOut` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
+| `src/app/actions/auth.ts:369` | `signUp` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | param (yazma) | P2 |
 | `src/app/actions/booking-public.ts:64` | `createPublicBooking` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/actions/bulk-property.ts:69` | `bulkUpdatePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:81` | `createCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
@@ -154,10 +154,10 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/payment-links.ts:122` | `startPaymentLinkCheckout` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/platform-account.ts:38` | `updateOwnProfile` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-billing-plans.ts:73` | `syncEntitlements` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-billing.ts:44` | `markInvoicePaid` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/app/actions/platform-billing.ts:146` | `recordInvoiceRefund` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/app/actions/platform-billing.ts:209` | `resolveCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/app/actions/platform-billing.ts:106` | `voidInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:46` | `markInvoicePaid` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:150` | `recordInvoiceRefund` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/app/actions/platform-billing.ts:236` | `resolveCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/actions/platform-billing.ts:108` | `voidInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/platform-coupons.ts:38` | `createCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-coupons.ts:120` | `deleteCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-coupons.ts:106` | `setCouponActive` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
@@ -317,8 +317,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/cron/vitrin-eslesme/route.ts:77` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
 | `src/app/api/customer-files/[id]/download/route.ts:58` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/health/route.ts:80` | `GET` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
-| `src/app/api/iyzico/callback/route.ts:60` | `handle` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
-| `src/app/api/iyzico/webhook/route.ts:121` | `POST` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
+| `src/app/api/iyzico/callback/route.ts:62` | `handle` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
+| `src/app/api/iyzico/webhook/route.ts:123` | `POST` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
 | `src/app/api/property-media/[id]/download/route.ts:60` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/property-media/[id]/route.ts:9` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/api/takvim/[token]/route.ts:63` | `GET` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
@@ -371,17 +371,17 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/automation-engine.ts:689` | `runScheduledAutomations` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/billing/coupon-server.ts:16` | `quoteCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/billing/coupon-server.ts:44` | `redeemCoupon` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/lib/billing/credit-pack-purchase.ts:25` | `createCreditPackInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/lib/billing/fulfillment.ts:299` | `assertBillingPlanPreflight` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/lib/billing/fulfillment.ts:221` | `createCheckoutInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/lib/billing/fulfillment.ts:103` | `fulfillBillingPaymentAtomic` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
-| `src/lib/billing/fulfillment.ts:287` | `markCheckoutInvoiceFailed` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
-| `src/lib/billing/fulfillment.ts:263` | `markCheckoutInvoiceInitialized` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/lib/billing/credit-pack-purchase.ts:28` | `createCreditPackInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/lib/billing/fulfillment.ts:389` | `assertBillingPlanPreflight` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/billing/fulfillment.ts:289` | `createCheckoutInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/lib/billing/fulfillment.ts:111` | `fulfillBillingPaymentAtomic` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/billing/fulfillment.ts:374` | `markCheckoutInvoiceFailed` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/lib/billing/fulfillment.ts:350` | `markCheckoutInvoiceInitialized` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/billing/payment-link-fulfill.ts:20` | `fulfillPaymentLink` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
-| `src/lib/billing/reconciliation.ts:60` | `reconcileCapture` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/lib/billing/reconciliation.ts:36` | `transitionCapture` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | yok | P2 |
-| `src/lib/billing/seat-purchase.ts:52` | `cachedSeatSupport` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/lib/billing/seat-purchase.ts:177` | `createSeatInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
+| `src/lib/billing/reconciliation.ts:61` | `reconcileCapture` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/lib/billing/reconciliation.ts:37` | `transitionCapture` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | yok | P2 |
+| `src/lib/billing/seat-purchase.ts:53` | `cachedSeatSupport` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/lib/billing/seat-purchase.ts:180` | `createSeatInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/campaign-delivery.ts:524` | `runCampaignDeliveryWorker` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/cron-heartbeat.ts:16` | `recordHeartbeat` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | uygulanamaz (yazma) | P2 |
 | `src/lib/definitions.ts:28` | `loadDefinitions` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |

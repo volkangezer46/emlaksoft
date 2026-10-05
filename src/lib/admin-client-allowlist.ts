@@ -336,7 +336,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/billing/plan-support.ts", fn: "getFoundersStatus", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/billing/plan-support.ts", fn: "getPlanSupport", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/billing/reconciliation.ts", fn: "reconcileCapture", calls: 1, tenantFilter: "var" },
-  { file: "src/lib/billing/reconciliation.ts", fn: "runBillingReconciliation", calls: 1, tenantFilter: "yok" },
+  { file: "src/lib/billing/reconciliation.ts", fn: "runBillingReconciliation", calls: 1, tenantFilter: "devir" },
   { file: "src/lib/billing/reconciliation.ts", fn: "transitionCapture", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/billing/seat-purchase.ts", fn: "cachedSeatSupport", calls: 1, tenantFilter: "var" },
   { file: "src/lib/billing/seat-purchase.ts", fn: "createSeatInvoice", calls: 1, tenantFilter: "var" },

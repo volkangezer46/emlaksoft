@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Coins, Loader2, ShieldAlert, Star } from "lucide-react";
 import { startCreditPackPurchase } from "@/app/actions/billing";
+import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,7 +28,10 @@ export function KontorPanel({
   packs,
   canBuy,
   blockReason,
+  wallet = null,
 }: {
+  /** TL hesap kredisi cüzdanı (yoksa/etkin değilse null: onay kutusu gösterilmez). */
+  wallet?: WalletCheckoutInfo | null;
   packs: KontorPackCard[];
   /** owner/gm. */
   canBuy: boolean;
@@ -37,6 +41,7 @@ export function KontorPanel({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useCredit, setUseCredit] = useState(false);
   const reason = !canBuy ? "Kontör paketini yalnızca ofis sahibi veya genel müdür satın alabilir." : blockReason;
 
   async function buy(p: KontorPackCard) {
@@ -46,6 +51,7 @@ export function KontorPanel({
     const fd = new FormData();
     fd.set("pack_id", p.id);
     fd.set("confirm_try", String(p.totalTry));
+    if (useCredit && wallet) fd.set("use_credit", "1");
     try {
       const result = await startCreditPackPurchase(fd);
       if (result.checkoutUrl) {
@@ -108,6 +114,14 @@ export function KontorPanel({
                     Net {tl2(p.netTry)} + KDV {tl2(p.taxTry)}. Ödeme iyzico güvenli sayfasında alınır; ödeme onaylanınca kontör
                     bakiyenize eklenir.
                   </p>
+                  <WalletCreditToggle
+                    wallet={wallet}
+                    checked={useCredit}
+                    onChange={setUseCredit}
+                    totalTry={p.totalTry}
+                    disabled={pending}
+                    idPrefix={`pack-${p.id}`}
+                  />
                   {error ? <p role="alert" className="font-semibold text-danger-600">{error}</p> : null}
                   <div className="flex flex-wrap gap-2">
                     <button
