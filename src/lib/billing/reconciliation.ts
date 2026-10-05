@@ -4,6 +4,7 @@ import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { isPlanId, type BillingCycle } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EF_RPC } from "@/lib/ef-credits/config";
+import { compareReconciliation, type EfReconcileResult } from "@/lib/ef-credits/reconcile";
 import { processClaims, type ProcessSummary } from "@/lib/growth/engine";
 import { tryReleaseDead } from "@/lib/try-credits/wallet";
 
@@ -176,8 +177,16 @@ export async function runBillingReconciliation(
    * KAPALI iş seçici (rastgele callback YOK: service_role istemcisi çağıran koda verilmez). `growth_claims`: growth-claims
    * cron'u aynı (allowlist'li) istemciyle YALNIZ sabit `processClaims` işini çalıştırır; mutabakat atlanır.
    */
-  job?: "growth_claims" | "ef_sweep",
-): Promise<BillingReconciliationSummary & { growthClaims?: ProcessSummary | null; efSweep?: number | null }> {
+  job?: "growth_claims" | "ef_sweep" | "ef_reconcile",
+  /** Yalniz `ef_reconcile`: EF `/kullanim` toplamlari + pencere (veri; callback DEGIL). */
+  efUsage?: { windowStart: string; windowEnd: string; degerleme: number | null; pdf: number | null; meta?: Record<string, unknown> },
+): Promise<
+  BillingReconciliationSummary & {
+    growthClaims?: ProcessSummary | null;
+    efSweep?: number | null;
+    efReconcile?: (EfReconcileResult & { saved: boolean }) | null;
+  }
+> {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
   const admin = createAdminClient();
   if (job === "growth_claims") {
@@ -203,6 +212,37 @@ export async function runBillingReconciliation(
       refundRequired: 0,
       efSweep: error ? null : Number(data ?? 0),
     };
+  }
+  if (job === "ef_reconcile") {
+    const empty = { expiredCheckouts: 0, inspected: 0, fulfilled: 0, retryPending: 0, manualReview: 0, refundRequired: 0 };
+    if (!efUsage) return { ...empty, efReconcile: null };
+    // Defter: pencerede KESINLESTIRILMIS (state=committed) rezervler; degerleme = valuation_*, pdf = pdf_first.
+    const base = () =>
+      admin
+        .from("ef_credit_reservations")
+        .select("id", { count: "exact", head: true })
+        .eq("state", "committed")
+        .gte("settled_at", efUsage.windowStart)
+        .lt("settled_at", efUsage.windowEnd);
+    const [val, pdf] = await Promise.all([base().like("item", "valuation_%"), base().eq("item", "pdf_first")]);
+    if (val.error || pdf.error) return { ...empty, efReconcile: null };
+    const result = compareReconciliation(
+      { degerleme: efUsage.degerleme, pdf: efUsage.pdf },
+      { degerleme: val.count ?? 0, pdf: pdf.count ?? 0 },
+    );
+    const { error: saveError } = await admin.from("ef_reconciliation_runs").insert({
+      window_start: efUsage.windowStart,
+      window_end: efUsage.windowEnd,
+      ef_degerleme: result.efDegerleme,
+      ef_pdf: result.efPdf,
+      ledger_degerleme: result.ledgerDegerleme,
+      ledger_pdf: result.ledgerPdf,
+      diff_degerleme: result.diffDegerleme,
+      diff_pdf: result.diffPdf,
+      status: result.status,
+      meta: { ...(efUsage.meta ?? {}), reasons: result.reasons },
+    });
+    return { ...empty, efReconcile: { ...result, saved: !saveError } };
   }
   const workerId = randomUUID();
 

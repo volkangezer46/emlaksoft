@@ -137,6 +137,10 @@
     {
       "path": "/api/cron/ef-kontor-saglik",
       "schedule": "50 1 * * *"
+    },
+    {
+      "path": "/api/cron/ef-kontor-mutabakat",
+      "schedule": "10 2 * * *"
     }
   ]
 }
