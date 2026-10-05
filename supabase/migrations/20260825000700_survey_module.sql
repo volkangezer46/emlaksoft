@@ -1,5 +1,8 @@
 -- ============================================================
--- Anket modülü (anketör kuyruğu) — TASLAK, UYGULANMAZ
+-- Anket modülü (anketör kuyruğu)
+-- MIGRATION 20260825000700 (2026-10-05 terfi; eski taslak adı proposed/20260820010000_survey_module.sql).
+-- UYGULANMADI: yalnız restore edilebilir backup/PITR doğrulandıktan sonra SAHİBİ
+-- `npm run db:migrate -- --only 20260825000700_survey_module.sql` ile uygular.
 -- ============================================================
 -- Amaç: yayından kalkan, yetki süresi uzayan, işlem gören, kaybedilen ve
 -- ziyaret edilen işlemler için ANKETÖR (atanabilir görev, rol değil) kuyruğu.
@@ -16,8 +19,8 @@
 -- Kod bu tablolar YOKKEN "modül etkin değil" uyarısı gösterir; mevcut memnuniyet
 -- anketi etkilenmez. Bu yüzden kod migration'dan ÖNCE yayınlanabilir.
 -- Uygulama: yalnız restore edilebilir yedek/PITR doğrulandıktan sonra, dry-run ve
--- ledger denetiminden geçip supabase/migrations altına taşınarak.
--- GERİ ALMA: 20260820010000_survey_module.rollback.sql (anket görev verisi silinir).
+-- ledger denetiminden geçtikten sonra (`--only`, tek dosya).
+-- GERİ ALMA: supabase/rollbacks/20260825000700_survey_module.rollback.sql (anket görev verisi silinir).
 -- RİSK: düşük (yalnız yeni tablolar + permission_defaults seed; mevcut tabloya dokunmaz).
 -- GÜVENLİK (denetim 3 / #7, taslak yerinde düzeltildi): tek `for all` tenant politikası yerine rol/atama
 --   bazlı politikalar + survey_tasks sütun koruma trigger'ı + yardımcı fonksiyonlar (survey_is_manager,

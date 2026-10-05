@@ -89,11 +89,13 @@ describe("vitrin ayarı kaynak sözleşmeleri", () => {
     expect(src).not.toMatch(/\.select\("id, name, status[^"]*vitrin_/);
   });
 
-  it("taslak migration: arama onayı varsayılan false, uygulanmış migration'larda yok", () => {
-    const draft = read("supabase/proposed/20260819010700_tenant_vitrin_sections_seo_optin.sql");
+  it("migration (2026-10-05 terfi): arama onayı varsayılan false, sütunu yalnız bu migration ekler", () => {
+    const own = "20260825001200_tenant_vitrin_sections_seo_optin.sql";
+    const draft = read(`supabase/migrations/${own}`);
     expect(draft).toMatch(/vitrin_seo_optin boolean not null default false/);
     const dir = path.join(root, "supabase/migrations");
     for (const f of readdirSync(dir)) {
+      if (f === own) continue;
       expect(readFileSync(path.join(dir, f), "utf8").includes("vitrin_seo_optin"), f).toBe(false);
     }
   });

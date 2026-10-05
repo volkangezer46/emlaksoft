@@ -1,8 +1,14 @@
--- TASLAK (UYGULANMADI): AI kredi + degerleme raporu olcumu.
--- TEK defter karari: public.account_credit_ledger (organik buyume taslagindaki defterle AYNI tablo).
--- Bu dosya tabloyu "if not exists" ile kurar; growth taslagi (20260819000100) once uygulanmissa
--- yalniz eksik sutun/kisitlari ekler. Uygulama koduna gore tablo yokken olcum "etkin degil" kalir,
--- AI cagrilari aynen calisir. Tasinirken numara: migrations/ icindeki son numaradan buyuk olmali.
+-- MIGRATION 20260825001000 (2026-10-05 terfi; eski taslak adi proposed/20260820000300_ai_credit_metering.sql).
+-- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
+-- `npm run db:migrate -- --only 20260825001000_ai_credit_metering.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825001000_ai_credit_metering.rollback.sql (defter tablosu DUSURULMEZ).
+-- AI kredi + degerleme raporu olcumu.
+-- TEK defter karari: public.account_credit_ledger (organik buyume migration'indaki defterle AYNI tablo).
+-- Bu dosya tabloyu "if not exists" ile kurar; 20260825000800_growth_referral_partner_attribution (eski 20260819000100)
+-- once uygulandigi icin (yayin sirasi) yalniz eksik sutun/kisitlari ekler. Uygulama koduna gore tablo yokken olcum
+-- "etkin degil" kalir, AI cagrilari aynen calisir.
+-- Terfi duzeltmesi: tablo ayricaliklari authenticated'dan da temizlenip yalniz SELECT verilir (Supabase varsayilan
+-- ayricaliklari yeni tabloya authenticated icin yazma + TRUNCATE verir; RLS TRUNCATE'i durdurmaz).
 --
 -- birim:   'ai'        = AI kredisi (aylik plan kotasi = 'grant', kullanim = 'spend' negatif tutar)
 --          'valuation' = profesyonel degerleme raporu adedi (her rapor 1 birim)
@@ -59,7 +65,7 @@ alter table public.account_credit_ledger enable row level security;
 drop policy if exists credit_ledger_own_select on public.account_credit_ledger;
 create policy credit_ledger_own_select on public.account_credit_ledger for select
   using (tenant_id = public.current_tenant_id());
-revoke all privileges on table public.account_credit_ledger from public, anon;
+revoke all privileges on table public.account_credit_ledger from public, anon, authenticated;
 grant select on table public.account_credit_ledger to authenticated;
 grant all privileges on table public.account_credit_ledger to service_role;
 

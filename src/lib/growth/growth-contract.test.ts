@@ -23,8 +23,8 @@ describe("büyüme sözleşmesi", () => {
     const store = read("src/lib/growth/store.ts");
     const insert = store.slice(store.indexOf('from("signup_attributions").insert'));
     expect(insert).not.toMatch(/ip_hash|clientIp|user-agent|phone|email/i);
-    expect(read("supabase/proposed/20260819000100_growth_referral_partner_attribution.sql")).not.toMatch(/^\s+signup_ip_hash\s+text/m);
-    expect(read("supabase/proposed/20260822000100_growth_click_counters.sql")).not.toMatch(/ip_address|ip_hash|user_agent/i);
+    expect(read("supabase/migrations/20260825000800_growth_referral_partner_attribution.sql")).not.toMatch(/^\s+signup_ip_hash\s+text/m);
+    expect(read("supabase/migrations/20260825000900_growth_click_counters.sql")).not.toMatch(/ip_address|ip_hash|user_agent/i);
   });
 
   it("her action yetki/personel kapısından geçer; 'use server' dosyası yalnız async fonksiyon export eder", () => {

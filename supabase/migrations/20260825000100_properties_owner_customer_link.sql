@@ -1,5 +1,11 @@
--- TASLAK (UYGULANMADI) — ONERI Ö-5 / BIRLESIK U-18: malik-musteri baglantisi.
+-- MIGRATION 20260825000100 (2026-10-05 terfi; eski taslak adi proposed/20261005000100_properties_owner_customer_link.sql).
+-- UYGULANMADI: canliya yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
+-- `npm run db:migrate -- --only 20260825000100_properties_owner_customer_link.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825000100_properties_owner_customer_link.rollback.sql (girilen malik baglantilari silinir).
+-- ONERI Ö-5 / BIRLESIK U-18: malik-musteri baglantisi.
 -- properties.owner_customer_id (nullable) -> customers.id. Mevcut satirlara DOKUNMAZ.
+-- NOT (tetikleyici): properties_owner_same_tenant SECURITY INVOKER calisir; authenticated oturumda customers RLS'i
+-- uygulanir, yani kullanicinin goremedigi musteri malik olarak baglanamaz (ayni 23514 hatasi). service_role etkilenmez.
 --
 -- UYGULAMADAN ONCE:
 --  1) PostgREST: properties <-> customers arasinda ikinci bir FK olusur. properties'ten customers'a

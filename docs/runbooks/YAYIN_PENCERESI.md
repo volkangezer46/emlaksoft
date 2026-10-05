@@ -9,8 +9,10 @@ Kaynaklar: `docs/HAFIZA.md` §2 (durum) · `docs/design/BIRLESIK_YOL_HARITASI.md
 `docs/design/GUVENLIK_DENETIMI_3.md` · `docs/runbooks/RESTORE.md` · `docs/runbooks/ROLLBACK.md`.
 Bu kılavuzun makine karşılığı: `npm run check:migration-pairs` (veri: `scripts/migration-pairs-data.ts`).
 
-Durum özeti (2026-10-05): canlıda uygulanan son migration `20260813000300`; sonrası **39 dosya** uygulanmamış
-(`supabase/migrations`), ayrıca `supabase/proposed/` altında terfi etmemiş taslaklar var (bu kılavuzun kapsamı DIŞI, bkz. §10).
+Durum özeti (GÜNCEL, 2026-10-05): bu kılavuzun P1–P11b pencereleri (40 dosya) CANLIDA UYGULANDI; yalnız **P12**
+(`20260816000500`, kazanç gizliliği) bekliyor. `supabase/proposed/` taslakları aynı gün `20260825000100..001300` olarak
+`migrations/`'a TERFİ ETTİ; onların sırası, `--only` listesi ve dosya başına doğrulaması **`docs/runbooks/YAYIN_PENCERESI_2.md`**'dedir.
+**P12 artık EN SONDA** (YAYIN_PENCERESI_2 pencereleri bittikten sonra, ayrı gün). Aşağıdaki P1–P11b bölümleri tarihsel kayıttır.
 
 ---
 
@@ -41,18 +43,20 @@ Durum özeti (2026-10-05): canlıda uygulanan son migration `20260813000300`; so
    npm run check:migrations -- --database      # canlı ledger ile karşılaştırır; drift varsa DUR
    npm run check:migration-pairs               # çift/grup/pencere denetimi (bu kılavuzun verisi)
    ```
-   `check:migration-pairs` bugün **2 bilinen hata** verir (exit 1): `proposed/` ile `migrations/` arasında iki numara
-   çakışması (§10). Bunlar uygulanacak 39 dosyayı etkilemez; ama bunlar dışında YENİ hata görürseniz durun.
+   `check:migration-pairs` bugün **0 hata** verir (uyarılar: perf indeks önerilerinin adı ve K4 dalı). Herhangi bir
+   HATA görürseniz durun. `check:migrations -- --database` bekleyen 14 dosyayı "veritabanında bekleyen migration" olarak
+   listeler (beklenen); `checksum drift` ya da `ledger kaydı diskte yok` satırı görülürse DURUN.
 4. **Dry-run (salt-okunur önizleme):**
    ```bash
    npm run db:migrate -- --dry-run
    ```
-   Çıktıdaki bekleyen liste bu kılavuzdaki 39 dosyayla birebir aynı olmalı. Başka dosya varsa ya da ledger/şema ayrışması
-   uyarısı gelirse (`reconciliation`) DURUN.
+   Çıktıdaki bekleyen liste `YAYIN_PENCERESI_2.md` §2'deki 14 dosyayla birebir aynı olmalı. Başka dosya varsa ya da
+   ledger/şema ayrışması uyarısı gelirse (`reconciliation`) DURUN.
 5. **Ledger'ın canlı görünümü (SQL, salt-okunur):**
    ```sql
    select version, applied_at from public.schema_migrations order by applied_at desc limit 10;
-   -- beklenen son satır: 20260813000300_expense_text_appointment_loose_definitions_system.sql
+   -- (tarihsel) ilk pencere öncesi beklenen son satır: 20260813000300_expense_text_appointment_loose_definitions_system.sql
+   -- GÜNCEL: P1–P11b uygulandı; 20260816000500 ve 20260825000100..001300 ledger'da OLMAMALI (YAYIN_PENCERESI_2.md §1)
    ```
 6. **Bakım penceresi:** trafiğin düşük olduğu saat; migration'lar kısa kilit alır ama `profiles`, `campaigns`, `customers`,
    `calls` üzerinde ALTER vardır (P1, P3, P4). Cron'lar (`/admin/sistem`) bir pencere boyunca "başarısız" görürse normaldir; sonunda yeşil olmalı.
@@ -91,7 +95,7 @@ Sıra = `check:migration-pairs` penceresi sırası. Pencere içi dosya sırası 
 | P9 | İlan sahibi bilgisi | `20260819020100` property_owner_info · `20260823000400` sec3 güncelleme kapsamı | property_owner_info + update kapsamı | ek + siki | var |
 | P10 | Ofis kontrol + onay kapısı | `20260820000100` oversight_center · `20260823000100` sec3 approval_requests RLS | oversight + approval_requests RLS | ek + siki | **oversight için YOK**, sec3 için var |
 | P11 | F-modülleri | `20260821000100` mahalle notları · `…000200` yasal kayıt defteri · `…000300` evrak linkleri | — | ek | **YOK (3 dosya)** |
-| P12 | **AYRI PENCERE** | `20260816000500` kazanç gizliliği RLS | önkoşul: P2 (earnings_all seed) + P3 (commission_splits) | **davranis** | var |
+| P12 | **AYRI PENCERE — EN SON** (YAYIN_PENCERESI_2 PB1–PB8 sonrası) | `20260816000500` kazanç gizliliği RLS | önkoşul: P2 (earnings_all seed) + P3 (commission_splits) | **davranis** | var |
 | K4 | K4 `is_document` (dal main'e girerse) | `20260818000400_property_media_is_document` | — | ek | dalda |
 
 Bağımlılık gerekçeleri (denetimle doğrulanır): P3 `faz2_touch_updated_at()` ve `commission_splits` tanımını P3 ilk dosyasından alır;
@@ -336,7 +340,8 @@ Smoke: belge işaretli görsel vitrin/paylaşım/portal/OG/`/api/property-media`
 ## 5. Sec3 smoke senaryoları (P5, P6, P7, P8, P9, P10 sonrası)
 
 Hepsi **izole/test ofisinde**, gerçek müşteri verisine dokunmadan. Roller: **owner**, **gm**, **danışman** (advisor). Anketör rol değildir
-(atanabilir görev; anket modülü `supabase/proposed/` altında, henüz uygulanmadı) — anketör smoke'u anket migration'ı terfi edince yapılır.
+(atanabilir görev; anket modülü `20260825000700_survey_module.sql` olarak terfi etti, henüz uygulanmadı) — anketör smoke'u o migration uygulanınca yapılır
+(YAYIN_PENCERESI_2.md PB4).
 
 | Grup | owner | gm | danışman | Beklenen |
 |---|---|---|---|---|
@@ -448,18 +453,24 @@ Bitiş kontrol listesi:
 
 ---
 
-## 10. Bu kılavuzun kapsamı DIŞINDA kalanlar (taslaklar ve bilinen çakışmalar)
+## 10. Taslakların terfisi (2026-10-05) ve kapsam dışı kalanlar
 
-`supabase/proposed/` altındaki dosyalar migration değildir ve **uygulanmaz**. Terfi edilirken yeni numara almaları ŞARTTIR; bugün
-`check:migration-pairs` şu çakışmaları raporlar (yeniden numaralama sahibe/ayrı göreve aittir, bu çalışmada `supabase/` değiştirilmedi):
+`supabase/proposed/` altındaki taslaklar kullanıcı onayıyla 2026-10-05'te `supabase/migrations/`'a **TERFİ ETTİ**
+(yeni, artan numaralar `20260825000100..001300`; rollback'ler `supabase/rollbacks/`). Eski numara çakışmaları
+(`20260819020100` sahiplik devri, `20260820000100` faturalama) bu terfiyle ortadan kalktı; `check:migration-pairs` 0 hata.
+Terfi edenlerin eski ad → yeni ad tablosu, uygulama sırası (`--only` listesi), dosya başına salt-okunur önkoşul ve
+uygulama sonrası doğrulama sorguları: **`docs/runbooks/YAYIN_PENCERESI_2.md`**. Hiçbiri canlıya UYGULANMADI.
 
-| Çakışma | migrations/ | proposed/ |
-|---|---|---|
-| `20260819020100` | `property_owner_info` (P9) | `ownership_transfers` (sahiplik devri taslağı) |
-| `20260820000100` | `oversight_center` (P10) | `billing_pause_proration_business_seats` (faturalama taslağı) |
+Terfi sırasında yapılan düzeltmeler (uygulanmamış dosyalar; ayrıntı YAYIN_PENCERESI_2 §6):
+- `20260825000500` (eski `20261005000800`): D bölümü (`pg_get_functiondef + replace` ile fiyat fonksiyonlarını yamalayan DO bloğu)
+  ÇIKARILDI; yerini tam gövdeli `20260825000300` aldı. A/B/C/E (duraklatma, oransal hesap, `extra_seats`, `effective_seat_limit`) aynen.
+- `20260825000300` (eski `20261005000500`): `plan_monthly_amount` yedek tabanı (ayar var ama plan fiyatı yoksa) plans.ts ile eşitlendi
+  (990/5990 → 749/4990). `fulfill_billing_payment` gövdesi DEĞİŞMEDİ: `20260825000600` ön koşulu onun md5'ini (`a69a7609…`) doğrular.
+- `20260825000200` (coğrafya): ofis bildirimi INSERT politikası `status='pending'` ve boş çözüm alanları ister.
+- `20260825001000` (AI kredi): defter tablosu ayrıcalıkları `authenticated`'dan da temizlenip yalnız SELECT verilir.
 
-Ek bilgi: `proposed/` içindeki 8 taslak (14 haneli numaralı olanların 8'i) `migrations/`'taki en büyük sürümün (`20260823000600`) gerisinde numaralıdır; terfide numara bunun
-ÜSTÜNDE olmalı. `20260814_perf_indexes*.sql` adları 14 haneli desene uymaz (terfide yeniden adlandırılmalı; `CREATE INDEX CONCURRENTLY`
-runner'ın transaction'ında çalışmaz). Anket modülü, AI kredi ölçümü, vitrin ayarları, büyüme/referral, sahiplik devri, faturalama duraklatma
-ve malik bağlantısı taslakları ayrı pencere(ler)dir; her biri terfi edildiğinde bu kılavuza ve `scripts/migration-pairs-data.ts`'e eklenir.
-Terfi bekleyen taslak numaraları: `20260816060100`, `20260819000100`, `20260819010700`, `20260820000300`, `20260820010000`, `20260822000100`, `20261005000100` (+ iki çakışan: bkz. tablo).
+**Terfi ETMEYENLER (proposed/'da kaldı):** `20260814_perf_indexes.sql` ve `20260814b_perf_indexes_measured.sql`.
+Nedeni: ikisi de `CREATE INDEX CONCURRENTLY` içerir; `scripts/apply-migrations.ts` her dosyayı `begin … commit` içinde
+çalıştırır ve CONCURRENTLY transaction bloğunda HATA verir (dosyanın tamamı geri alınır). Ayrıca "SONRA" planları ölçülmemiş
+tahmindir (dosyanın kendi dürüstlük notu), iki dosya aynı index adını (`idx_customers_phone_trgm`) farklı tanımla kullanır ve
+14 haneli ad desenine uymaz. İstenirse ayrı karar: CONCURRENTLY'siz (tablolar küçük) yeni bir migration ya da runner dışında psql ile.

@@ -1,4 +1,8 @@
--- K6 / F7 taslağı (UYGULANMADI): ofis vitrin ayarları — tanıtım metni ve görünürlük.
+-- MIGRATION 20260825001100 (2026-10-05 terfi; eski taslak adı proposed/20260816060100_tenant_vitrin_settings.sql).
+-- UYGULANMADI: yalnız restore edilebilir backup/PITR doğrulandıktan sonra SAHİBİ
+-- `npm run db:migrate -- --only 20260825001100_tenant_vitrin_settings.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825001100_tenant_vitrin_settings.rollback.sql (20260825001200 rollback'inden SONRA).
+-- K6 / F7: ofis vitrin ayarları — tanıtım metni ve görünürlük.
 --
 -- Şemada bugün yalnız logo_url, brand_color, phone ve lead_capture_enabled var; vitrin tanıtım metni ve
 -- vitrini kapatma/adres gizleme karşılıksızdı. Bu dosya üç ofis-düzeyi ayar ekler:
