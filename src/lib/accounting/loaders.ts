@@ -7,11 +7,11 @@ import "server-only";
  */
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
-import { EF_RPC } from "@/lib/ef-credits/config";
+import { EF_RPC, EF_UNIT } from "@/lib/ef-credits/config";
 import { exactArr, exactMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { type Period } from "@/lib/accounting/period";
 import { classifyInvoiceKind, toLedgerInvoice, type LedgerInvoice, type RawInvoiceRow } from "@/lib/accounting/ledger";
-import type { EfUsageRow } from "@/lib/accounting/ef-economics";
+import { packSaleOfInvoice, type EfLedgerEntry, type EfPackSale, type EfUsageRow } from "@/lib/accounting/ef-economics";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -183,7 +183,7 @@ export async function loadEfUsage(admin: Admin, period: Pick<Period, "fromIso" |
   while (offset < LEDGER_MAX_ROWS) {
     let q = admin
       .from("ef_credit_reservations")
-      .select("item, units")
+      .select("item, units, tenant_id")
       .eq("state", "committed")
       .order("settled_at", { ascending: false })
       .order("id", { ascending: true });
@@ -191,12 +191,60 @@ export async function loadEfUsage(admin: Admin, period: Pick<Period, "fromIso" |
     if (period.toIso) q = q.lt("settled_at", period.toIso);
     const { data, error } = await q.range(offset, offset + LEDGER_PAGE_SIZE - 1);
     if (error) return { enabled: false, rows: [], truncated: false };
-    const page = (data ?? []) as { item: string; units: number }[];
-    rows.push(...page.map((r) => ({ item: String(r.item), units: Number(r.units) })));
+    const page = (data ?? []) as { item: string; units: number; tenant_id?: string | null }[];
+    rows.push(...page.map((r) => ({ item: String(r.item), units: Number(r.units), tenantId: r.tenant_id ?? null })));
     if (page.length < LEDGER_PAGE_SIZE) return { enabled: true, rows, truncated: false };
     offset += LEDGER_PAGE_SIZE;
   }
   return { enabled: true, rows, truncated: true };
+}
+
+export type EfLedgerLoad = { enabled: boolean; entries: EfLedgerEntry[]; truncated: boolean };
+
+/** EF kontör defteri (account_credit_ledger, unit='ef'): tüm zamanlar; bakiye/yükümlülük ve hak dağılımı için. Hata: enabled:false. */
+export async function loadEfLedgerEntries(admin: Admin): Promise<EfLedgerLoad> {
+  const entries: EfLedgerEntry[] = [];
+  let offset = 0;
+  while (offset < LEDGER_MAX_ROWS) {
+    const { data, error } = await admin
+      .from("account_credit_ledger")
+      .select("id, tenant_id, amount, feature, created_at")
+      .eq("unit", EF_UNIT)
+      .order("id", { ascending: true })
+      .range(offset, offset + LEDGER_PAGE_SIZE - 1);
+    if (error) return { enabled: false, entries: [], truncated: false };
+    const page = (data ?? []) as { tenant_id: string; amount: number | string | null; feature: string | null; created_at: string }[];
+    for (const r of page) entries.push({ tenantId: r.tenant_id, amount: Number(r.amount ?? 0), feature: r.feature ?? null, createdAt: r.created_at });
+    if (page.length < LEDGER_PAGE_SIZE) return { enabled: true, entries, truncated: false };
+    offset += LEDGER_PAGE_SIZE;
+  }
+  return { enabled: true, entries, truncated: true };
+}
+
+export type EfPackSaleLoad = { enabled: boolean; sales: (EfPackSale & { paidAt: string | null })[]; truncated: boolean };
+
+/** Ödenmiş, iade edilmemiş kontör paketi faturaları (tüm zamanlar): net tutar + kontör. Hata: enabled:false. */
+export async function loadEfPackSales(admin: Admin): Promise<EfPackSaleLoad> {
+  const sales: EfPackSaleLoad["sales"] = [];
+  let offset = 0;
+  while (offset < LEDGER_MAX_ROWS) {
+    const { data, error } = await admin
+      .from("invoices")
+      .select("id, amount_try, paid_at, meta")
+      .eq("status", "paid")
+      .eq("meta->>kind", "credit_pack")
+      .order("id", { ascending: true })
+      .range(offset, offset + LEDGER_PAGE_SIZE - 1);
+    if (error) return { enabled: false, sales: [], truncated: false };
+    const page = (data ?? []) as { amount_try: unknown; paid_at: string | null; meta: unknown }[];
+    for (const r of page) {
+      const s = packSaleOfInvoice(r);
+      if (s) sales.push({ ...s, paidAt: r.paid_at });
+    }
+    if (page.length < LEDGER_PAGE_SIZE) return { enabled: true, sales, truncated: false };
+    offset += LEDGER_PAGE_SIZE;
+  }
+  return { enabled: true, sales, truncated: true };
 }
 
 export type EfBalanceLoad = { enabled: false } | { enabled: true; available: number; reserved: number; grantedTotal: number; committedTotal: number };

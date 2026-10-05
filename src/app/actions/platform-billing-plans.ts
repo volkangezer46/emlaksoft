@@ -329,5 +329,5 @@ export async function saveEfWelcomeUnits(formData: FormData): Promise<PlanOpResu
     entityType: "plan",
     meta: { before, units },
   });
-  return { ok: true, notice: units === 0 ? "Hoş geldin kontörü kapatıldı." : `Hoş geldin kontörü ${units} olarak kaydedildi; günlük çalışmada, henüz almamış aktif/deneme ofislere tek sefer verilir.` };
+  return { ok: true, notice: units === 0 ? "Hoş geldin kontörü kapatıldı." : `Hoş geldin kontörü ${units} olarak kaydedildi; yalnız deneme/yeni ofise tek sefer verilir, mevcut ofislere geriye dönük dağıtılmaz.` };
 }

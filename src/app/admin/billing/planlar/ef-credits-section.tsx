@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveEfWelcomeUnits } from "@/app/actions/platform-billing-plans";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
@@ -8,18 +9,21 @@ import { opFieldClass } from "../inline-op";
 
 const lbl = "block text-xs font-semibold text-text-muted";
 
-type Row = { id: string; name: string; units: number };
+type Row = { id: string; name: string; units: number; perExtraSeat?: number };
 
 /** "Kontör hakları": paket başına aylık hak özeti (canlı yaklaşık değerleme) + hoş geldin kontörü ayarı. */
 export function EfCreditsSection({
   rows,
   valuationCost,
   welcomeUnits,
+  wholesaleKnown,
   canWrite,
 }: {
   rows: Row[];
   valuationCost: number;
   welcomeUnits: number;
+  /** ef.wholesale tanımlı mı (iki tarife de 0 değilse). */
+  wholesaleKnown: boolean;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -48,18 +52,23 @@ export function EfCreditsSection({
         <p className="text-xs text-text-muted">
           Paket başına aylık EmlakFiyati kontörü plan düzenleyicisinden girilir; günlük çalışma, trialing/active aboneliği olan ofislere ayı için tek sefer verir.
           Kullanılmayan kontör süresiz devreder. Plan yükseltmede ara hak verilmez; yeni paketin hakkı sonraki ay başlar.
+          Ek kullanıcı başı kontör, plan düzenleyicisindeki &quot;ek kullanıcı başı kontör&quot; alanından girilir ve satırlarda hakka eklenir.
+        </p>
+        <p className="mt-1 text-xs text-text-muted">
+          Toptan maliyet (EmlakFiyatı işlem başı tarifesi): {wholesaleKnown ? "tanımlı" : "BİLİNMİYOR, varsayılan 0 kullanılıyor; marj gerçek değildir"}.{" "}
+          <Link href="/admin/ef-kontor#ekonomi" className="font-semibold text-brand-600 hover:underline">Kontör ekonomisi ve maliyet girişi</Link>
         </p>
       </div>
       <ul className="space-y-1 text-sm">
         {rows.map((r) => (
           <li key={r.id} className="flex flex-wrap justify-between gap-2 border-b border-line py-1.5 last:border-0">
             <span className="font-semibold text-ink-950">{r.name}</span>
-            <span className="tabular-nums text-text-muted">{efCreditsLine(r.units, valuationCost) ?? "Aylık hak yok"}</span>
+            <span className="tabular-nums text-text-muted">{efCreditsLine(r.units, valuationCost, r.perExtraSeat) ?? "Aylık hak yok"}</span>
           </li>
         ))}
       </ul>
       <div className="space-y-2 border-t border-line pt-4">
-        <h3 className="text-sm font-bold text-ink-950">Hoş geldin kontörü (yeni ofis, tek sefer)</h3>
+        <h3 className="text-sm font-bold text-ink-950">Hoş geldin kontörü (yalnız deneme/yeni ofis, tek sefer)</h3>
         <label className={lbl}>
           Kontör (0 = kapalı)
           <input
@@ -78,7 +87,7 @@ export function EfCreditsSection({
             {Number(value.trim()) === 0
               ? "Kapalı: yeni hoş geldin hibesi verilmez."
               : (efCreditsLine(Number(value.trim()), valuationCost)?.replace("Aylık ", "") ?? "")}
-            {" "}Henüz hoş geldin hibesi almamış aktif/deneme ofislere (mevcutlar dahil) bir kez verilir.
+            {" "}Hoş geldin kontörü yalnız deneme/yeni ofise bir kez verilir; mevcut ofislere geriye dönük dağıtılmaz.
           </p>
         ) : (
           <p role="alert" className="text-xs font-semibold text-danger-600">0-1000 arasında tam sayı girin.</p>
