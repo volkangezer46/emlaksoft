@@ -42,7 +42,7 @@
 --   20260817000220_subscription_price_lock             subscriptions.price_lock_try / price_lock_campaign (K2)
 --   (20260817000230 kuponlar ve 20260823000600 kupon kotasi GEREKMEZ; bu dosya redeem_coupon'a dokunmaz.)
 --
--- ILISKI: supabase/proposed/20260820000100_billing_pause_proration_business_seats.sql
+-- ILISKI: supabase/proposed/20261005000800_billing_pause_proration_business_seats.sql
 --   Bu dosya onun "D. Business plan listeleri" bolumunun YERINE gecer (o bolum canli govdeyi replace ile yamalar,
 --   update_tenant_plan_subscription'daki tutar ezme hatasini birakir). A/B/C/E bolumleri (duraklatma, oransal,
 --   extra_seats) bundan BAGIMSIZDIR. O taslak migrations'a terfi ederken D bolumu CIKARILMALIDIR:

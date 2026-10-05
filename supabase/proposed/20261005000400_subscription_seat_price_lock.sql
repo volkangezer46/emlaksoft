@@ -1,7 +1,7 @@
 -- TASLAK (UYGULANMADI, supabase/migrations'a TASINMADI): ek kullanici fiyat kilidi.
 -- Tasarim: src/lib/billing/seat-pricing.ts (quoteSeats opts.lockedBaseMonthlyTry / opts.lockedTiers).
 --
--- Bagimlilik: 20260820000100_billing_pause_proration_business_seats.sql (taslak) `subscriptions.extra_seats`
+-- Bagimlilik: 20261005000800_billing_pause_proration_business_seats.sql (taslak) `subscriptions.extra_seats`
 -- sutununu ekler; bu dosya YALNIZ kilit sutunlarini ekler. Uygulamadan once (1) restore edilebilir backup/PITR
 -- dogrulanmali, (2) `npm run check:migrations -- --database` ve dry-run temiz olmali, (3) dosya yeni zaman damgasiyla
 -- supabase/migrations'a tasinmali (forward-only). Uygulama kodu sema yokken zarifce calisir (kilit yok sayilir).

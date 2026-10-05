@@ -1,6 +1,6 @@
 # Ofis sahipliği devri (ofis sahibi tarafından, iki adımlı)
 
-Durum: TASARIM + TASLAK MİGRATION. Kod YAZILMADI; neden aşağıda. Taslak: `supabase/proposed/20260819020100_ownership_transfers.sql`
+Durum: TASARIM + TASLAK MİGRATION. Kod YAZILMADI; neden aşağıda. Taslak: `supabase/proposed/20261005000700_ownership_transfers.sql`
 (+ `.rollback.sql`). Uygulanmadı, `supabase/migrations`'a taşınmadı.
 
 ## Mevcut durum

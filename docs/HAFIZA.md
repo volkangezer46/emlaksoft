@@ -40,7 +40,7 @@ anket modülü (010000) · malik bağlantısı (20261005000100) · perf indeksle
 
 **Fiyat bütünlüğü taslağı (tam gövdeli, `pg_get_functiondef+replace` YOK):** `supabase/proposed/20261005000500_billing_plan_amount_integrity.sql`
 (+ rollback). `update_tenant_plan_subscription`, `fulfill_billing_payment` (10 arg), `provision_registration`, `convert_demo_request_to_tenant`
-fonksiyonlarını yeniden yazar (tutar plan tanımından, yıllık = aylık×10, fiyat kilidi yazılır, Business dahil). **`20260820000100_billing_pause_proration_business_seats.sql`
+fonksiyonlarını yeniden yazar (tutar plan tanımından, yıllık = aylık×10, fiyat kilidi yazılır, Business dahil). **`20261005000800_billing_pause_proration_business_seats.sql`
 taslağının D bölümünün YERİNE geçer; o taslak terfi ederken D bölümü ÇIKARILMALI** (aksi halde desen bulunamaz, A/B/C/E de uygulanmaz).
 Bağımlılıkları: 20260731000140, 20260802000300/400, 20260809000000, 20260810000100, 20260816010100, 20260817000210/220. Uygulanmadan Founders /
 yeni fiyat / admin plan değişimi KAPALI kalmalı. Ayrıca 20260731000138'den kalan 9 argümanlı `fulfill_billing_payment` overload'u eski sabitleri

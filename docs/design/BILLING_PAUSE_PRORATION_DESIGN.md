@@ -1,6 +1,6 @@
 # Abonelik duraklatma, oransal yukseltme, Business ve ek kullanici (TASLAK)
 
-Durum: tasarim notu. Migration taslagi `supabase/proposed/20260820000100_billing_pause_proration_business_seats.sql`
+Durum: tasarim notu. Migration taslagi `supabase/proposed/20261005000800_billing_pause_proration_business_seats.sql`
 (uygulanmadi, forward-only kurala uygun olarak tasinirken yeni zaman damgasi alir).
 
 ## Mevcut durumun tespitleri

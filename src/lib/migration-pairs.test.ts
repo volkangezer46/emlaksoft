@@ -160,11 +160,11 @@ describe("impactTable", () => {
 const supabaseDir = path.join(process.cwd(), "supabase");
 const ls = (d: string) => readdirSync(path.join(supabaseDir, d)).filter((f) => f.endsWith(".sql"));
 
-/** Bilinen, sahibe raporlanmis proposed cakismalari. Yeni bir cakisma bu listede yoksa test kirilir. */
-const KNOWN_PROPOSED_COLLISIONS = [
-  "20260819020100_ownership_transfers",
-  "20260820000100_billing_pause_proration_business_seats",
-];
+/**
+ * Bilinen proposed cakismalari. Iki eski cakisma (ownership_transfers, billing_pause) 20261005000700/800 olarak
+ * yeniden numaralandi; liste BOS kalmali. Yeni bir cakisma testi kirar.
+ */
+const KNOWN_PROPOSED_COLLISIONS: string[] = [];
 
 describe("gercek depo: yayin penceresi verisi", () => {
   const migrations = ls("migrations");
