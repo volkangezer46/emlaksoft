@@ -39,7 +39,13 @@ pencereler `PB1`…`PB8` + `P12`).
                                             # "checksum drift" ya da "ledger kaydı diskte yok" görülürse DUR
    npm run db:migrate -- --dry-run          # "14 migration uygulanacak" (AD sırasıyla listeler; uygulama sırası §3'tür)
    ```
-4. Ledger'da bunların hiçbiri olmamalı:
+4. **Prova (önerilir, yazmaz):** `npm run db:rehearse -- --yes-i-understand-locks [--with-earnings]`
+   (`scripts/migration-rehearsal.ts`). 13 dosyayı (bayrakla P12'yi de) GERÇEK şemada TEK transaction'da çalıştırır,
+   md5/varlık/yardımcı/işlevsel fatura/RLS kontrollerini PASS/FAIL/ATLANDI tablosuyla basar ve HER KOŞULDA ROLLBACK eder;
+   ledger'a yazmaz, `apply-migrations` ile aynı advisory anahtarını xact düzeyinde alır. ROLLBACK'e kadar `tenants`,
+   `properties`, `subscriptions`, `demo_requests`, `geo_*` tablolarında ACCESS EXCLUSIVE kilit tutar (statement 20 sn /
+   lock 10 sn / toplam 180 sn sınırı): düşük trafikte çalıştırın. FAIL varsa çıkış 1 → uygulamaya geçmeyin.
+5. Ledger'da bunların hiçbiri olmamalı:
    ```sql
    select version from public.schema_migrations
    where version like '20260825%' or version = '20260816000500_commission_earnings_privacy.sql';   -- 0 satır
