@@ -51,7 +51,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
   komisyonlar: (sb, gate) => {
     let q = sb
       .from("commissions")
-      .select("gross_amount, vat_amount, status, splits, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to, property:properties!deals_property_id_fkey(property_code, title))")
+      .select("gross_amount, vat_amount, status, splits, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to, property:properties!deals_property_id_fkey(property_code, title), advisor:profiles!deals_assigned_to_fkey(full_name, tenant_id))")
       .eq("tenant_id", gate.tenantId)
       .eq("deal.tenant_id", gate.tenantId)
       .order("created_at", { ascending: false })
