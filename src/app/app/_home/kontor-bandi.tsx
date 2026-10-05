@@ -13,6 +13,7 @@ const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
  */
 export async function KontorBandi({ ctx, valuationClosed }: { ctx: HomeCtx; valuationClosed: boolean }) {
   if (!ctx.tenantId || ctx.tvMode || !canManageEfCredits(ctx.role) || valuationClosed) return null;
+  let data: { state: "low" | "empty"; available: number } | null = null;
   try {
     const efState = await getEfPublicState();
     if (!efState.live) return null;
@@ -20,26 +21,27 @@ export async function KontorBandi({ ctx, valuationClosed }: { ctx: HomeCtx; valu
     if (!balance) return null;
     const low = lowBalanceState(balance.available, catalog.tariff);
     if (!shouldShowLowBalanceBanner({ role: ctx.role, valuationClosed, efLive: efState.live, state: low.state })) return null;
-    const empty = low.state === "empty";
-    return (
-      <KontorBandiKutu
-        storageKey={`es:ef-low-banner:${ctx.tenantId}:${ctx.userId}:${low.state}`}
-        empty={empty}
-        href="/app/abonelik?sekme=kontor#paketler"
-        actionLabel="Kontör paketlerini gör"
-      >
-        {empty ? (
-          <>
-            <span className="font-bold">Kontörünüz bitti.</span> Ada/parsel değerleme ve PDF rapor için kontör gerekir.
-          </>
-        ) : (
-          <>
-            <span className="font-bold">Kontörünüz azalıyor:</span> kalan {fmt.format(balance.available)} kontör.
-          </>
-        )}
-      </KontorBandiKutu>
-    );
+    data = { state: low.state === "empty" ? "empty" : "low", available: balance.available };
   } catch {
     return null;
   }
+  const empty = data.state === "empty";
+  return (
+    <KontorBandiKutu
+      storageKey={`es:ef-low-banner:${ctx.tenantId}:${ctx.userId}:${data.state}`}
+      empty={empty}
+      href="/app/abonelik?sekme=kontor#paketler"
+      actionLabel="Kontör paketlerini gör"
+    >
+      {empty ? (
+        <>
+          <span className="font-bold">Kontörünüz bitti.</span> Ada/parsel değerleme ve PDF rapor için kontör gerekir.
+        </>
+      ) : (
+        <>
+          <span className="font-bold">Kontörünüz azalıyor:</span> kalan {fmt.format(data.available)} kontör.
+        </>
+      )}
+    </KontorBandiKutu>
+  );
 }

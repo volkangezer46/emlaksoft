@@ -49,27 +49,28 @@ export async function EfCreditBadge({
   valuationClosed: boolean;
   impersonating?: boolean;
 }) {
+  let data: BadgeData = null;
   try {
     // Ucuz kapılar önce: yetkisiz kullanıcı için hiçbir okuma yapılmaz.
     if (!shouldShowEfBadge({ role, canAccessValuation, valuationClosed, efLive: true, impersonating })) return null;
     const state = await getEfPublicState();
     if (!shouldShowEfBadge({ role, canAccessValuation, valuationClosed, efLive: state.live, impersonating })) return null;
-    const data = await cachedBadgeData(tenantId);
-    if (!data) return null;
-    const label =
-      data.state === "empty" ? "Kontör bitti" : data.state === "low" ? `Kontör azalıyor: ${fmt.format(data.available)}` : `${fmt.format(data.available)} kontör`;
-    return (
-      <Link
-        href="/app/abonelik?sekme=kontor"
-        title="EmlakFiyati kontör bakiyeniz. Ayrıntı, aylık hak ve paketler için tıklayın."
-        aria-label={`${label}. Kontör merkezini aç`}
-        className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition ${TONE[data.state]}`}
-      >
-        <Coins className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className="numeric">{label}</span>
-      </Link>
-    );
+    data = await cachedBadgeData(tenantId);
   } catch {
     return null;
   }
+  if (!data) return null;
+  const label =
+    data.state === "empty" ? "Kontör bitti" : data.state === "low" ? `Kontör azalıyor: ${fmt.format(data.available)}` : `${fmt.format(data.available)} kontör`;
+  return (
+    <Link
+      href="/app/abonelik?sekme=kontor"
+      title="EmlakFiyati kontör bakiyeniz. Ayrıntı, aylık hak ve paketler için tıklayın."
+      aria-label={`${label}. Kontör merkezini aç`}
+      className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition ${TONE[data.state]}`}
+    >
+      <Coins className="h-3.5 w-3.5" aria-hidden="true" />
+      <span className="numeric">{label}</span>
+    </Link>
+  );
 }
