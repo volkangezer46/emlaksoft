@@ -1,5 +1,8 @@
 export type PlanId = "advisor" | "office" | "professional" | "business" | "enterprise";
 
+/** Fatura KDV oranı (%20). Ön izlemeler bunu kullanır; asıl fatura tutarını `invoiceAmountsTry` (fulfillment.ts) hesaplar. */
+export const BILLING_VAT_RATE = 0.2;
+
 /** Yıllık ödemede ödenen ay sayısı varsayılanı ("10 öde 12 kullan"); plan başına panelden değişir. */
 export const DEFAULT_YEARLY_PAID_MONTHS = 10;
 export type BillingCycle = "monthly" | "yearly";

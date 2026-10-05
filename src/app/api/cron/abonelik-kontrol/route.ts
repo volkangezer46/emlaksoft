@@ -5,6 +5,8 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setting-keys";
 
+export const maxDuration = 60;
+
 const DAY_MS = 86_400_000;
 const BILLING_HREF = "/app/abonelik";
 

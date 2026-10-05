@@ -17,7 +17,7 @@ export const TRY_GRANT_KINDS = ["referral", "partner", "campaign", "manual", "bo
 export type TryGrantKind = (typeof TRY_GRANT_KINDS)[number];
 
 export const TRY_GRANT_KIND_LABELS: Record<TryGrantKind, string> = {
-  referral: "Tavsiye ödülü",
+  referral: "Davet ödülü",
   partner: "Ortaklık ödülü",
   campaign: "Kampanya kredisi",
   manual: "Yönetici yüklemesi",

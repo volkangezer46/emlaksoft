@@ -269,7 +269,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         tier: "more",
       },
       { href: "/app/abonelik", label: "Abonelik ve paket", icon: ICONS.abonelik, module: "billing", tier: "core" },
-      { href: "/app/buyume", label: "Arkadaşını getir", icon: ICONS.davet, module: "settings", tier: "more" },
+      { href: "/app/buyume", label: "Davet et ve kazan", icon: ICONS.davet, module: "settings", tier: "more" },
       {
         // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.
         href: "/app/yardim",

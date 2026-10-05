@@ -53,7 +53,7 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/baslangic",
         selectors: ['[data-tour="kurulum"]', H1],
         title: "Ofis kurulumu",
-        desc: "Altı kısa adımda ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın. Dolu demo ile başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
+        desc: "Altı kısa adımda ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın. Örnek veriyle başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
       },
       {
         path: "/app/ekip",
@@ -77,7 +77,13 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/ayarlar",
         selectors: [H1],
         title: "Ayarlar ve modüller",
-        desc: "Roller, tanımlar, ofis bilgileri ve demo veri durumu burada. Kullanmadığınız modülleri kapatıp menüyü sadeleştirebilirsiniz.",
+        desc: "Roller, tanımlar, ofis bilgileri ve örnek veri durumu burada. Kullanmadığınız modülleri kapatıp menüyü sadeleştirebilirsiniz.",
+      },
+      {
+        path: "/app/abonelik",
+        selectors: [H1],
+        title: "Krediler",
+        desc: "Hesap kredisi (TL) faturalarınızdan düşer, kontör bakiyesi ise değerleme ve rapor işlemlerinde harcanır. Hesap kredisi ve Kontör sekmelerinden bakiyenizi görürsünüz.",
       },
     ],
   },

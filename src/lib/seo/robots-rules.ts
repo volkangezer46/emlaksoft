@@ -44,7 +44,7 @@ export function buildLlmsTxt(global: SeoGlobal, settings: SeoRobotsSettings, bas
     `- [Ana sayfa](${b}/)`,
     `- [Fiyatlar](${b}/fiyatlar)`,
     `- [Ücretsiz hesaplama araçları](${b}/araclar)`,
-    `- [Demo talebi](${b}/demo)`,
+    `- [Ücretsiz başla](${b}/kayit)`,
     "",
   ].join("\n");
 }

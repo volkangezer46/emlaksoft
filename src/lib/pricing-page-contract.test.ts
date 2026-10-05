@@ -43,7 +43,7 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
   });
 
   it("kayıp-kaçak yalnız Profesyonel ve üzeri, yıllık indirim plans.ts ile tutarlı", () => {
-    const row = buildComparison().flatMap((g) => g.rows).find((r) => r.label === "Kayıp-kaçak komisyon motoru")!;
+    const row = buildComparison().flatMap((g) => g.rows).find((r) => r.label === "Kayıp-kaçak kalkanı")!;
     expect(row.cells.map((c) => c.included)).toEqual([false, false, true, true]);
     const p = PLANS[0]!;
     expect(p.monthlyTry * 10).toBe(planAmountTry(p.id, "yearly"));

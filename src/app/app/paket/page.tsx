@@ -4,7 +4,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { PLAN_GATES, requiredPlanName } from "@/lib/billing/page-gates";
-import { getPlan } from "@/lib/billing/plans";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatTry } from "@/lib/utils";
 
@@ -23,7 +23,7 @@ export default async function UpgradePage({
   await requireModulePage("dashboard");
   const { ozellik } = await searchParams;
   const gate = PLAN_GATES.find((g) => g.href === ozellik) ?? null;
-  const plan = gate ? getPlan(gate.minPlan) : null;
+  const plan = gate ? await getPlanDefinition(gate.minPlan) : null;
 
   return (
     <div className="mx-auto w-full max-w-3xl">

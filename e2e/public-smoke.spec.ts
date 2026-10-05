@@ -13,8 +13,6 @@ test.describe("Landing", () => {
     await expect(page.locator("h1").first()).toBeVisible();
     // Hero CTA: /kayit'e giden ilk buton
     await expect(page.locator('main a[href="/kayit"], a[href="/kayit"]').first()).toBeVisible();
-    // Ikincil CTA: canli demo
-    await expect(page.locator('a[href="/demo"]').first()).toBeVisible();
   });
 });
 
@@ -54,13 +52,10 @@ test.describe("Kayit sihirbazi (/kayit)", () => {
   });
 });
 
-test.describe("Demo talebi (/demo)", () => {
-  test("form render olur", async ({ page }) => {
+test.describe("/demo yonlendirmesi", () => {
+  test("/kayit sayfasina gider", async ({ page }) => {
     await page.goto("/demo");
-    await expect(page.getByRole("heading", { name: "Canlı demo talebi" })).toBeVisible();
-    await expect(page.locator("#full_name")).toBeVisible();
-    await expect(page.locator("#phone")).toBeVisible();
-    await expect(page.locator("#email")).toBeVisible();
+    await expect(page).toHaveURL(/\/kayit/);
   });
 });
 

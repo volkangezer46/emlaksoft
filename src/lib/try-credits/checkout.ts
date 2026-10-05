@@ -29,7 +29,7 @@ export type AppliedWalletCredit = {
 export type ApplyCreditResult = { ok: true; applied: AppliedWalletCredit } | { ok: false; error: string };
 
 const MSG = {
-  unavailable: "Kredi cüzdanı şu an kullanılamıyor; krediyi seçmeden ödemeye devam edebilirsiniz.",
+  unavailable: "Hesap kredisi şu an kullanılamıyor; krediyi seçmeden ödemeye devam edebilirsiniz.",
   none: "Kullanılabilir hesap krediniz yok.",
   changed: "Kredi bakiyeniz değişti; sayfayı yenileyip tekrar deneyin.",
   cap: "Bu faturada uygulanabilecek kredi sınırı aşıldı.",

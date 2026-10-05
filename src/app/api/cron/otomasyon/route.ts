@@ -9,6 +9,9 @@ function authorized(req: NextRequest) {
 }
 
 /** Zaman tabanlı otomasyonları çalıştırır (auth_expiring, demand_stale, no_contact_days, appointment_missed). */
+/** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

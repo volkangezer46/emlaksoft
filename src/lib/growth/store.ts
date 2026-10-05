@@ -39,7 +39,7 @@ import {
 } from "@/lib/growth/attribution";
 
 /**
- * Büyüme verisi (SUNUCU). Tablolar `supabase/proposed/` taslağındadır; uygulanmamışsa her okuyucu
+ * Büyüme verisi (SUNUCU). Tablolar `supabase/migrations/20260825000800_*` ile gelir; uygulanmamışsa her okuyucu
  * `available:false` döner ve sayfa "etkin değil" uyarısı gösterir — sistem bozulmaz.
  * KVKK: IP/cihaz izi/kişisel veri SAKLANMAZ; atıf kaydı yalnız kod, kaynak etiketi ve zaman içerir.
  */

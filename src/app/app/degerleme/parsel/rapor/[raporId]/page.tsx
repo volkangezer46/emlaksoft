@@ -33,7 +33,7 @@ export default async function ParselReportPage({ params }: { params: Promise<{ r
           { label: "Rapor" },
         ]}
       />
-      <DegerlemeTabs active="parsel" />
+      <DegerlemeTabs active="parsel" parselReady={state.ready} />
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-text-muted">

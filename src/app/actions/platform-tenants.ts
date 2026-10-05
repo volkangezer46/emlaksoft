@@ -21,7 +21,8 @@ import {
 import { officeSlugCandidates, provisionSafeCompanyName, validateOfficeSlug } from "@/lib/admin/office-slug";
 import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvince } from "@/lib/geo/reader";
-import { getPlan, planLabel } from "@/lib/billing/plans";
+import { planLabel } from "@/lib/billing/plans";
+import { readEffectiveSeatLimit } from "@/lib/billing/seat-purchase";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { requirePlatformModule } from "@/lib/platform";
@@ -968,7 +969,7 @@ async function seatAvailable(admin: Admin, tenantId: string): Promise<{ ok: true
   if (tenant.status === "suspended" || tenant.status === "cancelled") {
     return { ok: false, error: "Askıdaki ya da arşivdeki ofise kullanıcı eklenemez." };
   }
-  const limit = getPlan(String(tenant.plan)).limits.seats;
+  const limit = await readEffectiveSeatLimit(admin, tenantId, String(tenant.plan));
   if ((count ?? 0) >= limit) {
     return {
       ok: false,

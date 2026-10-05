@@ -6,6 +6,7 @@ import { efUnitsFor, type EfPack, type EfTariff } from "@/lib/ef-credits/config"
 import { monthlyUnitsOf } from "@/lib/ef-credits/plan-credits";
 import { trialCtaLabel } from "@/lib/marketing-copy";
 import { formatNumberTr } from "@/lib/format";
+import type { EfValuationStatus } from "@/lib/site-content/ef-status";
 import { Em, SectionHeading } from "./section-heading";
 
 /** Uygulamadaki Kontör sekmesi (ofis paneli); girişsiz ziyaretçi önce giriş yapar, sonra buraya döner. */
@@ -21,12 +22,16 @@ export function EmlakFiyatiSection({
   pricing,
   tariff,
   packs,
+  status = "live",
 }: {
+  /** ValuationSection ile AYNI durum kaynağı; "live" değilse bölüm "yakında" tonundadır. */
+  status?: EfValuationStatus;
   pricing: PublicPricing;
   tariff: EfTariff;
   packs: EfPack[];
 }) {
   const { plans, trialDays } = pricing;
+  const live = status === "live";
   const entitled = plans.filter((p) => monthlyUnitsOf(p.efCreditsMonthly) > 0);
   if (entitled.length === 0) return null;
   const sellablePacks = activePacks(packs);
@@ -40,9 +45,22 @@ export function EmlakFiyatiSection({
         <SectionHeading
           center
           eyebrow="EmlakFiyati"
-          title={<span id="emlakfiyati-baslik">Her pakette <Em>aylık değerleme hakkı</Em></span>}
-          text="Ada/parsel bazlı EmlakFiyati değerleme ve PDF rapor sorguları için kontör, paketinizle birlikte her ay otomatik yüklenir. Yetmezse ek rapor paketi satın alırsınız."
+          title={
+            <span id="emlakfiyati-baslik">
+              {live ? <>Her pakette <Em>aylık değerleme hakkı</Em></> : <>Paket bazlı <Em>aylık kontör planı</Em></>}
+            </span>
+          }
+          text={
+            live
+              ? "Ada/parsel bazlı EmlakFiyati değerleme ve PDF rapor sorguları için kontör, paketinizle birlikte her ay otomatik yüklenir. Yetmezse ek rapor paketi satın alırsınız."
+              : "Ada/parsel bazlı EmlakFiyati değerleme henüz etkinleştirilmedi. Etkinleşince aşağıdaki aylık kontör hakları paketinizle birlikte yüklenecek; tutarlar planlanan değerlerdir."
+          }
         />
+        <p className="mt-4 flex justify-center">
+          <span className={`mk-tag ${live ? "mk-tag-plan" : "mk-example"}`} data-ef-status={status}>
+            {live ? "Canlı" : "Yakında"}
+          </span>
+        </p>
 
         <div className={`mt-9 grid gap-4 sm:grid-cols-2 ${cols}`}>
           {entitled.map((plan) => {
@@ -58,7 +76,7 @@ export function EmlakFiyatiSection({
                 <span className="text-xs font-extrabold tracking-[0.08em] text-text-muted">{plan.eyebrow}</span>
                 <h3 className="font-display text-lg font-bold text-ink-950">{plan.name}</h3>
                 <p className="mt-4 font-display text-4xl font-bold tabular-nums text-ink-950">{formatNumberTr(units)}</p>
-                <p className="text-sm text-text-muted">kontör / ay</p>
+                <p className="text-sm text-text-muted">{live ? "kontör / ay" : "kontör / ay (planlanan)"}</p>
                 {approx > 0 ? (
                   <p className="mt-2 text-sm font-semibold text-mint-700">Yaklaşık {formatNumberTr(approx)} değerleme</p>
                 ) : null}
@@ -102,7 +120,7 @@ export function EmlakFiyatiSection({
               Ek rapor paketi
             </p>
             <p className="mt-2 text-sm text-text-muted">
-              Aylık hakkınız bittiğinde ofis panelinde Abonelik &gt; Kontör sekmesinden ek kontör paketi satın alırsınız; kullanılmayan kontör süresiz
+              {live ? "Aylık hakkınız bittiğinde" : "Değerleme etkinleşince, aylık hakkınız bittiğinde"} ofis panelinde Abonelik &gt; Kontör sekmesinden ek kontör paketi satın alırsınız; kullanılmayan kontör süresiz
               devreder.
               {sellablePacks.length === 0 ? " Paket fiyatları panelde, giriş yaptıktan sonra görünür." : ""}
             </p>

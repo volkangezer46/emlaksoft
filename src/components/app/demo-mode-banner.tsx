@@ -9,7 +9,7 @@ export type DemoBannerVariant = "demo" | "mixed" | "switch";
 
 const COPY: Record<DemoBannerVariant, { title: string; text: string }> = {
   demo: {
-    title: "Demo modundasınız",
+    title: "Örnek veri modundasınız",
     text: "Ofis örnek verilerle dolu: her kaydı düzenleyebilir, silebilir, her ekranı deneyebilirsiniz. Hazır olunca gerçek kullanıma başlayın.",
   },
   mixed: {
@@ -79,7 +79,7 @@ export function DemoModeBanner({
 
   return (
     <section
-      aria-label="Demo modu"
+      aria-label="Örnek veri modu"
       className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.08] px-4 py-3"
       data-tour="demo-bandi"
     >

@@ -66,10 +66,11 @@ const BASE_PAGES: SeoPageDef[] = [
       "EmlakSoft'u 14 gün ücretsiz deneyin; kredi kartı gerekmez. Portföy, müşteri, komisyon ve portal yönetimini kendi verinizle görün. Sorunuz varsa görüşme talep edebilirsiniz.",
     ogTitle: "EmlakSoft — 14 Gün Ücretsiz Dene",
     ogDescription: "Emlak ofisinizi tek platformda yönetin. 14 gün ücretsiz deneyin.",
-    index: true,
-    canIndex: true,
-    sitemap: { include: true, priority: 0.8, freq: "monthly" },
-    jsonLd: ["BreadcrumbList"],
+    // /demo artık /kayit'a 308 yönlendirilir (next.config.ts); sayfa dosyası yalnız geriye dönük kalır. İndekslenmez, sitemap'e girmez.
+    index: false,
+    canIndex: false,
+    sitemap: { include: false, priority: 0.8, freq: "monthly" },
+    jsonLd: [],
   },
   {
     path: "/kayit",

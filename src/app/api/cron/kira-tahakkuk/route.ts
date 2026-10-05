@@ -62,6 +62,9 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
  * NOT: vercel.json'a bilerek DOKUNULMADI — cron path: /api/cron/kira-tahakkuk
  * (CRON_SECRET Bearer başlığıyla çağrılır).
  */
+/** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

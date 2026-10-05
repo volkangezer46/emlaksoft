@@ -59,11 +59,16 @@ export type EfPrerequisites = { key: boolean; flag: boolean; probe: boolean; wal
 export type EfFeatureState = {
   ready: boolean;
   prerequisites: EfPrerequisites;
-  /** Kullanıcıya gösterilecek eksik ön koşullar (Türkçe). */
+  /** Ofis kullanıcısına gösterilen TEK cümle (hazır değilse); teknik ayrıntı `details`'te, yalnız /admin/sistem için. */
   missing: string[];
+  /** Teknik eksik ön koşullar (anahtar, bayrak, yoklama, şema). Ofis kullanıcısına GÖSTERİLMEZ. */
+  details: string[];
   balance: EfBalance | null;
   tariff: EfTariff;
 };
+
+/** Ofis kullanıcısına gösterilen tek cümle; ayrıntı yalnız /admin/sistem'dedir. */
+export const EF_NOT_ENABLED_MESSAGE = "Bu özellik henüz etkinleştirilmedi.";
 
 async function loadTariff(): Promise<EfTariff> {
   return parseEfTariff(await getPlatformSetting(EF_TARIFF_SETTING_KEY));
@@ -78,14 +83,15 @@ export async function getEfFeatureState(tenantId: string): Promise<EfFeatureStat
     loadTariff(),
   ]);
   const prerequisites: EfPrerequisites = { key, flag, probe: probeAt !== null, wallet };
-  const missing: string[] = [];
-  if (!key) missing.push("EmlakFiyati anahtarı tanımlı değil (yönetici: Sistem > EmlakFiyati).");
-  if (!flag) missing.push("Ortak uçlar yönetici tarafından etkinleştirilmemiş.");
-  if (!prerequisites.probe) missing.push("Ortak bağlantı yoklaması başarılı değil (yönetici: 'Ortak bağlantıyı dene').");
-  if (!wallet) missing.push("Kontör cüzdanı henüz hazır değil (veritabanı şeması uygulanmamış).");
+  const details: string[] = [];
+  if (!key) details.push("EmlakFiyati anahtarı tanımlı değil (yönetici: Sistem > EmlakFiyati).");
+  if (!flag) details.push("Ortak uçlar yönetici tarafından etkinleştirilmemiş.");
+  if (!prerequisites.probe) details.push("Ortak bağlantı yoklaması başarılı değil (yönetici: 'Ortak bağlantıyı dene').");
+  if (!wallet) details.push("Kontör bakiyesi henüz hazır değil (veritabanı şeması uygulanmamış).");
+  const missing = details.length > 0 ? [EF_NOT_ENABLED_MESSAGE] : [];
   const ready = key && flag && prerequisites.probe && wallet;
   const balance = ready ? await efBalance(tenantId) : null;
-  return { ready: ready && balance !== null, prerequisites, missing, balance, tariff };
+  return { ready: ready && balance !== null, prerequisites, missing, details, balance, tariff };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +174,7 @@ async function holdUnits(a: EfActor, units: number, item: EfItem): Promise<Hold>
   return { kind: "held", reservationId: r.reservation_id };
 }
 
-const WALLET_ERROR_MESSAGE = "Kontör cüzdanına şu an yazılamadı; işlem yapılmadı ve kontörünüz düşülmedi. Lütfen tekrar deneyin.";
+const WALLET_ERROR_MESSAGE = "Kontör bakiyesine şu an yazılamadı; işlem yapılmadı ve kontörünüz düşülmedi. Lütfen tekrar deneyin.";
 
 // ---------------------------------------------------------------------------
 // Ada/parsel değerleme
@@ -182,7 +188,7 @@ export async function runParcelValuation(p: EfActor & { input: OrtakValuationInp
   const input = parsed.data;
 
   const state = await getEfFeatureState(p.tenantId);
-  if (!state.ready) return { status: "disabled", message: "Ada/parsel değerleme şu an etkin değil.", missing: state.missing };
+  if (!state.ready) return { status: "disabled", message: EF_NOT_ENABLED_MESSAGE, missing: [] };
 
   const item: EfItem = input.tip === "konut" ? "valuation_konut" : "valuation_arsa";
   const units = efUnitsFor(item, state.tariff);
@@ -293,7 +299,7 @@ export async function getReportDetail(p: EfActor & { raporId: string }): Promise
   const owned = await getOwnedReport(p.tenantId, p.raporId);
   if (!owned.ok) return { status: owned.status, message: efFailureMessage("not_found", "rapor_yok") };
   const state = await getEfFeatureState(p.tenantId);
-  if (!state.ready) return { status: "disabled", message: "Ada/parsel değerleme şu an etkin değil.", missing: state.missing };
+  if (!state.ready) return { status: "disabled", message: EF_NOT_ENABLED_MESSAGE, missing: [] };
 
   const units = efUnitsFor("report_detail", state.tariff);
   const hold = await holdUnits(p, units, "report_detail");
@@ -336,7 +342,7 @@ export async function getReportPdf(p: EfActor & { raporId: string }): Promise<Re
   if (!owned.ok) return { status: owned.status, message: efFailureMessage("not_found", "rapor_yok") };
   const row = owned.row;
   const state = await getEfFeatureState(p.tenantId);
-  if (!state.ready) return { status: "disabled", message: "Ada/parsel değerleme şu an etkin değil.", missing: state.missing };
+  if (!state.ready) return { status: "disabled", message: EF_NOT_ENABLED_MESSAGE, missing: [] };
 
   const lockKey = `${p.tenantId}:${row.rapor_id}`;
   if (pdfInflight.has(lockKey)) return { status: "busy", message: "Bu raporun PDF'i hazırlanıyor; birkaç saniye sonra tekrar deneyin." };

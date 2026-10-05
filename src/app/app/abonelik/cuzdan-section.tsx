@@ -54,6 +54,20 @@ export async function CuzdanSection({
   /** Faturada kredi kullanabilecek roller (owner/gm). */
   canSpend: boolean;
 }) {
+  // Hesap kredisi ofis geneli finans verisidir: yalnız ofis sahibi ve genel müdür görür (okuma bile yapılmaz).
+  if (!canSpend) {
+    return (
+      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <EmptyState
+          variant="full"
+          icon={Wallet}
+          title="Hesap kredisi bu rol için kapalı"
+          description="Yalnız ofis sahibi ve genel müdür görür."
+          action={{ href: "/app/abonelik", label: "Aboneliğe dön" }}
+        />
+      </section>
+    );
+  }
   const [overview, movements] = await Promise.all([readTryOverview(supabase), readTryMovements(supabase)]);
   const direction = resolveDirection(yon);
 
@@ -64,7 +78,7 @@ export async function CuzdanSection({
           variant="full"
           icon={Wallet}
           title="Hesap kredisi henüz etkin değil"
-          description="Tavsiye ödülleri, kampanya ve iade kredileri etkinleşince bakiyeniz burada görünür ve paket, ek kullanıcı ve kontör faturalarınızda kullanılır."
+          description="Davet ödülleri, kampanya ve iade kredileri etkinleşince bakiyeniz burada görünür ve paket, ek kullanıcı ve kontör faturalarınızda kullanılır."
           action={{ href: TRY_WALLET_LINKS.invoices, label: "Faturalarıma git" }}
         />
       </section>
@@ -91,7 +105,7 @@ export async function CuzdanSection({
         <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
           <Wallet className="h-4 w-4" /> Hesap kredisi (TL)
         </p>
-        <h2 className="mt-1 font-display font-bold text-ink-950">Cüzdan bakiyeniz</h2>
+        <h2 className="mt-1 font-display font-bold text-ink-950">Hesap kredisi bakiyeniz</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Link
             href={TRY_WALLET_LINKS.plans}

@@ -55,7 +55,7 @@ export default async function HomePage() {
         <HowItWorks trialDays={trialDays} plans={plans} steps={content.steps} heading={content.sections.nasil} />
         <SecurityBand trialDays={trialDays} plans={plans} content={content.security} heading={content.sections.guvenlik} />
         <PricingSection pricing={pricing} heading={content.sections.fiyat} />
-        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} />
+        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} status={efStatus} />
         <Faq items={faqs} heading={content.sections.sss} />
         <FinalCta trialDays={trialDays} plans={plans} content={content.finalCta} />
       </main>

@@ -88,6 +88,7 @@ describe("sitemap girdi kuralları", () => {
     expect(paths).toContain("/araclar");
     expect(paths).toContain("/kvkk-aydinlatma");
     expect(paths).not.toContain("/giris");
+    expect(paths).not.toContain("/demo");
   });
   it("statik girdilere sahte lastmod yazılmaz", () => {
     expect(entries.every((e) => e.lastModified === undefined)).toBe(true);
@@ -97,8 +98,8 @@ describe("sitemap girdi kuralları", () => {
     expect(e1).not.toContain("/demo");
     const e2 = staticSitemapEntries(BASE, { "/kayit": { sitemapInclude: false } }, DEFAULT_SITEMAP).map((e) => new URL(e.url).pathname);
     expect(e2).not.toContain("/kayit");
-    const e3 = staticSitemapEntries(BASE, { "/demo": { title: "x", updatedAt: "2026-10-01T10:00:00.000Z" } }, DEFAULT_SITEMAP);
-    expect(e3.find((e) => e.url.endsWith("/demo"))?.lastModified).toBe("2026-10-01T10:00:00.000Z");
+    const e3 = staticSitemapEntries(BASE, { "/kayit": { title: "x", updatedAt: "2026-10-01T10:00:00.000Z" } }, DEFAULT_SITEMAP);
+    expect(e3.find((e) => e.url.endsWith("/kayit"))?.lastModified).toBe("2026-10-01T10:00:00.000Z");
   });
   it("araçlar ve statik sayfa anahtarları kapatılabilir", () => {
     const off = staticSitemapEntries(BASE, {}, { ...DEFAULT_SITEMAP, tools: false, staticPages: false });

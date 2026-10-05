@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Loader2, Minus, Plus, ShieldAlert, Users2 } from "lucide-react";
 import { startSeatPurchase } from "@/app/actions/billing";
-import type { PlanDef, SeatTier } from "@/lib/billing/plans";
+import { BILLING_VAT_RATE, type PlanDef, type SeatTier } from "@/lib/billing/plans";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
 import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
@@ -311,7 +311,7 @@ export function SeatPanel(props: SeatPanelProps) {
                 wallet={props.wallet}
                 checked={useCredit}
                 onChange={setUseCredit}
-                totalTry={Math.round(ev.immediateChargeTry * 1.2 * 100) / 100}
+                totalTry={Math.round(ev.immediateChargeTry * (1 + BILLING_VAT_RATE) * 100) / 100}
                 disabled={pending}
                 idPrefix="seat"
               />

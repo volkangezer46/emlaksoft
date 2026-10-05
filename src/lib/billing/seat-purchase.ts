@@ -162,6 +162,23 @@ export async function getExtraSeats(
   }
 }
 
+/**
+ * Ofisin ETKİN koltuk sınırı (plan + satın alınmış ek kullanıcı), TEK okuyucu: önce DB `effective_seat_limit()`;
+ * fonksiyon yoksa/hata verirse DB plan kataloğu (`getPlanDefinition`) + `extra_seats` ile aynı değeri hesaplar.
+ * Platform (admin) koltuk kontrolleri bunu kullanır; statik `getPlan` limiti satın alınmış koltukları yok sayardı.
+ */
+export async function readEffectiveSeatLimit(admin: SupabaseClient, tenantId: string, planId: string): Promise<number> {
+  try {
+    const { data, error } = await admin.rpc("effective_seat_limit", { p_tenant_id: tenantId });
+    const n = Number(data);
+    if (!error && data !== null && Number.isFinite(n) && n > 0) return Math.floor(n);
+  } catch {
+    // RPC yok: aşağıdaki katalog hesabına düş.
+  }
+  const included = (await getPlanDefinition(planId)).limits.seats;
+  return included + (await getExtraSeats(admin, tenantId));
+}
+
 /** Koltuk satın alma faturası taslağı (meta.kind = 'extra_seats'); tahsilat tutarı sunucuda hesaplanmıştır. */
 export async function createSeatInvoice(input: {
   tenantId: string;

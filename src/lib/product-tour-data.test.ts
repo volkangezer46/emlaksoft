@@ -11,11 +11,11 @@ const ALL: AppModule[] = [
 ];
 
 describe("ürün turları veri sözleşmesi", () => {
-  it("her tur tam yetkide 4-6 adım içerir", () => {
+  it("her tur tam yetkide 4-7 adım içerir", () => {
     for (const t of TOURS) {
       const steps = resolveTourSteps(t.id, { accessible: ALL, closed: [] });
       expect(steps.length, t.id).toBeGreaterThanOrEqual(4);
-      expect(steps.length, t.id).toBeLessThanOrEqual(6);
+      expect(steps.length, t.id).toBeLessThanOrEqual(7);
     }
   });
 
@@ -48,7 +48,7 @@ describe("ürün turları veri sözleşmesi", () => {
   it("menüde olmayan sayfa (henüz eklenmemiş) elenir, ana ekran her zaman kalır", () => {
     const paths = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [] }).map((s) => s.path);
     expect(paths).toContain("/app");
-    for (const p of paths) expect(["/app", "/app/baslangic", "/app/ekip", "/app/ilan-havuzu", "/app/ofis-kontrol", "/app/ayarlar"]).toContain(p);
+    for (const p of paths) expect(["/app", "/app/baslangic", "/app/ekip", "/app/ilan-havuzu", "/app/ofis-kontrol", "/app/ayarlar", "/app/abonelik"]).toContain(p);
     expect(resolveTourSteps("ofis-sahibi", { accessible: [], closed: [] }).map((s) => s.path)).toEqual(["/app"]);
   });
 

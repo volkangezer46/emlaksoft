@@ -108,7 +108,7 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
   if (!parsed.success) return { error: firstIssue(parsed.error) };
   const { allowed } = await checkRateLimit(`efgrant:${w.staff.id}`, { limit: 10, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla yükleme denemesi. Birkaç dakika sonra tekrar deneyin." };
-  if (!(await getEfCreditReady())) return { error: "Kontör cüzdanı henüz etkin değil." };
+  if (!(await getEfCreditReady())) return { error: "Kontör bakiyesi henüz etkin değil." };
   const r = await grantEfCredit(parsed.data, w.staff.id);
   if (!r.ok) return { error: r.error ?? "Kontör yüklenemedi." };
   await logPlatformActivity({

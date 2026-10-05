@@ -18,6 +18,8 @@ const ALLOW: Record<string, string> = {
   // Sözlük ve test dosyaları yasaklı terimi tanımlamak/anlatmak için anar.
   "src/lib/terminology.ts": "sözlük tanımı",
   "src/lib/terminology-contract.test.ts": "sözleşme testi",
+  // Platform migration prova aracı (yalnız /admin): teknik tablo adlarını ("kontör cüzdanı") anlatır.
+  "src/lib/migration-rehearsal": "yalnız /admin migration provası",
 };
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -55,6 +57,19 @@ describe("terim sözlüğü yapısı", () => {
   });
   it("her terimin tanımı var", () => {
     for (const t of Object.values(TERMS)) expect(t.definition.length).toBeGreaterThan(10);
+  });
+});
+
+describe("kazanç sayfası 'cüzdan' demez", () => {
+  it("Kazanç sayfası dosyalarında (yorum dışı) 'cüzdan' geçmez; hesap kredisi ayrı kavramdır", () => {
+    const files = ["src/app/app/cuzdan/page.tsx", "src/app/app/cuzdan/office-earnings.tsx", "src/app/app/ekip/kazanc/page.tsx"];
+    const hits: string[] = [];
+    for (const f of files) {
+      for (const { line, text } of visibleTexts(readFileSync(join(process.cwd(), f), "utf8"))) {
+        if (/\bcüzdan/i.test(text)) hits.push(`${f}:${line}  ${text.slice(0, 90)}`);
+      }
+    }
+    expect(hits, hits.join("\n")).toEqual([]);
   });
 });
 

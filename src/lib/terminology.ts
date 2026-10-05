@@ -45,7 +45,23 @@ export const TERMS = {
   },
   ornekVeri: {
     canonical: "Örnek veri",
-    definition: "Ofisin içine yüklenen is_sample kayıtlar. 'Demo' yalnız satış demosudur (/demo, /admin/satis).",
+    definition: "Ofisin içine yüklenen is_sample kayıtlar. 'Demo' yalnız satış demosudur (/admin/satis; public /demo artık /kayit'a yönlenir).",
+    forbidden: [/demo modundasınız/i, /demo verileriyle/i, /dolu demo/i, /demo ofisle/i],
+  },
+  hesapKredisi: {
+    canonical: "Hesap kredisi",
+    definition: "Ofisin TL bakiyesi (davet ödülü, kampanya, iade); paket, ek kullanıcı ve kontör faturalarından düşer. Kontörle karıştırılmaz.",
+    forbidden: [/kredi cüzdan/i, /hesap cüzdan/i],
+  },
+  kontor: {
+    canonical: "Kontör bakiyesi",
+    definition: "EmlakFiyati değerleme ve PDF rapor işlemlerinde harcanan işlem hakkı; aylık hak ve ek paketlerle yüklenir.",
+    forbidden: [/kontör cüzdan/i],
+  },
+  davet: {
+    canonical: "Davet et ve kazan",
+    definition: "Ofisin başka ofisleri davet edip hesap kredisi kazandığı program (/app/buyume). Eski adlar kullanıcıya görünmez.",
+    forbidden: [/arkadaşını getir/i, /tavsiye ödül/i],
   },
 } as const satisfies Record<string, Term>;
 

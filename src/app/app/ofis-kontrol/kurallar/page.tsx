@@ -8,10 +8,8 @@ import { OversightNav } from "../_components/oversight-nav";
 import { PrivacyNote } from "../_components/privacy-note";
 import { OversightSettingsForm } from "./settings-form";
 
-const PATH = "/app/ofis-kontrol/kurallar";
-
 export default async function KurallarPage() {
-  const { tenantId, role } = await requireModulePage("dashboard", PATH);
+  const { tenantId, role } = await requireModulePage("dashboard", "/app/ofis-kontrol/kurallar");
   if (!tenantId || !hasOfficeWideDataScope(role)) redirect("/app/ofis-kontrol/benim");
 
   const supabase = await createClient();

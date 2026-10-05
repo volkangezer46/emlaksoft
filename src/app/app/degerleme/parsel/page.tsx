@@ -41,12 +41,12 @@ export default async function ParselValuationPage() {
     return (
       <div className="space-y-6">
         {header}
-        <DegerlemeTabs active="parsel" />
+        <DegerlemeTabs active="parsel" parselReady={false} />
         <section role="status" className="rounded-[var(--radius-panel)] border border-line bg-surface p-6 shadow-[var(--shadow-xs)]">
           <h2 className="flex items-center gap-2 font-display text-lg font-bold text-ink-950">
             <PlugZap className="h-5 w-5 text-amber-500" aria-hidden="true" /> Etkin değil
           </h2>
-          <p className="mt-1 text-sm text-text-muted">Ada/parsel değerleme şu an kullanılamıyor. Eksik ön koşullar:</p>
+          <p className="mt-1 text-sm text-text-muted">Ada/parsel değerleme şu an kullanılamıyor.</p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-950">
             {state.missing.length > 0 ? state.missing.map((m) => <li key={m}>{m}</li>) : <li>Kontör bakiyesi okunamadı; lütfen daha sonra tekrar deneyin.</li>}
           </ul>

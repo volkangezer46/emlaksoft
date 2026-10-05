@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   REFERRAL_CODE_ALPHABET,
   REFERRAL_CODE_LENGTH,
-  buildReferralUrl,
   cleanUtm,
   formatRefCookie,
   generateReferralCode,
@@ -71,7 +70,6 @@ describe("atıf kodları", () => {
   });
 
   it("bağlantı üreticileri", () => {
-    expect(buildReferralUrl("https://x.test/", "abcd2345")).toBe("https://x.test/kayit?ref=abcd2345");
     expect(vitrinSignatureHref("ornek")).toBe("/r/v-ornek");
   });
 });

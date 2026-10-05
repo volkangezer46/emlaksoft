@@ -100,7 +100,7 @@
     },
     {
       "path": "/api/cron/billing-reconciliation",
-      "schedule": "*/10 * * * *"
+      "schedule": "3-59/10 * * * *"
     },
     {
       "path": "/api/cron/direct-file-upload-cleanup",
@@ -120,7 +120,7 @@
     },
     {
       "path": "/api/cron/havuz-atama",
-      "schedule": "*/10 * * * *"
+      "schedule": "6-59/10 * * * *"
     },
     {
       "path": "/api/cron/ef-kontor-hak",
@@ -132,7 +132,7 @@
     },
     {
       "path": "/api/cron/ef-kontor-sweep",
-      "schedule": "*/10 * * * *"
+      "schedule": "8-59/10 * * * *"
     }
   ]
 }
