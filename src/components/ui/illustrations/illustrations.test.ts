@@ -18,6 +18,14 @@ describe("illüstrasyon kiti", () => {
     }
   });
 
+  it("viz boş durum illüstrasyonları (funnel, gauge, heatmap) tanımlı", () => {
+    for (const kind of ["funnel", "gauge", "heatmap"] as const) {
+      expect(ILLUSTRATION_KINDS).toContain(kind);
+      expect(resolveIllustration(kind)).toBe(kind);
+    }
+    expect(ILLUSTRATION_KINDS.length).toBeGreaterThanOrEqual(22);
+  });
+
   it("eski illustration değerleri çözülür", () => {
     expect(resolveIllustration("search")).toBe("aramaYok");
     expect(resolveIllustration("start")).toBe("baslangic");

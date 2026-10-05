@@ -20,6 +20,9 @@
   /* Gezinme cross-fade'i: eski/yeni sayfa aynı sürede (eşit süre = parlaklık çukuru yok). */
   --motion-nav: var(--motion-exit-base);
   --motion-stagger: 40ms;
+  /* Veri hareketi: cizilme/dolum ve sayi sayma. Ilk gorunurde BIR kez oynar. */
+  --motion-draw: 600ms;
+  --motion-count: 700ms;
 
   /* ---- Easing ---- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -192,12 +195,32 @@
   .ill-float, .ill-swing, .ill-pop { transform-box: fill-box; transform-origin: center; }
   .ill-swing { transform-origin: 50% 10%; }
   .ill-float { animation: ill-float 4s ease-in-out infinite; }
+  /* Veri illustrasyonlari (funnel/gauge/heatmap): bir kez dolar */
+  @keyframes ill-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+  .ill-grow-x { transform-box: fill-box; transform-origin: left center; animation: ill-grow-x var(--motion-draw) var(--ease-out-expo) both; }
+  .ill-grow-x.ill-d2 { animation-delay: 120ms; }
+  .ill-grow-x.ill-d3 { animation-delay: 240ms; }
   .ill-pulse { animation: ill-pulse 2.4s ease-in-out infinite; }
   .ill-swing { animation: ill-swing 3.6s ease-in-out infinite; }
   .ill-pop { animation: ill-pop var(--motion-slow) var(--ease-out) both; }
   .ill-draw { stroke-dasharray: 200; animation: ill-draw 900ms var(--ease-out) 150ms both; }
   .ill-draw.ill-d2 { animation-delay: 450ms; }
   .ill-check { animation-duration: 600ms; animation-delay: 250ms; }
+
+  /* ---- Veri görselleştirme (src/components/ui/viz): ilk görünümde BİR kez ----
+     Taban stil bitiş durumudur; hareket yalnız no-preference'ta bu sınıflarla oynar.
+     Çizgi: clipPath içindeki dikdörtgen soldan açılır (non-scaling-stroke ile uyumlu).
+     Bütçe: transform / opacity / stroke-dashoffset. */
+  @keyframes viz-reveal { from { transform: scaleX(0); } to { transform: none; } }
+  .viz-reveal { transform-box: fill-box; transform-origin: left center; animation: viz-reveal var(--motion-draw) var(--ease-out-expo) both; }
+  @keyframes viz-fade { from { opacity: 0; } to { opacity: 1; } }
+  .viz-fade { animation: viz-fade var(--motion-draw) var(--ease-out) 160ms both; }
+  .viz-fade-late { animation: viz-fade var(--motion-base) var(--ease-out) var(--motion-draw) both; }
+  @keyframes viz-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+  .viz-grow-x { transform-origin: left center; animation: viz-grow-x var(--motion-draw) var(--ease-out-expo) both; animation-delay: var(--viz-delay, 0ms); }
+  /* Gösterge yayı: pathLength=1; bitiş kaydırması --viz-off (satır içi öznitelikle aynı) */
+  @keyframes viz-sweep { from { stroke-dashoffset: 1.02; } to { stroke-dashoffset: var(--viz-off, 0); } }
+  .viz-sweep { animation: viz-sweep var(--motion-draw) var(--ease-out-expo) both; }
 
   /* ---- Kutlama: disk + tik (Celebration `tick`) ve konfeti; CSS, bir kez ---- */
   @keyframes celebrate-pop { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: none; } }

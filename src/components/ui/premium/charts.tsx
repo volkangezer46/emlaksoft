@@ -1,6 +1,9 @@
-import { useId, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { summarizeSeries, type PremiumTone } from "./premium-math";
+import { AreaChart as VizAreaChart } from "../viz/area-chart";
+import { RadialGauge } from "../viz/radial-gauge";
+import { vizToneColor } from "../viz/colors";
 
 /**
  * Saf SVG/CSS veri görselleştirme (sunucu bileşenleri, istemci JS yok). Hepsi YALNIZ
@@ -96,9 +99,9 @@ export function BarColumns({
 export type AreaSeries = { name: string; values: readonly number[]; tone?: PremiumTone };
 
 /**
- * AreaChart — çizgi + gradyan alan, ince kesikli ızgara. Tek veya çift seri; her seri
- * en az 2 sonlu nokta içermiyorsa o seri çizilmez. Ortak ölçek (en büyük değer).
- * `labels` HTML satırı olarak altta (ilk/orta/son). Tooltip yok; aria-label özet.
+ * AreaChart — viz kitine (`@/components/ui/viz`) yönlenen ince sarmalayıcı (eski dışa
+ * aktarım korunur). Çizgi + gradyan alan, ortak ölçek, ilk görünümde bir kez çizilme,
+ * sr-only veri tablosu. `labels` altta gösterilen eksen etiketleridir (ilk/orta/son).
  */
 export function AreaChart({
   series,
@@ -115,80 +118,22 @@ export function AreaChart({
   ariaLabel?: string;
   className?: string;
 }) {
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const W = 600;
-  const H = 160;
   const usable = series.filter((s) => s.values.length >= 2 && s.values.every((v) => Number.isFinite(v)));
-  const max = Math.max(1, ...usable.flatMap((s) => [...s.values]));
-  if (usable.length === 0 || usable.every((s) => s.values.every((v) => v === 0))) return null;
-  // Ortak ölçek (en büyük değer) için kendi geometrimiz; sparkPath her seriyi ayrı ölçekler.
-  const geo = usable.map((s) => {
-    const n = s.values.length;
-    const pts = s.values.map((v, i) => ({ x: (i / (n - 1)) * W, y: H - 8 - (v / max) * (H - 24) }));
-    const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-    return { s, pts, line, area: `${line} L${W},${H} L0,${H} Z`, last: pts[n - 1] };
-  });
   return (
-    <div className={className}>
-      <svg
-        role="img"
-        aria-label={ariaLabel ?? usable.map((s) => `${s.name}: ${summarizeSeries(s.values, unit)}`).join(" · ")}
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="none"
-        className="block w-full overflow-visible"
-        style={{ height }}
-      >
-        <defs>
-          {geo.map((g, i) => (
-            <linearGradient key={i} id={`pm-ar-${uid}-${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={toneVar(g.s.tone, i)} stopOpacity="0.32" />
-              <stop offset="100%" stopColor={toneVar(g.s.tone, i)} stopOpacity="0" />
-            </linearGradient>
-          ))}
-        </defs>
-        {GRID_STEPS.map((s) => (
-          <line key={s} x1="0" x2={W} y1={H - 8 - s * (H - 24)} y2={H - 8 - s * (H - 24)} className="pm-grid-line" vectorEffect="non-scaling-stroke" />
-        ))}
-        {geo.map((g, i) => (
-          <g key={i}>
-            <path d={g.area} fill={`url(#pm-ar-${uid}-${i})`} />
-            <path
-              d={g.line}
-              fill="none"
-              stroke={toneVar(g.s.tone, i)}
-              strokeWidth="2.25"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <path d={`M${g.last.x},${g.last.y} l0.001,0`} stroke={toneVar(g.s.tone, i)} strokeWidth="8" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-            <path d={`M${g.last.x},${g.last.y} l0.001,0`} stroke="var(--surface-raised)" strokeWidth="3.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-          </g>
-        ))}
-      </svg>
-      {labels && labels.length > 0 ? (
-        <div className="mt-2 flex justify-between text-xs text-[var(--text-muted)]" aria-hidden="true">
-          {labels.map((l, i) => (
-            <span key={i}>{l}</span>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    <VizAreaChart
+      series={series.map((s) => ({ name: s.name, values: s.values, tone: s.tone }))}
+      axisLabels={labels}
+      showLast={false}
+      height={height}
+      ariaLabel={ariaLabel ?? usable.map((s) => `${s.name}: ${summarizeSeries(s.values, unit)}`).join(" · ")}
+      className={className}
+    />
   );
 }
 
-function toneVar(tone: PremiumTone | undefined, i: number): string {
-  if (tone === "success") return "var(--pm-chart-success)";
-  if (tone === "gold") return "var(--gold-500)";
-  if (tone === "warn") return "var(--pm-chart-warn)";
-  if (tone === "danger") return "var(--pm-chart-danger)";
-  if (tone === "brand" || tone === undefined) return i === 0 ? "var(--accent)" : "var(--pm-chart-success)";
-  return "var(--text-muted)";
-}
-
 /**
- * Ring — halka (donut) ilerleme. `pct` 0–100 arası GERÇEK oran (üst sınır 100'e
- * kırpılır; taşma metinde ayrıca gösterilir). Merkez slotu değer/etiket içindir.
+ * Ring — halka (donut) ilerleme; viz `RadialGauge`'e yönlenir (eski dışa aktarım korunur).
+ * `pct` 0–100 arası GERÇEK oran (üst sınır 100'e kırpılır; taşma metinde ayrıca gösterilir).
  * Altın = para/hedef; ton verilmezse altın.
  */
 export function Ring({
@@ -207,26 +152,18 @@ export function Ring({
   children?: ReactNode;
 }) {
   const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const color = tone === "gold" ? "var(--gold-500)" : toneVar(tone, 0);
   return (
-    <div role="img" aria-label={ariaLabel} className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--hairline-strong)" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${(clamped / 100) * c} ${c}`}
-        />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center text-center">{children}</div>
-    </div>
+    <RadialGauge
+      value={clamped}
+      max={100}
+      size={size}
+      stroke={stroke}
+      color={tone === "gold" ? "var(--gold-500)" : vizToneColor(tone, 0)}
+      format="percent"
+      ariaLabel={ariaLabel}
+    >
+      {children}
+    </RadialGauge>
   );
 }
 

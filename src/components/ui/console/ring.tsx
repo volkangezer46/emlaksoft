@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
+import { RadialGauge } from "../viz/radial-gauge";
 
 /**
- * Halka ilerleme (saf SVG). `value`/`max` gerçek sayılar olmalı; max<=0 ise null
- * (sahte yüzde yok). Ortadaki içerik `children`.
+ * Halka ilerleme — viz `RadialGauge`'e yönlenen sarmalayıcı (eski dışa aktarım korunur).
+ * `value`/`max` gerçek sayılar olmalı; max<=0 ise null (sahte yüzde yok). Ortadaki içerik `children`.
  */
 export function Ring({
   value,
@@ -21,27 +22,16 @@ export function Ring({
   ariaLabel: string;
   children?: ReactNode;
 }) {
-  if (!(max > 0)) return null;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const ratio = Math.min(1, Math.max(0, value / max));
-  const color = tone === "gold" ? "var(--gold-500)" : tone === "success" ? "var(--mint-500)" : "var(--accent)";
   return (
-    <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={ariaLabel} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--hairline)" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={`${(c * ratio).toFixed(2)} ${c.toFixed(2)}`}
-        />
-      </svg>
-      {children ? <div className="absolute inset-0 grid place-items-center text-center">{children}</div> : null}
-    </div>
+    <RadialGauge
+      value={value}
+      max={max}
+      size={size}
+      stroke={stroke}
+      color={tone === "gold" ? "var(--gold-500)" : tone === "success" ? "var(--viz-pos)" : "var(--accent)"}
+      ariaLabel={ariaLabel}
+    >
+      {children}
+    </RadialGauge>
   );
 }

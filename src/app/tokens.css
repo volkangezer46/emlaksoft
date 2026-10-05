@@ -310,3 +310,33 @@
   --color-border-interactive: var(--border-interactive);
   --color-border-strong: var(--border-strong);
 }
+
+/* ============================================================================
+   VERI GORSELLESTIRME PALETI (--viz-*) - acik tema. Koyu karsiligi theme-dark.css.
+   Olcut (src/lib/viz-palette-contract.test.ts korur): cizgi/dolgu serileri
+   --surface uzerinde >=3:1 (WCAG 1.4.11), pos/neg/neutral metin olarak da >=4.5:1.
+   Kategorik 8 renk: yakin hue ciftleri (mint/cyan) ayri tutulur; seriler yalniz
+   renkle ayrilmaz, etiket / dogrudan deger / cizgi stili eslik eder.
+   Sirali palet tek hue (mavi): dusuk -> yuksek, 1..5.
+   ========================================================================== */
+:root {
+  --viz-1: #1d5fd6;
+  --viz-2: #0f7b6c;
+  --viz-3: #c2410c;
+  --viz-4: #7c3aed;
+  --viz-5: #a16207;
+  --viz-6: #be185d;
+  --viz-7: #0e7490;
+  --viz-8: #78716c;
+  --viz-seq-1: #e6efff;
+  --viz-seq-2: #b4cdfb;
+  --viz-seq-3: #5088ec;
+  --viz-seq-4: #2f6bdb;
+  --viz-seq-5: #17409a;
+  --viz-pos: #0b7a4b;
+  --viz-neg: #c62828;
+  --viz-neutral: #5b6b86;
+  --viz-gold: #b8820a;
+  --viz-grid: var(--line);
+  --viz-tooltip-text: var(--text);
+}
