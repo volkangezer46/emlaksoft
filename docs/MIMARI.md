@@ -1,6 +1,6 @@
 # EmlakSoft — Mimari Özet (1 sayfa)
 
-Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `supabase/migrations/` (2026-10-04). Güncel sayılar: `docs/DURUM.md`; proje kuralları: `CLAUDE.md` (çelişirse CLAUDE.md geçerlidir).
+Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `supabase/migrations/` (2026-10-05). Güncel sayılar: `docs/DURUM.md`; proje kuralları: `CLAUDE.md` (çelişirse CLAUDE.md geçerlidir).
 
 ## Katmanlar (URL uzayı)
 
@@ -12,11 +12,11 @@ Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `sup
 | Platform admin | `/admin/*` (tenant, fatura, ticket, cron sağlık, SEO, impersonation) | `platform_staff` + `PLATFORM_ADMIN_EMAILS` bootstrap |
 | Vitrin | `/vitrin/[slug]` — tenant'ın halka açık ofis sitesi | Açık, slug bazlı |
 | Token sayfaları | `/paylas/[token]` (portföy paylaşım) · `/musteri-portali/[token]` · `/malik-portali/[token]` · `/imza/[token]` (SMS OTP e-imza) · `/odeme-link/[token]` (iyzico) · `/degerleme-raporu/[token]` · `/lead` | Tekil token, oturumsuz |
-| API | `/api/cron/*` (32), `/api/app/*` (bootstrap, tv-data), `/api/export/[entity]`, `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
+| API | `/api/cron/*` (33), `/api/app/*` (bootstrap, tv-data), `/api/export/[entity]`, `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
 
 Veri erişimi: Server Component + server action ağırlıklı; mutasyonlar `src/app/actions/*` ve modül içi `actions.ts`.
 
-## Veri modeli ana hatları (206 migration dosyası)
+## Veri modeli ana hatları (243 migration dosyası; TL hesap kredisi, referans/ortak motoru, kayıtlı kart ve EF kontör için `docs/HAFIZA.md` §2/§6)
 
 - **Çekirdek:** `tenants` → `profiles` (rol) → `customers` (360: dosyalar, tarihler, lead sinyalleri, birleştirme) · `demands` (talep) · `properties` (+medya, fiyat geçmişi trigger'lı, lat/lng, aidat) · `portal_listings` (ilan no/URL teyidi — scrape yok).
 - **İşlem hattı:** eşleştirme → `appointments` → `offers`/`offer_rounds` → `deals` (+masraf) → `commissions` → `contracts` (şablon + sürüm + OTP imza) → kayıp-kaçak (`leak-sla`).

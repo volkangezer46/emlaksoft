@@ -39,16 +39,20 @@ Zorunlu (eksikse `next build`/`next start` production'da başlamaz veya readines
 | `RELEASE_MIGRATION`, `RELEASE_MIGRATION_CHECKSUM` | **Yeni migration sonrası güncellenir** (aşağıda) |
 | `PLATFORM_ADMIN_EMAILS` | En az iki kontrollü yönetici önerilir |
 | `PLATFORM_SECRETS_KEY` | **Zorunlu** (admin'den girilen üçüncü taraf API anahtarlarını `platform_settings` içinde AES-256-GCM ile şifreler). Üretim: `openssl rand -hex 32` (64 hex). Yoksa Admin > Sistem > EmlakFiyati formu "etkin değil: PLATFORM_SECRETS_KEY tanımlı değil" der ve KAYDETMEZ. **Kaybedilir/değişirse** şifreli kayıtlar çözülemez: admin'deki anahtar yeniden girilmelidir (ortam yedeği varsa o devreye girer). `NEXT_PUBLIC_` DEĞİL, diğer sırlarla paylaşılmaz |
+| `ADVISOR_PII_KEY` | **Zorunlu** (danışman TC/IBAN alanlarını şifreler; `openssl rand -hex 32`, 64 hex). Yoksa bu alanlar kapalıdır. **Kaybedilirse** şifreli TC/IBAN geri gelmez: anahtarı güvenli yerde yedekle. `NEXT_PUBLIC_` DEĞİL |
+| `PLATFORM_MFA_ENFORCEMENT` | **Yayın öncesi `on`** (platform personeli için zorunlu TOTP/2FA). Tanımsız/kapalıyken `/admin` üstünde "Geliştirme modu" şeridi görünür ve demo kartları süper admin girişi açabilir. Açıldıktan sonra redeploy |
+| `IYZICO_BASE_URL` | **Canlı ödeme için `https://api.iyzipay.com`**. `.env.example` varsayılanı sandbox (`https://sandbox-api.iyzipay.com`): bu değerle üretimde GERÇEK ödeme alınmaz/yanlış ortama gidilir. Anahtarlar (`IYZICO_API_KEY`/`IYZICO_SECRET_KEY`) da canlı çiftle eşleşmeli |
 | `EMLAKFIYATI_API_KEY` | **YEDEK**. Birincil kaynak Admin > Sistem > EmlakFiyati'nda girilen şifreli anahtardır (öncelik: admin > bu değişken). Piyasa endeksi için sunucu sırrı; `NEXT_PUBLIC_` DEĞİL. İkisi de yoksa özellik "etkin değil" der, hiçbir sayfa kırılmaz. Yalnız `emlakfiyati.com` hostuna HTTPS ile gider |
 
-Release çifti üretimi (DB migrate sonrası, kod deploy öncesi):
+Release çifti her zaman **DB'de uygulanmış SON migration'a** çekilir (dosya sisteminde bekleyen/uygulanmamış bir dosyaya DEĞİL; yoksa `/api/health` 503 verir
+ya da yanlış "hazır" gösterir). Üretimi (DB migrate sonrası, kod deploy öncesi):
 
 ```bash
 npm run check:migrations -- --release
 ```
 
-Çıktıdaki kimlik/checksum'ı `RELEASE_MIGRATION` / `RELEASE_MIGRATION_CHECKSUM` olarak Vercel'e yaz. Yeni migration
-eklendiğinde bu çift YENİDEN güncellenmezse `/api/health` migration uyumsuzluğu nedeniyle 503 döner.
+Çıktıdaki kimlik/checksum'ı `RELEASE_MIGRATION` / `RELEASE_MIGRATION_CHECKSUM` olarak Vercel'e yaz. DB'ye yeni migration uygulandığında bu çift
+YENİDEN güncellenmezse `/api/health` migration uyumsuzluğu nedeniyle 503 döner. Depoya eklenen ama henüz uygulanmamış dosya çifti DEĞİŞTİRMEZ.
 
 Opsiyonel: iyzico live anahtarları + live base URL, push, mesaj, AI, portal, banka oranı sağlayıcısı (`.env.example`).
 DB araçları için `DATABASE_POOLER_URL` veya `DATABASE_URL` yalnız kontrollü runner'da; tarayıcıya/runtime'a taşınmaz.

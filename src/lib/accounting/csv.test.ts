@@ -57,7 +57,8 @@ describe("muhasebe CSV", () => {
     expect(line).toContain('"Ödendi"');
     expect(line).toContain('"Kart (iyzico)"');
     expect(line).toContain('"YAZ25"');
-    expect(line.trim().endsWith(";300,50")).toBe(true);
+    // Son sütun "Hesap Kredisi ile Ödenen" (örnek faturada kredi yok = 0,00); iade tutarı bir önceki sütun
+    expect(line.trim().endsWith(";300,50;0,00")).toBe(true);
     expect(line).toContain('"Kadıköy";"1234567890"');
   });
 

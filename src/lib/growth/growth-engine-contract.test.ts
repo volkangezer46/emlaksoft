@@ -390,7 +390,7 @@ describe("arayüz sözleşmesi", () => {
     expect(read("src/lib/growth/program.ts")).not.toMatch(/^import .*(zod|supabase|phone-rules)|Date\.now\(|new Date\(/m);
   });
   it("tetik anları: 4 sayfada gerçek koşula bağlı, kapatılabilir kart", () => {
-    expect(read("src/app/app/anlasmalar/page.tsx")).toContain('<ReferralNudge moment="first_deal" show={(stageCounts.won ?? 0) >= 1} />');
+    expect(read("src/app/app/anlasmalar/page.tsx")).toContain('<ReferralNudge moment="first_deal" show={(realWonRes.count ?? 0) >= 1} />');
     expect(read("src/app/app/degerleme/page.tsx")).toContain('<ReferralNudge moment="first_valuation" show={rows.length >= 1} />');
     expect(read("src/app/app/abonelik/page.tsx")).toContain('<ReferralNudge moment="credit_purchase" show={Boolean(sp.paid && packInvoiceRecent && packInvoice?.status === "paid")} />');
     expect(read("src/app/app/ekip/page.tsx")).toContain('<ReferralNudge moment="team_grew" show={activeCount >= 3} />');

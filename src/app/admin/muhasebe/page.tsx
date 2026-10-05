@@ -23,7 +23,7 @@ import {
   computeEfEconomics,
   parseEfWholesale,
 } from "@/lib/accounting/ef-economics";
-import { loadEfUsage, loadLedger, loadOpenInvoices, loadPlatformMrr, loadSubscriptionMovement, LEDGER_MAX_ROWS } from "@/lib/accounting/loaders";
+import { loadEfUsage, loadLedger, loadOpenInvoices, loadPlatformMrr, loadSubscriptionMovement, loadTryLiability, LEDGER_MAX_ROWS } from "@/lib/accounting/loaders";
 import { saveEfWholesale } from "@/app/actions/accounting";
 import { InlineOp, opFieldClass } from "@/app/admin/billing/inline-op";
 import { BillingNav } from "@/app/admin/billing/billing-nav";
@@ -45,12 +45,13 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
   const admin = createAdminClient();
 
   let loadError = false;
-  const [ledgerRes, openRes, mrr, wholesaleRaw, efUsage] = await Promise.all([
+  const [ledgerRes, openRes, mrr, wholesaleRaw, efUsage, tryLiability] = await Promise.all([
     loadLedger(admin, period, { withRefunds: true }).catch(() => null),
     loadOpenInvoices(admin).catch(() => null),
     loadPlatformMrr(admin, nowMs).catch(() => null),
     getPlatformSetting(EF_WHOLESALE_SETTING_KEY),
     loadEfUsage(admin, period),
+    loadTryLiability(admin).catch(() => null),
   ]);
   if (!ledgerRes || !openRes) loadError = true;
 
@@ -119,6 +120,18 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
       value: formatKurusShort(summary.coupon.discountKurus),
       href: defterHref(period, { durum: "paid", kupon: "1" }),
       hint: `${summary.coupon.count} kuponlu fatura`,
+    },
+    {
+      label: "Hesap kredisi ile ödenen",
+      value: formatKurusShort(summary.walletCreditKurus),
+      href: defterHref(period, { durum: "paid", yontem: "hesap_kredisi" }),
+      hint: "tamamı kredi ile ödenen faturalar (karma ödemelerin kredi payı toplama dahil)",
+    },
+    {
+      label: "Kullanılmamış hesap kredisi",
+      value: tryLiability ? formatKurusShort(tryLiability.totalKurus) : "—",
+      href: "#hesap-kredisi",
+      hint: tryLiability ? `${tryLiability.tenantCount} ofis · yükümlülük (güncel)` : "okunamadı",
     },
   ];
 
@@ -339,6 +352,38 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
           <p className="font-semibold text-ink-950">Mutabakat</p>
           <p className="mt-0.5">EmlakFiyatı aylık dökümüyle eşleştirme: ortak adaptör hazır olunca.</p>
         </div>
+      </section>
+
+      <section id="hesap-kredisi" aria-labelledby="hk-baslik" className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+        <div>
+          <h2 id="hk-baslik" className="font-display font-bold text-ink-950">Kullanılmamış hesap kredisi (yükümlülük)</h2>
+          <p className="mt-1 text-xs text-text-faint">
+            Salt okunur: ofislerin TL kredi defterindeki nominal bakiyesi (eksi bakiyeler sayılmaz; vadesi dolup defterde düşülmemiş tutar dahil olabilir, yani üst sınırdır).
+            Güncel durumdur, dönemden bağımsızdır.
+          </p>
+        </div>
+        {!tryLiability ? (
+          <p className="text-sm text-text-muted">Kredi defteri okunamadı ya da henüz etkin değil.</p>
+        ) : tryLiability.top.length === 0 ? (
+          <p className="text-sm text-text-muted">Kullanılmamış hesap kredisi yok.</p>
+        ) : (
+          <>
+            {tryLiability.truncated ? (
+              <p role="alert" className="text-xs font-semibold text-warn-600">Defter satır sınırı aşıldı; toplam eksik olabilir.</p>
+            ) : null}
+            <ul className="divide-y divide-line text-sm">
+              {tryLiability.top.map((r) => (
+                <li key={r.tenantId} className="flex items-center justify-between gap-3 py-1.5">
+                  <Link href={`/admin/tenants/${r.tenantId}`} className="focus-ring font-medium text-ink-950 hover:text-brand-600">{r.name}</Link>
+                  <span className="numeric font-semibold text-ink-950">{formatKurus(r.kurus)}</span>
+                </li>
+              ))}
+            </ul>
+            {tryLiability.tenantCount > tryLiability.top.length ? (
+              <p className="text-xs text-text-faint">En yüksek {tryLiability.top.length} ofis gösteriliyor ({tryLiability.tenantCount} ofiste bakiye var).</p>
+            ) : null}
+          </>
+        )}
       </section>
 
       <p className="text-xs text-text-faint">

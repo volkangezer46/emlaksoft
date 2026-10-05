@@ -1,6 +1,6 @@
 # EmlakSoft — Güncel Durum
 
-**Tarih:** 2026-10-04 · **Dal:** main (K2, K5, SEO, Modüller kapıları birleşmiş; üstüne Dalga 1 tutarlılık paketi). Yol haritası: `docs/ROADMAP.md`.
+**Tarih:** 2026-10-05 · **Dal:** main (`origin/main` = canlı, `c5a6d32f`). Yol haritası: `docs/ROADMAP.md`.
 Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; eskirler, gerektiğinde komutla yeniden sayın.
 
 ## Sürümler (package.json)
@@ -20,12 +20,12 @@ Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; esk
 
 | Konu | Sayı | Nasıl sayıldı |
 |---|---|---|
-| Migration dosyası | 206 | `supabase/migrations/*.sql`; son: `20260819010600_k5_kvkk_requests.sql`. Bu turun K2/K5 migration'larının (kupon, hesap/abonelik/şube, KVKK talepleri) canlıya uygulanıp uygulanmadığı **doğrulanmadı** |
-| Canlıda uygulanmış migration | **doğrulanmadı** | Kesin sonuç için `npm run check:migrations -- --database` (salt-okunur); uygulama yalnız yedek/PITR doğrulandıktan sonra `npm run db:migrate` |
-| `route.ts` dosyası | 59 | `src/app/**/route.ts` |
+| Migration dosyası | 243 | `supabase/migrations/*.sql` (main'de 242; 001000 yeni eklendi, diğer ajanların 000900/001100 dosyaları kendi dallarında); son uygulanan: `20260826000800_default_program_settings.sql`; yeni uygulanmamış: 000900, 001000, 001100 (`docs/runbooks/YAYIN_PENCERESI_2.md` §8) |
+| Canlıda uygulanmış migration | `20260826000800`a kadar HEPSİ (2026-10-05) | `check:migrations -- --database` salt-okunur; bekleyen yok, yukarıdaki 3 yeni dosya hariç |
+| `route.ts` dosyası | 70 | `src/app/**/route.ts` |
 | Cron route / `vercel.json` zamanlaması | 33 / 33 | `src/app/api/cron/*`, `vercel.json` (31. cron: `ef-kontor-hak`, günlük 01:10 UTC = 04:10 TR, aylık EmlakFiyati kontör hakkı + hoş geldin kontörü; cüzdan hazır değilse atlar; 32. cron: `growth-claims`, günlük 03:40 UTC = 06:40 TR, referans/ortak ödül işleyicisi, cüzdan hazır değilse ödül yüklemez; 33. cron: `ef-kontor-sweep`, 10 dakikada bir, 15 dakikadan eski açık EF kontör rezervlerini `ef_credit_sweep` ile serbest bırakır); sayı `npm run check:cron` ile doğrulanır |
-| `page.tsx` | 194 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
-| Test dosyası | 272 | `src/**/*.test.ts(x)` (Playwright `e2e/*.spec.ts` hariç) |
+| `page.tsx` | 229 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
+| Test dosyası | 368 | `src/**/*.test.ts(x)` (Playwright `e2e/*.spec.ts` hariç) |
 | Test (case) sayısı | **doğrulanmadı** | `npm run test` çıktısından alınmalı |
 
 Not: eski belgelerdeki "113 rota, 170 birim + 28 E2E test, 15 cron" gibi sayılar tarihseldir.
@@ -48,7 +48,7 @@ Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz
 
 - Secret döndürme ve Git geçmişi temizliği açık (sahip sorumluluğu).
 - Yedek/PITR doğrulaması ve restore provası açık.
-- Canlı ledger ile depo arasındaki fark **doğrulanmadı** (depoda 206 dosya; son turların migration'ları canlıda olmayabilir) — `npm run check:migrations -- --database` ile bakılmalı.
+- Canlı ledger ile depo: 2026-10-05 itibarıyla `20260826000800`a kadar eşit; yeni dosyalar uygulanana dek `check:migrations -- --database` bunları "bekleyen" gösterir (beklenen).
 - `tenant_reporting_aggregates` RPC'si (`/app/raporlar`) ve `tenant_commission_aggregates` (ana ekran komisyon özeti) `is_sample` süzmez: eşik dışlaması bu iki toplulaştırmaya SQL değişikliği olmadan uygulanamaz. Örnek veri yüklüyse etiketlenir ("Örnek veri dahil"); süzgeç için yeni migration gerekir (sahip kararı).
 
 ## 2026-10-02/03 turu (yol haritası v2)
@@ -80,6 +80,6 @@ Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz
 - **Demo kartları canlıda açık** (`PRODUCTION_DEMO_LOGIN_OPT_IN`, `PRODUCTION_PLATFORM_DEMO_OPT_IN`): MFA kapalıyken giriş sayfasını açan herkes süper admin olabilir. Yayın öncesi ikisini de kapat.
 - Sızan anahtarların döndürülmesi ve Git geçmişi temizliği.
 
-## Bekleyen: varsayılan program seed`i (2026-10-05)
-- `20260826000800_default_program_settings.sql` hazır, canlı DB`ye UYGULAMA BEKLİYOR (referans programı açılır, hoş geldin 300 TL, katalog kaydı, EF paketleri). Komut: `npm run db:migrate -- --only 20260826000800_default_program_settings.sql`, sonra `npm run check:migrations -- --release` + Vercel `RELEASE_MIGRATION` güncelle. Ayrıntı: `docs/HAFIZA.md` §7. DOĞRULANMADI.
-- **Büyüme hotfix'i (PB14):** `20260826000900_growth_hotfix.sql` hazır, canlı DB'ye UYGULAMA BEKLİYOR (referans programı AÇIK olduğundan öncelikli: ilk-N sayacı, bekleme/yenileme kapısı, hoş geldin kredisi ilk ödemede, chargeback, panel gizliliği). Komut: `npm run db:migrate -- --only 20260826000900_growth_hotfix.sql` (önce backup/PITR). Ayrıntı: `docs/HAFIZA.md` §8. DOĞRULANMADI.
+## Varsayılan program seed (2026-10-05) — UYGULANDI
+- `20260826000800_default_program_settings.sql` canlıda UYGULANDI (referans programı açık, hoş geldin 300 TL, katalog kaydı, EF paketleri). Ayrıntı: `docs/HAFIZA.md` §11. Release çifti DB`deki son migration`a çekilmelidir (DEPLOY.md). Bu dosyadaki sayılar 2026-10-05 dosya sisteminden sayılmıştır; test (case) sayısı doğrulanmadı.
+- **Büyüme hotfix'i (PB14):** `20260826000900_growth_hotfix.sql` hazır, canlı DB'ye UYGULAMA BEKLİYOR (referans programı AÇIK olduğundan öncelikli: ilk-N sayacı, bekleme/yenileme kapısı, hoş geldin kredisi ilk ödemede, chargeback, panel gizliliği). Komut: `npm run db:migrate -- --only 20260826000900_growth_hotfix.sql` (önce backup/PITR). Ayrıntı: `docs/HAFIZA.md` §12. DOĞRULANMADI.

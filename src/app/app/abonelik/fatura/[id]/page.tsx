@@ -32,13 +32,18 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const [{ data: inv }, { data: tenant }] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, invoice_no, status, amount_try, tax_try, total_try, currency, period_start, period_end, due_at, paid_at, iyzico_payment_id, created_at")
+      .select("id, invoice_no, status, amount_try, tax_try, total_try, currency, period_start, period_end, due_at, paid_at, iyzico_payment_id, created_at, meta")
       .eq("id", id)
       .eq("tenant_id", tenantId)
       .maybeSingle(),
     supabase.from("tenants").select("name, tax_number, address_line, city").eq("id", tenantId).maybeSingle(),
   ]);
   if (!inv) notFound();
+  // Hesap kredisi ile odeme: SQL (000500) fatura meta'sina walletCreditTry/walletCashTry yazar; yoksa satir gosterilmez.
+  const meta = (inv.meta ?? {}) as Record<string, unknown>;
+  const walletCredit = Number(meta.walletCreditTry ?? 0);
+  const walletCash = Number(meta.walletCashTry ?? 0);
+  const showWallet = Number.isFinite(walletCredit) && walletCredit > 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -90,6 +95,14 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               <td className="py-2">Toplam</td>
               <td className="py-2 text-right tabular-nums">{money(Number(inv.total_try))}</td>
             </tr>
+            {showWallet ? (
+              <tr className="border-t border-line text-text-muted">
+                <td className="py-2">Ödeme dağılımı</td>
+                <td className="py-2 text-right tabular-nums">
+                  Hesap kredisi: {money(walletCredit)} / Kart: {money(Number.isFinite(walletCash) ? walletCash : 0)}
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
 

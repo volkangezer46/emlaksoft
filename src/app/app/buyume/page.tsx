@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Award, Clock3, HeartHandshake, MousePointerClick, UserPlus, Wallet, Hourglass, CheckCircle2, Undo2, PiggyBank } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
@@ -41,7 +42,9 @@ function monthsText(n: number): string {
 }
 
 export default async function BuyumePage({ searchParams }: { searchParams: Promise<{ durum?: string }> }) {
-  const { tenantId, perms } = await requireModulePage("settings", "/app/buyume");
+  const { tenantId, perms, role } = await requireModulePage("settings", "/app/buyume");
+  // R1: kazanc/davet verisi yalniz owner/gm (SQL tarafi growth_my_dashboard da ayni kapiyi uygular).
+  if (role !== "owner" && role !== "gm") redirect("/app?yetki=yok");
   const sp = await searchParams;
   const durum = parseInviteFilter(sp.durum);
 

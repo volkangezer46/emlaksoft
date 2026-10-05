@@ -4,7 +4,8 @@
  *
  * Kaynak sözleşmesi (invoices tablosu): amount_try = KDV HARİÇ net, tax_try = KDV, total_try = brüt.
  * Tür: meta.kind ('extra_seats' | 'credit_pack'); kind yoksa plan faturasıdır (meta.plan / subscription_id).
- * Ödeme yöntemi: meta.manual_payment.method (elle) ya da iyzico_payment_id (kart, sağlayıcı).
+ * Ödeme yöntemi: meta.manual_payment.method (elle), meta.paidWith='account_credit' (tamamı hesap kredisi) ya da iyzico_payment_id (kart).
+ * Hesap kredisi payı: meta.walletCreditTry (000500 SQL'i yazar; karma ödemede kalan nakit meta.walletCashTry).
  * İade: meta.refund = { amount_try (BRÜT), reason, at } (recordInvoiceRefund; faturada durum "paid" kalır).
  */
 import { inPeriod, type Period } from "@/lib/accounting/period";
@@ -28,10 +29,11 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
   uncollectible: "Tahsil edilemez",
 };
 
-export type PaymentMethodCode = "iyzico" | "havale" | "nakit" | "kart_pos" | "diger" | "belirsiz";
+export type PaymentMethodCode = "iyzico" | "hesap_kredisi" | "havale" | "nakit" | "kart_pos" | "diger" | "belirsiz";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethodCode, string> = {
   iyzico: "Kart (iyzico)",
+  hesap_kredisi: "Hesap kredisi",
   havale: MANUAL_PAYMENT_METHODS.find((m) => m.value === "havale")?.label ?? "Havale / EFT",
   nakit: "Nakit",
   kart_pos: "POS / kart (elle)",
@@ -82,6 +84,8 @@ export type LedgerInvoice = {
   /** İade BRÜT tutarı (kuruş), yoksa 0. */
   refundKurus: number;
   refundAt: string | null;
+  /** Hesap kredisi ile ödenen kısım (kuruş), yoksa 0 (meta.walletCreditTry). */
+  walletCreditKurus: number;
   couponCode: string | null;
   couponDiscountKurus: number;
 };
@@ -117,6 +121,7 @@ export function paymentMethodOf(meta: unknown, iyzicoPaymentId?: string | null):
   const m = typeof manual.method === "string" ? manual.method : null;
   if (m && MANUAL_PAYMENT_METHODS.some((x) => x.value === m)) return m as PaymentMethodCode;
   if (m) return "diger";
+  if (asRecord(meta).paidWith === "account_credit") return "hesap_kredisi";
   if (iyzicoPaymentId) return "iyzico";
   return "belirsiz";
 }
@@ -126,6 +131,12 @@ export function refundOf(meta: unknown): { kurus: number; at: string | null } {
   const kurus = toKurus(r.amount_try);
   if (kurus <= 0) return { kurus: 0, at: null };
   return { kurus, at: typeof r.at === "string" ? r.at : null };
+}
+
+/** Hesap kredisi ile ödenen kısım (kuruş). Alan yoksa/geçersizse 0; uydurma yok. */
+export function walletCreditOf(meta: unknown): number {
+  const kurus = toKurus(asRecord(meta).walletCreditTry);
+  return kurus > 0 ? kurus : 0;
 }
 
 export function toLedgerInvoice(
@@ -153,6 +164,7 @@ export function toLedgerInvoice(
     method: paymentMethodOf(row.meta, row.iyzico_payment_id),
     refundKurus: refund.kurus,
     refundAt: refund.at,
+    walletCreditKurus: walletCreditOf(row.meta),
     couponCode: coupon?.code ?? null,
     couponDiscountKurus: coupon?.discountKurus ?? 0,
   };
@@ -201,6 +213,8 @@ export type LedgerSummary = {
   byKind: Record<InvoiceKind, Money3>;
   byMethod: Record<PaymentMethodCode, Money3>;
   coupon: { count: number; discountKurus: number };
+  /** Dönemde tahsil edilen faturalarda hesap kredisiyle ödenen toplam (karma ödemelerin kredi payı dahil; kuruş). */
+  walletCreditKurus: number;
   /** Anlık (dönemden bağımsız): vadesi gelmemiş açık faturalar. */
   pending: { count: number; gross: number };
   /** Anlık: vadesi geçmiş açık faturalar. */
@@ -218,10 +232,12 @@ export function summarizeLedger(rows: readonly LedgerInvoice[], openRows: readon
   const byKind = Object.fromEntries(INVOICE_KINDS.map((k) => [k, zero3()])) as Record<InvoiceKind, Money3>;
   const byMethod = Object.fromEntries(PAYMENT_METHOD_CODES.map((k) => [k, zero3()])) as Record<PaymentMethodCode, Money3>;
   const coupon = { count: 0, discountKurus: 0 };
+  let walletCreditKurus = 0;
 
   for (const inv of rows) {
     if (isCollectedIn(inv, period)) {
       add3(collected, inv);
+      walletCreditKurus += inv.walletCreditKurus;
       add3(byKind[inv.kind], inv);
       add3(byMethod[inv.method], inv);
       if (inv.couponDiscountKurus > 0) {
@@ -247,7 +263,7 @@ export function summarizeLedger(rows: readonly LedgerInvoice[], openRows: readon
     bucket.gross += inv.grossKurus;
   }
 
-  return { collected, refunds, netOfRefundsGross: collected.gross - refunds.gross, byKind, byMethod, coupon, pending, overdue };
+  return { collected, refunds, netOfRefundsGross: collected.gross - refunds.gross, byKind, byMethod, coupon, walletCreditKurus, pending, overdue };
 }
 
 export function isCollectedIn(inv: LedgerInvoice, period: Pick<Period, "fromIso" | "toIso">): boolean {

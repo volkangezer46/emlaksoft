@@ -36,6 +36,7 @@ export const ACCOUNTING_CSV_HEADERS = [
   "Ödeme Yöntemi",
   "Kupon",
   "İade Tutarı",
+  "Hesap Kredisi ile Ödenen",
 ] as const;
 
 /** Metin hücresi: tırnakla, iç tırnağı ikile, formül öneklerini kaçır. */
@@ -89,6 +90,7 @@ export function csvInvoiceLine(inv: LedgerInvoice): string {
     csvText(PAYMENT_METHOD_LABELS[inv.method]),
     csvText(inv.couponCode),
     csvMoney(inv.refundKurus),
+    csvMoney(inv.walletCreditKurus),
   ];
   return cells.join(CSV_SEP) + CSV_EOL;
 }
