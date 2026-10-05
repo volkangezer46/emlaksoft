@@ -30,6 +30,12 @@ YASAK: bekleyenleri ad sırasıyla uygular ve P12'yi (en küçük numara) İLK s
 (`CREATE INDEX CONCURRENTLY` runner transaction'ında çalışmaz + ölçülmemiş; terfi ETMEDİ). K4 `is_document` dalda. Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı.
 Aşağıdaki liste TARİHSEL envanterdir (uygulananlar dahil); güncel bekleyenler için `npm run db:migrate -- --dry-run`.
 
+**PB9 EmlakFiyati kontör (HAZIRLANDI, UYGULANMADI; sahip bildirimi: 13 terfi + P12 canlıda):** `20260826000100_ef_credit_wallet`
+(defter `ef` birimi, `ef_credit_reservations`, 7 service_role RPC: `config.ts` EF_RPC birebir; 0 kontör = doğrudan kesinleşmiş kayıt,
+kontör süresiz, `ef_credit_ready()` SQL editöründe false) → `20260826000200_ef_reports` → `20260826000300_ef_credit_pack_fulfillment`
+(fulfill/v2 `credit_pack`; taban 000600 gövdesi bayt bayt, md5 kanıtı `src/lib/ef-credits/ef-wallet-sql-contract.test.ts`).
+Sıra/sorgular `YAYIN_PENCERESI_2.md` §7; prova `npm run db:rehearse -- --yes-i-understand-locks --ef` (koşulmadı). TS kontör akışı YOK.
+
 (Eski not) Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
 Sıra: yedek/PITR doğrula → `npm run check:migrations -- --database` → `npm run db:migrate -- --dry-run` → `npm run db:migrate` → `npm run db:rls-audit`.
 

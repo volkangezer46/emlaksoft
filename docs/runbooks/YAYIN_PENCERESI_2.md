@@ -1,4 +1,4 @@
-# Yayın Penceresi 2 — terfi eden 13 migration + kazanç gizliliği (EN SON)
+# Yayın Penceresi 2 — terfi eden 13 migration + kazanç gizliliği (EN SON) + EmlakFiyati kontör (§7, PB9)
 
 > **BU KILAVUZU YALNIZ SAHİP UYGULAR.** Ajan bu dosyayı ve migration'ları yalnız HAZIRLADI: canlı DB'ye bağlanılmadı,
 > hiçbir migration uygulanmadı. Aşağıdaki SQL'lerin TAMAMI salt-okunurdur (`select`; `begin read only … rollback`).
@@ -253,3 +253,98 @@ P12'nin geri alması YAYIN_PENCERESI §8. Ayrıntılı uyarılar her rollback do
 | 20260825001000 | `revoke all … from public, anon` → `from public, anon, authenticated` (+ SELECT yeniden verilir) | Supabase varsayılan ayrıcalıkları authenticated'a yazma + TRUNCATE verir; RLS TRUNCATE'i durdurmaz |
 | 000400 / 000500 / 000200 rollback | Yeni rollback dosyaları yazıldı | Taslaklarda yoktu |
 | Tüm başlıklar | Yeni numara, eski taslak adı, `--only` komutu, rollback yolu | Terfi |
+
+---
+
+## 7. Pencere PB9 — EmlakFiyati kontör (20260826000100..000300; HİÇBİRİ UYGULANMADI)
+
+> Sahip bildirimi: §3'teki 13 dosya ve P12 CANLIDA UYGULANDI. Bu pencere yalnız aşağıdaki üç YENİ dosyadır. Ajan yalnız
+> HAZIRLADI (canlı DB'ye bağlanılmadı, prova/dry-run koşulmadı). Uygulama: restore edilebilir backup/PITR doğrulandıktan
+> sonra SAHİP, `--only` ile, aşağıdaki sırayla. Kod (TS kontör akışı) henüz YOK; şema uygulanınca hiçbir ekran değişmez.
+
+| # | Dosya | Rollback | Etki |
+|---|---|---|---|
+| 1 | `20260826000100_ef_credit_wallet` | var (veri varsa yapısal kısmı atlar) | ek: defter CHECK genişler (`ef` + kaynaklar), `meta` sütunu, `ef_credit_reservations`, 7 service_role RPC |
+| 2 | `20260826000200_ef_reports` | var (satır varsa `emlaksoft.rollback_force` ister) | ek: `ef_reports` (yazma yalnız service_role) |
+| 3 | `20260826000300_ef_credit_pack_fulfillment` | var (000600 gövdelerine birebir döner) | **davranış**: fulfill + v2 `credit_pack` faturasını işler (taban gövde bayt bayt korunur) |
+
+### 7.0 Önkoşul (salt-okunur)
+```bash
+npm run check:migrations                 # "sağlıklı: 237 dosya · son 20260826000300_ef_credit_pack_fulfillment.sql"
+npm run check:migration-pairs            # "0 hata" (PB9-ef-kontor penceresi, ef-kontor grubu)
+npm run check:migrations -- --database   # BEKLENEN: yalnız bu 3 dosya bekliyor; drift/checksum görülürse DUR
+npm run db:migrate -- --dry-run          # "3 migration uygulanacak" (ad sırası = uygulama sırası)
+npm run db:rehearse -- --yes-i-understand-locks --ef   # önerilir: tek transaction + HER KOŞULDA ROLLBACK, FAIL varsa DUR
+```
+Prova (`--ef`) kontrolleri: (1) fatura gövdeleri ÖNCE = 20260825000600/000300, SONRA = yalnız fulfill/v2 değişir; (2) dosya başına
+varlık (§7.1–7.3 sorguları); (3) `seat_purchase_ready` ve `ef_credit_ready` service_role ile true, claim'siz false; (4) plan yenileme
++ ek koltuk + plan değişimi smoke'u YENİ gövdelerle (korunuyor mu); (6) cüzdan: grant 100 → reserve 5 (95/5) → aynı idem duplicate →
+kesinleştir (95, harcanan 5) → tekrar already → reserve 200 insufficient → reserve 3 + release (95) → 1 saatlik rezerv süpürülür →
+aynı idem grant already → 0 kontör kaydı → 22023/42501 retleri; (8) `credit_pack` faturası +25 kontör, tekrar etkisiz, net uyuşmazlığı
+22023, dönem/plan/tutar değişmez, bilinmeyen tür reddi korunur; (9) RLS: danışman başka ofisi ve sahibin raporunu görmez,
+authenticated `ef_credit_*` çağıramaz (42501), `ef_reports`'a yazamaz; sahip ofisin tüm raporlarını görür. Kilit: `account_credit_ledger`
+(ACCESS EXCLUSIVE, ROLLBACK'e kadar) — AI ölçüm yazımları bekler; düşük trafikte.
+
+Ledger'da hiçbiri olmamalı:
+```sql
+select version from public.schema_migrations where version like '20260826%';   -- 0 satır
+```
+
+### 7.1 `20260826000100_ef_credit_wallet`
+Önce (salt-okunur; rollback güvenliği):
+```sql
+select to_regclass('public.ef_credit_reservations') is null as tablo_yok, (select count(*) from pg_proc where pronamespace='public'::regnamespace and proname like 'ef\_credit\_%') as fn, (select count(*) from information_schema.columns where table_schema='public' and table_name='account_credit_ledger' and column_name='meta') as meta;
+```
+Beklenen: `t | 0 | 0`.
+```bash
+npm run db:migrate -- --only 20260826000100_ef_credit_wallet.sql
+```
+Sonra:
+```sql
+select (select pg_get_constraintdef(oid) like '%''ef''%' from pg_constraint where conname='account_credit_ledger_unit_check' and conrelid='public.account_credit_ledger'::regclass) as unit_ef, (select count(*) from pg_constraint where conrelid='public.account_credit_ledger'::regclass and conname in ('account_credit_ledger_ef_entry_check','account_credit_ledger_meta_check')) as chk, to_regclass('public.ef_credit_reservations') is not null as tablo, (select relrowsecurity from pg_class where oid='public.ef_credit_reservations'::regclass) as rls, (select count(*) from pg_policies where schemaname='public' and tablename='ef_credit_reservations') as pol, (select count(*) from pg_proc where pronamespace='public'::regnamespace and prosecdef and proname in ('ef_credit_balance','ef_credit_reserve','ef_credit_commit','ef_credit_release','ef_credit_grant','ef_credit_sweep','ef_credit_ready')) as fn, has_function_privilege('authenticated','public.ef_credit_reserve(uuid,uuid,integer,text,text)','execute') as auth_exec, (select count(*) from public.account_credit_ledger where unit='ef') as ef_satir;
+```
+Beklenen: `t | 2 | t | t | 1 | 7 | f | 0`. AI kredi davranışı değişmez (§4.10 sorgusu aynı sonucu verir). `ef_credit_ready()` bu adımdan sonra
+service_role ile bile **false** (000300 henüz yok) — beklenen.
+
+### 7.2 `20260826000200_ef_reports`
+```bash
+npm run db:migrate -- --only 20260826000200_ef_reports.sql
+```
+```sql
+select to_regclass('public.ef_reports') is not null as tablo, (select relrowsecurity from pg_class where oid='public.ef_reports'::regclass) as rls, (select count(*) from pg_policies where schemaname='public' and tablename='ef_reports') as pol, (select count(*) from pg_constraint where conrelid='public.ef_reports'::regclass and contype='f' and conname in ('ef_reports_tenant_id_fkey','ef_reports_user_id_fkey','ef_reports_reservation_id_fkey','ef_reports_pdf_reservation_id_fkey')) as fk, has_table_privilege('authenticated','public.ef_reports','insert') as auth_insert, has_table_privilege('authenticated','public.ef_reports','select') as auth_select;
+```
+Beklenen: `t | t | 1 | 4 | f | t`.
+
+### 7.3 `20260826000300_ef_credit_pack_fulfillment` (davranış)
+Önce (salt-okunur; sapma = DUR, dosyanın ön koşulu da durur):
+```sql
+select p.proname, p.pronargs, md5(replace(p.prosrc, E'\r', '')) as body_md5, position('credit-pack:v1' in p.prosrc) > 0 as credit_pack_v1, position('seat-fulfillment:v1' in p.prosrc) > 0 as seat_v1 from pg_proc p where p.pronamespace='public'::regnamespace and p.proname in ('fulfill_billing_payment','fulfill_billing_payment_v2') and not (p.proname = 'fulfill_billing_payment' and p.pronargs = 9) order by 1;
+```
+Beklenen (ÖNCE): `fulfill_billing_payment | 10 | 0f5b4589c3608509d3c7390e08c7834d | f | t` ·
+`fulfill_billing_payment_v2 | 10 | 5fc1c6552b2fe6f963fb72ea3264e03e | f | t`. Bilgi: bekleyen tahsilat
+`select status, count(*) from public.billing_payment_captures where status in ('captured_pending','retry_pending') group by 1;`
+```bash
+npm run db:migrate -- --only 20260826000300_ef_credit_pack_fulfillment.sql
+```
+Sonra (aynı sorgu): `fulfill_billing_payment | 10 | 48be5cd7f2f755c860d326209f52c9a3 | t | t` ·
+`fulfill_billing_payment_v2 | 10 | 47f246dea3152903ef17edd8cd08f95d | t | t` (9 argümanlı ESKİ overload süzülür, değişmez).
+**Hazırlık (salt-okunur transaction):**
+```sql
+begin read only; select set_config('request.jwt.claims', '{"role":"service_role"}', true); select public.ef_credit_ready() as ef_hazir, public.seat_purchase_ready() as koltuk_hazir; rollback;
+```
+Beklenen: `t | t`. Claim ayarlanmadan doğrudan `select public.ef_credit_ready();` → `f` (SQL editöründe beklenen, hata değil).
+Gözlem: plan yenileme ve ek koltuk satışı aynen çalışır (gövde tabanı bayt bayt aynı; `ef-wallet-sql-contract.test.ts` kanıtlar).
+Kontör paketi satışı KOD gelene dek açılmaz (paket kataloğu varsayılan boş, TS akışı yok).
+
+### 7.4 Geri alma (son çare; elle, TERS sırada; ledger satırına dokunmaz)
+`20260826000300` (fulfill/v2 → 000600 gövdeleri; `ef_credit_ready` false olur; eklenmiş kontör defterde KALIR) →
+`20260826000200` (`ef_reports` silinir: satır varsa `set local emlaksoft.rollback_force = 'on'` gerekir) →
+`20260826000100` (7 RPC her zaman kaldırılır; defterde `ef` satırı varsa CHECK/meta geri alınmaz ve rezerv tablosu satır içeriyorsa
+korunur — append-only defter, NOTICE ile atlar). Ayrıntılar rollback dosya başlıklarında.
+
+### 7.5 Bilinen sınırlar / sahip kararları
+- Kontör SÜRESİZ (v1); paket süresi/FIFO yok. Plan içi aylık kontör (`plan_monthly`) için RPC hazır, zamanlayıcı/kod yok.
+- 15 dk'dan uzun süren bir EmlakFiyati çağrısının rezervi süpürülürse sonradan kesinleştirme `released` alır (müşteri lehine; aylık
+  mutabakat `GET /kullanim` ile yakalanır). Süpürme cron'u henüz yok (`ef_credit_sweep` çağıran rota yazılmadı).
+- `account_credit_balances` görünümü `ef` için açık rezervleri düşmez; kullanılabilir bakiye yalnız `ef_credit_balance`.
+- `ef_credit_reservations` silinemez (guard tetikleyici) ve defter append-only: tenant'ın fiziksel silinmesi zaten engelliydi (ofis kapatma = arşiv).
