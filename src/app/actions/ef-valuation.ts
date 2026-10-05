@@ -84,6 +84,6 @@ export async function loadParcelReportDetail(raporId: string): Promise<EfDetailR
   if (!gate.ok) return { ok: false, error: gate.error };
   const limit = await checkRateLimit(`ef-detail:${gate.userId}`, { limit: 60, windowSec: 600, failurePolicy: "deny" });
   if (!limit.allowed) return { ok: false, error: RATE_MESSAGE };
-  const detail = await getReportDetail({ tenantId: gate.tenantId, userId: gate.userId, raporId: String(raporId ?? "") });
+  const detail = await getReportDetail({ tenantId: gate.tenantId, userId: gate.userId, role: gate.role, raporId: String(raporId ?? "") });
   return { ok: true, detail };
 }

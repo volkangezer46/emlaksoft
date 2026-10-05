@@ -35,6 +35,7 @@ import {
   markEfPdfCharged,
 } from "./wallet";
 import type { EfReportRow, ReportDetailResult, RunValuationResult } from "./types";
+import { canViewAllEfReports, canViewReport, filterVisibleReports, type EfViewer } from "./visibility";
 
 export type { EfReportRow, ReportDetailResult, RunValuationResult } from "./types";
 
@@ -285,18 +286,23 @@ async function settleValuation(
 
 export type OwnedReport = { ok: true; row: EfReportRow } | { ok: false; status: "not_found" | "expired" };
 
-/** `rapor_id` ERİŞİM ANAHTARIDIR: başka tenant'ın raporu "bulunamadı" (404) gibi davranır. */
-export async function getOwnedReport(tenantId: string, raporId: string): Promise<OwnedReport> {
+/**
+ * `rapor_id` ERİŞİM ANAHTARIDIR: başka tenant'ın raporu "bulunamadı" (404) gibi davranır.
+ * `viewer` verilirse görünürlük süzgeci de uygulanır: danışman yalnız kendi raporunu, owner/gm tümünü görür
+ * (başkasının raporu da "bulunamadı"; varlığı sızdırılmaz). `viewer` yoksa yalnız tenant sahipliği denetlenir.
+ */
+export async function getOwnedReport(tenantId: string, raporId: string, viewer?: EfViewer): Promise<OwnedReport> {
   if (!/^[0-9a-f-]{36}$/i.test(raporId)) return { ok: false, status: "not_found" };
   const row = await getEfReport(tenantId, raporId.toLowerCase());
   if (!row) return { ok: false, status: "not_found" };
+  if (viewer && !canViewReport(row, viewer)) return { ok: false, status: "not_found" };
   if (row.expires_at && isPast(row.expires_at)) return { ok: false, status: "expired" };
   return { ok: true, row };
 }
 
 /** Rapor detayı (JSON). Tarife `reportDetail` (varsayılan 0) kadar kontör: 0 ise rezerve açılmaz. */
-export async function getReportDetail(p: EfActor & { raporId: string }): Promise<ReportDetailResult> {
-  const owned = await getOwnedReport(p.tenantId, p.raporId);
+export async function getReportDetail(p: EfActor & { raporId: string; role?: string | null }): Promise<ReportDetailResult> {
+  const owned = await getOwnedReport(p.tenantId, p.raporId, p.role === undefined ? undefined : { userId: p.userId, role: p.role });
   if (!owned.ok) return { status: owned.status, message: efFailureMessage("not_found", "rapor_yok") };
   const state = await getEfFeatureState(p.tenantId);
   if (!state.ready) return { status: "disabled", message: EF_NOT_ENABLED_MESSAGE, missing: [] };
@@ -337,8 +343,8 @@ export type ReportPdfResult =
 /** Aynı rapor için eşzamanlı ilk-PDF indirmesi (aynı örnekte) çift ücretlendirmeyi önlemek için tek seferde işlenir. */
 const pdfInflight = new Set<string>();
 
-export async function getReportPdf(p: EfActor & { raporId: string }): Promise<ReportPdfResult> {
-  const owned = await getOwnedReport(p.tenantId, p.raporId);
+export async function getReportPdf(p: EfActor & { raporId: string; role?: string | null }): Promise<ReportPdfResult> {
+  const owned = await getOwnedReport(p.tenantId, p.raporId, p.role === undefined ? undefined : { userId: p.userId, role: p.role });
   if (!owned.ok) return { status: owned.status, message: efFailureMessage("not_found", "rapor_yok") };
   const row = owned.row;
   const state = await getEfFeatureState(p.tenantId);
@@ -381,7 +387,12 @@ export async function getReportPdf(p: EfActor & { raporId: string }): Promise<Re
 // Liste
 // ---------------------------------------------------------------------------
 
-/** Geçmiş raporlar (tenant kapsamlı). Tablo yoksa null (arayüz "etkin değil"). */
-export async function listTenantReports(tenantId: string, limit = 30): Promise<EfReportRow[] | null> {
-  return listEfReports(tenantId, limit);
+/**
+ * Geçmiş raporlar (tenant kapsamlı). Tablo yoksa null (arayüz "etkin değil").
+ * `viewer` verilirse görünürlük süzgeci: owner/gm tüm ofisi, diğerleri yalnız kendi raporlarını görür.
+ */
+export async function listTenantReports(tenantId: string, limit = 30, viewer?: EfViewer): Promise<EfReportRow[] | null> {
+  const onlyUser = viewer && !canViewAllEfReports(viewer.role) ? viewer.userId || "00000000-0000-0000-0000-000000000000" : null;
+  const rows = await listEfReports(tenantId, limit, onlyUser);
+  return rows && viewer ? filterVisibleReports(rows, viewer) : rows;
 }

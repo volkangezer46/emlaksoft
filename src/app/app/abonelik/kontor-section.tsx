@@ -14,6 +14,8 @@ import {
   type EfMovementCategory,
 } from "@/lib/ef-credits/credit-view";
 import { efUnitsFor } from "@/lib/ef-credits/config";
+import { now, trNextMonthStartMs } from "@/lib/clock";
+import { monthlyAllowanceView } from "@/lib/ef-credits/visibility";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
 import {
   activePacks,
@@ -26,6 +28,7 @@ import type { WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
+const renewalFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" });
 const BASE = "/app/abonelik";
 
 function hrefOf(params: Record<string, string | undefined>, hash = "gecmis"): string {
@@ -41,6 +44,8 @@ export type KontorSectionProps = {
   kalem?: string;
   kullanici?: string;
   sayfa?: string;
+  /** "Önerilen paketi tek tıkla al": önerilen paketin onay paneli açık gelir. */
+  onerilen?: boolean;
   /** Ödeme sonrası dönüş durumu (son kontör faturası). */
   latestInvoice: { status: string; paidAt: string | null; units: number | null } | null;
   /** Son kontör faturasının ödemesi yeni mi (sunucuda clock ile hesaplanır). */
@@ -84,6 +89,14 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
       : !iyzicoConfigured
       ? "Ödeme altyapısı yapılandırılmamış; lütfen yönetici ile iletişime geçin."
       : null;
+
+  // Aylık hak sayacı (saf hesap; zaman clock.ts üzerinden). Defter okunamıyorsa sayaç gösterilmez (sahte sayı yok).
+  const monthly =
+    allowance && allowance.units > 0 && history?.enabled
+      ? monthlyAllowanceView({ entitlement: allowance.units, rows: history.rows, available: balance?.available ?? null, nowMs: now() })
+      : null;
+  const canOneClick = canBuy && efState.purchasable && ready && iyzicoConfigured && suggested !== null && sellable.length > 0;
+  const oneClickHref = `${BASE}?sekme=kontor&onerilen=1#paketler`;
 
   const category: EfMovementCategory | null = categoryOf(props.kalem);
   const page = history
@@ -129,8 +142,8 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
           title={low.state === "empty" ? "Kontörünüz bitti" : "Kontörünüz azalıyor"}
           action={
             suggested && sellable.length > 0 ? (
-              <Link href={`${BASE}?sekme=kontor#paketler`} className="text-xs font-bold underline">
-                Önerilen paket: {suggested.name}
+              <Link href={canOneClick ? oneClickHref : `${BASE}?sekme=kontor#paketler`} className="text-xs font-bold underline">
+                {canOneClick ? `Önerilen paketi al: ${suggested.name}` : `Önerilen paket: ${suggested.name}`}
               </Link>
             ) : undefined
           }
@@ -183,7 +196,57 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 : ""}
               {" "}Yetmezse aşağıdan ek paket alabilirsiniz.
             </p>
+            {monthly ? (
+              <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <dt className="font-semibold text-text-muted">Bu ay verilen plan kontörü</dt>
+                  <dd className="numeric font-display text-base font-extrabold text-ink-950">
+                    {fmt.format(monthly.grantedThisMonth)} / {fmt.format(monthly.entitlement)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-text-muted">Bu ay harcanan</dt>
+                  <dd className="numeric font-display text-base font-extrabold text-ink-950">{fmt.format(monthly.spentThisMonth)}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-text-muted">Aylık haktan kalan</dt>
+                  <dd className="numeric font-display text-base font-extrabold text-ink-950">{fmt.format(monthly.remainingOfMonthly)}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-text-muted">Sonraki yenileme</dt>
+                  <dd className="font-display text-base font-extrabold text-ink-950">{renewalFmt.format(monthly.nextRenewalMs)}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="mt-2 text-xs font-semibold text-text-muted">Sonraki yenileme: {renewalFmt.format(trNextMonthStartMs(now()))}</p>
+            )}
+            <p className="mt-2 text-xs text-text-muted">
+              Plan kontörü en çok 3 aylık birikir ({fmt.format(allowance.units * 3)} kontör); üstü yüklenmez.
+            </p>
           </Link>
+        ) : null}
+        {suggested && sellable.length > 0 && canBuy ? (
+          <div className="mt-4">
+            {canOneClick ? (
+              <Link
+                href={oneClickHref}
+                className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white"
+              >
+                <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {suggested.name} ({fmt.format(suggested.units)} kontör)
+              </Link>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex min-h-9 cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white opacity-50"
+                >
+                  <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {suggested.name}
+                </button>
+                {blockReason ? <p className="mt-1.5 text-xs text-text-muted">{blockReason}</p> : null}
+              </>
+            )}
+          </div>
         ) : null}
       </section>
 
@@ -226,7 +289,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
               action={{ href: "/app/destek", label: "Destek talebi aç" }}
             />
           ) : (
-            <KontorPanel packs={cards} canBuy={canBuy} blockReason={blockReason} wallet={props.wallet ?? null} />
+            <KontorPanel packs={cards} canBuy={canBuy} blockReason={blockReason} wallet={props.wallet ?? null} autoOpenId={props.onerilen ? (suggested?.id ?? null) : null} />
           )}
         </div>
         <p className="mt-3 text-xs text-text-muted">Kupon kodları kontör paketlerinde geçerli değildir. Fiyatlara %20 KDV eklenir.</p>

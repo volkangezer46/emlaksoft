@@ -91,7 +91,7 @@ vi.mock("./wallet", () => {
 });
 
 import { EF_TARIFF_SETTING_KEY, efIdempotencyKey } from "./config";
-import { getEfFeatureState, getOwnedReport, getReportDetail, getReportPdf, runParcelValuation } from "./service";
+import { getEfFeatureState, getOwnedReport, getReportDetail, getReportPdf, listTenantReports, runParcelValuation } from "./service";
 
 const T1 = "9d1c7a52-6b3e-4f08-a1d4-2e5f6a7b8c90";
 const T2 = "7e1c7a52-6b3e-4f08-a1d4-2e5f6a7b8c91";
@@ -279,6 +279,29 @@ describe("EF kontör servisi", () => {
       expect(ef.pdf).not.toHaveBeenCalled();
       expect(ef.rapor).not.toHaveBeenCalled();
       expect(w.reserveCalls).toBe(0);
+    });
+
+    it("görünürlük: danışman başkasının raporunu göremez (404, sorgu/rezerve yok); sahibi ve owner/gm görür", async () => {
+      const OTHER = "5a5a5a5a-1c4d-4e6f-8a7b-9c0d1e2f3a4b";
+      seedReport(T1); // sahibi U
+      expect(await getOwnedReport(T1, RID, { userId: OTHER, role: "advisor" })).toEqual({ ok: false, status: "not_found" });
+      expect((await getOwnedReport(T1, RID, { userId: U, role: "advisor" })).ok).toBe(true);
+      expect((await getOwnedReport(T1, RID, { userId: OTHER, role: "owner" })).ok).toBe(true);
+      expect((await getOwnedReport(T1, RID, { userId: OTHER, role: "gm" })).ok).toBe(true);
+      expect(await getReportPdf({ tenantId: T1, userId: OTHER, role: "advisor", raporId: RID })).toMatchObject({ status: "not_found" });
+      expect(await getReportDetail({ tenantId: T1, userId: OTHER, role: "advisor", raporId: RID })).toMatchObject({ status: "not_found" });
+      expect(ef.pdf).not.toHaveBeenCalled();
+      expect(ef.rapor).not.toHaveBeenCalled();
+      expect(w.reserveCalls).toBe(0);
+    });
+
+    it("listTenantReports: danışman yalnız kendi raporlarını, owner/gm ofisinkileri görür", async () => {
+      const OTHER = "5a5a5a5a-1c4d-4e6f-8a7b-9c0d1e2f3a4b";
+      seedReport(T1);
+      w.reports.set(`${T1}:other`, { ...w.reports.get(`${T1}:${RID}`)!, user_id: OTHER, rapor_id: "other" });
+      expect((await listTenantReports(T1, 30, { userId: U, role: "advisor" }))!.map((r) => r.user_id)).toEqual([U]);
+      expect((await listTenantReports(T1, 30, { userId: U, role: "owner" }))!).toHaveLength(2);
+      expect((await listTenantReports(T1, 30, { userId: U, role: "readonly" }))!.map((r) => r.user_id)).toEqual([U]);
     });
 
     it("süresi dolan rapor: expired", async () => {

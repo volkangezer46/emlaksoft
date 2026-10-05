@@ -29,7 +29,10 @@ export function KontorPanel({
   canBuy,
   blockReason,
   wallet = null,
+  autoOpenId = null,
 }: {
+  /** "Önerilen paketi al" bağlantısı: bu paketin onay paneli açık gelir (ödeme yine ayrı onayla başlar). */
+  autoOpenId?: string | null;
   /** TL hesap kredisi cüzdanı (yoksa/etkin değilse null: onay kutusu gösterilmez). */
   wallet?: WalletCheckoutInfo | null;
   packs: KontorPackCard[];
@@ -38,14 +41,14 @@ export function KontorPanel({
   /** Satın almayı kapatan açıklama (hazır değil, ödeme yok vb.); null = açık. */
   blockReason: string | null;
 }) {
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(canBuy && !blockReason ? autoOpenId : null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useCredit, setUseCredit] = useState(false);
   const reason = !canBuy ? "Kontör paketini yalnızca ofis sahibi veya genel müdür satın alabilir." : blockReason;
 
   async function buy(p: KontorPackCard) {
-    if (pending) return;
+    if (pending || reason) return;
     setPending(true);
     setError(null);
     const fd = new FormData();

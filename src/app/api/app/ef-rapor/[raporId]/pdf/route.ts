@@ -25,7 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raporId
   const limit = await checkRateLimit(`ef-pdf:${gate.userId}`, { limit: 20, windowSec: 10 * 60, failurePolicy: "deny" });
   if (!limit.allowed) return jsonError("Çok fazla PDF isteği. Lütfen birkaç dakika sonra tekrar deneyin.", 429, { "Retry-After": "300" });
 
-  const res = await getReportPdf({ tenantId: gate.tenantId, userId: gate.userId, raporId });
+  const res = await getReportPdf({ tenantId: gate.tenantId, userId: gate.userId, role: gate.role, raporId });
   switch (res.status) {
     case "ok":
       return new Response(res.bytes as BodyInit, {
