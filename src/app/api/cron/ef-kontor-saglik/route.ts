@@ -18,7 +18,7 @@ function authorized(req: NextRequest): boolean {
  * EmlakFiyati günlük bağlantı sağlık yoklaması: ortak istemcinin probe'u (GET /kullanim, tek deneme) çalışır; başarıda
  * `emlakfiyati_ortak_probe_ok_at` damgası yenilenir, başarısızlıkta silinir (public durum "live" olmaktan çıkar, kontör
  * satışı kapanır). EmlakFiyati anahtarı veya ortak bayrağı yoksa HİÇBİR ŞEY yapılmaz (hata değil). service_role istemcisi
- * yok: damga yazımı mevcut platform-settings yolundan gider (yeni createAdminClient kullanımı eklenmez).
+ * yok: damga yazımı mevcut platform-settings yolundan gider (yeni service_role istemcisi kullanımı eklenmez).
  */
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET?.trim()) {
