@@ -172,7 +172,7 @@ describe("public mutation durable-effect contract", () => {
   it("surfaces queue backlog and dead letters in the protected admin cron health", () => {
     expect(worker).toContain("pendingBacklog");
     expect(worker).toContain("deadLetterBacklog");
-    expect(route).toContain("process.env.CRON_SECRET");
+    expect(route).toMatch(/authorizeCron|CRON_SECRET/);
     expect(route).toContain('recordHeartbeat("public-mutation-outbox"');
     expect(route).toContain("JSON.stringify(summary)");
     expect(cronJobs).toContain('job: "public-mutation-outbox"');

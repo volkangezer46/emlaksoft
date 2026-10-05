@@ -30,6 +30,7 @@ import {
   type EfGrantPlanEntry,
 } from "@/lib/ef-credits/plan-credits";
 import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const maxDuration = 300;
 
@@ -38,12 +39,6 @@ const CHUNK = 200;
 const CONCURRENCY = 8;
 /** Devir tavanı yalnız TR ayının ilk bu kadar gününde denenir (başarısız koşuya yeniden deneme payı; idempotent). */
 const EXPIRE_WINDOW_DAYS = 3;
-
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -66,7 +61,8 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
  * - Kontör cüzdanı (`ef_credit_ready()`) hazır değilse HİÇ hibe yapılmaz ("atlandı"), hata verilmez.
  */
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
 

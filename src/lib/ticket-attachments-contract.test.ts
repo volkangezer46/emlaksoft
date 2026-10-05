@@ -91,7 +91,7 @@ describe("support ticket attachment production contract", () => {
   });
 
   it("süresi dolan signed upload nesnelerini cron + heartbeat ile temizler", () => {
-    expect(cleanupRoute).toContain("CRON_SECRET");
+    expect(cleanupRoute).toMatch(/authorizeCron|CRON_SECRET/);
     expect(cleanupRoute).toContain('recordHeartbeat("ticket-attachment-cleanup"');
     expect(cleanupWorker).toContain("cleanupTicketAttachmentUploads");
     expect(cleanupWorker).toContain(".remove([session.storage_path])");

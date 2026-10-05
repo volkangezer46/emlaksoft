@@ -2,22 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { runGeoProvinceSyncWorker } from "@/lib/geo-province-sync";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
-}
-
 export async function GET(request: NextRequest) {
-  if (!process.env.CRON_SECRET?.trim()) {
-    return NextResponse.json({ ok: false, error: "cron_not_configured" }, { status: 503 });
-  }
-  if (!authorized(request)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(request);
+  if (denied) return denied;
 
   try {
     const summary = await runGeoProvinceSyncWorker();

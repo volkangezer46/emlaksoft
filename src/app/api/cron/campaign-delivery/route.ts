@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runCampaignDeliveryWorker } from "@/lib/campaign-delivery";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(request);
+  if (denied) return denied;
 
   try {
     const summary = await runCampaignDeliveryWorker({

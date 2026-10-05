@@ -6,6 +6,17 @@ import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
 import { getDisabledModulesByTenant, isDisabledFor, loadTenantModuleState } from "@/lib/modules/state";
 import type { FeatureKey } from "@/lib/modules/registry";
+import {
+  AUTOMATION_LIST_PAGE,
+  AUTOMATION_PAGE_SIZE,
+  MAX_PAGES_PER_AUTOMATION,
+  chunkArray,
+  firedIdsFromLogs,
+  nextCursor,
+  pageInfoOf,
+  splitFired,
+  type PageInfo,
+} from "@/lib/automation-paging";
 
 /**
  * Otomasyon motoru — `automations` tablosundaki kuralları fiilen ÇALIŞTIRAN katman.
@@ -89,6 +100,10 @@ export type ScheduledRunSummary = {
   entitiesMatched: number;
   actionsExecuted: number;
   skippedDuplicates: number;
+  /** Hata alan otomasyon sayısı (sorgu/log okuma/istisna). */
+  automationsFailed: number;
+  /** Zaman bütçesi dolduğu için kalan iş bırakıldı mı. */
+  timedOut: boolean;
 };
 
 const SCHEDULED_TRIGGERS: AutomationScheduledTrigger[] = [
@@ -530,154 +545,195 @@ export async function dispatchAutomationEvent(
 // 2) Zamanlanmış giriş noktası (cron)
 // ---------------------------------------------------------------------------
 
-/** Otomasyon için son REFIRE_WINDOW_DAYS içinde loglanmış kayıt id'leri (tek sorgu). */
-async function fetchRecentlyFiredEntityIds(
+/**
+ * Verilen aday id'leri içinden, otomasyon için son REFIRE_WINDOW_DAYS içinde loglanmış olanlar (anahtar bazlı SQL
+ * dedupe: tavanlı "tüm log" okuması yok). Sorgu hatasında `null` döner: çağıran o sayfayı ATLAR (log okunamazken
+ * aynı kayda tekrar aksiyon üretmek mükerrer bildirim/görev demektir).
+ */
+async function fetchFiredAmong(
   admin: SupabaseClient,
   automationId: string,
-): Promise<Set<string>> {
+  entityIds: readonly string[],
+): Promise<Set<string> | null> {
   const since = new Date(Date.now() - REFIRE_WINDOW_DAYS * DAY_MS).toISOString();
   const fired = new Set<string>();
-  const { data, error } = await admin
-    .from("automation_logs")
-    .select("entity_id, result")
-    .eq("automation_id", automationId)
-    .gte("created_at", since)
-    .limit(2000);
-  if (error) {
-    console.error("fetchRecentlyFiredEntityIds", error.message);
-    return fired;
-  }
-  for (const row of data ?? []) {
-    // 'error' logları dedupe'a girmez — bir sonraki cron yeniden dener
-    if (row.result !== "error" && row.entity_id) fired.add(String(row.entity_id).toLowerCase());
+  for (const ids of chunkArray(entityIds, AUTOMATION_PAGE_SIZE)) {
+    if (ids.length === 0) continue;
+    const { data, error } = await admin
+      .from("automation_logs")
+      .select("entity_id, result")
+      .eq("automation_id", automationId)
+      .gte("created_at", since)
+      .in("entity_id", ids as string[])
+      .limit(1000);
+    if (error) {
+      console.error("fetchFiredAmong", error.message);
+      return null;
+    }
+    for (const id of firedIdsFromLogs(data ?? [])) fired.add(id);
   }
   return fired;
 }
 
-/** Tetikleyiciye göre aday kayıtları toplar (otomasyon başına 1-2 sorgu). */
-async function collectScheduledCandidates(
+/**
+ * Tetikleyiciye göre BİR SAYFA aday kayıt (order(id) + `id > afterId` imleci). `rawCount` filtre öncesi satır
+ * sayısıdır; sayfa tükendi mi kararı bundan verilir.
+ */
+async function collectScheduledCandidatePage(
   admin: SupabaseClient,
   automation: AutomationRow,
-): Promise<AutomationEventPayload[]> {
+  afterId: string | null,
+): Promise<{ payloads: AutomationEventPayload[]; page: PageInfo }> {
   const cfg = automation.trigger_config ?? {};
   const now = Date.now();
+  const PAGE = AUTOMATION_PAGE_SIZE;
 
   switch (automation.trigger_type as AutomationScheduledTrigger) {
     case "auth_expiring": {
       const days = cfgNumber(cfg, ["days_before", "days"], 15);
       const today = new Date(now).toISOString().slice(0, 10);
       const until = new Date(now + days * DAY_MS).toISOString().slice(0, 10);
-      const { data } = await admin
+      let q = admin
         .from("properties")
         .select("id, property_code, title, status, assigned_to, authorization_end")
         .eq("tenant_id", automation.tenant_id)
         .not("authorization_end", "is", null)
         .gte("authorization_end", today)
-        .lte("authorization_end", until)
-        .limit(200);
-      return (data ?? []).map((p) => ({
-        entityType: "property" as const,
-        entityId: String(p.id),
-        propertyId: String(p.id),
-        label: [p.property_code, p.title].filter(Boolean).join(" · ") || null,
-        assignedTo: (p.assigned_to as string | null) ?? null,
-        fields: { status: p.status, authorization_end: p.authorization_end },
-      }));
+        .lte("authorization_end", until);
+      if (afterId) q = q.gt("id", afterId);
+      const { data, error } = await q.order("id", { ascending: true }).limit(PAGE);
+      if (error) throw new Error(`auth_expiring: ${error.message}`);
+      const rows = data ?? [];
+      return {
+        page: pageInfoOf(rows),
+        payloads: rows.map((p) => ({
+          entityType: "property" as const,
+          entityId: String(p.id),
+          propertyId: String(p.id),
+          label: [p.property_code, p.title].filter(Boolean).join(" · ") || null,
+          assignedTo: (p.assigned_to as string | null) ?? null,
+          fields: { status: p.status, authorization_end: p.authorization_end },
+        })),
+      };
     }
 
     case "demand_stale": {
       const days = cfgNumber(cfg, ["days"], 30);
       const cutoff = new Date(now - days * DAY_MS).toISOString();
-      const { data } = await admin
+      let q = admin
         .from("customer_demands")
         .select("id, customer_id, status, transaction_type, created_at, customer:customers!customer_demands_customer_id_fkey(full_name, phone, assigned_to)")
         .eq("tenant_id", automation.tenant_id)
         .in("status", ["new", "active"])
-        .lt("created_at", cutoff)
-        .limit(200);
-      return (data ?? []).map((d) => {
-        const cRaw = d.customer as unknown;
-        const c = (Array.isArray(cRaw) ? cRaw[0] : cRaw) as
-          | { full_name?: string; phone?: string | null; assigned_to?: string | null }
-          | null;
-        return {
-          entityType: "demand" as const,
-          entityId: String(d.id),
-          customerId: (d.customer_id as string | null) ?? null,
-          label: c?.full_name ?? null,
-          phone: c?.phone ?? null,
-          assignedTo: c?.assigned_to ?? null,
-          fields: { status: d.status, transaction_type: d.transaction_type },
-        };
-      });
+        .lt("created_at", cutoff);
+      if (afterId) q = q.gt("id", afterId);
+      const { data, error } = await q.order("id", { ascending: true }).limit(PAGE);
+      if (error) throw new Error(`demand_stale: ${error.message}`);
+      const rows = data ?? [];
+      return {
+        page: pageInfoOf(rows),
+        payloads: rows.map((d) => {
+          const cRaw = d.customer as unknown;
+          const c = (Array.isArray(cRaw) ? cRaw[0] : cRaw) as
+            | { full_name?: string; phone?: string | null; assigned_to?: string | null }
+            | null;
+          return {
+            entityType: "demand" as const,
+            entityId: String(d.id),
+            customerId: (d.customer_id as string | null) ?? null,
+            label: c?.full_name ?? null,
+            phone: c?.phone ?? null,
+            assignedTo: c?.assigned_to ?? null,
+            fields: { status: d.status, transaction_type: d.transaction_type },
+          };
+        }),
+      };
     }
 
     case "no_contact_days": {
       const days = cfgNumber(cfg, ["days"], 14);
       const cutoff = new Date(now - days * DAY_MS).toISOString();
-      // 2 sorgu: pencere içinde iletişim kurulan müşteriler + eski müşteriler; anti-join bellekte
-      const { data: comms } = await admin
-        .from("communications")
-        .select("customer_id")
-        .eq("tenant_id", automation.tenant_id)
-        .gte("created_at", cutoff)
-        .limit(5000);
-      const contacted = new Set(
-        (comms ?? []).map((r) => String(r.customer_id ?? "").toLowerCase()).filter(Boolean),
-      );
-      const { data: customers } = await admin
+      // Eski müşteri sayfası + yalnız O SAYFANIN id'leri için pencere içi iletişim sorgusu (anti-join; 5000 tavanı yok).
+      let cq = admin
         .from("customers")
         .select("id, full_name, phone, assigned_to")
         .eq("tenant_id", automation.tenant_id)
         .is("deleted_at", null)
         .eq("blacklist", false)
-        .lt("created_at", cutoff)
-        .limit(500);
-      return (customers ?? [])
-        .filter((c) => !contacted.has(String(c.id).toLowerCase()))
-        .map((c) => ({
-          entityType: "customer" as const,
-          entityId: String(c.id),
-          customerId: String(c.id),
-          label: (c.full_name as string | null) ?? null,
-          phone: (c.phone as string | null) ?? null,
-          assignedTo: (c.assigned_to as string | null) ?? null,
-          fields: { full_name: c.full_name },
-        }));
+        .lt("created_at", cutoff);
+      if (afterId) cq = cq.gt("id", afterId);
+      const { data: customers, error: custErr } = await cq.order("id", { ascending: true }).limit(PAGE);
+      if (custErr) throw new Error(`no_contact_days: ${custErr.message}`);
+      const rows = customers ?? [];
+      const contacted = new Set<string>();
+      if (rows.length > 0) {
+        const { data: comms, error: commErr } = await admin
+          .from("communications")
+          .select("customer_id")
+          .eq("tenant_id", automation.tenant_id)
+          .gte("created_at", cutoff)
+          .in("customer_id", rows.map((c) => String(c.id)))
+          .limit(5000);
+        if (commErr) throw new Error(`no_contact_days communications: ${commErr.message}`);
+        for (const r of comms ?? []) {
+          const id = String(r.customer_id ?? "").toLowerCase();
+          if (id) contacted.add(id);
+        }
+      }
+      return {
+        page: pageInfoOf(rows),
+        payloads: rows
+          .filter((c) => !contacted.has(String(c.id).toLowerCase()))
+          .map((c) => ({
+            entityType: "customer" as const,
+            entityId: String(c.id),
+            customerId: String(c.id),
+            label: (c.full_name as string | null) ?? null,
+            phone: (c.phone as string | null) ?? null,
+            assignedTo: (c.assigned_to as string | null) ?? null,
+            fields: { full_name: c.full_name },
+          })),
+      };
     }
 
     case "appointment_missed": {
       // 2 saat tolerans; en fazla 7 gün geriye bak
       const graceEnd = new Date(now - 2 * 3_600_000).toISOString();
       const lookback = new Date(now - 7 * DAY_MS).toISOString();
-      const { data } = await admin
+      let q = admin
         .from("appointments")
         .select("id, customer_id, property_id, assigned_to, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)")
         .eq("tenant_id", automation.tenant_id)
         .in("status", ["pending", "confirmed"])
         .lt("scheduled_at", graceEnd)
-        .gte("scheduled_at", lookback)
-        .limit(200);
-      return (data ?? []).map((a) => {
-        const cRaw = a.customer as unknown;
-        const c = (Array.isArray(cRaw) ? cRaw[0] : cRaw) as
-          | { full_name?: string; phone?: string | null }
-          | null;
-        return {
-          entityType: "appointment" as const,
-          entityId: String(a.id),
-          customerId: (a.customer_id as string | null) ?? null,
-          propertyId: (a.property_id as string | null) ?? null,
-          label: c?.full_name ?? null,
-          phone: c?.phone ?? null,
-          assignedTo: (a.assigned_to as string | null) ?? null,
-          fields: { status: a.status, scheduled_at: a.scheduled_at },
-        };
-      });
+        .gte("scheduled_at", lookback);
+      if (afterId) q = q.gt("id", afterId);
+      const { data, error } = await q.order("id", { ascending: true }).limit(PAGE);
+      if (error) throw new Error(`appointment_missed: ${error.message}`);
+      const rows = data ?? [];
+      return {
+        page: pageInfoOf(rows),
+        payloads: rows.map((a) => {
+          const cRaw = a.customer as unknown;
+          const c = (Array.isArray(cRaw) ? cRaw[0] : cRaw) as
+            | { full_name?: string; phone?: string | null }
+            | null;
+          return {
+            entityType: "appointment" as const,
+            entityId: String(a.id),
+            customerId: (a.customer_id as string | null) ?? null,
+            propertyId: (a.property_id as string | null) ?? null,
+            label: c?.full_name ?? null,
+            phone: c?.phone ?? null,
+            assignedTo: (a.assigned_to as string | null) ?? null,
+            fields: { status: a.status, scheduled_at: a.scheduled_at },
+          };
+        }),
+      };
     }
 
     default:
-      return [];
+      return { payloads: [], page: { rawCount: 0, lastId: null } };
   }
 }
 
@@ -685,54 +741,80 @@ async function collectScheduledCandidates(
  * Cron giriş noktası: tüm tenant'ların aktif, zaman tabanlı otomasyonlarını
  * tarar, koşulları değerlendirir, aksiyonları uygular.
  */
-export async function runScheduledAutomations(): Promise<ScheduledRunSummary> {
+export async function runScheduledAutomations(options: { deadlineMs?: number } = {}): Promise<ScheduledRunSummary> {
   const admin = createAdminClient();
   const summary: ScheduledRunSummary = {
     automationsEvaluated: 0,
     entitiesMatched: 0,
     actionsExecuted: 0,
     skippedDuplicates: 0,
+    automationsFailed: 0,
+    timedOut: false,
   };
+  const overDeadline = () => options.deadlineMs !== undefined && Date.now() >= options.deadlineMs;
 
-  const { data: automations, error } = await admin
-    .from("automations")
-    .select("id, tenant_id, name, trigger_type, trigger_config, conditions, actions, run_count")
-    .eq("status", "active")
-    .in("trigger_type", SCHEDULED_TRIGGERS)
-    .limit(500);
-
-  if (error) {
-    console.error("runScheduledAutomations", error.message);
-    return summary;
+  // Aktif otomasyon listesi: order(id) + range sayfalama (sırasız .limit(500) yok).
+  const all: AutomationRow[] = [];
+  for (let from = 0; ; from += AUTOMATION_LIST_PAGE) {
+    const { data, error } = await admin
+      .from("automations")
+      .select("id, tenant_id, name, trigger_type, trigger_config, conditions, actions, run_count")
+      .eq("status", "active")
+      .in("trigger_type", SCHEDULED_TRIGGERS)
+      .order("id", { ascending: true })
+      .range(from, from + AUTOMATION_LIST_PAGE - 1);
+    if (error) {
+      console.error("runScheduledAutomations", error.message);
+      summary.automationsFailed += 1;
+      if (all.length === 0) return summary;
+      break;
+    }
+    const rows = (data ?? []) as AutomationRow[];
+    all.push(...rows);
+    if (rows.length < AUTOMATION_LIST_PAGE) break;
   }
 
   // Modül kapısı: "Otomasyon" kapalı ofislerin kuralları taranmaz (silinmez).
   const disabledModules = await getDisabledModulesByTenant(admin);
-  for (const row of (automations ?? []) as AutomationRow[]) {
+  for (const row of all) {
+    if (overDeadline()) {
+      summary.timedOut = true;
+      break;
+    }
     if (isDisabledFor(disabledModules, row.tenant_id, "automation")) continue;
     summary.automationsEvaluated += 1;
     try {
-      const [candidates, alreadyFired] = await Promise.all([
-        collectScheduledCandidates(admin, row),
-        fetchRecentlyFiredEntityIds(admin, row.id),
-      ]);
-
       let fired = 0;
-      for (const payload of candidates) {
-        if (fired >= MAX_ENTITIES_PER_RUN) break;
-        if (alreadyFired.has(payload.entityId.toLowerCase())) {
-          summary.skippedDuplicates += 1;
-          continue;
+      let afterId: string | null = null;
+      for (let pageNo = 0; pageNo < MAX_PAGES_PER_AUTOMATION && fired < MAX_ENTITIES_PER_RUN; pageNo += 1) {
+        if (overDeadline()) {
+          summary.timedOut = true;
+          break;
         }
-        const { executed } = await runAutomationForEntity(admin, row, payload);
-        if (executed > 0) {
-          fired += 1;
-          summary.entitiesMatched += 1;
-          summary.actionsExecuted += executed;
+        const { payloads, page } = await collectScheduledCandidatePage(admin, row, afterId);
+        const alreadyFired = await fetchFiredAmong(admin, row.id, payloads.map((p) => p.entityId));
+        if (alreadyFired === null) {
+          // Log okunamadı: mükerrer aksiyon riskine girme, bu otomasyonu bu turda bırak.
+          summary.automationsFailed += 1;
+          break;
         }
+        const { fresh, skipped } = splitFired(payloads, alreadyFired);
+        summary.skippedDuplicates += skipped;
+        for (const payload of fresh) {
+          if (fired >= MAX_ENTITIES_PER_RUN) break;
+          const { executed } = await runAutomationForEntity(admin, row, payload);
+          if (executed > 0) {
+            fired += 1;
+            summary.entitiesMatched += 1;
+            summary.actionsExecuted += executed;
+          }
+        }
+        afterId = nextCursor(page);
+        if (afterId === null) break;
       }
       await bumpRunStats(admin, row, fired);
     } catch (e) {
+      summary.automationsFailed += 1;
       console.error("runScheduledAutomations", row.id, e instanceof Error ? e.message : e);
     }
   }

@@ -95,7 +95,7 @@ describe("province-scoped geo synchronization contract", () => {
   });
 
   it("keeps cron authorization, heartbeat and monitoring names aligned", () => {
-    expect(route).toContain("process.env.CRON_SECRET");
+    expect(route).toMatch(/authorizeCron|CRON_SECRET/);
     expect(route).toContain('recordHeartbeat("geo-province-sync"');
     expect(source("src/lib/cron-jobs.ts")).toContain('job: "geo-province-sync"');
     expect(source("vercel.json")).toContain('"path": "/api/cron/geo-province-sync"');

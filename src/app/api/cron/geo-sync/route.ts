@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
+import { authorizeCron } from "@/lib/cron-auth";
+
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /**
  * Çeyreklik geo tutarlılık denetimi (vercel.json: her 3 ayın 1'i, 04:00 UTC).
@@ -22,12 +26,6 @@ import { notifyPlatformStaff } from "@/lib/platform-notify";
  * notifyPlatformStaff deseni); temizse yalnız heartbeat yazılır.
  */
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 /** RPC çıktısındaki anahtarlar — hepsi sayı; eksikse 0 kabul edilir. */
 const CHECKS: ReadonlyArray<{ key: string; label: string; severity: "danger" | "warning" }> = [
   { key: "provinces_without_district", label: "ilçesi olmayan aktif il", severity: "warning" },
@@ -41,7 +39,8 @@ const CHECKS: ReadonlyArray<{ key: string; label: string; severity: "danger" | "
 ];
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("geo_consistency_check");

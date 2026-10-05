@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret && req.headers.get("authorization") === `Bearer ${secret}`);
-}
 
 /**
  * Referans/ortak talep işleyicisi (günlük): kaçırılan talepleri üretir, iade/iptali geri alır, bekleme süresi dolan
@@ -17,12 +13,8 @@ function authorized(req: NextRequest): boolean {
  * service_role istemcisi mevcut allowlist'li faturalama işleyicisinden gelir (yeni createAdminClient kullanımı yok).
  */
 export async function GET(req: NextRequest) {
-  if (!process.env.CRON_SECRET?.trim()) {
-    return NextResponse.json({ ok: false, error: "cron_not_configured" }, { status: 503 });
-  }
-  if (!authorized(req)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const result = await runBillingReconciliation(0, "growth_claims");

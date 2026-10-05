@@ -4,6 +4,7 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { runAutoRenewPass } from "@/lib/billing/auto-renew";
+import { authorizeCron } from "@/lib/cron-auth";
 
 /**
  * DUNNING: gecikmiş ödemeler için kademeli tenant bildirimi (e-posta yok).
@@ -21,12 +22,6 @@ import { runAutoRenewPass } from "@/lib/billing/auto-renew";
 
 const DAY_MS = 86_400_000;
 const BILLING_HREF = "/app/abonelik";
-
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 /** Vade aşım gününe göre kademe: 1+ gün → 1, 4+ gün → 2, 8+ gün → 3. */
 function stageOf(daysOverdue: number): number {
@@ -62,7 +57,8 @@ function stageMessage(stage: number, invoiceNo: string, daysOverdue: number) {
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = Date.now();

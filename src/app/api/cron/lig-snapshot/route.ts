@@ -5,6 +5,11 @@ import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@
 import { notifyTenant } from "@/lib/notify";
 import { evaluateBadges, BADGE_BY_CODE } from "@/lib/gamification";
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
+import { authorizeCron } from "@/lib/cron-auth";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
+
+/** Çok ofisli toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
+export const maxDuration = 300;
 
 /**
  * Aylık lig mühürleme cron'u.
@@ -30,14 +35,9 @@ import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gam
  * doldurma). Verilmezse bir önceki ay işlenir.
  */
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
 
@@ -50,15 +50,20 @@ export async function GET(req: NextRequest) {
   // Bugüne göre hesaplamak, geriye dönük doldurmada herkesin serisini 0 yapardı.
   const lastDayOfPeriod = new Date(Date.parse(range.endIso) - 86_400_000).toISOString().slice(0, 10);
 
-  const { data: tenants, error: tenantsError } = await admin
-    .from("tenants")
-    .select("id")
-    .in("status", ["active", "trial", "past_due"])
-    .limit(500);
+  const deadline = cronDeadline(Date.now());
+  // order(id) + range sayfalama (sırasız .limit(500) yok).
+  const { rows: tenants, error: tenantsError } = await fetchAllPaged<{ id: string }>((from, to) =>
+    admin
+      .from("tenants")
+      .select("id")
+      .in("status", ["active", "trial", "past_due"])
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
-  if (tenantsError) {
-    await recordHeartbeat("lig-snapshot", "error", `tenant listesi okunamadı: ${tenantsError.message}`);
-    return NextResponse.json({ error: "db", detail: tenantsError.message }, { status: 500 });
+  if (tenantsError && tenants.length === 0) {
+    await recordHeartbeat("lig-snapshot", "error", `tenant listesi okunamadı: ${tenantsError}`);
+    return NextResponse.json({ error: "db", detail: tenantsError }, { status: 500 });
   }
 
   let snapshots = 0;
@@ -66,9 +71,16 @@ export async function GET(req: NextRequest) {
   let notified = 0;
   let failed = 0;
   let tenantsWithData = 0;
+  let processed = 0;
+  let timedOut = false;
   const disabledModules = await getDisabledModulesByTenant(admin);
 
-  for (const t of tenants ?? []) {
+  for (const t of tenants) {
+    if (isPastDeadline(Date.now(), deadline)) {
+      timedOut = true;
+      break;
+    }
+    processed += 1;
     const tenantId = String(t.id);
     if (isDisabledFor(disabledModules, tenantId, "team_perf")) continue;
     try {
@@ -178,13 +190,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const detail = `${period}: ${tenantsWithData} ofis, ${snapshots} skor, ${badges} rozet, ${notified} bildirim${failed ? `, ${failed} hata` : ""}${skippedTenantsNote(disabledModules, "team_perf")}`;
-  await recordHeartbeat("lig-snapshot", failed > 0 ? "error" : "ok", detail);
+  const hb = heartbeatFor({
+    total: tenants.length,
+    processed,
+    failed,
+    timedOut,
+    listError: tenantsError,
+    summary: `${period}: ${tenantsWithData} ofis, ${snapshots} skor, ${badges} rozet, ${notified} bildirim${skippedTenantsNote(disabledModules, "team_perf")}`,
+  });
+  await recordHeartbeat("lig-snapshot", hb.status, hb.detail);
 
   return NextResponse.json({
-    ok: failed === 0,
+    ok: hb.status === "ok",
     period,
-    tenants: tenants?.length ?? 0,
+    remaining: remainingOf({ total: tenants.length, processed }),
+    tenants: tenants.length,
     tenantsWithData,
     snapshots,
     badges,

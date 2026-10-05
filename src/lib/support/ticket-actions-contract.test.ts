@@ -47,7 +47,7 @@ describe("support ticket action contract", () => {
   });
 
   it("protects and schedules the SLA escalation route", () => {
-    expect(cron).toContain("CRON_SECRET");
+    expect(cron).toMatch(/authorizeCron|CRON_SECRET/);
     expect(cron).toContain('admin.rpc("process_support_ticket_sla_escalations_v2"');
     expect(vercel).toContain('"path": "/api/cron/ticket-sla"');
     expect(vercel).toContain('"schedule": "*/5 * * * *"');

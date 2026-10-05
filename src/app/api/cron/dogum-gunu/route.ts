@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { authorizeCron } from "@/lib/cron-auth";
+
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /**
  * Cron: Bugün doğum günü veya yıldönümü olan müşterileri tespit et,
@@ -10,15 +14,8 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
  * Yetki: CRON_SECRET header kontrolü
  */
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  // CRON_SECRET tanımlı değilse production'da reddet ("Bearer undefined" bypass'ını engelle)
-  if (!secret) {
-    return NextResponse.json({ error: "Cron not configured" }, { status: process.env.NODE_ENV === "production" ? 401 : 200 });
-  }
-  const auth = req.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const today = new Date();
