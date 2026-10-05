@@ -4,6 +4,7 @@ import {
   PLAN_GATES,
   PLAN_GATING_START,
   findGate,
+  gatesLockedAfterTrial,
   lockedGate,
   lockedHrefs,
   planGatingApplies,
@@ -111,5 +112,20 @@ describe("paket kilidi sayfalara bağlı", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+});
+
+describe("deneme sonrası kilitlenecek sayfalar (deneme bandı)", () => {
+  it("PLAN_GATES'ten üretilir: aynı ofis planı için lockedHrefs ile birebir aynıdır", () => {
+    const fromBanner = gatesLockedAfterTrial({ plan: "office", tenantCreatedAt: NEW }).map((g) => g.href);
+    expect(fromBanner).toEqual(lockedHrefs(ctx("office")));
+    expect(fromBanner.length).toBeGreaterThan(0);
+    expect(fromBanner).toContain("/app/lig");
+    expect(fromBanner).not.toContain("/app/teklifler");
+  });
+
+  it("kesim tarihinden eski tenant'ta ve en üst pakette boş döner", () => {
+    expect(gatesLockedAfterTrial({ plan: "office", tenantCreatedAt: OLD })).toEqual([]);
+    expect(gatesLockedAfterTrial({ plan: "enterprise", tenantCreatedAt: NEW })).toEqual([]);
   });
 });

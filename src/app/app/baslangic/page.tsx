@@ -62,7 +62,7 @@ export default async function OnboardingPage({
       <PageHeader
         eyebrow="Başlangıç"
         title="Ofis kurulumu"
-        description="Önce ofis tipinizi seçip örnek veriyle ya da boş başlayın; sonra altı kısa adımda ofisinizi çalışır hale getirin. Her adımı atlayabilir, istediğiniz zaman geri dönebilirsiniz."
+        description="Önce ofis tipinizi seçip örnek veriyle ya da boş başlayın; sonra sekiz kısa adımda ofisinizi çalışır hale getirin. Her adımı atlayabilir, istediğiniz zaman geri dönebilirsiniz."
         breadcrumbs={crumbs}
       />
       <SetupWizard

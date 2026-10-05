@@ -15,6 +15,8 @@ const empty: OnboardingCounts = {
   activeIntegrations: 0,
   customDefinitions: 0,
   publishedProperties: 0,
+  demands: 0,
+  appointments: 0,
 };
 
 describe("onboarding-checklist", () => {
@@ -22,7 +24,7 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    expect(s.total).toBe(6);
+    expect(s.total).toBe(8);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
@@ -40,7 +42,7 @@ describe("onboarding-checklist", () => {
       profileFilled: { phone: true, city: true, licenseNo: false },
     });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(50);
+    expect(s.percent).toBe(38);
     expect(s.nextId).toBe("team");
   });
 
@@ -52,7 +54,7 @@ describe("onboarding-checklist", () => {
   });
 
   it("hepsi atlanınca settled, complete değil", () => {
-    const s = buildOnboarding(empty, ["office", "team", "data", "property", "defs", "portals"]);
+    const s = buildOnboarding(empty, ["office", "team", "data", "property", "demand", "appointment", "defs", "portals"]);
     expect(s.nextId).toBeNull();
     expect(s.settled).toBe(true);
     expect(s.complete).toBe(false);
@@ -67,6 +69,8 @@ describe("onboarding-checklist", () => {
       activeIntegrations: 0,
       customDefinitions: 2,
       publishedProperties: 1,
+      demands: 1,
+      appointments: 1,
     });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
@@ -80,7 +84,15 @@ describe("onboarding-checklist", () => {
     expect(resolveWizardStep("yok", s)).toBe("office");
   });
 
+  it("ilk talep ve ilk randevu adımları gerçek sayıdan tamamlanır", () => {
+    const s = buildOnboarding({ ...empty, demands: 2 });
+    expect(s.steps.find((x) => x.id === "demand")?.done).toBe(true);
+    expect(s.steps.find((x) => x.id === "appointment")?.done).toBe(false);
+    expect(buildOnboarding({ ...empty, appointments: 1 }).steps.find((x) => x.id === "appointment")?.done).toBe(true);
+  });
+
   it("geri/ileri komşuları", () => {
+    expect(wizardNeighbors("property")).toEqual({ prev: "data", next: "demand" });
     expect(wizardNeighbors("office")).toEqual({ prev: null, next: "team" });
     expect(wizardNeighbors("portals")).toEqual({ prev: "defs", next: "bitis" });
     expect(wizardNeighbors("bitis")).toEqual({ prev: "portals", next: null });

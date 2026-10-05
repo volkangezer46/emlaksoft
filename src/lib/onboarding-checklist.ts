@@ -22,9 +22,13 @@ export type OnboardingCounts = {
   customDefinitions: number;
   /** Yayın tarihi (published_at) dolu, örnek olmayan portföy sayısı. */
   publishedProperties: number;
+  /** Örnek (is_sample) olmayan müşteri talebi sayısı. */
+  demands: number;
+  /** Örnek olmayan randevu sayısı. */
+  appointments: number;
 };
 
-export type OnboardingStepId = "office" | "team" | "data" | "property" | "defs" | "portals";
+export type OnboardingStepId = "office" | "team" | "data" | "property" | "demand" | "appointment" | "defs" | "portals";
 
 /** Sihirbazın son (özet) adımı; ilerlemeye sayılmaz. */
 export const FINISH_STEP = "bitis" as const;
@@ -57,7 +61,7 @@ export function isProfileComplete(p: OnboardingCounts["profileFilled"]): boolean
   return [p.phone, p.city, p.licenseNo].filter(Boolean).length >= PROFILE_MIN_FIELDS;
 }
 
-export const ONBOARDING_STEP_IDS: readonly OnboardingStepId[] = ["office", "team", "data", "property", "defs", "portals"];
+export const ONBOARDING_STEP_IDS: readonly OnboardingStepId[] = ["office", "team", "data", "property", "demand", "appointment", "defs", "portals"];
 
 export function isOnboardingStepId(v: unknown): v is OnboardingStepId {
   return typeof v === "string" && (ONBOARDING_STEP_IDS as readonly string[]).includes(v);
@@ -99,6 +103,20 @@ export function buildOnboarding(
       title: "İlk portföyünüzü girin",
       description: "Portföy eklenince eşleştirme ve vitrin çalışmaya başlar.",
       done: counts.properties > 0,
+    },
+    {
+      id: "demand",
+      short: "Talep",
+      title: "İlk talebi kaydedin",
+      description: "Müşterinin aradığı evi (bütçe, bölge, oda) girin; uygun portföyler kendiliğinden eşleşir.",
+      done: counts.demands > 0,
+    },
+    {
+      id: "appointment",
+      short: "Randevu",
+      title: "İlk randevuyu planlayın",
+      description: "Yer gösterme veya görüşmeyi takvime yazın; bugünkü randevular ana ekranda görünür.",
+      done: counts.appointments > 0,
     },
     {
       id: "defs",

@@ -53,6 +53,8 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       .eq("is_sample", false)
       .not("published_at", "is", null),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", true),
+    supabase.from("customer_demands").select("id", { count: "exact", head: true }).eq("is_sample", false),
+    supabase.from("appointments").select("id", { count: "exact", head: true }).eq("is_sample", false),
   ]);
   if (results.some((r) => r.error)) return null;
 
@@ -72,6 +74,8 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       activeIntegrations: results[4].count ?? 0,
       customDefinitions: results[5].count ?? 0,
       publishedProperties: results[6].count ?? 0,
+      demands: results[8].count ?? 0,
+      appointments: results[9].count ?? 0,
     },
     skipped,
   );
