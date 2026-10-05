@@ -87,8 +87,10 @@ export function defaultSiteContent(): SiteContent {
       { id: "f7", q: "Hangi paketi seçmeliyim, modülleri kapatabilir miyim?", a: "Paketler kullanıcı sayısı ve kapsama göre ayrılır; güncel fiyat ve limitler fiyat bölümünde ve Fiyatlar sayfasındadır. Ofis yöneticisi kullanmadığı modülleri ayarlardan kapatıp yeniden açabilir; çekirdek alanlar kapatılamaz.", hidden: false },
       { id: "f8", q: "Mevcut CRM’den geçiş yapabilir miyim?", a: "Evet. Müşteri ve portföylerinizi Excel/CSV ile içeri aktarabilirsiniz. Özel entegrasyon ihtiyaçları teknik değerlendirme sonrasında planlanır.", hidden: false },
       { id: "f9", q: "Değerleme nasıl yapılıyor?", a: "Mahalleyi seçip ada ve parseli girersiniz; sistem EmlakFiyati verisinden bir değer aralığı, güven düzeyi ve açıklama üretir. Sonucu PDF rapora çevirebilirsiniz.", hidden: false },
-      { id: "f10", q: "Kontör ve aylık sorgu hakkı nasıl işliyor?", a: "Her sorgu ofisinizin kontör bakiyesinden düşer. Paketinizde aylık sorgu hakkı varsa bu hak kapsamında kullanılır; yetmezse ek kontör paketiyle devam edersiniz. Güncel kapsam fiyat bölümünde ve Fiyatlar sayfasındadır.", hidden: false },
-      { id: "f11", q: "Değerleme sonucu resmi ekspertiz midir?", a: "Hayır. Sonuç bilgilendirme amaçlıdır, ilan fiyatlarına dayanır ve resmi ekspertiz veya banka değerlemesi yerine geçmez.", hidden: false },
+      { id: "f10", q: "Kontör nedir, nasıl işliyor?", a: "Kontör, EmlakFiyati değerleme ve PDF rapor sorguları için ofisinizin bakiyesidir. Her sorgu çalışmadan önce kaç kontör düşeceği görünür. Paketinizdeki aylık kontör kapsamı fiyat bölümünde ve Fiyatlar sayfasındadır; yetmezse ek kontör paketi alırsınız.", hidden: false },
+      { id: "f11", q: "Değerleme sonucu resmi ekspertiz midir?", a: "Hayır. Sonuç ilan ve emsal verisine dayanır, bilgilendirme amaçlıdır; kesin değer değildir ve resmi ekspertiz veya banka değerlemesi yerine geçmez.", hidden: false },
+      { id: "f12", q: "Kontör devreder mi, iade var mı?", a: "Satın alınan ek paketin kontörü süresiz geçerlidir. Paketle gelen aylık kontör en çok 3 aylık birikir. Sonuç üretilemezse kontör düşmez veya iade edilir.", hidden: false },
+      { id: "f13", q: "Rapor ne kadar süre geçerli, PDF'i tekrar indirebilir miyim?", a: "Rapor üretildikten sonra 30 gün erişilebilir; PDF'i bu süre içinde indirip saklayın. Aynı raporun PDF'ini tekrar indirmek ücretsizdir; yalnız ilk PDF indirme tarifedeki kontörü düşer.", hidden: false },
     ],
     finalCta: {
       title: "Ofisinizde kaybolan fırsatları",

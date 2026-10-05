@@ -6,38 +6,10 @@ import type { SiteContent } from "@/lib/site-content/schema";
 import { resolveTokens, tx } from "@/lib/site-content/tokens";
 import { ContentLink, Lines, RichTitle } from "./content-link";
 import { SectionHeading } from "./section-heading";
+import { ExampleReport } from "./example-report";
+import type { EfPublicState } from "@/lib/ef-credits/public-state-core";
 
 const ICONS: Record<string, LucideIcon> = { adaparsel: MapPinned, guven: Gauge, pdf: FileText, kontor: Layers, hak: Calculator, paket: Package };
-
-/** "Örnek görünüm": CSS ile çizilmiş yer tutucu. Gerçek veri, sayı veya sonuç iddiası YOKTUR. */
-function Mockup() {
-  const field = (label: string) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: "0.75rem", color: "var(--mk-muted)", marginBottom: 4 }}>{label}</div>
-      <div style={{ height: 34, borderRadius: 8, border: "1px solid var(--mk-line)", background: "var(--mk-bg)" }} />
-    </div>
-  );
-  const bar = (w: string) => <div style={{ height: 10, width: w, borderRadius: 6, background: "var(--mk-line)" }} />;
-  return (
-    <div aria-hidden="true" style={{ position: "relative", background: "var(--mk-card)", border: "1px solid var(--mk-line)", borderRadius: 16, padding: "1.25rem", display: "grid", gap: "1rem" }}>
-      <span className="mk-tag mk-example">Örnek görünüm</span>
-      <div style={{ display: "flex", gap: 10 }}>
-        {field("Mahalle")}
-        {field("Ada")}
-        {field("Parsel")}
-      </div>
-      <div style={{ display: "grid", gap: 8, padding: "0.9rem", borderRadius: 12, background: "var(--mk-bg-2)" }}>
-        {bar("42%")}
-        {bar("68%")}
-        {bar("54%")}
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <div style={{ height: 32, flex: 1, borderRadius: 8, background: "var(--mk-line)" }} />
-        <div style={{ height: 32, width: 110, borderRadius: 8, background: "var(--mk-blue)", opacity: 0.85 }} />
-      </div>
-    </div>
-  );
-}
 
 /**
  * EmlakFiyati entegrasyonlu değerleme bölümü (#degerleme). Metinler site içeriğinden (varsayılan = bu metinler).
@@ -46,11 +18,14 @@ function Mockup() {
  */
 export function ValuationSection({
   status,
+  state,
   trialDays,
   plans = [],
   content = defaultSiteContent().valuation,
 }: {
   status: EfValuationStatus;
+  /** Ayrıntılı durum: stale/maintenance iken rozet Bakımda; verilmezse status'tan türer. */
+  state?: EfPublicState;
   trialDays?: number;
   plans?: readonly PlanDef[];
   content?: SiteContent["valuation"];
@@ -65,7 +40,7 @@ export function ValuationSection({
   const before = content.compare.before.filter((c) => !c.hidden);
   const after = content.compare.after.filter((c) => !c.hidden);
   const cta = live ? content.liveCta : content.soonCta;
-  const badge = live ? content.liveBadge : content.soonBadge;
+  const badge = live ? content.liveBadge : state === "maintenance" || state === "stale" ? "Bakımda" : content.soonBadge;
   return (
     <section id="degerleme" className="mk-section mk-alt" aria-labelledby="degerleme-baslik">
       <div className="mk-wrap mk-wrap-wide">
@@ -90,7 +65,7 @@ export function ValuationSection({
               </li>
             ))}
           </ul>
-          <Mockup />
+          <ExampleReport />
         </div>
         {before.length || after.length ? (
           <div className="mk-hl-grid" style={{ marginTop: "2rem", gridTemplateColumns: "repeat(auto-fit, minmax(16rem, 1fr))" }}>

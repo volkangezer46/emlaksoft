@@ -161,7 +161,7 @@ describe("SSS <-> JSON-LD tutarlılığı", () => {
     const q = faqs.find((f) => /resmi ekspertiz/.test(f.q));
     expect(q?.a).toMatch(/^Hayır\./);
     expect(q?.a).toMatch(/bilgilendirme amaçlı/);
-    expect(q?.a).toMatch(/ilan fiyatlarına dayanır/);
+    expect(q?.a).toMatch(/ilan ve emsal verisine dayanır/);
     expect(faqs.some((f) => /Değerleme nasıl/.test(f.q))).toBe(true);
     expect(faqs.some((f) => /Kontör/.test(f.q))).toBe(true);
   });
@@ -188,7 +188,7 @@ describe("EmlakFiyati değerleme bölümü", () => {
     expect(out).toMatch(/cretsiz dene/);
     expect(out).toContain('href="/kayit"');
     expect(out).not.toContain("Hemen deneyin");
-    expect(out).toContain("Örnek görünüm");
+    expect(out).toContain("ÖRNEK");
   });
 
   it("canlıyken 'Hemen deneyin' + kayıt CTA'sı; 'Yakında' rozeti yok", () => {

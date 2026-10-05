@@ -11,6 +11,8 @@ import { buildFaq, lostCommissionPlanName, trialPhrase, yearlyDiscountPercent } 
 import { ComparisonTable } from "@/components/pricing-page/comparison-table";
 import { PricingShell, Section } from "@/components/pricing-page/page-shell";
 import { RoiCalculator } from "@/components/pricing-page/roi-calculator";
+import { EfPackTiersTable, EfPlanCreditsTable, EF_PACKS_APP_HREF } from "@/components/marketing/emlakfiyati-section";
+import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
 import { SeatCalculatorLazy } from "@/components/pricing-page/seat-calculator-lazy";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -19,6 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function FiyatlarPage() {
   const { plans, trialDays, offers, founders, efValuationCost, efLive } = await getPublicPricing();
+  const efCatalog = await getEfCatalog();
   const faq = buildFaq({ trialDays, plans });
   const discount = yearlyDiscountPercent(plans);
   const lost = lostCommissionPlanName();
@@ -84,6 +87,28 @@ export default async function FiyatlarPage() {
 
       <Section id="karsilastirma" title="Paketleri yan yana karşılaştırın" lead="Tablo, uygulamadaki gerçek paket kuralları ve sayfa kilitlerinden üretilir.">
         <ComparisonTable plans={plans} efValuationCost={efValuationCost} efLive={efLive} />
+      </Section>
+      <Section
+        id="kontor"
+        title="EmlakFiyati kontörü"
+        lead={
+          efLive
+            ? "Ada/parsel değerleme ve PDF rapor sorguları kontörle çalışır. Paketinizdeki aylık kontör her ay yüklenir; yetmezse ek paket alırsınız."
+            : "Değerleme henüz herkese açık değil; aşağıdaki kontör hakları planlanan değerlerdir ve değerleme açılınca geçerli olur."
+        }
+      >
+        <EfPlanCreditsTable plans={plans} tariff={efCatalog.tariff} live={efLive} />
+        <p className="mt-2 text-xs text-text-muted">Plan kontörü en çok 3 aylık birikir. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.</p>
+        <div className="mt-6">
+          <EfPackTiersTable packs={efCatalog.packs} tariff={efCatalog.tariff} live={efLive} />
+          <p className="mt-2 text-xs text-text-muted">Satın alınan ek paketin kontörü süresiz geçerlidir. Tutarlar KDV hariçtir.</p>
+          {efLive ? (
+            <p className="mt-2 text-sm">
+              <Link href={EF_PACKS_APP_HREF} className="font-semibold text-brand-700 hover:underline">Ofis panelinde kontör satın al</Link>
+              <span className="text-text-muted"> · Hesabınız yoksa önce <Link href="/kayit" className="font-semibold text-brand-700 hover:underline">denemeyi başlatın</Link>.</span>
+            </p>
+          ) : null}
+        </div>
       </Section>
 
       <Section

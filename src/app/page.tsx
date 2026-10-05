@@ -15,7 +15,6 @@ import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
 import { Highlights } from "@/components/marketing/highlights";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { getLiveSiteContent } from "@/lib/site-content/store";
-import { getEfValuationStatus } from "@/lib/site-content/ef-status";
 import { ValuationSection } from "@/components/marketing/valuation-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { LandingJsonLd } from "@/components/marketing/landing-jsonld";
@@ -35,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function HomePage() {
   // Metinler yönetim panelinden (Site içeriği); yayın yoksa bugünkü metin. Okuma sunucuda, etiketli önbellekten (sayfa statik kalır).
-  const [pricing, content, efStatus] = await Promise.all([getPublicPricing(), getLiveSiteContent(), getEfValuationStatus()]);
+  const [pricing, content] = await Promise.all([getPublicPricing(), getLiveSiteContent()]);
   const efCatalog = await getEfCatalog();
   const { trialDays, plans } = pricing;
   const faqs = buildHomeFaqs({ trialDays, plans, content: content.faq });
@@ -49,13 +48,13 @@ export default async function HomePage() {
         <TrustStrip trialDays={trialDays} content={content.trust} />
         <ProductTour heading={content.sections.tur} />
         <BentoGrid heading={content.sections.ozellikler} />
-        <ValuationSection status={efStatus} trialDays={trialDays} plans={plans} content={content.valuation} />
+        <ValuationSection status={pricing.efLive ? "live" : "soon"} state={pricing.efState} trialDays={trialDays} plans={plans} content={content.valuation} />
+        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} />
         <Highlights heading={content.sections.diger} content={content.highlights} />
         <Why heading={content.sections.neden} />
         <HowItWorks trialDays={trialDays} plans={plans} steps={content.steps} heading={content.sections.nasil} />
         <SecurityBand trialDays={trialDays} plans={plans} content={content.security} heading={content.sections.guvenlik} />
         <PricingSection pricing={pricing} heading={content.sections.fiyat} />
-        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} status={efStatus} />
         <Faq items={faqs} heading={content.sections.sss} />
         <FinalCta trialDays={trialDays} plans={plans} content={content.finalCta} />
       </main>
