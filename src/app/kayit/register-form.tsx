@@ -22,12 +22,8 @@ import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { formatNumberTr } from "@/lib/format";
-import { PLANS, getPlan, planAmountOf, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
-import {
-  defaultTeamSizeForPlan,
-  registrationPlanForTeamSize,
-  type RegistrationTeamSize,
-} from "@/lib/billing/registration-plan";
+import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { registrationQuote, registrationSelection } from "@/lib/billing/seat-calculator-model";
 
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
 
@@ -39,12 +35,7 @@ const STEPS = [
   { no: 3, label: "Güvenlik", icon: Lock },
 ];
 
-const TEAM_OPTIONS = [
-  { value: "1", title: "Bağımsız", desc: "Tek danışman" },
-  { value: "2-10", title: "2–10", desc: "Butik ofis" },
-  { value: "10-50", title: "10–50", desc: "Kurumsal ofis" },
-  { value: "50+", title: "50+", desc: "Zincir / franchise" },
-];
+const MAX_SEATS_INPUT = 999;
 
 /**
  * Sunucu hatasını ilgili adıma eşler — kullanıcı 3. adımda gönderir ama hata
@@ -59,6 +50,7 @@ function errorStep(message: string): 1 | 2 | null {
 export function RegisterForm({
   initialPlan = "office",
   initialCycle = "monthly",
+  initialSeats,
   plans = PLANS,
   trialDays,
   offers,
@@ -66,6 +58,8 @@ export function RegisterForm({
 }: {
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
+  /** Fiyat sayfası hesaplayıcısından gelen kullanıcı sayısı; yoksa seçilen planın dahil kullanıcı sayısı. */
+  initialSeats?: number;
   plans?: readonly PlanDef[];
   /** Gerçekte verilen deneme günü (sunucuda getEffectiveTrialDays); yoksa sayı yazılmaz. */
   trialDays?: number;
@@ -77,21 +71,37 @@ export function RegisterForm({
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [pw, setPw] = useState("");
-  const [teamSize, setTeamSize] = useState<RegistrationTeamSize>(
-    defaultTeamSizeForPlan(initialPlan),
+  const [seats, setSeats] = useState(() =>
+    initialSeats && initialSeats > 0
+      ? Math.min(MAX_SEATS_INPUT, Math.floor(initialSeats))
+      : (plans.find((p) => p.id === initialPlan) ?? getPlan(initialPlan)).limits.seats,
   );
+  const [seatsText, setSeatsText] = useState(String(seats));
+  // Kullanıcı sayıyı değiştirene kadar fiyat sayfasından gelen bilinçli paket seçimi korunur.
+  const [seatsTouched, setSeatsTouched] = useState(initialSeats !== undefined);
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
 
   const errorTargetStep = state.error ? errorStep(state.error) : null;
-  const selectedPlanId = registrationPlanForTeamSize(initialPlan, teamSize);
+  // Paket önerisi fiyat sayfasındaki hesaplayıcıyla AYNI motordan gelir (sabit eşik yok).
+  const selection = registrationSelection(plans, offers, seats, initialCycle, seatsTouched ? null : initialPlan);
+  const selectedPlanId = selection.planId as PlanId;
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? getPlan(selectedPlanId);
-  // Fiyat yalnız sunucudan gelen etkin teklifle gösterilir (sabit tutar yok); özel fiyatlı pakette gösterilmez.
-  const offerMonthly = offers?.[selectedPlan.id]?.monthlyTry;
+  const quote = registrationQuote(plans, offers, selectedPlanId, seats, initialCycle);
+  // Fiyat yalnız sunucudan gelen etkin teklifle gösterilir (sabit tutar yok); özel fiyatlı/kapasite aşan pakette tutar yok.
   const planPriceText =
-    offerMonthly && !selectedPlan.customPricing
-      ? ` · ${formatNumberTr(planAmountOf({ ...selectedPlan, monthlyTry: offerMonthly }, initialCycle))} ₺ ${initialCycle === "yearly" ? "/yıl" : "/ay"} + KDV`
-      : "";
+    selectedPlan.customPricing || selection.calc.status === "contact"
+      ? " · ekibinize özel teklif"
+      : quote
+        ? ` · ${formatNumberTr(seats)} kullanıcı · ${formatNumberTr(quote.totalForCycleTry)} ₺ ${initialCycle === "yearly" ? "/yıl" : "/ay"} + KDV`
+        : "";
+
+  function commitSeats(n: number) {
+    const v = Math.min(MAX_SEATS_INPUT, Math.max(1, Math.floor(Number.isFinite(n) ? n : 1)));
+    setSeats(v);
+    setSeatsText(String(v));
+    setSeatsTouched(true);
+  }
 
   function validateStep(ref: React.RefObject<HTMLDivElement | null>) {
     const inputs = ref.current?.querySelectorAll<HTMLInputElement>("input");
@@ -206,24 +216,59 @@ export function RegisterForm({
               <legend className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ink-900">
                 <Users className="h-4 w-4 text-brand-600" /> Danışman sayısı
               </legend>
-              <div className="grid grid-cols-2 gap-2.5">
-                {TEAM_OPTIONS.map((o) => (
-                  <label key={o.value} className="group cursor-pointer">
-                    <input
-                      type="radio"
-                      name="agents"
-                      value={o.value}
-                      checked={teamSize === o.value}
-                      onChange={() => setTeamSize(o.value as RegistrationTeamSize)}
-                      className="peer sr-only"
-                    />
-                    <span className="block rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 transition peer-checked:border-brand-600 peer-checked:bg-brand-600/[0.05] peer-checked:ring-2 peer-checked:ring-brand-600/25 hover:border-brand-300">
-                      <span className="block text-sm font-bold text-ink-950">{o.title}</span>
-                      <span className="block text-xs text-text-muted">{o.desc}</span>
-                    </span>
-                  </label>
-                ))}
+              {/* Sunucu eylemi `agents` kovasını okur; kova önerilen plandan türetilir (paket yükseltilmez/düşürülmez). */}
+              <input type="hidden" name="agents" value={selection.teamSize} />
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  aria-label="Danışman sayısını azalt"
+                  disabled={seats <= 1}
+                  onClick={() => commitSeats(seats - 1)}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] border border-line bg-surface text-lg font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-40"
+                >
+                  −
+                </button>
+                <input
+                  id="seats"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  aria-label="Danışman sayısı"
+                  value={seatsText}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
+                    setSeatsText(digits);
+                    if (digits !== "") {
+                      setSeats(Math.min(MAX_SEATS_INPUT, Math.max(1, Number(digits))));
+                      setSeatsTouched(true);
+                    }
+                  }}
+                  onBlur={() => commitSeats(seatsText === "" ? 1 : Number(seatsText))}
+                  className="h-11 w-24 rounded-[var(--radius-card)] border border-line bg-surface px-3 text-center text-base font-bold tabular-nums text-ink-950 outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
+                />
+                <button
+                  type="button"
+                  aria-label="Danışman sayısını artır"
+                  disabled={seats >= MAX_SEATS_INPUT}
+                  onClick={() => commitSeats(seats + 1)}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] border border-line bg-surface text-lg font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-40"
+                >
+                  +
+                </button>
+                <span className="text-sm text-text-muted">kullanıcı</span>
               </div>
+              <p className="mt-3 min-h-10 rounded-[var(--radius-card)] bg-brand-600/[0.06] px-3.5 py-2.5 text-sm text-ink-950" aria-live="polite">
+                {selection.calc.status === "contact" ? (
+                  <>Bu ekip büyüklüğü için size özel teklif hazırlarız; hesabınızı yine de oluşturabilirsiniz.</>
+                ) : (
+                  <>
+                    Önerilen paket: <strong>{selectedPlan.name}</strong>
+                    {quote && !selectedPlan.customPricing
+                      ? ` · aylık ödemede ${formatNumberTr(quote.totalMonthlyTry)} ₺ / ay + KDV`
+                      : ""}
+                  </>
+                )}
+              </p>
               <p className="mt-2 text-xs text-text-faint">Ekip büyüklüğünüze göre en uygun planla başlatırız; sonradan değiştirilebilir.</p>
             </fieldset>
             <div className="flex gap-2.5">
