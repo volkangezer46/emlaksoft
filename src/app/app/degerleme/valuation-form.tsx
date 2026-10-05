@@ -104,19 +104,9 @@ export function ValuationForm({
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="valuation-block" className="mb-1.5 block text-sm text-text-muted">Ada (opsiyonel)</label>
-            <input id="valuation-block" name="ada" inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="1245" />
-          </div>
-          <div>
-            <label htmlFor="valuation-parcel" className="mb-1.5 block text-sm text-text-muted">Parsel (opsiyonel)</label>
-            <input id="valuation-parcel" name="parsel" inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="7" />
-          </div>
-        </div>
         <p className="text-xs leading-relaxed text-text-faint">
           İlçe seçilirse kendi portföy ve satış verinizden gerçek emsal analizi çalışır.
-          Endeksa &amp; Tapusor anahtarları tanımlandıysa onlar da kaynak olarak eklenir.
+          Konut ve arsa için EmlakFiyati bölge endeksi (medyan ₺/m²) de kaynak olarak eklenir; veri yoksa atlanır.
         </p>
         <p id="valuation-form-status" role="status" aria-live="polite" className="sr-only">{message}</p>
         <button

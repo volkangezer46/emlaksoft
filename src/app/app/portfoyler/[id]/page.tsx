@@ -13,10 +13,8 @@ import {
   History,
   ImageIcon,
   KeyRound,
-  Landmark,
   LayoutDashboard,
   MapPin,
-  MapPinned,
   Percent,
   Printer,
   RadioTower,
@@ -44,15 +42,12 @@ import { AiContentPanel } from "./ai-content-panel";
 import { PropertyAuthorizationPanel } from "./property-extras";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
-import { TapuInquiryPanel } from "./tapu-inquiry-panel";
 import { PropertyMap } from "@/components/app/property-map";
 import { PhotoQualityCard } from "@/components/app/photo-quality-card";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
 import { computePriceHealth } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
 import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
-import { isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
-import { isTapusorConfiguredFull } from "@/lib/integrations/tapusor";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { generateListingText } from "@/lib/listing-text";
 import { CopyListingText } from "@/components/app/copy-listing-text";
@@ -83,6 +78,8 @@ import { stageLabelMap } from "@/lib/deal-stage-labels";
 import type { CSSProperties } from "react";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
+import { mapPropertyTypeToTip } from "@/lib/integrations/emlakfiyati/contract";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
 const RING_C = 2 * Math.PI * 42;
@@ -275,10 +272,12 @@ export default async function PropertyDetailPage({
         ? Math.round(Number(property.list_price) * 0.02)
         : 0;
 
-  const [endeksaOn, tapusorOn] = await Promise.all([
-    isEndeksaConfiguredFull(),
-    isTapusorConfiguredFull(),
-  ]);
+  // EmlakFiyati endeks türü: yalnız satılık konut/arsa; diğer türler için açık "veri yok" durumu.
+  const endeksTip = mapPropertyTypeToTip(property.property_type, property.transaction_type);
+  const listSqmPrice =
+    property.list_price != null && features.sqm != null && Number(features.sqm) > 0
+      ? Math.round(Number(property.list_price) / Number(features.sqm))
+      : null;
 
   const priceSignal = computePriceHealth({
     listPrice: property.list_price != null ? Number(property.list_price) : null,
@@ -656,43 +655,33 @@ export default async function PropertyDetailPage({
             </Suspense>
           </div>
 
-          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          {endeksTip ? (
+            <Suspense fallback={<div className="h-40 animate-pulse rounded-[var(--radius-panel)] bg-line" role="status" aria-label="EmlakFiyati endeksi yükleniyor" />}>
+              <EmlakFiyatiEndeksPanel
+                province={province}
+                district={district}
+                tip={endeksTip}
+                stockHref={`/app/portfoyler?q=${encodeURIComponent(district ?? province ?? "")}`}
+                compareM2={listSqmPrice}
+                showTrend={false}
+              />
+            </Suspense>
+          ) : (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
-                <Sparkles className="h-4 w-4" /> Endeksa &amp; Tapusor derin değerleme
+                <Sparkles className="h-4 w-4" /> EmlakFiyati endeksi
               </p>
-              <Link
-                href={`/app/degerleme?property=${property.id}`}
-                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white hover:bg-ink-800"
-              >
-                Bu portföy için değerleme oluştur
-              </Link>
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div className={`flex items-center gap-3 rounded-[var(--radius-card)] border px-3 py-2.5 ${endeksaOn ? "border-cyan-400/30 bg-cyan-400/5" : "border-line bg-canvas/60"}`}>
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${endeksaOn ? "bg-cyan-500/15 text-cyan-700" : "bg-ink-950/6 text-text-faint"}`}>
-                  <Landmark className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink-950">Endeksa bölge endeksi</p>
-                  <p className="text-xs text-text-muted">{endeksaOn ? "Canlı — değerlemede otomatik kullanılır" : "Bağlantı bekliyor (ENDEKSA_CLIENT_ID)"}</p>
-                </div>
-              </div>
-              <div className={`flex items-center gap-3 rounded-[var(--radius-card)] border px-3 py-2.5 ${tapusorOn ? "border-cyan-400/30 bg-cyan-400/5" : "border-line bg-canvas/60"}`}>
-                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${tapusorOn ? "bg-cyan-400/15 text-cyan-700" : "bg-ink-950/6 text-text-faint"}`}>
-                  <MapPinned className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink-950">Tapusor EDİ + yatırım puanı</p>
-                  <p className="text-xs text-text-muted">
-                    {tapusorOn
-                      ? `Ada ${property.parcel_block ?? "—"} / Parsel ${property.parcel_lot ?? "—"} ile sorgulanır`
-                      : "Bağlantı bekliyor (TAPUSOR_API_KEY)"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
+              <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/60 px-4 py-5 text-center text-sm text-text-muted">
+                EmlakFiyati bölge endeksi yalnız satılık konut ve arsa için sağlanır; bu ilan türü için veri yok.
+              </p>
+            </section>
+          )}
+          <Link
+            href={`/app/degerleme?property=${property.id}`}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white hover:bg-ink-800"
+          >
+            Bu portföy için değerleme oluştur
+          </Link>
 
           {/* Yatırım görünümü — bölge medyanlarından getiri + satış süresi tahmini.
               İki `region_stats` RPC'si sayfanın en pahalı sorgusuydu; artık akıyor.
@@ -924,13 +913,6 @@ export default async function PropertyDetailPage({
             }}
           />
 
-          {/* Tapu & parsel sorgusu (TAKBİS/Tapusor) */}
-          <TapuInquiryPanel
-            provinceName={province}
-            districtName={district}
-            defaultAda={property.parcel_block}
-            defaultParsel={property.parcel_lot}
-          />
             </div>
           ) : null}
 

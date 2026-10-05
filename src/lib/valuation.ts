@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getEndeksaValuation, isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
-import { getTapusorParcelInsight, isTapusorConfiguredFull } from "@/lib/integrations/tapusor";
+import { getEndeksForPlace } from "@/lib/integrations/emlakfiyati/client";
+import {
+  endeksEvidenceLevel,
+  mapPropertyTypeToTip,
+  toEndeksValuationSource,
+  EMLAKFIYATI_SOURCE_NAME,
+  type EndeksGuven,
+  type EndeksSummary,
+} from "@/lib/integrations/emlakfiyati/contract";
 import { estimateFromComparables, type ComparableEstimate } from "@/lib/comparables";
 
 export type ValuationSource = {
@@ -17,8 +24,6 @@ export type MultiSourceValuation = {
   confidence: number;
   sources: ValuationSource[];
   notes: string;
-  investmentScore: number | null;
-  legalFlags: string[];
 };
 
 type ComparableConfidence = ComparableEstimate["confidence"] | null;
@@ -32,19 +37,21 @@ type ComparableConfidence = ComparableEstimate["confidence"] | null;
 export function valuationEvidenceConfidence(input: {
   hasListPrice: boolean;
   comparableConfidence: ComparableConfidence;
-  hasEndeksa: boolean;
-  hasTapusor: boolean;
+  /** EmlakFiyati endeksinin güven kademesi; "none" = kullanılmadı ya da örneklem yetersiz. */
+  marketIndex: "none" | EndeksGuven;
 }): number {
   const hasComparable = input.comparableConfidence != null && input.comparableConfidence !== "yetersiz";
-  const evidenceCount = Number(hasComparable) + Number(input.hasEndeksa) + Number(input.hasTapusor);
+  const hasMarketIndex = input.marketIndex !== "none";
+  const evidenceCount = Number(hasComparable) + Number(hasMarketIndex);
   if (!input.hasListPrice && evidenceCount === 0) return 0;
 
   let score = 0.15 + (input.hasListPrice ? 0.1 : 0);
   if (input.comparableConfidence === "yüksek") score += 0.55;
   else if (input.comparableConfidence === "orta") score += 0.4;
   else if (input.comparableConfidence === "düşük") score += 0.25;
-  if (input.hasEndeksa) score += 0.2;
-  if (input.hasTapusor) score += 0.15;
+  if (input.marketIndex === "high") score += 0.2;
+  else if (input.marketIndex === "medium") score += 0.15;
+  else if (input.marketIndex === "low") score += 0.08;
   if (evidenceCount >= 2) score += 0.05;
   return Math.min(0.95, Math.round(score * 100) / 100);
 }
@@ -54,8 +61,7 @@ export async function estimateMultiSourceValue(input: {
   sqm: number | null;
   districtHint: string | null;
   provinceName?: string | null;
-  ada?: string | null;
-  parsel?: string | null;
+  neighborhoodName?: string | null;
   /**
    * Yerli emsal motoru için gerekenler. Verilirse kendi verimizden gerçek
    * emsal analizi yapılır ve EN YÜKSEK ağırlığı alır.
@@ -122,85 +128,36 @@ export async function estimateMultiSourceValue(input: {
     }
   }
 
-  // Endeksa — canlı bölge endeksi + AVM
-  if (input.provinceName) {
+  // EmlakFiyati — aylık bölge endeksi (medyan TL/m²). Yalnız coğrafi yol + tip gider; kişisel veri yok.
+  // Kiralık ve desteklenmeyen türlerde (işyeri, dükkan...) kaynak hiç eklenmez (uydurma değer yok).
+  let marketSummary: EndeksSummary | null = null;
+  const tip = mapPropertyTypeToTip(input.propertyType, input.transactionType);
+  if (input.provinceName && sqm && tip) {
     try {
-      if (await isEndeksaConfiguredFull()) {
-        const ev = await getEndeksaValuation({
-          provinceName: input.provinceName,
-          districtName: input.districtHint,
-          sqm,
-        });
-        if (ev.valueAvg > 0) {
-          sources.push({
-            name: "Endeksa bölge endeksi",
-            weight: 0.4,
-            value: ev.valueAvg,
-            note:
-              ev.priceChange12m != null
-                ? `12 aylık değişim %${ev.priceChange12m} · canlı API`
-                : "Endeksa canlı veri",
-          });
+      const lookup = await getEndeksForPlace({
+        province: input.provinceName,
+        district: input.districtHint,
+        neighborhood: input.neighborhoodName,
+        tip,
+      });
+      if (lookup.status === "ok") {
+        const source = toEndeksValuationSource(lookup.summary, sqm);
+        if (source) {
+          sources.push(source);
+          marketSummary = lookup.summary;
         } else {
-          providerWarnings.push("Endeksa geçerli bir değer döndürmedi");
+          providerWarnings.push("EmlakFiyati geçerli bir değer döndürmedi");
         }
+      } else if (lookup.status === "error") {
+        providerWarnings.push("EmlakFiyati verisi alınamadı");
       }
+      // "empty": bu bölge/tip için veri yok; "disabled": anahtar tanımlı değil — ikisi de sessizce atlanır.
     } catch (e) {
       console.error("valuation provider unavailable", {
-        provider: "endeksa",
+        provider: "emlakfiyati",
         errorType: e instanceof Error ? e.name : "UnknownError",
       });
-      providerWarnings.push("Endeksa verisi alınamadı");
-    }
-  }
-
-  let investmentScore: number | null = null;
-  let legalFlags: string[] = [];
-
-  // Tapusor — EDİ yapay zeka değerlemesi + yatırım puanı + hukuki uyarı
-  if (input.provinceName) {
-    try {
-      if (await isTapusorConfiguredFull()) {
-        const ti = await getTapusorParcelInsight({
-          provinceName: input.provinceName,
-          districtName: input.districtHint,
-          ada: input.ada,
-          parsel: input.parsel,
-        });
-        if (ti.estimatedValue) {
-          sources.push({
-            name: "Tapusor EDİ değerleme",
-            weight: 0.3,
-            value: ti.estimatedValue,
-            note: "Yapay zeka destekli parsel değerlemesi",
-          });
-        } else {
-          providerWarnings.push("Tapusor geçerli bir değer döndürmedi");
-        }
-        investmentScore = ti.investmentScore;
-        legalFlags = ti.legalFlags;
-        if (investmentScore != null) {
-          sources.push({
-            name: "Tapusor yatırım puanı",
-            weight: 0,
-            value: investmentScore,
-            note: legalFlags.length ? legalFlags.join(", ") : "Hukuki/teknik uyarı yok",
-          });
-        } else if (legalFlags.length > 0) {
-          sources.push({
-            name: "Tapusor hukuki/teknik uyarıları",
-            weight: 0,
-            value: 0,
-            note: legalFlags.join(", "),
-          });
-        }
-      }
-    } catch (e) {
-      console.error("valuation provider unavailable", {
-        provider: "tapusor",
-        errorType: e instanceof Error ? e.name : "UnknownError",
-      });
-      providerWarnings.push("Tapusor verisi alınamadı");
+      providerWarnings.push("EmlakFiyati verisi alınamadı");
     }
   }
 
@@ -228,8 +185,6 @@ export async function estimateMultiSourceValue(input: {
       confidence: 0,
       sources,
       notes: "Yeterli fiyat kanıtı yok — liste fiyatı girin veya konum, m² ve yeterli emsal sağlayın.",
-      investmentScore,
-      legalFlags,
     };
   }
 
@@ -250,13 +205,11 @@ export async function estimateMultiSourceValue(input: {
   const low = band === null ? null : Math.round(mid * (1 - band));
   const high = band === null ? null : Math.round(mid * (1 + band));
 
-  const hasEndeksa = priceSources.some((source) => source.name === "Endeksa bölge endeksi");
-  const hasTapusor = priceSources.some((source) => source.name === "Tapusor EDİ değerleme");
+  const hasMarketIndex = priceSources.some((source) => source.name === EMLAKFIYATI_SOURCE_NAME);
   const confidence = valuationEvidenceConfidence({
     hasListPrice: list !== null,
     comparableConfidence: comparables?.confidence ?? null,
-    hasEndeksa,
-    hasTapusor,
+    marketIndex: hasMarketIndex ? endeksEvidenceLevel(marketSummary) : "none",
   });
 
   const notes = comparables && comparables.confidence !== "yetersiz"
@@ -272,7 +225,5 @@ export async function estimateMultiSourceValue(input: {
     confidence,
     sources,
     notes,
-    investmentScore,
-    legalFlags,
   };
 }

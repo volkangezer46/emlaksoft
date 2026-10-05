@@ -12,8 +12,7 @@ Bağımsız danışman, küçük/büyük ofis, franchise, proje satış ekipleri
 |-------|-----------|-----------------|
 | RE-OS | CRM+MLS+entegrasyon, Android telefon CRM | Şeffaf fiyat, komisyon derinliği, İYS/EİDS, kayıp-kaçak, Phone OS |
 | Revy | Portal arşiv + fiyat geçmişi | Derin komisyon/franchise + işletim sistemi |
-| Tapusor | Değerleme/risk | Zekâyı CRM iş akışına gömme |
-| Endeksa | AVM + API | Veri ortağı; tek kaynak değil |
+| EmlakFiyati | Bölge fiyat endeksi (kendi yazılımımız) | Endeksi CRM iş akışına gömme: değerleme, bölge analizi, ilan |
 
 **Slogan yönü:** Türkiye için en kapsamlı emlak işletim sistemi.
 
@@ -28,7 +27,7 @@ Tam Türkçe. “Lead” yok → müşteri adayı / arayan / ilgilenen.
 - Kayıp-kaçak motoru + zorunlu kapanış formu
 - Komisyon / hakediş defteri
 - Akıllı Arama OS (telefon CRM)
-- Çok kaynaklı değerleme (TCMB, TÜİK, kendi veri, kullanıcı comps; Endeksa/Tapusor opsiyonel)
+- Çok kaynaklı değerleme (TCMB, TÜİK, kendi veri, kullanıcı comps; EmlakFiyati bölge endeksi opsiyonel)
 - Yetki / EİDS kalkanı, İYS, KVKK
 - Ofis sağlık skoru, franchise / proje (ileri sprint)
 

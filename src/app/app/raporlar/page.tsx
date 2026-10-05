@@ -580,7 +580,7 @@ export default async function ReportsPage() {
         <Link href="/app/degerleme" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <Gauge className="h-4 w-4 text-cyan-600" />
           <p className="mt-2 font-display font-bold">Değerleme</p>
-          <p className="text-xs text-text-muted">Endeksa · Tapusor</p>
+          <p className="text-xs text-text-muted">Emsal · EmlakFiyati endeksi</p>
         </Link>
         <Link href="/app/musteriler" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
           <ICONS.musteri className="h-4 w-4 text-mint-600" />

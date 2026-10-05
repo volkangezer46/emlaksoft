@@ -84,14 +84,10 @@ export function auditActionLabel(action: string): string {
     "error_log.bulk_resolve":           "Hatalar toplu çözüldü",
     "activity.export":                  "Aktivite kaydı dışa aktarıldı",
     // Entegrasyon anahtarları
-    "integration.endeksa.save":   "Endeksa anahtarı kaydedildi",
-    "integration.endeksa.clear":  "Endeksa anahtarı silindi",
     "integration.netgsm.save":    "Netgsm bilgileri kaydedildi",
     "integration.netgsm.clear":   "Netgsm bilgileri silindi",
     "integration.whatsapp.save":  "WhatsApp bilgileri kaydedildi",
     "integration.whatsapp.clear": "WhatsApp bilgileri silindi",
-    "integration.tapusor.save":   "Tapusor anahtarı kaydedildi",
-    "integration.tapusor.clear":  "Tapusor anahtarı silindi",
   };
   if (map[action]) return map[action];
   // Fallback: "customer.create" → "customer · create"
