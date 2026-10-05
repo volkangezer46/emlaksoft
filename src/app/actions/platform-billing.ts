@@ -26,6 +26,28 @@ async function guard(action: string, destructive: boolean) {
   return { staff } as const;
 }
 
+/** Faturaya bağlı, hesap kredisine bugüne dek geri yazılan toplam (TL); okunamazsa null. */
+async function restoredCreditForInvoice(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  invoiceId: string,
+): Promise<number | null> {
+  const { data, error } = await admin
+    .from("account_credit_ledger")
+    .select("amount")
+    .eq("tenant_id", tenantId)
+    .eq("unit", "try")
+    .eq("entry_type", "reverse")
+    .gt("amount", 0)
+    .filter("meta->>invoiceId", "eq", invoiceId)
+    .not("meta->>refundOfReservation", "is", null);
+  if (error) {
+    console.error("restoredCreditForInvoice", error.code);
+    return null;
+  }
+  return Math.round((data ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0) * 100) / 100;
+}
+
 function refresh(invoiceId?: string) {
   revalidatePath("/admin/billing");
   if (invoiceId) revalidatePath(`/admin/billing/faturalar/${invoiceId}`);
@@ -200,14 +222,20 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
       cashPaidTry: Number(meta.walletCashTry ?? 0),
       creditUsedTry,
     });
-    if (restore > 0) {
+    // IDEM = FATURA + "bu faturaya o ana dek geri yazılan toplam" (tutar DEĞİL): aynı durumdaki yeniden deneme aynı anahtarı
+    // üretir (çift yazım yok); iade tutarı değişip önceki deneme kısmen yazıldıysa yalnız FARK tamamlanır (toplam
+    // geri yazım hedefi aşılmaz; SQL ayrıca harcanan krediyi aşmayı reddeder).
+    const alreadyRestored = await restoredCreditForInvoice(admin, inv.tenant_id as string, invoiceId);
+    if (alreadyRestored === null) {
+      return { error: "Geri yazılmış kredi doğrulanamadı; iade kaydı düşülmedi. Tekrar deneyin." };
+    }
+    const delta = Math.round((restore - alreadyRestored) * 100) / 100;
+    if (delta >= 0.01) {
       const restored = await tryRefundInvoice(admin, {
         tenantId: inv.tenant_id as string,
         invoiceId,
-        amountTry: restore,
-        // Idem anahtarı iade TUTARIYLA ilişkili: farklı tutarla yeniden deneme eski anahtarla çakışıp takılmaz
-        // (toplam geri yazım yine harcanan krediyi aşamaz: SQL tarafı sınırlar).
-        idem: tryRefundIdem(invoiceId, `admin-${Math.round(restore * 100)}`),
+        amountTry: delta,
+        idem: tryRefundIdem(invoiceId, `admin-from-${Math.round(alreadyRestored * 100)}`),
         reason: reason.slice(0, 200),
       });
       if (!restored || (!restored.ok && restored.code !== "no_credit_used")) {
@@ -240,6 +268,53 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
     entityType: "invoice",
     entityId: invoiceId,
     meta: { tenantId: inv.tenant_id, amountTry: amount.value, reason },
+  });
+  refresh(invoiceId);
+  return { ok: true };
+}
+
+/**
+ * Ters ibraz (chargeback) KAYDI: kart sahibi/banka işlemi geri çekti. Yalnız süper admin, neden ZORUNLU. Faturaya
+ * meta.chargeback yazılır (koşullu: ikinci tıklama ikinci kayıt yazmaz) ve referans/ortak programı: faturaya bağlı
+ * ödül/komisyon talepleri geri alınır, verilmiş kredi clawback edilir. Bu ekran para hareketi yapmaz.
+ */
+export async function recordInvoiceChargeback(formData: FormData): Promise<BillingOpResult> {
+  const g = await guard("chargeback", true);
+  if ("error" in g) return { error: g.error };
+  const invoiceId = String(formData.get("invoice_id") ?? "");
+  if (!UUID.test(invoiceId)) return { error: "Geçersiz fatura." };
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
+  if (reason.length < 3) return { error: "Ters ibraz nedenini yazın." };
+
+  const admin = createAdminClient();
+  const { data: inv } = await admin.from("invoices").select("id, tenant_id, status, meta").eq("id", invoiceId).maybeSingle();
+  if (!inv) return { error: "Fatura bulunamadı." };
+  if (inv.status !== "paid") return { error: "Yalnız ödenmiş faturaya ters ibraz kaydı düşülür." };
+  const meta = (inv.meta ?? {}) as Record<string, unknown>;
+  if (meta.chargeback) {
+    await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
+    return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
+  }
+  const { data: updated, error } = await admin
+    .from("invoices")
+    .update({ meta: { ...meta, chargeback: { reason, by: g.staff.id, at: new Date().toISOString(), source: "admin" } } })
+    .eq("id", invoiceId)
+    .eq("status", "paid")
+    .is("meta->chargeback", null)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("recordInvoiceChargeback", error.message);
+    return { error: "Ters ibraz kaydı yazılamadı." };
+  }
+  if (!updated) return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
+  await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
+  await logPlatformActivity({
+    actorId: g.staff.id,
+    action: "billing.invoice.chargeback_recorded",
+    entityType: "invoice",
+    entityId: invoiceId,
+    meta: { tenantId: inv.tenant_id, reason },
   });
   refresh(invoiceId);
   return { ok: true };

@@ -1,6 +1,6 @@
 "use client";
 
-import { markInvoicePaid, recordInvoiceRefund, voidInvoice } from "@/app/actions/platform-billing";
+import { markInvoicePaid, recordInvoiceChargeback, recordInvoiceRefund, voidInvoice } from "@/app/actions/platform-billing";
 import { MANUAL_PAYMENT_METHODS } from "@/lib/billing/invoice-ops";
 import { InlineOp, opFieldClass } from "./inline-op";
 
@@ -9,6 +9,7 @@ export function InvoiceActions({
   status,
   totalTry,
   refunded,
+  chargedBack = false,
   isSuperAdmin,
   today,
 }: {
@@ -16,6 +17,7 @@ export function InvoiceActions({
   status: string;
   totalTry: number;
   refunded: boolean;
+  chargedBack?: boolean;
   isSuperAdmin: boolean;
   today: string;
 }) {
@@ -78,6 +80,21 @@ export function InvoiceActions({
           </label>
           <label className={lbl}>
             İade nedeni
+            <input name="reason" required minLength={3} maxLength={300} className={`mt-1 block w-64 ${opFieldClass}`} />
+          </label>
+        </InlineOp>
+      ) : null}
+      {isSuperAdmin && status === "paid" && !chargedBack ? (
+        <InlineOp
+          label="Ters ibraz kaydı düş"
+          confirmLabel="Ters ibrazı kaydet"
+          tone="danger"
+          hidden={hidden}
+          action={recordInvoiceChargeback}
+          hint="Kart sahibi/banka işlemi geri çektiyse kayıt düşün: bu faturaya bağlı davet/ortak ödülleri geri alınır, verilmiş kredi geri çekilir. Bu ekran para hareketi yapmaz."
+        >
+          <label className={lbl}>
+            Ters ibraz nedeni
             <input name="reason" required minLength={3} maxLength={300} className={`mt-1 block w-64 ${opFieldClass}`} />
           </label>
         </InlineOp>

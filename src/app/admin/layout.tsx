@@ -8,7 +8,8 @@ import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
+import { PLATFORM_MFA_DB_SETTING_KEY, isPlatformMfaRequired, platformMfaSyncIssue } from "@/lib/platform-mfa";
+import { getPlatformSetting } from "@/lib/platform-settings";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { cookies } from "next/headers";
 import { FontScaleBoot } from "@/components/font-scale-boot";
@@ -60,6 +61,9 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
     modules.includes("sistem") ? getAdminHealth().catch(() => null) : Promise.resolve(null),
   ]);
 
+  // MFA tek kaynak uyumu: env ile DB ayarı (SQL kapıları yalnız ayara bakar) ayrışırsa uyarı şeridi.
+  const mfaSyncIssue = platformMfaSyncIssue(isPlatformMfaRequired(), await getPlatformSetting(PLATFORM_MFA_DB_SETTING_KEY));
+
   return (
     <div className="flex min-h-screen bg-canvas">
       <ThemeController />
@@ -68,6 +72,11 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} health={health} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} fontScale={fontScale} />
+        {mfaSyncIssue === "env_on_db_off" ? (
+          <p role="alert" className="border-b border-red-300/50 bg-red-50 px-4 py-1.5 text-center text-xs font-semibold text-red-800">
+            MFA tutarsız: PLATFORM_MFA_ENFORCEMENT açık ama platform_settings &quot;platform.mfa_enforced&quot; kapalı; veritabanı personel kapıları MFA istemiyor. Ayarı da açın.
+          </p>
+        ) : null}
         {!isPlatformMfaRequired() ? (
           <p role="status" className="border-b border-amber-300/50 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-800">
             Geliştirme modu: platform iki adımlı doğrulaması (TOTP) kapalı. Yayın öncesi PLATFORM_MFA_ENFORCEMENT=on yapın.

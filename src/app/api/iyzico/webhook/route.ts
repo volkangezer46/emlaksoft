@@ -13,6 +13,7 @@ import type { BillingCycle, PlanId } from "@/lib/billing/plans";
 import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
 import { tryInvoiceHold } from "@/lib/try-credits/wallet";
 import { saveCardAfterVerifiedPayment } from "@/lib/billing/card-store";
+import { reverseClaimsForInvoiceSafe } from "@/lib/growth/engine";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
   readRequestBodyLimited,
@@ -80,6 +81,30 @@ export async function POST(req: NextRequest) {
   if (!valid) {
     console.warn("iyzico webhook signature reddedildi");
     return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
+  }
+
+  // Ters ibraz (chargeback) bildirimi: imza doğrulandıktan sonra faturaya işaretlenir ve davet/ortak ödülleri geri alınır
+  // (verilmiş kredi clawback). Bildirim türü iyzico panelinde ayrı etkinleştirilir; tanınmayan türler eskisi gibi yok sayılır.
+  if (/chargeback|dispute|ters[\s_-]?ibraz/i.test(iyziEventType) && paymentConversationId) {
+    const admin = createAdminClient();
+    const { data: inv } = await admin
+      .from("invoices")
+      .select("id, status, meta")
+      .filter("meta->>conversationId", "eq", paymentConversationId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!inv) return NextResponse.json({ ok: true, unmatched: true });
+    const invMeta = (inv.meta ?? {}) as Record<string, unknown>;
+    if (!invMeta.chargeback) {
+      await admin
+        .from("invoices")
+        .update({ meta: { ...invMeta, chargeback: { at: new Date().toISOString(), source: "iyzico_webhook", eventType: iyziEventType.slice(0, 60) } } })
+        .eq("id", inv.id as string)
+        .is("meta->chargeback", null);
+    }
+    await reverseClaimsForInvoiceSafe(admin, inv.id as string, "chargeback");
+    return NextResponse.json({ ok: true, chargeback: true });
   }
 
   if (status.toUpperCase() !== "SUCCESS") {

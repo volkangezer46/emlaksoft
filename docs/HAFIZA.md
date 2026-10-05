@@ -225,3 +225,25 @@ Checkout Form'a `cardUserKey` verilir (iyzico sayfası kartı listeler; 3DS iyzi
 Tek, idempotent VERİ migration`ı `20260826000800_default_program_settings.sql` (+rollback, PB13): referans kuralı (`monthly_multiple` 1 aylık bedel, hold 30 gün, kredi 365 gün, tek seferlik), program ayarları (3.→+0,5 ay Gümüş Elçi, 10.→+2 ay Altın Elçi, yıllık tavan 12, hız 5/gün, nakit oranı 0,50, ilk 3 manuel), hoş geldin kredisi 300 TL (fatura payı %50 sınırının altında), `growth_referral_enabled=on` (ortak/nakit/oto-yenileme KAPALI, `platform.mfa_enforced`a dokunulmaz), `billing.plan_definitions` = RECOMMENDED_CATALOG_OVERRIDES kaydı (customPricing temizliği, Profesyonel plan_entitlements 20→15), `ef.tariff` ve 4 kontör paketi. Admin değeri varsa korunur. DOĞRULANMADI (test/lint/build koşulmadı).
 
 Sahibin çalıştıracağı: `npm run db:migrate -- --only 20260826000800_default_program_settings.sql` (önce backup/PITR); ardından `npm run check:migrations -- --release` ve Vercel `RELEASE_MIGRATION` çiftinin güncellenmesi.
+
+## 8. Büyüme motoru güvenlik hotfix'i (20260826000900) — 2026-10-05, CANLI DB'YE UYGULAMA BEKLİYOR (PB14)
+
+Bağımsız güvenlik denetimi bulguları (program canlıda AÇIK; 000600/000800 uygulanmış, dosyalara dokunulmadı). Yeni `20260826000900_growth_hotfix.sql`
+(+ `rollbacks/20260826000900_growth_hotfix.rollback.sql`: 9 orijinal gövde birebir + yeni yardımcıları düşürme; PB14, `scripts/migration-pairs-data.ts`).
+Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürümü; sapmada durur) + seed kural satırı; şema/bayrak değişmez.
+- **B1** ilk-N sayacı yalnız personelce onaylı talepleri sayar · **B2** onaylı talep de eligible_at + davet edilen aktif/yenileme kapısından geçer ·
+  **B3** hoş geldin kredisi kayıtta DEĞİL ilk gerçek ödemede (ödeme yapan aktif davetçi + yeni müşteri; `growth_welcome_apply`) · **ekonomi** ödül = davet edilenin
+  >=1 gerçek yenilemesi (ilk ödemeden >=20 gün sonra) + hâlâ aktif + hold 45 gün; seed kuralı (dokunulmamışsa) hold 45, aylık tavan 5000 ·
+  **B5** `meta.chargeback` = gerçek ödeme değil; admin "Ters ibraz kaydı düş" (`recordInvoiceChargeback`) + iyzico webhook (chargeback/dispute olay adı) talepleri geri alır ·
+  **B9** kademe bonusu yalnız aktif + >=2 ödemeli davetleri sayar, taban geri alınınca eşik altı bonus geri alınır · **B10** `low_cash_ratio` yerine `credit_used` bayrağı
+  (min_cash_ratio ayarı artık kullanılmaz) · **B11** tarama: A yalnız ilk-ödeme adayları, C hazır olmayanları sorguda eler + updated_at ile döner sıra ·
+  **B12** ofis panosu TL yalnız owner/gm (`money_visible`) · **B16** davet önizleme: 8 karakter kod, yalnız aktif+ödeyen davetçi, kayıt sayfasında IP hız sınırı ·
+  **B15** iade kredisi idem anahtarı fatura + önceki geri yazım (fark tamamlanır) · **B4** otomatik yenilemede belirsiz hata = fatura 'initialized' kalır (yalnız kesin ret
+  'initialization_failed'; çift çekim yok; çözülmemiş 'initialized' sonraki denemeyi engeller, mutabakat/yönetici çözer; bayrak KAPALI) · **B6** MFA env + DB ayarı tutarsızlık şeridi
+  + DEPLOY.md zorunlu adım (zorunlu MFA AÇILMADI).
+- **B13 (yalnız belge):** `20260826000800` rollback'i seed ÖNCESİ değerleri bilmez: `updated_by IS NULL` olan platform_settings satırlarını SİLER (seed'den önce SQL ile elle yazılmış
+  değerler de gider), `growth_referral_enabled`'ı 'off' yapar, welcome 300->0 sıfırlar, plan_entitlements 15->20 döndürür. Rollback ÖNCESİ ilgili anahtarların değerlerini kaydedin (`select key, value, updated_by from platform_settings where key in (...)`).
+- **B7 (yalnız belge):** seed `ef.packs`'ı '[]' ya da boşsa yazar (admin bilerek boş bırakıp paketleri kapattıysa ezilir) ve `growth_referral_enabled=on`'u /admin/growth hazırlık
+  kontrolünü ATLAYARAK yazdı (kontrol yalnız `saveGrowthFlags` yolunda). Seed uygulandı; geri alma yok; hotfix'te düzeltme gerekmedi.
+- **Test borcu:** `growth-engine-sql-exec.test.ts` (pglite) yalnız 000600'ü yükler; hotfix davranışları (hold/yenileme, welcome ilk ödemede, low_cash_ratio→credit_used, B1 sayaç)
+  için güncellenmeli/ genişletilmeli. Statik sözleşme: `growth-hotfix-contract.test.ts`. DOĞRULANMADI (test/tsc/lint/build koşulmadı).

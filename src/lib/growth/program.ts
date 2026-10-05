@@ -112,6 +112,8 @@ export type ReferralDashboard = {
   waiting: number;
   paid: number;
   cancelled: number;
+  /** false = TL tutarları yalnız ofis sahibi/genel müdüre açık (earned/pending/davet tutarı 0 gelir). */
+  money_visible: boolean;
   earned_try: number;
   pending_try: number;
   invites: DashboardInvite[];
@@ -149,6 +151,7 @@ export function parseDashboard(raw: unknown): ReferralDashboard | null {
     waiting: num(r.waiting),
     paid: num(r.paid),
     cancelled: num(r.cancelled),
+    money_visible: r.money_visible !== false,
     earned_try: num(r.earned_try),
     pending_try: num(r.pending_try),
     invites,

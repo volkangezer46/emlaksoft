@@ -82,3 +82,4 @@ Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz
 
 ## Bekleyen: varsayılan program seed`i (2026-10-05)
 - `20260826000800_default_program_settings.sql` hazır, canlı DB`ye UYGULAMA BEKLİYOR (referans programı açılır, hoş geldin 300 TL, katalog kaydı, EF paketleri). Komut: `npm run db:migrate -- --only 20260826000800_default_program_settings.sql`, sonra `npm run check:migrations -- --release` + Vercel `RELEASE_MIGRATION` güncelle. Ayrıntı: `docs/HAFIZA.md` §7. DOĞRULANMADI.
+- **Büyüme hotfix'i (PB14):** `20260826000900_growth_hotfix.sql` hazır, canlı DB'ye UYGULAMA BEKLİYOR (referans programı AÇIK olduğundan öncelikli: ilk-N sayacı, bekleme/yenileme kapısı, hoş geldin kredisi ilk ödemede, chargeback, panel gizliliği). Komut: `npm run db:migrate -- --only 20260826000900_growth_hotfix.sql` (önce backup/PITR). Ayrıntı: `docs/HAFIZA.md` §8. DOĞRULANMADI.

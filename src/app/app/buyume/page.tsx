@@ -77,8 +77,8 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
               <StatCard label="Ödedi, bekleme süresinde" value={d.waiting} icon={Hourglass} tone="warning" href={inviteFilterHref("bekliyor")} />
               <StatCard label="Ödül yüklendi" value={d.paid} icon={CheckCircle2} tone="mint" href={inviteFilterHref("odedi")} />
               <StatCard label="İptal / iade" value={d.cancelled} icon={Undo2} tone="danger" href={inviteFilterHref("iptal")} />
-              <StatCard label="Kazanılan kredi" value={formatTry(d.earned_try)} icon={Wallet} tone="mint" href={TRY_WALLET_LINKS.wallet} />
-              <StatCard label="Bekleyen kredi" value={formatTry(d.pending_try)} icon={PiggyBank} tone="warning" href={inviteFilterHref("bekliyor")} />
+              <StatCard label="Kazanılan kredi" value={d.money_visible ? formatTry(d.earned_try) : "Ofis sahibine açık"} icon={Wallet} tone="mint" href={TRY_WALLET_LINKS.wallet} />
+              <StatCard label="Bekleyen kredi" value={d.money_visible ? formatTry(d.pending_try) : "Ofis sahibine açık"} icon={PiggyBank} tone="warning" href={inviteFilterHref("bekliyor")} />
             </div>
           ) : null}
 
@@ -101,15 +101,15 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
             <CardContent className="space-y-2 text-sm text-text-muted">
               {ov.rewardText ? (
                 <p>
-                  Her başarılı davet için: {ov.rewardText}. Ödül, davet ettiğiniz ofisin <strong className="text-ink-950">ilk gerçek ödemesinden</strong> sonra
-                  oluşur; deneme süresi veya kayıt tek başına ödül vermez. İade ya da iptalde ödül geri alınır.
+                  Her başarılı davet için: {ov.rewardText}. Ödül, davet ettiğiniz ofis ilk gerçek ödemesini yaptıktan, <strong className="text-ink-950">bir kez yenileyip</strong> aboneliği aktif kaldıktan ve
+                  bekleme süresi dolduktan sonra yüklenir; deneme süresi veya kayıt tek başına ödül vermez. İade, iptal ya da ters ibrazda ödül geri alınır.
                 </p>
               ) : (
                 <p>Şu an tanımlı bir ödül kuralı yok; bu sayfa yalnız davetlerinizi takip eder ve ödül vaat etmez.</p>
               )}
               {d && d.welcome_credit_try > 0 ? (
                 <p>
-                  Davet ettiğiniz ofis de kazanır: kayıtta {formatTry(d.welcome_credit_try)} hoş geldin hesap kredisi, ilk faturasından düşer.
+                  Davet ettiğiniz ofis de kazanır: ilk ödemesinden sonra {formatTry(d.welcome_credit_try)} hoş geldin hesap kredisi, sonraki faturasından düşer (yalnız yeni müşteri ve ödeme yapan davetçi için).
                 </p>
               ) : null}
               {d && d.tiers.annual_cap_months > 0 ? (

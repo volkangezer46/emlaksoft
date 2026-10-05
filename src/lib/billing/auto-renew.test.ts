@@ -116,6 +116,20 @@ describe("otomatik yenileme: çift tahsilat ve sıra", () => {
     expect(res.skipped).toBe(1);
   });
 
+  it("ağ/zaman aşımı hatasında fatura 'initialized' KALIR (belirsiz; başarısız işaretlenmez)", async () => {
+    chargeStoredCard.mockRejectedValue(new Error("timeout"));
+    const res = await runAutoRenewPass(fakeAdmin(), 1_000);
+    expect(markCheckoutInvoiceFailed).not.toHaveBeenCalled();
+    expect(res.failed).toBe(1);
+  });
+
+  it("yalnız KESİN ret (status=failure + errorCode) faturayı başarısız işaretler", async () => {
+    chargeStoredCard.mockResolvedValue({ status: "failure", errorCode: "10051" });
+    const res = await runAutoRenewPass(fakeAdmin(), 1_000);
+    expect(markCheckoutInvoiceFailed).toHaveBeenCalled();
+    expect(res.failed).toBe(1);
+  });
+
   it("tahsilat doğrulandıktan sonra fulfill hatası faturayı başarısız İŞARETLEMEZ", async () => {
     fulfillSuccessfulPayment.mockRejectedValue(new Error("rpc"));
     const res = await runAutoRenewPass(fakeAdmin(), 1_000);

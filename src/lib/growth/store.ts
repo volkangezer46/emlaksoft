@@ -194,7 +194,8 @@ export async function recordSignupAttributionSafe(tenantId: string, input: Signu
       first_seen_at: new Date().toISOString(),
     });
     if (error && !isMissingTableError(error)) console.error("recordSignupAttribution", error.message);
-    // Davet edilen ofise hoş geldin kredisi (ayar > 0, bayraksız çift, cüzdan hazırsa). Güvenli kanca: kaydı bozmaz.
+    // Hoş geldin kredisi: kayıtta VERİLMEZ (SQL 'awaiting_first_payment' döner); davet edilenin İLK GERÇEK ÖDEMESİNDE
+    // growth_register_referral verir (yalnız ödeme yapan aktif davetçi + yeni müşteri). Güvenli kanca: kaydı bozmaz.
     if (!error && refKind === "referral") await grantWelcomeSafe(admin, tenantId);
   } catch (e) {
     console.error("recordSignupAttribution", e);

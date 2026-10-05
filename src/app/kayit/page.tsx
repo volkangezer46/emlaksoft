@@ -6,7 +6,8 @@ import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { getLiveSiteContent } from "@/lib/site-content/store";
-import { REF_COOKIE, parseRefCookie, parseRefParam } from "@/lib/growth/attribution";
+import { REF_COOKIE, REFERRAL_CODE_LENGTH, parseRefCookie, parseRefParam } from "@/lib/growth/attribution";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { readInvitePreview } from "@/lib/growth/engine";
 import { createClient } from "@/lib/supabase/server";
 import { tx } from "@/lib/site-content/tokens";
@@ -53,7 +54,12 @@ export default async function RegisterPage({
   // Davet bağlantısı (çerez ya da ?ref): "X sizi davet etti" + hoş geldin avantajı. Hata/kapalı program = banner yok.
   const jar = await cookies();
   const touch = parseRefCookie(jar.get(REF_COOKIE)?.value) ?? parseRefParam(params.ref);
-  const preview = touch?.kind === "referral" ? await readInvitePreview(await createClient(), touch.code) : null;
+  // Anon RPC: kod tam uzunlukta olmalı ve IP başına hız sınırı (kod tarama/ofis adı sızdırma koruması). Hata = banner yok.
+  const previewAllowed =
+    touch?.kind === "referral" && touch.code.length === REFERRAL_CODE_LENGTH
+      ? (await checkRateLimit(`invite-preview:${await clientIp()}`, { limit: 30, windowSec: 600, failurePolicy: "deny" })).allowed
+      : false;
+  const preview = previewAllowed && touch?.kind === "referral" ? await readInvitePreview(await createClient(), touch.code) : null;
   return (
     <RegisterForm
       copy={{
