@@ -40,7 +40,9 @@ import { getAppActions } from "@/lib/palette-core";
 import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
 import { getClosedFeatures } from "@/lib/modules/state";
 import { RouteSplash } from "@/components/route-splash";
-import { parseUiPrefs, uiPrefCookieName, uiPrefsCss } from "@/lib/ui-prefs";
+import { parseUiPrefs, uiPrefCookieName } from "@/lib/ui-prefs";
+import { FontScaleBoot } from "@/components/font-scale-boot";
+import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 
 /** Sekme başlığı: sayfalar `metadata.title` verir, şablon ofis uygulamasında "Sayfa · EmlakSoft" üretir. */
 export const metadata = { title: { default: "EmlakSoft", template: "%s · EmlakSoft" } };
@@ -237,10 +239,15 @@ async function AppShell({
 
   const jar = await cookies();
   const impersonationCookieMatches = jar.get(IMPERSONATE_COOKIE)?.value === tenantId;
-  // Arayüz tercihi (Sade görünüm + yazı boyutu): ofis+kullanıcı kapsamlı çerez, SSR'da uygulanır.
+  // Arayüz tercihi (Sade görünüm): ofis+kullanıcı kapsamlı çerez, SSR'da uygulanır.
   const uiPrefCookie = uiPrefCookieName(tenantId, user?.id);
   const uiPrefs = parseUiPrefs(uiPrefCookie ? jar.get(uiPrefCookie)?.value : undefined);
-  const uiCss = uiPrefsCss(uiPrefs.font);
+  // Yazı boyutu: kullanıcıya bağlı çerez > auth metadata > Normal (başka hesabın çerezi yok sayılır).
+  const fontScale = resolveFontScale({
+    userId: user?.id,
+    cookieValue: jar.get(FONT_SCALE_COOKIE)?.value,
+    metadataValue: user?.user_metadata?.[FONT_SCALE_META_KEY],
+  });
   const impName = impersonationCookieMatches
     ? (jar.get("es_impersonate_name")?.value ?? office?.name ?? "Hedef ofis")
     : (office?.name ?? "Hedef ofis");
@@ -248,7 +255,7 @@ async function AppShell({
   return (
     <ToastProvider>
       <ThemeController />
-      {uiCss ? <style>{uiCss}</style> : null}
+      <FontScaleBoot scale={fontScale} />
       <SidebarBoot />
       <ErrorBoundary>
         <ClosedModulesProvider closed={closedModules}>
@@ -323,6 +330,7 @@ async function AppShell({
                   ...(accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),
                 ]}
                 viewPrefs={uiPrefCookie ? { cookieName: uiPrefCookie, initial: uiPrefs } : undefined}
+                fontScale={user && !impersonating ? fontScale : undefined}
               />
             </div>
           </header>

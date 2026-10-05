@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { estimateMultiSourceValue } from "@/lib/valuation";
+import { EMLAKFIYATI_SOURCE_NAME } from "@/lib/integrations/emlakfiyati/contract";
 import { intakeLead } from "@/lib/lead-intake";
 import { districtWithProvinceResult, getDistrictOptions } from "@/lib/geo/reader";
 import { publicValuationSourceEntry } from "@/lib/public-valuation-source";
@@ -24,7 +25,7 @@ const VALUATION_CONSENT_VERSION = "valuation-lead-v1-2026-08-02";
  * verisi sızmaz.
  *
  * Değerleme mevcut motoru yeniden kullanır (estimateMultiSourceValue →
- * emsal RPC + Endeksa + Tapusor). Emsal çıkmazsa ilçe medyanı (region_stats)
+ * emsal RPC + EmlakFiyati endeksi). Emsal çıkmazsa ilçe medyanı (region_stats)
  * son çare; o da yoksa dürüstçe "yeterli veri yok" denir.
  */
 
@@ -76,7 +77,7 @@ export async function estimatePublicValuation(
   if ((input.website ?? "").trim()) return { ok: true, sufficient: false };
   if (!input.kvkk) return { ok: false, error: "Devam etmek için KVKK onayı gerekli." };
 
-  // Ücretli harici API çağrısına (Endeksa/Tapusor) inmeden IP bazlı hız sınırı —
+  // Ücretli harici API çağrısına (EmlakFiyati) inmeden IP bazlı hız sınırı —
   // sınırsız çağrı doğrudan maliyet/DoS vektörü (bkz. kardeş dosyalardaki
   // vitrin-degerleme deseni: booking-public.ts, open-house-public.ts, vb.).
   const ip = await clientIp();
@@ -109,7 +110,7 @@ export async function estimatePublicValuation(
 
   const provinceName = relName(district.province as Rel);
 
-  // Mevcut karma motor: emsal (kendi verimiz) + varsa Endeksa/Tapusor.
+  // Mevcut karma motor: emsal (kendi verimiz) + varsa EmlakFiyati endeksi.
   // Public bağlamda liste fiyatı yok — motor yalnızca bağımsız kaynaklarla çalışır.
   const est = await estimateMultiSourceValue({
     listPrice: null,
@@ -125,7 +126,10 @@ export async function estimatePublicValuation(
 
   if (est.low != null && est.high != null && est.mid != null) {
     const band = roundBand(est.low, est.high);
-    return { ok: true, sufficient: true, low: band.low, high: band.high, note: est.notes };
+    // Kaynak etiketi: piyasa endeksi hesaba girdiyse ziyaretçiye de söylenir (şeffaflık).
+    const usedIndex = est.sources.some((s) => s.weight > 0 && s.name === EMLAKFIYATI_SOURCE_NAME);
+    const note = usedIndex ? `${est.notes} Piyasa verisi: ${EMLAKFIYATI_SOURCE_NAME}.` : est.notes;
+    return { ok: true, sufficient: true, low: band.low, high: band.high, note };
   }
 
   // Son çare: ilçe geneli medyan ₺/m² (region_stats — yine tenant'ın kendi verisi).

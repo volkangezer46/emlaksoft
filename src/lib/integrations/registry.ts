@@ -8,8 +8,7 @@
  * Yeni entegrasyon = buraya kayıt + adaptör + uçtan uca kabul sözleşmesi.
  */
 
-import { isEndeksaConfiguredFull } from "./endeksa";
-import { isTapusorConfiguredFull } from "./tapusor";
+import { isEmlakFiyatiConfigured } from "./emlakfiyati/client";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { isPortalConfigured } from "@/lib/integrations/portals";
 import { getNetgsmConfig, getWhatsAppConfig } from "@/lib/messaging/netgsm";
@@ -44,15 +43,12 @@ export type Integration = {
 
 /** Tüm entegrasyonları CANLI durumlarıyla döndürür (yalnız sunucuda çağır). */
 export async function listIntegrations(tenantId: string | null = null): Promise<Integration[]> {
+  const emlakFiyatiConfigured = isEmlakFiyatiConfigured();
   const [
-    endeksaConfigured,
-    tapusorConfigured,
     netgsmConfigured,
     whatsappConfigured,
     portalConfigured,
   ] = await Promise.all([
-    isEndeksaConfiguredFull(),
-    isTapusorConfiguredFull(),
     tenantId
       ? isTenantSmsAvailable(tenantId)
       : getNetgsmConfig().then(Boolean),
@@ -147,31 +143,13 @@ export async function listIntegrations(tenantId: string | null = null): Promise<
       requires: "Meta uygulaması + sayfa erişim tokenı (META_PAGE_TOKEN)",
     },
     {
-      key: "endeksa",
-      name: "Endeksa",
-      category: "degerleme",
-      description: "Bölge endeksi ve emsal m² verisiyle değerleme motorunu besler.",
-      unlocks: "Emsal motorunda gerçek piyasa verisiyle otomatik değerleme.",
-      status: endeksaConfigured ? "configured" : "setup_required",
-      requires: "Endeksa API (ENDEKSA_CLIENT_ID / SECRET) veya ayarlardan anahtar",
-    },
-    {
-      key: "tapusor",
-      name: "Tapusor EDİ",
-      category: "degerleme",
-      description: "Yapay zekâ destekli konut değerleme raporu (EDİ).",
-      unlocks: "Değerlemede ikinci bağımsız AI görüşü.",
-      status: tapusorConfigured ? "configured" : "setup_required",
-      requires: "Tapusor API anahtarı (TAPUSOR_API_KEY)",
-    },
-    {
       key: "emlakfiyati",
-      name: "Emlakfiyati",
+      name: "EmlakFiyati",
       category: "degerleme",
-      description: "Değerleme motoruna dördüncü kaynak olarak takılacak arayüz iskeleti; sağlayıcı API belgesi ve anlaşması bekleniyor.",
-      unlocks: "Değerlemede Emlakfiyati tahmini (ofis emsal motoru en yüksek ağırlıkta kalır).",
-      status: "planned",
-      requires: "Emlakfiyati API belgesi + ticari anlaşma + anahtarlar (sahibin sağlayacağı liste: ONERI bölüm 3.2)",
+      description: "Aylık bölge fiyat endeksi (medyan TL/m², çeyrekler arası bant, değişim ve 12 aylık trend). Yalnız coğrafi yol ve tip gönderilir; kişisel veri gitmez.",
+      unlocks: "Değerleme motorunda piyasa endeksi kaynağı, bölge analizinde medyan/trend ve portföyde bölge referansı.",
+      status: emlakFiyatiConfigured ? "configured" : "setup_required",
+      requires: "Sunucu ortam değişkeni EMLAKFIYATI_API_KEY",
     },
     {
       key: "bank_rates",

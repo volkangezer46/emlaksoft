@@ -5,7 +5,6 @@ import {
   Gauge,
   Hourglass,
   Landmark,
-  MapPinned,
   PiggyBank,
   Sparkles,
   Timer,
@@ -13,8 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { isEndeksaConfiguredFull } from "@/lib/integrations/endeksa";
-import { isTapusorConfiguredFull } from "@/lib/integrations/tapusor";
+import { isEmlakFiyatiConfigured } from "@/lib/integrations/emlakfiyati/client";
 import { DAY_MS } from "@/lib/clock";
 import { ValuationForm } from "./valuation-form";
 import { DataPartnerStatus } from "@/components/app/data-partner-badges";
@@ -66,8 +64,6 @@ export default async function ValuationPage({
     { data: valuations },
     { data: properties },
     { data: provinces },
-    endeksaOn,
-    tapusorOn,
     { data: analyticProps },
     { data: wonDeals },
   ] = await Promise.all([
@@ -83,8 +79,6 @@ export default async function ValuationPage({
       .order("created_at", { ascending: false })
       .limit(100),
     provinceOptionsResult(),
-    isEndeksaConfiguredFull(),
-    isTapusorConfiguredFull(),
     // D4 — kira çarpanı / getiri: fiyat + m² girilmiş portföyler (satılık ve kiralık)
     supabase
       .from("properties")
@@ -260,10 +254,9 @@ export default async function ValuationPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + Endeksa bölge endeksi + Tapusor EDİ yapay zeka değerlemesi — insan onayı şart." actions={
+      <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + EmlakFiyati bölge endeksi — insan onayı şart." actions={
 <div className="theme-dark flex flex-col gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">
-            <DataPartnerStatus name="Endeksa" icon={Landmark} configured={endeksaOn} />
-            <DataPartnerStatus name="Tapusor" icon={MapPinned} configured={tapusorOn} />
+            <DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={isEmlakFiyatiConfigured()} />
           </div>
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
@@ -300,7 +293,6 @@ export default async function ValuationPage({
               {rows.map((v) => {
                 const sources = (Array.isArray(v.sources) ? v.sources : []) as ValuationSource[];
                 const priceSources = sources.filter((s) => s.weight > 0);
-                const investmentScoreSource = sources.find((s) => s.name === "Tapusor yatırım puanı");
                 return (
                   <article key={v.id} className="group relative rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4 transition hover:border-brand-300">
                     {/* Kartın tamamı rapora gider; alttaki ikincil linkler z-10 ile üstte kalır */}
@@ -328,22 +320,15 @@ export default async function ValuationPage({
                           <span
                             key={s.name}
                             className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                              s.name.includes("Endeksa")
+                              s.name.includes("EmlakFiyati")
                                 ? "bg-cyan-500/10 text-cyan-700"
-                                : s.name.includes("Tapusor")
-                                  ? "bg-brand-600/10 text-brand-600"
-                                  : "bg-ink-950/6 text-text-muted"
+                                : "bg-ink-950/6 text-text-muted"
                             }`}
                           >
                             {s.name}
                           </span>
                         ))}
                       </div>
-                    ) : null}
-                    {investmentScoreSource ? (
-                      <p className="mt-2 text-xs font-semibold text-brand-600">
-                        Tapusor yatırım puanı: {investmentScoreSource.value}/100
-                      </p>
                     ) : null}
                     {/* Rapor bagi eklendi: degerleme uretiliyordu ama musteriye
                         verilecek bir CIKTISI yoktu — sonuc yalnizca bu karttaki

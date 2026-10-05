@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { CheckCircle2, Circle } from "lucide-react";
 
-/** Değerleme sayfası hero'sunda Endeksa/Tapusor bağlantı durumu rozeti */
+/** Değerleme sayfası hero'sunda EmlakFiyati bağlantı durumu rozeti */
 export function DataPartnerStatus({
   name,
   icon: Icon,

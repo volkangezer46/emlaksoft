@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { runWhenIdle } from "@/lib/idle";
+import type { FontScale } from "@/lib/font-scale";
 import type { UiPrefs } from "@/lib/ui-prefs";
 
 export type UserMenuLink = { href: string; label: string } & (
@@ -25,8 +26,10 @@ export function UserMenu(props: {
   name: string;
   subtitle: string;
   links?: UserMenuLink[];
-  /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
+  /** Sade görünüm (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
+  /** Kayıtlı yazı boyutu (Küçük/Normal/Büyük); sunucu kabuğundan gelir. */
+  fontScale?: FontScale;
 }) {
   const [mounted, setMounted] = useState(false);
   // Sayfa boşalınca panel parçasını arka planda indir: ilk tıklama beklemesin (hover/odak ısıtması ek güvence).

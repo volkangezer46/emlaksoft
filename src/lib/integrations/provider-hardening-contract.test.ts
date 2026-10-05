@@ -1,35 +1,50 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+
+// Kaldırılan sağlayıcı adları parçalı yazılır (bu dosya da taramaya takılmasın).
+const REMOVED_PROVIDERS = new RegExp(["end" + "eksa", "tapu" + "sor"].join("|"), "i");
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const valuation = read("src/lib/valuation.ts");
-const endeksa = read("src/lib/integrations/endeksa.ts");
-const tapusor = read("src/lib/integrations/tapusor.ts");
+const emlakfiyati = read("src/lib/integrations/emlakfiyati/client.ts");
 const portals = read("src/lib/integrations/portals/index.ts");
 const portalActions = read("src/app/actions/portal-keys.ts");
 const efatura = read("src/lib/efatura.ts");
 
 describe("external provider hardening contract", () => {
-  it("honors database-backed valuation settings in the real request path", () => {
-    expect(valuation).toContain("isEndeksaConfiguredFull");
-    expect(valuation).toContain("isTapusorConfiguredFull");
-    expect(endeksa).toContain("(await getEndeksaConfigFull()) ?? getEndeksaConfig()");
-    expect(tapusor).toContain("(await getTapusorConfigFull()) ?? getTapusorConfig()");
+  it("wires EmlakFiyati into the real valuation path and never reads removed providers", () => {
+    expect(valuation).toContain("getEndeksForPlace");
+    expect(valuation).not.toMatch(REMOVED_PROVIDERS);
   });
 
-  it("bounds provider requests and keys the OAuth cache by full configuration", () => {
-    expect(endeksa).toContain("fetchExternal(");
-    expect(tapusor).toContain("fetchExternal(");
-    expect(endeksa).toContain("ENDEKSA_TOKEN_MAX_RESPONSE_BYTES");
-    expect(endeksa).toContain("ENDEKSA_VALUATION_MAX_RESPONSE_BYTES");
-    expect(tapusor).toContain("TAPUSOR_MAX_RESPONSE_BYTES");
-    expect(endeksa).not.toMatch(/\bfetch\s*\(/);
-    expect(tapusor).not.toMatch(/\bfetch\s*\(/);
-    expect(endeksa).toContain('redirect: "error"');
-    expect(tapusor).toContain('redirect: "error"');
-    expect(endeksa).toContain("configKey: key");
-    expect(endeksa).toContain("config.clientSecret");
+  it("leaves no code reference to the removed valuation providers under src/ or scripts/", () => {
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== "node_modules" && entry.name !== ".next") walk(full);
+        } else if (/\.(?:ts|tsx|css|json)$/.test(entry.name) && !full.endsWith("provider-hardening-contract.test.ts")) {
+          if (REMOVED_PROVIDERS.test(readFileSync(full, "utf8"))) hits.push(full);
+        }
+      }
+    };
+    walk(resolve(process.cwd(), "src"));
+    walk(resolve(process.cwd(), "scripts"));
+    expect(hits).toEqual([]);
+  });
+
+  it("bounds EmlakFiyati requests: single host, https only, no redirects, size cap, env-only key", () => {
+    expect(emlakfiyati).toContain("fetchExternal(");
+    expect(emlakfiyati).toContain("normalizeProviderBaseUrl(");
+    expect(emlakfiyati).toContain("MAX_RESPONSE_BYTES");
+    expect(emlakfiyati).toContain("PROVIDER_REQUEST_TIMEOUT_MS");
+    expect(emlakfiyati).not.toMatch(/fetch\s*\(/);
+    expect(emlakfiyati).toContain("process.env.EMLAKFIYATI_API_KEY");
+    expect(emlakfiyati).not.toContain("NEXT_PUBLIC_EMLAKFIYATI");
+    // Anahtar hiçbir log çağrısına girmez.
+    expect(emlakfiyati).not.toMatch(/console\.\w+\([^)]*key/);
   });
 
   it("validates portal identity and provider base URL before saving or fetching", () => {

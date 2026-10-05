@@ -20,6 +20,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
+import type { FontScale } from "@/lib/font-scale";
 
 const CRUMB: Record<string, string> = {
   admin: "Kontrol paneli",
@@ -50,10 +51,12 @@ export function AdminTopbar({
   roleLabel,
   staffName,
   modules,
+  fontScale,
 }: {
   roleLabel: string;
   staffName: string;
   modules: PlatformModule[];
+  fontScale?: FontScale;
 }) {
   const pathname = usePathname();
   const [clock, setClock] = useState("");
@@ -150,6 +153,7 @@ export function AdminTopbar({
           initials={staffName.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "P"}
           name={staffName}
           subtitle={roleLabel}
+          fontScale={fontScale}
           links={[
             { href: "/admin/hesabim", label: "Hesabım", icon: UserRound },
             { href: "/app", label: "Ofis paneline dön", icon: Undo2 },

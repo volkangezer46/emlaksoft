@@ -12,6 +12,7 @@ import {
   type AccentPref,
   type ThemePref,
 } from "@/lib/theme";
+import { FontScalePicker } from "@/components/font-scale-picker";
 import { cn } from "@/lib/utils";
 
 const MODES: { value: ThemePref; label: string; icon: typeof Sun }[] = [
@@ -100,6 +101,10 @@ export function AppearancePanel({ className }: { className?: string }) {
             );
           })}
         </div>
+      </section>
+
+      <section aria-label="Yazı boyutu">
+        <FontScalePicker />
       </section>
 
       <section aria-label="Canlı önizleme" className="rounded-[var(--radius-card)] border border-line bg-surface-2 p-3">

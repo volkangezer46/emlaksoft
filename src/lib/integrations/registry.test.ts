@@ -3,8 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const providerMocks = vi.hoisted(() => ({
-  endeksa: vi.fn(),
-  tapusor: vi.fn(),
+  emlakfiyati: vi.fn(),
   tenantSms: vi.fn(),
   tenantWhatsApp: vi.fn(),
   platformNetgsm: vi.fn(),
@@ -13,11 +12,8 @@ const providerMocks = vi.hoisted(() => ({
   portal: vi.fn(),
 }));
 
-vi.mock("./endeksa", () => ({
-  isEndeksaConfiguredFull: providerMocks.endeksa,
-}));
-vi.mock("./tapusor", () => ({
-  isTapusorConfiguredFull: providerMocks.tapusor,
+vi.mock("./emlakfiyati/client", () => ({
+  isEmlakFiyatiConfigured: providerMocks.emlakfiyati,
 }));
 vi.mock("@/lib/messaging/netgsm", () => ({
   getNetgsmConfig: providerMocks.platformNetgsm,
@@ -36,6 +32,9 @@ vi.mock("@/lib/integrations/portals", () => ({
 
 import { listIntegrations } from "./registry";
 
+// Kaldırılan sağlayıcı adları parçalı yazılır: repo genelindeki "kalıntı yok" taramasına takılmasın.
+const REMOVED_PROVIDER_KEYS = ["end" + "eksa", "tapu" + "sor"];
+
 function statusOf(
   integrations: Awaited<ReturnType<typeof listIntegrations>>,
   key: string,
@@ -46,8 +45,7 @@ function statusOf(
 describe("integration readiness registry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    providerMocks.endeksa.mockResolvedValue(false);
-    providerMocks.tapusor.mockResolvedValue(false);
+    providerMocks.emlakfiyati.mockReturnValue(false);
     providerMocks.tenantSms.mockResolvedValue(false);
     providerMocks.tenantWhatsApp.mockResolvedValue(false);
     providerMocks.platformNetgsm.mockResolvedValue(null);
@@ -112,5 +110,15 @@ describe("integration readiness registry", () => {
     expect(statusOf(integrations, "iyzico")).toBe("configured");
     expect(statusOf(integrations, "property_portals")).toBe("configured");
     expect(statusOf(integrations, "efatura")).toBe("planned");
+  });
+
+  it("reports EmlakFiyati from the API key readiness and no longer lists removed providers", async () => {
+    let integrations = await listIntegrations("tenant-4");
+    expect(statusOf(integrations, "emlakfiyati")).toBe("setup_required");
+    expect(integrations.some((i) => REMOVED_PROVIDER_KEYS.includes(i.key))).toBe(false);
+
+    providerMocks.emlakfiyati.mockReturnValue(true);
+    integrations = await listIntegrations("tenant-4");
+    expect(statusOf(integrations, "emlakfiyati")).toBe("configured");
   });
 });

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, Trophy, TrendingDown, TrendingUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -7,6 +8,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { ChartFrame, BarCompare, AreaTrend } from "@/app/app/_ui/lazy-chart";
 import { compareTr } from "@/lib/tr-text";
 import { now } from "@/lib/clock";
+import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
+import { EMLAKFIYATI_TIPS, type EmlakFiyatiTip } from "@/lib/integrations/emlakfiyati/contract";
 import { PrintReportButton } from "./print-report-button";
 
 export const metadata = { title: "Bölge Analizi" };
@@ -46,9 +49,9 @@ function money(n: number | null) {
 /**
  * Bölge Analizi — ilçe bazlı piyasa görünümü.
  *
- * KAYNAK: Yalnızca ofisin KENDİ portföy ve anlaşma verisi. Hiçbir dış siteden
- * veri kazınmıyor; Endeksa/Tapusor gibi sözleşmeli kaynaklar anahtar
- * tanımlıysa değerleme akışında ayrıca devreye giriyor.
+ * KAYNAK: Ofisin KENDİ portföy ve anlaşma verisi. Hiçbir dış siteden veri
+ * kazınmıyor; sözleşmeli piyasa endeksi (EmlakFiyati) anahtar tanımlıysa seçili
+ * ilçenin panelinde ayrıca gösterilir ve değerleme akışında kaynak olur.
  *
  * NEDEN ŞİMDİ MÜMKÜN: Bu sayfa `properties.district_id` olmadan anlamsızdı ve
  * o kolon hiçbir form tarafından doldurulmuyordu. İlçe seçimi eklendikten
@@ -57,7 +60,7 @@ function money(n: number | null) {
 export default async function RegionAnalysisPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tx?: string; months?: string; district?: string }>;
+  searchParams?: Promise<{ tx?: string; months?: string; district?: string; ef?: string }>;
 }) {
   const { tenantId } = await requireModulePage("reports", "/app/bolge-analizi");
   const params = (await searchParams) ?? {};
@@ -69,6 +72,11 @@ export default async function RegionAnalysisPage({
     typeof params.district === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.district)
       ? params.district
       : "";
+
+  // EmlakFiyati endeks türü — yalnız beyaz liste (konut | arsa).
+  const efTip: EmlakFiyatiTip = (EMLAKFIYATI_TIPS as readonly string[]).includes(params.ef ?? "")
+    ? (params.ef as EmlakFiyatiTip)
+    : "konut";
 
   const supabase = await createClient();
   // Kira çarpanı için her iki işlem tipinin medyanı gerekiyor. Ana çağrı zaten
@@ -266,7 +274,7 @@ export default async function RegionAnalysisPage({
         className="no-print mb-0"
         eyebrow="Kendi verinizden piyasa görünümü"
         title="Bölge analizi"
-        description="İlçe bazında medyan m² fiyatı, listede kalma süresi ve kapanan işlem hacmi."
+        description="İlçe bazında medyan m² fiyatı, listede kalma süresi ve kapanan işlem hacmi. Bir ilçeyi seçince EmlakFiyati piyasa endeksi de görünür."
       />
 
       <div className="no-print grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -447,6 +455,22 @@ export default async function RegionAnalysisPage({
                   </div>
                 )}
               </ChartFrame>
+
+              {/* ---- EmlakFiyati piyasa endeksi (dış, sözleşmeli kaynak) ---- */}
+              <div className="no-print">
+                <Suspense fallback={<div className="h-40 animate-pulse rounded-[var(--radius-panel)] bg-line" role="status" aria-label="EmlakFiyati endeksi yükleniyor" />}>
+                <EmlakFiyatiEndeksPanel
+                  province={selected.province_name}
+                  district={selected.district_name}
+                  tip={efTip}
+                  tipLinks={EMLAKFIYATI_TIPS.map((t) => ({
+                    tip: t,
+                    href: `/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}&district=${selected.district_id}&ef=${t}#emlakfiyati-endeks`,
+                  }))}
+                  stockHref={`/app/portfoyler?q=${encodeURIComponent(selected.district_name)}`}
+                />
+                </Suspense>
+              </div>
 
               {/* ---- PİYASA ZEKÂSI: stok / satış hızı / kapanış zaman serisi ---- */}
               {marketTrend.length >= 2 ? (
