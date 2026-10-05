@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const settings = vi.hoisted(() => ({ set: vi.fn(async () => true), get: vi.fn(async () => null as string | null) }));
+const settings = vi.hoisted(() => ({
+  set: vi.fn(async (_k: string, _v: string | null) => true),
+  get: vi.fn(async (_k: string) => null as string | null),
+}));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({
@@ -10,8 +13,13 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/platform-settings", () => ({
   setPlatformSetting: settings.set,
   getPlatformSetting: settings.get,
+  getPlatformSettingsMany: async (keys: readonly string[]) => Object.fromEntries(keys.map((k) => [k, null])),
 }));
+vi.mock("@/lib/platform-notify", () => ({ notifyPlatformStaff: vi.fn(async () => undefined) }));
 
+import { __setEmlakFiyatiAdapterTestHooks } from "./adapter";
+import { invalidateEmlakFiyatiKeyCache } from "./keys";
+import { FAKE_ENV_KEY } from "./test-fixtures";
 import {
   getEndeks,
   getEndeksForPlace,
@@ -19,7 +27,7 @@ import {
   resetEmlakFiyatiStateForTests,
 } from "./client";
 
-const FAKE_KEY = "test-key-not-real";
+const FAKE_KEY = FAKE_ENV_KEY;
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" }, ...init });
@@ -49,6 +57,8 @@ describe("EmlakFiyati istemcisi (fetch mock — gerçek API çağrısı yok)", (
 
   beforeEach(() => {
     resetEmlakFiyatiStateForTests();
+    invalidateEmlakFiyatiKeyCache();
+    __setEmlakFiyatiAdapterTestHooks({ sleep: async () => undefined, random: () => 0.5 });
     settings.set.mockClear();
     vi.stubEnv("EMLAKFIYATI_API_KEY", FAKE_KEY);
     fetchMock = vi.fn();
@@ -64,7 +74,8 @@ describe("EmlakFiyati istemcisi (fetch mock — gerçek API çağrısı yok)", (
 
   it("anahtar yoksa etkin değil döner ve ağ çağrısı yapmaz", async () => {
     vi.stubEnv("EMLAKFIYATI_API_KEY", "");
-    expect(isEmlakFiyatiConfigured()).toBe(false);
+    invalidateEmlakFiyatiKeyCache();
+    expect(await isEmlakFiyatiConfigured()).toBe(false);
     expect(await getEndeks({ path: "istanbul/kadikoy", tip: "konut" })).toEqual({ status: "disabled" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -81,7 +92,7 @@ describe("EmlakFiyati istemcisi (fetch mock — gerçek API çağrısı yok)", (
     expect(init.redirect).toBe("error");
     expect(init.cache).toBe("no-store");
     expect(init.body).toBeUndefined();
-    expect(settings.set).toHaveBeenCalledWith("emlakfiyati_last_ok_at", expect.any(String));
+    await vi.waitFor(() => expect(settings.set).toHaveBeenCalledWith("emlakfiyati_last_ok_at", expect.any(String)));
   });
 
   it("boş dizi ve 404 'veri yok' sayılır", async () => {
@@ -104,11 +115,12 @@ describe("EmlakFiyati istemcisi (fetch mock — gerçek API çağrısı yok)", (
     expect(JSON.stringify((console.error as unknown as { mock: { calls: unknown[] } }).mock.calls)).not.toContain(FAKE_KEY);
   });
 
-  it("429 Retry-After'a saygı gösterir: bekleme süresince hiçbir yola çağrı yapılmaz", async () => {
-    fetchMock.mockResolvedValue(new Response("", { status: 429, headers: { "retry-after": "120" } }));
+  it("429 (Retry-After yok): geri çekilmeyle yeniden dener, sonra soğuma süresince hiçbir yola çağrı yapılmaz", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 429 }));
     expect((await getEndeks({ path: "istanbul/kadikoy", tip: "konut" })).status).toBe("error");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect((await getEndeks({ path: "ankara/cankaya", tip: "konut" })).status).toBe("error");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("bozuk yanıt gövdesi ve ağ hatası fırlatmaz, error döner", async () => {
@@ -130,6 +142,9 @@ describe("EmlakFiyati istemcisi (fetch mock — gerçek API çağrısı yok)", (
     fetchMock.mockResolvedValue(new Response("", { status: 500 }));
     const failed = await getEndeksForPlace({ province: "Ankara", district: "Çankaya", tip: "konut" });
     expect(failed.status).toBe("error");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Adaptör 5xx'i sınırlı yeniden dener (3 deneme) ama hepsi AYNI yola gider: üst seviyeye inilmez.
+    const failedPaths = new Set(fetchMock.mock.calls.map((c) => new URL(c[0] as string).searchParams.get("path")));
+    expect([...failedPaths]).toEqual(["ankara/cankaya"]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

@@ -11,7 +11,7 @@ import { relativeTimeTR } from "@/lib/admin-format";
 import { msSince } from "@/lib/clock";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
-import { getEmlakFiyatiLastSuccessAt, isEmlakFiyatiConfigured } from "@/lib/integrations/emlakfiyati/client";
+import { getEmlakFiyatiAdminStatus } from "@/lib/integrations/emlakfiyati/admin-status";
 import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
 import { getPortalConfig } from "@/lib/integrations/portals";
 import { CronRunButton } from "./cron-run-button";
@@ -78,7 +78,7 @@ export async function SystemView() {
   // Tüm platform ayarları + geo sayımları tek turda (bağımsız → tam paralel)
   const [
     dbKey,
-    emlakFiyatiLastOk,
+    emlakFiyatiStatus,
     dbNetgsmUser, dbNetgsmPass, dbNetgsmHeader, dbWaUrl, dbWaToken,
     sahibindenConfig, hepsiemlakConfig, zingatConfig, emlakjetConfig,
     { count: provinces }, { count: districts }, { count: neighborhoods },
@@ -88,7 +88,7 @@ export async function SystemView() {
     { data: manualRunRows },
   ] = await Promise.all([
     getPlatformSetting("openai_api_key"),
-    getEmlakFiyatiLastSuccessAt(),
+    getEmlakFiyatiAdminStatus(),
     getPlatformSetting("netgsm_usercode"),
     getPlatformSetting("netgsm_password"),
     getPlatformSetting("netgsm_msgheader"),
@@ -138,8 +138,10 @@ export async function SystemView() {
   const keySource: "db" | "env" | "none" = dbKey?.trim() ? "db" : envKey ? "env" : "none";
   const maskedKey = activeKey ? mask(activeKey) : null;
 
-  // EmlakFiyati — yalnız sunucu ortam değişkeni; anahtar değeri ASLA gösterilmez (yalnız tanımlı mı).
-  const emlakFiyatiConfigured = isEmlakFiyatiConfigured();
+  // EmlakFiyati — anahtar admin'de şifreli (veya env yedek); değeri ASLA gösterilmez (yalnız durum).
+  const emlakFiyatiConfigured = emlakFiyatiStatus.configured;
+  const emlakFiyatiLastOk = emlakFiyatiStatus.lastOkAt;
+  const emlakFiyatiAlarm = emlakFiyatiStatus.authAlarm;
 
   // Portal API anahtarları
   const sahibindenKey  = sahibindenConfig?.apiKey ?? null;
@@ -376,14 +378,24 @@ export async function SystemView() {
                   <Landmark className="h-3.5 w-3.5 text-cyan-600" /> EmlakFiyati (bölge endeksi)
                 </span>
                 <span className="mt-0.5 block text-xs font-normal text-text-muted">
-                  {emlakFiyatiConfigured
-                    ? emlakFiyatiLastOk
-                      ? `Son başarılı çağrı: ${relativeTimeTR(emlakFiyatiLastOk)}`
-                      : "Henüz başarılı çağrı kaydı yok"
-                    : "EMLAKFIYATI_API_KEY tanımlı değil"}
+                  {emlakFiyatiAlarm
+                    ? "Anahtar reddedildi (401): yeni anahtar girin"
+                    : emlakFiyatiConfigured
+                      ? emlakFiyatiLastOk
+                        ? `Son başarılı çağrı: ${relativeTimeTR(emlakFiyatiLastOk)}`
+                        : "Henüz başarılı çağrı kaydı yok"
+                      : "API anahtarı tanımlı değil"}
+                  {" · "}
+                  <Link href="/admin/sistem?sekme=emlakfiyati" className="font-semibold text-brand-600 hover:underline">
+                    Yönet
+                  </Link>
                 </span>
               </span>
-              <StatusPill ok={emlakFiyatiConfigured} okLabel="Bağlı" badLabel="Bağlantı yok" />
+              <StatusPill
+                ok={emlakFiyatiConfigured && !emlakFiyatiAlarm}
+                okLabel="Bağlı"
+                badLabel={emlakFiyatiAlarm ? "Anahtar reddedildi" : "Bağlantı yok"}
+              />
             </div>
           </div>
           <p className="mt-4 text-xs text-text-muted">Deploy sonrası cron doğrulaması:</p>

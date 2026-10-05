@@ -256,7 +256,7 @@ export default async function ValuationPage({
     <div className="space-y-6">
       <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + EmlakFiyati bölge endeksi — insan onayı şart." actions={
 <div className="theme-dark flex flex-col gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">
-            <DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={isEmlakFiyatiConfigured()} />
+            <DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={await isEmlakFiyatiConfigured()} />
           </div>
 } />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">

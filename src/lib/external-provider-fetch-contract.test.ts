@@ -8,7 +8,7 @@ const protectedProviderFiles = [
   "src/lib/tcmb.ts",
   "src/lib/billing/iyzico.ts",
   "src/lib/efatura.ts",
-  "src/lib/integrations/emlakfiyati/client.ts",
+  "src/lib/integrations/emlakfiyati/adapter.ts",
   "src/lib/integrations/portals/index.ts",
   "src/lib/messaging/netgsm.ts",
   "src/lib/messaging/tenant-providers.ts",
