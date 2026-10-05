@@ -85,6 +85,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Finans",
     items: [
       { href: "/admin/billing", label: "Abonelik & fatura", icon: CreditCard, hint: "MRR & fatura", module: "billing" },
+      { href: "/admin/ef-kontor", label: "EmlakFiyati kontör", icon: CreditCard, hint: "Tarife, paket, bakiye", module: "billing" },
     ],
   },
   {

@@ -27,6 +27,9 @@ import {
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { validateCheckoutBuyer, type ValidatedCheckoutBuyer } from "@/lib/billing/buyer";
 import { getBaseUrl } from "@/lib/base-url";
+import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
+import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
+import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
 
 export type CheckoutResult = {
   error?: string;
@@ -359,6 +362,119 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   } catch (e) {
     await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
     console.error("startSeatPurchase", e);
+    return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
+  }
+}
+
+export type CreditPackPurchaseResult = CheckoutResult & { quotedTotalTry?: number };
+
+/**
+ * Kontör (EmlakFiyati) paketi satın alma. YALNIZ owner/gm. Paket kimliği gelir; kontör ve fiyat SUNUCUDA katalogdan
+ * (platform_settings) yeniden hesaplanır, istemciden tutar/kontör ALINMAZ. `confirm_try` yalnız "ekrandaki tutar değişti mi"
+ * kontrolüdür. Cüzdan hazır değilse (`ef_credit_ready()`) para tahsil eden hiçbir adım atılmaz. Demo ödeme YOKTUR.
+ * Kupon kontör paketlerinde KAPALIDIR (kupon mantığı plan kimliğine bağlıdır).
+ */
+export async function startCreditPackPurchase(formData: FormData): Promise<CreditPackPurchaseResult> {
+  const gate = await requirePermission("billing", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (gate.impersonating) return { error: "Destek oturumunda kontör satın alınamaz." };
+  if (gate.role !== "owner" && gate.role !== "gm") {
+    return { error: "Kontör paketini yalnızca ofis sahibi veya genel müdür satın alabilir." };
+  }
+
+  const packId = String(formData.get("pack_id") ?? "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(packId)) return { error: "Geçersiz paket." };
+  if (String(formData.get("coupon") ?? "").trim()) return { error: "Kupon kontör paketlerinde geçerli değil." };
+  const confirmRaw = String(formData.get("confirm_try") ?? "").trim();
+  const confirmTry = confirmRaw === "" ? null : Number(confirmRaw);
+
+  const { allowed } = await checkRateLimit(`efpack:${gate.userId}`, { limit: 8, windowSec: 600, failurePolicy: "deny" });
+  if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };
+
+  if (!(await getEfCreditReady())) {
+    return { error: "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor." };
+  }
+  if (!isIyzicoConfigured()) {
+    return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
+  }
+
+  const catalog = await getEfCatalog();
+  const pack = findPurchasablePack(catalog.packs, packId);
+  if (!pack) return { error: "Bu paket artık satışta değil. Sayfayı yenileyip güncel paketleri görün." };
+  const quote = quoteCreditPack(pack);
+  if (confirmTry !== null && (!Number.isFinite(confirmTry) || Math.abs(confirmTry - quote.totalTry) > 0.01)) {
+    return { error: "Tutar güncellendi; lütfen yeni tutarı inceleyip yeniden onaylayın.", quotedTotalTry: quote.totalTry };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Oturum bulunamadı." };
+  const [{ data: tenant }, { data: profile }] = await Promise.all([
+    supabase.from("tenants").select("id, name, tax_number, phone, address_line, city").eq("id", gate.tenantId).maybeSingle(),
+    supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle(),
+  ]);
+  if (!tenant) return { error: "Ofis bulunamadı." };
+
+  let checkoutBuyer: ValidatedCheckoutBuyer;
+  try {
+    checkoutBuyer = validateCheckoutBuyer({
+      id: user.id,
+      fullName: profile?.full_name,
+      email: user.email,
+      phone: profile?.phone || tenant.phone,
+      identityNumber: tenant.tax_number,
+      address: tenant.address_line,
+      city: tenant.city,
+      ip: await clientIp(),
+    });
+  } catch (error) {
+    return {
+      error: error instanceof Error
+        ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
+        : "Ödeme sahibi bilgileri doğrulanamadı.",
+    };
+  }
+
+  const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
+  let invoice: { invoiceId: string; totalTry: number };
+  try {
+    invoice = await createCreditPackInvoice({ tenantId: gate.tenantId, pack, conversationId });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "billing.credits.checkout_started",
+    entityType: "invoice",
+    entityId: invoice.invoiceId,
+    newValue: { packId: pack.id, units: pack.units, priceNetTry: pack.priceNetTry, invoiceTotalTry: invoice.totalTry },
+  });
+
+  try {
+    const init = await initializeCheckoutForm({
+      conversationId,
+      price: invoice.totalTry,
+      paidPrice: invoice.totalTry,
+      basketId: conversationId,
+      callbackUrl: `${appUrl()}/api/iyzico/callback`,
+      buyer: checkoutBuyer.buyer,
+      billingAddress: checkoutBuyer.billingAddress,
+      basketItemName: creditPackBasketName(pack),
+    });
+    if (init.status !== "success" || !init.paymentPageUrl) {
+      await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+      return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
+    }
+    await markCheckoutInvoiceInitialized({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+    revalidatePath("/app/abonelik");
+    return { checkoutUrl: init.paymentPageUrl, quotedTotalTry: invoice.totalTry };
+  } catch (e) {
+    await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+    console.error("startCreditPackPurchase", e);
     return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
   }
 }
