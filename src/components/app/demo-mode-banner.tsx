@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { Sparkles, X } from "lucide-react";
 import { RealUsePanel, type RealUseRow } from "@/components/app/real-use-panel";
@@ -47,11 +48,14 @@ export function DemoModeBanner({
   rows,
   total,
   canClear,
+  trialDaysLeft = null,
 }: {
   variant: DemoBannerVariant;
   rows: RealUseRow[];
   total: number;
   canClear: boolean;
+  /** Deneme aboneliğinde kalan gün (sunucuda subscriptions.trial_ends_at'tan); deneme değilse null. */
+  trialDaysLeft?: number | null;
 }) {
   const [sessionHidden, setSessionHidden] = useState(false);
   const dismissed = useSyncExternalStore(
@@ -85,6 +89,14 @@ export function DemoModeBanner({
           <div className="min-w-0">
             <p className="text-sm font-bold text-amber-800">{copy.title}</p>
             <p className="mt-0.5 text-xs leading-relaxed text-amber-800/80">{copy.text}</p>
+            {trialDaysLeft != null ? (
+              <p className="mt-1 text-xs font-semibold text-amber-900">
+                {trialDaysLeft > 0 ? `Denemenizin bitmesine ${trialDaysLeft} gün kaldı.` : "Deneme süreniz doldu."}{" "}
+                <Link href="/app/abonelik" className="underline underline-offset-2 hover:no-underline">
+                  Ücretli plana geç
+                </Link>
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
