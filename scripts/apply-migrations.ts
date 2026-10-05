@@ -176,6 +176,35 @@ const SCHEMA_EVIDENCE_PROBES: Readonly<Record<string, string>> = {
 };
 
 const args = process.argv.slice(2);
+
+// GUVENLIK: bilinmeyen bayrak CANLI UYGULAMA anlamina gelmemeli. (Eskiden `--help` gibi taninmayan bir bayrak
+// dry-run olmayan normal calismaya dusuyor ve bekleyen migration'lari canliya yaziyordu.)
+const KNOWN_FLAGS = new Set(["--dry-run", "--baseline", "--confirm-schema-present", "--only", "--help", "-h"]);
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(
+    [
+      "Kullanim: npm run db:migrate -- [secenek]",
+      "  --dry-run                                   ne calisacagini goster, HICBIR SEY yazma",
+      "  --only <dosya>                              yalniz bu migration'i uygula (pencere sirasiyla)",
+      "  --baseline --only <dosya> --confirm-schema-present   tek satirlik sema attestation'i",
+      "Bayrak vermeden calistirmak TUM bekleyen migration'lari uygular; yalniz yedek/PITR dogrulandiktan sonra.",
+    ].join("\n"),
+  );
+  process.exit(0);
+}
+for (let i = 0; i < args.length; i++) {
+  const a = args[i]!;
+  if (a.startsWith("-")) {
+    if (!KNOWN_FLAGS.has(a)) {
+      console.error(`Bilinmeyen secenek: ${a}. Hicbir sey uygulanmadi. (--help ile kullanimi gor)`);
+      process.exit(2);
+    }
+  } else if (args[i - 1] !== "--only") {
+    console.error(`Beklenmeyen argüman: ${a}. Hicbir sey uygulanmadi. (--help ile kullanimi gor)`);
+    process.exit(2);
+  }
+}
+
 const DRY_RUN = args.includes("--dry-run");
 const BASELINE = args.includes("--baseline");
 const CONFIRM_SCHEMA_PRESENT = args.includes("--confirm-schema-present");
