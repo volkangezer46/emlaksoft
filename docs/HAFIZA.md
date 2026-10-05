@@ -213,7 +213,7 @@ yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasy
 
 ## 6. Kayıtlı kart (iyzico kart saklama) — 2026-10-05, UYGULANMADI
 
-Kart BİZDE değil iyzico'da. Migration `20260826000100_payment_cards.sql` (+rollback) `payment_cards` + `tenant_payment_profiles` + `set_default_payment_card` (PB9, uygulanmadı;
+Kart BİZDE değil iyzico'da. Migration `20260826000700_payment_cards.sql` (+rollback) `payment_cards` + `tenant_payment_profiles` + `set_default_payment_card` (PB9, uygulanmadı;
 tablolar yokken kod zarifçe kapalı). Ofis düzeyi kapsam (owner/gm yönetir). Ekleme: ödeme ekranında varsayılan KAPALI "Kartımı sakla" (fatura meta `saveCard`), callback doğrulama
 zincirinden SONRA `saveCardFromPayment`. Liste/varsayılan/sil: `/app/abonelik` + `src/app/actions/payment-cards.ts`; sil iyzico'dan da siler (`card-store.ts`). Kayıtlı kartla ödeme =
 Checkout Form'a `cardUserKey` verilir (iyzico sayfası kartı listeler; 3DS iyzico'da). Otomatik yenileme altyapısı `auto-renew.ts` (dunning cron içinde) `platform_settings`
