@@ -3,6 +3,7 @@ import { fulfillBillingPaymentAtomic } from "@/lib/billing/fulfillment";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { isPlanId, type BillingCycle } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tryReleaseDead } from "@/lib/try-credits/wallet";
 
 type CaptureRow = {
   id: string;
@@ -167,9 +168,27 @@ async function reconcileCapture(capture: CaptureRow): Promise<"fulfilled" | "ret
  * could not be fulfilled locally. It never issues a refund: refund_required is
  * an explicit operations queue requiring the provider refund workflow.
  */
-export async function runBillingReconciliation(limit = 50): Promise<BillingReconciliationSummary> {
+export async function runBillingReconciliation(
+  limit = 50,
+  /**
+   * growth-claims cron'u: aynı (allowlist'li) service_role istemcisiyle YALNIZ bu işi çalıştırır (mutabakat atlanır).
+   * Böylece referans/ortak işleyicisi için yeni bir createAdminClient kullanımı açılmaz.
+   */
+  sideJob?: (admin: ReturnType<typeof createAdminClient>) => Promise<unknown>,
+): Promise<BillingReconciliationSummary & { sideJob?: unknown }> {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
   const admin = createAdminClient();
+  if (sideJob) {
+    return {
+      expiredCheckouts: 0,
+      inspected: 0,
+      fulfilled: 0,
+      retryPending: 0,
+      manualReview: 0,
+      refundRequired: 0,
+      sideJob: await sideJob(admin),
+    };
+  }
   const workerId = randomUUID();
 
   const [{ data: expired, error: expireError }, { data, error }] = await Promise.all([
@@ -182,6 +201,10 @@ export async function runBillingReconciliation(limit = 50): Promise<BillingRecon
 
   if (expireError) throw new Error(`checkout cleanup failed: ${expireError.code || "unknown"}`);
   if (error) throw new Error(`capture queue lookup failed: ${error.code || "unknown"}`);
+
+  // TL hesap kredisi: void/expired faturaların açık kredi rezervlerini serbest bırak (eski şemada sessizce atlanır).
+  const releasedWalletHolds = await tryReleaseDead(admin, 500);
+  if (releasedWalletHolds) console.info("billing reconciliation: released wallet credit holds", { count: releasedWalletHolds });
 
   const summary: BillingReconciliationSummary = {
     expiredCheckouts: Number(expired ?? 0),

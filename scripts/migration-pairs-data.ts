@@ -15,6 +15,9 @@ import type { GroupSpec } from "../src/lib/migration-pairs";
  * proposed/'dan terfi) HIC uygulanmadi. Taban bilerek 20260813000300'de birakildi: P12 dosyasi daha kucuk numarali
  * oldugu icin taban ilerletilirse bu arac onu "uygulanmis" sanar. Uygulanan pencereler basliklarinda isaretlidir;
  * kesin bekleyen listesi icin salt-okunur `npm run db:migrate -- --dry-run` esastir.
+ * GUNCELLEME (sahip bildirimi): PB1..PB8 (20260825000100..001300) ve P12 (20260816000500) de CANLIDA UYGULANDI.
+ * Bekleyen tek pencere PB9-ef-kontor (20260826000100..000300). Taban bu aracta bilerek ilerletilmedi (pencere
+ * sirasi/bagimlilik denetimi gecmis pencereler icin de calismaya devam etsin); kesin liste yine --dry-run.
  */
 export const APPLIED_HEAD = "20260813000300";
 
@@ -80,7 +83,15 @@ const F = {
   vitrinSettings: "20260825001100_tenant_vitrin_settings.sql", // eski 20260816060100
   vitrinSeo: "20260825001200_tenant_vitrin_sections_seo_optin.sql", // eski 20260819010700
   ownership: "20260825001300_ownership_transfers.sql", // eski 20261005000700
-  paymentCards: "20260826000100_payment_cards.sql",
+  // EmlakFiyati kontor kumesi (YAYIN_PENCERESI_2.md §7; prova: db:rehearse --ef). Hic UYGULANMADI.
+  efWallet: "20260826000100_ef_credit_wallet.sql",
+  efReports: "20260826000200_ef_reports.sql",
+  efPack: "20260826000300_ef_credit_pack_fulfillment.sql",
+  // TL hesap kredisi (birim try) + fatura odemesi. Hic UYGULANMADI; 000100'den (source CHECK refund/bonus) SONRA.
+  tryWallet: "20260826000400_try_credit_wallet.sql",
+  tryInvoice: "20260826000500_try_credit_invoice_payment.sql",
+  growthEngine: "20260826000600_growth_referral_engine.sql",
+  paymentCards: "20260826000700_payment_cards.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -145,6 +156,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.vitrinSettings]: "ek", // varsayilanlar bugunku davranis (vitrin acik, telefon gorunur)
     [F.vitrinSeo]: "davranis", // sitemap opt-in kaynagi elle listeden sutuna gecer (hepsi false dogar)
     [F.ownership]: "ek", // yeni tablo + 3 service_role RPC (kod henuz yok)
+    [F.efWallet]: "ek", // defter CHECK genisler ('ef' + kaynaklar) + nullable meta + rezerv tablosu + 7 service_role RPC; mevcut satir/davranis ayni
+    [F.efReports]: "ek", // yeni tablo (yazma yalniz service_role, okuma kendi/owner-gm)
+    [F.efPack]: "davranis", // fulfill + v2 tam govde yeniden tanimi: credit_pack faturasi islenir (taban govde bayt bayt korunur)
+    [F.tryWallet]: "ek", // yalniz try satirlarini kisitlayan CHECK + rezerv tablosu + view + service_role RPC'ler; mevcut satir/davranis ayni
+    [F.tryInvoice]: "ek", // yeni service_role fonksiyonlari (fulfill govdelerine DOKUNMAZ; icerden cagirir)
+    [F.growthEngine]: "ek", // yeni tablolar + RPC; 000800 (uygulanmamis) tablolarinin tekillik/CHECK/sutunlarini genisletir; fulfill govdelerine DOKUNMAZ; bayraklar KAPALI
     [F.paymentCards]: "ek", // yeni 2 tablo + service_role RPC; kod tablolar yokken zarifce kapali (kart saklama + otomatik yenileme altyapisi)
   },
 
@@ -183,7 +200,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P11-f-modulleri", order: 11, title: "(UYGULANDI) Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests, F.p5Notes, F.p5DocReq] },
     { id: "P11b-sayac-revoke", order: 11.5, title: "(UYGULANDI) Servis RPC sayaclari: anon/authenticated EXECUTE revoke", files: [F.p5Revoke] },
     { id: "PK4-is-document", order: 13, title: "K4 is_document (dal main'e girerse): migration KODDAN ONCE", files: [F.k4IsDocument] },
-    // ---- 2026-10-05 terfi: YAYIN_PENCERESI_2.md sirasi (hepsi BEKLIYOR) ----
+    // ---- 2026-10-05 terfi: YAYIN_PENCERESI_2.md sirasi (PB1..PB8 UYGULANDI; PB9 BEKLIYOR) ----
     { id: "PB1-malik-baglantisi", order: 14, title: "Malik-musteri baglantisi (properties.owner_customer_id, ikinci properties->customers FK)", files: [F.ownerLink] },
     { id: "PB2-cografya", order: 15, title: "Cografya tek merkez yonetimi (surum, alias, ofis bildirimi, birlestir/tasi RPC)", files: [F.geo] },
     {
@@ -197,7 +214,25 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB6-ai-kredi", order: 19, title: "AI kredi olcumu (ayni hesap kredisi defteri)", files: [F.aiCredit] },
     { id: "PB7-vitrin", order: 20, title: "Vitrin ayarlari + bolumler/SEO opt-in (sitemap kaynagi degisir)", files: [F.vitrinSettings, F.vitrinSeo] },
     { id: "PB8-sahiplik-devri", order: 21, title: "Ofis sahipligi devri (tablo + service_role RPC)", files: [F.ownership] },
-    { id: "PB9-kayitli-kart", order: 22, title: "Kayitli odeme karti (iyzico kart saklama; saglayici anahtari + maskeli alan)", files: [F.paymentCards] },
+    {
+      id: "PB9-ef-kontor",
+      order: 22,
+      title: "EmlakFiyati kontor: cuzdan (ef birimi + rezerv + RPC) -> ef_reports -> kontor paketi faturasi (fulfill/v2)",
+      files: [F.efWallet, F.efReports, F.efPack],
+    },
+    {
+      id: "PB10-tl-kredi",
+      order: 23,
+      title: "TL hesap kredisi: cuzdan (try birimi + rezerv + RPC) -> kredi ile fatura odemesi (fulfill/v2'yi icerden cagirir)",
+      files: [F.tryWallet, F.tryInvoice],
+    },
+    {
+      id: "PB11-referans-motoru",
+      order: 24,
+      title: "Referans/ortak motoru: talep uretimi, odul (TL kredi), clawback, inceleme kuyrugu, ortak komisyonu (bayraklar KAPALI)",
+      files: [F.growthEngine],
+    },
+    { id: "PB12-kayitli-kart", order: 25, title: "Kayitli odeme karti (iyzico kart saklama; saglayici anahtari + maskeli alan)", files: [F.paymentCards] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
@@ -219,6 +254,14 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       fixes: [F.seatFulfillment],
       window: "PB3-faturalama-koltuk",
       note: "20260825000600 on-kosul blogu 20260825000300 fulfill govde md5'ini (a69a7609...) ve 20260825000500 sutun/fonksiyonunu arar; eksikse hicbir sey yazmadan durur. Kod seat_purchase_ready() true olana dek koltuk satmaz.",
+    },
+    {
+      id: "ef-kontor",
+      title: "EF cuzdani + raporlar (ana) + kontor paketi fulfill (tamamlayici; ef_credit_grant'i cagirir)",
+      main: [F.efWallet, F.efReports],
+      fixes: [F.efPack],
+      window: "PB9-ef-kontor",
+      note: "20260826000300 on-kosulu ef_credit_grant'i ve canli fulfill/v2 govde md5'lerini (20260825000600: 0f5b4589... / 5fc1c655...) arar; eksik/sapma = hicbir sey yazmadan durur. ef_credit_ready() 'credit-pack:v1' isareti olmadan false: kod kontor akisini acmaz.",
     },
   ],
 
@@ -259,6 +302,23 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.aiCredit, F.growthReferral],
     // Vitrin: bolumler/SEO opt-in, vitrin ayarlarinin tamamlayicisi.
     [F.vitrinSeo, F.vitrinSettings],
+    // EF kontor: defter (000800 + 001000 feature/CHECK adlari) -> cuzdan -> raporlar (rezerv FK) -> paket fulfill
+    // (ef_credit_grant + 20260825000600 govde tabani).
+    [F.efWallet, F.growthReferral],
+    [F.efWallet, F.aiCredit],
+    [F.efReports, F.efWallet],
+    [F.efPack, F.efWallet],
+    [F.efPack, F.seatFulfillment],
+    // TL kredi: defter source CHECK'inde refund/bonus + meta (000100) -> cuzdan (000400) -> fatura odeme (000500).
+    [F.tryWallet, F.efWallet],
+    [F.tryWallet, F.growthReferral],
+    [F.tryWallet, F.aiCredit],
+    [F.tryInvoice, F.tryWallet],
+    // Referans/ortak motoru: growth tablolari + tiklama sayaci + TL cuzdan (try_credit_grant/reverse/ready) SONRASI.
+    [F.growthEngine, F.growthReferral],
+    [F.growthEngine, F.growthClicks],
+    [F.growthEngine, F.tryWallet],
+    [F.growthEngine, F.tryInvoice],
   ],
 
   externalPending: [

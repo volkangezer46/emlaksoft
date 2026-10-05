@@ -6,6 +6,7 @@ import { ArrowUpRight, Loader2, Minus, Plus, ShieldAlert, Users2 } from "lucide-
 import { startSeatPurchase } from "@/app/actions/billing";
 import type { PlanDef, SeatTier } from "@/lib/billing/plans";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
+import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -36,6 +37,8 @@ export type SeatPanelProps = {
   subscriptionActive: boolean;
   /** Eşik (%); admin ayarı. */
   warnPercent: number;
+  /** TL hesap kredisi cüzdanı (yoksa/etkin değilse null: onay kutusu gösterilmez). */
+  wallet?: WalletCheckoutInfo | null;
 };
 
 export function SeatPanel(props: SeatPanelProps) {
@@ -48,6 +51,7 @@ export function SeatPanel(props: SeatPanelProps) {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useCredit, setUseCredit] = useState(false);
 
   const locks = useMemo(
     () => ({ baseMonthlyTry: lockedBaseMonthlyTry, tiers: lockedTiers }),
@@ -69,7 +73,6 @@ export function SeatPanel(props: SeatPanelProps) {
     Math.min(Number.isFinite(ev.maxTotalSeats) ? ev.maxTotalSeats : includedSeats + UI_EXTRA_CAP, includedSeats + UI_EXTRA_CAP),
   );
   const notSold = ev.status === "not_sold" || sliderMax <= includedSeats;
-  const atCap = Number.isFinite(ev.maxTotalSeats) && target >= ev.maxTotalSeats;
 
   const q = ev.toQuote;
   const reco = q.recommendation;
@@ -89,6 +92,7 @@ export function SeatPanel(props: SeatPanelProps) {
     const fd = new FormData();
     fd.set("target_seats", String(target));
     fd.set("confirm_try", String(ev.immediateChargeTry));
+    if (useCredit && props.wallet) fd.set("use_credit", "1");
     const result = await startSeatPurchase(fd);
     if (result.checkoutUrl) {
       window.location.href = result.checkoutUrl;
@@ -147,8 +151,7 @@ export function SeatPanel(props: SeatPanelProps) {
 
       {notSold ? (
         <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-3 text-sm text-text-muted">
-          {planName} paketinde ek kullanıcı satılmıyor. Daha fazla kullanıcı için aşağıdan üst pakete geçebilir veya{" "}
-          <Link href="/demo" className="font-semibold text-brand-600 hover:underline">bize ulaşabilirsiniz</Link>.
+          {planName} paketinde ek kullanıcı satılmıyor. Daha fazla kullanıcı için aşağıdan üst pakete geçebilirsiniz.
         </p>
       ) : (
         <div className="mt-5">
@@ -190,12 +193,6 @@ export function SeatPanel(props: SeatPanelProps) {
             En az <span className="numeric font-semibold">{sliderMin}</span> (aktif kullanıcı sayınızın altına inilemez
             {sliderMin === includedSeats ? " ve pakete dahil kullanıcılar azaltılamaz" : ""}), en çok{" "}
             <span className="numeric font-semibold">{Number.isFinite(ev.maxTotalSeats) ? ev.maxTotalSeats : `${sliderMax}+`}</span>.
-            {atCap ? (
-              <>
-                {" "}Daha fazlası için Kurumsal teklif:{" "}
-                <Link href="/demo" className="font-semibold text-brand-600 hover:underline">bize ulaşın</Link>.
-              </>
-            ) : null}
           </p>
         </div>
       )}
@@ -284,8 +281,7 @@ export function SeatPanel(props: SeatPanelProps) {
           <span className="inline-flex items-start gap-2">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              {ev.message}{" "}
-              {ev.status === "over_max" ? <Link href="/demo" className="font-semibold underline">Bize ulaşın</Link> : null}
+              {ev.message}
             </span>
           </span>
         </div>
@@ -311,6 +307,14 @@ export function SeatPanel(props: SeatPanelProps) {
                 <li>Yenilemeden itibaren aylık toplam {tl(q.totalMonthlyTry)} ({tl(q.totalForCycleTry)} / {periodWord}).</li>
                 <li>Koltuk azaltma dönem sonunda geçerli olur; iade yapılmaz.</li>
               </ul>
+              <WalletCreditToggle
+                wallet={props.wallet}
+                checked={useCredit}
+                onChange={setUseCredit}
+                totalTry={Math.round(ev.immediateChargeTry * 1.2 * 100) / 100}
+                disabled={pending}
+                idPrefix="seat"
+              />
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"

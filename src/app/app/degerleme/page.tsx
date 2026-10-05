@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReferralNudge } from "@/components/app/referral-nudge";
 import {
   BadgePercent,
   FileText,
@@ -15,6 +16,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { isEmlakFiyatiConfigured } from "@/lib/integrations/emlakfiyati/client";
 import { DAY_MS } from "@/lib/clock";
 import { ValuationForm } from "./valuation-form";
+import { DegerlemeTabs } from "./degerleme-tabs";
 import { DataPartnerStatus } from "@/components/app/data-partner-badges";
 import { EmptyState } from "@/components/app/empty-state";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
@@ -259,6 +261,8 @@ export default async function ValuationPage({
             <DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={await isEmlakFiyatiConfigured()} />
           </div>
 } />
+      <DegerlemeTabs active="motor" />
+      <ReferralNudge moment="first_valuation" show={rows.length >= 1} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-cyan-400/20 blur-[80px]" />

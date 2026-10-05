@@ -100,3 +100,8 @@ export function exactTrendMrr(row: PlatformMrrTrendRow, prices: PlanPriceMap = d
   }
   return Math.round(Number(row.subscription_mrr) + fallback);
 }
+
+/** Yıllık yinelenen gelir: MRR × 12 (tek formül; muhasebe ve paneller aynı kaynağı kullanır). */
+export function exactArr(mrr: number): number {
+  return Math.round(mrr * 12);
+}

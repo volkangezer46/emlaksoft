@@ -27,7 +27,7 @@ export type SeatCalcOffers = Record<string, SeatCalcOffer | { monthlyTry: number
 const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
 
 function sellablePlans(plans: readonly PlanDef[]): PlanDef[] {
-  return plans.filter((p) => !p.hidden && !p.customPricing);
+  return plans.filter((p) => !p.hidden);
 }
 
 /** Etkin (kampanya dahil) taban fiyatlarla plan listesi; motor kampanyayı bilmez, etkin fiyat taban olarak verilir. */
@@ -45,9 +45,9 @@ export function applyOffers(plans: readonly PlanDef[], offers?: SeatCalcOffers):
 export type SeatBounds = { min: number; sliderMax: number; inputMax: number };
 
 /**
- * Kaydırıcı üst sınırı: herkese açık planlardan en çok kullanıcı taşıyanın kapasitesi + 10 (böylece
- * "bize ulaşın" durumuna da gidilebilir). Sınırsız kapasite varsa en büyük dahil kullanıcının 2 katı
- * (en az 50). Sayı girişi daha geniştir (999).
+ * Kaydırıcı ve sayı girişi üst sınırı: herkese açık planlardan en çok kullanıcı taşıyanın kapasitesi
+ * (ör. Kurumsal 500); bu sınırın üstü satılmaz, hesaplayıcı oraya sıkıştırır. Sınırsız kapasite varsa
+ * en büyük dahil kullanıcının 2 katı (en az 50) kaydırıcıda, sayı girişinde 999.
  */
 export function seatBounds(plans: readonly PlanDef[]): SeatBounds {
   const list = sellablePlans(plans);
@@ -60,8 +60,11 @@ export function seatBounds(plans: readonly PlanDef[]): SeatBounds {
     if (Number.isFinite(cap)) finiteCap = Math.max(finiteCap, cap);
     else unlimited = true;
   }
-  const raw = unlimited ? Math.max(50, maxIncluded * 2) : finiteCap + 10;
-  return { min: 1, sliderMax: Math.min(raw, 200), inputMax: 999 };
+  if (unlimited || finiteCap === 0) {
+    const raw = Math.max(50, maxIncluded * 2);
+    return { min: 1, sliderMax: Math.min(raw, 200), inputMax: 999 };
+  }
+  return { min: 1, sliderMax: finiteCap, inputMax: finiteCap };
 }
 
 export function clampSeats(value: number, bounds: SeatBounds): number {
@@ -83,12 +86,12 @@ export type SeatCalcAlternative = {
 };
 
 export type SeatCalcResult = {
-  status: "ok" | "contact";
+  status: "ok" | "over_max";
   seats: number;
   cycle: BillingCycle;
   planId: PlanId;
   planName: string;
-  /** Etkin (kampanya dahil) teklif; "contact" durumunda tutar gösterilmez. */
+  /** Etkin (kampanya dahil) teklif; "over_max" durumunda tutar gösterilmez. */
   quote: SeatQuote;
   /** Aylık eşdeğer toplam (yıllıkta yıllık tutarın 12'ye bölünmüşü). */
   monthlyEquivalentTry: number;
@@ -108,8 +111,8 @@ export type SeatCalcResult = {
   alternatives: SeatCalcAlternative[];
   /** "N ve üzeri kullanıcıda Profesyonel daha ucuz" / zorunlu geçiş açıklaması; yoksa null. */
   crossoverNote: string | null;
-  /** status === "contact": maksimum koltuk aşıldı. */
-  contactNote: string | null;
+  /** status === "over_max": maksimum koltuk aşıldı. */
+  limitNote: string | null;
 };
 
 function monthlyEquivalent(q: SeatQuote): number {
@@ -131,7 +134,7 @@ function crossoverNote(effective: readonly PlanDef[], planId: string, seats: num
 
 /**
  * `seats` kullanıcı için motorun önerisi + gösterim verisi. `plans`: sunucudan gelen herkese açık planlar;
- * `offers`: etkin (kampanya dahil) aylık fiyatlar. Hiç plan taşıyamazsa status "contact" olur.
+ * `offers`: etkin (kampanya dahil) aylık fiyatlar. Hiç plan taşıyamazsa status "over_max" olur.
  */
 export function computeSeatCalc(
   plans: readonly PlanDef[],
@@ -160,7 +163,7 @@ export function computeSeatCalc(
   const planName = def?.name ?? rec.planId;
 
   return {
-    status: exceeded ? "contact" : "ok",
+    status: exceeded ? "over_max" : "ok",
     seats,
     cycle,
     planId: rec.planId as PlanId,
@@ -187,15 +190,20 @@ export function computeSeatCalc(
           diffMonthlyTry: monthlyEquivalent(a) - monthlyEq,
         })),
     crossoverNote: exceeded ? null : crossoverNote(effective, rec.planId, seats),
-    contactNote: exceeded
-      ? `${seats} kullanıcı, herkese açık paketlerin kapasitesini aşıyor. Ekibinize özel teklif için bize ulaşın.`
+    limitNote: exceeded
+      ? `Bir ofis hesabında en fazla ${formatSeatCap(plans)} kullanıcı tanımlanabilir; ${seats} kullanıcı bu sınırı aşıyor.`
       : null,
   };
 }
 
+function formatSeatCap(plans: readonly PlanDef[]): string {
+  const cap = seatBounds(plans).inputMax;
+  return cap.toLocaleString("tr-TR");
+}
+
 /** Sonucu ekran okuyucu için tek cümleye çevirir (aria-live bölgesi). */
 export function seatCalcAnnouncement(r: SeatCalcResult): string {
-  if (r.status === "contact") return r.contactNote ?? "";
+  if (r.status === "over_max") return r.limitNote ?? "";
   const unit = r.cycle === "yearly" ? "yıl" : "ay";
   return `${r.seats} kullanıcı için ${r.planName} paketi önerilir. ${tl(r.cycleTotalTry)} / ${unit}, KDV hariç.`;
 }
@@ -215,7 +223,6 @@ export type ExtraSeatSummary = {
 
 /** Planın admin kademelerinden üretilen ek kullanıcı metni; ek kullanıcı satılmıyorsa null. */
 export function extraSeatSummary(def: PlanDef): ExtraSeatSummary | null {
-  if (def.customPricing) return null;
   const tiers = resolveSeatTiers(def);
   if (tiers.length === 0) return null;
   const lines = tiers.map((t, i) => {

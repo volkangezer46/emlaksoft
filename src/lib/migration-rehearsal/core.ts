@@ -31,6 +31,17 @@ export const PROMOTED_FILES = [
 /** Kazanç gizliliği (P12): yalnız `--with-earnings` ile, EN SONDA. */
 export const EARNINGS_FILE = "20260816000500_commission_earnings_privacy.sql";
 
+/**
+ * EmlakFiyati kontör kümesi (`--ef`): cüzdan → raporlar → kontör paketi faturası, uygulama sırasıyla
+ * (docs/runbooks/YAYIN_PENCERESI_2.md §7). Terfi eden 13 dosya + P12 canlıda uygulandığı için `--ef` onların
+ * YERİNE bu üç dosyayı prova eder.
+ */
+export const EF_FILES = [
+  "20260826000100_ef_credit_wallet.sql",
+  "20260826000200_ef_reports.sql",
+  "20260826000300_ef_credit_pack_fulfillment.sql",
+] as const;
+
 export const TIMEOUTS = {
   statement: "20s",
   lock: "10s",
@@ -44,9 +55,9 @@ export const TIMEOUTS = {
 // Bayraklar (apply-migrations.ts kadar sıkı: bilinmeyen bayrak / argüman = çıkış 2, hiçbir şey yapılmaz)
 // ---------------------------------------------------------------------------------------------------------
 
-export const KNOWN_FLAGS = ["--yes-i-understand-locks", "--with-earnings", "--help", "-h"] as const;
+export const KNOWN_FLAGS = ["--yes-i-understand-locks", "--with-earnings", "--ef", "--help", "-h"] as const;
 
-export type RehearsalFlags = { yes: boolean; withEarnings: boolean; help: boolean };
+export type RehearsalFlags = { yes: boolean; withEarnings: boolean; ef: boolean; help: boolean };
 
 export type ParsedArgs = { ok: true; flags: RehearsalFlags } | { ok: false; error: string };
 
@@ -59,28 +70,41 @@ export function parseRehearsalArgs(argv: readonly string[]): ParsedArgs {
     if (seen.has(a)) return { ok: false, error: `Seçenek iki kez verildi: ${a}. Hiçbir şey yapılmadı.` };
     seen.add(a);
   }
+  if (seen.has("--ef") && seen.has("--with-earnings")) {
+    return { ok: false, error: "--ef ile --with-earnings birlikte verilemez (ayrı kümeler). Hiçbir şey yapılmadı." };
+  }
   return {
     ok: true,
     flags: {
       yes: seen.has("--yes-i-understand-locks"),
       withEarnings: seen.has("--with-earnings"),
+      ef: seen.has("--ef"),
       help: seen.has("--help") || seen.has("-h"),
     },
   };
 }
 
+/** Bayraklara göre prova edilecek dosyalar, uygulama sırasıyla. */
+export function targetFilesFor(flags: Pick<RehearsalFlags, "withEarnings" | "ef">): string[] {
+  if (flags.ef) return [...EF_FILES];
+  return [...PROMOTED_FILES, ...(flags.withEarnings ? [EARNINGS_FILE] : [])];
+}
+
 export const USAGE = [
-  "Kullanım: npm run db:rehearse -- --yes-i-understand-locks [--with-earnings]",
-  "  Terfi eden 13 migration'ı (ve --with-earnings ile 20260816000500'ü) GERÇEK şemada TEK transaction içinde",
-  "  çalıştırır, doğrular ve HER KOŞULDA ROLLBACK eder. Ledger'a yazmaz. Bağlantı: DATABASE_POOLER_URL / DATABASE_URL.",
+  "Kullanım: npm run db:rehearse -- --yes-i-understand-locks [--with-earnings | --ef]",
+  "  Terfi eden 13 migration'ı (ve --with-earnings ile 20260816000500'ü) ya da --ef ile EmlakFiyati kontör kümesini",
+  "  (20260826000100..000300) GERÇEK şemada TEK transaction içinde çalıştırır, doğrular ve HER KOŞULDA ROLLBACK eder.",
+  "  Ledger'a yazmaz. Bağlantı: DATABASE_POOLER_URL / DATABASE_URL.",
   "  --yes-i-understand-locks  kısa süreli tablo kilitlerini kabul ettiğinizi belirtir (ZORUNLU)",
   "  --with-earnings           kazanç gizliliği migration'ını da en sonda prova eder",
+  "  --ef                      yalnız EmlakFiyati kontör kümesi (cüzdan, raporlar, kontör paketi faturası) + işlevsel smoke",
   "  --help, -h                bu metin",
 ].join("\n");
 
 export const LOCK_WARNING = [
   "DİKKAT: kısa süreli tablo kilitleri.",
-  "  Prova migration'ları gerçek şemada çalıştırır: ALTER TABLE (tenants, properties, subscriptions, demo_requests, geo_*),",
+  "  Prova migration'ları gerçek şemada çalıştırır: ALTER TABLE (tenants, properties, subscriptions, demo_requests, geo_*;",
+  "  --ef ile account_credit_ledger),",
   "  CREATE INDEX ve fonksiyon tanımları ROLLBACK'e kadar ACCESS EXCLUSIVE / SHARE kilitleri tutar. Bu sürede uygulamanın",
   `  bu tablolara erişimi BEKLER. Sınırlar: statement_timeout=${TIMEOUTS.statement}, lock_timeout=${TIMEOUTS.lock},`,
   `  idle_in_transaction_session_timeout=${TIMEOUTS.idleInTransaction}, toplam bekçi=${TIMEOUTS.overallMs / 1000} sn.`,

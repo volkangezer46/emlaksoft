@@ -27,7 +27,9 @@ describe("varsayılan katalog: panel kaydı yoksa önerilen katalog", () => {
     expect(byId.professional!.monthlyTry).toBe(4990);
     expect(byId.professional!.limits.seats).toBe(15);
     expect(byId.business!.hidden).toBe(true);
-    expect(byId.enterprise!.customPricing).toBe(true);
+    expect(byId.enterprise!.monthlyTry).toBe(12900);
+    expect(byId.enterprise!.maxSeats).toBe(500);
+    expect(Object.keys(byId.enterprise!)).not.toContain("customPricing");
     // gizli Business public listede yok; ücretsiz paket yok
     const publicIds = visiblePlans(defs).map((p) => p.id);
     expect(publicIds).toEqual(["advisor", "office", "professional", "enterprise"]);
@@ -46,10 +48,12 @@ describe("varsayılan katalog: panel kaydı yoksa önerilen katalog", () => {
 describe("fiyat sayfası modeli admin tanımlarını izler", () => {
   const defs = visiblePlans(applyPlanOverrides(resolveCatalogSettings(null).overrides));
 
-  it("özel fiyatlı paket tabloda tutar yerine 'Özel teklif' gösterir; isteğe bağlı satırlar yalnız doluysa çıkar", () => {
+  it("Kurumsal dahil her paket tabloda liste fiyatını gösterir (Özel teklif yok); isteğe bağlı satırlar yalnız doluysa çıkar", () => {
     const rows = buildComparison(defs)[0]!.rows;
     const monthly = rows.find((r) => r.label.startsWith("Aylık fiyat"))!;
-    expect(monthly.cells.at(-1)!.text).toBe("Özel teklif");
+    expect(monthly.cells.at(-1)!.text).toBe("12.900 ₺");
+    expect(rows.flatMap((r) => r.cells.map((c) => c.text))).not.toContain("Özel teklif");
+    expect(rows.find((r) => r.label.startsWith("En fazla kullanıcı"))!.cells.at(-1)!.text).toBe("500");
     expect(rows.some((r) => r.label.startsWith("Ek kullanıcı"))).toBe(true);
     expect(rows.some((r) => r.label.startsWith("Aylık AI kredisi"))).toBe(false);
     const withAi = buildComparison(defs.map((p) => ({ ...p, aiCreditsMonthly: 500 })))[0]!.rows;
@@ -80,8 +84,9 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     seatRounding: p.seatRounding ?? null,
     limits: p.limits,
     hidden: Boolean(p.hidden),
-    customPricing: Boolean(p.customPricing),
     yearlyPaidMonths: p.yearlyPaidMonths ?? 10,
+    efCreditsMonthly: p.efCreditsMonthly ?? null,
+    efCreditsPerExtraSeat: p.efCreditsPerExtraSeat ?? null,
   });
 
   it("fiyat, ek kullanıcı kademesi, sınır ve görünürlük alanları RECOMMENDED_CATALOG_OVERRIDES ile eşit", () => {
@@ -89,6 +94,12 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     for (const r of recommended) {
       expect(pick(raw.find((p) => p.id === r.id)!), `plan ${r.id}`).toEqual(pick(r));
     }
+  });
+
+  it("önerilen aylık kontör hakkı: Danışman 10, Ofis 40, Profesyonel 120, Business 300, Kurumsal 400 (+ ek kullanıcı başına 6)", () => {
+    const got = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsMonthly ?? null]));
+    expect(got).toEqual({ advisor: 10, office: 40, professional: 120, business: 300, enterprise: 400 });
+    expect(raw.find((p) => p.id === "enterprise")!.efCreditsPerExtraSeat).toBe(6);
   });
 
   it("ham katalogda eski fiyatlar yok ve ücretsiz paket yok", () => {

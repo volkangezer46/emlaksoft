@@ -12,6 +12,8 @@ import {
   Radar,
   Palette,
   PanelTop,
+  Globe,
+  FileText,
   Search,
   SearchCheck,
   User,
@@ -50,6 +52,8 @@ const ALL_NAV: NavCmd[] = [
   { label: "Marka (logo ve favicon)", href: "/admin/marka", icon: Palette, module: "marka" },
   { label: "SEO merkezi (sitemap, robots, robot)", href: "/admin/seo", icon: SearchCheck, module: "seo" },
   { label: "Site menüsü (menü, alt bilgi, duyuru)", href: "/admin/site-menu", icon: PanelTop, module: "sitemenu" },
+  { label: "Site yönetimi (tüm alanlar)", href: "/admin/site", icon: Globe, module: "dashboard" },
+  { label: "Site içeriği (ana sayfa metinleri, SSS)", href: "/admin/site-icerik", icon: FileText, module: "sitecontent" },
 ];
 
 // Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).

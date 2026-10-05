@@ -9,9 +9,10 @@ import {
 import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
+import { tryInvoiceHold } from "@/lib/try-credits/wallet";
 import { getBaseUrl } from "@/lib/base-url";
-import { extractStoredCard } from "@/lib/billing/cards";
-import { saveCardFromPayment } from "@/lib/billing/card-store";
+import { saveCardAfterVerifiedPayment } from "@/lib/billing/card-store";
 
 function appUrl() {
   return getBaseUrl();
@@ -92,10 +93,13 @@ async function handle(token: string | null) {
     ) {
       throw new Error("Fatura toplamları ödeme sözleşmesiyle eşleşmedi.");
     }
+    // TL hesap kredisi: faturada kredi rezervi varsa iyzico yalnız KALAN nakit tutarı tahsil etmiştir.
+    const hold = await tryInvoiceHold(admin, invoice.tenant_id, conversationId);
+    if (!hold) throw new Error("Kredi durumu doğrulanamadı.");
     const verified = verifyCheckoutPayment(result, {
       conversationId,
       basketId: conversationId,
-      amountTry: amounts.totalTry,
+      amountTry: expectedProviderAmountTry(amounts.totalTry, hold),
       currency: IYZICO_CURRENCY,
     });
     await fulfillSuccessfulPayment({
@@ -111,21 +115,9 @@ async function handle(token: string | null) {
 
     // Kart saklama: YALNIZ ödeme yukarıdaki tam doğrulamadan (imza, tutar, retrieve) geçtikten sonra ve YALNIZ
     // kullanıcı ödeme öncesi açık rıza verdiyse (fatura meta). Hata ödemeyi bozmaz; ham kart verisi hiç işlenmez.
+    // Ortak güvenli yol (webhook ile aynı): rıza + rıza veren owner/gm doğrulaması card-store'dadır; asla fırlatmaz.
     if (meta.saveCard === true) {
-      try {
-        const card = extractStoredCard(result);
-        if (card) {
-          await saveCardFromPayment({
-            tenantId: invoice.tenant_id,
-            consentUserId: typeof meta.saveCardConsentBy === "string" ? meta.saveCardConsentBy : null,
-            invoiceId: null,
-            card,
-            consentAtIso: new Date().toISOString(),
-          });
-        }
-      } catch (cardError) {
-        console.error("iyzico callback card save", cardError instanceof Error ? cardError.message : "error");
-      }
+      await saveCardAfterVerifiedPayment(admin, { tenantId: invoice.tenant_id, meta, result });
     }
 
     return NextResponse.redirect(

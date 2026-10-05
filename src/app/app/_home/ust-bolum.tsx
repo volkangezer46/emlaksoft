@@ -56,8 +56,20 @@ export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
   if (!ctx.tenantId) return null;
   const status = await loadSampleStatus(await createClient(), ctx.tenantId, sampleSeededAt).catch(() => null);
   if (!status || !status.active || status.total === 0) return null;
+  // Deneme günü sayacı: abonelik sayfasıyla aynı kaynak (subscriptions.trial_ends_at, durum trialing).
+  const supabase = await createClient();
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("status, trial_ends_at")
+    .eq("tenant_id", ctx.tenantId)
+    .maybeSingle();
+  const trialDaysLeft =
+    sub?.status === "trialing" && sub.trial_ends_at
+      ? Math.max(0, Math.ceil(msUntil(new Date(sub.trial_ends_at)) / DAY_MS))
+      : null;
   return (
     <DemoModeBanner
+      trialDaysLeft={trialDaysLeft}
       variant={status.variant}
       rows={status.rows.map((r) => ({ label: r.label, count: r.count }))}
       total={status.total}

@@ -5,6 +5,7 @@
  * okunarak yazıldı (kaynaklar her sorgunun yanında).
  */
 import type { Expectation } from "./core";
+import { EF_FILE_CHECKS, allEfCatalogSql } from "./ef-sql";
 
 export const TX = {
   begin: "begin",
@@ -57,6 +58,18 @@ export const BILLING_FUNCTIONS = [
   { key: "enforcePlan", name: "enforce_plan_capacity", before: "20260802000320_plan_entitlements.sql", after: "20260825000600_seat_purchase_fulfillment.sql" },
   { key: "enforceTenant", name: "enforce_tenant_plan_capacity", before: "20260802000320_plan_entitlements.sql", after: "20260825000600_seat_purchase_fulfillment.sql" },
   { key: "updatePlan", name: "update_tenant_plan_subscription", before: "20260802000300_identity_session_authorization_hardening.sql", after: "20260825000300_billing_plan_amount_integrity.sql" },
+] as const;
+
+/**
+ * `--ef` kümesi: canlı gövde = 20260825000600 (fulfill/v2/tetikleyiciler) ve 20260825000300 (update plan).
+ * Yalnız fulfill + v2 değişir (20260826000300); diğer üçü ÖNCE = SONRA (dokunulmadığının kanıtı).
+ */
+export const EF_BILLING_FUNCTIONS = [
+  { key: "fulfill10", name: "fulfill_billing_payment", before: "20260825000600_seat_purchase_fulfillment.sql", after: "20260826000300_ef_credit_pack_fulfillment.sql" },
+  { key: "fulfillV2", name: "fulfill_billing_payment_v2", before: "20260825000600_seat_purchase_fulfillment.sql", after: "20260826000300_ef_credit_pack_fulfillment.sql" },
+  { key: "enforcePlan", name: "enforce_plan_capacity", before: "20260825000600_seat_purchase_fulfillment.sql", after: "20260825000600_seat_purchase_fulfillment.sql" },
+  { key: "enforceTenant", name: "enforce_tenant_plan_capacity", before: "20260825000600_seat_purchase_fulfillment.sql", after: "20260825000600_seat_purchase_fulfillment.sql" },
+  { key: "updatePlan", name: "update_tenant_plan_subscription", before: "20260825000300_billing_plan_amount_integrity.sql", after: "20260825000300_billing_plan_amount_integrity.sql" },
 ] as const;
 
 export type ExistenceCheck = { id: string; title: string; sql: string; expect: Record<string, Expectation> };
@@ -283,6 +296,8 @@ export const FILE_CHECKS: Record<string, { pre?: ExistenceCheck; post: Existence
       },
     ],
   },
+  // EmlakFiyati kontör kümesi (`--ef`): kontroller ef-sql.ts'de.
+  ...EF_FILE_CHECKS,
 };
 
 /** Saf yardımcılar (20260825000300). */
@@ -383,5 +398,7 @@ export function allCatalogSql(): string[] {
     if (spec.pre) out.push(spec.pre.sql);
     for (const c of spec.post) out.push(c.sql);
   }
+  // EF dosya kontrolleri FILE_CHECKS üzerinden zaten eklendi; burada yalnız EF smoke/RLS sorguları.
+  for (const sql of allEfCatalogSql()) if (!out.includes(sql)) out.push(sql);
   return out;
 }

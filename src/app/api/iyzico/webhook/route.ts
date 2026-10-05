@@ -10,6 +10,9 @@ import {
 import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
+import { tryInvoiceHold } from "@/lib/try-credits/wallet";
+import { saveCardAfterVerifiedPayment } from "@/lib/billing/card-store";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
   readRequestBodyLimited,
@@ -136,7 +139,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, unmatched: true });
   }
 
-  const meta = (invoice.meta ?? {}) as { plan?: PlanId; cycle?: BillingCycle };
+  const meta = (invoice.meta ?? {}) as {
+    plan?: PlanId;
+    cycle?: BillingCycle;
+    saveCard?: boolean;
+    saveCardConsentBy?: string;
+  };
   const amounts = invoiceAmountsTry(Number(invoice.amount_try));
   if (
     String(invoice.currency ?? "").toUpperCase() !== IYZICO_CURRENCY ||
@@ -147,10 +155,15 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ ok: false, error: "invoice_totals" }, { status: 409 });
   }
+  // TL hesap kredisi: faturada kredi rezervi varsa iyzico yalnız KALAN nakit tutarı tahsil etmiştir.
+  const hold = await tryInvoiceHold(admin, invoice.tenant_id, conversationId);
+  if (!hold) {
+    return NextResponse.json({ ok: false, error: "wallet_hold" }, { status: 500 });
+  }
   const verified = verifyCheckoutPayment(providerResult, {
     conversationId,
     basketId: conversationId,
-    amountTry: amounts.totalTry,
+    amountTry: expectedProviderAmountTry(amounts.totalTry, hold),
     paymentId: providerPaymentId,
     currency: IYZICO_CURRENCY,
   });
@@ -164,6 +177,11 @@ export async function POST(req: NextRequest) {
     expectedCurrency: verified.currency,
     source: "webhook",
   });
+
+  // Kart saklama (callback ile aynı güvenli yol): yalnız doğrulanmış ödeme + faturadaki açık rıza. Asla fırlatmaz.
+  if (meta.saveCard === true) {
+    await saveCardAfterVerifiedPayment(admin, { tenantId: invoice.tenant_id, meta, result: providerResult });
+  }
 
   return NextResponse.json({ ok: true });
 }

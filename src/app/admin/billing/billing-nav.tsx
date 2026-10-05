@@ -5,6 +5,8 @@ const TABS = [
   { id: "genel", label: "Genel", href: "/admin/billing" },
   { id: "planlar", label: "Planlar", href: "/admin/billing/planlar" },
   { id: "kuponlar", label: "Kuponlar", href: "/admin/billing/kuponlar" },
+  { id: "muhasebe", label: "Muhasebe", href: "/admin/muhasebe" },
+  { id: "defter", label: "Fatura defteri", href: "/admin/muhasebe/defter" },
 ] as const;
 
 /** Faturalama bölümü sayfa sekmeleri (ayrı sayfa). Kupon sekmesi şema yokken gizlidir. */

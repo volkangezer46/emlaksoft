@@ -8,6 +8,7 @@ import {
   type PlanCampaignSettings,
   type PlanCatalogSettings,
 } from "@/lib/billing/plan-overrides";
+import { EF_TARIFF_SETTING_KEY, parseEfTariff, type EfTariff } from "@/lib/ef-credits/config";
 import { SEAT_SETTINGS_KEY, parseSeatSettings, type SeatSettings } from "@/lib/billing/seat-settings";
 import { PLANS, planAmountOf, visiblePlans, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { getFoundersStatus, getEffectiveTrialDays, type FoundersStatus } from "@/lib/billing/plan-support";
@@ -36,7 +37,7 @@ const loadCatalog = unstable_cache(
     const raw = await getPlatformSetting(PLAN_DEFINITIONS_SETTING_KEY);
     return resolveCatalogSettings(raw);
   },
-  ["plan-catalog-v3"],
+  ["plan-catalog-v4"],
   { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
 );
 
@@ -45,6 +46,17 @@ const loadSeatSettings = unstable_cache(
   ["seat-settings-v1"],
   { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
 );
+
+const loadEfTariff = unstable_cache(
+  async (): Promise<EfTariff> => parseEfTariff(await getPlatformSetting(EF_TARIFF_SETTING_KEY)),
+  ["ef-tariff-v1"],
+  { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
+);
+
+/** EmlakFiyati kontör tarifesi (platform_settings; yoksa varsayılan). Plan kartlarındaki "yaklaşık N değerleme" hesabı için. */
+export async function getEfTariff(): Promise<EfTariff> {
+  return loadEfTariff();
+}
 
 /** Ek kullanıcı (koltuk) genel ayarları; kayıt yoksa varsayılan. */
 export async function getSeatSettings(): Promise<SeatSettings> {

@@ -18,15 +18,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FiyatlarPage() {
-  const { plans, trialDays, offers, founders } = await getPublicPricing();
+  const { plans, trialDays, offers, founders, efValuationCost } = await getPublicPricing();
   const faq = buildFaq({ trialDays, plans });
   const discount = yearlyDiscountPercent(plans);
   const lost = lostCommissionPlanName();
   const trial = trialPhrase(trialDays);
-  const firstPriced = plans.find((p) => !p.customPricing);
+  const firstPriced = plans[0];
   const startLabel = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
-  // Özel fiyatlı paket hesaplayıcıya girmez; ROI hesaplayıcı etkin fiyatı (kampanya dahil) seat-pricing motorundan alır.
-  const roiPlans = plans.filter((p) => !p.customPricing);
+  // ROI hesaplayıcı etkin fiyatı (kampanya dahil) seat-pricing motorundan alır.
+  const roiPlans = plans;
   const defaultPlanId = (roiPlans.find((p) => p.popular) ?? roiPlans[0] ?? plans[0]!).id;
 
   return (
@@ -51,10 +51,10 @@ export default async function FiyatlarPage() {
               {startLabel} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
             </Link>
             <Link
-              href="/demo"
+              href="#karsilastirma"
               className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-white/40 px-5 text-sm font-semibold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
-              Canlı demo talep et
+              Paketleri karşılaştır
             </Link>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default async function FiyatlarPage() {
       </section>
 
       <section aria-label="Paketler" className="mx-auto max-w-6xl px-4 pb-4 pt-6 sm:px-6">
-        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} />
+        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} />
       </section>
 
       <section aria-label="Bilmeniz gerekenler" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -83,7 +83,7 @@ export default async function FiyatlarPage() {
       </section>
 
       <Section id="karsilastirma" title="Paketleri yan yana karşılaştırın" lead="Tablo, uygulamadaki gerçek paket kuralları ve sayfa kilitlerinden üretilir.">
-        <ComparisonTable plans={plans} />
+        <ComparisonTable plans={plans} efValuationCost={efValuationCost} />
       </Section>
 
       <Section
@@ -121,10 +121,10 @@ export default async function FiyatlarPage() {
                 Ücretsiz başla <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
               </Link>
               <Link
-                href="/demo"
+                href="#karsilastirma"
                 className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-white/40 px-5 text-sm font-semibold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
-                Demo talep et
+                Paketleri karşılaştır
               </Link>
             </div>
           </div>

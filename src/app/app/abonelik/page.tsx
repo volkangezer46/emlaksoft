@@ -14,7 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, msUntil, now } from "@/lib/clock";
+import { DAY_MS, msSince, msUntil, now } from "@/lib/clock";
 import { planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
 import { getPlanDefinition, getPublicPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { getSeatSupport, loadSeatState, type SeatUsageSummary } from "@/lib/billing/seat-purchase";
@@ -35,6 +35,15 @@ import {
   parseAutoRenewFlag,
   type PaymentCardRow,
 } from "@/lib/billing/cards";
+import { KontorSection } from "./kontor-section";
+import { ReferralNudge } from "@/components/app/referral-nudge";
+import { CuzdanSection } from "./cuzdan-section";
+import { readTryOverview } from "@/lib/try-credits/reader";
+import { getTryMaxShare } from "@/lib/try-credits/settings";
+import { TRY_DEFAULT_MAX_SHARE } from "@/lib/try-credits/constants";
+import type { WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
+import { monthlyUnitsWithSeats } from "@/lib/ef-credits/plan-credits";
+import { loadLatestPackInvoice } from "@/lib/ef-credits/credit-reader";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -54,11 +63,11 @@ const statusLabel: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string }>;
+  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string; kalem?: string; kullanici?: string; sayfa?: string; yon?: string }>;
 }) {
   const auth = await requireModulePage("billing");
   const sp = await searchParams;
-  const active = resolveTab(sp, ["plan", "faturalar", "iptal"], "plan");
+  const active = resolveTab(sp, ["plan", "kontor", "cuzdan", "faturalar", "iptal"], "plan");
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
@@ -112,6 +121,9 @@ export default async function BillingPage({
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
+  // Kontör paketi ödemesi sonrası dönüş mesajı: son kontör faturası yeniyse plan mesajı yerine kontör mesajı.
+  const packInvoice = tenantId && (sp.paid || active === "kontor") ? await loadLatestPackInvoice(supabase, tenantId) : null;
+  const packInvoiceRecent = Boolean(packInvoice && msSince(packInvoice.paidAt ?? packInvoice.createdAt) < 15 * 60_000);
 
   // Dönem sonu iptal (K5): kolonlar henüz yoksa sorgu hata verir ve iptal sekmesi gizlenir.
   const { data: cancelRow, error: cancelColError } = tenantId
@@ -129,6 +141,8 @@ export default async function BillingPage({
   const canCancel = auth.role === "owner" || auth.role === "gm";
   const tabs: DetailTabDef[] = [
     { id: "plan", label: "Plan ve kullanım" },
+    { id: "kontor", label: "Kontör" },
+    { id: "cuzdan", label: "Cüzdan" },
     { id: "faturalar", label: "Faturalar" },
     { id: "iptal", label: "İptal", hidden: !cancelSupported },
   ];
@@ -177,6 +191,13 @@ export default async function BillingPage({
   const savedCards = (cardsRes.data ?? []) as PaymentCardRow[];
   const defaultSavedCard = savedCards.find((c) => c.is_default) ?? savedCards[0] ?? null;
   const autoRenewAvailable = parseAutoRenewFlag(autoRenewRaw as string | null);
+  // TL hesap kredisi: bakiye oturumlu RLS'li RPC ile okunur; SQL yoksa null (onay kutusu hiç görünmez).
+  const walletOverview = tenantId ? await readTryOverview(supabase) : null;
+  const walletMaxShare = walletOverview ? await getTryMaxShare() : TRY_DEFAULT_MAX_SHARE;
+  const walletCheckout: WalletCheckoutInfo | null =
+    configured && isSeatOwner && walletOverview && walletOverview.available > 0
+      ? { availableTry: walletOverview.available, maxShare: walletMaxShare }
+      : null;
   const seatPlans = publicPlans.some((p) => p.id === currentPlanDef.id) ? publicPlans : [currentPlanDef, ...publicPlans];
   const planLabel = (id: string) =>
     publicPlans.find((p) => p.id === id)?.name ?? (id === currentPlanDef.id ? currentPlanDef.name : id);
@@ -233,10 +254,11 @@ export default async function BillingPage({
         <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-mint-700">
           <span className="inline-flex items-center gap-2">
             <Check className="h-4 w-4" />
-            Ödeme alındı{sp.demo ? " (demo)" : ""}. {sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
+            Ödeme alındı{sp.demo ? " (demo)" : ""}. {packInvoiceRecent && packInvoice?.status === "paid" ? "Kontör paketiniz bakiyenize eklenir (Kontör sekmesinden görebilirsiniz)." : sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
           </span>
         </div>
       ) : null}
+      <ReferralNudge moment="credit_purchase" show={Boolean(sp.paid && packInvoiceRecent && packInvoice?.status === "paid")} />
       {sp.error ? (
         <div className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600">
           Ödeme tamamlanamadı ({sp.error}). Destek veya tekrar deneyin.
@@ -281,6 +303,30 @@ export default async function BillingPage({
             <CancelPanel canCancel={canCancel} pendingCancel={pendingCancel} endsAtLabel={periodEndLabel} />
           </div>
         </section>
+      ) : null}
+
+      {active === "kontor" && tenantId ? (
+        <KontorSection
+          tenantId={tenantId}
+          canBuy={isSeatOwner}
+          iyzicoConfigured={configured}
+          kalem={sp.kalem}
+          kullanici={sp.kullanici}
+          sayfa={sp.sayfa}
+          latestInvoice={packInvoice}
+          invoiceIsRecent={packInvoiceRecent}
+          allowance={{
+            planName: currentPlanDef.name,
+            units: monthlyUnitsWithSeats(currentPlanDef.efCreditsMonthly, currentPlanDef.efCreditsPerExtraSeat, extraSeats),
+            perExtraSeat: currentPlanDef.efCreditsPerExtraSeat ?? 0,
+            extraSeats,
+          }}
+          wallet={walletCheckout}
+        />
+      ) : null}
+
+      {active === "cuzdan" && tenantId ? (
+        <CuzdanSection supabase={supabase} maxShare={walletMaxShare} yon={sp.yon} canSpend={isSeatOwner} />
       ) : null}
 
       {active === "plan" ? (
@@ -352,13 +398,14 @@ export default async function BillingPage({
           purchaseReady={seatSupport.purchaseReady && configured}
           subscriptionActive={seatState.status === "active"}
           warnPercent={seatSettings.warnPercent}
+          wallet={walletCheckout}
         />
       ) : (
         <section id="koltuk" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Users2 className="h-4 w-4" /> Kullanıcı ekle / çıkar</p>
           <p className="mt-2 text-sm text-text-muted">
             Etkin değil: yönetici hazırlığı tamamlanıyor. Şu an paketinize dahil {currentPlanDef.limits.seats} kullanıcıdan {memberCount ?? 0} tanesini kullanıyorsunuz;
-            daha fazlası için aşağıdan üst pakete geçebilir veya <Link href="/demo" className="font-semibold text-brand-600 hover:underline">bize ulaşabilirsiniz</Link>.
+            daha fazlası için aşağıdan üst pakete geçebilirsiniz.
           </p>
         </section>
       )}
@@ -384,7 +431,7 @@ export default async function BillingPage({
           href="/app/abonelik?cycle=yearly"
           className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${cycle === "yearly" ? "bg-brand-600 text-white" : "border border-line bg-surface text-text-muted"}`}
         >
-          Yıllık · {yearlyOfferLabel(publicPlans.find((p) => !p.customPricing) ?? {})}
+          Yıllık · {yearlyOfferLabel(publicPlans[0] ?? {})}
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />
@@ -395,7 +442,7 @@ export default async function BillingPage({
       <div id="paketler" className="grid scroll-mt-24 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {listedPlans.map((plan) => {
           const amount = planAmountOf(plan, cycle);
-          const sellable = !plan.hidden && !plan.customPricing;
+          const sellable = !plan.hidden;
           const current = plan.id === currentPlan;
           return (
             <article
@@ -412,16 +459,14 @@ export default async function BillingPage({
               <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
               <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950">{plan.name}</h2>
               <p className="mt-3 font-display text-3xl font-extrabold text-ink-950">
-                {plan.customPricing ? "Özel teklif" : money(amount)}
-                {plan.customPricing ? null : (
-                  <span className="ml-1 text-sm font-semibold text-text-muted">
-                    /{cycle === "yearly" ? "yıl" : "ay"}
-                  </span>
-                )}
+                {money(amount)}
+                <span className="ml-1 text-sm font-semibold text-text-muted">
+                  /{cycle === "yearly" ? "yıl" : "ay"}
+                </span>
               </p>
               <p className="mt-1 text-xs text-text-faint">
-                {plan.customPricing ? "Ekibinize göre hazırlanır" : "KDV hariç"}
-                {!plan.customPricing && cycle === "yearly"
+                KDV hariç
+                {cycle === "yearly"
                   ? ` · ${plan.yearlyPaidMonths ?? 10} ay ödenir, aylık ${money(Math.round(amount / 12))}'ye gelir`
                   : ""}
               </p>
@@ -445,14 +490,9 @@ export default async function BillingPage({
                     savedCardLabel={
                       cardsSupported && configured && isSeatOwner && defaultSavedCard ? maskedCardLabel(defaultSavedCard) : null
                     }
+                    wallet={current || sellable ? walletCheckout : null}
+                    totalTry={Math.round(amount * 1.2 * 100) / 100}
                   />
-                ) : plan.customPricing ? (
-                  <Link
-                    href="/demo"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400"
-                  >
-                    Bize ulaşın
-                  </Link>
                 ) : (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
                     Bu paket yeni satışa kapalı; mevcut aboneliğiniz değişmez.

@@ -63,7 +63,7 @@ describe("PCI: kart verisi alanları kod tabanında YOK", () => {
   });
 
   it("migration: payment_cards ham kart sütunu içermez ve maskeli alanları yapısal olarak sınırlar", () => {
-    const sql = readFileSync(join(ROOT, "supabase/migrations/20260826000100_payment_cards.sql"), "utf8")
+    const sql = readFileSync(join(ROOT, "supabase/migrations/20260826000700_payment_cards.sql"), "utf8")
       .split("\n")
       .filter((line) => !line.trim().startsWith("--"))
       .join("\n");
@@ -87,6 +87,8 @@ describe("PCI: kart verisi alanları kod tabanında YOK", () => {
     const callback = readFileSync(join(ROOT, "src/app/api/iyzico/callback/route.ts"), "utf8");
     expect(callback).toContain("meta.saveCard === true");
     // Doğrulama zinciri kart kaydından ÖNCE çalışır.
-    expect(callback.indexOf("verifyCheckoutPayment(result")).toBeLessThan(callback.indexOf("saveCardFromPayment("));
+    expect(callback.indexOf("verifyCheckoutPayment(result")).toBeLessThan(callback.indexOf("saveCardAfterVerifiedPayment("));
+    const webhook = readFileSync(join(ROOT, "src/app/api/iyzico/webhook/route.ts"), "utf8");
+    expect(webhook.indexOf("verifyCheckoutPayment(providerResult")).toBeLessThan(webhook.indexOf("saveCardAfterVerifiedPayment("));
   });
 });

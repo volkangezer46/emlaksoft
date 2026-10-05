@@ -35,7 +35,7 @@ export function RoiCalculator({
   const uid = useId();
   const [raw, setRaw] = useState<RoiRaw>(EMPTY);
   const [planId, setPlanId] = useState(defaultPlanId);
-  const effective = useMemo(() => applyOffers(plans.filter((p) => !p.customPricing), offers), [plans, offers]);
+  const effective = useMemo(() => applyOffers(plans, offers), [plans, offers]);
   const plan = effective.find((p) => p.id === planId) ?? effective[0]!;
   const advisors = parseTrNumber(raw.advisors);
   const seats = advisors !== null && advisors >= 1 ? Math.floor(advisors) : plan.limits.seats;

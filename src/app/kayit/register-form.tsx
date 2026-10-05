@@ -22,10 +22,12 @@ import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { formatNumberTr } from "@/lib/format";
+import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
-import { registrationQuote, registrationSelection } from "@/lib/billing/seat-calculator-model";
+import { registrationQuote, registrationSelection, seatBounds } from "@/lib/billing/seat-calculator-model";
 
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
+import { InviteBanner, type InviteBannerData } from "./invite-banner";
 
 const initial: AuthResult = {};
 
@@ -34,8 +36,6 @@ const STEPS = [
   { no: 2, label: "Ofisiniz", icon: Building2 },
   { no: 3, label: "Güvenlik", icon: Lock },
 ];
-
-const MAX_SEATS_INPUT = 999;
 
 /**
  * Sunucu hatasını ilgili adıma eşler — kullanıcı 3. adımda gönderir ama hata
@@ -55,7 +55,14 @@ export function RegisterForm({
   trialDays,
   offers,
   attribution,
+  invite = null,
+  efValuationCost,
+  copy,
 }: {
+  /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
+  efValuationCost?: number;
+  /** Üst metinler (Site içeriği, sunucuda değişkenleri çözülmüş düz metin); yoksa bugünkü metin. */
+  copy?: { title: string; text: string; panelText: string };
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
   /** Fiyat sayfası hesaplayıcısından gelen kullanıcı sayısı; yoksa seçilen planın dahil kullanıcı sayısı. */
@@ -66,7 +73,11 @@ export function RegisterForm({
   /** Etkin aylık fiyat (kampanya dahil), plan kimliğine göre. */
   offers?: Record<string, { monthlyTry: number }>;
   attribution?: SignupAttributionFields;
+  /** Davet bağlantısıyla gelen ziyaretçi için "X sizi davet etti" (program açık ve kod aktifse). */
+  invite?: InviteBannerData | null;
 }) {
+  // Tek hesapta satılabilecek en yüksek kullanıcı sayısı katalogdan gelir (sabit yok).
+  const MAX_SEATS_INPUT = seatBounds(plans).inputMax;
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -90,8 +101,8 @@ export function RegisterForm({
   const quote = registrationQuote(plans, offers, selectedPlanId, seats, initialCycle);
   // Fiyat yalnız sunucudan gelen etkin teklifle gösterilir (sabit tutar yok); özel fiyatlı/kapasite aşan pakette tutar yok.
   const planPriceText =
-    selectedPlan.customPricing || selection.calc.status === "contact"
-      ? " · ekibinize özel teklif"
+    selection.calc.status === "over_max"
+      ? ""
       : quote
         ? ` · ${formatNumberTr(seats)} kullanıcı · ${formatNumberTr(quote.totalForCycleTry)} ₺ ${initialCycle === "yearly" ? "/yıl" : "/ay"} + KDV`
         : "";
@@ -124,17 +135,22 @@ export function RegisterForm({
   return (
     <AuthShell
       panelTitle="Ofisinizi 2 dakikada dijitalleştirin"
-      panelDesc={`${trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme"}, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.`}
+      panelDesc={copy?.panelText ?? `${trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme"}, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.`}
     >
       <div className="mt-8 lg:mt-0">
-        <h1 className="font-display text-3xl font-extrabold text-ink-950">Ücretsiz başlayın</h1>
-        <p className="mt-2 text-sm text-text-muted">3 kısa adımda çalışma alanınız hazır.</p>
+        <h1 className="font-display text-3xl font-extrabold text-ink-950">{copy?.title ?? "Ücretsiz başlayın"}</h1>
+        <p className="mt-2 text-sm text-text-muted">{copy?.text ?? "3 kısa adımda çalışma alanınız hazır."}</p>
         <p
           className="mt-3 inline-flex rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-700"
           aria-live="polite"
         >
           {selectedPlan.name} · {initialCycle === "yearly" ? "Yıllık" : "Aylık"} plan seçimi{planPriceText}
         </p>
+        {efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0) ? (
+          <p className="mt-2 text-xs font-semibold text-mint-700">
+            {efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0)}; kontör ile ek sorgu satın alınabilir.
+          </p>
+        ) : null}
 
         {/* Adım göstergesi — tamamlanmış adımlar tıklanarak geri dönülebilir */}
         <ol className="mt-7 flex items-center gap-2" aria-label="Kayıt adımları">
@@ -174,6 +190,7 @@ export function RegisterForm({
           })}
         </ol>
 
+        <InviteBanner invite={invite} />
         <form action={action} className="mt-7">
           <input type="hidden" name="plan" value={selectedPlanId} />
           <input type="hidden" name="cycle" value={initialCycle} />
@@ -258,12 +275,12 @@ export function RegisterForm({
                 <span className="text-sm text-text-muted">kullanıcı</span>
               </div>
               <p className="mt-3 min-h-10 rounded-[var(--radius-card)] bg-brand-600/[0.06] px-3.5 py-2.5 text-sm text-ink-950" aria-live="polite">
-                {selection.calc.status === "contact" ? (
-                  <>Bu ekip büyüklüğü için size özel teklif hazırlarız; hesabınızı yine de oluşturabilirsiniz.</>
+                {selection.calc.status === "over_max" ? (
+                  <>{selection.calc.limitNote}</>
                 ) : (
                   <>
                     Önerilen paket: <strong>{selectedPlan.name}</strong>
-                    {quote && !selectedPlan.customPricing
+                    {quote
                       ? ` · aylık ödemede ${formatNumberTr(quote.totalMonthlyTry)} ₺ / ay + KDV`
                       : ""}
                   </>
@@ -310,6 +327,20 @@ export function RegisterForm({
               </div>
               <PasswordStrengthMeter password={pw} />
             </div>
+
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-brand-300/60 bg-brand-600/[0.04] px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-400">
+              <input
+                type="checkbox"
+                name="demo_data"
+                defaultChecked
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+              />
+              <span>
+                <strong className="text-ink-900">Demo verileriyle başla</strong> — müşteri, portföy, talep, randevu ve
+                anlaşmalarla dolu örnek bir ofisle her ekranı deneyin. Hazır olunca tek adımda temizleyip kendi
+                verinizle devam edersiniz; gerçek kayıtlarınıza dokunulmaz.
+              </span>
+            </label>
 
             <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
               <input

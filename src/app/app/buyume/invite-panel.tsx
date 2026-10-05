@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Link2, Loader2, MessageCircle, Sparkles } from "lucide-react";
 import { createMyReferralCode } from "@/app/actions/growth";
+import { buildWhatsAppHref } from "@/lib/growth/program";
 
 const BTN =
   "focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] border border-hairline bg-surface px-3.5 py-2 text-sm font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
@@ -48,7 +49,6 @@ export function InvitePanel({ url, canCreate }: { url: string | null; canCreate:
     );
   }
 
-  const text = `EmlakSoft ile ofisimi yönetiyorum. Denemek istersen: ${url}`;
   return (
     <div id="davet-baglantisi" className="space-y-3">
       <code className="block overflow-x-auto rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-sm text-ink-950">{url}</code>
@@ -69,7 +69,7 @@ export function InvitePanel({ url, canCreate }: { url: string | null; canCreate:
           {copied ? <Check className="h-4 w-4 text-mint-600" aria-hidden /> : <Link2 className="h-4 w-4" aria-hidden />}
           {copied ? "Kopyalandı" : "Bağlantıyı kopyala"}
         </button>
-        <a className={BTN} href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer">
+        <a className={BTN} href={buildWhatsAppHref(url)} target="_blank" rel="noopener noreferrer">
           <MessageCircle className="h-4 w-4" aria-hidden />
           WhatsApp ile paylaş
         </a>

@@ -50,6 +50,7 @@ describe("atomic billing fulfillment adapter", () => {
       if (name === "transition_billing_payment_capture") {
         return { data: { ok: true }, error: null };
       }
+      if (name === "try_credit_invoice_hold") return { data: { has_hold: false }, error: null };
       throw new Error(`Unexpected RPC: ${name}`);
     });
   });
@@ -92,6 +93,7 @@ describe("atomic billing fulfillment adapter", () => {
         error: null,
       };
       if (name === "transition_billing_payment_capture") return { data: { ok: true }, error: null };
+      if (name === "try_credit_invoice_hold") return { data: { has_hold: false }, error: null };
       throw new Error(`Unexpected RPC: ${name}`);
     });
 
@@ -137,6 +139,7 @@ describe("atomic billing fulfillment adapter", () => {
         error: null,
       };
       if (name === "transition_billing_payment_capture") return { data: { ok: true }, error: null };
+      if (name === "try_credit_invoice_hold") return { data: { has_hold: false }, error: null };
       throw new Error(`Unexpected RPC: ${name}`);
     });
 
@@ -180,6 +183,7 @@ describe("atomic billing fulfillment adapter", () => {
         return { data: null, error: { code: "55000", message: "atomic write failed" } };
       }
       if (name === "transition_billing_payment_capture") return { data: { ok: true }, error: null };
+      if (name === "try_credit_invoice_hold") return { data: { has_hold: false }, error: null };
       throw new Error(`Unexpected RPC: ${name}`);
     });
 

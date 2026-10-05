@@ -19,10 +19,12 @@ import {
   Megaphone,
   Menu,
   Radar,
+  Receipt,
   Search,
   SearchCheck,
   Palette,
   PanelTop,
+  FileText,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -85,6 +87,8 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Finans",
     items: [
       { href: "/admin/billing", label: "Abonelik & fatura", icon: CreditCard, hint: "MRR & fatura", module: "billing" },
+      { href: "/admin/ef-kontor", label: "EmlakFiyati kontör", icon: CreditCard, hint: "Tarife, paket, bakiye", module: "billing" },
+      { href: "/admin/muhasebe", label: "Muhasebe", icon: Receipt, hint: "Tahsilat, KDV, CSV", module: "billing" },
     ],
   },
   {
@@ -112,7 +116,9 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
       { href: "/admin/ayarlar", label: "Ayarlar", icon: Settings, hint: "Bakım, kayıt, deneme", module: "sistem" },
       { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
       { href: "/admin/seo", label: "SEO merkezi", icon: SearchCheck, hint: "Arama motoru, sitemap, robot", module: "seo" },
+      { href: "/admin/site", label: "Site yönetimi", icon: Globe, hint: "Tüm online yönetim alanları", module: "dashboard" },
       { href: "/admin/site-menu", label: "Site menüsü", icon: PanelTop, hint: "Menü, alt bilgi, duyuru", module: "sitemenu" },
+      { href: "/admin/site-icerik", label: "Site içeriği", icon: FileText, hint: "Ana sayfa metinleri, SSS", module: "sitecontent" },
     ],
   },
 ];

@@ -41,12 +41,10 @@ export default function SeatCalculator({
   const [cycle, setCycle] = useState<BillingCycle>(initialCycle);
 
   const result = useMemo(() => computeSeatCalc(plans, offers, seats, cycle), [plans, offers, seats, cycle]);
-  const contact = result.status === "contact";
+  const contact = result.status === "over_max";
   const unit = cycle === "yearly" ? "yıl" : "ay";
-  const ctaHref = contact
-    ? "/demo"
-    : `/kayit?plan=${result.planId}&cycle=${cycle}&seats=${seats}`;
-  const ctaLabel = contact ? "Bize ulaşın" : trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
+  const ctaHref = `/kayit?plan=${result.planId}&cycle=${cycle}&seats=${contact ? bounds.inputMax : seats}`;
+  const ctaLabel = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
 
   function commit(n: number) {
     const v = clampSeats(n, bounds);
@@ -145,9 +143,9 @@ export default function SeatCalculator({
         </p>
         {contact ? (
           <div className="flex h-full min-h-[22rem] flex-col justify-center">
-            <p className="text-sm font-bold uppercase tracking-[0.08em] text-brand-700">Özel teklif</p>
-            <p className="mt-2 font-display text-2xl font-bold text-ink-950">{formatNumberTr(seats)} kullanıcı için size özel paket</p>
-            <p className="mt-2 text-sm text-text-muted">{result.contactNote}</p>
+            <p className="text-sm font-bold uppercase tracking-[0.08em] text-brand-700">Kullanıcı sınırı</p>
+            <p className="mt-2 font-display text-2xl font-bold text-ink-950">En fazla {formatNumberTr(bounds.inputMax)} kullanıcı</p>
+            <p className="mt-2 text-sm text-text-muted">{result.limitNote}</p>
           </div>
         ) : (
           <div>

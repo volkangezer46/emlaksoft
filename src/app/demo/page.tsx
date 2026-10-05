@@ -8,9 +8,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/demo");
 }
 import { CalendarDays } from "lucide-react";
+import { getLiveSiteContent } from "@/lib/site-content/store";
 import { DemoForm } from "./demo-form";
 
-export default function DemoPage() {
+export default async function DemoPage() {
+  const { demo } = await getLiveSiteContent();
   return (
     <div className="flex min-h-screen items-center justify-center bg-[image:var(--grad-ink)] px-4 py-12">
       <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -22,8 +24,8 @@ export default function DemoPage() {
               <CalendarDays className="h-5 w-5" />
             </span>
             <div>
-              <h1 className="font-display text-2xl font-extrabold text-white">Canlı demo talebi</h1>
-              <p className="mt-1 text-sm text-white/60">15 dakikalık tur — CRM, portföy, kayıp-kaçak ve eşleştirme.</p>
+              <h1 className="font-display text-2xl font-extrabold text-white">{demo.title}</h1>
+              <p className="mt-1 text-sm text-white/60">{demo.text}</p>
             </div>
           </div>
         </div>

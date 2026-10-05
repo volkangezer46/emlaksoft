@@ -24,6 +24,7 @@ export const PLAN_FIELD_LIMITS = {
   priceMax: 1_000_000,
   limitMax: 10_000_000,
   quotaMax: 100_000_000,
+  efCreditsMax: 100_000,
   seatTiersMax: 12,
   maxSeatsMax: 100_000,
   orderMax: 1000,
@@ -50,7 +51,8 @@ export type PlanOverride = {
   seatRounding?: SeatRounding | null;
   aiCreditsMonthly?: number | null;
   valuationReportsMonthly?: number | null;
-  customPricing?: boolean;
+  efCreditsMonthly?: number | null;
+  efCreditsPerExtraSeat?: number | null;
   hidden?: boolean;
   order?: number;
   campaignMonthlyTry?: number | null;
@@ -133,7 +135,6 @@ export function sanitizePlanOverride(raw: unknown): PlanOverride {
   const eyebrow = cleanText(r.eyebrow, PLAN_FIELD_LIMITS.eyebrowMax);
   if (eyebrow) out.eyebrow = eyebrow;
   if (typeof r.popular === "boolean") out.popular = r.popular;
-  if (typeof r.customPricing === "boolean") out.customPricing = r.customPricing;
   if (typeof r.hidden === "boolean") out.hidden = r.hidden;
   if (isInt(r.yearlyPaidMonths, 1, 12)) out.yearlyPaidMonths = r.yearlyPaidMonths;
   if (isInt(r.order, 0, PLAN_FIELD_LIMITS.orderMax)) out.order = r.order;
@@ -153,6 +154,10 @@ export function sanitizePlanOverride(raw: unknown): PlanOverride {
   if (ai !== undefined) out.aiCreditsMonthly = ai;
   const valuation = cleanNullableInt(r.valuationReportsMonthly, 0, PLAN_FIELD_LIMITS.quotaMax);
   if (valuation !== undefined) out.valuationReportsMonthly = valuation;
+  const ef = cleanNullableInt(r.efCreditsMonthly, 0, PLAN_FIELD_LIMITS.efCreditsMax);
+  if (ef !== undefined) out.efCreditsMonthly = ef;
+  const efSeat = cleanNullableInt(r.efCreditsPerExtraSeat, 0, PLAN_FIELD_LIMITS.efCreditsMax);
+  if (efSeat !== undefined) out.efCreditsPerExtraSeat = efSeat;
   if (Array.isArray(r.features)) {
     const features = r.features
       .map((f) => cleanText(f, PLAN_FIELD_LIMITS.featureMax))
@@ -266,9 +271,12 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
     if (ai !== undefined) next.aiCreditsMonthly = ai;
     const valuation = nullable(o.valuationReportsMonthly, plan.valuationReportsMonthly);
     if (valuation !== undefined) next.valuationReportsMonthly = valuation;
+    const efCredits = nullable(o.efCreditsMonthly, plan.efCreditsMonthly);
+    if (efCredits !== undefined) next.efCreditsMonthly = efCredits;
+    const efSeat = nullable(o.efCreditsPerExtraSeat, plan.efCreditsPerExtraSeat);
+    if (efSeat !== undefined) next.efCreditsPerExtraSeat = efSeat;
     const campaign = nullable(o.campaignMonthlyTry, plan.campaignMonthlyTry);
     if (campaign !== undefined) next.campaignMonthlyTry = campaign;
-    if (o.customPricing !== undefined) next.customPricing = o.customPricing;
     if (o.hidden !== undefined) next.hidden = o.hidden;
     if (o.order !== undefined) next.order = o.order;
     return next;
@@ -310,8 +318,9 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
   if ((edited.valuationReportsMonthly ?? null) !== (plan.valuationReportsMonthly ?? null)) {
     o.valuationReportsMonthly = edited.valuationReportsMonthly ?? null;
   }
+  if ((edited.efCreditsMonthly ?? null) !== (plan.efCreditsMonthly ?? null)) o.efCreditsMonthly = edited.efCreditsMonthly ?? null;
+  if ((edited.efCreditsPerExtraSeat ?? null) !== (plan.efCreditsPerExtraSeat ?? null)) o.efCreditsPerExtraSeat = edited.efCreditsPerExtraSeat ?? null;
   if ((edited.campaignMonthlyTry ?? null) !== (plan.campaignMonthlyTry ?? null)) o.campaignMonthlyTry = edited.campaignMonthlyTry ?? null;
-  if (Boolean(edited.customPricing) !== Boolean(plan.customPricing)) o.customPricing = Boolean(edited.customPricing);
   if (Boolean(edited.hidden) !== Boolean(plan.hidden)) o.hidden = Boolean(edited.hidden);
   if (edited.order !== plan.order) {
     if (edited.order !== undefined) o.order = edited.order;
@@ -331,15 +340,16 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
  * Not: veritabanı sınırları (plan_entitlements) paneldeki kayıt sırasında senkronlanır.
  */
 export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
-  advisor: { monthlyTry: 749 },
+  advisor: { monthlyTry: 749, efCreditsMonthly: 10, extraSeatMonthlyTry: 499, maxSeats: 500, seatRounding: "x9" },
   office: {
+    efCreditsMonthly: 40,
     extraSeatMonthlyTry: 399,
     extraSeatTiers: [
       { fromSeat: 1, toSeat: 5, monthlyTry: 399 },
       { fromSeat: 6, toSeat: 15, monthlyTry: 349 },
       { fromSeat: 16, toSeat: null, monthlyTry: 299 },
     ],
-    maxSeats: 20,
+    maxSeats: 500,
     seatRounding: "x9",
   },
   professional: {
@@ -349,8 +359,9 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       { fromSeat: 1, toSeat: 10, monthlyTry: 349 },
       { fromSeat: 11, toSeat: null, monthlyTry: 299 },
     ],
-    maxSeats: 40,
+    maxSeats: 500,
     seatRounding: "x9",
+    efCreditsMonthly: 120,
     limits: { seats: 15 },
     features: [
       "15 kullanıcıya kadar · 10 şube",
@@ -360,8 +371,20 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       "KVKK uyum ve ofisler arası ağ",
     ],
   },
-  business: { monthlyTry: 8990, limits: { seats: 40 } },
-  enterprise: { customPricing: true },
+  business: { monthlyTry: 8990, limits: { seats: 40 }, efCreditsMonthly: 300 },
+  enterprise: {
+    monthlyTry: 12900,
+    efCreditsMonthly: 400,
+    efCreditsPerExtraSeat: 6,
+    extraSeatMonthlyTry: 249,
+    extraSeatTiers: [
+      { fromSeat: 1, toSeat: 50, monthlyTry: 249 },
+      { fromSeat: 51, toSeat: 200, monthlyTry: 199 },
+      { fromSeat: 201, toSeat: null, monthlyTry: 149 },
+    ],
+    maxSeats: 500,
+    seatRounding: "x9",
+  },
 };
 
 /** Kampanya aktifse ve plan için indirimli fiyat tanımlıysa o aylık fiyat; değilse liste fiyatı. */

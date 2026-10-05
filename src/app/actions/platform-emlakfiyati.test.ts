@@ -28,6 +28,7 @@ import {
   saveEmlakFiyatiKey,
   setEmlakFiyatiOrtakFlag,
   testEmlakFiyatiConnection,
+  testEmlakFiyatiOrtak,
 } from "./platform-emlakfiyati";
 import { EF_SETTING, invalidateEmlakFiyatiKeyCache } from "@/lib/integrations/emlakfiyati/keys";
 import { resetEmlakFiyatiStateForTests } from "@/lib/integrations/emlakfiyati/adapter";
@@ -62,6 +63,7 @@ describe("platform-emlakfiyati actions", () => {
       await deletePreviousEmlakFiyatiKey(),
       await clearEmlakFiyatiKey(),
       await testEmlakFiyatiConnection(),
+      await testEmlakFiyatiOrtak(),
       await setEmlakFiyatiOrtakFlag(true),
     ];
     for (const r of results) expect(r.error).toMatch(/yetkiniz yok|yalnız süper admin/);
@@ -130,10 +132,46 @@ describe("platform-emlakfiyati actions", () => {
     for (const k of ALL_FAKE_KEYS) expect(JSON.stringify([r, audit.mock.calls])).not.toContain(k);
   });
 
-  it("ortak uç bayrağı yazılır ('1'/'0')", async () => {
+  it("ortak uç bayrağı yoklama OLMADAN açılamaz; yoklama varsa yazılır ('1'/'0'); kapatmak serbest", async () => {
+    const denied = await setEmlakFiyatiOrtakFlag(true);
+    expect(denied.error).toMatch(/Ortak bağlantıyı dene/);
+    expect(store.get(EF_SETTING.ortakEnabled)).toBeUndefined();
+    await setEmlakFiyatiOrtakFlag(false);
+    expect(store.get(EF_SETTING.ortakEnabled)).toBe("0");
+
+    store.set(EF_SETTING.ortakProbeOkAt, "2026-10-05T10:00:00.000Z");
     expect((await setEmlakFiyatiOrtakFlag(true)).ok).toBe(true);
     expect(store.get(EF_SETTING.ortakEnabled)).toBe("1");
     await setEmlakFiyatiOrtakFlag(false);
     expect(store.get(EF_SETTING.ortakEnabled)).toBe("0");
+  });
+
+  it("ortak yoklama: başarıda damga + sınırlar/tarife.surum yazılır; başarısızlıkta damga SİLİNİR; anahtar sızmaz", async () => {
+    await saveEmlakFiyatiKey(form(FAKE_KEY));
+    const usage = {
+      ortak: { kod: "emlaksoft", ad: "Emlaksoft" },
+      tarife: { sorgu_tl: 0, pdf_tl: 0, surum: "v1:0:0" },
+      sinirlar: { istek_dakika: 1200, pdf_dakika: 60, esz_pdf: 3, esz_degerleme: 6 },
+      toplam: { degerleme: 0, pdf: 0 },
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(usage), { status: 200, headers: { "x-istek-id": "req-abc123" } })));
+    const ok = await testEmlakFiyatiOrtak();
+    expect(ok.ok).toBe(true);
+    expect(ok.probe).toMatchObject({ state: "connected", requestId: "req-abc123" });
+    expect(store.get(EF_SETTING.ortakProbeOkAt)).toMatch(/^2\d{3}-/);
+    expect(JSON.parse(store.get(EF_SETTING.ortakProbeInfo) as string)).toMatchObject({ tarifeSurum: "v1:0:0", sinirlar: { eszDegerleme: 6 } });
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://emlakfiyati.com/api/ortak/v1/kullanim");
+    expect(init.method).toBe("GET");
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ hata: "operator veya admin yetkisi gerekli" }), { status: 403 })));
+    const bad = await testEmlakFiyatiOrtak();
+    expect(bad.probe).toMatchObject({ state: "forbidden", code: null });
+    expect(store.get(EF_SETTING.ortakProbeOkAt)).toBeNull();
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ hata: "x", kod: "ortak_bagi_yok" }), { status: 403 })));
+    expect((await testEmlakFiyatiOrtak()).probe).toMatchObject({ state: "forbidden", code: "ortak_bagi_yok" });
+
+    for (const k of ALL_FAKE_KEYS) expect(JSON.stringify([ok, bad, audit.mock.calls])).not.toContain(k);
   });
 });

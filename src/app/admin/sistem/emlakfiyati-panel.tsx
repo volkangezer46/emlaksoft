@@ -10,6 +10,8 @@ import {
   saveEmlakFiyatiKey,
   setEmlakFiyatiOrtakFlag,
   testEmlakFiyatiConnection,
+  testEmlakFiyatiOrtak,
+  type EmlakFiyatiOrtakProbeResult,
 } from "@/app/actions/platform-emlakfiyati";
 import { EMLAKFIYATI_KEY_PREFIX } from "@/lib/integrations/emlakfiyati/policy";
 
@@ -26,6 +28,26 @@ const PROBE_LABEL: Record<string, { text: string; good: boolean }> = {
   server: { text: "Sunucu hatası (5xx): EmlakFiyati tarafında geçici sorun olabilir.", good: false },
   network: { text: "Ağ hatası: EmlakFiyati'na ulaşılamadı.", good: false },
   disabled: { text: "Anahtar tanımlı değil.", good: false },
+};
+
+const ORTAK_PROBE_LABEL: Record<string, { text: string; good: boolean }> = {
+  connected: { text: "Bağlı: ortak uçlar yanıt veriyor (GET /kullanim 2xx).", good: true },
+  auth: { text: "401: anahtar geçersiz, iptal edilmiş veya izinli IP listesi dışında.", good: false },
+  forbidden: { text: "403: ortak uçlar için yetki yok.", good: false },
+  rate_limited: { text: "429: istek sınırı aşıldı, biraz sonra deneyin.", good: false },
+  server: { text: "Sunucu hatası (5xx/503): EmlakFiyati tarafında geçici sorun olabilir.", good: false },
+  network: { text: "Ağ hatası veya zaman aşımı: ortak uçlara ulaşılamadı.", good: false },
+  disabled: { text: "Anahtar tanımlı değil.", good: false },
+  invalid_response: { text: "Beklenmeyen yanıt biçimi: ortak uç şemaya uymuyor.", good: false },
+  other: { text: "Yoklama tamamlanamadı.", good: false },
+};
+
+const ORTAK_CODE_LABEL: Record<string, string> = {
+  kapsam_yok: "Anahtarda ortak kapsamı (ortak:value / ortak:report) yok.",
+  ortak_bagi_yok: "Anahtar EmlakFiyati'nda Emlaksoft ortak kaydına bağlı değil.",
+  ortak_pasif: "Ortak kaydı pasif.",
+  kimlik_gerekli: "Kimlik reddedildi.",
+  probe_kaydedilemedi: "Yoklama başarılı ama kayıt yazılamadı.",
 };
 
 const ERROR_CLASS_LABEL: Record<string, string> = {
@@ -56,6 +78,12 @@ export type EmlakFiyatiPanelProps = {
   previousUsedLabel: string | null;
   ortakFlagOn: boolean;
   ortakEndpointsVerified: boolean;
+  ortakProbeOkLabel: string | null;
+  ortakProbeInfo: {
+    ortakAd: string | null;
+    tarifeSurum: string | null;
+    sinirlar: { istekDakika: number | null; pdfDakika: number | null; eszPdf: number | null; eszDegerleme: number | null };
+  } | null;
 };
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -73,7 +101,8 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [probe, setProbe] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<null | "clear" | "previous">(null);
+  const [confirm, setConfirm] = useState<null | "clear" | "previous" | "ortak-on" | "ortak-off">(null);
+  const [ortakProbe, setOrtakProbe] = useState<EmlakFiyatiOrtakProbeResult["probe"] | null>(null);
   const { canEdit, secretsEnabled } = props;
 
   function submitKey(e: FormEvent<HTMLFormElement>) {
@@ -116,6 +145,18 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
       const res = await testEmlakFiyatiConnection();
       if (res.error) setError(res.error);
       else setProbe(res.state ?? "network");
+      router.refresh();
+    });
+  }
+
+  function runOrtakProbe() {
+    setError(null);
+    setNotice(null);
+    setOrtakProbe(null);
+    start(async () => {
+      const res = await testEmlakFiyatiOrtak();
+      if (res.error) setError(res.error);
+      else setOrtakProbe(res.probe ?? null);
       router.refresh();
     });
   }
@@ -239,22 +280,76 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
         {notice ? <p role="status" className="mt-2 text-xs font-medium text-mint-700">{notice}</p> : null}
 
         <div className="mt-6 border-t border-line pt-4">
-          <h3 className="text-sm font-bold text-ink-950">Ortak uçlar (değerleme / PDF)</h3>
+          <h3 className="text-sm font-bold text-ink-950">Ortak uçlar (değerleme / rapor / PDF)</h3>
           <p className="mt-1 text-xs text-text-muted">
-            EmlakFiyati bu uçları henüz yayınlamadı (doğrulanmadı / bekliyor). Bayrak açık olsa bile çağrı üretilmez.
+            Uçlar canlıda doğrulanmadı: önce yoklama başarılı olmalı, sonra bayrak açılabilir. Bayrak kapalıyken hiçbir ortak çağrı yapılmaz.
           </p>
-          <label className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-ink-950">
-            <input
-              type="checkbox"
-              checked={props.ortakFlagOn}
-              disabled={!canEdit || pending}
-              onChange={(e) => run(() => setEmlakFiyatiOrtakFlag(e.target.checked), "Ayar kaydedildi.")}
-              className="h-4 w-4"
-            />
-            Ortak uçları etkinleştir {props.ortakFlagOn ? "(açık)" : "(kapalı)"}
-          </label>
-          {props.ortakFlagOn && !props.ortakEndpointsVerified ? (
-            <p className="mt-2 text-xs text-amber-700">Bayrak açık ama uçlar henüz yok: hiçbir çağrı yapılmıyor.</p>
+          <div className="mt-3 space-y-2">
+            <Row label="Son başarılı yoklama" value={props.ortakProbeOkLabel ?? "yok (bayrak açılamaz)"} />
+            <Row label="Bayrak" value={props.ortakFlagOn ? "açık" : "kapalı"} />
+            {props.ortakProbeInfo ? (
+              <>
+                <Row label="Tarife sürümü" value={props.ortakProbeInfo.tarifeSurum ?? "bildirilmedi"} />
+                <Row
+                  label="Sınırlar"
+                  value={
+                    [
+                      props.ortakProbeInfo.sinirlar.istekDakika !== null ? `${props.ortakProbeInfo.sinirlar.istekDakika} istek/dk` : null,
+                      props.ortakProbeInfo.sinirlar.pdfDakika !== null ? `${props.ortakProbeInfo.sinirlar.pdfDakika} PDF/dk` : null,
+                      props.ortakProbeInfo.sinirlar.eszDegerleme !== null ? `${props.ortakProbeInfo.sinirlar.eszDegerleme} eşzamanlı değerleme` : null,
+                      props.ortakProbeInfo.sinirlar.eszPdf !== null ? `${props.ortakProbeInfo.sinirlar.eszPdf} eşzamanlı PDF` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "bildirilmedi"
+                  }
+                />
+              </>
+            ) : null}
+          </div>
+          {canEdit ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={runOrtakProbe} disabled={pending || !props.configured} className={`${btn} border border-line bg-surface text-ink-950`}>
+                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5" />} Ortak bağlantıyı dene
+              </button>
+              {props.ortakFlagOn ? (
+                confirm === "ortak-off" ? (
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800">
+                    Ortak uçlar kapatılsın mı?
+                    <button type="button" onClick={() => run(() => setEmlakFiyatiOrtakFlag(false), "Ortak uçlar kapatıldı.")} className={`${btn} bg-ink-950 text-white`}>Evet, kapat</button>
+                    <button type="button" onClick={() => setConfirm(null)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+                  </span>
+                ) : (
+                  <button type="button" onClick={() => setConfirm("ortak-off")} disabled={pending} className={`${btn} border border-line text-danger-500`}>
+                    Ortak uçları kapat
+                  </button>
+                )
+              ) : confirm === "ortak-on" ? (
+                <span className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold text-amber-800">
+                  Canlı kullanıcı verisiyle kullanım için EmlakFiyati sözleşmesi imzalı mı? Etkinleştirilsin mi?
+                  <button type="button" onClick={() => run(() => setEmlakFiyatiOrtakFlag(true), "Ortak uçlar etkinleştirildi.")} className={`${btn} bg-ink-950 text-white`}>Evet, etkinleştir</button>
+                  <button type="button" onClick={() => setConfirm(null)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirm("ortak-on")}
+                  disabled={pending || !props.ortakProbeOkLabel}
+                  title={props.ortakProbeOkLabel ? undefined : "Önce başarılı ortak yoklaması gerekir"}
+                  className={`${btn} bg-ink-950 text-white`}
+                >
+                  Ortak uçları etkinleştir
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-text-faint">Ortak uçlar yalnız süper admin tarafından yönetilir.</p>
+          )}
+          {ortakProbe ? (
+            <div role="status" className={`mt-3 text-sm font-medium ${ORTAK_PROBE_LABEL[ortakProbe.state]?.good ? "text-mint-700" : "text-danger-600"}`}>
+              <p>{ORTAK_PROBE_LABEL[ortakProbe.state]?.text ?? "Yoklama tamamlanamadı."}</p>
+              {ortakProbe.code ? <p className="text-xs">{ORTAK_CODE_LABEL[ortakProbe.code] ?? `Kod: ${ortakProbe.code}`}</p> : null}
+              {ortakProbe.requestId ? <p className="text-xs text-text-muted">İstek kodu (destek için): {ortakProbe.requestId}</p> : null}
+            </div>
           ) : null}
         </div>
       </section>

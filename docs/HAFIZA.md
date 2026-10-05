@@ -30,6 +30,28 @@ YASAK: bekleyenleri ad sırasıyla uygular ve P12'yi (en küçük numara) İLK s
 (`CREATE INDEX CONCURRENTLY` runner transaction'ında çalışmaz + ölçülmemiş; terfi ETMEDİ). K4 `is_document` dalda. Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı.
 Aşağıdaki liste TARİHSEL envanterdir (uygulananlar dahil); güncel bekleyenler için `npm run db:migrate -- --dry-run`.
 
+**PB9 EmlakFiyati kontör (HAZIRLANDI, UYGULANMADI; sahip bildirimi: 13 terfi + P12 canlıda):** `20260826000100_ef_credit_wallet`
+(defter `ef` birimi, `ef_credit_reservations`, 7 service_role RPC: `config.ts` EF_RPC birebir; 0 kontör = doğrudan kesinleşmiş kayıt,
+kontör süresiz, `ef_credit_ready()` SQL editöründe false) → `20260826000200_ef_reports` → `20260826000300_ef_credit_pack_fulfillment`
+(fulfill/v2 `credit_pack`; taban 000600 gövdesi bayt bayt, md5 kanıtı `src/lib/ef-credits/ef-wallet-sql-contract.test.ts`).
+Sıra/sorgular `YAYIN_PENCERESI_2.md` §7; prova `npm run db:rehearse -- --yes-i-understand-locks --ef` (koşulmadı). TS kontör akışı YOK.
+
+**PB10 TL HESAP KREDİSİ (HAZIRLANDI, UYGULANMADI):** `20260826000400_try_credit_wallet` (defter `try` birimi, `try_credit_reservations`, service_role RPC'ler:
+`try_credit_balance/grant/reserve/commit/release/reverse`, ofis okuma `try_credit_my_overview()` + `try_credit_movements` görünümü; bakiye = defter TEKRAR OYNATMA, vade FIFO,
+clawback eksiye düşebilir ama harcanamaz) → `20260826000500_try_credit_invoice_payment` (`try_credit_fulfill_invoice` fulfill/v2'yi İÇERDEN çağırır, fulfill gövdelerine DOKUNMAZ;
+`try_credit_invoice_hold/release_invoice/release_dead/refund_invoice`, `try_credit_ready()`). Sıra: 000100 (source CHECK refund/bonus + meta) SONRA. TS: `src/lib/try-credits/*`
+(sözleşme `config.ts`, testler `try-wallet-sql-contract.test.ts` + pglite'lı `try-wallet-sql-exec.test.ts`: `npm i --no-save @electric-sql/pglite`). Ödeme: faturada "Hesap kredimi kullan"
+(`use_credit=1`), tek faturada en fazla `platform_settings.try_credit.max_invoice_share` (varsayılan 0.5; 1 = tam kredi/iyzico'suz), iyzico yalnız nakit kalanı; iade önce nakitten düşer, artan kredi geri yazılır.
+`/app/abonelik?sekme=cuzdan` Cüzdan bölümü. Ortaklık/tavsiye işi `try_credit_grant/reverse`'e bağlanır (kind: referral|partner|campaign|manual|bonus|refund).
+
+**PB11 REFERANS/ORTAK MOTORU (HAZIRLANDI, UYGULANMADI, bayraklar KAPALI):** `20260826000600_growth_referral_engine` (000800 + 000900 + 000400/000500 SONRASI). Müşteri-getir-müşteri (Faz 1, çift taraflı, kredi nakde çevrilmez):
+tetikleyici = davet edilen ofisin İLK GERÇEK ödemesi (`growth_real_payment`: paid plan faturası, demo/tam-kredi/iade yok) + `hold_days`; davetçiye 1 aylık paket bedeli TL kredisi (`try_credit_grant`, idem `ref-claim-<claim>`),
+kademe bonusu 3./10. referans (rozet sayımdan türetilir, depolanmaz), yıllık tavan (aylık bedel katı), kötüye kullanım bayrakları (aynı vergi no / telefon / kurumsal e-posta alan adı → `pending` inceleme; aynı tenant red; hız sınırı),
+iade/iptal/chargeback → `reversed` + `try_credit_reverse` clawback. Faz 2 (ortak, nakit): kademe %20/25/30, ilk 12 ay yinelenen, min eşik, yalnız vergi mükellefi + belge no/tarih (dış ödeme) veya hesap kredisi;
+`growth_partner_enabled` + AYRI `growth_cash_payout_enabled` kapalıyken komisyon/ödeme ÜRETİLMEZ. TS: `src/lib/growth/engine.ts` (RPC sarmalayıcıları, istemci enjekte, asla fırlatmaz) + `program.ts` (saf), kancalar:
+`fulfillment.ts` (`registerClaimSafe`, fulfill SQL'ine dokunmaz), `platform-billing.ts` iade, `store.ts` kayıt (hoş geldin kredisi), cron `growth-claims`. Test: `growth-engine-contract.test.ts` + pglite'lı `growth-engine-sql-exec.test.ts`
+(`PGLITE_MODULE=...` ya da `npm i --no-save @electric-sql/pglite`). Tasarım/parametreler/açık riskler: `docs/design/REFERANS_PROGRAMI.md`. Aktivasyon: /admin/growth "Aktivasyon" hazırlık kontrolü → süper admin bayrağı açar.
+
 (Eski not) Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
 Sıra: yedek/PITR doğrula → `npm run check:migrations -- --database` → `npm run db:migrate -- --dry-run` → `npm run db:migrate` → `npm run db:rls-audit`.
 
@@ -140,9 +162,10 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Havuz/atama puanı | `src/lib/pool/score.ts` |
 | Anket | `src/lib/surveys/**` (mevcut memnuniyet anketini genişletir) |
 | Ürün turu | `src/lib/product-tour-data.ts` |
-| Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (30 rota, `npm run check:cron`) |
+| Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (32 rota, `npm run check:cron`) |
 | service_role | `src/lib/admin-client-allowlist.ts` (`audit-admin-client.ts --write`) |
 | EmlakFiyati TEK ADAPTÖR (emlakfiyati.com'a TÜM çağrılar) | `src/lib/integrations/emlakfiyati/`: `adapter.ts` (tek `fetchExternal`; `emlakFiyatiGet(path, query)` tür-güvenli ince çekirdek, geri çekilme+jitter, en çok 4 eşzamanlı, bellek önbelleği, 401/403/429/5xx/ağ sınıflandırma, istek sayacı + `onEmlakFiyatiRequest` kancası [kontör ADAPTÖR DIŞINDA], 401 alarmı, `probeEmlakFiyatiConnection`), `policy.ts` (saf: izinli yol/başlık beyaz listesi, anahtar biçimi/maske, `X-Ortak-Kullanici-Ref` ve `Idempotency-Key` yardımcıları), `keys.ts` (anahtar çözümleme: admin şifreli > env `EMLAKFIYATI_API_KEY` yedek; rotasyon current/previous 7 gün), `ortak.ts` (ortak uç KAPISI + takma ref), `admin-status.ts`; şifreleme `src/lib/platform-secrets.ts` (`PLATFORM_SECRETS_KEY`, AES-256-GCM, `pii-crypto` kalıbı); admin ekranı `/admin/sistem?sekme=emlakfiyati` + `src/app/actions/platform-emlakfiyati.ts` (süper admin yazar, ops okur). Sözleşme testi: `single-adapter-contract.test.ts` |
+| EmlakFiyati KONTÖR (tarife/paket/cüzdan/satış) | **Sözleşme** `src/lib/ef-credits/config.ts` (tarife+paket şemaları, RPC adları; DEĞİŞTİRİLMEZ). **Okuyucu** `credit-reader.ts` (ef_credit_ready yoklaması 60 sn, katalog [tag `ef-credit-config`], bakiye, geçmiş, son kontör faturası), saf görünüm `credit-view.ts`, admin `admin-data.ts` (ofis bakiye listesi, manuel yükleme RPC) + saf `admin-grant.ts` (doğrulama, ÖRNEK 4 paket ön ayarı). **Cüzdan/servis (wallet.ts, service.ts) BAŞKA AJANDA.** Satış: saf `src/lib/billing/credit-pack-purchase-core.ts` (KDV=invoiceAmountsTry, kontör başı, düşük bakiye eşiği, öneri), sunucu `credit-pack-purchase.ts` (fatura meta.kind=credit_pack), action `startCreditPackPurchase` (billing.ts). Ofis ekranı `/app/abonelik?sekme=kontor`; admin `/admin/ef-kontor` (süper admin yazar, ops okur, `updateTag`). Cüzdan hazır değilse (ef_credit_ready) HER ŞEY "etkin değil", para tahsil eden yol AÇILMAZ; kupon paketlerde KAPALI; demo ödeme yok. **SAHİP İŞLERİ:** paket fiyatları (katalog varsayılan BOŞ; admin"Örnek ön ayar" yalnız öneri) ve tarife değerleri (varsayılan EF_DEFAULT_TARIFF). Geçmiş okuyucusu defter sütunlarında hoşgörülüdür (kind/entry_type, units/amount, item/feature); cüzdan SQL canlıya girince gerçek sütun adlarıyla doğrulanmalı |
 | Piyasa endeksi (EmlakFiyati) | `src/lib/integrations/emlakfiyati/` (`contract.ts` saf: zod yanıt, slug yolu, tip eşlemesi `konut`/`arsa`; `client.ts` yalnız `adapter.ts` üzerinden: `getEndeks`, `getEndeksForPlace`, 12 sa `unstable_cache` + kısa negatif önbellek; 429'da Retry-After YOK, geri çekilme adaptörde); panel `src/components/app/emlakfiyati-endeks-panel.tsx`; değerleme kaynağı `src/lib/valuation.ts`. Endeksa ve TapuSor KALDIRILDI (kullanıcı kararı); eski `platform_settings` anahtarları (`endeksa_*`, `tapusor_*`) kodda okunmaz, temizlik migration'ı yazılmadı |
 
 ### 6b. EmlakFiyati: sahip işleri ve "ortak uçlar bekliyor" (2026-10-05)
@@ -164,8 +187,9 @@ için sorgu parametreleri ve yanıt şemaları (adaptör yalnız `get(path, quer
 - Yanıtlar Türkçe. Popup yok, sekme/panel. Kararları sormadan ver (sert güvenlik hariç: zorunlu 2FA/TOTP vb. onaysız eklenmez;
   `PLATFORM_MFA_ENFORCEMENT=on` yayın öncesi açılacak, şu an kapalı). Özet panelinde maskeleme yok.
 - Fiyat kataloğu (kullanıcı onaylı): Danışman 749 · Ofis 2.490 (ek kullanıcı 399) · Profesyonel 4.990 (15 kullanıcı, ek 349) ·
-  Business 8.990 (varsayılan gizli) · Kurumsal özel; yıllık "10 öde 12"; ücretsiz paket YOK; deneme süresi tek kaynak
+  Business 8.990 (varsayılan gizli) · Kurumsal 12.900 (50 kullanıcı dahil, ek 249/199/149 kademeli, en fazla 500; "özel teklif" YOK, `customPricing` alanı kaldırıldı); yıllık "10 öde 12"; ücretsiz paket YOK; deneme süresi tek kaynak
   (`getEffectiveTrialDays`, migration sonrası 30 gün); Founders kampanyası admin düzenlenebilir; ödül/ortak oranları kodda sabit DEĞİL.
+- Aylık kontör hakkı (`efCreditsMonthly`): Danışman 10 · Ofis 40 · Profesyonel 120 · Business 300 · Kurumsal 400 + ek kullanıcı başı 6 (`efCreditsPerExtraSeat`, cron `ef-kontor-hak` `subscriptions.extra_seats` ile ölçekler; sütun yoksa 0). Ek rapor paketi = admin kontör kataloğu (`ef.packs`), ofiste Abonelik > Kontör; ana sayfada `EmlakFiyatiSection`.
 - Demo veri public vitrine/portal/sitemap'e sızmaz; demo danışman hesabı AÇILMAZ (auth.users bağı); tüm demo kayıtlar kurucuya atanır.
 - Onay kuralı muafiyeti owner/gm ile sınırlanmalı (denetim 3, #5); ofis kapatma veri paketi yalnız platformun `completed` yaptığı talepte.
 - Anketör rol değil, atanabilir görevdir. Tetikleyiciler kapalı doğar, geriye dönük anket üretilmez.
@@ -183,7 +207,7 @@ yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasy
 
 `docs/design/BIRLESIK_YOL_HARITASI.md` (yol haritası, terim sözlüğü, 15 çelişki kararı) · `ONERI_LISTESI_KARSILASTIRMA.md` (113 madde) ·
 `ISLEM_TAMLIK_DENETIMI.md` · `DANISMAN_UZMANLIK_HAVUZ_DEMO_SPEC.md` · `PIYASA_VE_FARK_YARATAN_OZELLIKLER.md` (F1-F5) ·
-`ORGANIK_BUYUME_PLANI.md` · `BILLING_PAUSE_PRORATION_DESIGN.md` · `OFIS_SAHIPLIGI_DEVRI.md` · `GUVENLIK_DENETIMI_3.md` ·
+`ORGANIK_BUYUME_PLANI.md` · `REFERANS_PROGRAMI.md` · `BILLING_PAUSE_PRORATION_DESIGN.md` · `OFIS_SAHIPLIGI_DEVRI.md` · `GUVENLIK_DENETIMI_3.md` ·
 `docs/DURUM.md`, `MIMARI.md`, `ROADMAP.md`, `DEPLOY.md`, `DESIGN_SYSTEM.md` · `docs/security/` (admin client envanteri) ·
 `.claude/agents/` (birlestirme, canli-qa, guvenlik, hiz, migration ajanları).
 

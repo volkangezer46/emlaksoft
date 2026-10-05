@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { startPlanCheckout } from "@/app/actions/billing";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 export function CheckoutButton({
   plan,
@@ -13,7 +14,13 @@ export function CheckoutButton({
   couponsEnabled = false,
   canSaveCard = false,
   savedCardLabel = null,
+  wallet = null,
+  totalTry = null,
 }: {
+  /** TL hesap kredisi cüzdanı (null: etkin değil → onay kutusu gösterilmez). */
+  wallet?: WalletCheckoutInfo | null;
+  /** KDV dahil tahmini toplam (yalnız ön izleme; asıl hesap sunucuda). */
+  totalTry?: number | null;
   plan: PlanId;
   cycle: BillingCycle;
   label: string;
@@ -31,6 +38,7 @@ export function CheckoutButton({
   // Açık rıza: VARSAYILAN KAPALI. Kart verisi bu bileşende/sunucumuzda hiç yoktur; kart iyzico sayfasında girilir.
   const [saveCard, setSaveCard] = useState(false);
   const [confirmSaved, setConfirmSaved] = useState(false);
+  const [useCredit, setUseCredit] = useState(false);
 
   async function onClick(useSavedCard = false) {
     setPending(true);
@@ -41,6 +49,7 @@ export function CheckoutButton({
     if (couponsEnabled && coupon.trim()) fd.set("coupon", coupon.trim());
     if (canSaveCard && saveCard) fd.set("save_card", "1");
     if (useSavedCard) fd.set("use_saved_card", "1");
+    if (useCredit && wallet) fd.set("use_credit", "1");
     const result = await startPlanCheckout(fd);
     if (result.checkoutUrl) {
       window.location.href = result.checkoutUrl;
@@ -109,6 +118,16 @@ export function CheckoutButton({
           </button>
         )
       ) : null}
+      <div className="mb-2">
+        <WalletCreditToggle
+          wallet={wallet}
+          checked={useCredit}
+          onChange={setUseCredit}
+          totalTry={totalTry}
+          disabled={pending}
+          idPrefix={`plan-${plan}`}
+        />
+      </div>
       <button
         type="button"
         disabled={pending}

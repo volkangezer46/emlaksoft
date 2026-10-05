@@ -3,27 +3,29 @@ import { Pricing } from "@/components/pricing";
 import { SeatCalculatorLazy } from "@/components/pricing-page/seat-calculator-lazy";
 import { extraSeatTexts } from "@/lib/billing/seat-calculator-model";
 import type { PublicPricing } from "@/lib/billing/public-pricing";
-import { yearlyOffer } from "@/lib/marketing-copy";
-import { Em, SectionHeading } from "./section-heading";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { Heading } from "@/lib/site-content/schema";
+import { tx } from "@/lib/site-content/tokens";
+import { RichTitle } from "./content-link";
+import { SectionHeading } from "./section-heading";
 
 /** Fiyatlar, limitler, kampanya ve deneme günü tek kaynaktan (admin paket tanımları) okunur; sabit tutar yazılmaz. */
-export function PricingSection({ pricing }: { pricing: PublicPricing }) {
-  const { plans, trialDays, offers, founders } = pricing;
-  const offer = yearlyOffer(plans);
+export function PricingSection({ pricing, heading = defaultSiteContent().sections.fiyat }: { pricing: PublicPricing; heading?: Heading }) {
+  const { plans, trialDays, offers, founders, efValuationCost } = pricing;
   return (
     <section id="fiyat" className="mk-section" aria-labelledby="fiyat-baslik">
       <div className="mk-wrap">
         <SectionHeading
           center
-          eyebrow="Fiyat"
-          title={<span id="fiyat-baslik">Gizli maliyet yok, <Em>sürpriz yok.</Em></span>}
-          text={`KDV hariç fiyatlar. Taahhüt yok, dilediğiniz an iptal edin.${offer ? ` Yıllık ödemede ${offer.label}.` : ""}`}
+          eyebrow={heading.eyebrow}
+          title={<span id="fiyat-baslik"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></span>}
+          text={heading.text ? tx(heading.text, { trialDays, plans }) : undefined}
         />
         <div className="mx-auto mt-8 max-w-5xl">
           <SeatCalculatorLazy plans={plans} offers={offers} trialDays={trialDays} />
         </div>
         <div className="mk-price-wrap mk-reveal">
-          <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} />
+          <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} />
         </div>
         <p className="mk-fine">
           Paketleri özellik özellik karşılaştırmak ve kaçan komisyonu kendi sayılarınızla hesaplamak için <Link href="/fiyatlar">Fiyatlar sayfasına</Link> gidin.

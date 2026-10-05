@@ -9,9 +9,11 @@ import {
 } from "@/lib/billing/iyzico";
 import {
   createCheckoutInvoice,
+  DuplicateAutoRenewAttemptError,
   fulfillSuccessfulPayment,
   invoiceAmountsTry,
   markCheckoutInvoiceFailed,
+  markCheckoutInvoiceInitialized,
 } from "@/lib/billing/fulfillment";
 import { validateCheckoutBuyer } from "@/lib/billing/buyer";
 import {
@@ -123,7 +125,7 @@ async function renewOne(
 
   const { data: sub } = await admin
     .from("subscriptions")
-    .select("id, plan, billing_cycle, amount_try, status")
+    .select("id, plan, billing_cycle, amount_try, status, current_period_end")
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (!sub || sub.status !== "past_due" || !(Number(sub.amount_try) > 0)) return "skipped";
@@ -131,12 +133,15 @@ async function renewOne(
   const sinceIso = new Date(nowMs - HISTORY_DAYS * 86_400_000).toISOString();
   const { data: prior } = await admin
     .from("invoices")
-    .select("created_at")
+    .select("created_at, status, checkout_status")
     .eq("tenant_id", tenantId)
     .filter("meta->>source", "eq", "auto_renew")
     .gte("created_at", sinceIso)
     .order("created_at", { ascending: false })
     .limit(10);
+  // Çözülmemiş önceki deneme (fatura hâlâ "initialized": tahsilat alınmış olabilir ama fulfill tamamlanmamış, ya da
+  // koşu yarıda kesilmiş): YENİ tahsilat YAPILMAZ; mutabakat/yönetici çözer. Çift tahsilatın son kapısı.
+  if ((prior ?? []).some((i) => i.status === "draft" && i.checkout_status === "initialized")) return "skipped";
   const last = prior?.[0]?.created_at ? new Date(prior[0].created_at as string).getTime() : null;
   if (!autoRenewAttemptAllowed({ priorAttempts: prior?.length ?? 0, lastAttemptAtMs: last, nowMs })) {
     return "skipped";
@@ -171,16 +176,39 @@ async function renewOne(
   const cycle = (sub.billing_cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const conversationId = `es-${tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
   const amounts = invoiceAmountsTry(Number(sub.amount_try));
-  const invoiceId = await createCheckoutInvoice({
-    tenantId,
-    subscriptionId: String(sub.id),
-    plan,
-    cycle,
-    conversationId,
-    amountTry: amounts.amountTry,
-    source: "auto_renew",
-  });
+  // Çift tahsilat koruması: `<abonelik>:<dönem sonu>:<deneme no>` anahtarı DB'de benzersizdir (kısmi indeks). Eş zamanlı
+  // ikinci koşu aynı anahtarla fatura açamaz → sessizce atlanır; kart ÇEKİLMEZ.
+  const periodKey = typeof sub.current_period_end === "string" ? sub.current_period_end.slice(0, 10) : "none";
+  const autoRenewAttemptKey = autoRenewAttemptKeyOf(String(sub.id), periodKey, (prior?.length ?? 0) + 1);
+  let invoiceId: string;
+  try {
+    const created = await createCheckoutInvoice({
+      tenantId,
+      subscriptionId: String(sub.id),
+      plan,
+      cycle,
+      conversationId,
+      amountTry: amounts.amountTry,
+      source: "auto_renew",
+      autoRenewAttemptKey,
+    });
+    invoiceId = created.invoiceId;
+  } catch (e) {
+    if (e instanceof DuplicateAutoRenewAttemptError) return "skipped";
+    throw e;
+  }
 
+  // Tahsilattan ÖNCE fatura "initialized" olur (fulfill SQL'i başlatılmış checkout faturası bekler; ödeme sonrası
+  // eşleşmeme/askıda kalma olmaz). Başarısızsa kart çekilmez.
+  try {
+    await markCheckoutInvoiceInitialized({ invoiceId, tenantId });
+  } catch (e) {
+    await markCheckoutInvoiceFailed({ invoiceId, tenantId });
+    console.error("autoRenew init", e instanceof Error ? e.message : "error");
+    return "failed";
+  }
+
+  let verified: ReturnType<typeof verifyStoredCardPayment>;
   try {
     const result = await chargeStoredCard({
       conversationId,
@@ -193,11 +221,20 @@ async function renewOne(
       basketItemName: `EmlakSoft ${plan} (${cycle === "yearly" ? "yıllık" : "aylık"}) otomatik yenileme`,
     });
     // Checkout Form ile aynı sıkı mutabakat: imza, durum, fraudStatus, conversationId/basketId, para birimi, tutar.
-    const verified = verifyStoredCardPayment(result, {
+    verified = verifyStoredCardPayment(result, {
       conversationId,
       basketId: conversationId,
       amountTry: amounts.totalTry,
     });
+  } catch (e) {
+    await markCheckoutInvoiceFailed({ invoiceId, tenantId });
+    console.error("autoRenew charge", e instanceof Error ? e.message : "error");
+    return "failed";
+  }
+
+  // Tahsilat DOĞRULANDI: fulfill hatası faturayı "başarısız" işaretlemez (para alındı). Mutabakat kaydı
+  // (record_billing_payment_capture) fulfill içinde yazılır; hata olursa reconciliation/yeniden deneme devralır.
+  try {
     await fulfillSuccessfulPayment({
       tenantId,
       plan,
@@ -210,8 +247,12 @@ async function renewOne(
     });
     return "charged";
   } catch (e) {
-    await markCheckoutInvoiceFailed({ invoiceId, tenantId });
-    console.error("autoRenew charge", e instanceof Error ? e.message : "error");
+    console.error("autoRenew fulfill", e instanceof Error ? e.message : "error");
     return "failed";
   }
+}
+
+/** Otomatik yenileme tekillik anahtarı (saf; testlenebilir). */
+export function autoRenewAttemptKeyOf(subscriptionId: string, periodKey: string, attemptNo: number): string {
+  return `${subscriptionId}:${periodKey}:${attemptNo}`;
 }

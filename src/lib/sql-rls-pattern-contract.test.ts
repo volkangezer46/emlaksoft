@@ -550,6 +550,37 @@ describe("statik SQL/RLS kalıp sözleşmesi (U13/P5)", { timeout: 60_000 }, () 
     expect({ yeniIhlal: fresh, bayatIstisna: stale }).toEqual({ yeniIhlal: [], bayatIstisna: [] });
   });
 
+  it("EmlakFiyati kontör kümesi (20260826000100..000300): yalnız SELECT politikası (tenant-only DEĞİL), definer + search_path, revoke, RLS", () => {
+    const ef = files.filter((f) => /^supabase\/migrations\/20260826000[123]00_ef_/.test(f.rel));
+    expect(ef.map((f) => f.name)).toEqual([
+      "20260826000100_ef_credit_wallet.sql",
+      "20260826000200_ef_reports.sql",
+      "20260826000300_ef_credit_pack_fulfillment.sql",
+    ]);
+    const efPolicies = ef.flatMap(policyDefs);
+    expect(efPolicies.map((p) => `${p.table}.${p.policy}:${p.cmd}`).sort()).toEqual([
+      "ef_credit_reservations.ef_credit_reservations_select:select",
+      "ef_reports.ef_reports_select:select",
+    ]);
+    // SELECT de olsa yalnız tenant koşulu yetmez: kendi kaydı ya da owner/gm.
+    for (const p of efPolicies) {
+      expect(isTenantOnly(p.using), p.key).toBe(false);
+      expect(p.using ?? "", p.key).toMatch(/auth\.uid\(\)/);
+      expect(p.using ?? "", p.key).toMatch(/current_profile_role\(\)\s*\)\s*in\s*\('owner',\s*'gm'\)/);
+    }
+    const fixed = alteredSearchPath(files);
+    expect(ef.flatMap((f) => definerWithoutSearchPath(f, fixed))).toEqual([]);
+    expect(ef.flatMap((f) => serviceRoleRpcWithoutRevoke(f, files))).toEqual([]);
+    const definers = ef.flatMap(functionDefs).filter((f) => /\bsecurity\s+definer\b/.test(f.head)).map((f) => f.name);
+    expect(definers.sort()).toEqual([
+      "ef_credit_balance", "ef_credit_commit", "ef_credit_grant", "ef_credit_ready", "ef_credit_release", "ef_credit_reserve",
+      "ef_credit_sweep", "fulfill_billing_payment", "fulfill_billing_payment_v2",
+    ]);
+    const tables = ef.flatMap(tenantTables);
+    expect(tables.sort()).toEqual(["ef_credit_reservations", "ef_reports"]);
+    for (const t of tables) expect(rlsEnabled(files, t), t).toBe(true);
+  });
+
   it("(d) yalnız service_role'e açık yeni RPC public/anon/authenticated'dan revoke ediliyor", () => {
     const found = files.flatMap((f) => serviceRoleRpcWithoutRevoke(f, files));
     const { fresh, stale } = diff(found, KNOWN_SERVICE_RPC_NO_REVOKE);

@@ -1,5 +1,7 @@
 # emlakfiyati.com Ortak API — Entegrasyon Kılavuzu (TASLAK v0, EmlakFiyati ekibinden)
 
+> **GEÇERSİZ: bu taslak v0, `EMLAKFIYATI_ORTAK_API_V1.md` (kesin v1) ile DEĞİŞTİRİLDİ. Yalnız tarihsel kayıt.**
+
 > **Durum: TASLAK. Bu kılavuza dayanarak CANLIYA BAĞLANMAYIN** (EmlakFiyati: "anahtar yayın sonrası verilecektir"). Yanıt gövdesi alanları, değerleme girdi şeması,
 > hata kodu listesi, PDF sınırları, OpenAPI ve mutabakat dökümü biçimi **KESİNLEŞECEK (v1)**. Emlaksoft tarafında bu uçlar `ORTAK_ENDPOINTS_VERIFIED=false`
 > ve bayrak kapalı olarak bekler (`src/lib/integrations/emlakfiyati/ortak.ts`). Kaynak: kullanıcı tarafından 2026-10-05'te iletilen metin; içerik aşağıda özetlenmiş değil, ayrıntı kaybı olmaması için maddeler korunmuştur.

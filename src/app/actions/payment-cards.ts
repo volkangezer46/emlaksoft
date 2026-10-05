@@ -6,7 +6,7 @@ import { logActivity } from "@/lib/activity";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { removeStoredCard, setDefaultStoredCard, writeAutoRenewConsent } from "@/lib/billing/card-store";
-import { now } from "@/lib/clock";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Kayıtlı kart yönetimi. Kart verisi bu action'lara GELMEZ: yalnız kartın kendi kimliği (uuid) gelir; ekleme zaten
@@ -35,7 +35,7 @@ export async function removePaymentCard(cardId: string): Promise<CardActionResul
   if (!UUID_RE.test(cardId)) return { ok: false, error: "Geçersiz kart." };
   if (!isIyzicoConfigured()) return { ok: false, error: "Ödeme altyapısı yapılandırılmamış." };
 
-  const res = await removeStoredCard({ tenantId: g.gate.tenantId, cardId });
+  const res = await removeStoredCard(await createClient(), { cardId });
   if (!res.ok) return { ok: false, error: res.error };
   await logActivity({
     tenantId: g.gate.tenantId,
@@ -53,7 +53,7 @@ export async function setDefaultPaymentCard(cardId: string): Promise<CardActionR
   if (!g.ok) return { ok: false, error: g.error };
   if (!UUID_RE.test(cardId)) return { ok: false, error: "Geçersiz kart." };
 
-  const done = await setDefaultStoredCard({ tenantId: g.gate.tenantId, cardId });
+  const done = await setDefaultStoredCard(await createClient(), { cardId });
   if (!done) return { ok: false, error: "Varsayılan kart değiştirilemedi." };
   await logActivity({
     tenantId: g.gate.tenantId,
@@ -76,13 +76,10 @@ export async function setAutoRenewConsent(input: { enabled: boolean; cardId?: st
   const cardId = input.cardId ?? null;
   if (input.enabled && (!cardId || !UUID_RE.test(cardId))) return { ok: false, error: "Kart seçin." };
 
-  const res = await writeAutoRenewConsent({
-    tenantId: g.gate.tenantId,
-    userId: g.gate.userId,
+  const res = await writeAutoRenewConsent(await createClient(), {
     enabled: input.enabled,
     cardId,
     ip: await clientIp(),
-    nowIso: new Date(now()).toISOString(),
   });
   if (!res.ok) return { ok: false, error: res.error };
   await logActivity({

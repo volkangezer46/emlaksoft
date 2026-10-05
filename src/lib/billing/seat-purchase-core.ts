@@ -113,7 +113,11 @@ export function evaluateSeatChange(input: SeatChangeInput): SeatChangeEval {
     return {
       ...base,
       status: "over_max",
-      message: `${def.name} paketinde en fazla ${Number.isFinite(maxTotal) ? maxTotal : "?"} kullanıcı olur. Daha fazlası için Kurumsal teklif: bize ulaşın.`,
+      message: `${def.name} paketinde en fazla ${Number.isFinite(maxTotal) ? maxTotal : "?"} kullanıcı olur.${
+        input.plans.some((p) => !p.hidden && p.id !== def.id && maxTotalSeats(p) > maxTotal)
+          ? " Daha fazlası için bir üst pakete geçin."
+          : ""
+      }`,
     };
   }
   if (target < included) {

@@ -64,7 +64,7 @@ describe("navigation accessibility contract", () => {
     );
   });
 
-  it("describes every landing demo link as a scheduled meeting", () => {
+  it("satış akışında demo/görüşme talebi yok: ana sayfa, menü ve fiyat yüzeyleri self-servis (kayıt ve fiyatlar)", () => {
     // Bölümler src/components/marketing altında ayrı dosyalardır: page + marketing/** + footer toplamı.
     const marketingFiles = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -75,12 +75,14 @@ describe("navigation accessibility contract", () => {
       ...marketingFiles("src/components/marketing"),
       "src/components/site-footer.tsx",
       "src/lib/site-menu/defaults.ts",
+      "src/lib/site-content/defaults.ts",
     ]
       .map(source)
       .join("\n");
 
-    expect(home.match(/"\/demo"/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(home.match(/Demo görüşmesi planla/gi)?.length).toBeGreaterThanOrEqual(3);
+    expect(home).not.toMatch(/"\/demo"/);
+    expect(home).not.toMatch(/Demo görüşmesi planla/i);
+    expect(home).toContain("/kayit");
     expect(home.toLocaleLowerCase("tr-TR")).not.toContain("canlı demo");
   });
 

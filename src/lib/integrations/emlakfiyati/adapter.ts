@@ -8,6 +8,19 @@ import {
   readExternalJson,
 } from "@/lib/external-fetch";
 import { normalizeProviderBaseUrl, PROVIDER_REQUEST_TIMEOUT_MS } from "@/lib/integrations/provider-url";
+import {
+  classifyOrtakStatus,
+  EMLAKFIYATI_ORTAK_JSON_MAX_BYTES,
+  EMLAKFIYATI_ORTAK_MAX_PDF_CONCURRENCY,
+  EMLAKFIYATI_ORTAK_MAX_VALUATION_CONCURRENCY,
+  EMLAKFIYATI_ORTAK_PDF_MAX_BYTES,
+  EMLAKFIYATI_ORTAK_TIMEOUT_MS,
+  extractOrtakErrorCode,
+  ortakRetryDelayMs,
+  parseRetryAfterSeconds,
+  sanitizeRequestId,
+  type OrtakErrorKind,
+} from "./ortak-contract";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/platform-settings";
 import { EF_SETTING, invalidateEmlakFiyatiKeyCache, resolveEmlakFiyatiKeys } from "./keys";
@@ -15,12 +28,15 @@ import {
   assertAllowedOutbound,
   backoffDelayMs,
   buildEmlakFiyatiHeaders,
+  buildEmlakFiyatiPublicHeaders,
   classifyStatus,
   cooldownMs,
   EMLAKFIYATI_BASE_URL,
   EMLAKFIYATI_MAX_CONCURRENCY,
   EmlakFiyatiPolicyError,
+  isAllowedOrtakPath,
   isAllowedPath,
+  isAllowedReferencePath,
   validateQuery,
   type EmlakFiyatiErrorKind,
   type EmlakFiyatiGetPath,
@@ -166,6 +182,7 @@ export function resetEmlakFiyatiStateForTests(): void {
   listeners.clear();
   sleepImpl = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   randomImpl = Math.random;
+  resetOrtakStateForTests();
 }
 
 // --- Kalıcı gözlem (platform_settings; en iyi çaba, asla çağrıyı bozmaz) -------------------------------------------
@@ -470,4 +487,320 @@ export async function probeEmlakFiyatiConnection(): Promise<{ state: EmlakFiyati
     default:
       return { state: "network" };
   }
+}
+
+// ===========================================================================================================================
+// ORTAK API v1 AKTARIMI (docs/integrations/EMLAKFIYATI_ORTAK_API_V1.md) — emlakfiyati.com'a giden ortak/referans çağrıları da
+// YALNIZ bu dosyadan çıkar. Kapı (bayrak + yoklama) ve kontör mantığı BURADA DEĞİL (ortak.ts / ef-credits/service.ts).
+// ===========================================================================================================================
+
+type Lane = "value" | "pdf" | "other";
+
+function makeLimiter(max: number) {
+  let running = 0;
+  let peak = 0;
+  const queue: Array<() => void> = [];
+  return {
+    async acquire(): Promise<void> {
+      if (running < max) {
+        running += 1;
+        peak = Math.max(peak, running);
+        return;
+      }
+      await new Promise<void>((resolve) => queue.push(resolve));
+    },
+    release(): void {
+      const next = queue.shift();
+      if (next) next();
+      else running -= 1;
+    },
+    peak: () => peak,
+    reset(): void {
+      running = 0;
+      peak = 0;
+      queue.length = 0;
+    },
+  };
+}
+
+const lanes: Record<Lane, ReturnType<typeof makeLimiter>> = {
+  value: makeLimiter(EMLAKFIYATI_ORTAK_MAX_VALUATION_CONCURRENCY),
+  pdf: makeLimiter(EMLAKFIYATI_ORTAK_MAX_PDF_CONCURRENCY),
+  other: makeLimiter(EMLAKFIYATI_MAX_CONCURRENCY),
+};
+/** Kullanıcı başına eşzamanlı çağrı üst sınırı (değerleme 2, PDF 1); yalnız o örnek (instance) içinde geçerli. */
+const USER_LANE_MAX: Record<Lane, number> = { value: 2, pdf: 1, other: 4 };
+const userInflight = new Map<string, number>();
+const referenceCache = new Map<string, { expires: number; data: unknown }>();
+const referenceInflight = new Map<string, Promise<OrtakRaw>>();
+const REFERENCE_TTL_MS = 6 * 60 * 60 * 1000;
+const REFERENCE_CACHE_MAX = 400;
+
+export function getOrtakPeakConcurrency(): Record<Lane, number> {
+  return { value: lanes.value.peak(), pdf: lanes.pdf.peak(), other: lanes.other.peak() };
+}
+
+function resetOrtakStateForTests(): void {
+  for (const l of Object.values(lanes)) l.reset();
+  userInflight.clear();
+  referenceCache.clear();
+  referenceInflight.clear();
+}
+
+export type OrtakCallSpec = {
+  method: "GET" | "POST";
+  path: string;
+  query?: URLSearchParams;
+  body?: string;
+  userRef?: string;
+  /** POST /degerleme: yeniden denemelerde AYNI değer kullanılır (bu işlev değiştirmez). */
+  idempotencyKey?: string;
+  lane: Lane;
+  expect: "json" | "pdf";
+  /** false: tek deneme (yoklama). */
+  retries?: boolean;
+  /** Yoklama: 401 alarmı/blok/eski anahtar YOK ve anahtar önbelleği tazelenir. */
+  probe?: boolean;
+  timeoutMs?: number;
+  /** Bekleme dahil toplam süre bütçesi (ms); aşılacaksa yeniden denenmez. */
+  deadlineMs?: number;
+};
+
+export type OrtakRaw =
+  | {
+      ok: true;
+      status: number;
+      requestId: string | null;
+      replayed: boolean;
+      attempts: number;
+      json?: unknown;
+      bytes?: Uint8Array;
+    }
+  | {
+      ok: false;
+      kind: OrtakErrorKind;
+      status?: number;
+      /** Güvenli makine kodu (kapsam_yok, ortak_bagi_yok, rapor_yok...). Hata METNİ taşınmaz. */
+      code: string | null;
+      requestId: string | null;
+      retryAfterSec: number | null;
+      attempts: number;
+    };
+
+type OneShot =
+  | { ok: true; status: number; requestId: string | null; replayed: boolean; json?: unknown; bytes?: Uint8Array }
+  | { ok: false; kind: OrtakErrorKind; status?: number; code: string | null; requestId: string | null; retryAfterSec: number | null };
+
+async function readBytesCapped(res: Response, maxBytes: number): Promise<Uint8Array | null> {
+  const declared = res.headers.get("content-length");
+  if (declared && /^\d+$/.test(declared) && Number(declared) > maxBytes) {
+    await discardExternalResponse(res);
+    return null;
+  }
+  if (!res.body) return new Uint8Array(0);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.byteLength;
+  }
+  return out;
+}
+
+const PDF_MAGIC = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
+
+async function oneShot(spec: OrtakCallSpec, apiKey: string | null): Promise<OneShot> {
+  const headers = apiKey
+    ? buildEmlakFiyatiHeaders(
+        apiKey,
+        { userRef: spec.userRef, idempotencyKey: spec.idempotencyKey },
+        { accept: spec.expect === "pdf" ? "application/pdf" : "application/json", jsonBody: spec.body !== undefined },
+      )
+    : buildEmlakFiyatiPublicHeaders();
+  const url = new URL(spec.path, EMLAKFIYATI_BASE_URL);
+  url.search = spec.query?.toString() ?? "";
+  assertAllowedOutbound(url.toString(), headers); // fırlatırsa ağa ÇIKILMAZ
+  const lane = lanes[spec.lane];
+  await lane.acquire();
+  try {
+    const res = await fetchExternal(
+      url.toString(),
+      { method: spec.method, headers, body: spec.body, cache: "no-store" },
+      { timeoutMs: spec.timeoutMs ?? EMLAKFIYATI_ORTAK_TIMEOUT_MS },
+    );
+    const requestId = sanitizeRequestId(res.headers.get("x-istek-id"));
+    const replayed = res.headers.get("idempotency-replayed")?.toLowerCase() === "true";
+    if (res.status >= 200 && res.status < 300) {
+      if (spec.expect === "json") {
+        try {
+          const json = await readExternalJson<unknown>(res, EMLAKFIYATI_ORTAK_JSON_MAX_BYTES);
+          return { ok: true, status: res.status, requestId, replayed, json };
+        } catch (error) {
+          console.error("EmlakFiyati ortak yanıtı okunamadı", externalErrorMetadata(error));
+          return { ok: false, kind: "invalid_response", status: res.status, code: null, requestId, retryAfterSec: null };
+        }
+      }
+      const type = res.headers.get("content-type") ?? "";
+      const bytes = type.toLowerCase().includes("application/pdf") ? await readBytesCapped(res, EMLAKFIYATI_ORTAK_PDF_MAX_BYTES) : null;
+      if (!bytes || bytes.byteLength < PDF_MAGIC.length || !PDF_MAGIC.every((b, i) => bytes[i] === b)) {
+        if (!bytes) await discardExternalResponse(res);
+        return { ok: false, kind: "invalid_response", status: res.status, code: null, requestId, retryAfterSec: null };
+      }
+      return { ok: true, status: res.status, requestId, replayed, bytes };
+    }
+    let code: string | null = null;
+    try {
+      code = extractOrtakErrorCode(await readExternalJson<unknown>(res, 8 * 1024));
+    } catch {
+      await discardExternalResponse(res);
+    }
+    return {
+      ok: false,
+      kind: classifyOrtakStatus(res.status, code),
+      status: res.status,
+      code,
+      requestId,
+      retryAfterSec: parseRetryAfterSeconds(res.headers.get("retry-after")),
+    };
+  } catch (error) {
+    const meta = externalErrorMetadata(error);
+    console.error("EmlakFiyati ortak isteği başarısız", meta);
+    return { ok: false, kind: meta.kind === "timeout" ? "timeout" : "network", code: null, requestId: null, retryAfterSec: null };
+  } finally {
+    lane.release();
+  }
+}
+
+/** Tek anahtarla, sözleşmedeki geri çekilme kurallarıyla (AYNI Idempotency-Key) deneme döngüsü. */
+async function ortakLoop(spec: OrtakCallSpec, apiKey: string | null): Promise<OrtakRaw> {
+  const startedAt = now();
+  const budget = spec.deadlineMs ?? 240_000;
+  const counts = new Map<OrtakErrorKind, number>();
+  let attempts = 0;
+  for (;;) {
+    attempts += 1;
+    const r = await oneShot(spec, apiKey);
+    if (r.ok) return { ...r, attempts };
+    if (spec.retries === false) return { ...r, attempts };
+    const retryIndex = counts.get(r.kind) ?? 0;
+    const delay = ortakRetryDelayMs({ kind: r.kind, retryIndex, retryAfterSec: r.retryAfterSec, random: randomImpl });
+    if (delay === null || now() - startedAt + delay > budget) return { ...r, attempts };
+    counts.set(r.kind, retryIndex + 1);
+    await sleepImpl(delay);
+  }
+}
+
+function disabledRaw(): OrtakRaw {
+  return { ok: false, kind: "disabled", code: null, requestId: null, retryAfterSec: null, attempts: 0 };
+}
+
+/**
+ * Anahtarlı ortak çağrı. Yol YALNIZ ortak beyaz listeden. Hata olsa FIRLATMAZ. Anahtar çözümleme/rotasyon/401 alarmı
+ * mevcut mekanizmayla (keys.ts + raiseAuthAlarm); 401'de YENİDEN DENEME YOK (yalnız geçerli `previous` ile BİR kez).
+ * Kapı (bayrak/yoklama) çağıranın işidir (ortak-client.ts); yoklama bu işlevi kapısız çağırır.
+ */
+export async function ortakCall(spec: OrtakCallSpec): Promise<OrtakRaw> {
+  try {
+    return await ortakCallInner(spec);
+  } catch (error) {
+    if (error instanceof EmlakFiyatiPolicyError) return disabledRaw(); // politika ihlali: ağa çıkılmadı
+    throw error;
+  }
+}
+
+async function ortakCallInner(spec: OrtakCallSpec): Promise<OrtakRaw> {
+  if (!ALLOWED_ORIGIN || !isAllowedOrtakPath(spec.path)) return disabledRaw();
+  if (spec.probe) invalidateEmlakFiyatiKeyCache();
+  const keys = await resolveEmlakFiyatiKeys();
+  if (!keys.current) return disabledRaw();
+  if (!spec.probe && (authBlockedUntil.get(keys.fingerprint) ?? 0) > now()) {
+    return { ok: false, kind: "auth", status: 401, code: null, requestId: null, retryAfterSec: null, attempts: 0 };
+  }
+
+  const userKey = spec.userRef ? `${spec.lane}:${spec.userRef}` : null;
+  if (userKey) {
+    const inUse = userInflight.get(userKey) ?? 0;
+    if (inUse >= USER_LANE_MAX[spec.lane]) {
+      return { ok: false, kind: "too_many_local", code: null, requestId: null, retryAfterSec: null, attempts: 0 };
+    }
+    userInflight.set(userKey, inUse + 1);
+  }
+  try {
+    const usePreviousFirst = !spec.probe && Boolean(keys.previous) && preferPrevious.has(keys.fingerprint);
+    const first = usePreviousFirst ? (keys.previous as string) : keys.current;
+    let out = await ortakLoop(spec, first);
+    if (!out.ok && out.kind === "auth" && !usePreviousFirst && !spec.probe && keys.previous) {
+      const viaPrevious = await ortakLoop({ ...spec, retries: false }, keys.previous);
+      if (viaPrevious.ok) {
+        preferPrevious.add(keys.fingerprint);
+        void noticePreviousKeyUsed();
+      }
+      out = viaPrevious;
+    }
+    if (out.ok) {
+      if (!spec.probe) void recordLastSuccess();
+      return out;
+    }
+    if (out.kind === "auth" && !spec.probe) {
+      authBlockedUntil.set(keys.fingerprint, now() + AUTH_BLOCK_MS);
+      await raiseAuthAlarm();
+    }
+    return out;
+  } finally {
+    if (userKey) {
+      const left = (userInflight.get(userKey) ?? 1) - 1;
+      if (left <= 0) userInflight.delete(userKey);
+      else userInflight.set(userKey, left);
+    }
+  }
+}
+
+/**
+ * Anahtarsız mahalle referans uçları (yalnız /api/musteri/iller|ilceler|mahalleler): 6 saat bellek önbelleği + eşzamanlı birleştirme.
+ * Sözleşmenin parçası DEĞİL ve sınırsız kullanım garantisi yok; her tıklamada çağrılmaz.
+ */
+export async function ortakReferenceGet(path: string, query: URLSearchParams): Promise<OrtakRaw> {
+  if (!ALLOWED_ORIGIN || !isAllowedReferencePath(path)) return disabledRaw();
+  const cacheKey = `${path}?${query.toString()}`;
+  const hit = referenceCache.get(cacheKey);
+  if (hit && hit.expires > now()) return { ok: true, status: 200, requestId: null, replayed: false, attempts: 0, json: hit.data };
+  if (hit) referenceCache.delete(cacheKey);
+  const pending = referenceInflight.get(cacheKey);
+  if (pending) return pending;
+  const run = ortakLoop(
+    { method: "GET", path, query, lane: "other", expect: "json", timeoutMs: PROVIDER_REQUEST_TIMEOUT_MS, deadlineMs: 45_000 },
+    null,
+  )
+    .then((out) => {
+      if (out.ok) {
+        if (referenceCache.size >= REFERENCE_CACHE_MAX) {
+          const oldest = referenceCache.keys().next().value;
+          if (oldest !== undefined) referenceCache.delete(oldest);
+        }
+        referenceCache.set(cacheKey, { expires: now() + REFERENCE_TTL_MS, data: out.json });
+      }
+      return out;
+    })
+    .finally(() => {
+      referenceInflight.delete(cacheKey);
+    });
+  referenceInflight.set(cacheKey, run);
+  return run;
 }

@@ -19,6 +19,7 @@ import {
 import {
   assertBillingPlanPreflight,
   createCheckoutInvoice,
+  fulfillInvoiceWithWalletCredit,
   fulfillSuccessfulPayment,
   invoiceAmountsTry,
   markCheckoutInvoiceFailed,
@@ -28,6 +29,11 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { validateCheckoutBuyer, type ValidatedCheckoutBuyer } from "@/lib/billing/buyer";
 import { getBaseUrl } from "@/lib/base-url";
 import { getTenantCardUserKey } from "@/lib/billing/card-store";
+import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
+import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
+import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
+import { getTryMaxShare } from "@/lib/try-credits/settings";
+import type { AppliedWalletCredit } from "@/lib/try-credits/checkout";
 
 export type CheckoutResult = {
   error?: string;
@@ -36,6 +42,19 @@ export type CheckoutResult = {
 };
 
 const PLAN_IDS = new Set(PLANS.map((p) => p.id));
+
+/**
+ * iyzico `cardUserKey`: kayıtlı kartlar ödeme sayfasında YALNIZ owner/gm için ve YALNIZ kullanıcı bunu istediyse
+ * (kart kaydetme rızası veya "kayıtlı kartla öde") listelenir. Diğer roller/istekler için null (RPC bile çağrılmaz).
+ */
+async function cardUserKeyForCheckout(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  role: string | undefined,
+  wanted: boolean,
+): Promise<string | null> {
+  if (!wanted || (role !== "owner" && role !== "gm")) return null;
+  return getTenantCardUserKey(supabase);
+}
 
 function appUrl() {
   return getBaseUrl();
@@ -49,10 +68,16 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   const cycle = (String(formData.get("cycle") ?? "monthly").trim() || "monthly") as BillingCycle;
   if (!PLAN_IDS.has(plan)) return { error: "Geçersiz paket." };
   if (cycle !== "monthly" && cycle !== "yearly") return { error: "Geçersiz dönem." };
+  // "Hesap kredimi kullan" (TL kredi cüzdanı): tutar istemciden ALINMAZ; sunucu bakiye ve pay sınırıyla hesaplar.
+  const useCredit = String(formData.get("use_credit") ?? "") === "1";
+  if (useCredit && gate.role !== "owner" && gate.role !== "gm") {
+    return { error: "Hesap kredisini yalnızca ofis sahibi veya genel müdür kullanabilir." };
+  }
 
   // Kart saklama AÇIK RIZASI: yalnız form alanı tam olarak "1" ise (onay kutusu varsayılan KAPALI). Kart verisi
   // bu action'a hiç gelmez; kart iyzico'nun barındırılan sayfasında girilir.
   const saveCardConsent = String(formData.get("save_card") ?? "") === "1";
+  const useSavedCard = String(formData.get("use_saved_card") ?? "") === "1";
   if (saveCardConsent && (gate.role !== "owner" && gate.role !== "gm")) {
     return { error: "Kartı yalnızca ofis sahibi veya genel müdür kaydedebilir." };
   }
@@ -82,8 +107,8 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   }
 
   const planDef = await getPlanDefinition(plan);
-  if (planDef.hidden || planDef.customPricing) {
-    return { error: "Bu paket çevrimiçi satın alınamıyor. Lütfen bizimle iletişime geçin." };
+  if (planDef.hidden) {
+    return { error: "Bu paket çevrimiçi satın alınamıyor." };
   }
   const listAmountTry = planAmountOf(planDef, cycle);
   // Kupon (isteğe bağlı `coupon` alanı): önce tüketmeden doğrulanır, fatura oluşunca atomik tüketilir.
@@ -105,6 +130,9 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
 
   if (!configured && !demoAllowed) {
     return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
+  }
+  if (useCredit && !configured) {
+    return { error: "Hesap kredisi, ödeme altyapısı bağlıyken kullanılabilir." };
   }
 
   if (configured) {
@@ -129,8 +157,9 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   }
 
   let invoiceId: string;
+  let credit: AppliedWalletCredit | null = null;
   try {
-    invoiceId = await createCheckoutInvoice({
+    const created = await createCheckoutInvoice({
       tenantId: gate.tenantId,
       subscriptionId: sub?.id ?? null,
       plan,
@@ -138,7 +167,10 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       conversationId,
       amountTry,
       saveCard: saveCardConsent && configured ? { consentUserId: user.id } : null,
+      walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
     });
+    invoiceId = created.invoiceId;
+    credit = created.credit;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
   }
@@ -184,20 +216,37 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     };
   }
 
+  // TAM kredi (yalnız pay=1 yapılandırmasında): iyzico ÇAĞRILMAZ; kredi + fulfill tek SQL işleminde tamamlanır.
+  if (credit?.fullCredit) {
+    try {
+      await fulfillInvoiceWithWalletCredit({ tenantId: gate.tenantId, plan, cycle, conversationId });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+    }
+    revalidatePath("/app/abonelik");
+    revalidatePath("/app/ayarlar");
+    revalidatePath("/admin/billing");
+    return { checkoutUrl: `${appUrl()}/app/abonelik?paid=1&plan=${plan}` };
+  }
+
   try {
+    // Kısmi kredi: iyzico YALNIZ kalan nakit tutarı tahsil eder (fatura toplamı/KDV değişmez).
+    const chargeTry = credit ? credit.cashTry : invoiceAmounts.totalTry;
     const init = await initializeCheckoutForm({
       conversationId,
-      price: invoiceAmounts.totalTry,
-      paidPrice: invoiceAmounts.totalTry,
+      price: chargeTry,
+      paidPrice: chargeTry,
       basketId: conversationId,
       callbackUrl: `${appUrl()}/api/iyzico/callback`,
       buyer: checkoutBuyer!.buyer,
       billingAddress: checkoutBuyer!.billingAddress,
       basketItemName: `EmlakSoft ${plan} (${cycle === "yearly" ? "yıllık" : "aylık"})`,
-      // Kayıtlı kartı olan ofiste iyzico ödeme sayfası kartları listeler (kayıtlı kartla tek adım ödeme).
-      cardUserKey: await getTenantCardUserKey(gate.tenantId),
+      // cardUserKey YALNIZ owner/gm + (kayıt rızası VEYA "kayıtlı kartla öde") ile gönderilir; aksi halde başka roller
+      // (ör. muhasebe) ofis sahibinin kartını ödeme sayfasında göremez/kullanamaz.
+      cardUserKey: await cardUserKeyForCheckout(supabase, gate.role, saveCardConsent || useSavedCard),
     });
-    if (formData.get("use_saved_card") === "1") {
+    if (useSavedCard) {
       await logActivity({
         tenantId: gate.tenantId,
         actorId: gate.userId,
@@ -243,6 +292,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   if (!Number.isInteger(target) || target < 1 || target > 5000) return { error: "Geçersiz kullanıcı sayısı." };
   const confirmRaw = String(formData.get("confirm_try") ?? "").trim();
   const confirmTry = confirmRaw === "" ? null : Number(confirmRaw);
+  const useCredit = String(formData.get("use_credit") ?? "") === "1";
 
   const { allowed } = await checkRateLimit(`seatbuy:${gate.userId}`, { limit: 8, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };
@@ -326,9 +376,10 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   }
 
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
-  let invoice: { invoiceId: string; totalTry: number };
+  let invoice: { invoiceId: string; totalTry: number; credit: AppliedWalletCredit | null };
   try {
     invoice = await createSeatInvoice({
+      walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
       tenantId: gate.tenantId,
       subscriptionId: state.subscriptionId,
       plan: state.planId as PlanId,
@@ -356,20 +407,38 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       extraSeats: evalResult.toQuote.extraSeats,
       chargeNetTry: chargeNet,
       invoiceTotalTry: invoice.totalTry,
+      walletCreditTry: invoice.credit?.creditTry ?? 0,
     },
   });
 
+  if (invoice.credit?.fullCredit) {
+    try {
+      await fulfillInvoiceWithWalletCredit({
+        tenantId: gate.tenantId,
+        plan: state.planId as PlanId,
+        cycle: state.cycle,
+        conversationId,
+      });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+    }
+    revalidatePath("/app/abonelik");
+    return { checkoutUrl: `${appUrl()}/app/abonelik?paid=1`, quotedChargeTry: chargeNet };
+  }
+
   try {
+    const chargeTry = invoice.credit ? invoice.credit.cashTry : invoice.totalTry;
     const init = await initializeCheckoutForm({
       conversationId,
-      price: invoice.totalTry,
-      paidPrice: invoice.totalTry,
+      price: chargeTry,
+      paidPrice: chargeTry,
       basketId: conversationId,
       callbackUrl: `${appUrl()}/api/iyzico/callback`,
       buyer: checkoutBuyer.buyer,
       billingAddress: checkoutBuyer.billingAddress,
       basketItemName: `EmlakSoft ek kullanıcı (${evalResult.toQuote.extraSeats - state.extraSeats} adet)`,
-      cardUserKey: await getTenantCardUserKey(gate.tenantId),
+      cardUserKey: await cardUserKeyForCheckout(supabase, gate.role, String(formData.get("use_saved_card") ?? "") === "1"),
     });
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
@@ -381,6 +450,149 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   } catch (e) {
     await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
     console.error("startSeatPurchase", e);
+    return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
+  }
+}
+
+export type CreditPackPurchaseResult = CheckoutResult & { quotedTotalTry?: number };
+
+/**
+ * Kontör (EmlakFiyati) paketi satın alma. YALNIZ owner/gm. Paket kimliği gelir; kontör ve fiyat SUNUCUDA katalogdan
+ * (platform_settings) yeniden hesaplanır, istemciden tutar/kontör ALINMAZ. `confirm_try` yalnız "ekrandaki tutar değişti mi"
+ * kontrolüdür. Cüzdan hazır değilse (`ef_credit_ready()`) para tahsil eden hiçbir adım atılmaz. Demo ödeme YOKTUR.
+ * Kupon kontör paketlerinde KAPALIDIR (kupon mantığı plan kimliğine bağlıdır).
+ */
+export async function startCreditPackPurchase(formData: FormData): Promise<CreditPackPurchaseResult> {
+  const gate = await requirePermission("billing", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (gate.impersonating) return { error: "Destek oturumunda kontör satın alınamaz." };
+  if (gate.role !== "owner" && gate.role !== "gm") {
+    return { error: "Kontör paketini yalnızca ofis sahibi veya genel müdür satın alabilir." };
+  }
+
+  const packId = String(formData.get("pack_id") ?? "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(packId)) return { error: "Geçersiz paket." };
+  if (String(formData.get("coupon") ?? "").trim()) return { error: "Kupon kontör paketlerinde geçerli değil." };
+  const confirmRaw = String(formData.get("confirm_try") ?? "").trim();
+  const confirmTry = confirmRaw === "" ? null : Number(confirmRaw);
+  const useCredit = String(formData.get("use_credit") ?? "") === "1";
+
+  const { allowed } = await checkRateLimit(`efpack:${gate.userId}`, { limit: 8, windowSec: 600, failurePolicy: "deny" });
+  if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };
+
+  if (!(await getEfCreditReady())) {
+    return { error: "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor." };
+  }
+  if (!isIyzicoConfigured()) {
+    return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
+  }
+
+  const catalog = await getEfCatalog();
+  const pack = findPurchasablePack(catalog.packs, packId);
+  if (!pack) return { error: "Bu paket artık satışta değil. Sayfayı yenileyip güncel paketleri görün." };
+  const quote = quoteCreditPack(pack);
+  if (confirmTry !== null && (!Number.isFinite(confirmTry) || Math.abs(confirmTry - quote.totalTry) > 0.01)) {
+    return { error: "Tutar güncellendi; lütfen yeni tutarı inceleyip yeniden onaylayın.", quotedTotalTry: quote.totalTry };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Oturum bulunamadı." };
+  const [{ data: tenant }, { data: profile }] = await Promise.all([
+    supabase.from("tenants").select("id, name, tax_number, phone, address_line, city").eq("id", gate.tenantId).maybeSingle(),
+    supabase.from("profiles").select("full_name, phone").eq("id", user.id).maybeSingle(),
+  ]);
+  if (!tenant) return { error: "Ofis bulunamadı." };
+
+  let checkoutBuyer: ValidatedCheckoutBuyer;
+  try {
+    checkoutBuyer = validateCheckoutBuyer({
+      id: user.id,
+      fullName: profile?.full_name,
+      email: user.email,
+      phone: profile?.phone || tenant.phone,
+      identityNumber: tenant.tax_number,
+      address: tenant.address_line,
+      city: tenant.city,
+      ip: await clientIp(),
+    });
+  } catch (error) {
+    return {
+      error: error instanceof Error
+        ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
+        : "Ödeme sahibi bilgileri doğrulanamadı.",
+    };
+  }
+
+  const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
+  let invoice: { invoiceId: string; totalTry: number; credit?: AppliedWalletCredit | null };
+  try {
+    invoice = await createCreditPackInvoice({
+      tenantId: gate.tenantId,
+      pack,
+      conversationId,
+      walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "billing.credits.checkout_started",
+    entityType: "invoice",
+    entityId: invoice.invoiceId,
+    newValue: {
+      packId: pack.id,
+      units: pack.units,
+      priceNetTry: pack.priceNetTry,
+      invoiceTotalTry: invoice.totalTry,
+      walletCreditTry: invoice.credit?.creditTry ?? 0,
+    },
+  });
+
+  if (invoice.credit?.fullCredit) {
+    try {
+      // Paket faturasında plan/döngü meta'sı yok: callback ile aynı varsayılanlar (SQL de aynı varsayılanı kullanır).
+      await fulfillInvoiceWithWalletCredit({
+        tenantId: gate.tenantId,
+        plan: "office",
+        cycle: "monthly",
+        conversationId,
+      });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+    }
+    revalidatePath("/app/abonelik");
+    return { checkoutUrl: `${appUrl()}/app/abonelik?sekme=kontor&paid=1`, quotedTotalTry: invoice.totalTry };
+  }
+
+  try {
+    const chargeTry = invoice.credit ? invoice.credit.cashTry : invoice.totalTry;
+    const init = await initializeCheckoutForm({
+      conversationId,
+      price: chargeTry,
+      paidPrice: chargeTry,
+      basketId: conversationId,
+      callbackUrl: `${appUrl()}/api/iyzico/callback`,
+      buyer: checkoutBuyer.buyer,
+      billingAddress: checkoutBuyer.billingAddress,
+      basketItemName: creditPackBasketName(pack),
+    });
+    if (init.status !== "success" || !init.paymentPageUrl) {
+      await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+      return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
+    }
+    await markCheckoutInvoiceInitialized({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+    revalidatePath("/app/abonelik");
+    return { checkoutUrl: init.paymentPageUrl, quotedTotalTry: invoice.totalTry };
+  } catch (e) {
+    await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+    console.error("startCreditPackPurchase", e);
     return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
   }
 }

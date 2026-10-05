@@ -3,8 +3,8 @@ import { PLANS, type PlanDef } from "@/lib/billing/plans";
 import { buildComparison } from "@/lib/pricing-page-model";
 
 /** Paket karşılaştırma tablosu: satırlar plans.ts + page-gates.ts'ten üretilir. */
-export function ComparisonTable({ plans = PLANS }: { plans?: readonly PlanDef[] } = {}) {
-  const groups = buildComparison(plans);
+export function ComparisonTable({ plans = PLANS, efValuationCost }: { plans?: readonly PlanDef[]; efValuationCost?: number } = {}) {
+  const groups = buildComparison(plans, { efValuationCost });
   return (
     <div
       className="relative overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-sm)]"

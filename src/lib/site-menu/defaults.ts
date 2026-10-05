@@ -28,7 +28,8 @@ const DEFAULT_GROUPS: MenuGroup[] = [
       item("urun-tur", "Satış ve kazanç", "Ürün turu", "Bugün, müşteriler, portföy ve daha fazlası", "/#tur", "LayoutDashboard"),
       item("urun-komisyon", "Satış ve kazanç", "Komisyon ve anlaşma", "Tekliften hakedişe tek omurga", "/#komisyon", "Handshake"),
       item("urun-kayip-kacak", "Satış ve kazanç", "Kayıp-kaçak kalkanı", "Kaçan komisyonu rakama dökün", "/#kayip-kacak", "ShieldAlert"),
-      item("urun-degerleme", "Satış ve kazanç", "Emsal bazlı değerleme", "Fiyat aralığı sinyali", "/#degerleme", "Calculator"),
+      item("urun-degerleme", "Satış ve kazanç", "Emsal bazlı değerleme", "Fiyat aralığı sinyali", "/#emsal-degerleme", "Calculator"),
+      item("urun-ef-degerleme", "Satış ve kazanç", "EmlakFiyati ile değerleme", "Ada/parsel bazlı değerleme ve PDF rapor", "/#degerleme", "MapPinned"),
       item("urun-imza", "Satış ve kazanç", "Dijital imza", "SMS onaylı sözleşme akışı", "/#imza", "FileSignature"),
       item("urun-otomasyon", "Otomasyon ve ofis", "Otomasyonlar", "Arka planda çalışan otomatik görevler", "/#otomasyon", "Workflow"),
       item("urun-ai-asistan", "Otomasyon ve ofis", "AI asistan", "Kişisel veri maskeli yanıtlar", "/#ai-asistan", "Bot"),
@@ -53,7 +54,7 @@ const DEFAULT_GROUPS: MenuGroup[] = [
       item("cozum-fiyatlar-karsilastirma", "Karar vermek için", "Paketleri karşılaştırın", "Fiyat, limit ve kapsam yan yana", "/fiyatlar#karsilastirma", "BadgeCheck"),
       item("cozum-neden", "Karar vermek için", "Neden EmlakSoft", "Excel ve defterle karşılaştırma", "/#neden", "Scale"),
     ],
-    featured: { eyebrow: "Başlamak kolay", icon: { kind: "lucide", name: "CalendarCheck" }, title: "Ofisinizi birlikte kuralım", text: "Demo görüşmesinde ekibinize uygun yapıyı ve içeri aktarma planını konuşalım.", ctaLabel: "Demo görüşmesi planla", href: "/demo", hidden: false, media: null },
+    featured: { eyebrow: "Başlamak kolay", icon: { kind: "lucide", name: "CalendarCheck" }, title: "Ofisinizi dakikalar içinde kurun", text: "Kullanıcı sayınızı seçin, fiyatı anında görün, ücretsiz denemeyi kendiniz başlatın.", ctaLabel: "Ücretsiz dene", href: "/kayit", hidden: false, media: null },
   },
   {
     id: "kaynak",
@@ -145,7 +146,6 @@ function defaultFooter(): FooterColumn[] {
       hidden: false,
       autoPlans: false,
       links: [
-        link("iletisim-demo", "Demo görüşmesi planla", "/demo"),
         link("iletisim-destek", "destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr"),
       ],
     },

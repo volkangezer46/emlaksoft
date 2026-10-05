@@ -9,6 +9,7 @@ import {
   type PlanOpResult,
 } from "@/app/actions/platform-billing-plans";
 import { planAmountOf, type PlanDef } from "@/lib/billing/plans";
+import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { opFieldClass } from "../inline-op";
 import { useSeatDraft } from "./seat-draft";
 import { SeatTierEditor } from "./seat-tier-editor";
@@ -48,7 +49,10 @@ export function PlanEditor({
   subscribers,
   businessReady,
   plans,
+  efValuationCost,
 }: {
+  /** Bir değerlemenin kontör bedeli (tarifeden; sunucuda okunur): "yaklaşık N değerleme" canlı hesabı için. */
+  efValuationCost: number;
   plan: PlanDef;
   /** Katalogun tamamı: kademe doğrulaması ve çapraz nokta uyarıları için. */
   plans: PlanDef[];
@@ -60,6 +64,8 @@ export function PlanEditor({
   const { pending, msg, run } = useOp();
   const yearly = planAmountOf(plan, "yearly");
   const draft = useSeatDraft(plan, plans);
+  const [efText, setEfText] = useState(num(plan.efCreditsMonthly));
+  const efNumber = /^\d+$/.test(efText.trim()) ? Number(efText.trim()) : 0;
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface">
@@ -77,7 +83,7 @@ export function PlanEditor({
           {customized ? <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Düzenlenmiş</span> : null}
         </span>
         <span className="text-xs text-text-muted">
-          {plan.customPricing ? "Özel teklif" : `${tl(plan.monthlyTry)} / ay · yıllık ${tl(yearly)}`} · {subscribers} abonelik
+          {`${tl(plan.monthlyTry)} / ay · yıllık ${tl(yearly)}`} · {subscribers} abonelik
         </span>
       </button>
 
@@ -125,6 +131,22 @@ export function PlanEditor({
             <label className={lbl}>Sıra<input name="order" inputMode="numeric" defaultValue={num(plan.order)} placeholder="otomatik" className={`mt-1 w-full ${opFieldClass}`} /></label>
           </fieldset>
 
+          <fieldset className="grid gap-3 sm:grid-cols-4">
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Kontör hakkı (EmlakFiyati; mevcut aboneler kendi hakkını aylık alır)</legend>
+            <label className={lbl}>
+              Aylık kontör hakkı
+              <input name="ef_credits_monthly" inputMode="numeric" value={efText} onChange={(e) => setEfText(e.target.value)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
+            </label>
+            <label className={lbl}>
+              Her ek kullanıcı için ek kontör (aylık)
+              <input name="ef_credits_per_extra_seat" inputMode="numeric" defaultValue={num(plan.efCreditsPerExtraSeat)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
+            </label>
+            <p className="self-end pb-2 text-xs text-text-muted" aria-live="polite">
+              {efNumber > 0 ? (efCreditsLine(efNumber, efValuationCost) ?? "Hak yok") : "Boş veya 0: bu pakete aylık kontör verilmez."}
+              {efNumber > 0 && efValuationCost <= 0 ? " Tarifede değerleme bedeli 0: yaklaşık değerleme hesaplanamaz." : ""}
+            </p>
+          </fieldset>
+
           <label className={lbl}>
             Özellik listesi (her satır bir madde; yalnız bugün çalışan özellikler)
             <textarea name="features" required rows={6} defaultValue={plan.features.join("\n")} className={`mt-1 w-full ${opFieldClass}`} />
@@ -132,7 +154,6 @@ export function PlanEditor({
 
           <div className="flex flex-wrap gap-4 text-xs font-semibold text-text-muted">
             <label className="inline-flex items-center gap-2"><input type="checkbox" name="popular" defaultChecked={Boolean(plan.popular)} /> Öne çıkan</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" name="custom_pricing" defaultChecked={Boolean(plan.customPricing)} /> Özel fiyat (&quot;Bize ulaşın&quot;)</label>
             <label className="inline-flex items-center gap-2">
               <input type="checkbox" name="hidden" defaultChecked={Boolean(plan.hidden)} /> Gizli (kayıt ve fiyat sayfasında görünmez)
             </label>
