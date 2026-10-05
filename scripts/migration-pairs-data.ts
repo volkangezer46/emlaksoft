@@ -80,6 +80,7 @@ const F = {
   vitrinSettings: "20260825001100_tenant_vitrin_settings.sql", // eski 20260816060100
   vitrinSeo: "20260825001200_tenant_vitrin_sections_seo_optin.sql", // eski 20260819010700
   ownership: "20260825001300_ownership_transfers.sql", // eski 20261005000700
+  paymentCards: "20260826000100_payment_cards.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -144,6 +145,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.vitrinSettings]: "ek", // varsayilanlar bugunku davranis (vitrin acik, telefon gorunur)
     [F.vitrinSeo]: "davranis", // sitemap opt-in kaynagi elle listeden sutuna gecer (hepsi false dogar)
     [F.ownership]: "ek", // yeni tablo + 3 service_role RPC (kod henuz yok)
+    [F.paymentCards]: "ek", // yeni 2 tablo + service_role RPC; kod tablolar yokken zarifce kapali (kart saklama + otomatik yenileme altyapisi)
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -195,6 +197,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB6-ai-kredi", order: 19, title: "AI kredi olcumu (ayni hesap kredisi defteri)", files: [F.aiCredit] },
     { id: "PB7-vitrin", order: 20, title: "Vitrin ayarlari + bolumler/SEO opt-in (sitemap kaynagi degisir)", files: [F.vitrinSettings, F.vitrinSeo] },
     { id: "PB8-sahiplik-devri", order: 21, title: "Ofis sahipligi devri (tablo + service_role RPC)", files: [F.ownership] },
+    { id: "PB9-kayitli-kart", order: 22, title: "Kayitli odeme karti (iyzico kart saklama; saglayici anahtari + maskeli alan)", files: [F.paymentCards] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],

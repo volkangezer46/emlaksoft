@@ -27,6 +27,7 @@ import {
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { validateCheckoutBuyer, type ValidatedCheckoutBuyer } from "@/lib/billing/buyer";
 import { getBaseUrl } from "@/lib/base-url";
+import { getTenantCardUserKey } from "@/lib/billing/card-store";
 
 export type CheckoutResult = {
   error?: string;
@@ -48,6 +49,13 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   const cycle = (String(formData.get("cycle") ?? "monthly").trim() || "monthly") as BillingCycle;
   if (!PLAN_IDS.has(plan)) return { error: "Geçersiz paket." };
   if (cycle !== "monthly" && cycle !== "yearly") return { error: "Geçersiz dönem." };
+
+  // Kart saklama AÇIK RIZASI: yalnız form alanı tam olarak "1" ise (onay kutusu varsayılan KAPALI). Kart verisi
+  // bu action'a hiç gelmez; kart iyzico'nun barındırılan sayfasında girilir.
+  const saveCardConsent = String(formData.get("save_card") ?? "") === "1";
+  if (saveCardConsent && (gate.role !== "owner" && gate.role !== "gm")) {
+    return { error: "Kartı yalnızca ofis sahibi veya genel müdür kaydedebilir." };
+  }
 
   const supabase = await createClient();
   const {
@@ -129,6 +137,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       cycle,
       conversationId,
       amountTry,
+      saveCard: saveCardConsent && configured ? { consentUserId: user.id } : null,
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
@@ -185,7 +194,19 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       buyer: checkoutBuyer!.buyer,
       billingAddress: checkoutBuyer!.billingAddress,
       basketItemName: `EmlakSoft ${plan} (${cycle === "yearly" ? "yıllık" : "aylık"})`,
+      // Kayıtlı kartı olan ofiste iyzico ödeme sayfası kartları listeler (kayıtlı kartla tek adım ödeme).
+      cardUserKey: await getTenantCardUserKey(gate.tenantId),
     });
+    if (formData.get("use_saved_card") === "1") {
+      await logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "billing.card.pay_started",
+        entityType: "invoice",
+        entityId: invoiceId,
+        newValue: { plan, cycle, amountTry },
+      });
+    }
 
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
@@ -348,6 +369,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       buyer: checkoutBuyer.buyer,
       billingAddress: checkoutBuyer.billingAddress,
       basketItemName: `EmlakSoft ek kullanıcı (${evalResult.toQuote.extraSeats - state.extraSeats} adet)`,
+      cardUserKey: await getTenantCardUserKey(gate.tenantId),
     });
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });

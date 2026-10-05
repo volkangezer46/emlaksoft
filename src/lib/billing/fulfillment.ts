@@ -217,6 +217,10 @@ export async function createCheckoutInvoice(input: {
   cycle: BillingCycle;
   conversationId: string;
   amountTry: number;
+  /** Kullanıcı "kartımı sakla" açık rızasını verdi: callback doğrulanmış ödemeden sonra kartı kaydeder. */
+  saveCard?: { consentUserId: string } | null;
+  /** Ödeme kaynağı etiketi (varsayılan checkout; otomatik yenileme auto_renew). */
+  source?: "checkout" | "auto_renew";
 }) {
   const admin = createAdminClient();
   const amounts = invoiceAmountsTry(input.amountTry);
@@ -243,7 +247,10 @@ export async function createCheckoutInvoice(input: {
         conversationId: input.conversationId,
         plan: input.plan,
         cycle: input.cycle,
-        source: "checkout",
+        source: input.source ?? "checkout",
+        ...(input.saveCard
+          ? { saveCard: true, saveCardConsentBy: input.saveCard.consentUserId, saveCardConsentVersion: "card-save-v1" }
+          : {}),
       },
     })
     .select("id")

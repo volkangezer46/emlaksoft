@@ -319,6 +319,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/ai/credits/usage.ts", fn: "getTenantUsage", calls: 1, tenantFilter: "var" },
   { file: "src/lib/automation-engine.ts", fn: "dispatchAutomationEvent", calls: 1, tenantFilter: "var" },
   { file: "src/lib/automation-engine.ts", fn: "runScheduledAutomations", calls: 1, tenantFilter: "var" },
+  { file: "src/lib/billing/card-store.ts", fn: "adminStore", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/billing/coupon-server.ts", fn: "quoteCoupon", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/billing/coupon-server.ts", fn: "redeemCoupon", calls: 1, tenantFilter: "var" },
   { file: "src/lib/billing/fulfillment.ts", fn: "assertBillingPlanPreflight", calls: 1, tenantFilter: "var" },

@@ -10,6 +10,8 @@ import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfi
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
 import { getBaseUrl } from "@/lib/base-url";
+import { extractStoredCard } from "@/lib/billing/cards";
+import { saveCardFromPayment } from "@/lib/billing/card-store";
 
 function appUrl() {
   return getBaseUrl();
@@ -74,7 +76,12 @@ async function handle(token: string | null) {
       return NextResponse.redirect(`${appUrl()}/app/abonelik?error=invoice`);
     }
 
-    const meta = (invoice.meta ?? {}) as { plan?: PlanId; cycle?: BillingCycle };
+    const meta = (invoice.meta ?? {}) as {
+      plan?: PlanId;
+      cycle?: BillingCycle;
+      saveCard?: boolean;
+      saveCardConsentBy?: string;
+    };
     const amounts = invoiceAmountsTry(Number(invoice.amount_try));
     if (
       String(invoice.currency ?? "").toUpperCase() !== IYZICO_CURRENCY ||
@@ -101,6 +108,25 @@ async function handle(token: string | null) {
       expectedCurrency: verified.currency,
       source: "callback",
     });
+
+    // Kart saklama: YALNIZ ödeme yukarıdaki tam doğrulamadan (imza, tutar, retrieve) geçtikten sonra ve YALNIZ
+    // kullanıcı ödeme öncesi açık rıza verdiyse (fatura meta). Hata ödemeyi bozmaz; ham kart verisi hiç işlenmez.
+    if (meta.saveCard === true) {
+      try {
+        const card = extractStoredCard(result);
+        if (card) {
+          await saveCardFromPayment({
+            tenantId: invoice.tenant_id,
+            consentUserId: typeof meta.saveCardConsentBy === "string" ? meta.saveCardConsentBy : null,
+            invoiceId: null,
+            card,
+            consentAtIso: new Date().toISOString(),
+          });
+        }
+      } catch (cardError) {
+        console.error("iyzico callback card save", cardError instanceof Error ? cardError.message : "error");
+      }
+    }
 
     return NextResponse.redirect(
       `${appUrl()}/app/abonelik?paid=1&plan=${meta.plan ?? "office"}`,
