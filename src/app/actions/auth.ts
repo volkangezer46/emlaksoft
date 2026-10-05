@@ -23,6 +23,7 @@ import { recordSignupAttributionFromRequest } from "@/lib/growth/capture";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
 import { createClient } from "@/lib/supabase/server";
 import {
   generateLoginCode,
@@ -418,6 +419,12 @@ export async function signUp(
   }
 
   await recordSignupAttributionFromRequest(tenantId, formData); // büyüme atfı: en iyi çaba, asla fırlatmaz
+
+  // "Demo verileriyle başla": is_sample işaretli tam demo set; hata kaydı engellemez, ofis sahibi
+  // ana ekran / Başlangıç sihirbazından yükleyebilir. Aynı admin client (yeni service_role kullanımı yok).
+  if (wantsDemoData(formData)) {
+    await seedDemoDataForNewTenant(admin, tenantId, created.user.id);
+  }
 
   const supabase = await createClient();
   const { error: signInError } = await supabase.auth.signInWithPassword({

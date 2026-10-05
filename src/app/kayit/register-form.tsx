@@ -323,6 +323,20 @@ export function RegisterForm({
               <PasswordStrengthMeter password={pw} />
             </div>
 
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-brand-300/60 bg-brand-600/[0.04] px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-400">
+              <input
+                type="checkbox"
+                name="demo_data"
+                defaultChecked
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+              />
+              <span>
+                <strong className="text-ink-900">Demo verileriyle başla</strong> — müşteri, portföy, talep, randevu ve
+                anlaşmalarla dolu örnek bir ofisle her ekranı deneyin. Hazır olunca tek adımda temizleyip kendi
+                verinizle devam edersiniz; gerçek kayıtlarınıza dokunulmaz.
+              </span>
+            </label>
+
             <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
               <input
                 type="checkbox"
