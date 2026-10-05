@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronDown, ExternalLink, Menu, X } from "lucide-react";
 import { FeaturedMedia } from "./featured-media";
+import { FeaturedPreview } from "./featured-preview";
 import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
 
 /**
@@ -13,7 +14,9 @@ import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/pu
  * bağlantıya odaklanır; Sol/Sağ ok üst düzey düğmeler arasında gezer; panel içinde Yukarı/Aşağı/Home/End bağlantıları
  * dolaşır; Esc kapatır ve odağı düğmeye geri verir; odak panelden çıkınca kapanır. Fare ile açma kısa gecikmelidir
  * (titreme yok). Kapalı panel `inert` + görünmez (yumuşak kapanış). Mobilde tam ekran panel + akordeon.
- * Hareket yalnız opacity/transform; reduced-motion'da kapalı.
+ * Hareket yalnız opacity/transform; reduced-motion'da kapalı. Fare konumu İZLENMEZ (imleç takibi yok): ikon ve kart
+ * hareketi yalnız durum tabanlıdır (hover/focus-visible/açık panel). Mobil sheet modal diyalogtur: arka plan inert, odak tuzağı
+ * (Tab/Shift+Tab sheet + kapat düğmesi içinde döner), Esc kapatır. Panel alt çubuğu iki hızlı eylem sunar (Tab ile erişilir).
  */
 
 export type ClientItem = Omit<PublicItem, "icon"> & { iconNode: ReactNode };
@@ -60,7 +63,7 @@ function Featured({ f, onClick, active, index, withMedia }: { f: ClientFeatured;
   return (
     <NavAnchor href={f.href} external={f.external} onClick={onClick} className="mk-mega-feat" style={{ "--i": index } as CSSProperties}>
       <>
-        {withMedia && f.media ? <FeaturedMedia media={f.media} active={active} /> : null}
+        {withMedia && f.media ? <FeaturedMedia media={f.media} active={active} /> : withMedia && f.preview ? <FeaturedPreview kind={f.preview} /> : null}
         {f.iconNode ? <span className="mk-mega-feat-ico">{f.iconNode}</span> : null}
         {f.eyebrow ? <span className="mk-mega-feat-eyebrow">{f.eyebrow}</span> : null}
         <b>{f.title}</b>
@@ -81,7 +84,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   const [scrolled, setScrolled] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const burgerRef = useRef<HTMLButtonElement>(null);
-  const sheetRef = useRef<HTMLElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const triggers = useRef<Record<string, HTMLButtonElement | null>>({});
   const panels = useRef<Record<string, HTMLDivElement | null>>({});
   const focusFirst = useRef<string | null>(null);
@@ -140,6 +143,38 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   useEffect(() => () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
   }, []);
+
+  // Mobil sheet modal: arka plan (sayfa gövdesi, alt bilgi) inert; odak sheet + kapat düğmesi içinde döner.
+  useEffect(() => {
+    if (!open) return;
+    const nav = rootRef.current;
+    const changed: HTMLElement[] = [];
+    for (const el of Array.from(nav?.parentElement?.children ?? [])) {
+      if (el === nav || el.tagName === "SCRIPT" || !(el instanceof HTMLElement) || el.inert) continue;
+      el.inert = true;
+      changed.push(el);
+    }
+    const onTab = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const list = [burgerRef.current, ...(sheetRef.current?.querySelectorAll<HTMLElement>("summary, a[href], button:not([disabled])") ?? [])].filter((x): x is HTMLElement => Boolean(x) && (x as HTMLElement).offsetParent !== null);
+      if (list.length === 0) return;
+      const first = list[0]!;
+      const last = list[list.length - 1]!;
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !list.includes(active as HTMLElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !list.includes(active as HTMLElement))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onTab);
+    return () => {
+      window.removeEventListener("keydown", onTab);
+      for (const el of changed) el.inert = false;
+    };
+  }, [open]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -264,6 +299,13 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                         ))}
                       </div>
                       {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia /> : null}
+                      <div className="mk-mega-bar">
+                        <span>Başlamak için hazır mısınız?</span>
+                        <span className="mk-mega-bar-cta">
+                          <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={16} aria-hidden="true" /></Link>
+                          <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Fiyatlar</Link>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -290,13 +332,15 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
         </div>
       </header>
       {open ? (
-        <nav id="mobile-site-navigation" aria-label="Mobil site navigasyonu" className="mk-sheet" ref={sheetRef}>
-          <MobileSheetBody groups={groups} close={close} />
-          <div className="mk-sheet-cta">
-            <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
-            <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Paketleri ve fiyatları gör</Link>
-          </div>
-        </nav>
+        <div id="mobile-site-navigation" role="dialog" aria-modal="true" aria-label="Site menüsü" className="mk-sheet" ref={sheetRef}>
+          <nav aria-label="Mobil site navigasyonu" className="mk-sheet-nav">
+            <MobileSheetBody groups={groups} close={close} />
+            <div className="mk-sheet-cta">
+              <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
+              <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Paketleri ve fiyatları gör</Link>
+            </div>
+          </nav>
+        </div>
       ) : null}
     </div>
   );

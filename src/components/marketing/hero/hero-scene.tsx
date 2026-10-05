@@ -1,13 +1,14 @@
 import { AlertTriangle, CalendarClock, Sparkles } from "lucide-react";
-import { HeroDashboard, HeroPhoneScreen, HeroSkyline } from "./hero-art";
+import { HeroDashboard, HeroKpiOverlay, HeroPhoneScreen, HeroSkyline } from "./hero-art";
 
 /**
  * Çok katmanlı ürün sahnesi: şehir silueti, eğik masaüstü paneli, telefon, süzülen cam kartlar, el çizimi not.
+ * Hareket: marketing-motion.css tek zaman çizelgesi (.mk-demo; ~14 sn, sonda duraklama); temel CSS = SON KARE. Fare takibi yok.
  * Sunucu bileşeni; oranlar sabit (aspect-ratio) olduğu için CLS=0. Kart ve ekran içeriği ÖRNEK veridir.
  */
 export function HeroScene() {
   return (
-    <div className="mk-scene" role="group" aria-label="Ürün görünümü: örnek ekranlar">
+    <div className="mk-scene mk-demo" role="group" aria-label="Ürün görünümü: örnek ekranlar">
       <div className="mk-scene-sky"><HeroSkyline /></div>
 
       <svg className="mk-scene-note-arrow" viewBox="0 0 90 70" aria-hidden="true" focusable="false">
@@ -17,7 +18,7 @@ export function HeroScene() {
       <p className="mk-scene-note" aria-hidden="true">Tüm süreçleriniz<br />tek ekranda</p>
 
       <div className="mk-scene-dash">
-        <div className="mk-dash-frame"><HeroDashboard /></div>
+        <div className="mk-dash-frame"><HeroDashboard /><HeroKpiOverlay /></div>
       </div>
 
       <div className="mk-scene-phone">

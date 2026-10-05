@@ -64,6 +64,10 @@ const itemSchema = z.strictObject({
   hidden: z.boolean(),
 });
 
+/** Öne çıkan kartta medya yokken gösterilen animasyonlu mini ürün önizlemesi (isteğe bağlı; eski yapılandırmalarda yok). */
+export const FEATURED_PREVIEWS = ["leak", "valuation", "signature", "plans", "assistant"] as const;
+export type FeaturedPreviewKind = (typeof FEATURED_PREVIEWS)[number];
+
 const featuredSchema = z.strictObject({
   eyebrow: text(LIMITS.featuredEyebrow, "Üst başlık"),
   icon: z.discriminatedUnion("kind", [z.strictObject({ kind: z.literal("none") }), z.strictObject({ kind: z.literal("lucide"), name: z.string().max(40) })]),
@@ -72,6 +76,7 @@ const featuredSchema = z.strictObject({
   ctaLabel: text(LIMITS.featuredCta, "Düğme metni"),
   href: z.string().trim().max(LIMITS.href, "Bağlantı çok uzun."),
   hidden: z.boolean(),
+  preview: z.enum(FEATURED_PREVIEWS).nullable().optional(),
   media: z
     .strictObject({
       mediaId,

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 /* Ürün ekranı illüstrasyonlarının ortak SVG parçaları. Tüm içerik ÖRNEK veridir (jenerik isimler). */
 export const C = {
@@ -107,18 +107,19 @@ export function Card({ x, y, w, h, title, right, children }: { x: number; y: num
   );
 }
 
-export function Pill({ x, y, text, tone = "blue", size = 12 }: { x: number; y: number; text: string; tone?: Tone; size?: number }) {
+/** `swap`: rozet geçişi çifti (from: başlangıç, to: SON KARE). Temel CSS yalnız `to`yu gösterir; hareket açıkken marketing-motion.css çaprazlar. */
+export function Pill({ x, y, text, tone = "blue", size = 12, swap, delay }: { x: number; y: number; text: string; tone?: Tone; size?: number; swap?: "from" | "to"; delay?: string }) {
   const w = Math.round(text.length * size * 0.56 + 18);
   const t = TONES[tone];
   return (
-    <g transform={`translate(${x} ${y})`}>
+    <g transform={`translate(${x} ${y})`} className={swap ? `mk-a-swap-${swap}` : undefined} style={swap && delay ? { animationDelay: delay } : undefined}>
       <rect width={w} height={size + 10} rx={(size + 10) / 2} fill={t.bg} />
       <text x={w / 2} y={size + 1} textAnchor="middle" fontSize={size} fontWeight="700" fill={t.fg}>{text}</text>
     </g>
   );
 }
 
-export function Kpi({ x, y, w, label, value, delta, tone = "green", icon = 0 }: { x: number; y: number; w: number; label: string; value: string; delta: string; tone?: Tone; icon?: number }) {
+export function Kpi({ x, y, w, label, value, delta, tone = "green", icon = 0, countCls }: { x: number; y: number; w: number; label: string; value: string; delta: string; tone?: Tone; icon?: number; countCls?: string }) {
   const t = TONES[tone];
   return (
     <g transform={`translate(${x} ${y})`}>
@@ -126,7 +127,7 @@ export function Kpi({ x, y, w, label, value, delta, tone = "green", icon = 0 }: 
       <rect x={14} y={14} width={28} height={28} rx={9} fill={t.bg} />
       <Icon i={icon} x={20} y={20} size={16} color={t.fg} />
       <text x={52} y={33} fontSize="14" fontWeight="600" fill={C.mute}>{label}</text>
-      <text x={16} y={70} fontSize="29" fontWeight="800" fill={C.ink}>{value}</text>
+      <text className={countCls} x={16} y={70} fontSize="29" fontWeight="800" fill={C.ink}>{value}</text>
       <text x={w - 14} y={70} textAnchor="end" fontSize="12.5" fontWeight="700" fill={t.fg}>{delta}</text>
     </g>
   );
@@ -167,7 +168,7 @@ export function AppShell({ w, h, sw, active, title, sub, label, cta = "+ Yeni", 
   );
 }
 
-export function Bars({ x, y, w, h, vals, hl = -1, labels }: { x: number; y: number; w: number; h: number; vals: number[]; hl?: number; labels?: string[] }) {
+export function Bars({ x, y, w, h, vals, hl = -1, labels, anim = false }: { x: number; y: number; w: number; h: number; vals: number[]; hl?: number; labels?: string[]; anim?: boolean }) {
   const max = Math.max(...vals);
   const bw = (w / vals.length) * 0.56;
   return (
@@ -176,22 +177,22 @@ export function Bars({ x, y, w, h, vals, hl = -1, labels }: { x: number; y: numb
       {vals.map((v, i) => {
         const bh = (v / max) * (h - 6);
         const bx = (w / vals.length) * i + ((w / vals.length) - bw) / 2;
-        return <rect key={i} x={bx} y={h - bh} width={bw} height={bh} rx={5} fill={i === hl ? "url(#mkBrand)" : "url(#mkBar)"} />;
+        return <rect key={i} className={anim ? "mk-a-bar" : undefined} style={anim ? ({ "--i": i } as CSSProperties) : undefined} x={bx} y={h - bh} width={bw} height={bh} rx={5} fill={i === hl ? "url(#mkBrand)" : "url(#mkBar)"} />;
       })}
       {labels ? labels.map((l, i) => <text key={l + i} x={(w / vals.length) * i + w / vals.length / 2} y={h + 18} textAnchor="middle" fontSize="11.5" fill={C.mute}>{l}</text>) : null}
     </g>
   );
 }
 
-export function Line({ x, y, w, h, vals, color = C.blue, area = true }: { x: number; y: number; w: number; h: number; vals: number[]; color?: string; area?: boolean }) {
+export function Line({ x, y, w, h, vals, color = C.blue, area = true, anim = false }: { x: number; y: number; w: number; h: number; vals: number[]; color?: string; area?: boolean; anim?: boolean }) {
   const max = Math.max(...vals), min = Math.min(...vals);
   const pts = vals.map((v, i) => [(w / (vals.length - 1)) * i, h - ((v - min) / (max - min || 1)) * (h - 8) - 4] as const);
   const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   return (
     <g transform={`translate(${x} ${y})`}>
-      {area ? <path d={`${d} L${w} ${h} L0 ${h} Z`} fill="url(#mkArea)" /> : null}
-      <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="4.5" fill="#fff" stroke={color} strokeWidth="2.5" />
+      {area ? <path className={anim ? "mk-a-area" : undefined} d={`${d} L${w} ${h} L0 ${h} Z`} fill="url(#mkArea)" /> : null}
+      <path className={anim ? "mk-a-line" : undefined} pathLength={anim ? 1 : undefined} d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle className={anim ? "mk-a-dot" : undefined} cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="4.5" fill="#fff" stroke={color} strokeWidth="2.5" />
     </g>
   );
 }

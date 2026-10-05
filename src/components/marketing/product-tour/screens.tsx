@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { AppShell, Avatar, Bars, C, Card, Donut, Kpi, Line, Pill, TONES, type Tone } from "../art/primitives";
 
 /* Ürün turu ekranları: saf SVG illüstrasyon, 1000x560. Veriler ÖRNEKTİR (jenerik isimler, uydurma müşteri yok). */
@@ -34,7 +35,7 @@ export function TodayScreen() {
           <g key={t} transform={`translate(16 ${50 + i * 66})`}>
             <rect width="348" height="54" rx="12" fill={d ? "#f5f7fc" : "#fff"} stroke={C.line} />
             <rect x="14" y="17" width="20" height="20" rx="6" fill={d ? C.green : "#fff"} stroke={d ? C.green : "#b9c4dc"} strokeWidth="1.5" />
-            {d ? <path d="M19 27 l4 4 l8 -9" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
+            {d ? <path className="mk-a-tick" pathLength={1} style={{ "--i": i } as CSSProperties} d="M19 27 l4 4 l8 -9" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
             <text x="46" y="32" fontSize="14" fontWeight="600" fill={d ? C.mute : C.ink} textDecoration={d ? "line-through" : undefined}>{t}</text>
           </g>
         ))}
@@ -86,6 +87,8 @@ export function CustomersScreen() {
         <text x="150" y="112" textAnchor="middle" fontSize="17" fontWeight="800" fill={C.ink}>Zeynep D.</text>
         <text x="150" y="132" textAnchor="middle" fontSize="12.5" fill={C.mute}>Alıcı · aktif talep</text>
         <Pill x={96} y={142} text="4 eşleşme" tone="green" />
+        <rect x="96" y="174" width="108" height="5" rx="2.5" fill="#e3e8f2" />
+        <rect className="mk-a-fillx" x="96" y="174" width="84" height="5" rx="2.5" fill={C.green} />
         {[["Talep", "Villa · satılık"], ["Bütçe", "8–10 milyon ₺"], ["Bölge", "Sahil hattı"], ["Son görüşme", "2 gün önce"], ["Sonraki adım", "Yer gösterme"]].map(([k, v], i) => (
           <g key={k} transform={`translate(20 ${190 + i * 50})`}>
             <rect width="260" height="42" rx="10" fill="#f5f7fc" />
@@ -99,7 +102,7 @@ export function CustomersScreen() {
 }
 
 export function PortfolioScreen() {
-  const items: [string, string, string, Tone][] = [["3+1 Daire · Kiralık", "Merkez", "Yayında", "green"], ["Villa · Satılık", "Sahil", "Yayında", "green"], ["2+1 Daire · Satılık", "Merkez", "Teyit bekliyor", "amber"], ["Arsa · İmarlı", "Çevre", "Yayında", "green"], ["Dükkan · Kiralık", "Çarşı", "Rezerve", "violet"], ["1+1 Daire · Kiralık", "Merkez", "Yayında", "green"]];
+  const items: [string, string, string, Tone][] = [["3+1 Daire · Kiralık", "Merkez", "Yayında", "green"], ["Villa · Satılık", "Sahil", "Yayında", "green"], ["2+1 Daire · Satılık", "Merkez", "Yayında", "green"], ["Arsa · İmarlı", "Çevre", "Yayında", "green"], ["Dükkan · Kiralık", "Çarşı", "Rezerve", "violet"], ["1+1 Daire · Kiralık", "Merkez", "Yayında", "green"]];
   const grads = ["#dbe8ff", "#e9defd", "#d6f3ea", "#ffe9c9", "#ffdfe2", "#dfe9fb"];
   return (
     <AppShell w={W} h={H} sw={190} active={2} title="Portföy" sub="Portföyler, yayın teyidi ve anahtar takibi" label="Portföy ekranı örneği: durum etiketli portföy kartları" cta="+ Portföy">
@@ -112,8 +115,16 @@ export function PortfolioScreen() {
             <rect width="246" height="202" rx="16" fill="#fff" stroke={C.line} filter="url(#mkShadow)" />
             <rect x="10" y="10" width="226" height="108" rx="11" fill={grads[i]} />
             <path d="M82 100 V66 L123 40 L164 66 V100 Z M111 100 V78 H135 V100" fill="none" stroke="#2a3d78" strokeOpacity="0.55" strokeWidth="2.5" strokeLinejoin="round" />
-            <rect x="20" y="20" width="70" height="22" rx="11" fill={TONES[tone].bg} />
-            <text x="55" y="35" textAnchor="middle" fontSize="11" fontWeight="800" fill={TONES[tone].fg}>{st}</text>
+            {i === 2 ? (
+              <g className="mk-a-swap-from" style={{ animationDelay: "1.4s" }}>
+                <rect x="20" y="20" width="98" height="22" rx="11" fill={TONES.amber.bg} />
+                <text x="69" y="35" textAnchor="middle" fontSize="11" fontWeight="800" fill={TONES.amber.fg}>Teyit bekliyor</text>
+              </g>
+            ) : null}
+            <g className={i === 2 ? "mk-a-swap-to" : undefined} style={i === 2 ? { animationDelay: "1.4s" } : undefined}>
+              <rect x="20" y="20" width="70" height="22" rx="11" fill={TONES[tone].bg} />
+              <text x="55" y="35" textAnchor="middle" fontSize="11" fontWeight="800" fill={TONES[tone].fg}>{st}</text>
+            </g>
             <text x="16" y="146" fontSize="14" fontWeight="800" fill={C.ink}>{t}</text>
             <text x="16" y="166" fontSize="12.5" fill={C.mute}>{loc} · örnek ilan</text>
             <text x="16" y="188" fontSize="13" fontWeight="800" fill={C.blue}>{["₺ 38.000 / ay", "₺ 12.400.000", "₺ 3.850.000", "₺ 2.100.000", "₺ 65.000 / ay", "₺ 24.000 / ay"][i]}</text>
@@ -141,6 +152,7 @@ export function DealsScreen() {
           <text x="166" y="31" textAnchor="end" fontSize="12.5" fontWeight="700" fill={C.mute}>{cards.length}</text>
           {cards.map(([a, b, p], k) => (
             <g key={a + k} transform={`translate(10 ${50 + k * 118})`}>
+              <g className={i === 1 && k === 0 ? "mk-a-slide" : undefined}>
               <rect width="162" height="108" rx="12" fill="#fff" stroke={C.line} filter="url(#mkShadow)" />
               <rect x="0" y="14" width="3.5" height="26" rx="2" fill={c} />
               <text x="14" y="30" fontSize="13.5" fontWeight="800" fill={C.ink}>{a}</text>
@@ -149,6 +161,7 @@ export function DealsScreen() {
               <Avatar x={138} y={86} r={12} text={a[0]} hue={k + i} />
               <rect x="14" y="90" width="70" height="6" rx="3" fill="#e3e8f2" />
               <rect x="14" y="90" width={28 + ((k + i) % 3) * 16} height="6" rx="3" fill={c} />
+              </g>
             </g>
           ))}
         </g>
@@ -176,7 +189,7 @@ export function CommissionScreen() {
         ))}
       </Card>
       <Card x={696} y={188} w={280} h={352} title="Aylık dağılım" right="6 ay">
-        <Bars x={22} y={70} w={236} h={210} vals={[46, 70, 54, 88, 66, 104]} hl={5} labels={["Nis", "May", "Haz", "Tem", "Ağu", "Eyl"]} />
+        <Bars x={22} y={70} w={236} h={210} vals={[46, 70, 54, 88, 66, 104]} hl={5} anim labels={["Nis", "May", "Haz", "Tem", "Ağu", "Eyl"]} />
       </Card>
     </AppShell>
   );
@@ -192,7 +205,7 @@ export function ReportsScreen() {
           <g key={t} transform={`translate(18 ${50 + i * 42})`}>
             <text x="0" y="22" fontSize="12.5" fontWeight="600" fill={C.body}>{t}</text>
             <rect x="104" y="4" width="240" height="26" rx="8" fill="#eef2fb" />
-            <rect x="104" y="4" width={(240 * v) / 100} height="26" rx="8" fill="url(#mkBrand)" opacity={1 - i * 0.14} />
+            <rect className="mk-a-fillx" style={{ "--i": i } as CSSProperties} x="104" y="4" width={(240 * v) / 100} height="26" rx="8" fill="url(#mkBrand)" opacity={1 - i * 0.14} />
             <text x={104 + (240 * v) / 100 - 10} y="22" textAnchor="end" fontSize="12" fontWeight="800" fill="#fff">%{v}</text>
           </g>
         ))}
@@ -203,7 +216,7 @@ export function ReportsScreen() {
             <Avatar x={14} y={14} r={13} text={n[n.length - 1]} hue={i} />
             <text x="38" y="19" fontSize="13" fontWeight="700" fill={C.ink}>{n}</text>
             <rect x="140" y="6" width="190" height="16" rx="8" fill="#eef2fb" />
-            <rect x="140" y="6" width={(190 * v) / 100} height="16" rx="8" fill={i === 0 ? C.green : "#6c8fe8"} />
+            <rect className="mk-a-fillx" style={{ "--i": i } as CSSProperties} x="140" y="6" width={(190 * v) / 100} height="16" rx="8" fill={i === 0 ? C.green : "#6c8fe8"} />
           </g>
         ))}
       </Card>
@@ -248,7 +261,7 @@ export function AutomationScreen() {
         {log.map(([t, d], i) => (
           <g key={t} transform={`translate(18 ${56 + i * 70})`}>
             <text x="0" y="22" fontSize="12.5" fontWeight="700" fill={C.mute}>{t}</text>
-            <circle cx="26" cy="18" r="6" fill={C.green} />
+            <circle className="mk-a-pop" style={{ "--i": i } as CSSProperties} cx="26" cy="18" r="6" fill={C.green} />
             <text x="46" y="16" fontSize="13" fontWeight="700" fill={C.ink}>{d}</text>
             <Pill x={46} y={26} text="Başarılı" tone="green" size={10.5} />
           </g>

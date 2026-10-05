@@ -38,7 +38,7 @@ const DEFAULT_GROUPS: MenuGroup[] = [
       item("urun-tv-modu", "Otomasyon ve ofis", "Ofis panosu (TV)", "Ofis ekranı için canlı pano", "/#tv-modu", "Tv"),
       item("urun-moduller", "Otomasyon ve ofis", "Modüller (aç/kapa)", "İhtiyacınız olmayanı kapatın", "/#moduller", "ToggleRight"),
     ],
-    featured: { eyebrow: "En çok bakılan", icon: { kind: "lucide", name: "ShieldAlert" }, title: "Kaybettiğiniz komisyonu görün", text: "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.", ctaLabel: "Kalkanı inceleyin", href: "/#kayip-kacak", hidden: false, media: null },
+    featured: { eyebrow: "En çok bakılan", icon: { kind: "lucide", name: "ShieldAlert" }, title: "Kaybettiğiniz komisyonu görün", text: "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.", ctaLabel: "Kalkanı inceleyin", href: "/#kayip-kacak", hidden: false, preview: "leak", media: null },
   },
   {
     id: "cozum",
@@ -84,7 +84,7 @@ const DEFAULT_GROUPS: MenuGroup[] = [
       item("fiyat-fiyatlar-kacan-komisyon", "Fiyatlandırma", "Kaçan komisyon hesaplayıcı", "Kendi sayılarınızla hesaplayın", "/fiyatlar#kacan-komisyon", "HandCoins"),
       item("fiyat-fiyatlar-sss", "Fiyatlandırma", "Fiyat SSS", "Fatura, KDV ve limitler", "/fiyatlar#sss", "CircleHelp"),
     ],
-    featured: { eyebrow: "Şeffaf fiyat", icon: { kind: "lucide", name: "Rocket" }, title: "Size uygun paketi seçin", text: "Fiyatlar KDV hariç, taahhütsüz. Deneme boyunca tüm özellikler açık.", ctaLabel: "Fiyatlara git", href: "/fiyatlar", hidden: false, media: null },
+    featured: { eyebrow: "Şeffaf fiyat", icon: { kind: "lucide", name: "Rocket" }, title: "Size uygun paketi seçin", text: "Fiyatlar KDV hariç, taahhütsüz. Deneme boyunca tüm özellikler açık.", ctaLabel: "Fiyatlara git", href: "/fiyatlar", hidden: false, preview: "plans", media: null },
   },
 ];
 

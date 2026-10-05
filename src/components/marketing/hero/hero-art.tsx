@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { AppShell, Avatar, Bars, C, Card, Donut, Kpi, Line, Pill } from "../art/primitives";
 
 /* Hero sahnesinin SVG parçaları. Sunucu bileşenleri; istemci JS yok. Tüm sayılar/isimler ÖRNEK veridir. */
@@ -5,18 +6,18 @@ import { AppShell, Avatar, Bars, C, Card, Donut, Kpi, Line, Pill } from "../art/
 export function HeroDashboard() {
   const rows: [string, string, string, string, "blue" | "green" | "amber"][] = [
     ["Ahmet K.", "3+1 daire · kiralık", "Yer gösterme", "Bugün 14:30", "blue"],
-    ["Zeynep D.", "Villa · satılık", "Teklif bekliyor", "Yarın", "amber"],
+    ["Zeynep D.", "Villa · satılık", "Eşleşti", "Yarın", "green"],
     ["Mehmet S.", "2+1 daire · satılık", "Eşleşti", "2 portföy", "green"],
   ];
   return (
     <AppShell w={900} h={560} sw={170} active={0} title="Günaydın" sub="Bugün 6 göreviniz, 3 randevunuz ve yeni talepleriniz var." label="Örnek ekran: EmlakSoft ana ekranı; göstergeler, aylık performans grafiği, dağılım halkası ve son talepler">
-      <Kpi x={194} y={84} w={166} label="Yeni talep" value="12" delta="bu hafta" tone="blue" icon={1} />
-      <Kpi x={372} y={84} w={166} label="Aktif portföy" value="38" delta="3 teyit bekliyor" tone="violet" icon={2} />
-      <Kpi x={550} y={84} w={166} label="Komisyon" value="₺ 184 bin" delta="" tone="green" icon={5} />
-      <Kpi x={728} y={84} w={160} label="Randevu" value="3" delta="ilki 10:00" tone="amber" icon={4} />
+      <Kpi x={194} y={84} w={166} label="Yeni talep" value="12" delta="bu hafta" tone="blue" icon={1} countCls="mk-kpi-v" />
+      <Kpi x={372} y={84} w={166} label="Aktif portföy" value="38" delta="3 teyit bekliyor" tone="violet" icon={2} countCls="mk-kpi-v" />
+      <Kpi x={550} y={84} w={166} label="Komisyon" value="₺ 184 bin" delta="" tone="green" icon={5} countCls="mk-kpi-v" />
+      <Kpi x={728} y={84} w={160} label="Randevu" value="3" delta="ilki 10:00" tone="amber" icon={4} countCls="mk-kpi-v" />
       <Card x={194} y={190} w={380} h={206} title="Aylık performans" right="Son 9 ay">
-        <Line x={20} y={52} w={340} h={110} vals={[30, 38, 34, 46, 52, 49, 62, 70, 84]} />
-        <Bars x={20} y={52} w={340} h={110} vals={[18, 26, 22, 30, 34, 31, 40, 44, 52]} hl={8} />
+        <Line x={20} y={52} w={340} h={110} vals={[30, 38, 34, 46, 52, 49, 62, 70, 84]} anim />
+        <Bars x={20} y={52} w={340} h={110} vals={[18, 26, 22, 30, 34, 31, 40, 44, 52]} hl={8} anim />
         {["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl"].map((m, i) => (
           <text key={m} x={20 + (340 / 9) * i + 340 / 18} y={186} textAnchor="middle" fontSize="11" fill={C.mute}>{m}</text>
         ))}
@@ -37,7 +38,8 @@ export function HeroDashboard() {
             <Avatar x={14} y={10} r={12} text={n[0]} hue={i} />
             <text x={36} y={8} fontSize="13" fontWeight="700" fill={C.ink}>{n}</text>
             <text x={36} y={22} fontSize="11.5" fill={C.mute}>{d}</text>
-            <Pill x={300} y={-3} text={st} tone={tone} />
+            {i === 1 ? <Pill x={300} y={-3} text="Teklif bekliyor" tone="amber" swap="from" delay="6.2s" /> : null}
+            <Pill x={300} y={-3} text={st} tone={tone} swap={i === 1 ? "to" : undefined} delay={i === 1 ? "6.2s" : undefined} />
             <text x={658} y={14} textAnchor="end" fontSize="12.5" fill={C.body}>{when}</text>
           </g>
         ))}
@@ -46,11 +48,32 @@ export function HeroDashboard() {
   );
 }
 
+/**
+ * KPI sayaç katmanı (HTML, aria-hidden). SVG <text> CSS sayaçla sayılamadığı için sayılar burada cqw ile konumlanır;
+ * KPI SVG değerleri yalnız hareket açıkken gizlenir (data-motion="on"), reduce/JS'siz durumda SVG metni görünür (son kare).
+ * Sayım: @property --mk-n (tamsayı) + CSS counter, JS yok. Koordinatlar HeroDashboard KPI kutularıyla aynı birimdedir (900 birim genişlik).
+ */
+export function HeroKpiOverlay() {
+  const kpis: [number, number, string, string][] = [
+    [210, 12, "", ""],
+    [388, 38, "", ""],
+    [566, 184, "₺ ", " bin"],
+    [744, 3, "", ""],
+  ];
+  return (
+    <div className="mk-dash-ov" aria-hidden="true">
+      {kpis.map(([x, v, pre, suf], i) => (
+        <b key={x} className="mk-ov-n" style={{ "--x": x, "--v": v, "--pre": `"${pre}"`, "--suf": `"${suf}"`, animationDelay: `${0.45 + i * 0.12}s` } as CSSProperties} />
+      ))}
+    </div>
+  );
+}
+
 /** Telefon içeriği: müşteri listesi + randevular. Çerçeve CSS ile çizilir. */
 export function HeroPhoneScreen() {
   const appts: [string, string, string, "blue" | "green" | "amber"][] = [
     ["10:00", "Yer gösterme", "Onaylandı", "green"],
-    ["14:30", "Müşteri görüşmesi", "Bekliyor", "amber"],
+    ["14:30", "Müşteri görüşmesi", "Onaylandı", "green"],
     ["16:00", "Sözleşme imzası", "Onaylandı", "green"],
   ];
   return (
@@ -82,7 +105,8 @@ export function HeroPhoneScreen() {
           <rect x="12" y="12" width="44" height="36" rx="10" fill="#eef3ff" />
           <text x="34" y="35" textAnchor="middle" fontSize="12" fontWeight="800" fill="#1546c2">{t}</text>
           <text x="68" y="28" fontSize="13" fontWeight="700" fill={C.ink}>{n}</text>
-          <Pill x={68} y={34} text={st} tone={tone} size={10.5} />
+          {i === 1 ? <Pill x={68} y={34} text="Bekliyor" tone="amber" size={10.5} swap="from" delay="8.4s" /> : null}
+          <Pill x={68} y={34} text={st} tone={tone} size={10.5} swap={i === 1 ? "to" : undefined} delay={i === 1 ? "8.4s" : undefined} />
         </g>
       ))}
       <text x="16" y="480" fontSize="14" fontWeight="800" fill={C.ink}>Hızlı işlemler</text>

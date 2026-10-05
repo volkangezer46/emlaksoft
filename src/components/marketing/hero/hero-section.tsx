@@ -20,6 +20,7 @@ export function HeroSection({
   const ctx = { trialDays, plans };
   const checks = content.checks.filter((c) => !c.hidden).map((c) => ({ id: c.id, ...resolveTokens(c.text, ctx) })).filter((c) => !c.missing);
   return (
+    <>
     <section className="mk-hero" aria-labelledby="hero-baslik">
       <div className="mk-hero-bg" aria-hidden="true" />
       <div className="mk-wrap mk-wrap-wide mk-hero-grid">
@@ -32,7 +33,7 @@ export function HeroSection({
           </h1>
           <p className="mk-hero-lead"><Lines text={tx(content.lead, ctx)} /></p>
           {content.integrationBadge || content.integrationLine ? (
-            <p className="mk-hero-lead" data-hero-integration="">
+            <p className="mk-hero-int" data-hero-integration="">
               {content.integrationBadge ? <a href="#degerleme" className="mk-tag mk-tag-plan">{tx(content.integrationBadge, ctx)}</a> : null}
               {content.integrationBadge && content.integrationLine ? " " : null}
               {content.integrationLine ? tx(content.integrationLine, ctx) : null}
@@ -48,7 +49,9 @@ export function HeroSection({
         </div>
         <HeroScene />
       </div>
-      <PortalStrip />
     </section>
+    {/* Portal şeridi hero kutusunun DIŞINDA: hero yüksekliği (1440'ta <=780px hedefi) şeritten bağımsız. */}
+    <PortalStrip />
+    </>
   );
 }

@@ -37,14 +37,14 @@ export function SecurityBand({
   const items = content.items.filter((i) => !i.hidden && ICONS[i.id]).map((i) => ({ ...i, icon: ICONS[i.id]! }));
   const chips = content.chips.filter((c) => !c.hidden);
   return (
-    <section id="guvenlik" className="mk-dark mk-section" aria-labelledby="guvenlik-baslik" style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
+    <section id="guvenlik" className="mk-dark mk-section" aria-labelledby="guvenlik-baslik">
       <div className="mk-grid-bg-dark" aria-hidden="true" />
       <div className="mk-glow-dark" aria-hidden="true" />
       <div className="mk-wrap">
         <div className="mk-split">
           <div className="mk-reveal">
             <p className="mk-eyebrow">{heading.eyebrow}</p>
-            <h2 id="guvenlik-baslik" className="mk-h2" style={{ marginTop: "1rem" }}><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></h2>
+            <h2 id="guvenlik-baslik" className="mk-h2 mk-h2-gap"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></h2>
             <ul className="mk-chips mk-chips-dark" aria-label="Güvenlik başlıkları">
               {chips.map((c) => <li key={c.id}>{tx(c.text, ctx)}</li>)}
             </ul>

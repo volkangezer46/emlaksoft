@@ -36,7 +36,7 @@ export async function ProductTour({ heading = defaultSiteContent().sections.tur 
     <section id="tur" className="mk-section mk-alt" aria-labelledby="tur-baslik">
       <div className="mk-wrap mk-wrap-wide">
         <SectionHeading center eyebrow={heading.eyebrow} title={<span id="tur-baslik"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></span>} text={heading.text ? tx(heading.text, { plans: [] }) : undefined} />
-        <fieldset className="mk-tour" style={{ border: 0, padding: 0, minInlineSize: 0 }}>
+        <fieldset className="mk-tour mk-reveal">
           <legend className="sr-only">Ürün turu ekranı seçin</legend>
           {TABS.map((t, i) => (
             <input key={t.id} type="radio" name="urun-turu" id={`tt${t.id}`} defaultChecked={i === 0} aria-label={t.label} />
