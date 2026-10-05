@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 /**
  * Auth GEREKTIRMEYEN smoke testleri.
@@ -74,4 +75,30 @@ test.describe("Sifre sifirlama (/sifre-sifirla)", () => {
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
   });
+});
+
+/**
+ * Erisilebilirlik (axe-core): yalniz KRITIK ve CIDDI ihlaller testi kirar (orta/hafif raporlanmaz).
+ * Salt-okunur; public sayfalar. Ihlal ozeti hata mesajina yazilir (kural, etki, hedef secici).
+ */
+test.describe("Erisilebilirlik (axe) — kritik/ciddi ihlal yok", () => {
+  const PAGES: { name: string; path: string }[] = [
+    { name: "landing", path: "/" },
+    { name: "giris", path: "/giris" },
+    { name: "kayit", path: "/kayit" },
+    { name: "fiyatlar", path: "/fiyatlar" },
+  ];
+
+  for (const p of PAGES) {
+    test(`${p.name} (${p.path})`, async ({ page }) => {
+      await page.goto(p.path);
+      await expect(page.locator("h1").first()).toBeVisible();
+      const results = await new AxeBuilder({ page }).analyze();
+      const blocking = results.violations.filter((v) => v.impact === "critical" || v.impact === "serious");
+      const summary = blocking.map(
+        (v) => `${v.id} [${v.impact}] x${v.nodes.length}: ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`,
+      );
+      expect(summary, `axe ihlalleri (${p.path}):\n${summary.join("\n")}`).toEqual([]);
+    });
+  }
 });

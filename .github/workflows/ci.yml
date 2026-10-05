@@ -97,8 +97,18 @@ jobs:
       - name: Lint
         run: npx eslint . --max-warnings=0
 
-      - name: Unit and contract tests
-        run: npm test
+      # pglite (@electric-sql/pglite) devDependency: para/kontör SQL'inin gerçek PL/pgSQL testleri burada KOŞAR (atlanmaz).
+      - name: Unit and contract tests (with coverage)
+        run: npm run test:coverage
+
+      - name: Coverage summary
+        if: ${{ always() }}
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            node -e "const t=require('./coverage/coverage-summary.json').total;const r=['lines','statements','functions','branches'].map(k=>'| '+k+' | '+t[k].pct+'% | '+t[k].covered+'/'+t[k].total+' |').join('\n');require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY,'### Test kapsamı (eşiksiz)\n\n| metrik | oran | kapsanan |\n|---|---|---|\n'+r+'\n')"
+          else
+            echo "coverage-summary.json yok (testler kapsam üretmeden bitti)."
+          fi
 
       - name: Production dependency gate
         run: npm run audit:deps

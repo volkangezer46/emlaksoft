@@ -23,6 +23,7 @@
     "db:rehearse": "tsx scripts/migration-rehearsal.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:rls-audit": "tsx scripts/rls-audit.ts",
@@ -62,11 +63,14 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@electric-sql/pglite": "0.3.14",
     "@playwright/test": "^1.62.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "4.1.10",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",

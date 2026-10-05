@@ -22,12 +22,13 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     // Testler .env.local'a bağımlı olmamalı; DB'ye giden hiçbir test yok.
     env: {},
-    // Yalnız tanım (eşik YOK); `vitest run --coverage` için @vitest/coverage-v8 gerekir.
+    // Yalnız tanım (eşik YOK); @vitest/coverage-v8 devDependency; `npm run test:coverage` (CI birim test adımı bunu koşar).
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts", "src/app/api/**/*.ts"],
       exclude: ["**/*.test.ts"],
-      reporter: ["text-summary", "lcov"],
+      // json-summary: CI özet adımı (coverage/coverage-summary.json) için; eşik YOK (yalnız görünürlük).
+      reporter: ["text-summary", "json-summary", "lcov"],
     },
   },
   resolve: {

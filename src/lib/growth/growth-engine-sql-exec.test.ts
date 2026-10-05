@@ -1,21 +1,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { loadPglite, type Db } from "@/lib/test-support/pglite";
 
 /**
  * İŞLEVSEL SQL TESTİ: referans/ortak motoru (20260826000600) gerçek PL/pgSQL ile (pglite, bellek içi Postgres).
- * `@electric-sql/pglite` bağımlılık DEĞİLDİR: kuruluysa koşar, yoksa ATLANIR.
- *   npm i --no-save @electric-sql/pglite && npx vitest run src/lib/growth/growth-engine-sql-exec
- *   (ya da PGLITE_MODULE=<mutlak yol>/node_modules/@electric-sql/pglite/dist/index.js)
- * Gerçek dosyalar yüklenir: 20260825000800, 20260825000900, 20260826000400, 20260826000500, 20260826000600.
+ * `@electric-sql/pglite` devDependency'dir (CI'da `npm ci` ile kurulur ve test KOŞAR); modül yüklenemezse ATLANIR.
+ *   Yerel: npx vitest run src/lib/growth/growth-engine-sql-exec  (PGLITE_MODULE=<yol> ile başka kopya da verilebilir)
+ * İKİ BLOK: (1) 000600 taban motoru; (2) HOTFIX blok — 000600 + 20260826000900 (B1/B2/B3/yenileme/chargeback/kademe) + 001000 (rol kapısı).
+ * Gerçek dosyalar yüklenir: 20260825000800, 20260825000900, 20260826000400, 20260826000500, 20260826000600 (+ 000900, 001000).
  * tenants/profiles/invoices/abonelik/fulfill_v2 canlı tabloların SADELEŞTİRİLMİŞ taklididir.
  */
-type Db = {
-  exec: (sql: string) => Promise<unknown>;
-  query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
-};
-const spec = process.env.PGLITE_MODULE ?? "@electric-sql/pglite";
-const mod: { PGlite: new () => Db } | null = await import(/* @vite-ignore */ spec).catch(() => null);
+const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
 
 const STUB = `
@@ -745,5 +741,371 @@ describe.skipIf(!mod)("Referans/ortak motoru SQL — gerçek PL/pgSQL (pglite)",
     await db.exec(rb);
     expect(await call(`select to_regprocedure('public.growth_claims_process(integer)') is null`)).toBe(true);
     expect(await call(`select to_regclass('public.growth_referral_settings') is null`)).toBe(true);
+  });
+});
+
+/**
+ * HOTFIX BLOĞU: 000600 + 20260826000900 (denetim düzeltmeleri) + 20260826001000 (ofis panosu rol kapısı), CANLIDAKİ SIRAYLA.
+ * Ayrı PGlite örneği: hotfix ödül zamanlamasını (hold 45 gün + gerçek yenileme şartı) değiştirdiği için taban bloğun
+ * varsayımlarıyla karışmaz. 000900 başındaki md5 ön-koşul bloğu da burada gerçekten çalışır (taban gövdeler 000600'dan gelir).
+ */
+describe.skipIf(!mod)("Referans motoru HOTFIX (000900 + 001000) — gerçek PL/pgSQL (pglite)", () => {
+  let db: Db;
+  let seq = 0;
+  const q = async (sql: string, params?: unknown[]) => (await db.query(sql, params)).rows;
+  type Res = Record<string, unknown> & { err?: string; code?: string };
+  const call = async (sql: string, params?: unknown[]): Promise<Res> => {
+    try {
+      const row = (await q(sql, params))[0];
+      return (row ? Object.values(row)[0] : undefined) as Res;
+    } catch (e) {
+      const err = e as { message: string; code?: string };
+      return { err: err.message, code: err.code };
+    }
+  };
+  const asService = () => db.exec(`select set_config('request.jwt.claim.role','service_role',false)`);
+  const asUser = (sub: string | null, tenant: string | null, prole = "owner") =>
+    db.exec(
+      `select set_config('request.jwt.claim.role','authenticated',false), set_config('request.jwt.claim.sub','${sub ?? ""}',false), set_config('request.jwt.claim.tenant','${tenant ?? ""}',false), set_config('request.jwt.claim.aal','aal2',false), set_config('request.jwt.claim.prole','${prole}',false)`,
+    );
+  const setFlag = (key: string, on: boolean) =>
+    q(`insert into public.platform_settings(key,value) values ($1,$2) on conflict (key) do update set value = excluded.value`, [key, on ? "on" : "off"]);
+
+  async function tenant(opts: { tax?: string; active?: boolean } = {}) {
+    const t = (await q(`insert into public.tenants(tax_number) values ($1) returning id`, [opts.tax ?? null]))[0]!.id as string;
+    seq += 1;
+    const u = (await q(`insert into auth.users(email) values ($1) returning id`, [`hf${seq}@gmail.com`]))[0]!.id as string;
+    await q(`insert into public.profiles(id, tenant_id) values ($1,$2)`, [u, t]);
+    await q(`insert into public.subscriptions(tenant_id, status) values ($1,$2)`, [t, opts.active === false ? "trialing" : "active"]);
+    return t;
+  }
+  const refer = (referrer: string, referred: string) =>
+    q(`insert into public.signup_attributions(tenant_id, ref_kind, referrer_tenant_id) values ($1,'referral',$2)`, [referred, referrer]);
+  async function pay(tenantId: string, amount = 1000, extra: Record<string, unknown> = {}, paidAt = "now()") {
+    seq += 1;
+    const meta = { conversationId: `hconv-${seq}`, plan: "office", cycle: "monthly", provider: "iyzico", source: "callback", ...extra };
+    return (
+      await q(
+        `insert into public.invoices(tenant_id,status,amount_try,total_try,paid_at,iyzico_payment_id,meta) values ($1,'paid',$2,$3,${paidAt},$4,$5) returning id`,
+        [tenantId, amount, amount * 1.2, `hpay-${seq}`, JSON.stringify(meta)],
+      )
+    )[0]!.id as string;
+  }
+  const claim = async (referred: string, component = "base") =>
+    (await q(`select * from public.growth_reward_claims where referred_tenant_id=$1 and component=$2`, [referred, component]))[0];
+  const register = (inv: string) => call(`select public.growth_claim_register($1)`, [inv]);
+  const process_ = () => call(`select public.growth_claims_process(200)`);
+  const makeDueAll = () =>
+    q(`update public.growth_reward_claims set eligible_at = now() - interval '1 day' where status in ('held','approved','pending')`);
+  const balance = async (t: string) => Number((await call(`select public.try_credit_balance($1)`, [t])).balance);
+  /** Davet edilenin taban faturası 40 gün önce; gerçek yenileme (>=20 gün sonra) 10 gün önce. */
+  const baseInvoice = (b: string, amount = 1000) => pay(b, amount, {}, "now() - interval '40 days'");
+  const renewal = (b: string, amount = 1000) => pay(b, amount, {}, "now() - interval '10 days'");
+  const newStaff = async () =>
+    (await q(`insert into public.platform_staff(id, role) values (gen_random_uuid(),'super_admin') returning id`))[0]!.id as string;
+
+  beforeAll(async () => {
+    db = new mod!.PGlite();
+    await db.exec(STUB);
+    // hotfix 000900 tenants.created_at'e bakar (growth_returning_customer); taklit şemaya eklenir.
+    await db.exec(`alter table public.tenants add column created_at timestamptz not null default now()`);
+    await db.exec(read("supabase/migrations/20260825000800_growth_referral_partner_attribution.sql"));
+    await db.exec(LEDGER_PATCH);
+    for (const f of [
+      "20260825000900_growth_click_counters.sql",
+      "20260826000400_try_credit_wallet.sql",
+      "20260826000500_try_credit_invoice_payment.sql",
+      "20260826000600_growth_referral_engine.sql",
+      "20260826000900_growth_hotfix.sql", // md5 ön-koşul bloğu dahil
+      "20260826001000_growth_dashboard_roles.sql",
+    ]) {
+      await db.exec(read(`supabase/migrations/${f}`));
+    }
+    await asService();
+    await setFlag("growth_referral_enabled", true);
+    await q(`update public.growth_referral_settings set manual_review_first_n = 0, velocity_max_per_day = 1000, welcome_credit_try = 0`);
+    await q(
+      `insert into public.growth_reward_rules(kind,name,reward_type,reward_value,hold_days,credit_expires_days) values ('referral','Standart','monthly_multiple',1,45,365)`,
+    );
+  }, 120_000);
+
+  it("hotfix uygulandı: yeni iç yardımcılar var; anon/authenticated hoş geldin işleyicisini ÇAĞIRAMAZ (katalog yetkisi)", async () => {
+    for (const fn of ["growth_referred_qualified(uuid)", "growth_renewal_ok(uuid,uuid)", "growth_referred_ready(uuid,uuid,text)", "growth_returning_customer(uuid)", "growth_welcome_apply(uuid)", "growth_tier_revalidate(uuid)"]) {
+      expect(await call(`select to_regprocedure('public.${fn}') is not null`), fn).toBe(true);
+    }
+    expect(await call(`select has_function_privilege('anon','public.growth_welcome_apply(uuid)','execute')`)).toBe(false);
+    expect(await call(`select has_function_privilege('authenticated','public.growth_welcome_apply(uuid)','execute')`)).toBe(false);
+  });
+
+  it("B1: ilk-N sayacı YALNIZ personelce onaylı talepleri sayar (bekleyen talepler sayacı doldurmaz)", async () => {
+    await q(`update public.growth_referral_settings set manual_review_first_n = 2`);
+    const staff = await newStaff();
+    const mk = async (referrer: string) => {
+      const b = await tenant();
+      await refer(referrer, b);
+      await register(await pay(b, 1000));
+      return b;
+    };
+    const approve = async (b: string) => {
+      await asUser(staff, null);
+      const r = await call(`select public.growth_admin_decide($1,'approve','kimlik dogrulandi')`, [(await claim(b))!.id]);
+      await asService();
+      return r;
+    };
+    const a = await tenant();
+    // 3 talep üst üste: hiçbiri personelce onaylanmadığından HEPSİ inceleme kuyruğunda (eski davranışta 3.'sü 'held' olurdu).
+    const first = [await mk(a), await mk(a), await mk(a)];
+    for (const b of first) {
+      const c = (await claim(b))!;
+      expect(c.status).toBe("pending");
+      expect(c.flags).toContain("first_claims_review");
+    }
+    // Personel ilk ikisini onaylar -> sayaç 2'ye ulaşır -> sonraki talep otomatik akışa ('held') girer.
+    expect(await approve(first[0]!)).toMatchObject({ ok: true, status: "approved" });
+    expect(await approve(first[1]!)).toMatchObject({ ok: true, status: "approved" });
+    expect((await claim(await mk(a)))!.status).toBe("held");
+    // Başka davetçide yalnız TEK onay (sayaç 1 < 2): sonraki talep hâlâ inceleme.
+    const a2 = await tenant();
+    const f1 = await mk(a2);
+    await mk(a2);
+    await approve(f1);
+    expect((await claim(await mk(a2)))!.status).toBe("pending");
+    await q(`update public.growth_referral_settings set manual_review_first_n = 0`);
+  });
+
+  it("bekleme 45 gün (eligible_at = ödeme + hold_days); süre dolmadan kredi YOK", async () => {
+    const a = await tenant();
+    const b = await tenant();
+    await refer(a, b);
+    const base = await baseInvoice(b, 800);
+    await renewal(b, 800);
+    expect(await register(base)).toMatchObject({ ok: true, status: "held" });
+    const days = Number((await q(`select extract(epoch from c.eligible_at - i.paid_at) / 86400 as d from public.growth_reward_claims c join public.invoices i on i.id = c.invoice_id where c.referred_tenant_id = $1`, [b]))[0]!.d);
+    expect(days).toBe(45);
+    await process_();
+    expect(await balance(a)).toBe(0); // yenileme var ama bekleme (45 gün) dolmadı
+    expect((await claim(b))!.status).toBe("held");
+  });
+
+  it("ödül yenileme şartı: vade dolsa da GERÇEK YENİLEME (>=20 gün sonraki gerçek 2. ödeme) yoksa ödenmez; gelince TEK sefer ödenir", async () => {
+    const a = await tenant();
+    const b = await tenant();
+    await refer(a, b);
+    await register(await baseInvoice(b, 1000));
+    await makeDueAll();
+    await process_();
+    expect(await balance(a)).toBe(0);
+    expect((await claim(b))!.status).toBe("held");
+    // 20 günden KISA aralıkla (10 gün sonra) 2. ödeme yenileme sayılmaz
+    await pay(b, 1000, {}, "now() - interval '30 days'");
+    await process_();
+    expect(await balance(a)).toBe(0);
+    // chargeback'li ikinci ödeme gerçek ödeme değildir -> yenileme sayılmaz
+    await pay(b, 1000, { chargeback: { at: "x" } }, "now() - interval '5 days'");
+    await process_();
+    expect(await balance(a)).toBe(0);
+    await renewal(b, 1000);
+    await process_();
+    expect(await balance(a)).toBe(1000);
+    await process_();
+    expect(await balance(a)).toBe(1000);
+    expect((await claim(b))!.status).toBe("paid");
+  });
+
+  it("ödül şartı: davet edilen abonelik AKTİF olmalı (past_due iken ödenmez, aktifleşince ödenir)", async () => {
+    const a = await tenant();
+    const b = await tenant();
+    await refer(a, b);
+    await register(await baseInvoice(b, 600));
+    await renewal(b, 600);
+    await makeDueAll();
+    await q(`update public.subscriptions set status = 'past_due' where tenant_id = $1`, [b]);
+    await process_();
+    expect(await balance(a)).toBe(0);
+    await q(`update public.subscriptions set status = 'active' where tenant_id = $1`, [b]);
+    await process_();
+    expect(await balance(a)).toBe(600);
+  });
+
+  it("B2: personel onayı eligible_at ÖNCESİ ödemez (işleyici + growth_grant_claim savunma kapısı); süre + yenileme sonrası öder", async () => {
+    const aT = await tenant({ tax: "1111111111" });
+    const b = await tenant({ tax: "1111111111" }); // aynı vergi no -> inceleme
+    await refer(aT, b);
+    await register(await baseInvoice(b, 500));
+    const c = (await claim(b))!;
+    expect(c.status).toBe("pending");
+    const staff = await newStaff();
+    await asUser(staff, null);
+    expect(await call(`select public.growth_admin_decide($1,'approve','vergi no farkı doğrulandı')`, [c.id])).toMatchObject({ ok: true, status: "approved" });
+    await asService();
+    await renewal(b, 500);
+    await process_();
+    expect(await balance(aT)).toBe(0);
+    expect((await claim(b))!.status).toBe("approved");
+    expect(await call(`select public.growth_grant_claim($1)`, [c.id])).toBe("not_due");
+    expect(await balance(aT)).toBe(0);
+    await makeDueAll();
+    await process_();
+    expect(await balance(aT)).toBe(500);
+    expect((await claim(b))!.status).toBe("paid");
+  });
+
+  it("B2: onaylı talep yenileme yoksa vade dolsa da ödenmez ('blocked_referred')", async () => {
+    const aT = await tenant({ tax: "2222222222" });
+    const b = await tenant({ tax: "2222222222" });
+    await refer(aT, b);
+    await register(await baseInvoice(b, 500));
+    const c = (await claim(b))!;
+    const staff = await newStaff();
+    await asUser(staff, null);
+    await call(`select public.growth_admin_decide($1,'approve','tamam')`, [c.id]);
+    await asService();
+    await makeDueAll();
+    await process_();
+    expect(await balance(aT)).toBe(0);
+    expect(await call(`select public.growth_grant_claim($1)`, [c.id])).toBe("blocked_referred");
+  });
+
+  it("B3: hoş geldin kredisi KAYITTA değil ilk gerçek ödemede; davetçi ödeyen+aktif olmalı; yeni müşteri olmalı; idempotent", async () => {
+    await q(`update public.growth_referral_settings set welcome_credit_try = 250`);
+    // Ödeyen davetçi
+    const a = await tenant();
+    await pay(a, 1000);
+    const b = await tenant();
+    await refer(a, b);
+    expect(await call(`select public.growth_grant_welcome($1)`, [b])).toMatchObject({ skipped: "awaiting_first_payment" });
+    expect(await balance(b)).toBe(0);
+    // İlk gerçek ödeme -> talep üretimi içinden kredi
+    expect(await register(await pay(b, 1000))).toMatchObject({ ok: true, status: "held" });
+    expect(await balance(b)).toBe(250);
+    expect(await call(`select public.growth_grant_welcome($1)`, [b])).toMatchObject({ ok: true, already: true });
+    expect(await balance(b)).toBe(250);
+
+    // Davetçi hiç ödememiş: kredi YOK
+    const a2 = await tenant();
+    const b2 = await tenant();
+    await refer(a2, b2);
+    await register(await pay(b2, 1000));
+    expect(await balance(b2)).toBe(0);
+    expect(await call(`select public.growth_grant_welcome($1)`, [b2])).toMatchObject({ skipped: "referrer_not_paying" });
+
+    // Davetçi ödeyen ama aboneliği aktif değil: kredi YOK
+    const a3 = await tenant({ active: false });
+    await pay(a3, 1000);
+    const b3 = await tenant();
+    await refer(a3, b3);
+    await register(await pay(b3, 1000));
+    expect(await balance(b3)).toBe(0);
+
+    // Daha önce gerçek ödemiş başka ofisle aynı vergi no: "yeni müşteri değil"
+    const old = await tenant({ tax: "7777777777" });
+    await pay(old, 1000);
+    const a4 = await tenant();
+    await pay(a4, 1000);
+    const d = await tenant({ tax: "7777777777" });
+    await refer(a4, d);
+    await register(await pay(d, 1000));
+    expect(await balance(d)).toBe(0);
+    expect(await call(`select public.growth_grant_welcome($1)`, [d])).toMatchObject({ skipped: "returning_customer" });
+    await q(`update public.growth_referral_settings set welcome_credit_try = 0`);
+  });
+
+  it("B5 chargeback: ters ibraz gerçek ödeme sayılmaz; bekleyen talep geri alınır; ödenmiş talep clawback ile geri çekilir", async () => {
+    // Bekleme sırasında
+    const a = await tenant();
+    const b = await tenant();
+    await refer(a, b);
+    const inv = await baseInvoice(b, 700);
+    await register(inv);
+    expect(await call(`select public.growth_real_payment($1)`, [inv])).toBe(true);
+    await q(`update public.invoices set meta = meta || '{"chargeback":{"at":"2026-10-01"}}' where id=$1`, [inv]);
+    expect(await call(`select public.growth_real_payment($1)`, [inv])).toBe(false);
+    await process_();
+    expect((await claim(b))!.status).toBe("reversed");
+    expect(await balance(a)).toBe(0);
+
+    // Ödüllendirildikten SONRA
+    const c = await tenant();
+    const d = await tenant();
+    await refer(c, d);
+    const inv2 = await baseInvoice(d, 900);
+    await register(inv2);
+    await renewal(d, 900);
+    await makeDueAll();
+    await process_();
+    expect(await balance(c)).toBe(900);
+    await q(`update public.invoices set meta = meta || '{"chargeback":{"at":"2026-10-02"}}' where id=$1`, [inv2]);
+    await process_();
+    expect(await balance(c)).toBe(0);
+    const row = (await claim(d))!;
+    expect(row.status).toBe("reversed");
+    expect(row.clawed_back_at).not.toBeNull();
+    await process_();
+    expect(await balance(c)).toBe(0); // idempotent
+  });
+
+  it("B9 kademe bonusu: aktif + >=2 gerçek ödemeli davetlerle verilir; taban talep geri alınınca eşik altı bonus da geri alınır (revalidate)", async () => {
+    const a = await tenant();
+    const invs: string[] = [];
+    for (let k = 0; k < 3; k++) {
+      const b = await tenant();
+      await refer(a, b);
+      const inv = await baseInvoice(b, 1000);
+      invs.push(inv);
+      await register(inv);
+      await renewal(b, 1000);
+    }
+    await makeDueAll();
+    await process_();
+    expect(await balance(a)).toBe(3500); // 3 x 1000 + 0,5 aylık kademe bonusu
+    expect((await q(`select count(*)::int as n from public.growth_reward_claims where beneficiary_tenant_id=$1 and component='tier1' and status='paid'`, [a]))[0]!.n).toBe(1);
+    await process_();
+    expect(await balance(a)).toBe(3500);
+    // 3. davetin taban faturası chargeback: taban geri alınır, ödenmiş taban sayısı 2 < 3 olur, tier1 de geri alınır
+    await q(`update public.invoices set meta = meta || '{"chargeback":{"at":"2026-10-03"}}' where id=$1`, [invs[2]]);
+    await process_();
+    expect(await balance(a)).toBe(2000);
+    expect((await q(`select status from public.growth_reward_claims where beneficiary_tenant_id=$1 and component='tier1'`, [a]))[0]!.status).toBe("reversed");
+    expect(await call(`select public.growth_tier_revalidate($1)`, [a])).toBe(0); // idempotent
+    await process_();
+    expect(await balance(a)).toBe(2000);
+  });
+
+  it("B9: growth_referred_qualified = aktif abonelik + >=2 gerçek ödeme", async () => {
+    const t = await tenant();
+    await baseInvoice(t, 1000);
+    expect(await call(`select public.growth_referred_qualified($1)`, [t])).toBe(false);
+    await renewal(t, 1000);
+    expect(await call(`select public.growth_referred_qualified($1)`, [t])).toBe(true);
+    await q(`update public.subscriptions set status = 'past_due' where tenant_id = $1`, [t]);
+    expect(await call(`select public.growth_referred_qualified($1)`, [t])).toBe(false);
+  });
+
+  it("B12/R1 ofis panosu: yalnız owner/gm görür (diğer roller NULL); ortak panosu da rol kapılı; başka tenant sızmaz", async () => {
+    await asService();
+    const a = await tenant();
+    const b = await tenant();
+    await refer(a, b);
+    await register(await baseInvoice(b, 700));
+    await asUser(null, a, "owner");
+    expect(await call(`select public.growth_my_dashboard()`)).toMatchObject({ enabled: true, signups: 1, waiting: 1, pending_try: 700 });
+    await asUser(null, a, "gm");
+    expect(await call(`select public.growth_my_dashboard()`)).toMatchObject({ signups: 1 });
+    for (const role of ["agent", "assistant", "accountant"]) {
+      await asUser(null, a, role);
+      expect(await call(`select public.growth_my_dashboard()`), role).toBeNull();
+      expect(await call(`select public.growth_my_partner_dashboard()`), role).toBeNull();
+    }
+    await asUser(null, b, "owner");
+    expect(await call(`select public.growth_my_dashboard()`)).toMatchObject({ signups: 0, pending_try: 0 });
+    await asService();
+  });
+
+  it("yetki: işleyici ve hoş geldin RPC'si ofis oturumuna KAPALI (gövde service_role ister)", async () => {
+    const a = await tenant();
+    await asUser(null, a, "owner");
+    expect((await call(`select public.growth_claims_process(10)`)).code).toBe("42501");
+    expect((await call(`select public.growth_grant_welcome($1)`, [a])).code).toBe("42501");
+    await asService();
   });
 });
