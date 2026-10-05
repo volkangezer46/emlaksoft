@@ -30,6 +30,11 @@ onay kapısını atlayarak doğrudan PostgREST ile fiyat düşürmeye izin veriy
 düzeltici migration bekliyor (`src/lib/sql-rls-pattern-contract.test.ts` istisna listesi). Coğrafya taslağı `proposed/20261005000600_geo_central_management.sql`,
 sahiplik devri `20261005000700`, faturalama duraklatma `20261005000800` olarak yeniden numaralandı. Koltuk satışı SQL taslağı (`20261005000900`) ve fiyat bütünlüğü (`000500`) sırası:
 000500 → 000800 (D bölümü çıkarılmış) → 000900.
+**Koltuk satışı SQL (`proposed/20261005000900_seat_purchase_fulfillment.sql`, uygulanmadı):** `fulfill_billing_payment` + `_v2` (v2 ayrıca dönemi uzatıyordu: ikisi de
+tam gövdeyle yeniden yazıldı), koltuk tetikleyicileri `effective_seat_limit`'e bağlı, `seat_purchase_ready()` (SQL editöründe false döner, doğrulama için başlıktaki katalog sorgusu).
+Ön koşul bloğu canlı gövde md5'ini doğrular, sapmada DURUR. **Açık sahip kararları:** (1) yenilemede ek koltuk ÜCRETLENDİRİLMİYOR (ilk dönemden sonra bedava kalır; geniş satıştan
+önce karar), (2) dahil koltuk iki kaynaktan okunuyor (kod `limits.seats`=15, DB `plan_entitlements.seat_limit`=20 Profesyonel), (3) koltuk fiyat kilidi yazılmıyor,
+(4) koltuk azaltma kodda/şemada yok, yan menü kullanım rozeti ek koltuğu saymıyor. Rollback sırası: 000900 → 000800 → 000500.
 Toplam uygulanmayan migration dosyası şu an 40 civarı (`ls supabase/migrations | awk '$0 > "20260813000300"'`).
 
 `supabase/migrations/` (ilk 31 dosya, uygulanmayan): 20260814000100 telefon CHECK · 20260815000100 kayıp nedeni seed ·
