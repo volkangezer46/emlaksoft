@@ -167,16 +167,16 @@ export function PropertyAuthorizationPanel({
         <form onSubmit={handleSave} className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Başlangıç</label>
-              <input name="auth_start" type="date" defaultValue={initial.authStart ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+              <label htmlFor="pe-auth-start" className="mb-1 block text-xs font-semibold text-ink-950">Başlangıç</label>
+              <input id="pe-auth-start" name="auth_start" type="date" defaultValue={initial.authStart ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Bitiş</label>
-              <input name="auth_end" type="date" defaultValue={initial.authEnd ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+              <label htmlFor="pe-auth-end" className="mb-1 block text-xs font-semibold text-ink-950">Bitiş</label>
+              <input id="pe-auth-end" name="auth_end" type="date" defaultValue={initial.authEnd ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             </div>
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Yetki türü</label>
-              <select name="auth_type" defaultValue={initial.authType ?? ""} className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
+              <label htmlFor="pe-auth-type" className="mb-1 block text-xs font-semibold text-ink-950">Yetki türü</label>
+              <select id="pe-auth-type" name="auth_type" defaultValue={initial.authType ?? ""} className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
                 <option value="">— Seçin —</option>
                 <option value="exclusive">Tek Yetkili</option>
                 <option value="open">Açık Yetki</option>
@@ -184,8 +184,8 @@ export function PropertyAuthorizationPanel({
               </select>
             </div>
           </div>
-          <textarea name="auth_notes" rows={2} defaultValue={initial.authNotes ?? ""} placeholder="Not (opsiyonel)" className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
-          {result?.error && <p className="text-xs text-red-600">{result.error}</p>}
+          <textarea name="auth_notes" aria-label="Yetki notu" rows={2} defaultValue={initial.authNotes ?? ""} placeholder="Not (opsiyonel)" className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+          {result?.error && <p role="alert" className="text-xs text-red-600">{result.error}</p>}
           <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50">
             <Shield className="h-3.5 w-3.5" /> {saving ? "Kaydediliyor…" : "Kaydet"}
           </button>

@@ -249,8 +249,9 @@ export function AutomationWizard({
 
               {triggerOpt?.daysConfig && (
                 <div className="max-w-xs">
-                  <label className={labelClass}>{triggerOpt.daysConfig.label} *</label>
+                  <label htmlFor="aw-days" className={labelClass}>{triggerOpt.daysConfig.label} *</label>
                   <input
+                    id="aw-days"
                     type="number"
                     min={1}
                     max={365}
@@ -262,8 +263,9 @@ export function AutomationWizard({
               )}
               {triggerType === "property_matched" && (
                 <div className="max-w-xs">
-                  <label className={labelClass}>Asgari eşleşme puanı (0-100, opsiyonel)</label>
+                  <label htmlFor="aw-min-score" className={labelClass}>Asgari eşleşme puanı (0-100, opsiyonel)</label>
                   <input
+                    id="aw-min-score"
                     type="number"
                     min={0}
                     max={100}
@@ -378,43 +380,43 @@ export function AutomationWizard({
               {actionType === "create_task" && (
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-3">
-                    <label className={labelClass}>Görev başlığı *</label>
-                    <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="ör. Müşteriyi ara" className={fieldClass} />
+                    <label htmlFor="aw-task-title" className={labelClass}>Görev başlığı *</label>
+                    <input id="aw-task-title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="ör. Müşteriyi ara" className={fieldClass} />
                   </div>
                   <div>
-                    <label className={labelClass}>Öncelik</label>
-                    <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} className={fieldClass}>
+                    <label htmlFor="aw-task-priority" className={labelClass}>Öncelik</label>
+                    <select id="aw-task-priority" value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} className={fieldClass}>
                       <option value="low">Düşük</option>
                       <option value="normal">Normal</option>
                       <option value="high">Yüksek</option>
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>Termin (gün, opsiyonel)</label>
-                    <input type="number" min={1} max={365} value={taskDueDays} onChange={(e) => setTaskDueDays(e.target.value)} placeholder="ör. 2" className={fieldClass} />
+                    <label htmlFor="aw-task-due" className={labelClass}>Termin (gün, opsiyonel)</label>
+                    <input id="aw-task-due" type="number" min={1} max={365} value={taskDueDays} onChange={(e) => setTaskDueDays(e.target.value)} placeholder="ör. 2" className={fieldClass} />
                   </div>
                 </div>
               )}
 
               {(actionType === "send_sms" || actionType === "send_whatsapp") && (
                 <div>
-                  <label className={labelClass}>{actionType === "send_sms" ? "SMS metni" : "WhatsApp metni"} *</label>
-                  <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={3} placeholder="Sayın {{name}}, …" className={fieldClass} />
+                  <label htmlFor="aw-message" className={labelClass}>{actionType === "send_sms" ? "SMS metni" : "WhatsApp metni"} *</label>
+                  <textarea id="aw-message" value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={3} placeholder="Sayın {{name}}, …" className={fieldClass} />
                   <p className="mt-1 text-xs text-text-faint">{"{{name}}"} yer tutucusu müşteri adıyla değiştirilir.</p>
                 </div>
               )}
 
               {(actionType === "notify_manager" || actionType === "send_notification") && (
                 <div>
-                  <label className={labelClass}>Bildirim metni *</label>
-                  <textarea value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={2} placeholder="ör. İlgilenilmesi gereken bir kayıt var." className={fieldClass} />
+                  <label htmlFor="aw-notify" className={labelClass}>Bildirim metni *</label>
+                  <textarea id="aw-notify" value={messageText} onChange={(e) => setMessageText(e.target.value)} rows={2} placeholder="ör. İlgilenilmesi gereken bir kayıt var." className={fieldClass} />
                 </div>
               )}
 
               {actionType === "assign_to_staff" && (
                 <div className="max-w-sm">
-                  <label className={labelClass}>Atanacak danışman *</label>
-                  <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={fieldClass}>
+                  <label htmlFor="aw-assignee" className={labelClass}>Atanacak danışman *</label>
+                  <select id="aw-assignee" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={fieldClass}>
                     <option value="">Seçin…</option>
                     {staff.map((s) => (
                       <option key={s.id} value={s.id}>{s.full_name}</option>
@@ -425,15 +427,15 @@ export function AutomationWizard({
 
               {actionType === "add_tag" && (
                 <div className="max-w-sm">
-                  <label className={labelClass}>Eklenecek etiket *</label>
-                  <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="ör. sıcak-müşteri" className={fieldClass} />
+                  <label htmlFor="aw-tag" className={labelClass}>Eklenecek etiket *</label>
+                  <input id="aw-tag" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="ör. sıcak-müşteri" className={fieldClass} />
                 </div>
               )}
 
               {actionType === "change_status" && (
                 <div className="max-w-sm">
-                  <label className={labelClass}>{statusEntity === "demand" ? "Talebin yeni durumu" : "Anlaşmanın yeni aşaması"} *</label>
-                  <select value={targetStatus} onChange={(e) => setTargetStatus(e.target.value)} className={fieldClass}>
+                  <label htmlFor="aw-status" className={labelClass}>{statusEntity === "demand" ? "Talebin yeni durumu" : "Anlaşmanın yeni aşaması"} *</label>
+                  <select id="aw-status" value={targetStatus} onChange={(e) => setTargetStatus(e.target.value)} className={fieldClass}>
                     <option value="">Seçin…</option>
                     {statusOptions.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -444,12 +446,12 @@ export function AutomationWizard({
 
               <div className="hairline-t grid gap-3 pt-4 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass}>Kural adı *</label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ör. Sıcak talepleri müdüre bildir" className={fieldClass} />
+                  <label htmlFor="aw-name" className={labelClass}>Kural adı *</label>
+                  <input id="aw-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="ör. Sıcak talepleri müdüre bildir" className={fieldClass} />
                 </div>
                 <div>
-                  <label className={labelClass}>Açıklama (opsiyonel)</label>
-                  <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ne işe yaradığını kısaca yazın" className={fieldClass} />
+                  <label htmlFor="aw-desc" className={labelClass}>Açıklama (opsiyonel)</label>
+                  <input id="aw-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ne işe yaradığını kısaca yazın" className={fieldClass} />
                 </div>
               </div>
             </div>

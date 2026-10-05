@@ -133,8 +133,8 @@ export function CommunicationTimeline({
           <div className="grid gap-3 sm:grid-cols-2">
             {/* Kanal */}
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Kanal</label>
-              <select name="channel" defaultValue="call" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
+              <label htmlFor="ct-channel" className="mb-1 block text-xs font-semibold text-ink-950">Kanal</label>
+              <select id="ct-channel" name="channel" defaultValue="call" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
                 {COMM_CHANNELS.map((c) => (
                   <option key={c.value} value={c.value}>{c.emoji} {c.label}</option>
                 ))}
@@ -143,8 +143,8 @@ export function CommunicationTimeline({
 
             {/* Yön */}
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Yön</label>
-              <select name="direction" defaultValue="outbound" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
+              <label htmlFor="ct-direction" className="mb-1 block text-xs font-semibold text-ink-950">Yön</label>
+              <select id="ct-direction" name="direction" defaultValue="outbound" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
                 <option value="outbound">Giden (ben aradım/yazdım)</option>
                 <option value="inbound">Gelen (müşteri aradı/yazdı)</option>
                 <option value="internal">İç not</option>
@@ -153,8 +153,8 @@ export function CommunicationTimeline({
 
             {/* Sonuç */}
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Sonuç</label>
-              <select name="outcome" defaultValue="" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
+              <label htmlFor="ct-outcome" className="mb-1 block text-xs font-semibold text-ink-950">Sonuç</label>
+              <select id="ct-outcome" name="outcome" defaultValue="" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300">
                 <option value="">— Seçin —</option>
                 {COMM_OUTCOMES.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -164,19 +164,19 @@ export function CommunicationTimeline({
 
             {/* Süre */}
             <div>
-              <label className="mb-1 block text-xs font-semibold text-ink-950">Süre (sn, opsiyonel)</label>
-              <input name="duration_sec" type="number" min="0" placeholder="örn. 120" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+              <label htmlFor="ct-duration" className="mb-1 block text-xs font-semibold text-ink-950">Süre (sn, opsiyonel)</label>
+              <input id="ct-duration" name="duration_sec" type="number" min="0" placeholder="örn. 120" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             </div>
           </div>
 
           {/* Not */}
           <div>
-            <label className="mb-1 block text-xs font-semibold text-ink-950">Not / Mesaj</label>
-            <textarea name="body" rows={3} placeholder="Görüşme özeti, mesaj içeriği veya not…" className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <label htmlFor="ct-body" className="mb-1 block text-xs font-semibold text-ink-950">Not / Mesaj</label>
+            <textarea id="ct-body" name="body" rows={3} placeholder="Görüşme özeti, mesaj içeriği veya not…" className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
           </div>
 
           {state?.error && (
-            <p className="rounded-[var(--radius-control)] bg-red-50 px-3 py-2 text-xs text-red-600">{state.error}</p>
+            <p role="alert" className="rounded-[var(--radius-control)] bg-red-50 px-3 py-2 text-xs text-red-600">{state.error}</p>
           )}
 
           <div className="flex justify-end">
