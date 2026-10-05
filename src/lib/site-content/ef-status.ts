@@ -1,18 +1,16 @@
 import { unstable_cache } from "next/cache";
-import { EF_ORTAK_FLAG_SETTING_KEY, EF_ORTAK_PROBE_OK_SETTING_KEY } from "@/lib/ef-credits/config";
-import { parseSettingBool } from "@/lib/platform-setting-keys";
-import { getPlatformSettingsMany } from "@/lib/platform-settings";
+import { now } from "@/lib/clock";
+import { decideEfPublicState } from "@/lib/ef-credits/public-state-core";
 
 /**
- * EmlakFiyati değerleme özelliği CANLI mı? Dürüst gösterim: yalnız ortak bayrak AÇIK ve son ortak yoklaması (probe) başarılı
- * kaydedilmişse "live"; aksi halde "soon" (ana sayfada "Yakında" rozeti, "şimdi deneyin" denmez). Saf karar `efValuationStatus`.
+ * EmlakFiyati değerleme özelliği CANLI mı? Karar TEK KAYNAKTAN gelir (`ef-credits/public-state`): vitrin yalnız "live" iken
+ * "canlı" der; stale/maintenance/soon hepsi vitrinde "soon" (Yakında rozeti) görünür, "şimdi deneyin" denmez.
  */
 export type EfValuationStatus = "live" | "soon";
 
+/** Saf karar (anahtar ve cüzdan hazır varsayılır; bayrak + TAZE yoklama gerekir). Geriye dönük uyumlu imza. */
 export function efValuationStatus(flagRaw: string | null | undefined, probeOkAt: string | null | undefined): EfValuationStatus {
-  const enabled = parseSettingBool(flagRaw, false);
-  const probed = typeof probeOkAt === "string" && probeOkAt.trim() !== "";
-  return enabled && probed ? "live" : "soon";
+  return decideEfPublicState({ key: true, flag: flagRaw, probeAt: probeOkAt, now: now(), walletReady: true }) === "live" ? "live" : "soon";
 }
 
 export const EF_STATUS_CACHE_TAG = "ef-valuation-status";
@@ -20,9 +18,10 @@ export const EF_STATUS_CACHE_TAG = "ef-valuation-status";
 /** Sunucuda, kısa süreli etiketli önbellekten okunur: ana sayfa statik kalır (dinamik render yok), durum ~1 dk içinde güncellenir. */
 export const getEfValuationStatus = unstable_cache(
   async (): Promise<EfValuationStatus> => {
-    const v = await getPlatformSettingsMany([EF_ORTAK_FLAG_SETTING_KEY, EF_ORTAK_PROBE_OK_SETTING_KEY]);
-    return efValuationStatus(v[EF_ORTAK_FLAG_SETTING_KEY], v[EF_ORTAK_PROBE_OK_SETTING_KEY]);
+    // Tembel içe aktarma: saf `efValuationStatus` testlerde sunucu modüllerini (server-only, admin client) yüklemesin.
+    const { getEfPublicState } = await import("@/lib/ef-credits/public-state");
+    return (await getEfPublicState()).live ? "live" : "soon";
   },
-  ["ef-valuation-status-v1"],
+  ["ef-valuation-status-v2"],
   { tags: [EF_STATUS_CACHE_TAG], revalidate: 60 },
 );

@@ -1,3 +1,4 @@
+import { EF_PLANNED_SUFFIX } from "@/lib/ef-credits/public-state-core";
 import type { PlanDef } from "@/lib/billing/plans";
 import { trialCtaLabel, trialShort, yearlyOffer } from "@/lib/marketing-copy";
 
@@ -5,7 +6,12 @@ import { trialCtaLabel, trialShort, yearlyOffer } from "@/lib/marketing-copy";
  * Metin değişkenleri ({deneme}, {yillik} ...): deneme günü ve yıllık teklif tek kaynaktan (admin paket tanımları) gelir;
  * editörde sabit gün/oran yazılmaz. Saf modül.
  */
-export type TokenContext = { trialDays?: number; plans: readonly PlanDef[] };
+export type TokenContext = {
+  trialDays?: number;
+  plans: readonly PlanDef[];
+  /** EmlakFiyati canlı mı (tek durum kaynağı). Verilmezse/false ise {ef_hak} sayıları "(planlanan)" etiketiyle yazılır. */
+  efLive?: boolean;
+};
 
 const TOKEN_RE = /\{([a-z_]+)\}/g;
 
@@ -34,7 +40,10 @@ function tokenValue(name: string, ctx: TokenContext): string | null | undefined 
     case "deneme_uzun":
       return ctx.trialDays ? `${ctx.trialDays} gün ücretsiz` : "Ücretsiz deneme";
     case "ef_hak":
-      return efMonthlyAllowanceText(ctx.plans);
+    {
+      const t = efMonthlyAllowanceText(ctx.plans);
+      return t && !ctx.efLive ? `${t} ${EF_PLANNED_SUFFIX}` : t;
+    }
     case "yillik":
       return offer ? offer.label : null;
     case "yillik_cumle":

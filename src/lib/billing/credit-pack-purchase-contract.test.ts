@@ -6,6 +6,7 @@ const gateRef = vi.hoisted(() => ({
   value: { ok: true, userId: "u1", tenantId: "11111111-2222-3333-4444-555555555555", role: "owner", impersonating: false } as Record<string, unknown>,
 }));
 const ready = vi.hoisted(() => ({ ok: true }));
+const efState = vi.hoisted(() => ({ purchasable: true }));
 const iyz = vi.hoisted(() => ({ configured: true }));
 const rate = vi.hoisted(() => ({ allowed: true }));
 const createInvoice = vi.hoisted(() => vi.fn(async (i: { pack: { units: number; priceNetTry: number } }) => ({ invoiceId: "inv-1", totalTry: i.pack.priceNetTry * 1.2 })));
@@ -24,6 +25,10 @@ vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => ({ allowed: rat
 vi.mock("@/lib/ef-credits/credit-reader", () => ({
   getEfCreditReady: async () => ready.ok,
   getEfCatalog: async () => ({ tariff: {}, packs: packs.list }),
+}));
+vi.mock("@/lib/ef-credits/public-state", () => ({
+  EF_PURCHASE_CLOSED_MESSAGE: "Kontör satın alma, EmlakFiyati değerleme etkinleşince açılır.",
+  getEfPublicState: async () => ({ state: efState.purchasable ? "live" : "soon", live: efState.purchasable, purchasable: efState.purchasable }),
 }));
 vi.mock("@/lib/billing/credit-pack-purchase", () => ({ createCreditPackInvoice: createInvoice }));
 vi.mock("@/lib/billing/iyzico", () => ({
@@ -64,6 +69,7 @@ describe("startCreditPackPurchase kapıları", () => {
   beforeEach(() => {
     gateRef.value = { ...OWNER };
     ready.ok = true;
+    efState.purchasable = true;
     iyz.configured = true;
     rate.allowed = true;
     createInvoice.mockClear();
@@ -91,6 +97,12 @@ describe("startCreditPackPurchase kapıları", () => {
     rate.allowed = false;
     expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toMatch(/Çok fazla/);
     expect(createInvoice).not.toHaveBeenCalled();
+  });
+  it("EmlakFiyati live değilken (anahtar/bayrak/taze yoklama) para alınmaz: iyzico ve fatura çağrılmaz", async () => {
+    efState.purchasable = false;
+    expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toBe("Kontör satın alma, EmlakFiyati değerleme etkinleşince açılır.");
+    expect(createInvoice).not.toHaveBeenCalled();
+    expect(initCheckout).not.toHaveBeenCalled();
   });
   it("ef_credit_ready kapalıyken para tahsil yolu AÇILMAZ", async () => {
     ready.ok = false;
@@ -139,6 +151,7 @@ describe("kontör satın alma kaynak sözleşmesi", () => {
       "gate.impersonating",
       'gate.role !== "owner" && gate.role !== "gm"',
       "checkRateLimit(`efpack:",
+      "getEfPublicState()",
       "getEfCreditReady()",
       "isIyzicoConfigured()",
       "findPurchasablePack(",

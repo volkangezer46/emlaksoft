@@ -11,6 +11,7 @@ import { ValuationSection } from "@/components/marketing/valuation-section";
 import { buildHomeFaqs, faqForJsonLd } from "@/components/marketing/faq";
 import { PIONEER_CLAIM } from "./claims";
 import { defaultSiteContent } from "./defaults";
+import { daysAgoIso } from "@/lib/clock";
 import { efValuationStatus } from "./ef-status";
 import { hasErrors, riskyWordsIn, validateSiteContent, type SiteContent } from "./schema";
 import { efMonthlyAllowanceText, resolveTokens, tx } from "./tokens";
@@ -76,6 +77,9 @@ describe("değişkenler", () => {
     expect(efMonthlyAllowanceText(NO_FIELD_PLANS)).toBeNull();
     const withField = NO_FIELD_PLANS.map((p, i) => (i === 0 ? ({ ...p, efCreditsMonthly: 7 } as PlanDef) : p));
     expect(efMonthlyAllowanceText(withField)).toBe(`${PLANS[0]!.name} 7`);
+    // {ef_hak}: canlı değilse "(planlanan)", canlıysa etiketsiz
+    expect(tx("{ef_hak}", { plans: withField })).toBe(`${PLANS[0]!.name} 7 (planlanan)`);
+    expect(tx("{ef_hak}", { plans: withField, efLive: true })).toBe(`${PLANS[0]!.name} 7`);
   });
 });
 
@@ -168,10 +172,12 @@ describe("EmlakFiyati değerleme bölümü", () => {
     renderToStaticMarkup(createElement(ValuationSection, { status, trialDays: 14, plans, content }));
 
   it("durum: bayrak AÇIK ve son yoklama başarılıysa canlı, aksi halde yakında", () => {
-    expect(efValuationStatus("on", "2026-10-05T10:00:00Z")).toBe("live");
+    const fresh = daysAgoIso(1);
+    expect(efValuationStatus("on", fresh)).toBe("live");
+    expect(efValuationStatus("on", daysAgoIso(8))).toBe("soon"); // eski damga: stale -> vitrinde yakında
     expect(efValuationStatus("on", null)).toBe("soon");
     expect(efValuationStatus("on", "  ")).toBe("soon");
-    expect(efValuationStatus("off", "2026-10-05T10:00:00Z")).toBe("soon");
+    expect(efValuationStatus("off", fresh)).toBe("soon");
     expect(efValuationStatus(null, null)).toBe("soon");
   });
 

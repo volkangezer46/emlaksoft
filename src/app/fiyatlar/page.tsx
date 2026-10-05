@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FiyatlarPage() {
-  const { plans, trialDays, offers, founders, efValuationCost } = await getPublicPricing();
+  const { plans, trialDays, offers, founders, efValuationCost, efLive } = await getPublicPricing();
   const faq = buildFaq({ trialDays, plans });
   const discount = yearlyDiscountPercent(plans);
   const lost = lostCommissionPlanName();
@@ -65,7 +65,7 @@ export default async function FiyatlarPage() {
       </section>
 
       <section aria-label="Paketler" className="mx-auto max-w-6xl px-4 pb-4 pt-6 sm:px-6">
-        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} />
+        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} efLive={efLive} />
       </section>
 
       <section aria-label="Bilmeniz gerekenler" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -83,7 +83,7 @@ export default async function FiyatlarPage() {
       </section>
 
       <Section id="karsilastirma" title="Paketleri yan yana karşılaştırın" lead="Tablo, uygulamadaki gerçek paket kuralları ve sayfa kilitlerinden üretilir.">
-        <ComparisonTable plans={plans} efValuationCost={efValuationCost} />
+        <ComparisonTable plans={plans} efValuationCost={efValuationCost} efLive={efLive} />
       </Section>
 
       <Section

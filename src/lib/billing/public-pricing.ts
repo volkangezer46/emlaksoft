@@ -1,4 +1,6 @@
 import { efUnitsFor } from "@/lib/ef-credits/config";
+import { getEfPublicState } from "@/lib/ef-credits/public-state";
+import type { EfPublicState } from "@/lib/ef-credits/public-state-core";
 import {
   getEfTariff,
   getFoundersStatus,
@@ -34,14 +36,19 @@ export type PublicPricing = {
   founders: PublicFounders | null;
   /** Bir değerlemenin kontör bedeli (tarifeden); "yaklaşık N değerleme" satırı için. */
   efValuationCost: number;
+  /** EmlakFiyati tek durum kaynağı (ef-credits/public-state). */
+  efState: EfPublicState;
+  /** efState === "live": kontör satırları "planlanan" etiketsiz ve "kontör ile ek sorgu satın alınabilir" cümlesi yalnız bu durumda. */
+  efLive: boolean;
 };
 
 export async function getPublicPricing(): Promise<PublicPricing> {
-  const [plans, catalog, trialDays, efTariff] = await Promise.all([
+  const [plans, catalog, trialDays, efTariff, efPublic] = await Promise.all([
     getPublicPlanDefinitions(),
     getPlanCatalog(),
     getEffectiveTrialDays(),
     getEfTariff(),
+    getEfPublicState(),
   ]);
   const status = await getFoundersStatus(catalog.campaign);
   const open = status.available && status.active && status.remaining > 0;
@@ -57,5 +64,7 @@ export async function getPublicPricing(): Promise<PublicPricing> {
     offers,
     founders: open && anyCampaign ? { name: status.name, remaining: status.remaining, quota: status.quota } : null,
     efValuationCost: efUnitsFor("valuation_arsa", efTariff),
+    efState: efPublic.state,
+    efLive: efPublic.live,
   };
 }

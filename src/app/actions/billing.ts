@@ -32,6 +32,7 @@ import { getTenantCardUserKey } from "@/lib/billing/card-store";
 import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
 import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
 import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
+import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
 import { getTryMaxShare } from "@/lib/try-credits/settings";
 import type { AppliedWalletCredit } from "@/lib/try-credits/checkout";
 
@@ -480,6 +481,8 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
   const { allowed } = await checkRateLimit(`efpack:${gate.userId}`, { limit: 8, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };
 
+  // Tek durum kaynağı: EmlakFiyati değerleme canlı değilse (anahtar/bayrak/taze yoklama/cüzdan) PARA ALINMAZ.
+  if (!(await getEfPublicState()).purchasable) return { error: EF_PURCHASE_CLOSED_MESSAGE };
   if (!(await getEfCreditReady())) {
     return { error: "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor." };
   }

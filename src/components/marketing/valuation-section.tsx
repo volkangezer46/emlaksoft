@@ -56,8 +56,8 @@ export function ValuationSection({
   content?: SiteContent["valuation"];
 }) {
   if (content.hidden) return null;
-  const ctx = { trialDays, plans };
   const live = status === "live";
+  const ctx = { trialDays, plans, efLive: live };
   const points = content.points
     .filter((p) => !p.hidden && ICONS[p.id])
     .map((p) => ({ id: p.id, icon: ICONS[p.id]!, title: tx(p.title, ctx), ...(() => { const r = resolveTokens(p.text, ctx); return { text: r.text, missing: r.missing }; })() }))

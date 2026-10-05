@@ -14,6 +14,7 @@ import {
   type EfMovementCategory,
 } from "@/lib/ef-credits/credit-view";
 import { efUnitsFor } from "@/lib/ef-credits/config";
+import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
 import {
   activePacks,
   lowBalanceState,
@@ -52,7 +53,7 @@ export type KontorSectionProps = {
 
 export async function KontorSection(props: KontorSectionProps & { tenantId: string }) {
   const { tenantId, canBuy, iyzicoConfigured, latestInvoice, invoiceIsRecent, allowance } = props;
-  const [ready, catalog] = await Promise.all([getEfCreditReady(), getEfCatalog()]);
+  const [ready, catalog, efState] = await Promise.all([getEfCreditReady(), getEfCatalog(), getEfPublicState()]);
   const [balance, history] = ready
     ? await Promise.all([readEfBalance(tenantId), readEfHistory(tenantId)])
     : [null, null];
@@ -76,9 +77,11 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
       suggested: suggested?.id === p.id,
     };
   });
-  const blockReason = !ready
-    ? "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor. Paketleri şimdiden inceleyebilirsiniz."
-    : !iyzicoConfigured
+  const blockReason = !efState.purchasable
+    ? `${EF_PURCHASE_CLOSED_MESSAGE} Paketleri şimdiden inceleyebilirsiniz.`
+    : !ready
+      ? "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor. Paketleri şimdiden inceleyebilirsiniz."
+      : !iyzicoConfigured
       ? "Ödeme altyapısı yapılandırılmamış; lütfen yönetici ile iletişime geçin."
       : null;
 
