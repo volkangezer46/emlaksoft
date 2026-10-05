@@ -190,6 +190,7 @@ export default async function DealsPage({
     wonRes,
     lostRes,
     staleRes,
+    realWonRes,
   ] = await Promise.all([
     dealsP,
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
@@ -203,6 +204,8 @@ export default async function DealsPage({
     head().eq("stage", "won"),
     head().eq("stage", "lost"),
     head().not("stage", "in", "(won,lost)").lt("updated_at", staleIso),
+    // Davet önerisi tetiği: örnek (demo) anlaşmalar sayılmaz; yalnız gerçek kazanılmış anlaşma.
+    head().eq("stage", "won").eq("is_sample", false),
   ]);
 
   const checklistByDeal = new Map<string, { done: number; total: number }>();
@@ -396,7 +399,7 @@ export default async function DealsPage({
 
   return (
     <div className="space-y-5">
-      <ReferralNudge moment="first_deal" show={(stageCounts.won ?? 0) >= 1} />
+      <ReferralNudge moment="first_deal" show={(realWonRes.count ?? 0) >= 1} />
       <PageHeader
         title="Anlaşma tahtası"
         eyebrow="Anlaşma hattı"

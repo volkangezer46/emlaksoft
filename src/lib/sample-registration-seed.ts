@@ -15,6 +15,9 @@ import { insertSampleRecords, SAMPLE_DATA_COUNTS } from "@/lib/sample-data-seed"
 /** Form alanı adı: işaretli onay kutusu "on" gönderir; alan yoksa demo yüklenmez. */
 export const REGISTRATION_DEMO_FIELD = "demo_data";
 
+/** Kayıtta demo veri yüklenemediyse set edilen çerez; ana ekran "yeniden dene" bandını tetikler. */
+export const DEMO_SEED_FAILED_COOKIE = "es_demo_seed_failed";
+
 export function wantsDemoData(formData: FormData): boolean {
   const v = String(formData.get(REGISTRATION_DEMO_FIELD) ?? "");
   return v === "on" || v === "1" || v === "true";

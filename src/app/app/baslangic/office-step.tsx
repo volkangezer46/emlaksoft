@@ -14,7 +14,7 @@ import { uploadTenantLogo } from "@/app/actions/tenant-logo";
 type Props = {
   canEdit: boolean;
   nextHref: string;
-  initial: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; logoUrl: string | null };
+  initial: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; taxNumber: string; logoUrl: string | null };
   provinces: GeoOption[];
 };
 
@@ -76,7 +76,10 @@ export function OfficeStep({ canEdit, nextHref, initial, provinces }: Props) {
       <div className="sm:col-span-2">
         <GeoSelect provinces={provinces} defaultProvinceId={initial.provinceId} defaultDistrictId={initial.districtId} withNeighborhood={false} />
       </div>
-      <Field label="Açık adres" htmlFor="kur-address">
+      <Field label="Vergi no / T.C. kimlik no" htmlFor="kur-tax" hint="Ödeme ve fatura için gerekir; 10 haneli vergi no ya da 11 haneli T.C. kimlik no.">
+        <input id="kur-tax" name="tax_number" inputMode="numeric" maxLength={11} defaultValue={initial.taxNumber} className={inputCls} placeholder="1234567890" />
+      </Field>
+      <Field label="Açık adres" htmlFor="kur-address" hint="Fatura için en az 10 karakter.">
         <input id="kur-address" name="address_line" defaultValue={initial.addressLine} placeholder="Kadıköy, Bağdat Cad. No:42" className={inputCls} />
       </Field>
       <div className="sm:col-span-2">

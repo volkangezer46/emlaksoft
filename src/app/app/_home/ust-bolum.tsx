@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { cookies } from "next/headers";
+import { AlertTriangle, Gift } from "lucide-react";
+import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
+import { readTryOverview } from "@/lib/try-credits/reader";
+import { readMyDashboard } from "@/lib/growth/engine";
+import { OrnekVeriYenile } from "./ornek-veri-yenile";
 import { DemoModeBanner } from "@/components/app/demo-mode-banner";
 import { createClient } from "@/lib/supabase/server";
 import { loadSampleStatus } from "@/lib/sample-status";
@@ -115,5 +120,48 @@ export async function YetkiUyari({ ctx }: { ctx: HomeCtx }) {
         Portföylere git
       </Link>
     </div>
+  );
+}
+
+/**
+ * Kayıtta seçilen örnek veri yüklenemediyse (signUp çerez bırakır) ve ofis hâlâ örneksiz ise
+ * "yeniden dene" bandı. Çerez yoksa ya da veri zaten yüklüyse hiçbir şey çizmez.
+ */
+export async function OrnekVeriYenileBandi({ ctx }: { ctx: HomeCtx }) {
+  if (!ctx.tenantId || !ctx.isManagement) return null;
+  const jar = await cookies();
+  if (jar.get(DEMO_SEED_FAILED_COOKIE)?.value !== "1") return null;
+  const tenant = await loadTenantRow(ctx);
+  if (tenant?.sample_seeded_at) return null;
+  return <OrnekVeriYenile />;
+}
+
+/**
+ * Hoş geldin kredisi duyurusu: YALNIZ ofisin kullanılabilir hesap kredisi varsa gösterilir; tutar
+ * `growth_referral_settings.welcome_credit_try` değerinden (my_dashboard RPC) okunur, kodda sabit değildir.
+ * Gösterilen tutar mevcut kullanılabilir bakiyeyi aşmaz. Tıklayınca cüzdan sekmesine gider.
+ */
+export async function HosgeldinKredisi({ ctx }: { ctx: HomeCtx }) {
+  if (!ctx.tenantId) return null;
+  const supabase = await createClient();
+  const [overview, dash] = await Promise.all([
+    readTryOverview(supabase),
+    readMyDashboard(supabase).catch(() => null),
+  ]);
+  const welcome = dash?.welcome_credit_try ?? 0;
+  if (!overview || overview.available <= 0 || welcome <= 0) return null;
+  const amount = Math.min(welcome, overview.available);
+  return (
+    <Link
+      href="/app/abonelik?sekme=cuzdan"
+      className="focus-ring press flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-mint-400/40 bg-mint-400/[0.08] px-4 py-2.5 text-sm text-ink-950 transition hover:border-mint-500/60"
+    >
+      <Gift className="h-4 w-4 shrink-0 text-mint-600" aria-hidden />
+      <span>
+        <span className="font-bold">{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(amount)} TL hoş geldin krediniz</span>{" "}
+        ödemede kullanılabilir.
+      </span>
+      <span className="ml-auto text-xs font-semibold underline underline-offset-2">Cüzdanı gör</span>
+    </Link>
   );
 }

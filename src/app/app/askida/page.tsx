@@ -103,14 +103,17 @@ export default async function SuspendedPage() {
           <>
             <span className="font-semibold text-text">{office?.name ?? "Ofisiniz"}</span> aboneliği şu an{" "}
             <span className="font-semibold text-danger-600">{isCancelled ? "iptal" : "askıda"}</span>. Panel erişimi
-            geçici olarak kapalı; kayıtlar saklama politikası kapsamında korunur ve abonelik yenilendiğinde erişim yeniden değerlendirilir.
+            geçici olarak kapalı; kayıtlar saklama politikası kapsamında korunur.
+            {isCancelled
+              ? " Abonelik yenilendiğinde erişim yeniden değerlendirilir."
+              : " Deneme süreniz ve ardından tanınan tolerans sona erdiği için hesap otomatik askıya alındı; bir plan seçip ödemeyi tamamladığınızda erişim otomatik açılır."}
           </>
         }
         actions={
           <>
             {!isCancelled ? (
               <ButtonLink href="/app/abonelik">
-                <CreditCard className="h-4 w-4" /> Ödemeyi tamamla
+                <CreditCard className="h-4 w-4" /> Planı seç ve öde
               </ButtonLink>
             ) : null}
             <a

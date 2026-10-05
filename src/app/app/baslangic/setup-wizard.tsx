@@ -32,7 +32,7 @@ export type SetupWizardProps = {
   /** Bos ofis ve tanim girilmemis: "Nasil baslamak istersiniz?" paneli (ofis tipi + demo/bos). */
   showStartChoice: boolean;
   canSeedSample: boolean;
-  office: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; logoUrl: string | null };
+  office: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; taxNumber: string; logoUrl: string | null };
   lossReasons: { value: string; label: string }[];
   stageLabels: { key: string; label: string }[];
   customers: number;

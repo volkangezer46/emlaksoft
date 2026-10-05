@@ -7,6 +7,8 @@ export const PLATFORM_SETTING_KEYS = {
   maintenanceMessage: "maintenance_message",
   registrationOpen: "registration_open",
   defaultTrialDays: "default_trial_days",
+  /** Deneme bitiminden sonra otomatik askıya almaya kadar tolerans (gün). */
+  trialGraceDays: "billing.trial_grace_days",
 } as const;
 
 /** Kayıt kapalıyken /kayit ve signUp'ın gösterdiği mesaj. */
@@ -34,9 +36,22 @@ export function parseTrialDays(raw: string | null | undefined): number {
   return n >= MIN_TRIAL_DAYS && n <= MAX_TRIAL_DAYS ? n : DEFAULT_TRIAL_DAYS;
 }
 
+export const DEFAULT_TRIAL_GRACE_DAYS = 7;
+export const MIN_TRIAL_GRACE_DAYS = 0;
+export const MAX_TRIAL_GRACE_DAYS = 60;
+
+/** Tolerans günü: tam sayı ve 0..60 dışında varsayılan (7). */
+export function parseTrialGraceDays(raw: string | null | undefined): number {
+  const v = (raw ?? "").trim();
+  if (!/^[0-9]{1,2}$/.test(v)) return DEFAULT_TRIAL_GRACE_DAYS;
+  const n = Number(v);
+  return n >= MIN_TRIAL_GRACE_DAYS && n <= MAX_TRIAL_GRACE_DAYS ? n : DEFAULT_TRIAL_GRACE_DAYS;
+}
+
 export type GeneralSettings = {
   maintenanceMode: boolean;
   maintenanceMessage: string;
   registrationOpen: boolean;
   defaultTrialDays: number;
+  trialGraceDays: number;
 };

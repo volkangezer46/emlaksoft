@@ -482,7 +482,7 @@ export function buildPartnerUrl(baseUrl: string, code: string): string {
 
 /* ------------------------------------------------------------------ tetik anları (ürün içi, kapatılabilir davet kartı) ------------------------------------------------------------------ */
 
-export const NUDGE_MOMENTS = ["first_deal", "first_valuation", "credit_purchase", "team_grew"] as const;
+export const NUDGE_MOMENTS = ["first_deal", "first_valuation", "credit_purchase", "team_grew", "first_payment"] as const;
 export type NudgeMoment = (typeof NUDGE_MOMENTS)[number];
 
 export const NUDGE_COPY: Record<NudgeMoment, { title: string; text: string; cta: string }> = {
@@ -499,6 +499,11 @@ export const NUDGE_COPY: Record<NudgeMoment, { title: string; text: string; cta:
   credit_purchase: {
     title: "Kontör aldınız",
     text: "Ofisinizin bu işi nasıl hızlandırdığını bir meslektaşınıza anlatın; davet bağlantınız hazır.",
+    cta: "Davet et ve kazan",
+  },
+  first_payment: {
+    title: "İlk plan ödemeniz alındı",
+    text: "Hoş geldiniz! EmlakSoft sizin için işe yaradıysa bir meslektaşınıza da önerin; davet bağlantınızla gelen her ödeyen ofis için hesap krediniz yüklenir.",
     cta: "Davet et ve kazan",
   },
   team_grew: {
