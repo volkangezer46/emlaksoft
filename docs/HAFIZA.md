@@ -18,7 +18,15 @@ Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son gün
 
 ## 2. Migration durumu (KRİTİK: hepsi sahibin işi)
 
-Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
+**GÜNCEL DURUM (2026-10-05, kullanıcı onayı + yedek/PITR teyidiyle, `--only` ile pencere pencere):** `migrations/` altındaki 41 dosyanın **40'ı CANLIDA UYGULANDI**
+(P1-P11b, sec3 düzeltici ve P5 migration'ları ana migration'larıyla aynı pencerede; ilk ikisi — telefon CHECK + kayıp nedeni seed — yanlışlıkla `--help` ile uygulanmıştı, bkz. memory
+`feedback-never-probe-apply-migrations`). `check:migrations -- --database` drift/checksum sorunu YOK. `db:rls-audit`: tenant sızıntısı yok; `coupon_redemptions` ve `direct_file_uploads`
+"RLS açık, politika yok" = yalnız service_role erişimi (beklenen). **KALAN:** `20260816000500_commission_earnings_privacy.sql` (P12, kazanç gizliliği RLS, davranış değiştirir, AYRI pencere +
+rol smoke'u + kullanıcı onayı), K4 `is_document` (dalda) ve `supabase/proposed/` taslakları (geo yönetimi, fiyat bütünlüğü 000500, duraklatma/ek koltuk 000800, koltuk satışı 000900, anket modülü,
+büyüme, AI kredi, vitrin ayarları, malik bağlantısı, sahiplik devri): bunlar hiç uygulanmadı → o özellikler hâlâ "etkin değil". Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı (rol oturumu gerekir).
+Aşağıdaki liste TARİHSEL envanterdir (uygulananlar dahil); güncel bekleyenler için `npm run db:migrate -- --dry-run`.
+
+(Eski not) Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
 Sıra: yedek/PITR doğrula → `npm run check:migrations -- --database` → `npm run db:migrate -- --dry-run` → `npm run db:migrate` → `npm run db:rls-audit`.
 
 **Ek (2026-10-05):** `20260821000100` mahalle notları · `20260821000200` yasal kayıt defteri · `20260821000300` evrak linkleri ·
