@@ -34,6 +34,8 @@ import { Bento, Bx, QueueList, type QueueItem } from "@/components/ui/console/be
 import { Ring } from "@/components/ui/console/ring";
 import { BillingHome } from "./_dashboards/billing-home";
 import { SupportHome } from "./_dashboards/support-home";
+import { GeoHealthCard } from "./geo/health-card";
+import { platformCanAccess } from "@/lib/platform-access";
 import { GlassSkeleton, KpiGridSkeleton, adminEyebrow, adminGreeting, firstNameOf } from "./_dashboards/shared";
 import { auditActionLabel, moneyTRY, relativeTimeTR } from "@/lib/admin-format";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
@@ -566,6 +568,12 @@ export default async function AdminHomePage({
       <Suspense fallback={<DetailsSkeleton />}>
         <Details period={period} />
       </Suspense>
+
+      {platformCanAccess(staff.role, "geo") ? (
+        <Suspense fallback={<GlassSkeleton />}>
+          <GeoHealthCard />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

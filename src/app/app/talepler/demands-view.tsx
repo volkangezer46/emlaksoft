@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AlarmClock, Crosshair, Flame, Plus, Search, Sparkles, Target } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getProvince } from "@/lib/geo/reader";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import {
@@ -274,7 +275,7 @@ export async function DemandsView({
     scopeHead().in("status", OPEN_STATUSES).eq("urgency", "high"),
     scopeHead().in("status", OPEN_STATUSES).lte("created_at", daysAgoIso(AGING_DAYS)),
     buildBase(`created_at${scopeEmbed}`, undefined, false).gte("created_at", daysAgoIso(56)).limit(SERIES_SCAN_LIMIT),
-    ilF ? supabase.from("geo_provinces").select("name").eq("id", ilF).maybeSingle() : Promise.resolve({ data: null }),
+    ilF ? getProvince(ilF).then((p) => ({ data: p ? { name: p.name } : null })) : Promise.resolve({ data: null }),
   ]);
 
   const advisors = (advisorsRes.data ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "") }));

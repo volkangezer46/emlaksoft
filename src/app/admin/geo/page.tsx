@@ -1,6 +1,8 @@
 import { MapPin, Search } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { attachUsage, listAdminRows } from "@/lib/geo/admin-store";
+import { NewEntityForm } from "./new-entity-form";
 import { GeoSyncAutoRefresh } from "./geo-sync-auto-refresh";
 import { ProvinceRow, type ProvinceRowData } from "./province-row";
 
@@ -9,22 +11,18 @@ export default async function AdminGeoPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requirePlatformModule("geo");
+  const staff = await requirePlatformModule("geo");
+  const canWrite = staff.role === "super_admin";
   const { q } = await searchParams;
   const query = (q ?? "").trim();
 
   const admin = createAdminClient();
-  let provinceQuery = admin
-    .from("geo_provinces")
-    .select("id, plate_code, name, lat, lng, is_active, population")
-    .order("plate_code", { ascending: true });
-  if (query) provinceQuery = provinceQuery.ilike("name", `%${query}%`);
-
-  const [{ data: provinces }, { data: stats }, syncResult] = await Promise.all([
-    provinceQuery,
+  const [{ rows: provinceList }, { data: stats }, syncResult] = await Promise.all([
+    listAdminRows("province", { q: query }),
     admin.from("geo_province_stats").select("province_id, district_count, neighborhood_count"),
     admin.from("geo_province_sync_status").select("*"),
   ]);
+  const provinces = await attachUsage("province", provinceList);
 
   const statMap = new Map((stats ?? []).map((s) => [s.province_id, s]));
   const syncMap = new Map(
@@ -38,14 +36,15 @@ export default async function AdminGeoPage({
   const totalDistricts = (stats ?? []).reduce((sum, s) => sum + (s.district_count ?? 0), 0);
   const totalNeighborhoods = (stats ?? []).reduce((sum, s) => sum + (s.neighborhood_count ?? 0), 0);
 
-  const rows: ProvinceRowData[] = (provinces ?? []).map((p) => ({
+  const rows: ProvinceRowData[] = provinces.map((p) => ({
     id: p.id,
-    plate_code: p.plate_code,
+    plate_code: p.plateCode ?? 0,
     name: p.name,
     lat: p.lat,
     lng: p.lng,
-    is_active: p.is_active,
+    is_active: p.isActive,
     population: p.population,
+    usage: p.usage,
     districtCount: statMap.get(p.id)?.district_count ?? 0,
     neighborhoodCount: statMap.get(p.id)?.neighborhood_count ?? 0,
     sync: syncMap.get(p.id) ?? null,
@@ -98,6 +97,7 @@ export default async function AdminGeoPage({
           </form>
           <p className="text-xs text-text-muted">Kaynakta bulunmayan mevcut kayıtlar silinmez; pasif kayıtlar otomatik açılmaz.</p>
         </div>
+        {canWrite ? <NewEntityForm level="province" /> : null}
         {syncResult.error ? (
           <div className="border-b border-amber-300/40 bg-amber-500/[0.06] px-5 py-3 text-xs font-medium text-amber-800">
             İl bazlı tarama altyapısı bu ortamda henüz etkin değil. Mevcut coğrafya kayıtları görüntülenmeye devam eder.

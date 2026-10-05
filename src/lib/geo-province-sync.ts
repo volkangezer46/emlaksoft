@@ -6,6 +6,7 @@ import {
   fetchGeoProvinceSnapshot,
   GeoProviderContractError,
 } from "@/lib/geo-provider";
+import { getProvince } from "@/lib/geo/reader";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type ClaimedGeoSyncJob = {
@@ -129,18 +130,11 @@ export async function runGeoProvinceSyncWorker(): Promise<GeoProvinceSyncWorkerS
   const job = parseClaim(rawClaim);
   if (!job) throw new Error("geo sync claim returned an invalid lease");
 
-  const { data: province, error: provinceError } = await admin
-    .from("geo_provinces")
-    .select("plate_code")
-    .eq("id", job.provinceId)
-    .maybeSingle();
-  const plateCode = Number(province?.plate_code);
-  if (provinceError || !Number.isInteger(plateCode) || plateCode < 1 || plateCode > 81) {
-    const outcome = await failClaimedJob(
-      job,
-      "province_lookup_failed",
-      retryableDatabaseCode(provinceError?.code),
-    );
+  // Plaka kodu değişmez; il kaydı TEK MERKEZDEN (src/lib/geo) okunur.
+  const province = await getProvince(job.provinceId);
+  const plateCode = Number(province?.plateCode);
+  if (!Number.isInteger(plateCode) || plateCode < 1 || plateCode > 81) {
+    const outcome = await failClaimedJob(job, "province_lookup_failed", false);
     return {
       claimed: 1,
       provinceId: job.provinceId,

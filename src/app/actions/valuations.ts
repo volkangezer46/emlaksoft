@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { estimateMultiSourceValue } from "@/lib/valuation";
 import { comparablesSourceEntry, listComparableDetails } from "@/lib/comparables";
 import { getBaseUrl } from "@/lib/base-url";
+import { getDistrict, getProvinceName } from "@/lib/geo/reader";
 
 export type ValuationResult = { error?: string; ok?: boolean; id?: string };
 export type ValuationShareResult = { error?: string; ok?: boolean; url?: string };
@@ -111,19 +112,13 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
 
   // Form ilce/il secildiyse adlarini tek sorguda coz.
   if (formDistrictId) {
-    const { data: d } = await supabase
-      .from("geo_districts")
-      .select("name, province:geo_provinces(name)")
-      .eq("id", formDistrictId)
-      .maybeSingle();
+    const d = await getDistrict(formDistrictId);
     if (d) {
       districtHint = d.name;
-      const rel = d.province as { name?: string } | { name?: string }[] | null;
-      provinceName = (Array.isArray(rel) ? rel[0]?.name : rel?.name) ?? null;
+      provinceName = await getProvinceName(d.provinceId);
     }
   } else if (formProvinceId) {
-    const { data: pr } = await supabase.from("geo_provinces").select("name").eq("id", formProvinceId).maybeSingle();
-    provinceName = pr?.name ?? null;
+    provinceName = await getProvinceName(formProvinceId);
   }
 
   if (propertyId) {

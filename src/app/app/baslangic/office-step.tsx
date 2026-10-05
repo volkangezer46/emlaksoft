@@ -6,13 +6,16 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { GeoSelect } from "@/components/app/geo-select";
+import type { GeoOption } from "@/lib/geo/types";
 import { saveOfficeProfile } from "@/app/actions/onboarding-setup";
 import { uploadTenantLogo } from "@/app/actions/tenant-logo";
 
 type Props = {
   canEdit: boolean;
   nextHref: string;
-  initial: { name: string; phone: string; city: string; addressLine: string; licenseNo: string; logoUrl: string | null };
+  initial: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; logoUrl: string | null };
+  provinces: GeoOption[];
 };
 
 const inputCls =
@@ -31,7 +34,7 @@ function Field({ label, htmlFor, children, hint }: { label: string; htmlFor: str
 }
 
 /** Adım 1: ofis bilgileri. Yalnız mevcut tenants alanları; logo varsa mevcut yükleme action'ı. */
-export function OfficeStep({ canEdit, nextHref, initial }: Props) {
+export function OfficeStep({ canEdit, nextHref, initial, provinces }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
@@ -70,10 +73,10 @@ export function OfficeStep({ canEdit, nextHref, initial }: Props) {
       <Field label="Ruhsat no" htmlFor="kur-license">
         <input id="kur-license" name="license_no" defaultValue={initial.licenseNo} className={inputCls} />
       </Field>
-      <Field label="İl" htmlFor="kur-city">
-        <input id="kur-city" name="city" defaultValue={initial.city} placeholder="İstanbul" className={inputCls} autoComplete="address-level1" />
-      </Field>
-      <Field label="İlçe ve adres" htmlFor="kur-address">
+      <div className="sm:col-span-2">
+        <GeoSelect provinces={provinces} defaultProvinceId={initial.provinceId} defaultDistrictId={initial.districtId} withNeighborhood={false} />
+      </div>
+      <Field label="Açık adres" htmlFor="kur-address">
         <input id="kur-address" name="address_line" defaultValue={initial.addressLine} placeholder="Kadıköy, Bağdat Cad. No:42" className={inputCls} />
       </Field>
       <div className="sm:col-span-2">

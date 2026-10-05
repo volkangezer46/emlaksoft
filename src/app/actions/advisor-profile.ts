@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now, trDayKey } from "@/lib/clock";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { getDistrict, getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/lib/geo/reader";
 import {
   diffByKey,
   isUuid,
@@ -157,19 +158,16 @@ async function checkRegionGeo(supabase: Supabase, rows: RegionRow[]): Promise<st
   const hoodIds = [...new Set(rows.map((r) => r.neighborhood_id).filter((x): x is string => !!x))];
   const provinceIds = [...new Set(rows.map((r) => r.province_id))];
   if (provinceIds.length) {
-    const { data } = await supabase.from("geo_provinces").select("id").in("id", provinceIds);
-    if ((data ?? []).length !== provinceIds.length) return "Seçilen il bulunamadı.";
+    if ((await getProvincesByIds(provinceIds)).length !== provinceIds.length) return "Seçilen il bulunamadı.";
   }
   const districtProvince = new Map<string, string>();
   if (districtIds.length) {
-    const { data } = await supabase.from("geo_districts").select("id, province_id").in("id", districtIds);
-    for (const d of (data ?? []) as { id: string; province_id: string }[]) districtProvince.set(d.id, d.province_id);
+    for (const d of await getDistrictsByIds(districtIds)) districtProvince.set(d.id, d.provinceId);
     if (districtProvince.size !== districtIds.length) return "Seçilen ilçe bulunamadı.";
   }
   const hoodDistrict = new Map<string, string>();
   if (hoodIds.length) {
-    const { data } = await supabase.from("geo_neighborhoods").select("id, district_id").in("id", hoodIds);
-    for (const h of (data ?? []) as { id: string; district_id: string }[]) hoodDistrict.set(h.id, h.district_id);
+    for (const h of await getNeighborhoodsByIds(hoodIds)) hoodDistrict.set(h.id, h.districtId);
     if (hoodDistrict.size !== hoodIds.length) return "Seçilen mahalle bulunamadı.";
   }
   for (const r of rows) {
@@ -263,8 +261,8 @@ async function writePrivate(supabase: Supabase, ctx: Ctx, profileId: string, fd:
   if ((provinceId && !isUuid(provinceId)) || (districtId && !isUuid(districtId))) return { error: "İl veya ilçe geçersiz." };
   if (districtId && !provinceId) return { error: "İlçe için önce il seçilmeli." };
   if (districtId && provinceId) {
-    const { data } = await supabase.from("geo_districts").select("province_id").eq("id", districtId).maybeSingle();
-    if (!data || data.province_id !== provinceId) return { error: "İlçe, seçilen ile ait değil." };
+    const d = await getDistrict(districtId);
+    if (!d || d.provinceId !== provinceId) return { error: "İlçe, seçilen ile ait değil." };
   }
 
   const phoneRaw = String(fd.get("emergency_phone") ?? "").trim();

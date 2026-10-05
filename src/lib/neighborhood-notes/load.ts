@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NoteRow, NoteTag } from "./notes";
+import { getDistrictsByIds, getNeighborhoodsByIds } from "@/lib/geo/reader";
 
 /**
  * Mahalle notu okuyucuları — oturumlu istemci (RLS: yalnız kendi kiracısı). Tablo yoksa `enabled: false`
@@ -46,13 +47,11 @@ export async function neighborhoodLabels(supabase: SupabaseClient, ids: string[]
   const out = new Map<string, string>();
   const unique = [...new Set(ids)];
   if (unique.length === 0) return out;
-  const { data: hoods } = await supabase.from("geo_neighborhoods").select("id, name, district_id").in("id", unique);
-  const rows = (hoods ?? []) as { id: string; name: string; district_id: string | null }[];
+  const rows = (await getNeighborhoodsByIds(unique)).map((h) => ({ id: h.id, name: h.name, district_id: h.districtId as string | null }));
   const districtIds = [...new Set(rows.map((h) => h.district_id).filter((v): v is string => Boolean(v)))];
   const districts = new Map<string, string>();
   if (districtIds.length > 0) {
-    const { data } = await supabase.from("geo_districts").select("id, name").in("id", districtIds);
-    for (const d of (data ?? []) as { id: string; name: string }[]) districts.set(d.id, d.name);
+    for (const d of await getDistrictsByIds(districtIds)) districts.set(d.id, d.name);
   }
   for (const h of rows) {
     const d = h.district_id ? districts.get(h.district_id) : null;

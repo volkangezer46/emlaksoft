@@ -36,6 +36,7 @@ import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 import { normalizeExternalHref } from "@/lib/external-href";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
@@ -178,7 +179,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       .eq("property_id", id)
       .order("is_cover", { ascending: false })
       .order("sort_order", { ascending: true }),
-    admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
+    provinceOptionsResult(),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;

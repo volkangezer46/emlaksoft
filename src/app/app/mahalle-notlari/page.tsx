@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/app/empty-state";
 import { NeighborhoodNoteForm } from "./note-form";
 import { DeleteNoteButton } from "./delete-note-button";
+import { getParentsOf, provinceOptionsResult } from "@/lib/geo/reader";
 
 export const metadata = { title: "Mahalle notları" };
 
@@ -45,7 +46,7 @@ export default async function NeighborhoodNotesPage({
   const [load, scope, provincesRes] = await Promise.all([
     listNeighborhoodNotes(supabase, { neighborhoodId: mahalleF ?? undefined, tag: tagF, limit: LIMIT }),
     listNeighborhoodNotes(supabase, { neighborhoodId: mahalleF ?? undefined, limit: LIMIT }),
-    supabase.from("geo_provinces").select("id, name").order("name"),
+    provinceOptionsResult(),
   ]);
   const provinces = (provincesRes.data ?? []) as { id: string; name: string }[];
 
@@ -70,12 +71,8 @@ export default async function NeighborhoodNotesPage({
   // Seçili mahalle varsa formu o mahalleyle açmak için il/ilçe zincirini çöz.
   let defaults: { province: string | null; district: string | null } = { province: null, district: null };
   if (mahalleF) {
-    const { data: hood } = await supabase.from("geo_neighborhoods").select("district_id").eq("id", mahalleF).maybeSingle();
-    const districtId = (hood as { district_id: string | null } | null)?.district_id ?? null;
-    if (districtId) {
-      const { data: dist } = await supabase.from("geo_districts").select("province_id").eq("id", districtId).maybeSingle();
-      defaults = { province: (dist as { province_id: string | null } | null)?.province_id ?? null, district: districtId };
-    }
+    const parents = await getParentsOf({ neighborhood_id: mahalleF });
+    if (parents.districtId) defaults = { province: parents.provinceId, district: parents.districtId };
   }
 
   const groups = new Map<string, typeof notes>();

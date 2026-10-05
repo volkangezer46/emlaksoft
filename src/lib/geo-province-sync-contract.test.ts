@@ -58,12 +58,11 @@ describe("province-scoped geo synchronization contract", () => {
 
   it("validates the platform module and re-reads the selected province", () => {
     expect(action).not.toContain("requirePlatformStaff");
-    expect(action.match(/requirePlatformModule\("geo"\)/g)?.length).toBeGreaterThanOrEqual(8);
+    expect(action.match(/requirePlatformModule\("geo"\)/g)?.length).toBeGreaterThanOrEqual(5); // yazan action'lar writer() kapısından geçer
     expect(action).toContain("UUID_PATTERN.test(provinceId)");
-    expect(action).toContain('.from("geo_provinces")');
-    expect(action).toContain('.eq("id", provinceId)');
+    expect(action).toContain('getAdminRow("province", provinceId)');
     expect(action).toContain("enqueue_geo_province_sync");
-    expect(action).toContain("province.plate_code === 46 ? 1_000 : 100");
+    expect(action).toContain("province.plateCode === 46 ? 1_000 : 100");
     expect(action).not.toContain("fetchGeoProvinceSnapshot");
   });
 
@@ -79,7 +78,7 @@ describe("province-scoped geo synchronization contract", () => {
 
   it("claims, resolves and applies through the queue RPC boundary", () => {
     expect(worker).toContain('admin.rpc("claim_geo_sync_job"');
-    expect(worker).toContain('.from("geo_provinces")');
+    expect(worker).toContain('getProvince(job.provinceId)');
     expect(worker).toContain("fetchGeoProvinceSnapshot(plateCode)");
     expect(worker).toContain('admin.rpc("apply_geo_province_sync"');
     expect(worker).toContain('admin.rpc("fail_geo_sync_job"');

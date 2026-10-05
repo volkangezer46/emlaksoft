@@ -14,6 +14,7 @@ import { isPoolEnabled, loadPoolCandidates, loadPoolRule, toPoolProperty } from 
 import { formatTry } from "@/lib/utils";
 import { PoolEntryPanel, type PanelSuggestion } from "./pool-entry-panel";
 import { PoolSettingsForm } from "./pool-settings-form";
+import { getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/lib/geo/reader";
 
 export const metadata = { title: "İlan havuzu" };
 
@@ -138,9 +139,9 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
 
   const geoIds = (key: string) => [...new Set([...props.values()].map((p) => s(p[key])).filter(Boolean))];
   const [nbRes, dsRes, pvRes, evRes, candidateBundle] = await Promise.all([
-    geoIds("neighborhood_id").length ? supabase.from("geo_neighborhoods").select("id, name").in("id", geoIds("neighborhood_id")) : Promise.resolve({ data: [] as Row[] }),
-    geoIds("district_id").length ? supabase.from("geo_districts").select("id, name").in("id", geoIds("district_id")) : Promise.resolve({ data: [] as Row[] }),
-    geoIds("province_id").length ? supabase.from("geo_provinces").select("id, name").in("id", geoIds("province_id")) : Promise.resolve({ data: [] as Row[] }),
+    getNeighborhoodsByIds(geoIds("neighborhood_id")).then((data) => ({ data: data as unknown as Row[] })),
+    getDistrictsByIds(geoIds("district_id")).then((data) => ({ data: data as unknown as Row[] })),
+    getProvincesByIds(geoIds("province_id")).then((data) => ({ data: data as unknown as Row[] })),
     entryIds.length
       ? supabase
           .from("listing_pool_events")

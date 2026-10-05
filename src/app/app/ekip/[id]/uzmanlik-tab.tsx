@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { MapPinned, Sparkles } from "lucide-react";
 import type { createClient } from "@/lib/supabase/server";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
-import { getProvincesCached } from "@/lib/geo";
+import { getProvinceOptions } from "@/lib/geo/reader";
 import { loadRegions, loadSpecialties, loadSpecialtyOptions } from "@/lib/advisor/advisor-store";
 import { SPECIALTY_LEVELS, type RegionView, type SpecialtyView } from "@/lib/advisor/advisor-profile";
 import { RegionsEditor, SpecialtiesEditor } from "./profil-editors";
@@ -87,7 +87,7 @@ export async function SpecialtyTab({
     loadSpecialties(supabase, tenantId, memberId),
     loadRegions(supabase, tenantId, memberId),
     canManage ? loadSpecialtyOptions() : Promise.resolve({ propertyTypes: [], segments: [] }),
-    canManage ? getProvincesCached() : Promise.resolve([]),
+    canManage ? getProvinceOptions() : Promise.resolve([]),
   ]);
 
   if (!specs.available || !regions.available) {

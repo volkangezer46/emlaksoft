@@ -16,7 +16,8 @@ import {
   parseDemandValues,
   type DemandCriteria,
 } from "@/lib/demand-criteria";
-import { pruneRequiredKeys, validateGeoChain } from "@/lib/demand-geo";
+import { pruneRequiredKeys } from "@/lib/demand-geo";
+import { validateGeoChain } from "@/lib/geo/reader";
 import { findSimilarOpenDemands } from "@/lib/duplicate-finders";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
@@ -48,7 +49,7 @@ export async function createDemand(
 
   const supabase = await createClient();
 
-  const geoError = await validateGeoChain(supabase, {
+  const geoError = await validateGeoChain({
     province_id: columns.province_id,
     district_id: columns.district_id,
     neighborhood_id: columns.neighborhood_id,
@@ -204,7 +205,7 @@ export async function updateDemand(
     geo.district_id !== existing.district_id ||
     geo.neighborhood_id !== existing.neighborhood_id;
   if (geoChanged) {
-    const geoError = await validateGeoChain(supabase, geo);
+    const geoError = await validateGeoChain(geo);
     if (geoError) return { error: geoError };
   }
 

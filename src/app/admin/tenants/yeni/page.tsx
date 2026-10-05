@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { requirePlatformModule } from "@/lib/platform";
-import { createClient } from "@/lib/supabase/server";
 import { OfficeForm } from "./office-form";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 
 export const metadata = { title: "Yeni ofis" };
 
@@ -14,9 +14,8 @@ export default async function YeniOfisPage() {
   const staff = await requirePlatformModule("tenants");
   if (!officeAdminCan(staff.role, "create")) redirect("/admin/tenants");
 
-  // İl listesi herkese açık referans verisidir (RLS'li istemci yeterli; service_role gerekmez).
-  const supabase = await createClient();
-  const { data: provinces } = await supabase.from("geo_provinces").select("id, name").order("name", { ascending: true });
+  // İl listesi coğrafya merkezinden gelir (aktif iller).
+  const { data: provinces } = await provinceOptionsResult();
 
   return (
     <OfficeForm

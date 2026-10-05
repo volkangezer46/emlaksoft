@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { isMissingTableError, isUuid, validateNoteInput } from "@/lib/neighborhood-notes/notes";
+import { getNeighborhood } from "@/lib/geo/reader";
 
 /**
  * Mahalle notu (F5) yazma eylemleri. Notlar ofis içidir: kiracı kimliği oturumdan gelir, RLS ikinci kapıdır.
@@ -25,11 +26,7 @@ export async function createNeighborhoodNote(input: {
 
   const supabase = await createClient();
   // Mahalle gerçekten var mı (geo_* herkese açık okunur)?
-  const { data: hood } = await supabase
-    .from("geo_neighborhoods")
-    .select("id")
-    .eq("id", parsed.value.neighborhoodId)
-    .maybeSingle();
+  const hood = await getNeighborhood(parsed.value.neighborhoodId);
   if (!hood) return { ok: false, error: "Seçilen mahalle bulunamadı." };
 
   const { error } = await supabase.from("neighborhood_notes").insert({

@@ -18,6 +18,7 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 import { toTelHref } from "@/lib/phone";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 
@@ -123,7 +124,7 @@ export default async function VitrinPage({
       .select("id, name, status, brand_color, logo_url, phone, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
-    admin.from("geo_provinces").select("id, name").eq("is_active", true).order("name"),
+    provinceOptionsResult(),
   ]);
 
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();

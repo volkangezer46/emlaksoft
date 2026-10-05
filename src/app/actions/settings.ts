@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { MATCHING_WEIGHT_KEYS, type MatchingWeights } from "@/lib/matching";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { resolveOfficeGeo } from "@/lib/geo/resolve";
 
 export type SettingsResult = { error?: string; ok?: boolean };
 
@@ -78,13 +79,20 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
   const iban        = String(formData.get("iban")         ?? "").trim().replace(/\s/g, "");
   const phone       = String(formData.get("phone")        ?? "").trim();
   const addressLine = String(formData.get("address_line") ?? "").trim();
-  const city        = String(formData.get("city")         ?? "").trim();
+  const provinceId  = String(formData.get("province_id")  ?? "").trim();
+  const districtId  = String(formData.get("district_id")  ?? "").trim();
+  const legacyCity  = String(formData.get("city")         ?? "").trim();
   const website     = String(formData.get("website")      ?? "").trim();
 
   if (!name) return { error: "Ofis adı zorunlu." };
 
   const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
+
+  // İl/ilçe: kimlikler TEK MERKEZDE doğrulanır; kimlik + gösterim adı birlikte saklanır.
+  // Eski istemciler serbest metin "city" gönderirse coğrafya servisiyle çözülür (çözülemezse reddedilir).
+  const geo = await resolveOfficeGeo({ provinceId, districtId, legacyCity });
+  if ("error" in geo) return { error: geo.error };
 
   // IBAN format kontrolü — TR ile başlayan 26 karakter (opsiyonel)
   if (iban && !/^TR\d{24}$/i.test(iban)) {
@@ -102,7 +110,8 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
       iban:         iban        || null,
       phone:        parsedPhone?.stored || null,
       address_line: addressLine || null,
-      city:         city        || null,
+      // İl seçilmediyse mevcut şehir/il/ilçe değerine dokunulmaz.
+      ...(geo.provinceId ? { city: geo.provinceName, province_id: geo.provinceId, district_id: geo.districtId } : {}),
       website:      website     || null,
       updated_at: new Date().toISOString(),
     })

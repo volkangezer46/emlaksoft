@@ -31,6 +31,7 @@ import type { CSSProperties } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { provinceOptionsResult } from "@/lib/geo/reader";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
 import { loadSeatUsageSummary } from "@/lib/billing/seat-purchase";
@@ -123,7 +124,7 @@ export default async function TeamPage() {
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches!profiles_branch_id_fkey(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult(),
     // Danışman başına müşteri sayısı — aggregate (10.000 satır yerine ~N satır)
     tenantId
       ? supabase.rpc("customer_counts_by_advisor", { p_tenant_id: tenantId })

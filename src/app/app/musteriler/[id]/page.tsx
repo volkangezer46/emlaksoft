@@ -45,6 +45,7 @@ import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 import { CustomerIntelCard } from "./customer-intel-card";
 import { OwnedPropertiesCard } from "./owned-properties-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
+import { provinceOptionsResult } from "@/lib/geo/reader";
 import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
@@ -166,7 +167,7 @@ export default async function CustomerDetailPage({
       .eq("customer_id", id)
       .order("scheduled_at", { ascending: false })
       .limit(50),
-    supabase.from("geo_provinces").select("id, name").order("name", { ascending: true }),
+    provinceOptionsResult({ includeInactive: true }),
     supabase
       .from("deals")
       .select("id, stage, deal_type, deal_value, updated_at")

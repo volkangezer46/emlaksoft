@@ -7,7 +7,7 @@ import { getExtraSeats } from "@/lib/billing/seat-purchase";
 import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import type { AppRole } from "@/lib/permissions";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
-import { getProvincesCached } from "@/lib/geo";
+import { getProvinceOptions } from "@/lib/geo/reader";
 import {
   loadSpecialtyOptions,
   probeAdvisorPrivateSchema,
@@ -89,7 +89,7 @@ async function loadExtras(supabase: Awaited<ReturnType<typeof createClient>>, ro
     return { ...empty, notice: "Kimlik, belge, uzmanlık ve bölge alanları bu ortamda henüz etkin değil." };
   }
   const [provinces, options] = await Promise.all([
-    priv || specialty ? getProvincesCached() : Promise.resolve([]),
+    priv || specialty ? getProvinceOptions() : Promise.resolve([]),
     specialty ? loadSpecialtyOptions() : Promise.resolve(empty.options),
   ]);
   return { private: priv, work, specialty, piiEnabled: piiEnabled(), provinces, options, notice: null };

@@ -15,6 +15,7 @@ import {
   type WizardStepKey,
 } from "@/lib/onboarding-checklist";
 import { OfficeStep } from "./office-step";
+import type { GeoOption } from "@/lib/geo/types";
 import { TeamStep } from "./team-step";
 import { QuickLossReason } from "./defs-step";
 import { SkipButton } from "./skip-button";
@@ -31,12 +32,13 @@ export type SetupWizardProps = {
   /** Bos ofis ve tanim girilmemis: "Nasil baslamak istersiniz?" paneli (ofis tipi + demo/bos). */
   showStartChoice: boolean;
   canSeedSample: boolean;
-  office: { name: string; phone: string; city: string; addressLine: string; licenseNo: string; logoUrl: string | null };
+  office: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; logoUrl: string | null };
   lossReasons: { value: string; label: string }[];
   stageLabels: { key: string; label: string }[];
   customers: number;
   properties: number;
   vitrinHref: string | null;
+  provinces: GeoOption[];
 };
 
 const href = (k: WizardStepKey) => `/app/baslangic?adim=${k}`;
@@ -146,7 +148,7 @@ export function SetupWizard(props: SetupWizardProps) {
 function StepBody(props: SetupWizardProps & { id: OnboardingStepId; done: boolean; nextHref: string }) {
   switch (props.id) {
     case "office":
-      return <OfficeStep canEdit={props.canEditSettings} nextHref={props.nextHref} initial={props.office} />;
+      return <OfficeStep canEdit={props.canEditSettings} nextHref={props.nextHref} initial={props.office} provinces={props.provinces} />;
     case "team":
       return <TeamStep canInvite={props.canInvite} nextHref={props.nextHref} />;
     case "data":

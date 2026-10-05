@@ -4,7 +4,7 @@ import { BadgeCheck, FileWarning, ShieldCheck } from "lucide-react";
 import type { createClient } from "@/lib/supabase/server";
 import { Alert } from "@/components/ui/alert";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
-import { getProvincesCached } from "@/lib/geo";
+import { getProvinceOptions } from "@/lib/geo/reader";
 import { piiEnabled } from "@/lib/advisor/pii-crypto";
 import { loadPrivateSummary } from "@/lib/advisor/advisor-store";
 import {
@@ -128,7 +128,7 @@ export async function ProfileTab({
 
   const [priv, provinces] = await Promise.all([
     canSeePrivate ? loadPrivateSummary(supabase, tenantId, memberId) : Promise.resolve(null),
-    canSeePrivate ? getProvincesCached() : Promise.resolve([]),
+    canSeePrivate ? getProvinceOptions() : Promise.resolve([]),
   ]);
 
   if (!workAvailable && !(priv?.available ?? false)) {

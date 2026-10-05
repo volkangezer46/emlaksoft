@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, now } from "@/lib/clock";
+import { resolveGeo } from "@/lib/geo/resolve";
 
 /**
  * Örnek (demo) ofis veri seti — TEK kaynak. İki çağıranı vardır:
@@ -86,20 +87,20 @@ export async function insertSampleRecords(
     maltepe: null,
     besiktas: null,
   };
-  const { data: prov } = await db
-    .from("geo_provinces").select("id").eq("name", "İstanbul").maybeSingle();
-  if (prov) {
-    istanbulId = prov.id;
-    const { data: districts } = await db
-      .from("geo_districts")
-      .select("id, name")
-      .eq("province_id", prov.id)
-      .in("name", ["Kadıköy", "Maltepe", "Beşiktaş"]);
-    for (const d of districts ?? []) {
-      if (d.name === "Kadıköy") geo.kadikoy = d.id;
-      else if (d.name === "Maltepe") geo.maltepe = d.id;
-      else if (d.name === "Beşiktaş") geo.besiktas = d.id;
-    }
+  const [kadikoy, maltepe, besiktas] = await Promise.all(
+    ["Kadıköy", "Maltepe", "Beşiktaş"].map((district) => resolveGeo({ province: "İstanbul", district })),
+  );
+  if (kadikoy.status === "ok") {
+    istanbulId = kadikoy.geo.provinceId;
+    geo.kadikoy = kadikoy.geo.districtId;
+  }
+  if (maltepe.status === "ok") {
+    istanbulId = istanbulId ?? maltepe.geo.provinceId;
+    geo.maltepe = maltepe.geo.districtId;
+  }
+  if (besiktas.status === "ok") {
+    istanbulId = istanbulId ?? besiktas.geo.provinceId;
+    geo.besiktas = besiktas.geo.districtId;
   }
 
   // ---- 12 müşteri (tip/etiket/sıcaklık/kaynak çeşitli; telefonlar kurgusal 0532 000 xx xx) ----

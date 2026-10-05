@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computePriceHealth, type PriceHealth } from "@/lib/price-health";
+import { getDistrictName } from "@/lib/geo/reader";
 
 /**
  * Yerli emsal (comparable) değerleme motoru — DIŞ API'YE SIFIR BAĞIMLILIK.
@@ -211,7 +212,7 @@ export async function listComparableDetails(
   const [{ data: props }, { data: district }] = await Promise.all([
     supabase.from("properties").select("id, property_code").in("id", ids),
     input.districtId
-      ? supabase.from("geo_districts").select("name").eq("id", input.districtId).maybeSingle()
+      ? getDistrictName(input.districtId).then((name) => ({ data: name ? { name } : null }))
       : Promise.resolve({ data: null }),
   ]);
 
