@@ -24,7 +24,7 @@ import { EmailInput } from "@/components/ui/email-input";
 import { formatNumberTr } from "@/lib/format";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
-import { registrationQuote, registrationSelection } from "@/lib/billing/seat-calculator-model";
+import { registrationQuote, registrationSelection, seatBounds } from "@/lib/billing/seat-calculator-model";
 
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
 
@@ -35,8 +35,6 @@ const STEPS = [
   { no: 2, label: "Ofisiniz", icon: Building2 },
   { no: 3, label: "Güvenlik", icon: Lock },
 ];
-
-const MAX_SEATS_INPUT = 999;
 
 /**
  * Sunucu hatasını ilgili adıma eşler — kullanıcı 3. adımda gönderir ama hata
@@ -74,6 +72,8 @@ export function RegisterForm({
   offers?: Record<string, { monthlyTry: number }>;
   attribution?: SignupAttributionFields;
 }) {
+  // Tek hesapta satılabilecek en yüksek kullanıcı sayısı katalogdan gelir (sabit yok).
+  const MAX_SEATS_INPUT = seatBounds(plans).inputMax;
   const [state, action, pending] = useActionState(signUp, initial);
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -97,8 +97,8 @@ export function RegisterForm({
   const quote = registrationQuote(plans, offers, selectedPlanId, seats, initialCycle);
   // Fiyat yalnız sunucudan gelen etkin teklifle gösterilir (sabit tutar yok); özel fiyatlı/kapasite aşan pakette tutar yok.
   const planPriceText =
-    selectedPlan.customPricing || selection.calc.status === "contact"
-      ? " · ekibinize özel teklif"
+    selection.calc.status === "over_max"
+      ? ""
       : quote
         ? ` · ${formatNumberTr(seats)} kullanıcı · ${formatNumberTr(quote.totalForCycleTry)} ₺ ${initialCycle === "yearly" ? "/yıl" : "/ay"} + KDV`
         : "";
@@ -270,12 +270,12 @@ export function RegisterForm({
                 <span className="text-sm text-text-muted">kullanıcı</span>
               </div>
               <p className="mt-3 min-h-10 rounded-[var(--radius-card)] bg-brand-600/[0.06] px-3.5 py-2.5 text-sm text-ink-950" aria-live="polite">
-                {selection.calc.status === "contact" ? (
-                  <>Bu ekip büyüklüğü için size özel teklif hazırlarız; hesabınızı yine de oluşturabilirsiniz.</>
+                {selection.calc.status === "over_max" ? (
+                  <>{selection.calc.limitNote}</>
                 ) : (
                   <>
                     Önerilen paket: <strong>{selectedPlan.name}</strong>
-                    {quote && !selectedPlan.customPricing
+                    {quote
                       ? ` · aylık ödemede ${formatNumberTr(quote.totalMonthlyTry)} ₺ / ay + KDV`
                       : ""}
                   </>

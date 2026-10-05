@@ -171,8 +171,9 @@ için sorgu parametreleri ve yanıt şemaları (adaptör yalnız `get(path, quer
 - Yanıtlar Türkçe. Popup yok, sekme/panel. Kararları sormadan ver (sert güvenlik hariç: zorunlu 2FA/TOTP vb. onaysız eklenmez;
   `PLATFORM_MFA_ENFORCEMENT=on` yayın öncesi açılacak, şu an kapalı). Özet panelinde maskeleme yok.
 - Fiyat kataloğu (kullanıcı onaylı): Danışman 749 · Ofis 2.490 (ek kullanıcı 399) · Profesyonel 4.990 (15 kullanıcı, ek 349) ·
-  Business 8.990 (varsayılan gizli) · Kurumsal özel; yıllık "10 öde 12"; ücretsiz paket YOK; deneme süresi tek kaynak
+  Business 8.990 (varsayılan gizli) · Kurumsal 12.900 (50 kullanıcı dahil, ek 249/199/149 kademeli, en fazla 500; "özel teklif" YOK, `customPricing` alanı kaldırıldı); yıllık "10 öde 12"; ücretsiz paket YOK; deneme süresi tek kaynak
   (`getEffectiveTrialDays`, migration sonrası 30 gün); Founders kampanyası admin düzenlenebilir; ödül/ortak oranları kodda sabit DEĞİL.
+- Aylık kontör hakkı (`efCreditsMonthly`): Danışman 10 · Ofis 40 · Profesyonel 120 · Business 300 · Kurumsal 400 + ek kullanıcı başı 6 (`efCreditsPerExtraSeat`, cron `ef-kontor-hak` `subscriptions.extra_seats` ile ölçekler; sütun yoksa 0). Ek rapor paketi = admin kontör kataloğu (`ef.packs`), ofiste Abonelik > Kontör; ana sayfada `EmlakFiyatiSection`.
 - Demo veri public vitrine/portal/sitemap'e sızmaz; demo danışman hesabı AÇILMAZ (auth.users bağı); tüm demo kayıtlar kurucuya atanır.
 - Onay kuralı muafiyeti owner/gm ile sınırlanmalı (denetim 3, #5); ofis kapatma veri paketi yalnız platformun `completed` yaptığı talepte.
 - Anketör rol değil, atanabilir görevdir. Tetikleyiciler kapalı doğar, geriye dönük anket üretilmez.

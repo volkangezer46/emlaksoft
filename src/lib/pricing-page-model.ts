@@ -1,4 +1,5 @@
 import { DEFAULT_YEARLY_PAID_MONTHS, PLANS, getPlan, planAmountOf, planAmountTry, yearlyDiscountPercentOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/page-gates";
 
 /**
@@ -13,7 +14,7 @@ import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/
  */
 export function yearlyDiscountPercent(plans?: readonly PlanDef[]): number {
   if (plans && plans.length > 0) {
-    const list = plans.filter((p) => !p.customPricing);
+    const list = plans;
     if (list.length > 0) return Math.min(...list.map((p) => yearlyDiscountPercentOf(p)));
   }
   const base = PLANS[0]!;
@@ -27,7 +28,6 @@ export type CompareGroup = { title: string; rows: CompareRow[] };
 
 const tl = new Intl.NumberFormat("tr-TR");
 const fmt = (n: number) => `${tl.format(n)} ₺`;
-const priceCell = (p: PlanDef, text: string) => (p.customPricing ? "Özel teklif" : text);
 const limit = (n: number | null, unit: string) => (n === null ? "Sınırsız" : `${tl.format(n)} ${unit}`.trim());
 
 function numericRow(plans: readonly PlanDef[], label: string, pick: (p: PlanDef) => string): CompareRow {
@@ -38,10 +38,14 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efVal
   const pricing: CompareGroup = {
     title: "Fiyat ve limitler",
     rows: [
-      numericRow(plans, "Aylık fiyat (KDV hariç)", (p) => priceCell(p, fmt(p.monthlyTry))),
-      numericRow(plans, "Yıllık ödemede aylık karşılığı (KDV hariç)", (p) => priceCell(p, fmt(Math.round(planAmountOf(p, "yearly") / 12)))),
-      numericRow(plans, "Yıllık ödemede ödenen ay", (p) => priceCell(p, `${p.yearlyPaidMonths ?? DEFAULT_YEARLY_PAID_MONTHS} / 12`)),
-      numericRow(plans, "Kullanıcı", (p) => `${tl.format(p.limits.seats)}`),
+      numericRow(plans, "Aylık fiyat (KDV hariç)", (p) => fmt(p.monthlyTry)),
+      numericRow(plans, "Yıllık ödemede aylık karşılığı (KDV hariç)", (p) => fmt(Math.round(planAmountOf(p, "yearly") / 12))),
+      numericRow(plans, "Yıllık ödemede ödenen ay", (p) => `${p.yearlyPaidMonths ?? DEFAULT_YEARLY_PAID_MONTHS} / 12`),
+      numericRow(plans, "Dahil kullanıcı", (p) => `${tl.format(p.limits.seats)}`),
+      numericRow(plans, "En fazla kullanıcı (ek kullanıcıyla)", (p) => {
+        const cap = maxTotalSeats(p);
+        return Number.isFinite(cap) ? tl.format(cap) : "Sınırsız";
+      }),
       numericRow(plans, "Şube", (p) => limit(p.limits.branches, "")),
       numericRow(plans, "Müşteri kaydı", (p) => limit(p.limits.customers, "")),
       numericRow(plans, "Aktif portföy", (p) => limit(p.limits.activeProperties, "")),
@@ -65,7 +69,9 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efVal
         const n = p.efCreditsMonthly ?? 0;
         if (n <= 0) return "Yok";
         const m = cost > 0 ? Math.floor(n / cost) : 0;
-        return m > 0 ? `${tl.format(n)} (≈ ${tl.format(m)} değerleme)` : tl.format(n);
+        const base = m > 0 ? `${tl.format(n)} (≈ ${tl.format(m)} değerleme)` : tl.format(n);
+        const per = p.efCreditsPerExtraSeat ?? 0;
+        return per > 0 ? `${base} + ek kullanıcı başına ${tl.format(per)}` : base;
       }),
     );
   }
@@ -105,7 +111,7 @@ export function trialPhrase(trialDays?: number): string {
 export function buildFaq(opts: { trialDays?: number; plans?: readonly PlanDef[] } = {}): FaqItem[] {
   const discount = yearlyDiscountPercent(opts.plans);
   const days = opts.trialDays;
-  const uniform = !opts.plans || new Set(opts.plans.filter((p) => !p.customPricing).map((p) => yearlyDiscountPercentOf(p))).size <= 1;
+  const uniform = !opts.plans || new Set(opts.plans.map((p) => yearlyDiscountPercentOf(p))).size <= 1;
   const lost = lostCommissionPlanName();
   const contractGate = findGate("/app/sozlesmeler");
   const contractPlan = contractGate ? requiredPlanName(contractGate) : getPlan("office").name;

@@ -10,6 +10,8 @@ import { HowItWorks } from "@/components/marketing/how-it-works";
 import { SecurityBand } from "@/components/marketing/security-band";
 import { PricingSection } from "@/components/marketing/pricing-section";
 import { Faq, buildHomeFaqs, faqForJsonLd } from "@/components/marketing/faq";
+import { EmlakFiyatiSection } from "@/components/marketing/emlakfiyati-section";
+import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
 import { Highlights } from "@/components/marketing/highlights";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { getLiveSiteContent } from "@/lib/site-content/store";
@@ -34,6 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HomePage() {
   // Metinler yönetim panelinden (Site içeriği); yayın yoksa bugünkü metin. Okuma sunucuda, etiketli önbellekten (sayfa statik kalır).
   const [pricing, content, efStatus] = await Promise.all([getPublicPricing(), getLiveSiteContent(), getEfValuationStatus()]);
+  const efCatalog = await getEfCatalog();
   const { trialDays, plans } = pricing;
   const faqs = buildHomeFaqs({ trialDays, plans, content: content.faq });
   return (
@@ -52,6 +55,7 @@ export default async function HomePage() {
         <HowItWorks trialDays={trialDays} plans={plans} steps={content.steps} heading={content.sections.nasil} />
         <SecurityBand trialDays={trialDays} plans={plans} content={content.security} heading={content.sections.guvenlik} />
         <PricingSection pricing={pricing} heading={content.sections.fiyat} />
+        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} />
         <Faq items={faqs} heading={content.sections.sss} />
         <FinalCta trialDays={trialDays} plans={plans} content={content.finalCta} />
       </main>

@@ -24,6 +24,22 @@ export function monthlyUnitsOf(efCreditsMonthly: number | null | undefined): num
   return typeof efCreditsMonthly === "number" && Number.isInteger(efCreditsMonthly) && efCreditsMonthly > 0 ? efCreditsMonthly : 0;
 }
 
+/**
+ * Kullanıcı sayısıyla ölçeklenen aylık hak: plan hakkı + (satın alınan ek kullanıcı x ek kullanıcı başına hak).
+ * Plan hakkı 0 ise ek kullanıcı hakkı tek başına verilmez.
+ */
+export function monthlyUnitsWithSeats(
+  efCreditsMonthly: number | null | undefined,
+  efCreditsPerExtraSeat: number | null | undefined,
+  extraSeats: number | null | undefined,
+): number {
+  const base = monthlyUnitsOf(efCreditsMonthly);
+  if (base === 0) return 0;
+  const per = monthlyUnitsOf(efCreditsPerExtraSeat);
+  const extra = typeof extraSeats === "number" && Number.isFinite(extraSeats) ? Math.max(0, Math.floor(extraSeats)) : 0;
+  return base + per * extra;
+}
+
 /** Bir değerlemenin kontör bedeli (= `efUnitsFor("valuation_arsa", tarife)`; config'i istemciye çekmemek için alan doğrudan okunur). */
 export function valuationUnitCost(tariff: Pick<EfTariff, "valuationArsa">): number {
   return tariff.valuationArsa;
@@ -37,13 +53,20 @@ export function approxValuations(units: number, tariff: Pick<EfTariff, "valuatio
 }
 
 /** Public/admin satırı: "Aylık N kontör (yaklaşık M değerleme)"; hak yoksa null (satır gizlenir). */
-export function efCreditsLine(efCreditsMonthly: number | null | undefined, valuationCost: number): string | null {
+export function efCreditsLine(
+  efCreditsMonthly: number | null | undefined,
+  valuationCost: number,
+  efCreditsPerExtraSeat?: number | null,
+): string | null {
   const n = monthlyUnitsOf(efCreditsMonthly);
   if (n === 0) return null;
-  const base = `Aylık ${n.toLocaleString("tr-TR")} kontör`;
-  if (valuationCost <= 0) return base;
-  const m = Math.floor(n / valuationCost);
-  return m > 0 ? `${base} (yaklaşık ${m.toLocaleString("tr-TR")} değerleme)` : base;
+  let base = `Aylık ${n.toLocaleString("tr-TR")} kontör`;
+  if (valuationCost > 0) {
+    const m = Math.floor(n / valuationCost);
+    if (m > 0) base = `${base} (yaklaşık ${m.toLocaleString("tr-TR")} değerleme)`;
+  }
+  const per = monthlyUnitsOf(efCreditsPerExtraSeat);
+  return per > 0 ? `${base} + her ek kullanıcı için ${per.toLocaleString("tr-TR")} kontör` : base;
 }
 
 export type EfGrantCandidate = {
@@ -53,6 +76,8 @@ export type EfGrantCandidate = {
   tenantStatus: string | null;
   /** Ofis "valuation" modülünü kapatmış mı. */
   valuationClosed: boolean;
+  /** Satın alınmış ek kullanıcı sayısı (subscriptions.extra_seats; sütun yoksa/okunamazsa 0). */
+  extraSeats?: number;
 };
 
 export type EfGrantPlanEntry = { tenantId: string; kind: "plan_monthly" | "bonus"; units: number; idempotencyKey: string };
@@ -73,6 +98,8 @@ export function decideGrants(input: {
   candidates: readonly EfGrantCandidate[];
   monthKey: string;
   planMonthly: Readonly<Record<string, number | null | undefined>>;
+  /** Plan başına ek kullanıcı başı aylık hak (yoksa ek kullanıcı hakkı verilmez). */
+  planPerExtraSeat?: Readonly<Record<string, number | null | undefined>>;
   welcomeUnits: number;
   welcomeGranted: ReadonlySet<string>;
   monthlyGranted?: ReadonlySet<string>;
@@ -89,7 +116,7 @@ export function decideGrants(input: {
       out.skipped.push({ tenantId: c.tenantId, reason: "modul_kapali" });
       continue;
     }
-    const units = monthlyUnitsOf(input.planMonthly[c.plan]);
+    const units = monthlyUnitsWithSeats(input.planMonthly[c.plan], input.planPerExtraSeat?.[c.plan], c.extraSeats);
     const monthlyKey = planMonthlyIdempotencyKey(c.tenantId, input.monthKey);
     if (units > 0 && !input.monthlyGranted?.has(monthlyKey)) {
       out.grants.push({ tenantId: c.tenantId, kind: "plan_monthly", units, idempotencyKey: monthlyKey });

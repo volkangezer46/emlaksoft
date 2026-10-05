@@ -16,7 +16,7 @@ export function defaultSiteContent(): SiteContent {
       tail: "yönetin",
       lead: "Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve 27 otomatik görev ofisinizle birlikte çalışır.",
       primary: { label: "{deneme_dene}", href: "/kayit" },
-      secondary: { label: "Görüşme talep edin", href: "/demo" },
+      secondary: { label: "Paketleri ve fiyatları gör", href: "/fiyatlar" },
       checks: [
         { id: "kart", text: "Kredi kartı gerekmez", hidden: false },
         { id: "ozellik", text: "Deneme boyunca tüm özellikler açık", hidden: false },
@@ -96,7 +96,7 @@ export function defaultSiteContent(): SiteContent {
       tail: "",
       text: "{deneme}, kredi kartı gerekmez. Verileriniz size ait; istediğiniz an dışa aktarın.",
       primary: { label: "{deneme_dene}", href: "/kayit" },
-      secondary: { label: "Görüşme talep edin", href: "/demo" },
+      secondary: { label: "Paketleri ve fiyatları gör", href: "/fiyatlar" },
       checks: [
         { id: "kvkk", text: "KVKK süreç desteği", hidden: false },
         { id: "yillik", text: "Yıllık ödemede {yillik}", hidden: false },

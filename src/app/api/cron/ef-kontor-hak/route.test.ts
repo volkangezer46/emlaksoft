@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-type Sub = { tenant_id: string; plan: string; status: string };
+type Sub = { tenant_id: string; plan: string; status: string; extra_seats?: number };
 const state = {
   ready: true as boolean | "error",
   subs: [] as Sub[],
@@ -109,7 +109,7 @@ describe("cron ef-kontor-hak", () => {
       { tenant_id: "t1", plan: "office", status: "active" },
       { tenant_id: "t2", plan: "advisor", status: "trialing" },
       { tenant_id: "t3", plan: "office", status: "past_due" },
-      { tenant_id: "t4", plan: "enterprise", status: "active" },
+      { tenant_id: "t4", plan: "enterprise", status: "active", extra_seats: 100 },
     ];
     state.tenants = { t1: "active", t2: "trial", t3: "past_due", t4: "active" };
     const res = await GET(req("Bearer s3cret"));
@@ -119,9 +119,11 @@ describe("cron ef-kontor-hak", () => {
     expect(state.grants.map((g) => [g.p_tenant, g.p_units, g.p_kind]).sort()).toEqual([
       ["t1", 40, "plan_monthly"],
       ["t2", 10, "plan_monthly"],
+      // Kurumsal: 400 + 100 ek kullanıcı x 6
+      ["t4", 1000, "plan_monthly"],
     ]);
     for (const g of state.grants) expect(g.p_idem).toMatch(key);
-    expect(body).toMatchObject({ offices: 2, units: 50, grants: 2, failed: 0 });
+    expect(body).toMatchObject({ offices: 3, units: 1050, grants: 3, failed: 0 });
   });
 
   it("aynı gün/ay ikinci çalıştırma çift hibe üretmez (idempotent)", async () => {
@@ -147,7 +149,8 @@ describe("cron ef-kontor-hak", () => {
   });
 
   it("hoş geldin kontörü tek sefer (welcome:<tenant>), 0 = kapalı", async () => {
-    state.subs = [{ tenant_id: "t4", plan: "enterprise", status: "active" }];
+    // Plan kontör hakkı olmayan (kataloğa girmeyen eski) paket de hoş geldin alır.
+    state.subs = [{ tenant_id: "t4", plan: "legacy", status: "active" }];
     state.tenants = { t4: "active" };
     state.settings = { "ef.welcome_units": "0" };
     await GET(req("Bearer s3cret"));

@@ -54,7 +54,7 @@ const DEFAULT_GROUPS: MenuGroup[] = [
       item("cozum-fiyatlar-karsilastirma", "Karar vermek için", "Paketleri karşılaştırın", "Fiyat, limit ve kapsam yan yana", "/fiyatlar#karsilastirma", "BadgeCheck"),
       item("cozum-neden", "Karar vermek için", "Neden EmlakSoft", "Excel ve defterle karşılaştırma", "/#neden", "Scale"),
     ],
-    featured: { eyebrow: "Başlamak kolay", icon: { kind: "lucide", name: "CalendarCheck" }, title: "Ofisinizi ücretsiz deneyin", text: "Kayıt olun; kurulum sihirbazı ofisinizi ve ekibinizi adım adım hazırlasın.", ctaLabel: "Ücretsiz dene", href: "/kayit", hidden: false, media: null },
+    featured: { eyebrow: "Başlamak kolay", icon: { kind: "lucide", name: "CalendarCheck" }, title: "Ofisinizi dakikalar içinde kurun", text: "Kullanıcı sayınızı seçin, fiyatı anında görün, ücretsiz denemeyi kendiniz başlatın.", ctaLabel: "Ücretsiz dene", href: "/kayit", hidden: false, media: null },
   },
   {
     id: "kaynak",
@@ -146,7 +146,6 @@ function defaultFooter(): FooterColumn[] {
       hidden: false,
       autoPlans: false,
       links: [
-        link("iletisim-demo", "Görüşme talep edin", "/demo"),
         link("iletisim-destek", "destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr"),
       ],
     },

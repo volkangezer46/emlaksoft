@@ -150,13 +150,13 @@ describe("SQL <-> TS plan sabit sözleşmesi", () => {
     expect(new Set(KNOWN_OPEN.map((k) => `${k.file}::${k.kind}`)).size).toBe(KNOWN_OPEN.length);
   });
 
-  it("onaylı katalog fiyatları plan tanımında: 749 / 2.490 / 4.990 / 8.990 (Business) ve Kurumsal özel", () => {
+  it("onaylı katalog fiyatları plan tanımında: 749 / 2.490 / 4.990 / 8.990 (Business); Kurumsal 12.900 (SQL yedek tutarıyla aynı) ve özel fiyat yok", () => {
     expect([...priceByPlan.entries()].filter(([id]) => id !== "enterprise")).toEqual([
       ["advisor", 749],
       ["office", 2490],
       ["professional", 4990],
       ["business", 8990],
     ]);
-    expect(PLANS.find((p) => p.id === "enterprise")!.customPricing).toBe(true);
+    expect(PLANS.find((p) => p.id === "enterprise")!.monthlyTry).toBe(12900);
   });
 });

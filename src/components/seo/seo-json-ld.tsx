@@ -25,8 +25,8 @@ export async function SeoJsonLd({
     global: s.global,
     base: getBaseUrl(),
     path,
-    // Özel fiyatlı ("Bize ulaşın") planın aylık tutarı yoktur; yapılandırılmış veriye sahte fiyat basılmaz.
-    plans: planDefs.filter((p) => !p.customPricing).map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry })),
+    // Yapılandırılmış veriye yalnız gerçek (KDV hariç liste) aylık tutarlar yazılır.
+    plans: planDefs.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry })),
     faq,
     kinds,
     tool,

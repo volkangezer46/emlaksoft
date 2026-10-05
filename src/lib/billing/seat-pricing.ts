@@ -141,7 +141,7 @@ function computeQuote(def: PlanDef, totalSeatsRaw: number, cycle: Cycle, opts?: 
 }
 
 function sellable(plans: readonly PlanDef[]): PlanDef[] {
-  return plans.filter((p) => !p.hidden && !p.customPricing);
+  return plans.filter((p) => !p.hidden);
 }
 
 /**
@@ -191,7 +191,7 @@ export function quoteSeats(
 
 /**
  * `totalSeats` kullanıcı için EN UCUZ uygun plan (herkese açık, özel fiyatsız) + alternatifler (artan fiyat).
- * Hiç plan taşıyamıyorsa özel fiyatlı (Kurumsal) paket döner ve quote.maxSeatsExceeded = true olur ("bize ulaşın").
+ * Hiç plan taşıyamıyorsa en yüksek kapasiteli paket döner ve quote.maxSeatsExceeded = true olur (satış yok).
  */
 export function recommendPlanForSeats(
   plans: PlanDef[],
@@ -206,12 +206,13 @@ export function recommendPlanForSeats(
     const [best, ...alternatives] = fits as [SeatQuote, ...SeatQuote[]];
     return { planId: best.planId, quote: best, alternatives };
   }
-  const custom = plans.find((p) => p.customPricing) ?? [...plans].sort((a, b) => b.limits.seats - a.limits.seats)[0];
-  if (!custom) throw new Error("Paket listesi boş.");
-  const q = computeQuote(custom, totalSeats, cycle);
-  if (custom.customPricing) q.maxSeatsExceeded = true;
+  // Hiçbir paket taşıyamıyor: en yüksek kapasiteli paket, aşım işaretiyle döner (satış yok, tutar gösterilmez).
+  const top = [...sellable(plans)].sort((a, b) => maxTotalSeats(b) - maxTotalSeats(a) || b.limits.seats - a.limits.seats)[0] ?? plans[0];
+  if (!top) throw new Error("Paket listesi boş.");
+  const q = computeQuote(top, totalSeats, cycle);
+  q.maxSeatsExceeded = true;
   q.recommendation = null;
-  return { planId: custom.id, quote: q, alternatives: [] };
+  return { planId: top.id, quote: q, alternatives: [] };
 }
 
 // ---------------------------------------------------------------------------

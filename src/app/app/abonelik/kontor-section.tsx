@@ -43,10 +43,12 @@ export type KontorSectionProps = {
   latestInvoice: { status: string; paidAt: string | null; units: number | null } | null;
   /** Son kontör faturasının ödemesi yeni mi (sunucuda clock ile hesaplanır). */
   invoiceIsRecent: boolean;
+  /** Planın otomatik aylık kontör hakkı (ek kullanıcı hakkı dahil); units 0 = pakette aylık hak yok. */
+  allowance?: { planName: string; units: number; perExtraSeat: number; extraSeats: number };
 };
 
 export async function KontorSection(props: KontorSectionProps & { tenantId: string }) {
-  const { tenantId, canBuy, iyzicoConfigured, latestInvoice, invoiceIsRecent } = props;
+  const { tenantId, canBuy, iyzicoConfigured, latestInvoice, invoiceIsRecent, allowance } = props;
   const [ready, catalog] = await Promise.all([getEfCreditReady(), getEfCatalog()]);
   const [balance, history] = ready
     ? await Promise.all([readEfBalance(tenantId), readEfHistory(tenantId)])
@@ -158,6 +160,25 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         ) : (
           <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Cüzdan etkinleşince bakiyeniz burada görünür."}</p>
         )}
+        {allowance && allowance.units > 0 ? (
+          <Link
+            href={hrefOf({ kalem: "satin-alma" })}
+            className="focus-ring mt-4 block rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 p-4 transition hover:border-mint-500/60"
+          >
+            <p className="text-xs font-semibold text-mint-700">{allowance.planName} paketinin aylık kontör hakkı</p>
+            <p className="numeric font-display text-xl font-extrabold text-ink-950">
+              Her ay {fmt.format(allowance.units)} kontör
+              {efUnitsFor("valuation_arsa", tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efUnitsFor("valuation_arsa", tariff)))} değerleme)` : ""}
+            </p>
+            <p className="mt-1 text-xs text-text-muted">
+              Otomatik yüklenir, kullanılmayan kontör devreder.
+              {allowance.perExtraSeat > 0
+                ? ` Hak, her ek kullanıcı için ${fmt.format(allowance.perExtraSeat)} kontör artar (şu an ${fmt.format(allowance.extraSeats)} ek kullanıcı).`
+                : ""}
+              {" "}Yetmezse aşağıdan ek paket alabilirsiniz.
+            </p>
+          </Link>
+        ) : null}
       </section>
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

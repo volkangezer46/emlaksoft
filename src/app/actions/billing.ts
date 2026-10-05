@@ -77,8 +77,8 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   }
 
   const planDef = await getPlanDefinition(plan);
-  if (planDef.hidden || planDef.customPricing) {
-    return { error: "Bu paket çevrimiçi satın alınamıyor. Lütfen bizimle iletişime geçin." };
+  if (planDef.hidden) {
+    return { error: "Bu paket çevrimiçi satın alınamıyor." };
   }
   const listAmountTry = planAmountOf(planDef, cycle);
   // Kupon (isteğe bağlı `coupon` alanı): önce tüketmeden doğrulanır, fatura oluşunca atomik tüketilir.

@@ -45,8 +45,8 @@ export type PlanDef = {
    * kontör tarifesi `src/lib/ef-credits/config.ts`te, "yaklaşık N değerleme" ondan hesaplanır.
    */
   efCreditsMonthly?: number | null;
-  /** true: fiyat yerine "Bize ulaşın" gösterilir, çevrimiçi ödeme açılmaz. */
-  customPricing?: boolean;
+  /** Satın alınan HER EK kullanıcı başına aylık ek EmlakFiyati kontörü (ek kullanıcı sayısı x bu değer, plan hakkına eklenir). */
+  efCreditsPerExtraSeat?: number | null;
   /** true: kayıt/fiyat sayfası ve yeni ödemede gizli; mevcut aboneler etkilenmez. */
   hidden?: boolean;
   /** Listeleme sırası (küçük önce). */
@@ -58,7 +58,7 @@ export type PlanDef = {
 /**
  * Paket, fiyat, satış metni ve kullanım sınırları için kod tarafı varsayılanı (ham katalog).
  * Sahibin onayladığı katalog: Danışman 749, Ofis 2.490 (ek kullanıcı kademeli 399/349/299),
- * Profesyonel 4.990 (15 kullanıcı, ek 349/299), Business 8.990 (gizli), Kurumsal özel teklif.
+ * Profesyonel 4.990 (15 kullanıcı, ek 349/299), Business 8.990 (gizli), Kurumsal Operasyon 12.900 (50 kullanıcı dahil, 500'e kadar kademeli ek kullanıcı).
  * `RECOMMENDED_CATALOG_OVERRIDES` (plan-overrides.ts) ile AYNI değerleri taşır; ikisinin
  * uyumu plan-default-catalog.test.ts ile korunur. Fiyat değişikliği yalnız yeni satışları etkiler.
  * Yalnızca bugün çalışan özellikler burada listelenir; yol haritasındaki
@@ -79,6 +79,10 @@ export const PLANS: readonly PlanDef[] = [
       "Komisyon takibi ve emsal bazlı değerleme",
     ],
     limits: { seats: 1, customers: 1_000, activeProperties: 150, branches: 1 },
+    // Ek kullanıcı: 5 kullanıcıda 749 + 4 x 499 = 2.745 TL > Ofis 2.490 TL (ve 499 > Ofis kişi başı 498): Ofis 5. kullanıcıdan itibaren hem ucuz hem kapsamlı.
+    extraSeatMonthlyTry: 499,
+    maxSeats: 500,
+    seatRounding: "x9",
     efCreditsMonthly: 10,
   },
   {
@@ -103,7 +107,7 @@ export const PLANS: readonly PlanDef[] = [
       { fromSeat: 6, toSeat: 15, monthlyTry: 349 },
       { fromSeat: 16, toSeat: null, monthlyTry: 299 },
     ],
-    maxSeats: 20,
+    maxSeats: 500,
     seatRounding: "x9",
     efCreditsMonthly: 40,
   },
@@ -126,7 +130,7 @@ export const PLANS: readonly PlanDef[] = [
       { fromSeat: 1, toSeat: 10, monthlyTry: 349 },
       { fromSeat: 11, toSeat: null, monthlyTry: 299 },
     ],
-    maxSeats: 40,
+    maxSeats: 500,
     seatRounding: "x9",
     efCreditsMonthly: 120,
   },
@@ -137,13 +141,23 @@ export const PLANS: readonly PlanDef[] = [
     blurb: "Franchise ve proje satış ekipleri",
     eyebrow: "KURUMSAL OPERASYON",
     features: [
-      "50 kullanıcıya kadar",
+      "50 kullanıcı dahil · 500 kullanıcıya kadar",
       "Sınırsız şube",
       "Proje satışı ve franchise BI",
       "Merkezi rol ve denetim yönetimi",
     ],
     limits: { seats: 50, customers: null, activeProperties: null, branches: null },
-    customPricing: true,
+    // Hacim indirimi: Profesyonel'in son kademesi 299 TL; Kurumsal bunun altından başlar ve ölçekle düşer.
+    extraSeatMonthlyTry: 249,
+    extraSeatTiers: [
+      { fromSeat: 1, toSeat: 50, monthlyTry: 249 },
+      { fromSeat: 51, toSeat: 200, monthlyTry: 199 },
+      { fromSeat: 201, toSeat: null, monthlyTry: 149 },
+    ],
+    maxSeats: 500,
+    seatRounding: "x9",
+    efCreditsMonthly: 400,
+    efCreditsPerExtraSeat: 6,
   },
 ] as const;
 

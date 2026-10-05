@@ -17,7 +17,7 @@ import { findCrossoverSeat, quoteSeats, recommendPlanForSeats } from "@/lib/bill
 import { registrationPlanForTeamSize } from "@/lib/billing/registration-plan";
 
 const catalog: PlanDef[] = visiblePlans(applyPlanOverrides(RECOMMENDED_CATALOG_OVERRIDES));
-const sellable = catalog.filter((p) => !p.customPricing);
+const sellable = catalog.filter((p) => !p.hidden);
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
 describe("computeSeatCalc: tek kaynak motor", () => {
@@ -66,13 +66,22 @@ describe("computeSeatCalc: tek kaynak motor", () => {
     if (c.planId === lo.id) expect(c.crossoverNote).toContain(String(cross));
   });
 
-  it("maksimum koltuk aşılınca 'contact' ve tutar yok", () => {
+  it("en yüksek kullanıcı sayısında (500) Kurumsal fiyatı hesaplanır, teklif istenmez", () => {
     const b = seatBounds(catalog);
+    expect(b.inputMax).toBe(500);
     const c = computeSeatCalc(catalog, undefined, b.inputMax, "monthly");
-    expect(c.status).toBe("contact");
-    expect(c.contactNote).toContain("bize ulaşın");
+    expect(c.status).toBe("ok");
+    expect(c.planId).toBe("enterprise");
+    expect(c.monthlyEquivalentTry).toBe(92450);
+    expect(seatCalcAnnouncement(c)).not.toContain("bize ulaşın");
+  });
+
+  it("sınırın üstü satılmaz: over_max, tutar yok, iletişim yönlendirmesi yok", () => {
+    const c = computeSeatCalc(catalog, undefined, 501, "monthly");
+    expect(c.status).toBe("over_max");
+    expect(c.limitNote).toContain("en fazla 500");
     expect(c.alternatives).toEqual([]);
-    expect(seatCalcAnnouncement(c)).toContain("bize ulaşın");
+    expect(seatCalcAnnouncement(c)).not.toContain("ulaşın");
   });
 
   it("geçersiz koltuk sayısı 1'e sıkıştırılır", () => {
@@ -102,11 +111,11 @@ describe("kampanya (Founders) etkin fiyatı", () => {
 });
 
 describe("seatBounds / clampSeats", () => {
-  it("kaydırıcı sonu herkese açık en büyük kapasiteyi aşar ('bize ulaşın' durumuna gidilebilir)", () => {
+  it("kaydırıcı ve giriş sonu herkese açık en büyük kapasitedir (500)", () => {
     const b = seatBounds(catalog);
     expect(b.min).toBe(1);
-    expect(b.sliderMax).toBeGreaterThan(1);
-    expect(computeSeatCalc(catalog, undefined, b.sliderMax, "monthly").status).toBe("contact");
+    expect(b.sliderMax).toBe(500);
+    expect(computeSeatCalc(catalog, undefined, b.sliderMax, "monthly").status).toBe("ok");
   });
 
   it("sıkıştırma sınırları", () => {
@@ -127,12 +136,11 @@ describe("extraSeatSummary: plan kartı metni admin kademelerinden üretilir", (
     for (const t of withTiers!.extraSeatTiers!) expect(s.tiers.join(" ")).toContain(t.monthlyTry.toLocaleString("tr-TR"));
   });
 
-  it("tek kademeli ve kademesiz ve özel fiyatlı", () => {
+  it("tek kademeli ve kademesiz", () => {
     const base = sellable[0]!;
     const single = extraSeatSummary({ ...base, extraSeatTiers: null, extraSeatMonthlyTry: 111 })!;
     expect(single.tiers).toEqual([`her ek kullanıcı ${(111).toLocaleString("tr-TR")} ₺`]);
     expect(extraSeatSummary({ ...base, extraSeatTiers: null, extraSeatMonthlyTry: null })).toBeNull();
-    expect(extraSeatSummary({ ...base, customPricing: true })).toBeNull();
   });
 
   it("azami kullanıcı varsa belirtilir", () => {

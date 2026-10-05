@@ -59,22 +59,37 @@ export async function GET(req: NextRequest) {
     const settings = await getPlatformSettingsMany([PLAN_DEFINITIONS_SETTING_KEY, EF_WELCOME_SETTING_KEY]);
     const defs = applyPlanOverrides(resolveCatalogSettings(settings[PLAN_DEFINITIONS_SETTING_KEY]).overrides);
     const planMonthly: Record<string, number> = {};
-    for (const p of defs) planMonthly[p.id] = monthlyUnitsOf(p.efCreditsMonthly);
+    const planPerExtraSeat: Record<string, number> = {};
+    for (const p of defs) {
+      planMonthly[p.id] = monthlyUnitsOf(p.efCreditsMonthly);
+      planPerExtraSeat[p.id] = monthlyUnitsOf(p.efCreditsPerExtraSeat);
+    }
     const welcomeUnits = parseEfWelcomeUnits(settings[EF_WELCOME_SETTING_KEY]);
     const monthKey = trMonthKey();
 
     // Uygun abonelikler (sayfalı).
-    const subs: { tenant_id: string; plan: string; status: string }[] = [];
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await admin
-        .from("subscriptions")
-        .select("tenant_id, plan, status")
+    // extra_seats (koltuk satışı migration'ı) henüz uygulanmamış olabilir: önce sütunla denenir, sütun yoksa 0 sayılır.
+    const subs: { tenant_id: string; plan: string; status: string; extra_seats?: number | null }[] = [];
+    let withExtraSeats = true;
+    type SubPage = { data: unknown[] | null; error: { message: string } | null };
+    const fetchSubs = async (from: number, extra: boolean): Promise<SubPage> => {
+      const base = admin.from("subscriptions");
+      const q = extra ? base.select("tenant_id, plan, status, extra_seats") : base.select("tenant_id, plan, status");
+      return (await q
         .in("status", [...EF_GRANT_SUBSCRIPTION_STATUSES])
         .order("tenant_id", { ascending: true })
-        .range(from, from + PAGE - 1);
-      if (error) throw new Error(`subscriptions: ${error.message}`);
-      subs.push(...((data ?? []) as typeof subs));
-      if (!data || data.length < PAGE) break;
+        .range(from, from + PAGE - 1)) as unknown as SubPage;
+    };
+    for (let from = 0; ; from += PAGE) {
+      let res = await fetchSubs(from, withExtraSeats);
+      if (res.error && withExtraSeats) {
+        withExtraSeats = false;
+        res = await fetchSubs(from, false);
+      }
+      if (res.error) throw new Error(`subscriptions: ${res.error.message}`);
+      const rows = (res.data ?? []) as unknown as typeof subs;
+      subs.push(...rows);
+      if (rows.length < PAGE) break;
     }
 
     // Ofis durumu (askıda/iptal/gecikmiş ofis hak almaz) ve kapalı modüller.
@@ -92,6 +107,7 @@ export async function GET(req: NextRequest) {
       subscriptionStatus: s.status,
       tenantStatus: tenantStatus.get(s.tenant_id) ?? "",
       valuationClosed: isDisabledFor(disabled, s.tenant_id, "valuation"),
+      extraSeats: typeof s.extra_seats === "number" ? s.extra_seats : 0,
     }));
 
     // Ön eleme (yalnız performans): zaten yazılmış anahtarlar. Okunamazsa RPC idempotency'si korur.
@@ -107,6 +123,7 @@ export async function GET(req: NextRequest) {
       candidates,
       monthKey,
       planMonthly,
+      planPerExtraSeat,
       welcomeUnits,
       welcomeGranted: alreadyKeys,
       monthlyGranted: alreadyKeys,
