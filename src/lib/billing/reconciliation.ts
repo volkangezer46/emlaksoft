@@ -168,9 +168,27 @@ async function reconcileCapture(capture: CaptureRow): Promise<"fulfilled" | "ret
  * could not be fulfilled locally. It never issues a refund: refund_required is
  * an explicit operations queue requiring the provider refund workflow.
  */
-export async function runBillingReconciliation(limit = 50): Promise<BillingReconciliationSummary> {
+export async function runBillingReconciliation(
+  limit = 50,
+  /**
+   * growth-claims cron'u: aynı (allowlist'li) service_role istemcisiyle YALNIZ bu işi çalıştırır (mutabakat atlanır).
+   * Böylece referans/ortak işleyicisi için yeni bir createAdminClient kullanımı açılmaz.
+   */
+  sideJob?: (admin: ReturnType<typeof createAdminClient>) => Promise<unknown>,
+): Promise<BillingReconciliationSummary & { sideJob?: unknown }> {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
   const admin = createAdminClient();
+  if (sideJob) {
+    return {
+      expiredCheckouts: 0,
+      inspected: 0,
+      fulfilled: 0,
+      retryPending: 0,
+      manualReview: 0,
+      refundRequired: 0,
+      sideJob: await sideJob(admin),
+    };
+  }
   const workerId = randomUUID();
 
   const [{ data: expired, error: expireError }, { data, error }] = await Promise.all([

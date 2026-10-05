@@ -78,7 +78,7 @@ describe("atıf kodları", () => {
 
 describe("ayarlar ve ödül metni", () => {
   it("varsayılan KAPALI; yalnız açık değerler açar", () => {
-    expect(parseGrowthFlags({})).toEqual({ referralEnabled: false, partnerEnabled: false });
+    expect(parseGrowthFlags({})).toEqual({ referralEnabled: false, partnerEnabled: false, cashPayoutEnabled: false });
     expect(parseGrowthFlags({ [GROWTH_SETTING_KEYS.referralEnabled]: "on" }).referralEnabled).toBe(true);
     expect(parseGrowthFlags({ [GROWTH_SETTING_KEYS.partnerEnabled]: "kapali" }).partnerEnabled).toBe(false);
   });

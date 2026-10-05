@@ -16,7 +16,7 @@ describe("büyüme sözleşmesi", () => {
   });
 
   it("program varsayılan kapalıdır", () => {
-    expect(read("src/lib/growth/settings.ts")).toContain("referralEnabled: false, partnerEnabled: false");
+    expect(read("src/lib/growth/settings.ts")).toContain("referralEnabled: false, partnerEnabled: false, cashPayoutEnabled: false");
   });
 
   it("kişisel veri toplanmaz: IP, cihaz izi, telefon, e-posta atıf kaydına yazılmaz", () => {

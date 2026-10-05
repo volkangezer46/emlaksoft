@@ -27,6 +27,7 @@ import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/
 import { registrationQuote, registrationSelection, seatBounds } from "@/lib/billing/seat-calculator-model";
 
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
+import { InviteBanner, type InviteBannerData } from "./invite-banner";
 
 const initial: AuthResult = {};
 
@@ -54,6 +55,7 @@ export function RegisterForm({
   trialDays,
   offers,
   attribution,
+  invite = null,
   efValuationCost,
   copy,
 }: {
@@ -71,6 +73,8 @@ export function RegisterForm({
   /** Etkin aylık fiyat (kampanya dahil), plan kimliğine göre. */
   offers?: Record<string, { monthlyTry: number }>;
   attribution?: SignupAttributionFields;
+  /** Davet bağlantısıyla gelen ziyaretçi için "X sizi davet etti" (program açık ve kod aktifse). */
+  invite?: InviteBannerData | null;
 }) {
   // Tek hesapta satılabilecek en yüksek kullanıcı sayısı katalogdan gelir (sabit yok).
   const MAX_SEATS_INPUT = seatBounds(plans).inputMax;
@@ -186,6 +190,7 @@ export function RegisterForm({
           })}
         </ol>
 
+        <InviteBanner invite={invite} />
         <form action={action} className="mt-7">
           <input type="hidden" name="plan" value={selectedPlanId} />
           <input type="hidden" name="cycle" value={initialCycle} />

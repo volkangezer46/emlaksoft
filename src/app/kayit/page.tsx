@@ -1,10 +1,14 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { RegisterForm } from "./register-form";
 import { isRegistrationOpen } from "@/lib/platform-flags";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { getLiveSiteContent } from "@/lib/site-content/store";
+import { REF_COOKIE, parseRefCookie, parseRefParam } from "@/lib/growth/attribution";
+import { readInvitePreview } from "@/lib/growth/engine";
+import { createClient } from "@/lib/supabase/server";
 import { tx } from "@/lib/site-content/tokens";
 
 import type { Metadata } from "next";
@@ -46,6 +50,10 @@ export default async function RegisterPage({
   }
   const [{ plans, trialDays, offers, efValuationCost }, content] = await Promise.all([getPublicPricing(), getLiveSiteContent()]);
   const tokenCtx = { trialDays, plans };
+  // Davet bağlantısı (çerez ya da ?ref): "X sizi davet etti" + hoş geldin avantajı. Hata/kapalı program = banner yok.
+  const jar = await cookies();
+  const touch = parseRefCookie(jar.get(REF_COOKIE)?.value) ?? parseRefParam(params.ref);
+  const preview = touch?.kind === "referral" ? await readInvitePreview(await createClient(), touch.code) : null;
   return (
     <RegisterForm
       copy={{
@@ -60,6 +68,7 @@ export default async function RegisterPage({
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
       initialSeats={/^\d{1,3}$/.test(params.seats ?? "") && Number(params.seats) > 0 ? Number(params.seats) : undefined}
+      invite={preview ? { officeName: preview.office_name, welcomeCreditTry: preview.welcome_credit_try } : null}
       attribution={{
         ref: params.ref,
         utm_source: params.utm_source,

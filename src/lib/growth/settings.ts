@@ -6,11 +6,13 @@
 export const GROWTH_SETTING_KEYS = {
   referralEnabled: "growth_referral_enabled",
   partnerEnabled: "growth_partner_enabled",
+  /** Faz 2: nakit ortak ödemesi. Ortak programından AYRI ve varsayılan KAPALI. */
+  cashPayoutEnabled: "growth_cash_payout_enabled",
 } as const;
 
-export type GrowthFlags = { referralEnabled: boolean; partnerEnabled: boolean };
+export type GrowthFlags = { referralEnabled: boolean; partnerEnabled: boolean; cashPayoutEnabled: boolean };
 
-export const GROWTH_FLAGS_OFF: GrowthFlags = { referralEnabled: false, partnerEnabled: false };
+export const GROWTH_FLAGS_OFF: GrowthFlags = { referralEnabled: false, partnerEnabled: false, cashPayoutEnabled: false };
 
 function on(raw: string | null | undefined): boolean {
   const v = (raw ?? "").trim().toLowerCase();
@@ -22,11 +24,13 @@ export function parseGrowthFlags(raw: Record<string, string | null | undefined>)
   return {
     referralEnabled: on(raw[GROWTH_SETTING_KEYS.referralEnabled]),
     partnerEnabled: on(raw[GROWTH_SETTING_KEYS.partnerEnabled]),
+    // Nakit ödeme ortak programı kapalıyken ASLA açık sayılmaz.
+    cashPayoutEnabled: on(raw[GROWTH_SETTING_KEYS.partnerEnabled]) && on(raw[GROWTH_SETTING_KEYS.cashPayoutEnabled]),
   };
 }
 
 export type RewardRuleView = {
-  reward_type: "fixed_try" | "percent_of_payment";
+  reward_type: "fixed_try" | "percent_of_payment" | "monthly_multiple";
   reward_value: number;
   duration_months: number | null;
   hold_days: number;
@@ -44,7 +48,9 @@ export function describeRewardRule(rule: RewardRuleView | null | undefined): str
   const what =
     rule.reward_type === "fixed_try"
       ? `${value} TL hesap kredisi`
-      : `ödemenin %${value}'i kadar hesap kredisi`;
+      : rule.reward_type === "monthly_multiple"
+        ? `${value} aylık paket bedeli kadar hesap kredisi`
+        : `ödemenin %${value}'i kadar hesap kredisi`;
   const dur = rule.duration_months ? ` (ilk ${rule.duration_months} ay)` : "";
   const hold = rule.hold_days > 0 ? `, ödeme sonrası ${rule.hold_days} gün bekleme süresinden sonra` : "";
   return `${what}${dur}${hold}`;

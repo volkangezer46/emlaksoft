@@ -90,6 +90,7 @@ const F = {
   // TL hesap kredisi (birim try) + fatura odemesi. Hic UYGULANMADI; 000100'den (source CHECK refund/bonus) SONRA.
   tryWallet: "20260826000400_try_credit_wallet.sql",
   tryInvoice: "20260826000500_try_credit_invoice_payment.sql",
+  growthEngine: "20260826000600_growth_referral_engine.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -159,6 +160,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efPack]: "davranis", // fulfill + v2 tam govde yeniden tanimi: credit_pack faturasi islenir (taban govde bayt bayt korunur)
     [F.tryWallet]: "ek", // yalniz try satirlarini kisitlayan CHECK + rezerv tablosu + view + service_role RPC'ler; mevcut satir/davranis ayni
     [F.tryInvoice]: "ek", // yeni service_role fonksiyonlari (fulfill govdelerine DOKUNMAZ; icerden cagirir)
+    [F.growthEngine]: "ek", // yeni tablolar + RPC; 000800 (uygulanmamis) tablolarinin tekillik/CHECK/sutunlarini genisletir; fulfill govdelerine DOKUNMAZ; bayraklar KAPALI
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -221,6 +223,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       order: 23,
       title: "TL hesap kredisi: cuzdan (try birimi + rezerv + RPC) -> kredi ile fatura odemesi (fulfill/v2'yi icerden cagirir)",
       files: [F.tryWallet, F.tryInvoice],
+    },
+    {
+      id: "PB11-referans-motoru",
+      order: 24,
+      title: "Referans/ortak motoru: talep uretimi, odul (TL kredi), clawback, inceleme kuyrugu, ortak komisyonu (bayraklar KAPALI)",
+      files: [F.growthEngine],
     },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
@@ -303,6 +311,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.tryWallet, F.growthReferral],
     [F.tryWallet, F.aiCredit],
     [F.tryInvoice, F.tryWallet],
+    // Referans/ortak motoru: growth tablolari + tiklama sayaci + TL cuzdan (try_credit_grant/reverse/ready) SONRASI.
+    [F.growthEngine, F.growthReferral],
+    [F.growthEngine, F.growthClicks],
+    [F.growthEngine, F.tryWallet],
+    [F.growthEngine, F.tryInvoice],
   ],
 
   externalPending: [
