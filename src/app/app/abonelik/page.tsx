@@ -14,9 +14,14 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, msUntil } from "@/lib/clock";
+import { DAY_MS, msUntil, now } from "@/lib/clock";
 import { planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
-import { getPlanDefinition, getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPlanDefinition, getPublicPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
+import { getSeatSupport, loadSeatState, type SeatUsageSummary } from "@/lib/billing/seat-purchase";
+import { seatUtilization } from "@/lib/billing/seat-pricing";
+import { warnRatioOf } from "@/lib/billing/seat-settings";
+import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
+import { SeatPanel } from "./seat-panel";
 import { getPlanSupport } from "@/lib/billing/plan-support";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -120,11 +125,29 @@ export default async function BillingPage({
     { id: "iptal", label: "İptal", hidden: !cancelSupported },
   ];
 
-  const [publicPlans, currentPlanDef, planSupport] = await Promise.all([
+  const [publicPlans, currentPlanDef, planSupport, seatSupport, seatSettings] = await Promise.all([
     getPublicPlanDefinitions(),
     getPlanDefinition(currentPlan),
     getPlanSupport(),
+    getSeatSupport(),
+    getSeatSettings(),
   ]);
+  // Koltuk: şema hazırsa satın alınmış ek kullanıcılar (RLS'li okuma); değilse plan limiti.
+  const seatState = tenantId ? await loadSeatState(supabase, tenantId, seatSupport) : null;
+  const extraSeats = seatState?.extraSeats ?? 0;
+  const seatLimit = currentPlanDef.limits.seats + extraSeats;
+  const seatUtil = seatUtilization(memberCount ?? 0, currentPlanDef.limits.seats, extraSeats, warnRatioOf(seatSettings));
+  const seatSummary: SeatUsageSummary = {
+    used: memberCount ?? 0,
+    included: currentPlanDef.limits.seats,
+    extra: extraSeats,
+    limit: seatLimit,
+    ratio: seatUtil.ratio,
+    level: seatUtil.level,
+    warnPercent: seatSettings.warnPercent,
+  };
+  const isSeatOwner = auth.role === "owner" || auth.role === "gm";
+  const seatPlans = publicPlans.some((p) => p.id === currentPlanDef.id) ? publicPlans : [currentPlanDef, ...publicPlans];
   const planLabel = (id: string) =>
     publicPlans.find((p) => p.id === id)?.name ?? (id === currentPlanDef.id ? currentPlanDef.name : id);
   // Gizli plandaki mevcut abone kendi paketini de görür; yeni satışa açık olanlar listelenir.
@@ -132,7 +155,7 @@ export default async function BillingPage({
     ? publicPlans
     : [currentPlanDef, ...publicPlans];
   const usage = [
-    { label: "Kullanıcı", value: memberCount ?? 0, limit: currentPlanDef.limits.seats, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
+    { label: "Kullanıcı", value: memberCount ?? 0, limit: seatLimit, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
     { label: "Aktif portföy", value: propertyCount ?? 0, limit: currentPlanDef.limits.activeProperties, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
     { label: "Müşteri kaydı", value: customerCount ?? 0, limit: currentPlanDef.limits.customers, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
     { label: "Aktif şube", value: branchCount ?? 0, limit: currentPlanDef.limits.branches, icon: GitBranch, href: "/app/ekip", tone: "text-cyan-600 bg-cyan-400/10" },
@@ -200,8 +223,10 @@ export default async function BillingPage({
       ) : null}
 
       {/* Limit uyarıları: %80 ve üzeri kullanım, ilgili modüle götürür */}
+      {/* Koltuk uyarısı: admin eşiği (varsayılan %80) ve %100; koltuk satın alma paneline götürür */}
+      <SeatLimitBanner summary={seatSummary} href={seatSupport.displayEnabled ? "#koltuk" : "/app/ekip"} />
       {usage
-        .filter((u) => u.limit && u.value / u.limit >= 0.8)
+        .filter((u) => u.label !== "Kullanıcı" && u.limit && u.value / u.limit >= 0.8)
         .map((u) => (
           <Link
             key={u.label}
@@ -280,6 +305,34 @@ export default async function BillingPage({
         </div>
       </section>
 
+      {seatSupport.displayEnabled && seatState ? (
+        <SeatPanel
+          plans={seatPlans}
+          planId={seatState.planId}
+          cycle={seatState.cycle}
+          usedSeats={memberCount ?? 0}
+          includedSeats={currentPlanDef.limits.seats}
+          extraSeats={extraSeats}
+          lockedBaseMonthlyTry={seatState.lockedBaseMonthlyTry}
+          lockedTiers={seatState.lockedTiers}
+          periodStartMs={seatState.periodStartMs}
+          periodEndMs={seatState.periodEndMs}
+          nowMs={now()}
+          canBuy={isSeatOwner}
+          purchaseReady={seatSupport.purchaseReady && configured}
+          subscriptionActive={seatState.status === "active"}
+          warnPercent={seatSettings.warnPercent}
+        />
+      ) : (
+        <section id="koltuk" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-5">
+          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Users2 className="h-4 w-4" /> Kullanıcı ekle / çıkar</p>
+          <p className="mt-2 text-sm text-text-muted">
+            Etkin değil: yönetici hazırlığı tamamlanıyor. Şu an paketinize dahil {currentPlanDef.limits.seats} kullanıcıdan {memberCount ?? 0} tanesini kullanıyorsunuz;
+            daha fazlası için aşağıdan üst pakete geçebilir veya <Link href="/demo" className="font-semibold text-brand-600 hover:underline">bize ulaşabilirsiniz</Link>.
+          </p>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/app/abonelik?cycle=monthly"
@@ -299,7 +352,7 @@ export default async function BillingPage({
         </span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div id="paketler" className="grid scroll-mt-24 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {listedPlans.map((plan) => {
           const amount = planAmountOf(plan, cycle);
           const sellable = !plan.hidden && !plan.customPricing;
