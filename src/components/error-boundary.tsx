@@ -2,6 +2,7 @@
 
 import { Component, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
+import { reportClientError } from "@/app/actions/report-error";
 
 type Props = {
   children: ReactNode;
@@ -29,6 +30,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: unknown) {
     console.error("ErrorBoundary caught:", error, errorInfo);
+    // Hata kaydına da yaz (aynı hata tekrarlanırsa sayaç artar); başarısızlık akışı bozmaz.
+    try {
+      void reportClientError({
+        message: error.message || "Bilinmeyen hata",
+        stack: error.stack,
+        path: typeof window !== "undefined" ? window.location.pathname : undefined,
+      }).catch(() => {});
+    } catch {
+      /* yut */
+    }
   }
 
   render() {

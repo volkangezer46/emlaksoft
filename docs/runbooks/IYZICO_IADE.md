@@ -27,6 +27,8 @@ Yarım kalma durumları:
 - iyzico'da iade yapıldı ama EmlakSoft kaydı düşülmedi: adım 4'ü tekrarla (idempotent). Kayıt düşülmeden fatura "tahsil edilmiş" görünür; muhasebe farkı oluşur.
 - EmlakSoft kaydı düşüldü ama iyzico iadesi yapılmadı: KAYIT geri alınamaz; iyzico'da iadeyi hemen yap, aksi halde müşteri iade görünür ama para gelmez.
 
+> İzleme: `manual_review` günlük kontrolü ve uptime/cron alarmları için bkz. `docs/runbooks/IZLEME.md`.
+
 ## 3. Tahsilat mutabakatı: `billing_payment_captures`
 
 iyzico'da tahsil edilmiş ama EmlakSoft'a işlenememiş ödemeler `billing_payment_captures` tablosunda izlenir (cron `billing-reconciliation`, her 10 dk). Durumlar:

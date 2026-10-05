@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { runWhenIdle } from "@/lib/idle";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { REALTIME_ALL_TABLES, tablesForPath } from "@/lib/realtime-throttle";
 import { emitNotificationInsert, type NotificationInsertRow } from "@/lib/realtime";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
@@ -12,8 +13,11 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
     tenantId,
     // notifications burada YOK: INSERT'ler aşağıdaki özel kanaldan zile akar; aynı tabloya
     // ikinci bir "*" aboneliği (Realtime list_changes poller maliyeti) gereksizdi.
-    tables: ["deals", "commissions", "portal_listings", "customers"],
+    tables: [...REALTIME_ALL_TABLES],
     debounceMs: 1200,
+    // Rota duyarlı: yalnız açık sayfayı ilgilendiren tablolar yenileme tetikler;
+    // iki yenileme arası en az 10 sn (bkz. src/lib/realtime-throttle.ts).
+    relevantTables: tablesForPath,
   });
 
   // Bildirim INSERT'lerini anlık olarak zile köprüle. Kanal burada açılıyor
