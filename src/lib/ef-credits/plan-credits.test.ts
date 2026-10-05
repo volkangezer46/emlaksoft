@@ -6,6 +6,7 @@ import {
   decideGrants,
   efCreditsLine,
   monthlyUnitsOf,
+  monthlyUnitsWithSeats,
   planMonthlyIdempotencyKey,
   welcomeIdempotencyKey,
   type EfGrantCandidate,
@@ -103,5 +104,32 @@ describe("hak verme kararı", () => {
   it("plan hakkı olmayan paket hoş geldin alabilir", () => {
     const d = decideGrants({ ...base, welcomeUnits: 10, candidates: [cand({ plan: "enterprise" })] });
     expect(d.grants.map((g) => g.kind)).toEqual(["bonus"]);
+  });
+});
+
+describe("kullanıcı sayısıyla ölçeklenen aylık hak (Kurumsal)", () => {
+  it("plan hakkı + ek kullanıcı x ek kullanıcı başı hak; plan hakkı yoksa 0", () => {
+    expect(monthlyUnitsWithSeats(400, 6, 0)).toBe(400);
+    expect(monthlyUnitsWithSeats(400, 6, 450)).toBe(3100);
+    expect(monthlyUnitsWithSeats(400, null, 450)).toBe(400);
+    expect(monthlyUnitsWithSeats(400, 6, -3)).toBe(400);
+    expect(monthlyUnitsWithSeats(null, 6, 10)).toBe(0);
+  });
+  it("hibe kararı ek kullanıcıyı sayar; ay anahtarı aynı kalır", () => {
+    const d = decideGrants({
+      candidates: [cand({ tenantId: "e1", plan: "enterprise", extraSeats: 100 }), cand({ tenantId: "o1", plan: "office", extraSeats: 3 })],
+      monthKey: "2026-10",
+      planMonthly: { enterprise: 400, office: 40 },
+      planPerExtraSeat: { enterprise: 6 },
+      welcomeUnits: 0,
+      welcomeGranted: new Set<string>(),
+    });
+    expect(d.grants.map((g) => [g.tenantId, g.units, g.idempotencyKey])).toEqual([
+      ["e1", 1000, "plan:e1:2026-10"],
+      ["o1", 40, "plan:o1:2026-10"],
+    ]);
+  });
+  it("satır metni ek kullanıcı hakkını yazar", () => {
+    expect(efCreditsLine(400, 5, 6)).toBe("Aylık 400 kontör (yaklaşık 80 değerleme) + her ek kullanıcı için 6 kontör");
   });
 });

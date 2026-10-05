@@ -20,7 +20,7 @@ export function trialCtaLabel(trialDays?: number): string {
  * (metin uydurulmaz). `gift` ödenmeyen ay sayısıdır.
  */
 export function yearlyOffer(plans: readonly PlanDef[]): { label: string; gift: number } | null {
-  const priced = plans.filter((p) => !p.customPricing);
+  const priced = plans;
   if (priced.length === 0) return null;
   const labels = new Set(priced.map((p) => yearlyOfferLabel(p)));
   if (labels.size !== 1) return null;

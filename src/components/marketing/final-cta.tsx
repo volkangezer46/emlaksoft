@@ -15,7 +15,7 @@ export function FinalCta({ trialDays, plans }: { trialDays?: number; plans: read
         <p className="mk-lead" style={{ marginTop: "1rem" }}>{trialShort(trialDays)}, kredi kartı gerekmez. Verileriniz size ait; istediğiniz an dışa aktarın.</p>
         <div className="mk-cta-row">
           <Link href="/kayit" className="mk-btn mk-btn-light btn-shine">{trialCtaLabel(trialDays)} <ArrowRight size={18} aria-hidden="true" /></Link>
-          <Link href="/demo" className="mk-btn mk-btn-outline-light">Demo görüşmesi planla</Link>
+          <Link href="/fiyatlar" className="mk-btn mk-btn-outline-light">Paketleri ve fiyatları gör</Link>
         </div>
         <ul className="mk-final-checks">
           <li><Lock size={16} aria-hidden="true" />KVKK süreç desteği</li>

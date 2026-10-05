@@ -34,11 +34,12 @@ describe("evaluateSeatChange", () => {
     expect(r.status).toBe("below_included");
   });
 
-  it("azami koltuk aşılırsa bize ulaşın", () => {
+  it("azami koltuk aşılırsa üst pakete yönlendirir (teklif/iletişim yok)", () => {
     const capped = plans.map((p) => (p.id === "office" ? { ...p, maxSeats: 12 } : p));
     const r = evaluateSeatChange({ ...base, plans: capped, targetTotalSeats: 13 });
     expect(r.status).toBe("over_max");
-    expect(r.message).toMatch(/bize ulaşın/);
+    expect(r.message).toMatch(/üst pakete geçin/);
+    expect(r.message).not.toMatch(/bize ulaşın|teklif/);
   });
 
   it("kilitli taban fiyat kullanılır", () => {

@@ -28,6 +28,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { CheckoutButton } from "./checkout-button";
 import { CancelPanel } from "./cancel-panel";
 import { KontorSection } from "./kontor-section";
+import { monthlyUnitsWithSeats } from "@/lib/ef-credits/plan-credits";
 import { loadLatestPackInvoice } from "@/lib/ef-credits/credit-reader";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 
@@ -269,6 +270,12 @@ export default async function BillingPage({
           sayfa={sp.sayfa}
           latestInvoice={packInvoice}
           invoiceIsRecent={packInvoiceRecent}
+          allowance={{
+            planName: currentPlanDef.name,
+            units: monthlyUnitsWithSeats(currentPlanDef.efCreditsMonthly, currentPlanDef.efCreditsPerExtraSeat, extraSeats),
+            perExtraSeat: currentPlanDef.efCreditsPerExtraSeat ?? 0,
+            extraSeats,
+          }}
         />
       ) : null}
 
@@ -347,7 +354,7 @@ export default async function BillingPage({
           <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Users2 className="h-4 w-4" /> Kullanıcı ekle / çıkar</p>
           <p className="mt-2 text-sm text-text-muted">
             Etkin değil: yönetici hazırlığı tamamlanıyor. Şu an paketinize dahil {currentPlanDef.limits.seats} kullanıcıdan {memberCount ?? 0} tanesini kullanıyorsunuz;
-            daha fazlası için aşağıdan üst pakete geçebilir veya <Link href="/demo" className="font-semibold text-brand-600 hover:underline">bize ulaşabilirsiniz</Link>.
+            daha fazlası için aşağıdan üst pakete geçebilirsiniz.
           </p>
         </section>
       )}
@@ -363,7 +370,7 @@ export default async function BillingPage({
           href="/app/abonelik?cycle=yearly"
           className={`rounded-full px-3.5 py-1.5 text-xs font-semibold ${cycle === "yearly" ? "bg-brand-600 text-white" : "border border-line bg-surface text-text-muted"}`}
         >
-          Yıllık · {yearlyOfferLabel(publicPlans.find((p) => !p.customPricing) ?? {})}
+          Yıllık · {yearlyOfferLabel(publicPlans[0] ?? {})}
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />
@@ -374,7 +381,7 @@ export default async function BillingPage({
       <div id="paketler" className="grid scroll-mt-24 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {listedPlans.map((plan) => {
           const amount = planAmountOf(plan, cycle);
-          const sellable = !plan.hidden && !plan.customPricing;
+          const sellable = !plan.hidden;
           const current = plan.id === currentPlan;
           return (
             <article
@@ -391,16 +398,14 @@ export default async function BillingPage({
               <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
               <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950">{plan.name}</h2>
               <p className="mt-3 font-display text-3xl font-extrabold text-ink-950">
-                {plan.customPricing ? "Özel teklif" : money(amount)}
-                {plan.customPricing ? null : (
-                  <span className="ml-1 text-sm font-semibold text-text-muted">
-                    /{cycle === "yearly" ? "yıl" : "ay"}
-                  </span>
-                )}
+                {money(amount)}
+                <span className="ml-1 text-sm font-semibold text-text-muted">
+                  /{cycle === "yearly" ? "yıl" : "ay"}
+                </span>
               </p>
               <p className="mt-1 text-xs text-text-faint">
-                {plan.customPricing ? "Ekibinize göre hazırlanır" : "KDV hariç"}
-                {!plan.customPricing && cycle === "yearly"
+                KDV hariç
+                {cycle === "yearly"
                   ? ` · ${plan.yearlyPaidMonths ?? 10} ay ödenir, aylık ${money(Math.round(amount / 12))}'ye gelir`
                   : ""}
               </p>
@@ -421,13 +426,6 @@ export default async function BillingPage({
                     variant={current ? "ghost" : "primary"}
                     couponsEnabled={planSupport.coupons}
                   />
-                ) : plan.customPricing ? (
-                  <Link
-                    href="/demo"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-400"
-                  >
-                    Bize ulaşın
-                  </Link>
                 ) : (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
                     Bu paket yeni satışa kapalı; mevcut aboneliğiniz değişmez.

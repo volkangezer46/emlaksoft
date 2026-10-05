@@ -83,7 +83,7 @@ export function PlanEditor({
           {customized ? <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Düzenlenmiş</span> : null}
         </span>
         <span className="text-xs text-text-muted">
-          {plan.customPricing ? "Özel teklif" : `${tl(plan.monthlyTry)} / ay · yıllık ${tl(yearly)}`} · {subscribers} abonelik
+          {`${tl(plan.monthlyTry)} / ay · yıllık ${tl(yearly)}`} · {subscribers} abonelik
         </span>
       </button>
 
@@ -131,13 +131,17 @@ export function PlanEditor({
             <label className={lbl}>Sıra<input name="order" inputMode="numeric" defaultValue={num(plan.order)} placeholder="otomatik" className={`mt-1 w-full ${opFieldClass}`} /></label>
           </fieldset>
 
-          <fieldset className="grid gap-3 sm:grid-cols-3">
+          <fieldset className="grid gap-3 sm:grid-cols-4">
             <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Kontör hakkı (EmlakFiyati; mevcut aboneler kendi hakkını aylık alır)</legend>
             <label className={lbl}>
               Aylık kontör hakkı
               <input name="ef_credits_monthly" inputMode="numeric" value={efText} onChange={(e) => setEfText(e.target.value)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
             </label>
-            <p className="self-end pb-2 text-xs text-text-muted sm:col-span-2" aria-live="polite">
+            <label className={lbl}>
+              Her ek kullanıcı için ek kontör (aylık)
+              <input name="ef_credits_per_extra_seat" inputMode="numeric" defaultValue={num(plan.efCreditsPerExtraSeat)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
+            </label>
+            <p className="self-end pb-2 text-xs text-text-muted" aria-live="polite">
               {efNumber > 0 ? (efCreditsLine(efNumber, efValuationCost) ?? "Hak yok") : "Boş veya 0: bu pakete aylık kontör verilmez."}
               {efNumber > 0 && efValuationCost <= 0 ? " Tarifede değerleme bedeli 0: yaklaşık değerleme hesaplanamaz." : ""}
             </p>
@@ -150,7 +154,6 @@ export function PlanEditor({
 
           <div className="flex flex-wrap gap-4 text-xs font-semibold text-text-muted">
             <label className="inline-flex items-center gap-2"><input type="checkbox" name="popular" defaultChecked={Boolean(plan.popular)} /> Öne çıkan</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" name="custom_pricing" defaultChecked={Boolean(plan.customPricing)} /> Özel fiyat (&quot;Bize ulaşın&quot;)</label>
             <label className="inline-flex items-center gap-2">
               <input type="checkbox" name="hidden" defaultChecked={Boolean(plan.hidden)} /> Gizli (kayıt ve fiyat sayfasında görünmez)
             </label>

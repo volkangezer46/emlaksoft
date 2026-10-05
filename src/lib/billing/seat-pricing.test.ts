@@ -16,7 +16,7 @@ import {
   validateSeatTiers,
 } from "@/lib/billing/seat-pricing";
 
-// Onaylı katalog: Danışman 749, Ofis 2490 (ek 399/349/299), Profesyonel 4990 (15 kullanıcı), Business gizli, Kurumsal özel.
+// Onaylı katalog: Danışman 749, Ofis 2490 (ek 399/349/299), Profesyonel 4990 (15 kullanıcı), Business gizli, Kurumsal 12.900 (50 dahil, ek 249/199/149, en fazla 500).
 const catalog = applyPlanOverrides(RECOMMENDED_CATALOG_OVERRIDES);
 const office = catalog.find((p) => p.id === "office")!;
 const pro = catalog.find((p) => p.id === "professional")!;
@@ -74,19 +74,21 @@ describe("quoteSeats: kademeli marjinal fiyat", () => {
     expect(resolveSeatTiers(plans.find((p) => p.id === "office")!)).toEqual([{ fromSeat: 1, toSeat: null, monthlyTry: 400 }]);
   });
 
-  it("ek kullanıcı satılmayan planda (Danışman) fazlası azami aşımıdır", () => {
-    const q = quoteSeats(catalog, "advisor", 2, "monthly");
-    expect(q.maxSeatsExceeded).toBe(true);
-    expect(q.extraMonthlyTry).toBe(0);
-    expect(q.recommendation?.planId).toBe("office");
+  it("Danışman'da da ek kullanıcı satılır (499 TL); 5 kullanıcıda Ofis önerilir", () => {
+    const q2 = quoteSeats(catalog, "advisor", 2, "monthly");
+    expect(q2.maxSeatsExceeded).toBe(false);
+    expect(q2.extraMonthlyTry).toBe(499);
+    expect(q2.recommendation).toBeNull();
+    const q5 = quoteSeats(catalog, "advisor", 5, "monthly");
+    expect(q5.totalMonthlyTry).toBe(749 + 4 * 499);
+    expect(q5.recommendation?.planId).toBe("office");
   });
 
   it("azami koltuk aşımı işaretlenir ve zorunlu yükseltme önerilir", () => {
-    const q = quoteSeats(catalog, "office", 21, "monthly");
+    expect(quoteSeats(catalog, "office", 500, "monthly").maxSeatsExceeded).toBe(false);
+    const q = quoteSeats(catalog, "office", 501, "monthly");
     expect(q.maxSeatsExceeded).toBe(true);
-    expect(q.recommendation?.planId).toBe("professional");
-    expect(q.recommendation?.savingsMonthlyTry).toBe(0);
-    expect(q.recommendation?.reason).toContain("en fazla 20");
+    expect(q.recommendation).toBeNull();
   });
 
   it("kapalı son kademe: ötesi son birim fiyatla uzatılır ama aşım işaretlenir", () => {
@@ -138,18 +140,22 @@ describe("çapraz nokta ve öneri", () => {
   it("recommendPlanForSeats en ucuz uygun planı ve alternatifleri verir", () => {
     const r = recommendPlanForSeats(catalog, 1, "monthly");
     expect(r.planId).toBe("advisor");
-    expect(r.alternatives.map((a) => a.planId)).toEqual(["office", "professional"]);
+    expect(r.alternatives.map((a) => a.planId)).toEqual(["office", "professional", "enterprise"]);
     const r15 = recommendPlanForSeats(catalog, 15, "monthly");
     expect(r15.planId).toBe("professional");
     expect(r15.quote.totalMonthlyTry).toBe(4990);
     expect(r15.alternatives.every((a) => a.totalMonthlyTry >= r15.quote.totalMonthlyTry)).toBe(true);
   });
 
-  it("gizli paket (Business) ve özel fiyatlı paket öneride yer almaz; hepsini aşınca Kurumsal 'bize ulaşın'", () => {
+  it("gizli paket (Business) öneride yer almaz; 41+ kullanıcıda Kurumsal satılır, 500'ü aşınca satış yok", () => {
     const r = recommendPlanForSeats(catalog, 41, "monthly");
     expect(r.planId).toBe("enterprise");
-    expect(r.quote.maxSeatsExceeded).toBe(true);
-    expect(r.alternatives).toEqual([]);
+    expect(r.quote.maxSeatsExceeded).toBe(false);
+    expect(r.quote.totalMonthlyTry).toBe(12900);
+    const over = recommendPlanForSeats(catalog, 501, "monthly");
+    expect(over.planId).toBe("enterprise");
+    expect(over.quote.maxSeatsExceeded).toBe(true);
+    expect(over.alternatives).toEqual([]);
     const mid = recommendPlanForSeats(catalog, 30, "monthly");
     expect(mid.planId).toBe("professional");
   });
@@ -162,8 +168,8 @@ describe("çapraz nokta ve öneri", () => {
 
   it("findSeatCrossovers ardışık planları listeler", () => {
     const list = findSeatCrossovers(catalog);
-    expect(list.map((c) => `${c.fromPlanId}>${c.toPlanId}`)).toEqual(["advisor>office", "office>professional"]);
-    expect(list[0]!.seat).toBe(2);
+    expect(list.map((c) => `${c.fromPlanId}>${c.toPlanId}`)).toEqual(["advisor>office", "office>professional", "professional>enterprise"]);
+    expect(list[0]!.seat).toBe(5);
   });
 });
 
@@ -354,5 +360,41 @@ describe("seatUtilization", () => {
     expect(seatUtilization(3, 5, 0, 0.6).level).toBe("warn80");
     expect(seatUtilization(0, 0, 0)).toEqual({ ratio: 0, level: "ok" });
     expect(seatUtilization(1, 0, 0).level).toBe("full");
+  });
+});
+
+describe("Kurumsal: kullanıcı başı kademeli fiyat (50 dahil, en fazla 500)", () => {
+  const ent = catalog.find((p) => p.id === "enterprise")!;
+  const total = (n: number) => quoteSeats(catalog, "enterprise", n, "monthly").totalMonthlyTry;
+
+  it("dahil 50 kullanıcıda taban, sonrası 249 / 199 / 149 marjinal", () => {
+    expect(ent.limits.seats).toBe(50);
+    expect(total(50)).toBe(12900);
+    expect(total(51)).toBe(12900 + 249);
+    expect(total(100)).toBe(12900 + 50 * 249);
+    expect(total(101)).toBe(12900 + 50 * 249 + 199);
+    expect(total(250)).toBe(12900 + 50 * 249 + 150 * 199);
+    expect(total(500)).toBe(12900 + 50 * 249 + 150 * 199 + 250 * 149);
+  });
+
+  it("toplam monoton artar, kullanıcı başı ortalama düşer (hacim indirimi) ve kademeler x9", () => {
+    let prev = 0;
+    let prevAvg = Number.POSITIVE_INFINITY;
+    for (const n of [50, 51, 75, 100, 101, 200, 250, 251, 400, 500]) {
+      const t = total(n);
+      expect(t).toBeGreaterThan(prev);
+      expect(t / n).toBeLessThan(prevAvg);
+      prev = t;
+      prevAvg = t / n;
+    }
+    for (const t of resolveSeatTiers(ent)) expect(t.monthlyTry % 10).toBe(9);
+  });
+
+  it("Profesyonel'in son kademesinden (299) ucuz; Profesyonel 40 kullanıcıdan sonra Kurumsal ucuzdur", () => {
+    const tiers = resolveSeatTiers(ent);
+    expect(Math.max(...tiers.map((t) => t.monthlyTry))).toBeLessThan(Math.min(...resolveSeatTiers(pro).slice(-1).map((t) => t.monthlyTry)));
+    expect(findCrossoverSeat(catalog, "professional", "enterprise")).toBe(40);
+    expect(quoteSeats(catalog, "enterprise", 501, "monthly").maxSeatsExceeded).toBe(true);
+    expect(quoteSeats(catalog, "enterprise", 500, "monthly").maxSeatsExceeded).toBe(false);
   });
 });

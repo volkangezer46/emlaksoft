@@ -27,7 +27,7 @@ export function PriceSimulator({
   subscribers: SimSubscriber[];
   canWrite: boolean;
 }) {
-  const sellable = plans.filter((p) => !p.customPricing);
+  const sellable = plans;
   const [planId, setPlanId] = useState<string>(sellable[0]?.id ?? plans[0]!.id);
   const plan = plans.find((p) => p.id === planId) ?? plans[0]!;
   return (
@@ -141,7 +141,7 @@ function SimulatorBody({
               <label className={lbl}>
                 Paket
                 <select value={s.planId} onChange={(e) => updateSale(i, { planId: e.target.value })} className={`mt-1 w-full ${opFieldClass}`}>
-                  {plans.filter((p) => !p.customPricing).map((p) => (
+                  {plans.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>

@@ -302,7 +302,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
           <MobileSheetBody groups={groups} close={close} />
           <div className="mk-sheet-cta">
             <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
-            <Link href="/demo" className="mk-btn mk-btn-line" onClick={close}>Demo görüşmesi planla</Link>
+            <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Paketleri ve fiyatları gör</Link>
           </div>
         </nav>
       ) : null}

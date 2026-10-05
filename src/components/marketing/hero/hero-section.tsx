@@ -20,7 +20,7 @@ export function HeroSection({ trialDays }: { trialDays?: number }) {
           </p>
           <div className="mk-cta-row">
             <Link href="/kayit" className="mk-btn mk-btn-grad btn-shine">{trialCtaLabel(trialDays)} <ArrowRight size={18} aria-hidden="true" /></Link>
-            <Link href="/demo" className="mk-btn mk-btn-ghost"><CalendarCheck size={18} aria-hidden="true" />Demo görüşmesi planla</Link>
+            <Link href="/fiyatlar" className="mk-btn mk-btn-ghost"><CalendarCheck size={18} aria-hidden="true" />Paketleri ve fiyatları gör</Link>
           </div>
           <ul className="mk-checks">
             <li><Check size={16} aria-hidden="true" />Kredi kartı gerekmez</li>

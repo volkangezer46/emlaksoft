@@ -33,7 +33,6 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
   const eyebrow = trim(f.eyebrow);
   if (!eyebrow || eyebrow.length > PLAN_FIELD_LIMITS.eyebrowMax) return { error: `Üst etiket 1-${PLAN_FIELD_LIMITS.eyebrowMax} karakter olmalı.` };
 
-  const customPricing = f.custom_pricing === "on";
   const price = intField(f.monthly_try, "Aylık fiyat", { min: 1, max: PLAN_FIELD_LIMITS.priceMax, nullable: false });
   if ("error" in price) return price;
   const months = intField(f.yearly_paid_months, "Yıllık ödenen ay", { min: 1, max: 12, nullable: false });
@@ -66,6 +65,8 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
   if ("error" in valuation) return valuation;
   const efCredits = intField(f.ef_credits_monthly, "Aylık kontör hakkı", { min: 0, max: PLAN_FIELD_LIMITS.efCreditsMax, nullable: true });
   if ("error" in efCredits) return efCredits;
+  const efSeat = intField(f.ef_credits_per_extra_seat, "Ek kullanıcı başına aylık kontör", { min: 0, max: PLAN_FIELD_LIMITS.efCreditsMax, nullable: true });
+  if ("error" in efSeat) return efSeat;
   const order = intField(f.order, "Sıra", { min: 0, max: PLAN_FIELD_LIMITS.orderMax, nullable: true });
   if ("error" in order) return order;
 
@@ -110,9 +111,9 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
     aiCreditsMonthly: ai.value,
     valuationReportsMonthly: valuation.value,
     efCreditsMonthly: efCredits.value,
+    efCreditsPerExtraSeat: efSeat.value,
     features,
     limits,
-    customPricing,
     hidden: f.hidden === "on",
   };
   const seatErrors = validateSeatTiers({ ...plan, limits });

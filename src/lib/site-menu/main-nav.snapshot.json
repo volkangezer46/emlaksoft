@@ -142,10 +142,10 @@
   ],
   "featured": {
    "eyebrow": "Başlamak kolay",
-   "title": "Ofisinizi birlikte kuralım",
-   "text": "Demo görüşmesinde ekibinize uygun yapıyı ve içeri aktarma planını konuşalım.",
-   "href": "/demo",
-   "cta": "Demo görüşmesi planla",
+   "title": "Ofisinizi dakikalar içinde kurun",
+   "text": "Kullanıcı sayınızı seçin, fiyatı anında görün, ücretsiz denemeyi kendiniz başlatın.",
+   "href": "/kayit",
+   "cta": "Ücretsiz dene",
    "icon": "CalendarCheck"
   }
  },

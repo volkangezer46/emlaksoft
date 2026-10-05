@@ -9,6 +9,8 @@ import { Why } from "@/components/marketing/why";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { SecurityBand } from "@/components/marketing/security-band";
 import { PricingSection } from "@/components/marketing/pricing-section";
+import { EmlakFiyatiSection } from "@/components/marketing/emlakfiyati-section";
+import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
 import { Faq, buildHomeFaqs } from "@/components/marketing/faq";
 import { Highlights } from "@/components/marketing/highlights";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
@@ -29,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * hero'da istemci JS yok. Public sayfa her zaman açık temadır.
  */
 export default async function HomePage() {
-  const pricing = await getPublicPricing();
+  const [pricing, efCatalog] = await Promise.all([getPublicPricing(), getEfCatalog()]);
   const faqs = buildHomeFaqs({ trialDays: pricing.trialDays, plans: pricing.plans });
   return (
     <div className="mk">
@@ -46,6 +48,7 @@ export default async function HomePage() {
         <HowItWorks trialDays={pricing.trialDays} />
         <SecurityBand />
         <PricingSection pricing={pricing} />
+        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} />
         <Faq items={faqs} />
         <FinalCta trialDays={pricing.trialDays} plans={pricing.plans} />
       </main>

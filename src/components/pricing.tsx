@@ -74,8 +74,7 @@ export function Pricing({
   founders?: PricingFounders | null;
 } = {}) {
   const [yearly, setYearly] = useState(false);
-  const priced = plans.filter((p) => !p.customPricing);
-  const monthsLabels = new Set(priced.map((p) => yearlyOfferLabel(p)));
+  const monthsLabels = new Set(plans.map((p) => yearlyOfferLabel(p)));
   const yearlyBadge = monthsLabels.size === 1 ? [...monthsLabels][0]! : "Yıllık avantaj";
   const cols = plans.length >= 4 ? "lg:grid-cols-4" : plans.length === 3 ? "lg:grid-cols-3" : plans.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-1";
   const trialCta = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
@@ -167,30 +166,20 @@ export function Pricing({
               <p className={`mt-4 text-sm ${plan.popular ? "text-white/75" : "text-text-muted"}`}>{plan.blurb}</p>
 
               <div className="mt-5 flex min-h-12 flex-wrap items-end gap-x-2">
-                {plan.customPricing ? (
-                  <span className={`font-display text-3xl font-bold ${plan.popular ? "text-white" : "text-ink-950"}`}>Özel teklif</span>
-                ) : (
-                  <>
-                    <span className={`font-display text-4xl font-bold tabular-nums ${plan.popular ? "text-white" : "text-ink-950"}`}>
-                      <AnimatedNumber value={price} suffix=" ₺" />
-                    </span>
-                    <span className={`mb-1 text-sm ${plan.popular ? "text-white/70" : "text-text-muted"}`}>/ay</span>
-                    {onCampaign ? (
-                      <span className={`mb-1 text-sm tabular-nums line-through ${plan.popular ? "text-white/60" : "text-text-muted"}`}>
-                        {formatTL(listPrice)} ₺
-                      </span>
-                    ) : null}
-                  </>
-                )}
+                <span className={`font-display text-4xl font-bold tabular-nums ${plan.popular ? "text-white" : "text-ink-950"}`}>
+                  <AnimatedNumber value={price} suffix=" ₺" />
+                </span>
+                <span className={`mb-1 text-sm ${plan.popular ? "text-white/70" : "text-text-muted"}`}>/ay</span>
+                {onCampaign ? (
+                  <span className={`mb-1 text-sm tabular-nums line-through ${plan.popular ? "text-white/60" : "text-text-muted"}`}>
+                    {formatTL(listPrice)} ₺
+                  </span>
+                ) : null}
               </div>
               <p className={`mt-1 text-xs ${plan.popular ? "text-white/65" : "text-text-muted"}`}>
-                {plan.customPricing
-                  ? "Ekibinize göre hazırlanır"
-                  : yearly
-                    ? `Yıllık faturalandırılır (${yearlyOfferLabel(plan)}) · KDV hariç`
-                    : "KDV hariç"}
+                {yearly ? `Yıllık faturalandırılır (${yearlyOfferLabel(plan)}) · KDV hariç` : "KDV hariç"}
               </p>
-              {yearly && !plan.customPricing && yearlySaving > 0 ? (
+              {yearly && yearlySaving > 0 ? (
                 <p className={`mt-2 text-xs font-semibold ${plan.popular ? "text-mint-400" : "text-mint-700"}`}>
                   Yılda {formatTL(yearlySaving)} ₺ tasarruf
                 </p>
@@ -211,9 +200,9 @@ export function Pricing({
                   </li>
                 ))}
               </ul>
-              {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0) ? (
+              {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0, plan.efCreditsPerExtraSeat) ? (
                 <p className={`mt-3 text-xs font-semibold ${plan.popular ? "text-mint-400" : "text-mint-700"}`}>
-                  {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0)}
+                  {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0, plan.efCreditsPerExtraSeat)}
                 </p>
               ) : null}
               {extra ? (
@@ -235,15 +224,15 @@ export function Pricing({
               </ul>
 
               <Link
-                href={plan.customPricing ? "/demo" : `/kayit?plan=${plan.id}&cycle=${yearly ? "yearly" : "monthly"}`}
+                href={`/kayit?plan=${plan.id}&cycle=${yearly ? "yearly" : "monthly"}`}
                 className={`btn-shine mt-7 inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
                   plan.popular ? "bg-white text-ink-950 hover:bg-white/90" : "bg-brand-600 text-white hover:bg-brand-700"
                 }`}
               >
-                {plan.customPricing ? "Bize ulaşın" : trialCta} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
+                {trialCta} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
               </Link>
               <p className={`mt-3 flex items-center justify-center gap-1.5 text-xs ${plan.popular ? "text-white/65" : "text-text-muted"}`}>
-                <ShieldCheck aria-hidden className="h-3.5 w-3.5" /> Demo çalışma alanıyla özellikleri keşfedin
+                <ShieldCheck aria-hidden className="h-3.5 w-3.5" /> Kredi kartı gerekmez, deneme boyunca tüm özellikler açık
               </p>
             </div>
           );
