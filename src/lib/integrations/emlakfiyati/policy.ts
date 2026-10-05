@@ -44,7 +44,45 @@ export const EMLAKFIYATI_ALLOWED_HEADERS = [
   "cache-control",
   "x-ortak-kullanici-ref",
   "idempotency-key",
+  "content-type",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Ortak API v1 yolları (ayrı liste: yalnız bu yollar + dinamik rapor yolları; `/api/parsel/rapor` ASLA)
+// ---------------------------------------------------------------------------
+
+export const EMLAKFIYATI_ORTAK_PATHS = [
+  "/api/ortak/v1/degerleme",
+  "/api/ortak/v1/kullanim",
+] as const;
+export type EmlakFiyatiOrtakPath = (typeof EMLAKFIYATI_ORTAK_PATHS)[number];
+
+/** Anahtarsız mahalle referans uçları (Ortak API sözleşmesinin parçası değil; yalnız bu 3 yol). */
+export const EMLAKFIYATI_REFERENCE_PATHS = [
+  "/api/musteri/iller",
+  "/api/musteri/ilceler",
+  "/api/musteri/mahalleler",
+] as const;
+export type EmlakFiyatiReferencePath = (typeof EMLAKFIYATI_REFERENCE_PATHS)[number];
+
+const ORTAK_REPORT_PATH_RE = /^\/api\/ortak\/v1\/rapor\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\.pdf)?$/i;
+
+export function isOrtakReportPath(path: string): boolean {
+  return ORTAK_REPORT_PATH_RE.test(path);
+}
+
+export function isAllowedOrtakPath(path: string): boolean {
+  return (EMLAKFIYATI_ORTAK_PATHS as readonly string[]).includes(path) || isOrtakReportPath(path);
+}
+
+export function isAllowedReferencePath(path: string): path is EmlakFiyatiReferencePath {
+  return (EMLAKFIYATI_REFERENCE_PATHS as readonly string[]).includes(path);
+}
+
+/** Anahtarlı (Authorization taşıyan) yollar: eski GET listesi + ortak yollar. Referans yolları anahtarsızdır. */
+export function isKeyedPath(path: string): boolean {
+  return isAllowedPath(path) || isAllowedOrtakPath(path);
+}
 
 // ---------------------------------------------------------------------------
 // Anahtar biçimi
@@ -111,7 +149,18 @@ export function assertAllowedOutbound(url: string, headers: Record<string, strin
   if (parsed.origin !== EMLAKFIYATI_BASE_URL || parsed.username || parsed.password || parsed.hash) {
     throw new EmlakFiyatiPolicyError("path");
   }
-  if (!isAllowedPath(parsed.pathname)) throw new EmlakFiyatiPolicyError("path");
+  const keyed = isKeyedPath(parsed.pathname);
+  const reference = isAllowedReferencePath(parsed.pathname);
+  if (!keyed && !reference) throw new EmlakFiyatiPolicyError("path");
+  // Anahtarsız referans uçlarına kimlik/ortak başlığı ASLA gitmez.
+  if (reference) {
+    for (const name of Object.keys(headers)) {
+      const lower = name.toLowerCase();
+      if (lower === "authorization" || lower === "x-ortak-kullanici-ref" || lower === "idempotency-key") {
+        throw new EmlakFiyatiPolicyError("header");
+      }
+    }
+  }
   for (const name of Object.keys(headers)) {
     if (!(EMLAKFIYATI_ALLOWED_HEADERS as readonly string[]).includes(name.toLowerCase())) {
       throw new EmlakFiyatiPolicyError("header");
@@ -164,7 +213,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** `X-Ortak-Kullanici-Ref` biçimi: 8-64 karakter, [A-Za-z0-9_.:-]. Takma olup olmadığını DENETLEMEZ (bkz. makeOrtakUserRef). */
 export function isValidOrtakUserRef(value: string): boolean {
-  return ORTAK_REF_RE.test(value) && !/^\d+$/.test(value);
+  return ORTAK_REF_RE.test(value) && /\d/.test(value) && !/^\d+$/.test(value) && !/@/.test(value);
 }
 
 /** Ham girdi yalnız Emlaksoft'un iç kullanıcı UUID'si olabilir (e-posta/telefon/TC/ad REDDEDİLİR). */
@@ -172,24 +221,42 @@ export function isAcceptableOrtakRefInput(value: string): boolean {
   return UUID_RE.test(value.trim());
 }
 
+export function isValidIdempotencyKey(value: string): boolean {
+  return IDEMPOTENCY_RE.test(value);
+}
+
 /** Her istek için tekil `Idempotency-Key` (rastgele; tekrar denemede AYNI değeri çağıran yeniden kullanır). */
 export function makeIdempotencyKey(): string {
   return `idem_${globalThis.crypto.randomUUID()}`;
 }
 
-export type OrtakHeaders = { userRef: string; idempotencyKey: string };
+export type OrtakHeaders = { userRef?: string; idempotencyKey?: string };
 
-export function buildEmlakFiyatiHeaders(apiKey: string, ortak?: OrtakHeaders): Record<string, string> {
+export function buildEmlakFiyatiHeaders(
+  apiKey: string,
+  ortak?: OrtakHeaders,
+  extra?: { accept?: "application/json" | "application/pdf"; jsonBody?: boolean },
+): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
-    Accept: "application/json",
+    Accept: extra?.accept ?? "application/json",
     "Cache-Control": "no-store",
   };
+  if (extra?.jsonBody) headers["Content-Type"] = "application/json";
   if (ortak) {
-    if (!isValidOrtakUserRef(ortak.userRef)) throw new EmlakFiyatiPolicyError("header");
-    if (!IDEMPOTENCY_RE.test(ortak.idempotencyKey)) throw new EmlakFiyatiPolicyError("header");
-    headers["X-Ortak-Kullanici-Ref"] = ortak.userRef;
-    headers["Idempotency-Key"] = ortak.idempotencyKey;
+    if (ortak.userRef !== undefined) {
+      if (!isValidOrtakUserRef(ortak.userRef)) throw new EmlakFiyatiPolicyError("header");
+      headers["X-Ortak-Kullanici-Ref"] = ortak.userRef;
+    }
+    if (ortak.idempotencyKey !== undefined) {
+      if (!IDEMPOTENCY_RE.test(ortak.idempotencyKey)) throw new EmlakFiyatiPolicyError("header");
+      headers["Idempotency-Key"] = ortak.idempotencyKey;
+    }
   }
   return headers;
+}
+
+/** Anahtarsız referans uçları için başlıklar: kimlik YOK. */
+export function buildEmlakFiyatiPublicHeaders(): Record<string, string> {
+  return { Accept: "application/json", "Cache-Control": "no-store" };
 }

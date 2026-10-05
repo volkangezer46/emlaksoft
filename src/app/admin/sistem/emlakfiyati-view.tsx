@@ -40,6 +40,8 @@ export async function EmlakFiyatiView() {
         previousUsedLabel={status.previousUsedAt ? relativeTimeTR(status.previousUsedAt) : null}
         ortakFlagOn={status.ortakFlagOn}
         ortakEndpointsVerified={status.ortakEndpointsVerified}
+        ortakProbeOkLabel={status.ortakProbeOkAt ? relativeTimeTR(status.ortakProbeOkAt) : null}
+        ortakProbeInfo={status.ortakProbeInfo}
       />
     </div>
   );

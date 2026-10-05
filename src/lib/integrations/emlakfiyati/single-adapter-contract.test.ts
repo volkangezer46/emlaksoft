@@ -69,9 +69,26 @@ describe("EmlakFiyati tek adaptör sözleşmesi", () => {
     expect(gateCount).toBe(fnCount);
   });
 
-  it("ortak uçlar için uç yolu/şeması yazılmamıştır (yalnız kapı + başlık yardımcıları)", () => {
-    for (const f of nonTest.filter((x) => x.startsWith(ADAPTER_DIR))) {
-      expect(read(f), f).not.toMatch(/\/api\/ortak\/v1\/(?:degerleme|rapor)/);
+  it("ortak uç yolları yalnız adaptör klasöründe; /api/parsel/rapor (eski PDF ucu) HİÇBİR yerde çağrılmaz", () => {
+    expect(nonTest.filter((f) => !f.startsWith(ADAPTER_DIR) && /\/api\/ortak\/v1/.test(read(f)))).toEqual([]);
+    for (const f of nonTest) {
+      // Yalnız yol sabiti/çağrısı aranır; politika dosyasındaki ret açıklaması yorum satırıdır.
+      const code = read(f).split("\n").filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l)).join("\n");
+      expect(code, f).not.toMatch(/["'`]\/api\/parsel\/rapor/);
+    }
+  });
+
+  it("ortak/referans HTTP çağrıları yalnız adapter.ts üzerinden: ortak-client.ts ağa çıkmaz, anahtar çözmez", () => {
+    const client = read(`${ADAPTER_DIR}ortak-client.ts`);
+    expect(client).not.toMatch(/fetch(?:External)?\(/);
+    expect(client).not.toMatch(/resolveEmlakFiyatiKeys|Authorization/);
+  });
+
+  it("kullanıcı arayüzü ve action'lar EmlakFiyati anahtarını/URL'sini görmez (istemci dosyaları adaptörü import etmez)", () => {
+    const clients = nonTest.filter((f) => f.startsWith("src/app/app/degerleme/") && /^["']use client["']/.test(read(f)));
+    expect(clients.length).toBeGreaterThan(0);
+    for (const f of clients) {
+      expect(read(f), f).not.toMatch(/integrations\/emlakfiyati\/(?:adapter|keys|ortak|ortak-client|admin-status)(?![\w-])|ef-credits\/(?:service|wallet)|server-only/);
     }
   });
 });
