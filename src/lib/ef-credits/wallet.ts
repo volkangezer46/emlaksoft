@@ -165,12 +165,15 @@ export async function getEfReport(tenantId: string, raporId: string): Promise<Ef
   }
 }
 
-export async function listEfReports(tenantId: string, limit = 30): Promise<EfReportRow[] | null> {
+/** `onlyUserId` verilirse yalnız o kullanıcının raporları (görünürlük süzgeci DB'de; limit görünür satırlara uygulanır). */
+export async function listEfReports(tenantId: string, limit = 30, onlyUserId?: string | null): Promise<EfReportRow[] | null> {
   try {
-    const { data, error } = await createAdminClient()
+    let q = createAdminClient()
       .from("ef_reports")
       .select(REPORT_COLUMNS)
-      .eq("tenant_id", tenantId)
+      .eq("tenant_id", tenantId);
+    if (onlyUserId) q = q.eq("user_id", onlyUserId);
+    const { data, error } = await q
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) return null;

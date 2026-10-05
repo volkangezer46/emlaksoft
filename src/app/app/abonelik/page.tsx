@@ -64,7 +64,7 @@ const statusLabel: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string; kalem?: string; kullanici?: string; sayfa?: string; yon?: string }>;
+  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string; kalem?: string; kullanici?: string; sayfa?: string; yon?: string; onerilen?: string }>;
 }) {
   const auth = await requireModulePage("billing");
   const sp = await searchParams;
@@ -349,6 +349,7 @@ export default async function BillingPage({
           kalem={sp.kalem}
           kullanici={sp.kullanici}
           sayfa={sp.sayfa}
+          onerilen={sp.onerilen === "1"}
           latestInvoice={packInvoice}
           invoiceIsRecent={packInvoiceRecent}
           allowance={{

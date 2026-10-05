@@ -14,6 +14,7 @@ import { getPlatformStaffIdentity } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
+import { EfCreditBadge } from "@/components/app/ef-credit-badge";
 import { ThemeController } from "@/components/theme-controller";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
@@ -297,6 +298,7 @@ async function AppShell({
             <CommandSearch accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} uiPrefCookie={uiPrefCookie} />
             <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
               <ThemeToggle />
+              {tenantId && !platformStaffFullAccess ? <Suspense fallback={null}><EfCreditBadge tenantId={tenantId} role={effectiveRole} canAccessValuation={effectiveCanAccessModule(effectivePerms ?? {}, "valuation")} valuationClosed={closedModules.includes("valuation")} impersonating={impersonating} /></Suspense> : null}
               {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
               {hasQuickCreate ? <QuickCreateMenu creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} /> : null}
               <Link

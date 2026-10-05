@@ -18,6 +18,7 @@ import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
 import { TvUst, OrnekVeri, OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
 import { AnaHero } from "./_home/hero";
+import { KontorBandi } from "./_home/kontor-bandi";
 import { parsePeriod } from "@/components/ui/premium";
 import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
 import { DuyuruSatiri } from "./_home/duyuru-satiri";
@@ -273,6 +274,9 @@ export default async function AppHomePage({
             </Suspense>
             <Suspense fallback={null}>
               <HosgeldinKredisi ctx={ctx} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <KontorBandi ctx={ctx} valuationClosed={off("valuation")} />
             </Suspense>
             {isManagement ? <KapsamAnahtari params={params} ofis={officeView} /> : null}
           </>

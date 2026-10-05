@@ -423,7 +423,7 @@ function RunOutcome({ run }: { run: RunValuationResult }) {
       return (
         <div role="alert" className="mt-4 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-800">
           <p className="font-semibold">Yetersiz kontör: bu işlem {run.needed} kontör, kalan {run.available}.</p>
-          <p className="mt-1">Kontör eklemek için ofis yöneticinize başvurun veya <Link href="/app/abonelik" className="font-semibold underline">abonelik sayfasına</Link> gidin.</p>
+          <p className="mt-1">Kontör paketlerini <Link href="/app/abonelik?sekme=kontor#paketler" className="font-semibold underline">Abonelik &gt; Kontör</Link> sayfasından alabilirsiniz (satın alma yalnızca ofis sahibi veya genel müdür içindir; değilseniz yöneticinize başvurun).</p>
         </div>
       );
     case "disabled":
