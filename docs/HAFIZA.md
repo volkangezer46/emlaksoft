@@ -18,6 +18,7 @@ referans/ortak motoru (000600), kayıtlı kart (000700), varsayılan program see
 **Depoda YENİ, canlıda UYGULANMAMIŞ dosyalar:** `20260826000900` (hotfix, başka ajan), `20260826001000_growth_dashboard_roles.sql` (PB15: `growth_my_dashboard` /
 `growth_my_partner_dashboard` yalnız owner/gm; +rollback), `20260826001100` (başka ajan). Uygulama sırası ve doğrulama: `docs/runbooks/YAYIN_PENCERESI_2.md` §8; her biri
 backup/PITR teyidi + `check:migrations -- --database` + `db:migrate -- --dry-run` sonrası `--only` ile. Düz `npm run db:migrate` YASAK değildir ama pencere sırasını sahip bilir; bekleyen listesi için dry-run esastır.
+**Migration sırası uyarısı:** aynı fonksiyonu yeniden yazan migration'lar önceki düzeltmeyi ezebilir; 001000 B12'yi ezdi (money_visible + yuvarlanmış davet tutarı kayboldu), `20260826001900_growth_dashboard_b12_reapply.sql` geri getirdi (DOGRULANMADI; sahip uygulayacak).
 Aşağıdaki §2 devamı TARİHSELDİR (uygulama anındaki notlar); güncel durum yalnız bu paragraftır.
 
 **(Tarihsel) 2026-10-05 ilk durum, kullanıcı onayı + yedek/PITR teyidiyle, `--only` ile pencere pencere:** `migrations/` altındaki 41 dosyanın **40'ı CANLIDA UYGULANDI**
