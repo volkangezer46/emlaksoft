@@ -19,6 +19,7 @@ import {
   Megaphone,
   Menu,
   Radar,
+  Receipt,
   Search,
   SearchCheck,
   Palette,
@@ -85,6 +86,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
     title: "Finans",
     items: [
       { href: "/admin/billing", label: "Abonelik & fatura", icon: CreditCard, hint: "MRR & fatura", module: "billing" },
+      { href: "/admin/muhasebe", label: "Muhasebe", icon: Receipt, hint: "Tahsilat, KDV, CSV", module: "billing" },
     ],
   },
   {

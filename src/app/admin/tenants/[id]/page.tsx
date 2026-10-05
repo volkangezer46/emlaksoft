@@ -46,6 +46,7 @@ import { OfficeManagement } from "./office-management";
 import { ModulePanel } from "./module-panel";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import { SubscriptionPanel } from "./subscription-panel";
+import { OfficeFinanceCard } from "@/app/admin/muhasebe/office-finance-card";
 import { SeatInfoCard, loadAdminSeatInfo } from "./seat-info";
 import { CORE_MODULES, moduleForAction } from "./module-map";
 import {
@@ -255,6 +256,9 @@ export default async function AdminTenantDetailPage({
     const seatInfo = await loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats);
     content = (
       <div className="space-y-6">
+        {access.billing ? (
+          <OfficeFinanceCard admin={admin} tenantId={id} sub={kpiData.sub} subscriptionHref={billingHref} />
+        ) : null}
         <SeatInfoCard info={seatInfo} teamHref={access.members ? tabHref("ekip") : undefined} />
         <SubscriptionTab
           sub={kpiData.sub}
