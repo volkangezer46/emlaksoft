@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { normalizeBuyerIdentityNumber } from "@/lib/billing/buyer";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { resolveOfficeGeo } from "@/lib/geo/resolve";
 import { isOnboardingStepId } from "@/lib/onboarding-checklist";
@@ -38,9 +39,13 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
   const licenseNo = String(formData.get("license_no") ?? "").trim().slice(0, 60);
   const name = String(formData.get("name") ?? "").trim().slice(0, 120);
   const addressLine = String(formData.get("address_line") ?? "").trim().slice(0, 200);
+  const taxRaw = String(formData.get("tax_number") ?? "").trim();
+  const taxNumber = taxRaw ? normalizeBuyerIdentityNumber(taxRaw) : null;
+  if (taxRaw && !taxNumber) return { error: "Geçerli bir vergi no (10 hane) ya da T.C. kimlik no (11 hane) girin." };
+  if (addressLine && addressLine.length < 10) return { error: "Açık adres fatura için en az 10 karakter olmalıdır." };
 
   if (formData.has("name") && !name) return { error: "Ofis adı boş bırakılamaz." };
-  if (!phone && !provinceId && !legacyCity && !licenseNo && !name && !addressLine) return { error: "En az bir alanı doldurun." };
+  if (!phone && !provinceId && !legacyCity && !licenseNo && !name && !addressLine && !taxNumber) return { error: "En az bir alanı doldurun." };
   const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
 
@@ -58,6 +63,7 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
   if (licenseNo) patch.license_no = licenseNo;
   if (name) patch.name = name;
   if (addressLine) patch.address_line = addressLine;
+  if (taxNumber) patch.tax_number = taxNumber;
 
   const supabase = await createClient();
   const { error } = await supabase.from("tenants").update(patch).eq("id", gate.tenantId);

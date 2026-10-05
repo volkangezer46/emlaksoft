@@ -8,7 +8,9 @@ import { getGeneralSettings } from "@/lib/platform-flags";
 import {
   MAX_MAINTENANCE_MESSAGE,
   MAX_TRIAL_DAYS,
+  MAX_TRIAL_GRACE_DAYS,
   MIN_TRIAL_DAYS,
+  MIN_TRIAL_GRACE_DAYS,
   PLATFORM_SETTING_KEYS,
 } from "@/lib/platform-setting-keys";
 
@@ -39,6 +41,11 @@ export async function saveGeneralSettings(fd: FormData): Promise<GeneralSettings
     return { error: `Deneme süresi ${MIN_TRIAL_DAYS} ile ${MAX_TRIAL_DAYS} gün arasında bir sayı olmalıdır.` };
   }
   const trialDays = Number(trialRaw);
+  const graceRaw = String(fd.get("trial_grace_days") ?? "").trim();
+  if (!/^[0-9]{1,2}$/.test(graceRaw) || Number(graceRaw) < MIN_TRIAL_GRACE_DAYS || Number(graceRaw) > MAX_TRIAL_GRACE_DAYS) {
+    return { error: `Tolerans süresi ${MIN_TRIAL_GRACE_DAYS} ile ${MAX_TRIAL_GRACE_DAYS} gün arasında bir sayı olmalıdır.` };
+  }
+  const graceDays = Number(graceRaw);
 
   const before = await getGeneralSettings();
   const writes: [string, string][] = [
@@ -46,6 +53,7 @@ export async function saveGeneralSettings(fd: FormData): Promise<GeneralSettings
     [PLATFORM_SETTING_KEYS.maintenanceMessage, message],
     [PLATFORM_SETTING_KEYS.registrationOpen, registrationOpen ? "on" : "off"],
     [PLATFORM_SETTING_KEYS.defaultTrialDays, String(trialDays)],
+    [PLATFORM_SETTING_KEYS.trialGraceDays, String(graceDays)],
   ];
   for (const [key, value] of writes) {
     const ok = await setPlatformSetting(key, value, gate.staff.id);
@@ -57,6 +65,7 @@ export async function saveGeneralSettings(fd: FormData): Promise<GeneralSettings
   if (before.maintenanceMessage !== message) changed.push("Bakım mesajı");
   if (before.registrationOpen !== registrationOpen) changed.push("Kayıt");
   if (before.defaultTrialDays !== trialDays) changed.push("Deneme süresi");
+  if (before.trialGraceDays !== graceDays) changed.push("Askı toleransı");
 
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -64,7 +73,7 @@ export async function saveGeneralSettings(fd: FormData): Promise<GeneralSettings
     entityType: "platform_settings",
     meta: {
       old: before,
-      new: { maintenanceMode: maintenance, maintenanceMessage: message, registrationOpen, defaultTrialDays: trialDays },
+      new: { maintenanceMode: maintenance, maintenanceMessage: message, registrationOpen, defaultTrialDays: trialDays, trialGraceDays: graceDays },
       changed,
     },
   });

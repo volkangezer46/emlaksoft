@@ -9,7 +9,9 @@ import { FormField, FormInput, FormTextarea } from "@/components/ui/form-control
 import {
   MAX_MAINTENANCE_MESSAGE,
   MAX_TRIAL_DAYS,
+  MAX_TRIAL_GRACE_DAYS,
   MIN_TRIAL_DAYS,
+  MIN_TRIAL_GRACE_DAYS,
   type GeneralSettings,
 } from "@/lib/platform-setting-keys";
 
@@ -84,6 +86,15 @@ export function GeneralSettingsForm({ initial, canEdit }: { initial: GeneralSett
           className="max-w-xs"
         >
           <FormInput id="default_trial_days" name="default_trial_days" type="number" inputMode="numeric" min={MIN_TRIAL_DAYS} max={MAX_TRIAL_DAYS} defaultValue={initial.defaultTrialDays} required />
+        </FormField>
+        <FormField
+          label="Deneme sonrası tolerans (gün)"
+          htmlFor="trial_grace_days"
+          required
+          hint={`${MIN_TRIAL_GRACE_DAYS}-${MAX_TRIAL_GRACE_DAYS} gün. Deneme bitip ödeme yapılmazsa bu süre sonunda ofis otomatik askıya alınır; ödeme yapılınca askı kalkar.`}
+          className="max-w-xs"
+        >
+          <FormInput id="trial_grace_days" name="trial_grace_days" type="number" inputMode="numeric" min={MIN_TRIAL_GRACE_DAYS} max={MAX_TRIAL_GRACE_DAYS} defaultValue={initial.trialGraceDays} required />
         </FormField>
       </fieldset>
 

@@ -33,6 +33,7 @@ export function AppSidebar({
   officeName,
   plan,
   trial,
+  trialDaysLeft = null,
   accessibleModules,
   creatableModules,
   lockedHrefs = [],
@@ -47,6 +48,8 @@ export function AppSidebar({
   officeName: string;
   plan: string;
   trial: boolean;
+  /** Deneme ofisinde kalan gün (tenants.trial_ends_at); bilinmiyorsa null. */
+  trialDaysLeft?: number | null;
   /** Etkin izinlere göre erişilebilir modüller (bkz. `getEffectivePermissions`, tenant override'larını içerir) */
   accessibleModules: AppModule[];
   /** "create" yetkisi olan modüller (hızlı eylemler yalnız bunlara çıkar). */
@@ -359,10 +362,20 @@ export function AppSidebar({
           >
             <span className="sb-eyebrow min-w-0 flex-1 truncate uppercase text-white/75">Kullanım</span>
             <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em] text-[var(--gold-300)]">
-              {trial ? "Deneme" : plan}
+              {trial ? (trialDaysLeft != null ? `Deneme · ${trialDaysLeft} gün` : "Deneme") : plan}
             </span>
             <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-white/70 transition-transform ${usageOpen ? "" : "-rotate-90"}`} aria-hidden />
           </button>
+          {trial ? (
+            <Link
+              href="/app/abonelik"
+              onClick={() => setOpen(false)}
+              className="focus-ring mb-1 flex min-h-8 items-center justify-between gap-2 rounded-[var(--radius-control)] bg-[var(--gold-300)]/15 px-2 text-xs font-semibold text-[var(--gold-300)] transition-colors hover:bg-[var(--gold-300)]/25"
+            >
+              <span>{trialDaysLeft != null ? (trialDaysLeft > 0 ? `Denemenin bitmesine ${trialDaysLeft} gün` : "Deneme süren doldu") : "Deneme sürümü"}</span>
+              <span>Plan seç</span>
+            </Link>
+          ) : null}
           {usageOpen ? (
           <div id="sb-kullanim" className="pb-1.5">
           <p className="mt-1 truncate text-sm font-semibold text-white">{officeName}</p>

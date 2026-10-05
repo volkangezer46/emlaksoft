@@ -7,6 +7,7 @@ import { UserMenu } from "@/components/ui/console/user-menu";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
+import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
@@ -87,6 +88,7 @@ type OfficeSummary = {
   brand_color?: string | null;
   created_at?: string | null;
   slug?: string | null;
+  trial_ends_at?: string | null;
 };
 
 /** Bildirim listesi (requireActiveTenant zinciri) Suspense içinde akar. */
@@ -122,7 +124,7 @@ async function AppShell({
   const impersonatedTenantPromise = user && impersonating && claimedTenantId
     ? supabase
         .from("tenants")
-        .select("name, plan, status, brand_color, created_at, slug")
+        .select("name, plan, status, brand_color, created_at, slug, trial_ends_at")
         .eq("id", claimedTenantId)
         .maybeSingle()
     : Promise.resolve({ data: null });
@@ -150,7 +152,7 @@ async function AppShell({
     user
       ? supabase
           .from("profiles")
-          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug)")
+          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug, trial_ends_at)")
           .eq("id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -276,6 +278,7 @@ async function AppShell({
           officeName={office?.name ?? "EmlakSoft Ofis"}
           plan={planLabel(office?.plan ?? "office")}
           trial={office?.status === "trial"}
+          trialDaysLeft={office?.status === "trial" && office.trial_ends_at ? Math.max(0, Math.ceil(msUntil(office.trial_ends_at) / DAY_MS)) : null}
           accessibleModules={accessibleModules}
           creatableModules={creatableModules}
           lockedHrefs={lockedNavHrefs}

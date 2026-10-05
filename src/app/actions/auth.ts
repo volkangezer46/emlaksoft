@@ -23,7 +23,7 @@ import { recordSignupAttributionFromRequest } from "@/lib/growth/capture";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
+import { DEMO_SEED_FAILED_COOKIE, seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
 import { createClient } from "@/lib/supabase/server";
 import {
   generateLoginCode,
@@ -423,7 +423,17 @@ export async function signUp(
   // "Demo verileriyle başla": is_sample işaretli tam demo set; hata kaydı engellemez, ofis sahibi
   // ana ekran / Başlangıç sihirbazından yükleyebilir. Aynı admin client (yeni service_role kullanımı yok).
   if (wantsDemoData(formData)) {
-    await seedDemoDataForNewTenant(admin, tenantId, created.user.id);
+    const demoSeed = await seedDemoDataForNewTenant(admin, tenantId, created.user.id);
+    if (!demoSeed.ok) {
+      // Kayıt başarılı ama örnek veri yüklenemedi: ana ekran "yeniden dene" bandı için kısa ömürlü işaret.
+      (await cookies()).set(DEMO_SEED_FAILED_COOKIE, "1", {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+        sameSite: "lax",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
   }
 
   const supabase = await createClient();

@@ -16,7 +16,7 @@ import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
-import { TvUst, OrnekVeri, YetkiUyari } from "./_home/ust-bolum";
+import { TvUst, OrnekVeri, OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
 import { AnaHero } from "./_home/hero";
 import { parsePeriod } from "@/components/ui/premium";
 import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
@@ -267,6 +267,12 @@ export default async function AppHomePage({
             <AnaHero ctx={ctx} hasName={Boolean(fullName)} params={{ kapsam: params.kapsam, daha: params.daha }} />
             <Suspense fallback={null}>
               <OrnekVeri ctx={ctx} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <OrnekVeriYenileBandi ctx={ctx} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <HosgeldinKredisi ctx={ctx} />
             </Suspense>
             {isManagement ? <KapsamAnahtari params={params} ofis={officeView} /> : null}
           </>

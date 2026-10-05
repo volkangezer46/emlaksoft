@@ -29,6 +29,7 @@ import { CheckoutButton } from "./checkout-button";
 import { CancelPanel } from "./cancel-panel";
 import { CardsPanel } from "./cards-panel";
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { normalizeBuyerIdentityNumber } from "@/lib/billing/buyer";
 import {
   AUTO_RENEW_FLAG_KEY,
   maskedCardLabel,
@@ -85,7 +86,7 @@ export default async function BillingPage({
     { count: branchCount },
   ] = await Promise.all([
     tenantId
-      ? supabase.from("tenants").select("id, name, plan, status").eq("id", tenantId).maybeSingle()
+      ? supabase.from("tenants").select("id, name, plan, status, tax_number, address_line, city, team_size").eq("id", tenantId).maybeSingle()
       : Promise.resolve({ data: null }),
     tenantId
       ? supabase
@@ -217,6 +218,21 @@ export default async function BillingPage({
   const trialDaysLeft = trialEnds ? Math.ceil(msUntil(trialEnds) / DAY_MS) : null;
   const showTrial = (sub?.status ?? "trialing") === "trialing" && trialDaysLeft != null;
 
+  // Fatura bilgisi eksikliği: validateCheckoutBuyer ile AYNI kurallar (geçerli TC/vergi no, adres >= 10, şehir >= 2).
+  const billingMissing: string[] = [];
+  if (tenant) {
+    if (!normalizeBuyerIdentityNumber(tenant.tax_number)) billingMissing.push("vergi no");
+    if (String(tenant.address_line ?? "").trim().length < 10) billingMissing.push("adres");
+    if (String(tenant.city ?? "").trim().length < 2) billingMissing.push("şehir");
+  }
+  // Kayıtta seçilen ekip büyüklüğü (tenants.team_size) ile mevcut koltuk karşılaştırması. Üst sınır tahmindir: "en fazla".
+  const TEAM_SIZE_MAX: Record<string, number> = { "1": 1, "2-10": 10, "10-50": 50 };
+  const teamSizeLabel = tenant?.team_size === "50+" ? "50+" : tenant?.team_size ?? null;
+  const teamSizeNeed = tenant?.team_size ? TEAM_SIZE_MAX[tenant.team_size] ?? null : null;
+  const seatShortfall = teamSizeNeed != null ? Math.max(0, teamSizeNeed - seatLimit) : tenant?.team_size === "50+" ? Math.max(0, 51 - seatLimit) : 0;
+  const paidInvoiceCount = (invoices ?? []).filter((i) => i.status === "paid").length;
+  const firstPaymentJustNow = Boolean(sp.paid && sp.plan && !packInvoiceRecent && paidInvoiceCount === 1);
+
   return (
     <div className="space-y-6">
       <Link href="/app/ayarlar" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
@@ -258,11 +274,30 @@ export default async function BillingPage({
           </span>
         </div>
       ) : null}
+      <ReferralNudge moment="first_payment" show={firstPaymentJustNow} />
       <ReferralNudge moment="credit_purchase" show={Boolean(sp.paid && packInvoiceRecent && packInvoice?.status === "paid")} />
       {sp.error ? (
         <div className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600">
           Ödeme tamamlanamadı ({sp.error}). Destek veya tekrar deneyin.
         </div>
+      ) : null}
+
+      {billingMissing.length > 0 && isSeatOwner ? (
+        <Link
+          href="/app/ayarlar#marka-kimlik"
+          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-700"
+        >
+          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Şirket bölümünden tamamlayın.
+        </Link>
+      ) : null}
+
+      {seatShortfall > 0 && isSeatOwner ? (
+        <Link
+          href={seatSupport.displayEnabled ? "#koltuk" : "/app/ekip"}
+          className="block rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/5 px-4 py-3 text-sm font-medium text-ink-950"
+        >
+          Kayıtta {teamSizeLabel} kullanıcı seçtiniz; planınızda {seatLimit} koltuk var, en fazla {seatShortfall} ek koltuk gerekebilir. Koltukları görün.
+        </Link>
       ) : null}
 
       {pendingCancel && cancelSupported ? (

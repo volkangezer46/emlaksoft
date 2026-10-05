@@ -35,7 +35,7 @@ export default async function OnboardingPage({
     getLossReasonOptions(),
     getStageLabels(),
     getProvinceOptions(),
-    supabase.from("tenants").select("province_id, district_id").eq("id", tenantId).maybeSingle(),
+    supabase.from("tenants").select("province_id, district_id, tax_number").eq("id", tenantId).maybeSingle(),
   ]);
   if (!snap) {
     return (
@@ -82,6 +82,7 @@ export default async function OnboardingPage({
           districtId: (geoRow?.district_id as string | null) ?? null,
           addressLine: tenant?.address_line ?? "",
           licenseNo: tenant?.license_no ?? "",
+          taxNumber: (geoRow?.tax_number as string | null) ?? "",
           logoUrl: tenant?.logo_url ?? null,
         }}
         lossReasons={lossReasons.map((r) => ({ value: r.value, label: r.label }))}

@@ -224,8 +224,8 @@ describe("bayrak etiketleri ve tetik kartları", () => {
     expect(flagLabel("same_tax_no")).toBe("Aynı vergi numarası");
     expect(flagLabel("yeni_bayrak")).toBe("yeni_bayrak");
   });
-  it("tetik anı kartları: sabit tutar/yüzde YOK, 4 an, depolama anahtarı ayrı", () => {
-    expect(NUDGE_MOMENTS).toHaveLength(4);
+  it("tetik anı kartları: sabit tutar/yüzde YOK, 5 an, depolama anahtarı ayrı", () => {
+    expect(NUDGE_MOMENTS).toHaveLength(5);
     for (const m of NUDGE_MOMENTS) {
       const c = NUDGE_COPY[m];
       expect(`${c.title} ${c.text} ${c.cta}`).not.toMatch(/\d+\s*TL|%\s*\d|bedava|ücretsiz/i);
