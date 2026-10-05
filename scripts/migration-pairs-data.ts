@@ -101,6 +101,8 @@ const F = {
   efPlanCreditValues: "20260826001100_ef_plan_credit_values.sql",
   // EF plan kontoru devir tavani (ef_credit_expire_plan) + hos geldin ayar seed'i. 000100 SONRASI.
   efPlanExpiry: "20260826001200_ef_plan_credit_expiry.sql",
+  // EF mutabakat calistirma kaydi (yeni tablo; yalniz ek). 000100 SONRASI.
+  efReconciliationRuns: "20260826001300_ef_reconciliation_runs.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -174,6 +176,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.defaultProgram]: "davranis", // yalniz VERI seed: referans bayragi ACIK, hos geldin 300 TL, katalog kaydi, EF paketleri; mevcut admin degerleri korunur
     [F.growthHotfix]: "davranis", // yalniz fonksiyon govdeleri (CREATE OR REPLACE, md5 korumali) + seed kural satiri; sema/bayrak DEGISMEZ; acik programin guvenlik denetimi duzeltmeleri (B1-B3, B9-B12, B16)
     [F.efPlanCreditValues]: "davranis", // yalniz VERI: billing.plan_definitions icinde dokunulmamis efCreditsPerExtraSeat/efCreditsMonthly onerilene cekilir; admin degerleri korunur
+    [F.efReconciliationRuns]: "ek", // yeni tablo (yazma yalniz service_role, okuma platform personeli); kod tablo yokken zarifce atlar
     [F.growthDashboardRoles]: "davranis", // growth_my_dashboard/partner_dashboard yalniz owner/gm icin veri doner (digerlerine NULL); govdeler aksi ayni
     [F.efPlanExpiry]: "ek", // yeni service_role RPC (ef_credit_expire_plan) + source CHECK'e 'expire' + ayar seed'i; mevcut satir/davranis ayni
     [F.paymentCards]: "ek", // yeni 2 tablo + service_role RPC; kod tablolar yokken zarifce kapali (kart saklama + otomatik yenileme altyapisi)
@@ -257,6 +260,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB15-buyume-rol-kapisi", order: 28, title: "Ofis buyume RPC rol kapisi (growth_my_dashboard/partner_dashboard yalniz owner/gm)", files: [F.growthDashboardRoles] },
     { id: "PB17-ef-plan-kontor", order: 29, title: "Plan kontor degerleri (ek kullanici basi 5/6/6/6, Business 240; yalniz dokunulmamis kayit)", files: [F.efPlanCreditValues] },
     { id: "PB18-ef-plan-kontor-devir", order: 29.3, title: "EF plan kontoru devir tavani (ef_credit_expire_plan, source expire) + hos geldin ayar seed'i", files: [F.efPlanExpiry] },
+    { id: "PB19-ef-mutabakat", order: 29.7, title: "EF kontor gunluk mutabakat kayitlari (ef_reconciliation_runs)", files: [F.efReconciliationRuns] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
@@ -334,6 +338,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efPack, F.efWallet],
     [F.efPack, F.seatFulfillment],
     [F.efPlanExpiry, F.efWallet],
+    [F.efReconciliationRuns, F.efWallet],
     // TL kredi: defter source CHECK'inde refund/bonus + meta (000100) -> cuzdan (000400) -> fatura odeme (000500).
     [F.tryWallet, F.efWallet],
     [F.tryWallet, F.growthReferral],
