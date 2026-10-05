@@ -5,9 +5,11 @@ import { bodyMd5FromFile, extractFunctionBodies } from "@/lib/migration-rehearsa
 import {
   EF_GRANT_KINDS,
   EF_RPC,
+  EF_RPC_EXPIRE_PLAN,
   efIdempotencyKey,
   efPackSchema,
   type EfBalance,
+  type EfExpireResult,
   type EfGrantResult,
   type EfSettleResult,
 } from "./config";
@@ -21,6 +23,8 @@ const WALLET = read("supabase/migrations/20260826000100_ef_credit_wallet.sql");
 const REPORTS = read("supabase/migrations/20260826000200_ef_reports.sql");
 const PACK = read("supabase/migrations/20260826000300_ef_credit_pack_fulfillment.sql");
 const SEAT = read("supabase/migrations/20260825000600_seat_purchase_fulfillment.sql");
+const EXPIRE = read("supabase/migrations/20260826001200_ef_plan_credit_expiry.sql");
+const EXPIRE_RB = read("supabase/rollbacks/20260826001200_ef_plan_credit_expiry.rollback.sql");
 const PACK_RB = read("supabase/rollbacks/20260826000300_ef_credit_pack_fulfillment.rollback.sql");
 
 /** `create or replace function public.<name>(<params>)` başlığındaki parametre adları (sıra korunur). */
@@ -204,5 +208,39 @@ describe("kontör paketi faturası (20260826000300): taban 20260825000600 bayt b
     for (const fn of ["fulfill_billing_payment", "fulfill_billing_payment_v2"]) {
       expect(bodyMd5FromFile(PACK_RB, fn), fn).toBe(bodyMd5FromFile(SEAT, fn));
     }
+  });
+});
+
+const EXPIRE_KEYS: Record<keyof EfExpireResult, true> = { ok: true, already: true, expired: true, available: true };
+
+describe("plan kontörü devir tavanı (20260826001200) = config.ts EF_RPC_EXPIRE_PLAN", () => {
+  it("ad, parametreler ve dönüş anahtarları birebir", () => {
+    expect(EF_RPC_EXPIRE_PLAN).toBe("ef_credit_expire_plan");
+    expect(paramNames(EXPIRE, EF_RPC_EXPIRE_PLAN)).toEqual(["p_tenant", "p_keep", "p_idem"]);
+    const b = bodyOf(EXPIRE, EF_RPC_EXPIRE_PLAN);
+    for (const k of Object.keys(EXPIRE_KEYS)) expect(b, k).toContain(`'${k}'`);
+  });
+
+  it("service_role-only SECURITY DEFINER, advisory kilit, idempotency, negatif bakiye yok", () => {
+    const stmt = statementOf(EXPIRE, EF_RPC_EXPIRE_PLAN);
+    expect(stmt).toMatch(/security definer/);
+    expect(stmt).toMatch(/set search_path = ''/);
+    const b = bodyOf(EXPIRE, EF_RPC_EXPIRE_PLAN);
+    expect(b).toMatch(/auth\.role\(\) is distinct from 'service_role'/);
+    expect(b).toContain("pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('ef-credit:' ||");
+    expect(b).toContain("'ef:expire:' || p_tenant::text || ':' || p_idem");
+    expect(b).toMatch(/least\(\s*greatest\(v_available, 0\)/);
+    expect(b).toMatch(/\(p_tenant, 'ef', 'spend', -v_excess, 'expire', v_key, 'ef_expire_plan'/);
+    expect(EXPIRE).toMatch(/revoke all on function public\.ef_credit_expire_plan\(uuid, integer, text\) from public, anon, authenticated;/);
+    expect(EXPIRE).toMatch(/grant execute on function public\.ef_credit_expire_plan\(uuid, integer, text\) to service_role;/);
+  });
+
+  it("ef satır CHECK'ine dokunmaz; source CHECK'e yalnız 'expire' eklenir; ön koşul 000100'ü arar; rollback RPC'yi kaldırır", () => {
+    expect(EXPIRE).not.toMatch(/alter table[^;]*(add|drop) constraint (if exists )?account_credit_ledger_ef_entry_check/i);
+    expect(EXPIRE).toContain("check (source in ('referral', 'partner', 'campaign', 'manual', 'usage', 'plan', 'purchase', 'bonus', 'refund', 'expire'))");
+    expect(EXPIRE).toContain("to_regprocedure('public.ef_credit_balance(uuid)') is null");
+    expect(EXPIRE).toContain("insert into public.platform_settings (key, value) values ('ef.welcome_units', '10')");
+    expect(EXPIRE).toMatch(/'ef\.welcome_since'[\s\S]*on conflict \(key\) do nothing/);
+    expect(EXPIRE_RB).toContain("drop function if exists public.ef_credit_expire_plan(uuid, integer, text);");
   });
 });

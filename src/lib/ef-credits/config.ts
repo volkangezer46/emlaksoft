@@ -21,6 +21,18 @@ export const EF_UNIT = "ef" as const;
 export const EF_WELCOME_SETTING_KEY = "ef.welcome_units";
 export const EF_WELCOME_DEFAULT_UNITS = 10;
 
+/**
+ * Hoş geldin kontörünün başlangıç anı (ISO; migration 20260826001200 uygulama zamanı yazar): yalnız `tenants.created_at`
+ * bu andan SONRA/eşit olan ofisler alır, mevcut ofislere GERİYE DÖNÜK dağıtım yok. Ayar yok/geçersizse null = kimse almaz.
+ */
+export const EF_WELCOME_SINCE_SETTING_KEY = "ef.welcome_since";
+
+export function parseEfWelcomeSince(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : null;
+}
+
 export function parseEfWelcomeUnits(raw: string | null | undefined): number {
   if (raw == null || raw === "") return EF_WELCOME_DEFAULT_UNITS;
   const n = Number(raw);
@@ -147,6 +159,11 @@ export type EfReserveResult =
   | { ok: false; code: "insufficient"; available: number };
 export type EfSettleResult = { ok: boolean; state: "reserved" | "committed" | "released" | "unknown"; already: boolean };
 export type EfGrantResult = { ok: boolean; already: boolean; available: number };
+
+/** `ef_credit_expire_plan` (20260826001200): plan kontörü devir tavanı; `expired` = bu çağrıda düşülen kontör. */
+export type EfExpireResult = { ok: boolean; already: boolean; expired: number; available: number };
+/** (p_tenant uuid, p_keep int, p_idem text) -> jsonb EfExpireResult; service_role-only. Cüzdan 000100 `EF_RPC` kümesinden AYRIDIR. */
+export const EF_RPC_EXPIRE_PLAN = "ef_credit_expire_plan" as const;
 
 export const EF_GRANT_KINDS = ["purchase", "plan_monthly", "bonus", "admin", "refund"] as const;
 export type EfGrantKind = (typeof EF_GRANT_KINDS)[number];
