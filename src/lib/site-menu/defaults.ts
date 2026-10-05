@@ -138,6 +138,7 @@ function defaultFooter(): FooterColumn[] {
         link("yasal-mesafeli", "Mesafeli Satış Sözleşmesi", "/mesafeli-satis"),
         link("yasal-on-bilgi", "Ön Bilgilendirme", "/on-bilgilendirme"),
         link("yasal-iptal", "İptal ve İade", "/iptal-iade"),
+        link("yasal-davet", "Davet ve Ortaklık Koşulları", "/davet-kosullari"),
       ],
     },
     {

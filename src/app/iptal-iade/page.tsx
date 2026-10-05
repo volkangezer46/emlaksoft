@@ -27,6 +27,11 @@ export default function IptalIadePage() {
           üzerinden dilediğiniz an iptal edebilirsiniz. İptal, mevcut fatura döneminin sonunda yürürlüğe girer;
           dönem sonuna kadar hizmete erişiminiz devam eder. Taahhüt yoktur, cayma bedeli alınmaz.
         </p>
+        <p>
+          Kayıtlı kartınız ve ayrıca verdiğiniz açık rızanız varsa dönem sonunda otomatik tahsilat yapılır; bu rızayı
+          panelden dilediğiniz an geri alabilirsiniz. Rızanız yoksa dönem sonunda hatırlatma ve ödeme bağlantısı
+          iletilir; ödeme yapılmazsa abonelik yenilenmez. Kart bilgileriniz EmlakSoft&apos;ta değil iyzico&apos;da saklanır.
+        </p>
       </LegalSection>
 
       <LegalSection no="3." title="Cayma Hakkı ve İade">
@@ -35,6 +40,12 @@ export default function IptalIadePage() {
           <li>Onayınızla hizmetin ifasına derhâl başlandığından, kullanılan döneme isabet eden bedel Mesafeli Sözleşmeler Yönetmeliği m.15/1-ğ uyarınca iade kapsamı dışındadır.</li>
           <li>Yıllık planlarda, kullanılmamış tam aylara isabet eden bedel talep hâlinde iade edilir.</li>
           <li>Onaylanan iadeler, bildirimin ulaşmasından itibaren <b>14 gün</b> içinde, ödemenin yapıldığı yöntemle iade edilir.</li>
+          <li>
+            <b>Kredi ve nakit ayrımı:</b> Fatura kısmen hesap kredisiyle ödenmişse, kartla ödenen tutar karta (nakit
+            olarak), krediyle karşılanan tutar ise hesap kredisi olarak iade edilir. Hesap kredisi hiçbir hâlde
+            nakde çevrilmez. Davet ödülüne dayanak olan bir fatura iade edilirse ilgili ödül de{" "}
+            <Link className="font-semibold text-brand-600" href="/davet-kosullari">Davet ve Ortaklık Programı Koşulları</Link> uyarınca geri alınır.
+          </li>
         </ul>
       </LegalSection>
 

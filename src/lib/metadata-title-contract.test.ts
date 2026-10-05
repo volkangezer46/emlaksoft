@@ -12,6 +12,7 @@ const legalPages = {
   "src/app/cerez-politikasi/page.tsx": ["/cerez-politikasi", "Çerez Politikası"],
   "src/app/on-bilgilendirme/page.tsx": ["/on-bilgilendirme", "Ön Bilgilendirme Formu"],
   "src/app/mesafeli-satis/page.tsx": ["/mesafeli-satis", "Mesafeli Satış Sözleşmesi"],
+  "src/app/davet-kosullari/page.tsx": ["/davet-kosullari", "Davet ve Ortaklık Programı Koşulları"],
 } as const;
 
 function source(file: string): string {

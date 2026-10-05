@@ -102,7 +102,8 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
               {ov.rewardText ? (
                 <p>
                   Her başarılı davet için: {ov.rewardText}. Ödül, davet ettiğiniz ofis ilk gerçek ödemesini yaptıktan, <strong className="text-ink-950">bir kez yenileyip</strong> aboneliği aktif kaldıktan ve
-                  bekleme süresi dolduktan sonra yüklenir; deneme süresi veya kayıt tek başına ödül vermez. İade, iptal ya da ters ibrazda ödül geri alınır.
+                  bekleme süresi dolduktan sonra yüklenir; deneme süresi veya kayıt tek başına ödül vermez. İade, iptal ya da ters ibrazda ödül geri alınır.{" "}
+                  <Link href="/davet-kosullari" className="font-semibold text-brand-600 hover:underline">Davet ve Ortaklık Programı Koşulları</Link>
                 </p>
               ) : (
                 <p>Şu an tanımlı bir ödül kuralı yok; bu sayfa yalnız davetlerinizi takip eder ve ödül vaat etmez.</p>

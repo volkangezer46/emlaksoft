@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Gift } from "lucide-react";
 import { formatTry } from "@/lib/format";
 
@@ -19,6 +20,10 @@ export function InviteBanner({ invite }: { invite: InviteBannerData | null }) {
       </span>
       <div className="min-w-0">
         <p className="font-semibold text-ink-950">{invite.officeName} sizi EmlakSoft&apos;a davet etti</p>
+        <p className="mt-0.5 text-xs text-text-muted">
+          Davet bağlantısı davetçi ofisin kendi paylaşımıdır; ayrıntılar{" "}
+          <Link href="/davet-kosullari" target="_blank" className="font-semibold text-brand-600 hover:underline">Davet Koşulları</Link>&apos;nda.
+        </p>
         {invite.welcomeCreditTry > 0 ? (
           <p className="mt-0.5 text-xs text-text-muted">
             İlk ödemenizi yaptığınızda hesabınıza {formatTry(invite.welcomeCreditTry)} hoş geldin kredisi yüklenir; sonraki faturanızdan düşer (fatura payı sınırı geçerlidir).

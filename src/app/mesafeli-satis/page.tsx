@@ -17,8 +17,16 @@ export default function MesafeliSatisPage() {
         <p>
           <b>Sağlayıcı:</b> EmlakSoft (&quot;Platform&quot;) — iletişim:{" "}
           <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>.
-          Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme sayfasındaki sözleşme onay ekranında ve faturada yer alır.
+          Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme sayfasındaki sözleşme onay ekranında ve faturada da yer alır.
         </p>
+        {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. AVUKAT ONAYI GEREKİR. */}
+        <ul className="list-disc space-y-1 pl-5">
+          <li><b>Ticari ünvan:</b> [ŞİRKET ÜNVANI — DOLDURULACAK]</li>
+          <li><b>Adres:</b> [TEBLİGAT ADRESİ — DOLDURULACAK]</li>
+          <li><b>MERSİS no:</b> [MERSİS NUMARASI — DOLDURULACAK]</li>
+          <li><b>Vergi dairesi / vergi no:</b> [VERGİ DAİRESİ VE NUMARASI — DOLDURULACAK]</li>
+          <li><b>KEP adresi:</b> [KEP ADRESİ — DOLDURULACAK]</li>
+        </ul>
         <p>
           <b>Alıcı:</b> Platform üzerinde abonelik satın alan gerçek veya tüzel kişi (&quot;Müşteri&quot;). Sipariş
           sırasında verilen kimlik, iletişim ve fatura bilgileri esas alınır.
@@ -44,9 +52,20 @@ export default function MesafeliSatisPage() {
       <LegalSection no="4." title="Bedel ve Ödeme">
         <p>
           Abonelik bedeli, seçilen plana ve fatura dönemine (aylık/yıllık) göre sipariş ekranında KDV dâhil olarak
-          gösterilir. Ödemeler, lisanslı ödeme kuruluşu aracılığıyla kredi/banka kartı ile tahsil edilir; kart
-          bilgileri Platform tarafından saklanmaz. Abonelik, dönem sonunda Müşteri iptal etmedikçe aynı koşullarla yenilenir;
-          fiyat değişiklikleri yenileme öncesinde bildirilir.
+          gösterilir. Ödemeler, lisanslı ödeme kuruluşu iyzico aracılığıyla kredi/banka kartı ile tahsil edilir; kart
+          bilgileri Platform&apos;da saklanmaz, iyzico nezdinde saklanır. Platform yalnızca kartın saklama anahtarını, kartın
+          son 4 hanesini ve markasını tutar. Kartınız, yalnızca açık rızanız varsa sonraki ödemeler için kaydedilir.
+        </p>
+        <p>
+          <b>Yenileme:</b> Otomatik tahsilat yalnızca kayıtlı kartınız ve ayrıca verdiğiniz açık rızanız bulunuyorsa
+          yapılır. Aksi hâlde dönem sonunda hatırlatma ve ödeme bağlantısı iletilir; ödeme yapılmazsa abonelik
+          yenilenmez. Fiyat değişiklikleri yenileme öncesinde bildirilir. Otomatik tahsilat rızasını panelden
+          dilediğiniz an geri alabilirsiniz.
+        </p>
+        <p>
+          <b>Hesap kredisi:</b> Davet programı gibi kampanyalarla tanımlanan hesap kredisi, abonelik faturalarında
+          indirim olarak kullanılır; nakde çevrilmez ve devredilemez (ayrıntılar:{" "}
+          <Link className="font-semibold text-brand-600" href="/davet-kosullari">Davet ve Ortaklık Programı Koşulları</Link>).
         </p>
       </LegalSection>
 

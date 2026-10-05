@@ -6,6 +6,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/kvkk-aydinlatma");
 }
 
+// AVUKAT ONAYI GEREKİR: alıcı/yurt dışı aktarım satırları ve veri sorumlusu ünvan/adres (VERBİS) alanları hukuki incelemeye tabidir.
 export default function KvkkAydinlatmaPage() {
   return (
     <LegalPage
@@ -22,7 +23,8 @@ export default function KvkkAydinlatmaPage() {
       <LegalSection no="2." title="İşlenen Kişisel Veriler">
         <ul className="list-disc space-y-1.5 pl-5">
           <li><b>Kimlik &amp; iletişim:</b> ad soyad, e-posta, telefon numarası, firma adı.</li>
-          <li><b>Hesap &amp; işlem:</b> abonelik planı, fatura bilgileri, ödeme kayıtları (kart verileri Platform&apos;da saklanmaz; ödeme kuruluşu üzerinden işlenir).</li>
+          <li><b>Hesap &amp; işlem:</b> abonelik planı, fatura bilgileri, ödeme kayıtları. Kart bilgileri (kart numarası, son kullanma tarihi, CVV) Platform&apos;da saklanmaz; ödeme kuruluşu iyzico tarafından işlenir ve saklanır. Platform yalnızca kartın saklama anahtarını, son 4 hanesini ve markasını tutar; kart yalnızca açık rızanızla kaydedilir.</li>
+          <li><b>Davet programı:</b> davet bağlantısı üzerinden gelen kayıtlarda davet eden ofis ile davet edilen ofis arasındaki ilişki (davet kodu, kayıt ve ödül durumu). Davet eden ofisin adı, kayıt ekranında davet edilene gösterilir.</li>
           <li><b>Kullanım:</b> oturum kayıtları, IP adresi, işlem günlükleri (audit log), cihaz/tarayıcı bilgisi.</li>
           <li><b>Müşteri verileri:</b> Ofisinizin Platform&apos;a girdiği müşteri/portföy kayıtları bakımından ofisiniz veri sorumlusu, EmlakSoft veri işleyendir.</li>
         </ul>
@@ -42,7 +44,20 @@ export default function KvkkAydinlatmaPage() {
           Verileriniz; barındırma ve altyapı hizmeti aldığımız sunucu sağlayıcılarına (veriler Avrupa bölgesi —
           eu-central-1 — veri merkezlerinde tutulur), ödeme kuruluşlarına, SMS/e-posta gönderim sağlayıcılarına ve
           yasal zorunluluk hâlinde yetkili kamu kurumlarına, amaçla sınırlı olarak aktarılabilir. Üçüncü kişilere
-          satış veya pazarlama amaçlı aktarım yapılmaz.
+          satış veya pazarlama amaçlı aktarım yapılmaz. Alıcı grupları ve hizmet sağlayıcılar aşağıdadır:
+        </p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li><b>iyzico (ödeme kuruluşu):</b> abonelik ödemelerinin tahsili, kartın saklanması (açık rızanızla) ve iade işlemleri.</li>
+          <li><b>Supabase (veritabanı ve kimlik doğrulama altyapısı):</b> hesap ve ofis verilerinin barındırılması; Avrupa bölgesi.</li>
+          <li><b>Vercel (uygulama barındırma):</b> uygulamanın sunulması; hizmet sağlayıcının altyapısı Türkiye dışındadır.</li>
+          <li><b>Netgsm (SMS gönderim sağlayıcısı):</b> işlemsel ve izinli SMS iletilerinin iletilmesi (telefon numarası ve ileti metni).</li>
+          <li><b>OpenAI (yapay zekâ asistanı):</b> yapay zekâ özellikleri kullanıldığında, istem metni gönderilmeden önce telefon, T.C. kimlik no, e-posta, IBAN ve kart bilgileri maskelenir; Türkiye dışındaki (ABD) sunucularda işlenir.</li>
+        </ul>
+        <p>
+          <b>Yurt dışına aktarım:</b> Yukarıdaki sağlayıcılardan Vercel ve OpenAI ile bazı hâllerde diğerlerinin
+          alt hizmet sağlayıcıları, verilerin Türkiye dışında işlenmesine yol açabilir. Bu aktarımlar KVKK m.9 ve
+          Kişisel Verileri Koruma Kurulu&apos;nun yurt dışına aktarım düzenlemelerine uygun güvencelerle (açık rıza,
+          standart sözleşme veya yeterli koruma kararı) yapılır; ayrıntılı bilgi için bize başvurabilirsiniz.
         </p>
       </LegalSection>
 

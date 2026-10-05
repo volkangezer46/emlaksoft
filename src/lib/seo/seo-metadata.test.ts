@@ -39,7 +39,7 @@ describe("sayfa metadata'sı: ayar yokken eski metadata sabitleriyle uyum", () =
     expect(m.robots).toBeUndefined();
   });
   it("/demo ve /kayit OG başlıkları", () => {
-    expect(resolvePageMetadata("/demo", G, {}).openGraph).toMatchObject({ title: "EmlakSoft — Ücretsiz Demo", url: "/demo" });
+    expect(resolvePageMetadata("/demo", G, {}).openGraph).toMatchObject({ title: "EmlakSoft — 14 Gün Ücretsiz Dene", url: "/demo" });
     expect(resolvePageMetadata("/kayit", G, {}).openGraph).toMatchObject({ title: "EmlakSoft — Ücretsiz Başla", url: "/kayit" });
     expect(resolvePageMetadata("/kayit", G, {}).title).toBe("Ofisinizi Ücretsiz Oluşturun");
   });
@@ -48,7 +48,7 @@ describe("sayfa metadata'sı: ayar yokken eski metadata sabitleriyle uyum", () =
     expect(resolvePageMetadata("/giris", G, { "/giris": { robotsIndex: true } }).robots).toEqual({ index: false, follow: true });
   });
   it("yasal sayfalar başlık, açıklama ve canonical taşır", () => {
-    for (const p of ["/gizlilik", "/kullanim-sartlari", "/cerez-politikasi", "/kvkk-aydinlatma", "/iptal-iade", "/mesafeli-satis", "/on-bilgilendirme"]) {
+    for (const p of ["/gizlilik", "/kullanim-sartlari", "/cerez-politikasi", "/kvkk-aydinlatma", "/iptal-iade", "/mesafeli-satis", "/on-bilgilendirme", "/davet-kosullari"]) {
       const m = resolvePageMetadata(p, G, {});
       expect(typeof m.title).toBe("string");
       expect(m.description).toBeTruthy();
