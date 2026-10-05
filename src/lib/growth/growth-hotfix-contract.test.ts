@@ -114,8 +114,14 @@ describe("growth hotfix SQL", () => {
 describe("growth hotfix TS kancalari", () => {
   it("admin ters ibraz eylemi ve iyzico webhook'u talepleri geri alir", () => {
     const action = read("src/app/actions/platform-billing.ts");
-    const fn = action.slice(action.indexOf("export async function recordInvoiceChargeback"));
-    expect(fn).toContain('guard("chargeback", true)');
+    // Ters ibraz, kabul listesine yeni service_role satırı eklememek için recordInvoiceRefund içinde kind=chargeback modudur;
+    // recordInvoiceChargeback yalnız ince bir sarmalayıcıdır.
+    const wrapperStart = action.indexOf("export async function recordInvoiceChargeback");
+    const wrapper = action.slice(wrapperStart, action.indexOf("const CAPTURE_ACTIONS", wrapperStart));
+    expect(wrapper).toContain('fd.set("kind", "chargeback")');
+    expect(wrapper).not.toContain("createAdminClient");
+    const fn = action.slice(action.indexOf("export async function recordInvoiceRefund"), action.indexOf("export async function recordInvoiceChargeback"));
+    expect(fn).toContain('guard(isChargeback ? "chargeback" : "refund", true)');
     expect(fn).toContain("reason.length < 3");
     expect(fn).toContain('reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback")');
     const hook = read("src/app/api/iyzico/webhook/route.ts");

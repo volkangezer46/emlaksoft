@@ -83,10 +83,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
   }
 
+  // Tek service_role istemcisi (imza doğrulandıktan sonra): ters ibraz ve fatura tamamlama aynı istemciyi kullanır.
+  const admin = createAdminClient();
+
   // Ters ibraz (chargeback) bildirimi: imza doğrulandıktan sonra faturaya işaretlenir ve davet/ortak ödülleri geri alınır
   // (verilmiş kredi clawback). Bildirim türü iyzico panelinde ayrı etkinleştirilir; tanınmayan türler eskisi gibi yok sayılır.
   if (/chargeback|dispute|ters[\s_-]?ibraz/i.test(iyziEventType) && paymentConversationId) {
-    const admin = createAdminClient();
     const { data: inv } = await admin
       .from("invoices")
       .select("id, status, meta")
@@ -146,7 +148,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, paymentLink: paid });
   }
 
-  const admin = createAdminClient();
   const { data: invoice, error: invoiceError } = await admin
     .from("invoices")
     .select("tenant_id, amount_try, tax_try, total_try, currency, meta")

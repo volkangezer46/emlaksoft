@@ -165,14 +165,51 @@ export async function voidInvoice(formData: FormData): Promise<BillingOpResult> 
  * Tutar: 0 < tutar <= fatura toplamı. Koşullu güncelleme: ikinci tıklama ikinci iade yazmaz.
  */
 export async function recordInvoiceRefund(formData: FormData): Promise<BillingOpResult> {
-  const g = await guard("refund", true);
+  // kind=chargeback: ters ibraz kaydı AYNI işlevde (tek service_role çağrısı, mevcut kabul listesi satırı) işlenir.
+  const isChargeback = String(formData.get("kind") ?? "") === "chargeback";
+  const g = await guard(isChargeback ? "chargeback" : "refund", true);
   if ("error" in g) return { error: g.error };
   const invoiceId = String(formData.get("invoice_id") ?? "");
   if (!UUID.test(invoiceId)) return { error: "Geçersiz fatura." };
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
-  if (reason.length < 3) return { error: "İade nedeni yazın." };
+  if (reason.length < 3) return { error: isChargeback ? "Ters ibraz nedenini yazın." : "İade nedeni yazın." };
 
   const admin = createAdminClient();
+
+  if (isChargeback) {
+    const { data: cb } = await admin.from("invoices").select("id, tenant_id, status, meta").eq("id", invoiceId).maybeSingle();
+    if (!cb) return { error: "Fatura bulunamadı." };
+    if (cb.status !== "paid") return { error: "Yalnız ödenmiş faturaya ters ibraz kaydı düşülür." };
+    const cbMeta = (cb.meta ?? {}) as Record<string, unknown>;
+    if (cbMeta.chargeback) {
+      await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
+      return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
+    }
+    const { data: marked, error: cbError } = await admin
+      .from("invoices")
+      .update({ meta: { ...cbMeta, chargeback: { reason, by: g.staff.id, at: new Date().toISOString(), source: "admin" } } })
+      .eq("id", invoiceId)
+      .eq("status", "paid")
+      .is("meta->chargeback", null)
+      .select("id")
+      .maybeSingle();
+    if (cbError) {
+      console.error("recordInvoiceChargeback", cbError.message);
+      return { error: "Ters ibraz kaydı yazılamadı." };
+    }
+    if (!marked) return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
+    await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
+    await logPlatformActivity({
+      actorId: g.staff.id,
+      action: "billing.invoice.chargeback_recorded",
+      entityType: "invoice",
+      entityId: invoiceId,
+      meta: { tenantId: cb.tenant_id, reason },
+    });
+    refresh(invoiceId);
+    return { ok: true };
+  }
+
   const { data: inv } = await admin
     .from("invoices")
     .select("id, tenant_id, status, total_try, currency, meta")
@@ -279,45 +316,11 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
  * ödül/komisyon talepleri geri alınır, verilmiş kredi clawback edilir. Bu ekran para hareketi yapmaz.
  */
 export async function recordInvoiceChargeback(formData: FormData): Promise<BillingOpResult> {
-  const g = await guard("chargeback", true);
-  if ("error" in g) return { error: g.error };
-  const invoiceId = String(formData.get("invoice_id") ?? "");
-  if (!UUID.test(invoiceId)) return { error: "Geçersiz fatura." };
-  const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
-  if (reason.length < 3) return { error: "Ters ibraz nedenini yazın." };
-
-  const admin = createAdminClient();
-  const { data: inv } = await admin.from("invoices").select("id, tenant_id, status, meta").eq("id", invoiceId).maybeSingle();
-  if (!inv) return { error: "Fatura bulunamadı." };
-  if (inv.status !== "paid") return { error: "Yalnız ödenmiş faturaya ters ibraz kaydı düşülür." };
-  const meta = (inv.meta ?? {}) as Record<string, unknown>;
-  if (meta.chargeback) {
-    await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
-    return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
-  }
-  const { data: updated, error } = await admin
-    .from("invoices")
-    .update({ meta: { ...meta, chargeback: { reason, by: g.staff.id, at: new Date().toISOString(), source: "admin" } } })
-    .eq("id", invoiceId)
-    .eq("status", "paid")
-    .is("meta->chargeback", null)
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    console.error("recordInvoiceChargeback", error.message);
-    return { error: "Ters ibraz kaydı yazılamadı." };
-  }
-  if (!updated) return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
-  await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
-  await logPlatformActivity({
-    actorId: g.staff.id,
-    action: "billing.invoice.chargeback_recorded",
-    entityType: "invoice",
-    entityId: invoiceId,
-    meta: { tenantId: inv.tenant_id, reason },
-  });
-  refresh(invoiceId);
-  return { ok: true };
+  // İş recordInvoiceRefund içinde (kind=chargeback): tek service_role çağrısı, ek kabul listesi satırı gerekmez.
+  const fd = new FormData();
+  for (const [k, v] of formData.entries()) fd.append(k, v);
+  fd.set("kind", "chargeback");
+  return recordInvoiceRefund(fd);
 }
 
 const CAPTURE_ACTIONS = {

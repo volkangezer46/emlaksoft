@@ -23,7 +23,7 @@ export default function KvkkAydinlatmaPage() {
       <LegalSection no="2." title="İşlenen Kişisel Veriler">
         <ul className="list-disc space-y-1.5 pl-5">
           <li><b>Kimlik &amp; iletişim:</b> ad soyad, e-posta, telefon numarası, firma adı.</li>
-          <li><b>Hesap &amp; işlem:</b> abonelik planı, fatura bilgileri, ödeme kayıtları. Kart bilgileri (kart numarası, son kullanma tarihi, CVV) Platform&apos;da saklanmaz; ödeme kuruluşu iyzico tarafından işlenir ve saklanır. Platform yalnızca kartın saklama anahtarını, son 4 hanesini ve markasını tutar; kart yalnızca açık rızanızla kaydedilir.</li>
+          <li><b>Hesap &amp; işlem:</b> abonelik planı, fatura bilgileri, ödeme kayıtları. Kart bilgileri (kart numarası, son kullanma tarihi, kart güvenlik kodu) Platform&apos;da saklanmaz; ödeme kuruluşu iyzico tarafından işlenir ve saklanır. Platform yalnızca kartın saklama anahtarını, son 4 hanesini ve markasını tutar; kart yalnızca açık rızanızla kaydedilir.</li>
           <li><b>Davet programı:</b> davet bağlantısı üzerinden gelen kayıtlarda davet eden ofis ile davet edilen ofis arasındaki ilişki (davet kodu, kayıt ve ödül durumu). Davet eden ofisin adı, kayıt ekranında davet edilene gösterilir.</li>
           <li><b>Kullanım:</b> oturum kayıtları, IP adresi, işlem günlükleri (audit log), cihaz/tarayıcı bilgisi.</li>
           <li><b>Müşteri verileri:</b> Ofisinizin Platform&apos;a girdiği müşteri/portföy kayıtları bakımından ofisiniz veri sorumlusu, EmlakSoft veri işleyendir.</li>
