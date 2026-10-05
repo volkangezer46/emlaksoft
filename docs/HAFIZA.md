@@ -21,9 +21,13 @@ Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son gün
 **GÜNCEL DURUM (2026-10-05, kullanıcı onayı + yedek/PITR teyidiyle, `--only` ile pencere pencere):** `migrations/` altındaki 41 dosyanın **40'ı CANLIDA UYGULANDI**
 (P1-P11b, sec3 düzeltici ve P5 migration'ları ana migration'larıyla aynı pencerede; ilk ikisi — telefon CHECK + kayıp nedeni seed — yanlışlıkla `--help` ile uygulanmıştı, bkz. memory
 `feedback-never-probe-apply-migrations`). `check:migrations -- --database` drift/checksum sorunu YOK. `db:rls-audit`: tenant sızıntısı yok; `coupon_redemptions` ve `direct_file_uploads`
-"RLS açık, politika yok" = yalnız service_role erişimi (beklenen). **KALAN:** `20260816000500_commission_earnings_privacy.sql` (P12, kazanç gizliliği RLS, davranış değiştirir, AYRI pencere +
-rol smoke'u + kullanıcı onayı), K4 `is_document` (dalda) ve `supabase/proposed/` taslakları (geo yönetimi, fiyat bütünlüğü 000500, duraklatma/ek koltuk 000800, koltuk satışı 000900, anket modülü,
-büyüme, AI kredi, vitrin ayarları, malik bağlantısı, sahiplik devri): bunlar hiç uygulanmadı → o özellikler hâlâ "etkin değil". Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı (rol oturumu gerekir).
+"RLS açık, politika yok" = yalnız service_role erişimi (beklenen). **KALAN (canlıda UYGULANMADI):** 2026-10-05'te `supabase/proposed/` taslakları kullanıcı onayıyla `migrations/`'a TERFİ ETTİ:
+`20260825000100..001300` (13 dosya; eski ad → yeni ad, uygulama sırası `--only` listesi ve dosya başına salt-okunur doğrulama:
+`docs/runbooks/YAYIN_PENCERESI_2.md`). Sıra: malik bağlantısı → coğrafya → fiyat bütünlüğü (000300) → koltuk fiyat kilidi → duraklatma/extra_seats
+(000500, D bölümü ÇIKARILDI) → koltuk satışı (000600) → anket → büyüme + tıklama sayacı → AI kredi → vitrin ayarları + SEO opt-in → sahiplik devri →
+**EN SON, AYRI gün:** `20260816000500_commission_earnings_privacy.sql` (P12, kazanç gizliliği RLS, davranış değiştirir + rol smoke'u). Düz `npm run db:migrate`
+YASAK: bekleyenleri ad sırasıyla uygular ve P12'yi (en küçük numara) İLK sıraya koyar. `supabase/proposed/`'da yalnız perf indeks önerileri kaldı
+(`CREATE INDEX CONCURRENTLY` runner transaction'ında çalışmaz + ölçülmemiş; terfi ETMEDİ). K4 `is_document` dalda. Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı.
 Aşağıdaki liste TARİHSEL envanterdir (uygulananlar dahil); güncel bekleyenler için `npm run db:migrate -- --dry-run`.
 
 (Eski not) Canlıda uygulanan son: `20260813000300`. Aşağıdakilerin HİÇBİRİ uygulanmadı; kod hepsinde "etkin değil" ile zarifçe çalışır.
@@ -35,15 +39,14 @@ kvkk_requests rol, property_owner_info update kapsamı, advisor_private PII biç
 migration'larla AYNI pencerede uygulanmalı.** **P5 (`20260824001100..001300`):** mahalle notu sahip/yönetici kapsamı, evrak linki yazma kapsamı, `increment_listing_view`/`increment_referral_click` anon+authenticated
 EXECUTE revoke (ilgili ana migration'ların ARDINDAN, aynı pencerede). **Bilinen açık (sahip kararı, P5 notu `GUVENLIK_DENETIMI_3.md` Ek):** `properties` UPDATE RLS'i
 onay kapısını atlayarak doğrudan PostgREST ile fiyat düşürmeye izin veriyor; `property_price_history` silinebilir; 29 etkin tenant-only yazma politikası ayrı
-düzeltici migration bekliyor (`src/lib/sql-rls-pattern-contract.test.ts` istisna listesi). Coğrafya taslağı `proposed/20261005000600_geo_central_management.sql`,
-sahiplik devri `20261005000700`, faturalama duraklatma `20261005000800` olarak yeniden numaralandı. Koltuk satışı SQL taslağı (`20261005000900`) ve fiyat bütünlüğü (`000500`) sırası:
-000500 → 000800 (D bölümü çıkarılmış) → 000900.
-**Koltuk satışı SQL (`proposed/20261005000900_seat_purchase_fulfillment.sql`, uygulanmadı):** `fulfill_billing_payment` + `_v2` (v2 ayrıca dönemi uzatıyordu: ikisi de
+düzeltici migration bekliyor (`src/lib/sql-rls-pattern-contract.test.ts` istisna listesi). Terfi sonrası adlar (2026-10-05): coğrafya `20260825000200`, sahiplik devri `20260825001300`, fiyat bütünlüğü `20260825000300`,
+duraklatma/extra_seats `20260825000500` (D bölümü çıkarıldı), koltuk satışı `20260825000600`; sıra 000300 → 000500 → 000600 korunur.
+**Koltuk satışı SQL (`migrations/20260825000600_seat_purchase_fulfillment.sql`, eski taslak 20261005000900, uygulanmadı):** `fulfill_billing_payment` + `_v2` (v2 ayrıca dönemi uzatıyordu: ikisi de
 tam gövdeyle yeniden yazıldı), koltuk tetikleyicileri `effective_seat_limit`'e bağlı, `seat_purchase_ready()` (SQL editöründe false döner, doğrulama için başlıktaki katalog sorgusu).
 Ön koşul bloğu canlı gövde md5'ini doğrular, sapmada DURUR. **Açık sahip kararları:** (1) yenilemede ek koltuk ÜCRETLENDİRİLMİYOR (ilk dönemden sonra bedava kalır; geniş satıştan
 önce karar), (2) dahil koltuk iki kaynaktan okunuyor (kod `limits.seats`=15, DB `plan_entitlements.seat_limit`=20 Profesyonel), (3) koltuk fiyat kilidi yazılmıyor,
-(4) koltuk azaltma kodda/şemada yok, yan menü kullanım rozeti ek koltuğu saymıyor. Rollback sırası: 000900 → 000800 → 000500.
-Toplam uygulanmayan migration dosyası şu an 40 civarı (`ls supabase/migrations | awk '$0 > "20260813000300"'`).
+(4) koltuk azaltma kodda/şemada yok, yan menü kullanım rozeti ek koltuğu saymıyor. Rollback sırası: 20260825000600 → 20260825000500 → 20260825000300.
+Toplam uygulanmayan migration dosyası: 14 (P12 `20260816000500` + `20260825000100..001300`); kesin liste salt-okunur `npm run db:migrate -- --dry-run`.
 
 `supabase/migrations/` (ilk 31 dosya, uygulanmayan): 20260814000100 telefon CHECK · 20260815000100 kayıp nedeni seed ·
 20260816000100..001000 (komisyon payı/plan/ödeme, **000500 kazanç gizliliği RLS = davranış değiştirir, AYRI PENCERE**, hedef, atama kuralı) ·
@@ -52,15 +55,16 @@ Toplam uygulanmayan migration dosyası şu an 40 civarı (`ls supabase/migration
 20260817000210 Business planı · 000220 fiyat kilidi · 000230 kuponlar · 20260819010500 abonelik iptal/şube telefonu ·
 010600 kvkk_requests · 020100 ilan sahibi bilgisi · 020200 havuz profil bayrakları · 20260820000100 ofis kontrol.
 
-`supabase/proposed/` (henüz migrations'a TERFİ ETMEDİ; terfide yeni numara şart): vitrin ayarları (060100 eski numaralı!) ·
-vitrin bölümleri/SEO opt-in (010700) · büyüme/referral (20260819000100) · sahiplik devri (020100) ·
-faturalama duraklatma/oransal/Business/koltuk (20260820000100, **oversight ile AYNI numara**) · AI kredi (000300) ·
-anket modülü (010000) · malik bağlantısı (20261005000100) · perf indeksleri.
+`supabase/proposed/` (TARİHSEL; 2026-10-05'te perf indeksleri hariç hepsi `20260825000100..001300` olarak TERFİ ETTİ): vitrin ayarları (060100→001100) ·
+vitrin bölümleri/SEO opt-in (010700→001200) · büyüme/referral (20260819000100→000800) · tıklama sayacı (20260822000100→000900) · sahiplik devri (→001300) ·
+faturalama duraklatma/koltuk (→000500) · AI kredi (→001000) · anket modülü (→000700) · malik bağlantısı (→000100) · coğrafya (→000200) ·
+fiyat bütünlüğü (→000300) · koltuk fiyat kilidi (→000400) · koltuk satışı (→000600). Perf indeksleri proposed'da kaldı (CONCURRENTLY).
 
-**Fiyat bütünlüğü taslağı (tam gövdeli, `pg_get_functiondef+replace` YOK):** `supabase/proposed/20261005000500_billing_plan_amount_integrity.sql`
+**Fiyat bütünlüğü (tam gövdeli, `pg_get_functiondef+replace` YOK):** `supabase/migrations/20260825000300_billing_plan_amount_integrity.sql` (eski taslak 20261005000500)
 (+ rollback). `update_tenant_plan_subscription`, `fulfill_billing_payment` (10 arg), `provision_registration`, `convert_demo_request_to_tenant`
-fonksiyonlarını yeniden yazar (tutar plan tanımından, yıllık = aylık×10, fiyat kilidi yazılır, Business dahil). **`20261005000800_billing_pause_proration_business_seats.sql`
-taslağının D bölümünün YERİNE geçer; o taslak terfi ederken D bölümü ÇIKARILMALI** (aksi halde desen bulunamaz, A/B/C/E de uygulanmaz).
+fonksiyonlarını yeniden yazar (tutar plan tanımından, yıllık = aylık×10, fiyat kilidi yazılır, Business dahil). **`20260825000500_billing_pause_proration_business_seats.sql`
+(eski 20261005000800) dosyasının D bölümünün YERİNE geçer; terfide D bölümü ÇIKARILDI.** Terfide `plan_monthly_amount` yedek tabanı plans.ts ile
+eşitlendi (990/5990 → 749/4990); fulfill gövdesi değişmedi (000600 md5 tabanı korunur).
 Bağımlılıkları: 20260731000140, 20260802000300/400, 20260809000000, 20260810000100, 20260816010100, 20260817000210/220. Uygulanmadan Founders /
 yeni fiyat / admin plan değişimi KAPALI kalmalı. Ayrıca 20260731000138'den kalan 9 argümanlı `fulfill_billing_payment` overload'u eski sabitleri
 taşıyor (ayrı temizlik migration'ı önerilir). Mevcut abonelik tutarları bu migration ile DÜZELTİLMEZ (korunur); veri düzeltme ayrı karar.
