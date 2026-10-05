@@ -7,6 +7,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { creditRestoreForRefund } from "@/lib/try-credits/invoice-credit";
 import { tryRefundIdem, tryRefundInvoice, tryReleaseInvoice } from "@/lib/try-credits/wallet";
+import { reverseClaimsForInvoiceSafe } from "@/lib/growth/engine";
 import { parseMoneyTry, validateRefundAmount, MANUAL_PAYMENT_METHODS, type ManualPaymentMethod } from "@/lib/billing/invoice-ops";
 
 export type BillingOpResult = { ok?: boolean; error?: string; notice?: string };
@@ -200,6 +201,9 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
     return { error: "İade kaydı yazılamadı." };
   }
   if (!updated) return { ok: true, notice: "Bu faturaya iade zaten kaydedilmiş." };
+  // Referans/ortak programı: iade = bu faturaya bağlı ödül/komisyon talepleri geri alınır, verilmiş kredi clawback edilir.
+  // Güvenli kanca: hata iadeyi bozmaz (growth-claims cron'u iade kaydını süpürür).
+  await reverseClaimsForInvoiceSafe(admin, invoiceId, "invoice_refunded");
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.invoice.refund_recorded",

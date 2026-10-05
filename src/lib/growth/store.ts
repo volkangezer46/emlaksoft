@@ -1,6 +1,28 @@
 import { randomInt } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
+import { tryCreditReady } from "@/lib/try-credits/wallet";
+import {
+  engineReady,
+  grantWelcomeSafe,
+  readAdminMetrics,
+  readAdminQueue,
+  readMyDashboard,
+  readMyPartnerDashboard,
+  readReferralSettings,
+  type QueueFilter,
+  type QueueRow,
+  type ReferralSettings,
+} from "@/lib/growth/engine";
+import {
+  computeGrowthMetrics,
+  evaluateReadiness,
+  type GrowthMetrics,
+  type PartnerDashboard,
+  type ReadinessCheck,
+  type ReferralDashboard,
+} from "@/lib/growth/program";
 import {
   GROWTH_FLAGS_OFF,
   GROWTH_SETTING_KEYS,
@@ -27,6 +49,7 @@ export async function getGrowthFlags(): Promise<GrowthFlags> {
     const raw = await getPlatformSettingsMany([
       GROWTH_SETTING_KEYS.referralEnabled,
       GROWTH_SETTING_KEYS.partnerEnabled,
+      GROWTH_SETTING_KEYS.cashPayoutEnabled,
     ]);
     return parseGrowthFlags(raw);
   } catch {
@@ -39,7 +62,8 @@ type RuleRow = RewardRuleView & { id: string };
 function toRuleView(r: Record<string, unknown>): RuleRow {
   return {
     id: String(r.id),
-    reward_type: r.reward_type === "percent_of_payment" ? "percent_of_payment" : "fixed_try",
+    reward_type:
+      r.reward_type === "percent_of_payment" ? "percent_of_payment" : r.reward_type === "monthly_multiple" ? "monthly_multiple" : "fixed_try",
     reward_value: Number(r.reward_value ?? 0),
     duration_months: r.duration_months == null ? null : Number(r.duration_months),
     hold_days: Number(r.hold_days ?? 0),
@@ -63,21 +87,24 @@ async function activeRule(kind: "referral" | "partner"): Promise<RuleRow | null>
   return row ? toRuleView(row as Record<string, unknown>) : null;
 }
 
-export type ReferralInvite = { tenantId: string; at: string; paying: boolean };
-
 export type ReferralOverview = {
   /** false: taslak tablolar yok (migration uygulanmadı). */
   available: boolean;
   enabled: boolean;
   code: string | null;
-  clicks: number;
-  invites: ReferralInvite[];
+  /** growth_my_dashboard (motor migration'ı uygulanmamışsa null: pano yalnız kodu gösterir). */
+  dashboard: ReferralDashboard | null;
   rewardText: string | null;
+  /** Ofis bir ortağın sahibi ise ortak panosu. */
+  partner: PartnerDashboard | null;
 };
 
-/** Ofisin "Arkadaşını getir" özeti. tenantId MUTLAKA oturumdan gelir (RLS yerine açık süzgeç). */
+/**
+ * Ofisin "Davet et ve kazan" panosu. tenantId MUTLAKA oturumdan gelir (RLS yerine açık süzgeç);
+ * pano sayıları oturumlu RPC'den (yalnız kendi tenant'ı) gelir, kişisel veri içermez.
+ */
 export async function getReferralOverview(tenantId: string): Promise<ReferralOverview> {
-  const empty: ReferralOverview = { available: false, enabled: false, code: null, clicks: 0, invites: [], rewardText: null };
+  const empty: ReferralOverview = { available: false, enabled: false, code: null, dashboard: null, rewardText: null, partner: null };
   const flags = await getGrowthFlags();
   empty.enabled = flags.referralEnabled;
   const admin = createAdminClient();
@@ -89,40 +116,16 @@ export async function getReferralOverview(tenantId: string): Promise<ReferralOve
   }
   const code = codeRes.data?.is_active === false ? null : ((codeRes.data?.code as string | undefined) ?? null);
 
-  const attrRes = await admin
-    .from("signup_attributions")
-    .select("tenant_id, created_at")
-    .eq("referrer_tenant_id", tenantId)
-    .eq("ref_kind", "referral")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (attrRes.error) return { ...empty, available: false };
-  const referred = (attrRes.data ?? []).map((r) => ({ tenantId: r.tenant_id as string, at: r.created_at as string }));
-
-  const payingIds = new Set<string>();
-  if (referred.length) {
-    const subs = await admin
-      .from("subscriptions")
-      .select("tenant_id, status")
-      .in("tenant_id", referred.map((r) => r.tenantId))
-      .eq("status", "active");
-    for (const s of subs.data ?? []) payingIds.add(s.tenant_id as string);
-  }
-
-  let clicks = 0;
-  if (code) {
-    const c = await admin.from("growth_click_counters").select("n").eq("kind", "referral").eq("code", code);
-    if (!c.error) clicks = (c.data ?? []).reduce((a, r) => a + Number(r.n ?? 0), 0);
-  }
-
+  const session = await createClient();
+  const [dashboard, partner] = await Promise.all([readMyDashboard(session), readMyPartnerDashboard(session)]);
   const rule = flags.referralEnabled ? await activeRule("referral") : null;
   return {
     available: true,
     enabled: flags.referralEnabled,
     code,
-    clicks,
-    invites: referred.map((r) => ({ ...r, paying: payingIds.has(r.tenantId) })),
+    dashboard,
     rewardText: describeRewardRule(rule),
+    partner,
   };
 }
 
@@ -191,6 +194,8 @@ export async function recordSignupAttributionSafe(tenantId: string, input: Signu
       first_seen_at: new Date().toISOString(),
     });
     if (error && !isMissingTableError(error)) console.error("recordSignupAttribution", error.message);
+    // Davet edilen ofise hoş geldin kredisi (ayar > 0, bayraksız çift, cüzdan hazırsa). Güvenli kanca: kaydı bozmaz.
+    if (!error && refKind === "referral") await grantWelcomeSafe(admin, tenantId);
   } catch (e) {
     console.error("recordSignupAttribution", e);
   }
@@ -243,6 +248,26 @@ export type PartnerRow = {
   contractSigned: boolean;
   signups: number;
   payers: number;
+  /** Faz 2 alanları (motor migration'ı uygulanmamışsa false/null). */
+  isTaxPayer: boolean;
+  hasTaxNo: boolean;
+  ownerTenantId: string | null;
+  ruleId: string | null;
+  pendingTry: number;
+  payableTry: number;
+  paidTry: number;
+};
+
+export type PayoutRow = {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  amountTry: number;
+  method: string;
+  status: string;
+  documentNo: string | null;
+  paidAt: string | null;
+  createdAt: string;
 };
 
 export type RuleAdminRow = RuleRow & {
@@ -252,6 +277,8 @@ export type RuleAdminRow = RuleRow & {
   is_active: boolean;
 };
 
+export type GrowthReadiness = { referral: ReadinessCheck[]; partner: ReadinessCheck[]; cash: ReadinessCheck[] };
+
 export type AdminGrowthOverview = {
   available: boolean;
   flags: GrowthFlags;
@@ -260,11 +287,39 @@ export type AdminGrowthOverview = {
   partners: PartnerRow[];
   rules: RuleAdminRow[];
   counts: { total: number; referral: number; partner: number; powered_by: number; none: number; payers: number };
+  /** Motor (20260826000600) hazırsa; değilse null (sayfa "motor etkin değil" der). */
+  engine: boolean;
+  metrics: GrowthMetrics | null;
+  statusCounts: Record<string, number>;
+  dueNow: number;
+  partnerMoney: { approvedTry: number; paidTry: number } | null;
+  queue: QueueRow[] | null;
+  settings: ReferralSettings | null;
+  payouts: PayoutRow[];
+  readiness: GrowthReadiness;
 };
 
 const ROW_CAP = 1000;
 
-export async function getAdminGrowthOverview(): Promise<AdminGrowthOverview> {
+function emptyReadiness(): GrowthReadiness {
+  const base = {
+    tablesReady: false,
+    engineReady: false,
+    walletReady: false,
+    referralRuleDefined: false,
+    cronFresh: null,
+    welcomeConfigured: false,
+    partnerRuleDefined: false,
+    taxPayerPartnerExists: false,
+  };
+  return {
+    referral: evaluateReadiness(base, "referral"),
+    partner: evaluateReadiness(base, "partner"),
+    cash: evaluateReadiness(base, "cash"),
+  };
+}
+
+export async function getAdminGrowthOverview(opts: { queue?: QueueFilter | null } = {}): Promise<AdminGrowthOverview> {
   const flags = await getGrowthFlags();
   const base: AdminGrowthOverview = {
     available: false,
@@ -274,6 +329,15 @@ export async function getAdminGrowthOverview(): Promise<AdminGrowthOverview> {
     partners: [],
     rules: [],
     counts: { total: 0, referral: 0, partner: 0, powered_by: 0, none: 0, payers: 0 },
+    engine: false,
+    metrics: null,
+    statusCounts: {},
+    dueNow: 0,
+    partnerMoney: null,
+    queue: null,
+    settings: null,
+    payouts: [],
+    readiness: emptyReadiness(),
   };
   const admin = createAdminClient();
   const attr = await admin
@@ -292,16 +356,25 @@ export async function getAdminGrowthOverview(): Promise<AdminGrowthOverview> {
     const subs = await admin.from("subscriptions").select("tenant_id").in("tenant_id", ids).eq("status", "active");
     for (const s of subs.data ?? []) payingIds.add(s.tenant_id as string);
   }
-  const [partnersRes, rulesRes] = await Promise.all([
-    admin.from("growth_partners").select("id, name, partner_type, code, status, contract_signed_at").order("created_at", { ascending: false }).limit(200),
+  const PARTNER_BASE = "id, name, partner_type, code, status, contract_signed_at";
+  const [partnersExt, rulesRes] = await Promise.all([
+    admin
+      .from("growth_partners")
+      .select(`${PARTNER_BASE}, is_tax_payer, tax_no, owner_tenant_id, rule_id`)
+      .order("created_at", { ascending: false })
+      .limit(200),
     admin
       .from("growth_reward_rules")
       .select("id, kind, name, reward_type, reward_value, duration_months, hold_days, monthly_cap_try, is_active")
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
+  // Faz 2 sütunları (20260826000600) yoksa temel sütunlarla devam edilir.
+  const partnersRes = partnersExt.error
+    ? await admin.from("growth_partners").select(PARTNER_BASE).order("created_at", { ascending: false }).limit(200)
+    : partnersExt;
   const partnerName = new Map<string, string>();
-  for (const p of partnersRes.data ?? []) partnerName.set(p.id as string, p.name as string);
+  for (const p of partnersRes.data ?? []) partnerName.set((p as { id: string }).id, (p as { name: string }).name);
 
   const rows: AttributionRow[] = list.map((r) => {
     const t = r.tenants as { name?: string } | { name?: string }[] | null;
@@ -327,8 +400,41 @@ export async function getAdminGrowthOverview(): Promise<AdminGrowthOverview> {
     if (r.paying) counts.payers++;
   }
 
-  const partners: PartnerRow[] = (partnersRes.data ?? []).map((p) => {
+  // Motor (talep/komisyon) verisi: ortak başına bekleyen/ödenebilir/ödenen komisyon.
+  const isEngine = await engineReady(admin);
+  const money = new Map<string, { pending: number; payable: number; paid: number }>();
+  let partnerMoney: AdminGrowthOverview["partnerMoney"] = null;
+  if (isEngine) {
+    const comm = await admin
+      .from("growth_reward_claims")
+      .select("partner_id, status, amount_try, payout_id")
+      .eq("component", "commission")
+      .limit(5000);
+    if (!comm.error) {
+      let approved = 0;
+      let paid = 0;
+      for (const c of comm.data ?? []) {
+        const id = c.partner_id as string;
+        const amt = Number(c.amount_try ?? 0);
+        const m = money.get(id) ?? { pending: 0, payable: 0, paid: 0 };
+        if (c.status === "held" || c.status === "pending") m.pending += amt;
+        else if (c.status === "approved" && !c.payout_id) {
+          m.payable += amt;
+          approved += amt;
+        } else if (c.status === "paid") {
+          m.paid += amt;
+          paid += amt;
+        }
+        money.set(id, m);
+      }
+      partnerMoney = { approvedTry: approved, paidTry: paid };
+    }
+  }
+
+  const partners: PartnerRow[] = (partnersRes.data ?? []).map((raw) => {
+    const p = raw as Record<string, unknown>;
     const mine = list.filter((r) => r.partner_id === p.id);
+    const m = money.get(p.id as string);
     return {
       id: p.id as string,
       name: p.name as string,
@@ -338,6 +444,13 @@ export async function getAdminGrowthOverview(): Promise<AdminGrowthOverview> {
       contractSigned: Boolean(p.contract_signed_at),
       signups: mine.length,
       payers: mine.filter((r) => payingIds.has(r.tenant_id as string)).length,
+      isTaxPayer: p.is_tax_payer === true,
+      hasTaxNo: Boolean(p.tax_no),
+      ownerTenantId: (p.owner_tenant_id as string | null | undefined) ?? null,
+      ruleId: (p.rule_id as string | null | undefined) ?? null,
+      pendingTry: m?.pending ?? 0,
+      payableTry: m?.payable ?? 0,
+      paidTry: m?.paid ?? 0,
     };
   });
   const rules: RuleAdminRow[] = (rulesRes.data ?? []).map((r) => ({
@@ -348,5 +461,77 @@ export async function getAdminGrowthOverview(): Promise<AdminGrowthOverview> {
     is_active: Boolean(r.is_active),
   }));
 
-  return { available: true, flags, rows, capped: list.length >= ROW_CAP, partners, rules, counts };
+  let metrics: GrowthMetrics | null = null;
+  let statusCounts: Record<string, number> = {};
+  let dueNow = 0;
+  let queue: QueueRow[] | null = null;
+  let settings: ReferralSettings | null = null;
+  let payouts: PayoutRow[] = [];
+  if (isEngine) {
+    const [raw, q, st] = await Promise.all([readAdminMetrics(admin), readAdminQueue(admin, opts.queue ?? null, 100), readReferralSettings(admin)]);
+    if (raw) {
+      metrics = computeGrowthMetrics(raw);
+      statusCounts = raw.status_counts;
+      dueNow = raw.due_now;
+    }
+    queue = q;
+    settings = st;
+    const po = await admin
+      .from("growth_partner_payouts")
+      .select("id, partner_id, amount_try, method, status, document_no, paid_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (!po.error) {
+      payouts = (po.data ?? []).map((r) => ({
+        id: r.id as string,
+        partnerId: r.partner_id as string,
+        partnerName: partnerName.get(r.partner_id as string) ?? "Ortak",
+        amountTry: Number(r.amount_try ?? 0),
+        method: r.method as string,
+        status: (r.status as string | null) ?? "paid",
+        documentNo: (r.document_no as string | null) ?? null,
+        paidAt: (r.paid_at as string | null) ?? null,
+        createdAt: r.created_at as string,
+      }));
+    }
+  }
+
+  // Hazırlık kontrolü (bayrak açmadan önce): migration, cüzdan, kural, cron, hoş geldin, ortak kuralı, vergi mükellefi ortak.
+  const walletReady = await tryCreditReady(admin);
+  const hb = await admin.from("cron_heartbeats").select("last_run_at, last_status").eq("job", "growth-claims").maybeSingle();
+  const cronFresh = hb.error ? null : Boolean(hb.data?.last_run_at && Date.now() - Date.parse(hb.data.last_run_at as string) < 3 * 86_400_000 && hb.data.last_status === "ok");
+  const input = {
+    tablesReady: true,
+    engineReady: isEngine,
+    walletReady,
+    referralRuleDefined: rules.some((r) => r.kind === "referral" && r.is_active),
+    cronFresh,
+    welcomeConfigured: (settings?.welcome_credit_try ?? 0) > 0,
+    partnerRuleDefined: rules.some((r) => r.kind === "partner" && r.is_active),
+    taxPayerPartnerExists: partners.some((p) => p.isTaxPayer && p.hasTaxNo && p.status === "active"),
+  };
+  const readiness: GrowthReadiness = {
+    referral: evaluateReadiness(input, "referral"),
+    partner: evaluateReadiness(input, "partner"),
+    cash: evaluateReadiness(input, "cash"),
+  };
+
+  return {
+    available: true,
+    flags,
+    rows,
+    capped: list.length >= ROW_CAP,
+    partners,
+    rules,
+    counts,
+    engine: isEngine,
+    metrics,
+    statusCounts,
+    dueNow,
+    partnerMoney,
+    queue,
+    settings,
+    payouts,
+    readiness,
+  };
 }

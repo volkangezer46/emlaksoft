@@ -34,6 +34,7 @@ import { KpiTile } from "@/components/ui/premium/kpi-card";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
+import { ReferralNudge } from "@/components/app/referral-nudge";
 import { loadSeatUsageSummary } from "@/lib/billing/seat-purchase";
 
 export const metadata = { title: "Ekip Merkezi" };
@@ -243,6 +244,7 @@ export default async function TeamPage() {
               </div>
 } />
 <SeatLimitBanner summary={seatSummary} />
+      <ReferralNudge moment="team_grew" show={activeCount >= 3} />
 <KpiGrid count={kpis.length}>
         {kpis.map((k) => (
           <KpiTile key={k.label} label={k.label} value={k.value} icon={k.icon} href={k.href} tone="brand" dim={k.value === 0} />

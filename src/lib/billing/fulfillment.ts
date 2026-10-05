@@ -5,6 +5,7 @@ import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
 import { TRY_RPC } from "@/lib/try-credits/config";
 import { tryInvoiceHold, tryReleaseInvoice } from "@/lib/try-credits/wallet";
+import { registerClaimSafe } from "@/lib/growth/engine";
 
 export type FulfillInput = {
   tenantId: string;
@@ -217,6 +218,12 @@ export async function fulfillBillingPaymentAtomic(
   }
 
   if (captureId) await transitionCapture(captureId, "fulfilled");
+
+  // Referans/ortak programı: ilk GERÇEK ödemede talep üretimi. Güvenli kanca: idempotent, asla fırlatmaz,
+  // hata ödemeyi BOZMAZ (kaçırılırsa growth-claims cron'u süpürür). fulfill SQL gövdelerine dokunulmaz.
+  if (input.targetType === "subscription" && typeof data.invoiceId === "string") {
+    await registerClaimSafe(admin, data.invoiceId);
+  }
 
   return {
     ...(data as AtomicFulfillmentResult),

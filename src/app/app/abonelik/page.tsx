@@ -28,6 +28,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { CheckoutButton } from "./checkout-button";
 import { CancelPanel } from "./cancel-panel";
 import { KontorSection } from "./kontor-section";
+import { ReferralNudge } from "@/components/app/referral-nudge";
 import { CuzdanSection } from "./cuzdan-section";
 import { readTryOverview } from "@/lib/try-credits/reader";
 import { getTryMaxShare } from "@/lib/try-credits/settings";
@@ -227,6 +228,7 @@ export default async function BillingPage({
           </span>
         </div>
       ) : null}
+      <ReferralNudge moment="credit_purchase" show={Boolean(sp.paid && packInvoiceRecent && packInvoice?.status === "paid")} />
       {sp.error ? (
         <div className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600">
           Ödeme tamamlanamadı ({sp.error}). Destek veya tekrar deneyin.

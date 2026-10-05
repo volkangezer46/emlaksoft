@@ -23,6 +23,7 @@ import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { BoardDeal } from "./deal-board";
 import { DealBoard } from "./deal-board-lazy";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
+import { ReferralNudge } from "@/components/app/referral-nudge";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDealsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
@@ -395,6 +396,7 @@ export default async function DealsPage({
 
   return (
     <div className="space-y-5">
+      <ReferralNudge moment="first_deal" show={(stageCounts.won ?? 0) >= 1} />
       <PageHeader
         title="Anlaşma tahtası"
         eyebrow="Anlaşma hattı"
