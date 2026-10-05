@@ -12,7 +12,14 @@ import { cn } from "@/lib/utils";
  * gezinme, Esc/dışarı tıklama ile kapanma, focus'un tetikleyiciye dönmesi,
  * ekran dışına taşmayı önleyen konumlandırma (collision detection).
  */
-export const DropdownMenu = DropdownMenuPrimitive.Root;
+/**
+ * Varsayılan MODAL DEĞİL: modal menü body'ye kaydırma kilidi (overflow + margin-right telafisi)
+ * ve `pointer-events:none` koyar; kabukta içeriğin kaymasına yol açıyordu (bkz. console.css).
+ * Menü zaten dışarı tıklama/Esc ile kapanır ve odağı tetikleyiciye döndürür; kilide gerek yok.
+ */
+export function DropdownMenu({ modal = false, ...props }: ComponentProps<typeof DropdownMenuPrimitive.Root>) {
+  return <DropdownMenuPrimitive.Root modal={modal} {...props} />;
+}
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 

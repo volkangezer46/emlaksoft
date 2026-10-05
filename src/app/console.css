@@ -162,3 +162,31 @@ html[data-sidebar="collapsed"] .shell-aside .sb-rail { display: block; }
 html[data-sidebar="collapsed"] .shell-aside .sb-expanded { display: none; }
 html[data-sidebar="collapsed"] .shell-aside .nav-search { justify-content: center; padding-inline: 0; }
 .nav-badge.is-ok { background: #0f6b4a; }
+
+/* ---- Kabukta kayma önleme (kullanıcı menüsü / açılır paneller) ----
+   KÖK NEDEN: html `overflow-x: clip` olduğundan Radix modal kilidi (react-remove-scroll) body'ye
+   `overflow:hidden` yazsa da görünüm penceresinin kaydırma çubuğu KALIR; yine de body'ye
+   `margin-right: <çubuk genişliği> !important` ekler. Sonuç: menü açılınca içerik çubuk kadar
+   kayar. Çözüm: çubuk yeri hep ayrılır (scrollbar-gutter) ve kilidin telafisi sıfırlanır; bu
+   kural kilit kullanan tüm bileşenler (Dialog, Select, modal menüler) için TEK yerden geçerlidir.
+   Yalnız kabukta (.shell-aside olan sayfalar): public sayfalar etkilenmez. */
+html:has(.shell-aside) {
+  scrollbar-gutter: stable;
+}
+html:has(.shell-aside) body[data-scroll-locked] {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* ---- Yazı boyutu (Küçük / Normal / Büyük): html[data-font-size] ----
+   Tailwind rem tabanlı olduğundan kök font-size ölçeği tüm arayüzü orantılı büyütür/küçültür.
+   Öznitelik yalnız /app ve /admin'de FontScaleController tarafından yazılır; public sayfalar etkilenmez.
+   Yüzdeler lib/font-scale.ts FONT_SCALES ile senkron (sözleşme testi doğrular). */
+html[data-font-size="sm"] { font-size: 90%; }
+html[data-font-size="md"] { font-size: 100%; }
+html[data-font-size="lg"] { font-size: 112.5%; }
+/* Dokunma hedefi: Büyükte 44px altı etkileşimli öğeler 44px'e çıkar. */
+html[data-font-size="lg"] .nav-row { min-height: 44px; }
+html[data-font-size="lg"] .nav-pin { min-width: 44px; min-height: 44px; }
+html[data-font-size="lg"] .pm-seg a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+html[data-font-size="lg"] :is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]) { min-height: 44px; }

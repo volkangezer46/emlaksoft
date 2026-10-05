@@ -1,6 +1,5 @@
 ﻿import { describe, expect, it } from "vitest";
 import { ACCENTS } from "./theme";
-import { UI_FONTS } from "./ui-prefs";
 import {
   APP_ACTIONS,
   APPEARANCE_COMMANDS,
@@ -84,10 +83,9 @@ describe("palette-core: yeni eylemleri", () => {
   });
 
   describe("görünüm komutları", () => {
-    it("her vurgu teması ve yazı boyutu için komut üretilir (tek kaynak)", () => {
+    it("her vurgu teması için komut üretilir (tek kaynak)", () => {
       const ids = APPEARANCE_COMMANDS.map((c) => c.id);
       for (const a of ACCENTS) expect(ids).toContain(`vurgu:${a.value}`);
-      for (const f of UI_FONTS) expect(ids).toContain(`yazi:${f.value}`);
       expect(new Set(ids).size).toBe(ids.length);
     });
 
@@ -104,20 +102,18 @@ describe("palette-core: yeni eylemleri", () => {
       expect(bordo[0]!.current).toBe(false);
     });
 
-    it("yazı boyutu ve sade görünüm çerez adı yoksa gizlenir; sade yalnız uygulanabilir yönüyle", () => {
-      expect(getAppearanceCommands("yazı boyutu", { ui: null })).toEqual([]);
-      const ui = { simple: true, font: "large" } as const;
-      expect(getAppearanceCommands("yazı boyutu", { ui }).length).toBe(UI_FONTS.length);
+    it("sade görünüm çerez adı yoksa gizlenir (yazı boyutu paletten kalktı); sade yalnız uygulanabilir yönüyle", () => {
+      expect(getAppearanceCommands("sade görünüm", { ui: null })).toEqual([]);
+      const ui = { simple: true } as const;
+      expect(getAppearanceCommands("yazı boyutu", { ui })).toEqual([]);
       expect(getAppearanceCommands("sade görünüm", { ui }).map((c) => c.id)).toEqual(["sade:off"]);
       expect(getAppearanceCommands("sade görünüm", { ui: { ...ui, simple: false } }).map((c) => c.id)).toEqual(["sade:on"]);
     });
 
-    it("nextUiPrefs yalnız ilgili alanı değiştirir", () => {
-      const cur = { simple: true, font: "large" } as const;
-      expect(nextUiPrefs(cur, { kind: "font", value: "xlarge" })).toEqual({ simple: true, font: "xlarge" });
-      expect(nextUiPrefs(cur, { kind: "simple", value: false })).toEqual({ simple: false, font: "large" });
+    it("nextUiPrefs yalnız sade görünümü değiştirir", () => {
+      const cur = { simple: true } as const;
+      expect(nextUiPrefs(cur, { kind: "simple", value: false })).toEqual({ simple: false });
       expect(nextUiPrefs(cur, { kind: "theme", value: "dark" })).toEqual(cur);
     });
   });
 });
-
