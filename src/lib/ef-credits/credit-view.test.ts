@@ -34,7 +34,7 @@ describe("kontör defter satırı", () => {
 });
 
 describe("admin manuel yükleme doğrulaması", () => {
-  const ok = { tenantId: "3f1c9c2e-1f43-4b0e-9a3c-0d2b5c7e8f10", units: 10, kind: "admin", reason: "Müşteri şikayeti telafisi" };
+  const ok = { tenantId: "3f1c9c2e-1f43-4b0e-9a3c-0d2b5c7e8f10", units: 10, kind: "admin", reason: "Müşteri şikayeti telafisi", idemKey: "11111111-2222-3333-4444-555555555555" };
   it("geçerli", () => expect(efAdminGrantSchema.safeParse(ok).success).toBe(true));
   it("gerekçesiz/kısa gerekçe reddedilir", () => {
     expect(efAdminGrantSchema.safeParse({ ...ok, reason: "" }).success).toBe(false);

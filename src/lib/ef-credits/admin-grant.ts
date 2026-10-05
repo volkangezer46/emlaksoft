@@ -23,6 +23,8 @@ export const efAdminGrantSchema = z.object({
     .max(100000, "Tek seferde en çok 100.000 kontör."),
   kind: z.enum(ADMIN_GRANT_KINDS),
   reason: z.string().trim().min(10, "Gerekçe zorunlu (en az 10 karakter).").max(300, "Gerekçe en çok 300 karakter."),
+  /** Formdan gelen TEK KULLANIMLIK anahtar (çift tıklama/yeniden gönderim aynı yüklemeyi bir kez yapar). */
+  idemKey: z.string().trim().regex(/^[A-Za-z0-9_-]{16,64}$/, "Geçersiz işlem anahtarı; sayfayı yenileyin."),
 });
 export type EfAdminGrantInput = z.infer<typeof efAdminGrantSchema>;
 

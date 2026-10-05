@@ -24,8 +24,20 @@
 --      growth_admin_save_settings, growth_admin_payout_create, growth_admin_partner_update.
 --      ANON (yalniz program aciksa, aktif kod): growth_invite_preview (kayit ekraninda "X sizi davet etti").
 --   Ic yardimcilar (kimseye acik degil): growth_flag_on, growth_public_email_domain, growth_tenant_email_domains,
---      growth_pair_flags, growth_monthly_equiv, growth_real_payment, growth_register_referral, growth_register_partner,
+--      growth_pair_flags, growth_cash_net, growth_monthly_equiv, growth_real_payment, growth_register_referral, growth_register_partner,
 --      growth_reverse_claims, growth_grant_claim, growth_clawback_pending.
+--
+-- GUVENLIK DENETIMI DUZELTMELERI (bu surum)
+--   * Odul/komisyon TABANI = NAKIT net tutar (fatura meta.walletCashTry / 1.2; yoksa amount_try). Kismen hesap kredisiyle
+--     odenen faturada kredi kismi odule esas OLMAZ. Nakit orani growth_referral_settings.min_cash_ratio altindaysa talep
+--     'low_cash_ratio' bayragiyla inceleme kuyruguna (pending) duser.
+--   * Cok hesap: ilk manual_review_first_n (varsayilan 3) davetci talebi ve hos geldin kredisi KULLANAN cift manuel onaya duser
+--     (flags: first_claims_review, welcome_credit_used); otomatik held->paid olmaz.
+--   * Kademe bonusu growth_referral_enabled KAPALIYKEN uretilmez; tarama yalniz ilk-odeme (taban) talepli, bonusu eksik davetcilerle
+--     sinirli ve limitlidir.
+--   * Personel RPC'leri, platform_settings 'platform.mfa_enforced' acikken DB icinde auth.jwt()->>'aal' = 'aal2' ister
+--     (growth_staff_super_admin; ayar yoksa/kapaliysa yalniz super_admin); ayar/ortak/odeme degisiklikleri
+--     append-only growth_admin_audit tablosuna yazilir.
 --
 -- TASARIM KARARLARI
 --   * Odul TETIKLEYICISI: davet edilen ofisin ILK GERCEK ODEMESI (invoices.status='paid', demo/hesap-kredisi-tam/iade yok,
@@ -57,7 +69,7 @@
 --        has_function_privilege('authenticated','public.growth_claims_process(integer)','execute') as auth_process,
 --        has_function_privilege('authenticated','public.growth_my_dashboard()','execute') as auth_dash,
 --        (select count(*) from public.growth_reward_claims) as talep;
--- BEKLENEN: t | t | 1 | 19 | f | t | 0
+-- BEKLENEN: t | t | 1 | 20 | f | t | 0
 
 set local lock_timeout = '5s';
 
@@ -119,6 +131,8 @@ create table if not exists public.growth_referral_settings (
   partner_tier3_pct numeric(5,2) not null default 30 check (partner_tier3_pct between 0 and 100),
   partner_duration_months int not null default 12 check (partner_duration_months between 1 and 60),
   partner_min_payout_try numeric(12,2) not null default 1000 check (partner_min_payout_try >= 0),
+  min_cash_ratio numeric(4,2) not null default 0.50 check (min_cash_ratio >= 0 and min_cash_ratio <= 1),
+  manual_review_first_n int not null default 3 check (manual_review_first_n between 0 and 1000),
   updated_by uuid references public.platform_staff(id) on delete set null,
   updated_at timestamptz not null default now(),
   check (tier2_at > tier1_at),
@@ -210,6 +224,24 @@ create trigger trg_growth_claim_events_immutable before update or delete on publ
 alter table public.growth_claim_events enable row level security;
 revoke all privileges on table public.growth_claim_events from public, anon, authenticated;
 grant select on table public.growth_claim_events to service_role;
+
+-- Personel degisikliklerinin denetim izi (ayar / ortak / odeme); append-only.
+create table if not exists public.growth_admin_audit (
+  id bigint generated always as identity primary key,
+  action text not null check (action in ('settings_save', 'partner_update', 'payout_create')),
+  actor_id uuid references public.platform_staff(id) on delete set null,
+  target text,
+  meta jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_growth_admin_audit_created on public.growth_admin_audit (created_at desc);
+create index if not exists idx_growth_admin_audit_actor on public.growth_admin_audit (actor_id) where actor_id is not null;
+drop trigger if exists trg_growth_admin_audit_immutable on public.growth_admin_audit;
+create trigger trg_growth_admin_audit_immutable before update or delete on public.growth_admin_audit
+  for each row execute function public.growth_claim_events_immutable();
+alter table public.growth_admin_audit enable row level security;
+revoke all privileges on table public.growth_admin_audit from public, anon, authenticated;
+grant select on table public.growth_admin_audit to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 6. IC YARDIMCILAR
@@ -308,7 +340,23 @@ begin
 end;
 $$;
 
--- Faturanin "1 aylik paket bedeli" karsiligi (KDV haric): yillik = /12.
+-- NAKIT net tutar (KDV haric): kismen hesap kredisiyle odenen faturada yalniz nakit kisim (walletCashTry brut / 1.2).
+-- walletCashTry yoksa fatura tamamen nakit sayilir (amount_try). Asla amount_try'yi asmaz.
+create or replace function public.growth_cash_net(p_invoice uuid)
+returns numeric
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select round(case
+           when jsonb_typeof(i.meta -> 'walletCashTry') = 'number' and (i.meta ->> 'walletCashTry')::numeric > 0
+             then least((i.meta ->> 'walletCashTry')::numeric / 1.2, i.amount_try)
+           else i.amount_try end, 2)
+  from public.invoices i where i.id = p_invoice;
+$$;
+
+-- Faturanin "1 aylik paket bedeli" karsiligi (NAKIT net, KDV haric): yillik = /12.
 create or replace function public.growth_monthly_equiv(p_invoice uuid)
 returns numeric
 language sql
@@ -316,7 +364,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select round(case when i.meta ->> 'cycle' = 'yearly' then i.amount_try / 12 else i.amount_try end, 2)
+  select round(case when i.meta ->> 'cycle' = 'yearly' then public.growth_cash_net(i.id) / 12 else public.growth_cash_net(i.id) end, 2)
   from public.invoices i where i.id = p_invoice;
 $$;
 
@@ -384,6 +432,8 @@ declare
   v_note text;
   v_claim uuid;
   v_recent int;
+  v_cash numeric;
+  v_prior int;
 begin
   select * into i from public.invoices where id = p_invoice;
   select * into a from public.signup_attributions where tenant_id = i.tenant_id;
@@ -418,10 +468,11 @@ begin
   select * into s from public.growth_referral_settings where singleton;
 
   v_base := public.growth_monthly_equiv(p_invoice);
+  v_cash := public.growth_cash_net(p_invoice);
   v_amount := round(case r.reward_type
     when 'monthly_multiple' then v_base * r.reward_value
     when 'fixed_try' then r.reward_value
-    else i.amount_try * r.reward_value / 100 end, 2);
+    else v_cash * r.reward_value / 100 end, 2);
   if v_amount is null or v_amount <= 0 then
     return jsonb_build_object('ok', true, 'skipped', 'zero_amount');
   end if;
@@ -433,6 +484,22 @@ begin
   where c.beneficiary_tenant_id = a.referrer_tenant_id and c.component = 'base' and c.created_at > now() - interval '24 hours';
   if v_recent >= s.velocity_max_per_day then
     v_flags := array_append(v_flags, 'velocity'::text);
+  end if;
+  -- Nakit orani dusukse (hos geldin/kampanya kredisiyle odenmis fatura) odul otomatik verilmez.
+  if i.amount_try > 0 and v_cash < round(i.amount_try * s.min_cash_ratio, 2) then
+    v_flags := array_append(v_flags, 'low_cash_ratio'::text);
+  end if;
+  -- Hos geldin kredisini KULLANAN cift: ayni davetliye verilen hos geldin kredisi harcanmissa manuel onay.
+  if exists (select 1 from public.account_credit_ledger l
+             where l.idempotency_key = 'try:grant:' || i.tenant_id::text || ':growth-welcome-' || i.tenant_id::text)
+     and exists (select 1 from public.try_credit_reservations rv where rv.tenant_id = i.tenant_id and rv.state = 'committed') then
+    v_flags := array_append(v_flags, 'welcome_credit_used'::text);
+  end if;
+  -- Ilk N davetci talebi manuel onaya duser (cok hesap/sahte zincir korumasi).
+  select count(*) into v_prior from public.growth_reward_claims c
+  where c.beneficiary_tenant_id = a.referrer_tenant_id and c.component = 'base' and c.status not in ('rejected', 'reversed');
+  if v_prior < s.manual_review_first_n then
+    v_flags := array_append(v_flags, 'first_claims_review'::text);
   end if;
 
   if 'same_tenant' = any (v_flags) then
@@ -482,6 +549,7 @@ declare
   v_amount numeric;
   v_flags text[] := '{}';
   v_claim uuid;
+  v_cash numeric;
 begin
   select * into i from public.invoices where id = p_invoice;
   select * into a from public.signup_attributions where tenant_id = i.tenant_id;
@@ -526,13 +594,17 @@ begin
   v_pct := case when v_n <= s.partner_tier1_max then s.partner_tier1_pct
                 when v_n <= s.partner_tier2_max then s.partner_tier2_pct
                 else s.partner_tier3_pct end;
-  v_amount := round(i.amount_try * v_pct / 100, 2);
+  v_cash := public.growth_cash_net(p_invoice);
+  v_amount := round(v_cash * v_pct / 100, 2);
   if v_amount <= 0 then
     return jsonb_build_object('ok', true, 'skipped', 'zero_amount');
   end if;
 
   if p.owner_tenant_id is not null then
     v_flags := public.growth_pair_flags(p.owner_tenant_id, i.tenant_id);
+  end if;
+  if i.amount_try > 0 and v_cash < round(i.amount_try * s.min_cash_ratio, 2) then
+    v_flags := array_append(v_flags, 'low_cash_ratio'::text);
   end if;
 
   insert into public.growth_reward_claims
@@ -542,7 +614,7 @@ begin
      v_amount,
      case when 'same_tenant' = any (v_flags) then 'rejected'
           when coalesce(array_length(v_flags, 1), 0) > 0 then 'pending' else 'held' end,
-     v_flags, coalesce(i.paid_at, now()) + make_interval(days => r.hold_days), 'commission', i.id, 0, i.amount_try)
+     v_flags, coalesce(i.paid_at, now()) + make_interval(days => r.hold_days), 'commission', i.id, 0, v_cash)
   returning id into v_claim;
   perform public.growth_log_event(v_claim, 'registered', null,
     jsonb_build_object('pct', v_pct, 'activeCustomers', v_n, 'amount', v_amount));
@@ -894,14 +966,23 @@ begin
     end if;
   end loop;
 
-  -- C2. Kademe bonusu: yeni odenen taban taleplerden sonra (davetci basina bir kez).
-  if v_wallet then
+  -- C2. Kademe bonusu: yeni odenen taban taleplerden sonra (davetci basina bir kez). Program bayragi KAPALIYKEN uretilmez;
+  -- tarama yalniz ilk-odeme (taban) taleplerinden bonusu henuz eksik davetcilerle sinirli ve limitlidir.
+  if v_wallet and public.growth_flag_on('growth_referral_enabled') then
     for rc in
       select b.beneficiary_tenant_id as ref_tenant, count(*) as paid_n
       from public.growth_reward_claims b
       where b.component = 'base' and b.status = 'paid' and b.beneficiary_tenant_id is not null
+        and ((s.tier1_bonus_months > 0 and not exists (
+                select 1 from public.growth_reward_claims t
+                where t.beneficiary_tenant_id = b.beneficiary_tenant_id and t.component = 'tier1' and t.status <> 'rejected'))
+             or (s.tier2_bonus_months > 0 and not exists (
+                select 1 from public.growth_reward_claims t
+                where t.beneficiary_tenant_id = b.beneficiary_tenant_id and t.component = 'tier2' and t.status <> 'rejected')))
       group by b.beneficiary_tenant_id
       having count(*) >= s.tier1_at
+      order by min(b.granted_at) nulls last
+      limit v_limit
     loop
       v_count := rc.paid_n;
       -- tier1
@@ -1276,6 +1357,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 13. PLATFORM PERSONELI RPC'leri (DB icinde super_admin dogrulamasi)
 -- ---------------------------------------------------------------------------
+-- Personel kapisi: aktif super_admin. platform_settings 'platform.mfa_enforced' = on/true/1 ise ayrica oturum AAL2 (MFA)
+-- ister; ayar yoksa/kapaliysa YALNIZ super_admin kontrolu (zorunlu MFA yayin oncesine kadar kapali; onaysiz sert kapi yok).
 create or replace function public.growth_staff_super_admin()
 returns uuid
 language sql
@@ -1284,7 +1367,8 @@ security definer
 set search_path = ''
 as $$
   select ps.id from public.platform_staff ps
-  where ps.id = auth.uid() and ps.is_active and ps.role = 'super_admin';
+  where ps.id = auth.uid() and ps.is_active and ps.role = 'super_admin'
+    and (not public.growth_flag_on('platform.mfa_enforced') or (auth.jwt() ->> 'aal') = 'aal2');
 $$;
 
 create or replace function public.growth_admin_decide(p_claim uuid, p_decision text, p_reason text)
@@ -1362,6 +1446,10 @@ begin
     return jsonb_build_object('ok', false, 'code', 'bad_input');
   end if;
   select * into s from public.growth_referral_settings where singleton for update;
+  -- Denetim: onceki satir + istenen degerler (kisisel veri yok; yalniz program parametreleri).
+  insert into public.growth_admin_audit (action, actor_id, target, meta)
+  values ('settings_save', v_actor, 'growth_referral_settings',
+          jsonb_build_object('before', to_jsonb(s) - 'updated_by' - 'updated_at', 'requested', p_values));
   update public.growth_referral_settings set
     welcome_credit_try = coalesce((p_values ->> 'welcome_credit_try')::numeric, welcome_credit_try),
     welcome_expires_days = coalesce((p_values ->> 'welcome_expires_days')::int, welcome_expires_days),
@@ -1380,6 +1468,8 @@ begin
     partner_tier3_pct = coalesce((p_values ->> 'partner_tier3_pct')::numeric, partner_tier3_pct),
     partner_duration_months = coalesce((p_values ->> 'partner_duration_months')::int, partner_duration_months),
     partner_min_payout_try = coalesce((p_values ->> 'partner_min_payout_try')::numeric, partner_min_payout_try),
+    min_cash_ratio = coalesce((p_values ->> 'min_cash_ratio')::numeric, min_cash_ratio),
+    manual_review_first_n = coalesce((p_values ->> 'manual_review_first_n')::int, manual_review_first_n),
     updated_by = v_actor, updated_at = now()
   where singleton;
   return jsonb_build_object('ok', true);
@@ -1464,6 +1554,10 @@ begin
   set flags = array_append(array_remove(flags, 'clawback_due'), 'clawback_offset'::text), updated_at = now()
   where partner_id = p.id and status = 'reversed' and 'clawback_due' = any (flags);
 
+  insert into public.growth_admin_audit (action, actor_id, target, meta)
+  values ('payout_create', v_actor, p.id::text,
+          jsonb_build_object('payout_id', v_payout, 'method', p_method, 'amount', v_net, 'clawback_offset', v_claw));
+
   return jsonb_build_object('ok', true, 'payout_id', v_payout, 'amount', v_net, 'clawback_offset', v_claw);
 end;
 $$;
@@ -1502,6 +1596,15 @@ begin
       return jsonb_build_object('ok', false, 'code', 'rule_not_found');
     end if;
   end if;
+  -- Denetim (vergi no degeri YAZILMAZ; yalniz degisti bilgisi).
+  insert into public.growth_admin_audit (action, actor_id, target, meta)
+  values ('partner_update', v_actor, p_partner::text,
+          jsonb_build_object('fields', (select coalesce(jsonb_agg(k order by k), '[]'::jsonb) from jsonb_object_keys(p_values) k),
+                             'is_tax_payer', p_values -> 'is_tax_payer',
+                             'tax_no_changed', p_values ? 'tax_no',
+                             'owner_tenant_id', p_values -> 'owner_tenant_id',
+                             'rule_id', p_values -> 'rule_id',
+                             'contract_signed_at', p_values -> 'contract_signed_at'));
   update public.growth_partners set
     is_tax_payer = case when p_values ? 'is_tax_payer' then (p_values ->> 'is_tax_payer')::boolean else is_tax_payer end,
     tax_no = case when p_values ? 'tax_no' then nullif(regexp_replace(coalesce(p_values ->> 'tax_no', ''), '\D', '', 'g'), '') else tax_no end,

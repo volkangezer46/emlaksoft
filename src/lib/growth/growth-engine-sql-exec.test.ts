@@ -25,7 +25,8 @@ create table auth.users(id uuid primary key default gen_random_uuid(), email tex
 create function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true),''),'anon') $$;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
 create function public.current_tenant_id() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.tenant', true),'')::uuid $$;
-create function public.current_profile_role() returns text language sql stable as $$ select 'owner' $$;
+create function auth.jwt() returns jsonb language sql stable as $$ select jsonb_build_object('aal', nullif(current_setting('request.jwt.claim.aal', true),'')) $$;
+create function public.current_profile_role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.prole', true),''),'owner') $$;
 create table public.tenants(id uuid primary key default gen_random_uuid(), name text default 'Ofis', tax_number text, phone text);
 create table public.profiles(id uuid primary key references auth.users(id), tenant_id uuid references public.tenants(id), phone text);
 create table public.platform_staff(id uuid primary key, role text not null default 'super_admin', is_active boolean not null default true);
@@ -63,9 +64,10 @@ describe.skipIf(!mod)("Referans/ortak motoru SQL — gerçek PL/pgSQL (pglite)",
     }
   };
   const asService = () => db.exec(`select set_config('request.jwt.claim.role','service_role',false)`);
-  const asUser = (sub: string | null, tenant: string | null) =>
+  // Varsayılan AAL2 (MFA'lı personel oturumu); aal=null ile MFA'sız oturum simüle edilir.
+  const asUser = (sub: string | null, tenant: string | null, aal: string | null = "aal2") =>
     db.exec(
-      `select set_config('request.jwt.claim.role','authenticated',false), set_config('request.jwt.claim.sub','${sub ?? ""}',false), set_config('request.jwt.claim.tenant','${tenant ?? ""}',false)`,
+      `select set_config('request.jwt.claim.role','authenticated',false), set_config('request.jwt.claim.sub','${sub ?? ""}',false), set_config('request.jwt.claim.tenant','${tenant ?? ""}',false), set_config('request.jwt.claim.aal','${aal ?? ""}',false)`,
     );
   const setFlag = (key: string, on: boolean) =>
     q(`insert into public.platform_settings(key,value) values ($1,$2) on conflict (key) do update set value = excluded.value`, [key, on ? "on" : "off"]);
@@ -113,6 +115,8 @@ describe.skipIf(!mod)("Referans/ortak motoru SQL — gerçek PL/pgSQL (pglite)",
       await db.exec(read(`supabase/migrations/${f}`));
     }
     await asService();
+    // Mevcut senaryolar otomatik akışı sınar: ilk-N manuel inceleme varsayılanı burada kapatılır (ayrı testte açılır).
+    await q(`update public.growth_referral_settings set manual_review_first_n = 0`);
     await q(
       `insert into public.growth_reward_rules(kind,name,reward_type,reward_value,hold_days,credit_expires_days) values ('referral','Standart','monthly_multiple',1,30,365)`,
     );
@@ -620,6 +624,117 @@ describe.skipIf(!mod)("Referans/ortak motoru SQL — gerçek PL/pgSQL (pglite)",
     await asService();
     const row = (await q(`select is_tax_payer, tax_no, owner_tenant_id, rule_id from public.growth_partners where id=$1`, [partner]))[0]!;
     expect(row).toMatchObject({ is_tax_payer: true, tax_no: "1234567890", owner_tenant_id: owner, rule_id: rid });
+  });
+
+  it("ödül tabanı NAKİT net tutardır (walletCashTry/1,2); nakit oranı asgarinin altındaysa inceleme", async () => {
+    await asService();
+    const a = await tenant();
+    const b = await tenant();
+    await refer(a, b);
+    // Brüt 1200 TL faturanın 720 TL'si nakit, 480 TL'si kredi: nakit net = 600 / 1.2... walletCashTry brüt kabul edilir (720/1.2 = 600).
+    expect(await register(await pay(b, 1000, { walletCashTry: 720 }))).toMatchObject({ ok: true, status: "held" });
+    expect(Number((await claim(b))!.amount_try)).toBe(600);
+    expect(Number((await claim(b))!.base_monthly_try)).toBe(600);
+    // Nakit net 200 TL = %20 < asgari %50: ödül 200 TL tabanında ve 'low_cash_ratio' ile pending.
+    const c = await tenant();
+    const d = await tenant();
+    await refer(c, d);
+    const r = await register(await pay(d, 1000, { walletCashTry: 240 }));
+    expect(r).toMatchObject({ ok: true, status: "pending" });
+    const cd = (await claim(d))!;
+    expect(Number(cd.amount_try)).toBe(200);
+    expect(cd.flags).toContain("low_cash_ratio");
+    // Hiç walletCashTry yoksa fatura tamamen nakit sayılır.
+    expect(Number((await call(`select public.growth_cash_net($1)`, [await pay(await tenant(), 1000)])))).toBe(1000);
+  });
+
+  it("çoklu hesap: ilk N davetçi talebi ve hoş geldin kredisini kullanan çift manuel onaya düşer (otomatik ödenmez)", async () => {
+    await asService();
+    await q(`update public.growth_referral_settings set manual_review_first_n = 2, velocity_max_per_day = 1000`);
+    const a = await tenant();
+    const statuses: string[] = [];
+    for (let k = 0; k < 3; k++) {
+      const b = await tenant();
+      await refer(a, b);
+      await register(await pay(b, 1000));
+      statuses.push((await claim(b))!.status as string);
+    }
+    expect(statuses).toEqual(["pending", "pending", "held"]);
+    const first = (await q(`select flags from public.growth_reward_claims where beneficiary_tenant_id=$1 order by created_at limit 1`, [a]))[0]!;
+    expect(first.flags).toContain("first_claims_review");
+    await makeDue();
+    const r = await process_();
+    expect(r).toMatchObject({ ok: true });
+    expect(await balance(a)).toBe(1000); // yalnız 3. talep ödenir; ilk ikisi pending kalır
+    expect((await q(`select count(*)::int as n from public.growth_reward_claims where beneficiary_tenant_id=$1 and status='pending'`, [a]))[0]!.n).toBe(2);
+    await q(`update public.growth_referral_settings set manual_review_first_n = 0`);
+
+    // Hoş geldin kredisini kullanan çift
+    await q(`update public.growth_referral_settings set welcome_credit_try = 250`);
+    const c = await tenant();
+    const d = await tenant();
+    await refer(c, d);
+    expect(await call(`select public.growth_grant_welcome($1)`, [d])).toMatchObject({ ok: true, amount: 250 });
+    await q(`insert into public.try_credit_reservations(tenant_id, amount, idempotency_key, state, settled_at) values ($1, 100, 'welcome-use-key-1', 'committed', now())`, [d]);
+    expect(await register(await pay(d, 1000))).toMatchObject({ ok: true, status: "pending" });
+    expect((await claim(d))!.flags).toContain("welcome_credit_used");
+    await q(`update public.growth_referral_settings set welcome_credit_try = 0`);
+  });
+
+  it("kademe bonusu program bayrağı KAPALIYKEN üretilmez; açılınca verilir", async () => {
+    await asService();
+    await q(`update public.growth_referral_settings set velocity_max_per_day = 1000, manual_review_first_n = 0`);
+    const a = await tenant();
+    for (let k = 0; k < 3; k++) {
+      const b = await tenant();
+      await refer(a, b);
+      await register(await pay(b, 1000));
+    }
+    await makeDue();
+    await setFlag("growth_referral_enabled", false);
+    expect(await process_()).toMatchObject({ paid: 3, bonus: 0 });
+    expect((await q(`select count(*)::int as n from public.growth_reward_claims where beneficiary_tenant_id=$1 and component='tier1'`, [a]))[0]!.n).toBe(0);
+    await setFlag("growth_referral_enabled", true);
+    expect(await process_()).toMatchObject({ bonus: 1 });
+  });
+
+  it("personel RPC'leri platform.mfa_enforced açıkken DB içinde AAL2 ister (kapalıyken istemez); ayar ve ortak değişiklikleri denetim satırı yazar", async () => {
+    await asService();
+    // Ayar yokken (varsayılan KAPALI) MFA'sız oturum da super_admin ise geçer.
+    const staff0 = (await q(`insert into public.platform_staff(id, role) values (gen_random_uuid(),'super_admin') returning id`))[0]!.id as string;
+    await asUser(staff0, null, null);
+    expect(await call(`select public.growth_admin_save_settings($1::jsonb)`, [JSON.stringify({ min_cash_ratio: 0.5 })])).toMatchObject({ ok: true });
+    await asService();
+    await setFlag("platform.mfa_enforced", true);
+    const staff = (await q(`insert into public.platform_staff(id, role) values (gen_random_uuid(),'super_admin') returning id`))[0]!.id as string;
+    const owner = await tenant();
+    const partner = (await q(`insert into public.growth_partners(name,partner_type,code) values ('PA','agency','ortak-aal') returning id`))[0]!.id as string;
+    const before = Number((await q(`select count(*)::int as n from public.growth_admin_audit`))[0]!.n);
+    // MFA'sız (aal1 / claim yok) oturum: tüm personel RPC'leri 42501
+    for (const aal of ["aal1", null]) {
+      await asUser(staff, null, aal);
+      expect((await call(`select public.growth_admin_save_settings($1::jsonb)`, [JSON.stringify({ min_cash_ratio: 0.4 })])).code).toBe("42501");
+      expect((await call(`select public.growth_admin_partner_update($1,$2::jsonb)`, [partner, JSON.stringify({ is_tax_payer: true })])).code).toBe("42501");
+      expect((await call(`select public.growth_admin_payout_create($1,'account_credit',null,null,null)`, [partner])).code).toBe("42501");
+      expect((await call(`select public.growth_admin_decide($1,'reject','sebep var')`, ["00000000-0000-4000-8000-000000000000"])).code).toBe("42501");
+    }
+    await asService();
+    expect(Number((await q(`select count(*)::int as n from public.growth_admin_audit`))[0]!.n)).toBe(before);
+    // AAL2: yazılır + denetim
+    await asUser(staff, null, "aal2");
+    expect(await call(`select public.growth_admin_save_settings($1::jsonb)`, [JSON.stringify({ min_cash_ratio: 0.4, manual_review_first_n: 0 })])).toMatchObject({ ok: true });
+    expect(await call(`select public.growth_admin_partner_update($1,$2::jsonb)`, [partner, JSON.stringify({ is_tax_payer: true, tax_no: "1234567890", owner_tenant_id: owner })])).toMatchObject({ ok: true });
+    await asService();
+    const rows = await q(`select action, actor_id, meta from public.growth_admin_audit order by id desc limit 2`);
+    expect(rows.map((r) => r.action).sort()).toEqual(["partner_update", "settings_save"]);
+    expect(rows.every((r) => r.actor_id === staff)).toBe(true);
+    // vergi no değeri denetim izine YAZILMAZ
+    expect(JSON.stringify(rows)).not.toContain("1234567890");
+    expect(Number((await q(`select min_cash_ratio from public.growth_referral_settings`))[0]!.min_cash_ratio)).toBe(0.4);
+    await q(`update public.growth_referral_settings set min_cash_ratio = 0.5`);
+    await setFlag("platform.mfa_enforced", false);
+    // denetim tablosu append-only
+    expect(await call(`update public.growth_admin_audit set action = 'settings_save'`)).toMatchObject({ code: "42501" });
   });
 
   it("geri alma dosyası temiz çalışır (zorlamasız dolu tabloda DURUR, zorlamayla düşer)", async () => {

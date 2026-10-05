@@ -393,6 +393,15 @@ declare
   v_key text;
   v_existing numeric;
   v_bal jsonb;
+  v_spend_meta jsonb;
+  v_segs jsonb;
+  v_rest numeric;
+  v_seg record;
+  v_skip numeric;
+  v_left numeric;
+  v_avail numeric;
+  v_take numeric;
+  v_idx integer := 0;
 begin
   if auth.role() is distinct from 'service_role' then
     raise exception 'Service role required.' using errcode = '42501';
@@ -411,10 +420,11 @@ begin
 
   v_key := 'try:refund:' || p_tenant::text || ':' || p_idem;
 
-  select l.amount into v_existing
+  -- Iade parcalara bolunebilir (orijinal vade basina bir satir): ilk satir v_key, digerleri v_key || ':<n>'.
+  select sum(l.amount) into v_existing
   from public.account_credit_ledger l
-  where l.idempotency_key = v_key;
-  if found then
+  where l.idempotency_key = v_key or l.idempotency_key like v_key || ':%';
+  if v_existing is not null then
     if p_amount is not null and v_existing <> p_amount then
       raise exception 'Idempotency key reused with a different refund.' using errcode = '22023';
     end if;
@@ -448,17 +458,67 @@ begin
     return jsonb_build_object('ok', false, 'code', 'exceeds_credit_used', 'remaining', v_remaining);
   end if;
 
-  insert into public.account_credit_ledger
-    (tenant_id, unit, entry_type, amount, source, source_id, idempotency_key, feature, meta, created_at)
-  values
-    (p_tenant, 'try', 'reverse', v_amount, 'refund', v_res.id, v_key, 'invoice_refund',
-     jsonb_build_object(
-       'invoiceId', p_invoice::text,
-       'reservationId', v_res.id::text,
-       'refundOfReservation', v_res.id::text,
-       'reason', coalesce(v_reason, 'invoice_refund')
-     ),
-     clock_timestamp());
+  -- ORIJINAL VADE: harcama satirinin meta.consumedExpiries'i (vadeli kovalar, en erkenden baslayarak) + vadesiz kalan.
+  -- Iade tutari, daha once geri yazilan (v_restored) kisim atlanarak bu parcalara sirayla dagitilir; her parca kendi
+  -- vadesiyle yazilir (geri yazilan kredi orijinalinden UZUN omurlu olamaz). Eski satirlarda (meta yok) tamami vadesiz.
+  select l.meta into v_spend_meta
+  from public.account_credit_ledger l
+  where l.idempotency_key = 'try:spend:' || v_res.id::text;
+  v_segs := coalesce(v_spend_meta -> 'consumedExpiries', '[]'::jsonb);
+  select v_res.amount - coalesce(sum((e ->> 'amount')::numeric), 0) into v_rest
+  from jsonb_array_elements(v_segs) e;
+  if v_rest > 0 then
+    v_segs := v_segs || jsonb_build_array(jsonb_build_object('amount', v_rest, 'expires_at', null));
+  end if;
+
+  v_skip := v_restored;
+  v_left := v_amount;
+  for v_seg in
+    select (t.e ->> 'amount')::numeric as amt, nullif(t.e ->> 'expires_at', '')::timestamptz as exp
+    from jsonb_array_elements(v_segs) with ordinality as t(e, n)
+    order by t.n
+  loop
+    exit when v_left <= 0;
+    v_avail := v_seg.amt;
+    if v_skip > 0 then
+      v_take := least(v_skip, v_avail);
+      v_skip := v_skip - v_take;
+      v_avail := v_avail - v_take;
+    end if;
+    if v_avail <= 0 then
+      continue;
+    end if;
+    v_take := least(v_left, v_avail);
+    v_idx := v_idx + 1;
+    insert into public.account_credit_ledger
+      (tenant_id, unit, entry_type, amount, source, source_id, idempotency_key, expires_at, feature, meta, created_at)
+    values
+      (p_tenant, 'try', 'reverse', v_take, 'refund', v_res.id,
+       case when v_idx = 1 then v_key else v_key || ':' || v_idx::text end, v_seg.exp, 'invoice_refund',
+       jsonb_build_object(
+         'invoiceId', p_invoice::text,
+         'reservationId', v_res.id::text,
+         'refundOfReservation', v_res.id::text,
+         'reason', coalesce(v_reason, 'invoice_refund')
+       ),
+       clock_timestamp());
+    v_left := v_left - v_take;
+  end loop;
+  if v_left > 0 then
+    v_idx := v_idx + 1;
+    insert into public.account_credit_ledger
+      (tenant_id, unit, entry_type, amount, source, source_id, idempotency_key, feature, meta, created_at)
+    values
+      (p_tenant, 'try', 'reverse', v_left, 'refund', v_res.id,
+       case when v_idx = 1 then v_key else v_key || ':' || v_idx::text end, 'invoice_refund',
+       jsonb_build_object(
+         'invoiceId', p_invoice::text,
+         'reservationId', v_res.id::text,
+         'refundOfReservation', v_res.id::text,
+         'reason', coalesce(v_reason, 'invoice_refund')
+       ),
+       clock_timestamp());
+  end if;
 
   v_bal := public.try_credit_calc_balance(p_tenant);
   return jsonb_build_object(

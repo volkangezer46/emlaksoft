@@ -269,7 +269,8 @@ describe("cron: growth-claims", () => {
     expect(route).toContain("process.env.CRON_SECRET");
     expect(route).toContain('`Bearer ${secret}`');
     expect(route).toContain('recordHeartbeat("growth-claims"');
-    expect(route).toContain("runBillingReconciliation(0,");
+    expect(route).toContain("runBillingReconciliation(0, \"growth_claims\")");
+    expect(route).not.toContain("=> processClaims");
     expect(route).not.toMatch(/createAdminClient\s*\(/);
   });
   it("vercel.json + cron-jobs.ts + route eşleşir", () => {
@@ -284,14 +285,15 @@ describe("cron: growth-claims", () => {
   });
   it("reconciliation: yan iş modunda mutabakat ATLANIR (para hareketi yok)", () => {
     const rec = read("src/lib/billing/reconciliation.ts");
-    const i = rec.indexOf("if (sideJob) {");
+    const i = rec.indexOf(`if (job === "growth_claims") {`);
     expect(i).toBeGreaterThan(0);
+    expect(rec).not.toContain("sideJob");
     expect(i).toBeLessThan(rec.indexOf('admin.rpc("claim_billing_payment_captures"'));
     expect(i).toBeLessThan(rec.indexOf('admin.rpc("expire_stale_billing_checkouts"'));
   });
   it("sayı belgelerde güncel", () => {
     const n = CRON_JOBS.length;
-    expect(n).toBe(32);
+    expect(n).toBe(33);
     expect(read("CLAUDE.md")).toContain(`Cron:** ${n} route`);
     expect(read("docs/DURUM.md")).toContain(`| ${n} / ${n} |`);
     expect(read("docs/MIMARI.md")).toContain(`Cron envanteri (${n}`);

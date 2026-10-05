@@ -39,7 +39,7 @@ function fd(o: Record<string, string>) {
   return f;
 }
 const goodPacks = JSON.stringify([{ id: "mini", name: "Mini", units: 10, priceNetTry: 175, active: true, order: 10 }]);
-const grantForm = { tenantId: T, units: "10", kind: "admin", reason: "Müşteri telafisi için manuel yükleme" };
+const grantForm = { tenantId: T, units: "10", kind: "admin", reason: "Müşteri telafisi için manuel yükleme", idemKey: "11111111-2222-3333-4444-555555555555" };
 
 describe("admin kontör action'ları", () => {
   beforeEach(() => {

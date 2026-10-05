@@ -30,6 +30,7 @@ drop function if exists public.growth_register_referral(uuid);
 drop function if exists public.growth_log_event(uuid, text, uuid, jsonb);
 drop function if exists public.growth_real_payment(uuid);
 drop function if exists public.growth_monthly_equiv(uuid);
+drop function if exists public.growth_cash_net(uuid);
 drop function if exists public.growth_pair_flags(uuid, uuid);
 drop function if exists public.growth_tenant_phone_tails(uuid);
 drop function if exists public.growth_tenant_email_domains(uuid);
@@ -51,6 +52,7 @@ end $$;
 
 -- Zorlama yolu: eski tekillik (kural, davet edilen ofis) yalniz taban talepler icin gecerlidir; bonus/komisyon satirlari silinir.
 drop table if exists public.growth_claim_events;
+drop table if exists public.growth_admin_audit;
 delete from public.growth_reward_claims where component <> 'base';
 drop table if exists public.growth_referral_settings;
 drop function if exists public.growth_claim_events_immutable();

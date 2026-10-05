@@ -7,6 +7,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { creditRestoreForRefund } from "@/lib/try-credits/invoice-credit";
 import { tryRefundIdem, tryRefundInvoice, tryReleaseInvoice } from "@/lib/try-credits/wallet";
+import { efCommit, efReserve } from "@/lib/ef-credits/wallet";
+import { EF_PACK_REFUND_ITEM, efPackClawbackUnits, efPackRefundIdem } from "@/lib/billing/credit-pack-refund";
 import { reverseClaimsForInvoiceSafe } from "@/lib/growth/engine";
 import { parseMoneyTry, validateRefundAmount, MANUAL_PAYMENT_METHODS, type ManualPaymentMethod } from "@/lib/billing/invoice-ops";
 
@@ -163,6 +165,32 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
   const amount = validateRefundAmount(String(formData.get("amount_try") ?? ""), Number(inv.total_try));
   if ("error" in amount) return { error: amount.error };
 
+  // Kontör paketi faturası: verilen EF kontörü GERİ ALINIR (clawback = rezerv + commit, kalem pack_refund; idem fatura+birim).
+  // Kontör kullanılmışsa bakiye yetmez ve iade ENGELLENİR (para iadesi + kontör birlikte kalamaz). İade kaydı düşmezse
+  // aynı işlem tekrarlanabilir: idem anahtarı aynı olduğundan kontör iki kez düşmez.
+  if (meta.kind === "credit_pack") {
+    const claw = efPackClawbackUnits(Number(meta.units ?? 0), amount.value, Number(inv.total_try));
+    if (claw > 0) {
+      const reserved = await efReserve({
+        tenantId: inv.tenant_id as string,
+        userId: null,
+        units: claw,
+        idem: efPackRefundIdem(invoiceId, claw),
+        item: EF_PACK_REFUND_ITEM,
+      });
+      if (!reserved) return { error: "Kontör geri alınamadı (EmlakFiyati cüzdanı yazılamadı); iade kaydı düşülmedi. Tekrar deneyin." };
+      if (!reserved.ok) {
+        return {
+          error: `Bu paketin kontörü kullanılmış (kalan ${reserved.available} < geri alınacak ${claw}); iade kaydı düşülmedi. Kullanılan kısım için tutarı düşürüp tekrar deneyin ya da işlemi elle değerlendirin.`,
+        };
+      }
+      if (reserved.state !== "committed") {
+        const done = await efCommit(inv.tenant_id as string, reserved.reservation_id, { kind: EF_PACK_REFUND_ITEM, invoice_id: invoiceId });
+        if (!done || !done.ok) return { error: "Kontör geri alma kesinleştirilemedi; iade kaydı düşülmedi. Tekrar deneyin." };
+      }
+    }
+  }
+
   // TL hesap kredisi: iade ÖNCE nakit kısmından düşer; artan kısım krediye geri yazılır (idempotent, harcanan krediyi
   // aşamaz). Geri yazma başarısızsa iade kaydı DÜŞÜLMEZ: yönetici aynı işlemi tekrar eder (aynı idem anahtarı).
   const creditUsedTry = Number(meta.walletCreditTry ?? 0);
@@ -177,7 +205,9 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
         tenantId: inv.tenant_id as string,
         invoiceId,
         amountTry: restore,
-        idem: tryRefundIdem(invoiceId, "admin"),
+        // Idem anahtarı iade TUTARIYLA ilişkili: farklı tutarla yeniden deneme eski anahtarla çakışıp takılmaz
+        // (toplam geri yazım yine harcanan krediyi aşamaz: SQL tarafı sınırlar).
+        idem: tryRefundIdem(invoiceId, `admin-${Math.round(restore * 100)}`),
         reason: reason.slice(0, 200),
       });
       if (!restored || (!restored.ok && restored.code !== "no_credit_used")) {

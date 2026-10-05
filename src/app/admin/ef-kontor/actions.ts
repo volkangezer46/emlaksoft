@@ -94,7 +94,7 @@ export async function saveEfPacks(formData: FormData): Promise<EfKontorResult> {
   return { ok: true, message: "Paket kataloğu kaydedildi." };
 }
 
-/** Manuel yükleme/bonus/iade (yalnız pozitif). Gerekçe zorunlu; idempotency anahtarı sunucuda üretilir. */
+/** Manuel yükleme/bonus/iade (yalnız pozitif). Gerekçe zorunlu; idempotency anahtarı formdan gelen tek kullanımlık anahtardır. */
 export async function grantEfCreditAction(formData: FormData): Promise<EfKontorResult> {
   const w = await writer();
   if ("error" in w) return w;
@@ -103,6 +103,7 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
     units: String(formData.get("units") ?? "").trim(),
     kind: String(formData.get("kind") ?? "").trim(),
     reason: String(formData.get("reason") ?? ""),
+    idemKey: String(formData.get("idemKey") ?? "").trim(),
   });
   if (!parsed.success) return { error: firstIssue(parsed.error) };
   const { allowed } = await checkRateLimit(`efgrant:${w.staff.id}`, { limit: 10, windowSec: 600, failurePolicy: "deny" });

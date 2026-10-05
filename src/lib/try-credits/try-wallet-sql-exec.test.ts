@@ -15,7 +15,7 @@ type Db = {
   exec: (sql: string) => Promise<unknown>;
   query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
 };
-const spec = "@electric-sql/pglite";
+const spec = process.env.PGLITE_MODULE ?? "@electric-sql/pglite";
 const mod: { PGlite: new () => Db } | null = await import(/* @vite-ignore */ spec).catch(() => null);
 
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -26,7 +26,7 @@ create schema auth;
 create function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true),''),'anon') $$;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
 create function public.current_tenant_id() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.tenant', true),'')::uuid $$;
-create function public.current_profile_role() returns text language sql stable as $$ select 'owner' $$;
+create function public.current_profile_role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.prole', true),''),'owner') $$;
 create table public.tenants(id uuid primary key default gen_random_uuid());
 create table public.profiles(id uuid primary key default gen_random_uuid(), tenant_id uuid references public.tenants(id));
 create table public.invoices(id uuid primary key default gen_random_uuid(), tenant_id uuid not null references public.tenants(id), status text not null default 'draft', checkout_status text, total_try numeric not null default 0, currency text default 'TRY', meta jsonb not null default '{}', created_at timestamptz default now());
@@ -42,7 +42,8 @@ alter table public.account_credit_ledger add constraint account_credit_ledger_so
 alter table public.account_credit_ledger enable row level security;
 create function public.account_credit_ledger_immutable() returns trigger language plpgsql as $$ begin raise exception 'append-only' using errcode='42501'; end $$;
 create trigger trg_imm before update or delete on public.account_credit_ledger for each row execute function public.account_credit_ledger_immutable();
-create policy own on public.account_credit_ledger for select using (tenant_id = public.current_tenant_id());
+create policy credit_ledger_own_select on public.account_credit_ledger for select using (tenant_id = public.current_tenant_id());
+grant select on public.account_credit_ledger to authenticated;
 create function public.fulfill_billing_payment_v2(p_provider text,p_conversation_id text,p_payment_id text,p_source text,p_target_type text,p_expected_tenant_id uuid,p_expected_plan text,p_expected_cycle text,p_expected_amount_try numeric,p_expected_currency text) returns jsonb language plpgsql security definer set search_path='' as $$
 declare v_t numeric; begin
  select total_try into v_t from public.invoices where meta->>'conversationId'=p_conversation_id;
@@ -224,6 +225,69 @@ describe.skipIf(!mod)("TL kredi SQL — gerçek PL/pgSQL (pglite)", () => {
     await reserve(t4, null, 50, "atom-resv01", bad.id);
     expect((await call(`select public.try_credit_fulfill_invoice($1,$2,'pay-bad','callback',null,null,40)`, [bad.conv, t4])).code).toBe("22023");
     expect(await balance(t4)).toMatchObject({ balance: 380, reserved: 50 });
+  });
+
+  it("iade ORİJİNAL vade ile geri yazılır (parça parça), idempotent, tutarla ilişkili anahtar", async () => {
+    await asService();
+    const t = await newTenant();
+    const a = new Date(Date.now() + 10 * 86_400_000).toISOString();
+    const b = new Date(Date.now() + 60 * 86_400_000).toISOString();
+    await grant(t, 100, "orig-exp-a1", "campaign", a);
+    await grant(t, 100, "orig-exp-b1", "campaign", b);
+    await grant(t, 100, "orig-exp-n1", "manual");
+    const inv = await invoice(t, 600);
+    const res = await reserve(t, null, 300, "orig-resv-1", inv.id);
+    expect(res.ok).toBe(true);
+    expect((await call(`select public.try_credit_commit($1,$2,null)`, [t, res.reservation_id])).ok).toBe(true);
+    const spend = (await q(`select meta from public.account_credit_ledger where tenant_id=$1 and entry_type='spend'`, [t]))[0]!;
+    expect(((spend.meta as { consumedExpiries: unknown[] }).consumedExpiries).length).toBe(2);
+    // 150 iade: 100 (vade A) + 50 (vade B)
+    expect(await call(`select public.try_credit_refund_invoice($1,$2,150,'refund-exp-01','t')`, [t, inv.id])).toMatchObject({ ok: true, restored: 150 });
+    let rows = await q(`select amount, expires_at, idempotency_key from public.account_credit_ledger where tenant_id=$1 and entry_type='reverse' order by id`, [t]);
+    expect(rows.map((r) => Number(r.amount))).toEqual([100, 50]);
+    expect(new Date(rows[0]!.expires_at as string).getTime()).toBe(new Date(a).getTime());
+    expect(new Date(rows[1]!.expires_at as string).getTime()).toBe(new Date(b).getTime());
+    // tekrar (aynı anahtar): already, ikinci satır yazılmaz
+    expect(await call(`select public.try_credit_refund_invoice($1,$2,150,'refund-exp-01','t')`, [t, inv.id])).toMatchObject({ ok: true, already: true, restored: 150 });
+    // farklı tutarla aynı anahtar reddedilir
+    expect((await call(`select public.try_credit_refund_invoice($1,$2,120,'refund-exp-01','t')`, [t, inv.id])).code).toBe("22023");
+    // kalan 150: B'den 50, vadesizden 100
+    expect(await call(`select public.try_credit_refund_invoice($1,$2,null,'refund-exp-02','t')`, [t, inv.id])).toMatchObject({ ok: true, restored: 150 });
+    rows = await q(`select amount, expires_at from public.account_credit_ledger where tenant_id=$1 and entry_type='reverse' order by id`, [t]);
+    expect(rows.slice(2).map((r) => Number(r.amount))).toEqual([50, 100]);
+    expect(new Date(rows[2]!.expires_at as string).getTime()).toBe(new Date(b).getTime());
+    expect(rows[3]!.expires_at).toBeNull();
+    // orijinalden UZUN omürlü kredi yok: tüm vadeli iade satırları orijinal vadelerde
+    const bal = await balance(t);
+    expect(bal.balance).toBe(300);
+  });
+
+  it("TL kredi özeti, hareketler ve defter okuması YALNIZ owner/gm (danışman göremez)", async () => {
+    await asService();
+    const t = await newTenant();
+    await grant(t, 40, "role-grant-1", "campaign");
+    const asRole = async (role: string) => {
+      await db.exec(`reset role`);
+      await db.exec(
+        `select set_config('request.jwt.claim.role','authenticated',false), set_config('request.jwt.claim.tenant','${t}',false), set_config('request.jwt.claim.prole','${role}',false)`,
+      );
+      await db.exec(`set role authenticated`);
+    };
+    try {
+      await asRole("agent");
+      expect((await call(`select public.try_credit_my_overview()`)).code).toBe("42501");
+      expect(await q(`select id from public.try_credit_movements`)).toHaveLength(0);
+      expect(await q(`select id from public.account_credit_ledger where unit='try'`)).toHaveLength(0);
+      await asRole("gm");
+      expect(await call(`select public.try_credit_my_overview()`)).toMatchObject({ balance: 40 });
+      expect((await q(`select id from public.try_credit_movements`)).length).toBeGreaterThan(0);
+      await asRole("owner");
+      expect((await q(`select id from public.account_credit_ledger where unit='try'`)).length).toBeGreaterThan(0);
+    } finally {
+      await db.exec(`reset role`);
+      await db.exec(`select set_config('request.jwt.claim.prole','',false)`);
+      await asService();
+    }
   });
 
   it("yetki: service_role dışı RPC çağıramaz; ofis özeti yalnız kendi tenant'ı; ready false/true", async () => {

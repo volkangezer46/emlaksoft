@@ -20,6 +20,11 @@ drop function if exists public.try_credit_calc_balance(uuid);
 drop function if exists public.try_credit_calc_state(uuid, timestamptz);
 drop view if exists public.try_credit_movements;
 
+-- Defter okuma politikasi 20260825001000'deki ilk haline doner (TL satirlari icin owner/gm kisiti kalkar).
+drop policy if exists credit_ledger_own_select on public.account_credit_ledger;
+create policy credit_ledger_own_select on public.account_credit_ledger for select
+  using (tenant_id = public.current_tenant_id());
+
 do $$
 declare
   v_force boolean := coalesce(current_setting('emlaksoft.rollback_force', true), '') = 'on';
