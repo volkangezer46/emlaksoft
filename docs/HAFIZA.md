@@ -24,7 +24,13 @@ Sıra: yedek/PITR doğrula → `npm run check:migrations -- --database` → `npm
 **Ek (2026-10-05):** `20260821000100` mahalle notları · `20260821000200` yasal kayıt defteri · `20260821000300` evrak linkleri ·
 **`20260823000100..000600` güvenlik denetimi 3 düzeltici migration'ları (approval_requests RLS+consumed_at, listing_pool insert/claim,
 kvkk_requests rol, property_owner_info update kapsamı, advisor_private PII biçim CHECK, kupon max_per_tenant) — ilgili ana
-migration'larla AYNI pencerede uygulanmalı.** Toplam uygulanmayan migration dosyası şu an 40 civarı (`ls supabase/migrations | awk '$0 > "20260813000300"'`).
+migration'larla AYNI pencerede uygulanmalı.** **P5 (`20260824001100..001300`):** mahalle notu sahip/yönetici kapsamı, evrak linki yazma kapsamı, `increment_listing_view`/`increment_referral_click` anon+authenticated
+EXECUTE revoke (ilgili ana migration'ların ARDINDAN, aynı pencerede). **Bilinen açık (sahip kararı, P5 notu `GUVENLIK_DENETIMI_3.md` Ek):** `properties` UPDATE RLS'i
+onay kapısını atlayarak doğrudan PostgREST ile fiyat düşürmeye izin veriyor; `property_price_history` silinebilir; 29 etkin tenant-only yazma politikası ayrı
+düzeltici migration bekliyor (`src/lib/sql-rls-pattern-contract.test.ts` istisna listesi). Coğrafya taslağı `proposed/20261005000600_geo_central_management.sql`,
+sahiplik devri `20261005000700`, faturalama duraklatma `20261005000800` olarak yeniden numaralandı. Koltuk satışı SQL taslağı (`20261005000900`) ve fiyat bütünlüğü (`000500`) sırası:
+000500 → 000800 (D bölümü çıkarılmış) → 000900.
+Toplam uygulanmayan migration dosyası şu an 40 civarı (`ls supabase/migrations | awk '$0 > "20260813000300"'`).
 
 `supabase/migrations/` (ilk 31 dosya, uygulanmayan): 20260814000100 telefon CHECK · 20260815000100 kayıp nedeni seed ·
 20260816000100..001000 (komisyon payı/plan/ödeme, **000500 kazanç gizliliği RLS = davranış değiştirir, AYRI PENCERE**, hedef, atama kuralı) ·
