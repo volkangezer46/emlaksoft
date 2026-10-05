@@ -417,11 +417,14 @@ export function AdvisorForm({
             {seatsFull ? (
               <p className="mt-1">
                 Paket kullanıcı limitine ulaştınız; yeni danışman eklenemez.{" "}
-                <Link href="/app/abonelik" className="font-semibold underline">Paketi yükseltin</Link> veya bir üyeyi pasife alın.
+                <Link href="/app/abonelik#koltuk" className="font-semibold underline">Koltuk ekle</Link>,{" "}
+                <Link href="/app/abonelik" className="font-semibold underline">paketi yükseltin</Link> veya bir üyeyi pasife alın.
               </p>
             ) : (
               <p className="mt-1 text-text-muted">
                 Bu danışmanla <span className="numeric">{next}/{seats.limit}</span> olur.{" "}
+                {seats.used / seats.limit >= 0.8 ? <>Limite yaklaşıyorsunuz. </> : null}
+                <Link href="/app/abonelik#koltuk" className="font-semibold text-brand-600 hover:underline">Koltuk ekle</Link>{" · "}
                 <Link href="/app/abonelik" className="font-semibold text-brand-600 hover:underline">Paketi incele</Link>
               </p>
             )}
@@ -479,7 +482,7 @@ export function AdvisorForm({
             <Alert
               tone="danger"
               title="Kullanıcı limitine ulaşıldı"
-              action={<ButtonLink href="/app/abonelik" size="sm">Paketi yükselt</ButtonLink>}
+              action={<ButtonLink href="/app/abonelik#koltuk" size="sm">Koltuk ekle</ButtonLink>}
             >
               Paketiniz en fazla {seats?.limit} aktif kullanıcı destekliyor.
             </Alert>

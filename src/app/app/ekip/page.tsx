@@ -32,6 +32,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
+import { loadSeatUsageSummary } from "@/lib/billing/seat-purchase";
 
 export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
@@ -117,6 +119,7 @@ export default async function TeamPage() {
     { data: leaveRows },
     loginRows,
     docAlerts,
+    seatSummary,
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches!profiles_branch_id_fkey(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
@@ -137,9 +140,18 @@ export default async function TeamPage() {
     tenantId && (viewerRole === "owner" || viewerRole === "gm")
       ? loadOfficeDocAlerts(supabase, tenantId, trDayKey(now()))
       : Promise.resolve(null),
+    // Koltuk doluluğu (%eşik / %100 uyarısı): paket + satın alınmış ek kullanıcı.
+    tenantId
+      ? supabase
+          .from("tenants")
+          .select("plan")
+          .eq("id", tenantId)
+          .maybeSingle()
+          .then(({ data }) => loadSeatUsageSummary(supabase, tenantId, String(data?.plan ?? "office")))
+      : Promise.resolve(null),
   ]);
 
-  const members = (membersData ?? []) as Member[];
+  const members =(membersData ?? []) as Member[];
   const todayLeaves = (leaveRows ?? []) as LeaveLike[];
 
   const lastLoginByUser = new Map<string, string>();
@@ -229,6 +241,7 @@ export default async function TeamPage() {
                 ) : null}
               </div>
 } />
+<SeatLimitBanner summary={seatSummary} />
 <KpiGrid count={kpis.length}>
         {kpis.map((k) => (
           <KpiTile key={k.label} label={k.label} value={k.value} icon={k.icon} href={k.href} tone="brand" dim={k.value === 0} />

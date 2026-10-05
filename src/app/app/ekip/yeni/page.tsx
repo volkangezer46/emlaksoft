@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
 import { getPlanUsage } from "@/lib/nav-badges";
+import { getExtraSeats } from "@/lib/billing/seat-purchase";
 import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import type { AppRole } from "@/lib/permissions";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
@@ -43,7 +44,10 @@ export default async function NewAdvisorPage() {
     seesAllEarnings: canSeeAllEarnings(roleMatrices[i] ?? {}),
   }));
 
-  const seats = usage.find((u) => u.key === "seats") ?? null;
+  const baseSeats = usage.find((u) => u.key === "seats") ?? null;
+  // Satın alınmış ek kullanıcı varsa etkin limit = plan limiti + ek (sütun yoksa 0).
+  const extraSeats = baseSeats ? await getExtraSeats(supabase, ctx.tenantId) : 0;
+  const seats = baseSeats ? { ...baseSeats, limit: baseSeats.limit + extraSeats } : null;
   const extras = await loadExtras(supabase, ctx.role);
 
   return (

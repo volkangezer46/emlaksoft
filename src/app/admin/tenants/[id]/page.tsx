@@ -46,6 +46,7 @@ import { OfficeManagement } from "./office-management";
 import { ModulePanel } from "./module-panel";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import { SubscriptionPanel } from "./subscription-panel";
+import { SeatInfoCard, loadAdminSeatInfo } from "./seat-info";
 import { CORE_MODULES, moduleForAction } from "./module-map";
 import {
   BillingProfileTab,
@@ -251,14 +252,18 @@ export default async function AdminTenantDetailPage({
         .order("captured_at", { ascending: false })
         .limit(60),
     ]);
+    const seatInfo = await loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats);
     content = (
-      <SubscriptionTab
-        sub={kpiData.sub}
-        tenantStatus={tenantStatusLabel[tenant.status] ?? tenant.status}
-        invoices={invoices ?? []}
-        captures={captures ?? []}
-        billingHref={billingHref}
-      />
+      <div className="space-y-6">
+        <SeatInfoCard info={seatInfo} teamHref={access.members ? tabHref("ekip") : undefined} />
+        <SubscriptionTab
+          sub={kpiData.sub}
+          tenantStatus={tenantStatusLabel[tenant.status] ?? tenant.status}
+          invoices={invoices ?? []}
+          captures={captures ?? []}
+          billingHref={billingHref}
+        />
+      </div>
     );
   } else if (active === "destek") {
     const { data: tickets } = await admin

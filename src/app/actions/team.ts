@@ -18,6 +18,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { getPlanDefinition } from "@/lib/billing/plan-definitions";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
+import { getExtraSeats } from "@/lib/billing/seat-purchase";
 
 import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
 
@@ -64,11 +65,14 @@ async function ensureSeatAvailable(
     return { ok: false, error: "Askıdaki veya iptal edilmiş ofise üye eklenemez." };
   }
 
-  const limit = (await getPlanDefinition(String(tenant.plan))).limits.seats;
+  // Etkin limit = plan limiti + satın alınmış ek kullanıcı (sütun yoksa ek = 0, eski davranış).
+  const includedSeats = (await getPlanDefinition(String(tenant.plan))).limits.seats;
+  const extraSeats = await getExtraSeats(admin, tenantId);
+  const limit = includedSeats + extraSeats;
   if ((count ?? 0) >= limit) {
     return {
       ok: false,
-      error: `Paketiniz en fazla ${limit} aktif kullanıcı destekliyor. Paketi yükseltin veya bir üyeyi pasife alın.`,
+      error: `Paketiniz en fazla ${limit} aktif kullanıcı destekliyor. Koltuk ekleyin (Abonelik > Kullanıcı ekle: /app/abonelik#koltuk), paketi yükseltin veya bir üyeyi pasife alın.`,
     };
   }
   return { ok: true };
