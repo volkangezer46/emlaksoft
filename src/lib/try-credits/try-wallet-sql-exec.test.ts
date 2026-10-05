@@ -1,22 +1,18 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { loadPglite, type Db } from "@/lib/test-support/pglite";
 
 /**
  * İŞLEVSEL SQL TESTİ: 20260826000400 + 000500 gerçek PL/pgSQL ile (pglite, bellek içi Postgres) çalıştırılır.
- * `@electric-sql/pglite` bağımlılık DEĞİLDİR (package.json'a eklenmedi): kuruluysa koşar, yoksa ATLANIR.
- *   Çalıştırmak için:  npm i --no-save @electric-sql/pglite && npx vitest run src/lib/try-credits/try-wallet-sql-exec
+ * `@electric-sql/pglite` devDependency'dir (CI'da `npm ci` ile kurulur ve test KOŞAR); modül yüklenemezse ATLANIR.
+ *   Yerel: npx vitest run src/lib/try-credits/try-wallet-sql-exec  (PGLITE_MODULE=<yol> ile başka kopya da verilebilir)
  * Şema, canlıdaki tablo/fonksiyonların SADELEŞTİRİLMİŞ taklididir (tenants/profiles/invoices/ledger/auth.role()); fulfill_v2
  * bir taklittir (fatura toplamını doğrulayıp 'paid' yapar). Gerçek fulfill gövdeleri sahip provasında doğrulanır.
  * Tek bağlantı olduğundan EŞ ZAMANLILIK burada denenmez (advisory lock varlığı sözleşme testinde); yarış senaryoları
  * "ardışık çift harcama" olarak sınanır.
  */
-type Db = {
-  exec: (sql: string) => Promise<unknown>;
-  query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
-};
-const spec = process.env.PGLITE_MODULE ?? "@electric-sql/pglite";
-const mod: { PGlite: new () => Db } | null = await import(/* @vite-ignore */ spec).catch(() => null);
+const mod = await loadPglite();
 
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
 
