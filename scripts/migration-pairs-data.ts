@@ -54,6 +54,11 @@ const F = {
   sec3Advisor: "20260823000500_sec3_advisor_private_pii_format_guard.sql",
   sec3Coupon: "20260823000600_sec3_coupon_max_per_tenant.sql",
   k4IsDocument: "20260818000400_property_media_is_document.sql",
+  // supabase/proposed/ taslaklari (migrations/'ta YOK; externalPending ile izlenir). Terfide YENI numara alirlar:
+  // terfi eden kisi buradaki adlari yeni adlarla degistirir (sira 000500 -> 000800 [D'siz] -> 000900 korunur).
+  billingAmount: "20261005000500_billing_plan_amount_integrity.sql",
+  billingPauseSeats: "20261005000800_billing_pause_proration_business_seats.sql",
+  seatFulfillment: "20261005000900_seat_purchase_fulfillment.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -101,6 +106,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sec3Advisor]: "siki", // CHECK kisitlari; mevcut satir uymuyorsa uygulama hata verir
     [F.sec3Coupon]: "siki",
     [F.k4IsDocument]: "ek",
+    [F.billingAmount]: "davranis", // fulfill/plan RPC tutarlari plan tanimindan; admin plan degisimi tutari korur
+    [F.billingPauseSeats]: "ek", // D bolumu CIKARILMIS halde: sutunlar + yeni RPC'ler + effective_seat_limit
+    [F.seatFulfillment]: "davranis", // koltuk tetikleyicileri extra_seats'i sayar; fulfill extra_seats faturasini isler
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -138,6 +146,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P11-f-modulleri", order: 11, title: "Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests] },
     { id: "P12-kazanc-gizliligi", order: 12, title: "AYRI PENCERE: kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PK4-is-document", order: 13, title: "K4 is_document (dal main'e girerse): migration KODDAN ONCE", files: [F.k4IsDocument] },
+    {
+      id: "PB-faturalama-koltuk",
+      order: 14,
+      title: "TASLAK (proposed, terfi bekliyor): fiyat butunlugu -> duraklatma/extra_seats (D'siz) -> koltuk satisi fulfill",
+      files: [F.billingAmount, F.billingPauseSeats, F.seatFulfillment],
+    },
   ],
 
   // (b) Birlikte uygulanmasi gerekenler (duzeltici ana'dan sonra numaralanmis ve ayni pencerede).
@@ -148,6 +162,14 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "ilan-sahibi", title: "property_owner_info + guncelleme kapsami", main: [F.ownerInfo], fixes: [F.sec3Owner], window: "P9-ilan-sahibi" },
     { id: "danisman-ozel", title: "advisor_private + PII biçim kisiti", main: [F.advisorPrivate], fixes: [F.sec3Advisor], window: "P7-danisman-profil" },
     { id: "kuponlar", title: "coupons + max_per_tenant", main: [F.coupons], fixes: [F.sec3Coupon], window: "P5-kupon" },
+    {
+      id: "koltuk-satisi",
+      title: "Fiyat butunlugu (fulfill tabani) + extra_seats/effective_seat_limit + koltuk satisi fulfill/tetikleyiciler",
+      main: [F.billingAmount, F.billingPauseSeats],
+      fixes: [F.seatFulfillment],
+      window: "PB-faturalama-koltuk",
+      note: "000900 on-kosul blogu 000500 govde hash'ini ve 000800 sutun/fonksiyonunu arar; eksikse hicbir sey yazmadan durur. Kod seat_purchase_ready() true olana dek koltuk satmaz.",
+    },
   ],
 
   // [bagimli, onkosul]: kaynak = dosya govdeleri + BIRLESIK_YOL_HARITASI §4.2.
@@ -171,6 +193,13 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sec3Owner, F.ownerInfo],
     [F.sec3Advisor, F.advisorPrivate],
     [F.sec3Coupon, F.coupons],
+    // 000500 basligindaki BAGIMLILIK (uygulanmamis olanlar; digerleri canlida)
+    [F.billingAmount, F.trialDays],
+    [F.billingAmount, F.planBusiness],
+    [F.billingAmount, F.priceLock],
+    // 000900: fulfill TABANI 000500, extra_seats + effective_seat_limit 000800 (D'siz)
+    [F.seatFulfillment, F.billingAmount],
+    [F.seatFulfillment, F.billingPauseSeats],
   ],
 
   externalPending: [
@@ -179,6 +208,24 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       branch: "worktree-agent-aaa0895d41f425d97 (K4)",
       rule: "migration-once",
       note: "public medya sorgulari is_document sutununa bagli: migration KODDAN ONCE uygulanmali (kod once yayinlanirsa vitrinde gorsel kaybolur).",
+    },
+    {
+      file: F.billingAmount,
+      branch: "supabase/proposed (taslak; terfide yeni numara)",
+      rule: "migration-once",
+      note: "fiyat butunlugu: Founders / yeni fiyat / admin plan degisimi bu uygulanana dek KAPALI kalmali. 000800'un D bolumunun yerine gecer.",
+    },
+    {
+      file: F.billingPauseSeats,
+      branch: "supabase/proposed (taslak; terfide yeni numara)",
+      rule: "migration-once",
+      note: "terfide D bolumu CIKARILMALI (000500 yerine gecer). Kod sema yokken duraklatma/ek koltuk gosterimini gizler.",
+    },
+    {
+      file: F.seatFulfillment,
+      branch: "supabase/proposed (taslak; terfide yeni numara)",
+      rule: "migration-once",
+      note: "koltuk satisi: kod zaten yayinda ve seat_purchase_ready() true olana dek satmaz. 000500 ve 000800 (D'siz) SONRASI uygulanir.",
     },
   ],
 };
