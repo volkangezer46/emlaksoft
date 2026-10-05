@@ -258,7 +258,18 @@
 .mk-badge[data-kind="populer"] { background: #fff0cf; color: #7a4300; }
 .mk-ext { margin-left: 0.25rem; opacity: 0.7; }
 
-/* İmleç spotlight'ı ve kademeli menü girişi kaldırıldı (--mx/--my artık kullanılmıyor; mega-menu.tsx yazmaya devam eder, zararsız). */
+/* imleç spotlight'ı: yalnız fare + hareket tercihi serbest; transform ile konumlanır (yerleşim/boyama yok) */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .mk-mega li a::before { content: ""; position: absolute; left: 0; top: 0; width: 11rem; height: 11rem; margin: -5.5rem 0 0 -5.5rem; border-radius: 50%; background: radial-gradient(closest-side, rgba(29, 92, 255, 0.16), rgba(29, 92, 255, 0)); opacity: 0; transform: translate3d(var(--mx, 0px), var(--my, 0px), 0); transition: opacity var(--motion-base); pointer-events: none; z-index: -1; }
+  .mk-mega li a:hover::before { opacity: 1; }
+  .mk-mega li a:hover .mk-panel-ico svg, .mk-mega li a:hover .mk-ico-img { transform: scale(1.14) rotate(-6deg); }
+}
+
+/* kademeli giriş: panel açılınca öğeler sırayla yükselir (en çok 240ms gecikme) */
+@keyframes mk-item-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .mk-dd[data-open="true"] .mk-mega li, .mk-dd[data-open="true"] .mk-mega-feat { animation: mk-item-in var(--motion-slow) var(--ease-out-expo) both; animation-delay: min(calc(var(--i, 0) * var(--motion-stagger)), 240ms); }
+}
 
 /* öne çıkan kart (ikon + üst başlık; isteğe bağlı medya) */
 .mk-mega-feat { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1.25rem; border-radius: var(--mk-r-card); text-decoration: none; color: #fff; background: linear-gradient(165deg, #081a45 0%, #0a1636 100%); transition: box-shadow 150ms; }

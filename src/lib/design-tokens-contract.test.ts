@@ -262,9 +262,14 @@ describe("premium konsol paleti", () => {
     const dark = block(premiumCss, 'html[data-theme="dark"]');
     const lightSurface = hex(LIGHT, "--surface");
     const darkSurface = hex(DARK, "--surface-raised");
+    // Seri renkleri ortak viz paletine takma ad olabilir (var(--viz-*)): gerçek hex'e çözülür, eşik aynı kalır.
+    const resolve = (body: string, themeCss: string, t: string): string => {
+      const alias = (body.includes(`${t}:`) ? body : light).match(new RegExp(`${t}:\\s*var\\((--[a-z0-9-]+)\\)`));
+      return alias ? hex(themeCss, alias[1]) : hex(body, t);
+    };
     for (const t of ["--pm-chart-success", "--pm-chart-warn", "--pm-chart-danger"]) {
-      expect(contrast(hex(light, t), lightSurface), `açık ${t}`).toBeGreaterThanOrEqual(3);
-      expect(contrast(hex(dark, t), darkSurface), `koyu ${t}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(resolve(light, tokensCss, t), lightSurface), `açık ${t}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(resolve(dark, darkCss, t), darkSurface), `koyu ${t}`).toBeGreaterThanOrEqual(3);
     }
     // Altın dolgu/halka (grafik işareti) iki temada
     expect(contrast(hex(premiumCss, "--gold-500"), lightSurface)).toBeGreaterThanOrEqual(2.1); // dekoratif dolgu; değer metni ayrıca AA (--pm-gold-text)
