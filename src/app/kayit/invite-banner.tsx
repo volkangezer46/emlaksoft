@@ -21,7 +21,7 @@ export function InviteBanner({ invite }: { invite: InviteBannerData | null }) {
         <p className="font-semibold text-ink-950">{invite.officeName} sizi EmlakSoft&apos;a davet etti</p>
         {invite.welcomeCreditTry > 0 ? (
           <p className="mt-0.5 text-xs text-text-muted">
-            Kaydınız tamamlandığında hesabınıza {formatTry(invite.welcomeCreditTry)} hoş geldin kredisi yüklenir; ilk faturanızdan düşer.
+            İlk ödemenizi yaptığınızda hesabınıza {formatTry(invite.welcomeCreditTry)} hoş geldin kredisi yüklenir; sonraki faturanızdan düşer (fatura payı sınırı geçerlidir).
           </p>
         ) : (
           <p className="mt-0.5 text-xs text-text-muted">Kaydı tamamladığınızda deneme süreniz başlar.</p>

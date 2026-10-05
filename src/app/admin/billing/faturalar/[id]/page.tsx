@@ -111,6 +111,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             status={inv.status}
             totalTry={Number(inv.total_try)}
             refunded={Boolean(refund)}
+            chargedBack={Boolean(meta.chargeback)}
             isSuperAdmin={staff.role === "super_admin"}
             today={trDayKey(clockNow())}
           />

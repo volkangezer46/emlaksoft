@@ -208,9 +208,14 @@ async function renewOne(
     return "failed";
   }
 
+  // BELİRSİZLİK İLKESİ (çift çekim yok): ağ/zaman aşımı/HTTP hatası ya da doğrulama (imza/tutar/eşleşme) hatasında para
+  // alınmış OLABİLİR; fatura "initialized" KALIR (yeni tahsilat engellenir, mutabakat/yönetici çözer, kredi rezervi
+  // serbest bırakılmaz). Yalnız sağlayıcının KESİN ret yanıtı (status=failure + errorCode) faturayı
+  // "initialization_failed" yapar.
   let verified: ReturnType<typeof verifyStoredCardPayment>;
+  let result: Awaited<ReturnType<typeof chargeStoredCard>>;
   try {
-    const result = await chargeStoredCard({
+    result = await chargeStoredCard({
       conversationId,
       price: amounts.totalTry,
       basketId: conversationId,
@@ -220,6 +225,16 @@ async function renewOne(
       billingAddress: buyer.billingAddress,
       basketItemName: `EmlakSoft ${plan} (${cycle === "yearly" ? "yıllık" : "aylık"}) otomatik yenileme`,
     });
+  } catch (e) {
+    console.error("autoRenew charge (belirsiz: fatura initialized kalır)", e instanceof Error ? e.message : "error");
+    return "failed";
+  }
+  if (isDefinitiveStoredCardDecline(result)) {
+    await markCheckoutInvoiceFailed({ invoiceId, tenantId });
+    console.error("autoRenew charge declined", { code: result.errorCode });
+    return "failed";
+  }
+  try {
     // Checkout Form ile aynı sıkı mutabakat: imza, durum, fraudStatus, conversationId/basketId, para birimi, tutar.
     verified = verifyStoredCardPayment(result, {
       conversationId,
@@ -227,8 +242,7 @@ async function renewOne(
       amountTry: amounts.totalTry,
     });
   } catch (e) {
-    await markCheckoutInvoiceFailed({ invoiceId, tenantId });
-    console.error("autoRenew charge", e instanceof Error ? e.message : "error");
+    console.error("autoRenew verify (belirsiz: fatura initialized kalır)", e instanceof Error ? e.message : "error");
     return "failed";
   }
 
@@ -250,6 +264,15 @@ async function renewOne(
     console.error("autoRenew fulfill", e instanceof Error ? e.message : "error");
     return "failed";
   }
+}
+
+/**
+ * Saklı kart tahsilatında KESİN ret: sağlayıcı açıkça status=failure + hata kodu döndü (para alınmadı). Başka her durum
+ * (ağ/zaman aşımı, imza/tutar uyuşmazlığı, beklenmeyen biçim) BELİRSİZDİR ve faturayı "initialized" bırakır. Saf; testlenebilir.
+ */
+export function isDefinitiveStoredCardDecline(result: { status?: unknown; errorCode?: unknown } | null | undefined): boolean {
+  if (!result) return false;
+  return String(result.status ?? "").trim().toLowerCase() === "failure" && String(result.errorCode ?? "").trim() !== "";
 }
 
 /** Otomatik yenileme tekillik anahtarı (saf; testlenebilir). */

@@ -58,6 +58,13 @@ aşamasında `true` olabilir (kod yalnız tam `true` değerini kabul eder; varsa
 kullanımına geçmeden önce kapatılır/silinir. `ENABLE_DEMO_LOGIN`, `ALLOW_PAYMENT_LINK_DEMO`, `ALLOW_BILLING_DEMO`
 production'da kapalı/tanımsız olmalı. Public isimli (`NEXT_PUBLIC_*`) hiçbir değişken sır içermez.
 
+**Platform MFA tek kaynak (ZORUNLU yayın adımı):** MFA iki yerde uygulanır: uygulama katmanı `PLATFORM_MFA_ENFORCEMENT=on` (env) ve
+veritabanı katmanı `platform_settings` `platform.mfa_enforced` (SQL personel kapıları, örn. `growth_staff_super_admin()`, AAL2'yi YALNIZ bu
+ayara bakarak ister; env'e bakamaz). İkisi AYNI ANDA açılır: env'i açtığınız anda
+`insert into public.platform_settings (key, value) values ('platform.mfa_enforced', 'on') on conflict (key) do update set value = 'on';`
+çalıştırın ve geri alırken ikisini birlikte kapatın. `/admin` üstündeki kırmızı "MFA tutarsız" şeridi env açık + ayar kapalı ise uyarır
+(`platformMfaSyncIssue`, `src/lib/platform-mfa.ts`). Bu adım atlanırsa DB personel RPC'leri MFA'sız çalışır. Zorunlu MFA hâlâ KAPALI (sahip kararı).
+
 ## 3. Veritabanı
 
 - [ ] Otomatik yedek/PITR durumu ve son başarılı yedek zamanı doğrulandı (restore edilebilirlik: `docs/runbooks/RESTORE.md`).
