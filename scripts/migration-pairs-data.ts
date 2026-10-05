@@ -1,13 +1,21 @@
 /**
  * Yayin penceresi verisi: hangi migration hangi pencerede, hangileri BIRLIKTE uygulanir, etki sinifi.
- * Mantik: `migration-pairs.ts` (saf, testli). Kilavuz: `docs/runbooks/YAYIN_PENCERESI.md`.
+ * Mantik: `migration-pairs.ts` (saf, testli). Kilavuz: `docs/runbooks/YAYIN_PENCERESI.md` (P1-P12) ve
+ * `docs/runbooks/YAYIN_PENCERESI_2.md` (2026-10-05 terfi eden 13 migration + P12 en sonda).
  *
  * Yeni bir uygulanmamis migration eklenirse BURAYA da eklenmelidir (etki sinifi + pencere); aksi halde
  * `npm run check:migration-pairs` "etki-sinifi-yok / pencere-yok" hatasi verir. Bu dosya SQL'e dokunmaz.
  */
 import type { GroupSpec } from "../src/lib/migration-pairs";
 
-/** Canlida uygulanan son migration (docs/HAFIZA.md §2). Bundan buyuk surumler "uygulanmamis" sayilir. */
+/**
+ * Pencere modelinin TABANI: bundan buyuk surumler bu aracta "uygulanmamis" sayilir (etki sinifi/pencere zorunlu).
+ * GERCEK CANLI DURUM (2026-10-05, docs/HAFIZA.md §2): 20260814000100..20260824001300 arasindaki 41 dosyanin 40'i
+ * UYGULANDI (P1-P11b); yalniz 20260816000500 (P12, kazanc gizliligi) bekliyor. 20260825000100..001300 (2026-10-05
+ * proposed/'dan terfi) HIC uygulanmadi. Taban bilerek 20260813000300'de birakildi: P12 dosyasi daha kucuk numarali
+ * oldugu icin taban ilerletilirse bu arac onu "uygulanmis" sanar. Uygulanan pencereler basliklarinda isaretlidir;
+ * kesin bekleyen listesi icin salt-okunur `npm run db:migrate -- --dry-run` esastir.
+ */
 export const APPLIED_HEAD = "20260813000300";
 
 /** `scripts/validate-migrations.ts` icindeki donmus tarihsel cakismalar (uygulanmis ledger'lar). */
@@ -57,11 +65,21 @@ const F = {
   p5DocReq: "20260824001200_p5_document_requests_write_scope.sql",
   p5Revoke: "20260824001300_p5_service_rpc_revoke_anon_authenticated.sql",
   k4IsDocument: "20260818000400_property_media_is_document.sql",
-  // supabase/proposed/ taslaklari (migrations/'ta YOK; externalPending ile izlenir). Terfide YENI numara alirlar:
-  // terfi eden kisi buradaki adlari yeni adlarla degistirir (sira 000500 -> 000800 [D'siz] -> 000900 korunur).
-  billingAmount: "20261005000500_billing_plan_amount_integrity.sql",
-  billingPauseSeats: "20261005000800_billing_pause_proration_business_seats.sql",
-  seatFulfillment: "20261005000900_seat_purchase_fulfillment.sql",
+  // 2026-10-05: supabase/proposed/ taslaklarindan TERFI (eski ad -> yeni ad, YAYIN_PENCERESI_2.md tablosu).
+  // Sira bagimliliga gore: fiyat butunlugu -> (koltuk kilidi) -> duraklatma/extra_seats (D'siz) -> koltuk satisi.
+  ownerLink: "20260825000100_properties_owner_customer_link.sql", // eski 20261005000100
+  geo: "20260825000200_geo_central_management.sql", // eski 20261005000600
+  billingAmount: "20260825000300_billing_plan_amount_integrity.sql", // eski 20261005000500
+  seatPriceLock: "20260825000400_subscription_seat_price_lock.sql", // eski 20261005000400
+  billingPauseSeats: "20260825000500_billing_pause_proration_business_seats.sql", // eski 20261005000800 (D cikarildi)
+  seatFulfillment: "20260825000600_seat_purchase_fulfillment.sql", // eski 20261005000900
+  survey: "20260825000700_survey_module.sql", // eski 20260820010000
+  growthReferral: "20260825000800_growth_referral_partner_attribution.sql", // eski 20260819000100
+  growthClicks: "20260825000900_growth_click_counters.sql", // eski 20260822000100
+  aiCredit: "20260825001000_ai_credit_metering.sql", // eski 20260820000300
+  vitrinSettings: "20260825001100_tenant_vitrin_settings.sql", // eski 20260816060100
+  vitrinSeo: "20260825001200_tenant_vitrin_sections_seo_optin.sql", // eski 20260819010700
+  ownership: "20260825001300_ownership_transfers.sql", // eski 20261005000700
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -112,53 +130,73 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.p5DocReq]: "siki", // evrak linki: authenticated UPDATE yalniz iptal (active -> revoked)
     [F.p5Revoke]: "siki", // increment_listing_view / increment_referral_click: anon+authenticated EXECUTE geri alinir
     [F.k4IsDocument]: "ek",
+    // 2026-10-05 terfi edenler
+    [F.ownerLink]: "ek", // nullable sutun + FK + ayni-ofis trigger'i (yalniz owner_customer_id yazilinca calisir)
+    [F.geo]: "ek", // yeni geo_* tablolari/sutunlari + service_role RPC'leri; ofis bildirimi INSERT'i durum alanlarini kilitler
     [F.billingAmount]: "davranis", // fulfill/plan RPC tutarlari plan tanimindan; admin plan degisimi tutari korur
+    [F.seatPriceLock]: "ek", // iki nullable sutun
     [F.billingPauseSeats]: "ek", // D bolumu CIKARILMIS halde: sutunlar + yeni RPC'ler + effective_seat_limit
     [F.seatFulfillment]: "davranis", // koltuk tetikleyicileri extra_seats'i sayar; fulfill extra_seats faturasini isler
+    [F.survey]: "ek", // yeni anket tablolari + permission_defaults seed (on conflict do nothing)
+    [F.growthReferral]: "ek", // yeni growth_* tablolari + hesap kredisi defteri (yazma yalniz service_role)
+    [F.growthClicks]: "ek", // sayac tablosu + service_role RPC
+    [F.aiCredit]: "ek", // defter sutun/kisit genisletme + service_role RPC; olcum kodda etkinlesir
+    [F.vitrinSettings]: "ek", // varsayilanlar bugunku davranis (vitrin acik, telefon gorunur)
+    [F.vitrinSeo]: "davranis", // sitemap opt-in kaynagi elle listeden sutuna gecer (hepsi false dogar)
+    [F.ownership]: "ek", // yeni tablo + 3 service_role RPC (kod henuz yok)
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
   windows: [
-    { id: "P1-duzeltme", order: 1, title: "Davranis duzeltmesi: telefon CHECK + kampanya claim", files: [F.phone, F.campaignClaim] },
-    { id: "P2-seed", order: 2, title: "Seed: kayip nedeni + earnings_all izin varsayilani", files: [F.lossSeed, F.earningsPerm] },
+    { id: "P1-duzeltme", order: 1, title: "(UYGULANDI) Davranis duzeltmesi: telefon CHECK + kampanya claim", files: [F.phone, F.campaignClaim] },
+    { id: "P2-seed", order: 2, title: "(UYGULANDI) Seed: kayip nedeni + earnings_all izin varsayilani", files: [F.lossSeed, F.earningsPerm] },
     {
       id: "P3-komisyon-temel",
       order: 3,
-      title: "Komisyon/talep/atama temeli (yalniz ekler)",
+      title: "(UYGULANDI) Komisyon/talep/atama temeli (yalniz ekler)",
       files: [F.splits, F.plans, F.payouts, F.demandCols, F.demandRpc, F.targets, F.assignRules, F.profileScope],
     },
     {
       id: "P4-altyapi",
       order: 4,
-      title: "Moduller, SEO 404, oturum kapatma, deneme gunu, plan/fiyat kilidi, ornek veri kapsami",
+      title: "(UYGULANDI) Moduller, SEO 404, oturum kapatma, deneme gunu, plan/fiyat kilidi, ornek veri kapsami",
       files: [F.sampleScope, F.tenantModules, F.seo404, F.trialDays, F.revokeSessions, F.planBusiness, F.priceLock],
     },
-    { id: "P5-kupon", order: 5, title: "Kuponlar + kupon tenant siniri", files: [F.coupons, F.sec3Coupon] },
-    { id: "P6-k5-kvkk", order: 6, title: "K5 abonelik/sube + KVKK talepleri + rol kapisi", files: [F.k5Subs, F.k5Kvkk, F.sec3Kvkk] },
+    { id: "P5-kupon", order: 5, title: "(UYGULANDI) Kuponlar + kupon tenant siniri", files: [F.coupons, F.sec3Coupon] },
+    { id: "P6-k5-kvkk", order: 6, title: "(UYGULANDI) K5 abonelik/sube + KVKK talepleri + rol kapisi", files: [F.k5Subs, F.k5Kvkk, F.sec3Kvkk] },
     {
       id: "P7-danisman-profil",
       order: 7,
-      title: "Danisman profili/ozel kimlik + PII bicim kisiti",
+      title: "(UYGULANDI) Danisman profili/ozel kimlik + PII bicim kisiti",
       files: [F.advisorPrivate, F.advisorSpecialties, F.sec3Advisor],
     },
     {
       id: "P8-ilan-havuzu",
       order: 8,
-      title: "Atama kurali ilan hedefi + ilan havuzu + insert/claim korumasi",
+      title: "(UYGULANDI) Atama kurali ilan hedefi + ilan havuzu + insert/claim korumasi",
       files: [F.assignListing, F.listingPool, F.poolFlags, F.sec3Pool],
     },
-    { id: "P9-ilan-sahibi", order: 9, title: "Ilan sahibi bilgisi + guncelleme kapsami", files: [F.ownerInfo, F.sec3Owner] },
-    { id: "P10-ofis-kontrol", order: 10, title: "Ofis kontrol merkezi + onay istekleri RLS", files: [F.oversight, F.sec3Approval] },
-    { id: "P11-f-modulleri", order: 11, title: "Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests, F.p5Notes, F.p5DocReq] },
-    { id: "P11b-sayac-revoke", order: 11.5, title: "Servis RPC sayaclari: anon/authenticated EXECUTE revoke (bagimsiz, kod etkilenmez)", files: [F.p5Revoke] },
-    { id: "P12-kazanc-gizliligi", order: 12, title: "AYRI PENCERE: kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
+    { id: "P9-ilan-sahibi", order: 9, title: "(UYGULANDI) Ilan sahibi bilgisi + guncelleme kapsami", files: [F.ownerInfo, F.sec3Owner] },
+    { id: "P10-ofis-kontrol", order: 10, title: "(UYGULANDI) Ofis kontrol merkezi + onay istekleri RLS", files: [F.oversight, F.sec3Approval] },
+    { id: "P11-f-modulleri", order: 11, title: "(UYGULANDI) Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests, F.p5Notes, F.p5DocReq] },
+    { id: "P11b-sayac-revoke", order: 11.5, title: "(UYGULANDI) Servis RPC sayaclari: anon/authenticated EXECUTE revoke", files: [F.p5Revoke] },
     { id: "PK4-is-document", order: 13, title: "K4 is_document (dal main'e girerse): migration KODDAN ONCE", files: [F.k4IsDocument] },
+    // ---- 2026-10-05 terfi: YAYIN_PENCERESI_2.md sirasi (hepsi BEKLIYOR) ----
+    { id: "PB1-malik-baglantisi", order: 14, title: "Malik-musteri baglantisi (properties.owner_customer_id, ikinci properties->customers FK)", files: [F.ownerLink] },
+    { id: "PB2-cografya", order: 15, title: "Cografya tek merkez yonetimi (surum, alias, ofis bildirimi, birlestir/tasi RPC)", files: [F.geo] },
     {
-      id: "PB-faturalama-koltuk",
-      order: 14,
-      title: "TASLAK (proposed, terfi bekliyor): fiyat butunlugu -> duraklatma/extra_seats (D'siz) -> koltuk satisi fulfill",
-      files: [F.billingAmount, F.billingPauseSeats, F.seatFulfillment],
+      id: "PB3-faturalama-koltuk",
+      order: 16,
+      title: "Fiyat butunlugu -> koltuk fiyat kilidi -> duraklatma/extra_seats (D'siz) -> koltuk satisi fulfill",
+      files: [F.billingAmount, F.seatPriceLock, F.billingPauseSeats, F.seatFulfillment],
     },
+    { id: "PB4-anket", order: 17, title: "Anket modulu (anketor kuyrugu) + permission_defaults seed", files: [F.survey] },
+    { id: "PB5-buyume", order: 18, title: "Organik buyume: referral/ortak/atif/hesap kredisi defteri + tiklama sayaci", files: [F.growthReferral, F.growthClicks] },
+    { id: "PB6-ai-kredi", order: 19, title: "AI kredi olcumu (ayni hesap kredisi defteri)", files: [F.aiCredit] },
+    { id: "PB7-vitrin", order: 20, title: "Vitrin ayarlari + bolumler/SEO opt-in (sitemap kaynagi degisir)", files: [F.vitrinSettings, F.vitrinSeo] },
+    { id: "PB8-sahiplik-devri", order: 21, title: "Ofis sahipligi devri (tablo + service_role RPC)", files: [F.ownership] },
+    // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
+    { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
   // (b) Birlikte uygulanmasi gerekenler (duzeltici ana'dan sonra numaralanmis ve ayni pencerede).
@@ -176,8 +214,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       title: "Fiyat butunlugu (fulfill tabani) + extra_seats/effective_seat_limit + koltuk satisi fulfill/tetikleyiciler",
       main: [F.billingAmount, F.billingPauseSeats],
       fixes: [F.seatFulfillment],
-      window: "PB-faturalama-koltuk",
-      note: "000900 on-kosul blogu 000500 govde hash'ini ve 000800 sutun/fonksiyonunu arar; eksikse hicbir sey yazmadan durur. Kod seat_purchase_ready() true olana dek koltuk satmaz.",
+      window: "PB3-faturalama-koltuk",
+      note: "20260825000600 on-kosul blogu 20260825000300 fulfill govde md5'ini (a69a7609...) ve 20260825000500 sutun/fonksiyonunu arar; eksikse hicbir sey yazmadan durur. Kod seat_purchase_ready() true olana dek koltuk satmaz.",
     },
   ],
 
@@ -204,13 +242,20 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sec3Coupon, F.coupons],
     [F.p5Notes, F.neighborhood],
     [F.p5DocReq, F.docRequests],
-    // 000500 basligindaki BAGIMLILIK (uygulanmamis olanlar; digerleri canlida)
+    // 20260825000300 basligindaki BAGIMLILIK (uygulanmamis olanlar; digerleri canlida). On-kosul blogu da denetler.
     [F.billingAmount, F.trialDays],
     [F.billingAmount, F.planBusiness],
     [F.billingAmount, F.priceLock],
-    // 000900: fulfill TABANI 000500, extra_seats + effective_seat_limit 000800 (D'siz)
+    // Yayin sirasi: D bolumunun yerine gecen tam govde (000300) duraklatma/extra_seats'ten (000500) once.
+    [F.billingPauseSeats, F.billingAmount],
+    // 20260825000600: fulfill TABANI 000300, extra_seats + effective_seat_limit 000500 (D'siz)
     [F.seatFulfillment, F.billingAmount],
     [F.seatFulfillment, F.billingPauseSeats],
+    // Buyume: tiklama sayaci ve AI kredi buyume migration'indan sonra (AI kredi ayni defter tablosunu genisletir).
+    [F.growthClicks, F.growthReferral],
+    [F.aiCredit, F.growthReferral],
+    // Vitrin: bolumler/SEO opt-in, vitrin ayarlarinin tamamlayicisi.
+    [F.vitrinSeo, F.vitrinSettings],
   ],
 
   externalPending: [
@@ -219,24 +264,6 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       branch: "worktree-agent-aaa0895d41f425d97 (K4)",
       rule: "migration-once",
       note: "public medya sorgulari is_document sutununa bagli: migration KODDAN ONCE uygulanmali (kod once yayinlanirsa vitrinde gorsel kaybolur).",
-    },
-    {
-      file: F.billingAmount,
-      branch: "supabase/proposed (taslak; terfide yeni numara)",
-      rule: "migration-once",
-      note: "fiyat butunlugu: Founders / yeni fiyat / admin plan degisimi bu uygulanana dek KAPALI kalmali. 000800'un D bolumunun yerine gecer.",
-    },
-    {
-      file: F.billingPauseSeats,
-      branch: "supabase/proposed (taslak; terfide yeni numara)",
-      rule: "migration-once",
-      note: "terfide D bolumu CIKARILMALI (000500 yerine gecer). Kod sema yokken duraklatma/ek koltuk gosterimini gizler.",
-    },
-    {
-      file: F.seatFulfillment,
-      branch: "supabase/proposed (taslak; terfide yeni numara)",
-      rule: "migration-once",
-      note: "koltuk satisi: kod zaten yayinda ve seat_purchase_ready() true olana dek satmaz. 000500 ve 000800 (D'siz) SONRASI uygulanir.",
     },
   ],
 };

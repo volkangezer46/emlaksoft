@@ -1,6 +1,11 @@
--- TASLAK (UYGULANMADI) — organik büyüme: ofis referral, ortaklar, kaynak yakalama, hesap kredisi defteri.
--- Tasarım: docs/design/ORGANIK_BUYUME_PLANI.md. supabase/migrations'a taşımadan önce: numara güncelle,
--- check:migrations + dry-run, restore edilebilir yedek. K2 (plan/kupon/kampanya) tablolarına DOKUNMAZ.
+-- MIGRATION 20260825000800 (2026-10-05 terfi; eski taslak adı proposed/20260819000100_growth_referral_partner_attribution.sql).
+-- UYGULANMADI: yalnız restore edilebilir backup/PITR doğrulandıktan sonra SAHİBİ
+-- `npm run db:migrate -- --only 20260825000800_growth_referral_partner_attribution.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825000800_growth_referral_partner_attribution.rollback.sql
+--   (önce 20260825001000 AI kredi ve 20260825000900 tıklama sayacı rollback'leri; defter tablosu düşer).
+-- Sonra: 20260825000900_growth_click_counters (aynı pencere) ve 20260825001000_ai_credit_metering (aynı defter tablosu).
+-- Organik büyüme: ofis referral, ortaklar, kaynak yakalama, hesap kredisi defteri.
+-- Tasarım: docs/design/ORGANIK_BUYUME_PLANI.md. K2 (plan/kupon/kampanya) tablolarına DOKUNMAZ.
 -- Not: mevcut `referral_links/referrals` (müşteri tavsiye programı) ile ilgisi yoktur; adlar bilerek ayrıdır (growth_*).
 -- Tablolar RLS'li; yazma yalnız service_role. Kişisel veri partnere gitmez: partner raporu agregattır.
 

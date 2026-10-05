@@ -161,8 +161,8 @@ const supabaseDir = path.join(process.cwd(), "supabase");
 const ls = (d: string) => readdirSync(path.join(supabaseDir, d)).filter((f) => f.endsWith(".sql"));
 
 /**
- * Bilinen proposed cakismalari. Iki eski cakisma (ownership_transfers, billing_pause) 20261005000700/800 olarak
- * yeniden numaralandi; liste BOS kalmali. Yeni bir cakisma testi kirar.
+ * Bilinen proposed cakismalari. 2026-10-05: 13 taslak 20260825000100..001300 olarak migrations/'a terfi etti;
+ * proposed/'da yalniz perf indeks onerileri (CONCURRENTLY, terfi edilmedi) kaldi. Liste BOS kalmali.
  */
 const KNOWN_PROPOSED_COLLISIONS: string[] = [];
 

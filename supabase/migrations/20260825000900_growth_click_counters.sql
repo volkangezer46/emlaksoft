@@ -1,7 +1,10 @@
--- TASLAK (UYGULANMADI) — organik büyüme: bağlantı tıklama sayacı (kişisel veri YOK).
--- Bağımlılık: 20260819000100_growth_referral_partner_attribution.sql ÖNCE uygulanır (growth_* ve signup_attributions tabloları).
--- Numara notu: taslak dosyalar supabase/migrations'a taşınırken ledger'daki en son numaranın ÜSTÜNE yeniden numaralanır
--- (20260819000100 zaten uygulanmış 20260819010xxx dosyalarının altında kalır). Bu dosya sıralamada taslağın ardından gelmelidir.
+-- MIGRATION 20260825000900 (2026-10-05 terfi; eski taslak adı proposed/20260822000100_growth_click_counters.sql).
+-- UYGULANMADI: yalnız restore edilebilir backup/PITR doğrulandıktan sonra SAHİBİ
+-- `npm run db:migrate -- --only 20260825000900_growth_click_counters.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825000900_growth_click_counters.rollback.sql (sayaçlar silinir).
+-- Organik büyüme: bağlantı tıklama sayacı (kişisel veri YOK).
+-- Bağımlılık (yayın sırası): 20260825000800_growth_referral_partner_attribution.sql (eski 20260819000100) ÖNCE uygulanır;
+-- bu dosya teknik olarak yalnız kendi tablosunu kullanır.
 -- Uygulama kodu (src/lib/growth/store.ts) tablo/fonksiyon yoksa sessizce "etkin değil" davranır; bu migration uygulanmadan sistem bozulmaz.
 --
 -- KVKK: yalnız (tür, kod, gün) başına sayaç. IP, cihaz izi, çerez kimliği saklanmaz. Kod opak/rastgeledir.

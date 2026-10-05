@@ -1,6 +1,9 @@
--- TASLAK (UYGULANMADI) — ofis sahipliği devri: iki adımlı (başlat -> hedef kabul), atomik.
--- Tasarım: docs/design/OFIS_SAHIPLIGI_DEVRI.md. supabase/migrations'a taşımadan önce: numarayı güncelle,
--- `npm run check:migrations` + dry-run, restore edilebilir yedek/PITR doğrulaması.
+-- MIGRATION 20260825001300 (2026-10-05 terfi; eski taslak adı proposed/20261005000700_ownership_transfers.sql).
+-- UYGULANMADI: yalnız restore edilebilir backup/PITR doğrulandıktan sonra SAHİBİ
+-- `npm run db:migrate -- --only 20260825001300_ownership_transfers.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825001300_ownership_transfers.rollback.sql (kabul edilmiş devirlerin rolleri geri ALINMAZ).
+-- Ofis sahipliği devri: iki adımlı (başlat -> hedef kabul), atomik. Tasarım: docs/design/OFIS_SAHIPLIGI_DEVRI.md.
+-- NOT: uygulama kodu (server action) HENÜZ YOK; bu migration yalnız tablo + 3 service_role RPC hazırlar.
 -- Forward-only. Mevcut hiçbir tablo/fonksiyon değiştirilmez; yalnız yeni tablo + 3 yeni RPC.
 --
 -- NEDEN RPC: rol hem public.profiles.role'de hem auth.users.raw_app_meta_data'da (JWT claim) tutulur.

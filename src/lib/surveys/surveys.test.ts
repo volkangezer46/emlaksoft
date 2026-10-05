@@ -212,11 +212,12 @@ describe("modül kaydı", () => {
     expect(featureForPublicPath("/anket/abc")).toBeNull();
   });
 
-  it("taslak migration ve rollback dosyaları aynı numarayla vardır, uygulanmış migration klasörüne dokunmaz", () => {
+  it("migration (2026-10-05 terfi) ve rollback dosyası aynı numarayla vardır; eski taslak kopyası kalmamıştır", () => {
     const dir = path.join(process.cwd(), "supabase");
-    const sql = path.join(dir, "proposed", "20260820010000_survey_module.sql");
+    const sql = path.join(dir, "migrations", "20260825000700_survey_module.sql");
     expect(existsSync(sql)).toBe(true);
-    expect(existsSync(path.join(dir, "proposed", "20260820010000_survey_module.rollback.sql"))).toBe(true);
+    expect(existsSync(path.join(dir, "rollbacks", "20260825000700_survey_module.rollback.sql"))).toBe(true);
+    expect(existsSync(path.join(dir, "proposed", "20260820010000_survey_module.sql"))).toBe(false);
     expect(existsSync(path.join(dir, "migrations", "20260820010000_survey_module.sql"))).toBe(false);
     const body = readFileSync(sql, "utf8");
     for (const table of ["survey_tasks", "survey_templates", "survey_questions", "survey_answers", "survey_assignees", "survey_triggers", "survey_settings", "survey_attempts"]) {

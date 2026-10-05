@@ -1,4 +1,11 @@
--- COĞRAFYA TEK MERKEZ YÖNETİMİ (TASLAK — uygulanmadı).
+-- MIGRATION 20260825000200 (2026-10-05 terfi; eski taslak adı proposed/20261005000600_geo_central_management.sql).
+-- UYGULANMADI: yalnız restore edilebilir backup/PITR doğrulandıktan sonra SAHİBİ
+-- `npm run db:migrate -- --only 20260825000200_geo_central_management.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825000200_geo_central_management.rollback.sql (sürüm/alias/bildirim verisi silinir).
+-- Terfi düzeltmesi: geo_change_requests INSERT politikası durum/çözüm alanlarını kilitler (ofis üyesi 'approved'
+-- durumunda ya da başkası adına bildirim yazamaz; kod insert'i bu alanları göndermez → davranış değişmez).
+--
+-- COĞRAFYA TEK MERKEZ YÖNETİMİ.
 --
 -- Amaç: il/ilçe/mahalle verisini admin panelinden TAM yönetilebilir yapmak:
 --   * sürüm kaydı (geo_data_versions): kim, ne zaman, hangi kaynak, fark özeti, geri alma bilgisi
@@ -108,7 +115,14 @@ create policy geo_change_requests_select on public.geo_change_requests
   for select using (tenant_id = public.current_tenant_id());
 drop policy if exists geo_change_requests_insert on public.geo_change_requests;
 create policy geo_change_requests_insert on public.geo_change_requests
-  for insert with check (tenant_id = public.current_tenant_id());
+  for insert with check (
+    tenant_id = public.current_tenant_id()
+    and (requested_by is null or requested_by = (select auth.uid()))
+    and status = 'pending'
+    and resolved_by is null
+    and resolved_at is null
+    and resolution_note is null
+  );
 grant select, insert on public.geo_change_requests to authenticated;
 grant select, insert, update on public.geo_change_requests to service_role;
 

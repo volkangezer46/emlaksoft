@@ -1,10 +1,14 @@
--- TASLAK (UYGULANMADI, supabase/migrations'a TASINMADI): ek kullanici fiyat kilidi.
--- Tasarim: src/lib/billing/seat-pricing.ts (quoteSeats opts.lockedBaseMonthlyTry / opts.lockedTiers).
+-- MIGRATION 20260825000400 (2026-10-05 terfi; eski taslak adi proposed/20261005000400_subscription_seat_price_lock.sql).
+-- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
+-- `npm run db:migrate -- --only 20260825000400_subscription_seat_price_lock.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825000400_subscription_seat_price_lock.rollback.sql (kilit degerleri silinir).
+-- Ek kullanici fiyat kilidi. Tasarim: src/lib/billing/seat-pricing.ts (quoteSeats opts.lockedBaseMonthlyTry / opts.lockedTiers).
 --
--- Bagimlilik: 20261005000800_billing_pause_proration_business_seats.sql (taslak) `subscriptions.extra_seats`
--- sutununu ekler; bu dosya YALNIZ kilit sutunlarini ekler. Uygulamadan once (1) restore edilebilir backup/PITR
--- dogrulanmali, (2) `npm run check:migrations -- --database` ve dry-run temiz olmali, (3) dosya yeni zaman damgasiyla
--- supabase/migrations'a tasinmali (forward-only). Uygulama kodu sema yokken zarifce calisir (kilit yok sayilir).
+-- Bagimlilik: YOK (yalniz subscriptions'a iki nullable sutun ekler). `subscriptions.extra_seats` sutunu
+-- 20260825000500_billing_pause_proration_business_seats.sql (eski taslak 20261005000800) ile gelir; bu dosya ona
+-- dokunmaz, bu yuzden ondan ONCE uygulanabilir. Uygulamadan once `npm run check:migrations -- --database` ve dry-run
+-- temiz olmali. Uygulama kodu sema yokken zarifce calisir (kilit yok sayilir). Kilit fulfill'de henuz YAZILMAZ
+-- (20260825000600 bilinen boslugu).
 --
 -- Kural: mevcut abonenin kayitli fiyati degismez. Yeni liste fiyati yalniz yeni satislara ve yeni ek koltuklara uygulanir;
 -- abone ilk ek koltugu aldiginda o anki kademeler `seat_price_lock_tiers` olarak dondurulur.

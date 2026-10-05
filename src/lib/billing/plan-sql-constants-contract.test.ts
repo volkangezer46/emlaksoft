@@ -17,11 +17,12 @@ import { BUSINESS_PLAN_TEMPLATE, DEFAULT_YEARLY_PAID_MONTHS, PLANS, type PlanDef
  *  - Listede OLMAYAN yeni bir uyumsuzluk/sabit çıkarsa test KIRILIR (yeni sapma sessizce eklenemez).
  *  - Listede olup artık sapma içermeyen kayıt da test'i KIRAR (bayat kayıt silinmelidir).
  *
- * P2 TERFİSİNDEN SONRA: P2 migration'ı `supabase/migrations`a girip fonksiyonları açık gövdeli
- * yeniden tanımlayınca eski dosyalar (değiştirilemez) eski sabitleri taşımaya devam eder. Terfiyi
- * yapan kişi, eski dosyaları SUPERSEDED_BY'a (eski dosya -> onu geçersiz kılan yeni dosya) taşır
- * ve KNOWN_OPEN'ı BOŞALTIR. Yeni dosya da taranır; doğru sabitleri taşımalıdır. Terfiden sonra
- * KNOWN_OPEN boş olmalıdır (bu testin hedef durumu).
+ * P2 TERFİ ETTİ (2026-10-05): `20260825000300_billing_plan_amount_integrity.sql` (eski taslak
+ * proposed/20261005000500) fonksiyonları açık gövdeli yeniden tanımlar; eski dosyalar (değiştirilemez) eski
+ * sabitleri taşımaya devam eder ve SUPERSEDED_BY'a taşındı. Yeni dosya da taranır; doğru sabitleri taşır.
+ * KNOWN_OPEN'da kalanlar P2'nin KAPSAMADIĞI gerçek açıklardır (9 argümanlı eski fulfill overload'u ve
+ * plan_entitlements seed'i); ayrı düzeltici migration ile boşalır (hedef durum: boş liste).
+ * NOT: canlıda P2 henüz UYGULANMADI; bu test dosya düzeyindedir (migrations/ içeriği), canlı DB'yi değil.
  */
 
 const MIGRATIONS_DIR = resolve(process.cwd(), "supabase/migrations");
@@ -36,83 +37,35 @@ const HISTORICAL_SEED_FILES = new Set(["20260722000006_billing_tickets.sql"]);
 
 /**
  * Eski dosya -> onu geçersiz kılan (aynı işlevleri yeniden tanımlayan) daha yeni dosya.
- * Yeni dosya migrations içinde VARSA eski dosya taranmaz. Şu an boş: P2 henüz terfi etmedi.
- * Not: dosya bazlıdır; birden çok işlev içeren dosyada yalnız tamamı geçersiz kılınmışsa eklenir.
+ * Yeni dosya migrations içinde VARSA eski dosya taranmaz.
+ * Not: dosya bazlıdır; dosyadaki SABİT TAŞIYAN işlevlerin tamamı yeniden tanımlanmışsa eklenir
+ * (20260802000300'de sabit taşıyan tek işlev update_tenant_plan_subscription'dır; diğer işlevleri sabit içermez).
  */
-const SUPERSEDED_BY: Readonly<Record<string, string>> = {};
+const SUPERSEDED_BY: Readonly<Record<string, string>> = {
+  "20260809000000_billing_fulfillment_hardening.sql": "20260825000300_billing_plan_amount_integrity.sql", // fulfill_billing_payment (10 arg)
+  "20260731000140_atomic_registration_provisioning.sql": "20260825000300_billing_plan_amount_integrity.sql", // provision_registration
+  "20260802000300_identity_session_authorization_hardening.sql": "20260825000300_billing_plan_amount_integrity.sql", // update_tenant_plan_subscription
+  "20260802000400_atomic_demo_conversion.sql": "20260825000300_billing_plan_amount_integrity.sql", // convert_demo_request_to_tenant
+};
 
 const KNOWN_OPEN: readonly OpenItem[] = [
   {
     file: "20260731000138_atomic_billing_fulfillment.sql",
     kind: "price",
-    fn: "fulfill_billing_payment (ilk tanım; 20260809000000 ile yeniden tanımlandı)",
-    why: "TODO(P2): eski liste fiyatları 990/5990; geçersiz kılan tanım da aynı sabitleri taşıyor.",
+    fn: "fulfill_billing_payment (9 argümanlı ESKİ overload; 10 argümanlı tanım ayrı imzadır)",
+    why: "TODO(P2): 990/5990 sabitleri; 20260825000300 yalnız 10 argümanlı imzayı yeniden tanımlar, 9 argümanlı overload canlıda kalır (kod çağırmıyor). Ayrı temizlik migration'ı (drop function, 9 arg) gerekir.",
   },
   {
     file: "20260731000138_atomic_billing_fulfillment.sql",
     kind: "yearly",
-    fn: "fulfill_billing_payment (ilk tanım)",
-    why: "TODO(P2): yıllık tutar `* 12 * 0.8` (%20); onaylı kural '10 öde 12' (aylık x 10).",
+    fn: "fulfill_billing_payment (9 argümanlı ESKİ overload)",
+    why: "TODO(P2): yıllık tutar `* 12 * 0.8` (%20); onaylı kural '10 öde 12'. 9 argümanlı overload temizlik migration'ı bekliyor.",
   },
   {
     file: "20260731000138_atomic_billing_fulfillment.sql",
     kind: "business-missing",
-    fn: "fulfill_billing_payment (ilk tanım)",
-    why: "TODO(P2): 'business' için tutar yok; gizli paket SQL'de fiyatlanamaz (tutar null).",
-  },
-  {
-    file: "20260809000000_billing_fulfillment_hardening.sql",
-    kind: "price",
-    fn: "fulfill_billing_payment (güncel canlı tanım)",
-    why: "TODO(P2): 990/5990 sabitleri; P2 açık gövdeli CREATE OR REPLACE ile tutarı çağırandan/abonelikten alır.",
-  },
-  {
-    file: "20260809000000_billing_fulfillment_hardening.sql",
-    kind: "yearly",
-    fn: "fulfill_billing_payment (güncel canlı tanım)",
-    why: "TODO(P2): yıllık `* 12 * 0.8`; TS tarafı 'aylık x 10' hesaplıyor, tahsilat tutarı uyuşmaz.",
-  },
-  {
-    file: "20260809000000_billing_fulfillment_hardening.sql",
-    kind: "business-missing",
-    fn: "fulfill_billing_payment (güncel canlı tanım)",
-    why: "TODO(P2): 'business' için tutar tanımı yok.",
-  },
-  {
-    file: "20260731000140_atomic_registration_provisioning.sql",
-    kind: "price",
-    fn: "provision_registration",
-    why: "TODO(P2): kayıtta abonelik tutarı 990/5990 yazılır (v_monthly_amount).",
-  },
-  {
-    file: "20260731000140_atomic_registration_provisioning.sql",
-    kind: "business-missing",
-    fn: "provision_registration",
-    why: "TODO(P2): 'business' için tutar tanımı yok.",
-  },
-  {
-    file: "20260802000300_identity_session_authorization_hardening.sql",
-    kind: "price",
-    fn: "update_tenant_plan_subscription",
-    why: "TODO(P2): plan değişiminde amount_try 990/5990 sabitinden yazılır.",
-  },
-  {
-    file: "20260802000300_identity_session_authorization_hardening.sql",
-    kind: "business-missing",
-    fn: "update_tenant_plan_subscription",
-    why: "TODO(P2): 'business' için tutar tanımı yok (v_amount_try null kalır).",
-  },
-  {
-    file: "20260802000400_atomic_demo_conversion.sql",
-    kind: "price",
-    fn: "convert_demo_request_to_tenant",
-    why: "TODO(P2): demo dönüşümünde abonelik tutarı 990/5990 sabitinden yazılır.",
-  },
-  {
-    file: "20260802000400_atomic_demo_conversion.sql",
-    kind: "business-missing",
-    fn: "convert_demo_request_to_tenant",
-    why: "TODO(P2): 'business' için tutar tanımı yok.",
+    fn: "fulfill_billing_payment (9 argümanlı ESKİ overload)",
+    why: "TODO(P2): 'business' için tutar yok (9 argümanlı overload); temizlik migration'ı bekliyor.",
   },
   {
     file: "20260802000320_plan_entitlements.sql",

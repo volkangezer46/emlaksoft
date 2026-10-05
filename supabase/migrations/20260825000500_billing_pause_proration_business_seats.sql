@@ -1,19 +1,28 @@
--- TASLAK (UYGULANMADI, supabase/migrations'a TASINMADI): abonelik duraklatma, oransal yukseltme,
--- Business plani satisi ve ek kullanici satisi. Tasarim: docs/design/BILLING_PAUSE_PRORATION_DESIGN.md
+-- MIGRATION 20260825000500 (2026-10-05 terfi; eski taslak adi proposed/20261005000800_billing_pause_proration_business_seats.sql).
+-- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
+-- `npm run db:migrate -- --only 20260825000500_billing_pause_proration_business_seats.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20260825000500_billing_pause_proration_business_seats.rollback.sql
+--   (20260825000600 rollback'inden SONRA, 20260825000300 rollback'inden ONCE).
+-- Abonelik duraklatma, oransal yukseltme ve ek kullanici (extra_seats) semasi.
+-- Tasarim: docs/design/BILLING_PAUSE_PRORATION_DESIGN.md
 --
--- Bu dosya calisan uygulamaya bagli DEGILDIR. Uygulanmadan once: (1) restore edilebilir backup/PITR
--- dogrulanmali, (2) `npm run check:migrations -- --database` ve dry-run temiz olmali, (3) dosya
--- supabase/migrations altina yeni zaman damgasiyla tasinmali (forward-only), (4) uygulama kodu ancak
--- getPlanSupport() probe'lari bu sema icin eklendikten SONRA acilmali (sema yokken ozellik gizli kalir).
+-- TERFI DUZELTMESI (2026-10-05): taslagin "D. Business plan listeleri" bolumu (pg_get_functiondef + replace ile
+-- fulfill_billing_payment / update_tenant_plan_subscription / provision_registration canli govdelerini yamalayan
+-- DO blogu) CIKARILDI. Yerini tam govdeli 20260825000300_billing_plan_amount_integrity.sql (eski 20261005000500)
+-- aldi; D kalsaydi 000300'den sonra desen bulamayip 'Plan list pattern not found' ile bu dosyayi (A/B/C/E dahil)
+-- durdururdu. Bu dosya artik HICBIR mevcut fonksiyonu degistirmez.
+--
+-- Uygulama kodu ancak getPlanSupport() probe'lari bu semayi gordugunde duraklatma/ek koltuk gosterir
+-- (sema yokken ozellik gizli kalir).
+-- BAGIMLILIK: 20260825000300 (fiyat butunlugu) ONCE uygulanir (yayin sirasi; bu dosya ona teknik olarak bagli degil).
 --
 -- KAPSAM
 --   A. subscriptions: duraklatma sutunlari + extra_seats
 --   B. pause_subscription / resume_subscription (service_role)
 --   C. quote_upgrade_proration (salt-okunur hesap)
---   D. Business: fulfill_billing_payment / update_tenant_plan_subscription / provision_registration plan listeleri
---      (canli govdeyi pg_get_functiondef ile okuyup degistirir; K1'in 20260816010100 deseni. Boylece
---       K1'in make_interval(platform_default_trial_days) govdesi KAYBOLMAZ.)
---   E. Ek kullanici: plan kota tetikleyicisinde seat_limit + extra_seats
+--   E. Ek kullanici: effective_seat_limit(uuid) yardimcisi (= plan seat_limit + extra_seats). Koltuk
+--      tetikleyicilerinin buna baglanmasi 20260825000600_seat_purchase_fulfillment.sql'dedir.
+--   (D bolumu yok: yukaridaki terfi duzeltmesi.)
 
 -- ---------------------------------------------------------------------------
 -- A. Sema
@@ -194,53 +203,10 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- D. Business plani: plan listeleri (canli govde uzerinde metin degistirme + dogrulama)
--- plan CHECK kisitlari ve plan_entitlements('business') satiri 20260817000210 ile ZATEN var.
--- Degisen: fonksiyonlardaki ('advisor','office','professional','enterprise') listesi ve sabit fiyat CASE'leri.
--- Sabit fiyatlar SQL'de kalmaya devam eder (yalniz liste fiyatinin YEDEGI; fatura tutari parametre/kayitlidir):
---   business 8990 (RECOMMENDED_CATALOG_OVERRIDES ile ayni). Yillik yedek: aylik * 10 (eski 12*0.8 yerine; kod 10 ay).
--- ---------------------------------------------------------------------------
-do $$
-declare
-  v_oid oid;
-  v_name text;
-  v_def text;
-  v_new text;
-  v_changed integer;
-begin
-  for v_oid, v_name in
-    select p.oid, p.proname
-    from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public'
-      and p.proname in ('fulfill_billing_payment', 'update_tenant_plan_subscription', 'provision_registration')
-  loop
-    v_def := pg_get_functiondef(v_oid);
-    v_new := v_def;
-    v_new := replace(v_new, '(''advisor'', ''office'', ''professional'', ''enterprise'')',
-                            '(''advisor'', ''office'', ''professional'', ''business'', ''enterprise'')');
-    v_new := replace(v_new, E'when ''enterprise'' then 12900',
-                            E'when ''business'' then 8990\n    when ''enterprise'' then 12900');
-    v_new := replace(v_new, 'v_monthly_amount * 12 * 0.8', 'v_monthly_amount * 10');
-    if v_new = v_def then
-      -- Beklenen desen bulunamadi: sessizce gecme; migration'i durdur ve govdeyi elle incele.
-      raise exception 'Plan list pattern not found in %; review live definition.', v_name;
-    end if;
-    execute v_new;
-  end loop;
-end
-$$;
-
--- update_tenant_plan_subscription icindeki v_amount_try CASE'i `when 'enterprise' then 12900` desenini
--- tasidigi icin yukaridaki replace onu da kapsar. NOT: bu fonksiyon plan degisince amount_try'i LISTE aylik fiyatina
--- yazar (kayitli tutari ezer). Tasarim notu: platform plan degisiminde amount_try'in korunmasi ya da parametre
--- (p_amount_try) alinmasi ayri karardir; bu taslak davranisi degistirmez.
-
--- ---------------------------------------------------------------------------
 -- E. Ek kullanici: koltuk limiti = plan limiti + extra_seats
 -- profiles ekleme/aktiflestirme ve plan degisimi kontrolleri 20260802000320'de seat_limit'i dogrudan okur.
--- Canli tetikleyici/fonksiyon adlari uygulamadan once `\sf` ile dogrulanmali; asagidaki yardimci tek kaynak olur
--- ve ilgili fonksiyonlar `limits.seat_limit` yerine `public.effective_seat_limit(tenant_id)` cagirir.
+-- Asagidaki yardimci tek kaynaktir; enforce_plan_capacity / enforce_tenant_plan_capacity tam govdeli olarak
+-- 20260825000600_seat_purchase_fulfillment.sql'de buna baglanir (canli govde md5 on-kosuluyla).
 -- ---------------------------------------------------------------------------
 create or replace function public.effective_seat_limit(p_tenant_id uuid)
 returns integer
@@ -267,7 +233,7 @@ grant execute on function public.pause_subscription(uuid, uuid, timestamptz) to 
 grant execute on function public.resume_subscription(uuid, uuid) to service_role;
 grant execute on function public.quote_upgrade_proration(uuid, text, numeric) to service_role;
 
--- TODO (uygulamadan once cozulecek): seat kontrol tetikleyicilerinin (profiles) effective_seat_limit'e baglanmasi
--- bu dosyada YAZILMADI cunku canli govde okunmadan degistirilemez; ayri taslak/adim olarak eklenecek.
+-- Koltuk tetikleyicilerinin effective_seat_limit'e baglanmasi bu dosyada YOKTUR: 20260825000600 (eski taslak
+-- 20261005000900) tam govdeyle yapar. Bu dosya tek basina uygulanirsa extra_seats sayilmaz (koltuk satisi kapali kalir).
 
 notify pgrst, 'reload schema';

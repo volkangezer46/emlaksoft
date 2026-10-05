@@ -1,349 +1,21 @@
--- TASLAK (UYGULANMADI, supabase/migrations'a TASINMADI): fiyat butunlugu duzeltici migration.
--- TAM GOVDELI yeniden tanim. pg_get_functiondef + replace ile canli govde YAMALANMAZ (uzman paneli hukmu).
---
--- NEDEN
---   * update_tenant_plan_subscription: her cagrida (yalniz durum degisse bile) amount_try'yi sabit
---     990/2490/5990/12900'e yaziyor; kayitli tutari eziyor, price_lock_* yazmiyor; 'business' reddediliyor.
---   * fulfill_billing_payment (10 arg): abonelik amount_try'yi sabit CASE'ten yaziyor; fatura tutari yoksa yedek
---     yillik tutar aylik*12*0.8 (onayli katalog "yillik 10 ode 12"); 'business' reddediliyor; fiyat kilidi yazmiyor.
---   * provision_registration / convert_demo_request_to_tenant: eski sabit aylik tutarlari yaziyor.
---
--- NE DEGISIR (yalniz tutar / deneme gunu / fiyat kilidi / plan listesi; baska mantik AYNEN korunur)
---   1. Yeni yardimcilar (service_role-only, search_path=''):
---        plan_catalog_document()             platform_settings 'billing.plan_definitions' JSON'u (yoksa null)
---        plan_monthly_amount(plan)           aylik liste fiyati (TS getPlanDefinition().monthlyTry ile ayni kural)
---        plan_yearly_paid_months(plan)       yillik odenen ay (varsayilan 10)
---        plan_period_amount(plan, cycle)     donem tutari: aylik | aylik * yillik_odenen_ay (TS planAmountOf ile ayni)
---        plan_campaign_lock_amount(plan)     katalogdaki kampanya (Founders) aylik fiyati; yoksa null
---      Katalog kurali TS resolveCatalogSettings ile BIREBIR: ayar YOKSA (ya da bos) sahibin onayladigi katalog
---      (749/2490/4990/8990, Kurumsal 12900 yedek); ayar VARSA plan basina monthlyTry, plan icin gecerli deger yoksa
---      plans.ts tabani (PLANS + BUSINESS_PLAN_TEMPLATE). TS ile SQL ayni tutari uretmezse odeme dogrulamasi ayrisir.
---   2. update_tenant_plan_subscription: plan DEGISMIYORSA kayitli amount_try ve price_lock_* KORUNUR.
---      Plan degisirse tutar plan_monthly_amount'tan; Founders uyesi (price_lock_campaign dolu) yeni planin kampanya
---      fiyatina yeniden kilitlenir (yeni planda kampanya fiyati yoksa kilit kalkar). 'business' kabul edilir.
---   3. fulfill_billing_payment (10 arg): abonelik tutari plan_monthly_amount (ya da kilit); fatura tutari yoksa
---      yedek plan_period_amount (0.8 carpani KALKTI). Fiyat kilidi YAZILIR: fatura meta 'priceLockTry' +
---      'priceLockCampaign' (sunucu yazar) > ayni planda mevcut kilit korunur > plan degisiminde yeniden kilit.
---      'business' kabul edilir.
---   4. provision_registration / convert_demo_request_to_tenant: tutar plan_monthly_amount'tan, deneme gunu
---      platform_default_trial_days()'ten (K1 ifadesi birebir korunur). provision_registration 'business' kabul eder.
---   KAPSAM DISI: ek koltuk / extra_seats (koltuk fiyat motoru ayri ajanda), redeem_coupon (SQL'de cagrilmiyor; kupon
---   TS checkout'ta redeem_coupon RPC'siyle tuketilir, fatura tutari zaten indirimli gelir), 9 argumanli eski
---   fulfill_billing_payment overload'u (20260731000138; DOKUNULMADI, bkz. dogrulama sorgusu notu).
---
--- BAGIMLILIK (bu dosya SU migration'lardan SONRA uygulanmali; asagidaki on-kosul blogu eksikse DURUR):
---   20260731000140_atomic_registration_provisioning   provision_registration + registration_consents
---   20260802000300_identity_session_authorization_hardening   update_tenant_plan_subscription
---   20260802000400_atomic_demo_conversion              convert_demo_request_to_tenant
---   20260809000000_billing_fulfillment_hardening       fulfill_billing_payment 10 arg + billing_fulfillment_events
---   20260810000100_billing_checkout_reconciliation     fulfill_billing_payment_v2 (bu fonksiyonu cagirir)
---   20260816010100_default_trial_days_setting          platform_default_trial_days() (K1)
---   20260817000210_plan_business_and_pricing_support   plan CHECK'lerinde 'business' (K2)
---   20260817000220_subscription_price_lock             subscriptions.price_lock_try / price_lock_campaign (K2)
---   (20260817000230 kuponlar ve 20260823000600 kupon kotasi GEREKMEZ; bu dosya redeem_coupon'a dokunmaz.)
---
--- ILISKI: supabase/proposed/20261005000800_billing_pause_proration_business_seats.sql
---   Bu dosya onun "D. Business plan listeleri" bolumunun YERINE gecer (o bolum canli govdeyi replace ile yamalar,
---   update_tenant_plan_subscription'daki tutar ezme hatasini birakir). A/B/C/E bolumleri (duraklatma, oransal,
---   extra_seats) bundan BAGIMSIZDIR. O taslak migrations'a terfi ederken D bolumu CIKARILMALIDIR:
---   - bu dosyadan SONRA calisirsa D'nin DO blogu desen bulamaz ve 'Plan list pattern not found' ile o migration'i
---     durdurur (guvenli ama A/B/C/E de uygulanmaz);
---   - bu dosyadan ONCE calisirsa bu dosya tam govdeyle ustune yazar (D'nin 8990 / *10 sabitleri gecersizlesir).
---   supabase/proposed/20261005000400_subscription_seat_price_lock.sql ile cakisma yok (yalniz sutun ekler).
---
--- CANLI UYGULAMA: restore edilebilir backup/PITR dogrulandiktan sonra sahibi uygular. Sira:
---   (1) asagidaki SALT-OKUNUR "canli govde dogrulama" sorgusu -> beklenen tabloyla karsilastir, sapma varsa DUR;
---   (2) dosyayi yeni zaman damgasiyla supabase/migrations'a tasi; (3) `npm run check:migrations -- --database`;
---   (4) `npm run db:migrate -- --dry-run`; (5) `npm run db:migrate`; (6) dogrulama sorgusunu tekrar calistir.
--- GERI ALMA: supabase/rollbacks/20261005000500_billing_plan_amount_integrity.rollback.sql (onceki govdeler aynen).
--- Yeniden calistirilabilir (create or replace; tablo/veri degisikligi YOK, mevcut abonelik satirlarina DOKUNMAZ).
---
--- ---------------------------------------------------------------------------
--- SALT-OKUNUR CANLI GOVDE DOGRULAMA (uygulamadan ONCE ve SONRA; hicbir sey yazmaz)
--- ---------------------------------------------------------------------------
--- select p.proname,
---        pg_get_function_identity_arguments(p.oid)                                   as args,
---        position('when ''advisor'' then 990' in d) > 0                              as old_990,
---        position('when ''professional'' then 5990' in d) > 0                        as old_5990,
---        position('when ''enterprise'' then 12900' in d) > 0                         as old_12900,
---        position('* 12 * 0.8' in d) > 0                                             as old_yearly_08,
---        position('interval ''14 days''' in d) > 0                                   as fixed_14_days,
---        position('make_interval(days => public.platform_default_trial_days())' in d) > 0 as k1_trial,
---        position('''business''' in d) > 0                                           as has_business,
---        position('public.plan_monthly_amount(' in d) > 0                            as uses_helper,
---        md5(d)                                                                      as body_md5
--- from pg_catalog.pg_proc p
--- join pg_catalog.pg_namespace n on n.oid = p.pronamespace
--- cross join lateral pg_catalog.pg_get_functiondef(p.oid) as d
--- where n.nspname = 'public'
---   and p.proname in ('update_tenant_plan_subscription', 'fulfill_billing_payment',
---                     'provision_registration', 'convert_demo_request_to_tenant')
--- order by 1, 2;
---
--- BEKLENEN (uygulamadan ONCE; migrations dosyalarindaki son halle ayni canli govde):
---   proname                         | args (kisaltma)        | 990 | 5990 | 12900 | 0.8 | 14d | k1 | business | helper
---   update_tenant_plan_subscription | uuid,uuid,text,text    |  t  |  t   |   t   |  f  |  f  | f  |    f     |   f
---   fulfill_billing_payment         | 10 arg (..numeric,text)|  t  |  t   |   t   |  t  |  f  | f  |    f     |   f
---   fulfill_billing_payment         | 9 arg (..numeric) ESKI |  t  |  t   |   t   |  t  |  f  | f  |    f     |   f
---   provision_registration          | 12 arg                 |  t  |  t   |   t   |  f  |  f  | t  |    f     |   f
---   convert_demo_request_to_tenant  | uuid,uuid,uuid,text    |  t  |  t   |   t   |  f  |  f  | t  |    f     |   f
---   SAPMA = DUR: provision/convert'te fixed_14_days=t ve k1_trial=f ise K1 (20260816010100) uygulanmamis;
---   herhangi bir satirda has_business=t ise govde elle/baska taslakla (or. 20260820000100 D) degismis -> once incele.
--- BEKLENEN (uygulamadan SONRA): 4 hedef satirda old_* ve fixed_14_days = f; has_business = t
---   (convert_demo_request_to_tenant haric: o fonksiyonun plan listesi yok, f kalir); uses_helper = t;
---   provision/convert'te k1_trial = t. 9 argumanli ESKI overload degismez (old_* = t kalir; bu dosya ona dokunmaz).
--- ---------------------------------------------------------------------------
+-- Rollback: 20260825000300_billing_plan_amount_integrity (eski taslak adi 20261005000500; 2026-10-05 terfi etti).
+-- SIRA: 20260825000600 (koltuk satisi) ve 20260825000500 (duraklatma) rollback'lerinden SONRA calistirilir.
+-- schema_migrations ledger satirina DOKUNMAZ.
+-- Onceki canli govdelere AYNEN doner (kaynak migration dosyalarindan satir satir kopya):
+--   update_tenant_plan_subscription  <- 20260802000300 (satir 894-1031)
+--   fulfill_billing_payment (10 arg) <- 20260809000000 (satir 141-746)
+--   provision_registration           <- 20260731000140 (satir 50-263) + K1 20260816010100 ifadesi
+--   convert_demo_request_to_tenant   <- 20260802000400 (satir 5-320)  + K1 20260816010100 ifadesi
+-- K1 notu: K1 canli govdede `interval '14 days'` ifadesini
+-- `make_interval(days => public.platform_default_trial_days())` ile degistirdi; geri donulen hal bu K1 halidir
+-- (K1'in kendi rollback'i daha sonra calisirsa ayni ifadeyi bulup 14 gune cevirebilir).
+-- UYARI: geri alininca sabit 990/2490/5990/12900 ve yillik *12*0.8 yedegi GERI GELIR; admin plan/durum
+-- degisimi kayitli tutari yeniden ezer; 'business' plan RPC'lerde yeniden reddedilir. Bu migration'in yazdigi
+-- amount_try / price_lock_* DEGERLERI geri alinmaz (veri degisikligi yapilmaz; yalniz fonksiyonlar doner).
+-- Yalniz restore edilebilir backup/PITR dogrulandiktan sonra sahibi uygular.
 
 -- ---------------------------------------------------------------------------
--- 0. On-kosul denetimi (eksik bagimlilikta migration'i yazmadan durdurur)
--- ---------------------------------------------------------------------------
-do $$
-begin
-  if to_regclass('public.platform_settings') is null then
-    raise exception '20261005000500: public.platform_settings yok (20260722000025).';
-  end if;
-  if to_regprocedure('public.platform_default_trial_days()') is null then
-    raise exception '20261005000500: once 20260816010100_default_trial_days_setting uygulanmali.';
-  end if;
-  if not exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'subscriptions' and column_name = 'price_lock_try'
-  ) or not exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'subscriptions' and column_name = 'price_lock_campaign'
-  ) then
-    raise exception '20261005000500: once 20260817000220_subscription_price_lock uygulanmali.';
-  end if;
-  if not exists (
-    select 1 from pg_catalog.pg_constraint c
-    where c.conrelid = 'public.subscriptions'::regclass
-      and c.contype = 'c'
-      and pg_catalog.pg_get_constraintdef(c.oid) ilike '%plan%'
-      and pg_catalog.pg_get_constraintdef(c.oid) ilike '%business%'
-  ) or not exists (
-    select 1 from pg_catalog.pg_constraint c
-    where c.conrelid = 'public.tenants'::regclass
-      and c.contype = 'c'
-      and pg_catalog.pg_get_constraintdef(c.oid) ilike '%plan%'
-      and pg_catalog.pg_get_constraintdef(c.oid) ilike '%business%'
-  ) then
-    raise exception '20261005000500: once 20260817000210_plan_business_and_pricing_support uygulanmali.';
-  end if;
-  if to_regprocedure('public.fulfill_billing_payment_v2(text, text, text, text, text, uuid, text, text, numeric, text)') is null
-    or to_regprocedure('public.fulfill_billing_payment(text, text, text, text, text, uuid, text, text, numeric, text)') is null then
-    raise exception '20261005000500: once 20260809000000 ve 20260810000100 uygulanmali.';
-  end if;
-  if to_regprocedure('public.update_tenant_plan_subscription(uuid, uuid, text, text)') is null
-    or to_regprocedure('public.provision_registration(uuid, text, text, text, text, text, text, text, text, text, text, text)') is null
-    or to_regprocedure('public.convert_demo_request_to_tenant(uuid, uuid, uuid, text)') is null then
-    raise exception '20261005000500: hedef fonksiyonlardan biri yok; once 20260731000140 / 20260802000300 / 20260802000400.';
-  end if;
-end
-$$;
-
--- ---------------------------------------------------------------------------
--- 1. Plan tutari yardimcilari (tek SQL kaynagi; TS: src/lib/billing/plan-overrides.ts + plans.ts)
--- ---------------------------------------------------------------------------
-
--- Ham katalog: ayar yoksa/bossa NULL (= onayli katalog gecerli), bozuk JSON ya da nesne degilse '{}'
--- (= plans.ts tabani; TS parsePlanCatalogSettings bozuk kayitta bos duzenleme dondurur).
-create or replace function public.plan_catalog_document()
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_raw text;
-  v_doc jsonb;
-begin
-  select s.value
-    into v_raw
-  from public.platform_settings s
-  where s.key = 'billing.plan_definitions';
-
-  if v_raw is null or btrim(v_raw, E' \t\r\n') = '' then
-    return null;
-  end if;
-
-  begin
-    v_doc := v_raw::jsonb;
-  exception when data_exception then
-    return '{}'::jsonb;
-  end;
-
-  if jsonb_typeof(v_doc) is distinct from 'object' then
-    return '{}'::jsonb;
-  end if;
-
-  return v_doc;
-end;
-$$;
-
--- Aylik liste fiyati (KDV haric). Bilinmeyen plan -> NULL (cagiran reddeder).
-create or replace function public.plan_monthly_amount(p_plan text)
-returns numeric
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_plan text := lower(btrim(coalesce(p_plan, '')));
-  v_doc jsonb;
-  v_val jsonb;
-  v_num numeric;
-begin
-  if v_plan not in ('advisor', 'office', 'professional', 'business', 'enterprise') then
-    return null;
-  end if;
-
-  v_doc := public.plan_catalog_document();
-
-  if v_doc is null then
-    -- Ayar yok: sahibin onayladigi katalog (RECOMMENDED_CATALOG_OVERRIDES). Kurumsal ozel fiyatlidir;
-    -- plans.ts'teki 12900 yalniz yedek tutardir (cevrimici satis TS'te customPricing ile kapali).
-    return case v_plan
-      when 'advisor' then 749
-      when 'office' then 2490
-      when 'professional' then 4990
-      when 'business' then 8990
-      when 'enterprise' then 12900
-    end;
-  end if;
-
-  v_val := v_doc -> 'plans' -> v_plan -> 'monthlyTry';
-  if jsonb_typeof(v_val) = 'number' then
-    v_num := (v_val #>> '{}')::numeric;
-    if v_num = trunc(v_num) and v_num between 1 and 1000000 then
-      return v_num;
-    end if;
-  end if;
-
-  -- Ayar var ama bu plan icin gecerli fiyat yok: plans.ts tabani (PLANS + BUSINESS_PLAN_TEMPLATE).
-  -- TS resolveCatalogSettings ayni davranir; burada farkli bir deger TS ile SQL'i ayristirir.
-  return case v_plan
-    when 'advisor' then 990
-    when 'office' then 2490
-    when 'professional' then 5990
-    when 'business' then 8990
-    when 'enterprise' then 12900
-  end;
-end;
-$$;
-
--- Yillik odemede odenen ay sayisi ("10 ode 12"). Plan duzenlemesi 1..12 degilse 10.
-create or replace function public.plan_yearly_paid_months(p_plan text)
-returns integer
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_plan text := lower(btrim(coalesce(p_plan, '')));
-  v_val jsonb;
-  v_num numeric;
-begin
-  v_val := public.plan_catalog_document() -> 'plans' -> v_plan -> 'yearlyPaidMonths';
-  if jsonb_typeof(v_val) = 'number' then
-    v_num := (v_val #>> '{}')::numeric;
-    if v_num = trunc(v_num) and v_num between 1 and 12 then
-      return v_num::integer;
-    end if;
-  end if;
-  return 10;
-end;
-$$;
-
--- Donem tutari (KDV haric): aylik ya da aylik * yillik odenen ay. TS planAmountOf ile ayni (Math.round).
-create or replace function public.plan_period_amount(p_plan text, p_cycle text)
-returns numeric
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_cycle text := lower(btrim(coalesce(p_cycle, '')));
-  v_monthly numeric;
-begin
-  v_monthly := public.plan_monthly_amount(p_plan);
-  if v_monthly is null then
-    return null;
-  end if;
-  if v_cycle = 'monthly' then
-    return v_monthly;
-  end if;
-  if v_cycle = 'yearly' then
-    return round(v_monthly * public.plan_yearly_paid_months(p_plan));
-  end if;
-  return null;
-end;
-$$;
-
--- Katalogdaki kampanya (Founders) aylik fiyati: yalniz campaign.lockPrice false DEGILSE ve fiyat liste
--- fiyatindan dusukse. Mevcut Founders uyesinin plan degisiminde yeniden kilitlenmesi icin kullanilir
--- (kampanya kapali olsa da uyelik korunur; kota sayimi price_lock_campaign adiyla yapildigi icin cift sayim yok).
-create or replace function public.plan_campaign_lock_amount(p_plan text)
-returns numeric
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_plan text := lower(btrim(coalesce(p_plan, '')));
-  v_doc jsonb;
-  v_val jsonb;
-  v_num numeric;
-  v_list numeric;
-begin
-  v_doc := public.plan_catalog_document();
-  if v_doc is null then
-    return null;
-  end if;
-  if (v_doc -> 'campaign' -> 'lockPrice') = 'false'::jsonb then
-    return null;
-  end if;
-  v_val := v_doc -> 'plans' -> v_plan -> 'campaignMonthlyTry';
-  if jsonb_typeof(v_val) is distinct from 'number' then
-    return null;
-  end if;
-  v_num := (v_val #>> '{}')::numeric;
-  v_list := public.plan_monthly_amount(v_plan);
-  if v_num = trunc(v_num) and v_num between 1 and 1000000 and v_list is not null and v_num < v_list then
-    return v_num;
-  end if;
-  return null;
-end;
-$$;
-
-revoke all privileges on function public.plan_catalog_document() from public, anon, authenticated;
-revoke all privileges on function public.plan_monthly_amount(text) from public, anon, authenticated;
-revoke all privileges on function public.plan_yearly_paid_months(text) from public, anon, authenticated;
-revoke all privileges on function public.plan_period_amount(text, text) from public, anon, authenticated;
-revoke all privileges on function public.plan_campaign_lock_amount(text) from public, anon, authenticated;
-grant execute on function public.plan_catalog_document() to service_role;
-grant execute on function public.plan_monthly_amount(text) to service_role;
-grant execute on function public.plan_yearly_paid_months(text) to service_role;
-grant execute on function public.plan_period_amount(text, text) to service_role;
-grant execute on function public.plan_campaign_lock_amount(text) to service_role;
-
-comment on function public.plan_catalog_document() is
-  'platform_settings billing.plan_definitions JSON. Null = ayar yok (onayli katalog). Service-role-only.';
-comment on function public.plan_monthly_amount(text) is
-  'Aylik liste fiyati (KDV haric). TS resolveCatalogSettings ile ayni kural; ayar yoksa onayli katalog 749/2490/4990/8990.';
-comment on function public.plan_yearly_paid_months(text) is
-  'Yillik odemede odenen ay (yillik 10 ode 12). Plan duzenlemesi yoksa 10.';
-comment on function public.plan_period_amount(text, text) is
-  'Donem tutari (KDV haric): monthly = aylik, yearly = aylik * plan_yearly_paid_months. TS planAmountOf ile ayni.';
-comment on function public.plan_campaign_lock_amount(text) is
-  'Kampanya (Founders) aylik kilit fiyati; lockPrice=false, gecersiz ya da liste fiyatindan dusuk degilse null.';
-
--- ---------------------------------------------------------------------------
--- 2. update_tenant_plan_subscription (kaynak: 20260802000300; tam govde)
+-- update_tenant_plan_subscription (20260802000300 aynen)
 -- ---------------------------------------------------------------------------
 create or replace function public.update_tenant_plan_subscription(
   p_tenant_id uuid,
@@ -366,14 +38,6 @@ declare
   v_subscription_status text;
   v_amount_try numeric;
   v_subscription_count integer;
-  v_sub_plan text;
-  v_old_amount_try numeric;
-  v_old_lock_try numeric;
-  v_old_lock_campaign text;
-  v_lock_try numeric;
-  v_lock_campaign text;
-  v_plan_changed boolean;
-  v_amount_source text;
 begin
   if auth.role() is distinct from 'service_role' then
     raise exception 'Service role required.' using errcode = '42501';
@@ -392,7 +56,7 @@ begin
     raise exception 'Active billing staff required.' using errcode = '42501';
   end if;
   if nullif(btrim(p_plan), '') is not null
-    and btrim(p_plan) not in ('advisor', 'office', 'professional', 'business', 'enterprise') then
+    and btrim(p_plan) not in ('advisor', 'office', 'professional', 'enterprise') then
     raise exception 'Invalid plan.' using errcode = '22023';
   end if;
   if nullif(btrim(p_status), '') is not null
@@ -419,40 +83,12 @@ begin
     when 'cancelled' then 'cancelled'
     else 'paused'
   end;
-
-  -- Kayitli tutar ve fiyat kilidi okunur; abonelik yoksa asagidaki row_count denetimi ayni hatayi verir.
-  select s.plan, s.amount_try, s.price_lock_try, s.price_lock_campaign
-    into v_sub_plan, v_old_amount_try, v_old_lock_try, v_old_lock_campaign
-  from public.subscriptions s
-  where s.tenant_id = p_tenant_id
-  for update;
-
-  v_plan_changed := v_next_plan is distinct from coalesce(v_sub_plan, v_old_plan);
-
-  if v_plan_changed then
-    -- Yeni plan: tutar plan tanimindan. Founders uyesi yeni planin kampanya fiyatina yeniden kilitlenir.
-    if v_old_lock_campaign is not null then
-      v_lock_try := public.plan_campaign_lock_amount(v_next_plan);
-      v_lock_campaign := case when v_lock_try is not null then v_old_lock_campaign end;
-    end if;
-    v_amount_try := coalesce(v_lock_try, public.plan_monthly_amount(v_next_plan));
-    v_amount_source := case when v_lock_try is not null then 'price_lock' else 'catalog' end;
-  else
-    -- Ayni plan (yalniz durum degisimi dahil): kayitli tutar ve kilit KORUNUR.
-    v_lock_try := v_old_lock_try;
-    v_lock_campaign := v_old_lock_campaign;
-    if v_old_amount_try > 0 then
-      v_amount_try := v_old_amount_try;
-      v_amount_source := 'preserved';
-    else
-      v_amount_try := coalesce(v_lock_try, public.plan_monthly_amount(v_next_plan));
-      v_amount_source := case when v_lock_try is not null then 'price_lock' else 'catalog' end;
-    end if;
-  end if;
-
-  if v_amount_try is null or v_amount_try <= 0 then
-    raise exception 'Plan amount could not be resolved.' using errcode = '22023';
-  end if;
+  v_amount_try := case v_next_plan
+    when 'advisor' then 990
+    when 'office' then 2490
+    when 'professional' then 5990
+    when 'enterprise' then 12900
+  end;
 
   update public.tenants
   set plan = v_next_plan,
@@ -464,8 +100,6 @@ begin
   set plan = v_next_plan,
       status = v_subscription_status,
       amount_try = v_amount_try,
-      price_lock_try = v_lock_try,
-      price_lock_campaign = v_lock_campaign,
       cancelled_at = case
         when v_subscription_status = 'cancelled' then coalesce(cancelled_at, now())
         else null
@@ -492,21 +126,12 @@ begin
     'billing.tenant_plan_status',
     'tenant',
     p_tenant_id,
-    jsonb_build_object(
-      'plan', v_old_plan,
-      'status', v_old_status,
-      'monthly_amount_try', v_old_amount_try,
-      'price_lock_try', v_old_lock_try,
-      'price_lock_campaign', v_old_lock_campaign
-    ),
+    jsonb_build_object('plan', v_old_plan, 'status', v_old_status),
     jsonb_build_object(
       'plan', v_next_plan,
       'status', v_next_status,
       'subscription_status', v_subscription_status,
-      'monthly_amount_try', v_amount_try,
-      'amount_source', v_amount_source,
-      'price_lock_try', v_lock_try,
-      'price_lock_campaign', v_lock_campaign
+      'monthly_amount_try', v_amount_try
     )
   );
 
@@ -518,10 +143,7 @@ begin
     'plan', v_next_plan,
     'status', v_next_status,
     'subscriptionStatus', v_subscription_status,
-    'monthlyAmountTry', v_amount_try,
-    'amountSource', v_amount_source,
-    'priceLockTry', v_lock_try,
-    'priceLockCampaign', v_lock_campaign
+    'monthlyAmountTry', v_amount_try
   );
 end;
 $$;
@@ -535,7 +157,7 @@ grant execute on function public.update_tenant_plan_subscription(uuid, uuid, tex
   to service_role;
 
 -- ---------------------------------------------------------------------------
--- 3. fulfill_billing_payment, 10 arg (kaynak: 20260809000000; tam govde)
+-- fulfill_billing_payment 10 arg (20260809000000 aynen)
 -- ---------------------------------------------------------------------------
 create or replace function public.fulfill_billing_payment(
   p_provider text,
@@ -584,15 +206,6 @@ declare
   v_subscription_id uuid;
   v_updated_invoice_id uuid;
   v_updated_tenant_id uuid;
-
-  v_sub_plan text;
-  v_old_lock_try numeric;
-  v_old_lock_campaign text;
-  v_meta_lock_try numeric;
-  v_meta_lock_campaign text;
-  v_lock_try numeric;
-  v_lock_campaign text;
-  v_subscription_amount numeric;
 
   v_link_token text;
   v_payment_link_id uuid;
@@ -779,7 +392,7 @@ begin
     v_plan := coalesce(nullif(btrim(v_invoice_meta ->> 'plan'), ''), 'office');
     v_cycle := coalesce(nullif(btrim(v_invoice_meta ->> 'cycle'), ''), 'monthly');
 
-    if v_plan not in ('advisor', 'office', 'professional', 'business', 'enterprise')
+    if v_plan not in ('advisor', 'office', 'professional', 'enterprise')
       or v_cycle not in ('monthly', 'yearly') then
       raise exception 'Invoice billing metadata is invalid.' using errcode = '22023';
     end if;
@@ -798,15 +411,18 @@ begin
       raise exception 'Invoice billing cycle does not match.' using errcode = '22023';
     end if;
 
-    -- Aylik liste fiyati plan tanimindan (platform katalogu; ayar yoksa onayli katalog).
-    v_monthly_amount := public.plan_monthly_amount(v_plan);
-    if v_monthly_amount is null or v_monthly_amount <= 0 then
-      raise exception 'Plan amount could not be resolved.' using errcode = '22023';
-    end if;
+    v_monthly_amount := case v_plan
+      when 'advisor' then 990
+      when 'office' then 2490
+      when 'professional' then 5990
+      when 'enterprise' then 12900
+    end;
 
-    -- Fatura tutari yoksa yedek: donem tutari (yillik = aylik * yillik odenen ay; 0.8 carpani yok).
     if v_amount_try is null or v_amount_try <= 0 then
-      v_amount_try := public.plan_period_amount(v_plan, v_cycle);
+      v_amount_try := case
+        when v_cycle = 'yearly' then round(v_monthly_amount * 12 * 0.8, 2)
+        else v_monthly_amount
+      end;
     end if;
 
     v_tax_try := round(v_amount_try * 0.20, 2);
@@ -848,44 +464,6 @@ begin
       return v_result;
     end if;
 
-    -- Fiyat kilidi (Founders). Kaynak sirasi: (1) sunucunun faturaya yazdigi teklif kilidi,
-    -- (2) ayni planda mevcut kilit korunur, (3) plan degisiminde Founders uyesi yeni planin kampanya
-    -- fiyatina yeniden kilitlenir (yoksa kilit kalkar).
-    if v_invoice_meta ? 'priceLockTry' or v_invoice_meta ? 'priceLockCampaign' then
-      if jsonb_typeof(v_invoice_meta -> 'priceLockTry') is distinct from 'number'
-        or char_length(btrim(coalesce(v_invoice_meta ->> 'priceLockCampaign', ''))) not between 1 and 60 then
-        raise exception 'Invoice price lock metadata is invalid.' using errcode = '22023';
-      end if;
-      v_meta_lock_try := (v_invoice_meta ->> 'priceLockTry')::numeric;
-      v_meta_lock_campaign := btrim(v_invoice_meta ->> 'priceLockCampaign');
-      if v_meta_lock_try <= 0 then
-        raise exception 'Invoice price lock metadata is invalid.' using errcode = '22023';
-      end if;
-    end if;
-
-    select s.plan, s.price_lock_try, s.price_lock_campaign
-      into v_sub_plan, v_old_lock_try, v_old_lock_campaign
-    from public.subscriptions s
-    where s.tenant_id = v_tenant_id
-    for update;
-
-    if v_meta_lock_try is not null and v_meta_lock_try < v_monthly_amount then
-      v_lock_try := v_meta_lock_try;
-      v_lock_campaign := v_meta_lock_campaign;
-    elsif v_old_lock_try is not null and v_sub_plan is not distinct from v_plan then
-      v_lock_try := v_old_lock_try;
-      v_lock_campaign := v_old_lock_campaign;
-    elsif v_old_lock_campaign is not null and v_sub_plan is distinct from v_plan then
-      v_lock_try := public.plan_campaign_lock_amount(v_plan);
-      v_lock_campaign := case when v_lock_try is not null then v_old_lock_campaign end;
-    end if;
-
-    -- subscriptions.amount_try kanonik aylik (MRR) tutardir; kilit varsa kilitli fiyat.
-    v_subscription_amount := case
-      when v_lock_try is not null then least(v_lock_try, v_monthly_amount)
-      else v_monthly_amount
-    end;
-
     v_period_end := case
       when v_cycle = 'yearly' then v_now + interval '1 year'
       else v_now + interval '1 month'
@@ -896,8 +474,6 @@ begin
       status,
       billing_cycle,
       amount_try,
-      price_lock_try,
-      price_lock_campaign,
       current_period_start,
       current_period_end,
       trial_ends_at,
@@ -909,9 +485,7 @@ begin
       v_plan,
       'active',
       v_cycle,
-      v_subscription_amount,
-      v_lock_try,
-      v_lock_campaign,
+      v_monthly_amount,
       v_now,
       v_period_end,
       null,
@@ -925,8 +499,6 @@ begin
       status = 'active',
       billing_cycle = excluded.billing_cycle,
       amount_try = excluded.amount_try,
-      price_lock_try = excluded.price_lock_try,
-      price_lock_campaign = excluded.price_lock_campaign,
       current_period_start = excluded.current_period_start,
       current_period_end = excluded.current_period_end,
       trial_ends_at = null,
@@ -1195,7 +767,7 @@ comment on function public.fulfill_billing_payment(
   'Service-role-only atomic fulfillment. Unique provider/conversation and provider/payment claims serialize callback/webhook races.';
 
 -- ---------------------------------------------------------------------------
--- 4. provision_registration (kaynak: 20260731000140 + K1 20260816010100 deneme gunu; tam govde)
+-- provision_registration (20260731000140 + K1 deneme gunu ifadesi)
 -- ---------------------------------------------------------------------------
 create or replace function public.provision_registration(
   p_user_id uuid,
@@ -1252,7 +824,7 @@ begin
   if p_phone is not null and char_length(btrim(p_phone)) not between 1 and 32 then
     raise exception 'Invalid phone.' using errcode = '22023';
   end if;
-  if p_plan not in ('advisor', 'office', 'professional', 'business', 'enterprise') then
+  if p_plan not in ('advisor', 'office', 'professional', 'enterprise') then
     raise exception 'Invalid plan.' using errcode = '22023';
   end if;
   if p_billing_cycle not in ('monthly', 'yearly') then
@@ -1278,11 +850,12 @@ begin
     raise exception 'Invalid tenant slug.' using errcode = '22023';
   end if;
 
-  -- Aylik liste fiyati plan tanimindan (platform katalogu; ayar yoksa onayli katalog).
-  v_monthly_amount := public.plan_monthly_amount(p_plan);
-  if v_monthly_amount is null or v_monthly_amount <= 0 then
-    raise exception 'Plan amount could not be resolved.' using errcode = '22023';
-  end if;
+  v_monthly_amount := case p_plan
+    when 'advisor' then 990
+    when 'office' then 2490
+    when 'professional' then 5990
+    when 'enterprise' then 12900
+  end;
   -- The unique slug decision is made inside the same transaction as the insert,
   -- avoiding the check-then-insert race in the former Server Action flow.
   for v_attempt in 0..7 loop
@@ -1412,7 +985,7 @@ comment on function public.provision_registration(
   'Service-role-only atomic registration provisioning with canonical plan pricing and versioned legal acceptance.';
 
 -- ---------------------------------------------------------------------------
--- 5. convert_demo_request_to_tenant (kaynak: 20260802000400 + K1 20260816010100 deneme gunu; tam govde)
+-- convert_demo_request_to_tenant (20260802000400 + K1 deneme gunu ifadesi)
 -- ---------------------------------------------------------------------------
 create or replace function public.convert_demo_request_to_tenant(
   p_demo_id uuid,
@@ -1520,11 +1093,12 @@ begin
     when '50+' then 'enterprise'
     else 'office'
   end;
-  -- Aylik liste fiyati plan tanimindan (platform katalogu; ayar yoksa onayli katalog).
-  v_monthly_amount := public.plan_monthly_amount(v_plan);
-  if v_monthly_amount is null or v_monthly_amount <= 0 then
-    raise exception 'Plan amount could not be resolved.' using errcode = '22023';
-  end if;
+  v_monthly_amount := case v_plan
+    when 'advisor' then 990
+    when 'office' then 2490
+    when 'professional' then 5990
+    when 'enterprise' then 12900
+  end;
 
   v_slug_base := lower(btrim(coalesce(p_slug_base, '')));
   if char_length(v_slug_base) not between 1 and 48
@@ -1729,5 +1303,14 @@ grant execute on function public.convert_demo_request_to_tenant(uuid, uuid, uuid
 
 comment on function public.convert_demo_request_to_tenant(uuid, uuid, uuid, text) is
   'Service-role-only atomic demo conversion with locked idempotency guard, canonical trial subscription, Auth claim verification and dual audit evidence.';
+
+-- ---------------------------------------------------------------------------
+-- Yardimcilar (geri donulen govdeler bunlari cagirmaz)
+-- ---------------------------------------------------------------------------
+drop function if exists public.plan_campaign_lock_amount(text);
+drop function if exists public.plan_period_amount(text, text);
+drop function if exists public.plan_yearly_paid_months(text);
+drop function if exists public.plan_monthly_amount(text);
+drop function if exists public.plan_catalog_document();
 
 notify pgrst, 'reload schema';
