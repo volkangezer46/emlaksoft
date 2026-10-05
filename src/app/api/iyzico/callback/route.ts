@@ -12,6 +12,7 @@ import type { BillingCycle, PlanId } from "@/lib/billing/plans";
 import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
 import { tryInvoiceHold } from "@/lib/try-credits/wallet";
 import { getBaseUrl } from "@/lib/base-url";
+import { saveCardAfterVerifiedPayment } from "@/lib/billing/card-store";
 
 function appUrl() {
   return getBaseUrl();
@@ -76,7 +77,12 @@ async function handle(token: string | null) {
       return NextResponse.redirect(`${appUrl()}/app/abonelik?error=invoice`);
     }
 
-    const meta = (invoice.meta ?? {}) as { plan?: PlanId; cycle?: BillingCycle };
+    const meta = (invoice.meta ?? {}) as {
+      plan?: PlanId;
+      cycle?: BillingCycle;
+      saveCard?: boolean;
+      saveCardConsentBy?: string;
+    };
     const amounts = invoiceAmountsTry(Number(invoice.amount_try));
     if (
       String(invoice.currency ?? "").toUpperCase() !== IYZICO_CURRENCY ||
@@ -106,6 +112,13 @@ async function handle(token: string | null) {
       expectedCurrency: verified.currency,
       source: "callback",
     });
+
+    // Kart saklama: YALNIZ ödeme yukarıdaki tam doğrulamadan (imza, tutar, retrieve) geçtikten sonra ve YALNIZ
+    // kullanıcı ödeme öncesi açık rıza verdiyse (fatura meta). Hata ödemeyi bozmaz; ham kart verisi hiç işlenmez.
+    // Ortak güvenli yol (webhook ile aynı): rıza + rıza veren owner/gm doğrulaması card-store'dadır; asla fırlatmaz.
+    if (meta.saveCard === true) {
+      await saveCardAfterVerifiedPayment(admin, { tenantId: invoice.tenant_id, meta, result });
+    }
 
     return NextResponse.redirect(
       `${appUrl()}/app/abonelik?paid=1&plan=${meta.plan ?? "office"}`,

@@ -102,7 +102,11 @@ function authHeaders(config: IyzicoConfig, path: string, body: string) {
   };
 }
 
-async function iyzicoPost<T>(path: string, payload: Record<string, unknown>): Promise<T> {
+async function iyzicoPost<T>(
+  path: string,
+  payload: Record<string, unknown>,
+  method: "POST" | "DELETE" = "POST",
+): Promise<T> {
   const config = getIyzicoConfig();
   if (!config) throw new Error("iyzico yapılandırılmamış.");
   const body = JSON.stringify(payload);
@@ -111,7 +115,7 @@ async function iyzicoPost<T>(path: string, payload: Record<string, unknown>): Pr
     throw new Error("iyzico istek yolu geçersiz.");
   }
   const res = await fetchExternal(endpoint, {
-    method: "POST",
+    method,
     headers: authHeaders(config, path, body),
     body,
     cache: "no-store",
@@ -142,6 +146,16 @@ export type CheckoutRetrieveResult = {
   signature?: string;
   fraudStatus?: number | string;
   errorMessage?: string;
+  /**
+   * Kart saklama alanlari (iyzico card-storage). Yalnız saglayici anahtarlari + maskeli gosterim; ham kart verisi
+   * iyzico'dan da gelmez. Alanlarin CF retrieve yanitinda donusu hesap/sandbox ile dogrulanmalidir (bkz. rapor).
+   */
+  cardUserKey?: string;
+  cardToken?: string;
+  cardAssociation?: string;
+  cardFamily?: string;
+  binNumber?: string;
+  lastFourDigits?: string;
 };
 
 export type VerifiedCheckoutPayment = {
@@ -299,6 +313,8 @@ export async function initializeCheckoutForm(input: {
     address: string;
   };
   basketItemName: string;
+  /** Ofisin iyzico kart-kullanici anahtari: verilirse kayitli kartlar iyzico odeme sayfasinda listelenir. */
+  cardUserKey?: string | null;
 }): Promise<CheckoutInitResult> {
   const buyerIp = normalizeIyzicoBuyerIp(input.buyer.ip);
   if (!buyerIp) throw new Error("Ödeme için geçerli istemci IP adresi bulunamadı.");
@@ -315,6 +331,7 @@ export async function initializeCheckoutForm(input: {
     paymentGroup: input.paymentGroup ?? "SUBSCRIPTION",
     callbackUrl: input.callbackUrl,
     enabledInstallments: [1],
+    ...(input.cardUserKey ? { cardUserKey: input.cardUserKey } : {}),
     buyer: {
       id: input.buyer.id,
       name: input.buyer.name,
@@ -416,4 +433,185 @@ export function verifyWebhookSignatureV3(
   const expected = createWebhookSignatureV3(config.secretKey, input);
   if (!expected) return false;
   return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(actual, "hex"));
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Kart saklama (iyzico card-storage). Ham kart verisi (no/CVC/son kullanma) bu modulden ASLA gecmez: yalniz
+// saglayici anahtarlari (cardUserKey, cardToken). Kaynak: docs.iyzico.com/en/advanced/card-storage.
+// ---------------------------------------------------------------------------------------------------------------
+
+export type StoredCardDeleteResult = { status: string; errorMessage?: string; errorCode?: string };
+
+/** iyzico'dan saklanan karti siler: DELETE /cardstorage/card {cardUserKey, cardToken}. */
+export async function deleteStoredCard(input: {
+  cardUserKey: string;
+  cardToken: string;
+  conversationId?: string;
+}): Promise<StoredCardDeleteResult> {
+  if (!input.cardUserKey.trim() || !input.cardToken.trim()) {
+    throw new Error("iyzico kart anahtarları eksik.");
+  }
+  return iyzicoPost<StoredCardDeleteResult>(
+    "/cardstorage/card",
+    {
+      locale: "tr",
+      ...(input.conversationId ? { conversationId: input.conversationId } : {}),
+      cardUserKey: input.cardUserKey,
+      cardToken: input.cardToken,
+    },
+    "DELETE",
+  );
+}
+
+/** Saglayicidaki "kart yok / zaten silinmis" cevabini idempotent silme olarak ele almak icin. */
+export function isStoredCardAlreadyGone(result: StoredCardDeleteResult): boolean {
+  const msg = `${result.errorMessage ?? ""}`.toLowerCase();
+  return String(result.status).toLowerCase() !== "success" && /(not\s*found|bulunamad|mevcut\s*de[gğ]il)/i.test(msg);
+}
+
+export type StoredCardPaymentResult = {
+  status: string;
+  paymentId?: string | number;
+  price?: string | number;
+  paidPrice?: string | number;
+  currency?: string;
+  basketId?: string;
+  conversationId?: string;
+  fraudStatus?: number | string;
+  signature?: string;
+  errorMessage?: string;
+  errorCode?: string;
+};
+
+/**
+ * `/payment/auth`, `/payment/3dsecure/auth`, `/payment/detail` yanit imzasi (resmi: response-signature-validation):
+ * HMAC-SHA256(secret, paymentId:currency:basketId:conversationId:paidPrice:price) — sondaki sifirlar atilmis tutar.
+ */
+export function createPaymentAuthResponseSignature(
+  secretKey: string,
+  result: StoredCardPaymentResult,
+): string | null {
+  const fields = [
+    String(result.paymentId ?? "").trim(),
+    String(result.currency ?? "").trim(),
+    String(result.basketId ?? "").trim(),
+    String(result.conversationId ?? "").trim(),
+    responseSignatureAmount(result.paidPrice) ?? "",
+    responseSignatureAmount(result.price) ?? "",
+  ];
+  const secret = secretKey.trim();
+  if (!secret || fields.some((field) => !field)) return null;
+  return createHmac("sha256", secret).update(fields.join(":"), "utf8").digest("hex");
+}
+
+export function verifyPaymentAuthResponseSignature(
+  result: StoredCardPaymentResult,
+  secretKey = getIyzicoConfig()?.secretKey ?? "",
+): boolean {
+  const actual = result.signature?.trim().toLowerCase() ?? "";
+  if (!/^[0-9a-f]{64}$/.test(actual)) return false;
+  const expected = createPaymentAuthResponseSignature(secretKey, result);
+  return Boolean(
+    expected && timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(actual, "hex")),
+  );
+}
+
+/**
+ * Saklı kartla tahsilat sonucunu mutabakatla dogrular (Checkout Form dogrulamasiyla ayni siki kurallar: imza,
+ * durum, fraudStatus=1, conversationId/basketId/para birimi/tutar). Hata atar; basarida paymentId doner.
+ */
+export function verifyStoredCardPayment(
+  result: StoredCardPaymentResult,
+  expected: { conversationId: string; basketId: string; amountTry: number },
+): VerifiedCheckoutPayment {
+  if (!verifyPaymentAuthResponseSignature(result)) {
+    throw new Error("Sağlayıcı yanıt imzası doğrulanamadı.");
+  }
+  if (String(result.status ?? "").trim().toLowerCase() !== "success") {
+    throw new Error("Sağlayıcı ödeme durumunu başarılı olarak doğrulamadı.");
+  }
+  const fraudStatus = typeof result.fraudStatus === "number"
+    ? result.fraudStatus
+    : Number(String(result.fraudStatus ?? "").trim());
+  if (fraudStatus !== 1) throw new Error("Sağlayıcı sahtecilik kontrolü ödemeyi onaylamadı.");
+  const paymentId = String(result.paymentId ?? "").trim();
+  if (!paymentId) throw new Error("Sağlayıcı ödeme kimliği eşleşmedi.");
+  if (String(result.conversationId ?? "").trim() !== expected.conversationId) {
+    throw new Error("Sağlayıcı işlem kimliği eşleşmedi.");
+  }
+  if (String(result.basketId ?? "").trim() !== expected.basketId) {
+    throw new Error("Sağlayıcı sepet kimliği eşleşmedi.");
+  }
+  if (String(result.currency ?? "").trim().toUpperCase() !== IYZICO_CURRENCY) {
+    throw new Error("Sağlayıcı para birimi eşleşmedi.");
+  }
+  const price = parseProviderAmount(result.price);
+  const paidPrice = parseProviderAmount(result.paidPrice);
+  if (
+    !Number.isFinite(expected.amountTry) ||
+    expected.amountTry <= 0 ||
+    price === null ||
+    paidPrice === null ||
+    !sameMoney(price, expected.amountTry) ||
+    !sameMoney(paidPrice, expected.amountTry)
+  ) {
+    throw new Error("Sağlayıcı tahsilat tutarı eşleşmedi.");
+  }
+  return {
+    conversationId: expected.conversationId,
+    paymentId,
+    basketId: expected.basketId,
+    amountTry: paidPrice,
+    currency: IYZICO_CURRENCY,
+  };
+}
+
+/**
+ * KULLANICISIZ (off-session) saklı kartla tahsilat: POST /payment/auth, paymentCard = {cardUserKey, cardToken}.
+ * YALNIZ otomatik yenileme altyapisi cagirir (bayrak + acik riza kapisi cagiranda). iyzico tarafinda bu akis icin
+ * satici onayi/etkinlestirme gerekebilir; onaysiz hesapta saglayici hata doner ve fatura odenmemis kalir.
+ */
+export async function chargeStoredCard(input: {
+  conversationId: string;
+  price: number;
+  basketId: string;
+  cardUserKey: string;
+  cardToken: string;
+  buyer: Parameters<typeof initializeCheckoutForm>[0]["buyer"];
+  billingAddress: Parameters<typeof initializeCheckoutForm>[0]["billingAddress"];
+  basketItemName: string;
+}): Promise<StoredCardPaymentResult> {
+  const buyerIp = normalizeIyzicoBuyerIp(input.buyer.ip);
+  if (!buyerIp) throw new Error("Ödeme için geçerli istemci IP adresi bulunamadı.");
+  const price = input.price.toFixed(2);
+  const address = {
+    contactName: input.billingAddress.contactName,
+    city: input.billingAddress.city,
+    country: input.billingAddress.country,
+    address: input.billingAddress.address,
+  };
+  return iyzicoPost<StoredCardPaymentResult>("/payment/auth", {
+    locale: "tr",
+    conversationId: input.conversationId,
+    price,
+    paidPrice: price,
+    currency: IYZICO_CURRENCY,
+    installment: 1,
+    basketId: input.basketId,
+    paymentChannel: "WEB",
+    paymentGroup: "SUBSCRIPTION",
+    paymentCard: { cardUserKey: input.cardUserKey, cardToken: input.cardToken },
+    buyer: { ...input.buyer, ip: buyerIp },
+    shippingAddress: address,
+    billingAddress: address,
+    basketItems: [
+      {
+        id: input.basketId,
+        name: input.basketItemName,
+        category1: "Abonelik",
+        itemType: "VIRTUAL",
+        price,
+      },
+    ],
+  });
 }

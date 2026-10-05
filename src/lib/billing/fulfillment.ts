@@ -276,6 +276,14 @@ export async function fulfillInvoiceWithWalletCredit(input: {
   });
 }
 
+/** Aynı otomatik yenileme denemesi için fatura zaten var (başka koşu işliyor / işledi): sessizce atlanır. */
+export class DuplicateAutoRenewAttemptError extends Error {
+  constructor() {
+    super("Bu otomatik yenileme denemesi için fatura zaten var.");
+    this.name = "DuplicateAutoRenewAttemptError";
+  }
+}
+
 export type CheckoutInvoiceResult = {
   invoiceId: string;
   totalTry: number;
@@ -290,6 +298,15 @@ export async function createCheckoutInvoice(input: {
   cycle: BillingCycle;
   conversationId: string;
   amountTry: number;
+  /** Kullanıcı "kartımı sakla" açık rızasını verdi: callback doğrulanmış ödemeden sonra kartı kaydeder. */
+  saveCard?: { consentUserId: string } | null;
+  /** Ödeme kaynağı etiketi (varsayılan checkout; otomatik yenileme auto_renew). */
+  source?: "checkout" | "auto_renew";
+  /**
+   * Otomatik yenileme tekillik anahtarı (`<abonelik>:<dönem sonu>:<deneme>`): DB'deki kısmi benzersiz indeks
+   * aynı anahtarla ikinci faturayı reddeder (eş zamanlı iki koşu çift tahsilat yapamaz).
+   */
+  autoRenewAttemptKey?: string;
   /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
   walletCredit?: WalletCreditRequest | null;
 }): Promise<CheckoutInvoiceResult> {
@@ -318,13 +335,18 @@ export async function createCheckoutInvoice(input: {
         conversationId: input.conversationId,
         plan: input.plan,
         cycle: input.cycle,
-        source: "checkout",
+        source: input.source ?? "checkout",
+        ...(input.autoRenewAttemptKey ? { autoRenewAttemptKey: input.autoRenewAttemptKey } : {}),
+        ...(input.saveCard
+          ? { saveCard: true, saveCardConsentBy: input.saveCard.consentUserId, saveCardConsentVersion: "card-save-v1" }
+          : {}),
       },
     })
     .select("id")
     .single();
 
   if (error) {
+    if (input.autoRenewAttemptKey && error.code === "23505") throw new DuplicateAutoRenewAttemptError();
     console.error("createCheckoutInvoice", error);
     throw new Error("Fatura oluşturulamadı.");
   }

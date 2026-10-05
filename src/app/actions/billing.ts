@@ -28,6 +28,7 @@ import {
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { validateCheckoutBuyer, type ValidatedCheckoutBuyer } from "@/lib/billing/buyer";
 import { getBaseUrl } from "@/lib/base-url";
+import { getTenantCardUserKey } from "@/lib/billing/card-store";
 import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
 import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
 import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
@@ -41,6 +42,19 @@ export type CheckoutResult = {
 };
 
 const PLAN_IDS = new Set(PLANS.map((p) => p.id));
+
+/**
+ * iyzico `cardUserKey`: kayıtlı kartlar ödeme sayfasında YALNIZ owner/gm için ve YALNIZ kullanıcı bunu istediyse
+ * (kart kaydetme rızası veya "kayıtlı kartla öde") listelenir. Diğer roller/istekler için null (RPC bile çağrılmaz).
+ */
+async function cardUserKeyForCheckout(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  role: string | undefined,
+  wanted: boolean,
+): Promise<string | null> {
+  if (!wanted || (role !== "owner" && role !== "gm")) return null;
+  return getTenantCardUserKey(supabase);
+}
 
 function appUrl() {
   return getBaseUrl();
@@ -58,6 +72,14 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   const useCredit = String(formData.get("use_credit") ?? "") === "1";
   if (useCredit && gate.role !== "owner" && gate.role !== "gm") {
     return { error: "Hesap kredisini yalnızca ofis sahibi veya genel müdür kullanabilir." };
+  }
+
+  // Kart saklama AÇIK RIZASI: yalnız form alanı tam olarak "1" ise (onay kutusu varsayılan KAPALI). Kart verisi
+  // bu action'a hiç gelmez; kart iyzico'nun barındırılan sayfasında girilir.
+  const saveCardConsent = String(formData.get("save_card") ?? "") === "1";
+  const useSavedCard = String(formData.get("use_saved_card") ?? "") === "1";
+  if (saveCardConsent && (gate.role !== "owner" && gate.role !== "gm")) {
+    return { error: "Kartı yalnızca ofis sahibi veya genel müdür kaydedebilir." };
   }
 
   const supabase = await createClient();
@@ -144,6 +166,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       cycle,
       conversationId,
       amountTry,
+      saveCard: saveCardConsent && configured ? { consentUserId: user.id } : null,
       walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
     });
     invoiceId = created.invoiceId;
@@ -219,7 +242,20 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       buyer: checkoutBuyer!.buyer,
       billingAddress: checkoutBuyer!.billingAddress,
       basketItemName: `EmlakSoft ${plan} (${cycle === "yearly" ? "yıllık" : "aylık"})`,
+      // cardUserKey YALNIZ owner/gm + (kayıt rızası VEYA "kayıtlı kartla öde") ile gönderilir; aksi halde başka roller
+      // (ör. muhasebe) ofis sahibinin kartını ödeme sayfasında göremez/kullanamaz.
+      cardUserKey: await cardUserKeyForCheckout(supabase, gate.role, saveCardConsent || useSavedCard),
     });
+    if (useSavedCard) {
+      await logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "billing.card.pay_started",
+        entityType: "invoice",
+        entityId: invoiceId,
+        newValue: { plan, cycle, amountTry },
+      });
+    }
 
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
@@ -402,6 +438,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       buyer: checkoutBuyer.buyer,
       billingAddress: checkoutBuyer.billingAddress,
       basketItemName: `EmlakSoft ek kullanıcı (${evalResult.toQuote.extraSeats - state.extraSeats} adet)`,
+      cardUserKey: await cardUserKeyForCheckout(supabase, gate.role, String(formData.get("use_saved_card") ?? "") === "1"),
     });
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });

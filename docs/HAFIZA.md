@@ -210,3 +210,12 @@ yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasy
 `ORGANIK_BUYUME_PLANI.md` · `REFERANS_PROGRAMI.md` · `BILLING_PAUSE_PRORATION_DESIGN.md` · `OFIS_SAHIPLIGI_DEVRI.md` · `GUVENLIK_DENETIMI_3.md` ·
 `docs/DURUM.md`, `MIMARI.md`, `ROADMAP.md`, `DEPLOY.md`, `DESIGN_SYSTEM.md` · `docs/security/` (admin client envanteri) ·
 `.claude/agents/` (birlestirme, canli-qa, guvenlik, hiz, migration ajanları).
+
+## 6. Kayıtlı kart (iyzico kart saklama) — 2026-10-05, UYGULANMADI
+
+Kart BİZDE değil iyzico'da. Migration `20260826000100_payment_cards.sql` (+rollback) `payment_cards` + `tenant_payment_profiles` + `set_default_payment_card` (PB9, uygulanmadı;
+tablolar yokken kod zarifçe kapalı). Ofis düzeyi kapsam (owner/gm yönetir). Ekleme: ödeme ekranında varsayılan KAPALI "Kartımı sakla" (fatura meta `saveCard`), callback doğrulama
+zincirinden SONRA `saveCardFromPayment`. Liste/varsayılan/sil: `/app/abonelik` + `src/app/actions/payment-cards.ts`; sil iyzico'dan da siler (`card-store.ts`). Kayıtlı kartla ödeme =
+Checkout Form'a `cardUserKey` verilir (iyzico sayfası kartı listeler; 3DS iyzico'da). Otomatik yenileme altyapısı `auto-renew.ts` (dunning cron içinde) `platform_settings`
+`billing.auto_renew_enabled`="true" olmadan ÇALIŞMAZ + ofis rızası şart. PCI sözleşme testi `pci-card-data-contract.test.ts`. Açık doğrulamalar: CF retrieve yanıtında
+`cardUserKey/cardToken` dönüşü, off-session `/payment/auth` için iyzico satıcı onayı (sandbox/hesap gerekir).

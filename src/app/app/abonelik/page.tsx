@@ -27,6 +27,14 @@ import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
 import { CancelPanel } from "./cancel-panel";
+import { CardsPanel } from "./cards-panel";
+import { getPlatformSetting } from "@/lib/platform-settings";
+import {
+  AUTO_RENEW_FLAG_KEY,
+  maskedCardLabel,
+  parseAutoRenewFlag,
+  type PaymentCardRow,
+} from "@/lib/billing/cards";
 import { KontorSection } from "./kontor-section";
 import { ReferralNudge } from "@/components/app/referral-nudge";
 import { CuzdanSection } from "./cuzdan-section";
@@ -161,6 +169,28 @@ export default async function BillingPage({
     warnPercent: seatSettings.warnPercent,
   };
   const isSeatOwner = auth.role === "owner" || auth.role === "gm";
+
+  // Kayıtlı kartlar: RLS'li okuma, yalnız güvenli sütunlar (sağlayıcı anahtarları istemciye çıkmaz). Tablo yoksa
+  // (migration uygulanmadı) panel ve "kartımı sakla" kutusu hiç görünmez.
+  const [cardsRes, cardProfileRes, autoRenewRaw] = tenantId
+    ? await Promise.all([
+        supabase
+          .from("payment_cards")
+          .select("id, brand, card_family, bin_prefix, last_four, is_default, consent_at, created_at")
+          .eq("tenant_id", tenantId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("tenant_payment_profiles")
+          .select("auto_renew_enabled, auto_renew_card_id")
+          .eq("tenant_id", tenantId)
+          .maybeSingle(),
+        getPlatformSetting(AUTO_RENEW_FLAG_KEY),
+      ])
+    : [{ data: null, error: { message: "tenant yok" } }, { data: null }, null];
+  const cardsSupported = !cardsRes.error;
+  const savedCards = (cardsRes.data ?? []) as PaymentCardRow[];
+  const defaultSavedCard = savedCards.find((c) => c.is_default) ?? savedCards[0] ?? null;
+  const autoRenewAvailable = parseAutoRenewFlag(autoRenewRaw as string | null);
   // TL hesap kredisi: bakiye oturumlu RLS'li RPC ile okunur; SQL yoksa null (onay kutusu hiç görünmez).
   const walletOverview = tenantId ? await readTryOverview(supabase) : null;
   const walletMaxShare = walletOverview ? await getTryMaxShare() : TRY_DEFAULT_MAX_SHARE;
@@ -380,6 +410,16 @@ export default async function BillingPage({
         </section>
       )}
 
+      {cardsSupported && configured ? (
+        <CardsPanel
+          cards={savedCards}
+          canManage={isSeatOwner}
+          autoRenewAvailable={autoRenewAvailable}
+          autoRenewEnabled={Boolean(cardProfileRes.data?.auto_renew_enabled)}
+          autoRenewCardId={(cardProfileRes.data?.auto_renew_card_id as string | null) ?? null}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/app/abonelik?cycle=monthly"
@@ -446,6 +486,10 @@ export default async function BillingPage({
                     label={current ? (configured ? "Yenile / öde" : "Demo yenile") : configured ? "Bu pakete geç" : "Demo ile seç"}
                     variant={current ? "ghost" : "primary"}
                     couponsEnabled={planSupport.coupons}
+                    canSaveCard={cardsSupported && configured && isSeatOwner}
+                    savedCardLabel={
+                      cardsSupported && configured && isSeatOwner && defaultSavedCard ? maskedCardLabel(defaultSavedCard) : null
+                    }
                     wallet={current || sellable ? walletCheckout : null}
                     totalTry={Math.round(amount * 1.2 * 100) / 100}
                   />
