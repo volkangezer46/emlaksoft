@@ -17,14 +17,15 @@ import {
 } from "recharts";
 import { ChartFrame } from "@/components/ui/chart-frame";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
+import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 
 /**
  * Grafikler — Recharts üzerine EmlakSoft teması.
  *
  * Neden Recharts: SVG tabanlı, MIT, React 19 uyumlu ve renkleri doğrudan
  * CSS değişkeni olarak kabul ediyor — yani paletimizi ikinci kez tanımlamıyoruz.
- * Palette bilinçli olarak globals.css'teki sıra: brand → mint → cyan → amber →
- * ink → danger. Mor yok (tasarım sistemi kuralı).
+ * Palet `--viz-1..8` tokenlarıdır (chart-colors.ts; iki temada kontrastı
+ * sözleşme testiyle korunur).
  *
  * Props serileştirilebilir (düz dizi + string anahtar), bu yüzden Server
  * Component sayfalardan doğrudan çağrılabilir.
@@ -52,6 +53,13 @@ function formatValue(value: number, format: ChartValueFormat = "number") {
 }
 
 export { ChartFrame };
+
+/**
+ * Hareket azaltma: Recharts'ın kendi giriş animasyonu (`isAnimationActive`) kapatılır.
+ * Sunucu/hidrasyon anlık görüntüsü "azalt" (animasyonsuz) → hidrasyon sonrası gerçek tercih
+ * (animated-number.tsx deseni). Süre `--motion-draw` (600 ms) ile aynıdır.
+ */
+const DRAW_MS = 600;
 
 const axisProps = {
   stroke: "var(--text-faint)",
@@ -87,7 +95,7 @@ function ChartTooltip({
         </p>
       ) : null}
       {payload.map((item, index) => (
-        <p key={index} className="flex items-center gap-2 text-sm text-ink-950">
+        <p key={index} className="flex items-center gap-2 text-sm text-[color:var(--viz-tooltip-text)]">
           <span
             className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40"
             style={{ background: item.color ?? CHART_COLORS[0] }}
@@ -116,6 +124,7 @@ export function AreaTrend({
   format?: ChartValueFormat;
   compactAxis?: boolean;
 }) {
+  const reduce = useReducedMotion();
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -130,7 +139,7 @@ export function AreaTrend({
             );
           })}
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--viz-grid)" vertical={false} />
         <XAxis dataKey={xKey} {...axisProps} />
         <YAxis
           {...axisProps}
@@ -162,6 +171,9 @@ export function AreaTrend({
               strokeWidth={2.2}
               fill={`url(#area-${s.key})`}
               dot={false}
+              isAnimationActive={!reduce}
+              animationDuration={DRAW_MS}
+              animationEasing="ease-out"
               activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
             />
           );
@@ -187,6 +199,7 @@ export function BarCompare({
   layout?: "vertical" | "horizontal";
 }) {
   const horizontal = layout === "horizontal";
+  const reduce = useReducedMotion();
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart
@@ -195,7 +208,7 @@ export function BarCompare({
         margin={{ top: 4, right: 12, left: horizontal ? 8 : 0, bottom: 0 }}
         barGap={4}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={horizontal} horizontal={!horizontal} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--viz-grid)" vertical={horizontal} horizontal={!horizontal} />
         {horizontal ? (
           <>
             <XAxis type="number" {...axisProps} tickFormatter={(v: number) => compactFormatter.format(v)} />
@@ -219,6 +232,9 @@ export function BarCompare({
             fill={s.color ?? CHART_COLORS[index % CHART_COLORS.length]}
             radius={horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0]}
             maxBarSize={horizontal ? 18 : 34}
+            isAnimationActive={!reduce}
+            animationDuration={DRAW_MS}
+            animationEasing="ease-out"
           />
         ))}
       </BarChart>
@@ -240,6 +256,7 @@ export function DonutSplit({
   format?: ChartValueFormat;
   centerLabel?: string;
 }) {
+  const reduce = useReducedMotion();
   const total = data.reduce((sum, row) => sum + Number(row[valueKey] ?? 0), 0);
   return (
     <div className="relative h-full">
@@ -253,6 +270,9 @@ export function DonutSplit({
             outerRadius="82%"
             paddingAngle={2}
             strokeWidth={0}
+            isAnimationActive={!reduce}
+            animationDuration={DRAW_MS}
+            animationEasing="ease-out"
           >
             {data.map((_, index) => (
               <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -267,7 +287,7 @@ export function DonutSplit({
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-x-0 top-[38%] -translate-y-1/2 text-center">
-        <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-ink-950">
+        <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-[color:var(--viz-tooltip-text)]">
           {formatValue(total, format)}
         </p>
         {centerLabel ? (

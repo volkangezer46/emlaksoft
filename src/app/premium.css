@@ -29,17 +29,14 @@
   --pm-danger-text: #b42318;
   --pm-gold-text: #7a5200;
   /* Kart dili: radius 16 + 1px kenarlık + iki katmanlı yumuşak gölge */
-  --pm-chart-success: #0d9373;
-  --pm-chart-warn: #c27803;
-  --pm-chart-danger: #dc3b3b;
+  --pm-chart-success: var(--viz-pos);
+  --pm-chart-warn: var(--viz-5);
+  --pm-chart-danger: var(--viz-neg);
   --pm-r: 16px;
   --pm-shadow: 0 1px 2px rgba(10, 34, 71, 0.05), 0 10px 26px -14px rgba(10, 34, 71, 0.14);
   --pm-shadow-hover: 0 1px 2px rgba(10, 34, 71, 0.06), 0 16px 34px -14px rgba(10, 34, 71, 0.22);
 }
 html[data-theme="dark"] {
-  --pm-chart-success: #34d3bd;
-  --pm-chart-warn: #fbbf24;
-  --pm-chart-danger: #f87171;
   --pm-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 26px -14px rgba(0, 0, 0, 0.55);
   --pm-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 34px -14px rgba(0, 0, 0, 0.7);
   --pm-success-text: #6ee7c8;
@@ -50,15 +47,11 @@ html[data-theme="dark"] {
 
 /* ---- Ton sınıfları: --t çizgi/ikon, --t-soft zemin, --t-text yazı ---------- */
 .pm-t-brand { --t: var(--accent); --t-soft: color-mix(in srgb, var(--accent) 12%, transparent); --t-text: var(--accent-text); }
-.pm-t-success { --t: #0d9373; --t-soft: color-mix(in srgb, #0d9373 13%, transparent); --t-text: var(--pm-success-text); }
-.pm-t-warn { --t: #c27803; --t-soft: color-mix(in srgb, #c27803 14%, transparent); --t-text: var(--pm-warn-text); }
-.pm-t-danger { --t: #dc3b3b; --t-soft: color-mix(in srgb, #dc3b3b 12%, transparent); --t-text: var(--pm-danger-text); }
-.pm-t-gold { --t: #b8820a; --t-soft: color-mix(in srgb, #d4a24c 18%, transparent); --t-text: var(--pm-gold-text); }
+.pm-t-success { --t: var(--pm-chart-success); --t-soft: color-mix(in srgb, var(--pm-chart-success) 13%, transparent); --t-text: var(--pm-success-text); }
+.pm-t-warn { --t: var(--pm-chart-warn); --t-soft: color-mix(in srgb, var(--pm-chart-warn) 14%, transparent); --t-text: var(--pm-warn-text); }
+.pm-t-danger { --t: var(--pm-chart-danger); --t-soft: color-mix(in srgb, var(--pm-chart-danger) 12%, transparent); --t-text: var(--pm-danger-text); }
+.pm-t-gold { --t: var(--viz-gold); --t-soft: color-mix(in srgb, #d4a24c 18%, transparent); --t-text: var(--pm-gold-text); }
 .pm-t-neutral { --t: var(--text-muted); --t-soft: color-mix(in srgb, var(--text-muted) 12%, transparent); --t-text: var(--text-muted); }
-html[data-theme="dark"] .pm-t-success { --t: #34d3bd; }
-html[data-theme="dark"] .pm-t-warn { --t: #fbbf24; }
-html[data-theme="dark"] .pm-t-danger { --t: #f87171; }
-html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 
 /* ---- KpiCard v3 ------------------------------------------------------------ */
 .pm-card {
@@ -234,13 +227,11 @@ html[data-theme="dark"] .pm-t-gold { --t: #f0c36a; }
 .pm-glass-sub[data-tone="danger"] { color: #fecaca; }
 .pm-glass-sub[data-tone="warn"] { color: var(--gold-200); }
 
-/* Gece şehri: yıldız/pencere ışıltısı (hareket azaltmada tamamen durur) */
-@keyframes pm-twinkle { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: no-preference) {
-  .pm-twinkle { animation: pm-twinkle 3.6s ease-in-out infinite; }
-  .pm-twinkle[data-d="1"] { animation-delay: -1.1s; }
-  .pm-twinkle[data-d="2"] { animation-delay: -2.2s; animation-duration: 4.4s; }
-}
+/* Gece şehri: yıldız/pencere ışıltısı DURAĞAN (süs sonsuz animasyon kaldırıldı);
+   data-d kademeleri statik opaklık farkı verir. */
+.pm-twinkle { opacity: 0.75; }
+.pm-twinkle[data-d="1"] { opacity: 0.55; }
+.pm-twinkle[data-d="2"] { opacity: 0.9; }
 
 /* ---- PeriodToggle -------------------------------------------------------------- */
 .pm-seg {

@@ -372,6 +372,59 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 
 **Ücretsiz CSS:** `@starting-style` panel girişi, `animation-timeline: view()` yalnız public landing ve /fiyatlar; hepsi `@supports` yedekli, reduced-motion'da kapalı.
 
+## Veri görselleştirme kiti ve hareket kuralları
+
+**Kod:** `src/components/ui/viz/` (sunucu-güvenli saf SVG/CSS, istemci JS ve yeni bağımlılık yok; `import { ... } from "@/components/ui/viz"`). Recharts yalnız `ui/chart.tsx` (çizgi/çubuk/halka, tooltip gereken yerler) ve `interactive-chart.tsx` (el yapımı SVG) içindir.
+
+| Bileşen | Ne zaman | Notlar |
+|---|---|---|
+| `AreaChart` | trend (tek/çift seri) | premium ve console `AreaChart` bunun sarmalayıcısıdır. İlk görünümde çizgi soldan açılır (clipPath; `non-scaling-stroke` ile uyumlu) + alan yumuşakça belirir; sr-only veri tablosu; `href` ile tüm grafik bağlantı; ikinci seri kesikli (renk dışı ayrım) |
+| `RadialGauge` | hedef/ilerleme | premium `Ring` ve console `Ring` bunun üzerine kuruludur. `pathLength=1` yay süpürmesi, `target` çentiği, uçta ilerleme işareti, sr-only "değer / max (hedef)". `max<=0` → `null` (sahte yüzde yok) |
+| `FunnelChart` | aşama dönüşümü | yatay, ORTAK ölçek, etiket + değer her satırda, aşama başına `href`. Dönüşüm oku (↓ %) YALNIZ `ardisik` true ise (her aşama öncekinin alt kümesi); bağımsız sayımlarda oran yanıltıcıdır |
+| `Heatmap` | 7×24 vb. yoğunluk | CSS grid, tek hue sıralı palet, hücre `title` + sr-only tablo, veri yoksa illüstrasyonlu boş durum. Hareket yok |
+| `ChartCard` (= `ChartFrame`) | her grafik kartı | başlık, `period`, `href`, `loading` (iskelet), `empty` (anlamlı boş durum) |
+| `SkeletonCard` | yükleniyor | `.skeleton` parlaması, sabit yükseklik (CLS yok); `lazy-chart` bunu kullanır |
+| `CountUp` | KPI sayısı | `value` metin ya da sayı + `format="number\|money\|percent"`; SSR sonucu basar; admin `CountUp` ve `OdometerNumber` bunun eski adlarıdır |
+
+Boş durum illüstrasyonları: `Illustration kind="funnel\|gauge\|heatmap"`.
+**Kural:** grafik yalnız gerçek veriyle çizilir; veri yoksa `null` döner ya da `ChartCard empty` gösterilir. Görünen her sayı/dilim/aşama mümkünse `href` ile filtrelenmiş hedefe gider (sıfır çıkmaz metrik).
+
+### Palet (`--viz-*`, tokens.css + theme-dark.css)
+
+Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--viz-pos/neg/neutral`, `--viz-gold`; ızgara `--viz-grid`, ipucu metni `--viz-tooltip-text`. `chart-colors.ts`, `pm-chart-*`, `.pm-t-*` bunlara bağlıdır; grafik koduna ham hex yazılmaz.
+**Ölçüt (`src/lib/viz-palette-contract.test.ts`):** çizgi/dolgu serileri `--surface` üzerinde ≥3:1 (WCAG 1.4.11); pos/neg/neutral metin olarak ≥4.5:1; kategorik renkler arası CIE76 ΔE ≥20 (mint/cyan gibi yakın hue yok); sıralı palet monoton. Seri ayrımı yalnız renkle yapılmaz: etiket, doğrudan değer, lejant ya da çizgi stili (kesikli) eşlik eder.
+
+| Token | Açık | Koyu |
+|---|---|---|
+| viz-1 mavi | #1d5fd6 (5.74) | #6ea1ff (6.79) |
+| viz-2 yeşil-teal | #0f7b6c (5.16) | #34d3bd (9.26) |
+| viz-3 turuncu | #c2410c (5.18) | #fb923c (7.67) |
+| viz-4 mor | #7c3aed (5.70) | #a78bfa (6.38) |
+| viz-5 amber | #a16207 (4.92) | #fbbf24 (10.40) |
+| viz-6 pembe | #be185d (6.04) | #f472b6 (6.56) |
+| viz-7 cyan | #0e7490 (5.36) | #38bdf8 (8.11) |
+| viz-8 nötr | #78716c (4.80) | #94a3b8 (6.77) |
+| seq-1…5 | #e6efff #b4cdfb #5088ec #2f6bdb #17409a | #16294d #1f4585 #2f6bc4 #5b94f0 #a9c8ff |
+| pos / neg / neutral | #0b7a4b #c62828 #5b6b86 | #4ade80 #f87171 #94a3b8 |
+
+(Parantez: `--surface` üzerinde kontrast oranı; açık #ffffff, koyu #101a2e. seq-1/2 yüzeyden belirgin ayrılmayan düşük-yoğunluk tonlarıdır: hücre kenarlığı + title + sr-only tablo bilgiyi taşır.)
+
+### Hareket kuralları
+
+- Süre token'ları: `--motion-draw` 600 ms (çizilme/dolum/süpürme), `--motion-count` 700 ms (sayı sayma). `chart-draw`, `ring-sweep`, `dashboard-line`, `bar-live/bar-rise` ve Recharts `animationDuration` buna eşittir.
+- **Çizilme animasyonları ilk görünümde BİR kez oynar.** Süs sonsuz animasyon yoktur.
+- **Sayfa başına bütçe (ilk boyama):** en çok 1 grafik çizilmesi + sayı sayma + liste stagger ≤12 öğe.
+- **Sonsuz döngü yalnız gerçek canlı göstergede** (`.status-pulse`: gerçek zamanlı bağlantı, canlı çağrı vb.). Süs için `.status-pulse-static`. `glow-halo`, `flow-line`, `conic-spin`, `pm-twinkle` sınıfları durağan tanımla kalır (tsx kırılmasın); `.bar-live` tek seferlik dolumdur.
+- **Fare süsü yok:** /app ve /admin'de imleç takibi, parallax, tilt yok (standart hover durumu kalır). Veri inceleme imleci (haritalar, `interactive-chart` crosshair) işlevdir ve kalır. Sözleşme: `src/lib/motion-viz-contract.test.ts`.
+- reduced-motion: genel kural TEK yerde (`a11y.css`); bileşenler bitiş durumunda durağandır; Recharts `isAnimationActive={!reduce}`.
+- `InteractiveChart`: klavye (Tab ile odak, ←/→, Home/End, Esc), `aria-live` duyuru ve sr-only veri tablosu.
+
+### Karar: 3B, GIF, Lottie
+
+- **3B pasta/çubuk yok:** derinlik algıyı bozar (ön dilim büyük görünür); yanıltıcı. Derinlik ipucu yalnız yüzey katmanları, ince iç ışık çizgisi (`--inner-top`), yumuşak gölge ve çizgi altı gradyan ile verilir.
+- **GIF yok:** tema duyarsız (koyu/açık), ağır, erişilemez. Hareket SVG + CSS illüstrasyon animasyonlarıdır (`ui/illustrations`, `motion.css`).
+- **Lottie yok:** yeni bağımlılık + paket büyümesi + tema renklerine bağlanamama; SVG+CSS aynı işi ölçülü ve kurumsal yapar.
+
 ## Marka
 
 **Seçilen sembol:** lacivert karo üzerinde altın çatı + beyaz "E" (omurga + 3 kol; orta kol marka mavisi). Üç alternatif

@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
+import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 
 /**
  * Danışman gelir grafiği — paylaşılan BarCompare'in tıklanabilir sürümü.
@@ -71,6 +72,7 @@ function RevenueTooltip({
 
 export function RevenueChart({ data }: { data: RevenueDatum[] }) {
   const router = useRouter();
+  const reduce = useReducedMotion();
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -90,6 +92,8 @@ export function RevenueChart({ data }: { data: RevenueDatum[] }) {
           fill={CHART_COLORS[0]}
           radius={[0, 6, 6, 0]}
           maxBarSize={18}
+          isAnimationActive={!reduce}
+          animationDuration={600}
           cursor="pointer"
           onClick={(entry: unknown) => {
             // Recharts onClick payload'ı: çubuğun veri satırı (id dahil)

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
+import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 
 /**
  * Gider kategori dağılımı — paylaşılan DonutSplit'in tıklanabilir sürümü.
@@ -45,6 +46,7 @@ function DonutTooltip({
 
 export function CategoryDonut({ data, centerLabel }: { data: CategoryDatum[]; centerLabel?: string }) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const total = data.reduce((sum, row) => sum + row.value, 0);
 
   return (
@@ -59,6 +61,8 @@ export function CategoryDonut({ data, centerLabel }: { data: CategoryDatum[]; ce
             outerRadius="82%"
             paddingAngle={2}
             strokeWidth={0}
+            isAnimationActive={!reduce}
+            animationDuration={600}
             cursor="pointer"
             onClick={(entry: unknown) => {
               const d = entry as { category?: string; payload?: { category?: string } };

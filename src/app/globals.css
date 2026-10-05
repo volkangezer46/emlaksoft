@@ -452,16 +452,6 @@ p {
     0 20px 45px -25px rgba(20, 99, 255, 0.35);
 }
 
-.perspective { perspective: 2000px; }
-.tilt-3d {
-  transform: rotateX(7deg) rotateY(-9deg) rotate(1deg);
-  transform-style: preserve-3d;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.perspective:hover .tilt-3d {
-  transform: rotateX(2deg) rotateY(-3deg);
-}
-
 .glow-conic {
   background: conic-gradient(
     from 180deg at 50% 50%,
@@ -886,7 +876,7 @@ p {
 .dashboard-chart-line {
   stroke-dasharray: 1200;
   stroke-dashoffset: 1200;
-  animation: dashboard-line 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: dashboard-line var(--motion-draw) var(--ease-out-expo) forwards;
 }
 
 @keyframes pipeline-grow {
@@ -904,20 +894,16 @@ p {
   50% { box-shadow: 0 0 0 7px rgba(16, 185, 163, 0); }
 }
 
+/* Yalnız GERÇEK "canlı" göstergede kullanılır (sonsuz döngü bütçesi). Süs için .status-pulse-static. */
 .status-pulse { animation: status-pulse 2.4s ease-in-out infinite; }
+.status-pulse-static { animation: none; }
 
 /* ============================================================
    Advanced live chart / data-viz animations
    ============================================================ */
 
-/* flowing energy along a stroked line (continuous) */
-@keyframes flow-dash {
-  to { stroke-dashoffset: -1000; }
-}
-.flow-line {
-  stroke-dasharray: 8 10;
-  animation: flow-dash 14s linear infinite;
-}
+/* Süs sonsuz akış kaldırıldı: sınıf durağan kesik çizgi olarak kalır (tsx kırılmasın). */
+.flow-line { stroke-dasharray: 8 10; }
 
 /* one-time draw then keep */
 @keyframes chart-draw {
@@ -927,34 +913,20 @@ p {
 .chart-draw {
   stroke-dasharray: var(--len, 1000);
   stroke-dashoffset: var(--len, 1000);
-  animation: chart-draw 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: chart-draw var(--motion-draw) var(--ease-out-expo) forwards;
 }
 
-/* glowing pulse dot (endpoint of a line) */
-@keyframes glow-dot {
-  0%, 100% { r: 4; opacity: 1; }
-  50% { r: 5.5; opacity: 0.75; }
-}
-.glow-dot { animation: glow-dot 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+/* çizgi uç noktası: süs sonsuz nabız kaldırıldı, durağan nokta */
+.glow-dot { transform-box: fill-box; transform-origin: center; }
 
-@keyframes glow-halo {
-  0% { transform: scale(0.6); opacity: 0.55; }
-  80%, 100% { transform: scale(2.6); opacity: 0; }
-}
-.glow-halo { transform-box: fill-box; transform-origin: center; animation: glow-halo 2.2s ease-out infinite; }
-
-/* animated bar rise + soft continuous bob */
+/* bar rise: tek seferlik çubuk dolumu (sürekli "nefes" kaldırıldı) */
 @keyframes bar-rise {
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
 }
-.bar-rise { transform-origin: bottom; animation: bar-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.bar-rise { transform-origin: bottom; animation: bar-rise var(--motion-draw) var(--ease-out-expo) both; }
 
-@keyframes bar-bob {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(1.06); }
-}
-.bar-live { transform-origin: bottom; animation: bar-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both, bar-bob 3.4s ease-in-out infinite; }
+.bar-live { transform-origin: bottom; animation: bar-rise var(--motion-draw) var(--ease-out-expo) both; }
 
 /* radial gauge / donut sweep */
 @keyframes ring-sweep {
@@ -964,49 +936,18 @@ p {
 .ring-sweep {
   stroke-dasharray: var(--circ, 440);
   stroke-dashoffset: var(--circ, 440);
-  animation: ring-sweep 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: ring-sweep var(--motion-draw) var(--ease-out-expo) forwards;
 }
 
-/* slow conic spin behind gauges */
-@keyframes spin-conic-2 { to { transform: rotate(360deg); } }
-.conic-spin { animation: spin-conic-2 9s linear infinite; }
-
-/* floating data particles */
-@keyframes particle-rise {
-  0% { transform: translateY(8px); opacity: 0; }
-  20% { opacity: 1; }
-  100% { transform: translateY(-26px); opacity: 0; }
-}
-.particle { animation: particle-rise 4.5s ease-in-out infinite; }
-
-/* moving gradient sweep across chart area */
-@keyframes area-sheen {
-  0% { transform: translateX(-40%); opacity: 0; }
-  50% { opacity: 0.5; }
-  100% { transform: translateX(140%); opacity: 0; }
-}
-.area-sheen { animation: area-sheen 5s ease-in-out infinite; }
-
-/* animated scanning gridline */
-@keyframes grid-scan {
-  0% { transform: translateX(-100%); opacity: 0; }
-  50% { opacity: 1; }
-  100% { transform: translateX(100%); opacity: 0; }
-}
-.grid-scan { animation: grid-scan 6s ease-in-out infinite; }
+/* conic arka plan (durağan) */
+/* Süs dönüşü kaldırıldı: sınıf durağan. */
+.conic-spin { animation: none; }
 
 /* soft number ticker flash */
 @keyframes value-flash {
   0%, 100% { color: inherit; }
   50% { color: var(--mint-400); }
 }
-
-/* live legend dot */
-@keyframes legend-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-.legend-blink { animation: legend-blink 1.6s ease-in-out infinite; }
 
 /* ticket/tape sliding row highlight */
 @keyframes row-sweep {
@@ -1024,58 +965,12 @@ p {
   animation: wave 1s ease-in-out infinite;
 }
 
-/* soft attention pulse for alert values */
-@keyframes danger-pulse {
-  0%, 100% { text-shadow: 0 0 0 rgba(229, 72, 77, 0); }
-  50% { text-shadow: 0 0 18px rgba(229, 72, 77, 0.45); }
-}
-.danger-pulse { animation: danger-pulse 2.4s ease-in-out infinite; }
-
-/* animated dashed connector that flows (leak trace) */
-@keyframes trace-flow { to { stroke-dashoffset: -600; } }
-.trace-flow { stroke-dasharray: 6 8; animation: trace-flow 10s linear infinite; }
-
-/* comet: traveling light dot across a horizontal connector */
-@keyframes comet-x {
-  0% { left: 0%; opacity: 0; }
-  8% { opacity: 1; }
-  92% { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
-}
-.comet { animation: comet-x 4.5s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
-
-/* slow rotating conic ring behind an icon (shield/security) */
-@keyframes ring-rotate { to { transform: rotate(360deg); } }
-.shield-ring::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: inherit;
-  background: conic-gradient(from 0deg, transparent 0 66%, rgba(52, 211, 189, 0.7) 80%, rgba(34, 211, 238, 0.7) 92%, transparent 100%);
-  animation: ring-rotate 5s linear infinite;
-  opacity: 0;
-  transition: opacity var(--motion-slow) var(--ease-out);
-}
-.group:hover .shield-ring::before { opacity: 1; }
-.shield-ring::after {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.06);
-  /* cam bütçesi: tekrar eden kart ikonunda 2px bulanıklık kaldırıldı (görsel fark yok). */
-}
-
+/* Reduced-motion: genel kural TEK yerde (a11y.css). Burada yalnız bitiş-durumu zorlamaları. */
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
   .reveal, .reveal-scale { opacity: 1 !important; transform: none !important; }
-  .path-draw { stroke-dashoffset: 0 !important; }
-  .flow-line, .chart-draw, .ring-sweep, .bar-live, .bar-rise { animation: none !important; stroke-dashoffset: 0 !important; transform: none !important; }
+  .path-draw, .chart-draw, .dashboard-chart-line { stroke-dashoffset: 0 !important; }
+  .ring-sweep { animation: none !important; stroke-dashoffset: var(--dash, 110) !important; }
+  .bar-live, .bar-rise { animation: none !important; transform: none !important; }
 }
 
 /* Panel sayfa geçişi — her navigasyonda zarif giriş (template.tsx ile) */
@@ -1179,23 +1074,6 @@ p {
    DASHBOARD 3D KATMANI — /app ana sayfası (yalnız yeni sınıflar)
    ============================================================ */
 
-/* KPI kartı perspektif mikro-tilt — .lift'in 3D karşılığı. 1-2 derece
-   yeterli; fazlası oyuncaksı. Çift kartlar ters yöne yatar (ritim). */
-.tilt-card {
-  transform-style: preserve-3d;
-  transition:
-    transform var(--motion-base) var(--ease-out-expo),
-    box-shadow var(--motion-base) var(--ease-out),
-    border-color var(--motion-base) var(--ease-out);
-}
-.tilt-card:hover {
-  transform: perspective(900px) translateY(-3px) rotateX(1.6deg) rotateY(-1.2deg);
-  box-shadow: var(--inner-top), var(--elev-4);
-}
-.tilt-card:nth-child(even):hover {
-  transform: perspective(900px) translateY(-3px) rotateX(1.6deg) rotateY(1.2deg);
-}
-
 /* KPI ikon çipine hafif iç parlaklık — üstten ışık, alttan gölge */
 .kpi-chip-shine {
   box-shadow:
@@ -1233,43 +1111,9 @@ p {
 
 /* Kart ızgarası stagger girişi: motion.css `.list-stagger` (tek tanım). */
 
-/* Odometre — dikey kayan basamak (OdometerNumber komponenti) */
-.odometer {
-  display: inline-flex;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
-}
-.odometer-digit {
-  display: inline-block;
-  height: 1em;
-  overflow: hidden;
-}
-/* Basamak 0'dan başlayıp inline hedef transform'una kayar */
-@keyframes odometer-roll {
-  from { transform: translateY(0); }
-}
-.odometer-track {
-  display: inline-flex;
-  flex-direction: column;
-  animation: odometer-roll 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: transform;
-}
-.odometer-track > span,
-.odometer-char {
-  display: block;
-  height: 1em;
-  line-height: 1;
-}
-
 /* TV modu — tüm panel ~%25 büyür (uzaktan okunur), düzen oranları korunur */
 .tv-zoom { zoom: 1.25; }
 
-@media (prefers-reduced-motion: reduce) {
-  .tilt-card:hover,
-  .tilt-card:nth-child(even):hover { transform: none; }
-  .odometer-track { animation: none; }
-}
 
 /* ============================================================
    YENİ CSS KATMANI — hepsi progressive enhancement
@@ -1627,16 +1471,8 @@ main [class*="backdrop-blur"] {
   background-clip: text;
   color: transparent;
 }
-.hero-tilt {
-  transform: perspective(1600px) rotateY(-9deg) rotateX(3deg) rotateZ(-0.5deg);
-  transform-origin: 80% 50%;
-  filter: drop-shadow(0 40px 48px rgba(7, 26, 56, 0.26)) drop-shadow(0 10px 18px rgba(20, 99, 255, 0.16));
-}
 .hero-phone {
   filter: drop-shadow(0 28px 32px rgba(7, 26, 56, 0.3));
-}
-@media (max-width: 640px) {
-  .hero-tilt { transform: perspective(1200px) rotateY(-4deg) rotateX(1.5deg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-chip { animation: none !important; }

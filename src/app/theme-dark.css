@@ -15,6 +15,25 @@
 html[data-theme="dark"] {
   color-scheme: dark;
 
+  /* Veri gorsellestirme paleti (--surface #101a2e uzerinde seriler >=3:1) */
+  --viz-1: #6ea1ff;
+  --viz-2: #34d3bd;
+  --viz-3: #fb923c;
+  --viz-4: #a78bfa;
+  --viz-5: #fbbf24;
+  --viz-6: #f472b6;
+  --viz-7: #38bdf8;
+  --viz-8: #94a3b8;
+  --viz-seq-1: #16294d;
+  --viz-seq-2: #1f4585;
+  --viz-seq-3: #2f6bc4;
+  --viz-seq-4: #5b94f0;
+  --viz-seq-5: #a9c8ff;
+  --viz-pos: #4ade80;
+  --viz-neg: #f87171;
+  --viz-neutral: #94a3b8;
+  --viz-gold: #f0c36a;
+
   /* Yüzeyler */
   --canvas: #0a1020;
   --surface: #101a2e;

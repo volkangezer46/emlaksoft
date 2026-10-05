@@ -156,6 +156,39 @@ const ART = {
       <path d="M52 44l10 10 19-21" strokeWidth={5} className="ill-draw ill-check" />
     </>
   ),
+  /** Veri görselleştirme boş durumları (viz kiti): hareket yalnız bir kez dolum/çizim. */
+  funnel: (
+    <>
+      <rect x="24" y="18" width="84" height="12" rx="4" fill={SOFT} className="ill-grow-x" />
+      <rect x="24" y="36" width="62" height="12" rx="4" fill={TINT} className="ill-grow-x ill-d2" />
+      <rect x="24" y="54" width="38" height="12" rx="4" fill={TINT} className="ill-grow-x ill-d3" />
+      <path d="M96 42l6 6 6-6" stroke={LINE} />
+    </>
+  ),
+  gauge: (
+    <>
+      <path d="M32 68a34 34 0 0 1 68 0" stroke={LINE} />
+      <path d="M32 68a34 34 0 0 1 52-28.8" className="ill-draw" />
+      <path d="M66 68l16-18" strokeWidth={2.5} />
+      <circle cx="66" cy="68" r="4" fill="currentColor" stroke="none" />
+    </>
+  ),
+  heatmap: (
+    <>
+      <rect x="26" y="20" width="16" height="14" rx="3" fill={SOFT} />
+      <rect x="46" y="20" width="16" height="14" rx="3" fill={TINT} />
+      <rect x="66" y="20" width="16" height="14" rx="3" fill={SOFT} />
+      <rect x="86" y="20" width="16" height="14" rx="3" fill={TINT} />
+      <rect x="26" y="38" width="16" height="14" rx="3" fill={TINT} />
+      <rect x="46" y="38" width="16" height="14" rx="3" fill="currentColor" stroke="none" opacity="0.55" />
+      <rect x="66" y="38" width="16" height="14" rx="3" fill={TINT} />
+      <rect x="86" y="38" width="16" height="14" rx="3" fill={SOFT} />
+      <rect x="26" y="56" width="16" height="14" rx="3" fill={SOFT} />
+      <rect x="46" y="56" width="16" height="14" rx="3" fill={SOFT} />
+      <rect x="66" y="56" width="16" height="14" rx="3" fill="currentColor" stroke="none" opacity="0.3" />
+      <rect x="86" y="56" width="16" height="14" rx="3" fill={TINT} />
+    </>
+  ),
   /** Eski (v2) "liste" ve "başlangıç" illüstrasyonları. */
   liste: (
     <>

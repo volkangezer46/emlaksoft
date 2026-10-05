@@ -22,21 +22,16 @@
  */
 
 import dynamic from "next/dynamic";
+import { SkeletonCard } from "@/components/ui/viz/skeleton-card";
 
 export { ChartFrame } from "@/components/ui/chart-frame";
 
 const chartModule = () => import("@/components/ui/chart");
 
-// Grafik parçası inerken ChartFrame'in sabit yüksekliğini dolduran sakin iskelet
-// (düzen kayması yok; reduced-motion global kuralla animasyonu kapatır).
+// Grafik parçası inerken ChartFrame'in sabit yüksekliğini dolduran iskelet (düzen kayması yok;
+// parlama motion.css `.skeleton`, reduced-motion'da durağan).
 function ChartSkeleton() {
-  return (
-    <div
-      role="status"
-      aria-label="Grafik yükleniyor"
-      className="h-full w-full animate-pulse rounded-[var(--radius-control)] bg-line"
-    />
-  );
+  return <SkeletonCard height="100%" label="Grafik yükleniyor" />;
 }
 
 export const AreaTrend = dynamic(() => chartModule().then((m) => m.AreaTrend), { loading: ChartSkeleton });

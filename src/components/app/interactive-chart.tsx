@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useId } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 
 /**
  * InteractiveChart — el yapımı SVG çizgi/alan grafiği, gerçek etkileşimle.
@@ -13,8 +13,11 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
  *
  * - Hover/dokunmatik: dikey crosshair + en yakın nokta büyür + tooltip balonu.
  * - Çift seri desteği (gelir vs gider): iki çizgi, tooltip'te ikisi + opsiyonel fark satırı.
- * - Soldan sağa çizilme animasyonu globals.css'teki `chart-draw` deseniyle;
- *   prefers-reduced-motion'da global kural animasyonu kapatır.
+ * - Soldan sağa çizilme animasyonu globals.css'teki `chart-draw` deseniyle (süre
+ *   `--motion-draw`); prefers-reduced-motion'da animasyon kapanır, bitiş durumu görünür.
+ * - Klavye: grafik odaklanır (Tab); Sol/Sağ ok noktadan noktaya gezer, Home/End uçlara,
+ *   Esc seçimi kapatır. Seçili nokta `aria-live` ile okunur; sr-only veri tablosu tüm veriyi verir.
+ *   (Fare imleciyle veri inceleme bilinçli olarak korunur: süs değil, işlevdir.)
  * - Props serileştirilebilir — Server Component sayfalardan doğrudan çağrılır.
  */
 
@@ -43,6 +46,8 @@ type Props = {
   diffLabel?: string;
   /** Çift seride komponent içi lejant (sayfada zaten varsa kapatın). */
   showLegend?: boolean;
+  /** Ekran okuyucu etiketi (varsayılan: "<name> grafiği"). */
+  ariaLabel?: string;
   className?: string;
 };
 
@@ -58,8 +63,8 @@ const PAD_X = 4;
 
 export function InteractiveChart({
   data,
-  color = "var(--brand-600)",
-  color2 = "var(--danger-500)",
+  color = "var(--viz-1)",
+  color2 = "var(--viz-3)",
   name = "Değer",
   name2 = "2. seri",
   format = "number",
@@ -68,6 +73,7 @@ export function InteractiveChart({
   labelEvery = 1,
   diffLabel,
   showLegend = true,
+  ariaLabel,
   className,
 }: Props) {
   const reactId = useId();
@@ -154,14 +160,37 @@ export function InteractiveChart({
     tipTop = Math.max(4, Math.min(...ys) - 10);
   }
 
+  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const cur = hover ?? (e.key === "ArrowLeft" ? n : -1);
+    let next: number | null = null;
+    if (e.key === "ArrowRight") next = Math.min(n - 1, cur + 1);
+    else if (e.key === "ArrowLeft") next = Math.max(0, cur - 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = n - 1;
+    else if (e.key === "Escape") {
+      setHover(null);
+      return;
+    }
+    if (next === null) return;
+    e.preventDefault();
+    setHover(next);
+  };
+  const chartLabel = ariaLabel ?? `${name} grafiği`;
+
   const labelVisible = (i: number) => (n - 1 - i) % Math.max(1, labelEvery) === 0;
 
   return (
     <div className={className}>
       <div
         ref={wrapRef}
-        className="relative"
+        className="relative rounded-[var(--radius-control)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
         style={{ height, touchAction: "pan-y" }}
+        role="group"
+        aria-roledescription="grafik"
+        aria-label={`${chartLabel}. Noktalar arasında gezmek için ok tuşlarını kullanın.`}
+        tabIndex={0}
+        onKeyDown={onKey}
+        onBlur={() => setHover(null)}
         onPointerMove={onMove}
         onPointerDown={onMove}
         onPointerLeave={() => setHover(null)}
@@ -276,7 +305,7 @@ export function InteractiveChart({
               >
                 <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-text-faint">{active.label}</p>
                 {seriesRows.map((row) => (
-                  <p key={row.label} className="flex items-center gap-2 text-xs text-ink-950">
+                  <p key={row.label} className="flex items-center gap-2 text-xs text-[color:var(--viz-tooltip-text)]">
                     <span className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40" style={{ background: row.color }} />
                     <span className="text-text-muted">{row.label}</span>
                     <span className="numeric ml-auto pl-3 font-bold tabular-nums">{fmt(row.value, format)}</span>
@@ -300,6 +329,30 @@ export function InteractiveChart({
           </>
         ) : null}
       </div>
+
+      {/* Seçili noktanın sesli duyurusu + tüm veri (görsel olmayan kullanıcılar için) */}
+      <p className="sr-only" aria-live="polite">
+        {active ? `${active.label}: ${seriesRows.map((r) => `${r.label} ${fmt(r.value, format)}`).join(", ")}` : ""}
+      </p>
+      <table className="sr-only">
+        <caption>{chartLabel}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Dönem</th>
+            <th scope="col">{name}</th>
+            {dual ? <th scope="col">{name2}</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d, i) => (
+            <tr key={`${d.label}-${i}`}>
+              <th scope="row">{d.label}</th>
+              <td>{fmt(d.value, format)}</td>
+              {dual ? <td>{fmt(d.value2 ?? 0, format)}</td> : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {/* X ekseni etiketleri */}
       {showLabels && geo ? (
