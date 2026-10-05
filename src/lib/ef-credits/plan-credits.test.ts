@@ -7,7 +7,12 @@ import {
   efCreditsLine,
   monthlyUnitsOf,
   monthlyUnitsWithSeats,
+  planCarryCap,
+  planDeltaIdempotencyKey,
+  planExpireIdempotencyKey,
+  planExpiryAmount,
   planMonthlyIdempotencyKey,
+  welcomeEligible,
   welcomeIdempotencyKey,
   type EfGrantCandidate,
 } from "./plan-credits";
@@ -18,9 +23,17 @@ const cand = (over: Partial<EfGrantCandidate> = {}): EfGrantCandidate => ({
   subscriptionStatus: "active",
   tenantStatus: "active",
   valuationClosed: false,
+  tenantCreatedAt: "2026-10-10T09:00:00Z",
   ...over,
 });
-const base = { monthKey: "2026-10", planMonthly: { office: 40, advisor: 10, enterprise: null }, welcomeUnits: 0, welcomeGranted: new Set<string>() };
+const SINCE = Date.parse("2026-10-06T00:00:00Z");
+const base = {
+  monthKey: "2026-10",
+  planMonthly: { office: 40, advisor: 10, enterprise: null },
+  welcomeUnits: 0,
+  welcomeSinceMs: SINCE,
+  welcomeGranted: new Set<string>(),
+};
 
 describe("plan kontör hakkı: anahtarlar ve ay sınırı", () => {
   it("idempotency anahtarları sözleşmeye uyar", () => {
@@ -59,9 +72,30 @@ describe("hak verme kararı", () => {
     const d = decideGrants({ ...base, candidates: [cand()] });
     expect(d.grants).toEqual([{ tenantId: "t1", kind: "plan_monthly", units: 40, idempotencyKey: "plan:t1:2026-10" }]);
   });
-  it("deneme (trialing/trial) ofisi hak alır", () => {
-    const d = decideGrants({ ...base, candidates: [cand({ subscriptionStatus: "trialing", tenantStatus: "trial" })] });
-    expect(d.grants).toHaveLength(1);
+  it("deneme (trialing/trial) ofisi AYLIK plan hakkı almaz (yalnız active)", () => {
+    const d = decideGrants({
+      ...base,
+      candidates: [cand({ subscriptionStatus: "trialing", tenantStatus: "trial", extraSeats: 5 })],
+      planPerExtraSeat: { office: 6 },
+    });
+    expect(d.grants).toEqual([]);
+    expect(d.skipped).toEqual([{ tenantId: "t1", reason: "plan_hakki_yok" }]);
+  });
+  it("deneme ofisi hoş geldin kontörünü alır (yeni ofis); aylık hak ilk ödemeden (active) sonra", () => {
+    const trial = decideGrants({
+      ...base,
+      welcomeUnits: 10,
+      candidates: [cand({ subscriptionStatus: "trialing", tenantStatus: "trial" })],
+    });
+    expect(trial.grants).toEqual([{ tenantId: "t1", kind: "bonus", units: 10, idempotencyKey: "welcome:t1" }]);
+    const paid = decideGrants({
+      ...base,
+      welcomeUnits: 10,
+      welcomeGranted: new Set(["welcome:t1"]),
+      monthGranted: new Map(),
+      candidates: [cand()],
+    });
+    expect(paid.grants).toEqual([{ tenantId: "t1", kind: "plan_monthly", units: 40, idempotencyKey: "plan:t1:2026-10" }]);
   });
   it("past_due / askıda / iptal / duraklatılmış hak almaz", () => {
     const d = decideGrants({
@@ -94,6 +128,7 @@ describe("hak verme kararı", () => {
   });
   it("hoş geldin: açıkken tek sefer bonus, almışsa verilmez, 0 = kapalı", () => {
     const on = decideGrants({ ...base, welcomeUnits: 10, candidates: [cand()] });
+    expect(on.grants).toHaveLength(2);
     expect(on.grants.map((g) => g.kind)).toEqual(["plan_monthly", "bonus"]);
     expect(on.grants[1]).toMatchObject({ units: 10, idempotencyKey: "welcome:t1" });
     const taken = decideGrants({ ...base, welcomeUnits: 10, candidates: [cand()], welcomeGranted: new Set(["welcome:t1"]) });
@@ -131,5 +166,98 @@ describe("kullanıcı sayısıyla ölçeklenen aylık hak (Kurumsal)", () => {
   });
   it("satır metni ek kullanıcı hakkını yazar", () => {
     expect(efCreditsLine(400, 5, 6)).toBe("Aylık 400 kontör (yaklaşık 80 değerleme) + her ek kullanıcı için 6 kontör");
+  });
+});
+
+describe("hoş geldin geriye dönük dağıtılmaz", () => {
+  it("welcomeEligible: since sonrası/eşit evet; önce, tarih yok, ayar yok hayır", () => {
+    expect(welcomeEligible("2026-10-06T00:00:00Z", SINCE)).toBe(true);
+    expect(welcomeEligible("2026-10-05T23:59:59Z", SINCE)).toBe(false);
+    expect(welcomeEligible(null, SINCE)).toBe(false);
+    expect(welcomeEligible("2026-10-10T00:00:00Z", null)).toBe(false);
+    expect(welcomeEligible("bozuk", SINCE)).toBe(false);
+  });
+  it("mevcut (since öncesi) ofise toplu hibe yok; yeni ofis alır; ayar yoksa kimse almaz", () => {
+    const candidates = [
+      cand({ tenantId: "eski", plan: "enterprise", tenantCreatedAt: "2026-01-01T00:00:00Z" }),
+      cand({ tenantId: "yeni", plan: "enterprise", tenantCreatedAt: "2026-10-07T00:00:00Z" }),
+    ];
+    const d = decideGrants({ ...base, welcomeUnits: 10, candidates });
+    expect(d.grants.map((g) => g.tenantId)).toEqual(["yeni"]);
+    expect(d.skipped).toEqual([{ tenantId: "eski", reason: "plan_hakki_yok" }]);
+    const none = decideGrants({ ...base, welcomeUnits: 10, welcomeSinceMs: null, candidates });
+    expect(none.grants).toEqual([]);
+  });
+});
+
+describe("plan yükseltme farkı (aynı ay)", () => {
+  const withGranted = (granted: number, plan = "office", seats = 0) =>
+    decideGrants({ ...base, planMonthly: { office: 40, pro: 120 }, candidates: [cand({ plan, extraSeats: seats })], monthGranted: new Map([["t1", granted]]) });
+
+  it("yükseltmede güncel hak ile o ay verilen arasındaki pozitif fark, delta anahtarıyla", () => {
+    const d = withGranted(40, "pro");
+    expect(d.grants).toEqual([
+      { tenantId: "t1", kind: "plan_monthly", units: 80, idempotencyKey: "plan:t1:2026-10:delta:120", delta: true },
+    ]);
+    expect(planDeltaIdempotencyKey("t1", "2026-10", 120)).toBe("plan:t1:2026-10:delta:120");
+  });
+  it("ikinci yükseltme yalnız kalan farkı verir (toplam = taban + önceki deltalar)", () => {
+    const d = decideGrants({
+      ...base,
+      planMonthly: { business: 300 },
+      candidates: [cand({ plan: "business" })],
+      monthGranted: new Map([["t1", 120]]), // 40 + 80 verilmişti
+    });
+    expect(d.grants.map((g) => [g.units, g.idempotencyKey])).toEqual([[180, "plan:t1:2026-10:delta:300"]]);
+  });
+  it("çift koşu = sıfır ek hibe: hak == verilen toplam", () => {
+    expect(withGranted(40).grants).toEqual([]);
+  });
+  it("düşürmede (verilenden küçük hak) geri alma/hibe yok", () => {
+    expect(withGranted(120, "office").grants).toEqual([]);
+  });
+  it("ay içi yükselt-düşür-yükselt: yeni fark yok (toplam zaten karşılanmış)", () => {
+    expect(withGranted(120, "pro").grants).toEqual([]);
+  });
+  it("hiç verilmemişse tam aylık hibe (taban anahtar)", () => {
+    const d = decideGrants({ ...base, candidates: [cand()], monthGranted: new Map() });
+    expect(d.grants).toEqual([{ tenantId: "t1", kind: "plan_monthly", units: 40, idempotencyKey: "plan:t1:2026-10" }]);
+  });
+  it("extra_seats yok/0/negatif iken ek hak 0; ek kullanıcı gelince fark verilir", () => {
+    const per = { office: 6 };
+    const mk = (extraSeats: number | undefined, granted: number) =>
+      decideGrants({ ...base, planPerExtraSeat: per, candidates: [cand({ extraSeats })], monthGranted: new Map([["t1", granted]]) }).grants;
+    expect(mk(undefined, 40)).toEqual([]);
+    expect(mk(0, 40)).toEqual([]);
+    expect(mk(-4, 40)).toEqual([]);
+    expect(mk(5, 40)).toEqual([{ tenantId: "t1", kind: "plan_monthly", units: 30, idempotencyKey: "plan:t1:2026-10:delta:70", delta: true }]);
+  });
+  it("monthGranted yoksa (okunamadı) eski ön eleme: fark verilmez", () => {
+    const d = decideGrants({ ...base, planMonthly: { office: 120 }, candidates: [cand()], monthlyGranted: new Set(["plan:t1:2026-10"]) });
+    expect(d.grants).toEqual([]);
+  });
+});
+
+describe("plan kontörü devir tavanı (saf hesap = SQL ef_credit_expire_plan)", () => {
+  it("tavan = 3 aylık hak; hak yoksa 0", () => {
+    expect(planCarryCap(40)).toBe(120);
+    expect(planCarryCap(1000)).toBe(3000);
+    expect(planCarryCap(0)).toBe(0);
+    expect(planExpireIdempotencyKey("2026-10")).toBe("plan-expire:2026-10");
+  });
+  it("fazla düşer; tavan altında düşmez", () => {
+    // 5 ay biriktirmiş (200 verilmiş, 0 harcanmış): 120 kalır, 80 düşer.
+    expect(planExpiryAmount({ available: 200, planGranted: 200, usageSpent: 0, expired: 0, keep: 120 })).toBe(80);
+    expect(planExpiryAmount({ available: 100, planGranted: 100, usageSpent: 0, expired: 0, keep: 120 })).toBe(0);
+  });
+  it("harcama önce plan kontöründen sayılır; paket kontörü (available - planKalan) düşmez", () => {
+    // plan 200, 50 harcama -> plan kalan 150; paket 500 ayrıca: available 650. keep 120 -> 30 düşer, paket 500 korunur.
+    expect(planExpiryAmount({ available: 650, planGranted: 200, usageSpent: 50, expired: 0, keep: 120 })).toBe(30);
+  });
+  it("daha önce düşülen sayılır (ikinci hesap 0); available planKalan'ı aşamaz (açık rezerv)", () => {
+    expect(planExpiryAmount({ available: 120, planGranted: 200, usageSpent: 0, expired: 80, keep: 120 })).toBe(0);
+    // 100 kontör rezervde: available 50 -> planKalan 50 (negatif bakiye yok), tavan 120 altında.
+    expect(planExpiryAmount({ available: 50, planGranted: 150, usageSpent: 0, expired: 0, keep: 120 })).toBe(0);
+    expect(planExpiryAmount({ available: -5, planGranted: 150, usageSpent: 0, expired: 0, keep: 0 })).toBe(0);
   });
 });

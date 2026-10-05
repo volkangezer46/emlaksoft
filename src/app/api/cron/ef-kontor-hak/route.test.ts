@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 type Sub = { tenant_id: string; plan: string; status: string; extra_seats?: number };
@@ -8,9 +8,12 @@ const state = {
   tenants: {} as Record<string, string>,
   disabled: new Map<string, Set<string>>(),
   settings: {} as Record<string, string | null>,
-  ledgerKeys: [] as string[],
-  alreadyKeys: new Set<string>(),
+  created: {} as Record<string, string>,
+  /** Defter satırları (grant RPC'si ekler; ön eleme ve ay toplamı buradan okunur). */
+  ledger: [] as { tenant_id: string; amount: number; idempotency_key: string }[],
   grants: [] as { p_tenant: string; p_units: number; p_kind: string; p_idem: string }[],
+  expires: [] as { p_tenant: string; p_keep: number; p_idem: string }[],
+  expireResult: { ok: true, already: false, expired: 0, available: 0 } as { ok: boolean; already: boolean; expired: number; available: number } | "error",
   statusFilter: [] as string[],
   heartbeat: [] as { status: string; detail?: string }[],
 };
@@ -30,30 +33,42 @@ vi.mock("@/lib/modules/state", () => ({
 }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
-    rpc: async (name: string, args?: { p_tenant: string; p_units: number; p_kind: string; p_idem: string }) => {
+    rpc: async (name: string, args?: { p_tenant: string; p_units: number; p_kind: string; p_idem: string; p_keep?: number }) => {
       if (name === "ef_credit_ready") {
         return state.ready === "error" ? { data: null, error: { message: "function does not exist" } } : { data: state.ready, error: null };
       }
       if (name === "ef_credit_grant" && args) {
-        const already = state.alreadyKeys.has(args.p_idem);
+        const key = `ef:grant:${args.p_tenant}:${args.p_idem}`;
+        const already = state.ledger.some((r) => r.idempotency_key === key);
         if (!already) {
-          state.alreadyKeys.add(args.p_idem);
+          state.ledger.push({ tenant_id: args.p_tenant, amount: args.p_units, idempotency_key: key });
           state.grants.push(args);
         }
         return { data: { ok: true, already, available: 0 }, error: null };
+      }
+      if (name === "ef_credit_expire_plan" && args) {
+        state.expires.push(args as unknown as { p_tenant: string; p_keep: number; p_idem: string });
+        if (state.expireResult === "error") return { data: null, error: { message: "function does not exist" } };
+        return { data: state.expireResult, error: null };
       }
       return { data: null, error: { message: "unknown rpc" } };
     },
     from: (table: string) => {
       const q = {
         select: () => q,
+        eq: () => q,
+        like: () => q,
         in: (col: string, values: string[]) => {
           if (table === "subscriptions" && col === "status") state.statusFilter = values;
           if (table === "tenants") {
-            return Promise.resolve({ data: values.filter((v) => state.tenants[v]).map((id) => ({ id, status: state.tenants[id] })), error: null });
+            return Promise.resolve({
+              data: values.filter((v) => state.tenants[v]).map((id) => ({ id, status: state.tenants[id], created_at: state.created[id] ?? "2026-10-10T09:00:00Z" })),
+              error: null,
+            });
           }
           if (table === "account_credit_ledger") {
-            return Promise.resolve({ data: state.ledgerKeys.filter((k) => values.includes(k)).map((k) => ({ idempotency_key: k })), error: null });
+            if (col === "tenant_id") return Promise.resolve({ data: state.ledger.filter((r) => values.includes(r.tenant_id)), error: null });
+            return Promise.resolve({ data: state.ledger.filter((r) => values.includes(r.idempotency_key)), error: null });
           }
           return q;
         },
@@ -77,12 +92,21 @@ beforeEach(() => {
   state.subs = [];
   state.tenants = {};
   state.disabled = new Map();
-  state.settings = { "ef.welcome_units": "0" };
-  state.ledgerKeys = [];
-  state.alreadyKeys = new Set();
+  state.settings = { "ef.welcome_units": "0", "ef.welcome_since": "2026-10-06T00:00:00Z" };
+  state.created = {};
+  state.ledger = [];
   state.grants = [];
+  state.expires = [];
+  state.expireResult = { ok: true, already: false, expired: 0, available: 0 };
+  // Ayın 10'u (devir tavanı penceresi dışı); tavan testleri tarihi 2'ye çeker.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-10T09:00:00Z"));
   state.statusFilter = [];
   state.heartbeat = [];
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("cron ef-kontor-hak", () => {
@@ -104,7 +128,7 @@ describe("cron ef-kontor-hak", () => {
     expect(state.heartbeat.at(-1)).toEqual({ status: "ok", detail: "atlandı: cüzdan hazır değil" });
   });
 
-  it("planın aylık hakkını TR ay anahtarıyla verir; aboneliği yalnız trialing/active olanlardan sorgular", async () => {
+  it("planın aylık hakkını TR ay anahtarıyla verir (yalnız active); deneme aylık hak almaz; aboneliği trialing/active olanlardan sorgular", async () => {
     state.subs = [
       { tenant_id: "t1", plan: "office", status: "active" },
       { tenant_id: "t2", plan: "advisor", status: "trialing" },
@@ -118,12 +142,11 @@ describe("cron ef-kontor-hak", () => {
     const key = /^plan:(t\d):(\d{4}-\d{2})$/;
     expect(state.grants.map((g) => [g.p_tenant, g.p_units, g.p_kind]).sort()).toEqual([
       ["t1", 40, "plan_monthly"],
-      ["t2", 10, "plan_monthly"],
       // Kurumsal: 400 + 100 ek kullanıcı x 6
       ["t4", 1000, "plan_monthly"],
     ]);
     for (const g of state.grants) expect(g.p_idem).toMatch(key);
-    expect(body).toMatchObject({ offices: 3, units: 1050, grants: 3, failed: 0 });
+    expect(body).toMatchObject({ offices: 2, units: 1040, grants: 2, failed: 0 });
   });
 
   it("aynı gün/ay ikinci çalıştırma çift hibe üretmez (idempotent)", async () => {
@@ -152,11 +175,11 @@ describe("cron ef-kontor-hak", () => {
     // Plan kontör hakkı olmayan (kataloğa girmeyen eski) paket de hoş geldin alır.
     state.subs = [{ tenant_id: "t4", plan: "legacy", status: "active" }];
     state.tenants = { t4: "active" };
-    state.settings = { "ef.welcome_units": "0" };
+    state.settings = { "ef.welcome_units": "0", "ef.welcome_since": "2026-10-06T00:00:00Z" };
     await GET(req("Bearer s3cret"));
     expect(state.grants).toEqual([]);
 
-    state.settings = { "ef.welcome_units": "10" };
+    state.settings = { "ef.welcome_units": "10", "ef.welcome_since": "2026-10-06T00:00:00Z" };
     await GET(req("Bearer s3cret"));
     expect(state.grants).toEqual([{ p_tenant: "t4", p_units: 10, p_kind: "bonus", p_idem: "welcome:t4", p_meta: expect.anything() }].map((g) => expect.objectContaining(g)));
     await GET(req("Bearer s3cret"));
@@ -166,9 +189,72 @@ describe("cron ef-kontor-hak", () => {
   it("deftere yazılmış anahtar ön elemeyle atlanır", async () => {
     state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
     state.tenants = { t1: "active" };
-    state.settings = { "ef.welcome_units": "10" };
-    state.ledgerKeys = ["welcome:t1"];
+    state.settings = { "ef.welcome_units": "10", "ef.welcome_since": "2026-10-06T00:00:00Z" };
+    state.ledger = [{ tenant_id: "t1", amount: 10, idempotency_key: "ef:grant:t1:welcome:t1" }];
     await GET(req("Bearer s3cret"));
     expect(state.grants.map((g) => g.p_kind)).toEqual(["plan_monthly"]);
+  });
+
+  it("aynı ay plan yükseltmede yalnız pozitif fark (delta anahtarı), tekrar koşuda ek hibe yok", async () => {
+    state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
+    state.tenants = { t1: "active" };
+    await GET(req("Bearer s3cret"));
+    state.subs = [{ tenant_id: "t1", plan: "enterprise", status: "active", extra_seats: 0 }]; // yükseltme: 400
+    await GET(req("Bearer s3cret"));
+    await GET(req("Bearer s3cret"));
+    expect(state.grants.map((g) => [g.p_units, g.p_idem])).toEqual([
+      [40, expect.stringMatching(/^plan:t1:\d{4}-\d{2}$/)],
+      [360, expect.stringMatching(/^plan:t1:\d{4}-\d{2}:delta:400$/)],
+    ]);
+  });
+
+  it("deneme (trialing) ofisi yalnız hoş geldin alır, aylık plan hakkı almaz", async () => {
+    state.subs = [{ tenant_id: "t2", plan: "office", status: "trialing", extra_seats: 4 }];
+    state.tenants = { t2: "trial" };
+    state.settings = { "ef.welcome_units": "10", "ef.welcome_since": "2026-10-06T00:00:00Z" };
+    await GET(req("Bearer s3cret"));
+    expect(state.grants.map((g) => [g.p_kind, g.p_idem])).toEqual([["bonus", "welcome:t2"]]);
+  });
+
+  it("hoş geldin geriye dönük dağıtılmaz: since öncesi ofise ve ayar yokken hiç ofise grant yok", async () => {
+    state.subs = [{ tenant_id: "eski", plan: "legacy", status: "active" }];
+    state.tenants = { eski: "active" };
+    state.created = { eski: "2026-01-01T00:00:00Z" };
+    state.settings = { "ef.welcome_units": "10", "ef.welcome_since": "2026-10-06T00:00:00Z" };
+    await GET(req("Bearer s3cret"));
+    state.settings = { "ef.welcome_units": "10" };
+    state.created = { eski: "2026-10-09T00:00:00Z" };
+    await GET(req("Bearer s3cret"));
+    expect(state.grants).toEqual([]);
+  });
+
+  it("devir tavanı: ayın ilk günlerinde active ofis için 3 aylık hak ile çağrılır; deneme/ay ortası çağrılmaz; hata cron'u düşürmez", async () => {
+    state.subs = [
+      { tenant_id: "t1", plan: "office", status: "active" },
+      { tenant_id: "t2", plan: "office", status: "trialing" },
+    ];
+    state.tenants = { t1: "active", t2: "trial" };
+    await GET(req("Bearer s3cret"));
+    expect(state.expires).toEqual([]); // 10. gün: pencere dışı
+
+    vi.setSystemTime(new Date("2026-10-02T09:00:00Z"));
+    state.expireResult = "error";
+    const res = await GET(req("Bearer s3cret"));
+    expect(res.status).toBe(200);
+    expect(state.expires).toEqual([{ p_tenant: "t1", p_keep: 120, p_idem: "plan-expire:2026-10" }]);
+    expect(await res.json()).toMatchObject({ ok: true, expireFailed: 1, expiredUnits: 0 });
+
+    state.expireResult = { ok: true, already: false, expired: 80, available: 120 };
+    const ok = await GET(req("Bearer s3cret"));
+    expect(await ok.json()).toMatchObject({ expiredUnits: 80, expireFailed: 0 });
+  });
+
+  it("devir tavanı: defterde ay anahtarı varsa RPC çağrılmaz", async () => {
+    vi.setSystemTime(new Date("2026-10-02T09:00:00Z"));
+    state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
+    state.tenants = { t1: "active" };
+    state.ledger = [{ tenant_id: "t1", amount: -80, idempotency_key: "ef:expire:t1:plan-expire:2026-10" }];
+    await GET(req("Bearer s3cret"));
+    expect(state.expires).toEqual([]);
   });
 });
