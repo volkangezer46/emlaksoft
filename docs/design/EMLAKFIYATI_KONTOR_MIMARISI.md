@@ -50,6 +50,15 @@ Mevcut `account_credit_ledger` (append-only, tenant_id, RLS; AI kredi ve değerl
 
 ## 5. Sunucu-sunucu sözleşmesi (EmlakSoft → EmlakFiyati)
 
+> **GÜNCELLEME (2026-10-05): EmlakFiyati ekibinin BİLDİRDİĞİ GERÇEK SÖZLEŞME aşağıdaki öneriyi geçersiz kılar.** Kesin olanlar:
+> kimlik yalnız `Authorization: Bearer ek_live_...` (başka başlık yok; `X-ES-Signature`/HMAC imzası, `X-ES-Timestamp`, `X-ES-Tenant-Ref`, `X-ES-Max-Units`
+> **kullanılmaz**); ortak uçlar (`/api/ortak/v1/degerleme`, `/api/ortak/v1/rapor/:id.pdf`) için zorunlu başlıklar `X-Ortak-Kullanici-Ref` (takma ref, 8-64
+> karakter, `[A-Za-z0-9_.:-]`) ve `Idempotency-Key`; hız sınırı anahtar başına dk'da 120, aşılınca 429 `{"hata":"istek siniri asildi"}` ve **Retry-After yok**;
+> kontörü EmlakSoft düşer, EmlakFiyati aylık kullanım dökümü (mutabakat) verir. Ortak uçlar **henüz yok** (yazılıyor): yol/şema/PDF sunumu/yanıtta birim bilgisi
+> bekleniyor. `/api/parsel/rapor?format=pdf` kullanıcı ürününde KULLANILMAZ. Aşağıdaki §5 başlık tablosu yalnız **tarihsel öneridir**; §3 akışı (rezerve → üret →
+> kesinleştir), §4 cüzdan modeli ve §7 mutabakat ilkeleri geçerli kalır, ama imza/zaman damgası/`X-EF-Units` gibi alanlar EmlakFiyati teyit etmeden uygulanmaz.
+> `X-EF-Units` (yanıtta gerçek tüketim) ve kullanım olayları ucu için **doğrulanmadı**: EmlakFiyati'na sorulacak.
+
 Her istek:
 ```
 Authorization: Bearer <EMLAKFIYATI_API_KEY>            # mevcut servis anahtarı (ortam başına ayrı)
