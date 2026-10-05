@@ -14,7 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, msUntil, now } from "@/lib/clock";
+import { DAY_MS, msSince, msUntil, now } from "@/lib/clock";
 import { planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
 import { getPlanDefinition, getPublicPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { getSeatSupport, loadSeatState, type SeatUsageSummary } from "@/lib/billing/seat-purchase";
@@ -27,6 +27,8 @@ import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
 import { CancelPanel } from "./cancel-panel";
+import { KontorSection } from "./kontor-section";
+import { loadLatestPackInvoice } from "@/lib/ef-credits/credit-reader";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -46,11 +48,11 @@ const statusLabel: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string }>;
+  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string; kalem?: string; kullanici?: string; sayfa?: string }>;
 }) {
   const auth = await requireModulePage("billing");
   const sp = await searchParams;
-  const active = resolveTab(sp, ["plan", "faturalar", "iptal"], "plan");
+  const active = resolveTab(sp, ["plan", "kontor", "faturalar", "iptal"], "plan");
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
@@ -104,6 +106,9 @@ export default async function BillingPage({
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
+  // Kontör paketi ödemesi sonrası dönüş mesajı: son kontör faturası yeniyse plan mesajı yerine kontör mesajı.
+  const packInvoice = tenantId && (sp.paid || active === "kontor") ? await loadLatestPackInvoice(supabase, tenantId) : null;
+  const packInvoiceRecent = Boolean(packInvoice && msSince(packInvoice.paidAt ?? packInvoice.createdAt) < 15 * 60_000);
 
   // Dönem sonu iptal (K5): kolonlar henüz yoksa sorgu hata verir ve iptal sekmesi gizlenir.
   const { data: cancelRow, error: cancelColError } = tenantId
@@ -121,6 +126,7 @@ export default async function BillingPage({
   const canCancel = auth.role === "owner" || auth.role === "gm";
   const tabs: DetailTabDef[] = [
     { id: "plan", label: "Plan ve kullanım" },
+    { id: "kontor", label: "Kontör" },
     { id: "faturalar", label: "Faturalar" },
     { id: "iptal", label: "İptal", hidden: !cancelSupported },
   ];
@@ -203,7 +209,7 @@ export default async function BillingPage({
         <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-mint-700">
           <span className="inline-flex items-center gap-2">
             <Check className="h-4 w-4" />
-            Ödeme alındı{sp.demo ? " (demo)" : ""}. {sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
+            Ödeme alındı{sp.demo ? " (demo)" : ""}. {packInvoiceRecent && packInvoice?.status === "paid" ? "Kontör paketiniz bakiyenize eklenir (Kontör sekmesinden görebilirsiniz)." : sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
           </span>
         </div>
       ) : null}
@@ -251,6 +257,19 @@ export default async function BillingPage({
             <CancelPanel canCancel={canCancel} pendingCancel={pendingCancel} endsAtLabel={periodEndLabel} />
           </div>
         </section>
+      ) : null}
+
+      {active === "kontor" && tenantId ? (
+        <KontorSection
+          tenantId={tenantId}
+          canBuy={isSeatOwner}
+          iyzicoConfigured={configured}
+          kalem={sp.kalem}
+          kullanici={sp.kullanici}
+          sayfa={sp.sayfa}
+          latestInvoice={packInvoice}
+          invoiceIsRecent={packInvoiceRecent}
+        />
       ) : null}
 
       {active === "plan" ? (
