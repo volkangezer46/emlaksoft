@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **432** (222 dosya) — risk: P0=12, P1=40, P2=380
-- Tenant filtresi: var=255, uygulanamaz=93, yok=67, param=14, devir=3
-- Kapı türü: public-token=35, dosya-duzeyi=99, platform=84, oturum-izin=80, belirsiz=95, elle-dogrulandi=12, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **70**; RLS'li client'a taşıma adayı: **66**
+- Toplam birim: **435** (225 dosya) — risk: P0=12, P1=40, P2=383
+- Tenant filtresi: var=255, uygulanamaz=93, yok=67, param=14, devir=6
+- Kapı türü: public-token=35, dosya-duzeyi=99, platform=87, oturum-izin=80, belirsiz=95, elle-dogrulandi=12, cron=24, webhook-imza=3
+- Filtresiz (yok+devir): **73**; RLS'li client'a taşıma adayı: **66**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -263,7 +263,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/bildirimler/page.tsx:57` | `AdminNotificationsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/billing/faturalar/[id]/page.tsx:28` | `InvoiceDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/billing/kuponlar/page.tsx:18` | `CouponsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/admin/billing/page.tsx:89` | `AdminBillingPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/billing/page.tsx:91` | `AdminBillingPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/billing/planlar/page.tsx:48` | `PlansAdminPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
 | `src/app/admin/duyuru/page.tsx:40` | `BroadcastPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/geo/[provinceId]/page.tsx:33` | `AdminGeoProvincePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
@@ -272,12 +272,15 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/hatalar/errors-view.tsx:94` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/[id]/page.tsx:66` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/page.tsx:70` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/muhasebe/defter/page.tsx:44` | `FaturaDefteriPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
+| `src/app/admin/muhasebe/disa-aktar/route.ts:38` | `GET` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
+| `src/app/admin/muhasebe/page.tsx:45` | `MuhasebePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
 | `src/app/admin/page.tsx:55` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/admin/raporlar/page.tsx:45` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/satis/[id]/page.tsx:24` | `AdminLeadDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/satis/page.tsx:50` | `AdminSalesPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/sistem/system-view.tsx:76` | `SystemView` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/tenants/[id]/page.tsx:97` | `AdminTenantDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/tenants/[id]/page.tsx:98` | `AdminTenantDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tenants/page.tsx:68` | `AdminTenantsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/[id]/page.tsx:139` | `AdminTicketDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/tickets/makrolar/page.tsx:10` | `MacrosPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |

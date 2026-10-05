@@ -1,9 +1,11 @@
-import Link from "next/link";
-import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
+﻿import Link from "next/link";
+import { Activity, AlertTriangle, ArrowUpRight, CreditCard, Download, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { orIlike } from "@/lib/pgrst";
-import { exportInvoicesCsv, exportSubscriptionsCsv } from "@/app/actions/platform-export";
+import { exportSubscriptionsCsv } from "@/app/actions/platform-export";
+import { ACCOUNTING_EXPORT_PATH } from "@/lib/accounting/csv";
+import { loadPlatformMrr } from "@/lib/accounting/loaders";
 import { ExportButton } from "@/components/admin/export-button";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
@@ -147,7 +149,9 @@ export default async function AdminBillingPage({
   const invRows = invoices ?? [];
   const reconciliationRows = captureQueue ?? [];
   const reconciliationCount = captureQueueCount ?? reconciliationRows.length;
-  const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
+  // MRR: tek hesap (reporting/platform exactMrr; panel ve raporlarla aynı). RPC okunamazsa eski yaklaşık toplam.
+  const platformMrr = await loadPlatformMrr(admin, clockNow()).catch(() => null);
+  const mrr = platformMrr?.mrr ?? subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
@@ -538,7 +542,13 @@ export default async function AdminBillingPage({
               {invCount ?? 0}
             </span>
           </h2>
-          <ExportButton action={exportInvoicesCsv} label="Faturaları indir" variant="light" />
+          {/* Dosya indirme (route handler): sayfa gezintisi değil, Link ile önceden yüklenmemeli. */}
+          <a
+            href={`${ACCOUNTING_EXPORT_PATH}?donem=tumu`}
+            className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
+          >
+            <Download className="h-3.5 w-3.5" /> Muhasebeci CSV (tüm faturalar)
+          </a>
         </div>
         {invRows.length === 0 ? (
           <AdminEmpty
