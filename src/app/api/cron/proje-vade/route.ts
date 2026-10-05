@@ -4,12 +4,10 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { logActivity } from "@/lib/activity";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { authorizeCron } from "@/lib/cron-auth";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /**
  * Proje ödeme planı vade cron'u — günlük çalışacak şekilde idempotent:
@@ -27,7 +25,8 @@ function authorized(req: NextRequest) {
  * (CRON_SECRET Bearer başlığıyla çağrılır).
  */
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);

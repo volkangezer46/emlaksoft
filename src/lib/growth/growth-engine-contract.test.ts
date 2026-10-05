@@ -266,8 +266,9 @@ describe("kancalar: güvenli, ödemeyi/iadeyi/kaydı bozmaz", () => {
 describe("cron: growth-claims", () => {
   const route = read("src/app/api/cron/growth-claims/route.ts");
   it("CRON_SECRET Bearer + heartbeat + mevcut allowlist'li istemci (yeni createAdminClient yok)", () => {
-    expect(route).toContain("process.env.CRON_SECRET");
-    expect(route).toContain('`Bearer ${secret}`');
+    expect(route).toMatch(/authorizeCron|CRON_SECRET/);
+    // Bearer doğrulaması ortak kapıdadır (authorizeCron -> cron-auth.ts).
+    expect(route.includes("authorizeCron(") ? read("src/lib/cron-auth.ts") : route).toMatch(/Bearer \$\{(secret|expected)\}/);
     expect(route).toContain('recordHeartbeat("growth-claims"');
     expect(route).toContain("runBillingReconciliation(0, \"growth_claims\")");
     expect(route).not.toContain("=> processClaims");

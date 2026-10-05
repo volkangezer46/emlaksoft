@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { authorizeCron } from "@/lib/cron-auth";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
+
+/** Çok ofisli toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
+export const maxDuration = 300;
 
 /**
  * Aylık bölge istatistik fotoğrafı cron'u.
@@ -35,14 +40,9 @@ const TX_VARIANTS: Array<{ filter: string | null; label: "Tümü" | "Satılık" 
   { filter: "Kiralık", label: "Kiralık" },
 ];
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
 
@@ -50,23 +50,35 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
 
-  const { data: tenants, error: tenantsError } = await admin
-    .from("tenants")
-    .select("id")
-    .in("status", ["active", "trial", "past_due"])
-    .limit(500);
+  const deadline = cronDeadline(Date.now());
+  // order(id) + range sayfalama (sırasız .limit(500) yok).
+  const { rows: tenants, error: tenantsError } = await fetchAllPaged<{ id: string }>((from, to) =>
+    admin
+      .from("tenants")
+      .select("id")
+      .in("status", ["active", "trial", "past_due"])
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
-  if (tenantsError) {
-    await recordHeartbeat("bolge-snapshot", "error", `tenant listesi okunamadı: ${tenantsError.message}`);
-    return NextResponse.json({ error: "db", detail: tenantsError.message }, { status: 500 });
+  if (tenantsError && tenants.length === 0) {
+    await recordHeartbeat("bolge-snapshot", "error", `tenant listesi okunamadı: ${tenantsError}`);
+    return NextResponse.json({ error: "db", detail: tenantsError }, { status: 500 });
   }
 
   const disabledModules = await getDisabledModulesByTenant(admin);
   let upserted = 0;
   let failed = 0;
   let tenantsWithData = 0;
+  let processed = 0;
+  let timedOut = false;
 
-  for (const t of tenants ?? []) {
+  for (const t of tenants) {
+    if (isPastDeadline(Date.now(), deadline)) {
+      timedOut = true;
+      break;
+    }
+    processed += 1;
     if (isDisabledFor(disabledModules, String(t.id), "reports")) continue;
     // Üç varyant birbirinden bağımsız — paralel çekilebilir
     const results = await Promise.all(
@@ -110,13 +122,21 @@ export async function GET(req: NextRequest) {
     tenantsWithData += 1;
   }
 
-  const detail = `${period}: ${tenantsWithData} ofis, ${upserted} satır${failed ? `, ${failed} hata` : ""}${skippedTenantsNote(disabledModules, "reports")}`;
-  await recordHeartbeat("bolge-snapshot", failed > 0 ? "error" : "ok", detail);
+  const hb = heartbeatFor({
+    total: tenants.length,
+    processed,
+    failed,
+    timedOut,
+    listError: tenantsError,
+    summary: `${period}: ${tenantsWithData} ofis, ${upserted} satır${skippedTenantsNote(disabledModules, "reports")}`,
+  });
+  await recordHeartbeat("bolge-snapshot", hb.status, hb.detail);
 
   return NextResponse.json({
-    ok: failed === 0,
+    ok: hb.status === "ok",
     period,
-    tenants: tenants?.length ?? 0,
+    remaining: remainingOf({ total: tenants.length, processed }),
+    tenants: tenants.length,
     tenantsWithData,
     upserted,
     failed,

@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret && req.headers.get("authorization") === `Bearer ${secret}`);
-}
 
 /**
  * EmlakFiyati kontör rezerv süpürmesi (10 dakikada bir): 15 dakikadan eski AÇIK rezervleri `ef_credit_sweep()` ile serbest
@@ -17,12 +13,8 @@ function authorized(req: NextRequest): boolean {
  * (yeni createAdminClient kullanımı yok).
  */
 export async function GET(req: NextRequest) {
-  if (!process.env.CRON_SECRET?.trim()) {
-    return NextResponse.json({ ok: false, error: "cron_not_configured" }, { status: 503 });
-  }
-  if (!authorized(req)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const result = await runBillingReconciliation(0, "ef_sweep");

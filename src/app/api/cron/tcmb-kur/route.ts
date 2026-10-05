@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTcmbRate, fetchLatestTcmbRate } from "@/lib/tcmb";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { authorizeCron } from "@/lib/cron-auth";
+
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /**
  * TCMB günlük kur çekme cron'u.
@@ -16,14 +20,9 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
  *    Zaten kayıtlı günler tekrar çekilmez — kotayı boşa harcamaz.
  */
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const backfillParam = req.nextUrl.searchParams.get("backfill");

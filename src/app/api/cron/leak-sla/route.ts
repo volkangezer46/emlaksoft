@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { authorizeCron } from "@/lib/cron-auth";
+import { cronDeadline, heartbeatFor, isPastDeadline } from "@/lib/cron-run";
+import { insertNotificationsDetailed } from "@/lib/notify-batch";
+import { buildDedupeKey } from "@/lib/notify-dedupe";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+/** Toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
+export const maxDuration = 300;
 
 function leakSeverity(dealAmount: number | null, daysOpen: number): "low" | "medium" | "high" | "critical" {
   const amount = dealAmount ?? 0;
@@ -32,7 +33,8 @@ type ClosureRow = {
 
 /** Proaktif kayıp-kaçak: deal olmadan kapanmış + uyarısı gitmemiş + SLA aşımı → bildir */
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = Date.now();
@@ -46,6 +48,8 @@ export async function GET(req: NextRequest) {
     .is("sla_warning_sent_at", null)
     .not("deal_happened", "is", true)
     .lt("created_at", sla7)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
     .limit(500);
 
   if (error) {
@@ -56,7 +60,16 @@ export async function GET(req: NextRequest) {
   // Modül kapısı: "Kaçan komisyonlar" (ya da bağlı olduğu Portal Kontrol) kapalı ofis için uyarı üretilmez.
   const disabledModules = await getDisabledModulesByTenant(admin);
   let sent = 0;
+  let failed = 0;
+  let processed = 0;
+  let timedOut = false;
+  const deadline = cronDeadline(now);
   for (const c of (closures ?? []) as ClosureRow[]) {
+    if (isPastDeadline(Date.now(), deadline)) {
+      timedOut = true;
+      break;
+    }
+    processed += 1;
     if (isDisabledFor(disabledModules, c.tenant_id, "leak")) continue;
     const daysOpen = Math.floor((now - new Date(c.created_at).getTime()) / 86_400_000);
     const amount = c.estimated_lost_commission != null ? Number(c.estimated_lost_commission) : c.deal_amount != null ? Number(c.deal_amount) : null;
@@ -70,23 +83,45 @@ export async function GET(req: NextRequest) {
 
     const body = `${propCode}${title ? ` · ${title}` : ""} · ${daysOpen} gün sonuçsuz · ${severity}`;
 
-    await admin.from("notifications").insert({
-      tenant_id: c.tenant_id,
-      title: "Kayıp-kaçak SLA uyarısı",
-      body,
-      href: "/app/kayip-kacak",
-      kind: severity === "critical" ? "danger" : severity === "high" ? "warning" : "info",
-    });
+    // SIRA: önce bildirim, BAŞARILIYSA işaretle. Bildirim yazılamadıysa sla_warning_sent_at yazılmaz (sonraki turda
+    // yeniden denenir). dedupe_key kapanış başına tektir: bildirim yazılıp işaretleme düşerse sonraki tur "zaten var"
+    // (duplicates) görür, tekrar bildirim üretmeden yalnız işaretler.
+    const ins = await insertNotificationsDetailed(admin, [
+      {
+        tenant_id: c.tenant_id,
+        title: "Kayıp-kaçak SLA uyarısı",
+        body,
+        href: "/app/kayip-kacak",
+        kind: severity === "critical" ? "danger" : severity === "high" ? "warning" : "info",
+        dedupe_key: buildDedupeKey("leak-sla", c.id),
+      },
+    ]);
+    if (ins.failed > 0 || ins.written + ins.duplicates === 0) {
+      failed += 1;
+      continue;
+    }
 
-    await admin
+    const { error: markError } = await admin
       .from("listing_closures")
       .update({ sla_warning_sent_at: new Date().toISOString(), leak_severity: severity })
       .eq("id", c.id);
+    if (markError) {
+      console.error("leak-sla işaretleme", markError.message);
+      failed += 1;
+      continue;
+    }
 
     sent += 1;
   }
 
-  await recordHeartbeat("leak-sla", "ok", `${sent} SLA uyarısı${skippedTenantsNote(disabledModules, "leak")}`);
+  const hb = heartbeatFor({
+    total: (closures ?? []).length,
+    processed: processed,
+    failed,
+    timedOut,
+    summary: `${sent} SLA uyarısı${skippedTenantsNote(disabledModules, "leak")}`,
+  });
+  await recordHeartbeat("leak-sla", hb.status, hb.detail);
 
-  return NextResponse.json({ ok: true, sent });
+  return NextResponse.json({ ok: hb.status === "ok", sent, failed });
 }

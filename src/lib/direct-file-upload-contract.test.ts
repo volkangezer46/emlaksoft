@@ -75,7 +75,7 @@ describe("customer/property signed direct upload production contract", () => {
     expect(cleanup).toContain('.lte("cleanup_after", nowIso)');
     expect(cleanup).toContain("enqueueStorageDeletion({");
     expect(cleanup).not.toContain(".remove(");
-    expect(cleanupRoute).toContain("CRON_SECRET");
+    expect(cleanupRoute).toMatch(/authorizeCron|CRON_SECRET/);
     expect(cleanupRoute).toContain('recordHeartbeat("direct-file-upload-cleanup"');
   });
 

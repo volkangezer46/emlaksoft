@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+import { authorizeCron } from "@/lib/cron-auth";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
 
 function wantsDigest(prefs: unknown) {
   if (!prefs || typeof prefs !== "object") return true;
@@ -19,23 +15,38 @@ function wantsDigest(prefs: unknown) {
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
   const since = dayStart.toISOString();
 
-  const { data: tenants } = await admin
-    .from("tenants")
-    .select("id, name")
-    .in("status", ["active", "trial", "past_due"])
-    .limit(500);
+  const startedAt = Date.now();
+  const deadline = cronDeadline(startedAt);
+  // order(id) + range sayfalama (sırasız .limit(500) yok): 500+ ofis sessizce atlanmaz.
+  const { rows: tenants, error: tenantsError } = await fetchAllPaged<{ id: string; name: string }>((from, to) =>
+    admin
+      .from("tenants")
+      .select("id, name")
+      .in("status", ["active", "trial", "past_due"])
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   let sent = 0;
   let skippedPrefs = 0;
+  let processed = 0;
+  let failed = 0;
+  let timedOut = false;
 
-  for (const t of tenants ?? []) {
+  for (const t of tenants) {
+    if (isPastDeadline(Date.now(), deadline)) {
+      timedOut = true;
+      break;
+    }
+    processed += 1;
     const [{ count: newCustomers }, { count: newDeals }, { count: overduePortals }, { data: profiles }] =
       await Promise.all([
         admin
@@ -91,11 +102,20 @@ export async function GET(req: NextRequest) {
 
     if (rows.length > 0) {
       const { error } = await admin.from("notifications").insert(rows);
-      if (!error) sent += rows.length;
+      if (error) failed += 1;
+      else sent += rows.length;
     }
   }
 
-  await recordHeartbeat("gunluk-ozet", "ok", `${sent} özet gönderildi`);
+  const hb = heartbeatFor({
+    total: tenants.length,
+    processed,
+    failed,
+    timedOut,
+    listError: tenantsError,
+    summary: `${sent} özet gönderildi`,
+  });
+  await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 
-  return NextResponse.json({ ok: true, sent, skippedPrefs });
+  return NextResponse.json({ ok: hb.status === "ok", sent, skippedPrefs, failed, remaining: remainingOf({ total: tenants.length, processed }) });
 }

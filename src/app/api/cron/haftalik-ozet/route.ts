@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { authorizeCron } from "@/lib/cron-auth";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
 
 /**
  * Haftalık yönetici özeti — her aktif tenant için GEÇEN haftanın (Pzt–Paz)
@@ -16,12 +18,6 @@ import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@
  *    scripts/check-link-contracts.ts ALLOWLIST'ine şu girişin eklenmesi
  *    gerekir: "/app/raporlar::hafta": "dedupe marker — haftalik-ozet cron".
  */
-
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 function wantsDigest(prefs: unknown) {
   if (!prefs || typeof prefs !== "object") return true;
@@ -50,7 +46,8 @@ const compactTry = new Intl.NumberFormat("tr-TR", {
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
 
@@ -68,19 +65,32 @@ export async function GET(req: NextRequest) {
   const { year, week } = isoWeek(weekStart);
   const markerHref = `/app/raporlar?hafta=${year}-${String(week).padStart(2, "0")}`;
 
-  const { data: tenants } = await admin
-    .from("tenants")
-    .select("id, name")
-    .in("status", ["active", "trial", "past_due"])
-    .limit(500);
+  const deadline = cronDeadline(Date.now());
+  // order(id) + range sayfalama (sırasız .limit(500) yok): 500+ ofis sessizce atlanmaz.
+  const { rows: tenants, error: tenantsError } = await fetchAllPaged<{ id: string; name: string }>((from, to) =>
+    admin
+      .from("tenants")
+      .select("id, name")
+      .in("status", ["active", "trial", "past_due"])
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const disabledModules = await getDisabledModulesByTenant(admin);
   let sent = 0;
   let skippedEmpty = 0;
   let skippedDone = 0;
   let skippedPrefs = 0;
+  let processed = 0;
+  let failed = 0;
+  let timedOut = false;
 
-  for (const t of tenants ?? []) {
+  for (const t of tenants) {
+    if (isPastDeadline(Date.now(), deadline)) {
+      timedOut = true;
+      break;
+    }
+    processed += 1;
     if (isDisabledFor(disabledModules, String(t.id), "reports")) continue;
     // Bu hafta için zaten gönderilmiş mi? (marker'lı href varlık kontrolü)
     const { count: already } = await admin
@@ -199,14 +209,27 @@ export async function GET(req: NextRequest) {
     }));
 
     const { error } = await admin.from("notifications").insert(rows);
-    if (!error) sent += rows.length;
+    if (error) failed += 1;
+    else sent += rows.length;
   }
 
-  await recordHeartbeat(
-    "haftalik-ozet",
-    "ok",
-    `${sent} özet gönderildi, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
-  );
+  const hb = heartbeatFor({
+    total: tenants.length,
+    processed,
+    failed,
+    timedOut,
+    listError: tenantsError,
+    summary: `${sent} özet gönderildi, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
+  });
+  await recordHeartbeat("haftalik-ozet", hb.status, hb.detail);
 
-  return NextResponse.json({ ok: true, sent, skippedEmpty, skippedDone, skippedPrefs });
+  return NextResponse.json({
+    ok: hb.status === "ok",
+    sent,
+    skippedEmpty,
+    skippedDone,
+    skippedPrefs,
+    failed,
+    remaining: remainingOf({ total: tenants.length, processed }),
+  });
 }

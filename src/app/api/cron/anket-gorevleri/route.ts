@@ -16,12 +16,10 @@ import {
   type TriggerRow,
 } from "@/lib/surveys/server";
 import { isSurveyEventType } from "@/lib/surveys/types";
+import { authorizeCron } from "@/lib/cron-auth";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 const LOOKBACK_DAYS = 45;
 const OVERDUE_HREF = "/app/anketler/kuyruk?durum=geciken";
@@ -38,7 +36,8 @@ const DAY_MS = 86_400_000;
  * Yetki süresi uzatma görevi bu cron'dan değil, tarih değiştirilirken (`updatePropertyAuthorization`) üretilir.
  */
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const admin = createAdminClient();

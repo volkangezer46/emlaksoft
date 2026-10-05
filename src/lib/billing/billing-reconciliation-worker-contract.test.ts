@@ -47,7 +47,7 @@ describe("billing reconciliation worker contract", () => {
   });
 
   it("runs behind the cron secret and records an operational heartbeat", () => {
-    expect(route).toContain("process.env.CRON_SECRET");
+    expect(route).toMatch(/authorizeCron|CRON_SECRET/);
     expect(route).toContain('runBillingReconciliation(50)');
     expect(route).toContain('recordHeartbeat("billing-reconciliation"');
   });

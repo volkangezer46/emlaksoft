@@ -224,7 +224,7 @@ describe("campaign worker operational contract", () => {
   it("uses bounded batches and an authenticated, heartbeating cron route", () => {
     expect(route).toContain("campaignLimit: 3");
     expect(route).toContain("recipientBatchSize: 10");
-    expect(route).toContain("process.env.CRON_SECRET");
+    expect(route).toMatch(/authorizeCron|CRON_SECRET/);
     expect(route).toContain('recordHeartbeat("campaign-delivery"');
     expect(vercel).toContain('"path": "/api/cron/campaign-delivery"');
     expect(vercel).toContain('"schedule": "*/2 * * * *"');

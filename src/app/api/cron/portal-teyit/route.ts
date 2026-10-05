@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { findRecentKeysByPrefix, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
+import { fetchAllPaged, heartbeatFor } from "@/lib/cron-run";
+import { buildDedupeKey, timeBucket } from "@/lib/notify-dedupe";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
+import { authorizeCron } from "@/lib/cron-auth";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
-}
+/** Toplu işlem + fiyat sağlığı adımı: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /** features jsonb'den m² değeri — kanonik `sqm` + eski/alternatif anahtarlar. */
 function sqmFromFeatures(features: Record<string, unknown> | null): number | null {
@@ -96,32 +95,71 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
 }
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
-  const due = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const { data: listings } = await admin
-    .from("portal_listings")
-    .select("id, tenant_id, portal_name, portal_listing_id, last_confirmed_at")
-    .eq("status", "live")
-    .or(`last_confirmed_at.is.null,last_confirmed_at.lt.${due}`)
-    .limit(200);
+  const startedAt = Date.now();
+  const due = new Date(startedAt - 7 * 86_400_000).toISOString();
+  // Sırasız .limit(200) kaldırıldı: order(id) + range sayfalama.
+  const { rows: listings, error: listError } = await fetchAllPaged<{
+    id: string;
+    tenant_id: string;
+    portal_name: string | null;
+    portal_listing_id: string | null;
+  }>(
+    (from, to) =>
+      admin
+        .from("portal_listings")
+        .select("id, tenant_id, portal_name, portal_listing_id, last_confirmed_at")
+        .eq("status", "live")
+        .or(`last_confirmed_at.is.null,last_confirmed_at.lt.${due}`)
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{
+        data: { id: string; tenant_id: string; portal_name: string | null; portal_listing_id: string | null }[] | null;
+        error: { message: string } | null;
+      }>,
+  );
 
-  // Döngü içi insert yerine toplu yazma: 200 ilan için 200 gidiş-dönüş
-  // yerine tek istek (500'lük parçalar hâlinde).
+  // Döngü içi insert yerine toplu yazma (500'lük parçalar hâlinde).
   // Modül kapısı: "Portal Kontrol" kapalı ofislere teyit uyarısı yazılmaz (fiyat sağlığı adımı etkilenmez).
   const disabledModules = await getDisabledModulesByTenant(admin);
-  const rows: NotificationRow[] = (listings ?? [])
-    .filter((row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals"))
-    .map((row) => ({
-    tenant_id: String(row.tenant_id),
-    title: "Portal teyit gecikti",
-    body: `${row.portal_name}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
-    href: "/app/portallar",
-    kind: "warning",
-  }));
+  const eligible = listings.filter((row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals"));
 
-  const notified = await insertNotifications(admin, rows);
+  // Tekrar önleme: ilan başına 24 saatte en fazla 1 bildirim (cron 6 saatte bir çalışır).
+  // dedupe_key kolonu yoksa (migration uygulanmamış) `recent` null → eski davranış (dedupe yok).
+  const dedupeWindowMs = 24 * 3_600_000;
+  const recent = await findRecentKeysByPrefix(admin, {
+    tenantIds: [...new Set(eligible.map((r) => String(r.tenant_id)))],
+    prefix: "portal-teyit:",
+    sinceIso: new Date(startedAt - dedupeWindowMs).toISOString(),
+  });
+  const bucket = timeBucket(startedAt, dedupeWindowMs);
+  const listingPrefix = (id: string) => buildDedupeKey("portal-teyit", id);
+  const recentListings = new Set<string>();
+  for (const k of recent ?? []) {
+    // "portal-teyit:<ilan>:<kova>" → "portal-teyit:<ilan>"
+    recentListings.add(k.slice(0, k.lastIndexOf(":")));
+  }
+  let skippedRecent = 0;
+  const rows: NotificationRow[] = [];
+  for (const row of eligible) {
+    if (recent && recentListings.has(listingPrefix(String(row.id)))) {
+      skippedRecent += 1;
+      continue;
+    }
+    rows.push({
+      tenant_id: String(row.tenant_id),
+      title: "Portal teyit gecikti",
+      body: `${row.portal_name}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
+      href: "/app/portallar",
+      kind: "warning",
+      dedupe_key: recent ? buildDedupeKey("portal-teyit", row.id, bucket) : null,
+    });
+  }
+
+  const insertResult = await insertNotificationsDetailed(admin, rows);
+  const notified = insertResult.written;
 
   // Ek adım: boş kalmış fiyat sağlıklarını doldur (best-effort, teyidi bozmaz).
   let priceHealthUpdated = 0;
@@ -131,7 +169,15 @@ export async function GET(req: NextRequest) {
     console.error("portal-teyit refreshPriceHealth", e);
   }
 
-  await recordHeartbeat("portal-teyit", "ok", `${notified} teyit uyarısı · ${priceHealthUpdated} fiyat sağlığı${skippedTenantsNote(disabledModules, "portals")}`);
+  const hb = heartbeatFor({
+    total: listings.length,
+    processed: listings.length,
+    failed: insertResult.failed,
+    timedOut: false,
+    listError,
+    summary: `${notified} teyit uyarısı · ${skippedRecent + insertResult.duplicates} son 24 saatte bildirilmiş · ${priceHealthUpdated} fiyat sağlığı${skippedTenantsNote(disabledModules, "portals")}`,
+  });
+  await recordHeartbeat("portal-teyit", hb.status, hb.detail);
 
-  return NextResponse.json({ ok: true, notified, priceHealthUpdated });
+  return NextResponse.json({ ok: hb.status === "ok", notified, skippedRecent, failed: insertResult.failed, priceHealthUpdated });
 }

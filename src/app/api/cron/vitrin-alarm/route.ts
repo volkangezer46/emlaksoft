@@ -3,12 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { processVitrinPriceAlerts } from "@/lib/vitrin-alert-notify";
+import { authorizeCron } from "@/lib/cron-auth";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /**
  * Vitrin fiyat alarmı cron'u (günlük 10:30 — vercel.json).
@@ -19,7 +17,8 @@ function authorized(req: NextRequest) {
  * vitrin-eslesme cron'una BİLEREK eklenmedi (ayrı sorumluluk, ayrı kalp atışı).
  */
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const admin = createAdminClient();

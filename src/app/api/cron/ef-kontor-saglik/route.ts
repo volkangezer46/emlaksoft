@@ -5,14 +5,10 @@ import { resolveEmlakFiyatiKeys } from "@/lib/integrations/emlakfiyati/keys";
 import { runOrtakProbe } from "@/lib/integrations/emlakfiyati/ortak-client";
 import { parseSettingBool } from "@/lib/platform-setting-keys";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret && req.headers.get("authorization") === `Bearer ${secret}`);
-}
 
 /**
  * EmlakFiyati günlük bağlantı sağlık yoklaması: ortak istemcinin probe'u (GET /kullanim, tek deneme) çalışır; başarıda
@@ -21,12 +17,8 @@ function authorized(req: NextRequest): boolean {
  * yok: damga yazımı mevcut platform-settings yolundan gider (yeni service_role istemcisi kullanımı eklenmez).
  */
 export async function GET(req: NextRequest) {
-  if (!process.env.CRON_SECRET?.trim()) {
-    return NextResponse.json({ ok: false, error: "cron_not_configured" }, { status: 503 });
-  }
-  if (!authorized(req)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const [settings, keys] = await Promise.all([getPlatformSettingsMany([EF_ORTAK_FLAG_SETTING_KEY]), resolveEmlakFiyatiKeys()]);

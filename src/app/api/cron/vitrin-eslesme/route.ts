@@ -4,12 +4,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { notifyTenant } from "@/lib/notify";
 import { formatTurkishPhone } from "@/lib/phone";
-
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+import { authorizeCron } from "@/lib/cron-auth";
 
 type SavedSearch = {
   id: string;
@@ -75,7 +70,8 @@ function matches(s: SavedSearch, p: LiveProperty): boolean {
 export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

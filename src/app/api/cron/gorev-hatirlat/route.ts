@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { authorizeCron } from "@/lib/cron-auth";
+import { formatDateTimeTr } from "@/lib/format";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const to = new Date(Date.now() + 24 * 3600_000);
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       tenant_id: String(t.tenant_id),
       user_id: t.assigned_to,
       title: overdue ? "Geciken görev" : "Yaklaşan görev",
-      body: `${t.title} · ${new Date(t.due_at as string).toLocaleString("tr-TR")} · task:${t.id}`,
+      body: `${t.title} · ${formatDateTimeTr(t.due_at as string)} · task:${t.id}`,
       href: "/app/gorevler",
       kind: overdue ? "warning" : "info",
     });

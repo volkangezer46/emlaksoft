@@ -107,7 +107,7 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
   });
   it("sağlık cron'u: Bearer + heartbeat + ortak probe, service_role istemcisi yok", () => {
     const s = read("src/app/api/cron/ef-kontor-saglik/route.ts");
-    expect(s).toContain("process.env.CRON_SECRET");
+    expect(s).toMatch(/authorizeCron|CRON_SECRET/);
     expect(s).toMatch(/recordHeartbeat\(\s*"ef-kontor-saglik"/);
     expect(s).toContain("runOrtakProbe(");
     expect(s).not.toContain("createAdminClient");

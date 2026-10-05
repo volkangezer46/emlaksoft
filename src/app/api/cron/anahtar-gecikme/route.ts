@@ -4,12 +4,10 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { keyOverdueDays } from "@/lib/key-overdue";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { authorizeCron } from "@/lib/cron-auth";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
+/** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 /** Bildirimin sabit hedefi — mükerrer freni bu href üzerinden sorgulanır. */
 const HREF = "/app/portfoyler/anahtarlar?durum=gecikmis";
@@ -49,7 +47,8 @@ type OverdueKey = {
  * pano ve portföy detayı da aynı fonksiyonu kullanır.
  */
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const admin = createAdminClient();

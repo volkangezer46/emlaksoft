@@ -68,8 +68,12 @@ for (const definition of CRON_JOBS) {
   const routePath = join(cronRoot, definition.job, "route.ts");
   if (!existsSync(routePath)) continue;
   const source = readFileSync(routePath, "utf8");
-  if (!/process\.env\.CRON_SECRET/.test(source)) {
-    issues.push(`${definition.path}: CRON_SECRET doğrulaması görünmüyor`);
+  // Yetki kapısı: ortak authorizeCron(req) (src/lib/cron-auth.ts: CRON_SECRET Bearer) veya eski doğrudan CRON_SECRET okuması.
+  const usesSharedGate =
+    /import\s*\{[^}]*\bauthorizeCron\b[^}]*\}\s*from\s*["']@\/lib\/cron-auth["']/.test(source) &&
+    /\bauthorizeCron\(\s*\w+\s*\)/.test(source);
+  if (!usesSharedGate && !/process\.env\.CRON_SECRET/.test(source)) {
+    issues.push(`${definition.path}: CRON_SECRET doğrulaması (authorizeCron) görünmüyor`);
   }
   const escapedJob = definition.job.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (!new RegExp(`recordHeartbeat\\(\\s*["']${escapedJob}["']`).test(source)) {

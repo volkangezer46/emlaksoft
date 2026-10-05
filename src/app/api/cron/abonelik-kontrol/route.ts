@@ -4,20 +4,16 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setting-keys";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const maxDuration = 60;
 
 const DAY_MS = 86_400_000;
 const BILLING_HREF = "/app/abonelik";
 
-function authorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return process.env.NODE_ENV !== "production";
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const now = new Date().toISOString();

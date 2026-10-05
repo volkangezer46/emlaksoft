@@ -8,16 +8,12 @@ import { ortakKullanim } from "@/lib/integrations/emlakfiyati/ortak-client";
 import { parseSettingBool } from "@/lib/platform-setting-keys";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
+import { authorizeCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const JOB = "ef-kontor-mutabakat";
-
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  return Boolean(secret && req.headers.get("authorization") === `Bearer ${secret}`);
-}
 
 /**
  * EmlakFiyati gunluk kontor MUTABAKATI: EF `GET /kullanim` (son 31 gun) `toplam.degerleme`/`toplam.pdf` ile defterdeki
@@ -26,12 +22,8 @@ function authorized(req: NextRequest): boolean {
  * service_role istemcisi mevcut allowlist'li faturalama isleyicisinden gelir (yeni createAdminClient kullanimi yok).
  */
 export async function GET(req: NextRequest) {
-  if (!process.env.CRON_SECRET?.trim()) {
-    return NextResponse.json({ ok: false, error: "cron_not_configured" }, { status: 503 });
-  }
-  if (!authorized(req)) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   try {
     const [settings, keys] = await Promise.all([getPlatformSettingsMany([EF_ORTAK_FLAG_SETTING_KEY]), resolveEmlakFiyatiKeys()]);

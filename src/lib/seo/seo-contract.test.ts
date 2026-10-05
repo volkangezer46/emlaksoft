@@ -104,8 +104,9 @@ describe("SEO sözleşmesi: sitemap kaynağı", () => {
 describe("SEO sözleşmesi: cron ve yetki", () => {
   const route = read("src/app/api/cron/seo-robot/route.ts");
   it("cron route CRON_SECRET Bearer doğrular ve heartbeat yazar", () => {
-    expect(route).toContain("process.env.CRON_SECRET");
-    expect(route).toMatch(/Bearer \$\{secret\}/);
+    expect(route).toMatch(/authorizeCron|CRON_SECRET/);
+    // Bearer doğrulaması ortak kapıdadır (authorizeCron -> cron-auth.ts); route ya kapıyı çağırır ya Bearer'i kendisi doğrular.
+    expect(route.includes("authorizeCron(") ? read("src/lib/cron-auth.ts") : route).toMatch(/Bearer \$\{(secret|expected)\}/);
     expect(route).toMatch(/recordHeartbeat\(\s*["']seo-robot["']/);
   });
   it("vercel.json ve cron envanterinde kayıtlı", () => {
