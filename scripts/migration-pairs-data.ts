@@ -53,6 +53,9 @@ const F = {
   sec3Owner: "20260823000400_sec3_property_owner_info_update_scope.sql",
   sec3Advisor: "20260823000500_sec3_advisor_private_pii_format_guard.sql",
   sec3Coupon: "20260823000600_sec3_coupon_max_per_tenant.sql",
+  p5Notes: "20260824001100_p5_neighborhood_notes_owner_scope.sql",
+  p5DocReq: "20260824001200_p5_document_requests_write_scope.sql",
+  p5Revoke: "20260824001300_p5_service_rpc_revoke_anon_authenticated.sql",
   k4IsDocument: "20260818000400_property_media_is_document.sql",
   // supabase/proposed/ taslaklari (migrations/'ta YOK; externalPending ile izlenir). Terfide YENI numara alirlar:
   // terfi eden kisi buradaki adlari yeni adlarla degistirir (sira 000500 -> 000800 [D'siz] -> 000900 korunur).
@@ -105,6 +108,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sec3Owner]: "siki",
     [F.sec3Advisor]: "siki", // CHECK kisitlari; mevcut satir uymuyorsa uygulama hata verir
     [F.sec3Coupon]: "siki",
+    [F.p5Notes]: "siki", // mahalle notu sahip/yonetici kapsami; yonetici olmayan baskasinin notunu silemez
+    [F.p5DocReq]: "siki", // evrak linki: authenticated UPDATE yalniz iptal (active -> revoked)
+    [F.p5Revoke]: "siki", // increment_listing_view / increment_referral_click: anon+authenticated EXECUTE geri alinir
     [F.k4IsDocument]: "ek",
     [F.billingAmount]: "davranis", // fulfill/plan RPC tutarlari plan tanimindan; admin plan degisimi tutari korur
     [F.billingPauseSeats]: "ek", // D bolumu CIKARILMIS halde: sutunlar + yeni RPC'ler + effective_seat_limit
@@ -143,7 +149,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     },
     { id: "P9-ilan-sahibi", order: 9, title: "Ilan sahibi bilgisi + guncelleme kapsami", files: [F.ownerInfo, F.sec3Owner] },
     { id: "P10-ofis-kontrol", order: 10, title: "Ofis kontrol merkezi + onay istekleri RLS", files: [F.oversight, F.sec3Approval] },
-    { id: "P11-f-modulleri", order: 11, title: "Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests] },
+    { id: "P11-f-modulleri", order: 11, title: "Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests, F.p5Notes, F.p5DocReq] },
+    { id: "P11b-sayac-revoke", order: 11.5, title: "Servis RPC sayaclari: anon/authenticated EXECUTE revoke (bagimsiz, kod etkilenmez)", files: [F.p5Revoke] },
     { id: "P12-kazanc-gizliligi", order: 12, title: "AYRI PENCERE: kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PK4-is-document", order: 13, title: "K4 is_document (dal main'e girerse): migration KODDAN ONCE", files: [F.k4IsDocument] },
     {
@@ -162,6 +169,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "ilan-sahibi", title: "property_owner_info + guncelleme kapsami", main: [F.ownerInfo], fixes: [F.sec3Owner], window: "P9-ilan-sahibi" },
     { id: "danisman-ozel", title: "advisor_private + PII biçim kisiti", main: [F.advisorPrivate], fixes: [F.sec3Advisor], window: "P7-danisman-profil" },
     { id: "kuponlar", title: "coupons + max_per_tenant", main: [F.coupons], fixes: [F.sec3Coupon], window: "P5-kupon" },
+    { id: "mahalle-notlari", title: "neighborhood_notes + sahip/yonetici kapsami", main: [F.neighborhood], fixes: [F.p5Notes], window: "P11-f-modulleri" },
+    { id: "evrak-linkleri", title: "document_requests + yazma kapsami (yalniz iptal)", main: [F.docRequests], fixes: [F.p5DocReq], window: "P11-f-modulleri" },
     {
       id: "koltuk-satisi",
       title: "Fiyat butunlugu (fulfill tabani) + extra_seats/effective_seat_limit + koltuk satisi fulfill/tetikleyiciler",
@@ -193,6 +202,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sec3Owner, F.ownerInfo],
     [F.sec3Advisor, F.advisorPrivate],
     [F.sec3Coupon, F.coupons],
+    [F.p5Notes, F.neighborhood],
+    [F.p5DocReq, F.docRequests],
     // 000500 basligindaki BAGIMLILIK (uygulanmamis olanlar; digerleri canlida)
     [F.billingAmount, F.trialDays],
     [F.billingAmount, F.planBusiness],
