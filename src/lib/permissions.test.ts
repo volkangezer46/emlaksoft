@@ -105,6 +105,11 @@ describe("rol sınırları", () => {
     expect(hasPermission("accounting", "commissions", "delete")).toBe(true);
   });
 
+  it("muhasebe gider/aidat (expenses) modülünü yalnız görüntüler", () => {
+    expect(hasPermission("accounting", "expenses", "view")).toBe(true);
+    for (const a of ["create", "edit", "delete"] as const) expect(hasPermission("accounting", "expenses", a)).toBe(false);
+  });
+
   it("muhasebe fatura silemez (yalnızca oluşturur/düzenler)", () => {
     expect(hasPermission("accounting", "billing", "create")).toBe(true);
     expect(hasPermission("accounting", "billing", "delete")).toBe(false);

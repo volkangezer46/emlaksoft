@@ -129,7 +129,7 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
     competitorClosed: formData.get("competitor_closed") === "on",
   });
   if (flags.closedByUs && flags.dealHappened && (!customerId || !authorityConfirmed)) {
-    return { error: "Bizim kapanışımız için müşteri ve yazılı yetki/EİDS onayı zorunludur." };
+    return { error: "Bizim kapanışımız için müşteri ve yazılı yetki belgesi onayı zorunludur." };
   }
   if (flags.closedByUs && flags.dealHappened) {
     const financialGate = await requirePermission("commissions", "create");
@@ -162,7 +162,7 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
     : null;
   const outcome = typeof result?.outcome === "string" ? result.outcome : "invalid_result";
   if (outcome === "not_found") return { error: "Portal ilanı bulunamadı." };
-  if (outcome === "closing_evidence_required") return { error: "Müşteri ve yazılı yetki/EİDS onayı zorunludur." };
+  if (outcome === "closing_evidence_required") return { error: "Müşteri ve yazılı yetki belgesi onayı zorunludur." };
   if (outcome === "commission_rate_required") return { error: "Kapanıştan önce portföyde 0'dan büyük geçerli bir komisyon oranı tanımlayın." };
   if (outcome !== "applied" && outcome !== "replay") return { error: "Kapanış kaydı oluşturulamadı." };
 

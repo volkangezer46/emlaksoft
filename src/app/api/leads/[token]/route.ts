@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { intakeLead, type LeadInput } from "@/lib/lead-intake";
+import { buildLeadConsentVersion } from "@/lib/legal-copy";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
@@ -16,7 +17,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export const PUBLIC_LEAD_CONSENT_VERSION = "lead-intake-v1-2026-08-02";
+/** Metin sürümü ve pazarlama tercihi legal-copy.ts'ten gelir (v2: amaç düzeltmesi + ayrı pazarlama kutusu). */
+export const PUBLIC_LEAD_CONSENT_VERSION = buildLeadConsentVersion(false);
 
 function allowedOrigins(req: NextRequest): string[] {
   return [
@@ -175,7 +177,7 @@ export async function POST(
     consent: {
       requestId,
       scope: "lead_intake",
-      version: PUBLIC_LEAD_CONSENT_VERSION,
+      version: buildLeadConsentVersion(isConsentAccepted(body.marketing_opt_in)),
       acceptedAt,
       ipHash: publicEvidenceHash(ip),
       userAgentHash: publicEvidenceHash(req.headers.get("user-agent")),

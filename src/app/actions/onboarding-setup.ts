@@ -12,6 +12,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { resolveOfficeGeo } from "@/lib/geo/resolve";
 import { isOnboardingStepId } from "@/lib/onboarding-checklist";
 import { getOfficeTemplate, isOfficeTemplateKey } from "@/lib/onboarding-templates";
+import { normalizeLicenseNo } from "@/lib/license";
 import {
   parseSkipped,
   serializeSkipped,
@@ -36,7 +37,9 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
   const provinceId = String(formData.get("province_id") ?? "").trim();
   const districtId = String(formData.get("district_id") ?? "").trim();
   const legacyCity = String(formData.get("city") ?? "").trim().slice(0, 80);
-  const licenseNo = String(formData.get("license_no") ?? "").trim().slice(0, 60);
+  const licParsed = normalizeLicenseNo(formData.get("license_no"));
+  if (!licParsed.ok) return { error: licParsed.error };
+  const licenseNo = licParsed.value ?? "";
   const name = String(formData.get("name") ?? "").trim().slice(0, 120);
   const addressLine = String(formData.get("address_line") ?? "").trim().slice(0, 200);
   const taxRaw = String(formData.get("tax_number") ?? "").trim();

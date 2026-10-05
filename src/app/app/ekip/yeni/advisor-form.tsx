@@ -72,7 +72,7 @@ const ROLE_META: Record<string, { label: string; blurb: string }> = {
   team_lead: { label: ROLE_LABELS.team_lead, blurb: "Saha danışmanı yetkileri; kendi kayıtlarıyla çalışır." },
   advisor: { label: ROLE_LABELS.advisor, blurb: "Kendi müşteri, portföy ve randevularını yönetir." },
   call_center: { label: ROLE_LABELS.call_center, blurb: "Talep karşılama, arama ve randevu kaydı." },
-  accounting: { label: ROLE_LABELS.accounting, blurb: "Komisyon, gider ve kazanç raporları." },
+  accounting: { label: ROLE_LABELS.accounting, blurb: "Komisyon ve faturalama yönetir; gider/aidat ve kazanç raporlarını yalnız görüntüler." },
   readonly: { label: ROLE_LABELS.readonly, blurb: "Yalnız görüntüleme; hiçbir kaydı değiştiremez." },
 };
 

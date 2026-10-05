@@ -107,6 +107,10 @@ const F = {
   leadSignalsByIds: "20260826001400_customer_lead_signals_by_ids.sql",
   // Bildirim dedupe anahtari (nullable kolon + kismi benzersiz indeks; yalniz ek).
   notificationsDedupeKey: "20260826001500_notifications_dedupe_key.sql",
+  // Muhasebe rolu expenses VIEW varsayilani (yalniz VERI seed). permission_defaults'a bagli (temel).
+  accountingExpensesView: "20260826001700_accounting_expenses_view.sql",
+  // tenants.license_title / license_valid_until (yalniz iki nullable sutun).
+  tenantLicenseDetails: "20260826001800_tenant_license_details.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -180,6 +184,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.defaultProgram]: "davranis", // yalniz VERI seed: referans bayragi ACIK, hos geldin 300 TL, katalog kaydi, EF paketleri; mevcut admin degerleri korunur
     [F.growthHotfix]: "davranis", // yalniz fonksiyon govdeleri (CREATE OR REPLACE, md5 korumali) + seed kural satiri; sema/bayrak DEGISMEZ; acik programin guvenlik denetimi duzeltmeleri (B1-B3, B9-B12, B16)
     [F.efPlanCreditValues]: "davranis", // yalniz VERI: billing.plan_definitions icinde dokunulmamis efCreditsPerExtraSeat/efCreditsMonthly onerilene cekilir; admin degerleri korunur
+    [F.accountingExpensesView]: "davranis", // yalniz VERI: accounting/expenses/view varsayilan izni (idempotent, kullanici istisnalarina dokunmaz)
+    [F.tenantLicenseDetails]: "ek", // tenants'a 2 nullable sutun (yetki belgesi unvani/gecerlilik); kod sutunlar yokken zarifce atlar
     [F.efReconciliationRuns]: "ek", // yeni tablo (yazma yalniz service_role, okuma platform personeli); kod tablo yokken zarifce atlar
     [F.growthDashboardRoles]: "davranis", // growth_my_dashboard/partner_dashboard yalniz owner/gm icin veri doner (digerlerine NULL); govdeler aksi ayni
     [F.leadSignalsByIds]: "ek", // yeni asiri yukleme customer_lead_signals(uuid, uuid[]); eski imza ve yetkiler ayni, istemci yoksa eskiye duser
@@ -269,6 +275,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB19-ef-mutabakat", order: 29.7, title: "EF kontor gunluk mutabakat kayitlari (ef_reconciliation_runs)", files: [F.efReconciliationRuns] },
     { id: "PB20-lead-signals-idler", order: 29.71, title: "customer_lead_signals(p_tenant_id, p_customer_ids) asiri yuklemesi (1000 satir kesilmesi duzeltmesi; eski imza kalir)", files: [F.leadSignalsByIds] },
     { id: "PB21-bildirim-dedupe", order: 29.72, title: "Bildirim dedupe anahtari (notifications.dedupe_key + kismi benzersiz indeks)", files: [F.notificationsDedupeKey] },
+    { id: "PB22-muhasebe-gider-goruntuleme", order: 29.73, title: "Muhasebe rolu gider/aidat (expenses) goruntuleme varsayilani (permission_defaults seed)", files: [F.accountingExpensesView] },
+    { id: "PB23-yetki-belgesi-alanlari", order: 29.74, title: "Ofis yetki belgesi unvani + gecerlilik tarihi (tenants, 2 nullable sutun)", files: [F.tenantLicenseDetails] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],

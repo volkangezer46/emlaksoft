@@ -1,6 +1,9 @@
 /**
- * EİDS / yazılı yetki kalkanı — pazarlık ve kaparo öncesi kontrol.
- * Harici EİDS API gelene kadar ofis onayı (checkbox / meta) ile çalışır.
+ * Yazılı yetki belgesi kalkanı — pazarlık ve kaparo öncesi kontrol.
+ *
+ * Adlandırma (karıştırmayın): Ticaret Bakanlığı sistemi TTBS = Taşınmaz Ticareti Bilgi Sistemi.
+ * EİDS = Elektronik İlan Doğrulama Sistemi (ilan yetki doğrulaması) AYRI bir sistemdir.
+ * Harici TTBS/EİDS erişimi gelene kadar ofis onayı (checkbox / meta) ile çalışır.
  */
 export function checkAuthorityShield(input: {
   hasWrittenAuthority: boolean;
@@ -11,7 +14,7 @@ export function checkAuthorityShield(input: {
     return {
       ok: false,
       warning:
-        "Yetki belgesi / EİDS kaydı onaylanmadan deal veya kaparo riskli. Yazılı yetkiyi işaretleyin veya uyum merkezinden kaydedin.",
+        "Yazılı yetki belgesi onaylanmadan deal veya kaparo riskli. Yazılı yetkiyi işaretleyin veya uyum merkezinden kaydedin.",
     };
   }
   return { ok: true };

@@ -20,6 +20,7 @@ import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { toTelHref } from "@/lib/phone";
+import { LicenseNotice } from "@/components/public/license-notice";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
@@ -121,7 +122,7 @@ export default async function VitrinPage({
   const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, status, brand_color, logo_url, phone, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, brand_color, logo_url, phone, license_no, address_line, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     provinceOptionsResult(),
@@ -600,6 +601,10 @@ export default async function VitrinPage({
         </section>
         ) : null}
       </main>
+
+      <div className="mx-auto max-w-6xl px-4 pb-4">
+        <LicenseNotice officeName={tenant.name} licenseNo={tenant.license_no} phone={tenant.phone} addressLine={tenant.address_line} />
+      </div>
 
       <footer className="border-t border-line py-6 text-center text-xs text-text-faint">
         <Link

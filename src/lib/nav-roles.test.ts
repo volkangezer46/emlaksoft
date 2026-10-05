@@ -63,7 +63,7 @@ describe("sade görünüm: rol çekirdek eşlemesi", () => {
 
   // Çekirdek listede olup rolün VARSAYILAN matrisinde modülü bulunmayan öğeler (ofis tenant override'ı
   // ile yetki verilirse görünür; matris bilinçli değiştirilmedi). Yeni boşluk bu testi kırar.
-  it("çekirdek öğe ile varsayılan yetki arasındaki bilinen boşluklar", () => {
+  it("çekirdek öğe ile varsayılan yetki arasında boşluk yok", () => {
     const gaps: string[] = [];
     for (const role of ROLES) {
       const accessible = new Set(accessibleOf(role));
@@ -73,7 +73,8 @@ describe("sade görünüm: rol çekirdek eşlemesi", () => {
         if (!mods.some((m) => accessible.has(m))) gaps.push(`${role}:${item.href}`);
       }
     }
-    expect(gaps.sort()).toEqual(["accounting:/app/aidat", "accounting:/app/giderler"]);
+    // Muhasebe artık "expenses" VIEW alır (20260826001700): önceki iki boşluk kapandı.
+    expect(gaps.sort()).toEqual([]);
   });
 
   it("tam görünüm (varsayılan) değişmedi", () => {

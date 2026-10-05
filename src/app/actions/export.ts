@@ -111,7 +111,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
   const supabase = await createClient();
   let q = supabase
     .from("commissions")
-    .select("gross_amount, vat_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to)")
+    .select("gross_amount, vat_amount, status, splits, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to, property:properties!deals_property_id_fkey(property_code, title), advisor:profiles!deals_assigned_to_fkey(full_name, tenant_id))")
     .eq("tenant_id", gate.tenantId)
     .eq("deal.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
@@ -123,7 +123,17 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
     console.error("exportCommissionsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((r) => mapCommission(r));
+  // Danışman adı: ilk sorguya gömülü profil (ek sorgu yok; deals_assigned_to_fkey). Yalnız bu ofisin profili
+  // kabul edilir (tenant_id kontrolü); çözülemeyen kimlik boş kalır.
+  const names = new Map<string, string>();
+  for (const r of data ?? []) {
+    const deal = relOne(r.deal) as { assigned_to?: string | null; advisor?: unknown } | null | undefined;
+    const advisor = relOne(deal?.advisor as never) as { full_name?: string | null; tenant_id?: string | null } | null | undefined;
+    if (deal?.assigned_to && advisor?.full_name && advisor.tenant_id === gate.tenantId) {
+      names.set(deal.assigned_to, advisor.full_name);
+    }
+  }
+  const rows = (data ?? []).map((r) => mapCommission(r, names));
   return exportResult(gate, "komisyonlar", rows, `komisyonlar-${trDayKey()}.csv`);
 }
 

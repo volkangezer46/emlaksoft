@@ -24,6 +24,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { LicenseStatusCard } from "@/components/app/license-status-card";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ButtonLink } from "@/components/ui/button";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
@@ -357,6 +358,8 @@ export default async function PropertyDetailPage({
           <ArrowLeft className="h-4 w-4" /> Portföy merkezine dön
         </Link>
       </div>
+
+      <LicenseStatusCard />
 
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-4 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />

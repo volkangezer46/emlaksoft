@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, Calculator, Info, TrendingUp } from "lucide-react";
-import { computeRentIncrease, TUFE_12M_AVG, hasOfficialTufe, tufeRateForMonth } from "@/lib/tufe";
+import { computeRentIncrease, hasOfficialTufeIn, tufeRateForMonthIn, tufeWarningFor, type TufeTable } from "@/lib/tufe";
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -15,7 +15,7 @@ function monthLabel(key: string) {
   return `${MONTH_NAMES[m - 1]} ${y}`;
 }
 
-export function RentCalculator({ months, latestMonth }: { months: string[]; latestMonth: string }) {
+export function RentCalculator({ months, latestMonth, table }: { months: string[]; latestMonth: string; table: TufeTable }) {
   const [rent, setRent] = useState<string>("");
   const [month, setMonth] = useState<string>(latestMonth);
   const [manualRate, setManualRate] = useState<string>("");
@@ -25,8 +25,9 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
   // UYGULAMAYIZ (Aralık 2025'e düşen fallback 2026 yenilemesi için yanlış yasal
   // tavan olurdu). Bu aylarda manuel giriş zorunlu; yasal tavan da bilinmediğinden
   // uygulanmaz — kullanıcı güncel resmi oranı girer.
-  const official = hasOfficialTufe(month);
-  const tufe = tufeRateForMonth(month);
+  const official = hasOfficialTufeIn(table, month);
+  const tufe = tufeRateForMonthIn(table, month);
+  const warning = tufeWarningFor(table, month);
   const legalCap = official ? tufe.rate : null;
   const forceManual = !official;
   const manualActive = useManual || forceManual;
@@ -77,17 +78,15 @@ export function RentCalculator({ months, latestMonth }: { months: string[]; late
               {months.map((m) => (
                 <option key={m} value={m}>
                   {monthLabel(m)}
-                  {hasOfficialTufe(m)
-                    ? ` — 12 aylık ort. TÜFE %${TUFE_12M_AVG[m]?.toFixed(2)}`
-                    : " — resmi oran bekleniyor"}
+                  {hasOfficialTufeIn(table, m)
+                    ? ` — 12 aylık ort. TÜFE %${table.entries[m]?.rate.toFixed(2)}`
+                    : table.entries[m]
+                      ? ` — %${table.entries[m]?.rate.toFixed(2)} (teyit edilmeli)`
+                      : " — resmi oran bekleniyor"}
                 </option>
               ))}
             </select>
-            {forceManual ? (
-              <p className="mt-1 text-xs text-amber-600">
-                Bu yenileme ayı için resmi TÜİK 12 aylık ortalama TÜFE henüz tabloda yok. Güncel resmi oranı aşağıya girin.
-              </p>
-            ) : null}
+            {warning ? <p className="mt-1 text-xs text-amber-600">{warning} Güncel resmi oranı aşağıya girin.</p> : null}
           </div>
 
           {/* Resmi oranı olan aylarda opsiyonel manuel giriş; olmayan (2026) aylarda

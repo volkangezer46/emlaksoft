@@ -7,6 +7,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { moneyTry } from "@/lib/leak-shield";
 import { getBaseUrl } from "@/lib/base-url";
 import { PrintButton } from "./print-button";
+import { LicenseNotice } from "@/components/public/license-notice";
 
 type Rel = { name?: string } | { name?: string }[] | null;
 
@@ -62,7 +63,7 @@ export default async function PropertyBrochurePage({
       .eq("id", id)
       .is("deleted_at", null)
       .maybeSingle(),
-    supabase.from("tenants").select("name, slug, logo_url, phone").maybeSingle(),
+    supabase.from("tenants").select("name, slug, logo_url, phone, license_no, address_line").maybeSingle(),
     supabase
       .from("property_media")
       .select("id")
@@ -260,6 +261,7 @@ export default async function PropertyBrochurePage({
               </div>
             )}
           </div>
+          <LicenseNotice officeName={tenant?.name} licenseNo={tenant?.license_no} phone={tenant?.phone} addressLine={tenant?.address_line} className="mt-3" />
           <p className="mt-3 text-center text-xs text-text-faint">EmlakSoft ile hazırlandı</p>
         </footer>
       </article>

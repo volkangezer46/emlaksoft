@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { computeLegalIncrease } from "@/lib/tufe";
+import { computeLegalIncreaseIn } from "@/lib/tufe";
+import { loadTufeTable } from "@/lib/tufe-server";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
@@ -416,7 +417,7 @@ export async function applyRentIncrease(
   // artışa izin verir (gerçek 2026 tavanı daha düşük olabilir). Bu aylarda tavan
   // KESİLMEZ — sorumluluk, resmi oranı bilen kullanıcıdadır; denetim kaydına da
   // uydurma "TÜFE %X" yazılmaz.
-  const legal = computeLegalIncrease(currentRent, effectiveDate.slice(0, 7));
+  const legal = computeLegalIncreaseIn(await loadTufeTable(), currentRent, effectiveDate.slice(0, 7));
   if (legal.official && validatedNewRent > legal.newRent) {
     return {
       error: `Yeni kira yasal tavanı aşıyor — TÜFE %${legal.appliedRate.toFixed(2)} ile en fazla ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(legal.newRent)} olabilir.`,

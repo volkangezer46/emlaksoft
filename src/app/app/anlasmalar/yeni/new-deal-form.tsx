@@ -128,7 +128,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
             className="mt-0.5 accent-mint-600"
           />
           <span>
-            <span className="font-bold text-mint-700">Yazılı yetki / EİDS onaylı</span>
+            <span className="font-bold text-mint-700">Yazılı yetki belgesi onaylı</span>
             <span className="mt-0.5 block text-text-muted">{nameOf("negotiation")} veya {nameOf("won")} aşaması için gerekli.</span>
           </span>
         </label>

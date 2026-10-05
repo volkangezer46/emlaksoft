@@ -201,6 +201,9 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     customers: VIEW,
     commissions: ALL,
     billing: CRUD_NO_DEL,
+    // Gider + aidat sayfaları aynı "expenses" modülünü kullanır (ayrı "dues" modülü YOK). Yalnız görüntüleme:
+    // gider/aidat ekleme-düzenleme yetkisi muhasebe rolünde yok. DB kopyası: 20260826001700_accounting_expenses_view.sql
+    expenses: VIEW,
     reports: VIEW,
     support: VIEW,
     surveys: VIEW,
