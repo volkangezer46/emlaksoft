@@ -1,29 +1,44 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { runWhenIdle } from "@/lib/idle";
+import { now } from "@/lib/clock";
+import { computeRefreshDelay } from "@/lib/realtime-throttle";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * HGDekor tarzı: ilgili tabloda değişiklik olunca sayfayı yenile.
  * Tenant izolasyonu RLS + filtre ile; channel adı tenant’a kilitli.
+ *
+ * Fırtına önleme: iki yenileme arası en az 10 sn; bekleyen yenileme varken
+ * gelen olaylar birleştirilir; `relevantTables` verilirse yalnız açık rotayı
+ * ilgilendiren tabloların olayları sayılır.
  */
 export function useRealtimeRefresh(opts: {
   tenantId: string | null | undefined;
   tables: string[];
   enabled?: boolean;
   debounceMs?: number;
+  /** Açık rotaya göre ilgili tablo alt kümesi; verilmezse tüm tablolar ilgilidir. */
+  relevantTables?: (pathname: string) => readonly string[];
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRefreshAt = useRef<number | null>(null);
   const enabled = opts.enabled !== false && Boolean(opts.tenantId);
 
+  // Güncel rota ve filtre fonksiyonu ref'te: abonelik rota değişince yeniden kurulmaz.
+  const pathRef = useRef(pathname);
+  const relevantRef = useRef(opts.relevantTables);
+  useEffect(() => {
+    pathRef.current = pathname;
+    relevantRef.current = opts.relevantTables;
+  });
+
   // Efektin bağımlılıkları yalnızca primitifler olsun: `opts.tables` her render'da
-  // yeni bir dizi referansı olabileceği için tek bir anahtar string'e indiriliyor
-  // ve tablo listesi efekt içinde bu anahtardan çözülüyor. Böylece bağımlılık
-  // dizisinde bileşik ifade kalmıyor (statik olarak denetlenebilir) ve gereksiz
-  // yeniden abonelik olmuyor.
+  // yeni bir dizi referansı olabileceği için tek bir anahtar string'e indiriliyor.
   const tablesKey = opts.tables.join("|");
   const tenantId = opts.tenantId;
   const debounceMs = opts.debounceMs;
@@ -37,22 +52,35 @@ export function useRealtimeRefresh(opts: {
     let channel: RealtimeChannel | null = null;
 
     // Her router.refresh() sayfanın TÜM sunucu sorgularını yeniden koşturur.
-    // Sekme arka plandayken boşuna tetiklenmesin: değişiklik "bekliyor" işaretlenir,
-    // sekme görünür olunca tek seferde yenilenir (veri bayatlamaz, sunucu yükü düşer).
+    // Sekme arka plandayken tetiklenmez: "bekliyor" işaretlenir, görünür olunca yenilenir.
     let pending = false;
-    const bump = () => {
-      if (timer.current) clearTimeout(timer.current);
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    const schedule = () => {
+      // Bekleyen bir yenileme zaten var: olayı birleştir (yeniden kurma).
+      if (timer.current) return;
+      const delay = computeRefreshDelay(now(), lastRefreshAt.current, debounceMs ?? 400);
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        if (document.visibilityState === "hidden") {
+          pending = true;
+          return;
+        }
+        lastRefreshAt.current = now();
+        router.refresh();
+      }, delay);
+    };
+    const bump = (table: string) => {
+      const relevant = relevantRef.current?.(pathRef.current ?? "");
+      if (relevant && !relevant.includes(table)) return;
+      if (document.visibilityState === "hidden") {
         pending = true;
         return;
       }
-      timer.current = setTimeout(() => router.refresh(), debounceMs ?? 400);
+      schedule();
     };
     const onVisible = () => {
       if (document.visibilityState !== "visible" || !pending) return;
       pending = false;
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => router.refresh(), debounceMs ?? 400);
+      schedule();
     };
     document.addEventListener("visibilitychange", onVisible);
 
@@ -65,7 +93,7 @@ export function useRealtimeRefresh(opts: {
         ch = ch.on(
           "postgres_changes",
           { event: "*", schema: "public", table, filter: `tenant_id=eq.${tenantId}` },
-          () => bump(),
+          () => bump(table),
         );
       }
       ch.subscribe();
@@ -77,6 +105,7 @@ export function useRealtimeRefresh(opts: {
       cancelIdle();
       document.removeEventListener("visibilitychange", onVisible);
       if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
       if (supabase && channel) void supabase.removeChannel(channel);
     };
   }, [enabled, tenantId, tablesKey, debounceMs, router]);

@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDeploymentStage } from "@/lib/deployment-env";
+import { CRON_JOBS } from "@/lib/cron-jobs";
+import { evaluateCronHealth } from "@/lib/cron-staleness";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +78,51 @@ export async function GET(request: Request) {
     : !requireReleaseContract;
   const releaseIdentityReady = !requireReleaseContract || Boolean(release.sha);
 
+  // /api/health/cron aynı işleyiciyi paylaşır (tek service_role kullanımı, kabul listesi değişmez).
+  // Yalnız HEALTHCHECK_SECRET sahibine: secret tanımsızsa 404, yanlışsa 401 — ayrıntı sızmaz.
+  const cronMode = new URL(request.url).pathname.replace(/\/+$/, "").endsWith("/health/cron");
+  if (cronMode && !detailed) {
+    const configured = runtimeEnvString(process.env.HEALTHCHECK_SECRET).length >= 32;
+    return NextResponse.json(
+      { ok: false },
+      { status: configured ? 401 : 404, headers: noStoreHeaders },
+    );
+  }
+
   try {
     const admin = createAdminClient();
+
+    if (cronMode) {
+      const { data, error } = await admin
+        .from("cron_heartbeats")
+        .select("job, last_run_at, last_status");
+      if (error) {
+        console.error("health cron check failed", { code: error.code });
+        return NextResponse.json(
+          { ok: false, status: "unavailable", at },
+          { status: 503, headers: noStoreHeaders },
+        );
+      }
+      const problems = evaluateCronHealth(
+        (data ?? []).map((r) => ({
+          job: String(r.job),
+          last_run_at: r.last_run_at ? String(r.last_run_at) : null,
+          last_status: r.last_status ? String(r.last_status) : null,
+        })),
+        Date.now(),
+      );
+      return NextResponse.json(
+        {
+          ok: problems.length === 0,
+          status: problems.length === 0 ? "cron_ok" : "cron_stale",
+          total: CRON_JOBS.length,
+          problems,
+          at,
+        },
+        { status: problems.length === 0 ? 200 : 503, headers: noStoreHeaders },
+      );
+    }
+
     const databaseStarted = Date.now();
     const databasePromise = admin.from("tenants").select("id").limit(1);
     const migrationPromise = expectedVersion
