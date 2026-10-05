@@ -3,6 +3,7 @@ import { Banknote, CheckCircle2, Plus, Search, Tag, Timer, Undo2 } from "lucide-
 import { daysAgoIso, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { exportOffersCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
@@ -134,7 +135,7 @@ export default async function TekliflerPage({
   };
   const statusKeys = Object.keys(OFFER_STATUS_LABELS);
 
-  const [listRes, advisorsRes, totalRes, openVolumeRes, seriesRes, savedViews, ...statusRes] = await Promise.all([
+  const [listRes, advisorsRes, totalRes, openVolumeRes, seriesRes, savedViews, ...statusRes] = await batchAll("Teklifler", ["offers", "profiles", "offers-total", "open-volume", "series", "saved-views", ...statusKeys.map((s) => `status-${s}`)], [
     search.empty ? Promise.resolve({ data: [], count: 0 }) : listQuery,
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     countOf(),

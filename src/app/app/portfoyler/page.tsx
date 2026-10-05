@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { exportPropertiesCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
@@ -259,7 +260,7 @@ export default async function PropertiesPage({
    */
   let qOrClause: string | null = null;
   if (q) {
-    const [geoHits, { data: portalHits }] = await Promise.all([
+    const [geoHits, { data: portalHits }] = await batchAll("Portföyler", ["geo-search", "portal-search"], [
       searchGeoIds(q),
       // Portal adıyla arama artık DB tarafında: eşleşen ilanların property_id'leri
       // ana sorgunun or() koşuluna eklenir (bellekte augment yerine).
@@ -339,12 +340,13 @@ export default async function PropertiesPage({
   const coversP = listP.then(async (res) => {
     const ids = ((res.data ?? []) as unknown as PropertyRow[]).map((p) => p.id);
     if (ids.length === 0) return [] as { id: string; property_id: string }[];
-    const { data: covers } = await supabase
+    const { data: covers, error: coversError } = await supabase
       .from("property_media")
       .select("id, property_id")
       .in("property_id", ids)
       .eq("kind", "image")
       .eq("is_cover", true);
+    if (coversError) throw new Error(`Portföyler verileri eksik yüklendi (covers:${coversError.code ?? "?"}).`);
     return (covers ?? []) as { id: string; property_id: string }[];
   });
 
@@ -364,7 +366,11 @@ export default async function PropertiesPage({
     typeDefs,
     savedViews,
     coverRows,
-  ] = await Promise.all([
+  ] = await batchAll("Portföyler", [
+    "properties", "properties-map", "properties-filtered-total", "fx-rates", "properties-total", "properties-live",
+    "portal-live", "health-green", "health-yellow", "health-red", "properties-recent", "properties-scan",
+    "property-types", "saved-views", "covers",
+  ], [
     listP,
     mapQuery,
     // Filtrelenmiş gerçek toplam — hem sayfalama ("X-Y / Toplam Z") hem de

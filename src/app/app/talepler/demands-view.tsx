@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AlarmClock, Crosshair, Flame, Plus, Search, Sparkles, Target } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { getProvince } from "@/lib/geo/reader";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
@@ -203,12 +204,12 @@ export async function DemandsView({
       .in("status", ["live", "draft", "reserved", "Yayında"])
       .order("created_at", { ascending: false })
       .limit(300),
-  ).then((res) => res.data);
+  );
   const weightsP = fetchTenantMatchingWeights(supabase);
   const rawListP = search.empty ? Promise.resolve({ data: [], count: 0 }) : Promise.resolve(listQuery);
 
   const pending: Pending = {
-    listP: Promise.all([rawListP, propsP, weightsP]).then(([{ data, count }, propsData, weights]) => {
+    listP: batchAll("Talepler", ["demands", "properties", "matching-weights"], [rawListP, propsP, weightsP]).then(([{ data, count }, { data: propsData }, weights]) => {
       const rows = (data ?? []) as unknown as DemandRow[];
       const matchProps = (propsData ?? []).map((p) => ({
         ...p,
@@ -233,7 +234,10 @@ export async function DemandsView({
     }),
     poolP: Promise.resolve(
       buildBase(`id, status, budget_min, budget_max, province_id, province:geo_provinces(name)${scopeEmbed}`).limit(POOL_LIMIT),
-    ).then((res) =>
+    ).then((res) => {
+      if (res.error) throw new Error(`Talepler verileri eksik yüklendi (demand-pool:${res.error.code ?? "?"}).`);
+      return res;
+    }).then((res) =>
       ((res.data ?? []) as unknown as Array<{
         status: string;
         budget_min: number | null;
@@ -264,7 +268,10 @@ export async function DemandsView({
     agingRes,
     seriesRes,
     ilRes,
-  ] = await Promise.all([
+  ] = await batchAll("Talepler", [
+    "profiles", "saved-views", "count-new", "count-active", "count-matched", "count-closed",
+    "count-urgent", "count-high", "count-aging", "series", "province",
+  ], [
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     savedViewsPromise,
     scopeHead().eq("status", "new"),

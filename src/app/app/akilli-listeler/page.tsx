@@ -4,6 +4,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso, msSince, DAY_MS } from "@/lib/clock";
 import { computeLeadScore } from "@/lib/lead-score";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
+import { fetchLeadSignals } from "@/lib/lead-signals";
 import { computeChurnRisk } from "@/lib/churn-risk";
 import { scoreSellerLikelihood, isOwnerCustomer } from "@/lib/seller-prediction";
 
@@ -36,21 +38,27 @@ export default async function AkilliListelerPage() {
   const { tenantId } = await requireModulePage("customers", "/app/akilli-listeler");
   const supabase = await createClient();
 
-  const [{ data: custData }, { data: signalData }, { data: upcomingData }] = await Promise.all([
+  const [custRes, upcomingRes] = await Promise.all([
     supabase
       .from("customers")
       .select("id, full_name, phone, email, customer_types, blacklist, source, created_at")
       .is("deleted_at", null)
       .limit(3000),
-    supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId }),
     supabase
       .from("appointments")
       .select("customer_id")
       .gte("scheduled_at", daysAgoIso(0))
       .in("status", ["pending", "confirmed"]),
   ]);
+  assertQueryBatchSucceeded([custRes, upcomingRes], ["akilli-customers", "akilli-upcoming"], "Akıllı listeler");
+  const { data: custData } = custRes;
+  const { data: upcomingData } = upcomingRes;
 
   const customers = (custData ?? []) as Cust[];
+  // Yalnız listelenen müşterilerin sinyalleri (tüm tenant'ı döndüren eski imza 1000 satırda kesiliyordu).
+  const signalRes = await fetchLeadSignals(supabase, tenantId, customers.map((c) => c.id));
+  assertQueryBatchSucceeded([signalRes], ["lead-signals"], "Akıllı listeler");
+  const signalData = signalRes.data;
   const sigMap = new Map<string, Signal>();
   for (const s of (signalData ?? []) as Signal[]) sigMap.set(s.customer_id, s);
   const hasUpcoming = new Set(

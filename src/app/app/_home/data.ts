@@ -11,6 +11,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
+import { fetchLeadSignals } from "@/lib/lead-signals";
 import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from "@/lib/clock";
 import type { Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
@@ -200,14 +201,17 @@ export const loadHotLeads = cache(async (ctx: HomeCtx): Promise<HotLead[]> => {
   let custQ = ctx.sample.apply(supabase.from("customers").select("id, full_name, phone, email, source, blacklist, created_at"))
     .is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
   if (ctx.scopeMine) custQ = custQ.eq("assigned_to", ctx.userId);
-  const results = await Promise.all([
-    custQ,
-    ctx.tenantId
-      ? supabase.rpc("customer_lead_signals", { p_tenant_id: ctx.tenantId })
-      : Promise.resolve({ data: [] as LeadSignalRow[] }),
-  ]);
-  assertQueryBatchSucceeded(results, ["briefing-customers", "lead-signals"], "Ana panel");
-  const [{ data: customers }, { data: signals }] = results;
+  const custRes = await custQ;
+  assertQueryBatchSucceeded([custRes], ["briefing-customers"], "Ana panel");
+  const customers = custRes.data;
+  // Yalnız skorlanan 200 müşterinin id'leri (tüm tenant'ı döndüren eski imza 1000 satırda kesiliyordu).
+  const signalRes = await fetchLeadSignals(
+    supabase,
+    ctx.tenantId,
+    (customers ?? []).map((c) => c.id as string),
+  );
+  assertQueryBatchSucceeded([signalRes], ["lead-signals"], "Ana panel");
+  const signals = signalRes.data;
   const signalMap = new Map<string, LeadSignalRow>();
   for (const s of (signals ?? []) as LeadSignalRow[]) signalMap.set(s.customer_id, s);
   const hot: HotLead[] = [];

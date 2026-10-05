@@ -4,6 +4,7 @@ import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { AlertTriangle, CalendarClock, Hourglass, KeyRound, Plus, Search, Wallet, Wrench } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { computeLegalIncrease } from "@/lib/tufe";
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
@@ -118,7 +119,9 @@ export default async function KiralamaPage({
 
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
-  const [rentalRes, curChargeRes, overdueChargeRes, overdueHead, maintRes, activeHead, savedViews] = await Promise.all([
+  const [rentalRes, curChargeRes, overdueChargeRes, overdueHead, maintRes, activeHead, savedViews] = await batchAll("Kiralama", [
+    "rentals", "charges-current", "charges-overdue", "charges-overdue-count", "maintenance", "rentals-active", "saved-views",
+  ], [
     supabase
       .from("rentals")
       .select(

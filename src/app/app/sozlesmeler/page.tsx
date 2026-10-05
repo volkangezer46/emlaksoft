@@ -4,6 +4,7 @@ import { AlarmClock, CalendarX2, FileSignature, PenLine, Plus, Search, Send } fr
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/app/empty-state";
@@ -168,7 +169,7 @@ export default async function SozlesmelerPage({
   const head = () => supabase.from("contracts").select("id", { count: "exact", head: true });
   const statusKeys = Object.keys(CONTRACT_STATUS_LABELS);
 
-  const [listRes, savedViews, totalRes, expiringRes, expiredRes, scanRes, ...statusRes] = await Promise.all([
+  const [listRes, savedViews, totalRes, expiringRes, expiredRes, scanRes, ...statusRes] = await batchAll("Sözleşmeler", ["contracts", "saved-views", "contracts-total", "contracts-expiring", "contracts-expired", "contracts-scan", ...statusKeys.map((s) => `status-${s}`)], [
     search.empty ? Promise.resolve({ data: [], count: 0 }) : listQuery,
     savedViewsPromise,
     head(),

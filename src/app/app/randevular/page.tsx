@@ -17,6 +17,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { resolveLazyTotal } from "@/lib/lazy-total";
 import { requireModulePage } from "@/lib/require-module-page";
 import { calendarDateToTrIso, formatTrTime, now, trDayKey, trTodayCalendarDate } from "@/lib/clock";
@@ -312,7 +313,12 @@ export default async function AppointmentsPage({
     leaveRows,
     { data: advisorRows },
     savedViews,
-  ] = await Promise.all([
+  ] = await batchAll("Randevular", [
+    "appointments", "appointments-total", "appointment-types", "filter-customer", "filter-property",
+    "count-today", "count-pending", "count-confirmed", "count-signature", "count-completed",
+    "count-showing", "count-office", "count-valuation", "count-contract",
+    "week-bar", "own-profile", "leaves", "advisors", "saved-views",
+  ], [
     apptP,
     apptTotalP,
     getDefinitions("appointment_type"),
