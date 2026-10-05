@@ -30,7 +30,7 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
   it("hatasız doğrulanır ve bugünkü grup/bağlantı sayılarını taşır", () => {
     expect(hasErrors(issues)).toBe(false);
     expect(cfg.groups.map((g) => [g.id, g.kind, g.items.length])).toEqual([
-      ["urun", "menu", 11],
+      ["urun", "menu", 12],
       ["cozum", "menu", 6],
       ["kaynak", "menu", 6],
       ["fiyat", "menu", 4],
@@ -211,7 +211,7 @@ describe("herkese açık görünüm", () => {
     c.groups[0].items[1].href = "javascript:alert(1)";
     const pub = toPublicMenu(c, 0);
     expect(pub.groups.map((g) => g.id)).toEqual(["urun", "kaynak"]);
-    expect(pub.groups[0].columns.flatMap((c) => c.items)).toHaveLength(9);
+    expect(pub.groups[0].columns.flatMap((c) => c.items)).toHaveLength(10);
     expect(pub.footer.map((f) => f.id)).not.toContain("urun");
   });
 
@@ -240,9 +240,9 @@ describe("editör modeli", () => {
     expect(moveInArray([1, 2, 3], 0, 2)).toEqual([2, 3, 1]);
     const c = defaultSiteMenu();
     const within = moveItem(c, "urun-tur", { kind: "item", id: "urun-ai-asistan" });
-    expect(within.groups[0].items[6].id).toBe("urun-tur");
+    expect(within.groups[0].items[7].id).toBe("urun-tur");
     const across = moveItem(c, "urun-tur", { kind: "group", id: "kaynak" });
-    expect(across.groups[0].items).toHaveLength(10);
+    expect(across.groups[0].items).toHaveLength(11);
     expect(across.groups[2].items.at(-1)?.id).toBe("urun-tur");
     const withLink = structuredClone(c);
     withLink.groups.push({ ...blankGroupForTest("lnk"), kind: "link", href: "/fiyatlar" });

@@ -75,12 +75,13 @@ describe("navigation accessibility contract", () => {
       ...marketingFiles("src/components/marketing"),
       "src/components/site-footer.tsx",
       "src/lib/site-menu/defaults.ts",
+      "src/lib/site-content/defaults.ts",
     ]
       .map(source)
       .join("\n");
 
     expect(home.match(/"\/demo"/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(home.match(/Demo görüşmesi planla/gi)?.length).toBeGreaterThanOrEqual(3);
+    expect(home.match(/Görüşme talep edin/gi)?.length).toBeGreaterThanOrEqual(3);
     expect(home.toLocaleLowerCase("tr-TR")).not.toContain("canlı demo");
   });
 

@@ -1,13 +1,12 @@
 import { KeyRound, Lock, Scale, Users } from "lucide-react";
-import { Em } from "./section-heading";
+import type { PlanDef } from "@/lib/billing/plans";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { Heading, SiteContent } from "@/lib/site-content/schema";
+import { tx } from "@/lib/site-content/tokens";
+import { Lines, RichTitle } from "./content-link";
 
-/* Garanti dili YOK: "süreç desteği". Maddeler ürün/mimari gerçeklerinden: RLS, rol-izin matrisi, KVKK akışları. */
-const ITEMS = [
-  { icon: Lock, title: "Ofisinizin verisi ayrı tutulur", text: "Her kayıt ofisinize bağlıdır; veritabanı satır düzeyinde güvenlik (RLS) ile ofisler arası erişimi sınırlar. Ana veritabanı Frankfurt (eu-central-1) bölgesindedir." },
-  { icon: KeyRound, title: "Her işlem yetki kapısından geçer", text: "Sayfalar ve işlemler izin kontrolünden geçer; yetkisiz kullanıcı ilgili ekranı ve işlemi göremez." },
-  { icon: Users, title: "Rol ve izin matrisi", text: "Danışman, muhasebe ve yönetici erişimi ayrı ayrı tanımlanır; kullanıcı bazlı istisnalar eklenebilir." },
-  { icon: Scale, title: "KVKK süreç desteği", text: "Aydınlatma, rıza, dışa aktarım ve silme akışları ile İYS/EİDS hazırlık adımları ürünün içindedir." },
-];
+/* Garanti dili YOK: "süreç desteği". Metinler site içeriğinden (varsayılan = bugünkü metin); ikon kimliğe bağlıdır. */
+const ICONS: Record<string, typeof Lock> = { veri: Lock, yetki: KeyRound, rol: Users, kvkk: Scale };
 
 function Shield() {
   return (
@@ -23,7 +22,20 @@ function Shield() {
   );
 }
 
-export function SecurityBand() {
+export function SecurityBand({
+  trialDays,
+  plans = [],
+  content = defaultSiteContent().security,
+  heading = defaultSiteContent().sections.guvenlik,
+}: {
+  trialDays?: number;
+  plans?: readonly PlanDef[];
+  content?: SiteContent["security"];
+  heading?: Heading;
+}) {
+  const ctx = { trialDays, plans };
+  const items = content.items.filter((i) => !i.hidden && ICONS[i.id]).map((i) => ({ ...i, icon: ICONS[i.id]! }));
+  const chips = content.chips.filter((c) => !c.hidden);
   return (
     <section id="guvenlik" className="mk-dark mk-section" aria-labelledby="guvenlik-baslik" style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
       <div className="mk-grid-bg-dark" aria-hidden="true" />
@@ -31,23 +43,23 @@ export function SecurityBand() {
       <div className="mk-wrap">
         <div className="mk-split">
           <div className="mk-reveal">
-            <p className="mk-eyebrow">Güvenlik ve KVKK</p>
-            <h2 id="guvenlik-baslik" className="mk-h2" style={{ marginTop: "1rem" }}>Verinizi korumak, <Em>süreçle</Em> desteklenir.</h2>
+            <p className="mk-eyebrow">{heading.eyebrow}</p>
+            <h2 id="guvenlik-baslik" className="mk-h2" style={{ marginTop: "1rem" }}><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></h2>
             <ul className="mk-chips mk-chips-dark" aria-label="Güvenlik başlıkları">
-              {["Frankfurt (eu-central-1)", "Satır düzeyinde güvenlik", "Rol-izin matrisi", "KVKK süreç araçları", "İYS/EİDS hazırlık"].map((c) => <li key={c}>{c}</li>)}
+              {chips.map((c) => <li key={c.id}>{tx(c.text, ctx)}</li>)}
             </ul>
             <ul className="mk-sec-items">
-              {ITEMS.map((it) => (
-                <li key={it.title}>
+              {items.map((it) => (
+                <li key={it.id}>
                   <span className="mk-sec-ico"><it.icon size={20} aria-hidden="true" /></span>
                   <div>
-                    <h3 className="mk-h3">{it.title}</h3>
-                    <p>{it.text}</p>
+                    <h3 className="mk-h3">{tx(it.title, ctx)}</h3>
+                    <p><Lines text={tx(it.text, ctx)} /></p>
                   </div>
                 </li>
               ))}
             </ul>
-            <p className="mk-note">EmlakSoft KVKK süreçlerinizi destekleyen araçlar sunar; hukuki uyumluluk sorumluluğu ofisinizdedir.</p>
+            {content.note ? <p className="mk-note">{tx(content.note, ctx)}</p> : null}
           </div>
           <div className="mk-reveal"><Shield /></div>
         </div>

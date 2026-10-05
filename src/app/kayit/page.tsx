@@ -4,6 +4,8 @@ import { isRegistrationOpen } from "@/lib/platform-flags";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
+import { getLiveSiteContent } from "@/lib/site-content/store";
+import { tx } from "@/lib/site-content/tokens";
 
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
@@ -42,9 +44,15 @@ export default async function RegisterPage({
       </main>
     );
   }
-  const { plans, trialDays, offers, efValuationCost } = await getPublicPricing();
+  const [{ plans, trialDays, offers, efValuationCost }, content] = await Promise.all([getPublicPricing(), getLiveSiteContent()]);
+  const tokenCtx = { trialDays, plans };
   return (
     <RegisterForm
+      copy={{
+        title: tx(content.register.title, tokenCtx),
+        text: tx(content.register.text, tokenCtx),
+        panelText: tx(content.register.panelText, tokenCtx),
+      }}
       plans={plans}
       trialDays={trialDays}
       offers={offers}

@@ -27,6 +27,7 @@ export const HOME_ANCHORS = [
   "tur",
   "ozellikler",
   "kayip-kacak",
+  "emsal-degerleme",
   "degerleme",
   "otomasyon",
   "portal-kontrol",

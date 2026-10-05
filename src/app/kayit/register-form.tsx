@@ -57,9 +57,12 @@ export function RegisterForm({
   offers,
   attribution,
   efValuationCost,
+  copy,
 }: {
   /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
   efValuationCost?: number;
+  /** Üst metinler (Site içeriği, sunucuda değişkenleri çözülmüş düz metin); yoksa bugünkü metin. */
+  copy?: { title: string; text: string; panelText: string };
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
   /** Fiyat sayfası hesaplayıcısından gelen kullanıcı sayısı; yoksa seçilen planın dahil kullanıcı sayısı. */
@@ -128,11 +131,11 @@ export function RegisterForm({
   return (
     <AuthShell
       panelTitle="Ofisinizi 2 dakikada dijitalleştirin"
-      panelDesc={`${trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme"}, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.`}
+      panelDesc={copy?.panelText ?? `${trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme"}, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.`}
     >
       <div className="mt-8 lg:mt-0">
-        <h1 className="font-display text-3xl font-extrabold text-ink-950">Ücretsiz başlayın</h1>
-        <p className="mt-2 text-sm text-text-muted">3 kısa adımda çalışma alanınız hazır.</p>
+        <h1 className="font-display text-3xl font-extrabold text-ink-950">{copy?.title ?? "Ücretsiz başlayın"}</h1>
+        <p className="mt-2 text-sm text-text-muted">{copy?.text ?? "3 kısa adımda çalışma alanınız hazır."}</p>
         <p
           className="mt-3 inline-flex rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-700"
           aria-live="polite"

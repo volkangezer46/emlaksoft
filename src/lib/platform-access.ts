@@ -22,7 +22,8 @@ export type PlatformModule =
   | "personel"
   | "marka"
   | "seo"
-  | "sitemenu";
+  | "sitemenu"
+  | "sitecontent";
 
 export const PLATFORM_ROLE_LABELS: Record<PlatformRole, string> = {
   super_admin: "Süper admin",
@@ -43,8 +44,8 @@ export const PLATFORM_ROLE_TAGLINES: Record<PlatformRole, string> = {
  * Rol → erişilebilir modüller. `dashboard` herkeste var; içeriği role göre uyarlanır.
  */
 export const PLATFORM_ROLE_MODULES: Record<PlatformRole, PlatformModule[]> = {
-  super_admin: ["dashboard", "sales", "tenants", "members", "billing", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "personel", "marka", "seo", "sitemenu"],
-  ops: ["dashboard", "sales", "tenants", "members", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "seo", "sitemenu"],
+  super_admin: ["dashboard", "sales", "tenants", "members", "billing", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "personel", "marka", "seo", "sitemenu", "sitecontent"],
+  ops: ["dashboard", "sales", "tenants", "members", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "seo", "sitemenu", "sitecontent"],
   billing: ["dashboard", "billing", "tenants", "reports", "advisor"],
   support: ["dashboard", "sales", "tickets", "members", "tenants"],
 };

@@ -1,7 +1,11 @@
 import { Check, X } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { gateBadge } from "@/lib/marketing-plan-badge";
-import { Em, SectionHeading } from "./section-heading";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { Heading } from "@/lib/site-content/schema";
+import { tx } from "@/lib/site-content/tokens";
+import { RichTitle } from "./content-link";
+import { SectionHeading } from "./section-heading";
 
 /**
  * Dürüst karşılaştırma: rakip adı veya rakip iddiası YOK; yalnızca "Excel + WhatsApp + defter" gibi genel eski yöntemle kıyas.
@@ -19,12 +23,12 @@ function buildRows(plans: readonly { id: string; name: string }[]) {
   ];
 }
 
-export async function Why() {
+export async function Why({ heading = defaultSiteContent().sections.neden }: { heading?: Heading } = {}) {
   const ROWS = buildRows(await getPublicPlanDefinitions());
   return (
     <section id="neden" className="mk-section mk-alt" aria-labelledby="neden-baslik">
       <div className="mk-wrap">
-        <SectionHeading center eyebrow="Neden EmlakSoft" title={<span id="neden-baslik">Excel, WhatsApp ve defterle <Em>karşılaştırın.</Em></span>} text="Bugün işi nasıl yürütüyorsanız, aynı işin ürün içindeki karşılığı." />
+        <SectionHeading center eyebrow={heading.eyebrow} title={<span id="neden-baslik"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></span>} text={heading.text ? tx(heading.text, { plans: [] }) : undefined} />
         <div className="mk-cmp-wrap mk-reveal">
           <table className="mk-cmp">
             <caption className="sr-only">Genel eski yöntemler ile EmlakSoft karşılaştırması</caption>

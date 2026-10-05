@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 import { Handshake, RadioTower, ShieldCheck, ToggleRight, Tv } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { gateBadge } from "@/lib/marketing-plan-badge";
-import { Em, SectionHeading } from "./section-heading";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { Heading, TextItem } from "@/lib/site-content/schema";
+import { tx } from "@/lib/site-content/tokens";
+import { RichTitle } from "./content-link";
+import { SectionHeading } from "./section-heading";
 
 /**
  * "Daha fazlası": yalnız sistemde GERÇEKTEN olan beş özellik. Rozetler sayfa kilitlerinden (page-gates) gelir.
@@ -46,14 +50,22 @@ const ITEMS: Item[] = [
   },
 ];
 
-export async function Highlights() {
+export async function Highlights({
+  heading = defaultSiteContent().sections.diger,
+  content = defaultSiteContent().highlights,
+}: { heading?: Heading; content?: readonly TextItem[] } = {}) {
   const plans = await getPublicPlanDefinitions();
+  // Başlık/açıklama, sıra ve gizleme içerikten; ikon, rozet (paket kilidi) ve önizleme kimliğe bağlı koddadır.
+  const shown = content.filter((c) => !c.hidden).flatMap((c) => {
+    const base = ITEMS.find((i) => i.id === c.id);
+    return base ? [{ ...base, title: tx(c.title, { plans }), text: tx(c.text, { plans }) }] : [];
+  });
   return (
     <section id="diger" className="mk-section" aria-labelledby="diger-baslik">
       <div className="mk-wrap">
-        <SectionHeading center eyebrow="Ayrıntılar" title={<span id="diger-baslik">Günlük işi kolaylaştıran <Em>küçük büyük şeyler.</Em></span>} text="Vitrin, portal ve otomasyonun yanında ofisin her günü kullandığı yardımcı özellikler." />
+        <SectionHeading center eyebrow={heading.eyebrow} title={<span id="diger-baslik"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></span>} text={heading.text ? tx(heading.text, { plans }) : undefined} />
         <ul className="mk-hl-grid mk-stagger">
-          {ITEMS.map((it, i) => {
+          {shown.map((it, i) => {
             const badge = it.gate ? gateBadge(it.gate, plans) : undefined;
             return (
               <li key={it.id} id={it.id} className={`mk-hl${it.wide ? " mk-hl-wide" : ""}`} style={{ "--i": i } as React.CSSProperties}>

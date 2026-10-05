@@ -24,6 +24,7 @@ import {
   SearchCheck,
   Palette,
   PanelTop,
+  FileText,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -115,7 +116,9 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
       { href: "/admin/ayarlar", label: "Ayarlar", icon: Settings, hint: "Bakım, kayıt, deneme", module: "sistem" },
       { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
       { href: "/admin/seo", label: "SEO merkezi", icon: SearchCheck, hint: "Arama motoru, sitemap, robot", module: "seo" },
+      { href: "/admin/site", label: "Site yönetimi", icon: Globe, hint: "Tüm online yönetim alanları", module: "dashboard" },
       { href: "/admin/site-menu", label: "Site menüsü", icon: PanelTop, hint: "Menü, alt bilgi, duyuru", module: "sitemenu" },
+      { href: "/admin/site-icerik", label: "Site içeriği", icon: FileText, hint: "Ana sayfa metinleri, SSS", module: "sitecontent" },
     ],
   },
 ];
