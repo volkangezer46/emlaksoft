@@ -96,10 +96,11 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     }
   });
 
-  it("önerilen aylık kontör hakkı: Danışman 10, Ofis 40, Profesyonel 120, Business 300, Kurumsal 400 (+ ek kullanıcı başına 6)", () => {
+  it("önerilen aylık kontör hakkı: Danışman 10, Ofis 40, Profesyonel 120, Business 240, Kurumsal 400 (+ ek kullanıcı başına 5/6/6/6)", () => {
     const got = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsMonthly ?? null]));
-    expect(got).toEqual({ advisor: 10, office: 40, professional: 120, business: 300, enterprise: 400 });
-    expect(raw.find((p) => p.id === "enterprise")!.efCreditsPerExtraSeat).toBe(6);
+    expect(got).toEqual({ advisor: 10, office: 40, professional: 120, business: 240, enterprise: 400 });
+    const seat = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsPerExtraSeat ?? null]));
+    expect(seat).toEqual({ advisor: 5, office: 6, professional: 6, business: null, enterprise: 6 });
   });
 
   it("ham katalogda eski fiyatlar yok ve ücretsiz paket yok", () => {

@@ -14,7 +14,7 @@ Ofis kademeleri: ek kullanıcı 1-5 arası 399, 6-15 arası 349, 16 ve sonrası 
 Profesyonel kademeleri: ek kullanıcı 1-10 arası 349, 11 ve sonrası 299 ₺.
 Kurumsal kademeleri: ek kullanıcı 1-50 arası 249, 51-200 arası 199, 201 ve sonrası 149 ₺.
 Her paket için kullanıcı üst sınırı (`maxSeats`) **500**'dür (eski "20/40 kullanıcı üst sınırı" notları geçersiz).
-Aylık EmlakFiyatı kontör hakkı: Danışman 10 · Ofis 40 · Profesyonel 120 · Business 300 · Kurumsal 400 (+ ek kullanıcı başı 6).
+Aylık EmlakFiyatı kontör hakkı (WP3, sahip kararı): Danışman 10 · Ofis 40 · Profesyonel 120 · Business 240 (gizli) · Kurumsal 400; ek kullanıcı başı (`efCreditsPerExtraSeat`): Danışman 5 · Ofis 6 · Profesyonel 6 · Kurumsal 6 (Business tanımsız). Tarife (arsa 5, konut 5, ilk PDF 2, detay 0) ve kontör paketleri (299/990/2490/6900 ₺) değişmedi. Plan kontörü paket birim fiyatıyla (11,96 → 6,90 ₺) değerlenince paket fiyatının %11–%22'si düzeyindedir. Canlı kayıt için migration `20260826001100_ef_plan_credit_values.sql` (yalnız dokunulmamış değerleri çeker).
 Kaynak: `PLANS` (`plans.ts`) ile `RECOMMENDED_CATALOG_OVERRIDES` (`plan-overrides.ts`) AYNI değerleri taşır; kaymayı `plan-default-catalog.test.ts` yakalar.
 Kademe değerleri, sınırları ve yuvarlama düzeni admin tanımlıdır; yukarıdaki sayılar yalnız ONAYLI VARSAYILANDIR
 (panel kaydı yoksa geçerlidir, kayıt varsa panel kaydı geçerlidir). Hesap marjinaldir: her ek kullanıcı kendi kademesinin

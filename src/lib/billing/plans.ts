@@ -87,6 +87,7 @@ export const PLANS: readonly PlanDef[] = [
     maxSeats: 500,
     seatRounding: "x9",
     efCreditsMonthly: 10,
+    efCreditsPerExtraSeat: 5,
   },
   {
     id: "office",
@@ -113,6 +114,7 @@ export const PLANS: readonly PlanDef[] = [
     maxSeats: 500,
     seatRounding: "x9",
     efCreditsMonthly: 40,
+    efCreditsPerExtraSeat: 6,
   },
   {
     id: "professional",
@@ -136,6 +138,7 @@ export const PLANS: readonly PlanDef[] = [
     maxSeats: 500,
     seatRounding: "x9",
     efCreditsMonthly: 120,
+    efCreditsPerExtraSeat: 6,
   },
   {
     id: "enterprise",
@@ -241,5 +244,5 @@ export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
   limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
   hidden: true,
   order: 35,
-  efCreditsMonthly: 300,
+  efCreditsMonthly: 240,
 };

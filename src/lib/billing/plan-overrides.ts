@@ -340,9 +340,10 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
  * Not: veritabanı sınırları (plan_entitlements) paneldeki kayıt sırasında senkronlanır.
  */
 export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
-  advisor: { monthlyTry: 749, efCreditsMonthly: 10, extraSeatMonthlyTry: 499, maxSeats: 500, seatRounding: "x9" },
+  advisor: { monthlyTry: 749, efCreditsMonthly: 10, efCreditsPerExtraSeat: 5, extraSeatMonthlyTry: 499, maxSeats: 500, seatRounding: "x9" },
   office: {
     efCreditsMonthly: 40,
+    efCreditsPerExtraSeat: 6,
     extraSeatMonthlyTry: 399,
     extraSeatTiers: [
       { fromSeat: 1, toSeat: 5, monthlyTry: 399 },
@@ -362,6 +363,7 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
     maxSeats: 500,
     seatRounding: "x9",
     efCreditsMonthly: 120,
+    efCreditsPerExtraSeat: 6,
     limits: { seats: 15 },
     features: [
       "15 kullanıcıya kadar · 10 şube",
@@ -371,7 +373,7 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       "KVKK uyum ve ofisler arası ağ",
     ],
   },
-  business: { monthlyTry: 8990, limits: { seats: 40 }, efCreditsMonthly: 300 },
+  business: { monthlyTry: 8990, limits: { seats: 40 }, efCreditsMonthly: 240 },
   enterprise: {
     monthlyTry: 12900,
     efCreditsMonthly: 400,
