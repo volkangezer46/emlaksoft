@@ -23,6 +23,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { formatNumberTr } from "@/lib/format";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
+import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { registrationQuote, registrationSelection, seatBounds } from "@/lib/billing/seat-calculator-model";
 
@@ -57,10 +58,13 @@ export function RegisterForm({
   attribution,
   invite = null,
   efValuationCost,
+  efLive = false,
   copy,
 }: {
   /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
   efValuationCost?: number;
+  /** EmlakFiyati canlı mı (tek durum kaynağı); değilse kontör satırı "(planlanan)" ve satın alma cümlesi yok. */
+  efLive?: boolean;
   /** Üst metinler (Site içeriği, sunucuda değişkenleri çözülmüş düz metin); yoksa bugünkü metin. */
   copy?: { title: string; text: string; panelText: string };
   initialPlan?: PlanId;
@@ -146,9 +150,10 @@ export function RegisterForm({
         >
           {selectedPlan.name} · {initialCycle === "yearly" ? "Yıllık" : "Aylık"} plan seçimi{planPriceText}
         </p>
-        {efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0) ? (
+        {efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive) ? (
           <p className="mt-2 text-xs font-semibold text-mint-700">
-            {efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0)}; kontör ile ek sorgu satın alınabilir.
+            {efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive)}
+            {efLive ? "; kontör ile ek sorgu satın alınabilir." : "."}
           </p>
         ) : null}
 

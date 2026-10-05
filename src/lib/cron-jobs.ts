@@ -49,4 +49,5 @@ export const CRON_JOBS = [
   { job: "ef-kontor-hak", label: "EmlakFiyati aylık kontör hakkı", path: "/api/cron/ef-kontor-hak", schedule: "10 1 * * *", cadenceLabel: "her gün 01:10 UTC (04:10 TR)", staleAfterMinutes: 2_160 },
   { job: "growth-claims", label: "Referans/ortak ödül işleyicisi", path: "/api/cron/growth-claims", schedule: "40 3 * * *", cadenceLabel: "her gün 03:40 UTC (06:40 TR)", staleAfterMinutes: 2_160 },
   { job: "ef-kontor-sweep", label: "EmlakFiyati kontör rezerv süpürmesi", path: "/api/cron/ef-kontor-sweep", schedule: "8-59/10 * * * *", cadenceLabel: "10 dakikada bir", staleAfterMinutes: 40 },
+  { job: "ef-kontor-saglik", label: "EmlakFiyati bağlantı sağlık yoklaması", path: "/api/cron/ef-kontor-saglik", schedule: "50 1 * * *", cadenceLabel: "her gün 01:50 UTC (04:50 TR)", staleAfterMinutes: 2_160 },
 ] as const satisfies readonly CronJobDefinition[];

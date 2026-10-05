@@ -49,8 +49,8 @@ export default async function RegisterPage({
       </main>
     );
   }
-  const [{ plans, trialDays, offers, efValuationCost }, content] = await Promise.all([getPublicPricing(), getLiveSiteContent()]);
-  const tokenCtx = { trialDays, plans };
+  const [{ plans, trialDays, offers, efValuationCost, efLive }, content] = await Promise.all([getPublicPricing(), getLiveSiteContent()]);
+  const tokenCtx = { trialDays, plans, efLive };
   // Davet bağlantısı (çerez ya da ?ref): "X sizi davet etti" + hoş geldin avantajı. Hata/kapalı program = banner yok.
   const jar = await cookies();
   const touch = parseRefCookie(jar.get(REF_COOKIE)?.value) ?? parseRefParam(params.ref);
@@ -71,6 +71,7 @@ export default async function RegisterPage({
       trialDays={trialDays}
       offers={offers}
       efValuationCost={efValuationCost}
+      efLive={efLive}
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
       initialSeats={/^\d{1,3}$/.test(params.seats ?? "") && Number(params.seats) > 0 ? Number(params.seats) : undefined}

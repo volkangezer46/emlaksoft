@@ -1,4 +1,5 @@
 import { DEFAULT_YEARLY_PAID_MONTHS, PLANS, getPlan, planAmountOf, planAmountTry, yearlyDiscountPercentOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { EF_PLANNED_SUFFIX } from "@/lib/ef-credits/public-state-core";
 import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/page-gates";
 
@@ -34,7 +35,7 @@ function numericRow(plans: readonly PlanDef[], label: string, pick: (p: PlanDef)
   return { label, cells: plans.map((p) => ({ text: pick(p) })) };
 }
 
-export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efValuationCost?: number } = {}): CompareGroup[] {
+export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efValuationCost?: number; efLive?: boolean } = {}): CompareGroup[] {
   const pricing: CompareGroup = {
     title: "Fiyat ve limitler",
     rows: [
@@ -64,8 +65,10 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efVal
 
   if (plans.some((p) => (p.efCreditsMonthly ?? 0) > 0)) {
     const cost = opts.efValuationCost ?? 0;
+    // Canlı değilse satır etiketi ve her hücre "(planlanan)" taşır (sayılar yine plan kataloğundan).
+    const planned = opts.efLive ? "" : ` ${EF_PLANNED_SUFFIX}`;
     pricing.rows.push(
-      numericRow(plans, "Aylık EmlakFiyati kontörü", (p) => {
+      numericRow(plans, `Aylık EmlakFiyati kontörü${planned}`, (p) => {
         const n = p.efCreditsMonthly ?? 0;
         if (n <= 0) return "Yok";
         const m = cost > 0 ? Math.floor(n / cost) : 0;

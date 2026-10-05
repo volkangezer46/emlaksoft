@@ -175,7 +175,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Havuz/atama puanı | `src/lib/pool/score.ts` |
 | Anket | `src/lib/surveys/**` (mevcut memnuniyet anketini genişletir) |
 | Ürün turu | `src/lib/product-tour-data.ts` |
-| Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (33 rota, `npm run check:cron`) |
+| Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (34 rota, `npm run check:cron`) |
 | service_role | `src/lib/admin-client-allowlist.ts` (`audit-admin-client.ts --write`) |
 | EmlakFiyati TEK ADAPTÖR (emlakfiyati.com'a TÜM çağrılar) | `src/lib/integrations/emlakfiyati/`: `adapter.ts` (tek `fetchExternal`; `emlakFiyatiGet(path, query)` tür-güvenli ince çekirdek, geri çekilme+jitter, en çok 4 eşzamanlı, bellek önbelleği, 401/403/429/5xx/ağ sınıflandırma, istek sayacı + `onEmlakFiyatiRequest` kancası [kontör ADAPTÖR DIŞINDA], 401 alarmı, `probeEmlakFiyatiConnection`), `policy.ts` (saf: izinli yol/başlık beyaz listesi, anahtar biçimi/maske, `X-Ortak-Kullanici-Ref` ve `Idempotency-Key` yardımcıları), `keys.ts` (anahtar çözümleme: admin şifreli > env `EMLAKFIYATI_API_KEY` yedek; rotasyon current/previous 7 gün), `ortak.ts` (ortak uç KAPISI + takma ref), `admin-status.ts`; şifreleme `src/lib/platform-secrets.ts` (`PLATFORM_SECRETS_KEY`, AES-256-GCM, `pii-crypto` kalıbı); admin ekranı `/admin/sistem?sekme=emlakfiyati` + `src/app/actions/platform-emlakfiyati.ts` (süper admin yazar, ops okur). Sözleşme testi: `single-adapter-contract.test.ts` |
 | EmlakFiyati KONTÖR (tarife/paket/cüzdan/satış) | **Sözleşme** `src/lib/ef-credits/config.ts` (tarife+paket şemaları, RPC adları; DEĞİŞTİRİLMEZ). **Okuyucu** `credit-reader.ts` (ef_credit_ready yoklaması 60 sn, katalog [tag `ef-credit-config`], bakiye, geçmiş, son kontör faturası), saf görünüm `credit-view.ts`, admin `admin-data.ts` (ofis bakiye listesi, manuel yükleme RPC) + saf `admin-grant.ts` (doğrulama, ÖRNEK 4 paket ön ayarı). **Cüzdan/servis (wallet.ts, service.ts) BAŞKA AJANDA.** Satış: saf `src/lib/billing/credit-pack-purchase-core.ts` (KDV=invoiceAmountsTry, kontör başı, düşük bakiye eşiği, öneri), sunucu `credit-pack-purchase.ts` (fatura meta.kind=credit_pack), action `startCreditPackPurchase` (billing.ts). Ofis ekranı `/app/abonelik?sekme=kontor`; admin `/admin/ef-kontor` (süper admin yazar, ops okur, `updateTag`). Cüzdan hazır değilse (ef_credit_ready) HER ŞEY "etkin değil", para tahsil eden yol AÇILMAZ; kupon paketlerde KAPALI; demo ödeme yok. **SAHİP İŞLERİ:** paket fiyatları (katalog varsayılan BOŞ; admin"Örnek ön ayar" yalnız öneri) ve tarife değerleri (varsayılan EF_DEFAULT_TARIFF). Geçmiş okuyucusu defter sütunlarında hoşgörülüdür (kind/entry_type, units/amount, item/feature); cüzdan SQL canlıya girince gerçek sütun adlarıyla doğrulanmalı |
@@ -200,6 +200,11 @@ Kontör EmlakSoft'ta düşer, mutabakat için EmlakFiyati aylık kullanım dök�
 **Hâlâ ŞEMA GEREKLİ (EmlakFiyati'ndan, tahmin edilmedi; ortak uç dışındakiler):** `/api/ara`, `/api/grafik/seri|iller|genel`, `/api/dashboard`, `/api/rayic`, `/api/resmi-duyurular`, `/api/parsel*` (mahalle, ornekler, kademe), `/api/konut-kapsama`, `/api/disa-aktar`, `/api/ilanlar`
 için sorgu parametreleri ve yanıt şemaları (adaptör yalnız `get(path, query)` çekirdeği sunar; yalnız `/api/endeks` path+tip doğrulandı). `/api/parsel/rapor?format=pdf` kullanıcı ürününde KULLANILMAZ.
 `docs/design/EMLAKFIYATI_KONTOR_MIMARISI.md` §5 (HMAC imza başlıkları `X-ES-*`) EmlakFiyati'nın bildirdiği sözleşmeyle UYUŞMUYOR (Bearer + `X-Ortak-Kullanici-Ref` + `Idempotency-Key`); kontör kodu yazılmadan önce o belge güncellenmeli.
+
+**EF tek durum kaynağı (WP1):** `src/lib/ef-credits/public-state.ts` (`getEfPublicState()` -> `{state: live|soon|stale|maintenance, live, purchasable}`;
+saf karar `public-state-core.ts`). live = anahtar + bayrak + 7 günden taze probe damgası + `ef_credit_ready`. Kontör satın alma
+(`startCreditPackPurchase`) ve kontör sekmesi yalnız `purchasable` iken açılır; public fiyat yüzeyleri live değilse "(planlanan)" der.
+Günlük `ef-kontor-saglik` cron'u damgayı yeniler/siler.
 
 ## 7. Kararlar (değişmez, tekrar sorulmaz)
 

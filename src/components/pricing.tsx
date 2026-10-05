@@ -17,6 +17,7 @@ import { formatNumberTr } from "@/lib/format";
 import type { ExtraSeatSummary } from "@/lib/billing/seat-calculator-model";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { efCreditsLine, monthlyUnitsOf } from "@/lib/ef-credits/plan-credits";
+import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
 
 const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
   advisor: UserRound,
@@ -60,9 +61,12 @@ export function Pricing({
   founders = null,
   extraSeats,
   efValuationCost,
+  efLive = false,
 }: {
   /** Bir değerlemenin kontör bedeli (sunucuda tarifeden okunur); verilmezse "yaklaşık değerleme" kısmı yazılmaz. */
   efValuationCost?: number;
+  /** EmlakFiyati canlı mı (public-state). Değilse kontör satırı "(planlanan)" etiketlenir. */
+  efLive?: boolean;
   /**
    * Plan kimliğine göre ek kullanıcı kademe metni; SUNUCUDA `extraSeatSummary` ile üretilir (fiyat motoru
    * istemci paketine girmesin diye). Verilmezse metin gösterilmez.
@@ -200,9 +204,9 @@ export function Pricing({
                   </li>
                 ))}
               </ul>
-              {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0, plan.efCreditsPerExtraSeat) ? (
+              {efPlannedLine(efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0, plan.efCreditsPerExtraSeat), efLive) ? (
                 <p className={`mt-3 text-xs font-semibold ${plan.popular ? "text-mint-400" : "text-mint-700"}`}>
-                  {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0, plan.efCreditsPerExtraSeat)}
+                  {efPlannedLine(efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0, plan.efCreditsPerExtraSeat), efLive)}
                 </p>
               ) : null}
               {extra ? (
@@ -240,7 +244,9 @@ export function Pricing({
       </div>
       {anyCredits ? (
         <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-text-muted">
-          Kontör, EmlakFiyati değerleme ve PDF rapor sorguları içindir. Paket kontörü bittiğinde kontör ile ek sorgu satın alınabilir.
+          {efLive
+            ? "Kontör, EmlakFiyati değerleme ve PDF rapor sorguları içindir. Paket kontörü bittiğinde kontör ile ek sorgu satın alınabilir."
+            : "Kontör, EmlakFiyati değerleme ve PDF rapor sorguları içindir. EmlakFiyati değerleme henüz etkinleştirilmedi; kontör satırları planlanan değerlerdir."}
         </p>
       ) : null}
     </div>
