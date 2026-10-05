@@ -77,7 +77,7 @@ export function parseMediaIndex(raw: string | null): MediaEntry[] {
 /** Yayındaki menü (önbellekli). Ayar yok/bozuk/okunamıyorsa varsayılan menü: site bugünkü gibi çalışır. */
 export const getLiveSiteMenu = unstable_cache(
   async (): Promise<SiteMenuConfig> => parseConfig(await getPlatformSetting(LIVE)) ?? defaultSiteMenu(),
-  ["site-menu-live-v1"],
+  ["site-menu-live-v2"],
   { tags: [SITE_MENU_CACHE_TAG], revalidate: 300 },
 );
 

@@ -90,7 +90,7 @@ export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu
     g.items.forEach((it) => {
       const pub = items.find((x) => x.id === it.id);
       if (!pub) return;
-      const key = it.section.trim();
+      const key = (it.section ?? "").trim();
       bySection.set(key, [...(bySection.get(key) ?? []), pub]);
     });
     groups.push({
