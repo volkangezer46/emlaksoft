@@ -89,8 +89,10 @@ describe("admin override'ları", () => {
     expect(m.openGraph).toMatchObject({ title: "OG başlık", images: [{ url: "/ozel-og.png" }] });
   });
   it("noindex/nofollow robots'a yansır", () => {
-    expect(resolvePageMetadata("/demo", G, { "/demo": { robotsIndex: false } }).robots).toEqual({ index: false, follow: true });
-    expect(resolvePageMetadata("/demo", G, { "/demo": { robotsFollow: false } }).robots).toEqual({ index: true, follow: false });
+    expect(resolvePageMetadata("/kayit", G, { "/kayit": { robotsIndex: false } }).robots).toEqual({ index: false, follow: true });
+    expect(resolvePageMetadata("/kayit", G, { "/kayit": { robotsFollow: false } }).robots).toEqual({ index: true, follow: false });
+    // /demo artık /kayit'a yönlenir: varsayılan noindex.
+    expect(resolvePageMetadata("/demo", G, {}).robots).toEqual({ index: false, follow: true });
   });
   it("ana sayfa başlığı override edilince şablon uygulanmaz (absolute)", () => {
     const m = resolvePageMetadata("/", G, { "/": { title: "Özel ana sayfa başlığı" } });

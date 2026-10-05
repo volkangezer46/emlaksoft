@@ -338,7 +338,7 @@ export default async function CuzdanPage({
         <div className="no-print">
           <EmptyState illustration="komisyon"
             icon={HandCoins}
-            title="Cüzdanın henüz boş"
+            title="Henüz kazancınız yok"
             description="İlk anlaşman kapanınca hakedişin burada birikecek."
             action={{ href: "/app/anlasmalar", label: "Anlaşmalara git" }}
             tone="mint"

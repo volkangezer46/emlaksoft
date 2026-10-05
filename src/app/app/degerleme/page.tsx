@@ -17,6 +17,7 @@ import { isEmlakFiyatiConfigured } from "@/lib/integrations/emlakfiyati/client";
 import { DAY_MS } from "@/lib/clock";
 import { ValuationForm } from "./valuation-form";
 import { DegerlemeTabs } from "./degerleme-tabs";
+import { getEfFeatureState } from "@/lib/ef-credits/service";
 import { DataPartnerStatus } from "@/components/app/data-partner-badges";
 import { EmptyState } from "@/components/app/empty-state";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
@@ -59,7 +60,9 @@ export default async function ValuationPage({
 }: {
   searchParams: Promise<{ property?: string }>;
 }) {
-  await requireModulePage("valuation", "/app/degerleme");
+  const { tenantId: gateTenantId } = await requireModulePage("valuation", "/app/degerleme");
+  // Ada/Parsel sekmesi yalnız servis hazırsa görünür (hazır değilken ofis kullanıcısına çıkmaz sayfa gösterilmez).
+  const parselReady = gateTenantId ? (await getEfFeatureState(gateTenantId)).ready : false;
   const { property: preselectedPropertyId } = await searchParams;
   const supabase = await createClient();
   const [
@@ -261,7 +264,7 @@ export default async function ValuationPage({
             <DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={await isEmlakFiyatiConfigured()} />
           </div>
 } />
-      <DegerlemeTabs active="motor" />
+      <DegerlemeTabs active="motor" parselReady={parselReady} />
       <ReferralNudge moment="first_valuation" show={rows.length >= 1} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />

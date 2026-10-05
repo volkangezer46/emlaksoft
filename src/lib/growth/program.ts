@@ -503,8 +503,8 @@ export const NUDGE_COPY: Record<NudgeMoment, { title: string; text: string; cta:
   },
   team_grew: {
     title: "Ekibiniz büyüyor",
-    text: "Ekibini davet et ve kazan: bağlantınızla gelen ofisler ödeme yaptığında hesap krediniz yüklenir.",
-    cta: "Ekibini davet et ve kazan",
+    text: "Tanıdığınız başka ofisleri de davet edin: bağlantınızla gelen ofisler ödeme yaptığında hesap krediniz yüklenir.",
+    cta: "Başka ofisleri davet et",
   },
 };
 

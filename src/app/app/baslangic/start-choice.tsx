@@ -35,7 +35,7 @@ export function StartChoice({ canEdit, canSeed }: { canEdit: boolean; canSeed: b
         const seed = await seedSampleData({ pack: kind });
         if (seed.error) return setError(seed.error);
         const skipped = seed.seed?.skipped.length ?? 0;
-        if (skipped > 0) setNotes([`${skipped} modül bu ortamda etkin değil, atlandı; kalan tüm demo veri yüklendi.`]);
+        if (skipped > 0) setNotes([`${skipped} modül bu ortamda etkin değil, atlandı; kalan tüm örnek veri yüklendi.`]);
       }
       setDone(choice);
       router.refresh();
@@ -46,7 +46,7 @@ export function StartChoice({ canEdit, canSeed }: { canEdit: boolean; canSeed: b
     <section aria-label="Nasıl başlamak istersiniz?" className="space-y-4 rounded-[var(--radius-card)] border border-brand-300/60 bg-brand-600/[0.04] p-4">
       <div>
         <h2 className="font-display text-base font-bold text-text">Nasıl başlamak istersiniz?</h2>
-        <p className="mt-0.5 text-sm text-text-muted">Ofis tipinizi seçin; sonra dolu bir demo ofisle keşfedin ya da boş başlayın. İkisi de sonradan değiştirilebilir.</p>
+        <p className="mt-0.5 text-sm text-text-muted">Ofis tipinizi seçin; sonra örnek veriyle keşfedin ya da boş başlayın. İkisi de sonradan değiştirilebilir.</p>
       </div>
       <fieldset>
         <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-faint">Ofis tipi</legend>
@@ -71,15 +71,15 @@ export function StartChoice({ canEdit, canSeed }: { canEdit: boolean; canSeed: b
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4">
           <p className="flex items-center gap-2 text-sm font-bold text-text">
-            <Sparkles className="h-4 w-4 text-amber-500" aria-hidden /> Dolu demo ile başla
+            <Sparkles className="h-4 w-4 text-amber-500" aria-hidden /> Örnek veriyle başla
           </p>
           <p className="text-xs text-text-muted">
             Müşteri, talep, portföy, randevu, görev, teklif, kazanılmış anlaşma ve komisyon, kira ve giderlerle dolu bir ofis. Düzenleyin, silin, her ekranı deneyin; hazır olunca tek tuşla hepsi silinir.
           </p>
           <Button type="button" className="mt-auto self-start" icon={Sparkles} loading={pending && mode === "demo"} disabled={pending || !canSeed} onClick={() => go("demo")}>
-            Demo ofisle başla
+            Örnek veriyle başla
           </Button>
-          {!canSeed ? <p className="text-xs text-text-faint">Demo için müşteri, portföy, talep, görev, randevu ve anlaşma yetkileri gerekir.</p> : null}
+          {!canSeed ? <p className="text-xs text-text-faint">Örnek veri için müşteri, portföy, talep, görev, randevu ve anlaşma yetkileri gerekir.</p> : null}
         </div>
         <div className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4">
           <p className="flex items-center gap-2 text-sm font-bold text-text">
@@ -93,7 +93,7 @@ export function StartChoice({ canEdit, canSeed }: { canEdit: boolean; canSeed: b
       </div>
       {done ? (
         <p role="status" className="text-sm font-semibold text-mint-600">
-          {done === "demo" ? "Demo ofis hazır. Ana ekrandaki bant ve Ayarlar > Örnek veriler üzerinden istediğiniz an gerçek kullanıma geçebilirsiniz." : "Ofis tipi tanımları eklendi. Aşağıdaki adımlarla devam edin."}
+          {done === "demo" ? "Örnek veri hazır. Ana ekrandaki bant ve Ayarlar > Örnek veriler üzerinden istediğiniz an gerçek kullanıma geçebilirsiniz." : "Ofis tipi tanımları eklendi. Aşağıdaki adımlarla devam edin."}
         </p>
       ) : null}
       {error ? (

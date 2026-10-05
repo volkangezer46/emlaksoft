@@ -16,7 +16,7 @@ import { runAutoRenewPass } from "@/lib/billing/auto-renew";
  * - past_due abonelik olup gecikmiş faturası OLMAYAN tenant'lara 3 günde bir
  *   marker (`dunsub:<id>`) ile tekrar korumalı genel hatırlatma gönderilir.
  *
- * Önerilen zamanlama (vercel.json'a eklenecek): "0 9 * * *" (her gün 09:00 UTC)
+ * Zamanlama (vercel.json'da tanımlı): "0 9 * * *" (her gün 09:00 UTC = 12:00 TR)
  */
 
 const DAY_MS = 86_400_000;
@@ -57,6 +57,9 @@ function stageMessage(stage: number, invoiceNo: string, daysOverdue: number) {
     kind: "warning" as const,
   };
 }
+
+/** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });

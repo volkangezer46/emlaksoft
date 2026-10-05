@@ -66,10 +66,11 @@ const BASE_PAGES: SeoPageDef[] = [
       "EmlakSoft'u ofisinize özel canlı demo ile keşfedin. Portföy, müşteri, komisyon ve portal yönetimini 15 dakikada görün.",
     ogTitle: "EmlakSoft — Ücretsiz Demo",
     ogDescription: "Emlak ofisinizi tek platformda yönetin. Canlı demo talep edin.",
-    index: true,
-    canIndex: true,
-    sitemap: { include: true, priority: 0.8, freq: "monthly" },
-    jsonLd: ["BreadcrumbList"],
+    // /demo artık /kayit'a 308 yönlendirilir (next.config.ts); sayfa dosyası yalnız geriye dönük kalır. İndekslenmez, sitemap'e girmez.
+    index: false,
+    canIndex: false,
+    sitemap: { include: false, priority: 0.8, freq: "monthly" },
+    jsonLd: [],
   },
   {
     path: "/kayit",

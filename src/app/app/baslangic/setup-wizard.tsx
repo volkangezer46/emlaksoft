@@ -173,7 +173,7 @@ function StepBody(props: SetupWizardProps & { id: OnboardingStepId; done: boolea
           </p>
           {props.showSampleData && props.canEditSettings ? (
             <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3">
-              <p className="min-w-0 flex-1 text-sm text-text-muted">Önce sistemi denemek ister misiniz? Dolu demo ofis yüklenir; hazır olunca tek tuşla tamamı silinir.</p>
+              <p className="min-w-0 flex-1 text-sm text-text-muted">Önce sistemi denemek ister misiniz? Örnek veri yüklenir; hazır olunca tek tuşla tamamı silinir.</p>
               <SampleSeedButton />
             </div>
           ) : null}

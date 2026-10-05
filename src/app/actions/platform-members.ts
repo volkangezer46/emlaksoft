@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { ASSIGNABLE_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
-import { getPlan } from "@/lib/billing/plans";
+import { readEffectiveSeatLimit } from "@/lib/billing/seat-purchase";
 import { getBaseUrl } from "@/lib/base-url";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
@@ -163,7 +163,7 @@ export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberAction
     if (tenant.status === "suspended" || tenant.status === "cancelled") {
       return { error: "Askıdaki veya iptal edilmiş ofiste üye aktifleştirilemez." };
     }
-    const limit = getPlan(String(tenant.plan)).limits.seats;
+    const limit = await readEffectiveSeatLimit(admin, target.tenant_id, String(tenant.plan));
     if ((count ?? 0) >= limit) {
       return { error: `Ofisin paketi en fazla ${limit} aktif kullanıcı destekliyor.` };
     }

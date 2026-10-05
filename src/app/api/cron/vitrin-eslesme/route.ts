@@ -71,6 +71,9 @@ function matches(s: SavedSearch, p: LiveProperty): boolean {
  * vercel.json'a DOKUNULMADI — cron path'i elle eklenmeli:
  *   { "path": "/api/cron/vitrin-eslesme", "schedule": "0 9 * * *" }
  */
+/** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

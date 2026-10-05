@@ -88,6 +88,11 @@ const nextConfig: NextConfig = {
     return [{ source: "/:key([a-f0-9]{32}).txt", destination: "/api/indexnow-key/:key" }];
   },
 
+  // /demo public sayfası kapatıldı: 308 ile kayıt akışına gider (satış demosu formu verisi /admin/satis'te kalır).
+  async redirects() {
+    return [{ source: "/demo", destination: "/kayit", permanent: true }];
+  },
+
   async headers() {
     return [
       // The worker is security-sensitive executable code. Every check must hit

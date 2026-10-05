@@ -15,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msSince, msUntil, now } from "@/lib/clock";
-import { planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
+import { BILLING_VAT_RATE, planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
 import { getPlanDefinition, getPublicPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { getSeatSupport, loadSeatState, type SeatUsageSummary } from "@/lib/billing/seat-purchase";
 import { seatUtilization } from "@/lib/billing/seat-pricing";
@@ -142,7 +142,8 @@ export default async function BillingPage({
   const tabs: DetailTabDef[] = [
     { id: "plan", label: "Plan ve kullanım" },
     { id: "kontor", label: "Kontör" },
-    { id: "cuzdan", label: "Cüzdan" },
+    // Hesap kredisi yalnız ofis sahibi ve genel müdüre görünür (sekme gizlenir; doğrudan bağlantıda bölüm mesaj gösterir).
+    { id: "cuzdan", label: "Hesap kredisi", hidden: !(auth.role === "owner" || auth.role === "gm") },
     { id: "faturalar", label: "Faturalar" },
     { id: "iptal", label: "İptal", hidden: !cancelSupported },
   ];
@@ -491,7 +492,7 @@ export default async function BillingPage({
                       cardsSupported && configured && isSeatOwner && defaultSavedCard ? maskedCardLabel(defaultSavedCard) : null
                     }
                     wallet={current || sellable ? walletCheckout : null}
-                    totalTry={Math.round(amount * 1.2 * 100) / 100}
+                    totalTry={Math.round(amount * (1 + BILLING_VAT_RATE) * 100) / 100}
                   />
                 ) : (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">

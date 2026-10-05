@@ -51,7 +51,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       />
 
       {!ready ? (
-        <Alert tone="info" title="Kontör cüzdanı henüz etkin değil">
+        <Alert tone="info" title="Kontör bakiyesi henüz etkin değil">
           Cüzdan SQL&apos;i (ef_credit_ready) hazır olana kadar bakiye, yükleme ve ofis satışı kapalıdır. Tarife ve paket kataloğunu şimdiden
           hazırlayabilirsiniz.
         </Alert>

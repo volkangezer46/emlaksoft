@@ -336,7 +336,7 @@ export function RegisterForm({
                 className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
               />
               <span>
-                <strong className="text-ink-900">Demo verileriyle başla</strong> — müşteri, portföy, talep, randevu ve
+                <strong className="text-ink-900">Örnek veriyle başla</strong> — müşteri, portföy, talep, randevu ve
                 anlaşmalarla dolu örnek bir ofisle her ekranı deneyin. Hazır olunca tek adımda temizleyip kendi
                 verinizle devam edersiniz; gerçek kayıtlarınıza dokunulmaz.
               </span>

@@ -19,7 +19,7 @@ import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string };
 
-const PLANS = ["advisor", "office", "professional", "enterprise"] as const;
+const PLANS = ["advisor", "office", "professional", "business", "enterprise"] as const;
 const STATUSES = ["trial", "active", "past_due", "suspended", "cancelled"] as const;
 const IMPERSONATION_ROLES: ReadonlySet<string> = new Set(["super_admin", "ops", "support"]);
 

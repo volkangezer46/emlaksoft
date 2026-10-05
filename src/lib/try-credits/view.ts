@@ -14,7 +14,7 @@ export function invoiceLink(invoiceId: string): string {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  referral: "Tavsiye ödülü",
+  referral: "Davet ödülü",
   partner: "Ortaklık ödülü",
   campaign: "Kampanya kredisi",
   manual: "Yönetici yüklemesi",
@@ -94,10 +94,8 @@ export function summarizeWallet(overview: TryOverview, nowMs: number): WalletSum
   };
 }
 
-const tl2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export function formatTry(n: number): string {
-  return `${tl2.format(n)} ₺`;
-}
+/** Kuruşlu ₺ biçimi tek kaynaktan (`@/lib/format`); çağıranlar için eski ad korunur. */
+export { formatTryKurus as formatTry } from "@/lib/format";
 
 /** Pay → "%50" */
 export function formatShare(maxShare: number): string {

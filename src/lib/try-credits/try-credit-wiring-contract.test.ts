@@ -119,7 +119,7 @@ describe("iade / iptal", () => {
 describe("abonelik sayfası: Cüzdan bölümü", () => {
   it("sekme kayıtlı, süzgeç URL'den, bakiye RLS'li RPC ile; zaman clock.ts'ten", () => {
     expect(page).toContain('resolveTab(sp, ["plan", "kontor", "cuzdan", "faturalar", "iptal"], "plan")');
-    expect(page).toContain('{ id: "cuzdan", label: "Cüzdan" }');
+    expect(page).toContain('{ id: "cuzdan", label: "Hesap kredisi" }');
     expect(page).toContain("readTryOverview(supabase)");
     expect(page).toContain("<CuzdanSection");
     const section = read("src/app/app/abonelik/cuzdan-section.tsx");

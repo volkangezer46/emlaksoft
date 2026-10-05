@@ -60,7 +60,7 @@ export function WalletCreditToggle({
         </span>
       </label>
       <Link href={TRY_WALLET_LINKS.wallet} className="mt-1 inline-block font-semibold text-brand-600 hover:underline">
-        Cüzdanı aç
+        Hesap kredisini aç
       </Link>
     </div>
   );

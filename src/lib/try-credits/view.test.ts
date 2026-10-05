@@ -17,7 +17,7 @@ const row = (p: Partial<TryMovementRow>): TryMovementRow => ({
 
 describe("hareket sunumu", () => {
   it("yükleme / harcama / geri alma / iade etiketleri", () => {
-    expect(describeMovement(row({})).label).toBe("Tavsiye ödülü");
+    expect(describeMovement(row({})).label).toBe("Davet ödülü");
     expect(describeMovement(row({ source: "partner" })).label).toBe("Ortaklık ödülü");
     expect(describeMovement(row({ source: "campaign", expiresAt: "2026-11-01T00:00:00Z" })).detail).toBe("Vadeli kredi");
     const spend = describeMovement(row({ entryType: "spend", amount: -50, source: "usage" }));

@@ -91,7 +91,7 @@ vi.mock("./wallet", () => {
 });
 
 import { EF_TARIFF_SETTING_KEY, efIdempotencyKey } from "./config";
-import { getOwnedReport, getReportDetail, getReportPdf, runParcelValuation } from "./service";
+import { getEfFeatureState, getOwnedReport, getReportDetail, getReportPdf, runParcelValuation } from "./service";
 
 const T1 = "9d1c7a52-6b3e-4f08-a1d4-2e5f6a7b8c90";
 const T2 = "7e1c7a52-6b3e-4f08-a1d4-2e5f6a7b8c91";
@@ -253,14 +253,17 @@ describe("EF kontör servisi", () => {
     it.each([
       ["bayrak kapalı", () => { settings.flag = false; }, /etkinleştirilmemiş/],
       ["yoklama yok", () => { settings.probe = null; }, /yoklaması/],
-      ["cüzdan hazır değil", () => { w.ready = false; }, /cüzdan/],
+      ["kontör bakiyesi hazır değil", () => { w.ready = false; }, /Kontör bakiyesi/],
       ["anahtar yok", () => { settings.configured = false; }, /anahtarı/],
     ] as const)("etkin değil (%s): açık eksik ön koşul, sorgu/rezerve yok", async (_n, setup, re) => {
       setup();
       const r = await runParcelValuation({ tenantId: T1, userId: U, input: INPUT });
       expect(r.status).toBe("disabled");
       if (r.status !== "disabled") throw new Error("beklenmeyen");
-      expect(r.missing.join(" ")).toMatch(re);
+      // Ofis kullanıcısı yalnız tek cümle görür; teknik ayrıntı `details`'te (yalnız /admin/sistem).
+      expect(r.message).toBe("Bu özellik henüz etkinleştirilmedi.");
+      expect(r.missing).toEqual([]);
+      expect((await getEfFeatureState(T1)).details.join(" ")).toMatch(re);
       expect(w.reserveCalls).toBe(0);
       expect(ef.degerleme).not.toHaveBeenCalled();
     });

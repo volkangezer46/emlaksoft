@@ -288,6 +288,19 @@ export const GUIDES: readonly Guide[] = [
     href: "/app/ice-aktarma",
     cta: "İçe aktarmaya git",
   },
+  {
+    slug: "krediler",
+    title: "Krediler: hesap kredisi, kontör, AI kullanımı",
+    intro: "Üç ayrı bakiye vardır; her biri farklı yerde harcanır ve birbirine dönüşmez.",
+    steps: [
+      "Hesap kredisi (TL): davet ödülü, kampanya ve iadelerden yüklenir; paket, ek kullanıcı ve kontör faturalarınızdan düşer. Ödeme adımında \"Hesap kredimi kullan\" kutusunu işaretlersiniz.",
+      "Kontör bakiyesi: Ada/parsel değerleme ve PDF rapor gibi işlemlerde harcanır. Paketinizle her ay yüklenir; yetmezse Abonelik sayfasının Kontör sekmesinden ek paket alırsınız.",
+      "AI kullanımı: yapay zeka asistanı ve AI özellikleri ölçülür ve paketinizin aylık AI kotasına göre izlenir; kotası tanımlı olmayan pakette sınırsız görünür. AI kullanımı kontör bakiyenizden veya hesap kredinizden düşmez.",
+      "Bakiyeleri görmek için Abonelik sayfasını açın. Hesap kredisi sekmesini yalnız ofis sahibi ve genel müdür görür.",
+    ],
+    href: "/app/abonelik?sekme=kontor",
+    cta: "Abonelik sayfası",
+  },
 ] as const;
 
 /** Başlangıç sekmesi: onboarding adımlarının yanındaki kısa notlar (adımlar canlı veriden gelir). */

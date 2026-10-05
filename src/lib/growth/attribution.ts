@@ -98,11 +98,6 @@ export function hasAttribution(a: SignupAttributionInput): boolean {
   return Boolean(a.touch || a.utm_source || a.utm_medium || a.utm_campaign);
 }
 
-/** Davet bağlantısı (mutlak): opak kod. */
-export function buildReferralUrl(baseUrl: string, code: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}/kayit?ref=${encodeURIComponent(code)}`;
-}
-
 /** Vitrin altbilgisi bağlantısı: hangi vitrinin getirdiğini ölçer; ödül vermez. */
 export function vitrinSignatureHref(slug: string): string {
   return `/r/v-${slug}`;

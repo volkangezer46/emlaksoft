@@ -89,10 +89,10 @@ describe("kayıt demo veri sözleşmesi", () => {
     expect(fn).toContain("wantsDemoData(formData)");
   });
 
-  it("kayıt formunda 'Demo verileriyle başla' kutusu varsayılan açıktır", () => {
+  it("kayıt formunda 'Örnek veriyle başla' kutusu varsayılan açıktır", () => {
     const src = read("src/app/kayit/register-form.tsx");
     expect(src).toMatch(/name="demo_data"\s+defaultChecked/);
-    expect(src).toContain("Demo verileriyle başla");
+    expect(src).toContain("Örnek veriyle başla");
   });
 
   it("geri dönüş: temizleme yalnız is_sample + tenant_id ile ve izin kapılı", () => {

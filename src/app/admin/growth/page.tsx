@@ -177,7 +177,7 @@ export default async function AdminGrowthPage({
 
       <AdminPanel
         title="Aktivasyon"
-        description="Bayraklar varsayılan kapalıdır. Kapalıdan açığa geçişte engelleyici hazırlık maddesi varsa program açılmaz."
+        description="Varsayılan: ofis daveti açık, ortaklık ve nakit ödeme kapalıdır (ayar tablosundan değişir). Kapalıdan açığa geçişte engelleyici hazırlık maddesi varsa program açılmaz."
       >
         <ReadinessPanel readiness={ov.readiness} />
         <div className="border-t border-line p-5">

@@ -15,6 +15,9 @@ function wantsDigest(prefs: unknown) {
 }
 
 /** Günlük ofis özeti — tercihi açık kullanıcılara */
+/** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
+export const maxDuration = 300;
+
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

@@ -6,10 +6,13 @@ const TABS = [
 ] as const;
 
 /** Değerleme sayfası sekmeleri (menüye yeni öğe EKLEMEZ: menü sözleşmesi korunur). */
-export function DegerlemeTabs({ active }: { active: "motor" | "parsel" }) {
+export function DegerlemeTabs({ active, parselReady = true }: { active: "motor" | "parsel"; parselReady?: boolean }) {
+  // Ada/Parsel hazır değilken sekme gizlenir (ofis kullanıcısına çıkmaz sayfa gösterilmez).
+  const tabs = TABS.filter((t) => t.key !== "parsel" || parselReady);
+  if (tabs.length < 2) return null;
   return (
     <nav aria-label="Değerleme bölümleri" className="flex flex-wrap gap-2">
-      {TABS.map((t) => (
+      {tabs.map((t) => (
         <Link
           key={t.key}
           href={t.href}

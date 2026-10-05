@@ -114,7 +114,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
       ) : null}
 
       {!ready ? (
-        <Alert tone="info" title="Kontör cüzdanı henüz etkin değil">
+        <Alert tone="info" title="Kontör bakiyesi henüz etkin değil">
           Kontör bakiyesi, satın alma ve kullanım geçmişi yönetici hazırlığı tamamlanınca açılır. Tarife ve paketleri şimdiden
           inceleyebilirsiniz.
         </Alert>
@@ -161,7 +161,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             </Link>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Cüzdan etkinleşince bakiyeniz burada görünür."}</p>
+          <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Kontör bakiyesi etkinleşince bakiyeniz burada görünür."}</p>
         )}
         {allowance && allowance.units > 0 ? (
           <Link
@@ -257,7 +257,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         </div>
         {!history ? (
           <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-            Kullanım geçmişi, kontör cüzdanı etkinleşince burada listelenir.
+            Kullanım geçmişi, kontör bakiyesi etkinleşince burada listelenir.
           </p>
         ) : !history.enabled ? (
           <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">

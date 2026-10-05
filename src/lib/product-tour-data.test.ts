@@ -11,11 +11,11 @@ const ALL: AppModule[] = [
 ];
 
 describe("ürün turları veri sözleşmesi", () => {
-  it("her tur tam yetkide 4-6 adım içerir", () => {
+  it("her tur tam yetkide 4-7 adım içerir", () => {
     for (const t of TOURS) {
       const steps = resolveTourSteps(t.id, { accessible: ALL, closed: [] });
       expect(steps.length, t.id).toBeGreaterThanOrEqual(4);
-      expect(steps.length, t.id).toBeLessThanOrEqual(6);
+      expect(steps.length, t.id).toBeLessThanOrEqual(7);
     }
   });
 

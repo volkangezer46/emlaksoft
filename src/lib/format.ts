@@ -34,6 +34,13 @@ export function formatTry(amount: number): string {
   return currencyFormatter("TRY").format(amount);
 }
 
+const kurusFormatter = new Intl.NumberFormat(TR_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Kuruşlu ₺, sembol sonda ("1.494,00 ₺"). Hesap kredisi/fatura tutarları için (try-credits/view.ts `formatTry` takma adı). */
+export function formatTryKurus(n: number): string {
+  return `${kurusFormatter.format(n)} ₺`;
+}
+
 /** `formatTry` ile aynı, ama sonlu olmayan sayı 0 sayılır (hesaplayıcı çıktıları). */
 export function formatTrySafe(n: number): string {
   return currencyFormatter("TRY").format(Number.isFinite(n) ? n : 0);

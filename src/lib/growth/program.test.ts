@@ -231,6 +231,6 @@ describe("bayrak etiketleri ve tetik kartları", () => {
       expect(`${c.title} ${c.text} ${c.cta}`).not.toMatch(/\d+\s*TL|%\s*\d|bedava|ücretsiz/i);
       expect(nudgeStorageKey(m)).toContain(m);
     }
-    expect(NUDGE_COPY.team_grew.cta).toBe("Ekibini davet et ve kazan");
+    expect(NUDGE_COPY.team_grew.cta).toBe("Başka ofisleri davet et");
   });
 });
