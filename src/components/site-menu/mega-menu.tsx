@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronDown, ExternalLink, Menu, X } from "lucide-react";
 import { FeaturedMedia } from "./featured-media";
 import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
@@ -41,24 +41,16 @@ function ItemLabel({ it }: { it: Pick<ClientItem, "label" | "badge" | "external"
   );
 }
 
-function spot(e: ReactPointerEvent<HTMLAnchorElement>) {
-  if (e.pointerType !== "mouse") return;
-  const el = e.currentTarget;
-  const r = el.getBoundingClientRect();
-  el.style.setProperty("--mx", `${e.clientX - r.left}px`);
-  el.style.setProperty("--my", `${e.clientY - r.top}px`);
-}
-
-function NavAnchor({ href, external, onClick, className, onPointerMove, style, children }: { href: string; external: boolean; onClick: () => void; className?: string; onPointerMove?: (e: ReactPointerEvent<HTMLAnchorElement>) => void; style?: CSSProperties; children: ReactNode }) {
+function NavAnchor({ href, external, onClick, className, style, children }: { href: string; external: boolean; onClick: () => void; className?: string; style?: CSSProperties; children: ReactNode }) {
   if (!external && isInternal(href)) {
     return (
-      <Link href={href} onClick={onClick} className={className} onPointerMove={onPointerMove} style={style}>
+      <Link href={href} onClick={onClick} className={className} style={style}>
         {children}
       </Link>
     );
   }
   return (
-    <a href={href} onClick={onClick} className={className} onPointerMove={onPointerMove} style={style} {...extProps(external)}>
+    <a href={href} onClick={onClick} className={className} style={style} {...extProps(external)}>
       {children}
     </a>
   );
@@ -261,7 +253,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                             <ul>
                               {c.items.map((it, ii) => (
                                 <li key={it.id} style={{ "--i": offsets[ci]! + ii } as CSSProperties}>
-                                  <NavAnchor href={it.href} external={it.external} onClick={close} onPointerMove={spot}>
+                                  <NavAnchor href={it.href} external={it.external} onClick={close}>
                                     <span className="mk-panel-ico">{it.iconNode}</span>
                                     <span><ItemLabel it={it} /><small>{it.text}</small></span>
                                   </NavAnchor>
