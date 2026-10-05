@@ -188,7 +188,6 @@ export function collectStrings(cfg: SiteContent): Array<{ path: string; value: s
   return out.map((o) => ({ ...o, path: o.path.replace(/^\./, "") }));
 }
 
-// eslint-disable-next-line no-control-regex
 const CONTROL_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
 export function validateSiteContent(input: unknown): { config: SiteContent | null; issues: Issue[] } {

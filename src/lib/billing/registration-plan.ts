@@ -3,6 +3,16 @@ import {
   type PlanId,
 } from "@/lib/billing/plans";
 
+/**
+ * Ekip büyüklüğü bandı = ÖDEME PLANININ TABANI (kayıt RPC'si ve DB CHECK'i bu dört değeri sabitler; değerler değişmez).
+ * Bant paketin ÜST sınırı değildir: Danışman/Ofis/Profesyonel ek kullanıcıyla 500'e kadar büyür (plans.ts maxSeats);
+ * bu yüzden kayıt eylemi seçilen planı yalnız bandın tabanının ALTINA düşürmez, üstünü korur.
+ *   "1"     -> Danışman (1 kullanıcı dahil)
+ *   "2-10"  -> Ofis (5 dahil, ek kullanıcıyla büyür)
+ *   "10-50" -> Profesyonel (15 dahil, 500'e kadar); hesaplayıcı 50'ye yaklaşınca Kurumsal'ı (50 dahil) daha ucuzsa önerir
+ *   "50+"   -> Kurumsal Operasyon (50 kullanıcı dahil taban, 500'e kadar)
+ * Hesaplayıcı önerisi (seat-calculator-model.computeSeatCalc) her zaman bandın tabanından düşük olmayan plandır.
+ */
 export const REGISTRATION_TEAM_SIZES = ["1", "2-10", "10-50", "50+"] as const;
 
 export type RegistrationTeamSize = (typeof REGISTRATION_TEAM_SIZES)[number];
@@ -51,6 +61,8 @@ export function registrationPlanForTeamSize(
 }
 
 export function defaultTeamSizeForPlan(planId: PlanId): RegistrationTeamSize {
+  // Gizli Business (40 kullanıcıya kadar) Profesyonel ile Kurumsal arasındadır: taban "10-50" (Profesyonel).
+  if (planId === "business") return "10-50";
   return (
     Object.entries(MINIMUM_PLAN_BY_TEAM_SIZE).find(([, plan]) => plan === planId)?.[0] as
       | RegistrationTeamSize

@@ -42,10 +42,10 @@ export function ToolsCta({ slug }: { slug: string }) {
             Ücretsiz başla <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
           </Link>
           <Link
-            href="/demo"
+            href={`/kayit?kaynak=arac-${slug}`}
             className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line-strong px-5 text-sm font-semibold text-ink-950 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
           >
-            Canlı demo talep et
+            14 gün ücretsiz dene
           </Link>
         </div>
       </div>
