@@ -35,7 +35,8 @@
 --     (flags: first_claims_review, welcome_credit_used); otomatik held->paid olmaz.
 --   * Kademe bonusu growth_referral_enabled KAPALIYKEN uretilmez; tarama yalniz ilk-odeme (taban) talepli, bonusu eksik davetcilerle
 --     sinirli ve limitlidir.
---   * Personel RPC'leri DB icinde auth.jwt()->>'aal' = 'aal2' ister (growth_staff_super_admin); ayar/ortak/odeme degisiklikleri
+--   * Personel RPC'leri, platform_settings 'platform.mfa_enforced' acikken DB icinde auth.jwt()->>'aal' = 'aal2' ister
+--     (growth_staff_super_admin; ayar yoksa/kapaliysa yalniz super_admin); ayar/ortak/odeme degisiklikleri
 --     append-only growth_admin_audit tablosuna yazilir.
 --
 -- TASARIM KARARLARI
@@ -1356,7 +1357,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 13. PLATFORM PERSONELI RPC'leri (DB icinde super_admin dogrulamasi)
 -- ---------------------------------------------------------------------------
--- Personel kapisi: aktif super_admin VE oturum AAL2 (MFA dogrulanmis). Uygulama katmani atlansa bile DB reddeder.
+-- Personel kapisi: aktif super_admin. platform_settings 'platform.mfa_enforced' = on/true/1 ise ayrica oturum AAL2 (MFA)
+-- ister; ayar yoksa/kapaliysa YALNIZ super_admin kontrolu (zorunlu MFA yayin oncesine kadar kapali; onaysiz sert kapi yok).
 create or replace function public.growth_staff_super_admin()
 returns uuid
 language sql
@@ -1366,7 +1368,7 @@ set search_path = ''
 as $$
   select ps.id from public.platform_staff ps
   where ps.id = auth.uid() and ps.is_active and ps.role = 'super_admin'
-    and (auth.jwt() ->> 'aal') = 'aal2';
+    and (not public.growth_flag_on('platform.mfa_enforced') or (auth.jwt() ->> 'aal') = 'aal2');
 $$;
 
 create or replace function public.growth_admin_decide(p_claim uuid, p_decision text, p_reason text)

@@ -698,8 +698,14 @@ describe.skipIf(!mod)("Referans/ortak motoru SQL — gerçek PL/pgSQL (pglite)",
     expect(await process_()).toMatchObject({ bonus: 1 });
   });
 
-  it("personel RPC'leri DB içinde AAL2 ister; ayar ve ortak değişiklikleri denetim satırı yazar", async () => {
+  it("personel RPC'leri platform.mfa_enforced açıkken DB içinde AAL2 ister (kapalıyken istemez); ayar ve ortak değişiklikleri denetim satırı yazar", async () => {
     await asService();
+    // Ayar yokken (varsayılan KAPALI) MFA'sız oturum da super_admin ise geçer.
+    const staff0 = (await q(`insert into public.platform_staff(id, role) values (gen_random_uuid(),'super_admin') returning id`))[0]!.id as string;
+    await asUser(staff0, null, null);
+    expect(await call(`select public.growth_admin_save_settings($1::jsonb)`, [JSON.stringify({ min_cash_ratio: 0.5 })])).toMatchObject({ ok: true });
+    await asService();
+    await setFlag("platform.mfa_enforced", true);
     const staff = (await q(`insert into public.platform_staff(id, role) values (gen_random_uuid(),'super_admin') returning id`))[0]!.id as string;
     const owner = await tenant();
     const partner = (await q(`insert into public.growth_partners(name,partner_type,code) values ('PA','agency','ortak-aal') returning id`))[0]!.id as string;
@@ -726,6 +732,7 @@ describe.skipIf(!mod)("Referans/ortak motoru SQL — gerçek PL/pgSQL (pglite)",
     expect(JSON.stringify(rows)).not.toContain("1234567890");
     expect(Number((await q(`select min_cash_ratio from public.growth_referral_settings`))[0]!.min_cash_ratio)).toBe(0.4);
     await q(`update public.growth_referral_settings set min_cash_ratio = 0.5`);
+    await setFlag("platform.mfa_enforced", false);
     // denetim tablosu append-only
     expect(await call(`update public.growth_admin_audit set action = 'settings_save'`)).toMatchObject({ code: "42501" });
   });
