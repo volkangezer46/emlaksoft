@@ -10,6 +10,9 @@ import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { cookies } from "next/headers";
+import { FontScaleBoot } from "@/components/font-scale-boot";
+import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
 import { OwnPasswordForm } from "@/app/admin/hesabim/account-forms";
 
 /** Kok loading.tsx kaldirildi: kabuk sorgulari Suspense icinde, splash hemen ustunde. */
@@ -26,10 +29,17 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
 
   // Geçici parolayla açılan hesap: kendi parolasını belirleyene dek yönetim kabuğu açılmaz.
   const user = await getRequestUser();
+  const jar = await cookies();
+  const fontScale = resolveFontScale({
+    userId: user?.id,
+    cookieValue: jar.get(FONT_SCALE_COOKIE)?.value,
+    metadataValue: user?.user_metadata?.[FONT_SCALE_META_KEY],
+  });
   if (mustChangePassword(user)) {
     return (
       <div className="grid min-h-screen place-items-center bg-canvas p-4">
         <ThemeController />
+        <FontScaleBoot scale={fontScale} />
         <div className="w-full max-w-xl space-y-4">
           <p role="status" className="rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
             {staff.full_name}, güvenliğiniz için yönetim paneline girmeden önce parolanızı değiştirmeniz gerekiyor.
@@ -53,10 +63,11 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-canvas">
       <ThemeController />
+      <FontScaleBoot scale={fontScale} />
       <SidebarBoot />
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} health={health} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} />
+        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} fontScale={fontScale} />
         {!isPlatformMfaRequired() ? (
           <p role="status" className="border-b border-amber-300/50 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-800">
             Geliştirme modu: platform iki adımlı doğrulaması (TOTP) kapalı. Yayın öncesi PLATFORM_MFA_ENFORCEMENT=on yapın.

@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ViewPrefs } from "@/components/ui/console/view-prefs";
+import { FontScalePicker } from "@/components/font-scale-picker";
+import type { FontScale } from "@/lib/font-scale";
 import type { UiPrefs } from "@/lib/ui-prefs";
 import type { UserMenuLink } from "./user-menu";
 
@@ -27,6 +29,7 @@ export function UserMenuPanel({
   subtitle,
   links = [],
   viewPrefs,
+  fontScale,
   initialOpen,
 }: {
   initials: string;
@@ -35,6 +38,8 @@ export function UserMenuPanel({
   links?: UserMenuLink[];
   /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
+  /** Kayıtlı yazı boyutu (sunucuda çözülür); verilmezse bölüm gösterilmez. */
+  fontScale?: FontScale;
   initialOpen?: boolean;
 }) {
   // Ürün turu yalnız ofis panelinde (/app) vardır; yönetim konsolunda gösterilmez.
@@ -86,6 +91,12 @@ export function UserMenuPanel({
         {viewPrefs ? (
           <>
             <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
+        {fontScale ? (
+          <>
+            <FontScalePicker initial={fontScale} className="px-3 py-2" />
             <DropdownMenuSeparator />
           </>
         ) : null}

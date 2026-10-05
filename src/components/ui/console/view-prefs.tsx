@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
-import { UI_FONTS, writeUiPrefsCookie, type UiFont, type UiPrefs } from "@/lib/ui-prefs";
+import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
 
 /**
- * Kullanıcı menüsü: "Sade görünüm" anahtarı + "Yazı boyutu" seçici. Tercih ofis+kullanıcı kapsamlı
- * çereze yazılır, ardından sunucu çıktısı yenilenir (menü ve yazı ölçeği SSR'da uygulanır).
+ * Kullanıcı menüsü: "Sade görünüm" anahtarı. Tercih ofis+kullanıcı kapsamlı
+ * çereze yazılır, ardından sunucu çıktısı yenilenir (menü SSR'da uygulanır). Yazı boyutu: FontScalePicker.
  */
 export function ViewPrefs({ cookieName, initial }: { cookieName: string; initial: UiPrefs }) {
   const router = useRouter();
@@ -41,29 +41,6 @@ export function ViewPrefs({ cookieName, initial }: { cookieName: string; initial
         </span>
       </button>
 
-      <div role="radiogroup" aria-label="Yazı boyutu">
-        <p className="mb-1.5 text-sm font-semibold text-ink-950">Yazı boyutu</p>
-        <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-control)] bg-surface-sunken p-1">
-          {UI_FONTS.map((f) => {
-            const active = prefs.font === f.value;
-            return (
-              <button
-                key={f.value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => save({ ...prefs, font: f.value as UiFont })}
-                className={cn(
-                  "focus-ring min-h-11 rounded-[var(--radius-chip)] px-1 text-xs font-medium transition-colors",
-                  active ? "bg-surface text-text shadow-[var(--elev-1)]" : "text-text-muted hover:text-text",
-                )}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
