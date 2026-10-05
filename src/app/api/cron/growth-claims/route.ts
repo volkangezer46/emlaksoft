@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { processClaims } from "@/lib/growth/engine";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -26,8 +25,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await runBillingReconciliation(0, (admin) => processClaims(admin, 200));
-    const summary = result.sideJob ?? null;
+    const result = await runBillingReconciliation(0, "growth_claims");
+    const summary = result.growthClaims ?? null;
     // Motor/migration yoksa processClaims null döner: hata değil, "etkin değil" kaydı.
     const detail = summary ? JSON.stringify(summary) : "motor etkin değil (migration uygulanmadı)";
     await recordHeartbeat("growth-claims", "ok", detail);

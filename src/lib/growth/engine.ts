@@ -49,6 +49,8 @@ export const SETTINGS_KEYS = [
   "partner_tier3_pct",
   "partner_duration_months",
   "partner_min_payout_try",
+  "min_cash_ratio",
+  "manual_review_first_n",
 ] as const;
 export type SettingsKey = (typeof SETTINGS_KEYS)[number];
 
@@ -248,6 +250,8 @@ const settingsSchema = z.object({
   partner_tier3_pct: z.coerce.number(),
   partner_duration_months: z.coerce.number(),
   partner_min_payout_try: z.coerce.number(),
+  min_cash_ratio: z.coerce.number(),
+  manual_review_first_n: z.coerce.number(),
 });
 
 /** Ayar satırını okur (service_role tablosu; çağıranın admin istemcisi). Yok/hata = null. */

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EF_RPC, EF_UNIT, type EfBalance } from "@/lib/ef-credits/config";
 import { parseEfBalance } from "@/lib/ef-credits/credit-view";
@@ -79,7 +78,10 @@ export async function readTenantName(tenantId: string): Promise<string | null> {
   }
 }
 
-/** Manuel yükleme: idempotency anahtarı SUNUCUDA üretilir; çift gönderimi hız sınırı ve satır içi onay adımı sınırlar. */
+/**
+ * Manuel yükleme: idempotency anahtarı FORMDAN gelen tek kullanımlık anahtardır (input.idemKey; personel + anahtar).
+ * Aynı form gönderimi tekrarlanırsa (çift tıklama, ağ yeniden denemesi) ef_credit_grant `already` döner, ikinci kez yüklemez.
+ */
 export async function grantEfCredit(
   input: EfAdminGrantInput,
   staffId: string,
@@ -90,7 +92,7 @@ export async function grantEfCredit(
       p_tenant: input.tenantId,
       p_units: input.units,
       p_kind: input.kind,
-      p_idem: `admin:${staffId}:${randomUUID()}`,
+      p_idem: `admin:${staffId}:${input.idemKey}`,
       p_meta: { reason: input.reason, staff_id: staffId, source: "admin_manual" },
     });
     if (error) {

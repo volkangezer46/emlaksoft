@@ -249,7 +249,17 @@ grant all privileges on table public.try_credit_reservations to service_role;
 create or replace view public.try_credit_movements with (security_invoker = true) as
   select l.id, l.tenant_id, l.entry_type, l.amount, l.source, l.source_id, l.feature, l.expires_at, l.created_at
   from public.account_credit_ledger l
-  where l.unit = 'try';
+  where l.unit = 'try'
+    and (select public.current_profile_role()) in ('owner', 'gm');
+
+-- Defter tablosunun dogrudan okumasi da TL satirlarinda yalniz owner/gm'e acik (danisman meta/idempotency'yi gormez).
+-- Diger birimler (ef/ai) icin mevcut ofis-ici okuma aynen korunur.
+drop policy if exists credit_ledger_own_select on public.account_credit_ledger;
+create policy credit_ledger_own_select on public.account_credit_ledger for select
+  using (
+    tenant_id = (select public.current_tenant_id())
+    and (unit <> 'try' or (select public.current_profile_role()) in ('owner', 'gm'))
+  );
 
 revoke all privileges on table public.try_credit_movements from public, anon, authenticated;
 grant select on table public.try_credit_movements to authenticated;
@@ -676,6 +686,7 @@ declare
   v_state jsonb;
   v_reserved numeric;
   v_spendable numeric;
+  v_consumed jsonb;
 begin
   if auth.role() is distinct from 'service_role' then
     raise exception 'Service role required.' using errcode = '42501';
@@ -720,12 +731,27 @@ begin
     return jsonb_build_object('ok', false, 'state', 'reserved', 'already', false, 'code', 'insufficient');
   end if;
 
+  -- Hangi vadeli kovalardan harcandigi (iade ORIJINAL vade ile geri yazilsin diye): harcama en erken vadeliden baslar;
+  -- vadeli kovalar bitince vadesiz kisim kalir (iade tarafi kalani vadesiz sayar).
+  select coalesce(jsonb_agg(jsonb_build_object('amount', z.take, 'expires_at', z.exp) order by z.exp), '[]'::jsonb)
+    into v_consumed
+  from (
+    select b.exp,
+           least(b.amt, greatest(v_row.amount - coalesce(sum(b.amt) over (order by b.exp rows between unbounded preceding and 1 preceding), 0), 0)) as take
+    from (
+      select (e ->> 'amount')::numeric as amt, (e ->> 'expires_at')::timestamptz as exp
+      from jsonb_array_elements(coalesce(v_state -> 'expiring_buckets', '[]'::jsonb)) e
+    ) b
+  ) z
+  where z.take > 0;
+
   insert into public.account_credit_ledger
     (tenant_id, unit, entry_type, amount, source, source_id, idempotency_key, created_by, feature, meta, created_at)
   values
     (p_tenant, 'try', 'spend', -v_row.amount, 'usage', v_row.id, 'try:spend:' || v_row.id::text, v_row.user_id,
      'invoice_payment',
-     jsonb_build_object('invoiceId', v_row.invoice_id::text, 'reservationId', v_row.id::text),
+     jsonb_build_object('invoiceId', v_row.invoice_id::text, 'reservationId', v_row.id::text,
+                        'consumedExpiries', v_consumed),
      clock_timestamp());
 
   update public.try_credit_reservations r
@@ -934,6 +960,10 @@ declare
 begin
   if auth.role() is distinct from 'authenticated' or v_tenant is null then
     raise exception 'Authentication required.' using errcode = '42501';
+  end if;
+  -- Bakiye/rezerv ozeti yalniz owner/gm (danisman gormez).
+  if (select public.current_profile_role()) not in ('owner', 'gm') then
+    raise exception 'Owner/gm required.' using errcode = '42501';
   end if;
 
   v_bal := public.try_credit_calc_balance(v_tenant);

@@ -58,7 +58,7 @@ export async function efBalance(tenantId: string): Promise<EfBalance | null> {
 }
 
 /** `null` = cüzdan yazılamadı (FAIL-CLOSED: çağıran sorgu YAPMAZ). */
-export async function efReserve(p: { tenantId: string; userId: string; units: number; idem: string; item: string }): Promise<EfReserveResult | null> {
+export async function efReserve(p: { tenantId: string; userId: string | null; units: number; idem: string; item: string }): Promise<EfReserveResult | null> {
   try {
     const { data, error } = await createAdminClient().rpc(EF_RPC.reserve, {
       p_tenant: p.tenantId,

@@ -308,6 +308,8 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
   const [units, setUnits] = useState("");
   const [kind, setKind] = useState<(typeof ADMIN_GRANT_KINDS)[number]>("admin");
   const [reason, setReason] = useState("");
+  // Tek kullanımlık idempotency anahtarı: girdi değişince ve başarılı yüklemeden sonra yenilenir; aynı gönderim tekrarında aynı kalır.
+  const [idemKey, setIdemKey] = useState(() => crypto.randomUUID());
   const [confirming, setConfirming] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -328,6 +330,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
         fd.set("units", units);
         fd.set("kind", kind);
         fd.set("reason", reason);
+        fd.set("idemKey", idemKey);
         start(async () => {
           const r = await grantEfCreditAction(fd);
           setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: r.message ?? "Yüklendi." });
@@ -335,6 +338,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
           if (!r.error) {
             setUnits("");
             setReason("");
+            setIdemKey(crypto.randomUUID());
             router.refresh();
           }
         });
@@ -344,7 +348,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
       <div className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr]">
         <label className="space-y-1">
           <span className={lbl}>Tür</span>
-          <select disabled={off} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} className={field}>
+          <select disabled={off} value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setIdemKey(crypto.randomUUID()); }} className={field}>
             {ADMIN_GRANT_KINDS.map((k) => (
               <option key={k} value={k}>{ADMIN_GRANT_KIND_LABEL[k]}</option>
             ))}
@@ -352,11 +356,11 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
         </label>
         <label className="space-y-1">
           <span className={lbl}>Kontör (yalnız artı)</span>
-          <input type="number" min={1} max={100000} step={1} disabled={off} value={units} onChange={(e) => { setUnits(e.target.value); setConfirming(false); }} className={field} required />
+          <input type="number" min={1} max={100000} step={1} disabled={off} value={units} onChange={(e) => { setUnits(e.target.value); setIdemKey(crypto.randomUUID()); setConfirming(false); }} className={field} required />
         </label>
         <label className="space-y-1">
           <span className={lbl}>Gerekçe (zorunlu, denetim kaydına yazılır)</span>
-          <input disabled={off} value={reason} maxLength={300} onChange={(e) => { setReason(e.target.value); setConfirming(false); }} className={field} required minLength={10} />
+          <input disabled={off} value={reason} maxLength={300} onChange={(e) => { setReason(e.target.value); setIdemKey(crypto.randomUUID()); setConfirming(false); }} className={field} required minLength={10} />
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-2">

@@ -111,7 +111,7 @@ describe("kuyruk, ayar ve önizleme okuyucuları", () => {
       welcome_credit_try: "0", welcome_expires_days: 45, tier1_at: 3, tier1_bonus_months: "0.50", tier1_badge: "G", tier2_at: 10,
       tier2_bonus_months: "2.00", tier2_badge: "A", annual_cap_months: "12.00", velocity_max_per_day: 5, partner_tier1_max: 4,
       partner_tier1_pct: "20", partner_tier2_max: 14, partner_tier2_pct: "25", partner_tier3_pct: "30", partner_duration_months: 12,
-      partner_min_payout_try: "1000",
+      partner_min_payout_try: "1000", min_cash_ratio: "0.50", manual_review_first_n: 3,
     };
     const from = (data: unknown) => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data, error: null }) }) }) }) }) as unknown as Pick<SupabaseClient, "from">;
     expect((await readReferralSettings(from(vals)))?.tier1_bonus_months).toBe(0.5);

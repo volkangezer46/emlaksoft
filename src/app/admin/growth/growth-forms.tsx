@@ -314,6 +314,8 @@ const SETTING_GROUPS: { title: string; fields: SettingField[] }[] = [
       { key: "tier2_badge", label: "2. kademe rozet adı", text: true },
       { key: "annual_cap_months", label: "Yıllık tavan (aylık bedel katı)" },
       { key: "velocity_max_per_day", label: "Hız sınırı: davetçi başına günlük talep" },
+      { key: "min_cash_ratio", label: "Asgari nakit oranı (0-1; altı inceleme)" },
+      { key: "manual_review_first_n", label: "İlk N davetçi talebi manuel onay" },
     ],
   },
   {

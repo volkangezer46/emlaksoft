@@ -3,6 +3,8 @@ import { fulfillBillingPaymentAtomic } from "@/lib/billing/fulfillment";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { isPlanId, type BillingCycle } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { EF_RPC } from "@/lib/ef-credits/config";
+import { processClaims, type ProcessSummary } from "@/lib/growth/engine";
 import { tryReleaseDead } from "@/lib/try-credits/wallet";
 
 type CaptureRow = {
@@ -171,14 +173,14 @@ async function reconcileCapture(capture: CaptureRow): Promise<"fulfilled" | "ret
 export async function runBillingReconciliation(
   limit = 50,
   /**
-   * growth-claims cron'u: aynı (allowlist'li) service_role istemcisiyle YALNIZ bu işi çalıştırır (mutabakat atlanır).
-   * Böylece referans/ortak işleyicisi için yeni bir createAdminClient kullanımı açılmaz.
+   * KAPALI iş seçici (rastgele callback YOK: service_role istemcisi çağıran koda verilmez). `growth_claims`: growth-claims
+   * cron'u aynı (allowlist'li) istemciyle YALNIZ sabit `processClaims` işini çalıştırır; mutabakat atlanır.
    */
-  sideJob?: (admin: ReturnType<typeof createAdminClient>) => Promise<unknown>,
-): Promise<BillingReconciliationSummary & { sideJob?: unknown }> {
+  job?: "growth_claims" | "ef_sweep",
+): Promise<BillingReconciliationSummary & { growthClaims?: ProcessSummary | null; efSweep?: number | null }> {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
   const admin = createAdminClient();
-  if (sideJob) {
+  if (job === "growth_claims") {
     return {
       expiredCheckouts: 0,
       inspected: 0,
@@ -186,7 +188,20 @@ export async function runBillingReconciliation(
       retryPending: 0,
       manualReview: 0,
       refundRequired: 0,
-      sideJob: await sideJob(admin),
+      growthClaims: await processClaims(admin, 200),
+    };
+  }
+  if (job === "ef_sweep") {
+    // EF kontör: 15 dakikadan eski açık rezervleri serbest bırakır. Cüzdan yoksa/RPC hata verirse null (etkin değil).
+    const { data, error } = await admin.rpc(EF_RPC.sweep, { p_older_than: "15 minutes" });
+    return {
+      expiredCheckouts: 0,
+      inspected: 0,
+      fulfilled: 0,
+      retryPending: 0,
+      manualReview: 0,
+      refundRequired: 0,
+      efSweep: error ? null : Number(data ?? 0),
     };
   }
   const workerId = randomUUID();
