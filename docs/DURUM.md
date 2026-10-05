@@ -23,7 +23,7 @@ Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; esk
 | Migration dosyası | 206 | `supabase/migrations/*.sql`; son: `20260819010600_k5_kvkk_requests.sql`. Bu turun K2/K5 migration'larının (kupon, hesap/abonelik/şube, KVKK talepleri) canlıya uygulanıp uygulanmadığı **doğrulanmadı** |
 | Canlıda uygulanmış migration | **doğrulanmadı** | Kesin sonuç için `npm run check:migrations -- --database` (salt-okunur); uygulama yalnız yedek/PITR doğrulandıktan sonra `npm run db:migrate` |
 | `route.ts` dosyası | 59 | `src/app/**/route.ts` |
-| Cron route / `vercel.json` zamanlaması | 28 / 28 | `src/app/api/cron/*`, `vercel.json` (28. cron: `seo-robot`, günlük 04:20); sayı `npm run check:cron` ile doğrulanır |
+| Cron route / `vercel.json` zamanlaması | 31 / 31 | `src/app/api/cron/*`, `vercel.json` (31. cron: `ef-kontor-hak`, günlük 01:10 UTC = 04:10 TR, aylık EmlakFiyati kontör hakkı + hoş geldin kontörü; cüzdan hazır değilse atlar); sayı `npm run check:cron` ile doğrulanır |
 | `page.tsx` | 194 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
 | Test dosyası | 272 | `src/**/*.test.ts(x)` (Playwright `e2e/*.spec.ts` hariç) |
 | Test (case) sayısı | **doğrulanmadı** | `npm run test` çıktısından alınmalı |

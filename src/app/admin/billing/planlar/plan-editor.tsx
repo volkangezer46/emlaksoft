@@ -9,6 +9,7 @@ import {
   type PlanOpResult,
 } from "@/app/actions/platform-billing-plans";
 import { planAmountOf, type PlanDef } from "@/lib/billing/plans";
+import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { opFieldClass } from "../inline-op";
 import { useSeatDraft } from "./seat-draft";
 import { SeatTierEditor } from "./seat-tier-editor";
@@ -48,7 +49,10 @@ export function PlanEditor({
   subscribers,
   businessReady,
   plans,
+  efValuationCost,
 }: {
+  /** Bir değerlemenin kontör bedeli (tarifeden; sunucuda okunur): "yaklaşık N değerleme" canlı hesabı için. */
+  efValuationCost: number;
   plan: PlanDef;
   /** Katalogun tamamı: kademe doğrulaması ve çapraz nokta uyarıları için. */
   plans: PlanDef[];
@@ -60,6 +64,8 @@ export function PlanEditor({
   const { pending, msg, run } = useOp();
   const yearly = planAmountOf(plan, "yearly");
   const draft = useSeatDraft(plan, plans);
+  const [efText, setEfText] = useState(num(plan.efCreditsMonthly));
+  const efNumber = /^\d+$/.test(efText.trim()) ? Number(efText.trim()) : 0;
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface">
@@ -123,6 +129,18 @@ export function PlanEditor({
             <label className={lbl}>AI kredisi<input name="ai_credits_monthly" inputMode="numeric" defaultValue={num(plan.aiCreditsMonthly)} placeholder="tanımsız" className={`mt-1 w-full ${opFieldClass}`} /></label>
             <label className={lbl}>Değerleme raporu<input name="valuation_reports_monthly" inputMode="numeric" defaultValue={num(plan.valuationReportsMonthly)} placeholder="tanımsız" className={`mt-1 w-full ${opFieldClass}`} /></label>
             <label className={lbl}>Sıra<input name="order" inputMode="numeric" defaultValue={num(plan.order)} placeholder="otomatik" className={`mt-1 w-full ${opFieldClass}`} /></label>
+          </fieldset>
+
+          <fieldset className="grid gap-3 sm:grid-cols-3">
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Kontör hakkı (EmlakFiyati; mevcut aboneler kendi hakkını aylık alır)</legend>
+            <label className={lbl}>
+              Aylık kontör hakkı
+              <input name="ef_credits_monthly" inputMode="numeric" value={efText} onChange={(e) => setEfText(e.target.value)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
+            </label>
+            <p className="self-end pb-2 text-xs text-text-muted sm:col-span-2" aria-live="polite">
+              {efNumber > 0 ? (efCreditsLine(efNumber, efValuationCost) ?? "Hak yok") : "Boş veya 0: bu pakete aylık kontör verilmez."}
+              {efNumber > 0 && efValuationCost <= 0 ? " Tarifede değerleme bedeli 0: yaklaşık değerleme hesaplanamaz." : ""}
+            </p>
           </fieldset>
 
           <label className={lbl}>

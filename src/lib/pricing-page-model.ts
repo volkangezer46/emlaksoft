@@ -34,7 +34,7 @@ function numericRow(plans: readonly PlanDef[], label: string, pick: (p: PlanDef)
   return { label, cells: plans.map((p) => ({ text: pick(p) })) };
 }
 
-export function buildComparison(plans: readonly PlanDef[] = PLANS): CompareGroup[] {
+export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efValuationCost?: number } = {}): CompareGroup[] {
   const pricing: CompareGroup = {
     title: "Fiyat ve limitler",
     rows: [
@@ -56,6 +56,18 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS): CompareGroup
   }
   if (plans.some((p) => p.valuationReportsMonthly != null)) {
     pricing.rows.push(numericRow(plans, "Aylık değerleme raporu", (p) => (p.valuationReportsMonthly == null ? "Belirtilmedi" : tl.format(p.valuationReportsMonthly))));
+  }
+
+  if (plans.some((p) => (p.efCreditsMonthly ?? 0) > 0)) {
+    const cost = opts.efValuationCost ?? 0;
+    pricing.rows.push(
+      numericRow(plans, "Aylık EmlakFiyati kontörü", (p) => {
+        const n = p.efCreditsMonthly ?? 0;
+        if (n <= 0) return "Yok";
+        const m = cost > 0 ? Math.floor(n / cost) : 0;
+        return m > 0 ? `${tl.format(n)} (≈ ${tl.format(m)} değerleme)` : tl.format(n);
+      }),
+    );
   }
 
   const byTier = new Map<PlanId, CompareGroup>();

@@ -23,6 +23,7 @@ import { parsePlanForm } from "@/lib/billing/plan-form";
 import { PLAN_DEFINITIONS_TAG } from "@/lib/billing/plan-definitions";
 import { PLAN_SUPPORT_TAG, getPlanSupport } from "@/lib/billing/plan-support";
 import type { PlanDef, PlanId } from "@/lib/billing/plans";
+import { EF_WELCOME_SETTING_KEY } from "@/lib/ef-credits/config";
 import { validateSeatCatalog } from "@/lib/billing/seat-pricing";
 import {
   SEAT_SETTINGS_KEY,
@@ -309,4 +310,24 @@ export async function saveSeatSettings(formData: FormData): Promise<PlanOpResult
   revalidatePath("/admin/billing/planlar");
   await logPlatformActivity({ actorId: g.staff.id, action: "billing.seat_settings.save", entityType: "plan", meta: { warnPercent: n } });
   return { ok: true, notice: `Uyarı eşiği %${n} olarak kaydedildi; %100'de "dolu" gösterilir.` };
+}
+
+/** Hoş geldin kontörü (yeni ofis, tek sefer; 0 = kapalı). platform_settings `ef.welcome_units`; yalnız süper admin. */
+export async function saveEfWelcomeUnits(formData: FormData): Promise<PlanOpResult> {
+  const g = await guard("ef-welcome");
+  if ("error" in g) return { error: g.error };
+  const raw = String(formData.get("welcome_units") ?? "").trim();
+  if (!/^\d+$/.test(raw) || Number(raw) > 1000) return { error: "Hoş geldin kontörü 0-1000 arasında tam sayı olmalı (0 = kapalı)." };
+  const units = Number(raw);
+  const before = await getPlatformSetting(EF_WELCOME_SETTING_KEY);
+  if (!(await setPlatformSetting(EF_WELCOME_SETTING_KEY, String(units), g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  updateTag(PLAN_DEFINITIONS_TAG);
+  revalidatePath("/admin/billing/planlar");
+  await logPlatformActivity({
+    actorId: g.staff.id,
+    action: "billing.ef_welcome.save",
+    entityType: "plan",
+    meta: { before, units },
+  });
+  return { ok: true, notice: units === 0 ? "Hoş geldin kontörü kapatıldı." : `Hoş geldin kontörü ${units} olarak kaydedildi; günlük çalışmada, henüz almamış aktif/deneme ofislere tek sefer verilir.` };
 }

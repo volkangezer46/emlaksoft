@@ -42,12 +42,13 @@ export default async function RegisterPage({
       </main>
     );
   }
-  const { plans, trialDays, offers } = await getPublicPricing();
+  const { plans, trialDays, offers, efValuationCost } = await getPublicPricing();
   return (
     <RegisterForm
       plans={plans}
       trialDays={trialDays}
       offers={offers}
+      efValuationCost={efValuationCost}
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
       initialSeats={/^\d{1,3}$/.test(params.seats ?? "") && Number(params.seats) > 0 ? Number(params.seats) : undefined}

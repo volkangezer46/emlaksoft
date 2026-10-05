@@ -8,7 +8,7 @@ import { Em, SectionHeading } from "./section-heading";
 
 /** Fiyatlar, limitler, kampanya ve deneme günü tek kaynaktan (admin paket tanımları) okunur; sabit tutar yazılmaz. */
 export function PricingSection({ pricing }: { pricing: PublicPricing }) {
-  const { plans, trialDays, offers, founders } = pricing;
+  const { plans, trialDays, offers, founders, efValuationCost } = pricing;
   const offer = yearlyOffer(plans);
   return (
     <section id="fiyat" className="mk-section" aria-labelledby="fiyat-baslik">
@@ -23,7 +23,7 @@ export function PricingSection({ pricing }: { pricing: PublicPricing }) {
           <SeatCalculatorLazy plans={plans} offers={offers} trialDays={trialDays} />
         </div>
         <div className="mk-price-wrap mk-reveal">
-          <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} />
+          <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} />
         </div>
         <p className="mk-fine">
           Paketleri özellik özellik karşılaştırmak ve kaçan komisyonu kendi sayılarınızla hesaplamak için <Link href="/fiyatlar">Fiyatlar sayfasına</Link> gidin.

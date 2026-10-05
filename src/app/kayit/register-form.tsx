@@ -22,6 +22,7 @@ import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { formatNumberTr } from "@/lib/format";
+import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { registrationQuote, registrationSelection } from "@/lib/billing/seat-calculator-model";
 
@@ -55,7 +56,10 @@ export function RegisterForm({
   trialDays,
   offers,
   attribution,
+  efValuationCost,
 }: {
+  /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
+  efValuationCost?: number;
   initialPlan?: PlanId;
   initialCycle?: BillingCycle;
   /** Fiyat sayfası hesaplayıcısından gelen kullanıcı sayısı; yoksa seçilen planın dahil kullanıcı sayısı. */
@@ -135,6 +139,11 @@ export function RegisterForm({
         >
           {selectedPlan.name} · {initialCycle === "yearly" ? "Yıllık" : "Aylık"} plan seçimi{planPriceText}
         </p>
+        {efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0) ? (
+          <p className="mt-2 text-xs font-semibold text-mint-700">
+            {efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0)}; kontör ile ek sorgu satın alınabilir.
+          </p>
+        ) : null}
 
         {/* Adım göstergesi — tamamlanmış adımlar tıklanarak geri dönülebilir */}
         <ol className="mt-7 flex items-center gap-2" aria-label="Kayıt adımları">

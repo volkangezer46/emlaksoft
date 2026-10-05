@@ -121,6 +121,10 @@
     {
       "path": "/api/cron/havuz-atama",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/ef-kontor-hak",
+      "schedule": "10 1 * * *"
     }
   ]
 }

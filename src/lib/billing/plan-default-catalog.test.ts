@@ -82,6 +82,7 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     hidden: Boolean(p.hidden),
     customPricing: Boolean(p.customPricing),
     yearlyPaidMonths: p.yearlyPaidMonths ?? 10,
+    efCreditsMonthly: p.efCreditsMonthly ?? null,
   });
 
   it("fiyat, ek kullanıcı kademesi, sınır ve görünürlük alanları RECOMMENDED_CATALOG_OVERRIDES ile eşit", () => {
@@ -89,6 +90,11 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     for (const r of recommended) {
       expect(pick(raw.find((p) => p.id === r.id)!), `plan ${r.id}`).toEqual(pick(r));
     }
+  });
+
+  it("önerilen aylık kontör hakkı: Danışman 10, Ofis 40, Profesyonel 120, Business 300, Kurumsal yok", () => {
+    const got = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsMonthly ?? null]));
+    expect(got).toEqual({ advisor: 10, office: 40, professional: 120, business: 300, enterprise: null });
   });
 
   it("ham katalogda eski fiyatlar yok ve ücretsiz paket yok", () => {

@@ -16,6 +16,7 @@ import {
 import { formatNumberTr } from "@/lib/format";
 import type { ExtraSeatSummary } from "@/lib/billing/seat-calculator-model";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { efCreditsLine, monthlyUnitsOf } from "@/lib/ef-credits/plan-credits";
 
 const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
   advisor: UserRound,
@@ -58,7 +59,10 @@ export function Pricing({
   offers,
   founders = null,
   extraSeats,
+  efValuationCost,
 }: {
+  /** Bir değerlemenin kontör bedeli (sunucuda tarifeden okunur); verilmezse "yaklaşık değerleme" kısmı yazılmaz. */
+  efValuationCost?: number;
   /**
    * Plan kimliğine göre ek kullanıcı kademe metni; SUNUCUDA `extraSeatSummary` ile üretilir (fiyat motoru
    * istemci paketine girmesin diye). Verilmezse metin gösterilmez.
@@ -75,6 +79,7 @@ export function Pricing({
   const yearlyBadge = monthsLabels.size === 1 ? [...monthsLabels][0]! : "Yıllık avantaj";
   const cols = plans.length >= 4 ? "lg:grid-cols-4" : plans.length === 3 ? "lg:grid-cols-3" : plans.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-1";
   const trialCta = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
+  const anyCredits = plans.some((p) => monthlyUnitsOf(p.efCreditsMonthly) > 0);
 
   return (
     <div>
@@ -206,6 +211,11 @@ export function Pricing({
                   </li>
                 ))}
               </ul>
+              {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0) ? (
+                <p className={`mt-3 text-xs font-semibold ${plan.popular ? "text-mint-400" : "text-mint-700"}`}>
+                  {efCreditsLine(plan.efCreditsMonthly, efValuationCost ?? 0)}
+                </p>
+              ) : null}
               {extra ? (
                 <p className={`mt-3 text-xs leading-relaxed ${plan.popular ? "text-white/75" : "text-text-muted"}`}>
                   <span className="font-semibold">Ek kullanıcı:</span> {extra.included}, {extra.tiers.join(", ")} (kullanıcı başı, ₺/ay, KDV hariç).
@@ -239,6 +249,11 @@ export function Pricing({
           );
         })}
       </div>
+      {anyCredits ? (
+        <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-text-muted">
+          Kontör, EmlakFiyati değerleme ve PDF rapor sorguları içindir. Paket kontörü bittiğinde kontör ile ek sorgu satın alınabilir.
+        </p>
+      ) : null}
     </div>
   );
 }

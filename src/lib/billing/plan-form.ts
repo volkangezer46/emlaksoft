@@ -64,6 +64,8 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
   if ("error" in ai) return ai;
   const valuation = intField(f.valuation_reports_monthly, "Değerleme raporu kotası", { min: 0, max: PLAN_FIELD_LIMITS.quotaMax, nullable: true });
   if ("error" in valuation) return valuation;
+  const efCredits = intField(f.ef_credits_monthly, "Aylık kontör hakkı", { min: 0, max: PLAN_FIELD_LIMITS.efCreditsMax, nullable: true });
+  if ("error" in efCredits) return efCredits;
   const order = intField(f.order, "Sıra", { min: 0, max: PLAN_FIELD_LIMITS.orderMax, nullable: true });
   if ("error" in order) return order;
 
@@ -107,6 +109,7 @@ export function parsePlanForm(base: PlanDef, f: Fields): { plan: PlanDef } | { e
     campaignMonthlyTry: campaignPrice.value,
     aiCreditsMonthly: ai.value,
     valuationReportsMonthly: valuation.value,
+    efCreditsMonthly: efCredits.value,
     features,
     limits,
     customPricing,

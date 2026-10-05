@@ -1,4 +1,6 @@
+import { efUnitsFor } from "@/lib/ef-credits/config";
 import {
+  getEfTariff,
   getFoundersStatus,
   getEffectiveTrialDays,
   getPlanCatalog,
@@ -30,13 +32,16 @@ export type PublicPricing = {
   offers: Record<string, PublicOffer>;
   /** Yalnız kampanya aktif, şema hazır, kota dolu değil ve en az bir planda indirimli fiyat varsa. */
   founders: PublicFounders | null;
+  /** Bir değerlemenin kontör bedeli (tarifeden); "yaklaşık N değerleme" satırı için. */
+  efValuationCost: number;
 };
 
 export async function getPublicPricing(): Promise<PublicPricing> {
-  const [plans, catalog, trialDays] = await Promise.all([
+  const [plans, catalog, trialDays, efTariff] = await Promise.all([
     getPublicPlanDefinitions(),
     getPlanCatalog(),
     getEffectiveTrialDays(),
+    getEfTariff(),
   ]);
   const status = await getFoundersStatus(catalog.campaign);
   const open = status.available && status.active && status.remaining > 0;
@@ -51,5 +56,6 @@ export async function getPublicPricing(): Promise<PublicPricing> {
     trialDays,
     offers,
     founders: open && anyCampaign ? { name: status.name, remaining: status.remaining, quota: status.quota } : null,
+    efValuationCost: efUnitsFor("valuation_arsa", efTariff),
   };
 }
