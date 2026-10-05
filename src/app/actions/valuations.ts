@@ -83,8 +83,6 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   const formDistrictId = String(formData.get("district_id") ?? "").trim();
   const formPropertyType = String(formData.get("property_type") ?? "").trim();
   const formTransactionType = String(formData.get("transaction_type") ?? "").trim();
-  const ada = String(formData.get("ada") ?? "").trim();
-  const parsel = String(formData.get("parsel") ?? "").trim();
 
   if (!title && !propertyId) return { error: "Başlık veya portföy zorunlu." };
 
@@ -94,8 +92,6 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   let area = sqm;
   let provinceName: string | null = null;
   let districtHint: string | null = null;
-  let adaVal = ada || null;
-  let parselVal = parsel || null;
 
   // Emsal motoru icin gereken alanlar. Once formdaki secim, portfoy secildiyse
   // ondan gelen deger bosluklari tamamlar.
@@ -125,7 +121,7 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     const { data: p } = await supabase
       .from("properties")
       .select(
-        "title, property_code, list_price, features, parcel_block, parcel_lot, district_id, property_type, transaction_type, province:geo_provinces(name)",
+        "title, property_code, list_price, features, district_id, property_type, transaction_type, province:geo_provinces(name)",
       )
       .eq("id", propertyId)
       .eq("tenant_id", gate.tenantId)
@@ -146,8 +142,6 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     targetBuildingAge = feat?.building_age != null ? Number(feat.building_age) : null;
     targetHeating = feat?.heating ?? null;
     targetFacade = feat?.facade ?? null;
-    adaVal = adaVal ?? p.parcel_block ?? null;
-    parselVal = parselVal ?? p.parcel_lot ?? null;
     // Formda secim yoksa portfoyden devral (?? ile: bos string degil, null kontrolu).
     districtId = districtId ?? p.district_id ?? null;
     propertyType = propertyType ?? p.property_type ?? null;
@@ -162,8 +156,6 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
     sqm: area,
     districtHint,
     provinceName,
-    ada: adaVal,
-    parsel: parselVal,
     // Yerli emsal motoru: kendi verimizden gerçek emsal analizi.
     // Portföy seçilmediyse ilçe/tip bilinmez ve motor sessizce devre dışı kalır.
     supabase,

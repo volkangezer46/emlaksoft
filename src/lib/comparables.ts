@@ -6,8 +6,8 @@ import { getDistrictName } from "@/lib/geo/reader";
 /**
  * Yerli emsal (comparable) değerleme motoru — DIŞ API'YE SIFIR BAĞIMLILIK.
  *
- * Neden var: "Bu daire ne eder?" sorusuna kendi verimizle cevap. Endeksa/
- * Tapusor anahtarı olmasa da sistem çalışır; anahtar varsa sonuç zenginleşir.
+ * Neden var: "Bu daire ne eder?" sorusuna kendi verimizle cevap. EmlakFiyati
+ * anahtarı olmasa da sistem çalışır; anahtar varsa değerlemede piyasa endeksi de kaynak olur.
  *
  * Kaynak güvenilirlik sırası:
  *   1) KAZANILMIŞ ANLAŞMA (deals.stage='won') — gerçekleşen fiyat. Liste

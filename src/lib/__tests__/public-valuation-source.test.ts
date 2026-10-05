@@ -42,12 +42,12 @@ describe("publicValuationSourceEntry", () => {
 
   it("emsal dökümü de dahili sayılır — rapor sayfaları tek kuralla süzüyor", () => {
     expect(isInternalSource(COMPARABLES_SOURCE_NAME)).toBe(true);
-    expect(isInternalSource("Endeksa")).toBe(false);
+    expect(isInternalSource("EmlakFiyati endeksi")).toBe(false);
     expect(isInternalSource(null)).toBe(false);
   });
 
   it("vitrin kaynaklı olmayan kayıtta null döner", () => {
-    expect(extractPublicValuationRequest([{ name: "Endeksa", weight: 1, value: 5, note: "" }])).toBeNull();
+    expect(extractPublicValuationRequest([{ name: "EmlakFiyati endeksi", weight: 1, value: 5, note: "" }])).toBeNull();
     expect(extractPublicValuationRequest(null)).toBeNull();
     expect(extractPublicValuationRequest([])).toBeNull();
     expect(extractPublicValuationRequest([{ name: PUBLIC_VALUATION_SOURCE_NAME }])).toBeNull();

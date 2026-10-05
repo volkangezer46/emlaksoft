@@ -38,6 +38,7 @@ Zorunlu (eksikse `next build`/`next start` production'da başlamaz veya readines
 | `CRON_SECRET` | Güçlü, bağımsız; tüm cron route'ları Bearer doğrular |
 | `RELEASE_MIGRATION`, `RELEASE_MIGRATION_CHECKSUM` | **Yeni migration sonrası güncellenir** (aşağıda) |
 | `PLATFORM_ADMIN_EMAILS` | En az iki kontrollü yönetici önerilir |
+| `EMLAKFIYATI_API_KEY` | Piyasa endeksi (EmlakFiyati) için sunucu sırrı; `NEXT_PUBLIC_` DEĞİL. Eksikse özellik "etkin değil" der, hiçbir sayfa kırılmaz (değerleme/bölge analizi kaynağı atlanır). Yalnız `emlakfiyati.com` hostuna HTTPS ile gider |
 
 Release çifti üretimi (DB migrate sonrası, kod deploy öncesi):
 
@@ -48,7 +49,7 @@ npm run check:migrations -- --release
 Çıktıdaki kimlik/checksum'ı `RELEASE_MIGRATION` / `RELEASE_MIGRATION_CHECKSUM` olarak Vercel'e yaz. Yeni migration
 eklendiğinde bu çift YENİDEN güncellenmezse `/api/health` migration uyumsuzluğu nedeniyle 503 döner.
 
-Opsiyonel: iyzico live anahtarları + live base URL, push, mesaj, AI, portal, değerleme sağlayıcıları (`.env.example`).
+Opsiyonel: iyzico live anahtarları + live base URL, push, mesaj, AI, portal, banka oranı sağlayıcısı (`.env.example`).
 DB araçları için `DATABASE_POOLER_URL` veya `DATABASE_URL` yalnız kontrollü runner'da; tarayıcıya/runtime'a taşınmaz.
 
 **Demo bayrakları:** `PRODUCTION_DEMO_LOGIN_OPT_IN` ve `PRODUCTION_PLATFORM_DEMO_OPT_IN` yalnız geliştirme

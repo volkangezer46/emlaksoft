@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, MapPinned, Radar, XCircle } from "lucide-react";
+import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { geoRowCount } from "@/lib/geo/reader";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
@@ -11,7 +11,7 @@ import { relativeTimeTR } from "@/lib/admin-format";
 import { msSince } from "@/lib/clock";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
-import { EndeksaKeyForm, TapusorKeyForm } from "@/components/admin/integration-keys-form";
+import { getEmlakFiyatiLastSuccessAt, isEmlakFiyatiConfigured } from "@/lib/integrations/emlakfiyati/client";
 import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
 import { getPortalConfig } from "@/lib/integrations/portals";
 import { CronRunButton } from "./cron-run-button";
@@ -78,7 +78,7 @@ export async function SystemView() {
   // Tüm platform ayarları + geo sayımları tek turda (bağımsız → tam paralel)
   const [
     dbKey,
-    dbEndeksaId, dbEndeksaSecret, dbTapusorKey,
+    emlakFiyatiLastOk,
     dbNetgsmUser, dbNetgsmPass, dbNetgsmHeader, dbWaUrl, dbWaToken,
     sahibindenConfig, hepsiemlakConfig, zingatConfig, emlakjetConfig,
     { count: provinces }, { count: districts }, { count: neighborhoods },
@@ -88,9 +88,7 @@ export async function SystemView() {
     { data: manualRunRows },
   ] = await Promise.all([
     getPlatformSetting("openai_api_key"),
-    getPlatformSetting("endeksa_client_id"),
-    getPlatformSetting("endeksa_client_secret"),
-    getPlatformSetting("tapusor_api_key"),
+    getEmlakFiyatiLastSuccessAt(),
     getPlatformSetting("netgsm_usercode"),
     getPlatformSetting("netgsm_password"),
     getPlatformSetting("netgsm_msgheader"),
@@ -140,13 +138,8 @@ export async function SystemView() {
   const keySource: "db" | "env" | "none" = dbKey?.trim() ? "db" : envKey ? "env" : "none";
   const maskedKey = activeKey ? mask(activeKey) : null;
 
-  // Endeksa — DB öncelikli
-  const endeksaClientId = dbEndeksaId?.trim() || process.env.ENDEKSA_CLIENT_ID?.trim() || null;
-  const endeksaSecret = dbEndeksaSecret?.trim() || process.env.ENDEKSA_CLIENT_SECRET?.trim() || null;
-  const tapusorApiKey = dbTapusorKey?.trim() || process.env.TAPUSOR_API_KEY?.trim() || null;
-
-  const endeksaConfigured = Boolean(endeksaClientId && endeksaSecret);
-  const tapusorConfigured = Boolean(tapusorApiKey);
+  // EmlakFiyati — yalnız sunucu ortam değişkeni; anahtar değeri ASLA gösterilmez (yalnız tanımlı mı).
+  const emlakFiyatiConfigured = isEmlakFiyatiConfigured();
 
   // Portal API anahtarları
   const sahibindenKey  = sahibindenConfig?.apiKey ?? null;
@@ -158,10 +151,6 @@ export async function SystemView() {
   const maskedHepsiemlak  = hepsiemlakKey  ? mask(hepsiemlakKey)  : null;
   const maskedZingat      = zingatKey      ? mask(zingatKey)      : null;
   const maskedEmlakjet    = emlakjetKey    ? mask(emlakjetKey)    : null;
-
-  // Endeksa/Tapusor masked değerler (güvenli gösterim)
-  const maskedEndeksaId = endeksaClientId ? mask(endeksaClientId, 4, 3) : null;
-  const maskedTapusorKey = tapusorApiKey ? mask(tapusorApiKey) : null;
 
   // Netgsm / WhatsApp — DB öncelikli, env yedek; ekrana yalnız maskeli özet düşer (parola/anahtar asla)
   const netgsmUser = dbNetgsmUser?.trim() || process.env.NETGSM_USERCODE?.trim() || null;
@@ -188,7 +177,7 @@ export async function SystemView() {
         eyebrow="Sistem sağlığı"
         icon={Radar}
         title="Altyapı & entegrasyon durumu"
-        description="Geo kapsama, cron güvenliği, şema sürümü ve opsiyonel entegrasyonların (iyzico, Endeksa, Tapusor, yapay zeka) canlı yapılandırma durumu."
+        description="Geo kapsama, cron güvenliği, şema sürümü ve opsiyonel entegrasyonların (iyzico, EmlakFiyati, yapay zeka) canlı yapılandırma durumu."
       >
         <AdminStatGrid className="mt-6">
           <AdminStatCard
@@ -381,17 +370,20 @@ export async function SystemView() {
               <span className="text-sm font-semibold text-ink-950">VAPID push (bildirim)</span>
               <StatusPill ok={pushConfigured} okLabel="Tanımlı" badLabel="Kapalı" />
             </div>
-            <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
-              <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-                <Landmark className="h-3.5 w-3.5 text-cyan-600" /> Endeksa (bölge endeksi)
+            <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
+              <span className="min-w-0 text-sm font-semibold text-ink-950">
+                <span className="flex items-center gap-1.5">
+                  <Landmark className="h-3.5 w-3.5 text-cyan-600" /> EmlakFiyati (bölge endeksi)
+                </span>
+                <span className="mt-0.5 block text-xs font-normal text-text-muted">
+                  {emlakFiyatiConfigured
+                    ? emlakFiyatiLastOk
+                      ? `Son başarılı çağrı: ${relativeTimeTR(emlakFiyatiLastOk)}`
+                      : "Henüz başarılı çağrı kaydı yok"
+                    : "EMLAKFIYATI_API_KEY tanımlı değil"}
+                </span>
               </span>
-              <StatusPill ok={endeksaConfigured} okLabel="Bağlı" badLabel="Bekliyor" />
-            </div>
-            <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
-              <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
-                <MapPinned className="h-3.5 w-3.5 text-mint-600" /> Tapusor (EDİ + yatırım puanı)
-              </span>
-              <StatusPill ok={tapusorConfigured} okLabel="Bağlı" badLabel="Bekliyor" />
+              <StatusPill ok={emlakFiyatiConfigured} okLabel="Bağlı" badLabel="Bağlantı yok" />
             </div>
           </div>
           <p className="mt-4 text-xs text-text-muted">Deploy sonrası cron doğrulaması:</p>
@@ -466,20 +458,6 @@ export async function SystemView() {
         masked={maskedKey}
         canEdit={staff.role === "super_admin"}
       />
-
-      {/* Endeksa & Tapusor anahtarları */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <EndeksaKeyForm
-          configured={endeksaConfigured}
-          maskedClientId={maskedEndeksaId}
-          canEdit={staff.role === "super_admin"}
-        />
-        <TapusorKeyForm
-          configured={tapusorConfigured}
-          maskedApiKey={maskedTapusorKey}
-          canEdit={staff.role === "super_admin"}
-        />
-      </div>
 
       {/* Portal API anahtarları */}
       <PortalApiKeysSection

@@ -138,6 +138,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Ürün turu | `src/lib/product-tour-data.ts` |
 | Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (30 rota, `npm run check:cron`) |
 | service_role | `src/lib/admin-client-allowlist.ts` (`audit-admin-client.ts --write`) |
+| Piyasa endeksi (EmlakFiyati) | `src/lib/integrations/emlakfiyati/` (`contract.ts` saf: zod yanıt, slug yolu, tip eşlemesi `konut`/`arsa`; `client.ts` sunucu: `getEndeks`, `getEndeksForPlace`, 12 sa `unstable_cache` + kısa negatif önbellek + 429 `Retry-After`); panel `src/components/app/emlakfiyati-endeks-panel.tsx`; değerleme kaynağı `src/lib/valuation.ts`. Endeksa ve TapuSor KALDIRILDI (kullanıcı kararı); eski `platform_settings` anahtarları (`endeksa_*`, `tapusor_*`) kodda okunmaz, temizlik migration'ı yazılmadı |
 
 ## 7. Kararlar (değişmez, tekrar sorulmaz)
 
@@ -157,7 +158,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 Migration uygulama (sıra §2) · `git push` (§1) · `ADVISOR_PII_KEY` üretimi (`openssl rand -hex 32`, kaybedilirse TC/IBAN geri gelmez) ·
 Supabase redirect allowlist'e `/app/hesabim?eposta=onay` · fiyat/DB tutarı kararı (§3) · Google Search Console'a sitemap ekleme ·
 yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasyonu, yedek/PITR) · TÜFE/kredi faizi/harç doğrulaması ·
-ödül/ortak programı oranları · KVKK açık rıza metni ("tanıtım amacıyla", `src/lib/legal-copy.ts`; asıl amaç talebe dönüş) AVUKAT ONAYI GEREKİR · canlı QA (mobil form çubuğu, menü yoğunluğu, pano sürükle-bırak, ofis açma, yeni TV/tur/sihirbaz).
+ödül/ortak programı oranları · KVKK açık rıza metni ("tanıtım amacıyla", `src/lib/legal-copy.ts`; asıl amaç talebe dönüş) AVUKAT ONAYI GEREKİR · **Vercel production env `EMLAKFIYATI_API_KEY` tanımla** (sunucu sırrı; yoksa piyasa endeksi "bağlantı yok" görünür) · canlı QA (mobil form çubuğu, menü yoğunluğu, pano sürükle-bırak, ofis açma, yeni TV/tur/sihirbaz).
 
 ## 9. Belge dizini (nerede ne var)
 

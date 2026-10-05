@@ -2,10 +2,10 @@ export type PriceHealth = "green" | "yellow" | "red" | "pending";
 
 /**
  * İl bazlı m² referans fiyatları (TL/m², Türkiye ortalamaları — 2026 Q2)
- * Kaynak: Endeksa/Tapusor canlı veri yoksa bu tablo kullanılır.
- * Canlı Endeksa/Tapusor değeri varsa DB'den override edilir.
+ * Hızlı, senkron iç model: dış API çağrısı yapmaz. Canlı bölge endeksi (EmlakFiyati) değerleme
+ * motorunda ve bölge analizinde ayrıca gösterilir.
  *
- * Güncelleme: Her çeyrekte bu tabloyu Endeksa API sonuçlarıyla güncelle.
+ * Güncelleme: Her çeyrekte bu tabloyu EmlakFiyati bölge medyanlarıyla gözden geçir.
  */
 const PROVINCE_SQM_PRICE: Record<string, number> = {
   // Büyük şehirler
@@ -87,14 +87,14 @@ function lookupSqmPrice(hint: string | null): number {
 
 /**
  * Liste fiyatını hızlı iç m² modeline göre sağlık bandına oturtur.
- * Liste/portföy sayfalarında satır başına çağrılır — dış API'ye (Endeksa/Tapusor)
+ * Liste/portföy sayfalarında satır başına çağrılır — dış API'ye (EmlakFiyati)
  * gitmez, senkron ve ücretsizdir. Derin çok-kaynaklı değerleme için
  * `/app/degerleme` → `estimateMultiSourceValue` kullanılır.
  *
  * Eşik değerleri: green ≤%10 sapma · yellow ≤%20 · red üzeri
  * (Türkiye'nin yüksek enflasyon ortamında %8 çok dar; %10/%20 daha gerçekçi)
  *
- * @param overrideSqmPrice — Endeksa/Tapusor'dan gelen canlı m² fiyatı varsa geçin
+ * @param overrideSqmPrice — EmlakFiyati'ndan gelen canlı m² fiyatı varsa geçin
  */
 export function computePriceHealth(input: {
   listPrice: number | null;

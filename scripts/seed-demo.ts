@@ -1583,7 +1583,7 @@ async function main() {
       estimated_mid: s.mid,
       estimated_high: Math.round(s.mid * 1.08),
       confidence: s.conf,
-      sources: ["ofis_listesi", "emsal_m2", "endeksa"],
+      sources: ["ofis_listesi", "emsal_m2", "emlakfiyati"],
       notes: "Emsal + bölge endeksi harmanı; insan onaylı.",
       created_by: advisorId,
       created_at: iso(daysFromNow(-(3 + i * 4), 11)),
