@@ -2,7 +2,7 @@ import "server-only";
 
 import { now } from "@/lib/clock";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
-import { platformSecretsEnabled } from "@/lib/platform-secrets";
+import { platformSecretsEnabled, platformSecretsKeySource, type PlatformSecretsKeySource } from "@/lib/platform-secrets";
 import { ORTAK_ENDPOINTS_VERIFIED } from "./ortak";
 import { EF_SETTING, resolveEmlakFiyatiKeys, type KeySource } from "./keys";
 import { maskEmlakFiyatiKey } from "./policy";
@@ -10,6 +10,7 @@ import { maskEmlakFiyatiKey } from "./policy";
 /** Admin ekranı için durum özeti. Anahtarın TAMAMI ASLA dönmez: yalnız maskeli (önek + son 4). */
 export type EmlakFiyatiAdminStatus = {
   secretsEnabled: boolean;
+  secretsKeySource: PlatformSecretsKeySource;
   configured: boolean;
   source: KeySource;
   masked: string | null;
@@ -41,6 +42,7 @@ export async function getEmlakFiyatiAdminStatus(): Promise<EmlakFiyatiAdminStatu
   const untilValid = Boolean(until) && new Date(until as string).getTime() > now();
   return {
     secretsEnabled: platformSecretsEnabled(),
+    secretsKeySource: platformSecretsKeySource(),
     configured: keys.current != null,
     source: keys.source,
     masked: maskEmlakFiyatiKey(keys.current),

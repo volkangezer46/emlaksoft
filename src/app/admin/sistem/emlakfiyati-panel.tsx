@@ -40,6 +40,8 @@ const ERROR_CLASS_LABEL: Record<string, string> = {
 export type EmlakFiyatiPanelProps = {
   canEdit: boolean;
   secretsEnabled: boolean;
+  /** Şifreleme anahtarının kaynağı (anahtarın kendisi ASLA gelmez). */
+  secretsKeySource: "env" | "derived" | "none";
   configured: boolean;
   source: "admin" | "env" | "none";
   masked: string | null;
@@ -205,7 +207,12 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
         </p>
         {!secretsEnabled ? (
           <p role="status" className="mt-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-800">
-            Etkin değil: PLATFORM_SECRETS_KEY tanımlı değil. Kayıt yapılamaz; ortam değişkeni yedeği çalışmaya devam eder.
+            Etkin değil: şifreleme anahtarı oluşturulamadı (ne PLATFORM_SECRETS_KEY ne de OTP_HMAC_SECRET tanımlı). Kayıt yapılamaz; ortam değişkeni yedeği çalışmaya devam eder.
+          </p>
+        ) : props.secretsKeySource === "derived" ? (
+          <p role="note" className="mt-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2 text-xs text-text-muted">
+            Şifreleme anahtarı sunucu sırrından türetildi. Daha güçlü ayrım için Vercel&apos;e PLATFORM_SECRETS_KEY (openssl rand -hex 32) eklenebilir;
+            eklenince eski kayıtlar da çözülmeye devam eder. Kaynak sunucu sırrı döndürülürse bu anahtarı yeniden girmeniz gerekir.
           </p>
         ) : null}
         {canEdit ? (

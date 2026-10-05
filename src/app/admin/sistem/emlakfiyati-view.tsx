@@ -25,6 +25,7 @@ export async function EmlakFiyatiView() {
       <EmlakFiyatiPanel
         canEdit={staff.role === "super_admin"}
         secretsEnabled={status.secretsEnabled}
+        secretsKeySource={status.secretsKeySource}
         configured={status.configured}
         source={status.source}
         masked={status.masked}
