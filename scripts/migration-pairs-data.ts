@@ -92,6 +92,8 @@ const F = {
   tryInvoice: "20260826000500_try_credit_invoice_payment.sql",
   growthEngine: "20260826000600_growth_referral_engine.sql",
   paymentCards: "20260826000700_payment_cards.sql",
+  // Varsayilan program ayarlari (yalniz veri seed; sema yok). 000600 SONRASI.
+  defaultProgram: "20260826000800_default_program_settings.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -162,6 +164,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.tryWallet]: "ek", // yalniz try satirlarini kisitlayan CHECK + rezerv tablosu + view + service_role RPC'ler; mevcut satir/davranis ayni
     [F.tryInvoice]: "ek", // yeni service_role fonksiyonlari (fulfill govdelerine DOKUNMAZ; icerden cagirir)
     [F.growthEngine]: "ek", // yeni tablolar + RPC; 000800 (uygulanmamis) tablolarinin tekillik/CHECK/sutunlarini genisletir; fulfill govdelerine DOKUNMAZ; bayraklar KAPALI
+    [F.defaultProgram]: "davranis", // yalniz VERI seed: referans bayragi ACIK, hos geldin 300 TL, katalog kaydi, EF paketleri; mevcut admin degerleri korunur
     [F.paymentCards]: "ek", // yeni 2 tablo + service_role RPC; kod tablolar yokken zarifce kapali (kart saklama + otomatik yenileme altyapisi)
   },
 
@@ -233,6 +236,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       files: [F.growthEngine],
     },
     { id: "PB12-kayitli-kart", order: 25, title: "Kayitli odeme karti (iyzico kart saklama; saglayici anahtari + maskeli alan)", files: [F.paymentCards] },
+    { id: "PB13-varsayilan-program", order: 26, title: "Varsayilan program ayarlari seed (referans kurali/ayarlari, bayraklar, katalog kaydi, EF paketleri)", files: [F.defaultProgram] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
@@ -319,6 +323,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.growthEngine, F.growthClicks],
     [F.growthEngine, F.tryWallet],
     [F.growthEngine, F.tryInvoice],
+    [F.defaultProgram, F.growthEngine],
   ],
 
   externalPending: [

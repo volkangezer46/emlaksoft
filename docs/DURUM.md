@@ -79,3 +79,6 @@ Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz
 - **Platform TOTP kapalı:** `PLATFORM_MFA_ENFORCEMENT` ayarlı değil (varsayılan kapalı). Yayın öncesi Production env'e `PLATFORM_MFA_ENFORCEMENT=on` + redeploy. `/admin` üstündeki "Geliştirme modu" şeridi bunu hatırlatır.
 - **Demo kartları canlıda açık** (`PRODUCTION_DEMO_LOGIN_OPT_IN`, `PRODUCTION_PLATFORM_DEMO_OPT_IN`): MFA kapalıyken giriş sayfasını açan herkes süper admin olabilir. Yayın öncesi ikisini de kapat.
 - Sızan anahtarların döndürülmesi ve Git geçmişi temizliği.
+
+## Bekleyen: varsayılan program seed`i (2026-10-05)
+- `20260826000800_default_program_settings.sql` hazır, canlı DB`ye UYGULAMA BEKLİYOR (referans programı açılır, hoş geldin 300 TL, katalog kaydı, EF paketleri). Komut: `npm run db:migrate -- --only 20260826000800_default_program_settings.sql`, sonra `npm run check:migrations -- --release` + Vercel `RELEASE_MIGRATION` güncelle. Ayrıntı: `docs/HAFIZA.md` §7. DOĞRULANMADI.

@@ -219,3 +219,9 @@ zincirinden SONRA `saveCardFromPayment`. Liste/varsayılan/sil: `/app/abonelik` 
 Checkout Form'a `cardUserKey` verilir (iyzico sayfası kartı listeler; 3DS iyzico'da). Otomatik yenileme altyapısı `auto-renew.ts` (dunning cron içinde) `platform_settings`
 `billing.auto_renew_enabled`="true" olmadan ÇALIŞMAZ + ofis rızası şart. PCI sözleşme testi `pci-card-data-contract.test.ts`. Açık doğrulamalar: CF retrieve yanıtında
 `cardUserKey/cardToken` dönüşü, off-session `/payment/auth` için iyzico satıcı onayı (sandbox/hesap gerekir).
+
+## 7. Varsayılan program ayarları seed (20260826000800) — 2026-10-05, CANLI DB`YE UYGULAMA BEKLİYOR
+
+Tek, idempotent VERİ migration`ı `20260826000800_default_program_settings.sql` (+rollback, PB13): referans kuralı (`monthly_multiple` 1 aylık bedel, hold 30 gün, kredi 365 gün, tek seferlik), program ayarları (3.→+0,5 ay Gümüş Elçi, 10.→+2 ay Altın Elçi, yıllık tavan 12, hız 5/gün, nakit oranı 0,50, ilk 3 manuel), hoş geldin kredisi 300 TL (fatura payı %50 sınırının altında), `growth_referral_enabled=on` (ortak/nakit/oto-yenileme KAPALI, `platform.mfa_enforced`a dokunulmaz), `billing.plan_definitions` = RECOMMENDED_CATALOG_OVERRIDES kaydı (customPricing temizliği, Profesyonel plan_entitlements 20→15), `ef.tariff` ve 4 kontör paketi. Admin değeri varsa korunur. DOĞRULANMADI (test/lint/build koşulmadı).
+
+Sahibin çalıştıracağı: `npm run db:migrate -- --only 20260826000800_default_program_settings.sql` (önce backup/PITR); ardından `npm run check:migrations -- --release` ve Vercel `RELEASE_MIGRATION` çiftinin güncellenmesi.
