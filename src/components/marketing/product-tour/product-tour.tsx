@@ -3,7 +3,11 @@ import { Check } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { gateBadge } from "@/lib/marketing-plan-badge";
 import { DeviceFrame } from "../device-frame";
-import { Em, SectionHeading } from "../section-heading";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { Heading } from "@/lib/site-content/schema";
+import { tx } from "@/lib/site-content/tokens";
+import { RichTitle } from "../content-link";
+import { SectionHeading } from "../section-heading";
 import { AutomationScreen, CommissionScreen, CustomersScreen, DealsScreen, PortfolioScreen, ReportsScreen, TodayScreen } from "./screens";
 
 /**
@@ -26,12 +30,12 @@ function buildTabs(plans: readonly { id: string; name: string }[]): Tab[] {
   ];
 }
 
-export async function ProductTour() {
+export async function ProductTour({ heading = defaultSiteContent().sections.tur }: { heading?: Heading } = {}) {
   const TABS = buildTabs(await getPublicPlanDefinitions());
   return (
     <section id="tur" className="mk-section mk-alt" aria-labelledby="tur-baslik">
       <div className="mk-wrap mk-wrap-wide">
-        <SectionHeading center eyebrow="Ürün turu" title={<span id="tur-baslik">Panelin içine <Em>bir bakın.</Em></span>} text="Yedi ana ekranın örnek görünümü. Menüdeki dokuz iş başlığının hepsi aynı müşteri ve portföy kaydını kullanır." />
+        <SectionHeading center eyebrow={heading.eyebrow} title={<span id="tur-baslik"><RichTitle title={heading.title} em={heading.em} tail={heading.tail} /></span>} text={heading.text ? tx(heading.text, { plans: [] }) : undefined} />
         <fieldset className="mk-tour" style={{ border: 0, padding: 0, minInlineSize: 0 }}>
           <legend className="sr-only">Ürün turu ekranı seçin</legend>
           {TABS.map((t, i) => (

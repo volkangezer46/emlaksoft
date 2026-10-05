@@ -1,31 +1,49 @@
-import Link from "next/link";
 import { ArrowRight, CalendarCheck, Check, Zap } from "lucide-react";
 import { HeroScene } from "./hero-scene";
 import { PortalStrip } from "../portal-strip";
-import { trialCtaLabel } from "@/lib/marketing-copy";
+import { ContentLink, Lines } from "../content-link";
+import type { PlanDef } from "@/lib/billing/plans";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { SiteContent } from "@/lib/site-content/schema";
+import { resolveTokens, tx } from "@/lib/site-content/tokens";
 
-/** Hero: sol metin bloğu + sağ ürün sahnesi. Sunucu bileşeni, istemci JS yok. */
-export function HeroSection({ trialDays }: { trialDays?: number }) {
+/** Hero: sol metin bloğu + sağ ürün sahnesi. Sunucu bileşeni, istemci JS yok. Metinler site içeriğinden (varsayılan = bugünkü metin). */
+export function HeroSection({
+  trialDays,
+  plans = [],
+  content = defaultSiteContent().hero,
+}: {
+  trialDays?: number;
+  plans?: readonly PlanDef[];
+  content?: SiteContent["hero"];
+}) {
+  const ctx = { trialDays, plans };
+  const checks = content.checks.filter((c) => !c.hidden).map((c) => ({ id: c.id, ...resolveTokens(c.text, ctx) })).filter((c) => !c.missing);
   return (
     <section className="mk-hero" aria-labelledby="hero-baslik">
       <div className="mk-hero-bg" aria-hidden="true" />
       <div className="mk-wrap mk-wrap-wide mk-hero-grid">
         <div className="mk-hero-copy">
-          <p className="mk-badge"><Zap size={15} aria-hidden="true" />Emlak ofisleri için işletim sistemi</p>
+          <p className="mk-badge"><Zap size={15} aria-hidden="true" />{tx(content.badge, ctx)}</p>
           <h1 id="hero-baslik" className="mk-h1">
-            Emlak işlerinizi <span className="mk-grad">tek platformda</span> yönetin
+            {content.title ? `${content.title} ` : null}
+            {content.em ? <span className="mk-grad">{content.em}</span> : null}
+            {content.tail ? ` ${content.tail}` : null}
           </h1>
-          <p className="mk-hero-lead">
-            Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve 27 otomatik görev ofisinizle birlikte çalışır.
-          </p>
+          <p className="mk-hero-lead"><Lines text={tx(content.lead, ctx)} /></p>
+          {content.integrationBadge || content.integrationLine ? (
+            <p className="mk-hero-lead" data-hero-integration="">
+              {content.integrationBadge ? <a href="#degerleme" className="mk-tag mk-tag-plan">{tx(content.integrationBadge, ctx)}</a> : null}
+              {content.integrationBadge && content.integrationLine ? " " : null}
+              {content.integrationLine ? tx(content.integrationLine, ctx) : null}
+            </p>
+          ) : null}
           <div className="mk-cta-row">
-            <Link href="/kayit" className="mk-btn mk-btn-grad btn-shine">{trialCtaLabel(trialDays)} <ArrowRight size={18} aria-hidden="true" /></Link>
-            <Link href="/demo" className="mk-btn mk-btn-ghost"><CalendarCheck size={18} aria-hidden="true" />Demo görüşmesi planla</Link>
+            <ContentLink href={content.primary.href} className="mk-btn mk-btn-grad btn-shine">{tx(content.primary.label, ctx)} <ArrowRight size={18} aria-hidden="true" /></ContentLink>
+            <ContentLink href={content.secondary.href} className="mk-btn mk-btn-ghost"><CalendarCheck size={18} aria-hidden="true" />{tx(content.secondary.label, ctx)}</ContentLink>
           </div>
           <ul className="mk-checks">
-            <li><Check size={16} aria-hidden="true" />Kredi kartı gerekmez</li>
-            <li><Check size={16} aria-hidden="true" />Deneme boyunca tüm özellikler açık</li>
-            <li><Check size={16} aria-hidden="true" />Taahhüt yok</li>
+            {checks.map((c) => <li key={c.id}><Check size={16} aria-hidden="true" />{c.text}</li>)}
           </ul>
         </div>
         <HeroScene />

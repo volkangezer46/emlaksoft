@@ -27,8 +27,14 @@
      {
       "label": "Emsal bazlı değerleme",
       "text": "Fiyat aralığı sinyali",
-      "href": "/#degerleme",
+      "href": "/#emsal-degerleme",
       "icon": "Calculator"
+     },
+     {
+      "label": "EmlakFiyati ile değerleme",
+      "text": "Ada/parsel bazlı değerleme ve PDF rapor",
+      "href": "/#degerleme",
+      "icon": "MapPinned"
      },
      {
       "label": "Dijital imza",
@@ -142,10 +148,10 @@
   ],
   "featured": {
    "eyebrow": "Başlamak kolay",
-   "title": "Ofisinizi birlikte kuralım",
-   "text": "Demo görüşmesinde ekibinize uygun yapıyı ve içeri aktarma planını konuşalım.",
-   "href": "/demo",
-   "cta": "Demo görüşmesi planla",
+   "title": "Ofisinizi ücretsiz deneyin",
+   "text": "Kayıt olun; kurulum sihirbazı ofisinizi ve ekibinizi adım adım hazırlasın.",
+   "href": "/kayit",
+   "cta": "Ücretsiz dene",
    "icon": "CalendarCheck"
   }
  },
