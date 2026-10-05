@@ -69,7 +69,53 @@ export const mapCustomer = (c: RawRow) => ({
   kaynak: c.source,
   kayit: c.created_at,
 });
-export const mapCommission = (c: RawRow) => ({ brut: c.gross_amount, kdv: c.vat_amount, durum: c.status, tarih: c.created_at });
+const COMMISSION_STATUS_TR: Record<string, string> = {
+  calculated: "Hesaplandı",
+  invoiced: "Faturalandı",
+  pending: "Bekliyor",
+  paid: "Tahsil edildi",
+  collected: "Tahsil edildi",
+  cancelled: "İptal",
+};
+
+type SplitRow = { label?: string; amount?: number | string | null };
+
+/** splits: "Ofis" etiketli satırlar ofis payı, kalanlar danışman payı (kuruşa yuvarlı). Boş/bozuksa null. */
+export function commissionShares(splits: unknown): { advisor: number | null; office: number | null } {
+  if (!Array.isArray(splits) || splits.length === 0) return { advisor: null, office: null };
+  let advisor = 0;
+  let office = 0;
+  for (const s of splits as SplitRow[]) {
+    const amount = Number(s?.amount ?? 0);
+    if (!Number.isFinite(amount)) continue;
+    if (String(s?.label ?? "").trim().toLocaleLowerCase("tr-TR").startsWith("ofis")) office += amount;
+    else advisor += amount;
+  }
+  return { advisor: Math.round(advisor * 100) / 100, office: Math.round(office * 100) / 100 };
+}
+
+/**
+ * Komisyon CSV'si (başlık satırı Türkçe). Tahsilat tarihi ve vade sütunları YOK: commissions tablosunda bu alanlar
+ * tutulmuyor (yalnız status + created_at); olmayan veriyi boş sütunla vaat etmemek için eklenmedi. Fatura no da yok.
+ * "Kayıt Tarihi" = komisyonun oluşturulma tarihi (tahsilat tarihi DEĞİL).
+ */
+export const mapCommission = (c: RawRow, names?: NameMap) => {
+  const deal = relOne(c.deal);
+  const property = relOne(deal?.property);
+  const shares = commissionShares(c.splits);
+  const advisorId = deal?.assigned_to as string | null | undefined;
+  return {
+    "Portföy Kodu": property?.property_code ?? "",
+    "Portföy Başlığı": property?.title ?? "",
+    "Danışman": advisorId ? (names?.get(advisorId) ?? "") : "",
+    "Brüt Tutar": c.gross_amount,
+    "KDV": c.vat_amount,
+    "Danışman Payı": shares.advisor ?? "",
+    "Ofis Payı": shares.office ?? "",
+    "Ödeme Durumu": COMMISSION_STATUS_TR[String(c.status)] ?? c.status ?? "",
+    "Kayıt Tarihi": c.created_at,
+  };
+};
 export const mapAudit = (r: RawRow, names: NameMap) => ({
   aksiyon: r.action,
   entity: r.entity_type,
@@ -205,7 +251,7 @@ export const mapReferral = (r: RawRow) => ({
  */
 export const EXPORT_ENTITIES: Record<string, ExportEntityDef> = {
   musteriler: { slug: "musteriler", module: "customers", filenameBase: "musteriler", map: mapCustomer },
-  komisyonlar: { slug: "komisyonlar", module: "commissions", filenameBase: "komisyonlar", map: mapCommission },
+  komisyonlar: { slug: "komisyonlar", module: "commissions", filenameBase: "komisyonlar", nameId: (r) => relOne(r.deal)?.assigned_to, map: mapCommission },
   denetim: { slug: "denetim", module: "settings", filenameBase: "denetim", nameId: (r) => r.actor_id, map: mapAudit },
   portfoyler: { slug: "portfoyler", module: "properties", filenameBase: "portfoyler", nameId: (r) => r.assigned_to, map: mapProperty },
   giderler: { slug: "giderler", module: "expenses", filenameBase: "giderler", map: mapExpense },

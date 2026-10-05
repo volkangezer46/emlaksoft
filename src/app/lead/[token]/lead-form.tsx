@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
-import { LEAD_FORM_CONSENT_TEXT } from "@/lib/legal-copy";
+import { LEAD_FORM_CONSENT_TEXT, LEAD_FORM_MARKETING_TEXT, LEAD_FORM_NOTICE_TEXT } from "@/lib/legal-copy";
 
 type Province = { id: string; name: string };
 
@@ -129,6 +129,13 @@ export function LeadForm({
 
       <textarea name="message" rows={3} placeholder="Aradığınız mülkü kısaca anlatın (opsiyonel)" className={inputCls} />
 
+      <p className="px-1 text-xs leading-relaxed text-white/55">
+        {LEAD_FORM_NOTICE_TEXT}{" "}
+        <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
+          Aydınlatma metni
+        </Link>
+      </p>
+
       <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
         <input
           type="checkbox"
@@ -138,12 +145,13 @@ export function LeadForm({
           onChange={(e) => setKvkkAccepted(e.target.checked)}
           className="mt-0.5 h-4 w-4 shrink-0 accent-mint-400"
         />
-        <span>
-          {LEAD_FORM_CONSENT_TEXT}{" "}
-          <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
-            Aydınlatma metni
-          </Link>
-        </span>
+        <span>{LEAD_FORM_CONSENT_TEXT}</span>
+      </label>
+
+      {/* Ayrı, opsiyonel pazarlama izni: varsayılan işaretsiz; talebin gönderilmesi buna bağlı değildir. */}
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
+        <input type="checkbox" name="marketing_opt_in" defaultChecked={false} className="mt-0.5 h-4 w-4 shrink-0 accent-mint-400" />
+        <span>{LEAD_FORM_MARKETING_TEXT}</span>
       </label>
 
       {error && <p className="text-sm font-medium text-danger-300">{error}</p>}

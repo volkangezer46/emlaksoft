@@ -29,7 +29,7 @@ export function PropertyWorkflow({
 
   async function createDeal() {
     if (!hasAuthority) {
-      push("Önce yazılı yetki / EİDS onayını işaretleyin", "err");
+      push("Önce yazılı yetki belgesi onayını işaretleyin", "err");
       return;
     }
     if (!customerId) {
@@ -131,7 +131,7 @@ export function PropertyWorkflow({
         />
         <span className="text-xs leading-relaxed text-ink-950">
           <span className="inline-flex items-center gap-1 font-bold text-mint-700">
-            <ShieldCheck className="h-3.5 w-3.5" /> EİDS / yazılı yetki onaylı
+            <ShieldCheck className="h-3.5 w-3.5" /> Yazılı yetki belgesi onaylı
           </span>
           <span className="mt-0.5 block text-text-muted">
             Pazarlık ve kaparo öncesi yetki belgesi alındı. Onaysız anlaşma oluşturulamaz.

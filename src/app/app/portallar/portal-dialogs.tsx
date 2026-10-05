@@ -215,7 +215,7 @@ export function ClosePortalDialog({
             </div>
             <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-medium text-text-muted">
               <input type="checkbox" name="has_authority" className="mt-0.5 accent-mint-600" />
-              <span><strong className="text-mint-700">Yazılı yetki / EİDS onaylı</strong><br />Bizim kapanışımızda müşteri seçimiyle birlikte zorunludur.</span>
+              <span><strong className="text-mint-700">Yazılı yetki belgesi onaylı</strong><br />Bizim kapanışımızda müşteri seçimiyle birlikte zorunludur.</span>
             </label>
             <div className="rounded-[var(--radius-control)] border border-danger-500/20 bg-danger-500/5 px-4 py-3 text-xs text-danger-500">Bu kayıt kayıp-kaçak analizine dahil edilir ve sonradan denetlenebilir.</div>
             {error ? <p role="alert" className="text-sm text-danger-500">{error}</p> : null}

@@ -446,7 +446,7 @@ export default async function CommissionPage({
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><ReceiptText className="h-4 w-4" /> Gerçek kayıtlar</p><h2 className="mt-1 font-display font-bold text-ink-950">Komisyon defteri</h2></div>
           <div className="flex items-center gap-2">
-            <ExportCsvButton action={exportCommissionsCsv} label="Dışa aktar" />
+            <ExportCsvButton action={exportCommissionsCsv} label="Dışa aktar" hint="Hızlı dışa aktarma en çok 2.000 satır içerir; daha fazlası varsa indirmeden sonra çıkan Tümünü indir bağlantısını kullanın." />
             <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{totalCount} kayıt</span>
           </div>
         </div>

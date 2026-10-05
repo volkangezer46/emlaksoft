@@ -22,12 +22,33 @@ type Tenant = {
   district_id?: string | null;
   logo_url?: string | null;
   website?: string | null;
+  license_title?: string | null;
+  license_valid_until?: string | null;
+};
+
+const BADGE_TONE: Record<string, string> = {
+  danger: "bg-danger-500/10 text-danger-500",
+  warning: "bg-amber-400/15 text-amber-700",
+  ok: "bg-mint-500/10 text-mint-700",
+  neutral: "bg-canvas text-text-muted",
 };
 
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
-export function CompanyForm({ tenant, provinces }: { tenant: Tenant; provinces: GeoOption[] }) {
+export function CompanyForm({
+  tenant,
+  provinces,
+  licenseBadge,
+  licenseColumnsReady = true,
+}: {
+  tenant: Tenant;
+  provinces: GeoOption[];
+  /** Sunucuda hesaplanan yetki belgesi durum rozeti (tarih okuma sunucuda: React saflık kuralı). */
+  licenseBadge?: { label: string; tone: "danger" | "warning" | "ok" | "neutral" };
+  /** Belge unvanı/geçerlilik sütunları (migration 20260826001800) etkin mi. */
+  licenseColumnsReady?: boolean;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -85,8 +106,29 @@ export function CompanyForm({ tenant, provinces }: { tenant: Tenant; provinces: 
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-license">Yetki belgesi no</label>
-          <input id="tenant-license" name="license_no" defaultValue={tenant.license_no ?? ""} className={fieldClass} placeholder="TR-46-00123" />
+          <input id="tenant-license" name="license_no" defaultValue={tenant.license_no ?? ""} maxLength={60} className={fieldClass} placeholder="TR-46-00123" />
+          <p className="mt-1 text-xs text-text-muted">Harf, rakam ve boşluk girebilirsiniz. İlan, vitrin, sunum ve broşürde görünür.</p>
         </div>
+        {licenseColumnsReady ? (
+          <>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-license-title">Belge unvanı</label>
+              <input id="tenant-license-title" name="license_title" defaultValue={tenant.license_title ?? ""} maxLength={200} className={fieldClass} placeholder="Belgede yazan işletme unvanı" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-license-valid">Belge geçerlilik tarihi</label>
+              <input id="tenant-license-valid" name="license_valid_until" type="date" defaultValue={tenant.license_valid_until ?? ""} className={fieldClass} />
+              {licenseBadge ? (
+                <span className={`mt-1.5 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${BADGE_TONE[licenseBadge.tone]}`}>{licenseBadge.label}</span>
+              ) : null}
+            </div>
+          </>
+        ) : licenseBadge ? (
+          <div className="sm:col-span-2">
+            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${BADGE_TONE[licenseBadge.tone]}`}>{licenseBadge.label}</span>
+            <p className="mt-1 text-xs text-text-muted">Belge unvanı ve geçerlilik tarihi alanları veritabanı güncellemesi sonrası açılır.</p>
+          </div>
+        ) : null}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-iban">
             IBAN <span className="text-text-faint text-xs font-normal">(fatura / ödeme)</span>

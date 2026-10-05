@@ -504,8 +504,8 @@ export async function SystemView() {
             gerektirir — manuel süreç şu an aktif.
           </li>
           <li>
-            • <strong className="text-ink-950">EİDS resmi kayıt (C3):</strong> e-Devlet/GİB API erişimi gerektirir —
-            checkbox tabanlı beyan şu an aktif, resmi kayıt entegrasyonu vendor onayı sonrası.
+            • <strong className="text-ink-950">TTBS / EİDS resmi kayıt (C3):</strong> TTBS (Taşınmaz Ticareti Bilgi Sistemi) ve EİDS (Elektronik İlan Doğrulama Sistemi) ayrı sistemlerdir; ikisi için de resmi erişim gerekir —
+            checkbox tabanlı beyan şu an aktif, resmi kayıt entegrasyonu erişim/onay sonrası.
           </li>
         </ul>
       </section>

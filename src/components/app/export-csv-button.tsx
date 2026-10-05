@@ -12,6 +12,7 @@ export function ExportCsvButton({
   className,
   iconOnly = false,
   fullQuery = "",
+  hint,
 }: {
   label?: string;
   action: () => Promise<ExportResult>;
@@ -19,6 +20,8 @@ export function ExportCsvButton({
   iconOnly?: boolean;
   /** "Tümünü indir" bağlantısına eklenen ekran filtresi (URL sorgu dizesi, başında ? olmadan). */
   fullQuery?: string;
+  /** Düğme ipucu (title): örn. satır sınırı uyarısı baştan görünsün. */
+  hint?: string;
 }) {
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
@@ -77,6 +80,7 @@ export function ExportCsvButton({
       onClick={onClick}
       disabled={busy}
       aria-label={label}
+      title={hint}
       className={
         className ??
         (iconOnly

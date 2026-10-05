@@ -35,6 +35,7 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
+import { LicenseNotice } from "@/components/public/license-notice";
 import { normalizeExternalHref } from "@/lib/external-href";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 
@@ -170,7 +171,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const [{ data: tenant }, { data: mediaRows }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
-      .select("id, name, status, phone, logo_url, lead_capture_token, lead_capture_enabled")
+      .select("id, name, status, phone, logo_url, license_no, address_line, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
     admin
@@ -762,6 +763,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           </Link>{" "}
           — Türkiye&apos;nin emlak işletim sistemi
         </p>
+        <LicenseNotice officeName={tenant.name} licenseNo={tenant.license_no} phone={tenant.phone} addressLine={tenant.address_line} className="mt-6" />
         {/* Mobilde ekrana yapışan aksiyon çubuğu — sayfa sonu dolgusu içeriği örtmesin */}
         {hasMobileBar ? <div aria-hidden="true" className="h-20 lg:hidden" /> : null}
       </main>

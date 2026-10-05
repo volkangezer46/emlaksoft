@@ -111,7 +111,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
   const supabase = await createClient();
   let q = supabase
     .from("commissions")
-    .select("gross_amount, vat_amount, status, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to)")
+    .select("gross_amount, vat_amount, status, splits, created_at, deal:deals!commissions_deal_id_fkey!inner(tenant_id, assigned_to, property:properties!deals_property_id_fkey(property_code, title))")
     .eq("tenant_id", gate.tenantId)
     .eq("deal.tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
@@ -123,7 +123,14 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
     console.error("exportCommissionsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((r) => mapCommission(r));
+  // Danışman adı: aynı ofisin profilleri (tenant filtreli); çözülemeyen kimlik boş kalır.
+  const advisorIds = [...new Set((data ?? []).map((r) => relOne(r.deal)?.assigned_to).filter((v): v is string => !!v))];
+  const names = new Map<string, string>();
+  if (advisorIds.length > 0) {
+    const { data: profiles } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", gate.tenantId).in("id", advisorIds);
+    for (const p of profiles ?? []) names.set(p.id as string, p.full_name as string);
+  }
+  const rows = (data ?? []).map((r) => mapCommission(r, names));
   return exportResult(gate, "komisyonlar", rows, `komisyonlar-${trDayKey()}.csv`);
 }
 

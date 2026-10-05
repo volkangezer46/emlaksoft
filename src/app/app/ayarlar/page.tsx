@@ -31,6 +31,8 @@ import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
 import { sanitizeMatchingWeights, type MatchingWeights } from "@/lib/matching";
 import { CompanyForm } from "./company-form";
+import { LicenseStatusCard } from "@/components/app/license-status-card";
+import { loadTenantLicense, tenantLicenseStatus } from "@/lib/license-server";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { MatchingWeightsForm } from "./matching-weights-form";
 import { LogoUploadForm } from "./logo-upload-form";
@@ -106,6 +108,8 @@ export default async function SettingsPage() {
   ]);
 
   const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, province_id: null, district_id: null, logo_url: null, website: null, sample_seeded_at: null };
+  const tenantLicense = await loadTenantLicense();
+  const licenseStatus = tenantLicenseStatus(tenantLicense);
   const sampleSeededAt = (tenant as { sample_seeded_at?: string | null }).sample_seeded_at ?? null;
   const sampleStatus = tenantId
     ? await loadSampleStatus(supabase, tenantId, sampleSeededAt).catch(() => null)
@@ -123,7 +127,7 @@ export default async function SettingsPage() {
       ok: (consentCount ?? 0) > 0,
       href: "/app/uyum",
     },
-    { label: "EİDS kalkanı", value: "Manuel", ok: false, href: "/app/uyum" },
+    { label: "Yetki belgesi kalkanı", value: "Manuel", ok: false, href: "/app/uyum" },
     {
       label: "Denetim kaydı",
       value: (auditCount ?? 0) > 0 ? `${auditCount} olay` : "Boş",
@@ -240,6 +244,8 @@ export default async function SettingsPage() {
           </details></div>
 } />
 
+      <LicenseStatusCard />
+
       {/* Logo + company form */}
       <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
@@ -252,7 +258,7 @@ export default async function SettingsPage() {
         <div className="mt-5 border-b border-line pb-5">
           <LogoUploadForm currentUrl={tenant.logo_url ?? null} officeName={tenant.name || "Ofis"} />
         </div>
-        <CompanyForm tenant={tenant} provinces={provinces} />
+        <CompanyForm tenant={{ ...tenant, license_title: tenantLicense.licenseTitle, license_valid_until: tenantLicense.validUntil }} provinces={provinces} licenseBadge={{ label: licenseStatus.label, tone: licenseStatus.tone }} licenseColumnsReady={tenantLicense.extendedColumns} />
         </ReadOnlyGate>
       </section>
 
@@ -307,7 +313,7 @@ export default async function SettingsPage() {
             {[
               { href: "/app/anlasmalar", label: "Anlaşma tahtası" },
               { href: "/app/denetim", label: "Denetim" },
-              { href: "/app/uyum", label: "İYS / EİDS" },
+              { href: "/app/uyum", label: "İYS / yetki kalkanı" },
               { href: "/app/degerleme", label: "Değerleme" },
             ].map((l) => (
               <Link

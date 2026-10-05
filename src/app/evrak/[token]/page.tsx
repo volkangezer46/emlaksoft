@@ -4,7 +4,7 @@ import { PortalInvalidLink } from "@/components/public/portal-kit";
 import { PublicStateBox, PublicTokenPage } from "@/components/public/token-page";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DOC_TYPE_LABELS, KVKK_PLACEHOLDER_TEXT, isDocType } from "@/lib/doc-request/doc-request";
+import { DOC_TYPE_LABELS, KVKK_PLATFORM_NOTICE_HREF, KVKK_PLATFORM_NOTICE_TEXT, isDocType } from "@/lib/doc-request/doc-request";
 import { lookupPublicRequest } from "@/lib/doc-request/server";
 import { UploadPanel } from "./upload-panel";
 
@@ -83,7 +83,7 @@ export default async function EvrakPage({ params }: { params: Promise<{ token: s
       {...common}
       subtitle="Aşağıdaki evrakları telefonunuzdan fotoğraf çekerek veya dosya seçerek yükleyin."
     >
-      <UploadPanel token={token} types={types} kvkkText={KVKK_PLACEHOLDER_TEXT} canUpload />
+      <UploadPanel token={token} types={types} kvkkText={KVKK_PLATFORM_NOTICE_TEXT} kvkkHref={KVKK_PLATFORM_NOTICE_HREF} canUpload />
     </PublicTokenPage>
   );
 }

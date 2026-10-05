@@ -141,7 +141,7 @@ export default async function CompliancePage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="İYS / EİDS kalkanı"
+        eyebrow="İYS / yetki belgesi kalkanı"
         title="Uyum merkezi"
         description="Ticari ileti izinleri ve yetki belgesi kontrolü. İYS entegratör API’si bağlanınca senkron otomatikleşir."
       />
@@ -376,10 +376,12 @@ export default async function CompliancePage({
       </Link>
 
       <section className="rounded-[var(--radius-panel)] border border-amber-400/30 bg-amber-400/5 p-5">
-        <h2 className="font-display font-bold text-ink-950">EİDS / yetki kalkanı</h2>
+        <h2 className="font-display font-bold text-ink-950">Yetki belgesi kalkanı</h2>
         <p className="mt-2 text-sm text-text-muted">
           Yazılı yetki belgesi olmadan kapora, pazarlık ve sözleşme adımlarında sistem uyarı üretir.
           `checkAuthorityShield` workflow ve portföy kapanışına entegre edilmeye hazır.
+          Not: Ticaret Bakanlığı sistemi TTBS (Taşınmaz Ticareti Bilgi Sistemi); EİDS (Elektronik İlan Doğrulama Sistemi) ilan yetki doğrulaması için ayrı bir sistemdir.
+          Bu ekran ikisine de bağlı değildir; ofis onayıyla (beyan) çalışır.
         </p>
       </section>
     </div>

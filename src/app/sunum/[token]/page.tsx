@@ -24,6 +24,7 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { PrintButton } from "./print-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { LicenseNotice } from "@/components/public/license-notice";
 
 // Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni).
 export const metadata: Metadata = {
@@ -88,7 +89,7 @@ export default async function PublicPresentationPage({
   const propertyIds = (pres.property_ids ?? []) as string[];
 
   const [{ data: tenant }, { data: advisor }, { data: propertyData }] = await Promise.all([
-    admin.from("tenants").select("name, status, phone, logo_url, brand_color").eq("id", pres.tenant_id).maybeSingle(),
+    admin.from("tenants").select("name, status, phone, logo_url, brand_color, license_no, address_line").eq("id", pres.tenant_id).maybeSingle(),
     pres.created_by
       ? admin.from("profiles").select("full_name, phone").eq("id", pres.created_by).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -398,6 +399,8 @@ export default async function PublicPresentationPage({
             ) : null}
           </div>
         </article>
+
+        <LicenseNotice officeName={tenant.name} licenseNo={tenant.license_no} phone={tenant.phone} addressLine={tenant.address_line} />
 
         <p className="no-print text-center text-xs text-text-faint">
           Bu sayfa size özel bir sunum linkidir ·{" "}

@@ -49,8 +49,18 @@ export const DOC_REQUEST_STATUS_LABELS: Record<RequestStatus | "expired" | "full
   full: "Dosya sınırı doldu",
 };
 
+/**
+ * ESKİ yer tutucu — CANLIDA GÖSTERİLMEZ (yalnız geriye dönük import uyumu).
+ * Evrak sayfası bunun yerine KVKK_PLATFORM_NOTICE_TEXT + KVKK_PLATFORM_NOTICE_HREF gösterir.
+ * AVUKAT ONAYI GEREKİR: ofise özgü aydınlatma metni modeli henüz yok; eklenince burası ofis metnine yönlenir.
+ */
 export const KVKK_PLACEHOLDER_TEXT =
   "[KVKK aydınlatma metni yer tutucusu] Yüklediğiniz belgeler yalnızca ilgili emlak ofisi tarafından, işlemin yürütülmesi amacıyla işlenir. Güncel aydınlatma metni ofisiniz tarafından hazırlanıp buraya eklenmelidir.";
+
+/** Ofise özgü aydınlatma yoksa gösterilen nötr yönlendirme (hukuki metin değil; yalnız bağlantıya yönlendirir). */
+export const KVKK_PLATFORM_NOTICE_TEXT =
+  "Yüklediğiniz belgelerin kişisel veri olarak nasıl işlendiği, genel platform aydınlatma metninde açıklanır.";
+export const KVKK_PLATFORM_NOTICE_HREF = "/kvkk-aydinlatma";
 
 export function isDocType(v: unknown): v is DocType {
   return typeof v === "string" && (DOC_TYPES as readonly string[]).includes(v);

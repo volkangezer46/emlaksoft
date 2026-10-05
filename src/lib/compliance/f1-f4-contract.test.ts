@@ -51,7 +51,8 @@ describe("F4 evrak linki sözleşmesi", () => {
     expect(page).toContain("index: false");
     expect(page).toContain("checkRateLimit(");
     expect(page).toContain('failurePolicy: "deny"');
-    expect(page).toContain("KVKK_PLACEHOLDER_TEXT");
+    expect(page).toContain("KVKK_PLATFORM_NOTICE_TEXT");
+    expect(page).not.toContain("KVKK_PLACEHOLDER_TEXT"); // yer tutucu canlıda görünmez
     const server = read("src/lib/doc-request/server.ts");
     expect(server).toContain("request.is_sample");
     expect(server).toContain("c?.is_sample");

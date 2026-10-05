@@ -2,7 +2,7 @@
  * Komisyon üst sınırı kontrolü — saf aritmetik, mevzuat gömülü DEĞİL.
  *
  * ÖNEMLİ: Aşağıdaki varsayılanlar (satışta %4, kirada 1 aylık kira, KDV %20)
- * PARAMETREDİR ve DOĞRULANMALIDIR (Ticaret Bakanlığı Gayrimenkul Ticareti
+ * PARAMETREDİR ve DOĞRULANMALIDIR (Ticaret Bakanlığı Taşınmaz Ticareti
  * Hakkında Yönetmelik / ilgili tebliğ ve güncel KDV oranı; bkz.
  * docs/TURKIYE_UYUM_NOTLARI.md). Mevzuat değişirse çağıran taraf kendi
  * değerini geçer; uygulama hukuki karar vermez.

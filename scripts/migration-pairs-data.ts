@@ -103,6 +103,10 @@ const F = {
   efPlanExpiry: "20260826001200_ef_plan_credit_expiry.sql",
   // EF mutabakat calistirma kaydi (yeni tablo; yalniz ek). 000100 SONRASI.
   efReconciliationRuns: "20260826001300_ef_reconciliation_runs.sql",
+  // Muhasebe rolu expenses VIEW varsayilani (yalniz VERI seed). permission_defaults'a bagli (temel).
+  accountingExpensesView: "20260826001700_accounting_expenses_view.sql",
+  // tenants.license_title / license_valid_until (yalniz iki nullable sutun).
+  tenantLicenseDetails: "20260826001800_tenant_license_details.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -176,6 +180,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.defaultProgram]: "davranis", // yalniz VERI seed: referans bayragi ACIK, hos geldin 300 TL, katalog kaydi, EF paketleri; mevcut admin degerleri korunur
     [F.growthHotfix]: "davranis", // yalniz fonksiyon govdeleri (CREATE OR REPLACE, md5 korumali) + seed kural satiri; sema/bayrak DEGISMEZ; acik programin guvenlik denetimi duzeltmeleri (B1-B3, B9-B12, B16)
     [F.efPlanCreditValues]: "davranis", // yalniz VERI: billing.plan_definitions icinde dokunulmamis efCreditsPerExtraSeat/efCreditsMonthly onerilene cekilir; admin degerleri korunur
+    [F.accountingExpensesView]: "davranis", // yalniz VERI: accounting/expenses/view varsayilan izni (idempotent, kullanici istisnalarina dokunmaz)
+    [F.tenantLicenseDetails]: "ek", // tenants'a 2 nullable sutun (yetki belgesi unvani/gecerlilik); kod sutunlar yokken zarifce atlar
     [F.efReconciliationRuns]: "ek", // yeni tablo (yazma yalniz service_role, okuma platform personeli); kod tablo yokken zarifce atlar
     [F.growthDashboardRoles]: "davranis", // growth_my_dashboard/partner_dashboard yalniz owner/gm icin veri doner (digerlerine NULL); govdeler aksi ayni
     [F.efPlanExpiry]: "ek", // yeni service_role RPC (ef_credit_expire_plan) + source CHECK'e 'expire' + ayar seed'i; mevcut satir/davranis ayni
@@ -261,6 +267,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB17-ef-plan-kontor", order: 29, title: "Plan kontor degerleri (ek kullanici basi 5/6/6/6, Business 240; yalniz dokunulmamis kayit)", files: [F.efPlanCreditValues] },
     { id: "PB18-ef-plan-kontor-devir", order: 29.3, title: "EF plan kontoru devir tavani (ef_credit_expire_plan, source expire) + hos geldin ayar seed'i", files: [F.efPlanExpiry] },
     { id: "PB19-ef-mutabakat", order: 29.7, title: "EF kontor gunluk mutabakat kayitlari (ef_reconciliation_runs)", files: [F.efReconciliationRuns] },
+    { id: "PB22-muhasebe-gider-goruntuleme", order: 29.73, title: "Muhasebe rolu gider/aidat (expenses) goruntuleme varsayilani (permission_defaults seed)", files: [F.accountingExpensesView] },
+    { id: "PB23-yetki-belgesi-alanlari", order: 29.74, title: "Ofis yetki belgesi unvani + gecerlilik tarihi (tenants, 2 nullable sutun)", files: [F.tenantLicenseDetails] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],

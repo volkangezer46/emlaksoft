@@ -21,11 +21,14 @@ export function UploadPanel({
   token,
   types,
   kvkkText,
+  kvkkHref,
   canUpload,
 }: {
   token: string;
   types: RequestedType[];
   kvkkText: string;
+  /** Aydınlatma metni bağlantısı (ofise özgü metin yoksa genel platform aydınlatması). */
+  kvkkHref?: string;
   canUpload: boolean;
 }) {
   const [counts, setCounts] = useState<Record<string, number>>(() =>
@@ -136,7 +139,17 @@ export function UploadPanel({
       <div className="rounded-[var(--radius-card)] border border-line bg-canvas p-4 text-xs leading-relaxed text-text-muted">
         <p className="flex items-start gap-2">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
-          <span>{kvkkText}</span>
+          <span>
+            {kvkkText}
+            {kvkkHref ? (
+              <>
+                {" "}
+                <a href={kvkkHref} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 underline underline-offset-2">
+                  Aydınlatma metnini aç
+                </a>
+              </>
+            ) : null}
+          </span>
         </p>
         <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold text-ink-950">
           <input
