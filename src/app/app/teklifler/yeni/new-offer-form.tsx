@@ -1,12 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Tag } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createOffer } from "@/app/actions/offers";
+import {
+  getPropertyPriceSummary,
+  searchCustomers,
+  searchOfferProperties,
+  type PropertyPriceSummary,
+} from "@/app/actions/lookup";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useCreateForm } from "@/components/app/use-create-form";
-import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
 import {
   SummaryGroup,
   SummaryRow,
@@ -20,7 +27,7 @@ import { formatTry } from "@/lib/utils";
 import { OFFER_DRAFT_FIELDS, OFFER_FORM_ID, OFFER_TABS } from "./offer-tabs";
 import { formatNumberTr } from "@/lib/format";
 
-type PropertyOption = { id: string; property_code: string; title: string | null; list_price: number | null };
+type PropertyOption = PropertyPriceSummary;
 type CustomerOption = { id: string; full_name: string };
 
 const formatTl = formatNumberTr;
@@ -30,19 +37,15 @@ const TAB_ICONS = { taraflar: TI.taraflar, kosullar: TI.kosullar } as const;
 const FIELD_LABELS = { property_id: "Portföy", amount: "Teklif tutarı" };
 
 export function NewOfferForm({
-  properties,
-  customers,
-  defaultPropertyId = null,
-  defaultCustomerId = null,
+  prefillProperty = null,
+  prefillCustomer = null,
   todayIso,
   userId,
 }: {
-  properties: PropertyOption[];
-  customers: CustomerOption[];
-  /** ?portfoy= — eşleştirme ekranındaki "Teklif al" kısayolunun ön dolgusu. */
-  defaultPropertyId?: string | null;
-  /** ?musteri= — aynı kısayolun müşteri ön dolgusu. */
-  defaultCustomerId?: string | null;
+  /** ?portfoy= — eşleştirme ekranındaki "Teklif al" kısayolunun ön dolgusu (tek kayıt). */
+  prefillProperty?: PropertyOption | null;
+  /** ?musteri= — aynı kısayolun müşteri ön dolgusu (tek kayıt). */
+  prefillCustomer?: CustomerOption | null;
   /** Geçerlilik tarihi alt sınırı (sunucudan; bileşende saat okunmaz). */
   todayIso: string;
   userId: string;
@@ -53,14 +56,48 @@ export function NewOfferForm({
     refresh: true,
   });
 
-  const preselectedProperty = defaultPropertyId
-    ? properties.find((p) => p.id === defaultPropertyId) ?? null
-    : null;
-  const [selectedPrice, setSelectedPrice] = useState<number | null>(preselectedProperty?.list_price ?? null);
+  // Seçiciler sunucu taraflı aranır; seçilen kayıtlar özet/fiyat için burada tutulur.
+  const [pickedProperty, setPickedProperty] = useState<PropertyOption | null>(prefillProperty);
+  const [pickedCustomer, setPickedCustomer] = useState<CustomerOption | null>(prefillCustomer);
+  const [selectedPrice, setSelectedPrice] = useState<number | null>(prefillProperty?.list_price ?? null);
+  const propertyCache = useRef(new Map<string, PropertyOption>());
+  const customerCache = useRef(new Map<string, CustomerOption>());
 
-  function handlePropertyChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const prop = properties.find((p) => p.id === e.target.value);
+  const propertyOption = (p: PropertyOption): ComboboxOption => ({
+    value: p.id,
+    label: p.title ?? "Başlıksız portföy",
+    hint: `${p.property_code}${p.list_price ? ` · ${formatTl(p.list_price)} ₺` : ""}`,
+  });
+
+  const onSearchProperties = useCallback(async (q: string): Promise<ComboboxOption[]> => {
+    const rows = await searchOfferProperties(q);
+    for (const r of rows) propertyCache.current.set(r.id, r);
+    return rows.map((p) => ({
+      value: p.id,
+      label: p.title ?? "Başlıksız portföy",
+      hint: `${p.property_code}${p.list_price ? ` · ${formatTl(p.list_price)} ₺` : ""}`,
+    }));
+  }, []);
+
+  const onSearchCustomers = useCallback(async (q: string): Promise<ComboboxOption[]> => {
+    const rows = await searchCustomers(q);
+    for (const r of rows) customerCache.current.set(r.value, { id: r.value, full_name: r.label });
+    return rows;
+  }, []);
+
+  async function handlePropertyChange(id: string) {
+    if (!id) {
+      setPickedProperty(null);
+      setSelectedPrice(null);
+      return;
+    }
+    const prop = propertyCache.current.get(id) ?? (await getPropertyPriceSummary(id));
+    setPickedProperty(prop);
     setSelectedPrice(prop?.list_price ?? null);
+  }
+
+  function handleCustomerChange(id: string) {
+    setPickedCustomer(id ? (customerCache.current.get(id) ?? null) : null);
   }
 
   const tabs: FormTab[] = useMemo(
@@ -83,42 +120,40 @@ export function NewOfferForm({
           label="Portföy"
           htmlFor="offer-property"
           required
+          inject={false}
           className="sm:col-span-2"
-          hint={
-            properties.length === 0 ? (
-              <Link href="/app/portfoyler/yeni" className="font-semibold text-brand-600 underline underline-offset-2">
-                Kayıtlı portföy yok — yeni portföy ekle
-              </Link>
-            ) : undefined
-          }
         >
-          <FormSelect
+          <Combobox
+            id="offer-property"
             name="property_id"
+            aria-label="Portföy"
             required
-            defaultValue={preselectedProperty?.id ?? ""}
-            onChange={handlePropertyChange}
-          >
-            <option value="">— Portföy seçin —</option>
-            {properties.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.property_code}{p.title ? ` — ${p.title}` : ""}
-                {p.list_price ? ` (${formatTl(p.list_price)} ₺)` : ""}
-              </option>
-            ))}
-          </FormSelect>
+            clearable={false}
+            placeholder="— Portföy seçin —"
+            searchPlaceholder="Kod ya da başlık ara…"
+            emptyText="Eşleşen portföy yok"
+            defaultValue={prefillProperty?.id ?? ""}
+            options={prefillProperty ? [propertyOption(prefillProperty)] : []}
+            onSearch={onSearchProperties}
+            onValueChange={handlePropertyChange}
+          />
+          <Link href="/app/portfoyler/yeni" className="mt-1 inline-block text-xs font-semibold text-brand-600 underline underline-offset-2">
+            Yeni portföy ekle
+          </Link>
         </FormField>
-        <FormField label="Müşteri (opsiyonel)" htmlFor="offer-customer" className="sm:col-span-2">
-          <FormSelect
+        <FormField label="Müşteri (opsiyonel)" htmlFor="offer-customer" inject={false} className="sm:col-span-2">
+          <Combobox
+            id="offer-customer"
             name="customer_id"
-            defaultValue={
-              defaultCustomerId && customers.some((c) => c.id === defaultCustomerId) ? defaultCustomerId : ""
-            }
-          >
-            <option value="">— Müşteri seçin —</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.full_name}</option>
-            ))}
-          </FormSelect>
+            aria-label="Müşteri"
+            placeholder="— Müşteri seçin —"
+            searchPlaceholder="Müşteri ara…"
+            emptyText="Eşleşen müşteri yok"
+            defaultValue={prefillCustomer?.id ?? ""}
+            options={prefillCustomer ? [{ value: prefillCustomer.id, label: prefillCustomer.full_name }] : []}
+            onSearch={onSearchCustomers}
+            onValueChange={handleCustomerChange}
+          />
         </FormField>
       </>
     ),
@@ -152,8 +187,8 @@ export function NewOfferForm({
   };
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
-    const prop = properties.find((p) => p.id === values.property_id);
-    const cust = customers.find((c) => c.id === values.customer_id);
+    const prop = pickedProperty && pickedProperty.id === values.property_id ? pickedProperty : null;
+    const cust = pickedCustomer && pickedCustomer.id === values.customer_id ? pickedCustomer : null;
     const amount = parseLooseNumber(values.amount);
     const list = prop?.list_price ?? null;
     const ratio = amount != null && amount > 0 && list ? Math.round((amount / list) * 1000) / 10 : null;

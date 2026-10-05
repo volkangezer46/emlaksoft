@@ -10,50 +10,61 @@ export default async function NewPresentationPage({
   searchParams?: Promise<{ portfoy?: string; musteri?: string }>;
 }) {
   const { perms } = await requireModulePage("properties", "/app/portfoyler/sunumlar");
-  // Müşteri seçici yalnız müşteri görebilenlere; göremeyene liste sızmasın.
+  // Müşteri ön dolgusu yalnız müşteri görebilenlere; göremeyene kayıt sızmasın.
   const canSeeCustomers = (perms.customers ?? []).includes("view");
   const params = (await searchParams) ?? {};
   // Portföy detayı / eşleştirme ekranı ?portfoy=&musteri= ile gelir → ön seçili açılır.
   const preselectedId = (params.portfoy ?? "").trim() || null;
   const preselectedCustomerId = (params.musteri ?? "").trim() || null;
 
+  // Portföy ve müşteri seçimi sunucu taraflı aranır (lookup.ts); burada yalnız
+  // ön dolgudaki tek kayıtlar .eq('id') ile getirilir (RLS kiracı süzgeci).
   const supabase = await createClient();
-  const [{ data: liveData }, { data: customerData }] = await Promise.all([
-    // Seçim havuzu: yalnız yayındaki portföyler (action da aynı kuralı zorlar).
-    supabase
-      .from("properties")
-      .select("id, property_code, title, list_price, transaction_type, district:geo_districts(name)")
-      .in("status", ["live", "Yayında"])
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(300),
-    // Müşteri seçici havuzu — arama client'ta, ek gidiş-dönüş yok.
-    canSeeCustomers
+  const [{ data: preProp }, { data: preCust }] = await Promise.all([
+    preselectedId
+      ? supabase
+          .from("properties")
+          .select("id, property_code, title, list_price, transaction_type, district:geo_districts(name)")
+          .eq("id", preselectedId)
+          // Seçim havuzu: yalnız yayındaki portföyler (action da aynı kuralı zorlar).
+          .in("status", ["live", "Yayında"])
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    canSeeCustomers && preselectedCustomerId
       ? supabase
           .from("customers")
           .select("id, full_name, phone")
+          .eq("id", preselectedCustomerId)
           .is("deleted_at", null)
-          .order("full_name", { ascending: true })
-          .limit(500)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
-  const customers: SelectableCustomer[] = (customerData ?? []).map((c) => ({
-    id: c.id as string,
-    name: c.full_name as string,
-    phone: (c.phone as string | null) ?? null,
-  }));
-  const properties: SelectableProperty[] = (liveData ?? []).map((p) => {
-    const rel = p.district as { name?: string } | { name?: string }[] | null;
-    return {
-      id: p.id as string,
-      code: p.property_code as string,
-      title: (p.title as string | null) ?? null,
-      price: p.list_price != null ? Number(p.list_price) : null,
-      tx: p.transaction_type as string,
-      district: (Array.isArray(rel) ? rel[0]?.name : rel?.name) ?? null,
-    };
-  });
+  const customers: SelectableCustomer[] = preCust
+    ? [
+        {
+          id: preCust.id as string,
+          name: preCust.full_name as string,
+          phone: (preCust.phone as string | null) ?? null,
+        },
+      ]
+    : [];
+  const properties: SelectableProperty[] = preProp
+    ? (() => {
+        const rel = preProp.district as { name?: string } | { name?: string }[] | null;
+        return [
+          {
+            id: preProp.id as string,
+            code: preProp.property_code as string,
+            title: (preProp.title as string | null) ?? null,
+            price: preProp.list_price != null ? Number(preProp.list_price) : null,
+            tx: preProp.transaction_type as string,
+            district: (Array.isArray(rel) ? rel[0]?.name : rel?.name) ?? null,
+          },
+        ];
+      })()
+    : [];
 
   return (
     <PresentationForm

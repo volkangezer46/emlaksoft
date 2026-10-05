@@ -145,15 +145,21 @@ export default async function EvrakLinkleriPage({
   if (musteri) list = list.eq("customer_id", musteri);
   if (portfoy) list = list.eq("property_id", portfoy);
 
-  const [listRes, totalRes, acikRes, bekleyenRes, tamamRes, kapaliRes, customersRes, propertiesRes] = await Promise.all([
+  const [listRes, totalRes, acikRes, bekleyenRes, tamamRes, kapaliRes, prefillCustomerRes, prefillPropertyRes] = await Promise.all([
     list,
     base(),
     filters.acik(base()),
     filters.bekleyen(base()),
     filters.tamamlandi(base()),
     filters.kapali(base()),
-    supabase.from("customers").select("id, full_name").is("deleted_at", null).order("full_name").limit(300),
-    supabase.from("properties").select("id, title").is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    // Müşteri/portföy seçicileri sunucu taraflı aranır (searchCustomers/searchProperties);
+    // yalnız ?musteri=/?portfoy= ön dolgusu tek kayıt olarak gelir (RLS kiracı süzgeci).
+    musteri
+      ? supabase.from("customers").select("id, full_name").eq("id", musteri).is("deleted_at", null).maybeSingle()
+      : Promise.resolve({ data: null }),
+    portfoy
+      ? supabase.from("properties").select("id, title, property_code").eq("id", portfoy).is("deleted_at", null).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const rows = (listRes.data ?? []) as unknown as RequestRow[];
@@ -202,10 +208,8 @@ export default async function EvrakLinkleriPage({
         </CardHeader>
         <CardContent>
           <NewRequestForm
-            customers={customersRes.data ?? []}
-            properties={propertiesRes.data ?? []}
-            defaultCustomerId={musteri}
-            defaultPropertyId={portfoy}
+            prefillCustomer={prefillCustomerRes.data ?? null}
+            prefillProperty={prefillPropertyRes.data ?? null}
           />
         </CardContent>
       </Card>

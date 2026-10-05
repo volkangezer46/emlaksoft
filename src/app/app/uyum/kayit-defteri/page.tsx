@@ -152,14 +152,13 @@ export default async function LedgerPage({
   const count = (build: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => build(base());
 
   const correctId = typeof sp.duzelt === "string" && UUID_RE.test(sp.duzelt) ? sp.duzelt : "";
-  const [listRes, totalRes, flaggedRes, noIdRes, cashRes, expiredRes, customersRes, correctionRes] = await Promise.all([
+  const [listRes, totalRes, flaggedRes, noIdRes, cashRes, expiredRes, correctionRes] = await Promise.all([
     listQuery,
     count((q) => q),
     count((q) => q.overlaps("flags", ["cash_over_threshold", "amount_over_threshold"])),
     count((q) => q.eq("identity_checked", false)),
     count((q) => q.eq("payment_method", "cash")),
     count((q) => q.lt("retain_until", today)),
-    supabase.from("customers").select("id, full_name").is("deleted_at", null).order("full_name").limit(300),
     correctId
       ? supabase
           .from("compliance_ledger_entries")
@@ -220,7 +219,6 @@ export default async function LedgerPage({
         <CardContent>
           <LedgerEntryForm
             todayIso={today}
-            customers={customersRes.data ?? []}
             correction={(correctionRes.data as CorrectionDefaults | null) ?? null}
           />
         </CardContent>

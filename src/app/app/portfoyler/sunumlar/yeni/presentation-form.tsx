@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Check, Copy, ExternalLink, Search, UserRound, X } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { FormActions, FormPage } from "@/components/ui/form-page";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
 import { createPresentation } from "@/app/actions/presentations";
+import { searchCustomers, searchLivePropertiesForPresentation } from "@/app/actions/lookup";
 import { PRESENTATION_TABS } from "./presentation-tabs";
 
 export type SelectableProperty = {
@@ -27,8 +28,8 @@ export type SelectableCustomer = {
 
 // Action tarafındaki MAX_PRESENTATION_PROPERTIES ile aynı — sunum 5 slaytı geçmesin.
 const MAX_SELECT = 5;
-// Müşteri arama önerisi: liste değil, kısa vurgu — 6 satır ekranı boğmaz.
-const CUSTOMER_SUGGESTIONS = 6;
+// Aramalar sunucu taraflı (lookup.ts): ofis kaç kayıt tutarsa tutsun seçilebilir.
+const MIN_QUERY = 2;
 
 const LIST_HREF = "/app/portfoyler/sunumlar";
 
@@ -49,21 +50,9 @@ function money(n: number | null, tx: string) {
   return tx === "rent" || tx === "Kiralık" ? `${s}/ay` : s;
 }
 
-/** Türkçe katlamalı arama — foldTr'nin hafif client kopyası (İ/ı/ş… duyarsız). */
-function fold(s: string) {
-  return s
-    .toLocaleLowerCase("tr-TR")
-    .replaceAll("ı", "i")
-    .replaceAll("ş", "s")
-    .replaceAll("ğ", "g")
-    .replaceAll("ü", "u")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c");
-}
-
 /**
  * Yeni sunum formu: başlık + müşteri adı + not + yayındaki portföylerden
- * aramalı çoklu seçim (maks 5). Başarıda sayfa değişmez — üretilen public
+ * sunucu taraflı aramalı çoklu seçim (maks 5). Başarıda sayfa değişmez — üretilen public
  * link kopyalanabilir halde gösterilir (danışman linki hemen WhatsApp'a taşır).
  */
 export function PresentationForm({
@@ -79,14 +68,21 @@ export function PresentationForm({
   preselectedCustomerId?: string | null;
 }) {
   const { push } = useToast();
-  // Ön seçim yalnız gerçekten seçilebilir (yayında) bir portföyse uygulanır.
+  // Ön seçim yalnız gerçekten seçilebilir (yayında) bir portföyse uygulanır;
+  // sayfa ön dolgu kaydını havuza ekler (.eq('id')), tüm liste yüklenmez.
   const validPreselect = preselectedId && properties.some((p) => p.id === preselectedId) ? [preselectedId] : [];
-  // Müşteri ön seçimi: yalnız listede gerçekten bulunan kayıt bağlanır.
+  // Müşteri ön seçimi: yalnız bulunan tek kayıt bağlanır.
   const presetCustomer = preselectedCustomerId
     ? customers.find((c) => c.id === preselectedCustomerId) ?? null
     : null;
   const [selected, setSelected] = useState<string[]>(validPreselect);
   const [query, setQuery] = useState("");
+  // Bilinen portföyler (başlangıç + arama sonuçları): seçilenlerin özeti için.
+  const [known, setKnown] = useState<Record<string, SelectableProperty>>(() =>
+    Object.fromEntries(properties.map((p) => [p.id, p])),
+  );
+  const [remote, setRemote] = useState<SelectableProperty[]>(properties);
+  const [searchingProps, setSearchingProps] = useState(false);
   /*
    * Müşteri alanı TEK input: yazılan metin hem serbest `customer_name` hem de
    * kayıtlı müşteri araması. Bir öneri seçilirse `pickedCustomer` dolar ve
@@ -95,29 +91,67 @@ export function PresentationForm({
   const [customerQuery, setCustomerQuery] = useState(presetCustomer?.name ?? "");
   const [pickedCustomer, setPickedCustomer] = useState<SelectableCustomer | null>(presetCustomer);
   const [customerFocused, setCustomerFocused] = useState(false);
+  const [customerMatches, setCustomerMatches] = useState<SelectableCustomer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [pending, startTransition] = useTransition();
 
-  const filtered = useMemo(() => {
-    const needle = fold(query.trim());
-    if (!needle) return properties;
-    return properties.filter((p) =>
-      fold(`${p.code} ${p.title ?? ""} ${p.district ?? ""}`).includes(needle),
-    );
-  }, [properties, query]);
+  // Portföy araması (250 ms debounce + eski yanıtı yoksayma). Boş sorgu = son yayındakiler.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length > 0 && q.length < MIN_QUERY) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      setSearchingProps(true);
+      searchLivePropertiesForPresentation(q)
+        .then((rows) => {
+          if (stale) return;
+          setRemote(rows);
+          setKnown((prev) => ({ ...prev, ...Object.fromEntries(rows.map((r) => [r.id, r])) }));
+        })
+        .catch(() => {
+          if (!stale) setRemote([]);
+        })
+        .finally(() => {
+          if (!stale) setSearchingProps(false);
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
-  const customerMatches = useMemo(() => {
-    const needle = fold(customerQuery.trim());
-    if (!needle || customers.length === 0) return [];
-    return customers
-      .filter((c) => fold(`${c.name} ${c.phone ?? ""}`).includes(needle))
-      .slice(0, CUSTOMER_SUGGESTIONS);
-  }, [customers, customerQuery]);
+  // Müşteri önerisi: kayıtlı müşteri araması (yetki ve kiracı süzgeci sunucuda).
+  useEffect(() => {
+    const q = customerQuery.trim();
+    if (!customerFocused || pickedCustomer || q.length < MIN_QUERY) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      searchCustomers(q)
+        .then((rows) => {
+          if (!stale) setCustomerMatches(rows.map((r) => ({ id: r.value, name: r.label, phone: r.hint ?? null })));
+        })
+        .catch(() => {
+          if (!stale) setCustomerMatches([]);
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [customerQuery, customerFocused, pickedCustomer]);
 
-  const showSuggestions = customerFocused && !pickedCustomer && customerMatches.length > 0;
+  // Seçili ama sonuçta görünmeyen portföyler listenin başında sabit kalır (işaret kaldırılabilsin).
+  const shown = [
+    ...selected.filter((id) => !remote.some((p) => p.id === id)).map((id) => known[id]).filter((p): p is SelectableProperty => Boolean(p)),
+    ...remote,
+  ];
+
+  const showSuggestions =
+    customerFocused && !pickedCustomer && customerQuery.trim().length >= MIN_QUERY && customerMatches.length > 0;
 
   const toggle = (id: string) => {
     setError(null);
@@ -131,6 +165,7 @@ export function PresentationForm({
   const reset = () => {
     setSelected([]);
     setQuery("");
+    setCustomerMatches([]);
     setCustomerQuery("");
     setPickedCustomer(null);
     setCustomerFocused(false);
@@ -321,19 +356,23 @@ export function PresentationForm({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Portföy ara"
-            placeholder="Kod, başlık veya ilçe ara…"
+            placeholder="Kod veya başlık ara… (tüm yayındaki portföylerde)"
             className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
           />
         </div>
         <div className="mt-2 max-h-96 space-y-1 overflow-y-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1.5">
-          {properties.length === 0 ? (
+          {searchingProps && shown.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-text-muted" role="status">Aranıyor…</p>
+          ) : shown.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-text-muted">
-              Yayında portföy yok — sunuma eklemek için önce bir portföyü yayına alın.
+              {query.trim()
+                ? query.trim().length < MIN_QUERY
+                  ? "Aramak için en az 2 karakter yazın."
+                  : "Aramanıza uyan yayında portföy yok."
+                : "Yayında portföy yok — sunuma eklemek için önce bir portföyü yayına alın."}
             </p>
-          ) : filtered.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-text-muted">Aramanıza uyan portföy yok.</p>
           ) : (
-            filtered.map((p) => {
+            shown.map((p) => {
               const checked = selected.includes(p.id);
               const full = !checked && selected.length >= MAX_SELECT;
               return (
@@ -372,7 +411,7 @@ export function PresentationForm({
     const customerName = (values.customer_name ?? "").trim();
     const note = (values.note ?? "").trim();
     const chosen = selected
-      .map((id) => properties.find((p) => p.id === id))
+      .map((id) => known[id])
       .filter((p): p is SelectableProperty => Boolean(p));
     return (
       <>

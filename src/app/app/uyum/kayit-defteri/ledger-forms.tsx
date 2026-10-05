@@ -1,13 +1,15 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Plus, Save } from "lucide-react";
 import {
   addLedgerEntry,
   saveLedgerSettings,
   type LedgerActionResult,
 } from "@/app/actions/compliance-ledger";
+import { searchCustomers } from "@/app/actions/lookup";
 import { Alert } from "@/components/ui/alert";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import {
@@ -42,17 +44,20 @@ export type CorrectionDefaults = {
 /** Yeni kayıt / düzeltme kaydı formu (sayfa içi panel; popup yok). Düzeltme asıl kaydı DEĞİŞTİRMEZ. */
 export function LedgerEntryForm({
   todayIso,
-  customers,
   correction,
 }: {
   todayIso: string;
-  customers: { id: string; full_name: string }[];
   correction: CorrectionDefaults | null;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  // Başarıdan sonra Combobox seçimini sıfırlamak için anahtar (form.reset() onun durumunu silmez).
+  const [resetKey, setResetKey] = useState(0);
   const [state, action, pending] = useActionState(async (prev: LedgerActionResult, fd: FormData) => {
     const res = await addLedgerEntry(prev, fd);
-    if (res.ok) formRef.current?.reset();
+    if (res.ok) {
+      formRef.current?.reset();
+      setResetKey((k) => k + 1);
+    }
     return res;
   }, initial);
   const c = correction;
@@ -99,13 +104,18 @@ export function LedgerEntryForm({
           ))}
         </FormSelect>
       </FormField>
-      <FormField label="Müşteri bağlantısı" htmlFor="lg-customer" hint="İsteğe bağlı; kayıt tek başına da okunur.">
-        <FormSelect id="lg-customer" name="customer_id" defaultValue="">
-          <option value="">Bağlanmadı</option>
-          {customers.map((cu) => (
-            <option key={cu.id} value={cu.id}>{cu.full_name}</option>
-          ))}
-        </FormSelect>
+      <FormField label="Müşteri bağlantısı" htmlFor="lg-customer" inject={false} hint="İsteğe bağlı; kayıt tek başına da okunur.">
+        <Combobox
+          key={resetKey}
+          id="lg-customer"
+          name="customer_id"
+          aria-label="Müşteri bağlantısı"
+          placeholder="Bağlanmadı"
+          searchPlaceholder="Müşteri ara…"
+          emptyText="Eşleşen müşteri yok"
+          options={[]}
+          onSearch={searchCustomers}
+        />
       </FormField>
       <div className="flex items-end pb-2">
         <label className="flex min-h-11 items-center gap-2 text-sm font-semibold text-ink-950">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -21,6 +21,7 @@ import {
   toggleReferralLink,
 } from "@/app/actions/referrals";
 import { formatTurkishPhone } from "@/lib/phone";
+import { searchCustomers } from "@/app/actions/lookup";
 
 export type CustomerOption = { id: string; full_name: string; phone: string | null };
 export type StaffOption = { id: string; full_name: string };
@@ -297,16 +298,10 @@ export function ReferralLinkToggle({ id, active }: { id: string; active: boolean
 /**
  * Tavsiye linki üretici — aramalı müşteri seçici + danışman + ödül notu.
  *
- * Müşteri listesi sunucudan ilk 300 kayıt olarak gelir ve arama istemcide
- * yapılır: seçim anlık olsun, her tuşta sunucuya gidilmesin.
+ * Müşteri araması sunucu taraflıdır (lookup.ts searchCustomers: 250 ms debounce,
+ * yetki + kiracı süzgeci sunucuda): ofis kaç müşteri tutarsa tutsun seçilebilir.
  */
-export function ReferralLinkCreator({
-  customers,
-  staff,
-}: {
-  customers: CustomerOption[];
-  staff: StaffOption[];
-}) {
+export function ReferralLinkCreator({ staff }: { staff: StaffOption[] }) {
   const router = useRouter();
   const [term, setTerm] = useState("");
   const [selected, setSelected] = useState<CustomerOption | null>(null);
@@ -316,17 +311,31 @@ export function ReferralLinkCreator({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const filtered = useMemo(() => {
-    const t = term.trim().toLocaleLowerCase("tr");
-    const list = t
-      ? customers.filter(
-          (c) =>
-            c.full_name.toLocaleLowerCase("tr").includes(t) ||
-            (c.phone ?? "").replace(/\D/g, "").includes(t.replace(/\D/g, "")),
-        )
-      : customers;
-    return list.slice(0, 8);
-  }, [customers, term]);
+  const [filtered, setFiltered] = useState<CustomerOption[]>([]);
+  const [searching, setSearching] = useState(false);
+  const termTrim = term.trim();
+
+  useEffect(() => {
+    if (termTrim.length < 2) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      setSearching(true);
+      searchCustomers(termTrim)
+        .then((rows) => {
+          if (!stale) setFiltered(rows.slice(0, 8).map((r) => ({ id: r.value, full_name: r.label, phone: r.hint ?? null })));
+        })
+        .catch(() => {
+          if (!stale) setFiltered([]);
+        })
+        .finally(() => {
+          if (!stale) setSearching(false);
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [termTrim]);
 
   return (
     <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
@@ -368,10 +377,10 @@ export function ReferralLinkCreator({
                 placeholder="Ad veya telefon ara…"
                 className={`${inputCls} pl-9`}
               />
-              {term.trim() ? (
+              {termTrim.length >= 2 ? (
                 <ul className="mt-1.5 max-h-56 space-y-1 overflow-y-auto rounded-[var(--radius-control)] border border-line bg-canvas p-1">
                   {filtered.length === 0 ? (
-                    <li className="px-2.5 py-2 text-xs text-text-muted">Eşleşen müşteri yok.</li>
+                    <li className="px-2.5 py-2 text-xs text-text-muted" role="status">{searching ? "Aranıyor…" : "Eşleşen müşteri yok."}</li>
                   ) : (
                     filtered.map((c) => (
                       <li key={c.id}>

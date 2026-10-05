@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createDemand } from "@/app/actions/demands";
+import { searchCustomers } from "@/app/actions/lookup";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { DemandSummaryGroups } from "@/components/app/demand-summary";
 import { StructuredDemandFields, useDemandRequired } from "@/components/app/structured-demand-fields";
 import { useCreateForm } from "@/components/app/use-create-form";
-import { FormField, FormSelect } from "@/components/ui/form-controls";
+import { FormField } from "@/components/ui/form-controls";
 import {
   SummaryGroup,
   SummaryRow,
@@ -71,6 +73,16 @@ export function DemandForm({
   });
   const req = useDemandRequired();
 
+  // Müşteri seçici sunucu taraflı aranır (searchCustomers); seçilen ad özet için tutulur.
+  const prefill = customers.find((c) => c.id === defaultCustomerId) ?? null;
+  const [pickedCustomer, setPickedCustomer] = useState<CustomerOption | null>(prefill);
+  const customerCache = useRef(new Map<string, CustomerOption>());
+  const onSearchCustomers = useCallback(async (q: string): Promise<ComboboxOption[]> => {
+    const rows = await searchCustomers(q);
+    for (const r of rows) customerCache.current.set(r.value, { id: r.value, full_name: r.label });
+    return rows;
+  }, []);
+
   const tabs: FormTab[] = useMemo(
     () =>
       DEMAND_TABS.map((t) => ({
@@ -111,24 +123,25 @@ export function DemandForm({
             htmlFor="demand-customer"
             required
             className="sm:col-span-2"
-            hint={
-              customers.length === 0 ? (
-                <Link href="/app/musteriler/yeni" className="font-semibold text-brand-600 underline underline-offset-2">
-                  Kayıtlı müşteri yok — yeni müşteri ekle
-                </Link>
-              ) : undefined
-            }
+            inject={false}
           >
-            <FormSelect
+            <Combobox
+              id="demand-customer"
               name="customer_id"
+              aria-label="Müşteri"
               required
-              defaultValue={customers.some((c) => c.id === defaultCustomerId) ? defaultCustomerId : ""}
-            >
-              <option value="" disabled>Müşteri seçin…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name}</option>
-              ))}
-            </FormSelect>
+              clearable={false}
+              placeholder="Müşteri seçin…"
+              searchPlaceholder="Müşteri ara…"
+              emptyText="Eşleşen müşteri yok"
+              defaultValue={prefill?.id ?? ""}
+              options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
+              onSearch={onSearchCustomers}
+              onValueChange={(id) => setPickedCustomer(id ? (customerCache.current.get(id) ?? null) : null)}
+            />
+            <Link href="/app/musteriler/yeni" className="mt-1 inline-block text-xs font-semibold text-brand-600 underline underline-offset-2">
+              Yeni müşteri ekle
+            </Link>
           </FormField>
         )}
         <StructuredDemandFields section="ne" {...shared} />
@@ -140,7 +153,7 @@ export function DemandForm({
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
     const customerId = fixedCustomer?.id ?? values.customer_id ?? "";
-    const customerName = fixedCustomer?.full_name ?? customers.find((c) => c.id === customerId)?.full_name;
+    const customerName = fixedCustomer?.full_name ?? (pickedCustomer && pickedCustomer.id === customerId ? pickedCustomer.full_name : undefined);
     return (
       <>
         <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
