@@ -18,6 +18,7 @@ export default async function RegisterPage({
   searchParams: Promise<{
     plan?: string;
     cycle?: string;
+    seats?: string;
     ref?: string;
     utm_source?: string;
     utm_medium?: string;
@@ -49,6 +50,7 @@ export default async function RegisterPage({
       offers={offers}
       initialPlan={normalizePlanId(params.plan)}
       initialCycle={normalizeBillingCycle(params.cycle)}
+      initialSeats={/^\d{1,3}$/.test(params.seats ?? "") && Number(params.seats) > 0 ? Number(params.seats) : undefined}
       attribution={{
         ref: params.ref,
         utm_source: params.utm_source,

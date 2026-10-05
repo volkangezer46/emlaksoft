@@ -6,10 +6,12 @@ import { SeoJsonLd } from "@/components/seo/seo-json-ld";
 import { buildMetadata } from "@/lib/seo/store";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { yearlyOfferLabel } from "@/lib/billing/plans";
+import { extraSeatTexts } from "@/lib/billing/seat-calculator-model";
 import { buildFaq, lostCommissionPlanName, trialPhrase, yearlyDiscountPercent } from "@/lib/pricing-page-model";
 import { ComparisonTable } from "@/components/pricing-page/comparison-table";
 import { PricingShell, Section } from "@/components/pricing-page/page-shell";
 import { RoiCalculator } from "@/components/pricing-page/roi-calculator";
+import { SeatCalculatorLazy } from "@/components/pricing-page/seat-calculator-lazy";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/fiyatlar");
@@ -23,11 +25,9 @@ export default async function FiyatlarPage() {
   const trial = trialPhrase(trialDays);
   const firstPriced = plans.find((p) => !p.customPricing);
   const startLabel = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
-  // Özel fiyatlı paketin tutarı hesaplayıcıya girmez; kampanya açıksa etkin aylık fiyat kullanılır.
-  const roiPlans = plans
-    .filter((p) => !p.customPricing)
-    .map((p) => ({ id: p.id, name: p.name, monthlyTry: offers[p.id]?.monthlyTry ?? p.monthlyTry, seats: p.limits.seats }));
-  const defaultPlanId = (roiPlans.find((p) => plans.find((x) => x.id === p.id)?.popular) ?? roiPlans[0] ?? { id: plans[0]!.id }).id;
+  // Özel fiyatlı paket hesaplayıcıya girmez; ROI hesaplayıcı etkin fiyatı (kampanya dahil) seat-pricing motorundan alır.
+  const roiPlans = plans.filter((p) => !p.customPricing);
+  const defaultPlanId = (roiPlans.find((p) => p.popular) ?? roiPlans[0] ?? plans[0]!).id;
 
   return (
     <PricingShell>
@@ -60,8 +60,12 @@ export default async function FiyatlarPage() {
         </div>
       </div>
 
+      <section aria-label="Ekibinize göre paket hesaplayıcı" className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
+        <SeatCalculatorLazy plans={plans} offers={offers} trialDays={trialDays} />
+      </section>
+
       <section aria-label="Paketler" className="mx-auto max-w-6xl px-4 pb-4 pt-6 sm:px-6">
-        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} />
+        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} />
       </section>
 
       <section aria-label="Bilmeniz gerekenler" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -87,7 +91,7 @@ export default async function FiyatlarPage() {
         title="Kaçan komisyonunuzu kendi sayılarınızla hesaplayın"
         lead="Aşağıdaki sayı alanlarına kendi rakamlarınızı yazın; sonuç anında hesaplanır. Sektör ortalaması kullanılmaz, alanlar bilerek boş bırakıldı."
       >
-        <RoiCalculator plans={roiPlans} defaultPlanId={defaultPlanId} />
+        <RoiCalculator plans={roiPlans} offers={offers} defaultPlanId={defaultPlanId} />
       </Section>
 
       <Section id="sss" title="Fiyatlarla ilgili sık sorulanlar">

@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useState } from "react";
-import { calculateRoi, formatNum, formatTry, type RoiRaw } from "@/lib/roi-calculator";
+import { useId, useMemo, useState } from "react";
+import { calculateRoi, formatNum, formatTry, parseTrNumber, type RoiRaw } from "@/lib/roi-calculator";
 import { AnimatedNumber } from "@/components/ui/animated-number";
-
-export type RoiPlanOption = { id: string; name: string; monthlyTry: number; seats: number };
+import type { PlanDef } from "@/lib/billing/plans";
+import { applyOffers, type SeatCalcOffers } from "@/lib/billing/seat-calculator-model";
+import { maxTotalSeats, quoteSeats } from "@/lib/billing/seat-pricing";
 
 const FIELDS: { key: keyof RoiRaw; label: string; hint: string; unit?: string; example: string }[] = [
   { key: "monthlyLeads", label: "Aylık gelen talep sayısı", hint: "Telefon, portal, web ve yönlendirmeyle gelen toplam talep.", example: "örn. 60" },
@@ -12,17 +13,39 @@ const FIELDS: { key: keyof RoiRaw; label: string; hint: string; unit?: string; e
   { key: "commissionRate", label: "Ortalama komisyon oranı", hint: "KDV hariç, tek taraf için.", unit: "%", example: "örn. 2" },
   { key: "conversionRate", label: "Şu anki dönüşüm oranı", hint: "Taleplerin satışa dönüşme yüzdesi.", unit: "%", example: "örn. 4" },
   { key: "untrackedRate", label: "Takipsiz kalan talep oranı", hint: "Geri dönülmeyen veya unutulan taleplerin yüzdesi.", unit: "%", example: "örn. 25" },
-  { key: "advisors", label: "Danışman sayısı", hint: "İsteğe bağlı; yalnızca paket kapsamını kontrol eder.", example: "örn. 4" },
+  { key: "advisors", label: "Danışman sayısı", hint: "İsteğe bağlı; girerseniz paket bedeli bu kullanıcı sayısına göre hesaplanır.", example: "örn. 4" },
 ];
 
 const EMPTY: RoiRaw = { monthlyLeads: "", avgPrice: "", commissionRate: "", conversionRate: "", untrackedRate: "", advisors: "" };
 
-export function RoiCalculator({ plans, defaultPlanId }: { plans: RoiPlanOption[]; defaultPlanId: string }) {
+/**
+ * Paket bedeli ek kullanıcı fiyatlama motorundan (seat-pricing) gelir: "Danışman sayısı" girildiyse seçilen
+ * paketin O KADAR kullanıcı için aylık toplamı, girilmediyse dahil kullanıcı sayısı için tutarı kullanılır.
+ * Fiyat mantığı burada çoğaltılmaz.
+ */
+export function RoiCalculator({
+  plans,
+  offers,
+  defaultPlanId,
+}: {
+  plans: readonly PlanDef[];
+  offers?: SeatCalcOffers;
+  defaultPlanId: string;
+}) {
   const uid = useId();
   const [raw, setRaw] = useState<RoiRaw>(EMPTY);
   const [planId, setPlanId] = useState(defaultPlanId);
-  const plan = plans.find((p) => p.id === planId) ?? plans[0]!;
-  const result = calculateRoi(raw, plan);
+  const effective = useMemo(() => applyOffers(plans.filter((p) => !p.customPricing), offers), [plans, offers]);
+  const plan = effective.find((p) => p.id === planId) ?? effective[0]!;
+  const advisors = parseTrNumber(raw.advisors);
+  const seats = advisors !== null && advisors >= 1 ? Math.floor(advisors) : plan.limits.seats;
+  const quote = quoteSeats(effective, plan.id, seats, "monthly");
+  const cap = maxTotalSeats(plan);
+  const result = calculateRoi(raw, {
+    monthlyTry: quote.totalMonthlyTry,
+    // Ek kullanıcı satın alınabildiği için kapsam uyarısı yalnız paketin azami kullanıcısına göredir.
+    seats: Number.isFinite(cap) ? cap : Number.MAX_SAFE_INTEGER,
+  });
   const invalid = result.status === "invalid" ? result.fields : [];
 
   return (
@@ -78,9 +101,9 @@ export function RoiCalculator({ plans, defaultPlanId }: { plans: RoiPlanOption[]
               onChange={(e) => setPlanId(e.target.value)}
               className="mt-1.5 h-11 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-base text-ink-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
             >
-              {plans.map((p) => (
+              {effective.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} · {formatTry(p.monthlyTry)}/ay (KDV hariç)
+                  {p.name} · taban {formatTry(p.monthlyTry)}/ay (KDV hariç)
                 </option>
               ))}
             </select>
@@ -114,7 +137,7 @@ export function RoiCalculator({ plans, defaultPlanId }: { plans: RoiPlanOption[]
                 <p className="text-sm tabular-nums text-text-muted">Yılda yaklaşık <AnimatedNumber value={result.missedYearly} kind="currency" /> (KDV hariç)</p>
               </div>
               <dl className="space-y-2 border-t border-line pt-4 text-sm">
-                <Row dt={`${plan.name} paketinin aylık bedeli`} dd={`${formatTry(result.planMonthly)} (KDV hariç)`} />
+                <Row dt={`${plan.name} paketinin aylık bedeli (${seats} kullanıcı)`} dd={`${formatTry(result.planMonthly)} (KDV hariç)`} />
                 {result.coverage !== null ? (
                   <Row dt="Kaçan komisyon / paket bedeli" dd={`${formatNum(result.coverage)} kat`} />
                 ) : null}
@@ -131,7 +154,7 @@ export function RoiCalculator({ plans, defaultPlanId }: { plans: RoiPlanOption[]
               </div>
               {result.seatsExceeded ? (
                 <p role="status" className="rounded-[var(--radius-card)] tone-warning p-3 text-sm">
-                  {plan.name} paketi en fazla {plan.seats} kullanıcıyı kapsar; danışman sayınız bunu aşıyor.
+                  {plan.name} paketi en fazla {Number.isFinite(cap) ? cap : seats} kullanıcıyı kapsar; danışman sayınız bunu aşıyor.
                 </p>
               ) : null}
             </div>

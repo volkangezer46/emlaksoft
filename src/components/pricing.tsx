@@ -14,6 +14,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { formatNumberTr } from "@/lib/format";
+import type { ExtraSeatSummary } from "@/lib/billing/seat-calculator-model";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 
 const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
@@ -56,7 +57,13 @@ export function Pricing({
   trialDays,
   offers,
   founders = null,
+  extraSeats,
 }: {
+  /**
+   * Plan kimliğine göre ek kullanıcı kademe metni; SUNUCUDA `extraSeatSummary` ile üretilir (fiyat motoru
+   * istemci paketine girmesin diye). Verilmezse metin gösterilmez.
+   */
+  extraSeats?: Record<string, ExtraSeatSummary | null>;
   plans?: readonly PlanDef[];
   trialDays?: number;
   offers?: Record<string, PricingOffer>;
@@ -122,6 +129,7 @@ export function Pricing({
           const effectiveMonthly = offer?.monthlyTry ?? plan.monthlyTry;
           const onCampaign = Boolean(offer?.campaign);
           const effective = { ...plan, monthlyTry: effectiveMonthly };
+          const extra = extraSeats?.[plan.id] ?? null;
           const price = yearly ? Math.round(planAmountOf(effective, "yearly") / 12) : planAmountOf(effective, "monthly");
           const listPrice = yearly ? Math.round(planAmountOf(plan, "yearly") / 12) : plan.monthlyTry;
           const yearlySaving = plan.monthlyTry * 12 - planAmountOf(effective, "yearly");
@@ -198,9 +206,10 @@ export function Pricing({
                   </li>
                 ))}
               </ul>
-              {plan.extraSeatMonthlyTry ? (
-                <p className={`mt-3 text-xs ${plan.popular ? "text-white/75" : "text-text-muted"}`}>
-                  Ek kullanıcı: {formatTL(plan.extraSeatMonthlyTry)} ₺/ay (KDV hariç)
+              {extra ? (
+                <p className={`mt-3 text-xs leading-relaxed ${plan.popular ? "text-white/75" : "text-text-muted"}`}>
+                  <span className="font-semibold">Ek kullanıcı:</span> {extra.included}, {extra.tiers.join(", ")} (kullanıcı başı, ₺/ay, KDV hariç).
+                  {extra.max ? ` ${extra.max}.` : ""}
                 </p>
               ) : null}
 
