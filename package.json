@@ -20,6 +20,7 @@
     "kur:backfill": "tsx scripts/tcmb-backfill.ts",
     "db:migrate": "tsx scripts/apply-migrations.ts",
     "db:smoke": "tsx scripts/smoke-auth.ts",
+    "db:rehearse": "tsx scripts/migration-rehearsal.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "test": "vitest run",
     "test:watch": "vitest",
