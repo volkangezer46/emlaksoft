@@ -43,7 +43,7 @@ export type Integration = {
 
 /** Tüm entegrasyonları CANLI durumlarıyla döndürür (yalnız sunucuda çağır). */
 export async function listIntegrations(tenantId: string | null = null): Promise<Integration[]> {
-  const emlakFiyatiConfigured = isEmlakFiyatiConfigured();
+  const emlakFiyatiConfigured = await isEmlakFiyatiConfigured();
   const [
     netgsmConfigured,
     whatsappConfigured,
@@ -149,7 +149,7 @@ export async function listIntegrations(tenantId: string | null = null): Promise<
       description: "Aylık bölge fiyat endeksi (medyan TL/m², çeyrekler arası bant, değişim ve 12 aylık trend). Yalnız coğrafi yol ve tip gönderilir; kişisel veri gitmez.",
       unlocks: "Değerleme motorunda piyasa endeksi kaynağı, bölge analizinde medyan/trend ve portföyde bölge referansı.",
       status: emlakFiyatiConfigured ? "configured" : "setup_required",
-      requires: "Sunucu ortam değişkeni EMLAKFIYATI_API_KEY",
+      requires: "Admin > Sistem > EmlakFiyati sekmesinde API anahtarı (yedek: sunucu ortam değişkeni EMLAKFIYATI_API_KEY)",
     },
     {
       key: "bank_rates",

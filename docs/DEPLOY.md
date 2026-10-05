@@ -38,7 +38,8 @@ Zorunlu (eksikse `next build`/`next start` production'da başlamaz veya readines
 | `CRON_SECRET` | Güçlü, bağımsız; tüm cron route'ları Bearer doğrular |
 | `RELEASE_MIGRATION`, `RELEASE_MIGRATION_CHECKSUM` | **Yeni migration sonrası güncellenir** (aşağıda) |
 | `PLATFORM_ADMIN_EMAILS` | En az iki kontrollü yönetici önerilir |
-| `EMLAKFIYATI_API_KEY` | Piyasa endeksi (EmlakFiyati) için sunucu sırrı; `NEXT_PUBLIC_` DEĞİL. Eksikse özellik "etkin değil" der, hiçbir sayfa kırılmaz (değerleme/bölge analizi kaynağı atlanır). Yalnız `emlakfiyati.com` hostuna HTTPS ile gider |
+| `PLATFORM_SECRETS_KEY` | **Zorunlu** (admin'den girilen üçüncü taraf API anahtarlarını `platform_settings` içinde AES-256-GCM ile şifreler). Üretim: `openssl rand -hex 32` (64 hex). Yoksa Admin > Sistem > EmlakFiyati formu "etkin değil: PLATFORM_SECRETS_KEY tanımlı değil" der ve KAYDETMEZ. **Kaybedilir/değişirse** şifreli kayıtlar çözülemez: admin'deki anahtar yeniden girilmelidir (ortam yedeği varsa o devreye girer). `NEXT_PUBLIC_` DEĞİL, diğer sırlarla paylaşılmaz |
+| `EMLAKFIYATI_API_KEY` | **YEDEK**. Birincil kaynak Admin > Sistem > EmlakFiyati'nda girilen şifreli anahtardır (öncelik: admin > bu değişken). Piyasa endeksi için sunucu sırrı; `NEXT_PUBLIC_` DEĞİL. İkisi de yoksa özellik "etkin değil" der, hiçbir sayfa kırılmaz. Yalnız `emlakfiyati.com` hostuna HTTPS ile gider |
 
 Release çifti üretimi (DB migrate sonrası, kod deploy öncesi):
 

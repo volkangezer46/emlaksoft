@@ -142,7 +142,22 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Ürün turu | `src/lib/product-tour-data.ts` |
 | Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (30 rota, `npm run check:cron`) |
 | service_role | `src/lib/admin-client-allowlist.ts` (`audit-admin-client.ts --write`) |
-| Piyasa endeksi (EmlakFiyati) | `src/lib/integrations/emlakfiyati/` (`contract.ts` saf: zod yanıt, slug yolu, tip eşlemesi `konut`/`arsa`; `client.ts` sunucu: `getEndeks`, `getEndeksForPlace`, 12 sa `unstable_cache` + kısa negatif önbellek + 429 `Retry-After`); panel `src/components/app/emlakfiyati-endeks-panel.tsx`; değerleme kaynağı `src/lib/valuation.ts`. Endeksa ve TapuSor KALDIRILDI (kullanıcı kararı); eski `platform_settings` anahtarları (`endeksa_*`, `tapusor_*`) kodda okunmaz, temizlik migration'ı yazılmadı |
+| EmlakFiyati TEK ADAPTÖR (emlakfiyati.com'a TÜM çağrılar) | `src/lib/integrations/emlakfiyati/`: `adapter.ts` (tek `fetchExternal`; `emlakFiyatiGet(path, query)` tür-güvenli ince çekirdek, geri çekilme+jitter, en çok 4 eşzamanlı, bellek önbelleği, 401/403/429/5xx/ağ sınıflandırma, istek sayacı + `onEmlakFiyatiRequest` kancası [kontör ADAPTÖR DIŞINDA], 401 alarmı, `probeEmlakFiyatiConnection`), `policy.ts` (saf: izinli yol/başlık beyaz listesi, anahtar biçimi/maske, `X-Ortak-Kullanici-Ref` ve `Idempotency-Key` yardımcıları), `keys.ts` (anahtar çözümleme: admin şifreli > env `EMLAKFIYATI_API_KEY` yedek; rotasyon current/previous 7 gün), `ortak.ts` (ortak uç KAPISI + takma ref), `admin-status.ts`; şifreleme `src/lib/platform-secrets.ts` (`PLATFORM_SECRETS_KEY`, AES-256-GCM, `pii-crypto` kalıbı); admin ekranı `/admin/sistem?sekme=emlakfiyati` + `src/app/actions/platform-emlakfiyati.ts` (süper admin yazar, ops okur). Sözleşme testi: `single-adapter-contract.test.ts` |
+| Piyasa endeksi (EmlakFiyati) | `src/lib/integrations/emlakfiyati/` (`contract.ts` saf: zod yanıt, slug yolu, tip eşlemesi `konut`/`arsa`; `client.ts` yalnız `adapter.ts` üzerinden: `getEndeks`, `getEndeksForPlace`, 12 sa `unstable_cache` + kısa negatif önbellek; 429'da Retry-After YOK, geri çekilme adaptörde); panel `src/components/app/emlakfiyati-endeks-panel.tsx`; değerleme kaynağı `src/lib/valuation.ts`. Endeksa ve TapuSor KALDIRILDI (kullanıcı kararı); eski `platform_settings` anahtarları (`endeksa_*`, `tapusor_*`) kodda okunmaz, temizlik migration'ı yazılmadı |
+
+### 6b. EmlakFiyati: sahip işleri ve "ortak uçlar bekliyor" (2026-10-05)
+
+**Sahip işleri:** (1) Vercel production'da `PLATFORM_SECRETS_KEY` tanımla (`openssl rand -hex 32`; kaybedilirse Admin'deki anahtar yeniden girilir) ·
+(2) Admin > Sistem > EmlakFiyati'dan API anahtarını gir (env `EMLAKFIYATI_API_KEY` artık YEDEK; admin kaydı önceliklidir) ·
+(3) "Bağlantıyı dene" ile doğrula · (4) anahtar rotasyonunda yeni anahtar girilir, eski 7 gün geçerli kalır (EmlakFiyati sözleşmesi).
+
+**Ortak uçlar BEKLİYOR (kod yazılmadı, canlıya bağlanmadı):** EmlakFiyati değerleme ve rapor PDF uçlarını henüz yayınlamadı.
+Adaptörde yalnız kapı (`ortakGate`, bayrak varsayılan KAPALI, `ORTAK_ENDPOINTS_VERIFIED=false`) ve başlık yardımcıları var.
+Geldiklerinde zorunlu: `X-Ortak-Kullanici-Ref` (takma ref, 8-64 karakter) + `Idempotency-Key`. Kontör EmlakSoft'ta düşer, mutabakat için EmlakFiyati aylık kullanım dökümü verir.
+**ŞEMA GEREKLİ (EmlakFiyati'ndan, tahmin edilmedi):** ortak değerleme isteği/yanıtı, ortak rapor PDF ucu (yol, kimlik, süre, hata gövdesi), kontör/birim bilgisi yanıtta var mı,
+`/api/ara`, `/api/grafik/seri|iller|genel`, `/api/dashboard`, `/api/rayic`, `/api/resmi-duyurular`, `/api/parsel*` (mahalle, ornekler, kademe), `/api/konut-kapsama`, `/api/disa-aktar`, `/api/ilanlar`
+için sorgu parametreleri ve yanıt şemaları (adaptör yalnız `get(path, query)` çekirdeği sunar; yalnız `/api/endeks` path+tip doğrulandı). `/api/parsel/rapor?format=pdf` kullanıcı ürününde KULLANILMAZ.
+`docs/design/EMLAKFIYATI_KONTOR_MIMARISI.md` §5 (HMAC imza başlıkları `X-ES-*`) EmlakFiyati'nın bildirdiği sözleşmeyle UYUŞMUYOR (Bearer + `X-Ortak-Kullanici-Ref` + `Idempotency-Key`); kontör kodu yazılmadan önce o belge güncellenmeli.
 
 ## 7. Kararlar (değişmez, tekrar sorulmaz)
 

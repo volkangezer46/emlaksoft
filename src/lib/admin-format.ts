@@ -88,6 +88,11 @@ export function auditActionLabel(action: string): string {
     "integration.netgsm.clear":   "Netgsm bilgileri silindi",
     "integration.whatsapp.save":  "WhatsApp bilgileri kaydedildi",
     "integration.whatsapp.clear": "WhatsApp bilgileri silindi",
+    "integration.emlakfiyati.key_change": "EmlakFiyati anahtarı değişti",
+    "integration.emlakfiyati.key_clear": "EmlakFiyati anahtarı silindi",
+    "integration.emlakfiyati.previous_delete": "EmlakFiyati eski anahtarı silindi",
+    "integration.emlakfiyati.test": "EmlakFiyati bağlantısı denendi",
+    "integration.emlakfiyati.ortak_flag": "EmlakFiyati ortak uç bayrağı değişti",
   };
   if (map[action]) return map[action];
   // Fallback: "customer.create" → "customer · create"

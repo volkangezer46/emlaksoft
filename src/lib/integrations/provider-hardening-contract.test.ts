@@ -7,7 +7,8 @@ const REMOVED_PROVIDERS = new RegExp(["end" + "eksa", "tapu" + "sor"].join("|"),
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const valuation = read("src/lib/valuation.ts");
-const emlakfiyati = read("src/lib/integrations/emlakfiyati/client.ts");
+const emlakfiyati = read("src/lib/integrations/emlakfiyati/adapter.ts");
+const emlakfiyatiKeys = read("src/lib/integrations/emlakfiyati/keys.ts");
 const portals = read("src/lib/integrations/portals/index.ts");
 const portalActions = read("src/app/actions/portal-keys.ts");
 const efatura = read("src/lib/efatura.ts");
@@ -41,8 +42,11 @@ describe("external provider hardening contract", () => {
     expect(emlakfiyati).toContain("MAX_RESPONSE_BYTES");
     expect(emlakfiyati).toContain("PROVIDER_REQUEST_TIMEOUT_MS");
     expect(emlakfiyati).not.toMatch(/fetch\s*\(/);
-    expect(emlakfiyati).toContain("process.env.EMLAKFIYATI_API_KEY");
+    // Anahtar: admin (şifreli) > ortam değişkeni (yedek); ortam değişkeni YALNIZ keys.ts'te okunur.
+    expect(emlakfiyatiKeys).toContain("process.env.EMLAKFIYATI_API_KEY");
+    expect(emlakfiyati).not.toContain("process.env");
     expect(emlakfiyati).not.toContain("NEXT_PUBLIC_EMLAKFIYATI");
+    expect(emlakfiyatiKeys).not.toContain("NEXT_PUBLIC_EMLAKFIYATI");
     // Anahtar hiçbir log çağrısına girmez.
     expect(emlakfiyati).not.toMatch(/console\.\w+\([^)]*key/);
   });
