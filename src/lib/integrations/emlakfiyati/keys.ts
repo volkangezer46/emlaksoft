@@ -23,6 +23,10 @@ export const EF_SETTING = {
   alarmNotifiedAt: "emlakfiyati_alarm_notified_at",
   previousUsedAt: "emlakfiyati_previous_used_at",
   ortakEnabled: "emlakfiyati_ortak_enabled",
+  /** Son BAŞARILI ortak yoklaması (ISO); bayrağı açmanın ön koşulu. config.ts EF_ORTAK_PROBE_OK_SETTING_KEY ile aynı. */
+  ortakProbeOkAt: "emlakfiyati_ortak_probe_ok_at",
+  /** Son yoklamanın özeti (JSON: sınırlar + tarife sürümü; anahtar/kişisel veri yok). */
+  ortakProbeInfo: "emlakfiyati_ortak_probe_info",
 } as const;
 
 export type KeySource = "admin" | "env" | "none";
