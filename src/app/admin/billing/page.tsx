@@ -76,10 +76,12 @@ function billingHref(p: { durum?: string; from?: string; to?: string; q?: string
 export default async function AdminBillingPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; from?: string; to?: string; q?: string; sayfa?: string; fsayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; from?: string; to?: string; q?: string; sayfa?: string; fsayfa?: string; odeme?: string }>;
 }) {
   const staff = await requirePlatformModule("billing");
   const sp = (await searchParams) ?? {};
+  // "Ödeme uyarıları" kartı: mutabakat kuyruğunu tek duruma süzer (yalnız bu iki değer kabul edilir).
+  const captureFilter = sp.odeme === "manual_review" || sp.odeme === "refund_required" ? sp.odeme : null;
   const durum = sp.durum && subStatus[sp.durum] ? sp.durum : undefined;
   const from = parseDateParam(sp.from);
   const to = parseDateParam(sp.to);
@@ -131,6 +133,8 @@ export default async function AdminBillingPage({
     { data: statRows },
     { data: invoices, count: invCount },
     { data: captureQueue, count: captureQueueCount, error: captureQueueError },
+    { count: manualReviewCount },
+    { count: refundRequiredCount },
   ] = await Promise.all([
     subsQuery,
     admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
@@ -138,9 +142,11 @@ export default async function AdminBillingPage({
     admin
       .from("billing_payment_captures")
       .select("id, tenant_id, payment_id, target_type, amount_try, status, reconciliation_attempt_count, last_error_code, captured_at", { count: "exact" })
-      .in("status", ["captured_pending", "retry_pending", "manual_review", "refund_required"])
+      .in("status", captureFilter ? [captureFilter] : ["captured_pending", "retry_pending", "manual_review", "refund_required"])
       .order("captured_at", { ascending: false })
       .limit(20),
+    admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "manual_review"),
+    admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "refund_required"),
   ]);
 
   const listRows = subs ?? [];
@@ -295,7 +301,33 @@ export default async function AdminBillingPage({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+      <section id="odeme-uyarilari" aria-labelledby="odeme-uyari-baslik" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+        <h2 id="odeme-uyari-baslik" className="flex items-center gap-2 font-display font-bold text-ink-950">
+          <AlertTriangle className="h-4 w-4 text-warn-600" /> Ödeme uyarıları
+        </h2>
+        <p className="mt-0.5 text-xs text-text-faint">
+          Günlük kontrol: sağlayıcıda tahsil edilmiş ama elle karar bekleyen kayıtlar. Prosedür: docs/runbooks/IYZICO_IADE.md.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {([
+            { key: "manual_review", label: "Manuel inceleme", count: manualReviewCount },
+            { key: "refund_required", label: "İade gerekiyor", count: refundRequiredCount },
+          ] as const).map((c) => (
+            <Link
+              key={c.key}
+              href={`/admin/billing?odeme=${c.key}#mutabakat`}
+              className={`focus-ring rounded-[var(--radius-card)] border px-4 py-3 transition hover:border-brand-400 ${
+                (c.count ?? 0) > 0 ? "border-danger-500/40 bg-danger-500/5" : "border-line bg-canvas"
+              }`}
+            >
+              <span className="block text-xs font-medium text-text-muted">{c.label}</span>
+              <span className="numeric font-display text-2xl font-extrabold text-ink-950">{c.count ?? "—"}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section id="mutabakat" className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">

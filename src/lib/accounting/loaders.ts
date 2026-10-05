@@ -236,3 +236,55 @@ export async function loadPlatformMrr(admin: Admin, nowMs: number): Promise<{ mr
   const mrr = exactMrr(aggregate.plan_stats, priceMapOf(planDefs));
   return { mrr, arr: exactArr(mrr) };
 }
+
+export type TryLiabilityRow = { tenantId: string; name: string; kurus: number };
+export type TryLiability = {
+  /** Pozitif nominal bakiyesi olan ofis sayısı. */
+  tenantCount: number;
+  /** Ofis başına max(0, Σ defter tutarı) toplamı (kuruş). Vadesi dolmuş ama defterde düşülmemiş kısım DAHİLDİR (üst sınır). */
+  totalKurus: number;
+  top: TryLiabilityRow[];
+  truncated: boolean;
+};
+
+/**
+ * Kullanılmamış hesap kredisi (yükümlülük) — SALT OKUNUR. account_credit_ledger (unit='try') nominal toplamı;
+ * eksi bakiyeli (borçlu) ofis yükümlülük sayılmaz. Çağıranın `admin` istemcisiyle çalışır (yeni service_role YOK).
+ * Hata/tablo yoksa null: arayüz "—" gösterir.
+ */
+export async function loadTryLiability(admin: Admin, topN = 10): Promise<TryLiability | null> {
+  const sums = new Map<string, number>();
+  let offset = 0;
+  let truncated = false;
+  for (;;) {
+    if (offset >= LEDGER_MAX_ROWS) {
+      truncated = true;
+      break;
+    }
+    const { data, error } = await admin
+      .from("account_credit_ledger")
+      .select("id, tenant_id, amount")
+      .eq("unit", "try")
+      .order("id", { ascending: true })
+      .range(offset, offset + LEDGER_PAGE_SIZE - 1);
+    if (error) return null;
+    const rows = (data ?? []) as { tenant_id: string; amount: number | string | null }[];
+    for (const r of rows) sums.set(r.tenant_id, (sums.get(r.tenant_id) ?? 0) + Math.round(Number(r.amount ?? 0) * 100));
+    if (rows.length < LEDGER_PAGE_SIZE) break;
+    offset += LEDGER_PAGE_SIZE;
+  }
+  const positive = [...sums.entries()].filter(([, k]) => k > 0).sort((a, b) => b[1] - a[1]);
+  const totalKurus = positive.reduce((a, [, k]) => a + k, 0);
+  const topIds = positive.slice(0, topN);
+  const names = new Map<string, string>();
+  if (topIds.length > 0) {
+    const { data } = await admin.from("tenants").select("id, name").in("id", topIds.map(([id]) => id));
+    for (const t of (data ?? []) as { id: string; name: string | null }[]) names.set(t.id, t.name ?? "");
+  }
+  return {
+    tenantCount: positive.length,
+    totalKurus,
+    top: topIds.map(([tenantId, kurus]) => ({ tenantId, name: names.get(tenantId) || "Ofis", kurus })),
+    truncated,
+  };
+}

@@ -35,7 +35,8 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 | [x] | PostgREST PGRST201: 113 gömülü sorguya FK kısıtlama adı | 175aa01, 980d95e |
 | [x] | Dışa aktarma: 2000 satır kesintisi bildirimi + audit_logs kaydı | 5c71df8 |
 | [x] | Production demo girişi için açık opt-in bayrakları (varsayılan kapalı) | bc0f170 |
-| [x] | Migration zinciri canlıda (depoda 206 dosya; canlı ledger farkı için `docs/DURUM.md`) | `npm run check:migrations -- --database` ile doğrulanmalı |
+| [x] | Migration zinciri canlıda: `20260826000800`a kadar uygulandı (2026-10-05); yeni 000900/001000/001100 bekliyor | `docs/HAFIZA.md` §2; `npm run check:migrations -- --database` |
+| [x] | Faturalama genişlemesi (canlı): EF kontör cüzdanı + paketleri, TL hesap kredisi + kredi ile fatura ödemesi, referans programı (müşteri-getir-müşteri; ortak/nakit KAPALI), kayıtlı kart (otomatik yenileme KAPALI), admin muhasebe merkezi, ortak API v1 kodu | `docs/HAFIZA.md` §2/§6/§10/§11 |
 | [x] | Modül sistemi (ofis bazlı aç/kapat), SEO merkezi + robotu, plan okuyucu, kupon, K5 hesap/abonelik/ekip/şube/uyum, bakım modu, TV modu, telefon tek merkez | `docs/DURUM.md` "2026-10-03/04 turu"; `docs/MIMARI.md` |
 | [x] | Dalga 1 tutarlılık: örnek veri KPI eşiği tek yardımcı, TR ay sınırları, rol etiketi tek kaynak, terim sözlüğü, "kayıp" üç kavram | `sample-scope.ts`, `clock.ts`, `role-labels.ts`, `terminology.ts` + sözleşme testleri |
 
@@ -49,6 +50,9 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 - [~] **Tenant izolasyonu:** RLS audit (`npm run db:rls-audit`) ve ilişki denetimi var; cache/realtime/ortak
   admin-client yollarında sürekli doğrulama ve canlı DB üzerinde yeniden koşum açık.
 - [ ] CI'da `npm ci` + audit kapılarının yeşil olduğunun Actions'tan teyidi (doğrulanmadı).
+- [ ] **Ödeme operasyonu (2026-10-05):** `IYZICO_BASE_URL` canlı değeri, `PLATFORM_MFA_ENFORCEMENT=on`, `ADVISOR_PII_KEY` (DEPLOY.md zorunlu env tablosu); iyzico iadesi elle (`docs/runbooks/IYZICO_IADE.md`); günlük `manual_review`/`refund_required` kontrolü; dış uptime izleyici.
+- [ ] **Yeni migration'lar:** `20260826000900`, `001000` (büyüme paneli owner/gm rol kapısı), `001100`: `docs/runbooks/YAYIN_PENCERESI_2.md` §8.
+- [ ] **Admin "Hesap kredisi yükle/geri al" ekranı:** service_role allowlist kararı bekliyor (HAFIZA §3).
 
 ### P1 — Ürün
 - [ ] **Türkiye uyum paketi:** EİDS tamamlama (iskelet var), İYS entegrasyonu, GİB BTRANS raporlama
@@ -85,7 +89,7 @@ Ticari beta (güvenilir "Ofis paketi") → tam vizyon. Uygulama canlıda: https:
 ## 4. Çelişkiler / doğrulanması gerekenler
 
 - ÇÖZÜLDÜ: `CLAUDE.md` artık koyu temayı tanımlar (yalnız /app ve /admin, `html[data-theme="dark"]`, `src/app/theme-dark.css`, tercih sistem/açık/koyu; vitrin ve portallar hep açık). Eski "dark mode YOK" notu geçersizdir.
-- ÇÖZÜLDÜ: cron sayısı `CLAUDE.md`, `vercel.json` ve `src/app/api/cron` altında 28'dir (28. cron `seo-robot`); `npm run check:cron` doğrular.
+- ÇÖZÜLDÜ: cron sayısı `CLAUDE.md`, `vercel.json` ve `src/app/api/cron` altında 33'tür (güncel; 28. cron `seo-robot` idi); `npm run check:cron` doğrular.
 - AÇIK: `tenant_reporting_aggregates` ve `tenant_commission_aggregates` RPC'leri `is_sample` süzmez (örnek veri KPI eşiği bunlara uygulanamıyor, yalnız etiketlenir); süzgeç için migration gerekir. Ayrıntı: `docs/DURUM.md` "Açık riskler".
 - AÇIK: musteriler paketindeki "Lead skoru" metinleri ve modül kayıt defterindeki "Kayıp nedenleri" etiketi (`src/lib/modules/registry.ts`, `lost_sales`) yeni adlara ("Aday skoru", "Risk altındaki müşteriler") sahiplerinin birleşiminde çekilmeli.
 - Eski devir belgeleri "secret rotasyonu bitmeden deploy yok" der; uygulama bu arada canlıya alınmış. Rotasyon açık (P0).

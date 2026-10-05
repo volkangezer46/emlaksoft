@@ -348,3 +348,73 @@ korunur — append-only defter, NOTICE ile atlar). Ayrıntılar rollback dosya b
   mutabakat `GET /kullanim` ile yakalanır). Süpürme cron'u henüz yok (`ef_credit_sweep` çağıran rota yazılmadı).
 - `account_credit_balances` görünümü `ef` için açık rezervleri düşmez; kullanılabilir bakiye yalnız `ef_credit_balance`.
 - `ef_credit_reservations` silinemez (guard tetikleyici) ve defter append-only: tenant'ın fiziksel silinmesi zaten engelliydi (ofis kapatma = arşiv).
+
+## 8. Pencereler PB10-PB15 — TL kredi, referans motoru, kart, program seed, büyüme paneli rol kapısı (2026-10-05)
+
+**Durum:** `20260826000400 … 000800` CANLIDA UYGULANDI (bu bölüm onların kayıt/doğrulama/geri alma referansıdır; yeniden uygulanmaz).
+`000900` (hotfix), `001000`, `001100` HENÜZ UYGULANMADI: aşağıdaki sıra ve ön koşullarla, tek tek `--only` ile.
+Genel kurallar §0/§1 aynen geçerli: önce restore edilebilir backup/PITR teyidi, `npm run check:migrations -- --database` (drift yok), `npm run db:migrate -- --dry-run` (yalnız beklenen dosya),
+sonra `npm run db:migrate -- --only <dosya>` (ASLA `--help`/keşif bayrağıyla yazan komut deneme), her dosyadan sonra salt-okunur doğrulama, sonunda `npm run db:rls-audit` ve release çiftini DB'deki son migration'a çekme (DEPLOY.md §2).
+
+### 8.1 Sıra
+| # | Dosya | Pencere | Durum | Etki |
+|---|---|---|---|---|
+| 1 | `20260826000400_try_credit_wallet` | PB10 | UYGULANDI | ek (try defter CHECK + rezerv tablosu + RPC) |
+| 2 | `20260826000500_try_credit_invoice_payment` | PB10 | UYGULANDI | ek (yeni fonksiyonlar; fulfill gövdelerine dokunmaz) |
+| 3 | `20260826000600_growth_referral_engine` | PB11 | UYGULANDI | ek (bayraklar KAPALI doğar) |
+| 4 | `20260826000700_payment_cards` | PB12 | UYGULANDI | ek (2 tablo + RPC) |
+| 5 | `20260826000800_default_program_settings` | PB13 | UYGULANDI | davranış (VERİ seed: referans bayrağı açılır, hoş geldin 300 TL, katalog kaydı) |
+| 6 | `20260826000900_*` (hotfix, başka ajan) | PB14 | BEKLİYOR | dosya başlığındaki doğrulamayı izle (bu belge yazılırken dosya depoda yoktu) |
+| 7 | `20260826001000_growth_dashboard_roles` | PB15 | BEKLİYOR | davranış (yalnız owner/gm için `growth_my_dashboard`/`growth_my_partner_dashboard` veri döner) |
+| 8 | `20260826001100_*` (başka ajan) | ayrı | BEKLİYOR | dosya başlığını izle |
+
+Bağımlılık: 000400/000500 → 000600 → 000800 (seed) → 001000. 001000, 000600'ün iki fonksiyonunu `CREATE OR REPLACE` eder; 000600 yoksa ön koşul bloğu durur.
+
+### 8.2 Dosya başına salt-okunur doğrulama (uygulama SONRASI)
+**000400:** dosya başlığındaki sorgu (try CHECK, rezerv tablosu RLS/politika, 8 RPC, `authenticated` rezerv yetkisi YOK):
+```sql
+select (select count(*) from pg_constraint where conname='account_credit_ledger_try_entry_check') as try_chk, to_regclass('public.try_credit_reservations') is not null as tablo, (select relrowsecurity from pg_class where oid='public.try_credit_reservations'::regclass) as rls, (select count(*) from pg_policies where schemaname='public' and tablename='try_credit_reservations') as pol, (select count(*) from pg_proc where pronamespace='public'::regnamespace and prosecdef and proname in ('try_credit_balance','try_credit_grant','try_credit_reserve','try_credit_commit','try_credit_release','try_credit_reverse','try_credit_my_overview','try_credit_ready')) as fn, has_function_privilege('authenticated','public.try_credit_reserve(uuid,uuid,numeric,text,uuid,numeric)','execute') as auth_exec, has_function_privilege('authenticated','public.try_credit_my_overview()','execute') as my_exec, (select count(*) from public.account_credit_ledger where unit='try') as try_satir;
+```
+Beklenen: `1 | t | t | 1 | 8 | f | t | <mevcut try satırı, genelde 0>`.
+
+**000500:** altı fonksiyon var, `try_credit_ready` `authenticated`'a açık değil; fulfill gövdeleri değişmedi (000300 sonrası md5'ler §7.3):
+```sql
+select (select count(*) from pg_proc where pronamespace='public'::regnamespace and proname in ('try_credit_invoice_hold','try_credit_fulfill_invoice','try_credit_release_invoice','try_credit_release_dead','try_credit_refund_invoice','try_credit_ready')) as fn, has_function_privilege('authenticated','public.try_credit_ready()','execute') as auth_ready;
+```
+Beklenen: `6 | f`. Ofiste "Hesap kredimi kullan" 000400+000500 + `try_credit_ready()` (service_role) hazır olunca görünür.
+
+**000600:** dosya başlığındaki sorgu:
+```sql
+select to_regclass('public.growth_referral_settings') is not null as settings, to_regclass('public.growth_claim_events') is not null as events, (select count(*) from public.growth_referral_settings) as ayar_satiri, (select count(*) from pg_proc where pronamespace='public'::regnamespace and prosecdef and proname like 'growth\_%') as fn, has_function_privilege('authenticated','public.growth_claims_process(integer)','execute') as auth_process, has_function_privilege('authenticated','public.growth_my_dashboard()','execute') as auth_dash, (select count(*) from public.growth_reward_claims) as talep;
+```
+Beklenen: `t | t | 1 | 20 | f | t | 0` (`talep` kullanım sonrası artabilir; sayılar dosya başlığıyla birlikte okunur).
+
+**000700:** tablolar + RLS, ham kart sütunu YOK:
+```sql
+select to_regclass('public.payment_cards') is not null as kart, to_regclass('public.tenant_payment_profiles') is not null as profil, (select count(*) from information_schema.columns where table_schema='public' and table_name='payment_cards' and column_name in ('card_number','pan','cvc','cvv','expiry','expire_month','expire_year')) as ham_alan, (select bool_and(relrowsecurity) from pg_class where oid in ('public.payment_cards'::regclass,'public.tenant_payment_profiles'::regclass)) as rls;
+```
+Beklenen: `t | t | 0 | t`. `ham_alan` 0'dan farklıysa DUR (PCI).
+
+**000800 (veri seed):** idempotent; ikinci çalıştırma satır değiştirmez:
+```sql
+select (select count(*) from public.growth_reward_rules where kind='referral' and is_active) as kural, (select welcome_credit_try from public.growth_referral_settings where singleton) as hos_geldin, (select value from public.platform_settings where key='growth_referral_enabled') as ref_bayrak, (select count(*) from public.platform_settings where key in ('growth_partner_enabled','growth_cash_payout_enabled','billing.auto_renew_enabled') and value in ('on','true')) as kapali_olmasi_gerekenler_acik;
+```
+Beklenen: `>=1 | 300 (panelden değişmediyse) | on | 0`. Ortak/nakit/otomatik yenileme bayrakları KAPALI kalmalıdır.
+
+**001000 (büyüme paneli rol kapısı):** yalnız iki fonksiyon gövdesi değişir:
+```sql
+select pg_get_functiondef('public.growth_my_dashboard()'::regprocedure) like '%current_profile_role()%' as dash_rol, pg_get_functiondef('public.growth_my_partner_dashboard()'::regprocedure) like '%current_profile_role()%' as partner_rol, has_function_privilege('authenticated','public.growth_my_dashboard()','execute') as auth_dash;
+```
+Beklenen: `t | t | t`. Duman testi (rol): owner/gm ile `/app/buyume` dolu; danışman ile sayfa `/app?yetki=yok`'a döner (kod kapısı) ve RPC `null` döner (SQL kapısı).
+
+**000900 / 001100:** dosya başlığındaki "SALT-OKUNUR DOGRULAMA" bloğu esastır; bu belge o dosyalar depoya girince güncellenmelidir.
+
+### 8.3 Geri alma (son çare; elle, TERS sırada; ledger satırına dokunmaz; ÖNCE bayrakları kapat)
+Sıra: `001100` → `001000` → `000900` → `000800` → `000700` → `000600` → `000500` → `000400` (her biri `supabase/rollbacks/<ad>.rollback.sql`).
+- **001000:** iki fonksiyonu 000600'ün orijinal gövdesine döndürür (rol kapısı kalkar). Veri kaybı yok.
+- **000800:** seed'in yazdığı satırları geri alır; panelin sonradan değiştirdiği değerler (`updated_by` dolu) KORUNUR. Önce referans bayrağını `off` yap.
+- **000700:** kayıtlı kart satırları silinir; iyzico'daki saklanan kartlar KALIR (panelden/API'den ayrıca silinir).
+- **000600:** bayrakları KAPAT; `growth_reward_claims` doluysa denetim izi kaybolur (`set local emlaksoft.rollback_force = 'on'` gerekir). Verilmiş TL krediler KALIR.
+- **000500:** önce `select count(*) from public.try_credit_reservations where state='reserved'` boşalt. Harcanmış kredi ve committed rezervler KALIR.
+- **000400:** try RPC'leri kalkar, kredi akışı "etkin değil"e düşer; defter append-only, try satırları KALIR; rezerv tablosu yalnız boşsa düşer.
+Kod rollback'i veri restore'u değildir (`docs/runbooks/ROLLBACK.md`).
