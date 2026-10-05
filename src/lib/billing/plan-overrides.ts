@@ -24,6 +24,7 @@ export const PLAN_FIELD_LIMITS = {
   priceMax: 1_000_000,
   limitMax: 10_000_000,
   quotaMax: 100_000_000,
+  efCreditsMax: 100_000,
   seatTiersMax: 12,
   maxSeatsMax: 100_000,
   orderMax: 1000,
@@ -50,6 +51,7 @@ export type PlanOverride = {
   seatRounding?: SeatRounding | null;
   aiCreditsMonthly?: number | null;
   valuationReportsMonthly?: number | null;
+  efCreditsMonthly?: number | null;
   customPricing?: boolean;
   hidden?: boolean;
   order?: number;
@@ -153,6 +155,8 @@ export function sanitizePlanOverride(raw: unknown): PlanOverride {
   if (ai !== undefined) out.aiCreditsMonthly = ai;
   const valuation = cleanNullableInt(r.valuationReportsMonthly, 0, PLAN_FIELD_LIMITS.quotaMax);
   if (valuation !== undefined) out.valuationReportsMonthly = valuation;
+  const ef = cleanNullableInt(r.efCreditsMonthly, 0, PLAN_FIELD_LIMITS.efCreditsMax);
+  if (ef !== undefined) out.efCreditsMonthly = ef;
   if (Array.isArray(r.features)) {
     const features = r.features
       .map((f) => cleanText(f, PLAN_FIELD_LIMITS.featureMax))
@@ -266,6 +270,8 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
     if (ai !== undefined) next.aiCreditsMonthly = ai;
     const valuation = nullable(o.valuationReportsMonthly, plan.valuationReportsMonthly);
     if (valuation !== undefined) next.valuationReportsMonthly = valuation;
+    const efCredits = nullable(o.efCreditsMonthly, plan.efCreditsMonthly);
+    if (efCredits !== undefined) next.efCreditsMonthly = efCredits;
     const campaign = nullable(o.campaignMonthlyTry, plan.campaignMonthlyTry);
     if (campaign !== undefined) next.campaignMonthlyTry = campaign;
     if (o.customPricing !== undefined) next.customPricing = o.customPricing;
@@ -310,6 +316,7 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
   if ((edited.valuationReportsMonthly ?? null) !== (plan.valuationReportsMonthly ?? null)) {
     o.valuationReportsMonthly = edited.valuationReportsMonthly ?? null;
   }
+  if ((edited.efCreditsMonthly ?? null) !== (plan.efCreditsMonthly ?? null)) o.efCreditsMonthly = edited.efCreditsMonthly ?? null;
   if ((edited.campaignMonthlyTry ?? null) !== (plan.campaignMonthlyTry ?? null)) o.campaignMonthlyTry = edited.campaignMonthlyTry ?? null;
   if (Boolean(edited.customPricing) !== Boolean(plan.customPricing)) o.customPricing = Boolean(edited.customPricing);
   if (Boolean(edited.hidden) !== Boolean(plan.hidden)) o.hidden = Boolean(edited.hidden);
@@ -331,8 +338,9 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
  * Not: veritabanı sınırları (plan_entitlements) paneldeki kayıt sırasında senkronlanır.
  */
 export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
-  advisor: { monthlyTry: 749 },
+  advisor: { monthlyTry: 749, efCreditsMonthly: 10 },
   office: {
+    efCreditsMonthly: 40,
     extraSeatMonthlyTry: 399,
     extraSeatTiers: [
       { fromSeat: 1, toSeat: 5, monthlyTry: 399 },
@@ -351,6 +359,7 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
     ],
     maxSeats: 40,
     seatRounding: "x9",
+    efCreditsMonthly: 120,
     limits: { seats: 15 },
     features: [
       "15 kullanıcıya kadar · 10 şube",
@@ -360,7 +369,7 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       "KVKK uyum ve ofisler arası ağ",
     ],
   },
-  business: { monthlyTry: 8990, limits: { seats: 40 } },
+  business: { monthlyTry: 8990, limits: { seats: 40 }, efCreditsMonthly: 300 },
   enterprise: { customPricing: true },
 };
 

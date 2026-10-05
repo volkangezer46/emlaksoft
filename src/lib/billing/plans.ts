@@ -40,6 +40,11 @@ export type PlanDef = {
   aiCreditsMonthly?: number | null;
   /** Aylık profesyonel değerleme raporu kotası (yalnız alan). */
   valuationReportsMonthly?: number | null;
+  /**
+   * Aylık dahil EmlakFiyati kontörü (null/0 = hak yok). Cron `ef-kontor-hak` her ay `plan_monthly` hibesi verir;
+   * kontör tarifesi `src/lib/ef-credits/config.ts`te, "yaklaşık N değerleme" ondan hesaplanır.
+   */
+  efCreditsMonthly?: number | null;
   /** true: fiyat yerine "Bize ulaşın" gösterilir, çevrimiçi ödeme açılmaz. */
   customPricing?: boolean;
   /** true: kayıt/fiyat sayfası ve yeni ödemede gizli; mevcut aboneler etkilenmez. */
@@ -74,6 +79,7 @@ export const PLANS: readonly PlanDef[] = [
       "Komisyon takibi ve emsal bazlı değerleme",
     ],
     limits: { seats: 1, customers: 1_000, activeProperties: 150, branches: 1 },
+    efCreditsMonthly: 10,
   },
   {
     id: "office",
@@ -99,6 +105,7 @@ export const PLANS: readonly PlanDef[] = [
     ],
     maxSeats: 20,
     seatRounding: "x9",
+    efCreditsMonthly: 40,
   },
   {
     id: "professional",
@@ -121,6 +128,7 @@ export const PLANS: readonly PlanDef[] = [
     ],
     maxSeats: 40,
     seatRounding: "x9",
+    efCreditsMonthly: 120,
   },
   {
     id: "enterprise",
@@ -216,4 +224,5 @@ export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
   limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
   hidden: true,
   order: 35,
+  efCreditsMonthly: 300,
 };

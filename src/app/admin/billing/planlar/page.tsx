@@ -2,7 +2,9 @@ import Link from "next/link";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/ui/page-header";
-import { getPlanCatalog, getPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
+import { getEfTariff, getPlanCatalog, getPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
+import { EF_WELCOME_SETTING_KEY, efUnitsFor, parseEfWelcomeUnits } from "@/lib/ef-credits/config";
+import { getPlatformSetting } from "@/lib/platform-settings";
 import { computeSeatAnalytics } from "@/lib/billing/seat-analytics";
 import { findSeatCrossovers, validateSeatCatalog } from "@/lib/billing/seat-pricing";
 import { warnRatioOf } from "@/lib/billing/seat-settings";
@@ -10,6 +12,7 @@ import { planLabel } from "@/lib/billing/plans";
 import { getFoundersStatus, getPlanSupport } from "@/lib/billing/plan-support";
 import { BillingNav } from "../billing-nav";
 import { ApplyRecommended } from "./apply-recommended";
+import { EfCreditsSection } from "./ef-credits-section";
 import { CampaignForm, PlanEditor } from "./plan-editor";
 import { PriceSimulator } from "./price-simulator";
 import { SeatAnalyticsPanel, type SeatListKey } from "./seat-analytics-panel";
@@ -38,6 +41,9 @@ export default async function PlansAdminPage({
   const [defs, catalog, support] = await Promise.all([getPlanDefinitions(), getPlanCatalog(), getPlanSupport()]);
   const founders = await getFoundersStatus(catalog.campaign);
   const seatSettings = await getSeatSettings();
+  const efTariff = await getEfTariff();
+  const efValuationCost = efUnitsFor("valuation_arsa", efTariff);
+  const welcomeUnits = parseEfWelcomeUnits(await getPlatformSetting(EF_WELCOME_SETTING_KEY));
 
   const admin = createAdminClient();
   const { data: subs } = await admin.from("subscriptions").select("plan").limit(5000);
@@ -115,9 +121,16 @@ export default async function PlansAdminPage({
                 customized={Boolean(catalog.overrides[plan.id])}
                 subscribers={counts.get(plan.id) ?? 0}
                 businessReady={support.businessPlan}
+                efValuationCost={efValuationCost}
               />
             ))}
           </div>
+          <EfCreditsSection
+            rows={defs.map((p) => ({ id: p.id, name: p.name, units: p.efCreditsMonthly ?? 0 }))}
+            valuationCost={efValuationCost}
+            welcomeUnits={welcomeUnits}
+            canWrite={isSuper}
+          />
         </>
       ) : null}
       {section === "simulator" && seatData ? (

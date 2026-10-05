@@ -46,4 +46,5 @@ export const CRON_JOBS = [
   { job: "geo-province-sync", label: "İl bazlı coğrafya tarama kuyruğu", path: "/api/cron/geo-province-sync", schedule: "*/5 * * * *", cadenceLabel: "5 dakikada bir", staleAfterMinutes: 20 },
   { job: "seo-robot", label: "SEO robotu (site denetimi ve IndexNow)", path: "/api/cron/seo-robot", schedule: "20 4 * * *", cadenceLabel: "her gün 04:20", staleAfterMinutes: 2_160 },
   { job: "havuz-atama", label: "İlan havuzu atama süpürmesi", path: "/api/cron/havuz-atama", schedule: "*/10 * * * *", cadenceLabel: "10 dakikada bir", staleAfterMinutes: 40 },
+  { job: "ef-kontor-hak", label: "EmlakFiyati aylık kontör hakkı", path: "/api/cron/ef-kontor-hak", schedule: "10 1 * * *", cadenceLabel: "her gün 04:10 (TR)", staleAfterMinutes: 2_160 },
 ] as const satisfies readonly CronJobDefinition[];

@@ -244,6 +244,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/api/cron/bolge-snapshot/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/dogum-gunu/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/dunning/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
+  { file: "src/app/api/cron/ef-kontor-hak/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/geo-sync/route.ts", fn: "GET", calls: 1, tenantFilter: "yok" },
   { file: "src/app/api/cron/gorev-hatirlat/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/gunluk-ozet/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
