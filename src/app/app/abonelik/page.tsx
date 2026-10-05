@@ -28,6 +28,11 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { CheckoutButton } from "./checkout-button";
 import { CancelPanel } from "./cancel-panel";
 import { KontorSection } from "./kontor-section";
+import { CuzdanSection } from "./cuzdan-section";
+import { readTryOverview } from "@/lib/try-credits/reader";
+import { getTryMaxShare } from "@/lib/try-credits/settings";
+import { TRY_DEFAULT_MAX_SHARE } from "@/lib/try-credits/constants";
+import type { WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 import { monthlyUnitsWithSeats } from "@/lib/ef-credits/plan-credits";
 import { loadLatestPackInvoice } from "@/lib/ef-credits/credit-reader";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
@@ -49,11 +54,11 @@ const statusLabel: Record<string, string> = {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string; kalem?: string; kullanici?: string; sayfa?: string }>;
+  searchParams: Promise<{ paid?: string; demo?: string; plan?: string; error?: string; cycle?: string; sekme?: string; kalem?: string; kullanici?: string; sayfa?: string; yon?: string }>;
 }) {
   const auth = await requireModulePage("billing");
   const sp = await searchParams;
-  const active = resolveTab(sp, ["plan", "kontor", "faturalar", "iptal"], "plan");
+  const active = resolveTab(sp, ["plan", "kontor", "cuzdan", "faturalar", "iptal"], "plan");
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
@@ -128,6 +133,7 @@ export default async function BillingPage({
   const tabs: DetailTabDef[] = [
     { id: "plan", label: "Plan ve kullanım" },
     { id: "kontor", label: "Kontör" },
+    { id: "cuzdan", label: "Cüzdan" },
     { id: "faturalar", label: "Faturalar" },
     { id: "iptal", label: "İptal", hidden: !cancelSupported },
   ];
@@ -154,6 +160,13 @@ export default async function BillingPage({
     warnPercent: seatSettings.warnPercent,
   };
   const isSeatOwner = auth.role === "owner" || auth.role === "gm";
+  // TL hesap kredisi: bakiye oturumlu RLS'li RPC ile okunur; SQL yoksa null (onay kutusu hiç görünmez).
+  const walletOverview = tenantId ? await readTryOverview(supabase) : null;
+  const walletMaxShare = walletOverview ? await getTryMaxShare() : TRY_DEFAULT_MAX_SHARE;
+  const walletCheckout: WalletCheckoutInfo | null =
+    configured && isSeatOwner && walletOverview && walletOverview.available > 0
+      ? { availableTry: walletOverview.available, maxShare: walletMaxShare }
+      : null;
   const seatPlans = publicPlans.some((p) => p.id === currentPlanDef.id) ? publicPlans : [currentPlanDef, ...publicPlans];
   const planLabel = (id: string) =>
     publicPlans.find((p) => p.id === id)?.name ?? (id === currentPlanDef.id ? currentPlanDef.name : id);
@@ -276,7 +289,12 @@ export default async function BillingPage({
             perExtraSeat: currentPlanDef.efCreditsPerExtraSeat ?? 0,
             extraSeats,
           }}
+          wallet={walletCheckout}
         />
+      ) : null}
+
+      {active === "cuzdan" && tenantId ? (
+        <CuzdanSection supabase={supabase} maxShare={walletMaxShare} yon={sp.yon} canSpend={isSeatOwner} />
       ) : null}
 
       {active === "plan" ? (
@@ -348,6 +366,7 @@ export default async function BillingPage({
           purchaseReady={seatSupport.purchaseReady && configured}
           subscriptionActive={seatState.status === "active"}
           warnPercent={seatSettings.warnPercent}
+          wallet={walletCheckout}
         />
       ) : (
         <section id="koltuk" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-5">
@@ -425,6 +444,8 @@ export default async function BillingPage({
                     label={current ? (configured ? "Yenile / öde" : "Demo yenile") : configured ? "Bu pakete geç" : "Demo ile seç"}
                     variant={current ? "ghost" : "primary"}
                     couponsEnabled={planSupport.coupons}
+                    wallet={current || sellable ? walletCheckout : null}
+                    totalTry={Math.round(amount * 1.2 * 100) / 100}
                   />
                 ) : (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">

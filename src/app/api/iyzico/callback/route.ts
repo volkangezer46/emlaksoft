@@ -9,6 +9,8 @@ import {
 import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
+import { tryInvoiceHold } from "@/lib/try-credits/wallet";
 import { getBaseUrl } from "@/lib/base-url";
 
 function appUrl() {
@@ -85,10 +87,13 @@ async function handle(token: string | null) {
     ) {
       throw new Error("Fatura toplamları ödeme sözleşmesiyle eşleşmedi.");
     }
+    // TL hesap kredisi: faturada kredi rezervi varsa iyzico yalnız KALAN nakit tutarı tahsil etmiştir.
+    const hold = await tryInvoiceHold(admin, invoice.tenant_id, conversationId);
+    if (!hold) throw new Error("Kredi durumu doğrulanamadı.");
     const verified = verifyCheckoutPayment(result, {
       conversationId,
       basketId: conversationId,
-      amountTry: amounts.totalTry,
+      amountTry: expectedProviderAmountTry(amounts.totalTry, hold),
       currency: IYZICO_CURRENCY,
     });
     await fulfillSuccessfulPayment({

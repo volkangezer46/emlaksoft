@@ -2,6 +2,9 @@ import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
+import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
+import { TRY_RPC } from "@/lib/try-credits/config";
+import { tryInvoiceHold, tryReleaseInvoice } from "@/lib/try-credits/wallet";
 
 export type FulfillInput = {
   tenantId: string;
@@ -36,7 +39,11 @@ export type AtomicFulfillmentResult = {
 };
 
 type AtomicFulfillmentInput = {
-  provider: "iyzico" | "demo";
+  /**
+   * `account_credit` = TAM hesap kredisi ile ödeme (iyzico YOK, capture YOK): `try_credit_fulfill_invoice` p_cash_try=0.
+   * Yalnız fatura üzerinde etkin bir kredi rezervi varsa çalışır.
+   */
+  provider: "iyzico" | "demo" | "account_credit";
   conversationId: string;
   paymentId?: string | null;
   source: FulfillInput["source"];
@@ -92,10 +99,11 @@ export function invoiceAmountsTry(netAmountTry: number) {
 export async function fulfillBillingPaymentAtomic(
   input: AtomicFulfillmentInput,
 ): Promise<AtomicFulfillmentResult> {
+  const walletOnly = input.provider === "account_credit";
   if (
     typeof input.expectedAmountTry !== "number" ||
     !Number.isFinite(input.expectedAmountTry) ||
-    input.expectedAmountTry <= 0
+    (walletOnly ? input.expectedAmountTry < 0 : input.expectedAmountTry <= 0)
   ) {
     throw new Error("Beklenen tahsilat tutarı geçersiz.");
   }
@@ -136,18 +144,45 @@ export async function fulfillBillingPaymentAtomic(
     if (!captureId) throw new Error("Ödeme mutabakat kimliği doğrulanamadı.");
   }
 
-  const { data, error } = await admin.rpc("fulfill_billing_payment_v2", {
-    p_provider: input.provider,
-    p_conversation_id: input.conversationId,
-    p_payment_id: input.paymentId || null,
-    p_source: input.source,
-    p_target_type: input.targetType,
-    p_expected_tenant_id: input.expectedTenantId || null,
-    p_expected_plan: input.expectedPlan || null,
-    p_expected_cycle: input.expectedCycle || null,
-    p_expected_amount_try: input.expectedAmountTry ?? null,
-    p_expected_currency: input.expectedCurrency,
-  });
+  // TL hesap kredisi: faturada kredi rezervi varsa (herhangi bir durumda) ödeme `try_credit_fulfill_invoice` ile
+  // tamamlanır (kredi + nakit = fatura toplamı; mevcut fulfill_billing_payment_v2 içeriden çağrılır). Rezerv sorgusu
+  // belirsizse FAIL-CLOSED: para akışı sürdürülmez, yakalama yeniden denenir.
+  let useWallet = false;
+  if (input.targetType === "subscription" && input.provider !== "demo" && input.expectedTenantId) {
+    const hold = await tryInvoiceHold(admin, input.expectedTenantId, input.conversationId);
+    if (!hold) {
+      if (captureId) await transitionCapture(captureId, "retry_pending", "wallet_hold_lookup");
+      throw new Error("Ödeme doğrulandı ancak kredi durumu doğrulanamadı; işlem yeniden denenecek.");
+    }
+    useWallet = hold.has_hold;
+  }
+  if (walletOnly && !useWallet) {
+    throw new Error("Bu fatura için etkin bir kredi rezervi bulunamadı.");
+  }
+
+  const { data, error } = useWallet
+    ? await admin.rpc(TRY_RPC.fulfillInvoice, {
+        p_conversation_id: input.conversationId,
+        p_expected_tenant_id: input.expectedTenantId || null,
+        p_payment_id: walletOnly ? null : input.paymentId || null,
+        p_source: walletOnly ? "demo" : input.source,
+        p_expected_plan: input.expectedPlan || null,
+        p_expected_cycle: input.expectedCycle || null,
+        // iyzico'dan alınan NAKİT tutar (tam kredi = 0); kredi payı SQL'de rezervden okunur.
+        p_cash_try: walletOnly ? 0 : input.expectedAmountTry,
+      })
+    : await admin.rpc("fulfill_billing_payment_v2", {
+        p_provider: input.provider,
+        p_conversation_id: input.conversationId,
+        p_payment_id: input.paymentId || null,
+        p_source: input.source,
+        p_target_type: input.targetType,
+        p_expected_tenant_id: input.expectedTenantId || null,
+        p_expected_plan: input.expectedPlan || null,
+        p_expected_cycle: input.expectedCycle || null,
+        p_expected_amount_try: input.expectedAmountTry ?? null,
+        p_expected_currency: input.expectedCurrency,
+      });
 
   if (error) {
     if (captureId) {
@@ -210,6 +245,37 @@ export async function fulfillSuccessfulPayment(input: FulfillInput) {
   });
 }
 
+/**
+ * TAM hesap kredisi ile ödeme (iyzico çağrılmaz): kredi rezervi toplamı karşılıyorsa (yalnız `try_credit.max_invoice_share`
+ * = 1 yapılandırmasında olur) faturayı tamamlar. Capture yazılmaz; tek-sefer garantisi SQL'dedir.
+ */
+export async function fulfillInvoiceWithWalletCredit(input: {
+  tenantId: string;
+  plan: PlanId;
+  cycle: BillingCycle;
+  conversationId: string;
+}) {
+  return fulfillBillingPaymentAtomic({
+    provider: "account_credit",
+    conversationId: input.conversationId,
+    paymentId: null,
+    source: "demo",
+    targetType: "subscription",
+    expectedTenantId: input.tenantId,
+    expectedPlan: input.plan,
+    expectedCycle: input.cycle,
+    expectedAmountTry: 0,
+    expectedCurrency: IYZICO_CURRENCY,
+  });
+}
+
+export type CheckoutInvoiceResult = {
+  invoiceId: string;
+  totalTry: number;
+  /** Kullanıcı kredi istediyse uygulanan kredi (rezerv açıldı); yoksa null. */
+  credit: AppliedWalletCredit | null;
+};
+
 export async function createCheckoutInvoice(input: {
   tenantId: string;
   subscriptionId: string | null;
@@ -217,7 +283,9 @@ export async function createCheckoutInvoice(input: {
   cycle: BillingCycle;
   conversationId: string;
   amountTry: number;
-}) {
+  /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
+  walletCredit?: WalletCreditRequest | null;
+}): Promise<CheckoutInvoiceResult> {
   const admin = createAdminClient();
   const amounts = invoiceAmountsTry(input.amountTry);
   const now = new Date();
@@ -253,7 +321,26 @@ export async function createCheckoutInvoice(input: {
     console.error("createCheckoutInvoice", error);
     throw new Error("Fatura oluşturulamadı.");
   }
-  return data.id as string;
+  const invoiceId = data.id as string;
+  if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };
+
+  const applied = await applyWalletCreditToInvoice(admin, {
+    tenantId: input.tenantId,
+    invoiceId,
+    totalTry: amounts.totalTry,
+    request: input.walletCredit,
+  });
+  if (!applied.ok) {
+    // Fatura taslağı kullanılmayacak: sahipsiz kalmasın (rezerv zaten açılmadı).
+    await admin
+      .from("invoices")
+      .update({ checkout_status: "initialization_failed" })
+      .eq("id", invoiceId)
+      .eq("tenant_id", input.tenantId)
+      .eq("status", "draft");
+    throw new Error(applied.error);
+  }
+  return { invoiceId, totalTry: amounts.totalTry, credit: applied.applied };
 }
 
 export async function markCheckoutInvoiceInitialized(input: {
@@ -293,6 +380,9 @@ export async function markCheckoutInvoiceFailed(input: {
     .eq("status", "draft")
     .in("checkout_status", ["pending_checkout", "initialized"]);
   if (error) console.error("markCheckoutInvoiceFailed", error);
+  // Başarısız/terk edilen checkout'ta kredi rezervi hemen serbest kalır (kalan kaçakları reconciliation'daki
+  // try_credit_release_dead süpürür). Eski şemada (RPC yok) sessizce atlanır.
+  await tryReleaseInvoice(admin, input.tenantId, input.invoiceId, "checkout_failed");
 }
 
 export async function assertBillingPlanPreflight(tenantId: string, plan: PlanId) {

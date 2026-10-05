@@ -21,6 +21,7 @@ import {
   suggestPack,
 } from "@/lib/billing/credit-pack-purchase-core";
 import { KontorPanel, type KontorPackCard } from "./kontor-panel";
+import type { WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
@@ -45,6 +46,8 @@ export type KontorSectionProps = {
   invoiceIsRecent: boolean;
   /** Planın otomatik aylık kontör hakkı (ek kullanıcı hakkı dahil); units 0 = pakette aylık hak yok. */
   allowance?: { planName: string; units: number; perExtraSeat: number; extraSeats: number };
+  /** TL hesap kredisi cüzdanı (null: etkin değil → "kredimi kullan" kutusu gösterilmez). */
+  wallet?: WalletCheckoutInfo | null;
 };
 
 export async function KontorSection(props: KontorSectionProps & { tenantId: string }) {
@@ -220,7 +223,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
               action={{ href: "/app/destek", label: "Destek talebi aç" }}
             />
           ) : (
-            <KontorPanel packs={cards} canBuy={canBuy} blockReason={blockReason} />
+            <KontorPanel packs={cards} canBuy={canBuy} blockReason={blockReason} wallet={props.wallet ?? null} />
           )}
         </div>
         <p className="mt-3 text-xs text-text-muted">Kupon kodları kontör paketlerinde geçerli değildir. Fiyatlara %20 KDV eklenir.</p>

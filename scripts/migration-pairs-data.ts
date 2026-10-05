@@ -87,6 +87,9 @@ const F = {
   efWallet: "20260826000100_ef_credit_wallet.sql",
   efReports: "20260826000200_ef_reports.sql",
   efPack: "20260826000300_ef_credit_pack_fulfillment.sql",
+  // TL hesap kredisi (birim try) + fatura odemesi. Hic UYGULANMADI; 000100'den (source CHECK refund/bonus) SONRA.
+  tryWallet: "20260826000400_try_credit_wallet.sql",
+  tryInvoice: "20260826000500_try_credit_invoice_payment.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -154,6 +157,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efWallet]: "ek", // defter CHECK genisler ('ef' + kaynaklar) + nullable meta + rezerv tablosu + 7 service_role RPC; mevcut satir/davranis ayni
     [F.efReports]: "ek", // yeni tablo (yazma yalniz service_role, okuma kendi/owner-gm)
     [F.efPack]: "davranis", // fulfill + v2 tam govde yeniden tanimi: credit_pack faturasi islenir (taban govde bayt bayt korunur)
+    [F.tryWallet]: "ek", // yalniz try satirlarini kisitlayan CHECK + rezerv tablosu + view + service_role RPC'ler; mevcut satir/davranis ayni
+    [F.tryInvoice]: "ek", // yeni service_role fonksiyonlari (fulfill govdelerine DOKUNMAZ; icerden cagirir)
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -210,6 +215,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       order: 22,
       title: "EmlakFiyati kontor: cuzdan (ef birimi + rezerv + RPC) -> ef_reports -> kontor paketi faturasi (fulfill/v2)",
       files: [F.efWallet, F.efReports, F.efPack],
+    },
+    {
+      id: "PB10-tl-kredi",
+      order: 23,
+      title: "TL hesap kredisi: cuzdan (try birimi + rezerv + RPC) -> kredi ile fatura odemesi (fulfill/v2'yi icerden cagirir)",
+      files: [F.tryWallet, F.tryInvoice],
     },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
@@ -287,6 +298,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efReports, F.efWallet],
     [F.efPack, F.efWallet],
     [F.efPack, F.seatFulfillment],
+    // TL kredi: defter source CHECK'inde refund/bonus + meta (000100) -> cuzdan (000400) -> fatura odeme (000500).
+    [F.tryWallet, F.efWallet],
+    [F.tryWallet, F.growthReferral],
+    [F.tryWallet, F.aiCredit],
+    [F.tryInvoice, F.tryWallet],
   ],
 
   externalPending: [

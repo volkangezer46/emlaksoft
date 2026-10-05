@@ -3,6 +3,7 @@ import { fulfillBillingPaymentAtomic } from "@/lib/billing/fulfillment";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { isPlanId, type BillingCycle } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tryReleaseDead } from "@/lib/try-credits/wallet";
 
 type CaptureRow = {
   id: string;
@@ -182,6 +183,10 @@ export async function runBillingReconciliation(limit = 50): Promise<BillingRecon
 
   if (expireError) throw new Error(`checkout cleanup failed: ${expireError.code || "unknown"}`);
   if (error) throw new Error(`capture queue lookup failed: ${error.code || "unknown"}`);
+
+  // TL hesap kredisi: void/expired faturaların açık kredi rezervlerini serbest bırak (eski şemada sessizce atlanır).
+  const releasedWalletHolds = await tryReleaseDead(admin, 500);
+  if (releasedWalletHolds) console.info("billing reconciliation: released wallet credit holds", { count: releasedWalletHolds });
 
   const summary: BillingReconciliationSummary = {
     expiredCheckouts: Number(expired ?? 0),

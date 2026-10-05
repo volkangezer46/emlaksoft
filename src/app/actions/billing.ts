@@ -19,6 +19,7 @@ import {
 import {
   assertBillingPlanPreflight,
   createCheckoutInvoice,
+  fulfillInvoiceWithWalletCredit,
   fulfillSuccessfulPayment,
   invoiceAmountsTry,
   markCheckoutInvoiceFailed,
@@ -30,6 +31,8 @@ import { getBaseUrl } from "@/lib/base-url";
 import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
 import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
 import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
+import { getTryMaxShare } from "@/lib/try-credits/settings";
+import type { AppliedWalletCredit } from "@/lib/try-credits/checkout";
 
 export type CheckoutResult = {
   error?: string;
@@ -51,6 +54,11 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   const cycle = (String(formData.get("cycle") ?? "monthly").trim() || "monthly") as BillingCycle;
   if (!PLAN_IDS.has(plan)) return { error: "Geçersiz paket." };
   if (cycle !== "monthly" && cycle !== "yearly") return { error: "Geçersiz dönem." };
+  // "Hesap kredimi kullan" (TL kredi cüzdanı): tutar istemciden ALINMAZ; sunucu bakiye ve pay sınırıyla hesaplar.
+  const useCredit = String(formData.get("use_credit") ?? "") === "1";
+  if (useCredit && gate.role !== "owner" && gate.role !== "gm") {
+    return { error: "Hesap kredisini yalnızca ofis sahibi veya genel müdür kullanabilir." };
+  }
 
   const supabase = await createClient();
   const {
@@ -101,6 +109,9 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   if (!configured && !demoAllowed) {
     return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };
   }
+  if (useCredit && !configured) {
+    return { error: "Hesap kredisi, ödeme altyapısı bağlıyken kullanılabilir." };
+  }
 
   if (configured) {
     try {
@@ -124,15 +135,19 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   }
 
   let invoiceId: string;
+  let credit: AppliedWalletCredit | null = null;
   try {
-    invoiceId = await createCheckoutInvoice({
+    const created = await createCheckoutInvoice({
       tenantId: gate.tenantId,
       subscriptionId: sub?.id ?? null,
       plan,
       cycle,
       conversationId,
       amountTry,
+      walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
     });
+    invoiceId = created.invoiceId;
+    credit = created.credit;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
   }
@@ -178,11 +193,27 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     };
   }
 
+  // TAM kredi (yalnız pay=1 yapılandırmasında): iyzico ÇAĞRILMAZ; kredi + fulfill tek SQL işleminde tamamlanır.
+  if (credit?.fullCredit) {
+    try {
+      await fulfillInvoiceWithWalletCredit({ tenantId: gate.tenantId, plan, cycle, conversationId });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+    }
+    revalidatePath("/app/abonelik");
+    revalidatePath("/app/ayarlar");
+    revalidatePath("/admin/billing");
+    return { checkoutUrl: `${appUrl()}/app/abonelik?paid=1&plan=${plan}` };
+  }
+
   try {
+    // Kısmi kredi: iyzico YALNIZ kalan nakit tutarı tahsil eder (fatura toplamı/KDV değişmez).
+    const chargeTry = credit ? credit.cashTry : invoiceAmounts.totalTry;
     const init = await initializeCheckoutForm({
       conversationId,
-      price: invoiceAmounts.totalTry,
-      paidPrice: invoiceAmounts.totalTry,
+      price: chargeTry,
+      paidPrice: chargeTry,
       basketId: conversationId,
       callbackUrl: `${appUrl()}/api/iyzico/callback`,
       buyer: checkoutBuyer!.buyer,
@@ -225,6 +256,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   if (!Number.isInteger(target) || target < 1 || target > 5000) return { error: "Geçersiz kullanıcı sayısı." };
   const confirmRaw = String(formData.get("confirm_try") ?? "").trim();
   const confirmTry = confirmRaw === "" ? null : Number(confirmRaw);
+  const useCredit = String(formData.get("use_credit") ?? "") === "1";
 
   const { allowed } = await checkRateLimit(`seatbuy:${gate.userId}`, { limit: 8, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };
@@ -308,9 +340,10 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   }
 
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
-  let invoice: { invoiceId: string; totalTry: number };
+  let invoice: { invoiceId: string; totalTry: number; credit: AppliedWalletCredit | null };
   try {
     invoice = await createSeatInvoice({
+      walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
       tenantId: gate.tenantId,
       subscriptionId: state.subscriptionId,
       plan: state.planId as PlanId,
@@ -338,14 +371,32 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       extraSeats: evalResult.toQuote.extraSeats,
       chargeNetTry: chargeNet,
       invoiceTotalTry: invoice.totalTry,
+      walletCreditTry: invoice.credit?.creditTry ?? 0,
     },
   });
 
+  if (invoice.credit?.fullCredit) {
+    try {
+      await fulfillInvoiceWithWalletCredit({
+        tenantId: gate.tenantId,
+        plan: state.planId as PlanId,
+        cycle: state.cycle,
+        conversationId,
+      });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+    }
+    revalidatePath("/app/abonelik");
+    return { checkoutUrl: `${appUrl()}/app/abonelik?paid=1`, quotedChargeTry: chargeNet };
+  }
+
   try {
+    const chargeTry = invoice.credit ? invoice.credit.cashTry : invoice.totalTry;
     const init = await initializeCheckoutForm({
       conversationId,
-      price: invoice.totalTry,
-      paidPrice: invoice.totalTry,
+      price: chargeTry,
+      paidPrice: chargeTry,
       basketId: conversationId,
       callbackUrl: `${appUrl()}/api/iyzico/callback`,
       buyer: checkoutBuyer.buyer,
@@ -387,6 +438,7 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
   if (String(formData.get("coupon") ?? "").trim()) return { error: "Kupon kontör paketlerinde geçerli değil." };
   const confirmRaw = String(formData.get("confirm_try") ?? "").trim();
   const confirmTry = confirmRaw === "" ? null : Number(confirmRaw);
+  const useCredit = String(formData.get("use_credit") ?? "") === "1";
 
   const { allowed } = await checkRateLimit(`efpack:${gate.userId}`, { limit: 8, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };
@@ -438,9 +490,14 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
   }
 
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
-  let invoice: { invoiceId: string; totalTry: number };
+  let invoice: { invoiceId: string; totalTry: number; credit?: AppliedWalletCredit | null };
   try {
-    invoice = await createCreditPackInvoice({ tenantId: gate.tenantId, pack, conversationId });
+    invoice = await createCreditPackInvoice({
+      tenantId: gate.tenantId,
+      pack,
+      conversationId,
+      walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
+    });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
   }
@@ -451,14 +508,38 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
     action: "billing.credits.checkout_started",
     entityType: "invoice",
     entityId: invoice.invoiceId,
-    newValue: { packId: pack.id, units: pack.units, priceNetTry: pack.priceNetTry, invoiceTotalTry: invoice.totalTry },
+    newValue: {
+      packId: pack.id,
+      units: pack.units,
+      priceNetTry: pack.priceNetTry,
+      invoiceTotalTry: invoice.totalTry,
+      walletCreditTry: invoice.credit?.creditTry ?? 0,
+    },
   });
 
+  if (invoice.credit?.fullCredit) {
+    try {
+      // Paket faturasında plan/döngü meta'sı yok: callback ile aynı varsayılanlar (SQL de aynı varsayılanı kullanır).
+      await fulfillInvoiceWithWalletCredit({
+        tenantId: gate.tenantId,
+        plan: "office",
+        cycle: "monthly",
+        conversationId,
+      });
+    } catch (error) {
+      await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
+      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+    }
+    revalidatePath("/app/abonelik");
+    return { checkoutUrl: `${appUrl()}/app/abonelik?sekme=kontor&paid=1`, quotedTotalTry: invoice.totalTry };
+  }
+
   try {
+    const chargeTry = invoice.credit ? invoice.credit.cashTry : invoice.totalTry;
     const init = await initializeCheckoutForm({
       conversationId,
-      price: invoice.totalTry,
-      paidPrice: invoice.totalTry,
+      price: chargeTry,
+      paidPrice: chargeTry,
       basketId: conversationId,
       callbackUrl: `${appUrl()}/api/iyzico/callback`,
       buyer: checkoutBuyer.buyer,

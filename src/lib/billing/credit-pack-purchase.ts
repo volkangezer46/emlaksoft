@@ -5,6 +5,7 @@ import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { buildCreditPackMeta } from "@/lib/billing/credit-pack-purchase-core";
 import { now } from "@/lib/clock";
 import type { EfPack } from "@/lib/ef-credits/config";
+import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
 
 /**
  * KONTÖR PAKETİ SATIN ALMA: SUNUCU KATMANI.
@@ -21,7 +22,9 @@ export async function createCreditPackInvoice(input: {
   tenantId: string;
   pack: Pick<EfPack, "id" | "units" | "priceNetTry">;
   conversationId: string;
-}): Promise<{ invoiceId: string; totalTry: number }> {
+  /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
+  walletCredit?: WalletCreditRequest | null;
+}): Promise<{ invoiceId: string; totalTry: number; credit?: AppliedWalletCredit | null }> {
   const admin = createAdminClient();
   const amounts = invoiceAmountsTry(input.pack.priceNetTry);
   const expiresAt = new Date(now() + 2 * 60 * 60 * 1000);
@@ -49,5 +52,22 @@ export async function createCreditPackInvoice(input: {
     console.error("createCreditPackInvoice", error);
     throw new Error("Kontör paketi faturası oluşturulamadı.");
   }
-  return { invoiceId: data.id as string, totalTry: amounts.totalTry };
+  const invoiceId = data.id as string;
+  if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };
+  const applied = await applyWalletCreditToInvoice(admin, {
+    tenantId: input.tenantId,
+    invoiceId,
+    totalTry: amounts.totalTry,
+    request: input.walletCredit,
+  });
+  if (!applied.ok) {
+    await admin
+      .from("invoices")
+      .update({ checkout_status: "initialization_failed" })
+      .eq("id", invoiceId)
+      .eq("tenant_id", input.tenantId)
+      .eq("status", "draft");
+    throw new Error(applied.error);
+  }
+  return { invoiceId, totalTry: amounts.totalTry, credit: applied.applied };
 }
