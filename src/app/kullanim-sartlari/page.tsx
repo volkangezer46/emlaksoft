@@ -40,21 +40,33 @@ export default function KullanimSartlariPage() {
 
       <LegalSection no="4." title="Abonelik, Ücretlendirme ve Fesih">
         <p>
-          Abonelik dönemsel olarak ücretlendirilir ve iptal edilmedikçe yenilenir. İptal ve iade koşulları{" "}
+          Abonelik dönemsel olarak ücretlendirilir. Otomatik tahsilat yalnızca kayıtlı kartınız ve ayrıca verdiğiniz
+          açık rızanız varsa yapılır; aksi hâlde dönem sonunda ödeme bağlantısı ve hatırlatma ile yenilenir. Kart
+          bilgileri EmlakSoft&apos;ta saklanmaz; ödeme kuruluşu iyzico nezdinde saklanır. İptal ve iade koşulları{" "}
           <Link className="font-semibold text-brand-600" href="/iptal-iade">İptal &amp; İade Politikası</Link>&apos;nda,
           satış koşulları <Link className="font-semibold text-brand-600" href="/mesafeli-satis">Mesafeli Satış Sözleşmesi</Link>&apos;nde
           düzenlenir. Şartların ağır ihlali hâlinde hesap askıya alınabilir; askıya alma öncesinde makul bildirim yapılır.
         </p>
       </LegalSection>
 
-      <LegalSection no="5." title="Fikri Mülkiyet">
+      <LegalSection no="5." title="Hesap Kredisi">
+        <p>
+          Davet programı ve kampanyalarla hesabınıza tanımlanan kredi, yalnızca EmlakSoft abonelik faturalarında
+          indirim olarak kullanılır; nakde çevrilemez, devredilemez ve belirli bir süre sonunda (varsayılan 365 gün)
+          geçerliliğini yitirir. Bir faturanın en fazla %50&apos;si krediyle karşılanabilir. Kredinin dayanağı olan
+          ödeme iade edilir, iptal edilir veya kötüye kullanım tespit edilirse kredi geri alınabilir. Ayrıntılar{" "}
+          <Link className="font-semibold text-brand-600" href="/davet-kosullari">Davet ve Ortaklık Programı Koşulları</Link>&apos;ndadır.
+        </p>
+      </LegalSection>
+
+      <LegalSection no="6." title="Fikri Mülkiyet">
         <p>
           Platformun yazılımı, tasarımı ve markası EmlakSoft&apos;a aittir. Ofisinizin platforma girdiği veriler ise
           size aittir; EmlakSoft bu verileri yalnızca hizmeti sunmak için işler.
         </p>
       </LegalSection>
 
-      <LegalSection no="6." title="Sorumluluk Sınırı">
+      <LegalSection no="7." title="Sorumluluk Sınırı">
         <p>
           Hizmet &quot;olduğu gibi&quot; sunulur; kesintisizlik hedeflenir ancak internet altyapısından kaynaklanan
           kesintiler garanti kapsamında değildir. EmlakSoft&apos;un sorumluluğu, ilgili olayın gerçekleştiği dönemde
@@ -63,7 +75,7 @@ export default function KullanimSartlariPage() {
         </p>
       </LegalSection>
 
-      <LegalSection no="7." title="Değişiklikler ve Uygulanacak Hukuk">
+      <LegalSection no="8." title="Değişiklikler ve Uygulanacak Hukuk">
         <p>
           Şartlar güncellenebilir; önemli değişiklikler panelden ve e-posta ile duyurulur. Bu sözleşme Türkiye
           Cumhuriyeti hukukuna tabidir; tüketici işlemleri bakımından Tüketici Hakem Heyetleri ve Tüketici

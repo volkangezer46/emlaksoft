@@ -20,6 +20,7 @@ export const STATIC_PUBLIC_PATHS = [
   "/mesafeli-satis",
   "/on-bilgilendirme",
   "/iptal-iade",
+  "/davet-kosullari",
 ] as const;
 
 /** Ana sayfadaki bölüm kimlikleri (`/#tur` gibi). */

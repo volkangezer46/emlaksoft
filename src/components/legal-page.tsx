@@ -64,6 +64,7 @@ export function LegalPage({
           <Link className="hover:text-brand-600" href="/mesafeli-satis">Mesafeli Satış Sözleşmesi</Link>
           <Link className="hover:text-brand-600" href="/on-bilgilendirme">Ön Bilgilendirme Formu</Link>
           <Link className="hover:text-brand-600" href="/iptal-iade">İptal &amp; İade</Link>
+          <Link className="hover:text-brand-600" href="/davet-kosullari">Davet Koşulları</Link>
         </nav>
       </section>
     </main>

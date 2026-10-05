@@ -17,8 +17,16 @@ export default function OnBilgilendirmePage() {
         <p>
           EmlakSoft — Türkiye emlak ofisleri için bulut tabanlı CRM ve ofis yönetim platformu. İletişim:{" "}
           <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>.
-          Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme onay ekranında ve düzenlenen faturada yer alır.
+          Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme onay ekranında ve düzenlenen faturada da yer alır.
         </p>
+        {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. AVUKAT ONAYI GEREKİR. */}
+        <ul className="list-disc space-y-1 pl-5">
+          <li><b>Ticari ünvan:</b> [ŞİRKET ÜNVANI — DOLDURULACAK]</li>
+          <li><b>Adres:</b> [TEBLİGAT ADRESİ — DOLDURULACAK]</li>
+          <li><b>MERSİS no:</b> [MERSİS NUMARASI — DOLDURULACAK]</li>
+          <li><b>Vergi dairesi / vergi no:</b> [VERGİ DAİRESİ VE NUMARASI — DOLDURULACAK]</li>
+          <li><b>KEP adresi:</b> [KEP ADRESİ — DOLDURULACAK]</li>
+        </ul>
       </LegalSection>
 
       <LegalSection no="2." title="Hizmetin Temel Nitelikleri">
@@ -31,9 +39,15 @@ export default function OnBilgilendirmePage() {
 
       <LegalSection no="3." title="Fiyat, Vergiler ve Ödeme">
         <p>
-          Tüm fiyatlar Türk Lirası cinsinden ve KDV dâhil gösterilir. Ödeme, lisanslı ödeme kuruluşu üzerinden
-          kredi/banka kartıyla alınır; ek teslimat/kargo bedeli yoktur. Abonelik, iptal edilmedikçe dönem sonunda
-          otomatik yenilenir; yenileme öncesi fiyat değişiklikleri e-posta ile bildirilir.
+          Tüm fiyatlar Türk Lirası cinsinden ve KDV dâhil gösterilir. Ödeme, lisanslı ödeme kuruluşu iyzico üzerinden
+          kredi/banka kartıyla alınır; ek teslimat/kargo bedeli yoktur. Kart bilgileriniz EmlakSoft&apos;ta saklanmaz,
+          iyzico nezdinde saklanır; EmlakSoft yalnızca saklama anahtarını ve kartın son 4 hanesi ile markasını tutar.
+          Kartınız yalnızca açık rızanızla kaydedilir.
+        </p>
+        <p>
+          Otomatik tahsilat yalnızca kayıtlı kartınız ve ayrıca verdiğiniz açık rızanız varsa yapılır; aksi hâlde
+          dönem sonunda hatırlatma ve ödeme bağlantısı ile yenilenir. Yenileme öncesi fiyat değişiklikleri e-posta ile
+          bildirilir. Hesap kredisi (ör. davet programı) yalnızca fatura indirimi olarak kullanılır; nakde çevrilmez.
         </p>
       </LegalSection>
 

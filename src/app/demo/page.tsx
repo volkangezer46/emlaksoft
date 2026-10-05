@@ -30,7 +30,18 @@ export default async function DemoPage() {
           </div>
         </div>
         <div className="p-8">
-          <DemoForm />
+          <Link
+            href="/kayit"
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+          >
+            14 gün ücretsiz dene
+          </Link>
+          <p className="mt-2 text-center text-xs text-text-muted">Kredi kartı gerekmez; dilediğiniz an vazgeçebilirsiniz.</p>
+          <div className="mt-8 border-t border-line pt-6">
+            <h2 className="font-display text-base font-bold text-ink-950">Sorunuz mu var?</h2>
+            <p className="mb-4 mt-1 text-xs text-text-muted">Önce denemeyi tercih etmiyorsanız görüşme talep edin; size dönüş yapalım.</p>
+            <DemoForm />
+          </div>
           <Link href="/" className="mt-6 inline-block text-sm font-semibold text-brand-600 hover:underline">
             Ana sayfaya dön
           </Link>
