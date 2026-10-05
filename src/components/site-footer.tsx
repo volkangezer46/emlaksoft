@@ -2,70 +2,27 @@ import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
-import { trParts } from "@/lib/clock";
+import { now, trParts } from "@/lib/clock";
+import { toPublicMenu } from "@/lib/site-menu/public";
+import { getLiveSiteMenu } from "@/lib/site-menu/store";
 
-type FooterLink = [label: string, href: string];
-
-const BASE_COLUMNS: { title: string; links: FooterLink[] }[] = [
-  {
-    title: "Ürün",
-    links: [
-      ["Özellikler", "/#ozellikler"],
-      ["Ürün turu", "/#tur"],
-      ["Kayıp-kaçak motoru", "/#kayip-kacak"],
-      ["Emsal bazlı değerleme", "/#degerleme"],
-      ["Portal kontrolü", "/#portal-kontrol"],
-      ["Dijital imza", "/#imza"],
-      ["Güvenlik ve KVKK", "/#guvenlik"],
-    ],
-  },
-  {
-    title: "Paketler",
-    // Paket bağlantıları SiteFooter içinde etkin plan tanımlarından doldurulur.
-    links: [["Fiyatları karşılaştır", "/fiyatlar"]],
-  },
-  {
-    title: "Kaynaklar",
-    links: [
-      ["Neden EmlakSoft", "/#neden"],
-      ["Nasıl çalışır", "/#nasil"],
-      ["Sık sorulan sorular", "/#sss"],
-      ["Araçlar", "/araclar"],
-      ["Giriş yap", "/giris"],
-    ],
-  },
-  {
-    title: "Yasal",
-    links: [
-      ["KVKK Aydınlatma", "/kvkk-aydinlatma"],
-      ["Gizlilik Politikası", "/gizlilik"],
-      ["Çerez Politikası", "/cerez-politikasi"],
-      ["Kullanım Şartları", "/kullanim-sartlari"],
-      ["Mesafeli Satış Sözleşmesi", "/mesafeli-satis"],
-      ["Ön Bilgilendirme", "/on-bilgilendirme"],
-      ["İptal ve İade", "/iptal-iade"],
-    ],
-  },
-  {
-    title: "İletişim",
-    links: [
-      ["Demo görüşmesi planla", "/demo"],
-      ["destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr"],
-    ],
-  },
-];
-
+/**
+ * Alt bilgi sütunları admin'den (Site menüsü > Alt bilgi) yönetilir; yayın yoksa varsayılan içerik kullanılır
+ * (src/lib/site-menu/defaults.ts). Sunucu bileşeni: istemciye JS göndermez. `autoPlans` sütununa (varsayılan: "Paketler")
+ * paket bağlantıları etkin plan tanımlarından (fiyat okuyucu) eklenir.
+ */
 export async function SiteFooter() {
-  const plans = await getPublicPlanDefinitions();
-  const columns = BASE_COLUMNS.map((col) =>
-    col.title === "Paketler"
-      ? { ...col, links: [...plans.map((p): FooterLink => [p.name, `/kayit?plan=${p.id}`]), ...col.links] }
-      : col,
+  const menuColumns = toPublicMenu(await getLiveSiteMenu(), now()).footer;
+  const plans = menuColumns.some((c) => c.autoPlans) ? await getPublicPlanDefinitions() : [];
+  const columns = menuColumns.map((c) =>
+    c.autoPlans
+      ? { ...c, links: [...plans.map((p) => ({ id: `plan-${p.id}`, label: p.name, href: `/kayit?plan=${p.id}`, external: false })), ...c.links] }
+      : c,
   );
   return (
     <footer className="mk-foot">
       <div className="mk-wrap" style={{ paddingBlock: "clamp(3rem, 2rem + 4vw, 5rem)" }}>
-        <div className="mk-foot-grid">
+        <div className="mk-foot-grid" style={{ "--mk-foot-cols": Math.min(Math.max(columns.length, 1), 5) } as React.CSSProperties}>
           <div className="mk-foot-brand">
             <Link href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
               <Brand variant="horizontal" tone="dark" height={36} alt="" />
@@ -83,11 +40,22 @@ export async function SiteFooter() {
             </Link>
           </div>
           {columns.map((col) => (
-            <nav key={col.title} aria-label={col.title}>
+            <nav key={col.id} aria-label={col.title}>
               <h2>{col.title}</h2>
               <ul>
-                {col.links.map(([label, href]) => (
-                  <li key={label}><Link href={href}>{label}</Link></li>
+                {col.links.map((l) => (
+                  <li key={l.id}>
+                    {l.external ? (
+                      <a href={l.href} target="_blank" rel="noopener noreferrer">
+                        {l.label}
+                        <span className="sr-only"> (yeni sekmede açılır)</span>
+                      </a>
+                    ) : l.href.startsWith("mailto:") || l.href.startsWith("tel:") ? (
+                      <a href={l.href}>{l.label}</a>
+                    ) : (
+                      <Link href={l.href}>{l.label}</Link>
+                    )}
+                  </li>
                 ))}
               </ul>
             </nav>

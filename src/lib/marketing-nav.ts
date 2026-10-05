@@ -1,165 +1,45 @@
-import {
-  BadgeCheck,
-  Bot,
-  Briefcase,
-  Building2,
-  CalendarCheck,
-  Calculator,
-  CircleHelp,
-  Crown,
-  FileSignature,
-  Globe,
-  HandCoins,
-  Handshake,
-  LayoutDashboard,
-  Link2,
-  Lock,
-  Mail,
-  Rocket,
-  Route,
-  Scale,
-  ShieldAlert,
-  ShieldCheck,
-  ToggleRight,
-  Tv,
-  UserRound,
-  Workflow,
-  type LucideIcon,
-} from "lucide-react";
+import { defaultSiteMenu } from "@/lib/site-menu/defaults";
 
 /**
- * ÜST MENÜ (mega menü) İÇERİĞİ — TEK YER. Sayfa yolları değişmez; yalnız var olan rotalar ve
- * ana sayfa bölüm bağlantıları (`/#id`) bulunur, olmayan sayfaya bağlantı verilmez
- * (`src/lib/marketing-nav.test.ts` ve `npm run check:links`). Menüde fiyat/paket adı/deneme günü YAZILMAZ:
- * bunlar admin paket tanımlarından gelir, menü metni eskiyemesin diye genel dilde tutulur.
- * İkonlar `src/lib/icons.ts` sözlüğündeki kavramlarla aynıdır (aynı kavram = aynı ikon); paketi küçük tutmak için
- * sözlüğün tamamı yerine tek tek lucide içe aktarılır.
+ * ÜST MENÜ (mega menü) VARSAYILAN İÇERİĞİNİN SALT OKUNUR GÖRÜNÜMÜ.
+ * Menünün tek kaynağı artık admin'in yayınladığı yapılandırmadır (`/admin/site-menu`, `src/lib/site-menu/`); hiç yayın
+ * yokken `src/lib/site-menu/defaults.ts` içeriği gösterilir. Bu dosya o varsayılanı eski "sütunlu grup" biçiminde sunar ve
+ * `marketing-nav.test.ts` sözleşmesinin (her bağlantı var olan sayfaya/bölüm kimliğine gider; menüde fiyat/paket adı yok)
+ * dayanağıdır. Menü içeriğini değiştirmek için `defaults.ts` (varsayılan) veya admin ekranı kullanılır, burası değil.
  */
-export type NavLink = { label: string; text: string; href: string; icon: LucideIcon };
+export type NavLink = { label: string; text: string; href: string; icon: string };
 export type NavColumn = { title: string; items: NavLink[] };
-export type NavFeatured = { eyebrow: string; title: string; text: string; href: string; cta: string; icon: LucideIcon };
+export type NavFeatured = { eyebrow: string; title: string; text: string; href: string; cta: string; icon: string };
 export type NavGroup = { id: string; label: string; columns: NavColumn[]; featured: NavFeatured };
 
-export const MARKETING_NAV: readonly NavGroup[] = [
-  {
-    id: "urun",
-    label: "Ürün",
-    columns: [
-      {
-        title: "Satış ve kazanç",
-        items: [
-          { label: "Ürün turu", text: "Bugün, müşteriler, portföy ve daha fazlası", href: "/#tur", icon: LayoutDashboard },
-          { label: "Komisyon ve anlaşma", text: "Tekliften hakedişe tek omurga", href: "/#komisyon", icon: Handshake },
-          { label: "Kayıp-kaçak kalkanı", text: "Kaçan komisyonu rakama dökün", href: "/#kayip-kacak", icon: ShieldAlert },
-          { label: "Emsal bazlı değerleme", text: "Fiyat aralığı sinyali", href: "/#degerleme", icon: Calculator },
-          { label: "Dijital imza", text: "SMS onaylı sözleşme akışı", href: "/#imza", icon: FileSignature },
-        ],
+function derive(): NavGroup[] {
+  const out: NavGroup[] = [];
+  for (const g of defaultSiteMenu().groups) {
+    if (g.kind !== "menu" || !g.featured) continue;
+    const cols = new Map<string, NavLink[]>();
+    for (const it of g.items) {
+      const list = cols.get(it.section) ?? [];
+      list.push({ label: it.label, text: it.text, href: it.href, icon: it.icon.kind === "lucide" ? it.icon.name : "" });
+      cols.set(it.section, list);
+    }
+    out.push({
+      id: g.id,
+      label: g.label,
+      columns: [...cols.entries()].map(([title, items]) => ({ title, items })),
+      featured: {
+        eyebrow: g.featured.eyebrow,
+        title: g.featured.title,
+        text: g.featured.text,
+        href: g.featured.href,
+        cta: g.featured.ctaLabel,
+        icon: g.featured.icon.kind === "lucide" ? g.featured.icon.name : "",
       },
-      {
-        title: "Otomasyon ve ofis",
-        items: [
-          { label: "Otomasyonlar", text: "Arka planda çalışan otomatik görevler", href: "/#otomasyon", icon: Workflow },
-          { label: "AI asistan", text: "Kişisel veri maskeli yanıtlar", href: "/#ai-asistan", icon: Bot },
-          { label: "Vitrin ve portallar", text: "Ofis vitrini, token’lı portallar", href: "/#vitrin", icon: Globe },
-          { label: "Portal kontrolü", text: "İlan takibi ve teyit", href: "/#portal-kontrol", icon: Link2 },
-          { label: "Ofis panosu (TV)", text: "Ofis ekranı için canlı pano", href: "/#tv-modu", icon: Tv },
-          { label: "Modüller (aç/kapa)", text: "İhtiyacınız olmayanı kapatın", href: "/#moduller", icon: ToggleRight },
-        ],
-      },
-    ],
-    featured: {
-      eyebrow: "En çok bakılan",
-      title: "Kaybettiğiniz komisyonu görün",
-      text: "İlan yayından kalkınca sistem sebebini sorar; kaçan komisyon danışman bazında görünür olur.",
-      href: "/#kayip-kacak",
-      cta: "Kalkanı inceleyin",
-      icon: ShieldAlert,
-    },
-  },
-  {
-    id: "cozum",
-    label: "Çözümler",
-    columns: [
-      {
-        title: "Ofis büyüklüğüne göre",
-        items: [
-          { label: "Bağımsız danışman", text: "Tek kişilik çalışma için", href: "/kayit?plan=advisor", icon: UserRound },
-          { label: "Emlak ofisi", text: "Küçük ve orta ölçekli ekip", href: "/kayit?plan=office", icon: Building2 },
-          { label: "Büyüyen ekip", text: "Çok danışmanlı, çok şubeli yapı", href: "/kayit?plan=professional", icon: Briefcase },
-          { label: "Kurumsal yapı", text: "Franchise ve proje satış ekipleri", href: "/kayit?plan=enterprise", icon: Crown },
-        ],
-      },
-      {
-        title: "Karar vermek için",
-        items: [
-          { label: "Paketleri karşılaştırın", text: "Fiyat, limit ve kapsam yan yana", href: "/fiyatlar#karsilastirma", icon: BadgeCheck },
-          { label: "Neden EmlakSoft", text: "Excel ve defterle karşılaştırma", href: "/#neden", icon: Scale },
-        ],
-      },
-    ],
-    featured: {
-      eyebrow: "Başlamak kolay",
-      title: "Ofisinizi birlikte kuralım",
-      text: "Demo görüşmesinde ekibinize uygun yapıyı ve içeri aktarma planını konuşalım.",
-      href: "/demo",
-      cta: "Demo görüşmesi planla",
-      icon: CalendarCheck,
-    },
-  },
-  {
-    id: "kaynak",
-    label: "Kaynaklar",
-    columns: [
-      {
-        title: "Öğrenin",
-        items: [
-          { label: "Nasıl çalışır", text: "Üç adımda başlangıç", href: "/#nasil", icon: Route },
-          { label: "Sık sorulan sorular", text: "Net cevaplar", href: "/#sss", icon: CircleHelp },
-          { label: "Güvenlik ve KVKK", text: "Süreç ve altyapı", href: "/#guvenlik", icon: Lock },
-        ],
-      },
-      {
-        title: "Yasal ve destek",
-        items: [
-          { label: "Telefon ve KVKK uyumu", text: "Doğru numara, izinli iletişim", href: "/#uyum", icon: ShieldCheck },
-          { label: "KVKK aydınlatma metni", text: "Yasal metin", href: "/kvkk-aydinlatma", icon: Scale },
-          { label: "Destek", text: "destek@emlaksoft.com.tr", href: "mailto:destek@emlaksoft.com.tr", icon: Mail },
-        ],
-      },
-    ],
-    featured: {
-      eyebrow: "Veri güvenliği",
-      title: "Verinizi süreçle koruyun",
-      text: "Satır düzeyinde güvenlik, rol ve izin matrisi, denetim kaydı ve dışa aktarma.",
-      href: "/#guvenlik",
-      cta: "Güvenlik bölümüne git",
-      icon: Lock,
-    },
-  },
-  {
-    id: "fiyat",
-    label: "Fiyatlar",
-    columns: [
-      {
-        title: "Fiyatlandırma",
-        items: [
-          { label: "Paketler ve fiyatlar", text: "Güncel fiyat ve limitler", href: "/fiyatlar", icon: BadgeCheck },
-          { label: "Paket karşılaştırma", text: "Özellik özellik tablo", href: "/fiyatlar#karsilastirma", icon: Scale },
-          { label: "Kaçan komisyon hesaplayıcı", text: "Kendi sayılarınızla hesaplayın", href: "/fiyatlar#kacan-komisyon", icon: HandCoins },
-          { label: "Fiyat SSS", text: "Fatura, KDV ve limitler", href: "/fiyatlar#sss", icon: CircleHelp },
-        ],
-      },
-    ],
-    featured: {
-      eyebrow: "Şeffaf fiyat",
-      title: "Size uygun paketi seçin",
-      text: "Fiyatlar KDV hariç, taahhütsüz. Deneme boyunca tüm özellikler açık.",
-      href: "/fiyatlar",
-      cta: "Fiyatlara git",
-      icon: Rocket,
-    },
-  },
-];
+    });
+  }
+  return out;
+}
+
+export const MARKETING_NAV: readonly NavGroup[] = derive();
 
 /** Düz bağlantı listesi (klavye sırası, test ve mobil için). */
 export function allNavLinks(): NavLink[] {

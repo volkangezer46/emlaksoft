@@ -44,6 +44,7 @@ describe("Server Action binary body limit", () => {
       "src/app/actions/agent-profile.ts",
       "src/app/actions/geo-admin.ts",
       "src/app/actions/platform-brand.ts",
+      "src/app/actions/site-menu.ts",
       "src/app/actions/tenant-logo.ts",
     ]);
 
@@ -57,6 +58,10 @@ describe("Server Action binary body limit", () => {
     const geoImport = source("src/app/actions/geo-admin.ts");
     expect(geoImport).toContain("const MAX_IMPORT_BYTES = 3 * 1024 * 1024");
     expect(geoImport).toContain("file.size > MAX_IMPORT_BYTES");
+    // Site menüsü medyası: en büyük dosya 2 MiB (+64 KiB pay) < 3 MiB; sınır sunucuda belleğe okumadan uygulanır.
+    const menu = source("src/app/actions/site-menu.ts");
+    expect(menu).toContain("file.size > HARD_FILE_LIMIT");
+    expect(menu).toContain("MEDIA_LIMITS.motionBytes + 64 * 1024");
   });
 
   it("keeps larger customer/property files on the signed direct-upload path", () => {

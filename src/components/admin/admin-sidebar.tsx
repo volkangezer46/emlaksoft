@@ -22,6 +22,7 @@ import {
   Search,
   SearchCheck,
   Palette,
+  PanelTop,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -111,6 +112,7 @@ const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
       { href: "/admin/ayarlar", label: "Ayarlar", icon: Settings, hint: "Bakım, kayıt, deneme", module: "sistem" },
       { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
       { href: "/admin/seo", label: "SEO merkezi", icon: SearchCheck, hint: "Arama motoru, sitemap, robot", module: "seo" },
+      { href: "/admin/site-menu", label: "Site menüsü", icon: PanelTop, hint: "Menü, alt bilgi, duyuru", module: "sitemenu" },
     ],
   },
 ];

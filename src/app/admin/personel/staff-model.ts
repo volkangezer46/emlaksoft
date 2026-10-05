@@ -23,6 +23,7 @@ export const PLATFORM_MODULE_LABELS: Record<PlatformModule, string> = {
   personel: "Personel yönetimi",
   marka: "Marka (logo ve favicon)",
   seo: "SEO merkezi",
+  sitemenu: "Site menüsü (ops: salt okunur)",
 };
 
 export const PLATFORM_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];

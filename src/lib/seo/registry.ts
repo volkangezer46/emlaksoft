@@ -244,6 +244,7 @@ export const NEVER_INDEX_PREFIXES = [
   "/sifre-sifirla",
   "/sifre-yenile",
   "/brand-asset",
+  "/site-menu-asset",
 ] as const;
 
 /** robots.txt'te her zaman Disallow olan yollar (çıkarılamaz). */
