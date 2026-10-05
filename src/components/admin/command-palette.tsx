@@ -16,6 +16,7 @@ import {
   FileText,
   Search,
   SearchCheck,
+  Settings,
   User,
   Users,
   Activity,
@@ -29,7 +30,7 @@ import { createRecentsStore, matchesQuery, OPEN_PALETTE_EVENT } from "@/lib/pale
 
 type Hit = {
   id: string;
-  type: "tenant" | "member" | "ticket";
+  type: "tenant" | "member" | "ticket" | "setting";
   title: string;
   subtitle: string;
   href: string;
@@ -49,6 +50,7 @@ const ALL_NAV: NavCmd[] = [
   { label: "Raporlar", href: "/admin/raporlar", icon: BarChart3, module: "reports" },
   { label: "Coğrafya", href: "/admin/geo", icon: MapPin, module: "geo" },
   { label: "Sistem sağlığı", href: "/admin/sistem", icon: Radar, module: "sistem" },
+  { label: "Sistem ayarları merkezi", href: "/admin/ayarlar/merkez", icon: Settings, module: "sistem" },
   { label: "Marka (logo ve favicon)", href: "/admin/marka", icon: Palette, module: "marka" },
   { label: "SEO merkezi (sitemap, robots, robot)", href: "/admin/seo", icon: SearchCheck, module: "seo" },
   { label: "Site menüsü (menü, alt bilgi, duyuru)", href: "/admin/site-menu", icon: PanelTop, module: "sitemenu" },
@@ -59,8 +61,8 @@ const ALL_NAV: NavCmd[] = [
 // Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).
 const recentsStore = createRecentsStore("admin_palette_recents");
 
-const typeIcon = { tenant: Building2, member: User, ticket: LifeBuoy };
-const typeLabel = { tenant: "Ofis", member: "Kullanıcı", ticket: "Destek talebi" };
+const typeIcon = { tenant: Building2, member: User, ticket: LifeBuoy, setting: Settings };
+const typeLabel = { tenant: "Ofis", member: "Kullanıcı", ticket: "Destek talebi", setting: "Ayar" };
 
 export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
   const router = useRouter();
@@ -249,7 +251,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
                       <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Git</p>
                     ) : null}
                     {isFirstHit ? (
-                      <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Kayıtlar</p>
+                      <p className="px-3 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{item.type === "setting" ? "Ayarlar" : "Kayıtlar"}</p>
                     ) : null}
                     <button
                       id={`admin-command-option-${i}`}

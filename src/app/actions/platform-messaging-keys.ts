@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { guardPlatformAction } from "@/lib/platform-guards";
-import { setPlatformSetting } from "@/lib/platform-settings";
+import { applyPlatformWrites } from "@/lib/settings/write";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { normalizeAllowedWhatsAppApiUrl } from "@/lib/messaging/netgsm";
 
@@ -31,12 +31,16 @@ export async function saveNetgsmKeys(fd: FormData): Promise<MessagingKeyResult> 
     return { error: "Mesaj başlığı 1-11 karakter olmalı (harf, rakam, boşluk)." };
   }
 
-  const results = await Promise.all([
-    setPlatformSetting("netgsm_usercode", usercode, gate.staff.id),
-    setPlatformSetting("netgsm_password", password, gate.staff.id),
-    setPlatformSetting("netgsm_msgheader", msgheader, gate.staff.id),
-  ]);
-  if (results.some((ok) => !ok)) return { error: "Netgsm bilgileri kaydedilemedi." };
+  const res = await applyPlatformWrites(
+    gate.staff,
+    [
+      { key: "notify.netgsm_usercode", value: usercode },
+      { key: "notify.netgsm_password", value: password },
+      { key: "notify.netgsm_msgheader", value: msgheader },
+    ],
+    { reason: "Netgsm bilgileri kaydı", fromBridge: true },
+  );
+  if (!res.ok) return { error: res.error || "Netgsm bilgileri kaydedilemedi." };
 
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -52,11 +56,16 @@ export async function clearNetgsmKeys(): Promise<MessagingKeyResult> {
   const gate = await gateSuperAdmin();
   if ("error" in gate) return { error: gate.error };
 
-  await Promise.all([
-    setPlatformSetting("netgsm_usercode", null, gate.staff.id),
-    setPlatformSetting("netgsm_password", null, gate.staff.id),
-    setPlatformSetting("netgsm_msgheader", null, gate.staff.id),
-  ]);
+  const res = await applyPlatformWrites(
+    gate.staff,
+    [
+      { key: "notify.netgsm_usercode", value: null },
+      { key: "notify.netgsm_password", value: null },
+      { key: "notify.netgsm_msgheader", value: null },
+    ],
+    { reason: "Netgsm bilgileri silindi", fromBridge: true },
+  );
+  if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: gate.staff.id, action: "integration.netgsm.clear", entityType: "integration" });
   revalidatePath("/admin/sistem");
   return { ok: true };
@@ -77,11 +86,15 @@ export async function saveWhatsappKeys(fd: FormData): Promise<MessagingKeyResult
     return { error: "WhatsApp API adresi HTTPS olmalı ve izinli sağlayıcı alan adını kullanmalıdır." };
   }
 
-  const results = await Promise.all([
-    setPlatformSetting("whatsapp_api_url", apiUrl, gate.staff.id),
-    setPlatformSetting("whatsapp_api_token", token, gate.staff.id),
-  ]);
-  if (results.some((ok) => !ok)) return { error: "WhatsApp bilgileri kaydedilemedi." };
+  const res = await applyPlatformWrites(
+    gate.staff,
+    [
+      { key: "notify.whatsapp_api_url", value: apiUrl },
+      { key: "notify.whatsapp_api_token", value: token },
+    ],
+    { reason: "WhatsApp bilgileri kaydı", fromBridge: true },
+  );
+  if (!res.ok) return { error: res.error || "WhatsApp bilgileri kaydedilemedi." };
 
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -97,10 +110,15 @@ export async function clearWhatsappKeys(): Promise<MessagingKeyResult> {
   const gate = await gateSuperAdmin();
   if ("error" in gate) return { error: gate.error };
 
-  await Promise.all([
-    setPlatformSetting("whatsapp_api_url", null, gate.staff.id),
-    setPlatformSetting("whatsapp_api_token", null, gate.staff.id),
-  ]);
+  const res = await applyPlatformWrites(
+    gate.staff,
+    [
+      { key: "notify.whatsapp_api_url", value: null },
+      { key: "notify.whatsapp_api_token", value: null },
+    ],
+    { reason: "WhatsApp bilgileri silindi", fromBridge: true },
+  );
+  if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: gate.staff.id, action: "integration.whatsapp.clear", entityType: "integration" });
   revalidatePath("/admin/sistem");
   return { ok: true };

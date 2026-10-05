@@ -9,6 +9,7 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { getPlatformSecret } from "@/lib/settings/secret-read";
 import {
   discardExternalResponse,
   fetchExternal,
@@ -54,7 +55,7 @@ export type SmsBulkResult = {
 export async function getNetgsmConfig(): Promise<NetgsmConfig | null> {
   const [usercode, password, msgheader] = await Promise.all([
     getPlatformSetting("netgsm_usercode"),
-    getPlatformSetting("netgsm_password"),
+    getPlatformSecret("netgsm_password"),
     getPlatformSetting("netgsm_msgheader"),
   ]);
 
@@ -189,7 +190,7 @@ export function isAllowedWhatsAppApiUrl(rawUrl: string): boolean {
 export async function getWhatsAppConfig(): Promise<WhatsAppConfig | null> {
   const [apiUrl, apiToken] = await Promise.all([
     getPlatformSetting("whatsapp_api_url"),
-    getPlatformSetting("whatsapp_api_token"),
+    getPlatformSecret("whatsapp_api_token"),
   ]);
 
   const url = apiUrl ?? process.env.WHATSAPP_API_URL ?? "";

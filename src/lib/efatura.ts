@@ -17,6 +17,7 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { getPlatformSecret } from "@/lib/settings/secret-read";
 import {
   normalizeProviderBaseUrl,
   providerAllowedHosts,
@@ -101,7 +102,7 @@ export async function getEFaturaConfig(): Promise<EFaturaConfig | null> {
   const [provider, apiUrl, apiKey, companyVkn] = await Promise.all([
     getPlatformSetting("efatura_provider"),
     getPlatformSetting("efatura_api_url"),
-    getPlatformSetting("efatura_api_key"),
+    getPlatformSecret("efatura_api_key"),
     getPlatformSetting("efatura_company_vkn"),
   ]);
 

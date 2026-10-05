@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getPlatformSetting } from "@/lib/platform-settings";
+import { getPlatformSecret } from "@/lib/settings/secret-read";
 import { getPlan } from "@/lib/billing/plans";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
@@ -29,7 +29,7 @@ const OPENAI_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /** DB ayarı öncelikli, yoksa ortam değişkeni. */
 export async function getOpenAiKey(): Promise<string | null> {
-  const fromDb = await getPlatformSetting("openai_api_key");
+  const fromDb = await getPlatformSecret("openai_api_key");
   if (fromDb && fromDb.trim()) return fromDb.trim();
   const fromEnv = process.env.OPENAI_API_KEY?.trim();
   return fromEnv || null;

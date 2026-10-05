@@ -3,10 +3,13 @@ import { orIlike, safeLike } from "@/lib/pgrst";
 import { getPlatformStaff } from "@/lib/platform";
 import { platformCanAccess } from "@/lib/platform-access";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ALL_SETTING_DEFS } from "@/lib/settings/registry";
+import { searchSettings } from "@/lib/settings/view";
+import { SETTING_CATEGORIES } from "@/lib/settings/types";
 
 export type SearchHit = {
   id: string;
-  type: "tenant" | "member" | "ticket";
+  type: "tenant" | "member" | "ticket" | "setting";
   title: string;
   subtitle: string;
   href: string;
@@ -92,6 +95,19 @@ export async function GET(req: NextRequest) {
           }
         }),
     );
+  }
+
+  // Ayarlar (Sistem Ayarları Merkezi): registry indeksinden, rol filtreli (modül "sistem"); gizli ayarlarda değer YOK.
+  if (platformCanAccess(staff.role, "sistem")) {
+    for (const h of searchSettings(ALL_SETTING_DEFS.filter((d) => d.scope === "platform"), q, 5)) {
+      hits.push({
+        id: `setting:${h.key}`,
+        type: "setting",
+        title: h.label,
+        subtitle: SETTING_CATEGORIES.find((c) => c.id === h.category)?.label ?? "Ayar",
+        href: h.href,
+      });
+    }
   }
 
   await Promise.all(tasks);

@@ -113,6 +113,11 @@ const F = {
   tenantLicenseDetails: "20260826001800_tenant_license_details.sql",
   // growth_my_dashboard B12 geri getirme (001000, 000900 duzeltmesini ezdi). 000900 + 001000 SONRASI.
   growthDashboardB12Reapply: "20260826001900_growth_dashboard_b12_reapply.sql",
+  // Ayar Kayit Defteri: settings_history (append-only), tenant_settings, platform_settings guard (version + bypass tetikleyici), write_setting RPC.
+  settingsHistory: "20260826002100_settings_history.sql",
+  tenantSettings: "20260826002200_tenant_settings.sql",
+  platformSettingsGuard: "20260826002300_platform_settings_guard.sql",
+  writeSettingRpc: "20260826002400_write_setting_rpc.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -189,6 +194,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.accountingExpensesView]: "davranis", // yalniz VERI: accounting/expenses/view varsayilan izni (idempotent, kullanici istisnalarina dokunmaz)
     [F.tenantLicenseDetails]: "ek", // tenants'a 2 nullable sutun (yetki belgesi unvani/gecerlilik); kod sutunlar yokken zarifce atlar
     [F.efReconciliationRuns]: "ek", // yeni tablo (yazma yalniz service_role, okuma platform personeli); kod tablo yokken zarifce atlar
+    [F.settingsHistory]: "ek", // yeni append-only tablo (settings_history); kod tablo yokken zarifce atlar
+    [F.tenantSettings]: "ek", // yeni tablo (tenant_settings); kod tablo yokken zarifce atlar
+    [F.platformSettingsGuard]: "davranis", // platform_settings: version/schema_version kolonlari + dogrudan yazimi settings_history'ye isleyen tetikleyici (deger ayni, yazim yolu degismez)
+    [F.writeSettingRpc]: "ek", // yeni service_role RPC write_setting (atomik deger + gecmis); kod RPC yokken eski upsert yoluna duser
     [F.growthDashboardB12Reapply]: "davranis", // growth_my_dashboard: 000900 B12 govdesi + 001000 rol kapisi (owner/gm degilse NULL); partner_dashboard dokunulmaz (md5 korumali)
     [F.growthDashboardRoles]: "davranis", // growth_my_dashboard/partner_dashboard yalniz owner/gm icin veri doner (digerlerine NULL); govdeler aksi ayni
     [F.leadSignalsByIds]: "ek", // yeni asiri yukleme customer_lead_signals(uuid, uuid[]); eski imza ve yetkiler ayni, istemci yoksa eskiye duser
@@ -282,6 +291,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB23-yetki-belgesi-alanlari", order: 29.74, title: "Ofis yetki belgesi unvani + gecerlilik tarihi (tenants, 2 nullable sutun)", files: [F.tenantLicenseDetails] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "PB24-buyume-b12-geri-getirme", order: 29.75, title: "growth_my_dashboard B12 geri getirme (001000 ezmesi duzeltilir: money_visible + yuvarli davet tutari + rol kapisi)", files: [F.growthDashboardB12Reapply] },
+    { id: "PB25-ayar-gecmisi", order: 29.76, title: "Ayar Kayit Defteri: settings_history (append-only gecmis)", files: [F.settingsHistory] },
+    { id: "PB26-ofis-ayarlari", order: 29.77, title: "Ayar Kayit Defteri: tenant_settings (ofis/sube/kullanici ayar deposu)", files: [F.tenantSettings] },
+    { id: "PB27-platform-ayar-korumasi", order: 29.78, title: "Ayar Kayit Defteri: platform_settings version + dogrudan yazim algilama tetikleyicisi", files: [F.platformSettingsGuard] },
+    { id: "PB28-ayar-yazma-rpc", order: 29.79, title: "Ayar Kayit Defteri: write_setting RPC (atomik yazim + gecmis)", files: [F.writeSettingRpc] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -374,6 +387,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.growthHotfix, F.defaultProgram],
     [F.growthDashboardB12Reapply, F.growthHotfix],
     [F.growthDashboardB12Reapply, F.growthDashboardRoles],
+    // Ayar Kayit Defteri: gecmis tablosu -> guard tetikleyicisi (gecmise yazar) -> RPC (ikisine de dayanir).
+    [F.platformSettingsGuard, F.settingsHistory],
+    [F.writeSettingRpc, F.settingsHistory],
+    [F.writeSettingRpc, F.platformSettingsGuard],
+    [F.writeSettingRpc, F.tenantSettings],
   ],
 
   externalPending: [
