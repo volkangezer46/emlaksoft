@@ -16,13 +16,29 @@ export type TenantBalanceRow = { tenantId: string; name: string; balance: EfBala
  * Ofis bazlı bakiye listesi. Varsayılan: kontör hareketi olan ofisler; `q` verilirse ad araması (tüm ofisler).
  * Sayfalama ofis listesi üzerindedir; her sayfa için bakiye RPC'si çağrılır (en çok 25).
  */
-export async function listTenantEfBalances(opts: {
-  q?: string;
-  page: number;
-}): Promise<{ enabled: boolean; rows: TenantBalanceRow[]; total: number }> {
-  const empty = { enabled: false, rows: [] as TenantBalanceRow[], total: 0 };
+export async function listTenantEfBalances<X = null>(
+  opts: {
+    q?: string;
+    page: number;
+  },
+  /**
+   * Aynı service_role istemcisini (yeni createAdminClient çağrısı AÇMADAN) salt-okunur raporlara ödünç verir
+   * (Kontör ekonomisi bölümü). Hata fırlatırsa `extra` null kalır; liste etkilenmez.
+   */
+  withAdmin?: (admin: ReturnType<typeof createAdminClient>) => Promise<X>,
+): Promise<{ enabled: boolean; rows: TenantBalanceRow[]; total: number; extra: X | null }> {
+  const empty = { enabled: false, rows: [] as TenantBalanceRow[], total: 0, extra: null as X | null };
   try {
     const admin = createAdminClient();
+    let extra: X | null = null;
+    if (withAdmin) {
+      try {
+        extra = await withAdmin(admin);
+      } catch (e) {
+        console.error("listTenantEfBalances.withAdmin", e);
+      }
+      empty.extra = extra;
+    }
     const from = (opts.page - 1) * ADMIN_BALANCE_PAGE_SIZE;
     const to = from + ADMIN_BALANCE_PAGE_SIZE - 1;
     let tenants: { id: string; name: string | null }[] = [];
@@ -61,7 +77,7 @@ export async function listTenantEfBalances(opts: {
         return { tenantId: t.id, name: t.name ?? "(adsız ofis)", balance: error ? null : parseEfBalance(data) };
       }),
     );
-    return { enabled: true, rows, total };
+    return { enabled: true, rows, total, extra };
   } catch (e) {
     console.error("listTenantEfBalances", e);
     return empty;

@@ -13,6 +13,7 @@ import { getFoundersStatus, getPlanSupport } from "@/lib/billing/plan-support";
 import { BillingNav } from "../billing-nav";
 import { ApplyRecommended } from "./apply-recommended";
 import { EfCreditsSection } from "./ef-credits-section";
+import { EF_WHOLESALE_SETTING_KEY, isWholesaleUnknown, parseEfWholesale } from "@/lib/accounting/ef-economics";
 import { CampaignForm, PlanEditor } from "./plan-editor";
 import { PriceSimulator } from "./price-simulator";
 import { SeatAnalyticsPanel, type SeatListKey } from "./seat-analytics-panel";
@@ -126,9 +127,10 @@ export default async function PlansAdminPage({
             ))}
           </div>
           <EfCreditsSection
-            rows={defs.map((p) => ({ id: p.id, name: p.name, units: p.efCreditsMonthly ?? 0 }))}
+            rows={defs.map((p) => ({ id: p.id, name: p.name, units: p.efCreditsMonthly ?? 0, perExtraSeat: p.efCreditsPerExtraSeat ?? 0 }))}
             valuationCost={efValuationCost}
             welcomeUnits={welcomeUnits}
+            wholesaleKnown={!isWholesaleUnknown(parseEfWholesale(await getPlatformSetting(EF_WHOLESALE_SETTING_KEY)))}
             canWrite={isSuper}
           />
         </>

@@ -11,6 +11,11 @@ import { getEfCatalog, getEfCreditReady, readEfBalance, readEfHistory } from "@/
 import { ADMIN_BALANCE_PAGE_SIZE, listTenantEfBalances, readTenantName } from "@/lib/ef-credits/admin-data";
 import { filterAndPage } from "@/lib/ef-credits/credit-view";
 import { GrantForm, PacksEditor, TariffForm } from "./editors";
+import { EconomicsSection, loadEfEconomicsData } from "./economics-section";
+import { now as clockNow } from "@/lib/clock";
+import { getPlatformSetting } from "@/lib/platform-settings";
+import { resolvePeriod } from "@/lib/accounting/period";
+import { EF_WHOLESALE_SETTING_KEY, parseEfWholesale } from "@/lib/accounting/ef-economics";
 
 export const metadata = { title: "EmlakFiyati kontör" };
 
@@ -19,7 +24,7 @@ const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "s
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BASE = "/admin/ef-kontor";
 
-type SP = { q?: string; sayfa?: string; ofis?: string; hsayfa?: string };
+type SP = { q?: string; sayfa?: string; ofis?: string; hsayfa?: string; donem?: string };
 
 export default async function AdminEfKontorPage({ searchParams }: { searchParams: Promise<SP> }) {
   const staff = await requirePlatformModule("billing");
@@ -30,7 +35,10 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
   const officeId = sp.ofis && UUID.test(sp.ofis) ? sp.ofis : null;
 
   const [ready, catalog] = await Promise.all([getEfCreditReady(), getEfCatalog()]);
-  const list = ready ? await listTenantEfBalances({ q, page }) : null;
+  const period = resolvePeriod({ donem: sp.donem }, clockNow());
+  const wholesale = parseEfWholesale(await getPlatformSetting(EF_WHOLESALE_SETTING_KEY));
+  // Ekonomi verisi, bakiye listesinin (allowlist'li) service_role istemcisini ödünç alır: yeni service_role kullanımı yok.
+  const list = ready ? await listTenantEfBalances({ q, page }, (admin) => loadEfEconomicsData(admin, period, wholesale)) : null;
 
   let detail: Awaited<ReturnType<typeof loadDetail>> | null = null;
   if (officeId && ready) detail = await loadDetail(officeId, Math.max(1, Number.parseInt(sp.hsayfa ?? "", 10) || 1));
@@ -64,9 +72,10 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
           { label: "Satıştaki paket", value: activeCount, href: "#paketler", hint: `${catalog.packs.length} tanımlı` },
           { label: "Listelenen ofis", value: list?.total ?? 0, href: "#bakiyeler" },
           { label: "Kullanılabilir (sayfa)", value: fmt.format(totals.available), href: "#bakiyeler" },
-          { label: "Rezerve (sayfa)", value: fmt.format(totals.reserved), href: "#bakiyeler" },
-        ]}
+          { label: "Rezerve (sayfa)", value: fmt.format(totals.reserved), href: "#bakiyeler" },        ]}
       />
+
+      <EconomicsSection data={list?.extra ?? null} period={period} wholesale={wholesale} canWrite={canWrite} />
 
       <Card id="tarife">
         <CardHeader>
