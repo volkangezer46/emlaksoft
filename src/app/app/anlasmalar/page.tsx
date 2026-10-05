@@ -15,6 +15,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { getStageLabels } from "@/lib/definitions";
@@ -191,7 +192,7 @@ export default async function DealsPage({
     lostRes,
     staleRes,
     realWonRes,
-  ] = await Promise.all([
+  ] = await batchAll("Anlaşmalar", ["deals", "profiles", "deal-checklist", "stage-labels", "saved-views", "sum-scan", "stage-new", "stage-qualified", "stage-negotiation", "stage-won", "stage-lost", "stale", "real-won"], [
     dealsP,
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     relatedP,

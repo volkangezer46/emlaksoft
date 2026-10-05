@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { getOpenAiKey } from "@/lib/ai-advisor";
 import { computeLeadScore } from "@/lib/lead-score";
+import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
@@ -92,15 +93,6 @@ type TenantAdvisorContext = {
   overpriced: OverpricedProperty[];
 };
 
-// customer_lead_signals RPC satırı — bkz. /app ve /app/musteriler'deki aynı desen
-type LeadSignalRow = {
-  customer_id: string;
-  active_demands: number;
-  comms: number;
-  appts: number;
-  calls: number;
-  last_activity: string | null;
-};
 
 async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promise<TenantAdvisorContext> {
   const supabase = await createClient();
@@ -126,7 +118,6 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
     { count: todayAppointments },
     { data: commissionRows },
     { data: leadCustomers },
-    { data: leadSignals },
     { data: redProperties, count: overpricedCount },
   ] = await Promise.all([
     gated(scope.customers, () =>
@@ -208,7 +199,6 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
           .limit(200),
       ),
     ),
-    gated(scope.customers, () => supabase.rpc("customer_lead_signals", { p_tenant_id: tenantId })),
     gated(scope.properties, () =>
       mine(
         supabase
@@ -221,8 +211,14 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
     ),
   ]);
 
+  // Yalnız skorlanan (≤200) müşterilerin sinyalleri; tüm tenant'ı döndüren eski imza 1000 satırda kesiliyordu.
+  const { data: leadSignals } = await fetchLeadSignals(
+    supabase,
+    tenantId,
+    (leadCustomers ?? []).map((c) => c.id as string),
+  );
   const signalMap = new Map<string, LeadSignalRow>(
-    ((leadSignals ?? []) as LeadSignalRow[]).map((s) => [s.customer_id, s]),
+    leadSignals.map((s) => [s.customer_id, s]),
   );
 
   const hotLeads: HotLead[] = [];

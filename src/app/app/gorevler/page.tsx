@@ -2,6 +2,7 @@ import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-role
 import { redirect } from "next/navigation";
 import { AlarmClock, CalendarClock, CheckCircle2, Plus, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysFromNowIso, now, trDayStartMs } from "@/lib/clock";
 import { QuickTask } from "./quick-task";
@@ -100,7 +101,9 @@ export default async function TasksPage({
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
   // Atama / düzenleme / filtre için ofis üyeleri (kiracı RLS ile sınırlı).
-  const { data: memberRows } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("full_name").limit(200);
+  const [{ data: memberRows }] = await batchAll("Görevler", ["members"], [
+    supabase.from("profiles").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("full_name").limit(200),
+  ]);
   const members = (memberRows ?? []).map((m) => ({ id: m.id as string, name: (m.full_name as string | null) ?? "İsimsiz" }));
   const nowIso = new Date(now()).toISOString();
 
@@ -152,7 +155,10 @@ export default async function TasksPage({
     doneRes,
     allRes,
     ...kindRes
-  ] = await Promise.all([
+  ] = await batchAll("Görevler", [
+    "tasks", "saved-views", "count-open", "count-overdue", "count-today", "count-upcoming", "count-done", "count-all",
+    ...KIND_FILTERS.map((k) => `count-kind-${k.key}`),
+  ], [
     query,
     savedViewsPromise,
     head().eq("status", "open"),

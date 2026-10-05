@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getExpiringAuthorizations } from "@/app/actions/property-management";
 import { exportPortalListingsCsv } from "@/app/actions/export";
@@ -91,6 +92,8 @@ function portalHref(durum: string, portal: string, sayfa?: number, property?: st
 const PAGE_SIZE = 50;
 /** Portal dağılımı barları için taranan azami kayıt (tek kolon, hafif). */
 const DIST_LIMIT = 2000;
+/** Yeni ilan formundaki portföy önerisi için çekilen azami kayıt; fazlası Combobox aramasıyla bulunur. */
+const PROPERTY_OPTIONS_LIMIT = 300;
 
 export default async function PortalsPage({
   searchParams,
@@ -142,7 +145,11 @@ export default async function PortalsPage({
     { data: distRows },
     { data: properties },
     expiringAuths,
-  ] = await Promise.all([
+    { data: chipProperty },
+  ] = await batchAll("Portallar", [
+    "portal-listings", "portal-total", "portal-live", "portal-overdue", "portal-removed", "portal-dist",
+    "properties", "expiring-authorizations", "property-chip",
+  ], [
     buildFilteredQuery(LIST_COLS, { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1),
@@ -157,9 +164,16 @@ export default async function PortalsPage({
       .from("properties")
       .select("id, property_code, title")
       .is("deleted_at", null)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      // P3: eskiden TÜM portföyler limitsiz çekiliyordu; ilk 300 yeterli, gerisi form içindeki
+      // Combobox'ın sunucu aramasıyla (searchProperties) bulunur.
+      .limit(PROPERTY_OPTIONS_LIMIT),
     // Yetki süresi 15 gün içinde dolan portföyler — uyarı şeridi
     getExpiringAuthorizations(15),
+    // ?property= çipi için ilgili portföy (ilk 300 dışında olabilir).
+    propertyF
+      ? supabase.from("properties").select("id, property_code, title").eq("id", propertyF).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const pageRows = (listings ?? []) as unknown as PortalRow[];
@@ -174,7 +188,9 @@ export default async function PortalsPage({
   const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
   const liveOnPage = pageRows.filter((row) => row.status === "live").length;
 
-  const propertyChip = propertyF ? propertyOptions.find((p) => p.id === propertyF) ?? null : null;
+  const propertyChip = propertyF
+    ? (propertyOptions.find((p) => p.id === propertyF) ?? chipProperty ?? null)
+    : null;
 
   const onTime = Math.max(0, live - overdue);
   const healthRate = live ? onTime / live : 0;

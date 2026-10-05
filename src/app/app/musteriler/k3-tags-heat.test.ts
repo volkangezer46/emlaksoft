@@ -51,7 +51,8 @@ describe("etiket yeniden yazma mantığı", () => {
 describe("sıcaklık segmenti: ekran ve CSV aynı havuz sınırı", () => {
   it("tek kaynak sabit; ekran ve dışa aktarma ayrı sayı kullanmaz", () => {
     expect(HEAT_POOL_LIMIT).toBeGreaterThanOrEqual(HEAT_RPC_CHUNK);
-    const page = read("src/app/app/musteriler/page.tsx");
+    // T1: sorgular data.ts'e taşındı; sabit tanımı ne sayfada ne veri katmanında olmamalı.
+    const page = read("src/app/app/musteriler/data.ts") + read("src/app/app/musteriler/page.tsx");
     const exp = read("src/lib/customer-heat-export.ts");
     expect(page).not.toMatch(/HEAT_POOL_LIMIT\s*=\s*\d/);
     expect(page).toContain(".limit(HEAT_POOL_LIMIT)");

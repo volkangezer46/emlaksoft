@@ -12,6 +12,7 @@ import {
   ImageOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
@@ -193,7 +194,7 @@ export default async function DocumentsPage({
   let propertyIds: string[] = [];
   let dealIds: string[] = [];
   if (q) {
-    const [{ data: cHits }, { data: pHits }] = await Promise.all([
+    const [{ data: cHits }, { data: pHits }] = await batchAll("Belgeler", ["search-customers", "search-properties"], [
       supabase.from("customers").select("id").ilike("full_name", safeLike(q)).is("deleted_at", null).limit(50),
       supabase
         .from("properties")
@@ -309,9 +310,10 @@ export default async function DocumentsPage({
       supabase.from(TABLE[source]).select(COLS[source]).order("created_at", { ascending: false }),
       source,
     ).limit(fetchLimit);
+    // R1: hata "kayıt yok" gibi görünmesin; error.tsx sınırına düşer.
     if (error) {
       console.error(`belgeler ${source} rows`, error);
-      return [];
+      throw new Error(`Belgeler verileri eksik yüklendi (${source}-rows:${error.code ?? "?"}).`);
     }
     return (data ?? []) as unknown as Record<string, unknown>[];
   }
@@ -325,7 +327,7 @@ export default async function DocumentsPage({
     );
     if (error) {
       console.error(`belgeler ${source} count`, error);
-      return 0;
+      throw new Error(`Belgeler verileri eksik yüklendi (${source}-count:${error.code ?? "?"}).`);
     }
     return count ?? 0;
   }
@@ -346,7 +348,12 @@ export default async function DocumentsPage({
     usageRes,
     healthRes,
     { data: missingRaw },
-  ] = await Promise.all([
+  ] = await batchAll("Belgeler", [
+    "rows-customer", "rows-media", "rows-contract", "rows-checklist",
+    "count-customer", "count-media", "count-contract", "count-checklist",
+    "month-customer", "month-media", "month-contract", "month-checklist",
+    "storage-usage", "health-counts", "missing-required",
+  ], [
     fetchRows("musteri", wantSource("musteri")),
     fetchRows("portfoy", wantSource("portfoy")),
     fetchRows("sozlesme", contractsAllowed),
@@ -366,7 +373,8 @@ export default async function DocumentsPage({
       .gte("created_at", monthStart()),
     // Depolama: PostgREST'te aggregate kapalı, storage şeması açık değil →
     // migration 122'deki RPC file_size'ları DB içinde toplar (bkz. rapor).
-    supabase.rpc("document_storage_usage"),
+    // Depolama kartı kendi "—" durumuna sahip; hata tüm sayfayı düşürmez.
+    Promise.resolve(supabase.rpc("document_storage_usage")).then((r) => ({ data: r.data, failed: Boolean(r.error) })),
     supabase.rpc("document_health_counts"),
     // Belge sağlığı: eksik zorunlu evrakı olan açık anlaşmalar — filtrelerden
     // BAĞIMSIZ olduğu için ayrı round-trip yerine bu batch'te toplanır.
@@ -394,7 +402,7 @@ export default async function DocumentsPage({
   const usage = (usageRes.data as
     | { customer_bytes: number; customer_count: number; media_bytes: number; media_count: number }[]
     | null)?.[0] ?? null;
-  const usageError = Boolean(usageRes.error);
+  const usageError = usageRes.failed;
   const storageBytes = usage ? Number(usage.customer_bytes) + Number(usage.media_bytes) : 0;
   const storedFileCount = usage ? Number(usage.customer_count) + Number(usage.media_count) : 0;
 
