@@ -17,26 +17,20 @@ export default async function NewDemandPage({
 
   const { musteri } = await searchParams;
   const supabase = await createClient();
-  const [{ data: customers }, { data: provinces }, txDefs, propDefs, urgDefs, preselected] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, full_name")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(300),
+  const [{ data: provinces }, txDefs, propDefs, urgDefs, preselected] = await Promise.all([
     provinceOptionsResult(),
     getDefinitionsOrDefault("transaction_type"),
     getDefinitionsOrDefault("property_type"),
     getDefinitionsOrDefault("demand_urgency"),
-    // ?musteri= ilk 300 içinde olmayabilir; RLS tenant izolasyonunu korur.
+    // Müşteri seçici sunucu taraflı aranır (searchCustomers); yalnız ?musteri= ön dolgusu
+    // tek kayıt olarak gelir. RLS tenant izolasyonunu korur.
     musteri
       ? supabase.from("customers").select("id, full_name").eq("id", musteri).is("deleted_at", null).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
-  const list = customers ?? [];
   const pre = preselected.data;
-  const options = pre && !list.some((c) => c.id === pre.id) ? [pre, ...list] : list;
+  const options = pre ? [pre] : [];
 
   return (
     <DemandForm

@@ -20,68 +20,45 @@ export default async function NewOfferPage({
   const prefillCustomerId = (params.musteri ?? "").trim() || null;
   const prefillPropertyId = (params.portfoy ?? "").trim() || null;
 
+  // Seçiciler sunucu taraflı aranır (searchOfferProperties / searchCustomers): ofis kaç
+  // kayıt tutarsa tutsun seçilebilir. Sayfa yalnız ön dolgudaki tek kaydı (.eq('id')) getirir.
   const supabase = await createClient();
-  const [{ data: propData }, { data: custData }] = await Promise.all([
-    supabase
-      .from("properties")
-      .select("id, property_code, title, list_price")
-      .is("deleted_at", null)
-      .in("status", ["live", "draft", "reserved"])
-      .order("created_at", { ascending: false })
-      .limit(200),
-    supabase
-      .from("customers")
-      .select("id, full_name")
-      .is("deleted_at", null)
-      .order("full_name", { ascending: true })
-      .limit(300),
+  const [{ data: preProp }, { data: preCust }] = await Promise.all([
+    prefillPropertyId
+      ? supabase
+          .from("properties")
+          .select("id, property_code, title, list_price")
+          .eq("id", prefillPropertyId)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    prefillCustomerId
+      ? supabase
+          .from("customers")
+          .select("id, full_name")
+          .eq("id", prefillCustomerId)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
-  const properties = (propData ?? []).map((p) => ({
-    id: p.id as string,
-    property_code: p.property_code as string,
-    title: p.title as string | null,
-    list_price: p.list_price as number | null,
-  }));
-  const customers = (custData ?? []).map((c) => ({
-    id: c.id as string,
-    full_name: c.full_name as string,
-  }));
-
-  // Seçici havuzları sınırlı: ön dolgu havuzun dışında kalırsa eksik kaydı ekle.
-  if (prefillPropertyId && !properties.some((p) => p.id === prefillPropertyId)) {
-    const { data: extra } = await supabase
-      .from("properties")
-      .select("id, property_code, title, list_price")
-      .eq("id", prefillPropertyId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (extra) {
-      properties.unshift({
-        id: extra.id as string,
-        property_code: extra.property_code as string,
-        title: extra.title as string | null,
-        list_price: extra.list_price as number | null,
-      });
-    }
-  }
-  if (prefillCustomerId && !customers.some((c) => c.id === prefillCustomerId)) {
-    const { data: extra } = await supabase
-      .from("customers")
-      .select("id, full_name")
-      .eq("id", prefillCustomerId)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (extra) customers.unshift({ id: extra.id as string, full_name: extra.full_name as string });
-  }
+  const prefillProperty = preProp
+    ? {
+        id: preProp.id as string,
+        property_code: preProp.property_code as string,
+        title: preProp.title as string | null,
+        list_price: preProp.list_price as number | null,
+      }
+    : null;
+  const prefillCustomer = preCust
+    ? { id: preCust.id as string, full_name: preCust.full_name as string }
+    : null;
 
   return (
     <NewOfferForm
       userId={userId}
-      properties={properties}
-      customers={customers}
-      defaultPropertyId={prefillPropertyId}
-      defaultCustomerId={prefillCustomerId}
+      prefillProperty={prefillProperty}
+      prefillCustomer={prefillCustomer}
       todayIso={new Date(now()).toISOString().slice(0, 10)}
     />
   );

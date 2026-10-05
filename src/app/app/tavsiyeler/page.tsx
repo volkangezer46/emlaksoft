@@ -28,7 +28,6 @@ import {
   ReferralNoteButton,
   ReferralStatusPills,
   SuggestedReferralButton,
-  type CustomerOption,
   type StaffOption,
 } from "./referral-actions";
 
@@ -139,7 +138,6 @@ export default async function ReferralsPage({
     { count: wonCount },
     { data: linkRows },
     { data: linkCountRows },
-    { data: customerRows },
     { data: staffRows },
     { data: promoterRows },
   ] = await Promise.all([
@@ -160,12 +158,7 @@ export default async function ReferralsPage({
       .order("created_at", { ascending: false })
       .limit(200),
     supabase.from("referrals").select("link_id").limit(5000),
-    supabase
-      .from("customers")
-      .select("id, full_name, phone")
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(300),
+    // Müşteri seçici sunucu taraflı aranır (ReferralLinkCreator → searchCustomers).
     supabase.from("profiles").select("id, full_name").eq("is_active", true).limit(200),
     // NPS entegrasyonu: destekleyenler (9-10) — linki olmayanlar önerilecek.
     supabase
@@ -193,7 +186,6 @@ export default async function ReferralsPage({
 
   const staff = ((staffRows ?? []) as StaffOption[]).slice();
   const staffById = new Map(staff.map((s) => [s.id, s.full_name]));
-  const customers = (customerRows ?? []) as CustomerOption[];
 
   // Linki olan müşteriler (aktif/pasif fark etmez) öneri listesinden düşer.
   const linkedCustomerIds = new Set(links.map((l) => l.customer_id));
@@ -465,7 +457,7 @@ export default async function ReferralsPage({
       {/* ---------------- Link üretimi ---------------- */}
       {canEdit ? (
         <section id="linkler" className="space-y-3">
-          <ReferralLinkCreator customers={customers} staff={staff} />
+          <ReferralLinkCreator staff={staff} />
 
           {promoters.length > 0 ? (
             <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 p-4">

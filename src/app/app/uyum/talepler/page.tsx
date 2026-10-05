@@ -43,7 +43,7 @@ export default async function KvkkRequestsPage({
   const canEdit = (perms.compliance ?? []).includes("edit");
   const supabase = await createClient();
 
-  const [reqRes, { data: customers }] = await Promise.all([
+  const [reqRes] = await Promise.all([
     supabase
       .from("kvkk_requests")
       .select(
@@ -51,7 +51,6 @@ export default async function KvkkRequestsPage({
       )
       .order("created_at", { ascending: false })
       .limit(200),
-    supabase.from("customers").select("id, full_name").is("deleted_at", null).order("full_name").limit(300),
   ]);
 
   const supported = !reqRes.error;
@@ -98,7 +97,7 @@ export default async function KvkkRequestsPage({
                 </div>
               </CardHeader>
               <CardContent>
-                <NewRequestForm customers={customers ?? []} canOfficeLevel={role === "owner" || role === "gm"} />
+                <NewRequestForm canOfficeLevel={role === "owner" || role === "gm"} />
               </CardContent>
             </Card>
           ) : null}

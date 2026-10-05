@@ -7,7 +7,9 @@ import {
   updateKvkkRequestStatus,
   type KvkkRequestResult,
 } from "@/app/actions/kvkk-requests";
+import { searchCustomers } from "@/app/actions/lookup";
 import { Alert } from "@/components/ui/alert";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import {
@@ -29,18 +31,17 @@ function Result({ state }: { state: KvkkRequestResult }) {
 }
 
 /** Yeni KVKK talebi (tam sayfa içi form; popup yok). Ofis düzeyi türler yalnız yetkili rolde listelenir. */
-export function NewRequestForm({
-  customers,
-  canOfficeLevel,
-}: {
-  customers: { id: string; full_name: string }[];
-  canOfficeLevel: boolean;
-}) {
+export function NewRequestForm({ canOfficeLevel }: { canOfficeLevel: boolean }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [type, setType] = useState<KvkkRequestType>("access");
+  // Başarıdan sonra Combobox seçimini sıfırlamak için anahtar (form.reset() onun durumunu silmez).
+  const [resetKey, setResetKey] = useState(0);
   const [state, action, pending] = useActionState(async (prev: KvkkRequestResult, fd: FormData) => {
     const res = await createKvkkRequest(prev, fd);
-    if (res.ok) formRef.current?.reset();
+    if (res.ok) {
+      formRef.current?.reset();
+      setResetKey((k) => k + 1);
+    }
     return res;
   }, initial);
   const officeType = (KVKK_OFFICE_TYPES as readonly string[]).includes(type);
@@ -68,13 +69,18 @@ export function NewRequestForm({
       </FormField>
       {!officeType ? (
         <>
-          <FormField label="Müşteri" htmlFor="kr-customer" hint="Kayıtlı müşteriyse seçin.">
-            <FormSelect id="kr-customer" name="customer_id" defaultValue="">
-              <option value="">Seçilmedi</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name}</option>
-              ))}
-            </FormSelect>
+          <FormField label="Müşteri" htmlFor="kr-customer" inject={false} hint="Kayıtlı müşteriyse seçin.">
+            <Combobox
+              key={resetKey}
+              id="kr-customer"
+              name="customer_id"
+              aria-label="Müşteri"
+              placeholder="Seçilmedi"
+              searchPlaceholder="Müşteri ara…"
+              emptyText="Eşleşen müşteri yok"
+              options={[]}
+              onSearch={searchCustomers}
+            />
           </FormField>
           <FormField label="Başvuru sahibi adı" htmlFor="kr-name" hint="Müşteri seçilmediyse zorunlu.">
             <FormInput id="kr-name" name="requester_name" maxLength={120} />

@@ -12,7 +12,9 @@ import {
   type DocRequestResult,
 } from "@/app/actions/document-requests";
 import { applyDocFieldsToProperty, type PropertyDocFields } from "@/app/actions/property-media";
+import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { Alert } from "@/components/ui/alert";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import {
@@ -28,15 +30,13 @@ const initial: DocRequestResult = {};
 
 /** Yeni evrak linki; üretilen link YALNIZ bir kez gösterilir ve panelde kopyalanır (SMS gönderilmez). */
 export function NewRequestForm({
-  customers,
-  properties,
-  defaultCustomerId,
-  defaultPropertyId,
+  prefillCustomer,
+  prefillProperty,
 }: {
-  customers: { id: string; full_name: string }[];
-  properties: { id: string; title: string | null }[];
-  defaultCustomerId: string;
-  defaultPropertyId: string;
+  /** ?musteri= ön dolgusu (tek kayıt); diğer müşteriler sunucu aramasıyla seçilir. */
+  prefillCustomer: { id: string; full_name: string } | null;
+  /** ?portfoy= ön dolgusu (tek kayıt). */
+  prefillProperty: { id: string; title: string | null; property_code?: string } | null;
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(async (prev: DocRequestResult, fd: FormData) => {
@@ -68,21 +68,35 @@ export function NewRequestForm({
             ))}
           </FormSelect>
         </FormField>
-        <FormField label="Müşteri" htmlFor="dr-customer" hint="Müşteri veya portföyden en az biri.">
-          <FormSelect id="dr-customer" name="customer_id" defaultValue={defaultCustomerId}>
-            <option value="">Seçilmedi</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.full_name}</option>
-            ))}
-          </FormSelect>
+        <FormField label="Müşteri" htmlFor="dr-customer" inject={false} hint="Müşteri veya portföyden en az biri.">
+          <Combobox
+            id="dr-customer"
+            name="customer_id"
+            aria-label="Müşteri"
+            placeholder="Seçilmedi"
+            searchPlaceholder="Müşteri ara…"
+            emptyText="Eşleşen müşteri yok"
+            defaultValue={prefillCustomer?.id ?? ""}
+            options={prefillCustomer ? [{ value: prefillCustomer.id, label: prefillCustomer.full_name }] : []}
+            onSearch={searchCustomers}
+          />
         </FormField>
-        <FormField label="Portföy" htmlFor="dr-property" hint="Tapu okuma önerisi için portföy seçin.">
-          <FormSelect id="dr-property" name="property_id" defaultValue={defaultPropertyId}>
-            <option value="">Seçilmedi</option>
-            {properties.map((p) => (
-              <option key={p.id} value={p.id}>{p.title ?? "Başlıksız portföy"}</option>
-            ))}
-          </FormSelect>
+        <FormField label="Portföy" htmlFor="dr-property" inject={false} hint="Tapu okuma önerisi için portföy seçin.">
+          <Combobox
+            id="dr-property"
+            name="property_id"
+            aria-label="Portföy"
+            placeholder="Seçilmedi"
+            searchPlaceholder="Kod ya da başlık ara…"
+            emptyText="Eşleşen portföy yok"
+            defaultValue={prefillProperty?.id ?? ""}
+            options={
+              prefillProperty
+                ? [{ value: prefillProperty.id, label: prefillProperty.title ?? "Başlıksız portföy", hint: prefillProperty.property_code }]
+                : []
+            }
+            onSearch={searchProperties}
+          />
         </FormField>
         <fieldset className="sm:col-span-2">
           <legend className="mb-2 text-sm font-semibold text-ink-950">İstenen evraklar</legend>
