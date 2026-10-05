@@ -22,6 +22,9 @@ const COPY: Record<DemoBannerVariant, { title: string; text: string }> = {
   },
 };
 
+/** Bantta tek tek adı yazılan kilitli sayfa sayısı; kalanı sayı olarak söylenir. */
+const LOCK_PREVIEW = 5;
+
 const keyOf = (variant: DemoBannerVariant) => `emlaksoft:demo-banner-dismissed:${variant}`;
 
 /** localStorage okuması try/catch içinde; kapalıysa bant gösterilir (kapatma yalnız bu oturumda geçerli). */
@@ -49,6 +52,7 @@ export function DemoModeBanner({
   total,
   canClear,
   trialDaysLeft = null,
+  lockedAfterTrial = [],
 }: {
   variant: DemoBannerVariant;
   rows: RealUseRow[];
@@ -56,6 +60,8 @@ export function DemoModeBanner({
   canClear: boolean;
   /** Deneme aboneliğinde kalan gün (sunucuda subscriptions.trial_ends_at'tan); deneme değilse null. */
   trialDaysLeft?: number | null;
+  /** Deneme sonrası paketinize göre kilitlenecek sayfalar (page-gates.ts'ten sunucuda üretilir). */
+  lockedAfterTrial?: { title: string; href: string }[];
 }) {
   const [sessionHidden, setSessionHidden] = useState(false);
   const dismissed = useSyncExternalStore(
@@ -94,6 +100,23 @@ export function DemoModeBanner({
                 {trialDaysLeft > 0 ? `Denemenizin bitmesine ${trialDaysLeft} gün kaldı.` : "Deneme süreniz doldu."}{" "}
                 <Link href="/app/abonelik" className="underline underline-offset-2 hover:no-underline">
                   Ücretli plana geç
+                </Link>
+              </p>
+            ) : null}
+            {trialDaysLeft != null && lockedAfterTrial.length > 0 ? (
+              <p className="mt-1 text-xs leading-relaxed text-amber-900/90">
+                Denemeden sonra paketinize göre kilitlenecek sayfalar:{" "}
+                {lockedAfterTrial.slice(0, LOCK_PREVIEW).map((g, i) => (
+                  <span key={g.href}>
+                    {i > 0 ? ", " : ""}
+                    <Link href={g.href} className="underline underline-offset-2 hover:no-underline">
+                      {g.title}
+                    </Link>
+                  </span>
+                ))}
+                {lockedAfterTrial.length > LOCK_PREVIEW ? ` ve ${lockedAfterTrial.length - LOCK_PREVIEW} sayfa daha` : ""}.{" "}
+                <Link href="/app/abonelik" className="font-semibold underline underline-offset-2 hover:no-underline">
+                  Paketleri karşılaştır
                 </Link>
               </p>
             ) : null}

@@ -111,6 +111,16 @@ export function lockedGate(path: string, ctx: GateContext): PlanGate | null {
   return planRank(plan) >= planRank(gate.minPlan) ? null : gate;
 }
 
+/**
+ * Deneme bittiğinde bu paket/tenant için kilitlenecek sayfalar (PLAN_GATES'ten üretilir, sabit liste yok).
+ * Kilit hiç uygulanmayan tenant'ta (kesim tarihinden eski) boş döner.
+ */
+export function gatesLockedAfterTrial(ctx: { plan: string | null | undefined; tenantCreatedAt: string | null | undefined }): PlanGate[] {
+  if (!planGatingApplies({ plan: ctx.plan, trial: false, tenantCreatedAt: ctx.tenantCreatedAt })) return [];
+  const rank = planRank(normalizePlanId(ctx.plan, "office"));
+  return PLAN_GATES.filter((g) => rank < planRank(g.minPlan));
+}
+
 /** Menüde kilit simgesi göstermek için kilitli yolların listesi. */
 export function lockedHrefs(ctx: GateContext): string[] {
   if (!planGatingApplies(ctx)) return [];

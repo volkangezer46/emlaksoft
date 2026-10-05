@@ -14,6 +14,7 @@ import {
   type OnboardingStepId,
   type WizardStepKey,
 } from "@/lib/onboarding-checklist";
+import { OWNER_REQUIRED_SUMMARY } from "@/lib/help-content";
 import { OfficeStep } from "./office-step";
 import type { GeoOption } from "@/lib/geo/types";
 import { TeamStep } from "./team-step";
@@ -188,6 +189,40 @@ function StepBody(props: SetupWizardProps & { id: OnboardingStepId; done: boolea
           <p className="text-sm text-text-muted">
             Şu an <strong className="text-text">{props.properties}</strong> portföyünüz var. Başlık, fiyat ve konum yeterli; fotoğraf ve ayrıntıları sonra ekleyebilirsiniz.
           </p>
+          <div className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.06] p-4">
+            <p className="text-sm font-semibold text-ink-950">İlanın taslak kalmaması için 8 bilgi gerekir</p>
+            <p className="mt-1 text-xs text-text-muted">
+              Kayıt her zaman açılır; ancak aşağıdakilerden biri eksikse ilan yayına alınamaz ve taslak kalır.
+            </p>
+            <ul className="mt-2 grid list-disc gap-x-6 gap-y-0.5 pl-5 text-sm text-text sm:grid-cols-2">
+              {OWNER_REQUIRED_SUMMARY.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+            <Link href="/app/yardim?sekme=rehberler#portfoy-ekle" className="focus-ring mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 hover:underline">
+              Ayrıntılı rehber
+            </Link>
+          </div>
+        </div>
+      );
+    case "demand":
+      return (
+        <div className="space-y-3">
+          <ButtonLink href="/app/talepler/yeni" iconRight={ArrowRight}>
+            İlk talebi ekle
+          </ButtonLink>
+          <p className="text-sm text-text-muted">
+            Satılık/kiralık, tür, bütçe ve bölgeyi girin; Talepler sayfasındaki Eşleşme sekmesi uygun portföyleri puanlar.
+          </p>
+        </div>
+      );
+    case "appointment":
+      return (
+        <div className="space-y-3">
+          <ButtonLink href="/app/randevular/yeni" iconRight={ArrowRight}>
+            İlk randevuyu planla
+          </ButtonLink>
+          <p className="text-sm text-text-muted">Randevu türü, tarih ve saat yeterlidir; müşteri ve portföyü isterseniz ekleyin.</p>
         </div>
       );
     case "defs":

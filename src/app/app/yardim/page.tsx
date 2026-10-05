@@ -4,9 +4,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { requireModulePage } from "@/lib/require-module-page";
-import { FIRST_30_INTRO, GLOSSARY, GUIDES, HELP_TABS, resolveHelpTab, type HelpTab } from "@/lib/help-content";
+import { FIRST_30_INTRO, GLOSSARY, HELP_TABS, resolveHelpTab, type HelpTab } from "@/lib/help-content";
 import { loadOnboardingState, type HomeCtx } from "../_home/data";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
+import { FaqSearch, GuidesSearch } from "./help-search";
 
 export const metadata = { title: "Yardım ve Destek" };
 
@@ -22,9 +23,11 @@ function tabHref(tab: HelpTab) {
  * gelir (src/lib/help-content.ts); "Destek talepleri" sekmesi mevcut /app/destek
  * sayfasıdır, formu değişmemiştir.
  */
-export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
+export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string }> }) {
   const { tenantId } = await requireModulePage("support");
-  const tab = resolveHelpTab((await searchParams)?.sekme);
+  const sp = await searchParams;
+  const tab = resolveHelpTab(sp?.sekme);
+  const q = (sp?.q ?? "").slice(0, 100);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
@@ -54,7 +57,8 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
 
       {tab === "baslangic" ? <TourPicker /> : null}
       {tab === "baslangic" ? <StartTab tenantId={tenantId} /> : null}
-      {tab === "rehberler" ? <GuidesTab /> : null}
+      {tab === "rehberler" ? <GuidesSearch initialQ={q} /> : null}
+      {tab === "sss" ? <FaqSearch initialQ={q} /> : null}
       {tab === "sozluk" ? <GlossaryTab /> : null}
       {tab === "destek" ? <SupportTab /> : null}
     </div>
@@ -119,41 +123,6 @@ async function StartTab({ tenantId }: { tenantId: string | null }) {
           Ofis kurulumunu aç
         </ButtonLink>
       </div>
-    </section>
-  );
-}
-
-function GuidesTab() {
-  return (
-    <section aria-label="Rehberler" className="space-y-4">
-      <ul className="flex flex-wrap gap-2" aria-label="Rehber listesi">
-        {GUIDES.map((g) => (
-          <li key={g.slug}>
-            <a
-              href={`#${g.slug}`}
-              className="focus-ring inline-flex min-h-11 items-center rounded-full border border-line bg-surface px-4 text-sm font-semibold text-text-muted transition hover:border-brand-300 hover:text-ink-950"
-            >
-              {g.title}
-            </a>
-          </li>
-        ))}
-      </ul>
-      {GUIDES.map((g) => (
-        <article key={g.slug} id={g.slug} className={`${PANEL} scroll-mt-24`}>
-          <h2 className="font-display text-lg font-bold text-ink-950">{g.title}</h2>
-          <p className="mt-1 text-sm text-text-muted">{g.intro}</p>
-          <ol className="mt-4 list-decimal space-y-2 pl-5 text-base leading-relaxed text-text marker:font-bold marker:text-brand-600">
-            {g.steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ol>
-          <div className="mt-5">
-            <ButtonLink href={g.href} iconRight={ArrowRight}>
-              Şimdi dene: {g.cta}
-            </ButtonLink>
-          </div>
-        </article>
-      ))}
     </section>
   );
 }

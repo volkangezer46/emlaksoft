@@ -5,6 +5,7 @@ import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
 import { readTryOverview } from "@/lib/try-credits/reader";
 import { readMyDashboard } from "@/lib/growth/engine";
 import { OrnekVeriYenile } from "./ornek-veri-yenile";
+import { gatesLockedAfterTrial } from "@/lib/billing/page-gates";
 import { DemoModeBanner } from "@/components/app/demo-mode-banner";
 import { createClient } from "@/lib/supabase/server";
 import { loadSampleStatus } from "@/lib/sample-status";
@@ -68,6 +69,8 @@ export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
     .select("status, trial_ends_at")
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
+  // Deneme bandı: deneme sonrası kilitlenecek sayfalar PLAN_GATES'ten üretilir (planı okunamazsa liste gösterilmez).
+  const { data: tenantPlan } = await supabase.from("tenants").select("plan, created_at").eq("id", ctx.tenantId).maybeSingle();
   const trialDaysLeft =
     sub?.status === "trialing" && sub.trial_ends_at
       ? Math.max(0, Math.ceil(msUntil(new Date(sub.trial_ends_at)) / DAY_MS))
@@ -75,6 +78,14 @@ export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
   return (
     <DemoModeBanner
       trialDaysLeft={trialDaysLeft}
+      lockedAfterTrial={
+        trialDaysLeft != null && tenantPlan
+          ? gatesLockedAfterTrial({ plan: tenantPlan.plan as string | null, tenantCreatedAt: tenantPlan.created_at as string | null }).map((g) => ({
+              title: g.title,
+              href: g.href,
+            }))
+          : []
+      }
       variant={status.variant}
       rows={status.rows.map((r) => ({ label: r.label, count: r.count }))}
       total={status.total}

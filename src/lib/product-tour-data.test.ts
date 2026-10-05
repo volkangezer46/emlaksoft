@@ -52,6 +52,17 @@ describe("ürün turları veri sözleşmesi", () => {
     expect(resolveTourSteps("ofis-sahibi", { accessible: [], closed: [] }).map((s) => s.path)).toEqual(["/app"]);
   });
 
+  it("muhasebe rolünün özel turu: komisyon ve abonelik adımları, yetkisi olanlara kalır", () => {
+    expect(tourIdForRole("accounting")).toBe("muhasebe");
+    const accessible: AppModule[] = ["dashboard", "customers", "commissions", "billing", "reports", "support"];
+    const paths = resolveTourSteps("muhasebe", { accessible, closed: [], role: "accounting" }).map((s) => s.path);
+    expect(paths).toEqual(["/app", "/app/komisyon", "/app/cuzdan", "/app/abonelik"]);
+    expect(paths).not.toContain("/app/giderler");
+    // Abonelik yetkisi yoksa o adım elenir.
+    const noBilling = resolveTourSteps("muhasebe", { accessible: accessible.filter((m) => m !== "billing"), closed: [] }).map((s) => s.path);
+    expect(noBilling).not.toContain("/app/abonelik");
+  });
+
   it("rol -> tur eşlemesi; bilinmeyen rol danışman turu alır", () => {
     expect(tourIdForRole("owner")).toBe("ofis-sahibi");
     expect(tourIdForRole("gm")).toBe("yonetici");

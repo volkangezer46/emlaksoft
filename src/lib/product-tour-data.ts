@@ -13,7 +13,7 @@ import type { AppModule } from "@/lib/permissions";
  * Seçiciler sıralı denenir: önce özel `data-tour` işareti, yoksa sayfa başlığı (`#main-content h1`).
  */
 
-export type TourId = "ofis-sahibi" | "yonetici" | "danisman";
+export type TourId = "ofis-sahibi" | "yonetici" | "muhasebe" | "danisman";
 
 export type TourStepDef = {
   /** Adımın sayfası (`/app` = ana ekran). Menüde yoksa (çekirdek `/app` hariç) adım elenir. */
@@ -53,7 +53,7 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/baslangic",
         selectors: ['[data-tour="kurulum"]', H1],
         title: "Ofis kurulumu",
-        desc: "Altı kısa adımda ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın. Örnek veriyle başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
+        desc: "Sekiz kısa adımda ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın. Örnek veriyle başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
       },
       {
         path: "/app/ekip",
@@ -132,10 +132,42 @@ export const TOURS: readonly TourDef[] = [
     ],
   },
   {
+    id: "muhasebe",
+    label: "Muhasebe turu",
+    description: "Komisyon defterini, kazançları ve EmlakSoft aboneliği ile faturalarını tanıyın.",
+    roles: ["accounting"],
+    steps: [
+      {
+        path: "/app",
+        selectors: ['[data-tour="kpi"]', '[data-tour="brifing"]'],
+        title: "Ana ekran",
+        desc: "Ofisin güncel rakamları burada. Bir rakama dokunursanız o kayıtların listesi açılır.",
+      },
+      {
+        path: "/app/komisyon",
+        selectors: [H1],
+        title: "Komisyon defteri",
+        desc: "Kazanılan anlaşmaların komisyonu, danışman ve ofis payı, tahsilat durumu burada. \"Dışa aktar\" ile listeyi CSV olarak indirirsiniz.",
+      },
+      {
+        path: "/app/cuzdan",
+        selectors: [H1],
+        title: "Kazanç",
+        desc: "Danışman ve ofis kazançları; hakediş ve tahsilat takibi tek yerde.",
+      },
+      {
+        path: "/app/abonelik",
+        selectors: [H1],
+        title: "Abonelik ve faturalar",
+        desc: "Paketiniz, kontör bakiyesi ve kayıtlı kartlar burada. Faturalar sekmesinde EmlakSoft faturalarınızı görür ve yazdırırsınız. Giderler sayfası için ofis sahibinin size \"expenses\" izni vermesi gerekir.",
+      },
+    ],
+  },
+  {
     id: "danisman",
     label: "Danışman turu",
     description: "Müşteri, talep, randevu ve ilanlarla günlük işinizi öğrenin.",
-    roles: ["advisor", "call_center", "accounting", "readonly"],
+    roles: ["advisor", "call_center", "readonly"],
     steps: [
       {
         path: "/app",
