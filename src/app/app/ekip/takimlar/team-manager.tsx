@@ -7,6 +7,7 @@ import { createTeam, deleteTeam, setMemberTeam, updateTeam } from "@/app/actions
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { ROLE_LABELS } from "@/lib/role-labels";
 
 export type TeamRow = { id: string; name: string; branchId: string | null; leadUserId: string | null; isActive: boolean; memberCount: number };
 export type MemberRow = { id: string; name: string; roleLabel: string; branchId: string | null; teamId: string | null };
@@ -18,7 +19,7 @@ function Fields({ idPrefix, team, members, branches }: { idPrefix: string; team?
       <FormField label="Takım adı" htmlFor={`${idPrefix}-name`} required>
         <FormInput id={`${idPrefix}-name`} name="name" required maxLength={80} defaultValue={team?.name ?? ""} placeholder="Örn. Kuzey Ekibi" />
       </FormField>
-      <FormField label="Takım lideri" htmlFor={`${idPrefix}-lead`} hint="Portal uyarıları 4 saat sonra bu kişiye yükselir.">
+      <FormField label={ROLE_LABELS.team_lead} htmlFor={`${idPrefix}-lead`} hint="Portal uyarıları 4 saat sonra bu kişiye yükselir.">
         <FormSelect id={`${idPrefix}-lead`} name="lead_user_id" defaultValue={team?.leadUserId ?? ""}>
           <option value="">Atanmadı</option>
           {members.map((m) => (

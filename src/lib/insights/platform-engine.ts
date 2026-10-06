@@ -129,9 +129,9 @@ export async function runPlatformInsightEngine(admin: SupabaseClient, opts: { no
 
   const rows = drafts.flatMap((d) => {
     const pr = computePriority({ severity: d.severity, urgencyDays: d.urgencyDays, impact: d.impact });
-    const module = platformInsightModule(d.kind);
+    const insightModule = platformInsightModule(d.kind);
     return staff
-      .filter((s) => platformCanAccess(s.role, module))
+      .filter((s) => platformCanAccess(s.role, insightModule))
       .map((s) => ({
         staff_id: s.id,
         tenant_id: d.tenantId,

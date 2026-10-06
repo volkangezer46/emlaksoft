@@ -3,7 +3,7 @@ import { FAQ, FAQ_PRICE_PATTERN, type FaqItem } from "@/lib/help-faq";
 /**
  * AI asistanına ürün kullanım bilgisi (SSS) besleme — SAF seçici. Ağ/AI çağrısı YOKTUR: seçilen kayıtlar yalnız
  * mevcut asistan çağrısına (src/lib/ai/openai-client.ts üzerinden; kişisel veri redact.ts ile maskelenir) sistem bağlamı
- * olarak eklenir. Doğrudan api.openai.com çağrısı yazılmaz.
+ * olarak eklenir. Ağ çağrısı burada yazılmaz.
  *
  * Dürüstlük: soruyla ilgili SSS kaydı bulunamazsa HİÇBİR şey eklenmez (uydurma yönlendirme yok). Fiyat/tutar içeren
  * kayıt asla beslenmez (güncel fiyat sayfada; FAQ_PRICE_PATTERN).
