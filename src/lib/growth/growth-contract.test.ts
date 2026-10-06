@@ -57,6 +57,6 @@ describe("büyüme sözleşmesi", () => {
 
   it("tek menü girişi ve admin yan menü satırı vardır", () => {
     expect(read("src/lib/nav-config.ts")).toContain('href: "/app/buyume"');
-    expect(read("src/components/admin/admin-sidebar.tsx")).toContain('href: "/admin/growth"');
+    expect(read("src/lib/admin/nav.ts")).toContain('href: "/admin/growth"');
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "@/lib/platform-setting-keys";
 import { TRY_DEFAULT_MAX_SHARE, TRY_MAX_SHARE_SETTING_KEY } from "@/lib/try-credits/constants";
 import { parseMaxShare } from "@/lib/try-credits/config";
+import { DEFAULT_LEAD_FORM_COPY } from "@/lib/legal-copy";
 import type { AnySettingDef } from "../types";
 import { defineBool, defineEnum, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
 
@@ -20,11 +21,16 @@ import { defineBool, defineEnum, defineInt, defineJson, defineNumber, defineSecr
 
 const SUPER = { platformModule: "sistem", superAdminOnly: true } as const;
 
+/** Konuya ait ayarların düzenlendiği bölüm sayfaları (merkez bunları bağlantı olarak gösterir). */
+export const SYSTEM_HOME = { href: "/admin/sistem#ayarlar", label: "Sistem > Kayıt ve bakım" } as const;
+export const BILLING_HOME = { href: "/admin/billing#ayarlar", label: "Abonelik & fatura > Ayarlar" } as const;
+
 export const PORTAL_NAMES = ["sahibinden", "hepsiemlak", "zingat", "emlakjet"] as const;
 
 const general: AnySettingDef[] = [
   defineBool({
     key: "platform.maintenance_mode",
+    home: SYSTEM_HOME,
     storageKey: PLATFORM_SETTING_KEYS.maintenanceMode,
     legacyKeys: ["maintenance_mode"],
     default: false,
@@ -38,6 +44,7 @@ const general: AnySettingDef[] = [
   }),
   defineString({
     key: "platform.maintenance_message",
+    home: SYSTEM_HOME,
     storageKey: PLATFORM_SETTING_KEYS.maintenanceMessage,
     legacyKeys: ["maintenance_message"],
     default: "",
@@ -51,6 +58,7 @@ const general: AnySettingDef[] = [
   }),
   defineBool({
     key: "platform.registration_open",
+    home: SYSTEM_HOME,
     storageKey: PLATFORM_SETTING_KEYS.registrationOpen,
     legacyKeys: ["registration_open"],
     default: true,
@@ -63,6 +71,7 @@ const general: AnySettingDef[] = [
   }),
   defineInt({
     key: "billing.default_trial_days",
+    home: BILLING_HOME,
     storageKey: PLATFORM_SETTING_KEYS.defaultTrialDays,
     legacyKeys: ["default_trial_days"],
     default: DEFAULT_TRIAL_DAYS,
@@ -76,6 +85,7 @@ const general: AnySettingDef[] = [
   }),
   defineInt({
     key: "billing.trial_grace_days",
+    home: BILLING_HOME,
     storageKey: PLATFORM_SETTING_KEYS.trialGraceDays,
     default: DEFAULT_TRIAL_GRACE_DAYS,
     min: MIN_TRIAL_GRACE_DAYS,
@@ -89,6 +99,7 @@ const general: AnySettingDef[] = [
   }),
   defineBool({
     key: "billing.auto_renew_enabled",
+    home: BILLING_HOME,
     default: false,
     truthy: "true-false",
     category: "faturalama",
@@ -99,6 +110,7 @@ const general: AnySettingDef[] = [
   }),
   defineNumber({
     key: "try_credit.max_invoice_share",
+    home: BILLING_HOME,
     storageKey: TRY_MAX_SHARE_SETTING_KEY,
     default: TRY_DEFAULT_MAX_SHARE,
     min: 0.0001,
@@ -351,9 +363,57 @@ const portals: AnySettingDef[] = PORTAL_NAMES.flatMap((p) => [
   }),
 ]);
 
+/**
+ * Yasal metinler (başvuru formu onay/aydınlatma/pazarlama). Varsayılan = legal-copy.ts sabitleri (davranış değişmez);
+ * değişiklik rıza kanıtı sürümüne metin izi olarak yansır (buildLeadConsentVersion). Metin sorumluluğu ofis/şirket sahibindedir.
+ */
+export const LEGAL_HOME = { href: "/admin/ayarlar/yasal", label: "Ayarlar > Yasal metinler" } as const;
+const legal: AnySettingDef[] = [
+  defineString({
+    key: "legal.lead_consent_text",
+    home: LEGAL_HOME,
+    default: DEFAULT_LEAD_FORM_COPY.consent,
+    maxLength: 300,
+    minLength: 10,
+    multiline: true,
+    category: "uyum",
+    label: "Başvuru formu zorunlu onay metni",
+    description: "Ofis başvuru formundaki (/lead/...) zorunlu kişisel veri onay kutusunun metni.",
+    impact: "Yeni başvurularda gösterilir; rıza kanıtındaki sürüm metnin iziyle değişir. Eski kanıtlar etkilenmez.",
+    risk: "high",
+  }),
+  defineString({
+    key: "legal.lead_notice_text",
+    home: LEGAL_HOME,
+    default: DEFAULT_LEAD_FORM_COPY.notice,
+    maxLength: 300,
+    minLength: 10,
+    multiline: true,
+    category: "uyum",
+    label: "Başvuru formu aydınlatma satırı",
+    description: "Onay kutusunun üstündeki, aydınlatma metnine yönlendiren bilgi satırı.",
+    impact: "Yeni başvurularda gösterilir; rıza kanıtındaki sürüm metnin iziyle değişir.",
+    risk: "high",
+  }),
+  defineString({
+    key: "legal.lead_marketing_text",
+    home: LEGAL_HOME,
+    default: DEFAULT_LEAD_FORM_COPY.marketing,
+    maxLength: 300,
+    minLength: 10,
+    multiline: true,
+    category: "uyum",
+    label: "Başvuru formu isteğe bağlı pazarlama izni metni",
+    description: "Ayrı, varsayılan işaretsiz pazarlama izni kutusunun metni.",
+    impact: "Yeni başvurularda gösterilir; izin kanıtı ayrı sürüm ekiyle saklanır.",
+    risk: "high",
+  }),
+];
+
 export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...general,
   ...security,
+  ...legal,
   ...growth,
   ...bridges,
   ...integrations,

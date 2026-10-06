@@ -27,8 +27,8 @@ export default async function AdminTufePage() {
         </p>
       ) : null}
       <TufeForm initial={table} canEdit={staff.role === "super_admin"} />
-      <Link href="/admin/ayarlar" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
-        <ArrowLeft className="h-3 w-3" /> Genel ayarlara dön
+      <Link href="/admin/ayarlar/merkez" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+        <ArrowLeft className="h-3 w-3" /> Ayar merkezine dön
       </Link>
     </div>
   );

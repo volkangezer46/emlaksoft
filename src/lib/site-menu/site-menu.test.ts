@@ -372,7 +372,7 @@ describe("sözleşme: yetki, kayıt ve önbellek", () => {
     expect(platformCanAccess("ops", "sitemenu")).toBe(true);
     expect(platformCanAccess("support", "sitemenu")).toBe(false);
     expect(platformCanAccess("billing", "sitemenu")).toBe(false);
-    expect(read("src/components/admin/admin-sidebar.tsx")).toContain('module: "sitemenu"');
+    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/site-menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"])');
   });
 
   it("yayın medya rotası SVG'yi sandbox/nosniff ile sunar ve Range destekler", () => {

@@ -4,6 +4,7 @@ import { ChevronRight, ShieldAlert } from "lucide-react";
 import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
@@ -71,9 +72,9 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <ThemeController />
       <FontScaleBoot scale={fontScale} />
       <SidebarBoot />
-      <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} health={health} />
+      <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} fontScale={fontScale} />
+        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} fontScale={fontScale} health={health} />
         {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
         <main
@@ -94,6 +95,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
               ) : null}
             </div>
           ) : null}
+          <AdminSectionTabs modules={modules} />
           {children}
         </main>
       </div>

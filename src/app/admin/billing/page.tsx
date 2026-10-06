@@ -15,6 +15,7 @@ import { AreaChart } from "@/components/ui/viz";
 import { StackedBar } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { BillingNav } from "./billing-nav";
+import { RegistrySettings } from "@/components/settings/registry-settings";
 import { CaptureActions } from "./capture-actions";
 
 const subStatus: Record<string, string> = {
@@ -567,6 +568,14 @@ export default async function AdminBillingPage({
           />
         </div>
       </section>
+
+      {/* Deneme ve yenileme ayarları: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
+      <RegistrySettings
+        title="Ayarlar"
+        description="Deneme süresi, deneme sonrası tolerans, otomatik yenileme ve TL kredinin fatura payı. Fiyatlar Plan editöründedir."
+        keys={["billing.default_trial_days", "billing.trial_grace_days", "billing.auto_renew_enabled", "try_credit.max_invoice_share"]}
+        canEdit={staff.role === "super_admin"}
+      />
     </div>
   );
 }

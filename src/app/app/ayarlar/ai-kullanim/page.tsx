@@ -81,7 +81,7 @@ export default async function AiUsagePage() {
           title={`Aylık AI kredinizin %${ai.percent} kadarını kullandınız`}
           action={<ButtonLink href="/app/paket" iconRight={ArrowRight}>Paketi incele</ButtonLink>}
         >
-          Kalan {fmt(ai.remaining ?? 0)} kredi. Kredi bitse bile özellikler kapanmaz; ek kredi satın alma seçeneği yakında burada olacak.
+          Kalan {fmt(ai.remaining ?? 0)} kredi. Kredi bitse bile özellikler kapanmaz; daha yüksek aylık kredi için paketinizi inceleyin.
         </Alert>
       ) : null}
       {ai.state === "over" ? (
@@ -90,7 +90,7 @@ export default async function AiUsagePage() {
           title="Aylık AI krediniz doldu"
           action={<ButtonLink href="/app/paket" iconRight={ArrowRight}>Paketi incele</ButtonLink>}
         >
-          Çalışmanız kesilmez; kullanım kayda geçmeye devam eder. Ek kredi satın alma (yakında) ve paket yükseltme için paket sayfasına bakın.
+          Çalışmanız kesilmez; kullanım kayda geçmeye devam eder. Daha yüksek aylık kredi için paket sayfasından yükseltme yapabilirsiniz.
         </Alert>
       ) : null}
       {u.valuation.state === "over" ? (

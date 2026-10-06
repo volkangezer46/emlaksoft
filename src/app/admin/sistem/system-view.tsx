@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { RegistrySettings } from "@/components/settings/registry-settings";
 import { geoRowCount } from "@/lib/geo/reader";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { probeSchema } from "./schema-checks";
@@ -493,6 +494,14 @@ export async function SystemView() {
           <code className="rounded bg-canvas px-1">npx tsx scripts/check-schema.ts</code>.
         </p>
       </section>
+
+      {/* Kayıt ve bakım: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
+      <RegistrySettings
+        title="Kayıt ve bakım"
+        description="Yeni ofis kaydı ve bakım modu. Değişiklikler doğrulanır, gerekçesiyle geçmişe yazılır ve geri alınabilir."
+        keys={["platform.registration_open", "platform.maintenance_mode", "platform.maintenance_message"]}
+        canEdit={staff.role === "super_admin"}
+      />
 
       {/* Yapay zeka anahtarı */}
       <OpenAiKeyForm

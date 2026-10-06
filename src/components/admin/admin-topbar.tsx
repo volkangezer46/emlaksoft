@@ -12,7 +12,6 @@ import { now } from "@/lib/clock";
 import {
   Building2,
   CreditCard,
-  Handshake,
   LifeBuoy,
   MapPin,
   Plus,
@@ -21,24 +20,12 @@ import {
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 import type { FontScale } from "@/lib/font-scale";
-
-const CRUMB: Record<string, string> = {
-  admin: "Kontrol paneli",
-  satis: "Demo & aday",
-  tenants: "Ofisler",
-  members: "Üyeler",
-  billing: "Abonelik & fatura",
-  tickets: "Destek talepleri",
-  geo: "Coğrafya",
-  sistem: "Sistem sağlığı",
-  aktivite: "Aktivite kaydı",
-  raporlar: "Raporlar",
-  danisman: "Yapay zeka iş danışmanı",
-  bildirimler: "Bildirimler",
-};
+import type { AdminHealth } from "@/lib/admin-badges";
+import { activeAdminItem } from "@/lib/admin/nav";
+import { SystemStatusChip } from "@/components/admin/system-status-chip";
 
 const QUICK: { label: string; href: string; icon: typeof Building2; module: PlatformModule }[] = [
-  { label: "Demo & aday", href: "/admin/satis", icon: Handshake, module: "sales" },
+  { label: "Yeni ofis aç", href: "/admin/tenants/yeni", icon: Plus, module: "sales" },
   { label: "Ofisler", href: "/admin/tenants", icon: Building2, module: "tenants" },
   { label: "Abonelik & fatura", href: "/admin/billing", icon: CreditCard, module: "billing" },
   { label: "Destek talepleri", href: "/admin/tickets", icon: LifeBuoy, module: "tickets" },
@@ -52,11 +39,14 @@ export function AdminTopbar({
   staffName,
   modules,
   fontScale,
+  health = null,
 }: {
   roleLabel: string;
   staffName: string;
   modules: PlatformModule[];
   fontScale?: FontScale;
+  /** Gerçek sağlık ölçümü (yalnız "sistem" modülü görenlere); yoksa çip çizilmez. */
+  health?: AdminHealth | null;
 }) {
   const pathname = usePathname();
   const [clock, setClock] = useState("");
@@ -86,9 +76,8 @@ export function AdminTopbar({
     };
   }, []);
 
-  const seg = pathname.split("/").filter(Boolean);
-  const current = seg.length <= 1 ? "admin" : seg[1]!;
-  const title = CRUMB[current] ?? "Platform";
+  // Başlık menü tek kaynağından (src/lib/admin/nav.ts); menü dışı sayfa "Platform".
+  const title = activeAdminItem(pathname)?.label ?? (pathname.startsWith("/admin/bildirimler") ? "Bildirimler" : pathname.startsWith("/admin/hesabim") ? "Hesabım" : "Platform");
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
@@ -143,6 +132,8 @@ export function AdminTopbar({
         <span className="hidden h-10 items-center gap-2 rounded-full bg-mint-500/10 px-3 text-sm font-bold tabular-nums text-mint-700 lg:inline-flex" aria-label={clock ? `Saat ${clock}` : undefined}>
           <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" aria-hidden /> {clock}
         </span>
+
+        {health ? <SystemStatusChip health={health} /> : null}
 
         <ThemeToggle />
 

@@ -6,6 +6,7 @@ import { provinceOptionsResult } from "@/lib/geo/reader";
 
 export const revalidate = 60;
 import { LeadForm } from "./lead-form";
+import { getLeadFormCopy } from "@/lib/legal-copy-server";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const closed = tenant.lead_capture_enabled === false;
+  // Onay/aydınlatma/pazarlama metinleri yönetimden (yoksa legal-copy.ts); rıza kanıtı sürümü aynı metinden türetilir.
+  const copy = await getLeadFormCopy();
 
   return (
     <div className="min-h-screen bg-[image:var(--grad-ink)] px-4 py-10 text-white sm:py-16">
@@ -69,7 +72,7 @@ export default async function PublicLeadPage({ params }: { params: Promise<{ tok
               Bu form şu anda kapalı. Lütfen daha sonra tekrar deneyin.
             </p>
           ) : (
-            <LeadForm token={token} provinces={provinces ?? []} vitrinSlug={tenant.slug ?? null} />
+            <LeadForm token={token} provinces={provinces ?? []} vitrinSlug={tenant.slug ?? null} copy={copy} />
           )}
         </div>
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Building2, CreditCard, Handshake, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowUpRight, Building2, CreditCard, Hourglass, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { buildAdvisorContext, isAiConfigured } from "@/lib/ai-advisor";
 import { AdvisorChat } from "./advisor-chat-lazy";
@@ -13,7 +13,7 @@ export default async function AdvisorPage() {
   const kpis = [
     { label: "Aylık gelir", value: money(ctx.mrr), icon: TrendingUp, tone: "text-mint-400", href: "/admin/billing" },
     { label: "Aktif ofis", value: String(ctx.tenantsActive), icon: Building2, tone: "text-brand-400", href: "/admin/tenants" },
-    { label: "Yeni aday", value: String(ctx.newDemos), icon: Handshake, tone: "text-cyan-400", href: "/admin/satis?durum=new" },
+    { label: "Denemesi bitiyor", value: String(ctx.trialsEndingSoon), icon: Hourglass, tone: "text-cyan-400", href: "/admin/tenants?deneme=bitiyor" },
     { label: "Açık talep", value: String(ctx.openTickets), icon: LifeBuoy, tone: "text-amber-400", href: "/admin/tickets" },
   ];
 

@@ -91,7 +91,7 @@ export default async function AdminNotificationsPage({
         description={
           unread > 0
             ? `${unread} okunmamış bildirim bekliyor — kart üzerinden filtreleyebilirsiniz.`
-            : "Tüm bildirimler okundu. Yeni demo talepleri ve sistem uyarıları burada belirir."
+            : "Tüm bildirimler okundu. Abonelik, deneme ve sistem uyarıları burada belirir."
         }
         glow="brand"
         actions={
@@ -183,7 +183,7 @@ export default async function AdminNotificationsPage({
             description={
               filtered
                 ? "Filtreyi temizleyip tüm bildirimlere bakabilirsiniz."
-                : "Yeni demo talepleri, abonelik uyarıları ve sistem mesajları burada görünür."
+                : "Abonelik ve deneme uyarıları ile sistem mesajları burada görünür."
             }
             action={
               filtered ? (

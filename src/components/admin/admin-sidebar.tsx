@@ -4,145 +4,27 @@ import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  Building2,
-  ChevronDown,
-  CreditCard,
-  Crown,
-  ExternalLink,
-  Globe,
-  Handshake,
-  LayoutDashboard,
-  LifeBuoy,
-  MapPin,
-  Megaphone,
-  Menu,
-  Radar,
-  Receipt,
-  SearchCheck,
-  Palette,
-  PanelTop,
-  FileText,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  Sprout,
-  Users,
-  X,
-} from "lucide-react";
-import {
-  platformModulesFor,
-  type PlatformModule,
-  type PlatformRole,
-} from "@/lib/platform-access";
-import type { AdminHealth } from "@/lib/admin-badges";
+import { ChevronDown, ExternalLink, Globe, Menu, X, Crown } from "lucide-react";
+import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
+import { adminNavFor, isAdminNavActive, type AdminNavItem } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
-import { formatTrTime } from "@/lib/clock";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
-type Item = {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  hint: string;
-  module: PlatformModule;
-  badgeKey?: "tickets" | "risk" | "trial" | "sales";
-};
-
-const SECTIONS: { id: string; title: string | null; items: Item[] }[] = [
-  {
-    id: "genel",
-    title: null,
-    items: [
-      { href: "/admin", label: "Kontrol paneli", icon: LayoutDashboard, hint: "Canlı metrikler", module: "dashboard" },
-    ],
-  },
-  {
-    id: "satis",
-    title: "Satış",
-    items: [
-      { href: "/admin/satis", label: "Demo & aday", icon: Handshake, hint: "Satış hunisi", module: "sales", badgeKey: "sales" },
-      { href: "/admin/growth", label: "Büyüme", icon: Sprout, hint: "Davet, ortak, kaynak", module: "sales" },
-    ],
-  },
-  {
-    id: "operasyon",
-    title: "Operasyon",
-    items: [
-      { href: "/admin/tenants", label: "Ofisler", icon: Building2, hint: "Ofis envanteri", module: "tenants", badgeKey: "risk" },
-      { href: "/admin/tenants/yeni", label: "Yeni ofis", icon: Building2, hint: "Ofis aç ve sahibine erişim ver", module: "sales" },
-      { href: "/admin/members", label: "Üyeler", icon: Users, hint: "Platform kullanıcıları", module: "members" },
-      { href: "/admin/personel", label: "Personel", icon: ShieldCheck, hint: "EmlakSoft çalışanları", module: "personel" },
-      { href: "/admin/duyuru", label: "Toplu duyuru", icon: Megaphone, hint: "Ofislere mesaj gönder", module: "broadcast" },
-      { href: "/admin/geo", label: "Coğrafya", icon: MapPin, hint: "İl · ilçe · mahalle", module: "geo" },
-    ],
-  },
-  {
-    id: "finans",
-    title: "Finans",
-    items: [
-      { href: "/admin/billing", label: "Abonelik & fatura", icon: CreditCard, hint: "MRR & fatura", module: "billing" },
-      { href: "/admin/ef-kontor", label: "EmlakFiyati kontör", icon: CreditCard, hint: "Tarife, paket, bakiye", module: "billing" },
-      { href: "/admin/muhasebe", label: "Muhasebe", icon: Receipt, hint: "Tahsilat, KDV, CSV", module: "billing" },
-    ],
-  },
-  {
-    id: "destek",
-    title: "Destek",
-    items: [
-      { href: "/admin/tickets", label: "Destek ticket", icon: LifeBuoy, hint: "Destek kuyruğu", module: "tickets", badgeKey: "tickets" },
-    ],
-  },
-  {
-    id: "analiz",
-    title: "Analiz",
-    items: [
-      { href: "/admin/danisman", label: "Yapay zeka danışmanı", icon: Sparkles, hint: "Verilerden içgörü", module: "advisor" },
-      { href: "/admin/raporlar", label: "Raporlar", icon: BarChart3, hint: "Platform analizi", module: "reports" },
-      { href: "/admin/ai-kullanim", label: "AI kullanımı", icon: Sparkles, hint: "Kredi ve rapor kotası", module: "billing" },
-      { href: "/admin/aktivite", label: "Aktivite kaydı", icon: Activity, hint: "Denetim izi", module: "activity" },
-    ],
-  },
-  {
-    id: "sistem",
-    title: "Sistem",
-    items: [
-      { href: "/admin/sistem", label: "Sistem sağlığı", icon: Radar, hint: "Geo, cron, push", module: "sistem" },
-      { href: "/admin/ayarlar", label: "Ayarlar", icon: Settings, hint: "Bakım, kayıt, deneme", module: "sistem" },
-      { href: "/admin/marka", label: "Marka", icon: Palette, hint: "Logo ve favicon", module: "marka" },
-      { href: "/admin/seo", label: "SEO merkezi", icon: SearchCheck, hint: "Arama motoru, sitemap, robot", module: "seo" },
-      { href: "/admin/site", label: "Site yönetimi", icon: Globe, hint: "Tüm online yönetim alanları", module: "dashboard" },
-      { href: "/admin/site-menu", label: "Site menüsü", icon: PanelTop, hint: "Menü, alt bilgi, duyuru", module: "sitemenu" },
-      { href: "/admin/site-icerik", label: "Site içeriği", icon: FileText, hint: "Ana sayfa metinleri, SSS", module: "sitecontent" },
-    ],
-  },
-];
-
-const isActive = (pathname: string, href: string) =>
-  href === "/admin"
-    ? pathname === "/admin"
-    : href === "/admin/tenants"
-      ? pathname.startsWith(href) && !pathname.startsWith("/admin/tenants/yeni")
-      : pathname.startsWith(href);
+type Item = AdminNavItem;
+const isActive = (pathname: string, item: Item) => isAdminNavActive(pathname, item);
 
 export function AdminSidebar({
   staffName,
   role,
   roleLabel,
   badges,
-  health = null,
 }: {
   staffName: string;
   role: PlatformRole;
   roleLabel: string;
-  badges?: { tickets?: number; risk?: number; trial?: number; sales?: number };
-  /** Ölçülen gerçek sağlık verisi; yoksa (veya rol "sistem" göremiyorsa) kart gösterilmez. */
-  health?: AdminHealth | null;
+  badges?: { tickets?: number; risk?: number };
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -157,17 +39,15 @@ export function AdminSidebar({
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
 
-  const sections = SECTIONS.map((s) => ({
-    ...s,
-    items: s.items.filter((i) => allowed.includes(i.module)),
-  })).filter((s) => s.items.length > 0);
+  // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, boş bölüm atılır.
+  const sections = adminNavFor(allowed);
 
   // Mobil alt gezinme: erişilebilir ilk dört rota + menü çekmecesi.
   const tabItems = sections.flatMap((s) => s.items).slice(0, 4);
   const allItems = sections.flatMap((s) => s.items);
 
   const renderItem = (item: Item) => {
-    const active = isActive(pathname, item.href);
+    const active = isActive(pathname, item);
     const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
     return (
       <div key={item.href} className="nav-item group relative">
@@ -176,7 +56,7 @@ export function AdminSidebar({
           data-nav-link
           data-nav-active={active ? "true" : undefined}
           aria-current={active ? "page" : undefined}
-          title={`${item.label} · ${item.hint}`}
+          title={`${item.label} · ${item.description}`}
           prefetch
           onClick={() => setOpen(false)}
           onMouseEnter={() => router.prefetch(item.href)}
@@ -191,7 +71,7 @@ export function AdminSidebar({
         {badge && badge > 0 ? (
           <span
             aria-label={`${badge} bekleyen`}
-            className={`nav-badge pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 ${item.badgeKey === "sales" ? "is-ok" : item.badgeKey === "risk" ? "is-danger" : "is-warn"}`}
+            className={`nav-badge pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 ${item.badgeKey === "risk" ? "is-danger" : "is-warn"}`}
           >
             {badge > 99 ? "99+" : badge}
           </span>
@@ -199,9 +79,6 @@ export function AdminSidebar({
       </div>
     );
   };
-
-  const cronIssues = health ? (health.cronErrors ?? 0) > 0 : false;
-  const dbDown = health ? !health.ok : false;
 
   const renderContent = (variant: "desktop" | "drawer") => (
     <aside className="sb-surface flex h-full w-full flex-col">
@@ -222,7 +99,7 @@ export function AdminSidebar({
       <NavScroller label="Platform menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
         <div className="sb-expanded">
           {sections.map((section) => {
-            const hasActive = section.items.some((i) => isActive(pathname, i.href));
+            const hasActive = section.items.some((i) => isActive(pathname, i));
             const expanded = !section.title || hasActive || !closed.includes(section.id);
             return (
               <div key={section.id}>
@@ -258,13 +135,13 @@ export function AdminSidebar({
         {/* İkon modu: her öğe ikon + hover'da başlık/ipucu (erişilebilir tooltip) */}
         <div className="sb-rail space-y-1 pt-3">
           {allItems.map((item) => {
-            const active = isActive(pathname, item.href);
+            const active = isActive(pathname, item);
             const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
             return (
               <NavFlyout
                 key={item.href}
                 enabled={variant === "desktop"}
-                title={`${item.label} · ${item.hint}`}
+                title={`${item.label} · ${item.description}`}
                 href={item.href}
               >
                 <Link
@@ -291,55 +168,7 @@ export function AdminSidebar({
           {staffName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "P"}
         </div>
 
-        {health ? (
-          <Link
-            href="/admin/sistem"
-            onClick={() => setOpen(false)}
-            aria-label={`Sistem durumu: ${dbDown ? "veritabanı hatası" : "çevrimiçi"}${cronIssues ? `, ${health.cronErrors} hatalı zamanlanmış iş` : ""}. Sistemi görüntüle`}
-            className="sb-label focus-ring group block rounded-[var(--radius-card)] border border-white/12 bg-white/[0.06] p-3 transition-colors hover:bg-white/[0.09]"
-          >
-            <span className="flex items-center justify-between gap-2">
-              <span className="sb-eyebrow uppercase text-white/80">Sistem durumu</span>
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold ${
-                  dbDown ? "bg-danger-500/20 text-danger-300" : "bg-mint-500/15 text-mint-300"
-                }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${dbDown ? "bg-danger-400" : "status-pulse bg-mint-400"}`} aria-hidden />
-                {dbDown ? "Sorunlu" : "Çevrimiçi"}
-              </span>
-            </span>
-            <span className="mt-2.5 flex items-center gap-2 text-sm font-semibold text-white">
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dbDown ? "bg-danger-400" : "bg-mint-400"}`} aria-hidden />
-              {dbDown ? "Veritabanı sorgusu hata verdi" : "Veritabanı yanıt veriyor"}
-            </span>
-            <span className="num mt-1 block text-xs font-medium text-white/75">
-              {health.dbMs} ms
-              {health.cronTotal != null
-                ? ` · ${health.cronTotal} cron işi${cronIssues ? `, ${health.cronErrors} hatalı` : ", hatasız"}`
-                : ""}
-            </span>
-            {health.failedJobs && health.failedJobs.length > 0 ? (
-              <span className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-300" title={health.failedJobs.join(", ")}>
-                <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span className="line-clamp-2 break-words">Hatalı: {health.failedJobs.join(", ")}</span>
-              </span>
-            ) : null}
-            {health.unknownJobs && health.unknownJobs.length > 0 ? (
-              <span className="mt-1 block line-clamp-2 break-words text-xs text-white/60" title={health.unknownJobs.join(", ")}>
-                Tanımsız iş (eski kayıt): {health.unknownJobs.join(", ")}
-              </span>
-            ) : null}
-            {health.checkedAt ? (
-              <span className="num mt-1.5 block text-xs text-white/65">Son kontrol: {formatTrTime(health.checkedAt)}</span>
-            ) : null}
-            <span className="mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-white/15 bg-white/[0.04] px-3 text-sm font-semibold text-white transition-colors group-hover:bg-white/10">
-              Sistemi görüntüle
-              <ExternalLink className="h-3.5 w-3.5 text-white/70" aria-hidden />
-            </span>
-          </Link>
-        ) : null}
-
+        {/* Sistem durumu: üst çubukta kompakt çip (SystemStatusChip); menüde yer kaplayan kart kaldırıldı. */}
         <a
           href="/"
           target="_blank"
@@ -388,7 +217,7 @@ export function AdminSidebar({
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
-            const active = isActive(pathname, tab.href);
+            const active = isActive(pathname, tab);
             return (
               <Link
                 key={tab.href}

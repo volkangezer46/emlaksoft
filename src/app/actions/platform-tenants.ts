@@ -456,7 +456,6 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
   });
 
   revalidateOffice(tenantId);
-  revalidatePath("/admin/satis");
 
   return {
     ok: true,

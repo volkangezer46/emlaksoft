@@ -45,7 +45,7 @@ export const TERMS = {
   },
   ornekVeri: {
     canonical: "Örnek veri",
-    definition: "Ofisin içine yüklenen is_sample kayıtlar. 'Demo' yalnız satış demosudur (/admin/satis; public /demo artık /kayit'a yönlenir).",
+    definition: "Ofisin içine yüklenen is_sample kayıtlar. Demo talebi akışı yoktur (self-servis kayıt; eski /admin/satis ve public /demo yönlendirilir).",
     forbidden: [/demo modundasınız/i, /demo verileriyle/i, /dolu demo/i, /demo ofisle/i],
   },
   hesapKredisi: {

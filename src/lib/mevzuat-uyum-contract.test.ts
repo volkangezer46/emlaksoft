@@ -65,12 +65,22 @@ describe("KVKK: bilgi, zorunlu onay ve ayrı pazarlama kutusu", () => {
     expect(buildLeadConsentVersion(true)).toBe(`${LEAD_CONSENT_TEXT_VERSION}+mkt`);
     expect(buildLeadConsentVersion(true).length).toBeLessThanOrEqual(80);
   });
+  it("yönetimden değişen metin rıza sürümüne iz olarak girer; varsayılana dönünce sürüm de döner", () => {
+    const custom = { consent: "Kişisel verilerimin başvurum için işlenmesini kabul ediyorum.", notice: LEAD_FORM_CONSENT_TEXT, marketing: LEAD_FORM_MARKETING_TEXT };
+    const v = buildLeadConsentVersion(true, custom);
+    expect(v).toMatch(new RegExp(`^${LEAD_CONSENT_TEXT_VERSION}-c[0-9a-f]{8}\\+mkt$`));
+    expect(v.length).toBeLessThanOrEqual(80);
+    expect(buildLeadConsentVersion(false, custom)).not.toBe(LEAD_CONSENT_TEXT_VERSION);
+    expect(buildLeadConsentVersion(false, { ...custom, consent: custom.consent + " " })).not.toBe(buildLeadConsentVersion(false, custom));
+  });
   it("form: pazarlama kutusu varsayılan işaretsiz ve zorunlu değil; sunucu sürümü kanıta yazar", () => {
     const form = read("src/app/lead/[token]/lead-form.tsx");
     expect(form).toContain('name="marketing_opt_in" defaultChecked={false}');
     expect(form).not.toMatch(/name="marketing_opt_in"[^>]*required/);
     const route = read("src/app/api/leads/[token]/route.ts");
-    expect(route).toContain("buildLeadConsentVersion(isConsentAccepted(body.marketing_opt_in))");
+    // Sürüm, formda gösterilen AYNI metinden türetilir (yönetimden değişirse metin izi kanıta girer).
+    expect(route).toContain("buildLeadConsentVersion(isConsentAccepted(body.marketing_opt_in), await getLeadFormCopy())");
+    expect(read("src/app/lead/[token]/page.tsx")).toContain("copy={copy}");
   });
   it("legal-copy avukat-onayı bekleme işareti taşımaz (karar 2026-10-06); evrak sayfası yer tutucuyu göstermez", () => {
     expect(read("src/lib/legal-copy.ts")).not.toContain("AVUKAT ONAYI GEREKİR");

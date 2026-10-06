@@ -8,6 +8,7 @@ import { isPlatformMfaRequired, platformMfaSyncIssue } from "@/lib/platform-mfa"
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { platformSecretsKeySource } from "@/lib/platform-secrets";
 import { getPlatformSettingViews } from "@/lib/settings/read";
+import { getSettingDef } from "@/lib/settings/registry";
 import { SETTING_CATEGORIES, type SettingCategoryId, type SettingView } from "@/lib/settings/types";
 
 export const metadata = { title: "Sistem ayarları merkezi" };
@@ -156,9 +157,25 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
               </ul>
             ) : null}
             <div className="grid gap-3">
-              {c.items.map((v: SettingView) => (
-                <SettingField key={v.key} view={v} canEdit={canEdit} />
-              ))}
+              {c.items.map((v: SettingView) => {
+                // Konuya ait ayar kendi bölümünde düzenlenir (tek yer); merkez yalnız değeri ve bağlantıyı gösterir.
+                const home = getSettingDef(v.key)?.home;
+                return home ? (
+                  <Link
+                    key={v.key}
+                    href={home.href}
+                    className="focus-ring flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-panel)] border border-line bg-surface px-4 py-3 text-sm transition hover:border-brand-300"
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-ink-950">{v.label}</span>
+                      <span className="block text-xs text-text-muted">Şu an: {v.display} · {home.label} bölümünde düzenlenir</span>
+                    </span>
+                    <span className="text-xs font-semibold text-brand-600">Düzenle →</span>
+                  </Link>
+                ) : (
+                  <SettingField key={v.key} view={v} canEdit={canEdit} />
+                );
+              })}
             </div>
           </section>
         ))
@@ -178,7 +195,10 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
             ["Site menüsü", "/admin/site-menu"],
             ["Marka (logo, favicon)", "/admin/marka"],
             ["TÜFE tablosu", "/admin/ayarlar/tufe"],
-            ["Genel ayarlar (bakım, kayıt, deneme)", "/admin/ayarlar"],
+            ["Kayıt ve bakım modu", "/admin/sistem#ayarlar"],
+            ["Deneme süresi ve otomatik yenileme", "/admin/billing#ayarlar"],
+            ["Özellik bayrakları", "/admin/ayarlar/bayraklar"],
+            ["Yasal metinler ve mevzuat sabitleri", "/admin/ayarlar/yasal"],
             ["Sistem sağlığı, cron nabzı ve entegrasyon formları", "/admin/sistem"],
           ].map(([label, to]) => (
             <li key={to}>

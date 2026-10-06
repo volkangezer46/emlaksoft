@@ -100,6 +100,11 @@ export type SettingDef<T = unknown> = {
   multiline?: boolean;
   /** Capraz kural: hata metni dondurur, gecerliyse null. */
   crossRule?: (value: T) => string | null;
+  /**
+   * Ayarin DUZENLENDIGI bolum sayfasi (konuya ait ayar ilgili sayfanin "Ayarlar" kisminda). Doluysa merkez bu ayari
+   * duzenleme formu olarak DEGIL, bolume baglanti olarak gosterir: her ayar tek yerde duzenlenir.
+   */
+  home?: { href: string; label: string };
 };
 
 export type AnySettingDef = SettingDef<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
