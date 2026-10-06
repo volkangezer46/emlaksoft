@@ -51,7 +51,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { createCustomer, updateCustomer } from "./customers";
 import { createTeamMember } from "./team";
-import { importCustomers } from "./import-data";
+import { importChunk } from "./import-data";
 
 function fd(values: Record<string, string>): FormData {
   const f = new FormData();
@@ -112,18 +112,22 @@ describe("createTeamMember", () => {
   });
 });
 
-describe("importCustomers", () => {
+describe("importChunk (içe aktarma sihirbazının yolu)", () => {
   it("geçersiz telefon/e-posta satırı raporlanır; farklı biçimli aynı numara dosyada tekilleşir", async () => {
-    const res = await importCustomers([
-      { row: 1, full_name: "A", phone: "0532 123 45 67" },
-      { row: 2, full_name: "B", phone: "+90 532 123 45 67" },
-      { row: 3, full_name: "C", phone: "xyz" },
-      { row: 4, full_name: "D", email: "bozuk" },
-      { row: 5, full_name: "E", phone: "+49 151 2345 6789" },
-    ]);
-    expect("error" in res && res.error).toBeFalsy();
-    const errorRows = (res.errors ?? []).map((e) => e.row).sort();
-    expect(errorRows).toEqual([2, 3, 4]);
-    expect(res.skipped).toBe(1);
+    const res = await importChunk(
+      "customers",
+      [
+        { row: 1, full_name: "A", phone: "0532 123 45 67" },
+        { row: 2, full_name: "B", phone: "+90 532 123 45 67" },
+        { row: 3, full_name: "C", phone: "xyz" },
+        { row: 4, full_name: "D", email: "bozuk" },
+        { row: 5, full_name: "E", phone: "+49 151 2345 6789" },
+      ],
+      { batchId: crypto.randomUUID() },
+    );
+    expect(res.error).toBeFalsy();
+    const problemRows = (res.rows ?? []).filter((r) => r.status === "error" || r.status === "skip").map((r) => r.row).sort();
+    expect(problemRows).toEqual([2, 3, 4]);
+    expect(res.counters?.skip).toBe(1);
   });
 });

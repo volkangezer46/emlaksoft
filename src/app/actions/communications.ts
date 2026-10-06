@@ -61,46 +61,6 @@ export async function createCommunication(
 }
 
 // ---------------------------------------------------------------------------
-// Müşterinin iletişim geçmişini getir
-// ---------------------------------------------------------------------------
-
-export async function listCustomerCommunications(customerId: string) {
-  const gate = await requirePermission("customers", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("communications")
-    .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles!communications_created_by_fkey(full_name)")
-    .eq("customer_id", customerId)
-    .eq("tenant_id", gate.tenantId)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  return data ?? [];
-}
-
-// ---------------------------------------------------------------------------
-// Portföyün iletişim geçmişini getir
-// ---------------------------------------------------------------------------
-
-export async function listPropertyCommunications(propertyId: string) {
-  const gate = await requirePermission("properties", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("communications")
-    .select("id, channel, direction, subject, body, outcome, duration_sec, scheduled_at, created_at, created_by:profiles!communications_created_by_fkey(full_name), customer:customers!communications_customer_id_fkey(full_name)")
-    .eq("property_id", propertyId)
-    .eq("tenant_id", gate.tenantId)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  return data ?? [];
-}
-
-// ---------------------------------------------------------------------------
 // İletişim kaydı sil
 // ---------------------------------------------------------------------------
 

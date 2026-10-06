@@ -1,6 +1,6 @@
 "use server";
 
-import { getDistrictOptions, getNeighborhoodOptions, searchDistricts as searchDistrictsCentral } from "@/lib/geo/reader";
+import { getDistrictOptions, getNeighborhoodOptions } from "@/lib/geo/reader";
 import type { GeoOption } from "@/lib/geo/types";
 
 export type { GeoOption };
@@ -19,9 +19,4 @@ export async function listDistricts(provinceId: string): Promise<GeoOption[]> {
 
 export async function listNeighborhoods(districtId: string): Promise<GeoOption[]> {
   return getNeighborhoodOptions(districtId);
-}
-
-/** İl seçmeden doğrudan ilçe aramak için ("Kadıköy" yazan önce İstanbul'u bulmak zorunda kalmasın). */
-export async function searchDistricts(query: string, limit = 20) {
-  return searchDistrictsCentral(query, limit);
 }
