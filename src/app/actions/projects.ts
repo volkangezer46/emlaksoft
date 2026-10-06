@@ -5,6 +5,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import {
+  changedFields,
+  firstIssue,
+  formFields,
+  PROJECT_EDIT_FIELDS,
+  projectEditSchema,
+  UNIT_EDIT_FIELDS,
+  unitEditSchema,
+} from "@/lib/projects/edit-schemas";
 
 export type ProjectResult = { ok?: boolean; error?: string; id?: string };
 
@@ -152,6 +161,130 @@ export async function createProject(_prev: ProjectResult, fd: FormData): Promise
 
   revalidatePath("/app/projeler");
   return { ok: true, id: data.id };
+}
+
+// ============================================================
+// Proje düzenleme (P0-6)
+// ============================================================
+
+export async function updateProject(_prev: ProjectResult, fd: FormData): Promise<ProjectResult> {
+  const gate = await requirePermission("projects", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const parsed = projectEditSchema.safeParse(formFields(fd, PROJECT_EDIT_FIELDS));
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+  const { id, ...next } = parsed.data;
+
+  const supabase = await createClient();
+  const { data: before } = await supabase
+    .from("projects")
+    .select("id, name, developer_name, location, delivery_date, description, status")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!before) return { error: "Proje bulunamadı." };
+
+  const diff = changedFields(before, next);
+  if (Object.keys(diff).length === 0) return { ok: true, id };
+
+  const { error } = await supabase
+    .from("projects")
+    .update(next)
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("updateProject", { code: error.code });
+    return { error: "Proje güncellenemedi." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "project.update",
+    entityType: "project",
+    entityId: id,
+    oldValue: Object.fromEntries(Object.keys(diff).map((k) => [k, before[k as keyof typeof before] ?? null])),
+    newValue: diff,
+  });
+
+  revalidatePath(`/app/projeler/${id}`);
+  revalidatePath("/app/projeler");
+  return { ok: true, id };
+}
+
+// ============================================================
+// Daire düzenleme (P0-7) — bilgi alanları; durum kendi akışında
+// ============================================================
+
+export async function updateUnit(_prev: ProjectResult, fd: FormData): Promise<ProjectResult> {
+  const gate = await requirePermission("projects", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const parsed = unitEditSchema.safeParse(formFields(fd, UNIT_EDIT_FIELDS));
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+  const { id, ...next } = parsed.data;
+
+  const supabase = await createClient();
+  const { data: before } = await supabase
+    .from("project_units")
+    .select("id, project_id, status, block, floor, unit_no, rooms, gross_m2, list_price, notes")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!before) return { error: "Daire bulunamadı." };
+
+  const projectId = before.project_id as string;
+  const status = before.status;
+  const beforeFields = {
+    block: before.block,
+    floor: before.floor,
+    unit_no: before.unit_no,
+    rooms: before.rooms,
+    gross_m2: before.gross_m2,
+    list_price: before.list_price,
+    notes: before.notes,
+  };
+  const diff = changedFields(beforeFields, next);
+  if (Object.keys(diff).length === 0) return { ok: true, id };
+
+  if ("list_price" in diff) {
+    // Satılmış dairenin fiyatı anlaşma/komisyonla bağlıdır (DB tetikleyicisi de reddeder).
+    if (status === "sold") return { error: "Satılmış dairenin fiyatı değiştirilemez; önce satışı geri alın." };
+    const { data: plan } = await supabase
+      .from("unit_payments")
+      .select("id")
+      .eq("unit_id", id)
+      .eq("tenant_id", gate.tenantId)
+      .limit(1);
+    if ((plan ?? []).length > 0) {
+      return { error: "Ödeme planı olan dairenin fiyatı değiştirilemez; önce ödeme planını silin." };
+    }
+  }
+
+  // Tetikleyici `update of list_price` kolon listesinde çalışır: değişmeyen fiyat yazılmaz.
+  const { error } = await supabase
+    .from("project_units")
+    .update(diff)
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    if (error.code === "23505") return { error: "Bu blokta aynı daire numarası zaten kayıtlı." };
+    console.error("updateUnit", { code: error.code });
+    return { error: "Daire güncellenemedi." };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "project_unit.update",
+    entityType: "project_unit",
+    entityId: id,
+    oldValue: Object.fromEntries(Object.keys(diff).map((k) => [k, beforeFields[k as keyof typeof beforeFields] ?? null])),
+    newValue: { ...diff, project_id: projectId },
+  });
+
+  revalidateUnit(projectId);
+  return { ok: true, id };
 }
 
 // ============================================================

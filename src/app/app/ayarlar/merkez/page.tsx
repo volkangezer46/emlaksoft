@@ -1,3 +1,4 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Search, SlidersHorizontal } from "lucide-react";
 import { ReadOnlyGate } from "../read-only-gate";
@@ -59,7 +60,7 @@ const ACTIONS = {
  */
 export default async function OfficeSettingsCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { tenantId, perms } = await requireModulePage("settings");
-  if (!tenantId) throw new Error("Ofis bilgisi bulunamadı.");
+  if (!tenantId) return <StaffNoTenantNotice feature="Ofis tanımları" />;
   const canEdit = (perms.settings ?? []).includes("edit");
   const sp = await searchParams;
   const q = first(sp.ara).trim();

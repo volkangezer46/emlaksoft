@@ -3,28 +3,43 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Copy, LayoutGrid, Plus } from "lucide-react";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, FormField } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { addUnit, bulkAddUnits, type ProjectResult } from "@/app/actions/projects";
 
+const PANEL_ID = "daire-ekle";
 const init: ProjectResult = {};
 
+export function AddUnitsTrigger() {
+  return (
+    <InlinePanelTrigger panelId={PANEL_ID}>
+      <Plus className="h-4 w-4" /> Daire ekle
+    </InlinePanelTrigger>
+  );
+}
+
 /**
- * Daire ekleme — iki sekme:
+ * Daire ekleme — sayfa içi panel (popup değil), iki sekme:
  *  - Tekil: tek daire formu
  *  - Çoğalt: aynı bloka N kat × M daire hızlı üretim (daire no = kat×100+sıra)
  */
-export function AddUnitsDialog({ projectId }: { projectId: string }) {
+export function AddUnitsPanel({ projectId }: { projectId: string }) {
+  return (
+    <InlinePanel
+      id={PANEL_ID}
+      title="Daire ekle"
+      description="Tek daire girin ya da Çoğalt ile aynı bloka kat kat stok üretin."
+      icon={<LayoutGrid />}
+    >
+      {(close) => <AddUnitsForms projectId={projectId} onClose={close} />}
+    </InlinePanel>
+  );
+}
+
+function AddUnitsForms({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -40,40 +55,18 @@ export function AddUnitsDialog({ projectId }: { projectId: string }) {
         }
         setError(null);
         if (res.created) {
-          // Çoğaltmada dialog açık kalır — art arda blok üretimi yaygın senaryo.
+          // Çoğaltmada panel açık kalır — art arda blok üretimi yaygın senaryo.
           setInfo(`${res.created} daire eklendi.`);
         } else {
           setInfo(null);
-          setOpen(false);
+          onClose();
         }
         router.refresh();
       });
     };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) {
-          setError(null);
-          setInfo(null);
-        }
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4" /> Daire ekle
-        </Button>
-      </DialogTrigger>
-
-      <DialogContent size="md">
-        <DialogHeader
-          icon={<LayoutGrid />}
-          title="Daire ekle"
-          description="Tek daire girin ya da Çoğalt ile aynı bloka kat kat stok üretin."
-        />
-        <div className="p-6">
+        <div className="px-4 py-4 md:px-6">
           <Tabs defaultValue="tekil">
             <TabsList className="w-full">
               <TabsTrigger value="tekil" className="flex-1 justify-center">
@@ -118,9 +111,7 @@ export function AddUnitsDialog({ projectId }: { projectId: string }) {
                 ) : null}
 
                 <div className="hairline-t flex justify-end gap-2 pt-4">
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary">Kapat</Button>
-                  </DialogClose>
+                  <Button type="button" variant="secondary" onClick={onClose}>Kapat</Button>
                   <Button type="submit" loading={pending}>
                     <Plus className="h-4 w-4" /> Daire ekle
                   </Button>
@@ -170,9 +161,7 @@ export function AddUnitsDialog({ projectId }: { projectId: string }) {
                 ) : null}
 
                 <div className="hairline-t flex justify-end gap-2 pt-4">
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary">Kapat</Button>
-                  </DialogClose>
+                  <Button type="button" variant="secondary" onClick={onClose}>Kapat</Button>
                   <Button type="submit" loading={pending}>
                     <Copy className="h-4 w-4" /> Daireleri üret
                   </Button>
@@ -181,7 +170,5 @@ export function AddUnitsDialog({ projectId }: { projectId: string }) {
             </TabsContent>
           </Tabs>
         </div>
-      </DialogContent>
-    </Dialog>
   );
 }

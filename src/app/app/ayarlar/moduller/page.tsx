@@ -1,3 +1,4 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import { redirect } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -20,7 +21,8 @@ export const metadata = { title: "Modüller" };
  */
 export default async function ModulesPage() {
   const { tenantId, role } = await requireModulePage("settings", "/app/ayarlar/moduller");
-  if (!canManageModules(role) || !tenantId) redirect("/app?yetki=yok");
+  if (!tenantId) return <StaffNoTenantNotice feature="Modül ayarları" />;
+  if (!canManageModules(role)) redirect("/app?yetki=yok");
 
   const [state, planCtx] = await Promise.all([getTenantModuleState(tenantId), getTenantGateContext(tenantId)]);
   const planLocked = planLockedKeys(planCtx);

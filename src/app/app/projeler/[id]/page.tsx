@@ -7,7 +7,8 @@ import { getProject, getProjectPaymentSummary, listProjectUnits } from "@/app/ac
 import { StatCard } from "@/components/app/stat-card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { UnitsBoard } from "./units-board";
-import { AddUnitsDialog } from "./add-units-dialog";
+import { AddUnitsPanel, AddUnitsTrigger } from "./add-units-panel";
+import { ProjectEditPanel, ProjectEditTrigger } from "./project-edit-panel";
 import { PROJECT_STATUS_LABELS } from "@/lib/status-labels";
 
 export const metadata = { title: "Proje detayı" };
@@ -78,8 +79,19 @@ export default async function ProjeDetayPage({ params }: { params: Promise<{ id:
             {STATUS_LABELS[project.status] ?? project.status}
           </Badge>
         }
-        actions={canCreate ? <AddUnitsDialog projectId={project.id} /> : undefined}
+        actions={
+          canCreate || canEdit ? (
+            <div className="flex flex-wrap gap-2">
+              {canEdit ? <ProjectEditTrigger /> : null}
+              {canCreate ? <AddUnitsTrigger /> : null}
+            </div>
+          ) : undefined
+        }
       />
+
+      {/* Sayfa içi paneller (popup değil): proje düzenleme ve daire ekleme */}
+      {canEdit ? <ProjectEditPanel project={project} /> : null}
+      {canCreate ? <AddUnitsPanel projectId={project.id} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {/* Durum kartları daire ızgarasına iner (orada durum çipiyle süzülür) — sıfır çıkmaz metrik */}

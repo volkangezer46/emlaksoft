@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPublicListingImage } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -10,7 +11,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { data: media } = await admin
     .from("property_media")
-    .select("storage_path, file_type, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id)")
+    .select("kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id)")
     .eq("id", id)
     .eq("kind", "image")
     .maybeSingle();
@@ -30,7 +31,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Görsel bulunamadı" }, { status: 404 });
   }
 
-  if (!/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "")) {
+  // KVKK P0-9: belge gibi görünen görsel (tapu, yetki belgesi...) public uçtan servis edilmez (tek kural).
+  if (!/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "") || !isPublicListingImage(media)) {
     return NextResponse.json({ error: "Görsel bulunamadı." }, { status: 404 });
   }
 

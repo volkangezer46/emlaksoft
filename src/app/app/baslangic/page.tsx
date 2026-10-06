@@ -1,3 +1,4 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -23,7 +24,7 @@ export default async function OnboardingPage({
     return (
       <div className="mx-auto w-full max-w-3xl">
         <PageHeader title="Ofis kurulumu" breadcrumbs={crumbs} />
-        <Alert tone="info">Kurulum adımları bir ofis hesabı içinde görünür.</Alert>
+        <StaffNoTenantNotice feature="Ofis kurulumu" />
       </div>
     );
   }
