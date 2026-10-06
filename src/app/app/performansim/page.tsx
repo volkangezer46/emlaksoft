@@ -13,6 +13,8 @@ import { CoachInsightSlot } from "@/app/app/danisman-kpi/coach-insight-slot";
 import { greetingFor } from "@/app/app/_home/helpers";
 import { PersonalGoal } from "./personal-goal";
 import { Son30Gun } from "./son-30-gun";
+import { Komisyonum } from "./komisyonum";
+import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 
 export const metadata = { title: "Performansım" };
 
@@ -65,6 +67,12 @@ export default async function PerformansimPage({
           </Suspense>
         </div>
       </div>
+      {/* Komisyonum: yalnız kendi payı (kazanç gizliliği); Komisyon modülü yetkisi yoksa çizilmez. */}
+      {effectiveCanAccessModule(auth.perms, "commissions") ? (
+        <Suspense fallback={<SkeletonCard height={150} label="Komisyon yükleniyor" />}>
+          <Komisyonum userId={auth.userId} tenantId={auth.tenantId} officeWide={hasOfficeWideDataScope(auth.role)} />
+        </Suspense>
+      ) : null}
       <Suspense fallback={null}>
         <CoachInsightSlot tenantId={auth.tenantId} userId={auth.userId} role={auth.role} perms={auth.perms} />
       </Suspense>
