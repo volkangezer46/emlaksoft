@@ -37,8 +37,10 @@ const dayLabel = (key: string) =>
  * Opsiyonel AI özet satırı — Suspense içinde ayrı stream edilir, sayfanın
  * ilk boyamasını bekletmez. OpenAI anahtarı yoksa/hata olursa hiç görünmez.
  */
-async function BriefingAiLine({ items }: { items: BriefingItem[] }) {
-  const summary = await generateBriefingSummary(items);
+async function BriefingAiLine({ items, ctx }: { items: BriefingItem[]; ctx: HomeCtx }) {
+  // audit ZORUNLU (kredi defteri + denetim izi); tenant yoksa çağrı yapılmaz. Günlük önbellek + kota kapısı lib'de.
+  if (!ctx.tenantId) return null;
+  const summary = await generateBriefingSummary(items, { tenantId: ctx.tenantId, actorId: ctx.userId });
   if (!summary) return null;
   return (
     <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-3 py-2 text-xs font-medium text-[var(--accent-text)]">
@@ -124,7 +126,7 @@ export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
             <p className="mt-2 px-2 text-xs text-[var(--text-muted)]">+{items.length - shown.length} iş daha — görevler ve randevular aşağıda.</p>
           ) : null}
           <Suspense fallback={null}>
-            <BriefingAiLine items={items} />
+            <BriefingAiLine items={items} ctx={ctx} />
           </Suspense>
           {expiring.data.length > 0 ? (
             <div className="mt-4 border-t border-line pt-3">

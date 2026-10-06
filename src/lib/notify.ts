@@ -40,7 +40,8 @@ export type NotifPrefKey =
   | "support"
   | "dunning"
   | "rentOverdue"
-  | "network";
+  | "network"
+  | "insight";
 
 export async function notifyTenant(input: {
   tenantId: string;
@@ -57,6 +58,11 @@ export async function notifyTenant(input: {
    * `filterByNotifPrefs` (notification-prefs.tsx) kullanıcı bazında süzer.
    */
   prefKey?: NotifPrefKey;
+  /**
+   * Verilirse ayni (tenant_id, dedupe_key) icin bildirim TEK KEZ yazilir (notifications_tenant_dedupe_key_uidx).
+   * Cakisma (23505) sessizce "zaten gonderilmis" sayilir. Kolon yoksa (migration 001500 uygulanmadi) hata firlatir.
+   */
+  dedupeKey?: string;
 }) {
   const admin = createAdminClient();
 
@@ -86,7 +92,10 @@ export async function notifyTenant(input: {
     body: input.body ?? null,
     href: input.href ?? null,
     kind: input.kind ?? "info",
+    ...(input.dedupeKey ? { dedupe_key: input.dedupeKey } : {}),
   });
+  // Ayni anahtar daha once yazilmis: bildirim zaten var (tek kez); push da tekrar gonderilmez.
+  if (notificationError && input.dedupeKey && notificationError.code === "23505") return;
   if (notificationError) throw new Error("Bildirim kalıcılaştırılamadı.");
 
   if (input.userId) {
