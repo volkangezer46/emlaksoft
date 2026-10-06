@@ -114,7 +114,7 @@ export async function CuzdanSection({
 
       <section className="rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-3)]">
         <p className="flex items-center gap-2 text-xs font-semibold text-accent-text">
-          <Wallet className="h-4 w-4" /> Hesap kredisi (TL)
+          <Wallet className="h-4 w-4" /> Hesap kredisi (₺)
         </p>
         <h2 className="mt-1 font-display font-bold text-text">Hesap kredisi bakiyeniz</h2>
         <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">

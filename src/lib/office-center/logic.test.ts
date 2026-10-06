@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AdvisorMetricRow } from "@/lib/team/advisor-metrics";
-import { buildLeague, computeTeamHealth, filterAdvisors, parseAdvisorFilters, parseTab, sortAdvisors, tabHref, unassignedSlaState } from "./logic";
+import { assignHref, buildLeague, computeTeamHealth, filterAdvisors, parseAdvisorFilters, parseAssignView, parseTab, sortAdvisors, tabHref, unassignedSlaState } from "./logic";
 import type { OfficeAdvisorRow, OfficeStatistics } from "./types";
 
 const NOW = Date.UTC(2026, 9, 5, 9, 0, 0);
@@ -32,6 +32,9 @@ describe("URL filtre kontratı", () => {
   it("bozuk sekme/filtre varsayılana düşer, geçerli olanlar korunur", () => {
     expect(parseTab("yok")).toBe("danismanlar");
     expect(parseTab(["atamalar"])).toBe("atamalar");
+    // Birleşen sekmeler: eski yer imleri tek "Tanımlar" sekmesine düşer.
+    expect(parseTab("ayarlar")).toBe("tanimlar");
+    expect(parseTab("tanimlamalar")).toBe("tanimlar");
     const f = parseAdvisorFilters({ q: "  ece ", durum: "x", rol: "advisor", sube: "nope", sirala: "portfoy" });
     expect(f).toEqual({ q: "ece", durum: "", rol: "advisor", sube: "", sirala: "portfoy", yon: "desc" });
     expect(parseAdvisorFilters({}).yon).toBe("asc");
@@ -40,6 +43,13 @@ describe("URL filtre kontratı", () => {
   it("tabHref yalnız dolu parametreleri yazar", () => {
     expect(tabHref("danismanlar")).toBe("/app/ofis-merkezi");
     expect(tabHref("atamalar", { durum: "gecikmis", bos: undefined })).toBe("/app/ofis-merkezi?sekme=atamalar&durum=gecikmis");
+  });
+
+  it("atama TEK ekranda: İlan Havuzu ?atama= (bozuk görünüm varsayılana düşer)", () => {
+    expect(assignHref()).toBe("/app/ilan-havuzu?atama=bekleyen");
+    expect(assignHref("iptal")).toBe("/app/ilan-havuzu?atama=iptal");
+    expect(parseAssignView("yok")).toBe("bekleyen");
+    expect(parseAssignView(["gecmis"])).toBe("gecmis");
   });
 });
 
@@ -85,10 +95,10 @@ describe("SLA ve ekip sağlığı", () => {
     expect(computeTeamHealth({ stats, breachedUnassigned: 0, unassignedThreshold: 5, advisorsWithoutActivity30d: 0 }).level).toBe("healthy");
     const crit = computeTeamHealth({ stats, breachedUnassigned: 2, unassignedThreshold: 5, advisorsWithoutActivity30d: 0 });
     expect(crit.level).toBe("critical");
-    expect(crit.alerts[0].href).toContain("durum=gecikmis");
+    expect(crit.alerts[0].href).toBe("/app/ilan-havuzu?atama=gecikmis");
     const warn = computeTeamHealth({ stats: { ...stats, cancelledAssignmentsThisMonth: 4 }, breachedUnassigned: 0, unassignedThreshold: 5, advisorsWithoutActivity30d: 0 });
     expect(warn.level).toBe("warning");
-    expect(warn.alerts.every((a) => a.href.startsWith("/app/ofis-merkezi"))).toBe(true);
+    expect(warn.alerts.every((a) => a.href.startsWith("/app/ofis-merkezi") || a.href.startsWith("/app/ilan-havuzu"))).toBe(true);
   });
 });
 

@@ -4,16 +4,16 @@ import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Search, X } from "lucide-react";
+import { ChevronDown, Lock, Menu, Pin, PinOff, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { MOBILE_TAB_SECTIONS, moreSections, resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, MAX_RECENT_SHOWN, pushRecent, togglePin } from "@/lib/nav-memory";
-import { getAppActions, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { useClosedModules } from "@/components/app/closed-modules-context";
-import { ShortcutHint } from "@/components/app/shortcut-hint";
+import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
@@ -125,15 +125,8 @@ export function AppSidebar({
   // "Daha fazla": varsayılan kapalı; kullanıcı açtıysa ya da etkin sayfa içindeyse açık ("closed" deposunda
   // bu kimlik AÇIK anlamına gelir).
   const moreOpen = activeInMore || closed.includes("daha-fazla-acik");
-  // "Son kullanılanlar" ve "Kullanım" kartı da varsayılan KAPALI; kimlik depoda varsa AÇIK (aynı desen).
+  // "Son kullanılanlar" da varsayılan KAPALI; kimlik depoda varsa AÇIK (aynı desen).
   const recentOpen = closed.includes("son-acik");
-  const usageOpen = closed.includes("kullanim-acik");
-  // Ofis durumu kartı: en dolu kullanım kalemi (gerçek plan kullanımı) ve genel ton.
-  const ratioOf = (u: PlanUsageRow) => (u.limit > 0 ? Math.min(1, u.used / u.limit) : 0);
-  const topUsage = usage.reduce<PlanUsageRow | null>((best, u) => (best === null || ratioOf(u) > ratioOf(best) ? u : best), null);
-  const topRatio = topUsage ? ratioOf(topUsage) : 0;
-  const officeTone =
-    (trial && trialDaysLeft != null && trialDaysLeft <= 0) || topRatio >= 0.9 ? "bg-danger-400" : topRatio >= 0.75 || trial ? "bg-amber-400" : "bg-mint-400";
   const toggleMore = () => {
     const cur = closedStore.read();
     closedStore.write(cur.includes("daha-fazla-acik") ? cur.filter((x) => x !== "daha-fazla-acik") : [...cur, "daha-fazla-acik"]);
@@ -142,11 +135,6 @@ export function AppSidebar({
   const toggleSection = (id: string) => {
     const cur = closedStore.read();
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
-  };
-
-  const openPalette = () => {
-    setOpen(false);
-    window.dispatchEvent(new Event(OPEN_PALETTE_EVENT));
   };
 
   const renderItem = (item: NavItem, opts: { group: string; pinnable?: boolean }) => {
@@ -163,7 +151,7 @@ export function AppSidebar({
           aria-current={active ? "page" : undefined}
           title={item.description ? `${item.label} — ${item.description}` : item.label}
           onClick={() => setOpen(false)}
-          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-8 ${
+          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 ${
             badge ? "pr-16" : "pr-9"
           } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
         >
@@ -252,20 +240,6 @@ export function AppSidebar({
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">Ofis konsolu</p>
         </div>
         <SidebarCollapseButton />
-      </div>
-
-      <div className={`sb-pad px-3 pt-1.5${simple && variant === "desktop" ? " hidden" : ""}`}>
-        <button
-          type="button"
-          onClick={openPalette}
-          aria-label="Ara: müşteri, portföy, ilan no veya sayfa"
-          title="Ara"
-          className="nav-search focus-ring w-full text-left transition-colors hover:bg-white/10"
-        >
-          <Search className="h-4 w-4 shrink-0" aria-hidden />
-          <span className="sb-label flex-1 truncate text-sm text-white/75">Ad, telefon veya ilan no ara…</span>
-          <ShortcutHint className="sb-label rounded-md border border-white/15 bg-white/8 px-1.5 py-0.5 font-sans text-xs font-semibold text-white/80" />
-        </button>
       </div>
 
       <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
@@ -365,112 +339,30 @@ export function AppSidebar({
         </div>
       </NavScroller>
 
-      <div className="sb-pad space-y-0.5 border-t border-white/8 px-3 py-1.5">
-        <div
-          className="sb-when-collapsed mx-auto h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-white/10 bg-white/8 font-display text-sm font-extrabold text-[var(--gold-300)]"
-          title={`${officeName} · ${plan}`}
-          role="img"
-          aria-label={`${officeName}, ${plan} paketi`}
-        >
-          {officeName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "E"}
+      {/* Alt şerit TEK satır: kompakt ofis durumu çipi (paket + deneme günü / en dolu kullanım; tıklayınca panel)
+          ve vitrin kısayolu. Eski büyük "Ofis durumu" kartı kaldırıldı (kullanıcı geri bildirimi: gereksiz büyük). */}
+      <div className="sb-pad sb-foot flex shrink-0 items-center gap-1 border-t border-white/8 px-3 py-1.5">
+        <div className="min-w-0 flex-1">
+          <OfficeStatusChip
+            officeName={officeName}
+            plan={plan}
+            trial={trial}
+            trialDaysLeft={trialDaysLeft}
+            usage={usage}
+            canUpgrade={canUpgrade}
+            onNavigate={() => setOpen(false)}
+          />
         </div>
-
-        {/* OFİS DURUMU (admin "Sistem durumu" kartının /app karşılığı): paket/deneme günü + en dolu kullanım kalemi,
-            hepsi mevcut veriden (tenant planı, trial_ends_at, plan kullanımı). Ayrıntı açılır; sahte sayı yok. */}
-        <div className="sb-label rounded-[var(--radius-card)] border border-white/12 bg-white/[0.06] p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="sb-eyebrow uppercase text-white/80">Ofis durumu</span>
-            <span
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold ${
-                trial ? "bg-amber-400/15 text-amber-300" : "bg-mint-500/15 text-mint-300"
-              }`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${trial ? "bg-amber-300" : "bg-mint-400"}`} aria-hidden />
-              {trial ? (trialDaysLeft != null ? `Deneme · ${Math.max(0, trialDaysLeft)} gün` : "Deneme") : plan}
-            </span>
-          </div>
-          <p className="mt-2.5 flex items-center gap-2 text-sm font-semibold text-white" title={officeName}>
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${officeTone}`} aria-hidden />
-            <span className="truncate">{officeName}</span>
-          </p>
-          <p className="num mt-1 truncate text-xs font-medium text-white/75">
-            {topUsage
-              ? `${topUsage.label}: ${topUsage.used.toLocaleString("tr-TR")} / ${topUsage.limit.toLocaleString("tr-TR")} · %${Math.round(topRatio * 100)}`
-              : "Paketinizde sayılı kullanım sınırı yok"}
-          </p>
-          {trial ? (
-            <Link
-              href="/app/abonelik"
-              onClick={() => setOpen(false)}
-              className="focus-ring mt-2 flex min-h-8 touch:min-h-11 items-center justify-between gap-2 rounded-[var(--radius-control)] bg-[var(--gold-300)]/15 px-2 text-xs font-semibold text-[var(--gold-300)] transition-colors hover:bg-[var(--gold-300)]/25"
-            >
-              <span>{trialDaysLeft != null ? (trialDaysLeft > 0 ? `Denemenin bitmesine ${trialDaysLeft} gün` : "Deneme süren doldu") : "Deneme sürümü"}</span>
-              <span>Plan seç</span>
-            </Link>
-          ) : null}
-          {usage.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => toggleSection("kullanim-acik")}
-              aria-expanded={usageOpen}
-              aria-controls="sb-kullanim"
-              className="focus-ring mt-2 flex min-h-8 touch:min-h-11 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] text-left text-xs font-semibold text-white/80 hover:text-white"
-            >
-              Kullanım ayrıntısı
-              <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-white/70 transition-transform ${usageOpen ? "" : "-rotate-90"}`} aria-hidden />
-            </button>
-          ) : null}
-          {usageOpen && usage.length > 0 ? (
-            <ul id="sb-kullanim" className="mt-1 space-y-2 pb-1">
-              {usage.map((u) => {
-                const ratio = u.limit > 0 ? Math.min(1, u.used / u.limit) : 0;
-                const tone = ratio >= 0.9 ? "bg-danger-400" : ratio >= 0.75 ? "bg-amber-400" : "bg-mint-400";
-                return (
-                  <li key={u.key}>
-                    <Link href={u.href} onClick={() => setOpen(false)} className="focus-ring group block rounded-[var(--radius-control)]">
-                      <span className="flex items-center justify-between text-xs">
-                        <span className="text-white/80 group-hover:text-white">{u.label}</span>
-                        <span className="num text-white/90">
-                          {u.used.toLocaleString("tr-TR")} / {u.limit.toLocaleString("tr-TR")}
-                        </span>
-                      </span>
-                      <span
-                        className="mt-1 block h-1.5 overflow-hidden rounded-full bg-white/10"
-                        role="meter"
-                        aria-label={`${u.label} kullanımı`}
-                        aria-valuemin={0}
-                        aria-valuemax={u.limit}
-                        aria-valuenow={Math.min(u.used, u.limit)}
-                      >
-                        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.max(ratio * 100, u.used > 0 ? 3 : 0)}%` }} />
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-          <Link
-            href="/app/abonelik"
-            onClick={() => setOpen(false)}
-            className="focus-ring mt-2.5 flex min-h-9 touch:min-h-11 items-center justify-between rounded-[var(--radius-control)] border border-white/15 bg-white/[0.04] px-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
-          >
-            {canUpgrade ? "Paketi yükselt" : "Abonelik ve kullanım"}
-            <ExternalLink className="h-3.5 w-3.5 text-white/70" aria-hidden />
-          </Link>
-        </div>
-
         {vitrinHref ? (
           <a
             href={vitrinHref}
             target="_blank"
             rel="noopener noreferrer"
             title="Ofis vitrinini yeni sekmede aç"
-            className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-8"
+            aria-label="Vitrini görüntüle (yeni sekme)"
+            className="sb-label focus-ring grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-white/70 transition-colors hover:bg-white/8 hover:text-white touch:h-11 touch:w-11"
           >
-            <VitrinIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
-            <span className="sb-label flex-1 truncate">Vitrini görüntüle</span>
-            <ExternalLink className="sb-label h-3.5 w-3.5 shrink-0 text-white/60" aria-hidden />
+            <VitrinIcon className="h-[18px] w-[18px]" aria-hidden />
           </a>
         ) : null}
       </div>

@@ -41,7 +41,8 @@ describe("support ticket action contract", () => {
 
   it("supports internal notes and max-50 bulk operations", () => {
     expect(tickets).toContain('formData.get("visibility")');
-    expect(adminOps).toContain('formData.set("visibility", "internal")');
+    // İç not personel yanıt formundan (visibility=internal) replyTicketAsStaff ile gider; ayrı addInternalTicketNote silindi.
+    expect(readFileSync(resolve(process.cwd(), "src/app/admin/tickets/staff-reply-form.tsx"), "utf8")).toContain('replyData.set("visibility", effectiveVisibility)');
     expect(adminOps).toContain("uniqueValidTicketIds");
     expect(adminOps).toContain("bulkUpdateTickets");
   });

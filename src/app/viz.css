@@ -1,0 +1,39 @@
+/* ============================================================================
+   Grafik DERİNLİK dili ("3B görünüm", WebGL yok) — tek dosya.
+   Kullananlar: src/components/ui/chart.tsx (Recharts) ve src/components/ui/viz/* (saf SVG/CSS).
+   Token'lar: --viz-sheen (üstten ışık), --viz-shade (alt gölge hattı / iç kenar), --viz-shadow (hover gölgesi),
+   --viz-glow (çizgi parlaması opaklığı) → tokens.css + theme-dark.css. SVG filtresi YOK (maliyet): parlama, aynı
+   eğrinin altına çizilmiş kalın ve yarı saydam ikinci çizgidir; gölge yalnız üzerine gelinen TEK öğede (drop-shadow).
+   Hareket: yalnız opacity/transform/stroke-dash*; reduced-motion'da a11y.css süreleri sıfırlar.
+   ========================================================================== */
+
+/* Çubuk ve dilim: üzerine gelinen öne çıkar, diğerleri bir kademe söner (renk tek başına anlam taşımaz; ipucu metni var). */
+.viz-bar, .viz-sector { transition: opacity var(--motion-fast) var(--ease-out); }
+.viz-depth:has(.viz-bar[data-active]) .viz-bar:not([data-active]),
+.viz-depth:has(.viz-sector[data-active]) .viz-sector:not([data-active]) { opacity: 0.55; }
+.viz-bar[data-active], .viz-sector[data-active] { filter: drop-shadow(0 4px 6px var(--viz-shadow)); }
+
+/* Alan/çizgi: parlama katmanı (aynı eğri, kalın, düşük opaklık) ve etkin nokta gölgesi. */
+.viz-glow .recharts-area-curve { stroke-opacity: var(--viz-glow); }
+.viz-dot { filter: drop-shadow(0 2px 3px var(--viz-shadow)); }
+
+/* Eksen etiketleri: sade ama okunur (AA metin tonu); ızgara yalnız yatay ve kesikli (bileşende). */
+.viz-depth .recharts-cartesian-axis-tick-value { fill: var(--text-muted); }
+
+/* Saf CSS çubuk (FunnelChart vb.): üstten ışık + alt gölge hattı; satır üzerine gelince hafif kalkar. */
+.viz-bar-fill {
+  background-image: linear-gradient(180deg, var(--viz-sheen), transparent 72%);
+  box-shadow: inset 0 -2px 0 var(--viz-shade);
+}
+.viz-row:hover .viz-bar-fill, .viz-row:focus-visible .viz-bar-fill {
+  box-shadow: inset 0 -2px 0 var(--viz-shade), 0 3px 8px -3px var(--viz-shadow);
+}
+
+/* Isı haritası hücresi: üst kenarda ince ışık + hairline çerçeve (kabartma hissi, hareket yok). */
+.viz-cell { box-shadow: inset 0 1px 0 var(--viz-sheen), inset 0 0 0 1px var(--hairline); }
+
+/* Değer değişince akıcı geçiş (ilk görünüm süpürmesi motion.css .viz-sweep'te). */
+@media (prefers-reduced-motion: no-preference) {
+  .viz-ring-seg { transition: stroke-dasharray var(--motion-slow) var(--ease-out-expo), stroke-dashoffset var(--motion-slow) var(--ease-out-expo); }
+  .viz-arc-live { transition: stroke-dashoffset 1.2s var(--ease-out-expo); }
+}

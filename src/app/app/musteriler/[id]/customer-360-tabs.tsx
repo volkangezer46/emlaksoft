@@ -19,7 +19,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
 import { DetailTabs, type DetailTabDef } from "@/components/app/detail-tabs";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { formatLeadSource } from "@/lib/lead-sources";

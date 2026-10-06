@@ -4,7 +4,7 @@ import { findRecentKeysByPrefix, insertNotificationsDetailed, type NotificationR
 import { fetchAllPaged, heartbeatFor } from "@/lib/cron-run";
 import { buildDedupeKey, timeBucket } from "@/lib/notify-dedupe";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
 import { authorizeCron } from "@/lib/cron-auth";
 import { runControlStepBroad } from "@/lib/listing-control/server/cron-steps";
@@ -195,7 +195,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Ek adım: kontrol işi planlama + lease hasadı (yeni cron yok; en iyi çaba, teyidi bozmaz).
-  const control = await runControlStepBroad(admin);
+  // Gece turunda kopya portföy taraması da burada yürür (portals modülü kapalı ofisler atlanır).
+  const control = await runControlStepBroad(admin, { disabledTenantIds: new Set(tenantsDisabledFor(disabledModules, "portals")) });
 
   const hb = heartbeatFor({
     total: listings.length,

@@ -5,7 +5,7 @@ import { now, trParts } from "@/lib/clock";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { loadAdvisorMetrics, trYearPeriod, type MetricsViewer } from "@/lib/team/advisor-metrics";
 

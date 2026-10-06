@@ -59,7 +59,6 @@ const MUAF: Record<string, string> = {
   "demo-login.ts::quickDemoLogin": "Demo girişi; kendi bayrağıyla (ENABLE_DEMO_LOGIN) korunuyor.",
   "contracts.ts::signContractByToken": "İmza bağlantısı token ile korunuyor, oturum gerektirmez.",
   "contracts.ts::submitSignatureByToken": "Aynı token akışı.",
-  "compliance.ts::checkAuthorityShield": "Saf hesap; veriye dokunmuyor.",
 
   // --- Token ile korunan portal akislari (oturum YOK, olmamali) ---
   "customer-portal.ts::getCustomerPortalData": "Musteri portali token ile acilir; oturum gerektirmez.",
@@ -102,8 +101,6 @@ const MUAF: Record<string, string> = {
   // --- Acik referans verisi (kiraciya ozel deger icermez) ---
   "geo.ts::listDistricts": "Turkiye idari bolunusu; geo_* tablolari RLS'te herkese acik okunur.",
   "geo.ts::listNeighborhoods": "Ayni.",
-  "geo.ts::searchDistricts": "Ayni.",
-  "property-management.ts::getLookupValues": "Kullanici istemcisiyle okur; RLS kiraci ayrimini yapar, oturum yoksa bos doner.",
   "portal-publish.ts::getConfiguredPortals": "Yalnizca hangi portal adaptorlerinin yapilandirildigini doner; veri icermez.",
 };
 

@@ -1,3 +1,5 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Award, HeartHandshake, MousePointerClick, UserPlus, Wallet, Hourglass, CheckCircle2, Undo2, PiggyBank } from "lucide-react";
@@ -63,12 +65,12 @@ function monthsText(n: number): string {
 
 export default async function BuyumePage({ searchParams }: { searchParams: Promise<{ durum?: string }> }) {
   const { tenantId, perms, role } = await requireModulePage("settings", "/app/buyume");
+  if (!tenantId) return <StaffNoTenantNotice feature="Büyüme ve davetler" />;
   // R1: kazanc/davet verisi yalniz owner/gm (SQL tarafi growth_my_dashboard da ayni kapiyi uygular).
   if (role !== "owner" && role !== "gm") redirect("/app?yetki=yok");
   const sp = await searchParams;
   const durum = parseInviteFilter(sp.durum);
 
-  if (!tenantId) return null;
   const ov = await getReferralOverview(tenantId);
   const base = getBaseUrl();
   const url = ov.code ? buildShortInviteUrl(base, ov.code) : null;
@@ -124,12 +126,12 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
                   </p>
                 </CardContent>
               </Card>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiGrid>
                 <StatCard label="Ödül yüklendi" value={d.paid} icon={CheckCircle2} tone="mint" href={inviteFilterHref("odedi")} />
                 <StatCard label="İptal / iade" value={d.cancelled} icon={Undo2} tone="danger" href={inviteFilterHref("iptal")} />
                 <StatCard label="Kazanılan kredi" value={d.money_visible ? formatTry(d.earned_try) : "Ofis sahibine açık"} icon={Wallet} tone="mint" href={TRY_WALLET_LINKS.wallet} />
                 <StatCard label="Bekleyen kredi" value={d.money_visible ? formatTry(d.pending_try) : "Ofis sahibine açık"} icon={PiggyBank} tone="warning" href={inviteFilterHref("bekliyor")} />
-              </div>
+              </KpiGrid>
             </div>
           ) : null}
 
@@ -276,7 +278,7 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiGrid>
               <StatCard label="Ortak bağlantı tıklaması" value={ov.partner.clicks} icon={MousePointerClick} href="#ortak-baglanti" />
               <StatCard label="Kayıt olan" value={ov.partner.signups} icon={UserPlus} href="#ortak-baglanti" />
               <StatCard label="Ödeyen müşteri" value={ov.partner.payers} icon={CheckCircle2} tone="mint" href="#ortak-komisyon" />
@@ -285,7 +287,7 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
               <StatCard label="Ödenebilir komisyon" value={formatTry(ov.partner.payable_try)} icon={PiggyBank} tone="mint" href="#ortak-komisyon" />
               <StatCard label="Ödenen komisyon" value={formatTry(ov.partner.paid_try)} icon={Wallet} tone="mint" href="#ortak-komisyon" />
               <StatCard label="Geri alınacak" value={formatTry(ov.partner.clawback_due_try)} icon={Undo2} tone="danger" href="#ortak-komisyon" />
-            </div>
+            </KpiGrid>
             <div id="ortak-baglanti" className="rounded-[var(--radius-control)] bg-[var(--surface-sunken)] px-3 py-2 text-sm">
               <p className="text-xs font-semibold text-text-muted">Ortak bağlantı</p>
               <code className="block overflow-x-auto text-sm text-text">{buildPartnerUrl(base, ov.partner.code)}</code>

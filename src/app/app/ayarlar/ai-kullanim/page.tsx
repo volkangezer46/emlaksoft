@@ -1,3 +1,4 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
@@ -54,7 +55,8 @@ function BucketList({ items, total, label }: { items: { name: string; b: UsageBu
  */
 export default async function AiUsagePage() {
   const { tenantId, role } = await requireModulePage("settings", "/app/ayarlar/ai-kullanim");
-  if (!canManageModules(role) || !tenantId) redirect("/app?yetki=yok");
+  if (!tenantId) return <StaffNoTenantNotice feature="AI kullanımı" />;
+  if (!canManageModules(role)) redirect("/app?yetki=yok");
 
   const u = await getTenantUsage(tenantId);
   const ai = u.ai;

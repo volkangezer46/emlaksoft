@@ -14,7 +14,7 @@ import {
 import { requireModulePage } from "@/lib/require-module-page";
 import { searchWorkspace, type SearchHit } from "@/app/actions/search";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { NlPanel } from "./nl-panel";
 
 /**

@@ -100,6 +100,66 @@ export async function listControlProperties(
   return { available: true, rows, nextCursor: rows.length === limit && last ? { riskScore: last.risk_score, propertyId: last.property_id } : null };
 }
 
+export type DistrictSummaryRow = {
+  district_id: string | null;
+  district_name: string | null;
+  total_active: number;
+  in_portals: number;
+  awaiting_publish: number;
+  portal_missing: number;
+  price_mismatch: number;
+  in_review: number;
+  unverifiable: number;
+  healthy: number;
+};
+
+/** Bölge (ilçe) kırılımı (20261007000220; rol kapsamlı, sayı = liste). RPC yoksa available:false. */
+export async function getDistrictSummary(db: Db, includeSample = false): Promise<{ available: boolean; rows: DistrictSummaryRow[] }> {
+  const { data, error } = await db.rpc("listing_control_district_summary", { p_include_sample: includeSample });
+  if (error) {
+    if (!isMissingSchema(error)) console.error("listing_control_district_summary", { code: error.code });
+    return { available: false, rows: [] };
+  }
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    district_id: (r.district_id as string | null) ?? null,
+    district_name: (r.district_name as string | null) ?? null,
+    total_active: num(r.total_active),
+    in_portals: num(r.in_portals),
+    awaiting_publish: num(r.awaiting_publish),
+    portal_missing: num(r.portal_missing),
+    price_mismatch: num(r.price_mismatch),
+    in_review: num(r.in_review),
+    unverifiable: num(r.unverifiable),
+    healthy: num(r.healthy),
+  }));
+  return { available: true, rows };
+}
+
+/** İlçe filtreli KPI listesi (sayı ile AYNI k_* kolonu; `districtId` null = ilçesi girilmemiş portföyler). */
+export async function listControlPropertiesByDistrict(
+  db: Db,
+  kpi: KpiKey,
+  districtId: string | null,
+  opts: { limit?: number; after?: { riskScore: number; propertyId: string } | null; includeSample?: boolean } = {},
+): Promise<{ available: boolean; rows: ControlListRow[]; nextCursor: { riskScore: number; propertyId: string } | null }> {
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  const { data, error } = await db.rpc("listing_control_list_district", {
+    p_kpi: kpi,
+    p_district_id: districtId,
+    p_limit: limit,
+    p_after_risk: opts.after?.riskScore ?? null,
+    p_after_id: opts.after?.propertyId ?? null,
+    p_include_sample: opts.includeSample ?? false,
+  });
+  if (error) {
+    if (!isMissingSchema(error)) console.error("listing_control_list_district", { code: error.code });
+    return { available: false, rows: [], nextCursor: null };
+  }
+  const rows = ((data ?? []) as ControlListRow[]).map((r) => ({ ...r, risk_score: num(r.risk_score), open_anomalies: num(r.open_anomalies), portals_live: num(r.portals_live) }));
+  const last = rows[rows.length - 1];
+  return { available: true, rows, nextCursor: rows.length === limit && last ? { riskScore: last.risk_score, propertyId: last.property_id } : null };
+}
+
 /** "Dünden beri değişenler". */
 export async function getChangesSince(db: Db, sinceIso: string): Promise<{ available: boolean; changes: ControlChanges | null }> {
   const { data, error } = await db.rpc("listing_control_changes_since", { p_since: sinceIso });

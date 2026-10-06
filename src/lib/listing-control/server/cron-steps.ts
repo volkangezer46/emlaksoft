@@ -3,13 +3,15 @@ import { loadListingControlConfig, type Db } from "./db";
 import { consumeControlEvents } from "./events";
 import { planVerificationJobs, reapJobs } from "./queue";
 import { runControlSweep } from "./sweep";
+import { runDuplicateScan } from "./duplicates";
 
 /**
  * Mevcut cron'lara EKLENEN ilan kontrol adımları (yeni cron YOK; sayı değişmez). Her adım en iyi çabadır: hata mevcut
  * cron işini (havuz atama, portal teyit) BOZMAZ. service_role istemcisi cron GET'inden gelir (zaten kabul listesinde).
  *  - havuz-atama (10 dk): olay tüketimi (tarayıcı işçisi sonuçları), değerlendirme taraması (yayınlanmayan portföy, yetki), lease hasadı, iş planlama.
  *    SLA YÜKSELTME burada DEĞİL: tek SLA zinciri `leak-sla` cron'unda (saatlik; kapanış SLA'sı ile aynı yerde).
- *  - portal-teyit (6 saat): geniş iş planlama + hasat (aynı iş idempotent; açık iş tekil).
+ *  - portal-teyit (6 saat): geniş iş planlama + hasat (aynı iş idempotent; açık iş tekil) + GÜNLÜK kopya portföy
+ *    taraması (yalnız UTC 00-06 turunda; `server/duplicates.ts`).
  */
 
 export type ControlStepSummary = { text: string; ok: boolean };
@@ -41,23 +43,38 @@ export async function runControlStepFrequent(db: Db, disabledTenantIds: Readonly
   }
 }
 
-export async function runControlStepBroad(db: Db): Promise<ControlStepSummary> {
+/** Kopya portföy taraması günde BİR kez: `portal-teyit` (6 saatte bir) yalnız gece turunda (UTC 00-06) tarar. */
+export function isDailyDuplicateWindow(nowMs: number): boolean {
+  return new Date(nowMs).getUTCHours() < 6;
+}
+
+export async function runControlStepBroad(db: Db, opts: { disabledTenantIds?: ReadonlySet<string> } = {}): Promise<ControlStepSummary> {
   try {
+    const startedAt = now();
     const reaped = await reapJobs(db);
     const cache = new Map<string, Awaited<ReturnType<typeof loadListingControlConfig>>>();
-    const plan = await planVerificationJobs(
-      db,
-      async (tenantId) => {
-        let c = cache.get(tenantId);
-        if (!c) {
-          c = await loadListingControlConfig(db, tenantId);
-          cache.set(tenantId, c);
-        }
-        return c;
-      },
-      now(),
-    );
-    return { ok: true, text: `${plan.enqueued} kontrol işi planlandı (${plan.tenantsWithClients} cihazlı ofis), ${reaped.requeued} hasat` };
+    const cfgFor = async (tenantId: string) => {
+      let c = cache.get(tenantId);
+      if (!c) {
+        c = await loadListingControlConfig(db, tenantId);
+        cache.set(tenantId, c);
+      }
+      return c;
+    };
+    const plan = await planVerificationJobs(db, cfgFor, now());
+    let dupText = "";
+    if (isDailyDuplicateWindow(startedAt)) {
+      const dup = await runDuplicateScan(db, {
+        deadlineMs: startedAt + 150_000,
+        cfgFor,
+        disabledTenantIds: opts.disabledTenantIds,
+        rotateSeed: Math.floor(startedAt / 86_400_000),
+      });
+      dupText = dup.schemaMissing
+        ? " · kopya taraması: şema yok"
+        : ` · kopya taraması: ${dup.tenants} ofis, ${dup.pairs} çift, ${dup.opened} açıldı, ${dup.closed} kapandı${dup.timedOut ? " (süre doldu, kalan yarın)" : ""}`;
+    }
+    return { ok: true, text: `${plan.enqueued} kontrol işi planlandı (${plan.tenantsWithClients} cihazlı ofis), ${reaped.requeued} hasat${dupText}` };
   } catch (err) {
     console.error("runControlStepBroad", err);
     return { ok: false, text: "kontrol planlama başarısız" };

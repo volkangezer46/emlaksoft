@@ -32,7 +32,7 @@ import {
 } from "@/lib/leave-utils";
 import { approveLeaveForm, deleteLeaveForm, rejectLeaveForm } from "@/app/actions/staff-leaves";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { AddLeavePanel, AddLeaveTrigger } from "./leave-form";
 
 import { PageHeader } from "@/components/ui/page-header";

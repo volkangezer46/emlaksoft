@@ -14,7 +14,7 @@ const KIND_LABEL: Record<(typeof ADMIN_GRANT_KINDS)[number], string> = { manual:
 type Mode = "grant" | "reverse";
 
 /**
- * Hesap kredisi (TL) — yalnız süper admin. Yükleme ve geri alma `admin-account-credit` eylemleriyle; denetim önce yazılır,
+ * Hesap kredisi (₺) — yalnız süper admin. Yükleme ve geri alma `admin-account-credit` eylemleriyle; denetim önce yazılır,
  * çift gönderim `request_id` ile engellenir (ilk gönderimde istemcide crypto.randomUUID ile üretilir, başarıdan sonra yenilenir). Bakiye burada okunmaz;
  * işlem sonucu mesajı eylemden gelir. Gönderimden önce satır içi onay (geri alma geri döndürülemez uyarısı).
  */
@@ -47,7 +47,7 @@ export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; gra
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="hesap-kredisi-baslik" className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
-            <Coins className="h-4 w-4 text-[var(--pm-gold-text)]" aria-hidden /> Hesap kredisi (TL)
+            <Coins className="h-4 w-4 text-[var(--pm-gold-text)]" aria-hidden /> Hesap kredisi (₺)
           </h2>
           <p className="mt-0.5 text-xs text-text-muted">Ofisin faturalarında kullanılabilen TL kredisi. Her işlem gerekçesiyle denetim kaydına yazılır.</p>
         </div>
@@ -84,7 +84,7 @@ export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; gra
         }}
       >
         <input type="hidden" name="tenant_id" value={tenantId} />
-        <FormField label="Tutar (TL)" htmlFor="kredi-tutar" required hint={`En fazla ${ADMIN_CREDIT_MAX_TRY.toLocaleString("tr-TR")} TL; kuruş için virgül.`}>
+        <FormField label="Tutar (₺)" htmlFor="kredi-tutar" required hint={`En fazla ${ADMIN_CREDIT_MAX_TRY.toLocaleString("tr-TR")} ₺; kuruş için virgül.`}>
           <FormInput id="kredi-tutar" name="amount" inputMode="decimal" required autoComplete="off" placeholder="Örn. 500" onChange={() => setConfirming(false)} />
         </FormField>
         {mode === "grant" ? (

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -30,6 +30,13 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { Progress } from "@/components/ui/progress";
 import { formatNumberTr } from "@/lib/format";
+import {
+  SIGNUP_FIELD_STEP,
+  signupErrorTarget,
+  signupFieldInputId,
+  signupPhoneClientError,
+  type SignupField,
+} from "@/lib/signup-errors";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
@@ -61,16 +68,6 @@ const STEPS = [
   { no: 6, label: "Başla", question: "Ofisin dolu mu gelsin, boş mu?", icon: Rocket },
 ] as const;
 const LAST = STEPS.length;
-
-/**
- * Sunucu hatasını ilgili adıma eşler — kullanıcı son adımda gönderir ama hata
- * 1. adımdaki e-posta/telefona ya da 2. adımdaki ofis bilgisine ait olabilir.
- */
-function errorStep(message: string): 1 | 2 | null {
-  if (message.includes("e-posta zaten") || message.includes("cep telefonu") || message.includes("Şifre")) return 1;
-  if (message.includes("Ofis") || message.includes("firma")) return 2;
-  return null;
-}
 
 const inputCls =
   "w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-3.5 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
@@ -148,9 +145,11 @@ export function RegisterForm({
   const formRef = useRef<HTMLFormElement>(null);
   // Sunucu yanıtı işlendi mi (hata dönünce ilgili adıma geçiş, render sırasında durum ayarı; efekt yok).
   const [handledState, setHandledState] = useState(state);
+  // Alan hataları ALANIN ALTINDA, ilgili adımda gösterilir; kullanıcı alanı değiştirince o alanın hatası silinir.
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<SignupField, string>>>({});
+  // Alanla eşleşmeyen sunucu hatası (kayıt kapalı, hız sınırı, teknik hata): yalnız son adımın bandında.
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
-
-  const errorTargetStep = state.error ? errorStep(state.error) : null;
   // Paket önerisi fiyat sayfasındaki hesaplayıcıyla AYNI motordan gelir (sabit eşik yok).
   const selection = registrationSelection(plans, offers, seats, initialCycle, seatsTouched ? null : initialPlan);
   const selectedPlanId = selection.planId as PlanId;
@@ -170,10 +169,62 @@ export function RegisterForm({
     };
   }, [provinceId]);
 
-  // Sunucu hatası dönünce ilgili adıma dön (kullanıcı 6. adımda kalıp hatayı görmesin).
+  // Sunucu hatası dönünce: alan hatasıysa o alanın adımına dön + alanın altına yaz; değilse genel bant.
   if (state !== handledState) {
     setHandledState(state);
-    if (errorTargetStep) setStep(errorTargetStep);
+    const target = signupErrorTarget(state);
+    if (target.kind === "field") {
+      setFieldErrors({ [target.field]: target.message });
+      setGeneralError(null);
+      setStep(target.step);
+    } else {
+      setFieldErrors({});
+      setGeneralError(target.kind === "general" ? target.message : null);
+    }
+  }
+
+  // Alan hatasında adım değiştikten sonra alanı odakla (yalnız DOM işlemi; durum ayarı yok).
+  useEffect(() => {
+    const target = signupErrorTarget(state);
+    if (target.kind !== "field") return;
+    document.getElementById(signupFieldInputId(target.field))?.focus();
+  }, [state]);
+
+  function clearFieldError(field: SignupField) {
+    setFieldErrors((cur) => {
+      if (!cur[field]) return cur;
+      const rest = { ...cur };
+      delete rest[field];
+      return rest;
+    });
+  }
+
+  /** Form içi değişiklik: değişen alanın (data-field) hatası ve genel bant temizlenir. */
+  function handleFormChange(e: React.FormEvent<HTMLFormElement>) {
+    const host = (e.target as HTMLElement).closest<HTMLElement>("[data-field]");
+    const field = host?.dataset.field as SignupField | undefined;
+    if (field) clearFieldError(field);
+    if (generalError) setGeneralError(null);
+  }
+
+  /**
+   * React `<form action>` iş bitince formu otomatik sıfırlar; sunucu hatasından sonra ad/e-posta/ofis
+   * alanları boşalırdı. Elle gönderip sıfırlamayı engelliyoruz (değerler düzeltme için yerinde kalır).
+   */
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(() => action(fd));
+  }
+
+  function fieldErrorEl(field: SignupField) {
+    const msg = fieldErrors[field];
+    if (!msg) return null;
+    return (
+      <p id={`${field}-error`} role="alert" className="mt-1 text-xs font-medium text-danger-strong">
+        {msg}
+      </p>
+    );
   }
 
   function commitSeats(n: number) {
@@ -195,6 +246,22 @@ export function RegisterForm({
 
   function next() {
     if (!validateStep(step)) return;
+    if (step === 1) {
+      // Telefon opsiyonel ama girildiyse TR cep olmalı (sunucu aynı kuralı parsePhoneStrict ile uygular).
+      const stored = formRef.current?.querySelector<HTMLInputElement>('input[type="hidden"][name="phone"]')?.value;
+      const phoneError = signupPhoneClientError(stored);
+      if (phoneError) {
+        setFieldErrors((cur) => ({ ...cur, phone: phoneError }));
+        document.getElementById("phone")?.focus();
+        return;
+      }
+    }
+    // Bu adımda düzeltilmemiş alan hatası varsa ilerleme; alanı odakla.
+    const pending = (Object.keys(fieldErrors) as SignupField[]).find((f) => SIGNUP_FIELD_STEP[f] === step);
+    if (pending) {
+      document.getElementById(signupFieldInputId(pending))?.focus();
+      return;
+    }
     setStep((s) => Math.min(s + 1, LAST));
   }
   function back() {
@@ -286,7 +353,7 @@ export function RegisterForm({
 
         <InviteBanner invite={invite} />
 
-        <form ref={formRef} action={action} className="mt-6" encType="multipart/form-data">
+        <form ref={formRef} onSubmit={handleSubmit} onChange={handleFormChange} className="mt-6" encType="multipart/form-data">
           <input type="hidden" name="plan" value={selectedPlanId} />
           <input type="hidden" name="cycle" value={initialCycle} />
           <input type="hidden" name="agents" value={selection.teamSize} />
@@ -307,27 +374,30 @@ export function RegisterForm({
 
           {/* ADIM 1 — Hesap */}
           <div data-step="1" className={step === 1 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
-            <div>
+            <div data-field="name">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="name">Ad soyad</label>
               <div className="relative">
                 <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input id="name" name="name" required autoComplete="name" placeholder="Adınız Soyadınız" className={inputCls} />
+                <input id="name" name="name" required autoComplete="name" placeholder="Adınız Soyadınız" className={inputCls} aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "name-error" : undefined} />
               </div>
+              {fieldErrorEl("name")}
             </div>
-            <div>
+            <div data-field="email">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="email">E-posta</label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <EmailInput id="email" name="email" required autoComplete="email" placeholder="ornek@ofis.com" className={inputCls} />
+                <EmailInput id="email" name="email" required autoComplete="email" placeholder="ornek@ofis.com" className={inputCls} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={fieldErrors.email ? "email-error" : undefined} />
               </div>
+              {fieldErrorEl("email")}
             </div>
-            <div>
+            <div data-field="phone">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="phone">
-                Telefon <span className="font-normal text-text-faint">(opsiyonel)</span>
+                Telefon <span className="font-normal text-text-faint">(opsiyonel, cep)</span>
               </label>
-              <PhoneInput id="phone" name="phone" className={plainInputCls} />
+              <PhoneInput id="phone" name="phone" className={plainInputCls} aria-invalid={fieldErrors.phone ? true : undefined} aria-describedby={fieldErrors.phone ? "phone-error" : undefined} />
+              {fieldErrorEl("phone")}
             </div>
-            <div>
+            <div data-field="password">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="password">Şifre</label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
@@ -353,6 +423,7 @@ export function RegisterForm({
                 </button>
               </div>
               <PasswordStrengthMeter password={pw} />
+              {fieldErrorEl("password")}
             </div>
             <button type="button" onClick={next} className={primaryBtn}>
               Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
@@ -361,12 +432,13 @@ export function RegisterForm({
 
           {/* ADIM 2 — Ofis */}
           <div data-step="2" className={step === 2 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
-            <div>
+            <div data-field="company">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="company">Ofis / firma adı</label>
               <div className="relative">
                 <Building2 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input id="company" name="company" required placeholder="Örn. Gezertaşar Emlak" className={inputCls} />
+                <input id="company" name="company" required placeholder="Örn. Gezertaşar Emlak" className={inputCls} aria-invalid={fieldErrors.company ? true : undefined} aria-describedby={fieldErrors.company ? "company-error" : undefined} />
               </div>
+              {fieldErrorEl("company")}
             </div>
             <div>
               <p className="mb-1.5 text-sm font-semibold text-ink-900">Ofisin konumu</p>
@@ -683,22 +755,21 @@ export function RegisterForm({
               <dd className="font-semibold text-ink-950">{trialText} · kart gerekmez</dd>
             </dl>
 
+            <div data-field="legal_consent">
             <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
-              <input type="checkbox" name="legal_consent" value="accepted" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
+              <input id="legal_consent" type="checkbox" name="legal_consent" value="accepted" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" aria-invalid={fieldErrors.legal_consent ? true : undefined} aria-describedby={fieldErrors.legal_consent ? "legal_consent-error" : undefined} />
               <span>
                 <Link href="/kullanim-sartlari" target="_blank" className="font-semibold text-brand-600 hover:underline">Kullanım Şartları</Link>&apos;nı ve{" "}
                 <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-brand-600 hover:underline">KVKK Aydınlatma Metni</Link>&apos;ni okudum, kabul ediyorum.
               </span>
             </label>
+            {fieldErrorEl("legal_consent")}
+            </div>
 
-            {state.error ? (
+            {/* Genel bant: yalnız alanla eşleşmeyen sunucu hatası (alan hataları kendi adımında, alanın altında). */}
+            {generalError ? (
               <div className="rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5" role="alert">
-                <p className="text-sm font-medium text-danger-600">{state.error}</p>
-                {errorTargetStep ? (
-                  <button type="button" onClick={() => setStep(errorTargetStep)} className="mt-2 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 bg-surface px-3 py-1.5 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/10">
-                    <ArrowLeft className="h-3.5 w-3.5" /> {errorTargetStep}. adıma dön ({STEPS[errorTargetStep - 1]!.label})
-                  </button>
-                ) : null}
+                <p className="text-sm font-medium text-danger-600">{generalError}</p>
               </div>
             ) : null}
 
@@ -721,12 +792,6 @@ export function RegisterForm({
             <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · {trialText} · Taahhütsüz</p>
           </div>
 
-          {/* Hata başka adımda gösterilirken de görünür kalsın (1-5. adımlarda) */}
-          {state.error && step !== LAST ? (
-            <div className="mt-4 rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5" role="alert">
-              <p className="text-sm font-medium text-danger-600">{state.error}</p>
-            </div>
-          ) : null}
         </form>
 
         <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">

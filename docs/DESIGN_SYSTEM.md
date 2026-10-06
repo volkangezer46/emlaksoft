@@ -126,10 +126,37 @@ Hepsi `src/components/ui`; ton/ikon karosu mevcut `.pm-t-*` + `.pm-ico` (yeni to
 - **İllüstrasyon:** `CitySkyline` (hero), `ev`, `anahtar`, `haritaPin` (+ mevcut `liste`, `basari` …); hepsi
   `currentColor` + token, < 6 KB.
 - **Kabuk:** iki yan menü + çekmece `.sb-surface` (lacivert degrade); aktif öğe DOLGULU vurgu hapı (beyaz yazı
-  `--accent` üstünde AA) + kayan altın çizgi; admin menüsünde "Sistem durumu" kartı gerçek sağlık verisinden
-  (`getAdminHealth`: DB yanıt süresi, cron sayısı/hatalı iş adı, "Son kontrol" = ölçüm anı). Üst çubuk: ev ikonlu konum
-  şeridi, yuvarlak arama kapsülü (Ctrl K), dolgulu "Hızlı erişim", canlı saat hapı, zil, `UserMenuFace` (tek yüz).
+  `--accent` üstünde AA) + kayan altın çizgi. Durum bilgisi KART DEĞİL ÇİP: /admin üst çubukta `SystemStatusChip`
+  (`getAdminHealth`), /app yan menü altında `OfficeStatusChip` (nokta + paket + deneme günü / en dolu kullanım yüzdesi +
+  ince çubuk; daraltılmış menüde yalnız nokta; tıklayınca popover: paket, kullanım kalemleri, "Paketi yönet"; saf karar
+  `lib/app-shell/office-status.ts`). Yan menüde arama kutusu YOK (üst çubuk Ctrl K tek arama). Üst çubuk: ev ikonlu konum
+  şeridi, yuvarlak arama kapsülü (Ctrl K), dolgulu "Hızlı erişim", kompakt skor hapı, zil, `UserMenuFace` (tek yüz).
   Bilgi şeridi (MFA/geliştirme modu) içerikte yuvarlak `tone-warning` kart.
+- **ScopeSwitch (`ui/scope-switch`):** "Ofis geneli | Benim işlerim" (Building2 / User), `.ds-seg` ailesi, kayan hap,
+  altında tek satır açıklama, `role=radiogroup` + `aria-checked` + ok tuşları; URL `?kapsam=` + son seçim çerezi `es_scope`
+  (`lib/ui/scope.ts`: URL > çerez > "ben"; yönetim rolü değilse daima "ben"). Yalnız yönetim rollerinde çizilir.
+
+### Kurumsal yoğun ölçek ve yerleşim (2026-10)
+
+| Öğe | Normal (kök 15 px) | Kaynak |
+|---|---|---|
+| Kök yazı | %93,75 (Küçük %87,5, Büyük %112,5 = erişilebilirlik, 44 px dokunma) | `console.css` + `lib/font-scale.ts` |
+| Gövde / küçük / en küçük | 14 / 13 / 12 px (12'nin altı yok, `max(12px, …)`) | kabukta `--text-base/sm/xs` |
+| Sayfa başlığı (`PageHeader` h1, `text-2xl`) | 20 px | `--text-2xl` |
+| Hero selamlaması | 21-26 px (mobil 21) | `.ds-hero-title` |
+| KPI sayısı | ~24 px (`--fs-kpi`), büyük ~26 px | `.pm-value` |
+| Kart başlığı | 14 px (`SectionHeader` `text-base`) | |
+| Düğme / girdi | 34 px (`md`), girdi `py-[0.4375rem]`; dokunmada 44 px | `button.tsx`, `input.tsx` |
+| Yan menü öğesi | 13 px / 34 px | `.nav-row lg:min-h-9` |
+
+- **Genişlik:** /app ve /admin içerik izi `minmax(0,1600px)` ve ortalı (`justify-center`); liste/tablo bu sınırda tam
+  genişlik. Form sayfası `FormPage` `max-w-4xl` ortalı. `PageHeader` eylemleri başlık satırıyla aynı hizada.
+- **KpiGrid (TEK, `ui/dashboard-grid`; `ui/kpi-card` yeniden dışa aktarır):** esnek satır (`.kpi-flow`): satır başına
+  `--kpi-cols` kart (`kpiFlowCols(n)`: mobil 2; 5 → xl'de 5, 6 → xl'de 6, 7+ → md'de 4), `flex-grow` son satırı eşit
+  genişlikte doldurur → yarım/boş hücre yok, tek kalan kart tam genişlik; boşluk tek token `--kpi-gap`; dar kartta
+  (< 11,5 rem, container query) ikon karosu gizlenir. Sabit `grid-cols-4/5/6` KPI şeridi YAZILMAZ.
+- **DashboardGrid:** doğrudan `DashCell` çocuklarının span'ları her kırılımda `fillRowSpans` ile satırı tamamlar
+  (md'de 3+3+3 → 3+3+6, tek kalan 7 → 12); `span.xxl` ile 2xl (1536+) ayrı düzen.
 
 ### Hareket katmanı (`src/components/ui/motion`)
 
@@ -457,6 +484,28 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 | `ChartCard` (= `ChartFrame`) | her grafik kartı | başlık, `period`, `href`, `loading` (iskelet), `empty` (anlamlı boş durum) |
 | `SkeletonCard` | yükleniyor | `.skeleton` parlaması, sabit yükseklik (CLS yok); `lazy-chart` bunu kullanır |
 | `CountUp` | KPI sayısı | `value` metin ya da sayı + `format="number\|money\|percent"`; SSR sonucu basar; admin `CountUp` ve `OdometerNumber` bunun eski adlarıdır |
+| `DonutRing` | küçük pay dağılımı (danışman/ofis payı, kanal) | saf SVG, istemci bileşeninde de kullanılır; `segments[{label,value,color\|tone}]`, `children` merkez; değer değişince dilimler akıcı kayar (`.viz-ring-seg`); toplam ≤0 → `null`. İpuçlu/tıklanabilir dağılım için `DonutSplit` |
+
+**API ekleri (2026-10-06):** `RadialGauge` → `trackColor` (yatak rengi), `fluid` (kapsayıcıyı doldurur; TV panosu), `live`
+(ilk süpürme yerine değer değişiminde akıcı geçiş). `FunnelChart` → `tone`. Recharts sarmalayıcıları (`ui/lazy-charts`):
+`BarCompare` / `DonutSplit` → `hrefKey` (satırdaki hedef adres alanı; tıklayınca filtreli sayfa) + `hint` (ipucu alt satırı).
+Sayfaya özel Recharts kopyası YAZILMAZ: tıklanabilirlik/biçim gerekiyorsa bu bileşenlere prop eklenir (`viz-depth-contract.test.ts`
+recharts içe aktarımını yalnız `ui/chart.tsx`'e kilitler; eski `danisman-kpi/revenue-chart` ve `giderler/category-donut` silindi).
+
+### Grafik derinlik dili ("3B görünüm", WebGL yok)
+
+Kod: `src/app/viz.css` + `ui/chart.tsx` + `ui/viz/*`. Token: `--viz-sheen` (üstten ışık), `--viz-shade` (alt gölge hattı / iç kenar),
+`--viz-shadow` (yalnız üzerine gelinen öğe), `--viz-glow` (çizgi parlaması opaklığı); açık değer `tokens.css`, koyu `theme-dark.css`.
+- **Çubuk:** yuvarlatılmış uç + üstten ışık degradesi (grafik başına tek `linearGradient`) + taban gölge hattı; üzerine gelinen öne
+  çıkar (drop-shadow), diğerleri %55'e söner (`.viz-depth:has(.viz-bar[data-active])`).
+- **Halka:** halka kalınlığı boyunca tek "tüp" degradesi (`ui/viz/tube-gradient.tsx`: iç kenar gölge → ortada saydam → dış kenar
+  ışık; ayrı şerit gibi okunmaz); Recharts dilimi, `RadialGauge` ve `DonutRing` aynı bileşeni kullanır. Etkin dilim 4 px dışarı taşar.
+- **Alan:** 3 duraklı degrade + çizginin altında kalın, yarı saydam ikinci eğri (parlama). SVG `filter` KULLANILMAZ (maliyet; test).
+- **Eksen/ızgara:** yalnız yatay kesikli ızgara, 4-5 değer etiketi, eksen çizgisi yok, etiket `--text-muted` (AA).
+- **Dönem değişimi:** aynı bileşen yeni veriyle çizilince Recharts eski değerden yeniye canlandırır; `AreaTrendChart` `animationKey`.
+- **Kontrast (test):** ışık katmanı çubuğun yarı yüksekliğinde bile `--viz-1..8`'i `--surface` üzerinde ≥3:1 tutar (iki tema).
+  Her zaman koyu hero bantlarındaki halka yatağı `--viz-track-inverse`; /app, /admin ve ortak bileşen SVG'lerinde sabit renk yok
+  (istisna: üçüncü taraf marka logoları, harita işaretçisi).
 
 Boş durum illüstrasyonları: `Illustration kind="funnel\|gauge\|heatmap"`.
 **Kural:** grafik yalnız gerçek veriyle çizilir; veri yoksa `null` döner ya da `ChartCard empty` gösterilir. Görünen her sayı/dilim/aşama mümkünse `href` ile filtrelenmiş hedefe gider (sıfır çıkmaz metrik).
@@ -493,7 +542,7 @@ Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--
 
 ### Karar: 3B, GIF, Lottie, degrade, motion (güncel: 2026-10-06)
 
-- **3B pasta/çubuk yok:** derinlik algıyı bozar (ön dilim büyük görünür); yanıltıcı. Derinlik ipucu yalnız yüzey katmanları, ince iç ışık çizgisi (`--inner-top`), yumuşak gölge ve çizgi altı gradyan ile verilir.
+- **3B pasta/çubuk yok:** derinlik algıyı bozar (ön dilim büyük görünür); yanıltıcı. Derinlik ipucu yalnız yüzey katmanları, ince iç ışık çizgisi (`--inner-top`), yumuşak gölge ve çizgi altı gradyan ile verilir → uygulaması aşağıdaki "Grafik derinlik dili" (perspektif/eğim YOK, oran bozulmaz).
 - **GIF yok:** tema duyarsız (koyu/açık), ağır, erişilemez. Hareket SVG + CSS illüstrasyon animasyonlarıdır (`ui/illustrations`, `motion.css`).
 - **Lottie yok:** yeni bağımlılık + paket büyümesi + tema renklerine bağlanamama; SVG+CSS aynı işi ölçülü ve kurumsal yapar.
 - **Dekoratif degrade:** yalnız `DashboardHero` bandında, çok hafif ve hareketli (yukarıdaki kurallar); kart/panel

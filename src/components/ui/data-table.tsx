@@ -33,7 +33,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { EmptyStateV3 } from "./empty-state-v3";
+import { EmptyStateV3 } from "./empty-state";
 import { Skeleton } from "./skeleton";
 import { Table, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "./table";
 import {

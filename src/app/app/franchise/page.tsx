@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -205,7 +206,7 @@ export default async function FranchiseBiPage({
       </section>
 
       {/* Konsolide KPI'lar — tüm şubelerin toplamı; her kart ilgili modüle iner */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <KpiGrid>
         <StatCard label="Toplam portföy" value={totalProps} icon={Home} href="/app/portfoyler" />
         <StatCard label="Toplam müşteri" value={totalCust} icon={Users} href="/app/musteriler" />
         <StatCard label="Aktif danışman" value={totalAdv} icon={Users} href="/app/ekip" />
@@ -223,7 +224,7 @@ export default async function FranchiseBiPage({
           tone="success"
           href="/app/anlasmalar"
         />
-      </div>
+      </KpiGrid>
 
       {/* Dönem seçici — GET formu (?from=&to=) + hızlı çipler; varsayılan tüm zamanlar */}
       <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">

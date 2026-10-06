@@ -5,7 +5,7 @@ import { trDayKey } from "@/lib/clock";
 import { dayHeading } from "@/lib/activity-timeline";
 import { categoryOf, ENTITY_LABEL, entityHref, feedActionLabel, FEED_CATEGORIES } from "@/lib/oversight/feed";
 import { feedParams, hasFeedFilter, type FeedFilters, type FeedPage, type FeedRow } from "@/lib/oversight/feed-query";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const RISK_CHIP: Record<Exclude<RiskLevel, "dusuk">, { label: string; cls: string }> = {
   yuksek: { label: "Yüksek risk", cls: "bg-danger-500/10 text-danger-600" },

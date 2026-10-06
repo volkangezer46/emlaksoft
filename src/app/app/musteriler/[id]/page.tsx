@@ -38,6 +38,7 @@ import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activi
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { CustomerOwnedListings } from "@/components/app/customer-owned-listings";
 import { Wallet } from "lucide-react";
+import { ReassignAdvisorForm } from "./reassign-advisor-form";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
@@ -557,6 +558,9 @@ export default async function CustomerDetailPage({
                     sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
                   />
                 ) : null}
+                {canEdit && (editAdvisors ?? []).length > 0 ? (
+                  <ReassignAdvisorForm customerId={customer.id} current={customer.assigned_to} advisors={(editAdvisors ?? []) as { id: string; full_name: string }[]} />
+                ) : null}
                 {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}
                 </MoreActions>
               </div>
@@ -567,7 +571,7 @@ export default async function CustomerDetailPage({
             <div className="relative grid h-28 w-28 shrink-0 place-items-center">
               <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
               <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="8" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="8" />
                 <circle
                   cx="50"
                   cy="50"

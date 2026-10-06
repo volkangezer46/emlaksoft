@@ -65,7 +65,8 @@ describe("menü yapısı", () => {
   it("tüm modüller en az bir başlıkta erişilebilir", () => {
     const used = new Set(NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.module, ...(i.tabs?.map((t) => t.module) ?? [])])));
     // `matching`: Talepler sayfasının "Eşleşme" sekmesi (sayfa içi sekme, ?sekme=eslesme); kendi izniyle gizlenir.
-    const missing = ALL_MODULES.filter((m) => !used.has(m) && m !== "dashboard" && m !== "matching");
+    // `leak`: Kayıp-Kaçak Kalkanı İlan Kontrol alt gezinmesinin "Kapanış kayıpları" sekmesi (matchPaths; tek menü girişi).
+    const missing = ALL_MODULES.filter((m) => !used.has(m) && m !== "dashboard" && m !== "matching" && m !== "leak");
     expect(missing).toEqual([]);
   });
 
@@ -94,6 +95,26 @@ describe("menü yapısı", () => {
       const res = resolveActiveNav(path, visibleSections(ALL_MODULES));
       expect(res.href, path).not.toBeNull();
     }
+  });
+});
+
+describe("mükerrer menü girişi yok (2026-10)", () => {
+  const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
+  it("Kayıp-kaçak yalnız İlan Kontrol alt sekmesidir; sayfa yolu korunur ve İlan Kontrol öğesini etkin yapar", () => {
+    expect(menu).not.toContain("/app/kayip-kacak");
+    expect(ALL_NAV_HREFS).toContain("/app/kayip-kacak");
+    expect(resolveActiveNav("/app/kayip-kacak", visibleSections(ALL_MODULES)).href).toBe("/app/ilan-kontrol");
+  });
+  it("TV panosu menü öğesi değil (ana ekran 'TV modu' düğmesi); Brifing menüde yok", () => {
+    expect(menu).not.toContain("/app/pano-tv");
+    expect(menu).not.toContain("/app/brifing");
+    expect(resolveActiveNav("/app/pano-tv", visibleSections(ALL_MODULES)).href).toBe("/app/danisman-kpi");
+  });
+  it("Ekip performansı TEK öğe: Özet / Lig / Kıyas; Ekip Merkezi bu sekmeleri tekrar etmez", () => {
+    const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Ekip performansı");
+    expect(perf?.tabs?.map((t) => t.label)).toEqual(["Özet", "Lig", "Kıyas"]);
+    const ekip = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.href === "/app/ekip");
+    for (const h of ["/app/lig", "/app/danisman-kpi", "/app/ekip/kiyas"]) expect(ekip?.tabs?.map((t) => t.href)).not.toContain(h);
   });
 });
 
@@ -132,8 +153,10 @@ describe("sekmeli menü öğeleri", () => {
     const sections = visibleSections(ALL_MODULES);
     expect(resolveActiveNav("/app/cuzdan", sections).href).toBe("/app/komisyon");
     expect(resolveActiveNav("/app/onaylar", sections).href).toBe("/app/komisyon");
-    expect(resolveActiveNav("/app/lig", sections).href).toBe("/app/ekip");
-    expect(resolveActiveNav("/app/danisman-kpi", sections).href).toBe("/app/ekip");
+    expect(resolveActiveNav("/app/lig", sections).href).toBe("/app/danisman-kpi");
+    expect(resolveActiveNav("/app/danisman-kpi", sections).href).toBe("/app/danisman-kpi");
+    expect(resolveActiveNav("/app/ekip/kiyas", sections).href).toBe("/app/danisman-kpi");
+    expect(resolveActiveNav("/app/ekip/devir", sections).href).toBe("/app/ekip");
     expect(resolveActiveNav("/app/kira-artis", sections).href).toBe("/app/kiralama");
     expect(resolveActiveNav("/app/hesaplayici", sections).href).toBe("/app/hesaplayici");
   });

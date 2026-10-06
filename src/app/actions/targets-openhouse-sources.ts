@@ -11,48 +11,6 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 
 export type TargetResult = { ok?: boolean; error?: string; id?: string };
 
-export async function upsertTarget(
-  _prev: TargetResult,
-  fd: FormData,
-): Promise<TargetResult> {
-  const gate = await requirePermission("targets", "create");
-  if (!gate.ok) return { error: gate.error };
-
-  const profileId     = String(fd.get("profile_id")     ?? "").trim() || null;
-  const period        = String(fd.get("period")         ?? "monthly").trim();
-  const periodStart   = String(fd.get("period_start")   ?? "").trim();
-  const targetDeals   = parseInt(String(fd.get("target_deals")   ?? "0"));
-  const targetRevenue = parseFloat(String(fd.get("target_revenue") ?? "0"));
-
-  if (!periodStart) return { error: "Dönem başlangıcı zorunludur." };
-
-  const references = await validateTenantReferences(gate.tenantId, { profileId });
-  if (!references.ok) return { error: references.error };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("targets")
-    .upsert(
-      {
-        tenant_id:      gate.tenantId,
-        profile_id:     profileId,
-        period,
-        period_start:   periodStart,
-        target_deals:   isNaN(targetDeals)   ? 0 : targetDeals,
-        target_revenue: isNaN(targetRevenue) ? 0 : targetRevenue,
-        updated_at:     new Date().toISOString(),
-      },
-      { onConflict: "tenant_id,profile_id,period,period_start" },
-    )
-    .select("id")
-    .single();
-
-  if (error || !data) return { error: "Hedef kaydedilemedi." };
-
-  revalidatePath("/app/hedefler");
-  return { ok: true, id: data.id };
-}
-
 const TARGET_PERIODS = ["monthly", "quarterly", "yearly"] as const;
 
 /** Hedef formu alanlarını tek yerden ayrıştırır (create + update aynı formu kullanır). */
@@ -365,49 +323,3 @@ export async function listOpenHouses() {
 // ============================================================
 
 export type LeadSourceResult = { ok?: boolean; error?: string };
-
-export async function updateCustomerLeadSource(
-  customerId: string,
-  leadSource: string,
-  leadSourceDetail?: string,
-): Promise<LeadSourceResult> {
-  const gate = await requirePermission("customers", "edit");
-  if (!gate.ok) return { error: gate.error };
-
-  const supabase = await createClient();
-  await supabase
-    .from("customers")
-    .update({
-      lead_source:        leadSource || null,
-      lead_source_detail: leadSourceDetail || null,
-    })
-    .eq("id", customerId)
-    .eq("tenant_id", gate.tenantId);
-
-  revalidatePath(`/app/musteriler/${customerId}`);
-  revalidatePath("/app/musteriler");
-  return { ok: true };
-}
-
-export async function getLeadSourceStats() {
-  const gate = await requirePermission("reports", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("customers")
-    .select("lead_source")
-    .eq("tenant_id", gate.tenantId)
-    .not("lead_source", "is", null)
-    .limit(10000);
-
-  const counts = new Map<string, number>();
-  for (const row of data ?? []) {
-    const src = row.lead_source ?? "diger";
-    counts.set(src, (counts.get(src) ?? 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .map(([source, count]) => ({ source, count }))
-    .sort((a, b) => b.count - a.count);
-}

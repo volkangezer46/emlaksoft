@@ -10,6 +10,8 @@ import { formatViz, vizToneColor, type VizFormat, type VizTone } from "./colors"
  *
  * - Tek veya çift seri, ortak ölçek (sıfırdan en büyük değere). İkinci seri kesikli çizgidir:
  *   seri ayrımı yalnız renge bağlı değildir.
+ * - Derinlik (viz.css token'ları): katmanlı (3 duraklı) degrade dolgu + çizginin altında kalın, yarı saydam parlama
+ *   çizgisi (SVG filtresi yok).
  * - Hareket: ilk görünümde çizgi soldan açılır (clipPath), alan yumuşakça belirir; bir kez.
  *   reduced-motion'da hareket sınıfları oynamaz → bitiş durumu (motion.css).
  * - Erişilebilirlik: role="img" + özet etiket + sr-only veri tablosu. `href` verilirse
@@ -97,7 +99,8 @@ export function AreaChart({
             </clipPath>
             {geo.map((g, i) => (
               <linearGradient key={i} id={`viz-ar-${uid}-${i}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={g.color} stopOpacity="0.28" />
+                <stop offset="0%" stopColor={g.color} stopOpacity="0.3" />
+                <stop offset="45%" stopColor={g.color} stopOpacity="0.12" />
                 <stop offset="100%" stopColor={g.color} stopOpacity="0" />
               </linearGradient>
             ))}
@@ -112,6 +115,21 @@ export function AreaChart({
             <path key={`a${i}`} d={g.area} fill={`url(#viz-ar-${uid}-${i})`} className="viz-fade" />
           ))}
           <g clipPath={`url(#${clipId})`}>
+            {geo.map((g, i) =>
+              i === 0 ? (
+                <path
+                  key={`gl${i}`}
+                  d={g.line}
+                  fill="none"
+                  stroke={g.color}
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ strokeOpacity: "var(--viz-glow)" }}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : null,
+            )}
             {geo.map((g, i) => (
               <path
                 key={`l${i}`}
@@ -190,7 +208,7 @@ export function AreaChart({
 
   if (!href) return body;
   return (
-    <Link href={href} aria-label={hrefLabel}className="block rounded-[var(--radius-control)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
+    <Link href={href} aria-label={hrefLabel} className="block rounded-[var(--radius-control)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
       {body}
     </Link>
   );

@@ -34,15 +34,13 @@ const ICON: Record<MetricKey, ComponentType<{ className?: string }>> = {
   "yanit-suresi": Timer,
 };
 
-/** 360 px'te iki sütun (KpiGrid'in 1-2-3 kartlık düzenleri tek sütunla başlar). */
-const NARROW_TWO = "grid-cols-2";
-
 /** KPI ızgarası iskeleti: gerçek kartlarla aynı ızgara ve ölçü (CLS yok). */
-export function MetrikSeridiIskelet({ rows = 4 }: { rows?: number }) {
+export function MetrikSeridiIskelet({ rows = 4, caption = false }: { rows?: number; caption?: boolean }) {
   return (
-    <div role="status" aria-busy="true">
+    <div role="status" aria-busy="true" className={caption ? "flex flex-col gap-1.5" : undefined}>
       <span className="sr-only">Göstergeler yükleniyor</span>
-      <KpiGrid count={rows} stagger={false} label="Göstergeler yükleniyor" className={rows > 1 ? NARROW_TWO : undefined}>
+      {caption ? <span className="ds-eyebrow block" aria-hidden="true">&nbsp;</span> : null}
+      <KpiGrid count={rows} stagger={false} label="Göstergeler yükleniyor">
         {Array.from({ length: rows }).map((_, i) => (
           <KpiCardSkeleton key={i} />
         ))}
@@ -223,8 +221,10 @@ export async function MetrikSeridi({ ctx, keys, label = "Özet göstergeler" }: 
   const built = await Promise.all(keys.map((k) => buildMetric(k, ctx).catch(() => null)));
   const metrics = dedupeMetrics(built.filter((m): m is MetricSpec => m !== null && hasContext(m)));
   if (metrics.length === 0) return null;
-  return (
-    <KpiGrid count={metrics.length} label={label} className={metrics.length > 1 ? NARROW_TWO : undefined}>
+  // Kapsam geçişi olan yönetim ekranında göstergelerin kimin olduğu AÇIKÇA yazılır (Ofis geneli / Sizin).
+  const scopeCaption = ctx.isManagement ? (ctx.scopeMine ? "Sizin göstergeleriniz" : "Ofis geneli göstergeleri") : null;
+  const grid = (
+    <KpiGrid count={metrics.length} label={scopeCaption ?? label}>
       {metrics.map((m) => (
         <KpiCard
           key={m.key}
@@ -242,5 +242,14 @@ export async function MetrikSeridi({ ctx, keys, label = "Özet göstergeler" }: 
         />
       ))}
     </KpiGrid>
+  );
+  if (!scopeCaption) return grid;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="ds-eyebrow" aria-hidden="true">
+        {scopeCaption}
+      </p>
+      {grid}
+    </div>
   );
 }

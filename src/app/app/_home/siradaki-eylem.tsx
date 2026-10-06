@@ -14,7 +14,7 @@ import {
   loadTodayAppointments,
   type HomeCtx,
 } from "./data";
-import { apptTypeLabel } from "./format";
+import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { overdueListingsOf } from "./helpers";
 import { SKIP_COOKIE, buildNextActions, parseSkipCookie, pickNextAction, type NextActionTone } from "./siradaki";
 import { SiradakiGec } from "./siradaki-gec";
@@ -65,7 +65,7 @@ export async function SiradakiEylem({ ctx }: { ctx: HomeCtx }) {
   const actions = buildNextActions({
     appointmentsToday: appts.total || appts.rows.length,
     firstAppointment: first
-      ? { time: formatTrTime(first.scheduled_at), type: apptTypeLabel[first.appointment_type] ?? first.appointment_type }
+      ? { time: formatTrTime(first.scheduled_at), type: appointmentTypeLabel(first.appointment_type) }
       : null,
     tasksOverdue: tasks.overdue,
     hotLeads: hot,

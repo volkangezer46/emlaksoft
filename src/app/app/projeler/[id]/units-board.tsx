@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowUpRight, BadgeCheck, Building2, Clock3, KeyRound, LayoutGrid, Undo2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { AlertTriangle, ArrowUpRight, BadgeCheck, Building2, Clock3, KeyRound, LayoutGrid, Pencil, Save, Undo2, X } from "lucide-react";
+import { FormField, Input, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -17,6 +17,8 @@ import {
   releaseUnit,
   reserveUnit,
   sellUnit,
+  updateUnit,
+  type ProjectResult,
   type UnitRow,
   type UnitStatus,
 } from "@/app/actions/projects";
@@ -80,7 +82,9 @@ export function UnitsBoard({
   const [customerId, setCustomerId] = useState("");
   const [optionDays, setOptionDays] = useState("7");
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
+  const panelRef = useRef<HTMLElement>(null);
 
   // Render saflığı: Date.now() render içinde çağrılamaz (react-hooks/purity).
   // Mount anındaki zaman yeterli — opsiyon süresi dakika hassasiyeti istemiyor.
@@ -136,7 +140,18 @@ export function UnitsBoard({
     setCustomerId("");
     setOptionDays("7");
     setError(null);
+    setEditing(false);
   };
+  const closeUnit = () => {
+    setSelectedId(null);
+    setEditing(false);
+  };
+
+  // Daire seçilince sayfa içi panel görünür alana gelir (popup yok).
+  useEffect(() => {
+    if (!selectedId) return;
+    panelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedId]);
 
   const run = (fn: () => Promise<{ ok?: boolean; error?: string }>, closeOnSuccess = true) => {
     startTransition(async () => {
@@ -146,7 +161,7 @@ export function UnitsBoard({
         return;
       }
       setError(null);
-      if (closeOnSuccess) setSelectedId(null);
+      if (closeOnSuccess) closeUnit();
       router.refresh();
     });
   };
@@ -220,95 +235,58 @@ export function UnitsBoard({
         ) : null}
       </div>
 
-      {units.length === 0 ? (
-        <EmptyState illustration="portfoy"
-          icon={LayoutGrid}
-          title="Henüz daire eklenmedi"
-          description={'Sağ üstteki "Daire ekle" ile tekil daire girin ya da "Çoğalt" sekmesiyle kat kat üretin.'}
-        />
-      ) : filtered.length === 0 ? (
-        <EmptyState illustration="portfoy"
-          icon={LayoutGrid}
-          title="Filtreye uyan daire yok"
-          description="Durum ya da blok filtresini değiştirip tekrar deneyin."
-          tone="amber"
-        />
-      ) : (
-        <div className="space-y-5">
-          {grouped.map(({ blockName, floors }) => (
-            <div key={blockName} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-              <h3 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
-                <Building2 className="h-4 w-4 text-brand-600" />
-                {blockName === GENEL_BLOK ? "Blok belirtilmemiş" : `${blockName} Blok`}
-              </h3>
-              <div className="mt-4 space-y-2.5">
-                {floors.map(({ floor, list }) => (
-                  <div key={floor ?? "x"} className="flex items-start gap-3">
-                    <span className="numeric mt-1.5 w-14 shrink-0 text-right text-xs font-bold text-text-faint">
-                      {floor == null ? "Kat —" : floor === 0 ? "Zemin" : `Kat ${floor}`}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {list.map((u) => {
-                        const meta = STATUS_META[u.status];
-                        const expired = isExpired(u, now);
-                        return (
-                          <button
-                            key={u.id}
-                            type="button"
-                            onClick={() => openUnit(u.id)}
-                            title={`Daire ${u.unit_no} — ${meta.label}${expired ? " (opsiyon doldu)" : ""}`}
-                            className={`focus-ring press relative rounded-[var(--radius-control)] border px-2.5 py-1.5 text-left transition ${meta.chip} ${
-                              expired ? "ring-2 ring-amber-400/70" : ""
-                            }`}
-                          >
-                            <span className="numeric block text-xs font-bold">{u.unit_no}</span>
-                            <span className="block text-xs opacity-80">{u.rooms ?? "—"}</span>
-                            {expired ? (
-                              <span
-                                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-amber-400 text-white"
-                                aria-label="Opsiyon süresi doldu"
-                              >
-                                <AlertTriangle className="h-2.5 w-2.5" />
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
+      {/* Daire detay + durum akışı + bilgi düzenleme: sayfa içi panel (popup değil) */}
+      {selected ? (
+        <section
+          ref={panelRef}
+          aria-labelledby="daire-panel-title"
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !e.defaultPrevented) closeUnit();
+          }}
+          className="motion-enter scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-brand-300 bg-surface shadow-[var(--elev-2)]"
+        >
+              <header className="hairline-b flex items-start justify-between gap-4 px-4 py-4 md:px-6">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-50 text-brand-600 [&_svg]:h-5 [&_svg]:w-5">
+                    <LayoutGrid />
+                  </span>
+                  <div>
+                    <h2 id="daire-panel-title" className="font-display text-base font-bold text-ink-950">
+                      {`${selected.block ? `${selected.block} Blok — ` : ""}Daire ${selected.unit_no}`}
+                    </h2>
+                    <p className="text-xs text-text-muted">
+                      {`${STATUS_META[selected.status].label}${isExpired(selected, now) ? " — opsiyon süresi doldu" : ""}`}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Durum açıklaması (legend) */}
-      <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-text-muted">
-        {(Object.keys(STATUS_META) as UnitStatus[]).map((s) => (
-          <span key={s} className="flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-full ${STATUS_META[s].dot}`} />
-            {STATUS_META[s].label}
-          </span>
-        ))}
-        <span className="flex items-center gap-1.5">
-          <AlertTriangle className="h-3 w-3 text-amber-600" /> Opsiyon süresi doldu
-        </span>
-      </div>
-
-      {/* Daire detay + durum akışı */}
-      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelectedId(null)}>
-        <DialogContent size="md">
-          {selected ? (
-            <>
-              <DialogHeader
-                icon={<LayoutGrid />}
-                title={`${selected.block ? `${selected.block} Blok — ` : ""}Daire ${selected.unit_no}`}
-                description={`${STATUS_META[selected.status].label}${
-                  isExpired(selected, now) ? " — opsiyon süresi doldu" : ""
-                }`}
-              />
-              <div className="space-y-4 p-6">
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {canEdit && !editing ? (
+                    <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                      <Pencil className="h-4 w-4" /> Bilgileri düzenle
+                    </Button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={closeUnit}
+                    aria-label="Paneli kapat"
+                    className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-ink-950"
+                  >
+                    <X className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </div>
+              </header>
+              <div className="space-y-4 px-4 py-4 md:px-6">
+                {editing ? (
+                  <UnitEditForm
+                    key={selected.id}
+                    unit={selected}
+                    onCancel={() => setEditing(false)}
+                    onSaved={() => {
+                      setEditing(false);
+                      router.refresh();
+                    }}
+                  />
+                ) : (
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-[var(--radius-card)] border border-line bg-canvas p-4 text-sm">
                   <dt className="text-text-muted">Kat</dt>
                   <dd className="text-right font-semibold text-ink-950">
@@ -370,6 +348,7 @@ export function UnitsBoard({
                     </>
                   ) : null}
                 </dl>
+                )}
 
                 {/* Ödeme planı — yalnızca kaporalı/satılan dairede anlamlı */}
                 {selected.status === "deposit" || selected.status === "sold" ? (
@@ -457,7 +436,7 @@ export function UnitsBoard({
                                 if (res.error) setError(res.error);
                                 else {
                                   setError(null);
-                                  setSelectedId(null);
+                                  closeUnit();
                                   router.refresh();
                                 }
                               }
@@ -482,7 +461,7 @@ export function UnitsBoard({
                             if (res.error) setError(res.error);
                             else {
                               setError(null);
-                              setSelectedId(null);
+                              closeUnit();
                               router.refresh();
                             }
                           }}
@@ -501,10 +480,142 @@ export function UnitsBoard({
                   </div>
                 ) : null}
               </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+        </section>
+      ) : null}
+
+      {units.length === 0 ? (
+        <EmptyState illustration="portfoy"
+          icon={LayoutGrid}
+          title="Henüz daire eklenmedi"
+          description={'Sağ üstteki "Daire ekle" ile tekil daire girin ya da "Çoğalt" sekmesiyle kat kat üretin.'}
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState illustration="portfoy"
+          icon={LayoutGrid}
+          title="Filtreye uyan daire yok"
+          description="Durum ya da blok filtresini değiştirip tekrar deneyin."
+          tone="amber"
+        />
+      ) : (
+        <div className="space-y-5">
+          {grouped.map(({ blockName, floors }) => (
+            <div key={blockName} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+              <h3 className="flex items-center gap-2 font-display text-sm font-bold text-ink-950">
+                <Building2 className="h-4 w-4 text-brand-600" />
+                {blockName === GENEL_BLOK ? "Blok belirtilmemiş" : `${blockName} Blok`}
+              </h3>
+              <div className="mt-4 space-y-2.5">
+                {floors.map(({ floor, list }) => (
+                  <div key={floor ?? "x"} className="flex items-start gap-3">
+                    <span className="numeric mt-1.5 w-14 shrink-0 text-right text-xs font-bold text-text-faint">
+                      {floor == null ? "Kat —" : floor === 0 ? "Zemin" : `Kat ${floor}`}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {list.map((u) => {
+                        const meta = STATUS_META[u.status];
+                        const expired = isExpired(u, now);
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => openUnit(u.id)}
+                            title={`Daire ${u.unit_no} — ${meta.label}${expired ? " (opsiyon doldu)" : ""}`}
+                            className={`focus-ring press relative rounded-[var(--radius-control)] border px-2.5 py-1.5 text-left transition ${meta.chip} ${
+                              expired ? "ring-2 ring-amber-400/70" : ""
+                            }`}
+                          >
+                            <span className="numeric block text-xs font-bold">{u.unit_no}</span>
+                            <span className="block text-xs opacity-80">{u.rooms ?? "—"}</span>
+                            {expired ? (
+                              <span
+                                className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-amber-400 text-white"
+                                aria-label="Opsiyon süresi doldu"
+                              >
+                                <AlertTriangle className="h-2.5 w-2.5" />
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Durum açıklaması (legend) */}
+      <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-text-muted">
+        {(Object.keys(STATUS_META) as UnitStatus[]).map((s) => (
+          <span key={s} className="flex items-center gap-1.5">
+            <span className={`h-2 w-2 rounded-full ${STATUS_META[s].dot}`} />
+            {STATUS_META[s].label}
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5">
+          <AlertTriangle className="h-3 w-3 text-amber-600" /> Opsiyon süresi doldu
+        </span>
+      </div>
+
     </section>
+  );
+}
+
+const unitInit: ProjectResult = {};
+
+/** Daire bilgisi düzenleme (blok, kat, no, oda, m², fiyat, not). Durum kendi akışındadır (rezerve/kapora/satış). */
+function UnitEditForm({ unit, onCancel, onSaved }: { unit: UnitRow; onCancel: () => void; onSaved: () => void }) {
+  const [state, action, pending] = useActionState(updateUnit, unitInit);
+  useEffect(() => {
+    if (state.ok) onSaved();
+  }, [state, onSaved]);
+  const priceLocked = unit.status === "sold";
+
+  return (
+    <form action={action} className="space-y-4">
+      <input type="hidden" name="id" value={unit.id} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <FormField label="Blok" htmlFor="ue-block">
+          <Input id="ue-block" name="block" maxLength={40} defaultValue={unit.block ?? ""} />
+        </FormField>
+        <FormField label="Kat" htmlFor="ue-floor">
+          <Input id="ue-floor" name="floor" type="number" step={1} defaultValue={unit.floor ?? ""} />
+        </FormField>
+        <FormField label="Daire no" htmlFor="ue-no" required>
+          <Input id="ue-no" name="unit_no" required maxLength={20} defaultValue={unit.unit_no} />
+        </FormField>
+        <FormField label="Oda" htmlFor="ue-rooms">
+          <Input id="ue-rooms" name="rooms" maxLength={20} placeholder="2+1" defaultValue={unit.rooms ?? ""} />
+        </FormField>
+        <FormField label="Brüt m²" htmlFor="ue-m2">
+          <Input id="ue-m2" name="gross_m2" type="number" min={1} step="0.1" defaultValue={unit.gross_m2 ?? ""} />
+        </FormField>
+        <FormField
+          label="Liste fiyatı (₺)"
+          htmlFor="ue-price"
+          hint={priceLocked ? "Satılmış dairenin fiyatı değiştirilemez." : "Ödeme planı varsa önce plan silinmelidir."}
+        >
+          <Input id="ue-price" name="list_price" type="number" min={0} step={1000} defaultValue={unit.list_price ?? ""} readOnly={priceLocked} />
+        </FormField>
+      </div>
+      <FormField label="Not" htmlFor="ue-notes">
+        <Textarea id="ue-notes" name="notes" rows={2} maxLength={1000} defaultValue={unit.notes ?? ""} />
+      </FormField>
+      {state.error ? (
+        <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+          {state.error}
+        </p>
+      ) : null}
+      <div className="hairline-t flex justify-end gap-2 pt-4">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Vazgeç
+        </Button>
+        <Button type="submit" loading={pending}>
+          <Save className="h-4 w-4" /> Kaydet
+        </Button>
+      </div>
+    </form>
   );
 }

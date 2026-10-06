@@ -129,11 +129,11 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
           <input name="q" defaultValue={filter.q ?? ""} maxLength={80} placeholder="Ara…" className={`${selectClass} w-44`} />
         </label>
         <label className="text-xs font-semibold text-text-muted">
-          En az (TL)
+          En az (₺)
           <input name="min" inputMode="decimal" defaultValue={sp.min ?? ""} className={`${selectClass} w-24`} />
         </label>
         <label className="text-xs font-semibold text-text-muted">
-          En çok (TL)
+          En çok (₺)
           <input name="max" inputMode="decimal" defaultValue={sp.max ?? ""} className={`${selectClass} w-24`} />
         </label>
         <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">

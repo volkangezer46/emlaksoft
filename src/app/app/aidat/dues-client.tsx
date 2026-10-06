@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Check, CheckCheck, Coins, Loader2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { createDue, toggleDuePaid, deleteDue, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
 import { useToast } from "@/components/app/toast-provider";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";

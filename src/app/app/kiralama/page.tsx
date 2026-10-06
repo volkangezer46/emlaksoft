@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Badge } from "@/components/ui/badge";
 import { ApplyIncreaseDialog } from "./apply-increase-dialog";

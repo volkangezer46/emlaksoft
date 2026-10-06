@@ -219,11 +219,51 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
   const st = (state.data ?? null) as { health_score: number | null; lifecycle_stage: string; stage_since: string | null; assigned_at: string | null; exit_kind: string | null } | null;
   const anRows = (anomalies.data ?? []) as { id: string; type: string; status: string; risk_score: number | null; first_seen_at: string; explained_at: string | null; explained_reason_code: string | null; resolved_at: string | null }[];
 
+  // Aşama geçişleri (20261007000200) ve portal ilanı kapanış kayıtları: ayrı, hataya dayanıklı okumalar (tablo yoksa atlanır).
+  const [stageRes, closureRes, extraRes] = await Promise.all([
+    db.from("lc_lifecycle_events").select("created_at, from_stage, to_stage, actor_id, actor_source, reason").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(40),
+    ls.length
+      ? db.from("listing_closures").select("portal_listing_id, reason, created_by, created_at").in("portal_listing_id", ls.map((l) => l.id)).order("created_at", { ascending: false }).limit(40)
+      : Promise.resolve({ data: [], error: null }),
+    ls.length
+      ? db.from("portal_listings").select("id, ended_reason, removal_reason, published_by").in("id", ls.map((l) => l.id))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const stageRows = stageRes.error ? [] : ((stageRes.data ?? []) as { created_at: string; from_stage: string | null; to_stage: string; actor_id: string | null; actor_source: "user" | "inferred" | "system"; reason: string | null }[]);
+  const closureRows = closureRes.error ? [] : ((closureRes.data ?? []) as { portal_listing_id: string; reason: string | null; created_by: string | null; created_at: string }[]);
+  const extraRows = extraRes.error ? [] : ((extraRes.data ?? []) as { id: string; ended_reason: string | null; removal_reason: string | null; published_by: string | null }[]);
+  const closureByListing = new Map<string, { reason: string | null; created_by: string | null }>();
+  for (const c of closureRows) if (!closureByListing.has(c.portal_listing_id)) closureByListing.set(c.portal_listing_id, c);
+  const extraById = new Map(extraRows.map((r) => [r.id, r]));
+  const actorNames = await loadProfileNames(db, [
+    ...stageRows.map((s) => s.actor_id),
+    ...closureRows.map((c) => c.created_by),
+    ...extraRows.map((r) => r.published_by),
+  ]);
+
   const timeline = buildLifecycleTimeline({
     createdAt: p?.created_at ?? null,
     assignedAt: st?.assigned_at ?? null,
     stage: st ? { stage: st.lifecycle_stage, since: st.stage_since } : null,
-    listings: ls,
+    stageEvents: stageRows.map((s) => ({
+      at: s.created_at,
+      from: s.from_stage,
+      to: s.to_stage,
+      actorName: s.actor_id ? (actorNames.get(s.actor_id) ?? null) : null,
+      actorSource: s.actor_source,
+      reason: s.reason,
+    })),
+    listings: ls.map((l) => {
+      const x = extraById.get(l.id);
+      const c = closureByListing.get(l.id);
+      return {
+        ...l,
+        endedReason: x?.ended_reason ?? null,
+        removalReason: c?.reason ?? x?.removal_reason ?? null,
+        removedByName: c?.created_by ? (actorNames.get(c.created_by) ?? null) : null,
+        publishedByName: x?.published_by ? (actorNames.get(x.published_by) ?? null) : null,
+      };
+    }),
     verifications: ((verifs.data ?? []) as { checked_at: string; result: string; state_after: string | null; portal_listing_id: string }[]).map((v) => ({
       checkedAt: v.checked_at, portal: portalById.get(v.portal_listing_id) ?? "Portal", result: v.result, stateAfter: v.state_after,
     })),

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getBaseUrl } from "@/lib/base-url";
 import { CopySurveyLinkButton, CreateSurveyButton } from "./survey-actions";
 import { formatDateTr } from "@/lib/format";

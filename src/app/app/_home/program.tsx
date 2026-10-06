@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { loadTodayAppointments, type HomeCtx } from "./data";
-import { apptTypeLabel, timeFmt } from "./format";
+import { formatTrTime } from "@/lib/clock";
+import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { scheduleWarnings, scheduleWarningText } from "./home-brief";
 
 /**
@@ -17,8 +18,8 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
     return {
       id: a.id as string,
       at: new Date(a.scheduled_at as string).getTime(),
-      time: timeFmt.format(new Date(a.scheduled_at as string)),
-      type: apptTypeLabel[a.appointment_type] ?? a.appointment_type,
+      time: formatTrTime(a.scheduled_at as string),
+      type: appointmentTypeLabel(a.appointment_type),
       customer: (cust?.full_name as string | undefined) ?? null,
       pending: a.status === "pending",
     };

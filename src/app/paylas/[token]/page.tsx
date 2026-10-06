@@ -11,6 +11,7 @@ import { ShareFeedback } from "@/components/public/share-feedback";
 import { ShareButton } from "@/components/public/share-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { isPublicListingImage } from "@/lib/public-property-media";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { normalizeExternalHref } from "@/lib/external-href";
@@ -173,7 +174,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       .maybeSingle(),
     admin
       .from("property_media")
-      .select("id, kind, external_url, is_cover")
+      .select("id, kind, file_type, file_name, external_url, is_cover")
       .eq("property_id", share.entity_id)
       .eq("tenant_id", share.tenant_id)
       .order("is_cover", { ascending: false })
@@ -210,7 +211,8 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const description = await fetchDescription(admin, share.entity_id, share.tenant_id, property.features);
 
   const media = mediaRows ?? [];
-  const images = media.filter((m) => m.kind === "image");
+  // KVKK P0-9: belge gibi görünen görsel (tapu, yetki belgesi...) paylaşım linkinde gösterilmez (tek kural).
+  const images = media.filter((m) => isPublicListingImage(m));
   const tours = media.flatMap((item) => {
     const externalUrl = normalizeExternalHref(item.external_url);
     return item.kind !== "image" && externalUrl

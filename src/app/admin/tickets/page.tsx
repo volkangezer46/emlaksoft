@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -507,7 +508,7 @@ export default async function AdminTicketsPage({
         </div>
       </header>
 
-      <section aria-label="Destek özeti" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <KpiGrid label="Destek özeti">
         <MetricCard label="Toplam talep" value={total} hint="Tüm zamanlar" icon={Inbox} tone="brand" href={metricHrefFor()} />
         <MetricCard
           label="Açık kuyruk"
@@ -520,7 +521,7 @@ export default async function AdminTicketsPage({
         <MetricCard label="Acil talep" value={urgent} hint={urgent > 0 ? "Öncelikli müdahale" : "Kritik bekleyen yok"} icon={Siren} tone="danger" href={metricHrefFor({ oncelik: "urgent", durum: "acik" })} />
         <MetricCard label="Ort. çözüm süresi" value={averageLabel} hint="Tüm sonuçlanan kayıtlardan" icon={TimerReset} tone="cyan" />
         <MetricCard label="Çözüm oranı" value={`%${solveRate}`} hint={`${resolved}/${total} sonuçlandırıldı`} icon={CheckCircle2} tone="mint" href={metricHrefFor({ durum: "cozulmus" })} />
-      </section>
+      </KpiGrid>
 
       <section aria-label="Destek analitiği" className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-[0.95fr_1.45fr_0.9fr]">
         <TicketStatusDonut segments={donutSegments} total={total} />

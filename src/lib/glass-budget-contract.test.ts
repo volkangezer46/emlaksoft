@@ -41,6 +41,8 @@ const CSS_ENVANTERI: Record<string, string[]> = {
   // .glass / .glass-dark / .glass-card / .mega-backdrop: eski yardımcılar; hiçbir bileşen kullanmıyor (aşağıda sabit).
   "src/app/globals.css": [".glass", ".glass-dark", ".mega-backdrop", ".glass-card", ".glass-bar"],
   "src/app/marketing.css": [".mk-nav::before", ".mk-portals"],
+  // Mega menü paneli: yalnız panel yüzeyinin arkası hafif bulanık (2026-10-06); açıkken arkadaki demo döngüsü durur.
+  "src/app/marketing-sections.css": [".mk-mega-in"],
 };
 
 /** Tailwind `backdrop-blur-*` sınıfı taşıyabilen ortak bileşenler: yalnız geçici modal örtüleri. */
@@ -129,5 +131,12 @@ describe("cam yüzey bütçesi", () => {
       const b = body(marketing, head);
       for (const sel of CSS_ENVANTERI["src/app/marketing.css"]!) expect(b, `${head}: ${sel}`).toContain(sel);
     }
+    const sections = stripCssComments(read("src/app/marketing-sections.css"));
+    for (const head of [supports, media]) {
+      const b = body(sections, head);
+      for (const sel of CSS_ENVANTERI["src/app/marketing-sections.css"]!) expect(b, `${head}: ${sel}`).toContain(`${sel} { background: #ffffff`);
+    }
+    // Panel açıkken arkadaki sonsuz demo döngüsü durur (bulanıklık her karede yeniden hesaplanmaz).
+    expect(sections).toMatch(/html:has\(\.mk-nav\[data-menu\]\) \.mk-demo[^{]*\{[^}]*animation-play-state:\s*paused/);
   });
 });

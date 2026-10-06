@@ -1,9 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { RadioTower } from "lucide-react";
 import { daysAgoIso, now } from "@/lib/clock";
-import { BRIDGE_RESPONSE_SOURCE, bridgeInstalled, parseBridgeMessage, requestProbe } from "@/lib/listing-control/worker/bridge";
+import {
+  BRIDGE_DEFER_ERRORS,
+  BRIDGE_RESPONSE_SOURCE,
+  bridgeAutorun,
+  bridgeInstalled,
+  bridgePaused,
+  parseBridgeMessage,
+  requestProbe,
+} from "@/lib/listing-control/worker/bridge";
+import { EXTENSION_INSTALL_PATH } from "@/lib/listing-control/worker/extension-copy";
 import { nextDelayMs, replyToReport, workerGate, WORKER_LIMITS, type StepOutcome } from "@/lib/listing-control/worker/core";
 import { workerClaim, workerComplete, workerRegister, workerRelease } from "@/app/actions/listing-control-worker";
 
@@ -11,7 +21,9 @@ import { workerClaim, workerComplete, workerRegister, workerRelease } from "@/ap
  * Tarayıcı doğrulama işçisi (görünmez döngü + küçük durum satırı). Kullanıcı İlan Kontrol bölümünü açık tuttuğu sürece,
  * sekme görünürken ve çevrimiçiyken, yavaş hızda (iş arası >= 20 sn, saatte <= 60) kendi tarayıcısından portal
  * ilanlarını teyit eder. Kural ve sınırlar `lib/listing-control/worker/core.ts`; sunucu tarafı `lc_worker_*` RPC'leri
- * (kullanıcı JWT'si). Köprü (tarayıcı eklentisi) yoksa HİÇ iş talep edilmez: sahte doğrulama üretilmez.
+ * (kullanıcı JWT'si). Köprü (tarayıcı eklentisi) yoksa HİÇ iş talep edilmez: sahte doğrulama üretilmez; durum satırı
+ * kurulum sayfasına bağlanır. Eklenti otomatik kontrolü KENDİSİ yürütüyorsa (`autorun`, herhangi bir EmlakSoft
+ * sayfasında) bu işçi iş talep etmez (çift kontrol yok); duraklatılmışsa hiçbir şey yapmaz.
  * Portal sayfası sunucudan çekilmez; CAPTCHA/hız sınırı aşılmaz (engel = "blocked", ASLA "ilan yok" değil).
  */
 
@@ -30,7 +42,7 @@ function deviceKey(): string | null {
   }
 }
 
-type Status = { text: string; active: boolean };
+type Status = { text: string; active: boolean; install?: boolean };
 
 export function VerificationWorker() {
   const [status, setStatus] = useState<Status>({ text: "Doğrulama yardımcısı denetleniyor", active: false });
@@ -65,6 +77,14 @@ export function VerificationWorker() {
     };
 
     const step = async (): Promise<StepOutcome> => {
+      if (bridgeInstalled() && bridgePaused()) {
+        setStatus({ text: "Tarayıcı eklentisi duraklatıldı: kontrol yapılmıyor", active: false });
+        return "idle";
+      }
+      if (bridgeInstalled() && bridgeAutorun()) {
+        setStatus({ text: "Tarayıcı eklentisi EmlakSoft açıkken ilanları otomatik kontrol ediyor", active: true });
+        return "idle";
+      }
       const nav = navigator as Navigator & { connection?: { saveData?: boolean } };
       const gate = workerGate({
         visible: document.visibilityState === "visible",
@@ -84,7 +104,7 @@ export function VerificationWorker() {
           session_cap: "Doğrulama yardımcısı bu oturum için tamamlandı",
           hour_cap: "Doğrulama yardımcısı saatlik sınıra ulaştı",
         };
-        setStatus({ text: text[gate.reason] ?? "Doğrulama yardımcısı beklemede", active: false });
+        setStatus({ text: text[gate.reason] ?? "Doğrulama yardımcısı beklemede", active: false, install: gate.reason === "no_bridge" });
         return "idle";
       }
 
@@ -118,6 +138,12 @@ export function VerificationWorker() {
         return "done";
       }
       const reply = await requestProbe({ id: job.jobId, portal: job.portal, url: job.url, externalId: job.externalId }, WORKER_LIMITS.probeTimeoutMs);
+      const replyError = (reply as { error?: unknown } | null)?.error;
+      if (typeof replyError === "string" && BRIDGE_DEFER_ERRORS.includes(replyError)) {
+        // Eklenti şimdi yapamadı (kendi hız kuralı) ya da duraklatıldı: gözlem değil, iş geri bırakılır.
+        await workerRelease(clientId.current, job.jobId, `bridge_${replyError}`);
+        return "busy";
+      }
       const report = replyToReport(reply, daysAgoIso(0));
       const done = await workerComplete({ clientId: clientId.current, jobId: job.jobId, result: report.result, observed: report.observed });
       if (!done.ok) return "error";
@@ -158,9 +184,14 @@ export function VerificationWorker() {
   }, []);
 
   return (
-    <p role="status" className="mt-6 flex items-center gap-2 text-xs text-text-muted">
+    <p role="status" className="mt-6 flex flex-wrap items-center gap-2 text-xs text-text-muted">
       <RadioTower aria-hidden="true" className={`h-3.5 w-3.5 ${status.active ? "text-brand-600" : ""}`} />
       {status.text}
+      {status.install ? (
+        <Link href={EXTENSION_INSTALL_PATH} className="focus-ring rounded font-semibold text-accent-text hover:underline">
+          Eklentiyi kur
+        </Link>
+      ) : null}
     </p>
   );
 }

@@ -160,6 +160,11 @@ const F = {
   planSubscriptionAmount: "20261006000700_fix_plan_subscription_amount.sql",
   reportingSampleScope: "20261006000710_reporting_aggregates_sample_scope.sql",
   ownershipTransferRpc: "20261006000720_ownership_transfer_rpc.sql",
+  // PB46 ilan kontrol veri yollari: yasam dongusu gecis kaydi (append-only) -> envanter ice aktarma + eslesme kuyrugu
+  // (JWT RPC) -> ilce kirilimi RPC'leri + SLA yeniden acilis duzeltmesi.
+  lcLifecycleEvents: "20261007000200_lc_lifecycle_events.sql",
+  lcInventoryMatching: "20261007000210_lc_inventory_matching.sql",
+  lcDistrictSlaReset: "20261007000220_lc_district_sla_reset.sql",
   // PB47 CRM ozellik turu (2026-10-07): GOS anlasma alanlari.
   dealGosFields: "20261007000300_deal_gos_fields.sql",
   customFields: "20261007000310_custom_fields.sql",
@@ -278,6 +283,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.planSubscriptionAmount]: "davranis", // 9 argumanli ESKI fulfill_billing_payment overload DROP (kod cagirmaz); 9 argumanli cagri artik 10 argumanli dogru tanima cozulur
     [F.reportingSampleScope]: "davranis", // tenant_commission/reporting_aggregates imzasina p_sample_threshold (varsayilan 5); esik ustu ofiste ornek kayitlar toplamlardan DUSER
     [F.ownershipTransferRpc]: "ek", // yeni authenticated RPC'ler ownership_transfer_request/accept/resolve (JWT kimligi, ayni islemde audit_logs); mevcut 3 service_role RPC degismez
+    [F.lcLifecycleEvents]: "ek", // yeni append-only tablo lc_lifecycle_events + property_control_state AFTER tetikleyicisi (yalniz olay yazar, hata yutulur)
+    [F.lcInventoryMatching]: "ek", // yeni tablo listing_inventory_imports + 2 authenticated RPC (lc_inventory_import, lc_match_decide) mevcut service_role cekirdeklerini sarar
+    [F.lcDistrictSlaReset]: "davranis", // 2 yeni invoker RPC (ilce kirilimi) + listing_anomalies tetikleyicisi: yeniden acilan uyarinin eski SLA asama kayitlarini siler (yukseltme bastan isler)
     [F.webhooksApiKeys]: "ek", // yeni api_keys/webhook_endpoints/webhook_deliveries + RLS (ayarlar:edit) + 3 DEFINER RPC (api_v1_list anon'a acik, yalniz anahtar ozetiyle okur)
     [F.customFields]: "ek", // yeni custom_field_defs/values + RLS (okuma ust kayit gorunurlugu, yazma modul edit) + 2 INVOKER yardimci fonksiyon
     [F.dealGosFields]: "ek", // deals'a 2 nullable kolon (gos_reference_no + CHECK, title_deed_appointment_at) + kismi indeks; politika degismez
@@ -387,6 +395,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
     { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
     { id: "PB45-bekleyen-isler", order: 29.96, title: "Bekleyen isler: eski 9 arg fulfill overload DROP -> rapor/komisyon ozetleri ornek veri kapsami -> sahiplik devri JWT RPC'leri", files: [F.planSubscriptionAmount, F.reportingSampleScope, F.ownershipTransferRpc] },
+    { id: "PB46-ilan-kontrol-veri-yollari", order: 29.97, title: "Ilan kontrol veri yollari: yasam dongusu gecis kaydi -> envanter ice aktarma + eslesme kuyrugu (JWT RPC) -> ilce kirilimi + SLA yeniden acilis duzeltmesi", files: [F.lcLifecycleEvents, F.lcInventoryMatching, F.lcDistrictSlaReset] },
     { id: "PB47-crm-ozellikleri", order: 29.98, title: "CRM ozellik turu: GOS anlasma alanlari -> ozel alanlar -> API anahtari + giden webhook", files: [F.dealGosFields, F.customFields, F.webhooksApiKeys] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
@@ -507,6 +516,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // PB45: overload temizliginin on-kosulu fiyat butunlugu (000300) govdesidir; sahiplik devri RPC'leri tabloya (001300) dayanir.
     [F.planSubscriptionAmount, F.billingAmount],
     [F.ownershipTransferRpc, F.ownership],
+    // PB46: gecis kaydi property_control_state'e, envanter/eslesme RPC'leri cekirdek RPC'lere, ilce/SLA duzeltmesi KPI/SLA tablolarina dayanir.
+    [F.lcLifecycleEvents, F.lcControlState],
+    [F.lcInventoryMatching, F.lcAnomalyRpcs],
+    [F.lcInventoryMatching, F.lcQueueRpcs],
+    [F.lcDistrictSlaReset, F.lcControlState],
+    [F.lcDistrictSlaReset, F.lcAnomalyTables],
   ],
 
   externalPending: [

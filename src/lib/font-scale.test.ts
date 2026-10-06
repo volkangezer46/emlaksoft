@@ -19,7 +19,7 @@ describe("font-scale (saf yardımcılar)", () => {
   it("varsayılan Normal; seçenekler Küçük/Normal/Büyük", () => {
     expect(DEFAULT_FONT_SCALE).toBe("md");
     expect(FONT_SCALES.map((f) => f.label)).toEqual(["Küçük", "Normal", "Büyük"]);
-    expect(FONT_SCALES.map((f) => f.percent)).toEqual([90, 100, 112.5]);
+    expect(FONT_SCALES.map((f) => f.percent)).toEqual([87.5, 93.75, 112.5]);
   });
 
   it("geçersiz değer Normal'e düşer", () => {
@@ -47,9 +47,9 @@ describe("font-scale (saf yardımcılar)", () => {
     expect(resolveFontScale({ userId: null, cookieValue: serializeFontCookie(UID, "lg"), metadataValue: "lg" })).toBe("md");
   });
 
-  it("SSR stili: Normal'de boş, diğerlerinde yalnız öznitelik yokken geçerli", () => {
-    expect(fontScaleCss("md")).toBe("");
-    expect(fontScaleCss("sm")).toBe("html:not([data-font-size]){font-size:90%}");
+  it("SSR stili: her ölçek yalnız öznitelik yokken geçerli (Normal = kurumsal yoğun %93,75)", () => {
+    expect(fontScaleCss("md")).toBe("html:not([data-font-size]){font-size:93.75%}");
+    expect(fontScaleCss("sm")).toBe("html:not([data-font-size]){font-size:87.5%}");
     expect(fontScaleCss("lg")).toBe("html:not([data-font-size]){font-size:112.5%}");
   });
 });

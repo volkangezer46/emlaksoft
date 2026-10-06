@@ -309,7 +309,7 @@ canCreateTicket ? <ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep
                 style={{ background: "conic-gradient(from 0deg, var(--mint-400), var(--brand-500), var(--mint-400))" }}
               />
               <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="10" />
                 {grandTotal === 0 ? (
                   <circle
                     cx="50"

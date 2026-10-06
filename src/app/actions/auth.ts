@@ -33,6 +33,7 @@ import {
   TWO_FACTOR_COOKIE,
 } from "@/lib/two-factor";
 import { hashOtpForStorage } from "@/lib/otp-hmac";
+import type { SignupField } from "@/lib/signup-errors";
 
 const REGISTRATION_TERMS_VERSION = "kullanim-sartlari-2026-07-31";
 const REGISTRATION_KVKK_VERSION = "kvkk-aydinlatma-2026-07-31";
@@ -48,7 +49,12 @@ function slugify(input: string) {
     .slice(0, 48);
 }
 
-export type AuthResult = { error?: string; ok?: true };
+export type AuthResult = {
+  error?: string;
+  ok?: true;
+  /** Kayıt sihirbazı: hata bir alana aitse alan adı (adım + alan altı gösterim, `@/lib/signup-errors`). */
+  field?: SignupField;
+};
 
 export async function signIn(
   _prev: AuthResult,
@@ -336,10 +342,10 @@ export async function signUp(
     return { error: "Ad, e-posta, şifre ve firma adı zorunlu." };
   }
   if (password.length < 8) {
-    return { error: "Şifre en az 8 karakter olmalı." };
+    return { error: "Şifre en az 8 karakter olmalı.", field: "password" };
   }
   if (legalConsent !== "accepted") {
-    return { error: "Kullanım şartları ve KVKK aydınlatma metni onayı zorunlu." };
+    return { error: "Kullanım şartları ve KVKK aydınlatma metni onayı zorunlu.", field: "legal_consent" };
   }
 
   const ip = await clientIp();
@@ -352,15 +358,15 @@ export async function signUp(
     return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
   }
   if (!isValidEmail(email)) {
-    return { error: EMAIL_ERROR_MESSAGE };
+    return { error: EMAIL_ERROR_MESSAGE, field: "email" };
   }
   // profiles.phone şu an DB'de yalnız TR cep (05XXXXXXXXX) kabul eder (profiles_phone_tr_format);
   // 2FA SMS'i de Netgsm (yalnız TR) ile gider. Yabancı numara için migration gerekir.
   let phone = "";
   if (rawPhone) {
     const parsed = parsePhoneStrict(rawPhone);
-    if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
-    if (parsed.country !== "TR" || parsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE };
+    if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE, field: "phone" };
+    if (parsed.country !== "TR" || parsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE, field: "phone" };
     phone = parsed.stored;
   }
   const teamSize = normalizeRegistrationTeamSize(requestedTeamSize);
@@ -381,11 +387,9 @@ export async function signUp(
   });
   if (createError || !created.user) {
     console.error("signUp auth", createError);
-    return {
-      error: createError?.message?.includes("already")
-        ? "Bu e-posta zaten kayıtlı."
-        : "Hesap oluşturulamadı.",
-    };
+    return createError?.message?.includes("already")
+      ? { error: "Bu e-posta zaten kayıtlı.", field: "email" }
+      : { error: "Hesap oluşturulamadı." };
   }
 
   const { data: provisioned, error: provisionError } = await admin.rpc(

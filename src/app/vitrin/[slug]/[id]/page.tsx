@@ -38,6 +38,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { normalizeExternalHref } from "@/lib/external-href";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { isPublicListingImage } from "@/lib/public-property-media";
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
@@ -176,7 +177,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       .maybeSingle(),
     admin
       .from("property_media")
-      .select("id, kind, external_url, is_cover, sort_order")
+      .select("id, kind, file_type, file_name, external_url, is_cover, sort_order")
       .eq("property_id", id)
       .order("is_cover", { ascending: false })
       .order("sort_order", { ascending: true }),
@@ -322,7 +323,8 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   }
 
   const media = mediaRows ?? [];
-  const images = media.filter((m) => m.kind === "image");
+  // KVKK P0-9: belge gibi görünen görsel vitrinde gösterilmez (tek kural, public-property-media).
+  const images = media.filter((m) => isPublicListingImage(m));
   const tours = media.flatMap((item) => {
     const externalUrl = normalizeExternalHref(item.external_url);
     return item.kind !== "image" && externalUrl

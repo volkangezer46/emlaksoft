@@ -15,8 +15,8 @@ export const FONT_SCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 /** Beyaz liste: tek kaynak. Yüzdeler console.css kurallarıyla senkron (sözleşme testi doğrular). */
 export const FONT_SCALES: readonly { value: FontScale; label: string; percent: number }[] = [
-  { value: "sm", label: "Küçük", percent: 90 },
-  { value: "md", label: "Normal", percent: 100 },
+  { value: "sm", label: "Küçük", percent: 87.5 },
+  { value: "md", label: "Normal", percent: 93.75 },
   { value: "lg", label: "Büyük", percent: 112.5 },
 ];
 
@@ -70,8 +70,9 @@ export function resolveFontScale(input: {
  * (canlı önizleme). Kabuk bileşeni sökülünce stil de düşer, public sayfalar etkilenmez.
  */
 export function fontScaleCss(scale: FontScale): string {
-  if (scale === DEFAULT_FONT_SCALE) return "";
   const pct = FONT_SCALES.find((f) => f.value === scale)?.percent ?? 100;
+  // Normal da %100 değil (kurumsal yoğun ölçek %93,75): ilk boyamada o da basılır.
+  if (pct === 100) return "";
   return `html:not([${FONT_SCALE_ATTR}]){font-size:${pct}%}`;
 }
 

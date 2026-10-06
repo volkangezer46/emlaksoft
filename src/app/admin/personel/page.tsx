@@ -1,5 +1,6 @@
 "use client";
 
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { useTransition, useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -291,7 +292,7 @@ export default function PersonelPage() {
         }
       >
         {/* Rol dağılımı — her kart o rolü filtreler */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <KpiGrid>
           {roleCounts.map((r) => {
             const isActive = roleFilter === r.role;
             return (
@@ -313,11 +314,11 @@ export default function PersonelPage() {
               </button>
             );
           })}
-        </div>
+        </KpiGrid>
       </AdminPageHeader>
 
       {/* KPI şeridi — her kart listeyi süzer */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <KpiGrid>
         {(
           [
             { key: "active", label: "Aktif personel", value: kpi.active, icon: UserCheck },
@@ -345,7 +346,7 @@ export default function PersonelPage() {
             </button>
           );
         })}
-      </div>
+      </KpiGrid>
 
       {/* Arama + filtre çubuğu */}
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">

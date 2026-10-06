@@ -87,7 +87,7 @@ function displayDigits(entry: Entry): string {
 }
 
 const DEFAULT_INPUT_CLASS =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400 aria-[invalid=true]:border-danger-400";
+  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-sm outline-none focus:border-brand-400 aria-[invalid=true]:border-danger-400";
 
 /**
  * Uluslararası telefon girişi (varsayılan Türkiye). Solda ülke seçici (bayrak + +kod), sağda ulusal numara.
@@ -182,7 +182,7 @@ export function PhoneInput(props: PhoneInputProps) {
     <div className="@container">
     <div className="flex flex-nowrap items-stretch gap-2 @max-[18rem]:flex-wrap">
       <label
-        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-2.5 text-sm text-ink transition focus-within:border-brand-400"
+        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-[0.4375rem] text-sm text-ink transition focus-within:border-brand-400"
       >
         <span
           aria-hidden="true"

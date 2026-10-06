@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -112,8 +112,9 @@ describe("viz kiti: eski dışa aktarımlar ve cam bütçesi", () => {
   });
 
   it("eski adlar yeni kite yönlenir", () => {
-    expect(read("src/components/admin/count-up.tsx")).toContain("@/components/ui/count-up");
-    expect(read("src/app/app/odometer-number.tsx")).toContain("@/components/ui/count-up");
+    // Tek sayaç ui/count-up: eski admin CountUp ve OdometerNumber sarmalayıcıları silindi (2026-10).
+    expect(existsSync(join(process.cwd(), "src/components/admin/count-up.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "src/app/app/odometer-number.tsx"))).toBe(false);
     expect(read("src/components/ui/console/ring.tsx")).toContain("RadialGauge");
     expect(read("src/components/ui/premium/charts.tsx")).toContain("RadialGauge");
     expect(read("src/components/ui/console/area-chart.tsx")).toContain("viz/area-chart");
@@ -127,8 +128,9 @@ describe("viz kiti: eski dışa aktarımlar ve cam bütçesi", () => {
   it("Recharts grafikleri reduced-motion'da animasyonu kapatır", () => {
     // Recharts'ı doğrudan import eden HER dosyada, her seri bileşeni (Area/Bar/Pie/Line/Radar/Scatter)
     // isAnimationActive={!reduce} taşımalı (CSS reduced-motion kuralı Recharts'ın JS animasyonunu kapatmaz).
-    const rechartsFiles = files("src", /\.tsx?$/).filter((f) => /from "recharts"/.test(read(f)));
-    expect(rechartsFiles.length).toBeGreaterThanOrEqual(4);
+    // Tek grafik seti: Recharts yalnız ui/chart.tsx'ten içe aktarılır (viz-depth-contract.test.ts); yorumlar sayılmaz.
+    const rechartsFiles = files("src", /\.tsx?$/).filter((f) => /^import[^;]*from "recharts"/m.test(read(f)));
+    expect(rechartsFiles).toContain("src/components/ui/chart.tsx");
     for (const file of rechartsFiles) {
       const src = read(file);
       const series = (src.match(/<(Area|Bar|Pie|Line|Radar|RadialBar|Scatter)\b/g) ?? []).length;

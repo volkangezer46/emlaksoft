@@ -6,7 +6,7 @@ import { formatViz, VIZ_SEQ, type VizFormat } from "./colors";
  * Heatmap (viz) — CSS grid ısı haritası (ör. 7 gün x 24 saat). Tek hue sıralı palet
  * (`--viz-seq-1..5`): koyu = yüksek. Hücre başına title + aynı veriyi veren sr-only tablo.
  * Veri yoksa (hepsi 0 / boş) EmptyArt değil illüstrasyonlu boş durum. Hareket yok (hücre
- * sayısı yüksek; sayfa hareket bütçesini yemez).
+ * sayısı yüksek; sayfa hareket bütçesini yemez). Derinlik: hücre üst kenarında ince ışık (viz.css `.viz-cell`).
  *
  * `values[r][c]` satır r, sütun c. Düzey: değer/en büyük değer oranı 5 basamağa bölünür;
  * 0 değer "boş" yüzeydir (palette girmez).
@@ -67,7 +67,7 @@ export function Heatmap({
                   <span
                     key={ci}
                     title={`${r} ${c}: ${formatViz(v, format)}${unit ? ` ${unit}` : ""}`}
-                    className="h-5 rounded-sm shadow-[inset_0_0_0_1px_var(--hairline)]"
+                    className="viz-cell h-5 rounded-sm"
                     style={{ background: lv === 0 ? "var(--surface-sunken)" : VIZ_SEQ[lv - 1] }}
                   />
                 );
