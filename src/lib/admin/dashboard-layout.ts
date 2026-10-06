@@ -5,7 +5,7 @@
  *  - churn riski satırları (yalnız mevcut veriden: durum, deneme bitişi, 14 gün aktivite).
  *
  * Sahte içgörü ÜRETİLMEZ: her satır gerçek bir sayımdan gelir ve filtrelenmiş bir hedefe bağlanır.
- * Platform insight okuyucusu henüz yok; bkz. `ATTENTION_INSIGHT_SLOT` (page.tsx'te bırakılan yer).
+ * Platform içgörüleri ayrı okunur (`src/lib/insights/platform-read.ts`); bkz. `ATTENTION_INSIGHT_SLOT` (page.tsx). Üretici kural henüz yok: veri yoksa boş kalır.
  */
 import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
 

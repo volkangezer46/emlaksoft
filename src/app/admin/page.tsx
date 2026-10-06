@@ -29,6 +29,8 @@ import { SupportHome } from "./_dashboards/support-home";
 import { GeoHealthCard } from "./geo/health-card";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./_dashboards/shared";
 import { getAdminHealth } from "@/lib/admin-badges";
+import { getPlatformInsights } from "@/lib/insights/platform-read";
+import { PlatformInsightList } from "./_components/platform-insight-list";
 import { readLatestEfReconciliation } from "@/lib/ef-credits/reconcile-reader";
 import {
   buildAttentionQueue,
@@ -210,6 +212,7 @@ async function AttentionSection({ period, role }: { period: Period; role: Platfo
     demoRequests: d.demoCount,
   };
   const queue = buildAttentionQueue(input, role);
+  const insights = await getPlatformInsights({ limit: 5 });
   return (
     <section aria-label="Dikkat gerektirenler" className="bx h-full min-w-0 p-4 sm:p-5" style={FOCUS_SHADOW}>
       <header className="mb-3">
@@ -233,13 +236,14 @@ async function AttentionSection({ period, role }: { period: Period; role: Platfo
             </li>
           ))}
         </ul>
-      ) : (
+      ) : insights.length === 0 ? (
         <div className="flex items-center gap-3 py-2 text-sm text-text-muted">
           <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--viz-pos)]" aria-hidden />
           <span>Şu an bekleyen iş yok. Yeni bir durum oluşunca burada sıralanır.</span>
         </div>
-      )}
-      {/* ATTENTION_INSIGHT_SLOT: platform insight okuyucusu hazır olunca sıralı içgörü satırları buraya eklenir. Henüz içgörü ÜRETİLMEZ. */}
+      ) : null}
+      {/* ATTENTION_INSIGHT_SLOT: gerçek platform içgörüleri (platform_insights, RLS'li okuyucu). Satır yoksa hiçbir şey çizilmez; içgörü UYDURULMAZ. */}
+      <PlatformInsightList insights={insights} />
     </section>
   );
 }
