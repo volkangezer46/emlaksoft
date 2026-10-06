@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { eventKey } from "@/lib/surveys/logic";
+import { eventKey, latestRentAnniversary, rentRenewalEventDate, RENT_RENEWAL_LEAD_DAYS } from "@/lib/surveys/logic";
 import type { EventCandidate } from "@/lib/surveys/server";
 import type { SurveyEventType } from "@/lib/surveys/types";
 
@@ -339,6 +339,110 @@ export async function collectAppointmentDone(db: SupabaseClient, tenantId: strin
   return out;
 }
 
+/* --------------------------------------------------------------- kira (kiracı) */
+
+type RentalRow = {
+  id: string;
+  property_id: string;
+  renter_customer_id: string;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+const RENTAL_COLS = "id, property_id, renter_customer_id, start_date, end_date";
+
+function rentalRows(res: { data: unknown; error: { message: string } | null }): RentalRow[] {
+  if (res.error) {
+    console.error("anket: kiralar", res.error.message);
+    return [];
+  }
+  return (res.data ?? []) as RentalRow[];
+}
+
+async function rentalCandidates(
+  db: SupabaseClient,
+  tenantId: string,
+  rows: { rental: RentalRow; eventDate: string; key: string; summary: string }[],
+  eventType: "rent_renewal" | "tenant_annual",
+): Promise<EventCandidate[]> {
+  if (rows.length === 0) return [];
+  const [custs, props] = await Promise.all([
+    customersById(db, tenantId, [...new Set(rows.map((r) => r.rental.renter_customer_id))]),
+    propertiesById(db, tenantId, [...new Set(rows.map((r) => r.rental.property_id))]),
+  ]);
+  const out: EventCandidate[] = [];
+  for (const r of rows) {
+    const cust = custs.get(r.rental.renter_customer_id);
+    if (!usableCustomer(cust)) continue;
+    const p = props.get(r.rental.property_id);
+    if (p?.is_sample) continue;
+    out.push({
+      eventType,
+      audience: "tenant",
+      eventKey: r.key,
+      summary: `${p ? propLabel(p) : "Kiralık"}: ${r.summary}`,
+      eventAt: `${r.eventDate}T09:00:00.000Z`,
+      customerId: cust.id,
+      propertyId: r.rental.property_id,
+      agentId: p?.assigned_to ?? null,
+    });
+  }
+  return out;
+}
+
+/** Kira bitişinden 60 gün önce: olay tarihi `sinceIso` ile bugün arasındaysa (geriye dönük anket yok). */
+export async function collectRentRenewal(db: SupabaseClient, tenantId: string, sinceIso: string, todayDate: string): Promise<EventCandidate[]> {
+  const sinceDate = sinceIso.slice(0, 10);
+  const lo = addDays(sinceDate, RENT_RENEWAL_LEAD_DAYS);
+  const hi = addDays(todayDate, RENT_RENEWAL_LEAD_DAYS);
+  const rentals = rentalRows(
+    await db
+      .from("rentals")
+      .select(RENTAL_COLS)
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .eq("is_sample", false)
+      .not("end_date", "is", null)
+      .gte("end_date", lo)
+      .lte("end_date", hi)
+      .limit(CAP),
+  );
+  const rows = rentals.flatMap((rental) => {
+    const eventDate = rentRenewalEventDate(rental.end_date);
+    if (!eventDate || eventDate < sinceDate || eventDate > todayDate) return [];
+    const end = String(rental.end_date).slice(0, 10);
+    return [{ rental, eventDate, key: eventKey("rent_renewal", rental.id, "tenant", end), summary: `kira ${end} tarihinde bitiyor` }];
+  });
+  return rentalCandidates(db, tenantId, rows, "rent_renewal");
+}
+
+/** Kira başlangıcının yıl dönümü (her yıl): yıl dönümü `sinceIso` ile bugün arasındaysa. */
+export async function collectTenantAnnual(db: SupabaseClient, tenantId: string, sinceIso: string, todayDate: string): Promise<EventCandidate[]> {
+  const sinceDate = sinceIso.slice(0, 10);
+  const rentals = rentalRows(
+    await db
+      .from("rentals")
+      .select(RENTAL_COLS)
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .eq("is_sample", false)
+      .not("start_date", "is", null)
+      .lte("start_date", addDays(todayDate, -365))
+      .order("start_date", { ascending: false })
+      .limit(1000),
+  );
+  const rows = rentals.flatMap((rental) => {
+    const anniv = latestRentAnniversary(rental.start_date, todayDate);
+    if (!anniv || anniv.date < sinceDate) return [];
+    return [{ rental, eventDate: anniv.date, key: eventKey("tenant_annual", rental.id, "tenant", `yil-${anniv.year}`), summary: `kiracılığın ${anniv.year}. yılı` }];
+  });
+  return rentalCandidates(db, tenantId, rows, "tenant_annual");
+}
+
+function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00.000Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
 export async function collectFor(
   db: SupabaseClient,
   tenantId: string,
@@ -357,9 +461,16 @@ export async function collectFor(
       return collectDemandLost(db, tenantId, sinceIso);
     case "appointment_done":
       return collectAppointmentDone(db, tenantId, sinceIso);
+    case "rent_renewal":
+      return collectRentRenewal(db, tenantId, sinceIso, todayDate);
+    case "tenant_annual":
+      return collectTenantAnnual(db, tenantId, sinceIso, todayDate);
     case "authority_extended":
       // Olay kaynağı yok (yetki bitiş tarihi geçmişi tutulmuyor): görev, tarih uzatılırken
       // `updatePropertyAuthorization` kancasından anında üretilir.
+      return [];
+    case "advisor_pulse":
+      // Kişiye bağlı görev üretilmez: ekip nabzı daveti `pulse.ts` (bildirim), cevap anonim RPC ile yazılır.
       return [];
   }
 }

@@ -37,31 +37,9 @@ export const DEMAND_FIELD_NAMES: readonly string[] = [
   ...DEMAND_FIELD_GROUPS.bolge,
 ];
 
-/** "Olmazsa olmaz" işaretlenebilen kriter anahtarları. */
-export const CRITERIA_REQUIRED_KEYS = [
-  "property_type",
-  "budget",
-  "rooms",
-  "sqm",
-  "location",
-  "floor",
-  "heating",
-  "facade",
-  "features",
-] as const;
-export type CriteriaKey = (typeof CRITERIA_REQUIRED_KEYS)[number];
-
-export const CRITERIA_LABELS: Record<CriteriaKey, string> = {
-  property_type: "Portföy türü",
-  budget: "Bütçe",
-  rooms: "Oda",
-  sqm: "m²",
-  location: "Konum",
-  floor: "Kat",
-  heating: "Isınma",
-  facade: "Cephe",
-  features: "Özellikler",
-};
+// Kriter anahtarları + etiketleri bağımlılıksız modülde (istemci paketine zod taşımasın); burada aynen yeniden dışa aktarılır.
+import { CRITERIA_REQUIRED_KEYS, CRITERIA_LABELS, type CriteriaKey } from "@/lib/demand-criteria-labels";
+export { CRITERIA_REQUIRED_KEYS, CRITERIA_LABELS, type CriteriaKey };
 
 const ID_RE = /^[0-9a-fA-F-]{8,40}$/;
 const idOrNull = z

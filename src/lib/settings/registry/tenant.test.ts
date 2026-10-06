@@ -34,9 +34,9 @@ describe("ofis ayarları: varsayılan = bugünkü sabit (davranış değişmez)"
   });
 
   it("bildirim varsayılanları notification-prefs DEFAULTS ile aynı 12 tür", () => {
-    expect(NOTIFY_DEFAULTS).toHaveLength(12);
+    expect(NOTIFY_DEFAULTS).toHaveLength(16);
     expect(NOTIFY_DEFAULTS.find((n) => n.id === "marketing")!.default).toBe(false);
-    expect(NOTIFY_DEFAULTS.filter((n) => n.default)).toHaveLength(11);
+    expect(NOTIFY_DEFAULTS.filter((n) => n.default)).toHaveLength(15);
     expect(getSettingDef(notifyKey("priceDrop"))!.default).toBe(true);
   });
 });

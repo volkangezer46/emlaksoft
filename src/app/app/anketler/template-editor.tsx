@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { saveSurveyTemplate } from "@/app/actions/surveys";
-import { KIND_LABELS, SURVEY_QUESTION_KINDS, type SurveyQuestionKind } from "@/lib/surveys/types";
+import { KIND_LABELS, SURVEY_QUESTION_KINDS, type SurveyQuestionKind, type SurveyQuestionTag } from "@/lib/surveys/types";
 
 type Draft = {
   key: string;
@@ -15,7 +15,7 @@ type Draft = {
   label: string;
   optionsText: string;
   required: boolean;
-  tag: "primary" | "reason" | null;
+  tag: SurveyQuestionTag | null;
 };
 
 export type TemplateQuestionVM = {
@@ -24,14 +24,15 @@ export type TemplateQuestionVM = {
   label: string;
   options: string[];
   required: boolean;
-  tag: "primary" | "reason" | null;
+  tag: SurveyQuestionTag | null;
 };
 
 const FIELD =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400 disabled:opacity-60";
 
 /**
- * Şablon düzenleyici (satır içi panel). Soru tipleri: puan (1-10), çoktan seçmeli, evet/hayır, metin.
+ * Şablon düzenleyici (satır içi panel). Soru tipleri: puan (0-10), çoktan seçmeli, evet/hayır, metin.
+ * Puan sorusu "ana puan" (NPS/CSAT) veya "danışman puanı" (danışman kartı) olarak işaretlenebilir.
  * Telefonla doldurma ve bağlı link AYNI şablonu kullanır. Soru kimlikleri korunur; kaldırılan sorunun
  * eski cevapları soru metniyle birlikte saklanmaya devam eder.
  */
@@ -140,7 +141,10 @@ export function TemplateEditor({
                     value={d.kind}
                     onChange={(e) => {
                       const kind = e.target.value as SurveyQuestionKind;
-                      patch(d.key, { kind, tag: kind === "score" ? d.tag : kind === "choice" ? d.tag : null });
+                      patch(d.key, {
+                        kind,
+                        tag: kind === "score" && d.tag !== "reason" ? d.tag : kind === "choice" && d.tag === "reason" ? d.tag : null,
+                      });
                     }}
                     disabled={readOnly}
                     aria-label={`Soru ${i + 1} türü`}
@@ -167,6 +171,19 @@ export function TemplateEditor({
                         disabled={readOnly}
                       />
                       Ana puan
+                    </label>
+                  ) : null}
+                  {d.kind === "score" ? (
+                    <label className="inline-flex items-center gap-1.5 font-semibold text-text-muted">
+                      <input
+                        type="checkbox"
+                        checked={d.tag === "advisor"}
+                        onChange={(e) =>
+                          setDrafts((prev) => prev.map((x) => (x.key === d.key ? { ...x, tag: e.target.checked ? "advisor" : null } : x.tag === "advisor" && e.target.checked ? { ...x, tag: null } : x)))
+                        }
+                        disabled={readOnly}
+                      />
+                      Danışman puanı
                     </label>
                   ) : null}
                   {d.kind === "choice" ? (

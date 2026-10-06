@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
+import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
 import {
   HANDOFF_PERMISSION,
   HANDOFF_SCOPES,
@@ -523,6 +524,19 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
   revalidatePath(`/app/ekip/${from}`);
   revalidatePath(`/app/ekip/${to}`);
   const skipped = scopes.filter((sc) => !counts[sc]);
+  // Devralana bildirim (yalnız gerçekten taşınan kalem varsa ve devralan işlemi yapan kişi değilse).
+  const movedParts = HANDOFF_SCOPES.filter((sc) => (counts[sc] ?? 0) > 0).map((sc) => `${counts[sc]} ${HANDOFF_SCOPE_LABELS[sc].toLocaleLowerCase("tr-TR")}`);
+  if (movedParts.length > 0 && to !== gate.userId) {
+    const allIds = HANDOFF_SCOPES.flatMap((sc) => moved[sc] ?? []);
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: to,
+      title: `İş yükü devri: ${source.full_name ?? "Bir danışman"} → size`,
+      body: `Size devredildi: ${movedParts.join(", ")}. Gerekçe: ${reason.slice(0, 160)}`,
+      href: `/app/ekip/${to}`,
+      dedupeKey: `team-handoff:${from}:${to}:${idsDigest(allIds)}`,
+    });
+  }
   return { ok: true, counts, skipped };
 }
 

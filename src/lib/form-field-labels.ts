@@ -1,4 +1,4 @@
-import { CRITERIA_LABELS, CRITERIA_REQUIRED_KEYS } from "@/lib/demand-criteria";
+import { CRITERIA_LABELS, CRITERIA_REQUIRED_KEYS } from "@/lib/demand-criteria-labels";
 
 /**
  * Form alan adı -> Türkçe etiket sözlüğü. Etiketi DOM'dan çıkarılamayan (gizli girdi) alanların

@@ -1,15 +1,16 @@
 import Link from "next/link";
-import { BarChart3, Headphones, Settings2 } from "lucide-react";
+import { BarChart3, Headphones, HeartPulse, Settings2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { key: "sonuclar", href: "/app/anketler", label: "Sonuçlar", icon: BarChart3 },
   { key: "kuyruk", href: "/app/anketler/kuyruk", label: "Anketör kuyruğu", icon: Headphones },
+  { key: "ic-anket", href: "/app/anketler/ic-anket", label: "Ekip nabzı", icon: HeartPulse },
   { key: "ayarlar", href: "/app/anketler/ayarlar", label: "Tetikleyiciler ve şablonlar", icon: Settings2 },
 ] as const;
 
-/** Anketler modülü sekmeleri (sunucu bileşeni; üç sayfa ortak kullanır). */
+/** Anketler modülü sekmeleri (sunucu bileşeni; dört sayfa ortak kullanır). */
 export function SurveyNav({ current }: { current: (typeof TABS)[number]["key"] }) {
   return (
     <nav aria-label="Anketler bölümleri" className="mb-5 flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-1">

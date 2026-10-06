@@ -16,6 +16,8 @@ export type PublicSurveyResult = {
   error?: string;
   /** Anket daha önce cevaplandıysa true — "Yanıtınız alınmış" ekranı gösterilir. */
   alreadyAnswered?: boolean;
+  /** Destekleyen (9-10) cevapta müşteriye özel tavsiye sayfası (teşekkür ekranında "Bizi tavsiye edin"). */
+  referralUrl?: string;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -222,7 +224,7 @@ export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurve
   }
   const settings = await loadSurveySettings(admin, tenantId);
   try {
-    const done = await completeSurveyTask(
+    const result = await completeSurveyTask(
       admin,
       {
         id: String(task.id),
@@ -236,11 +238,12 @@ export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurve
         contact_name: (task.contact_name as string | null) ?? null,
         attempts: Number(task.attempts) || 0,
       },
-      { answers: check.answers, score: check.score, comment: check.comment, via: "link", userId: null, lowScoreMax: settings.low_score_max, customerName },
+      { answers: check.answers, score: check.score, comment: check.comment, via: "link", userId: null, settings, customerName },
     );
-    if (!done) return { ok: true, alreadyAnswered: true };
+    if (!result.done) return { ok: true, alreadyAnswered: true };
+    // Destekleyen (9-10): teşekkür ekranında müşteriye özel tavsiye bağlantısı (ofis ayarı + modül açıksa).
+    return result.referralUrl ? { ok: true, referralUrl: result.referralUrl } : { ok: true };
   } catch {
     return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
   }
-  return { ok: true };
 }

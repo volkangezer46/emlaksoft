@@ -1,12 +1,15 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyTenant } from "@/lib/notify";
-import { dueAtFor, isLowScore, resolveAssignee, type StoredQuestion, type ValidAnswer } from "@/lib/surveys/logic";
+import { getBaseUrl } from "@/lib/base-url";
+import { isFeatureEnabledIn } from "@/lib/modules/logic";
+import { loadTenantModuleState } from "@/lib/modules/state";
+import { dueAtFor, isLowScore, isPromoter, resolveAssignee, type StoredQuestion, type ValidAnswer } from "@/lib/surveys/logic";
 import { DEFAULT_TEMPLATES } from "@/lib/surveys/defaults";
 import {
-  DEFAULT_DELAY_DAYS,
   DEFAULT_MAX_ATTEMPTS,
   DEFAULT_SURVEY_SETTINGS,
+  EVENT_DEFAULT_DELAY_DAYS,
   SURVEY_EVENT_TYPES,
   isSurveyEventType,
   type SurveyAudience,
@@ -18,7 +21,11 @@ import {
  * Anket modülünün sunucu yardımcıları. Her fonksiyon çağıranın verdiği Supabase client'ı ile çalışır:
  * oturumlu action'larda RLS'li kullanıcı client'ı, cron ve public bağlantıda service role.
  * Tablolar yokken (migration uygulanmadı) hiçbir yardımcı fırlatmaz; `isSurveyModuleReady` false döner.
+ * 20261007000400 (PB49) yokken yeni sütunlar/olaylar sessizce atlanır (eski davranış).
  */
+
+/** PB49 ile gelen olaylar: migration yokken CHECK reddeder, bu yüzden ayrı yazılır. */
+const V2_EVENTS: readonly SurveyEventType[] = ["rent_renewal", "tenant_annual", "advisor_pulse"];
 
 export function isSurveySchemaMissing(error: { code?: string | null; message?: string | null } | null | undefined): boolean {
   if (!error) return false;
@@ -26,6 +33,12 @@ export function isSurveySchemaMissing(error: { code?: string | null; message?: s
   if (code === "42P01" || code === "PGRST205" || code === "PGRST200") return true;
   const msg = (error.message ?? "").toLowerCase();
   return msg.includes("survey_") && (msg.includes("does not exist") || msg.includes("schema cache") || msg.includes("could not find"));
+}
+
+/** Sütun yok (PB49 uygulanmadı) hatası mı? */
+export function isMissingColumn(error: { code?: string | null; message?: string | null } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === "42703" || error.code === "PGRST204" || /column .* does not exist|could not find the .* column/i.test(error.message ?? "");
 }
 
 /** Anket tabloları veritabanında var mı? Yoksa modül "etkin değil" uyarısıyla gizlenir. */
@@ -37,21 +50,33 @@ export async function isSurveyModuleReady(db: SupabaseClient): Promise<boolean> 
   return false;
 }
 
-export async function loadSurveySettings(db: SupabaseClient, tenantId: string): Promise<SurveySettings> {
-  const { data } = await db
-    .from("survey_settings")
-    .select("assignment_mode, fixed_assignee, overdue_hours, retry_hours, low_score_max")
-    .eq("tenant_id", tenantId)
-    .maybeSingle();
+const BASE_SETTINGS_COLS = "assignment_mode, fixed_assignee, overdue_hours, retry_hours, low_score_max";
+const V2_SETTINGS_COLS = `${BASE_SETTINGS_COLS}, auto_send, whatsapp_template, whatsapp_language, promoter_invite`;
+
+/** Satır → ayar (saf). Sütun yoksa varsayılan. */
+export function parseSurveySettings(data: Record<string, unknown> | null | undefined): SurveySettings {
   if (!data) return { ...DEFAULT_SURVEY_SETTINGS };
   const mode = data.assignment_mode === "selected" || data.assignment_mode === "manual" ? data.assignment_mode : "balanced";
+  const template = typeof data.whatsapp_template === "string" && data.whatsapp_template.trim() ? data.whatsapp_template.trim() : null;
   return {
     assignment_mode: mode,
     fixed_assignee: (data.fixed_assignee as string | null) ?? null,
     overdue_hours: Number(data.overdue_hours) || DEFAULT_SURVEY_SETTINGS.overdue_hours,
     retry_hours: Number(data.retry_hours) || DEFAULT_SURVEY_SETTINGS.retry_hours,
     low_score_max: Number(data.low_score_max) || DEFAULT_SURVEY_SETTINGS.low_score_max,
+    auto_send: data.auto_send === true,
+    whatsapp_template: template,
+    whatsapp_language: typeof data.whatsapp_language === "string" && data.whatsapp_language ? data.whatsapp_language : "tr",
+    promoter_invite: data.promoter_invite === undefined ? DEFAULT_SURVEY_SETTINGS.promoter_invite : data.promoter_invite === true,
   };
+}
+
+export async function loadSurveySettings(db: SupabaseClient, tenantId: string): Promise<SurveySettings> {
+  const first = await db.from("survey_settings").select(V2_SETTINGS_COLS).eq("tenant_id", tenantId).maybeSingle();
+  if (!first.error) return parseSurveySettings(first.data as Record<string, unknown> | null);
+  if (!isMissingColumn(first.error)) return { ...DEFAULT_SURVEY_SETTINGS };
+  const legacy = await db.from("survey_settings").select(BASE_SETTINGS_COLS).eq("tenant_id", tenantId).maybeSingle();
+  return parseSurveySettings(legacy.data as Record<string, unknown> | null);
 }
 
 export async function loadAssigneeIds(db: SupabaseClient, tenantId: string): Promise<string[]> {
@@ -80,40 +105,63 @@ export async function loadOpenLoad(db: SupabaseClient, tenantId: string): Promis
   return load;
 }
 
-/**
- * Eksik varsayılan şablon ve tetikleyici satırlarını oluşturur (idempotent; mevcut satıra dokunmaz).
- * Tetikleyiciler KAPALI doğar: ofis sahibi tek tek açar.
- */
-export async function ensureSurveyDefaults(db: SupabaseClient, tenantId: string): Promise<void> {
-  await db.from("survey_triggers").upsert(
-    SURVEY_EVENT_TYPES.map((event_type) => ({
+type QuestionRow = {
+  tenant_id: string;
+  template_id: string;
+  position: number;
+  kind: string;
+  label: string;
+  options: string[];
+  required: boolean;
+  tag: string | null;
+};
+
+async function insertQuestions(db: SupabaseClient, rows: QuestionRow[]) {
+  if (rows.length === 0) return;
+  const { error } = await db.from("survey_questions").insert(rows);
+  if (!error) return;
+  // PB49 yokken `advisor` etiketi CHECK'e takılır: etiketsiz yeniden dene (soru yine eklenir).
+  if (error.code === "23514") {
+    const { error: retry } = await db.from("survey_questions").insert(rows.map((r) => (r.tag === "advisor" ? { ...r, tag: null } : r)));
+    if (retry) console.error("ensureSurveyDefaults sorular", retry.message);
+    return;
+  }
+  console.error("ensureSurveyDefaults sorular", error.message);
+}
+
+async function ensureDefaultsFor(db: SupabaseClient, tenantId: string, events: readonly SurveyEventType[]): Promise<void> {
+  const { error: trigErr } = await db.from("survey_triggers").upsert(
+    events.map((event_type) => ({
       tenant_id: tenantId,
       event_type,
       enabled: false,
-      delay_days: DEFAULT_DELAY_DAYS,
+      delay_days: EVENT_DEFAULT_DELAY_DAYS[event_type],
       max_attempts: DEFAULT_MAX_ATTEMPTS,
     })),
     { onConflict: "tenant_id,event_type", ignoreDuplicates: true },
   );
+  if (trigErr && trigErr.code !== "23514") console.error("ensureSurveyDefaults tetikleyici", trigErr.message);
 
+  const defs = DEFAULT_TEMPLATES.filter((t) => events.includes(t.event));
   const { data: inserted, error } = await db
     .from("survey_templates")
     .upsert(
-      DEFAULT_TEMPLATES.map((t) => ({ tenant_id: tenantId, event_type: t.event, audience: t.audience, name: t.name })),
+      defs.map((t) => ({ tenant_id: tenantId, event_type: t.event, audience: t.audience, name: t.name })),
       { onConflict: "tenant_id,event_type,audience", ignoreDuplicates: true },
     )
     .select("id, event_type, audience");
   if (error) {
-    console.error("ensureSurveyDefaults şablon", error.message);
+    // 23514: yeni olaylar için CHECK (PB49 uygulanmadı) — beklenen, sessiz.
+    if (error.code !== "23514") console.error("ensureSurveyDefaults şablon", error.message);
     return;
   }
   // Yalnız bu çağrıda YENİ doğan şablonların soruları eklenir (mevcut şablon düzenlemesi korunur).
-  const rows = (inserted ?? []).flatMap((tpl) => {
-    const def = DEFAULT_TEMPLATES.find((d) => d.event === tpl.event_type && d.audience === tpl.audience);
+  const rows: QuestionRow[] = (inserted ?? []).flatMap((tpl) => {
+    const def = defs.find((d) => d.event === tpl.event_type && d.audience === tpl.audience);
     if (!def) return [];
     return def.questions.map((q, position) => ({
       tenant_id: tenantId,
-      template_id: tpl.id,
+      template_id: String(tpl.id),
       position,
       kind: q.kind,
       label: q.label,
@@ -122,10 +170,17 @@ export async function ensureSurveyDefaults(db: SupabaseClient, tenantId: string)
       tag: q.tag,
     }));
   });
-  if (rows.length > 0) {
-    const { error: qErr } = await db.from("survey_questions").insert(rows);
-    if (qErr) console.error("ensureSurveyDefaults sorular", qErr.message);
-  }
+  await insertQuestions(db, rows);
+}
+
+/**
+ * Eksik varsayılan şablon ve tetikleyici satırlarını oluşturur (idempotent; mevcut satıra dokunmaz).
+ * Tetikleyiciler KAPALI doğar: ofis sahibi tek tek açar. Yeni olaylar (PB49) ayrı turda yazılır ki migration
+ * yokken eski olayların kurulumu bozulmasın.
+ */
+export async function ensureSurveyDefaults(db: SupabaseClient, tenantId: string): Promise<void> {
+  await ensureDefaultsFor(db, tenantId, SURVEY_EVENT_TYPES.filter((e) => !V2_EVENTS.includes(e)));
+  await ensureDefaultsFor(db, tenantId, V2_EVENTS);
 }
 
 export async function loadTemplateQuestions(db: SupabaseClient, tenantId: string, templateId: string): Promise<StoredQuestion[]> {
@@ -181,7 +236,7 @@ export async function loadActiveTemplateMap(db: SupabaseClient, tenantId: string
 /**
  * Adayları görev olarak yazar. Zaten var olan olay anahtarları atlanır (mükerrer anket yok);
  * yarışta ikinci yazım `unique(tenant_id, event_key)` ile DB tarafında da engellenir.
- * Döner: gerçekten yazılan görev sayısı.
+ * Kitle kapalıysa (şablon pasif) aday atlanır. Döner: gerçekten yazılan görev sayısı.
  */
 export async function insertCandidates(
   db: SupabaseClient,
@@ -201,7 +256,7 @@ export async function insertCandidates(
   for (const c of candidates) {
     if (existing.has(c.eventKey)) continue;
     const templateId = ctx.templates.get(`${c.eventType}:${c.audience}`);
-    if (!templateId) continue; // şablon yok veya pasif: anket üretilmez
+    if (!templateId) continue; // şablon yok veya pasif (kitle kapalı): anket üretilmez
     const assignee = resolveAssignee(ctx.settings.assignment_mode, ctx.assigneeIds, ctx.settings.fixed_assignee, ctx.load);
     if (assignee) ctx.load.set(assignee, (ctx.load.get(assignee) ?? 0) + 1);
     rows.push({
@@ -269,16 +324,27 @@ export type CompletableTask = {
   attempts: number;
 };
 
+export type CompletionResult = { done: boolean; referralUrl: string | null };
+
 /**
  * Cevapları yazıp görevi tamamlar. Yalnız hâlâ 'pending' görev güncellenir (çift cevap yok).
- * Döner: false = görev zaten kapanmış. Düşük puanda ofis sahibine/danışmana bildirim ve "geri arama" görevi açılır;
- * kapanış (deal_won) müşteri anketinde NPS raporu için mevcut `surveys` tablosuna da yansıtılır.
+ * Döner: done=false = görev zaten kapanmış. Düşük puanda "geri arama" takip görevi + danışmana bildirim açılır
+ * (kapanmazsa 24 sa takım lideri, 48 sa ofis sahibi: `escalate.ts`); destekleyende (9-10) tavsiye bağlantısı hazırlanır.
+ * Kapanış (deal_won) alıcı/kiracı cevabı NPS raporu için mevcut `surveys` tablosuna da yansıtılır.
  */
 export async function completeSurveyTask(
   db: SupabaseClient,
   task: CompletableTask,
-  input: { answers: ValidAnswer[]; score: number | null; comment: string | null; via: "phone" | "link"; userId: string | null; lowScoreMax: number; customerName: string },
-): Promise<boolean> {
+  input: {
+    answers: ValidAnswer[];
+    score: number | null;
+    comment: string | null;
+    via: "phone" | "link";
+    userId: string | null;
+    settings: SurveySettings;
+    customerName: string;
+  },
+): Promise<CompletionResult> {
   const nowIso = new Date().toISOString();
   const { data: updated, error } = await db
     .from("survey_tasks")
@@ -303,7 +369,7 @@ export async function completeSurveyTask(
     console.error("anket görevi tamamlanamadı", error.message);
     throw new Error("save_failed");
   }
-  if (!updated) return false;
+  if (!updated) return { done: false, referralUrl: null };
 
   if (input.answers.length > 0) {
     const { error: aErr } = await db
@@ -315,13 +381,17 @@ export async function completeSurveyTask(
     await db.from("survey_attempts").insert({ tenant_id: task.tenant_id, task_id: task.id, user_id: input.userId, outcome: "completed" });
   }
 
-  if (isLowScore(input.score, input.lowScoreMax)) {
+  if (isLowScore(input.score, input.settings.low_score_max)) {
     await lowScoreFollowUp(db, task, input.score ?? 0, input.customerName);
   }
   if (task.event_type === "deal_won" && task.deal_id && task.customer_id && input.score !== null && (task.audience === "buyer" || task.audience === "tenant")) {
     await mirrorToSatisfactionSurvey(db, task, input.score, input.comment, nowIso);
   }
-  return true;
+  let referralUrl: string | null = null;
+  if (isPromoter(input.score) && input.settings.promoter_invite) {
+    referralUrl = await promoterReferralInvite(db, task, input.customerName, input.score ?? 0);
+  }
+  return { done: true, referralUrl };
 }
 
 async function mirrorToSatisfactionSurvey(db: SupabaseClient, task: CompletableTask, score: number, comment: string | null, nowIso: string) {
@@ -352,39 +422,36 @@ async function mirrorToSatisfactionSurvey(db: SupabaseClient, task: CompletableT
   }
 }
 
+/** Ofisin ilk aktif sahibi (danışmansız görevde takip görevi ona düşer). */
+async function firstOwnerId(db: SupabaseClient, tenantId: string): Promise<string | null> {
+  const { data } = await db
+    .from("profiles")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("role", "owner")
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.id ? String(data.id) : null;
+}
+
+/**
+ * Düşük puan zinciri 1. halka: danışmana (yoksa ofis sahibine) 24 saat vadeli "geri arama" görevi + bildirim.
+ * `low_score_handled` burada YAZILMAZ: takip yalnız aksiyon notuyla kapanır (`survey_close_low_score`).
+ */
 async function lowScoreFollowUp(db: SupabaseClient, task: CompletableTask, score: number, customerName: string) {
   try {
-    const { data: owner } = await db
-      .from("profiles")
-      .select("id")
-      .eq("tenant_id", task.tenant_id)
-      .eq("role", "owner")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    const ownerId = owner?.id ? String(owner.id) : null;
-    const targets = new Set<string>();
-    if (task.agent_id) targets.add(task.agent_id);
-    if (ownerId) targets.add(ownerId);
+    const assignee = task.agent_id ?? (await firstOwnerId(db, task.tenant_id));
+    if (!assignee) return;
     const name = customerName || task.contact_name || "Müşteri";
-    await Promise.all(
-      [...targets].map((userId) =>
-        notifyTenant({
-          tenantId: task.tenant_id,
-          userId,
-          title: `Düşük anket puanı: ${name} ${score}/10 verdi`,
-          body: "Geri arama önerisi: deneyimi telafi etmek için müşteriyi arayın.",
-          href: "/app/anketler?puan=dusuk",
-          kind: "warning",
-        }),
-      ),
-    );
-    const assignee = task.agent_id ?? ownerId;
-    if (assignee) {
-      await db.from("tasks").insert({
+    const { data: created, error } = await db
+      .from("tasks")
+      .insert({
         tenant_id: task.tenant_id,
-        title: `Geri arama önerisi: ${name} (anket puanı ${score}/10)`,
-        notes: "Anket sonucunda düşük puan alındı. Müşteriyi arayıp deneyimi telafi edin.",
+        title: `Geri arama: ${name} (anket puanı ${score}/10)`,
+        notes:
+          "Anket sonucunda düşük puan alındı. Müşteriyi arayıp deneyimi telafi edin; kapanışta Anketler > Düşük puan takibi bölümüne aksiyon notu yazın. 24 saat içinde kapanmazsa takım liderine, 48 saatte ofis sahibine bildirilir.",
         kind: "call",
         priority: "high",
         due_at: new Date(Date.now() + 86_400_000).toISOString(),
@@ -392,10 +459,79 @@ async function lowScoreFollowUp(db: SupabaseClient, task: CompletableTask, score
         customer_id: task.customer_id,
         property_id: task.property_id,
         deal_id: task.deal_id,
-      });
+      })
+      .select("id")
+      .maybeSingle();
+    if (error) console.error("düşük puan takip görevi", error.message);
+    if (created?.id) {
+      const { error: linkErr } = await db
+        .from("survey_tasks")
+        .update({ followup_task_id: created.id })
+        .eq("id", task.id)
+        .eq("tenant_id", task.tenant_id);
+      if (linkErr && !isMissingColumn(linkErr)) console.error("düşük puan takip bağlantısı", linkErr.message);
     }
-    await db.from("survey_tasks").update({ low_score_handled: true }).eq("id", task.id).eq("tenant_id", task.tenant_id);
+    await notifyTenant({
+      tenantId: task.tenant_id,
+      userId: assignee,
+      title: `Düşük anket puanı: ${name} ${score}/10 verdi`,
+      body: "Geri arama görevi açıldı. 24 saat içinde arayıp aksiyon notuyla kapatın.",
+      href: "/app/anketler?takip=acik",
+      kind: "warning",
+      prefKey: "survey",
+      dedupeKey: `survey-low:${task.id}:0`,
+    });
   } catch (e) {
     console.error("düşük puan takibi", e);
+  }
+}
+
+/**
+ * Destekleyen (9-10) müşteriye tavsiye daveti: müşteriye özel tavsiye bağlantısı (varsa mevcut aktif bağlantı) +
+ * danışmana bildirim. Yalnız müşteri kaydı olan görevde ve "Akıllı listeler ve tavsiyeler" modülü açıkken.
+ * Hata akışı bozmaz; döner: tavsiye sayfası adresi (teşekkür ekranında gösterilir) ya da null.
+ */
+async function promoterReferralInvite(db: SupabaseClient, task: CompletableTask, customerName: string, score: number): Promise<string | null> {
+  if (!task.customer_id) return null;
+  try {
+    const modules = await loadTenantModuleState(db, task.tenant_id);
+    if (!isFeatureEnabledIn(modules, "smart_lists")) return null;
+    const { data: existing } = await db
+      .from("referral_links")
+      .select("public_token")
+      .eq("tenant_id", task.tenant_id)
+      .eq("customer_id", task.customer_id)
+      .eq("is_active", true)
+      .maybeSingle();
+    let token = existing?.public_token ? String(existing.public_token) : null;
+    if (!token) {
+      const { data: created, error } = await db
+        .from("referral_links")
+        .insert({ tenant_id: task.tenant_id, customer_id: task.customer_id, staff_id: task.agent_id })
+        .select("public_token")
+        .maybeSingle();
+      if (error) {
+        console.error("tavsiye daveti", error.message);
+        return null;
+      }
+      token = created?.public_token ? String(created.public_token) : null;
+    }
+    if (!token) return null;
+    if (task.agent_id) {
+      await notifyTenant({
+        tenantId: task.tenant_id,
+        userId: task.agent_id,
+        title: `${customerName || "Müşteriniz"} ${score}/10 verdi: tavsiye daveti hazır`,
+        body: "Destekleyen müşteriye tavsiye bağlantısı sunuldu. Tavsiyeler sayfasından takip edebilirsiniz.",
+        href: "/app/tavsiyeler",
+        kind: "success",
+        prefKey: "survey",
+        dedupeKey: `survey-promoter:${task.id}`,
+      });
+    }
+    return `${getBaseUrl()}/tavsiye/${token}`;
+  } catch (e) {
+    console.error("tavsiye daveti", e);
+    return null;
   }
 }

@@ -111,7 +111,8 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
     "id, event_type, audience, event_summary, status, due_at, next_attempt_at, attempts, max_attempts, assigned_to, agent_id, customer_id, property_id, contact_name, contact_phone, template_id, last_outcome, customer:customers!survey_tasks_customer_id_fkey(id, full_name, phone)";
 
   const closedView = durum === "kapali";
-  let q = supabase.from("survey_tasks").select(select);
+  // Ekip nabzı (anonim iç anket) kuyruğa girmez.
+  let q = supabase.from("survey_tasks").select(select).neq("event_type", "advisor_pulse");
   q = closedView ? q.neq("status", "pending").order("completed_at", { ascending: false, nullsFirst: false }).limit(60) : q.eq("status", "pending").order("due_at", { ascending: true }).limit(1000);
   if (!canManage) q = q.eq("assigned_to", ctx.userId);
   else if (anketor === "atanmamis") q = q.is("assigned_to", null);
@@ -133,14 +134,20 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
 
   // Şablonlar + sorular + isimler (görünen satırlar için)
   const templateIds = [...new Set(shown.map((r) => r.template_id).filter((v): v is string => Boolean(v)))];
-  const [{ data: templates }, { data: questions }, { data: profiles }, assigneeIds] = await Promise.all([
+  const shownIds = shown.slice(0, 300).map((r) => r.id);
+  const [{ data: templates }, { data: questions }, { data: profiles }, assigneeIds, { data: sentRows }] = await Promise.all([
     templateIds.length ? supabase.from("survey_templates").select("id, name").in("id", templateIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     templateIds.length
       ? supabase.from("survey_questions").select("id, template_id, kind, label, options, required, position").in("template_id", templateIds).order("position", { ascending: true })
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     supabase.from("profiles").select("id, full_name").limit(500),
     canManage ? loadAssigneeIds(supabase, tenantId) : Promise.resolve([] as string[]),
+    // Otomatik gönderim izi (PB49; sütun yoksa hata = boş, kuyruk etkilenmez).
+    shownIds.length
+      ? supabase.from("survey_tasks").select("id, sent_via").in("id", shownIds).not("sent_via", "is", null)
+      : Promise.resolve({ data: [] as { id: string; sent_via: string }[] }),
   ]);
+  const sentVia = new Map(((sentRows ?? []) as { id: string; sent_via: string }[]).map((s) => [String(s.id), String(s.sent_via)]));
   const nameOf = new Map((profiles ?? []).map((p) => [String(p.id), String(p.full_name ?? "Kullanıcı")]));
   const tplName = new Map((templates ?? []).map((t) => [String(t.id), String(t.name)]));
   const qByTpl = new Map<string, QueueQuestionVM[]>();
@@ -186,6 +193,7 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
       assignedTo: r.assigned_to,
       assigneeName: r.assigned_to ? (nameOf.get(r.assigned_to) ?? null) : null,
       lastOutcomeLabel: r.last_outcome && r.last_outcome in OUTCOME_LABELS ? OUTCOME_LABELS[r.last_outcome as SurveyOutcome] : null,
+      sentLabel: sentVia.get(r.id) === "sms" ? "SMS ile gönderildi" : sentVia.get(r.id) === "whatsapp" ? "WhatsApp ile gönderildi" : null,
       questions: r.template_id ? (qByTpl.get(r.template_id) ?? []) : [],
     };
   });

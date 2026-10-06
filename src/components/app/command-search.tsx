@@ -1,18 +1,20 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { ShortcutHint } from "./shortcut-hint";
 import type { AppModule } from "@/lib/permissions";
 import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { runWhenIdle } from "@/lib/idle";
+import { lazyPanel } from "@/lib/lazy-panel";
 
 /**
  * Üst çubuk arama kutusu — hafif kabuk. Palet gövdesi (arama aksiyonu, hesap makinesi,
  * son kayıtlar, eylem listeleri) ilk etkileşime kadar yüklenmez: tık, Ctrl/Cmd+K veya
- * hover/odak (önceden ısıtma). Yüklenince gerçek bileşen aynı görünümlü kutuyu devralır.
+ * hover/odak (önceden ısıtma) ve sayfa boşalınca arka planda. Yüklenince gerçek bileşen aynı görünümlü
+ * kutuyu devralır; parça önceden indiyse askıya alınmadan açılır (`lazyPanel`).
  */
-const loadPanel = () => import("./command-search-panel").then((m) => ({ default: m.CommandSearchPanel }));
-const Panel = lazy(loadPanel);
+const panel = lazyPanel(() => import("./command-search-panel").then((m) => m.CommandSearchPanel));
 
 function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void }) {
   return (
@@ -50,8 +52,12 @@ export function CommandSearch({
   storageScope?: string;
   uiPrefCookie?: string | null;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const [Panel, setPanel] = useState<ReturnType<typeof panel.resolve> | null>(null);
+  const mounted = Panel !== null;
   const [openOnMount, setOpenOnMount] = useState(false);
+
+  // Sayfa boşalınca palet parçasını arka planda indir: ilk Ctrl+K / tık beklemesin.
+  useEffect(() => runWhenIdle(panel.preload), []);
 
   useEffect(() => {
     if (mounted) return;
@@ -59,12 +65,12 @@ export function CommandSearch({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpenOnMount(true);
-        setMounted(true);
+        setPanel(() => panel.resolve());
       }
     };
     const onOpen = () => {
       setOpenOnMount(true);
-      setMounted(true);
+      setPanel(() => panel.resolve());
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener(OPEN_PALETTE_EVENT, onOpen);
@@ -74,14 +80,14 @@ export function CommandSearch({
     };
   }, [mounted]);
 
-  if (!mounted) {
+  if (!Panel) {
     return (
       <Trigger
         onOpen={() => {
           setOpenOnMount(true);
-          setMounted(true);
+          setPanel(() => panel.resolve());
         }}
-        onWarm={() => void loadPanel()}
+        onWarm={panel.preload}
       />
     );
   }

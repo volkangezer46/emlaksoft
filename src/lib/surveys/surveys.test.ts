@@ -2,21 +2,38 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
+  LOW_SCORE_OWNER_HOURS,
+  LOW_SCORE_TEAM_LEAD_HOURS,
+  MAX_SEND_ATTEMPTS,
   applyAttemptOutcome,
+  autoSendDecision,
   averageScore,
   breakdownByAgent,
+  breakdownByAudienceGroup,
   breakdownByEvent,
+  breakdownByEventAudience,
+  combinedNpsScores,
+  customerScores,
   dueAtFor,
   eventKey,
   isDueNow,
   isLowScore,
   isOverdue,
+  isPromoter,
   isScheduled,
+  latestRentAnniversary,
+  lowScoreEscalationTarget,
+  monthlyTrend,
   pickBalancedAssignee,
+  pulseSummary,
   reasonDistribution,
+  rentRenewalEventDate,
   resolveAssignee,
   responseRate,
   sanitizeQuestionDrafts,
+  scoreStats,
+  surveySmsText,
+  validLowScoreNote,
   validateAnswers,
   type StatTask,
   type StoredQuestion,
@@ -109,9 +126,169 @@ describe("cevap doğrulama (telefon ve bağlı link aynı kural)", () => {
   it("zorunlu soru boşsa, aralık dışı puan ve geçersiz seçenek reddedilir", () => {
     expect(validateAnswers(questions, { q2: "Fiyat" }).ok).toBe(false);
     expect(validateAnswers(questions, { q1: "11" }).ok).toBe(false);
-    expect(validateAnswers(questions, { q1: "0" }).ok).toBe(false);
+    expect(validateAnswers(questions, { q1: "-1" }).ok).toBe(false);
+    expect(validateAnswers(questions, { q1: "7.5" }).ok).toBe(false);
     expect(validateAnswers(questions, { q1: "5", q2: "Başka" }).ok).toBe(false);
     expect(validateAnswers(questions, { q1: "5", q3: "belki" }).ok).toBe(false);
+  });
+});
+
+describe("tek ölçek 0-10", () => {
+  it("0 geçerli puandır (NPS ölçeği), şablon metinlerinde 1-10 kalmaz", () => {
+    const qs: StoredQuestion[] = [{ id: "q1", kind: "score", label: "Puan", options: [], required: true, tag: "primary" }];
+    const r = validateAnswers(qs, { q1: "0" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.score).toBe(0);
+    const text = JSON.stringify(DEFAULT_TEMPLATES);
+    expect(text).not.toContain("1-10");
+    for (const t of DEFAULT_TEMPLATES) {
+      for (const q of t.questions) if (q.kind === "score") expect(q.label, `${t.event}/${t.audience}`).toContain("0-10");
+    }
+  });
+
+  it("alıcı/kiracı ve satıcı/ev sahibi kapanış şablonlarında NPS + danışman puanı vardır", () => {
+    for (const audience of ["buyer", "tenant", "seller", "landlord"] as const) {
+      const t = DEFAULT_TEMPLATES.find((x) => x.event === "deal_won" && x.audience === audience)!;
+      expect(t.questions.find((q) => q.tag === "primary")!.label).toContain("tavsiye");
+      expect(t.questions.some((q) => q.tag === "advisor" && q.kind === "score")).toBe(true);
+    }
+  });
+
+  it("danışman puanı etiketi yalnız puan sorusunda ve tek kalır", () => {
+    const out = sanitizeQuestionDrafts([
+      { kind: "score", label: "Ana", tag: "primary" },
+      { kind: "score", label: "Danışman", tag: "advisor" },
+      { kind: "score", label: "İkinci danışman", tag: "advisor" },
+      { kind: "text", label: "Metin", tag: "advisor" },
+    ]);
+    expect(Array.isArray(out)).toBe(true);
+    if (Array.isArray(out)) {
+      expect(out.filter((q) => q.tag === "advisor")).toHaveLength(1);
+      expect(out[3]!.tag).toBeNull();
+    }
+  });
+});
+
+describe("NPS / CSAT", () => {
+  it("bantlar 0-6 / 7-8 / 9-10; veri yoksa null", () => {
+    expect(scoreStats([])).toBeNull();
+    const s = scoreStats([10, 9, 8, 7, 6, 0])!;
+    expect(s).toMatchObject({ n: 6, promoters: 2, passives: 2, detractors: 2, nps: 0, csat: 67 });
+    expect(scoreStats([10, 10, 3])!.nps).toBe(33);
+    expect(isPromoter(9)).toBe(true);
+    expect(isPromoter(8)).toBe(false);
+  });
+
+  it("kitle grubu kırılımı satıcı/malik dahil; ekip nabzı müşteri NPS'ine girmez", () => {
+    const tasks: StatTask[] = [
+      { id: "1", event_type: "deal_won", audience: "buyer", status: "completed", score: 10, agent_id: "a", assigned_to: null },
+      { id: "2", event_type: "deal_won", audience: "seller", status: "completed", score: 3, agent_id: "a", assigned_to: null },
+      { id: "3", event_type: "property_unpublished", audience: "owner", status: "completed", score: 9, agent_id: "a", assigned_to: null },
+      { id: "4", event_type: "advisor_pulse", audience: "advisor", status: "completed", score: 0, agent_id: null, assigned_to: null },
+    ];
+    expect(customerScores(tasks)).toEqual([10, 3, 9]);
+    const groups = breakdownByAudienceGroup(tasks);
+    expect(groups.find((g) => g.id === "satici")!.stats).toMatchObject({ n: 2, promoters: 1, detractors: 1, nps: 0 });
+    expect(groups.find((g) => g.id === "alici")!.stats!.nps).toBe(100);
+    expect(breakdownByEventAudience(tasks).some((r) => r.event === "advisor_pulse")).toBe(false);
+  });
+
+  it("birleşik NPS: aynı anlaşmanın alıcı cevabı (surveys yansıması) iki kez sayılmaz", () => {
+    const tasks = [
+      { id: "1", event_type: "deal_won", audience: "buyer", status: "completed", score: 9, agent_id: null, assigned_to: null, deal_id: "d1" },
+      { id: "2", event_type: "deal_won", audience: "seller", status: "completed", score: 5, agent_id: null, assigned_to: null, deal_id: "d1" },
+    ];
+    const legacy = [
+      { deal_id: "d1", score: 9, status: "answered" },
+      { deal_id: "d2", score: 7, status: "answered" },
+      { deal_id: "d3", score: null, status: "pending" },
+    ];
+    expect(combinedNpsScores(tasks, legacy).sort()).toEqual([5, 7, 9]);
+  });
+
+  it("aylık trend son 6 TR ayını verir; tamamlanma ayına göre", () => {
+    const now = Date.parse("2026-10-07T09:00:00.000Z");
+    const t = monthlyTrend(
+      [
+        { id: "1", event_type: "deal_won", audience: "buyer", status: "completed", score: 10, agent_id: null, assigned_to: null, completed_at: "2026-10-01T08:00:00.000Z" },
+        { id: "2", event_type: "deal_won", audience: "buyer", status: "completed", score: 2, agent_id: null, assigned_to: null, completed_at: "2026-08-31T22:30:00.000Z" },
+      ],
+      now,
+      6,
+    );
+    expect(t.map((p) => p.month)).toEqual(["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]);
+    // 31 Ağu 22:30 UTC = 1 Eyl 01:30 TR → Eylül
+    expect(t.find((p) => p.month === "2026-09")!.stats!.n).toBe(1);
+    expect(t.find((p) => p.month === "2026-10")!.stats!.nps).toBe(100);
+    expect(t.find((p) => p.month === "2026-08")!.stats).toBeNull();
+  });
+});
+
+describe("otomatik gönderim kuralı", () => {
+  const base = { status: "pending", sent_at: null, send_attempts: 0, due_at: new Date(NOW - HOUR).toISOString(), customer_id: "c1", event_type: "deal_won" };
+  const ok = { nowMs: NOW, consentGranted: true, contactRecentlySent: false };
+  it("vadesi gelmiş, izinli, gönderilmemiş müşteri görevine gönderir", () => {
+    expect(autoSendDecision(base, ok)).toEqual({ send: true });
+  });
+  it("İYS izni yok, 30 gün içinde mesaj gitti, müşteri kaydı yok, deneme doldu, vade gelmedi: göndermez", () => {
+    expect(autoSendDecision(base, { ...ok, consentGranted: false })).toMatchObject({ send: false, reason: "no_consent" });
+    expect(autoSendDecision(base, { ...ok, contactRecentlySent: true })).toMatchObject({ send: false, reason: "cooldown" });
+    expect(autoSendDecision({ ...base, customer_id: null }, ok)).toMatchObject({ send: false, reason: "no_customer" });
+    expect(autoSendDecision({ ...base, send_attempts: MAX_SEND_ATTEMPTS }, ok)).toMatchObject({ send: false, reason: "attempts" });
+    expect(autoSendDecision({ ...base, due_at: new Date(NOW + HOUR).toISOString() }, ok)).toMatchObject({ send: false, reason: "not_due" });
+    expect(autoSendDecision({ ...base, sent_at: new Date(NOW).toISOString() }, ok)).toMatchObject({ send: false, reason: "already_sent" });
+    expect(autoSendDecision({ ...base, event_type: "advisor_pulse" }, ok)).toMatchObject({ send: false, reason: "internal" });
+  });
+  it("SMS metni kişisel veri/işlem ayrıntısı taşımaz, bağlantıyı içerir", () => {
+    const t = surveySmsText("Yıldız Emlak", "https://x.test/anket/abc");
+    expect(t).toContain("https://x.test/anket/abc");
+    expect(t.startsWith("Yıldız Emlak:")).toBe(true);
+  });
+});
+
+describe("düşük puan zinciri", () => {
+  it("24 saatte takım lideri, 48 saatte ofis sahibi; kapanmış takipte kademe yok", () => {
+    const done = NOW - 10 * HOUR;
+    expect(lowScoreEscalationTarget({ completedAtMs: done, handled: false, nowMs: NOW })).toBe(0);
+    expect(lowScoreEscalationTarget({ completedAtMs: NOW - LOW_SCORE_TEAM_LEAD_HOURS * HOUR, handled: false, nowMs: NOW })).toBe(1);
+    expect(lowScoreEscalationTarget({ completedAtMs: NOW - LOW_SCORE_OWNER_HOURS * HOUR, handled: false, nowMs: NOW })).toBe(2);
+    expect(lowScoreEscalationTarget({ completedAtMs: NOW - 99 * HOUR, handled: true, nowMs: NOW })).toBe(0);
+  });
+  it("aksiyon notu en az 10 karakter", () => {
+    expect(validLowScoreNote("arandı")).toBe(false);
+    expect(validLowScoreNote("  Müşteri arandı, özür dilendi.  ")).toBe(true);
+    expect(validLowScoreNote("x".repeat(2001))).toBe(false);
+  });
+});
+
+describe("kira olayları", () => {
+  it("yenileme olayı bitişten 60 gün önce", () => {
+    expect(rentRenewalEventDate("2026-12-31")).toBe("2026-11-01");
+    expect(rentRenewalEventDate(null)).toBeNull();
+    expect(rentRenewalEventDate("bozuk")).toBeNull();
+  });
+  it("en son yıl dönümü (en az 1. yıl); 29 Şubat 28 Şubat'a düşer", () => {
+    expect(latestRentAnniversary("2024-03-15", "2026-10-07")).toEqual({ year: 2, date: "2026-03-15" });
+    expect(latestRentAnniversary("2025-11-01", "2026-10-07")).toBeNull();
+    expect(latestRentAnniversary("2024-02-29", "2025-03-01")).toEqual({ year: 1, date: "2025-02-28" });
+  });
+});
+
+describe("ekip nabzı (anonim)", () => {
+  it("en az 3 cevap yoksa hiçbir sayı/yorum gösterilmez; yorumlar alfabetik", () => {
+    const two = pulseSummary([{ id: "1", score: 9 }, { id: "2", score: 3 }], [], ["b", "a"]);
+    expect(two).toEqual({ visible: false, n: 2 });
+    const three = pulseSummary(
+      [{ id: "1", score: 9 }, { id: "2", score: 3 }, { id: "3", score: 10 }],
+      [{ task_id: "1", tag: "reason", value_text: "Eğitim ve koçluk" }],
+      ["zeta", "Alfa"],
+    );
+    expect(three.visible).toBe(true);
+    if (three.visible) {
+      expect(three.stats.nps).toBe(33);
+      expect(three.comments).toEqual(["Alfa", "zeta"]);
+      expect(three.reasons).toEqual([{ reason: "Eğitim ve koçluk", count: 1 }]);
+    }
   });
 });
 

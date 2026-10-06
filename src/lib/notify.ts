@@ -29,7 +29,8 @@ import { coerceInput } from "@/lib/settings/view";
 /**
  * Tercih anahtarları — profiles.notification_prefs jsonb'sindeki boolean
  * bayraklar. Eksik anahtar AÇIK sayılır (marketing hariç; onun UI varsayılanı
- * kapalı). Yeni tür ekleyince buraya, UI ROWS'a ve action DEFAULTS'a da ekle.
+ * kapalı). Yeni tür ekleyince buraya, UI ROWS'a, action DEFAULTS'a ve ofis varsayılanı `NOTIFY_DEFAULTS`
+ * (settings/registry/tenant.ts) listesine de ekle; sözleşme `notification-prefs-contract.test.ts`.
  */
 export type NotifPrefKey =
   | "portal"
@@ -44,7 +45,10 @@ export type NotifPrefKey =
   | "dunning"
   | "rentOverdue"
   | "network"
-  | "insight";
+  | "insight"
+  | "assignment"
+  | "authority"
+  | "survey";
 
 /** Ofisin `office.notify.default_<tür>` kaydı "kapalı" mı? Kayıt yok/okunamıyor/tür tanımsız = false (davranış değişmez). */
 async function officeDefaultIsOff(admin: ReturnType<typeof createAdminClient>, tenantId: string, prefKey: string): Promise<boolean> {
