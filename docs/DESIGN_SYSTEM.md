@@ -457,6 +457,28 @@ Tetikleyici düğme olduğu yerde kalır (render prop `trigger`); kontrollü kul
 | `ChartCard` (= `ChartFrame`) | her grafik kartı | başlık, `period`, `href`, `loading` (iskelet), `empty` (anlamlı boş durum) |
 | `SkeletonCard` | yükleniyor | `.skeleton` parlaması, sabit yükseklik (CLS yok); `lazy-chart` bunu kullanır |
 | `CountUp` | KPI sayısı | `value` metin ya da sayı + `format="number\|money\|percent"`; SSR sonucu basar; admin `CountUp` ve `OdometerNumber` bunun eski adlarıdır |
+| `DonutRing` | küçük pay dağılımı (danışman/ofis payı, kanal) | saf SVG, istemci bileşeninde de kullanılır; `segments[{label,value,color\|tone}]`, `children` merkez; değer değişince dilimler akıcı kayar (`.viz-ring-seg`); toplam ≤0 → `null`. İpuçlu/tıklanabilir dağılım için `DonutSplit` |
+
+**API ekleri (2026-10-06):** `RadialGauge` → `trackColor` (yatak rengi), `fluid` (kapsayıcıyı doldurur; TV panosu), `live`
+(ilk süpürme yerine değer değişiminde akıcı geçiş). `FunnelChart` → `tone`. Recharts sarmalayıcıları (`ui/lazy-charts`):
+`BarCompare` / `DonutSplit` → `hrefKey` (satırdaki hedef adres alanı; tıklayınca filtreli sayfa) + `hint` (ipucu alt satırı).
+Sayfaya özel Recharts kopyası YAZILMAZ: tıklanabilirlik/biçim gerekiyorsa bu bileşenlere prop eklenir (`viz-depth-contract.test.ts`
+recharts içe aktarımını yalnız `ui/chart.tsx`'e kilitler; eski `danisman-kpi/revenue-chart` ve `giderler/category-donut` silindi).
+
+### Grafik derinlik dili ("3B görünüm", WebGL yok)
+
+Kod: `src/app/viz.css` + `ui/chart.tsx` + `ui/viz/*`. Token: `--viz-sheen` (üstten ışık), `--viz-shade` (alt gölge hattı / iç kenar),
+`--viz-shadow` (yalnız üzerine gelinen öğe), `--viz-glow` (çizgi parlaması opaklığı); açık değer `tokens.css`, koyu `theme-dark.css`.
+- **Çubuk:** yuvarlatılmış uç + üstten ışık degradesi (grafik başına tek `linearGradient`) + taban gölge hattı; üzerine gelinen öne
+  çıkar (drop-shadow), diğerleri %55'e söner (`.viz-depth:has(.viz-bar[data-active])`).
+- **Halka:** halka kalınlığı boyunca tek "tüp" degradesi (`ui/viz/tube-gradient.tsx`: iç kenar gölge → ortada saydam → dış kenar
+  ışık; ayrı şerit gibi okunmaz); Recharts dilimi, `RadialGauge` ve `DonutRing` aynı bileşeni kullanır. Etkin dilim 4 px dışarı taşar.
+- **Alan:** 3 duraklı degrade + çizginin altında kalın, yarı saydam ikinci eğri (parlama). SVG `filter` KULLANILMAZ (maliyet; test).
+- **Eksen/ızgara:** yalnız yatay kesikli ızgara, 4-5 değer etiketi, eksen çizgisi yok, etiket `--text-muted` (AA).
+- **Dönem değişimi:** aynı bileşen yeni veriyle çizilince Recharts eski değerden yeniye canlandırır; `AreaTrendChart` `animationKey`.
+- **Kontrast (test):** ışık katmanı çubuğun yarı yüksekliğinde bile `--viz-1..8`'i `--surface` üzerinde ≥3:1 tutar (iki tema).
+  Her zaman koyu hero bantlarındaki halka yatağı `--viz-track-inverse`; /app, /admin ve ortak bileşen SVG'lerinde sabit renk yok
+  (istisna: üçüncü taraf marka logoları, harita işaretçisi).
 
 Boş durum illüstrasyonları: `Illustration kind="funnel\|gauge\|heatmap"`.
 **Kural:** grafik yalnız gerçek veriyle çizilir; veri yoksa `null` döner ya da `ChartCard empty` gösterilir. Görünen her sayı/dilim/aşama mümkünse `href` ile filtrelenmiş hedefe gider (sıfır çıkmaz metrik).
@@ -493,7 +515,7 @@ Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--
 
 ### Karar: 3B, GIF, Lottie, degrade, motion (güncel: 2026-10-06)
 
-- **3B pasta/çubuk yok:** derinlik algıyı bozar (ön dilim büyük görünür); yanıltıcı. Derinlik ipucu yalnız yüzey katmanları, ince iç ışık çizgisi (`--inner-top`), yumuşak gölge ve çizgi altı gradyan ile verilir.
+- **3B pasta/çubuk yok:** derinlik algıyı bozar (ön dilim büyük görünür); yanıltıcı. Derinlik ipucu yalnız yüzey katmanları, ince iç ışık çizgisi (`--inner-top`), yumuşak gölge ve çizgi altı gradyan ile verilir → uygulaması aşağıdaki "Grafik derinlik dili" (perspektif/eğim YOK, oran bozulmaz).
 - **GIF yok:** tema duyarsız (koyu/açık), ağır, erişilemez. Hareket SVG + CSS illüstrasyon animasyonlarıdır (`ui/illustrations`, `motion.css`).
 - **Lottie yok:** yeni bağımlılık + paket büyümesi + tema renklerine bağlanamama; SVG+CSS aynı işi ölçülü ve kurumsal yapar.
 - **Dekoratif degrade:** yalnız `DashboardHero` bandında, çok hafif ve hareketli (yukarıdaki kurallar); kart/panel
