@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { NAV_SHORTCUTS } from "@/lib/nav-config";
 import { APP_ACTIONS } from "@/lib/palette-core";
 
 /**
@@ -39,19 +40,8 @@ const KisayolDialog = lazy(() =>
 
 type Kisayol = { tuslar: string; hedef: string; etiket: string };
 
-/** `g` önekinden sonraki harf → gidilecek yol. */
-const GIT: Kisayol[] = [
-  { tuslar: "g p", hedef: "/app/portfoyler", etiket: "Portföyler" },
-  { tuslar: "g m", hedef: "/app/musteriler", etiket: "Müşteriler" },
-  { tuslar: "g t", hedef: "/app/talepler", etiket: "Talepler" },
-  { tuslar: "g a", hedef: "/app/anlasmalar", etiket: "Anlaşmalar" },
-  { tuslar: "g g", hedef: "/app/gorevler", etiket: "Görevler" },
-  { tuslar: "g r", hedef: "/app/randevular", etiket: "Randevular" },
-  { tuslar: "g k", hedef: "/app/komisyon", etiket: "Komisyon" },
-  { tuslar: "g e", hedef: "/app/eslestirme", etiket: "Eşleştirme" },
-  { tuslar: "g d", hedef: "/app/degerleme", etiket: "Değerleme" },
-  { tuslar: "g h", hedef: "/app", etiket: "Ana panel" },
-];
+/** `g` önekinden sonraki harf → gidilecek yol (TEK kaynak: nav-config `shortcut` alanı → NAV_SHORTCUTS). */
+const GIT: Kisayol[] = NAV_SHORTCUTS.map((k) => ({ tuslar: k.keys, hedef: k.href, etiket: k.label }));
 
 const HARF_YOL = new Map(GIT.map((k) => [k.tuslar.split(" ")[1], k.hedef]));
 

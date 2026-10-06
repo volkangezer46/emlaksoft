@@ -323,6 +323,15 @@ export async function DemandsView({
       hint: "yeni + aktif + eşleşti",
     },
     {
+      // Karar KPI'sı: henüz dokunulmamış (eşleşme/arama yapılmamış) talepler — ilk aranacaklar.
+      label: "Yeni",
+      value: statusCounts.new!,
+      icon: <Sparkles />,
+      tone: "info",
+      href: hrefWith({ status: "new", aciliyet: "", yas: "" }),
+      hint: "henüz işlenmedi",
+    },
+    {
       label: "Acil / yüksek",
       value: urgentTotal,
       icon: <Flame />,

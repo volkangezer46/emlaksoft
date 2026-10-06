@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
 import { now } from "@/lib/clock";
 import {
   KVKK_REQUEST_LABELS,
@@ -115,9 +116,19 @@ export default async function KvkkRequestsPage({
             </CardHeader>
             <CardContent>
               {rows.length === 0 ? (
-                <p className="py-6 text-center text-sm text-text-muted">
-                  {durum ? "Bu durumda talep yok." : "Henüz talep kaydı yok. Gelen ilk başvuruyu yukarıdan kaydedin."}
-                </p>
+                <EmptyState
+                  variant="compact"
+                  bare
+                  icon={ClipboardList}
+                  tone={durum ? "brand" : "mint"}
+                  title={durum ? `${KVKK_STATUS_LABELS[durum]} durumunda talep yok` : "Henüz KVKK talebi kaydı yok"}
+                  description={
+                    durum
+                      ? "Süzgeci kaldırıp tüm talepleri görün."
+                      : "Veri sahibi size erişim, düzeltme veya silme başvurusu yaptığında yukarıdaki formdan kaydedin; yasal 30 günlük süre otomatik izlenir."
+                  }
+                  action={durum ? { href: "/app/uyum/talepler", label: "Filtreyi temizle" } : { href: "/app/uyum", label: "KVKK ve uyum merkezi" }}
+                />
               ) : (
                 <ul className="divide-y divide-line">
                   {rows.map((r) => {

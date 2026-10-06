@@ -115,6 +115,10 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 - Kazanç gizliliği (P12) ve sec3 rol smoke senaryoları: runbook'taki duman testleri; `properties` UPDATE RLS açığı sahip kararı (eski madde, hâlâ geçerli).
 - Kayıtlı kartla otomatik yenileme (`billing.auto_renew_enabled`) KAPALI; iyzico off-session onayı ve CF retrieve alanları doğrulanmadan açılmaz.
 - Dış uptime izleyici (cron kaçırma/site erişimi) kurulmadı: öneri `docs/runbooks/IYZICO_IADE.md` §Alarm.
+- **Menü IA (2026-10-06, menü ajanı dalı):** `main`'de Ofis Merkezi iskeletiyle gelen 2 kırmızı test menü ajanının sahası değil, Ofis Merkezi
+  ajanına ait: `modules.test.ts` "27 kapatılabilir modül" (registry 28) ve "kapatılabilir her rota requireModulePage'e href geçirir"
+  (`/app/ofis-merkezi/page.tsx` istemci bileşeni, kapı yok). Ayrıca `/app/ayarlar/yetkilendirme` nav-config'te Ayarlar sekmesi olarak
+  TANIMLI ama sayfa dosyası başka ajanın dalında; birleşmeden önce o dal gelmeli (yoksa sekme 404'e gider).
 
 - **Uzman paneli kararı (2026-10-05):** canlıya almadan zorunlu paketler (P1-P7), ilk 30 gün planı, sahip kararları (S1-S13) ve "asla yapılmayacaklar" için `docs/design/PANEL_KARAR_1.md`.
 - **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Public medya sorguları
@@ -171,7 +175,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Telefon | `src/lib/phone-rules.ts` (`parsePhoneStrict`), `PhoneInput` |
 | Rol etiketi / terim | `src/lib/role-labels.ts`, `src/lib/terminology.ts` |
 | Zaman | `src/lib/clock.ts` (TR ay sınırları `trMonth*`) |
-| Menü | `src/lib/nav-config.ts` (39 öğe/9 başlık sözleşmesi `modules.test.ts`, ikonlar benzersiz `src/lib/icons.ts`) |
+| Menü | `src/lib/nav-config.ts` (9 başlık/42 öğe sözleşmesi; `description`/`keywords`/`advanced`/`shortcut` alanları, `NAV_SHORTCUTS`, `HIDDEN_APP_PAGES`, `MOBILE_TAB_SECTIONS`; ikonlar benzersiz `src/lib/icons.ts`; yetim sayfa testi `nav-pages-contract.test.ts`; tasarım `docs/design/MENU_IA_2026_10.md`) |
 | Modül aç/kapa | `src/lib/modules/**` (registry, guard, pending-defs); tablo yokken hepsi açık |
 | Onay kuralları | `src/lib/oversight/approval-gate.ts` (varsayılan kapalı, 48 sa tek kullanımlık; muafiyet yalnız owner/gm, `APPROVAL_EXEMPT_ROLES`; karar yetkisi `APPROVAL_DECIDER_ROLES`; tek mesaj `APPROVAL_PENDING_MESSAGE`) |
 | AI | yalnız `src/lib/ai/openai-client.ts` + `redact.ts`; kredi `src/lib/ai/credits/**` |
@@ -337,3 +341,20 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Action'lar `src/app/actions/access-control.ts`:** `upsertUserScope`, `resetUserScope`, `createScopeOverride`, `cancelScopeOverride`, `searchScopeResources`, `listAccessAudit`, `exportAccessAuditCsv` — Zod, tenant eşitliği (hedef profil + takım/şube + kaynak aynı ofis), her yazma önce/sonra ile `access_audit_log`; denetim yazılamazsa telafi (geri al). `actions/permissions.ts` istisnalar da `permission_granted/revoked` yazar (tablo yoksa ana işlemi bozmaz). Yalnız DEĞİŞİKLİK yazılır; aktif kapsam izi/okuma yazılmaz.
 - **Rol değişimi:** `updateTeamMember` rol değişince `syncScopeForRoleChange(admin, …)` ile kapsam satırını rol varsayılanına çeker (+günlük, `source: role_change`; şema yoksa atlar). Süresi 90+ gün önce dolan istisnalar `operational-retention` cron'unun adımı `purgeExpiredScopeOverrides` ile silinir (YENİ cron yok; allowlist satırı değişmedi).
 - **Bilinen/sahip:** (1) `has_permission_with_scope` RPC `customer_demands`/`customers.assigned_to` ile düzeltildi (main, canlıda). (2) `/api/export/[entity]` tam akış dışa aktarma ve ana ekran `scopeMine` hâlâ yalnız eski rol kuralı (kapsam bağlanmadı; sonraki adım). (3) Bayrağı AÇMA kararı sahibin: açınca danışman yalnız kendi müşteri/portföyünü görür (bugün tüm ofisi görüyor). (4) Pre-existing kırmızılar (bu işten değil): `nav-config.test` ikon çakışması "Ofis Merkezi"/"Ayarlar" (ikisi `ICONS.ayar`), `admin-client-tenant-contract` office-center.ts için allowlist satırı yok (Ofis Merkezi ajanı).
+
+## 18. Menü bilgi mimarisi düzeni — 2026-10-06 (main'e birleşti)
+
+- **Tek kaynak genişledi (`src/lib/nav-config.ts`):** 9 başlık korunur (id'ler sabit), 42 öğe. Yeni alanlar `description` (zorunlu; palet satırı + menü ipucu),
+  `keywords` (yalnız arama eş anlamlısı; "lead" yalnız Talepler), `advanced` (yan menüde "İleri düzey" ayracının altı), `shortcut` (`g m`…; `NAV_SHORTCUTS`
+  → `keyboard-shortcuts.tsx` GIT listesi ve palet rozeti). `HIDDEN_APP_PAGES` (8 gerekçeli gizli sayfa) + `nav-pages-contract.test.ts` (her statik page.tsx
+  menüde / üst öğe altında / gizli listede). `MOBILE_TAB_SECTIONS` alt çubuk (Bugün, Müşteriler, Portföy, Anlaşmalar + Daha fazla; "Yeni" FAB kaldırıldı,
+  hızlı kayıt üst çubuk Yeni menüsünde ve `n h`).
+- **Taşımalar:** Randevular+Görevler → Bugün; AI Asistan → Araçlar; Ofis kurulumu → Ofis; Bildirimler/İçe aktarma/Mahalle notları menüye bağlandı;
+  Ayarlar sekmeli (Genel, Roller, Yetkilendirme, Modüller); Portal Kontrol → "Portal ilanları". Başlık adları: Müşteriler ve Talepler, Portföy ve İlanlar,
+  Anlaşmalar ve Sözleşmeler, İletişim ve Pazarlama, Performans ve Raporlar, Ofis ve Ayarlar. İkon: Ofis Merkezi `ICONS.ofisMerkezi` (Ayarlar çakışması giderildi).
+- **Palet:** `getAppGoItems` etiket+açıklama+eş anlamlıda arar, sekmeler "Öğe · Sekme" adıyla; açıklama satırı gösterilir.
+- **Zenginleştirme (9 sayfa):** Akıllı Listeler `?segment=` filtre kontratı + grup bazlı boş durum + hızlı eylemler; Takımlar, Şubeler, Etiketler, Sözleşme
+  şablonları, KVKK talepleri, Evrak linkleri, Otomasyonlar, Denetim: EmptyState + CTA. Talepler KPI "Yeni" eklendi. Dashboard KPI yerleşimi yalnız ÖNERİ
+  (`docs/design/MENU_IA_2026_10.md` §6; `page.tsx`/`_home` hız ajanında, dokunulmadı).
+- **Doğrulama (bu dalda):** tsc 0, eslint 0, check:links 0; tam vitest: 5008 geçti / 4 kırmızı — hepsi main'den gelen başka ajan işleri (Ofis Merkezi 2 test,
+  cron sayısı 37 ↔ belgelerde 36). Menüyle ilgili tüm sözleşme testleri yeşil.

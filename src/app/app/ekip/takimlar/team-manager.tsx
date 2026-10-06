@@ -6,6 +6,7 @@ import { Check, Pencil, Plus, Power, Trash2, UserRound, Users } from "lucide-rea
 import { createTeam, deleteTeam, setMemberTeam, updateTeam } from "@/app/actions/teams";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
@@ -84,9 +85,14 @@ export function TeamManager({ teams, members, branches, canManage }: { teams: Te
       ) : null}
 
       {teams.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-          Henüz takım tanımlanmadı. Takım tanımlamazsanız uyarılar doğrudan şube müdürüne ve ofis sahibine yükselir.
-        </p>
+        <EmptyState
+          variant="compact"
+          icon={Users}
+          title="Henüz takım tanımlanmadı"
+          description="Takım tanımlamazsanız portal ilanı uyarıları doğrudan şube müdürüne ve ofis sahibine yükselir; takım kurup lider atayınca uyarı önce lidere gider."
+          action={canManage && !adding ? { node: <Button type="button" icon={Plus} onClick={() => setAdding(true)}>İlk takımı oluştur</Button> } : undefined}
+          secondary={{ href: "/app/ekip", label: "Ekip üyeleri" }}
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {teams.map((t) =>

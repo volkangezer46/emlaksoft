@@ -560,7 +560,12 @@ export function CommandSearchPanel({
                                   >
                                     <Icon className="h-4 w-4" />
                                   </span>
-                                  <span className="flex-1 truncate text-sm font-semibold text-ink-950">{action.label}</span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm font-semibold text-ink-950">{action.label}</span>
+                                    {action.description ? (
+                                      <span className="block truncate text-xs text-text-muted">{action.description}</span>
+                                    ) : null}
+                                  </span>
                                   {action.shortcut ? (
                                     <span className="ml-2 shrink-0" aria-label={`Kısayol ${action.shortcut}`}>
                                       <KbdCombo keys={action.shortcut.split(" ")} className="uppercase" />
