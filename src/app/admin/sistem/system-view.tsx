@@ -9,7 +9,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { getPlatformSecret } from "@/lib/settings/secret-read";
 import { relativeTimeTR } from "@/lib/admin-format";
-import { msSince } from "@/lib/clock";
+import { msSince, now as clockNow } from "@/lib/clock";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
 import { getEmlakFiyatiAdminStatus } from "@/lib/integrations/emlakfiyati/admin-status";
@@ -17,6 +17,9 @@ import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
 import { getPortalConfig } from "@/lib/integrations/portals";
 import { CronRunButton } from "./cron-run-button";
 import { MessagingKeysSection } from "./messaging-keys-form";
+import { RadialGauge } from "@/components/ui/viz";
+import { CronStatusStrip } from "./cron-status-strip";
+import { classifyCron, geoCoverage, schemaGauge } from "./cron-strip-model";
 
 const TOTAL_PROVINCES = 81;
 
@@ -168,7 +171,13 @@ export async function SystemView() {
     waHost = null;
   }
 
-  const provinceCoverage = Math.round(((provinces ?? 0) / TOTAL_PROVINCES) * 100);
+  const provinceCoverage = geoCoverage(provinces ?? null, TOTAL_PROVINCES);
+  const nowMs = clockNow();
+  const stripItems = CRON_JOBS.map(({ job, label, staleAfterMinutes }) => {
+    const hb = heartbeats.get(job);
+    return { job, label, status: classifyCron(hb, staleAfterMinutes, nowMs), when: hb ? relativeTimeTR(hb.last_run_at) : "hiç çalışmadı" };
+  });
+  const schemaG = schemaGauge(schemaRows);
   const cronConfigured = Boolean(process.env.CRON_SECRET?.trim());
   const pushConfigured = Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
   const iyzicoConfigured = Boolean(process.env.IYZICO_API_KEY && process.env.IYZICO_SECRET_KEY);
@@ -220,6 +229,8 @@ export async function SystemView() {
         </AdminStatGrid>
       </AdminPageHeader>
 
+      <CronStatusStrip items={stripItems} />
+
       {/* Geo + ortam değişkenleri */}
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
@@ -227,19 +238,26 @@ export async function SystemView() {
             <MapPin className="h-4 w-4" /> Geo kapsama (D3)
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">İl / ilçe / mahalle</h2>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <div className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 text-center">
-              <p className="font-display text-xl font-extrabold text-ink-950">{provinces ?? 0}/{TOTAL_PROVINCES}</p>
-              <p className="text-xs text-text-muted">İl (%{provinceCoverage})</p>
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 text-center">
-              <p className="font-display text-xl font-extrabold text-ink-950">{(districts ?? 0).toLocaleString("tr-TR")}</p>
-              <p className="text-xs text-text-muted">İlçe</p>
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 text-center">
-              <p className="font-display text-xl font-extrabold text-ink-950">{(neighborhoods ?? 0).toLocaleString("tr-TR")}</p>
-              <p className="text-xs text-text-muted">Mahalle</p>
-            </div>
+          <div className="@container mt-4 flex flex-wrap items-center gap-5">
+            <Link href="/admin/geo" aria-label="Coğrafya yönetimi: il kapsamı">
+              <RadialGauge value={provinces ?? 0} max={TOTAL_PROVINCES} size={96} tone={provinceCoverage === 100 ? "success" : "warn"} ariaLabel="İl kapsamı">
+                <span className="text-lg font-bold tabular-nums text-ink-950">%{provinceCoverage}</span>
+              </RadialGauge>
+            </Link>
+            <dl className="m-0 min-w-0 flex-1 divide-y divide-line text-sm">
+              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                <dt className="text-text-muted">İl</dt>
+                <dd className="m-0 font-semibold tabular-nums text-ink-950">{provinces ?? 0}/{TOTAL_PROVINCES}</dd>
+              </Link>
+              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                <dt className="text-text-muted">İlçe</dt>
+                <dd className="m-0 font-semibold tabular-nums text-ink-950">{(districts ?? 0).toLocaleString("tr-TR")}</dd>
+              </Link>
+              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                <dt className="text-text-muted">Mahalle</dt>
+                <dd className="m-0 font-semibold tabular-nums text-ink-950">{(neighborhoods ?? 0).toLocaleString("tr-TR")}</dd>
+              </Link>
+            </dl>
           </div>
           <p className="mt-4 text-xs text-text-muted">
             Her il, coğrafya yönetiminden tek tıkla ayrı taranır. Seçilen il öne alınır; diğer il taramaları bekletilir ve eksikler atomik olarak tamamlanır.
@@ -267,6 +285,12 @@ export async function SystemView() {
             Tarayıcı hata sınırlarından gelen kayıtlar. Aynı hata tekrar geldiğinde yeni satır
             açılmaz, sayaç artar — kaç <strong>farklı</strong> sorun olduğu görünür.
           </p>
+          <p className="mt-3">
+            <Link href="/admin/sistem?sekme=hatalar" className={`text-3xl font-bold tabular-nums hover:underline ${(openErrors ?? 0) > 0 ? "text-danger-500" : "text-mint-600"}`}>
+              {openErrors ?? 0}
+            </Link>{" "}
+            <span className="text-xs text-text-muted">açık hata türü</span>
+          </p>
           <Link
             href="/admin/sistem?sekme=hatalar"
             className="mt-4 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
@@ -282,7 +306,7 @@ export async function SystemView() {
             <HeartPulse className="h-4 w-4" /> Cron sağlığı
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Zamanlanmış görevler</h2>
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 divide-y divide-line">
             {CRON_JOBS.map(({ job, label, cadenceLabel, staleAfterMinutes }) => {
               const hb = heartbeats.get(job);
               const stale = !hb || msSince(hb.last_run_at) > staleAfterMinutes * 60_000;
@@ -290,7 +314,8 @@ export async function SystemView() {
               return (
                 <div
                   key={job}
-                  className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5"
+                  id={`cron-${job}`}
+                  className="flex min-h-10 scroll-mt-24 items-center justify-between gap-3 py-1"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-950">{label}</p>
@@ -360,20 +385,20 @@ export async function SystemView() {
             <KeyRound className="h-4 w-4" /> Altyapı &amp; güvenlik
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Ortam değişkenleri</h2>
-          <div className="mt-4 space-y-2.5">
-            <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
+          <div className="mt-4 divide-y divide-line">
+            <div className="flex min-h-10 items-center justify-between py-1">
               <span className="text-sm font-semibold text-ink-950">CRON_SECRET</span>
               <StatusPill ok={cronConfigured} okLabel="Tanımlı" badLabel="Eksik" />
             </div>
-            <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
+            <div className="flex min-h-10 items-center justify-between py-1">
               <span className="text-sm font-semibold text-ink-950">iyzico (canlı tahsilat)</span>
               <StatusPill ok={iyzicoConfigured} okLabel="Tanımlı" badLabel="Demo mod" />
             </div>
-            <div className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
+            <div className="flex min-h-10 items-center justify-between py-1">
               <span className="text-sm font-semibold text-ink-950">VAPID push (bildirim)</span>
               <StatusPill ok={pushConfigured} okLabel="Tanımlı" badLabel="Kapalı" />
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2.5">
+            <div className="flex min-h-10 items-center justify-between gap-3 py-1">
               <span className="min-w-0 text-sm font-semibold text-ink-950">
                 <span className="flex items-center gap-1.5">
                   <Landmark className="h-3.5 w-3.5 text-cyan-600" /> EmlakFiyati (bölge endeksi)
@@ -415,6 +440,11 @@ export async function SystemView() {
             </p>
             <h2 className="mt-1 font-display font-bold text-ink-950">Bu ortama uygulanmış migration&apos;lar</h2>
           </div>
+          {schemaG ? (
+            <RadialGauge value={schemaG.ok} max={schemaG.total} size={56} stroke={7} tone={schemaMissing.length === 0 ? "success" : "danger"} ariaLabel="Uygulanmış şema kontrolleri">
+              <span className="text-[11px] font-bold tabular-nums text-ink-950">{schemaG.ok}/{schemaG.total}</span>
+            </RadialGauge>
+          ) : null}
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
               schemaMissing.length === 0 ? "bg-mint-500/12 text-mint-600" : "bg-danger-500/10 text-danger-500"
@@ -437,7 +467,7 @@ export async function SystemView() {
         <div className="overflow-x-auto">
           <div className="min-w-[520px] divide-y divide-line">
             {schemaRows.map((r) => (
-              <div key={`${r.table}.${r.column ?? ""}`} className="flex items-center justify-between gap-3 px-5 py-2.5">
+              <div key={`${r.table}.${r.column ?? ""}`} className="flex min-h-10 items-center justify-between gap-3 px-5 py-1">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-950">{r.label}</p>
                   <p className="numeric truncate text-xs text-text-faint">

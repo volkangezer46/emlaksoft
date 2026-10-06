@@ -3,9 +3,11 @@ import { AlertTriangle } from "lucide-react";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatRow } from "@/components/ui/stat-row";
-import { Table, TableEmptyRow, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { InlineOp, opFieldClass } from "@/app/admin/billing/inline-op";
 import { saveEfWholesale } from "@/app/actions/accounting";
+import { VIZ_SERIES } from "@/components/ui/viz";
+import { grantSegments, marginFlow, officeUsageBars } from "./viz-model";
 import { formatKurus, formatKurusShort } from "@/lib/accounting/format";
 import { periodSearchParams, type Period } from "@/lib/accounting/period";
 import {
@@ -107,7 +109,7 @@ export function EconomicsSection({
           <Body data={data} ledgerHref={ledgerHref} muhasebeHref={muhasebeHref} />
         )}
 
-        <div className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
+        <div className="border-t border-line pt-3">
           <p className="text-xs font-semibold text-ink-950">EmlakFiyatı toptan maliyet (işlem başı, KDV hariç)</p>
           {isWholesaleUnknown(wholesale) ? (
             <p role="alert" className="mt-1 flex items-start gap-1.5 text-xs font-semibold text-warn-600">
@@ -151,6 +153,10 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
   const { view } = data;
   const { econ, liability } = view;
   const shown = view.offices.slice(0, OFFICE_ROWS_SHOWN);
+  const bars = officeUsageBars(view.offices, data.names, OFFICE_ROWS_SHOWN);
+  const flow = marginFlow(econ, view.wholesaleUnknown);
+  const segments = grantSegments(view.grants);
+  const grantCounts = Object.fromEntries(view.grants.map((g) => [g.kind, g.count]));
   return (
     <>
       {data.usageTruncated || data.ledgerTruncated || data.salesTruncated ? (
@@ -169,6 +175,33 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
           { label: "Brüt marj", value: formatKurusShort(econ.marginKurus), href: muhasebeHref, hint: view.wholesaleUnknown ? "maliyet bilinmeden gerçek değil" : undefined },
         ]}
       />
+
+      {flow ? (
+        <div id="ekonomi-marj" className="@container">
+          <h3 className="mb-2 text-sm font-bold text-ink-950">Gelir, maliyet ve marj</h3>
+          <div className="grid h-40 grid-cols-3 items-end gap-6" role="img" aria-label="Net gelir, toptan maliyet ve brüt marj çubukları">
+            {flow.map((b) => (
+              <Link key={b.key} href={b.key === "revenue" ? ledgerHref : muhasebeHref} className="flex h-full flex-col justify-end gap-1 text-center hover:opacity-90">
+                <span className="text-sm font-bold tabular-nums text-[color:var(--viz-gold)]">{formatKurusShort(b.kurus)}</span>
+                <span
+                  className="block w-full rounded-t-[var(--radius-control)]"
+                  style={{
+                    height: `${Math.max(2, b.pct) * 0.8}%`,
+                    background: b.key === "cost" ? "var(--viz-neg)" : b.key === "margin" ? (b.kurus < 0 ? "var(--viz-neg)" : "var(--viz-pos)") : "var(--viz-gold)",
+                  }}
+                />
+              </Link>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-3 gap-6 text-center text-xs text-text-muted">
+            {flow.map((b) => (
+              <span key={b.key}>{b.label}</span>
+            ))}
+          </div>
+        </div>
+      ) : view.wholesaleUnknown ? (
+        <p className="text-xs text-text-muted">Marj grafiği çizilmedi: toptan maliyet bilinmiyor (aşağıdaki uyarıya bakın).</p>
+      ) : null}
 
       <div id="ekonomi-kalem">
         <TableFrame minWidth={520}>
@@ -202,12 +235,12 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
         <strong>{econ.revenuePerSpentUnitKurus === null ? "—" : formatKurus(econ.revenuePerSpentUnitKurus)}</strong>.
       </p>
 
-      <div id="ekonomi-yukumluluk" className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
-        <p className="text-xs font-semibold text-ink-950">Kullanılmamış kontör yükümlülüğü (üst sınır)</p>
-        <p className="numeric mt-1 text-lg font-bold text-ink-950">
+      <div id="ekonomi-yukumluluk" className="@container py-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-text-faint">Kullanılmamış kontör yükümlülüğü (üst sınır)</p>
+        <p className="mt-1 text-3xl font-bold tabular-nums text-[color:var(--viz-gold)]">
           {liability.liabilityKurus === null ? "—" : formatKurus(liability.liabilityKurus)}
         </p>
-        <p className="mt-0.5 text-xs text-text-muted">
+        <p className="mt-1 text-xs text-text-muted">
           <Link href="#bakiyeler" className="font-semibold text-brand-600 hover:underline">{fmt.format(liability.unusedUnits)} kullanılmamış kontör</Link>
           {" × "}
           {liability.avgUnitPriceKurus === null ? "ortalama net fiyat yok (henüz paket satışı yok)" : `${formatKurus(liability.avgUnitPriceKurus)} ağırlıklı ortalama net kontör fiyatı`}.
@@ -216,71 +249,65 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
       </div>
 
       <div>
-        <h3 className="mb-1 text-sm font-bold text-ink-950">Plan hakkı ve yükleme dağılımı (dönemdeki yüklemeler)</h3>
-        <TableFrame minWidth={420}>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Tür</TH>
-                <TH align="right">Yükleme</TH>
-                <TH align="right">Kontör</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {view.grants.length === 0 ? (
-                <TableEmptyRow colSpan={3}>Bu dönemde kontör yüklemesi yok.</TableEmptyRow>
-              ) : (
-                view.grants.map((g) => (
-                  <TR key={g.kind}>
-                    <TD className="font-semibold text-ink-950">
-                      <Link href="#bakiyeler" className="hover:text-brand-600 hover:underline">{g.label}</Link>
-                    </TD>
-                    <TD align="right" className="numeric">{fmt.format(g.count)}</TD>
-                    <TD align="right" className="numeric font-bold">{fmt.format(g.units)}</TD>
-                  </TR>
-                ))
-              )}
-            </TBody>
-          </Table>
-        </TableFrame>
+        <h3 className="mb-2 text-sm font-bold text-ink-950">Plan hakkı ve yükleme dağılımı (dönemdeki yüklemeler)</h3>
+        {segments.length === 0 ? (
+          <p className="text-sm text-text-muted">Bu dönemde kontör yüklemesi yok.</p>
+        ) : (
+          <>
+            <div role="img" aria-label="Yükleme dağılımı (kontör payı)" className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+              {segments.map((g, i) => (
+                <Link
+                  key={g.kind}
+                  href="#bakiyeler"
+                  title={`${g.label}: ${fmt.format(g.units)} kontör (%${g.pct})`}
+                  className="block h-full"
+                  style={{ width: `${g.pct}%`, background: VIZ_SERIES[i % VIZ_SERIES.length] }}
+                />
+              ))}
+            </div>
+            <ul className="mt-2 divide-y divide-line text-sm">
+              {segments.map((g, i) => (
+                <li key={g.kind}>
+                  <Link href="#bakiyeler" className="flex h-10 items-center gap-3 hover:bg-surface-hover">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: VIZ_SERIES[i % VIZ_SERIES.length] }} />
+                    <span className="min-w-0 flex-1 truncate font-semibold text-ink-950">{g.label}</span>
+                    <span className="tabular-nums text-text-muted">{fmt.format(grantCounts[g.kind] ?? 0)} yükleme</span>
+                    <span className="w-24 text-right font-bold tabular-nums text-ink-950">{fmt.format(g.units)} kontör</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
 
       <div>
-        <h3 className="mb-1 text-sm font-bold text-ink-950">Ofis bazlı kullanım ve bakiye</h3>
-        <TableFrame minWidth={560}>
-          <Table>
-            <THead>
-              <TR>
-                <TH>Ofis</TH>
-                <TH align="right">İşlem</TH>
-                <TH align="right">Harcanan</TH>
-                <TH align="right">Maliyet</TH>
-                <TH align="right">Defter bakiyesi</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {shown.length === 0 ? (
-                <TableEmptyRow colSpan={5}>Kontör hareketi olan ofis yok.</TableEmptyRow>
-              ) : (
-                shown.map((o) => (
-                  <TR key={o.tenantId}>
-                    <TD className="font-semibold text-ink-950">
-                      <Link href={`${BASE}?ofis=${o.tenantId}#ofis`} className="hover:text-brand-600 hover:underline">
-                        {data.names[o.tenantId] || "(adsız ofis)"}
-                      </Link>
-                    </TD>
-                    <TD align="right" className="numeric">{fmt.format(o.transactions)}</TD>
-                    <TD align="right" className="numeric">{fmt.format(o.units)}</TD>
-                    <TD align="right" className="numeric text-text-muted">{formatKurus(o.costKurus)}</TD>
-                    <TD align="right" className="numeric font-bold">{fmt.format(o.balance)}</TD>
-                  </TR>
-                ))
-              )}
-            </TBody>
-          </Table>
-        </TableFrame>
+        <h3 className="mb-2 text-sm font-bold text-ink-950">Ofis bazlı kullanım (en çok harcayan {OFFICE_ROWS_SHOWN})</h3>
+        {bars.length === 0 ? (
+          <p className="text-sm text-text-muted">Kontör hareketi olan ofis yok.</p>
+        ) : (
+          <ol className="m-0 list-none divide-y divide-line p-0">
+            {bars.map((o) => {
+              const row = shown.find((x) => x.tenantId === o.tenantId);
+              return (
+                <li key={o.tenantId}>
+                  <Link href={`${BASE}?ofis=${o.tenantId}#ofis`} className="grid h-10 grid-cols-[minmax(6rem,12rem)_1fr_auto] items-center gap-3 hover:bg-surface-hover">
+                    <span className="truncate text-sm font-semibold text-ink-950" title={o.label}>{o.label}</span>
+                    <span aria-hidden="true" className="relative block h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+                      <span className="viz-grow-x absolute inset-y-0 left-0 block rounded-full" style={{ width: `${o.pct}%`, background: "var(--viz-1)" }} />
+                    </span>
+                    <span className="text-right text-sm tabular-nums">
+                      <strong className="text-ink-950">{fmt.format(o.value)}</strong>
+                      <span className="text-text-faint"> kontör{row ? ` · bakiye ${fmt.format(row.balance)}` : ""}</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        )}
         <p className="mt-1 text-xs text-text-faint">
-          En çok harcayan {shown.length} ofis ({view.offices.length} ofiste hareket var); tamamı için aşağıdaki Ofis bakiyeleri listesi. Defter bakiyesi açık rezervleri düşmez.
+          {view.offices.length} ofiste hareket var; tamamı için aşağıdaki Ofis bakiyeleri listesi. Defter bakiyesi açık rezervleri düşmez.
           {view.untaggedUsage > 0 ? ` ${view.untaggedUsage} kullanım kaydında ofis bilgisi yok.` : ""}
         </p>
       </div>
