@@ -37,7 +37,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       {...props}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-left text-sm text-ink-950 outline-none transition",
+        "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-left text-sm text-ink-950 outline-none transition",
         "focus:border-brand-400 focus:bg-surface data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
         "disabled:cursor-not-allowed disabled:opacity-60",
         "data-[placeholder]:text-text-faint",

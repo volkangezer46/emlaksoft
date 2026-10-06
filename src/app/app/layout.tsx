@@ -356,10 +356,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 tam olarak kullanılabilir genişliğe sabitlenir; içteki geniş tablonun
                 overflow-x-auto kabı düzgün kaydırılır ve belgeyi (ICB'yi) şişiremez.
                 iOS Safari `overflow:clip`'i viewport'a propagate etmiyor (sayfa yana
-                kayıyordu) — minmax(0,1fr) track bunu kökten keser. */}
+                kayıyordu) — minmax(0,…) track bunu kökten keser. İçerik en çok 1600 px ve ortalı
+                (geniş ekranda satırlar okunur kalır; liste/tablo bu sınır içinde tam genişlik). */}
             <main
               id="main-content"
-              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
+              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip p-4 pb-28 md:px-5 md:pt-5 lg:px-6 lg:pb-6 lg:pt-5"
             >
               <Suspense fallback={<SectionTabsPlaceholder allModules={NAV_MODULES} />}>
                 <ShellTabs />
