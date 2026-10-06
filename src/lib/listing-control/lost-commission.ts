@@ -7,7 +7,7 @@ import { estimateLostCommission } from "@/lib/leak-shield";
  */
 export function anomalyLostCommission(
   type: string,
-  input: { listPrice: number | null; commissionRate: number | null },
+  input: { listPrice: number | null; commissionRate: number | null; defaultRate?: number },
 ): { amount: number; rate: number; base: number } | null {
   if (type !== "potential_lost_deal") return null;
   const r = estimateLostCommission({
@@ -18,6 +18,7 @@ export function anomalyLostCommission(
     dealAmount: null,
     listPrice: input.listPrice,
     commissionRate: input.commissionRate,
+    defaultRate: input.defaultRate,
   });
   if (r.estimatedLostCommission <= 0) return null;
   return { amount: r.estimatedLostCommission, rate: r.rate, base: r.baseAmount };

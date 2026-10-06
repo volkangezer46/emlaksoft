@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import {
   ArrowUpRight,
   CalendarRange,
@@ -203,7 +204,7 @@ export default async function CommissionPage({
         .eq("deal.assigned_to", userId)
         .order("created_at", { ascending: false })
         .limit(OWN_ROWS_LIMIT);
-  const [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult] = await Promise.all([
+  const [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult] = await batchAll("Komisyon", [], [
     ledgerQuery,
     // Sayfalama dışı KPI, dağılım ve aylık seri tam kapsamlı SQL aggregate'tir.
     seeAllEarnings ? supabase.rpc("tenant_commission_aggregates", { p_as_of: now.toISOString() }) : Promise.resolve(null),

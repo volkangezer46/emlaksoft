@@ -53,10 +53,10 @@ const numOrNull = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-export async function loadQuietCustomers(admin: SupabaseClient, tenantId: string): Promise<QuietCustomerFact[]> {
+export async function loadQuietCustomers(admin: SupabaseClient, tenantId: string, minQuietDays = 14): Promise<QuietCustomerFact[]> {
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_quiet_valuable_customers", {
     p_tenant_id: tenantId,
-    p_min_quiet_days: 14,
+    p_min_quiet_days: minQuietDays,
     p_limit: 200,
   });
   return rows.map((r) => ({
@@ -68,10 +68,10 @@ export async function loadQuietCustomers(admin: SupabaseClient, tenantId: string
   }));
 }
 
-export async function loadStalledDeals(admin: SupabaseClient, tenantId: string): Promise<StalledDealFact[]> {
+export async function loadStalledDeals(admin: SupabaseClient, tenantId: string, minIdleDays = 14): Promise<StalledDealFact[]> {
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_stalled_deals", {
     p_tenant_id: tenantId,
-    p_min_idle_days: 14,
+    p_min_idle_days: minIdleDays,
     p_limit: 200,
   });
   return rows.map((r) => ({
@@ -92,10 +92,10 @@ export async function loadStalledDeals(admin: SupabaseClient, tenantId: string):
   }));
 }
 
-export async function loadStaleListings(admin: SupabaseClient, tenantId: string): Promise<StaleListingFact[]> {
+export async function loadStaleListings(admin: SupabaseClient, tenantId: string, minDays = 30): Promise<StaleListingFact[]> {
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_stale_listings", {
     p_tenant_id: tenantId,
-    p_min_days: 30,
+    p_min_days: minDays,
     p_limit: 200,
   });
   return rows.map((r) => ({

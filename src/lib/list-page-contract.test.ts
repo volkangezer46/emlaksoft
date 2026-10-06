@@ -30,24 +30,10 @@ const REQUIRED = [
 ];
 
 /**
- * Henüz düzeltilmemiş bilinen borç (R1 ikinci dalga). Yeni sayfa BURAYA EKLENMEZ: korumayı uygulayın.
- * Bir sayfa düzeltilince buradan silinir.
+ * Bilinen borç listesi. R1 ikinci dalga borcu (13 sayfa) kapandı: sayfalar batchAll/assertQueryBatchSucceeded kullanır.
+ * Yeni sayfa BURAYA EKLENMEZ: korumayı uygulayın.
  */
-const KNOWN_DEBT = new Set([
-  "src/app/app/aidat/page.tsx",
-  "src/app/app/arama/calls-view.tsx",
-  "src/app/app/belgeler/evrak-linkleri/page.tsx",
-  "src/app/app/bildirimler/notifications-view.tsx",
-  "src/app/app/denetim/page.tsx",
-  "src/app/app/destek/page.tsx",
-  "src/app/app/gelen-kutusu/inbox-view.tsx",
-  "src/app/app/kayip-kacak/page.tsx",
-  "src/app/app/komisyon/page.tsx",
-  "src/app/app/onaylar/page.tsx",
-  "src/app/app/portfoyler/anahtarlar/page.tsx",
-  "src/app/app/tavsiyeler/page.tsx",
-  "src/app/app/uyum/kayit-defteri/page.tsx",
-]);
+const KNOWN_DEBT = new Set<string>();
 
 const GUARD = /assertQueryBatchSucceeded|batchAll/;
 

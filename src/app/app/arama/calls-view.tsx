@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import {
   Activity,
@@ -93,7 +94,7 @@ export async function CallsView({
   if (fromF) listQuery = listQuery.gte("started_at", fromF);
   if (toF) listQuery = listQuery.lte("started_at", `${toF}T23:59:59.999`);
 
-  const [{ data: calls }, { data: filteredCalls, count: listTotal }, { data: customers }, { data: demands }, { data: danismanProfile }] = await Promise.all([
+  const [{ data: calls }, { data: filteredCalls, count: listTotal }, { data: customers }, { data: demands }, { data: danismanProfile }] = await batchAll("Aramalar", [], [
     supabase
       .from("calls")
       .select(CALL_SELECT)

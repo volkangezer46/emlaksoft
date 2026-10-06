@@ -30,6 +30,12 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.commission.simulator_rate": { label: "Komisyon hesaplayıcı", href: "/app/komisyon" },
   "office.commission.simulator_advisor_share": { label: "Komisyon hesaplayıcı", href: "/app/komisyon" },
   "office.commission.split_advisor_share": { label: "Anlaşmalar (kapanış bölüşümü)", href: "/app/anlasmalar?gorunum=liste&asama=won" },
+  "office.commission.default_rate": { label: "İlan uyarıları (kaçan komisyon tahmini)", href: "/app/ilan-kontrol/anomaliler?tur=potential_lost_deal" },
+  "office.insight.customer_quiet_days": { label: "Ana ekran içgörüleri", href: "/app" },
+  "office.insight.listing_stale_days": { label: "Ana ekran içgörüleri", href: "/app" },
+  "office.insight.dormant_days": { label: "Uykuda müşteriler", href: "/app/musteriler?segment=uykuda" },
+  "office.listing_control.report_daily": { label: "İlan Kontrol raporu", href: "/app/ilan-kontrol/rapor" },
+  "office.listing_control.report_weekly": { label: "İlan Kontrol raporu", href: "/app/ilan-kontrol/rapor" },
 };
 const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };
 

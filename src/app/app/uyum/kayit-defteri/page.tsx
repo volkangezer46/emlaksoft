@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { ArrowLeft, BookLock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -152,7 +153,7 @@ export default async function LedgerPage({
   const count = (build: (q: ReturnType<typeof base>) => ReturnType<typeof base>) => build(base());
 
   const correctId = typeof sp.duzelt === "string" && UUID_RE.test(sp.duzelt) ? sp.duzelt : "";
-  const [listRes, totalRes, flaggedRes, noIdRes, cashRes, expiredRes, correctionRes] = await Promise.all([
+  const [listRes, totalRes, flaggedRes, noIdRes, cashRes, expiredRes, correctionRes] = await batchAll("Uyum kayıt defteri", [], [
     listQuery,
     count((q) => q),
     count((q) => q.overlaps("flags", ["cash_over_threshold", "amount_over_threshold"])),

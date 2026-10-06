@@ -5,7 +5,8 @@ import { AlertTriangle, CalendarClock, Hourglass, KeyRound, Plus, Search, Wallet
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { computeLegalIncrease } from "@/lib/tufe";
+import { computeLegalIncreaseIn } from "@/lib/tufe";
+import { loadTufeTable } from "@/lib/tufe-server";
 import { EmptyState } from "@/components/app/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +162,8 @@ export default async function KiralamaPage({
   const activeCount = activeHead.count ?? 0;
 
   // ---- Yenileme radarı: yıldönümü YA DA sözleşme bitişi 60 gün içinde ----
+  // TÜFE: yönetimin /admin/ayarlar/tufe tablosu (yoksa gömülü, doğrulanmamış tablo); yasal artış işlemiyle (rentals.ts) aynı kaynak.
+  const tufeTable = await loadTufeTable();
   const renewalRadar = rentals
     .filter((r) => r.status === "active")
     .flatMap((r) => {
@@ -171,7 +174,7 @@ export default async function KiralamaPage({
       const renewalDate = annDue && endDue ? (annDue < endDue ? annDue : endDue) : (annDue ?? endDue);
       if (!renewalDate) return [];
       const current = Number(r.monthly_rent);
-      const increase = computeLegalIncrease(current, renewalDate.slice(0, 7));
+      const increase = computeLegalIncreaseIn(tufeTable, current, renewalDate.slice(0, 7));
       return [{ rental: r, renewalDate, current, increase }];
     })
     .sort((a, b) => (a.renewalDate < b.renewalDate ? -1 : 1));

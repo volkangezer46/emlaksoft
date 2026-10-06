@@ -45,6 +45,16 @@ export async function GET(req: NextRequest) {
     if (s.wrapped) parts.push(`tur tamamlandı${s.housekeepingDeleted !== null ? `, ${s.housekeepingDeleted} eski satır temizlendi` : ""}`);
 
     // Yalnız gerçek hata (ofis/liste hatası) 'error'. Kalan ofis normal devam eden turdur (bir sonraki çalıştırma sürdürür).
+    // Platform içgörüleri (EmlakSoft ekibi için; en iyi çaba: hata ofis içgörü sonucunu bozmaz).
+    try {
+      const p = (await runBillingReconciliation(0, "platform_insights")).platformInsights;
+      if (p && !p.tableMissing) parts.push(`${p.inserted} platform içgörüsü`);
+      if (p && p.rulesUnavailable.length > 0) parts.push(`etkin olmayan platform kuralı: ${p.rulesUnavailable.join(",")}`);
+    } catch (e) {
+      console.error("insight-engine platform", e instanceof Error ? e.message : "hata");
+      parts.push("platform içgörüleri hata verdi");
+    }
+
     const failed = s.tenantsFailed > 0 || Boolean(s.listError);
     await recordHeartbeat("insight-engine", failed ? "error" : "ok", parts.join(" · "));
     return NextResponse.json({ ok: !failed, summary: s });

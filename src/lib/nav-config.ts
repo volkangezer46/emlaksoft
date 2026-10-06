@@ -239,6 +239,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets" },
           { href: "/app/ekip/devir", label: "Devir / Atama", icon: ICONS.devir, module: "team" },
           { href: "/app/ekip/subeler", label: "Şubeler", icon: ICONS.ekip, module: "team" },
+          { href: "/app/ekip/takimlar", label: "Takımlar", icon: ICONS.ekip, module: "team" },
         ],
         // Ekip Merkezi ekip modülü olanın girişidir; modülsüz rolde (danışman) yerine Performansım vardır.
         needsItemModule: true,

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { computeLegalIncrease } from "@/lib/tufe";
+import { computeLegalIncreaseIn } from "@/lib/tufe";
+import { loadTufeTable } from "@/lib/tufe-server";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 
@@ -189,6 +190,8 @@ export async function GET(req: NextRequest) {
   });
 
   let renewalNotified = 0;
+  // TÜFE: yönetimin tablosu (yoksa gömülü); kiralama sayfası ve yasal artış işlemiyle aynı kaynak.
+  const tufeTable = await loadTufeTable();
   if (candidates.length > 0) {
     const { data: existingNotifs, error: notifErr } = await admin
       .from("notifications")
@@ -202,7 +205,7 @@ export async function GET(req: NextRequest) {
       if (notifErr || already.has(href)) continue;
       const prop = Array.isArray(r.property) ? r.property[0] : r.property;
       const propName = prop?.title ?? prop?.property_code ?? "Portföy";
-      const increase = computeLegalIncrease(Number(r.monthly_rent), renewalDate.slice(0, 7));
+      const increase = computeLegalIncreaseIn(tufeTable, Number(r.monthly_rent), renewalDate.slice(0, 7));
       const kalanGun = Math.max(0, Math.ceil((new Date(`${renewalDate}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000));
 
       // Resmi TÜFE'si olmayan yenileme ayında (ör. 2026) uydurma bir tavan/tutar

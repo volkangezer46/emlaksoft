@@ -1,3 +1,4 @@
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { HelpTip } from "@/components/ui/help-tip";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -186,7 +187,10 @@ export default async function LeakShieldPage({
   // Sorgular burada BAŞLATILIR ama await edilmez: başlık/hero iskeleti hemen akar,
   // her bölüm kendi Suspense sınırında ilgili promise'i bekler (bağımsız, paralel).
   const pending: Pending = {
-    closuresP: Promise.resolve(closuresQuery).then((res) => (res.data ?? []) as Closure[]),
+    closuresP: Promise.resolve(closuresQuery).then((res) => {
+      assertQueryBatchSucceeded([res], ["kapanışlar"], "Kayıp-kaçak");
+      return (res.data ?? []) as Closure[];
+    }),
     liveP: Promise.resolve(
       supabase
         .from("portal_listings")
@@ -194,12 +198,18 @@ export default async function LeakShieldPage({
         .select("id, portal_name, portal_listing_id, status, last_confirmed_at, property:properties!portal_listings_property_id_fkey(id, property_code, title)")
         .eq("status", "live")
         .limit(200),
-    ).then((res) => (res.data ?? []) as unknown as Listing[]),
-    listP: Promise.resolve(listQuery.range(offset, offset + PAGE_SIZE - 1)).then((res) => ({
-      rows: (res.data ?? []) as unknown as Closure[],
-      count: res.count ?? 0,
-    })),
-    totalP: Promise.resolve(totalQuery).then((res) => res.count ?? 0),
+    ).then((res) => {
+      assertQueryBatchSucceeded([res], ["canlı ilanlar"], "Kayıp-kaçak");
+      return (res.data ?? []) as unknown as Listing[];
+    }),
+    listP: Promise.resolve(listQuery.range(offset, offset + PAGE_SIZE - 1)).then((res) => {
+      assertQueryBatchSucceeded([res], ["kapanış listesi"], "Kayıp-kaçak");
+      return { rows: (res.data ?? []) as unknown as Closure[], count: res.count ?? 0 };
+    }),
+    totalP: Promise.resolve(totalQuery).then((res) => {
+      assertQueryBatchSucceeded([res], ["kapanış sayısı"], "Kayıp-kaçak");
+      return res.count ?? 0;
+    }),
   };
 
   const hasFilter = Boolean(nedenF || tipF || sevF || rangeActive);

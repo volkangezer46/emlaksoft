@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
+import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
+import { getDisabledModulesByTenant, tenantsDisabledFor } from "@/lib/modules/state";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
 
-function wantsDigest(prefs: unknown) {
-  if (!prefs || typeof prefs !== "object") return true;
-  const digest = (prefs as { digest?: boolean }).digest;
-  return digest !== false;
-}
 
 /** Günlük ofis özeti — tercihi açık kullanıcılara */
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
@@ -47,6 +45,8 @@ export async function GET(req: NextRequest) {
       break;
     }
     processed += 1;
+    // Ofis tanımı: kendi tercihini kaydetmemiş kullanıcılar için özet varsayılanı (okunamazsa açık).
+    const officeDigest = await officeDigestDefault(admin, t.id);
     const [{ count: newCustomers }, { count: newDeals }, { count: overduePortals }, { data: profiles }] =
       await Promise.all([
         admin
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       ]);
 
     const body = `Bugün: ${newCustomers ?? 0} müşteri · ${newDeals ?? 0} anlaşma hareketi · ${overduePortals ?? 0} gecikmiş teyit`;
-    const recipients = (profiles ?? []).filter((p) => wantsDigest(p.notification_prefs));
+    const recipients = (profiles ?? []).filter((p) => wantsDigest(p.notification_prefs, officeDigest));
     skippedPrefs += (profiles?.length ?? 0) - recipients.length;
     if (recipients.length === 0) continue;
 
@@ -107,13 +107,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // İlan Kontrol raporu teslimi (ofis ayarı açık ofisler; en iyi çaba, özet işini bozmaz; dedupe dönem başına tek).
+  let controlReports = 0;
+  try {
+    const lc = await runControlReportDelivery(admin, "daily", Date.now(), {
+      disabledTenantIds: new Set(tenantsDisabledFor(await getDisabledModulesByTenant(admin), "portals")),
+    });
+    controlReports = lc.sent;
+    failed += lc.failed;
+  } catch (e) {
+    console.error("gunluk-ozet ilan kontrol raporu", e);
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu`,
   });
   await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 

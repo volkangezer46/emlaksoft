@@ -9,8 +9,9 @@ import { chunk, isMissingSchema, type Db } from "./db";
  * SLA YÜKSELTME (sunucu): açık/üstlenilmiş anomalileri 4 saat danışman→takım lideri, 8 saat şube müdürü, 24 saat ofis
  * sahibi zincirinde yükseltir (süreler ofis ayarlı). Aşama kaydı `lc_escalate_anomaly` ile tekil (anomali, aşama):
  * aynı aşama ASLA iki kez bildirilmez; bildirim yazılamazsa kayıt zaten atıldığından tekrar denenmez ama bildirim
- * `dedupe_key` taşır (kısmi hata sonraki turda aynı anahtarla güvenle yeniden yazılabilir). Takım modeli olmadığından
- * takım lideri alıcısı şimdilik boş (aşama kaydı düşer, bildirim üretilmez). Mevcut `leak-sla` kapanış-formu SLA'sı
+ * `dedupe_key` taşır (kısmi hata sonraki turda aynı anahtarla güvenle yeniden yazılabilir). Takım lideri alıcısı danışmanın
+ * `profiles.team_id` → `teams.lead_user_id` zincirinden çözülür (takım şeması uygulanmadıysa ya da takım/lider yoksa boş:
+ * aşama kaydı düşer, bildirim üretilmez; sahte alıcı uydurulmaz). Lider danışmanın kendisiyse atlanır. Mevcut `leak-sla` kapanış-formu SLA'sı
  * AYRIDIR ve davranışı değişmez; aynı portföyde açık `potential_lost_deal` anomalisi varsa orada çifte uyarı üretilmez.
  */
 
@@ -70,6 +71,8 @@ export async function runSlaEscalation(
     for (const b of (br ?? []) as { id: string; manager_user_id: string | null }[]) if (b.manager_user_id) managers.set(b.id, b.manager_user_id);
   }
 
+  const teamLeads = await resolveTeamLeads(db, anomalies.map((a) => a.advisor_id).filter((x): x is string => !!x));
+
   const notifications: NotificationRow[] = [];
   const cfgCache = new Map<string, ListingControlConfig>();
   for (const a of anomalies) {
@@ -80,7 +83,7 @@ export async function runSlaEscalation(
     }
     const recipients: SlaRecipients = {
       advisorId: a.advisor_id,
-      teamLeadId: null,
+      teamLeadId: a.advisor_id ? (teamLeads.get(a.advisor_id) ?? null) : null,
       branchManagerId: a.branch_id ? (managers.get(a.branch_id) ?? null) : null,
       ownerIds: owners.get(a.tenant_id) ?? [],
     };
@@ -125,6 +128,34 @@ export async function runSlaEscalation(
   }
   const res = await insertNotificationsDetailed(db, notifications);
   out.notified = res.written;
+  return out;
+}
+
+/**
+ * danışman → takım lideri. Takım tabloları yoksa (migration uygulanmadı) ya da hata olursa boş harita (eski davranış).
+ * Lider danışmanın kendisiyse eşleşme yazılmaz (kendi kendine yükseltme anlamsız).
+ */
+export async function resolveTeamLeads(db: Db, advisorIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const ids = [...new Set(advisorIds)];
+  if (ids.length === 0) return out;
+  const teamOf = new Map<string, string>();
+  for (const part of chunk(ids, 200)) {
+    const { data, error } = await db.from("profiles").select("id, team_id").in("id", part).not("team_id", "is", null);
+    if (error) return out; // team_id kolonu yok → takım lideri aşaması boş
+    for (const r of (data ?? []) as { id: string; team_id: string | null }[]) if (r.team_id) teamOf.set(r.id, r.team_id);
+  }
+  const teamIds = [...new Set(teamOf.values())];
+  const leadOf = new Map<string, string>();
+  for (const part of chunk(teamIds, 200)) {
+    const { data, error } = await db.from("teams").select("id, lead_user_id").in("id", part).eq("is_active", true).not("lead_user_id", "is", null);
+    if (error) return out;
+    for (const t of (data ?? []) as { id: string; lead_user_id: string | null }[]) if (t.lead_user_id) leadOf.set(t.id, t.lead_user_id);
+  }
+  for (const [advisor, team] of teamOf) {
+    const lead = leadOf.get(team);
+    if (lead && lead !== advisor) out.set(advisor, lead);
+  }
   return out;
 }
 

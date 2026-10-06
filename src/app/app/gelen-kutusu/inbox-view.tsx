@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import {
   ArrowDownLeft,
@@ -210,7 +211,7 @@ export async function InboxView({
     { count: missedWeek },
     [{ data: waTenant }, { data: waAdvisor }],
     savedViews,
-  ] = await Promise.all([
+  ] = await batchAll("Gelen kutusu", [], [
     commQuery,
     includeCalls
       ? callQuery

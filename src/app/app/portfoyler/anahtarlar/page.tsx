@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -133,7 +134,7 @@ export default async function PropertyKeysBoardPage({
   else if (durum === "gecikmis")
     listQuery = listQuery.in("status", OUT_STATUSES).lt("due_at", nowIso).is("returned_at", null);
 
-  const [listRes, officeRes, outRes, overdueRes, lostRes, baseRes, staffRes] = await Promise.all([
+  const [listRes, officeRes, outRes, overdueRes, lostRes, baseRes, staffRes] = await batchAll("Anahtarlar", [], [
     listQuery.range(offset, offset + PAGE_SIZE - 1),
     headCount((b) => b.eq("status", "ofiste")),
     headCount((b) => b.in("status", OUT_STATUSES)),

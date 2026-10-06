@@ -4,6 +4,10 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
 import { formatDateTimeTr } from "@/lib/format";
+import { fetchAllPaged } from "@/lib/cron-run";
+
+/** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
+const MAX_PAGES = 10;
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -16,18 +20,32 @@ export async function GET(req: NextRequest) {
   const to = new Date(Date.now() + 24 * 3600_000);
 
   // Açık, atanmış ve önümüzdeki 24 saatte (veya geçmişte) vadesi gelen görevler
-  const { data: tasks } = await admin
-    .from("tasks")
-    .select("id, tenant_id, title, due_at, assigned_to")
-    .eq("status", "open")
-    .not("assigned_to", "is", null)
-    .not("due_at", "is", null)
-    .lte("due_at", to.toISOString())
-    .limit(300);
+  // Sabit .limit(300) tavanı KALDIRILDI: eskiden 300'ü aşan açık görevden fazlası hiç hatırlatılmıyordu (sıralamasız kesme).
+  // Artık vade sırasıyla (en eski önce, id ile kararlı) sayfalanır; tavana dayanırsa heartbeat bunu açıkça söyler.
+  const { rows: tasks, error: listError } = await fetchAllPaged<{ id: string; tenant_id: string; title: string; due_at: string | null; assigned_to: string }>(
+    (from, upTo) =>
+      admin
+        .from("tasks")
+        .select("id, tenant_id, title, due_at, assigned_to")
+        .eq("status", "open")
+        .not("assigned_to", "is", null)
+        .not("due_at", "is", null)
+        .lte("due_at", to.toISOString())
+        .order("due_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, upTo),
+    1000,
+    MAX_PAGES,
+  );
+  const capped = Boolean(listError && listError.startsWith("sayfa üst sınırı"));
+  if (listError && !capped && tasks.length === 0) {
+    await recordHeartbeat("gorev-hatirlat", "error", "görev listesi okunamadı");
+    return NextResponse.json({ ok: false, error: "query_failed" }, { status: 500 });
+  }
 
   const windowStart = new Date(Date.now() - 20 * 3600_000).toISOString();
   const now = Date.now();
-  const list = tasks ?? [];
+  const list = tasks;
 
   // N+1 KALDIRILDI: eskiden görev başına 1 SELECT + 1 INSERT vardı
   // (300 görev → 600 gidiş-dönüş). Artık 2 sorgu: pencereye giren
@@ -61,7 +79,7 @@ export async function GET(req: NextRequest) {
 
   const notified = await insertNotifications(admin, toInsert);
 
-  await recordHeartbeat("gorev-hatirlat", "ok", `${notified} bildirim, ${skipped} atlandı`);
+  await recordHeartbeat("gorev-hatirlat", "ok", `${notified} bildirim, ${skipped} atlandı${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`);
 
   return NextResponse.json({ ok: true, notified, skipped });
 }

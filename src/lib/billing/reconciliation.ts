@@ -9,6 +9,7 @@ import { processClaims, type ProcessSummary } from "@/lib/growth/engine";
 import { tryReleaseDead } from "@/lib/try-credits/wallet";
 import { now } from "@/lib/clock";
 import { runInsightEngine, type EngineSummary } from "@/lib/insights/engine";
+import { runPlatformInsightEngine, type PlatformEngineSummary } from "@/lib/insights/platform-engine";
 import { generateInsightNarrative } from "@/lib/ai/insight-narrative";
 import { notifyTenant } from "@/lib/notify";
 
@@ -182,8 +183,10 @@ export async function runBillingReconciliation(
    * cron'u aynı (allowlist'li) istemciyle YALNIZ sabit `processClaims` işini çalıştırır; mutabakat atlanır.
    * `insight_engine`: insight-engine cron'u aynı istemciyle YALNIZ sabit `runInsightEngine` işini çalıştırır (içgörü yazar,
    * yüksek şiddette zil bildirimi; başka hiçbir kaydı değiştirmez); mutabakat atlanır.
+   * `platform_insights`: aynı cron aynı istemciyle YALNIZ sabit `runPlatformInsightEngine` işini çalıştırır (yalnız
+   * `platform_insights` satırı yazar; para/abonelik kaydına dokunmaz); mutabakat atlanır.
    */
-  job?: "growth_claims" | "ef_sweep" | "ef_reconcile" | "insight_engine",
+  job?: "growth_claims" | "ef_sweep" | "ef_reconcile" | "insight_engine" | "platform_insights",
   /** Yalniz `ef_reconcile`: EF `/kullanim` toplamlari + pencere (veri; callback DEGIL). */
   efUsage?: { windowStart: string; windowEnd: string; degerleme: number | null; pdf: number | null; meta?: Record<string, unknown> },
 ): Promise<
@@ -192,6 +195,7 @@ export async function runBillingReconciliation(
     efSweep?: number | null;
     efReconcile?: (EfReconcileResult & { saved: boolean }) | null;
     insightEngine?: EngineSummary;
+    platformInsights?: PlatformEngineSummary;
   }
 > {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
@@ -228,6 +232,10 @@ export async function runBillingReconciliation(
       },
     );
     return { expiredCheckouts: 0, inspected: 0, fulfilled: 0, retryPending: 0, manualReview: 0, refundRequired: 0, insightEngine };
+  }
+  if (job === "platform_insights") {
+    const platformInsights = await runPlatformInsightEngine(admin, { nowMs: now() });
+    return { expiredCheckouts: 0, inspected: 0, fulfilled: 0, retryPending: 0, manualReview: 0, refundRequired: 0, platformInsights };
   }
   if (job === "ef_sweep") {
     // EF kontör: 15 dakikadan eski açık rezervleri serbest bırakır. Cüzdan yoksa/RPC hata verirse null (etkin değil).

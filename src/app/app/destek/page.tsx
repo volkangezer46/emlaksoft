@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -167,7 +168,7 @@ export default async function SupportPage({
     oldestOpenResult,
     lastUpdatedResult,
     categoryCountResults,
-  ] = await Promise.all([
+  ] = await batchAll("Destek talepleri", [], [
     listQuery.range(offset, offset + PAGE_SIZE - 1),
     headCount((b) => b),
     Promise.all(

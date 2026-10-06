@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -121,7 +122,7 @@ export default async function AidatPage({
     kpiRes,
     { data: overdueStripData, error: overdueStripError },
     { data: propData, error: propertiesError },
-  ] = await Promise.all([
+  ] = await batchAll("Aidat", [], [
     listQuery,
     supabase.rpc("aidat_kpi"),
     overdueStripQuery,
