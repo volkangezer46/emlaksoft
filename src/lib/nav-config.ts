@@ -140,6 +140,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
           { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers", description: "Kimi aramalıyım? Risk, sıcak ve sessiz müşteri grupları", keywords: ["segment", "churn", "sıcak"] },
           { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", description: "Müşteri tavsiye bağlantıları ve referans zinciri", keywords: ["referans", "tavsiye"] },
+          // Modül ayarı modülün içinde (yol sabit; aynı sayfa Ayarlar dizininden de açılır — tek form, iki giriş).
+          { href: "/app/ayarlar/etiketler", label: "Ayarlar", icon: ICONS.musteri, module: "customers", description: "Müşteri etiketlerini yeniden adlandır, birleştir ya da kaldır", keywords: ["etiket", "ayar"] },
         ],
         tier: "core",
         description: "Müşteri kartları, akıllı listeler ve tavsiyeler",
@@ -157,16 +159,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["lead", "aday", "istek", "başvuru", "eşleştirme", "eşleşme"],
         shortcut: "g t",
       },
-      {
-        href: "/app/ice-aktarma",
-        label: "İçe aktarma",
-        icon: ICONS.iceAktarma,
-        module: "customers",
-        tier: "more",
-        advanced: true,
-        description: "Excel/CSV dosyasından toplu müşteri ve portföy yükleme",
-        keywords: ["excel", "csv", "import", "aktar", "yükle", "toplu"],
-      },
+      // İçe aktarma bir EYLEM sayfasıdır: menü öğesi değil; Müşteriler/Portföyler başlığında "İçe aktar" düğmesi
+      // ve komut paleti eylemi (HIDDEN_APP_PAGES gerekçesi).
     ],
   },
   {
@@ -186,6 +180,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties", description: "Anahtar kimde, ne zaman teslim edildi", keywords: ["anahtar", "teslim"] },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", description: "Müşteriye gönderilecek portföy sunumları", keywords: ["sunum", "paylaşım", "pdf"] },
           { href: "/app/ilan-havuzu", label: "İlan Havuzu", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama"] },
+          { href: "/app/ayarlar/filigran", label: "Ayarlar", icon: ICONS.portfoy, module: "settings", description: "İlan fotoğraflarına otomatik ofis filigranı", keywords: ["filigran", "logo", "fotoğraf", "ayar"] },
         ],
         tier: "core",
         description: "İlan ve portföy kayıtları, anahtar, sunum ve havuz",
@@ -292,6 +287,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Sözleşmeler",
         icon: ICONS.sozlesme,
         module: "contracts",
+        tabs: [
+          { href: "/app/sozlesmeler", label: "Sözleşmeler", icon: ICONS.sozlesme, module: "contracts" },
+          { href: "/app/ayarlar/sozlesme-sablonlari", label: "Ayarlar", icon: ICONS.sozlesme, module: "settings", description: "Sözleşme şablonlarını ekle, düzenle, pasife al", keywords: ["şablon", "ayar"] },
+        ],
         tier: "more",
         description: "Şablondan sözleşme ve SMS onaylı e-imza",
         keywords: ["e-imza", "imza", "kontrat", "şablon"],
@@ -319,6 +318,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Kampanyalar",
         icon: ICONS.mesaj,
         module: "campaigns",
+        tabs: [
+          { href: "/app/kampanyalar", label: "Kampanyalar", icon: ICONS.mesaj, module: "campaigns" },
+          { href: "/app/ayarlar/mesaj-sablonlari", label: "Ayarlar", icon: ICONS.mesaj, module: "settings", description: "WhatsApp ve SMS için hazır mesaj şablonları", keywords: ["şablon", "mesaj", "ayar"] },
+        ],
         tier: "more",
         description: "İYS uyumlu toplu SMS ve WhatsApp gönderimi",
         keywords: ["toplu mesaj", "iys", "pazarlama", "bülten"],
@@ -453,6 +456,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "AI Asistan",
         icon: ICONS.ai,
         module: "dashboard",
+        tabs: [
+          { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" },
+          { href: "/app/ayarlar/ai-kullanim", label: "Ayarlar", icon: ICONS.ai, module: "settings", description: "Aylık AI kredisi, kalan hak ve kişi bazında kullanım", keywords: ["kredi", "kota", "ai", "ayar"] },
+        ],
         tier: "more",
         description: "Ofis verinizle sohbet eden yardımcı",
         keywords: ["yapay zeka", "sohbet", "chat", "asistan", "soru"],
@@ -531,7 +538,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
         tier: "more",
         description: "Ofis kimliği, roller, yetkilendirme, modüller ve entegrasyonlar",
-        keywords: ["settings", "yapılandırma", "entegrasyon", "rol", "izin", "logo", "netgsm"],
+        keywords: ["settings", "yapılandırma", "entegrasyon", "rol", "izin", "logo", "netgsm", "kurulum", "sihirbaz"],
       },
       {
         href: "/app/abonelik",
@@ -555,16 +562,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
         description: "Yardım merkezi, rehberler ve destek talepleri",
         keywords: ["sss", "destek", "yardım", "ticket", "rehber", "nasıl"],
-      },
-      {
-        href: "/app/baslangic",
-        label: "Ofis kurulumu",
-        icon: ICONS.kurulum,
-        module: "dashboard",
-        tier: "more",
-        advanced: true,
-        description: "Adım adım ilk kurulum sihirbazı",
-        keywords: ["başlangıç", "sihirbaz", "onboarding", "kurulum"],
       },
       {
         // Otomasyon: kurallar + iş akışları (motorlar ayrı kalır, yalnız sayfa düzeyinde tek öğe).
@@ -651,10 +648,12 @@ export const NAV_ALIASES: Readonly<Record<string, string>> = {
 export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
   "/app/arama-sonuclari": "Komut paletindeki 'Tüm sonuçları gör' hedefi; menü öğesi değil arama yüzeyi",
   "/app/askida": "Askıya alınmış/ödemesi geciken ofis bilgilendirme ekranı; kabuk yönlendirir",
+  "/app/baslangic": "Kurulum sihirbazı bir EYLEM akışıdır: ana ekran kurulum şeridi, Ayarlar dizini kartı ve komut paleti eylemi",
   "/app/brifing": "Ana ekrana yönlendirir (içerik Bugün bloğunda)",
   "/app/hesabim": "Kullanıcı menüsünden (sağ üst) açılır",
   "/app/hizli": "Sahada hızlı kayıt: üst çubuk 'Yeni' menüsü ve komut paleti eylemi",
   "/app/hos-geldin": "Danışman ilk giriş karşılaması; koşul sağlanmazsa ana ekrana yönlendirir",
+  "/app/ice-aktarma": "Toplu yükleme bir EYLEM sayfasıdır: Müşteriler/Portföyler başlığındaki 'İçe aktar' düğmesi ve komut paleti eylemi",
   "/app/modul-kapali": "Kapalı modül bilgilendirme sayfası (modül kapısı yönlendirir)",
   "/app/paket": "Paket yükseltme sayfası (kilitli sayfadan ve Abonelik'ten ulaşılır)",
 };

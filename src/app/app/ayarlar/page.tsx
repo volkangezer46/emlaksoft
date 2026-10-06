@@ -13,6 +13,7 @@ import {
   MessageSquareText,
   Plug,
   Radio,
+  Rocket,
   ShieldCheck,
   Sliders,
   Sparkles,
@@ -59,6 +60,7 @@ type SettingCard = {
 const SETUP_RING_C = 2 * Math.PI * 42;
 
 const cards: SettingCard[] = [
+  { title: "Ofis kurulumu", desc: "Adım adım kurulum sihirbazı: ofis bilgileri, ekip, ilk kayıtlar ve örnek veri.", icon: Rocket, tone: "bg-brand-600/10 text-brand-600", href: "/app/baslangic" },
   { title: "Şube / ekip", desc: "Şubeler, ekipler ve bölge yetkilendirmeleri.", icon: Users2, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ekip" },
   { title: "Kullanıcı & roller", desc: "Danışman, yönetici ve broker rol izinleri.", icon: Fingerprint, tone: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/roller" },
   { title: "Yetkilendirme", desc: "Kim hangi kayıtları görür: kullanıcı kapsamları, geçici istisnalar, kişiye özel izinler ve denetim günlüğü.", icon: ShieldCheck, tone: "bg-amber-400/12 text-amber-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/yetkilendirme" },

@@ -63,6 +63,8 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Yeni danışman", href: "/app/ekip/yeni", icon: ICONS.ekip, module: "team" },
   { label: "Yeni destek talebi", href: "/app/destek/yeni", icon: ICONS.destek, module: "support" },
   { label: "Görüşme kaydet", href: "/app/arama", icon: ICONS.telefon, module: "calls" },
+  // Toplu kayıt eylemi (menü öğesi değil; Müşteriler/Portföyler başlığındaki "İçe aktar" düğmesiyle aynı hedef).
+  { label: "Excel'den içe aktar", href: "/app/ice-aktarma", icon: ICONS.iceAktarma, module: "customers" },
 ];
 
 /** Ofisin kapattığı modüle ait adres mi? (Eylemler listesinden elenir; "Git" listesi menü süzgecini kullanır) */
