@@ -3,7 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { revalidatePath } from "next/cache";
-import { generateContent, type ContentKind } from "@/lib/ai/content";
+import { generateContent, translateListingText, type ContentKind } from "@/lib/ai/content";
+import { TRANSLATE_MAX_SOURCE_CHARS, isTranslateLang } from "@/lib/ai/translate-logic";
 import { logActivity } from "@/lib/activity";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 
@@ -57,6 +58,36 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
   }, { tenantId: gate.tenantId, actorId: gate.userId });
 
   return { text, source };
+}
+
+export type TranslateResult = { text?: string; error?: string };
+
+/**
+ * Üretilen/düzenlenen metni EN/DE/AR/RU'ya çevirir. Çıktı yalnız taslaktır: hiçbir kayda yazılmaz,
+ * kullanıcı panelde düzenleyip kopyalar. Kişisel veri maskeleme `openAiChat` içinde yapılır.
+ */
+export async function translatePropertyContent(propertyId: string, text: string, lang: string): Promise<TranslateResult> {
+  const gate = await requirePermission("properties", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!isTranslateLang(lang)) return { error: "Desteklenmeyen dil." };
+  const source = (text ?? "").trim();
+  if (!source) return { error: "Çevrilecek metin boş." };
+  if (source.length > TRANSLATE_MAX_SOURCE_CHARS) {
+    return { error: `Metin çok uzun (en fazla ${TRANSLATE_MAX_SOURCE_CHARS} karakter).` };
+  }
+
+  // Portföy bu ofise ait olmalı (tenant izolasyonu); yalnız varlık doğrulanır, veri okunmaz.
+  const supabase = await createClient();
+  const { data: property } = await supabase
+    .from("properties")
+    .select("id")
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!property) return { error: "Portföy bulunamadı." };
+
+  const res = await translateListingText(source, lang, { tenantId: gate.tenantId, actorId: gate.userId });
+  return res.ok ? { text: res.text } : { error: res.error };
 }
 
 export type SaveDescriptionResult = { ok?: boolean; error?: string };

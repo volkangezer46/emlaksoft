@@ -1,6 +1,7 @@
 import "server-only";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat, type OpenAiAudit } from "@/lib/ai/openai-client";
+import { buildTranslateMessages, checkTranslation, type TranslateLang } from "@/lib/ai/translate-logic";
 
 const OPENAI_TIMEOUT_MS = 45_000;
 const OPENAI_MAX_RESPONSE_BYTES = 512 * 1024;
@@ -204,6 +205,42 @@ Portföy bilgileri (JSON): ${facts}` },
   } catch (e) {
     console.error("openAiContent", externalErrorMetadata(e));
     return null;
+  }
+}
+
+/**
+ * İlan metnini EN/DE/AR/RU'ya çevirir (taslak). Yalnız `openAiChat` üzerinden gider: kişisel veri
+ * (telefon, TC, e-posta, IBAN, kart) çağrıda maskelenir, yanıtta geri yerleştirilir. Kayda YAZMAZ.
+ * Şablon yedeği yoktur: anahtar yoksa ya da çıktı doğrulanamazsa hata döner.
+ */
+export async function translateListingText(
+  text: string,
+  lang: TranslateLang,
+  audit?: OpenAiAudit,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false, error: "AI çeviri için OpenAI anahtarı tanımlı değil." };
+  const { system, user } = buildTranslateMessages(text, lang);
+  try {
+    const { content } = await openAiChat({
+      apiKey: key,
+      purpose: "property_translate",
+      audit,
+      timeoutMs: OPENAI_TIMEOUT_MS,
+      maxResponseBytes: OPENAI_MAX_RESPONSE_BYTES,
+      body: {
+        model: getOpenAiChatModel(),
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      },
+    });
+    return checkTranslation(content, text);
+  } catch (e) {
+    console.error("translateListingText", externalErrorMetadata(e));
+    return { ok: false, error: "Çeviri şu an yapılamadı. Lütfen tekrar deneyin." };
   }
 }
 
