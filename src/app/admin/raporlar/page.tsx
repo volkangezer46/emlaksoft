@@ -6,7 +6,9 @@ import { requirePlatformModule } from "@/lib/platform";
 import { exportPlatformReportCsv } from "@/app/actions/platform-export";
 import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import type { PremiumTone } from "@/components/ui/premium/premium-math";
+import { formatTry } from "@/lib/format";
 import { moneyTRY } from "@/lib/admin-format";
 import { now as clockNow } from "@/lib/clock";
 import { AreaChart } from "@/components/ui/viz";
@@ -123,13 +125,13 @@ export default async function AdminReportsPage({
     money?: boolean;
     suffix?: string;
     icon: typeof TrendingUp;
-    accent: string;
+    tone: PremiumTone;
     hint?: string;
   }[] = [
-    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr : null, money: true, icon: TrendingUp, accent: "text-mint-400", hint: `${active} aktif ofis` },
-    { label: "Yıllık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr * 12 : null, money: true, icon: LineChart, accent: "text-brand-300", hint: "MRR × 12" },
-    { label: "Ofis başına gelir", href: "/admin/tenants?durum=active", value: active ? arpa : null, money: true, icon: Users, accent: "text-amber-300", hint: "aktif ofis ortalaması" },
-    { label: "Müşteri kaybı oranı", href: "/admin/tenants?durum=cancelled", value: hasData ? churnRate : null, suffix: "%", icon: BarChart3, accent: "text-danger-300", hint: `${cancelled} iptal` },
+    { label: "Aylık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr : null, money: true, icon: TrendingUp, tone: "success", hint: `${active} aktif ofis` },
+    { label: "Yıllık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr * 12 : null, money: true, icon: LineChart, tone: "brand", hint: "MRR × 12" },
+    { label: "Ofis başına gelir", href: "/admin/tenants?durum=active", value: active ? arpa : null, money: true, icon: Users, tone: "gold", hint: "aktif ofis ortalaması" },
+    { label: "Müşteri kaybı oranı", href: "/admin/tenants?durum=cancelled", value: hasData ? churnRate : null, suffix: "%", icon: BarChart3, tone: "danger", hint: `${cancelled} iptal` },
   ];
 
   return (
@@ -140,25 +142,22 @@ export default async function AdminReportsPage({
         title="Platform raporları"
         description="Gelir, büyüme, paket dağılımı ve destek performansı — tüm ofislerin toplu görünümü."
         glow="mint"
-        actions={<ExportButton action={exportPlatformReportCsv} label="Raporu indir" />}
+        actions={<ExportButton action={exportPlatformReportCsv} label="Raporu indir" variant="light" />}
       >
-        <AdminStatGrid className="mt-6">
+        <KpiGrid label="Platform göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
           {kpis.map((k) => (
-            <AdminStatCard
+            <KpiCard
               key={k.label}
-              tone="dark"
+              layout="inline"
               label={k.label}
-              value={k.value}
+              value={k.value === null ? "—" : k.money ? formatTry(k.value) : `${k.value}${k.suffix ?? ""}`}
               href={k.href}
               icon={k.icon}
-              accent={k.accent}
-              money={k.money}
-              suffix={k.suffix}
-              hint={k.hint}
-              emptyHint="Henüz ofis kaydı yok"
+              tone={k.tone}
+              hint={k.value === null ? "Henüz ofis kaydı yok" : k.hint}
             />
           ))}
-        </AdminStatGrid>
+        </KpiGrid>
       </AdminPageHeader>
 
       {/* Tarih aralığı — metrikler seçili aralıktaki kayıtlardan hesaplanır */}

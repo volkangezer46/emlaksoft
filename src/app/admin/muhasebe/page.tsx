@@ -30,6 +30,7 @@ import { BillingNav } from "@/app/admin/billing/billing-nav";
 import { PeriodBar } from "./period-bar";
 import { RankedBars } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 export const dynamic = "force-dynamic";
 
@@ -351,27 +352,27 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
               />
             </dl>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[32rem] text-left text-xs">
+              <Table className="w-full min-w-[32rem] text-left text-xs">
                 <caption className="sr-only">Kontör kullanımı kalem bazında</caption>
-                <thead className="text-text-faint">
-                  <tr>
-                    <th scope="col" className="py-1.5 pr-3 font-semibold">Kalem</th>
-                    <th scope="col" className="py-1.5 pr-3 text-right font-semibold">İşlem</th>
-                    <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Kontör</th>
-                    <th scope="col" className="py-1.5 text-right font-semibold">Maliyet</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
+                <THead className="text-text-faint">
+                  <TR>
+                    <TH scope="col" className="py-1.5 pr-3 font-semibold">Kalem</TH>
+                    <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">İşlem</TH>
+                    <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">Kontör</TH>
+                    <TH scope="col" className="py-1.5 text-right font-semibold">Maliyet</TH>
+                  </TR>
+                </THead>
+                <TBody className="divide-y divide-line">
                   {econ.byItem.map((r) => (
-                    <tr key={r.item}>
-                      <th scope="row" className="py-1.5 pr-3 font-medium text-ink-950">{EF_ITEM_LABELS[r.item]}</th>
-                      <td className="py-1.5 pr-3 text-right">{r.transactions.toLocaleString("tr-TR")}</td>
-                      <td className="py-1.5 pr-3 text-right">{r.units.toLocaleString("tr-TR")}</td>
-                      <td className="py-1.5 text-right">{formatKurus(r.costKurus)}</td>
-                    </tr>
+                    <TR key={r.item}>
+                      <TH scope="row" className="py-1.5 pr-3 font-medium text-ink-950">{EF_ITEM_LABELS[r.item]}</TH>
+                      <TD className="py-1.5 pr-3 text-right">{r.transactions.toLocaleString("tr-TR")}</TD>
+                      <TD className="py-1.5 pr-3 text-right">{r.units.toLocaleString("tr-TR")}</TD>
+                      <TD className="py-1.5 text-right">{formatKurus(r.costKurus)}</TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
             {econ.unknownItems > 0 ? (
               <p className="text-xs text-warn-600">{econ.unknownItems} kayıt bilinmeyen kalemde olduğu için sayılmadı.</p>
@@ -467,28 +468,28 @@ function Metric({ label, value, tone = "default" }: { label: string; value: stri
 function BreakdownTable({ rows }: { rows: { key: string; label: string; count: number; net: number; gross: number; href: string }[] }) {
   return (
     <div className="overflow-x-auto px-5 py-3">
-      <table className="w-full min-w-[22rem] text-left text-xs">
-        <thead className="text-text-faint">
-          <tr>
-            <th scope="col" className="py-1.5 pr-3 font-semibold">Kalem</th>
-            <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Adet</th>
-            <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Net</th>
-            <th scope="col" className="py-1.5 text-right font-semibold">Brüt</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
+      <Table className="w-full min-w-[22rem] text-left text-xs">
+        <THead className="text-text-faint">
+          <TR>
+            <TH scope="col" className="py-1.5 pr-3 font-semibold">Kalem</TH>
+            <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">Adet</TH>
+            <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">Net</TH>
+            <TH scope="col" className="py-1.5 text-right font-semibold">Brüt</TH>
+          </TR>
+        </THead>
+        <TBody className="divide-y divide-line">
           {rows.map((r) => (
-            <tr key={r.key} className={r.count === 0 ? "opacity-60" : undefined}>
-              <th scope="row" className="py-1.5 pr-3 font-medium">
+            <TR key={r.key} className={r.count === 0 ? "opacity-60" : undefined}>
+              <TH scope="row" className="py-1.5 pr-3 font-medium">
                 <Link href={r.href} className="focus-ring text-ink-950 hover:text-brand-600">{r.label}</Link>
-              </th>
-              <td className="py-1.5 pr-3 text-right">{r.count.toLocaleString("tr-TR")}</td>
-              <td className="py-1.5 pr-3 text-right">{formatKurus(r.net)}</td>
-              <td className="py-1.5 text-right font-semibold text-ink-950">{formatKurus(r.gross)}</td>
-            </tr>
+              </TH>
+              <TD className="py-1.5 pr-3 text-right">{r.count.toLocaleString("tr-TR")}</TD>
+              <TD className="py-1.5 pr-3 text-right">{formatKurus(r.net)}</TD>
+              <TD className="py-1.5 text-right font-semibold text-ink-950">{formatKurus(r.gross)}</TD>
+            </TR>
           ))}
-        </tbody>
-      </table>
+        </TBody>
+      </Table>
     </div>
   );
 }

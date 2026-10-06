@@ -3,7 +3,7 @@ import { Handshake, Hourglass, Megaphone, ShieldAlert, Sprout, Users, Wallet, Ch
 import { requirePlatformModule } from "@/lib/platform";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { FunnelChart, RadialGauge } from "@/components/ui/viz";
-import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { AdminEmpty, AdminFilterChip, AdminPanel, AdminScrollArea } from "@/components/admin/admin-table";
 import { describeRewardRule } from "@/lib/growth/settings";
 import { getAdminGrowthOverview, type GrowthReadiness } from "@/lib/growth/store";
@@ -20,6 +20,7 @@ import {
 import { formatDateTr, formatTry } from "@/lib/format";
 import { buildGrowthFunnel, growthIsIdle, kFactorParts, readinessSummary } from "./funnel-model";
 import { ClaimActions, FlagsForm, PartnerDetailsForm, PartnerForm, PartnerStatus, PayoutForm, RuleForm, RuleToggle, SettingsForm } from "./growth-forms";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 export const metadata = { title: "Büyüme" };
 
@@ -150,12 +151,12 @@ export default async function AdminGrowthPage({
         description="Müşteri-getir-müşteri ve profesyonel ortak programı: kayıt kaynakları, talep (ödül/komisyon) kuyruğu, ölçüm ve aktivasyon. Ödül kuralları ve kademe sayıları yalnız burada tanımlanır; kodda sabit tutar yoktur."
         glow="mint"
       >
-        <AdminStatGrid className="mt-5">
-          <AdminStatCard label="Atıflı kayıt" value={ov.available ? ov.counts.total : null} href="/admin/growth#kayitlar" icon={Users} tone="dark" emptyHint="Tablolar etkin değil" />
-          <AdminStatCard label="Ofis daveti" value={ov.available ? ov.counts.referral : null} href={hrefFor({ kaynak: "referral" })} icon={Megaphone} tone="dark" emptyHint="Tablolar etkin değil" />
-          <AdminStatCard label="Ortak" value={ov.available ? ov.counts.partner : null} href={hrefFor({ kaynak: "partner" })} icon={Handshake} tone="dark" emptyHint="Tablolar etkin değil" />
-          <AdminStatCard label="Ödeyen" value={ov.available ? ov.counts.payers : null} href={hrefFor({ kaynak: "odeyen" })} icon={Wallet} tone="dark" emptyHint="Tablolar etkin değil" />
-        </AdminStatGrid>
+        <KpiGrid label="Büyüme göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
+          <KpiCard layout="inline" label="Atıflı kayıt" value={ov.available ? ov.counts.total : "—"} href={"/admin/growth#kayitlar"} icon={Users} tone="brand" hint={ov.available ? undefined : "Tablolar etkin değil"} />
+          <KpiCard layout="inline" label="Ofis daveti" value={ov.available ? ov.counts.referral : "—"} href={hrefFor({ kaynak: "referral" })} icon={Megaphone} tone="success" hint={ov.available ? undefined : "Tablolar etkin değil"} />
+          <KpiCard layout="inline" label="Ortak" value={ov.available ? ov.counts.partner : "—"} href={hrefFor({ kaynak: "partner" })} icon={Handshake} tone="neutral" hint={ov.available ? undefined : "Tablolar etkin değil"} />
+          <KpiCard layout="inline" label="Ödeyen" value={ov.available ? ov.counts.payers : "—"} href={hrefFor({ kaynak: "odeyen" })} icon={Wallet} tone="gold" hint={ov.available ? undefined : "Tablolar etkin değil"} />
+        </KpiGrid>
       </AdminPageHeader>
 
       {!ov.available ? (
@@ -302,22 +303,22 @@ export default async function AdminGrowthPage({
             />
           ) : (
             <AdminScrollArea minWidth={900}>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-text-muted">
-                  <tr>
-                    <th className="px-5 py-2">Talep</th>
-                    <th className="py-2 pr-3">Tür</th>
-                    <th className="py-2 pr-3">Tutar</th>
-                    <th className="py-2 pr-3">Durum</th>
-                    <th className="py-2 pr-3">Bayrak / not</th>
-                    <th className="py-2 pr-3">Vade</th>
-                    <th className="py-2 pr-5">Karar</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line align-middle">
+              <Table className="w-full text-left text-sm">
+                <THead className="text-xs text-text-muted">
+                  <TR>
+                    <TH className="px-5 py-2">Talep</TH>
+                    <TH className="py-2 pr-3">Tür</TH>
+                    <TH className="py-2 pr-3">Tutar</TH>
+                    <TH className="py-2 pr-3">Durum</TH>
+                    <TH className="py-2 pr-3">Bayrak / not</TH>
+                    <TH className="py-2 pr-3">Vade</TH>
+                    <TH className="py-2 pr-5">Karar</TH>
+                  </TR>
+                </THead>
+                <TBody className="divide-y divide-line align-middle">
                   {ov.queue.map((c) => (
-                    <tr key={c.id} className="h-10">
-                      <td className="px-5 py-1">
+                    <TR key={c.id} className="h-10">
+                      <TD className="px-5 py-1">
                         <p className="font-semibold text-ink-950">
                           {c.partner_name ? (
                             c.partner_name
@@ -333,23 +334,23 @@ export default async function AdminGrowthPage({
                           </Link>{" "}
                           · {formatDateTr(c.created_at)}
                         </p>
-                      </td>
-                      <td className="py-2 pr-3 text-text-muted">{CLAIM_COMPONENT_LABEL[c.component] ?? c.component}</td>
-                      <td className="py-1 pr-3 font-semibold tabular-nums text-[color:var(--viz-gold)]">{formatTry(c.amount_try)}</td>
-                      <td className="py-2 pr-3">
+                      </TD>
+                      <TD className="py-2 pr-3 text-text-muted">{CLAIM_COMPONENT_LABEL[c.component] ?? c.component}</TD>
+                      <TD className="py-1 pr-3 font-semibold tabular-nums text-[color:var(--viz-gold)]">{formatTry(c.amount_try)}</TD>
+                      <TD className="py-2 pr-3">
                         {CLAIM_STATUS_LABEL[c.status as ClaimStatus] ?? c.status}
                         {c.clawed_back_at ? <span className="block text-xs text-text-muted">kredi geri alındı</span> : null}
-                      </td>
-                      <td className="py-2 pr-3 text-xs text-text-muted">
+                      </TD>
+                      <TD className="py-2 pr-3 text-xs text-text-muted">
                         {c.flags.length ? c.flags.map(flagLabel).join(", ") : "-"}
                         {c.note || c.reversal_reason ? <span className="block">{c.reversal_reason ?? c.note}</span> : null}
-                      </td>
-                      <td className="py-2 pr-3 text-xs text-text-muted">{c.eligible_at ? formatDateTr(c.eligible_at) : "-"}</td>
-                      <td className="py-2 pr-5">{isSuper ? <ClaimActions id={c.id} status={c.status} flags={c.flags} /> : <span className="text-xs text-text-muted">Süper admin</span>}</td>
-                    </tr>
+                      </TD>
+                      <TD className="py-2 pr-3 text-xs text-text-muted">{c.eligible_at ? formatDateTr(c.eligible_at) : "-"}</TD>
+                      <TD className="py-2 pr-5">{isSuper ? <ClaimActions id={c.id} status={c.status} flags={c.flags} /> : <span className="text-xs text-text-muted">Süper admin</span>}</TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </AdminScrollArea>
           )}
         </AdminPanel>
@@ -406,56 +407,56 @@ export default async function AdminGrowthPage({
         ) : (
           <div className="space-y-5">
             <AdminScrollArea minWidth={760}>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-text-muted">
-                  <tr>
-                    <th className="py-2 pr-3">Ortak</th>
-                    <th className="py-2 pr-3">Tür</th>
-                    <th className="py-2 pr-3">Kod</th>
-                    <th className="py-2 pr-3">Kayıt</th>
-                    <th className="py-2 pr-3">Ödeyen</th>
-                    <th className="py-2 pr-3">Bekleyen</th>
-                    <th className="py-2 pr-3">Ödenebilir</th>
-                    <th className="py-2 pr-3">Ödenen</th>
-                    <th className="py-2">Durum</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
+              <Table className="w-full text-left text-sm">
+                <THead className="text-xs text-text-muted">
+                  <TR>
+                    <TH className="py-2 pr-3">Ortak</TH>
+                    <TH className="py-2 pr-3">Tür</TH>
+                    <TH className="py-2 pr-3">Kod</TH>
+                    <TH className="py-2 pr-3">Kayıt</TH>
+                    <TH className="py-2 pr-3">Ödeyen</TH>
+                    <TH className="py-2 pr-3">Bekleyen</TH>
+                    <TH className="py-2 pr-3">Ödenebilir</TH>
+                    <TH className="py-2 pr-3">Ödenen</TH>
+                    <TH className="py-2">Durum</TH>
+                  </TR>
+                </THead>
+                <TBody className="divide-y divide-line">
                   {ov.partners.map((p) => (
-                    <tr key={p.id}>
-                      <td className="py-2 pr-3 font-semibold text-ink-950">{p.name}</td>
-                      <td className="py-2 pr-3 text-text-muted">{PARTNER_TYPE_LABEL[p.type] ?? p.type}</td>
-                      <td className="py-2 pr-3 font-mono text-xs">{p.code}</td>
-                      <td className="py-2 pr-3">
+                    <TR key={p.id}>
+                      <TD className="py-2 pr-3 font-semibold text-ink-950">{p.name}</TD>
+                      <TD className="py-2 pr-3 text-text-muted">{PARTNER_TYPE_LABEL[p.type] ?? p.type}</TD>
+                      <TD className="py-2 pr-3 font-mono text-xs">{p.code}</TD>
+                      <TD className="py-2 pr-3">
                         <Link className="font-semibold text-brand-600 hover:underline" href={hrefFor({ ortak: p.id })}>
                           {p.signups}
                         </Link>
-                      </td>
-                      <td className="py-2 pr-3">
+                      </TD>
+                      <TD className="py-2 pr-3">
                         <Link className="font-semibold text-brand-600 hover:underline" href={hrefFor({ ortak: p.id, kaynak: "odeyen" })}>
                           {p.payers}
                         </Link>
-                      </td>
-                      <td className="py-2 pr-3">
+                      </TD>
+                      <TD className="py-2 pr-3">
                         <Link className="text-brand-600 hover:underline" href={queueHref("held")}>
                           {formatTry(p.pendingTry)}
                         </Link>
-                      </td>
-                      <td className="py-2 pr-3">
+                      </TD>
+                      <TD className="py-2 pr-3">
                         <Link className="text-brand-600 hover:underline" href={queueHref("approved")}>
                           {formatTry(p.payableTry)}
                         </Link>
-                      </td>
-                      <td className="py-2 pr-3">
+                      </TD>
+                      <TD className="py-2 pr-3">
                         <Link className="text-brand-600 hover:underline" href={queueHref("paid")}>
                           {formatTry(p.paidTry)}
                         </Link>
-                      </td>
-                      <td className="py-2">{isSuper ? <PartnerStatus id={p.id} status={p.status} /> : p.status}</td>
-                    </tr>
+                      </TD>
+                      <TD className="py-2">{isSuper ? <PartnerStatus id={p.id} status={p.status} /> : p.status}</TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </AdminScrollArea>
             {isSuper && ov.engine
               ? ov.partners.map((p) => (
@@ -477,30 +478,30 @@ export default async function AdminGrowthPage({
           <div className="space-y-2">
             <h3 className="text-sm font-bold text-ink-950">Son ortak ödemeleri</h3>
             <AdminScrollArea minWidth={640}>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-text-muted">
-                  <tr>
-                    <th className="py-2 pr-3">Ortak</th>
-                    <th className="py-2 pr-3">Tutar</th>
-                    <th className="py-2 pr-3">Yöntem</th>
-                    <th className="py-2 pr-3">Belge no</th>
-                    <th className="py-2 pr-3">Tarih</th>
-                    <th className="py-2">Durum</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
+              <Table className="w-full text-left text-sm">
+                <THead className="text-xs text-text-muted">
+                  <TR>
+                    <TH className="py-2 pr-3">Ortak</TH>
+                    <TH className="py-2 pr-3">Tutar</TH>
+                    <TH className="py-2 pr-3">Yöntem</TH>
+                    <TH className="py-2 pr-3">Belge no</TH>
+                    <TH className="py-2 pr-3">Tarih</TH>
+                    <TH className="py-2">Durum</TH>
+                  </TR>
+                </THead>
+                <TBody className="divide-y divide-line">
                   {ov.payouts.map((po) => (
-                    <tr key={po.id}>
-                      <td className="py-2 pr-3 font-semibold text-ink-950">{po.partnerName}</td>
-                      <td className="py-2 pr-3">{formatTry(po.amountTry)}</td>
-                      <td className="py-2 pr-3 text-text-muted">{po.method === "account_credit" ? "Hesap kredisi" : "Dış ödeme (fatura karşılığı)"}</td>
-                      <td className="py-2 pr-3 text-text-muted">{po.documentNo ?? "-"}</td>
-                      <td className="py-2 pr-3 text-text-muted">{po.paidAt ? formatDateTr(po.paidAt) : formatDateTr(po.createdAt)}</td>
-                      <td className="py-2">{po.status === "paid" ? "Ödendi" : po.status === "requested" ? "İşleyici bekliyor" : "İptal"}</td>
-                    </tr>
+                    <TR key={po.id}>
+                      <TD className="py-2 pr-3 font-semibold text-ink-950">{po.partnerName}</TD>
+                      <TD className="py-2 pr-3">{formatTry(po.amountTry)}</TD>
+                      <TD className="py-2 pr-3 text-text-muted">{po.method === "account_credit" ? "Hesap kredisi" : "Dış ödeme (fatura karşılığı)"}</TD>
+                      <TD className="py-2 pr-3 text-text-muted">{po.documentNo ?? "-"}</TD>
+                      <TD className="py-2 pr-3 text-text-muted">{po.paidAt ? formatDateTr(po.paidAt) : formatDateTr(po.createdAt)}</TD>
+                      <TD className="py-2">{po.status === "paid" ? "Ödendi" : po.status === "requested" ? "İşleyici bekliyor" : "İptal"}</TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </AdminScrollArea>
           </div>
         ) : null}
@@ -528,35 +529,35 @@ export default async function AdminGrowthPage({
             />
           ) : (
             <AdminScrollArea minWidth={640}>
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-text-muted">
-                  <tr>
-                    <th className="px-5 py-2">Ofis</th>
-                    <th className="py-2 pr-3">Kaynak</th>
-                    <th className="py-2 pr-3">UTM</th>
-                    <th className="py-2 pr-3">Tarih</th>
-                    <th className="py-2 pr-5">Durum</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
+              <Table className="w-full text-left text-sm">
+                <THead className="text-xs text-text-muted">
+                  <TR>
+                    <TH className="px-5 py-2">Ofis</TH>
+                    <TH className="py-2 pr-3">Kaynak</TH>
+                    <TH className="py-2 pr-3">UTM</TH>
+                    <TH className="py-2 pr-3">Tarih</TH>
+                    <TH className="py-2 pr-5">Durum</TH>
+                  </TR>
+                </THead>
+                <TBody className="divide-y divide-line">
                   {shown.map((r) => (
-                    <tr key={r.tenantId}>
-                      <td className="px-5 py-2">
+                    <TR key={r.tenantId}>
+                      <TD className="px-5 py-2">
                         <Link className="font-semibold text-brand-600 hover:underline" href={`/admin/tenants/${r.tenantId}`}>
                           {r.tenantName}
                         </Link>
-                      </td>
-                      <td className="py-2 pr-3 text-text-muted">
+                      </TD>
+                      <TD className="py-2 pr-3 text-text-muted">
                         {SOURCE_LABEL[r.refKind] ?? r.refKind}
                         {r.partnerName ? ` · ${r.partnerName}` : ""}
-                      </td>
-                      <td className="py-2 pr-3 text-text-muted">{[r.utmSource, r.utmCampaign].filter(Boolean).join(" / ") || "-"}</td>
-                      <td className="py-2 pr-3 text-text-muted">{formatDateTr(r.at)}</td>
-                      <td className="py-2 pr-5">{r.paying ? "Ödeyen" : "Deneme/diğer"}</td>
-                    </tr>
+                      </TD>
+                      <TD className="py-2 pr-3 text-text-muted">{[r.utmSource, r.utmCampaign].filter(Boolean).join(" / ") || "-"}</TD>
+                      <TD className="py-2 pr-3 text-text-muted">{formatDateTr(r.at)}</TD>
+                      <TD className="py-2 pr-5">{r.paying ? "Ödeyen" : "Deneme/diğer"}</TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </AdminScrollArea>
           )}
         </AdminPanel>

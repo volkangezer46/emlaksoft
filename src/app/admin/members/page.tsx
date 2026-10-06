@@ -7,7 +7,7 @@ import { orIlike } from "@/lib/pgrst";
 import { exportMembersCsv } from "@/app/actions/platform-export";
 import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { DataTable, ROW_HREF, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
@@ -149,49 +149,38 @@ export default async function AdminMembersPage({
             ? `${memberTotal ?? rows.length} sonuç · toplam ${totalMembers} profil içinde filtreleniyor`
             : `${totalMembers} profil · ofis bazlı görünüm`
         }
-        actions={<ExportButton action={exportMembersCsv} label="Excel'e aktar" />}
+        actions={<ExportButton action={exportMembersCsv} label="Excel'e aktar" variant="light" />}
       >
-        <AdminStatGrid className="mt-6">
-          <AdminStatCard
-            tone="dark"
-            label="Toplam kullanıcı"
-            value={totalMembers || null}
-            href={totalMembers ? "/admin/members" : undefined}
-            icon={Users}
-            accent="text-amber-300"
-            emptyHint="Henüz kullanıcı yok"
-          />
-          <AdminStatCard
-            tone="dark"
+        <KpiGrid label="Kullanıcı göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
+          <KpiCard layout="inline" label="Toplam kullanıcı" value={totalMembers || "—"} href="/admin/members" icon={Users} tone="gold" hint={totalMembers ? undefined : "Henüz kullanıcı yok"} />
+          <KpiCard
+            layout="inline"
             label="Aktif"
-            value={totalMembers ? active : null}
-            href={totalMembers ? buildMembersHref({ tenant: tenantFilter, q: query, durum: durum === "aktif" ? undefined : "aktif" }) : undefined}
+            value={totalMembers ? active : "—"}
+            href={buildMembersHref({ tenant: tenantFilter, q: query, durum: durum === "aktif" ? undefined : "aktif" })}
             icon={UserCheck}
-            accent="text-mint-400"
-            hint={durum === "aktif" ? "filtre aktif · kaldırmak için tıkla" : undefined}
-            emptyHint="Henüz kullanıcı yok"
+            tone="success"
+            hint={!totalMembers ? "Henüz kullanıcı yok" : durum === "aktif" ? "filtre aktif · kaldırmak için tıkla" : undefined}
           />
-          <AdminStatCard
-            tone="dark"
+          <KpiCard
+            layout="inline"
             label="Pasif"
-            value={totalMembers ? totalMembers - active : null}
-            href={totalMembers ? buildMembersHref({ tenant: tenantFilter, q: query, durum: durum === "pasif" ? undefined : "pasif" }) : undefined}
+            value={totalMembers ? totalMembers - active : "—"}
+            href={buildMembersHref({ tenant: tenantFilter, q: query, durum: durum === "pasif" ? undefined : "pasif" })}
             icon={UserMinus}
-            accent="text-danger-300"
-            hint={durum === "pasif" ? "filtre aktif · kaldırmak için tıkla" : undefined}
-            emptyHint="Henüz kullanıcı yok"
+            tone="danger"
+            hint={!totalMembers ? "Henüz kullanıcı yok" : durum === "pasif" ? "filtre aktif · kaldırmak için tıkla" : undefined}
           />
-          <AdminStatCard
-            tone="dark"
+          <KpiCard
+            layout="inline"
             label="Ofis"
-            value={officeCount ?? null}
-            href={officeCount ? "/admin/tenants" : undefined}
+            value={officeCount ?? "—"}
+            href="/admin/tenants"
             icon={Building2}
-            accent="text-brand-300"
-            hint={officeCount ? `ofis başına ~${Math.round(totalMembers / officeCount)} kullanıcı` : undefined}
-            emptyHint="Henüz ofis yok"
+            tone="brand"
+            hint={officeCount ? `ofis başına ~${Math.round(totalMembers / officeCount)} kullanıcı` : "Henüz ofis yok"}
           />
-        </AdminStatGrid>
+        </KpiGrid>
       </AdminPageHeader>
 
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">

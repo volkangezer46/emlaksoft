@@ -2,14 +2,11 @@
  * Premium konsol bileşen kitaplığı (bkz. docs/DESIGN_SYSTEM.md "Premium konsol").
  * Hepsi sunucu-güvenli (istemci JS yok), saf SVG, yeni bağımlılık yok.
  */
-export { HeroBanner } from "./hero-banner";
-export { GlassKpi } from "./glass-kpi";
 export { KpiCard, KpiTile, type KpiCardProps, type KpiTileProps } from "./kpi-card";
 export { Sparkline } from "./sparkline";
 export { MiniBars } from "./mini-bars";
 export { TrendPill } from "./trend-pill";
 export { PeriodToggle } from "./period-toggle";
-export { CityNight } from "./city-night";
 export { AreaChart, BarColumns, EmptyArt, Ring, type AreaSeries } from "./charts";
 export {
   PERIODS,

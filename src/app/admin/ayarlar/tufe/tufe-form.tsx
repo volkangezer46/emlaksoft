@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { saveTufeTable } from "@/app/actions/platform-tufe";
 import type { TufeTable } from "@/lib/tufe";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 type Row = { month: string; rate: string; official: boolean };
 
@@ -80,37 +81,37 @@ export function TufeForm({ initial, canEdit }: { initial: TufeTable; canEdit: bo
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[480px] text-sm">
-            <thead>
-              <tr className="text-left text-xs text-text-muted">
-                <th className="pb-2 font-semibold">Ay (YYYY-AA)</th>
-                <th className="pb-2 font-semibold">12 aylık ort. TÜFE (%)</th>
-                <th className="pb-2 font-semibold">Resmi (teyit edildi)</th>
-                <th className="pb-2" />
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full min-w-[480px] text-sm">
+            <THead>
+              <TR className="text-left text-xs text-text-muted">
+                <TH className="pb-2 font-semibold">Ay (YYYY-AA)</TH>
+                <TH className="pb-2 font-semibold">12 aylık ort. TÜFE (%)</TH>
+                <TH className="pb-2 font-semibold">Resmi (teyit edildi)</TH>
+                <TH className="pb-2" />
+              </TR>
+            </THead>
+            <TBody>
               {rows.map((r, i) => (
-                <tr key={i} className="border-t border-line">
-                  <td className="py-1.5 pr-2">
+                <TR key={i} className="border-t border-line">
+                  <TD className="py-1.5 pr-2">
                     <input value={r.month} onChange={(e) => update(i, { month: e.target.value })} aria-label="Ay" placeholder="2026-08" className={inputCls} />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TD>
+                  <TD className="py-1.5 pr-2">
                     <input value={r.rate} onChange={(e) => update(i, { rate: e.target.value })} inputMode="decimal" aria-label="Oran" className={inputCls} />
-                  </td>
-                  <td className="py-1.5 pr-2">
+                  </TD>
+                  <TD className="py-1.5 pr-2">
                     <input type="checkbox" checked={r.official} onChange={(e) => update(i, { official: e.target.checked })} aria-label="Resmi" className="h-4 w-4 accent-brand-600" />
                     {!r.official ? <span className="ml-2 text-xs text-amber-700">Teyit edilmeli</span> : null}
-                  </td>
-                  <td className="py-1.5 text-right">
+                  </TD>
+                  <TD className="py-1.5 text-right">
                     <button type="button" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))} aria-label="Satırı sil" className="rounded p-1.5 text-text-muted hover:text-danger-500">
                       <Trash2 className="h-4 w-4" />
                     </button>
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
 
         <button

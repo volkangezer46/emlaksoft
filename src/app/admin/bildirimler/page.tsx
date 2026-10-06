@@ -8,7 +8,7 @@ import {
 } from "@/app/actions/platform-notifications";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { AdminEmpty, AdminPanel } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 
@@ -99,7 +99,7 @@ export default async function AdminNotificationsPage({
             <form action={markAllPlatformNotificationsReadForm}>
               <button
                 type="submit"
-                className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur-sm transition hover:border-white/35 hover:bg-white/15"
+                className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
               >
                 <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
               </button>
@@ -107,47 +107,38 @@ export default async function AdminNotificationsPage({
           ) : null
         }
       >
-        <AdminStatGrid className="mt-6">
-          <AdminStatCard
-            tone="dark"
-            label="Toplam bildirim"
-            value={total || null}
-            href={total ? buildHref({}) : undefined}
-            icon={Inbox}
-            accent="text-brand-300"
-            emptyHint="Henüz bildirim yok"
-          />
-          <AdminStatCard
-            tone="dark"
+        <KpiGrid label="Bildirim göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
+          <KpiCard layout="inline" label="Toplam bildirim" value={total ? total : "—"} href={buildHref({})} icon={Inbox} tone="brand" hint={total ? undefined : "Henüz bildirim yok"} />
+          <KpiCard
+            layout="inline"
             label="Okunmamış"
-            value={total ? unread : null}
-            href={total ? buildHref({ tur, durum: durum === "okunmamis" ? undefined : "okunmamis" }) : undefined}
+            value={total ? unread : "—"}
+            href={buildHref({ tur, durum: durum === "okunmamis" ? undefined : "okunmamis" })}
             icon={Bell}
-            accent="text-amber-300"
-            hint={durum === "okunmamis" ? "filtre aktif · kaldırmak için tıkla" : "yalnızca okunmamışları göster"}
-            emptyHint="Henüz bildirim yok"
+            tone="warn"
+            attention={unread > 0}
+            hint={!total ? "Henüz bildirim yok" : durum === "okunmamis" ? "filtre aktif · kaldırmak için tıkla" : "yalnızca okunmamışları göster"}
           />
-          <AdminStatCard
-            tone="dark"
+          <KpiCard
+            layout="inline"
             label="Okundu"
-            value={total ? total - unread : null}
-            href={total ? buildHref({ tur, durum: durum === "okunmus" ? undefined : "okunmus" }) : undefined}
+            value={total ? total - unread : "—"}
+            href={buildHref({ tur, durum: durum === "okunmus" ? undefined : "okunmus" })}
             icon={MailOpen}
-            accent="text-mint-400"
-            hint={durum === "okunmus" ? "filtre aktif · kaldırmak için tıkla" : undefined}
-            emptyHint="Henüz bildirim yok"
+            tone="success"
+            hint={!total ? "Henüz bildirim yok" : durum === "okunmus" ? "filtre aktif · kaldırmak için tıkla" : undefined}
           />
-          <AdminStatCard
-            tone="dark"
+          <KpiCard
+            layout="inline"
             label="Bekleyen kritik/uyarı"
-            value={total ? (criticalUnread ?? 0) : null}
-            href={total ? buildHref({ tur: "danger" }) : undefined}
+            value={total ? (criticalUnread ?? 0) : "—"}
+            href={buildHref({ tur: "danger" })}
             icon={BellRing}
-            accent="text-danger-300"
-            hint="okunmamış danger + warning"
-            emptyHint="Henüz bildirim yok"
+            tone="danger"
+            attention={(criticalUnread ?? 0) > 0}
+            hint={total ? "okunmamış danger + warning" : "Henüz bildirim yok"}
           />
-        </AdminStatGrid>
+        </KpiGrid>
       </AdminPageHeader>
 
       <nav aria-label="Tür filtresi" className="flex flex-wrap gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
