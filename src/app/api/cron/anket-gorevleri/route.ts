@@ -16,12 +16,16 @@ import {
   type TriggerRow,
 } from "@/lib/surveys/server";
 import { isSurveyEventType } from "@/lib/surveys/types";
+import { dispatchSurveyLinks } from "@/lib/surveys/dispatch";
+import { sendPulseInvites } from "@/lib/surveys/pulse";
 import { authorizeCron } from "@/lib/cron-auth";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
 const LOOKBACK_DAYS = 45;
+/** Gönderim adımı bu süreden sonra yeni ofiste başlamaz (300 sn tavanın altında kalmak için). */
+const SEND_BUDGET_MS = 200_000;
 const OVERDUE_HREF = "/app/anketler/kuyruk?durum=geciken";
 const DAY_MS = 86_400_000;
 
@@ -31,6 +35,9 @@ const DAY_MS = 86_400_000;
  * 1) Açık tetikleyicisi olan her ofis için olayları tarar (yayından kalkan ilan, kazanılan/kaybedilen anlaşma,
  *    kapanan talep, tamamlanan ziyaret) ve anket görevi üretir. Mükerrer yok: `unique(tenant_id, event_key)`;
  *    tetikleyici açılmadan ÖNCEKİ olaylar için geriye dönük görev üretilmez (en çok 45 gün).
+ *    Kira olayları (bitişe 60 gün, kiracı yıl dönümü) da buradan üretilir; ekip nabzı aylık DAVET bildirimidir.
+ *    Ofis "otomatik gönder" açtıysa vadesi gelen bağlantılar SMS/WhatsApp ile gönderilir (İYS izni, sınır, dedupe:
+ *    `dispatch.ts`).
  * 2) Geciken görevler için anketöre ve ofis sahibine günde en fazla bir bildirim yazar.
  * "Anketler" modülünü kapatan ofisler atlanır (kayıtlar silinmez). Tablolar yoksa iş sessizce "ok" döner.
  * Yetki süresi uzatma görevi bu cron'dan değil, tarih değiştirilirken (`updatePropertyAuthorization`) üretilir.
@@ -78,6 +85,9 @@ export async function GET(req: NextRequest) {
     }
 
     let created = 0;
+    let sent = 0;
+    let sendFailed = 0;
+    let pulseInvites = 0;
     for (const [tenantId, triggers] of byTenant) {
       try {
         await ensureSurveyDefaults(admin, tenantId);
@@ -88,11 +98,22 @@ export async function GET(req: NextRequest) {
           loadActiveTemplateMap(admin, tenantId),
         ]);
         for (const trigger of triggers) {
+          if (trigger.event_type === "advisor_pulse") {
+            // Ekip nabzı kişiye bağlı görev üretmez: aylık davet bildirimi (cevap anonim RPC ile).
+            pulseInvites += await sendPulseInvites(admin, tenantId, trigger, nowMs);
+            continue;
+          }
           const floor = nowMs - LOOKBACK_DAYS * DAY_MS;
           const enabledSince = trigger.enabled_since ? Date.parse(trigger.enabled_since) : floor;
           const since = new Date(Math.max(floor, Number.isFinite(enabledSince) ? enabledSince : floor)).toISOString();
           const candidates = await collectFor(admin, tenantId, trigger.event_type, since, todayDate);
           created += await insertCandidates(admin, tenantId, trigger, candidates, { settings, assigneeIds, load, templates });
+        }
+        // Otomatik gönderim (ayar açık + kanal hazır + İYS izni); süre bütçesi aşıldıysa bu tur atlanır.
+        if (settings.auto_send && Date.now() - nowMs < SEND_BUDGET_MS) {
+          const d = await dispatchSurveyLinks(admin, tenantId, settings, nowMs);
+          sent += d.sent;
+          sendFailed += d.failed;
         }
       } catch (e) {
         console.error("cron anket-gorevleri ofis", tenantId, e);
@@ -104,9 +125,9 @@ export async function GET(req: NextRequest) {
     await recordHeartbeat(
       "anket-gorevleri",
       "ok",
-      `${byTenant.size} ofis, ${created} yeni görev, ${reminded} gecikme bildirimi${skippedTenantsNote(disabled, "surveys")}`,
+      `${byTenant.size} ofis, ${created} yeni görev, ${sent} bağlantı gönderildi${sendFailed ? ` (${sendFailed} başarısız)` : ""}, ${pulseInvites} ekip nabzı daveti, ${reminded} gecikme bildirimi${skippedTenantsNote(disabled, "surveys")}`,
     );
-    return NextResponse.json({ ok: true, tenants: byTenant.size, created, reminded });
+    return NextResponse.json({ ok: true, tenants: byTenant.size, created, sent, sendFailed, pulseInvites, reminded });
   } catch (e) {
     console.error("cron anket-gorevleri", e);
     await recordHeartbeat("anket-gorevleri", "error", e instanceof Error ? e.message : "bilinmeyen hata");

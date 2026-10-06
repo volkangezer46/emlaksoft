@@ -8,9 +8,19 @@ import { notifyTenant } from "@/lib/notify";
 import { getBaseUrl } from "@/lib/base-url";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { canWorkTask, resolveWorkerAccess } from "@/lib/surveys/access";
-import { applyAttemptOutcome, pickBalancedAssignee, sanitizeQuestionDrafts, validateAnswers } from "@/lib/surveys/logic";
+import {
+  LOW_SCORE_NOTE_MIN,
+  applyAttemptOutcome,
+  isValidEventAudience,
+  pickBalancedAssignee,
+  sanitizeQuestionDrafts,
+  validLowScoreNote,
+  validateAnswers,
+} from "@/lib/surveys/logic";
 import {
   completeSurveyTask,
+  ensureSurveyDefaults,
+  isMissingColumn,
   isSurveySchemaMissing,
   loadAssigneeIds,
   loadOpenLoad,
@@ -18,11 +28,22 @@ import {
   loadTemplateQuestions,
   type CompletableTask,
 } from "@/lib/surveys/server";
-import { SURVEY_ASSIGNMENT_MODES, isSurveyEventType, type SurveyAssignmentMode, type SurveyOutcome } from "@/lib/surveys/types";
+import { loadPulseFormState, pulseEligibleRole } from "@/lib/surveys/pulse";
+import { isModuleEnabled } from "@/lib/modules/state";
+import { now } from "@/lib/clock";
+import {
+  SURVEY_ASSIGNMENT_MODES,
+  isSurveyAudience,
+  isSurveyEventType,
+  type SurveyAssignmentMode,
+  type SurveyOutcome,
+} from "@/lib/surveys/types";
 
 export type SurveyResult = { error?: string; ok?: boolean; id?: string; url?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const WA_TEMPLATE_RE = /^[a-z0-9_]{1,512}$/;
+const WA_LANG_RE = /^[a-z]{2}(_[A-Z]{2})?$/;
 
 function appUrl() {
   return getBaseUrl();
@@ -209,13 +230,20 @@ export async function saveSurveyTrigger(input: {
   return { ok: true };
 }
 
-/** Atama modu, gecikme eşiği, yeniden deneme saati ve düşük puan sınırı. */
+/**
+ * Atama modu, gecikme eşiği, yeniden deneme saati, düşük puan sınırı; otomatik gönderim (SMS/WhatsApp) ve destekleyene
+ * tavsiye daveti. Gönderim sütunları yoksa (PB49 uygulanmadı) yalnız temel ayarlar yazılır ve bu açıkça söylenir.
+ */
 export async function saveSurveySettings(input: {
   assignmentMode: string;
   fixedAssignee: string | null;
   overdueHours: number;
   retryHours: number;
   lowScoreMax: number;
+  autoSend?: boolean;
+  whatsappTemplate?: string | null;
+  whatsappLanguage?: string;
+  promoterInvite?: boolean;
 }): Promise<SurveyOpResult> {
   const gate = await requirePermission("surveys", "delete");
   if (!gate.ok) return { error: gate.error };
@@ -237,22 +265,159 @@ export async function saveSurveySettings(input: {
     }
     fixed = input.fixedAssignee;
   }
-  const { error } = await supabase.from("survey_settings").upsert(
-    {
-      tenant_id: gate.tenantId,
-      assignment_mode: mode,
-      fixed_assignee: fixed,
-      overdue_hours: overdue,
-      retry_hours: retry,
-      low_score_max: low,
-      updated_by: gate.userId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "tenant_id" },
-  );
+  const template = String(input.whatsappTemplate ?? "").trim();
+  if (template && !WA_TEMPLATE_RE.test(template)) {
+    return { error: "WhatsApp şablon adı yalnız küçük harf, rakam ve alt çizgi içerebilir (Meta'da onaylı şablon adı)." };
+  }
+  const language = String(input.whatsappLanguage ?? "tr").trim() || "tr";
+  if (!WA_LANG_RE.test(language)) return { error: "WhatsApp şablon dili geçersiz (ör. tr veya en_US)." };
+
+  const base = {
+    tenant_id: gate.tenantId,
+    assignment_mode: mode,
+    fixed_assignee: fixed,
+    overdue_hours: overdue,
+    retry_hours: retry,
+    low_score_max: low,
+    updated_by: gate.userId,
+    updated_at: new Date().toISOString(),
+  };
+  const v2 = {
+    ...base,
+    auto_send: input.autoSend === true,
+    whatsapp_template: template || null,
+    whatsapp_language: language,
+    promoter_invite: input.promoterInvite !== false,
+  };
+  let { error } = await supabase.from("survey_settings").upsert(v2, { onConflict: "tenant_id" });
+  let legacyOnly = false;
+  if (error && isMissingColumn(error)) {
+    legacyOnly = true;
+    ({ error } = await supabase.from("survey_settings").upsert(base, { onConflict: "tenant_id" }));
+  }
   if (error) return { error: schemaError(error, "Ayarlar kaydedilemedi.") };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "survey.settings",
+    entityType: "survey_settings",
+    entityId: gate.tenantId,
+    newValue: legacyOnly ? { mode, overdue, retry, low } : { mode, overdue, retry, low, auto_send: v2.auto_send, whatsapp_template: v2.whatsapp_template, promoter_invite: v2.promoter_invite },
+  });
+  revalidateSurveys();
+  return legacyOnly
+    ? { ok: true, message: "Temel ayarlar kaydedildi. Otomatik gönderim ve tavsiye daveti veritabanı güncellemesinden sonra etkinleşir." }
+    : { ok: true };
+}
+
+/**
+ * Kitle × tetik matrisi: bir olayın bir kitlesini aç/kapa (o şablonun `active` bayrağı). Kapalı kitleye anket üretilmez;
+ * şablon ve geçmiş cevaplar korunur.
+ */
+export async function setSurveyAudienceEnabled(input: { event: string; audience: string; enabled: boolean }): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "delete");
+  if (!gate.ok) return { error: gate.error };
+  if (!isSurveyEventType(input.event) || !isSurveyAudience(input.audience) || !isValidEventAudience(input.event, input.audience)) {
+    return { error: "Geçersiz olay veya kitle." };
+  }
+  const supabase = await createClient();
+  await ensureSurveyDefaults(supabase, gate.tenantId);
+  const { data, error } = await supabase
+    .from("survey_templates")
+    .update({ active: input.enabled === true, updated_at: new Date().toISOString() })
+    .eq("tenant_id", gate.tenantId)
+    .eq("event_type", input.event)
+    .eq("audience", input.audience)
+    .select("id")
+    .maybeSingle();
+  if (error) return { error: schemaError(error, "Kitle ayarı kaydedilemedi.") };
+  if (!data) return { error: "Bu olay için şablon henüz oluşturulamadı (veritabanı güncellemesi bekleniyor olabilir)." };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "survey.audience",
+    entityType: "survey_template",
+    entityId: String(data.id),
+    newValue: { event: input.event, audience: input.audience, enabled: input.enabled === true },
+  });
   revalidateSurveys();
   return { ok: true };
+}
+
+/**
+ * Düşük puan takibini aksiyon notuyla kapatır (zincirin son halkası). Yetki DB'de (`survey_close_low_score`, JWT kimlikli):
+ * yönetici, ilgili danışman, takip görevinin atananı veya danışmanın takım lideri. Takip görevi aynı işlemde "tamamlandı" olur.
+ */
+export async function closeLowScoreFollowUp(taskId: string, note: string): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(taskId)) return { error: "Geçersiz görev." };
+  const text = String(note ?? "").trim();
+  if (!validLowScoreNote(text)) return { error: `Aksiyon notu en az ${LOW_SCORE_NOTE_MIN} karakter olmalı (ne yapıldığını yazın).` };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("survey_close_low_score", { p_task_id: taskId, p_note: text });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") return { error: "Düşük puan kapanışı veritabanı güncellemesinden sonra etkinleşir." };
+    return { error: schemaError(error, "Takip kapatılamadı.") };
+  }
+  const res = (data ?? {}) as { ok?: boolean; code?: string };
+  if (!res.ok) {
+    const messages: Record<string, string> = {
+      note_required: `Aksiyon notu en az ${LOW_SCORE_NOTE_MIN} karakter olmalı.`,
+      forbidden: "Bu takibi yalnız ilgili danışman, takım lideri, görevin sahibi veya yönetici kapatabilir.",
+      already: "Bu takip zaten kapatılmış.",
+      not_found: "Anket görevi bulunamadı.",
+      invalid: "Bu anket için düşük puan takibi yok.",
+      unauthorized: "Oturum doğrulanamadı.",
+    };
+    return { error: messages[res.code ?? ""] ?? "Takip kapatılamadı." };
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "survey.low_score_close",
+    entityType: "survey_task",
+    entityId: taskId,
+    newValue: { note_length: text.length },
+  });
+  revalidateSurveys();
+  revalidatePath("/app/gorevler");
+  return { ok: true, message: "Takip aksiyon notuyla kapatıldı." };
+}
+
+/**
+ * Ekip nabzı cevabı (danışman iç anketi). ANONİM: cevap satırı kişiye bağlanmaz (RPC), bu yüzden etkinlik günlüğüne
+ * KİŞİ + ZAMAN kaydı da yazılmaz (yazılırsa cevapla eşleştirilebilirdi). Ayda bir kural DB'de (`survey_pulse_responses`).
+ */
+export async function submitAdvisorPulse(answers: Record<string, string>): Promise<SurveyOpResult> {
+  const gate = await requirePermission("surveys", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!(await isModuleEnabled(gate.tenantId, "surveys"))) return { error: "Anketler modülü bu ofiste kapalı." };
+  if (!pulseEligibleRole(gate.role)) return { error: "Ekip nabzı ofis sahibi ve genel müdür dışındaki ekip içindir." };
+  const supabase = await createClient();
+  const state = await loadPulseFormState(supabase, gate.tenantId, gate.userId, now());
+  if (state.state === "answered") return { error: "Bu ayın anketini zaten cevapladınız. Teşekkürler!" };
+  if (state.state !== "open") return { error: "Ekip nabzı şu an açık değil." };
+  const check = validateAnswers(state.questions, answers && typeof answers === "object" ? answers : {});
+  if (!check.ok) return { error: check.error };
+  const payload = check.answers.map((a) => ({ question_id: a.question_id, value_num: a.value_num, value_text: a.value_text }));
+  const { data, error } = await supabase.rpc("survey_submit_advisor_pulse", { p_template_id: state.templateId, p_period: state.period, p_answers: payload });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") return { error: "Ekip nabzı veritabanı güncellemesinden sonra etkinleşir." };
+    return { error: schemaError(error, "Cevap kaydedilemedi.") };
+  }
+  const res = (data ?? {}) as { ok?: boolean; code?: string };
+  if (!res.ok) {
+    const messages: Record<string, string> = {
+      already: "Bu ayın anketini zaten cevapladınız. Teşekkürler!",
+      disabled: "Ekip nabzı şu an kapalı.",
+      period: "Dönem değişti; sayfayı yenileyip tekrar deneyin.",
+      required: "Zorunlu soruları cevaplayın.",
+    };
+    return { error: messages[res.code ?? ""] ?? "Cevap kaydedilemedi." };
+  }
+  revalidatePath(`${SURVEYS_HREF}/ic-anket`);
+  return { ok: true, message: "Teşekkürler! Cevabınız anonim olarak kaydedildi." };
 }
 
 /** Kullanıcıyı anketör yapar / görevden alır (rol değişmez). */
@@ -539,16 +704,16 @@ export async function completeSurveyByPhone(taskId: string, answers: Record<stri
   }
   const settings = await loadSurveySettings(supabase, gate.tenantId);
   try {
-    const done = await completeSurveyTask(supabase, task, {
+    const result = await completeSurveyTask(supabase, task, {
       answers: check.answers,
       score: check.score,
       comment: check.comment,
       via: "phone",
       userId: gate.userId,
-      lowScoreMax: settings.low_score_max,
+      settings,
       customerName,
     });
-    if (!done) return { error: "Görev az önce başka biri tarafından kapatıldı." };
+    if (!result.done) return { error: "Görev az önce başka biri tarafından kapatıldı." };
   } catch {
     return { error: "Cevaplar kaydedilemedi. Lütfen tekrar deneyin." };
   }

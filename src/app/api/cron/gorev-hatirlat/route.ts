@@ -5,6 +5,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
 import { formatDateTimeTr } from "@/lib/format";
 import { fetchAllPaged } from "@/lib/cron-run";
+import { runLowScoreEscalation } from "@/lib/surveys/escalate";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
 const MAX_PAGES = 10;
@@ -79,7 +80,19 @@ export async function GET(req: NextRequest) {
 
   const notified = await insertNotifications(admin, toInsert);
 
-  await recordHeartbeat("gorev-hatirlat", "ok", `${notified} bildirim, ${skipped} atlandı${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`);
+  // Anket düşük puan zinciri (24 sa takım lideri, 48 sa ofis sahibi). Hata görev hatırlatmasını bozmaz.
+  let lowScore = { escalated: 0, notified: 0, skipped: true };
+  try {
+    lowScore = await runLowScoreEscalation(admin, now);
+  } catch (e) {
+    console.error("gorev-hatirlat düşük puan zinciri", e);
+  }
 
-  return NextResponse.json({ ok: true, notified, skipped });
+  await recordHeartbeat(
+    "gorev-hatirlat",
+    "ok",
+    `${notified} bildirim, ${skipped} atlandı · düşük puan zinciri: ${lowScore.escalated} kademe, ${lowScore.notified} bildirim${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
+  );
+
+  return NextResponse.json({ ok: true, notified, skipped, lowScoreEscalated: lowScore.escalated });
 }

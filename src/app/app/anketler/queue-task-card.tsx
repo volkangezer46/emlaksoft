@@ -45,6 +45,8 @@ export type QueueTaskVM = {
   assignedTo: string | null;
   assigneeName: string | null;
   lastOutcomeLabel: string | null;
+  /** Bağlantı otomatik gönderildiyse kanal etiketi ("SMS ile gönderildi" ...). */
+  sentLabel?: string | null;
   questions: QueueQuestionVM[];
 };
 
@@ -62,7 +64,7 @@ function scoreTone(n: number, selected: boolean): string {
 /**
  * Anketör kuyruğu satırı. "Ara" tel: bağlantısıdır; soru-cevap formu satırın İÇİNDE açılır (popup değil).
  * Sonuçlar: kaydet (tamamlandı), açmadı/meşgul (otomatik yeniden planlama), yanlış numara, reddetti.
- * Müşteri isterse aynı şablonu bağlı linkle de cevaplayabilir; link kopyalanır, SMS gönderilmez.
+ * Müşteri isterse aynı şablonu bağlı linkle de cevaplayabilir; link kopyalanır (otomatik gönderim ayrı: dispatch.ts).
  */
 export function QueueTaskCard({
   task,
@@ -113,7 +115,7 @@ export function QueueTaskCard({
     try {
       await navigator.clipboard.writeText(res.url);
       setCopied(true);
-      setMessage({ tone: "ok", text: "Bağlantı kopyalandı. SMS gönderilmez; müşteriye siz iletirsiniz." });
+      setMessage({ tone: "ok", text: "Bağlantı kopyalandı; müşteriye iletebilirsiniz. (Otomatik gönderim açıksa ve İYS izni varsa sistem kendisi gönderir.)" });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setMessage({ tone: "ok", text: `Bağlantı: ${res.url}` });
@@ -143,6 +145,11 @@ export function QueueTaskCard({
             {task.scheduled ? (
               <Badge variant="neutral" size="sm">
                 Zamanlanmış
+              </Badge>
+            ) : null}
+            {task.sentLabel ? (
+              <Badge variant="success" size="sm">
+                {task.sentLabel}
               </Badge>
             ) : null}
             {closed ? (
@@ -218,8 +225,8 @@ export function QueueTaskCard({
                   {q.required ? <span className="text-danger-500"> *</span> : null}
                 </legend>
                 {q.kind === "score" ? (
-                  <div className="grid grid-cols-5 gap-2 sm:grid-cols-10" role="radiogroup" aria-label={q.label}>
-                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <div className="grid grid-cols-6 gap-2 sm:grid-cols-11" role="radiogroup" aria-label={q.label}>
+                    {Array.from({ length: 11 }, (_, i) => i).map((n) => (
                       <button
                         key={n}
                         type="button"
