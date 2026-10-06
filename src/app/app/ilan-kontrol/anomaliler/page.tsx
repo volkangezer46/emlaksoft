@@ -8,6 +8,7 @@ import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { anomalyLostCommission } from "@/lib/listing-control/lost-commission";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
+import { getSetting } from "@/lib/settings/read";
 import { formatDateTimeTr, formatTry } from "@/lib/format";
 import { listAnomalies } from "@/lib/listing-control/server/readers";
 import { REASON_LABELS, type ReasonCode } from "@/lib/listing-control/types";
@@ -35,7 +36,7 @@ const PAGE_SIZE = 25;
 const RISK_VISUAL: Record<string, KpiVisual> = { critical: "critical", high: "critical", medium: "mismatch", low: "pending", none: "neutral" };
 
 export default async function AnomalilerPage({ searchParams }: { searchParams: SearchParams }) {
-  const { perms } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const { perms, tenantId } = await requireModulePage("portals", "/app/ilan-kontrol");
   const canEdit = (perms.portals ?? []).includes("edit");
   const sp = await searchParams;
   const type = parseAnomalyType(sp.tur);
@@ -53,7 +54,7 @@ export default async function AnomalilerPage({ searchParams }: { searchParams: S
       <ControlSubNav active="anomaliler" closures={effectiveCanAccessModule(perms, "leak")} />
       <TypeFilters active={type} advisorId={advisorId} />
       <Suspense fallback={<SkeletonCard height={480} label="Uyarılar yükleniyor" />}>
-        <QueueBody type={type} advisorId={advisorId} page={page} canEdit={canEdit} />
+        <QueueBody type={type} advisorId={advisorId} page={page} canEdit={canEdit} tenantId={tenantId} />
       </Suspense>
     </>
   );
@@ -83,7 +84,7 @@ function TypeFilters({ active, advisorId }: { active: string | null; advisorId: 
   );
 }
 
-async function QueueBody({ type, advisorId, page, canEdit }: { type: string | null; advisorId: string | null; page: number; canEdit: boolean }) {
+async function QueueBody({ type, advisorId, page, canEdit, tenantId }: { type: string | null; advisorId: string | null; page: number; canEdit: boolean; tenantId: string | null | undefined }) {
   const db = await getDb();
   const res = await listAnomalies(db, { type, advisorId, page, pageSize: PAGE_SIZE });
   if (!res.available) return <ControlUnavailable />;
@@ -99,6 +100,8 @@ async function QueueBody({ type, advisorId, page, canEdit }: { type: string | nu
     );
   }
   const nowMs = now();
+  // Ofis tanımı: portföyde oran yoksa kaçan komisyon tahmininde kullanılan yedek oran.
+  const defaultRate = tenantId ? await getSetting<number>("office.commission.default_rate", { tenantId }) : undefined;
   const [briefs, names] = await Promise.all([
     loadPropertyBriefs(db, res.rows.map((r) => r.property_id)),
     loadProfileNames(db, res.rows.map((r) => r.advisor_id)),
@@ -112,7 +115,7 @@ async function QueueBody({ type, advisorId, page, canEdit }: { type: string | nu
           const b = briefs.get(r.property_id);
           const risk = riskLabel(r.risk_score);
           const sla = r.status === "explained" ? null : slaCountdown(r.sla_due_at, nowMs);
-          const lost = anomalyLostCommission(r.type, { listPrice: b?.price ?? null, commissionRate: b?.commissionRate ?? null });
+          const lost = anomalyLostCommission(r.type, { listPrice: b?.price ?? null, commissionRate: b?.commissionRate ?? null, defaultRate });
           const priceDetail = r.type === "price_mismatch" ? (r.details as { crmPrice?: number; portals?: { portal: string; price: number }[] }) : null;
           return (
             <li key={r.id} className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">

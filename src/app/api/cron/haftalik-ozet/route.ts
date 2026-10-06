@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
+import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
 
 /**
@@ -19,11 +20,6 @@ import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf 
  *    gerekir: "/app/raporlar::hafta": "dedupe marker — haftalik-ozet cron".
  */
 
-function wantsDigest(prefs: unknown) {
-  if (!prefs || typeof prefs !== "object") return true;
-  const digest = (prefs as { digest?: boolean }).digest;
-  return digest !== false;
-}
 
 /** ISO-8601 hafta numarası — marker "YYYY-WW" için (yıl, ISO hafta yılıdır). */
 function isoWeek(d: Date): { year: number; week: number } {
@@ -158,6 +154,8 @@ export async function GET(req: NextRequest) {
         .in("role", ["owner", "gm", "branch_manager"]),
     ]);
 
+    // Ofis tanımı: kendi tercihini kaydetmemiş yöneticiler için özet varsayılanı (okunamazsa açık).
+    const officeDigest = await officeDigestDefault(admin, String(t.id));
     const wonCount = wonDeals?.length ?? 0;
     const wonValue = (wonDeals ?? []).reduce((s, d) => s + Number(d.deal_value || 0), 0);
     const collectedTotal = (collected ?? []).reduce((s, c) => s + Number(c.gross_amount || 0), 0);
@@ -195,7 +193,7 @@ export async function GET(req: NextRequest) {
     ];
     const body = `Haftalık özet: ${parts.join(" · ")}`;
 
-    const recipients = (profiles ?? []).filter((p) => wantsDigest(p.notification_prefs));
+    const recipients = (profiles ?? []).filter((p) => wantsDigest(p.notification_prefs, officeDigest));
     skippedPrefs += (profiles?.length ?? 0) - recipients.length;
     if (recipients.length === 0) continue;
 

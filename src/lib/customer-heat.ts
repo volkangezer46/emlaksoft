@@ -68,7 +68,8 @@ function daysBetween(iso: string | null, nowMs: number): number | null {
  *  - Açık teklif/anlaşma .......... +18
  *  - Yeni kayıt (≤14 gün) ......... +6
  */
-export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number): CustomerHeat {
+export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number, opts: { dormantDays?: number } = {}): CustomerHeat {
+  const dormantDays = opts.dormantDays != null && opts.dormantDays > 0 ? opts.dormantDays : DORMANT_DAYS;
   const ageDays = daysBetween(inputs.createdAt, nowMs);
   const contactDays = daysBetween(inputs.lastContactAt, nowMs);
   // Temas hiç yoksa "temassız süre" kayıt yaşıdır — uykuda kuralı buna bakar.
@@ -76,7 +77,7 @@ export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number): Cu
 
   if (inputs.blacklist) {
     const segment: HeatSegment =
-      daysSinceContact !== null && daysSinceContact >= DORMANT_DAYS ? "uykuda" : "soguk";
+      daysSinceContact !== null && daysSinceContact >= dormantDays ? "uykuda" : "soguk";
     return {
       score: 0,
       segment,
@@ -138,7 +139,7 @@ export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number): Cu
   if (score >= 70) segment = "sicak";
   else if (score >= 40) segment = "ilgili";
   else if (score >= 15) segment = "soguk";
-  else segment = daysSinceContact !== null && daysSinceContact >= DORMANT_DAYS ? "uykuda" : "soguk";
+  else segment = daysSinceContact !== null && daysSinceContact >= dormantDays ? "uykuda" : "soguk";
 
   return { score, segment, label: HEAT_SEGMENTS[segment].label, daysSinceContact, factors };
 }

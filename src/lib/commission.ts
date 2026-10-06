@@ -30,6 +30,8 @@ export type CommissionInput = {
   amount: number;
   /** Komisyon oranı, yüzde (ör. 3 = %3). */
   rate?: number;
+  /** `rate` boşsa kullanılacak yedek oran (ofis tanımı `office.commission.default_rate`); yoksa DEFAULT_COMMISSION_RATE. */
+  defaultRate?: number;
   /** KDV oranı, yüzde. */
   vatRate?: number;
   /**
@@ -86,7 +88,7 @@ function pozitif(v: number | undefined, yedek: number): number {
  */
 export function calculateCommission(input: CommissionInput): CommissionBreakdown {
   const amount = pozitif(input.amount, 0);
-  const rate = pozitif(input.rate, DEFAULT_COMMISSION_RATE);
+  const rate = pozitif(input.rate, pozitif(input.defaultRate, DEFAULT_COMMISSION_RATE));
   const vatRate = pozitif(input.vatRate, DEFAULT_VAT_RATE);
   // Pay 0-100 aralığında olmalı; dışarısı anlamsız.
   const advisorShare = Math.min(100, pozitif(input.advisorShare, 50));

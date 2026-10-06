@@ -24,11 +24,12 @@ export type QuietCustomerFact = {
   quietDays: number;
 };
 
-export function evaluateCallPriority(facts: readonly QuietCustomerFact[], nowMs: number): InsightDraft[] {
+/** `minQuietDays`: ofis tanımı (office.insight.customer_quiet_days); verilmezse CALL_MIN_QUIET_DAYS. */
+export function evaluateCallPriority(facts: readonly QuietCustomerFact[], nowMs: number, minQuietDays: number = CALL_MIN_QUIET_DAYS): InsightDraft[] {
   const week = weekPeriod(nowMs);
   const drafts: InsightDraft[] = [];
   for (const f of facts) {
-    if (!f.assignedTo || f.activeDemands < 1 || f.quietDays < CALL_MIN_QUIET_DAYS) continue;
+    if (!f.assignedTo || f.activeDemands < 1 || f.quietDays < minQuietDays) continue;
     const severity = f.quietDays >= 30 || f.activeDemands >= 2 ? "orta" : "bilgi";
     const who = nameOr(f.fullName, "Müşteri");
     drafts.push({

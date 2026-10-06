@@ -21,6 +21,7 @@ import { computeLeadScore } from "@/lib/lead-score";
 import { HEAT_SEGMENTS, heatTitle, scoreCustomerHeat, type CustomerHeat, type HeatSegment } from "@/lib/customer-heat";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
+import { getSetting } from "@/lib/settings/read";
 import { formatDateTr } from "@/lib/format";
 import type { CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
@@ -312,6 +313,8 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const heatSignalMap = new Map<string, HeatSignalRow>();
   for (const s of (heatSignals ?? []) as HeatSignalRow[]) heatSignalMap.set(s.customer_id, s);
   const nowMs = now();
+  // Ofis tanımı: uykuda eşiği (varsayılan 90 gün = DORMANT_DAYS).
+  const dormantDays = tenantId ? await getSetting<number>("office.insight.dormant_days", { tenantId }) : undefined;
   const heatOf = (id: string, createdAt: string, blacklist: boolean | null): CustomerHeat => {
     const s = heatSignalMap.get(id);
     return scoreCustomerHeat(
@@ -325,6 +328,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
         blacklist: Boolean(blacklist),
       },
       nowMs,
+      { dormantDays },
     );
   };
   const heatMap = new Map<string, CustomerHeat>();

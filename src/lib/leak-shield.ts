@@ -15,6 +15,8 @@ export type LeakCalcInput = {
   dealAmount: number | null;
   listPrice: number | null;
   commissionRate: number | null;
+  /** Portföyde oran yoksa yedek (ofis tanımı); verilmezse DEFAULT_COMMISSION_RATE. */
+  defaultRate?: number;
 };
 
 export type LeakCalcResult = {
@@ -56,7 +58,9 @@ export function estimateLostCommission(input: LeakCalcInput): LeakCalcResult {
   const flags = normalizeCloseFlags(input);
   const rate = Number.isFinite(input.commissionRate) && input.commissionRate != null && input.commissionRate >= 0
     ? Number(input.commissionRate)
-    : DEFAULT_COMMISSION_RATE;
+    : input.defaultRate != null && Number.isFinite(input.defaultRate) && input.defaultRate >= 0
+      ? Number(input.defaultRate)
+      : DEFAULT_COMMISSION_RATE;
   const baseAmount =
     input.dealAmount && input.dealAmount > 0
       ? input.dealAmount

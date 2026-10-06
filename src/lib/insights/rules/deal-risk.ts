@@ -36,11 +36,12 @@ export type StalledDealFact = {
 // Aşama adları tek kaynaktan (definition-defaults / deal-stage-labels); sabit metin yazılmaz.
 const STAGE_TR = stageLabelMap(defaultStageLabels());
 
-export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: number): InsightDraft[] {
+/** `minIdleDays`: ofis tanımı (office.alert.deal_stale_days); verilmezse DEAL_MIN_IDLE_DAYS. */
+export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: number, minIdleDays: number = DEAL_MIN_IDLE_DAYS): InsightDraft[] {
   const week = weekPeriod(nowMs);
   const drafts: (InsightDraft & { _idle: number })[] = [];
   for (const f of facts) {
-    if (!f.assignedTo || f.idleDays < DEAL_MIN_IDLE_DAYS) continue;
+    if (!f.assignedTo || f.idleDays < minIdleDays) continue;
     const score = computeDealScore(
       {
         stage: f.stage,

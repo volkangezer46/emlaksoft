@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SLA_MIN } from "@/lib/response-time/core";
 import { STALE_DAYS } from "@/app/app/anlasmalar/deal-list-logic";
 import { AGING_DAYS } from "@/app/app/talepler/demand-list-logic";
+import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
+import { DORMANT_DAYS } from "@/lib/customer-heat";
+import { CALL_MIN_QUIET_DAYS } from "@/lib/insights/rules/call-priority";
+import { PRICE_MIN_DAYS } from "@/lib/insights/rules/price-action";
+import { DEAL_MIN_IDLE_DAYS } from "@/lib/insights/rules/deal-risk";
 import { prepareWrite } from "../prepare";
 import { getSettingDef } from "./index";
 import { NOTIFY_DEFAULTS, notifyKey, TENANT_SETTING_DEFS } from "./tenant";
@@ -18,6 +23,14 @@ describe("ofis ayarları: varsayılan = bugünkü sabit (davranış değişmez)"
     expect(getSettingDef("office.commission.simulator_rate")!.default).toBe(3);
     expect(getSettingDef("office.commission.simulator_advisor_share")!.default).toBe(60);
     expect(getSettingDef("office.commission.split_advisor_share")!.default).toBe(50);
+  });
+
+  it("yedek komisyon oranı ve içgörü eşikleri bugünkü sabitlerle aynı", () => {
+    expect(getSettingDef("office.commission.default_rate")!.default).toBe(DEFAULT_COMMISSION_RATE);
+    expect(getSettingDef("office.insight.customer_quiet_days")!.default).toBe(CALL_MIN_QUIET_DAYS);
+    expect(getSettingDef("office.insight.listing_stale_days")!.default).toBe(PRICE_MIN_DAYS);
+    expect(getSettingDef("office.insight.dormant_days")!.default).toBe(DORMANT_DAYS);
+    expect(getSettingDef("office.alert.deal_stale_days")!.default).toBe(DEAL_MIN_IDLE_DAYS);
   });
 
   it("bildirim varsayılanları notification-prefs DEFAULTS ile aynı 12 tür", () => {

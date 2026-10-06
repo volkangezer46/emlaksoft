@@ -30,11 +30,12 @@ export type StaleListingFact = {
   peerMedian: number | null;
 };
 
-export function evaluatePriceAction(facts: readonly StaleListingFact[], nowMs: number): InsightDraft[] {
+/** `minDays`: ofis tanımı (office.insight.listing_stale_days); verilmezse PRICE_MIN_DAYS. */
+export function evaluatePriceAction(facts: readonly StaleListingFact[], nowMs: number, minDays: number = PRICE_MIN_DAYS): InsightDraft[] {
   const month = monthPeriod(nowMs);
   const drafts: (InsightDraft & { _days: number })[] = [];
   for (const f of facts) {
-    if (!f.assignedTo || f.daysListed < PRICE_MIN_DAYS) continue;
+    if (!f.assignedTo || f.daysListed < minDays) continue;
     // Emsal yoksa üretme.
     if (f.peerMedian === null || !(f.peerMedian > 0) || f.peerCount < PRICE_MIN_PEERS) continue;
     if (!(f.listPrice > 0)) continue;

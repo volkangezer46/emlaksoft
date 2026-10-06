@@ -105,6 +105,58 @@ const commission: AnySettingDef[] = [
     impact: "Yalnız henüz pay kaydedilmemiş anlaşmalarda önerilen değer değişir; kayıtlı paylar etkilenmez.",
     unit: "%",
   }),
+  defineNumber({
+    ...TENANT,
+    key: "office.commission.default_rate",
+    group: "komisyon",
+    default: 3,
+    min: 0.1,
+    max: 20,
+    parse: numberParser(3, 0.1, 20),
+    label: "Portföyde oran yoksa varsayılan komisyon oranı",
+    description: "Portföyün komisyon oranı boşken kaçan komisyon tahmininde (İlan Kontrol uyarıları) ve komisyon hesabında yedek olarak kullanılan oran.",
+    impact: "Yalnız portföyünde oran girilmemiş kayıtların TAHMİNİ tutarı değişir; portföy oranları ve kayıtlı komisyonlar etkilenmez.",
+    unit: "%",
+  }),
+];
+
+const insight: AnySettingDef[] = [
+  defineInt({
+    ...TENANT,
+    key: "office.insight.customer_quiet_days",
+    group: "esik",
+    default: 14,
+    min: 7,
+    max: 90,
+    label: "Sessiz değerli müşteri eşiği (arama önceliği)",
+    description: "Açık talebi olan bir müşteriyle kaç gündür temas yoksa içgörülerde \"arama önceliği\" önerilsin.",
+    impact: "Yalnız içgörü kuyruğundaki arama önceliği önerileri değişir; müşteri kayıtlarına dokunulmaz. Düşürürseniz daha çok öneri üretilir.",
+    unit: "gün",
+  }),
+  defineInt({
+    ...TENANT,
+    key: "office.insight.listing_stale_days",
+    group: "esik",
+    default: 30,
+    min: 14,
+    max: 180,
+    label: "Eskiyen ilan eşiği (fiyat aksiyonu)",
+    description: "Bir ilan kaç gündür satılmadığında içgörülerde emsallere göre fiyat aksiyonu önerilsin.",
+    impact: "Yalnız içgörü kuyruğundaki fiyat aksiyonu önerileri değişir; fiyatlar kendiliğinden değişmez.",
+    unit: "gün",
+  }),
+  defineInt({
+    ...TENANT,
+    key: "office.insight.dormant_days",
+    group: "esik",
+    default: 90,
+    min: 30,
+    max: 365,
+    label: "Uykuda müşteri eşiği",
+    description: "Temas olmayan bir müşteri kaç günden sonra \"uykuda\" segmentine alınsın.",
+    impact: "Müşteri listesindeki ısı segmenti (uykuda/soğuk) ve uykuda filtresi değişir; ısı puanı hesabı aynı kalır.",
+    unit: "gün",
+  }),
 ];
 
 /** Bildirim tercihi anahtarlari (NotifPrefs) ve ofis varsayilani: notification-prefs.ts DEFAULTS ile ayni. */
@@ -138,4 +190,4 @@ const notify: AnySettingDef[] = NOTIFY_DEFAULTS.map((n) =>
   }),
 );
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...notify];
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify];
