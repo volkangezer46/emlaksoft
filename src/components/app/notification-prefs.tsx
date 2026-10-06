@@ -18,6 +18,7 @@ export type NotifPrefs = {
   dunning: boolean;
   rentOverdue: boolean;
   network: boolean;
+  insight: boolean;
 };
 
 const KEY = "es_notif_prefs_v1";
@@ -33,6 +34,7 @@ const DEFAULTS: NotifPrefs = {
   dunning: true,
   rentOverdue: true,
   network: true,
+  insight: true,
 };
 
 /** Geriye dönük: bell hâlâ local cache okuyabilir; sunucu öncelikli */
@@ -59,6 +61,7 @@ const ROWS: { key: keyof NotifPrefs; label: string; desc: string }[] = [
   { key: "dunning", label: "Ödeme hatırlatmaları", desc: "Gecikmiş fatura ve abonelik uyarıları" },
   { key: "rentOverdue", label: "Kira gecikmeleri", desc: "Geciken kira tahakkuk ve kira yenileme bildirimleri" },
   { key: "network", label: "Ağ iş birliği talepleri", desc: "Ofisler arası iş birliği bildirimleri" },
+  { key: "insight", label: "Önemli öneriler", desc: "Yüksek öncelikli içgörüler (günde en çok 3 bildirim)" },
 ];
 
 export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {

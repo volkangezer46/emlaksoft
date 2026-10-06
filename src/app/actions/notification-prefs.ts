@@ -17,6 +17,7 @@ const DEFAULTS: NotifPrefs = {
   dunning: true,
   rentOverdue: true,
   network: true,
+  insight: true,
 };
 
 // Helper function (not exported, not a server action)
@@ -58,6 +59,7 @@ export async function saveNotificationPrefs(prefs: NotifPrefs): Promise<{ error?
     dunning: prefs.dunning !== false,
     rentOverdue: prefs.rentOverdue !== false,
     network: prefs.network !== false,
+    insight: prefs.insight !== false,
   };
 
   const supabase = await createClient();

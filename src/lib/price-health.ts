@@ -1,6 +1,36 @@
 export type PriceHealth = "green" | "yellow" | "red" | "pending";
 
 /**
+ * Fiyat sağlığı KAYNAĞI (dürüstlük kuralı 4): "emsal" = canlı bölge/emsal m² fiyatı (overrideSqmPrice),
+ * "referans_modeli" = bu dosyadaki sabit il/ilçe tablosu (yaşı belirsiz; DÜŞÜK güven), "yok" = hesaplanamadı.
+ * Referans kaynaklı "red/yellow" kesin hüküm değildir; insight üretimi yalnız emsal kaynaklıda "red" der.
+ */
+export type PriceHealthSource = "emsal" | "referans_modeli" | "yok";
+export type PriceHealthConfidence = "dusuk" | "orta" | null;
+
+export type PriceHealthResult = {
+  health: PriceHealth;
+  mid: number | null;
+  deltaPct: number | null;
+  note: string;
+  sqmPrice: number;
+  source: PriceHealthSource;
+  confidence: PriceHealthConfidence;
+};
+
+/** Kaynak + güven (saf). Canlı m² fiyatı varsa emsal/orta, yoksa sabit tablo/düşük. */
+export function priceHealthProvenance(hasLiveSqmPrice: boolean): { source: PriceHealthSource; confidence: PriceHealthConfidence } {
+  return hasLiveSqmPrice ? { source: "emsal", confidence: "orta" } : { source: "referans_modeli", confidence: "dusuk" };
+}
+
+/** Kullanıcıya gösterilecek kaynak etiketi (referans kaynaklıda açıkça düşük güven yazar). */
+export function priceHealthSourceLabel(source: PriceHealthSource): string {
+  if (source === "emsal") return "Kaynak: emsal";
+  if (source === "referans_modeli") return "Kaynak: referans modeli (düşük güven)";
+  return "Kaynak: yok";
+}
+
+/**
  * İl bazlı m² referans fiyatları (TL/m², Türkiye ortalamaları — 2026 Q2)
  * Hızlı, senkron iç model: dış API çağrısı yapmaz. Canlı bölge endeksi (EmlakFiyati) değerleme
  * motorunda ve bölge analizinde ayrıca gösterilir.
@@ -102,14 +132,14 @@ export function computePriceHealth(input: {
   districtHint: string | null;
   transactionType?: string | null;
   overrideSqmPrice?: number | null;
-}): { health: PriceHealth; mid: number | null; deltaPct: number | null; note: string; sqmPrice: number } {
+}): PriceHealthResult {
   const list = input.listPrice && input.listPrice > 0 ? input.listPrice : null;
   if (!list) {
-    return { health: "pending", mid: null, deltaPct: null, note: "Liste fiyatı yok", sqmPrice: 0 };
+    return { health: "pending", mid: null, deltaPct: null, note: "Liste fiyatı yok", sqmPrice: 0, source: "yok", confidence: null };
   }
   const sqm = input.sqm && input.sqm > 0 ? input.sqm : null;
   if (!sqm) {
-    return { health: "pending", mid: null, deltaPct: null, note: "Karşılaştırma için m² gerekli", sqmPrice: 0 };
+    return { health: "pending", mid: null, deltaPct: null, note: "Karşılaştırma için m² gerekli", sqmPrice: 0, source: "yok", confidence: null };
   }
 
   // Kiralık için m² fiyatları çok farklı — kira için ayrı çarpan
@@ -136,5 +166,6 @@ export function computePriceHealth(input: {
     deltaPct,
     note: `${isRent ? "Kira" : "Satış"} modeli ~${mid.toLocaleString("tr-TR")} ₺ · liste %${deltaPct} ${direction}`,
     sqmPrice,
+    ...priceHealthProvenance(input.overrideSqmPrice != null),
   };
 }
