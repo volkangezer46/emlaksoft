@@ -15,6 +15,7 @@ import { RentalEditPanel } from "./rental-edit-panel";
 import { RemindersPanel } from "./reminders-panel";
 import { loadReminderTab } from "./reminder-data";
 import { now, trDayKey } from "@/lib/clock";
+import { EdevletTransferCard } from "./edevlet-transfer-card";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -29,6 +30,10 @@ function dateLabel(iso: string) {
 type Rel<T> = T | T[] | null;
 function rel<T>(v: Rel<T>): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+function geoName(v: unknown): string | null {
+  const r = rel(v as Rel<{ name?: string | null }>);
+  return r?.name ?? null;
 }
 
 const CONTRACT_STATUS_LABELS: Record<string, string> = { draft: "Taslak", sent: "Gönderildi", signed: "İmzalandı", rejected: "Reddedildi", cancelled: "İptal" };
@@ -55,7 +60,7 @@ export default async function KiraDetayPage({
   const { data: rental } = await supabase
     .from("rentals")
     .select(
-      "id, monthly_rent, due_day, start_date, end_date, deposit, deposit_returned, deposit_returned_at, status, notes, created_at, property:properties!rentals_property_id_fkey(id, property_code, title), renter:customers!rentals_renter_customer_id_fkey(id, full_name, phone), charges:rent_charges!rent_charges_rental_id_fkey(id, period, amount, status, paid_at), maintenance:maintenance_requests!maintenance_requests_rental_id_fkey(id, title, description, status, cost, created_at)",
+      "id, monthly_rent, due_day, start_date, end_date, deposit, deposit_returned, deposit_returned_at, status, notes, created_at, property:properties!rentals_property_id_fkey(id, property_code, title, address_line, province:geo_provinces(name), district:geo_districts(name)), renter:customers!rentals_renter_customer_id_fkey(id, full_name, phone), charges:rent_charges!rent_charges_rental_id_fkey(id, period, amount, status, paid_at), maintenance:maintenance_requests!maintenance_requests_rental_id_fkey(id, title, description, status, cost, created_at)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -304,6 +309,24 @@ export default async function KiraDetayPage({
                 Metin yer tutucudur ve hukuki danışmanlık değildir; imza, SMS doğrulamalı e-imza akışıyla yapılır (nitelikli e-imza değildir).
               </p>
             </section>
+          ) : null}
+
+          {tab === "sozlesme" ? (
+            <EdevletTransferCard
+              input={{
+                propertyCode: prop?.property_code ?? null,
+                propertyTitle: prop?.title ?? null,
+                addressLine: (prop as { address_line?: string | null } | null)?.address_line ?? null,
+                district: geoName((prop as { district?: unknown } | null)?.district),
+                province: geoName((prop as { province?: unknown } | null)?.province),
+                renterName: renter?.full_name ?? null,
+                monthlyRent: Number(rental.monthly_rent),
+                dueDay: rental.due_day,
+                startDate: String(rental.start_date),
+                endDate: rental.end_date ? String(rental.end_date) : null,
+                deposit: rental.deposit != null ? Number(rental.deposit) : null,
+              }}
+            />
           ) : null}
 
           {tab === "notlar" ? (

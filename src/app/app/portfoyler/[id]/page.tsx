@@ -40,6 +40,10 @@ import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
+import { SocialCardPanel } from "@/components/app/social-card-panel";
+import { VitrinQr } from "@/components/public/vitrin-qr";
+import { getBaseUrl } from "@/lib/base-url";
+import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
 import { PropertyAuthorizationPanel } from "./property-extras";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
@@ -650,6 +654,12 @@ export default async function PropertyDetailPage({
           </Suspense>
 
           <AiContentPanel propertyId={property.id} canEdit={canEdit} />
+
+          {tenantId ? (
+            <Suspense fallback={null}>
+              <SocialCardPanel propertyId={property.id} tenantId={tenantId} />
+            </Suspense>
+          ) : null}
             </div>
           ) : null}
 
@@ -873,6 +883,15 @@ export default async function PropertyDetailPage({
           <Suspense fallback={null}>
             <ClosuresSection portalIds={portalIds} />
           </Suspense>
+
+          {/* QR'lı tabela: vitrin ilan sayfasına `?kaynak=qr` ile gider; taramadan gelen talepler kaynak raporunda ayrışır */}
+          <VitrinQr
+            vitrinUrl={buildQrListingUrl(getBaseUrl(), vitrinSlug, property.id) ?? ""}
+            heading="QR'lı tabela ve afiş"
+            hint={`Tabelaya, cama veya ilan afişine basın. Tarayan kişi bu ilanın vitrin sayfasına gider; oradan bıraktığı talep kaynak raporunda "${QR_SOURCE_LABEL}" olarak görünür.${isLiveListing ? "" : " Not: portföy yayında değil; QR yayına alınana kadar vitrinde açılmaz."}`}
+            emptyHint="QR kodu için önce ofis vitrin adresi (slug) tanımlanmalı (Ayarlar)."
+            fileName={`tabela-qr-${(property.property_code ?? "ilan").replace(/[^A-Za-z0-9-]/g, "") || "ilan"}.png`}
+          />
             </div>
           ) : null}
 

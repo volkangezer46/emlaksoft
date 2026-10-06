@@ -200,6 +200,15 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .maybeSingle();
   if (!property) notFound();
 
+  // EİDS taşınmaz no (20260826002950): sütun yoksa sorgu hata verir → gösterilmez (sayfa bozulmaz).
+  const { data: eidsRow, error: eidsError } = await admin
+    .from("properties")
+    .select("eids_property_no")
+    .eq("id", property.id)
+    .eq("tenant_id", tenant.id)
+    .maybeSingle();
+  const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
+
   const price = property.list_price != null ? Number(property.list_price) : null;
 
   // Açıklama + benzer ilanlar yalnızca property'ye bağlı → paralel.
@@ -763,7 +772,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
           </Link>{" "}
           — Türkiye&apos;nin emlak işletim sistemi
         </p>
-        <LicenseNotice officeName={tenant.name} licenseNo={tenant.license_no} phone={tenant.phone} addressLine={tenant.address_line} className="mt-6" />
+        <LicenseNotice officeName={tenant.name} licenseNo={tenant.license_no} phone={tenant.phone} addressLine={tenant.address_line} eidsNo={eidsNo} className="mt-6" />
         {/* Mobilde ekrana yapışan aksiyon çubuğu — sayfa sonu dolgusu içeriği örtmesin */}
         {hasMobileBar ? <div aria-hidden="true" className="h-20 lg:hidden" /> : null}
       </main>

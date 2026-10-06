@@ -110,6 +110,67 @@ export function licenseStatus(
 }
 
 /**
+ * Ünvan/adres değişikliğinde yetki belgesi tadili: değişiklikten sonra kaç gün içinde başvurulması beklendiği.
+ * Değer ürün sahibi bildirimidir (Taşınmaz Ticareti Hakkında Yönetmelik; resmî metin bu depoda açılmadı) —
+ * görünür metinde "doğrulayın" notuyla kullanılır.
+ */
+export const LICENSE_AMENDMENT_DAYS = 10;
+
+export type LicenseAmendmentSnapshot = {
+  name: string | null;
+  addressLine: string | null;
+  licenseTitle: string | null;
+  provinceId: string | null;
+  districtId: string | null;
+};
+
+const clean = (v: string | null | undefined) => String(v ?? "").replace(/\s+/g, " ").trim().toLocaleLowerCase("tr-TR");
+
+/**
+ * Yetki belgesinde yazan bilgilerden (işletme adı/ünvanı, adres, il/ilçe) hangileri değişti? Boş liste = tadil gerekmez.
+ * Boşluk/büyük-küçük harf farkı değişiklik sayılmaz. Yeni değer boşsa (alan temizlendi) değişiklik sayılmaz.
+ */
+export function licenseAmendmentChanges(prev: LicenseAmendmentSnapshot, next: LicenseAmendmentSnapshot): string[] {
+  const out: string[] = [];
+  const changed = (a: string | null, b: string | null) => clean(b) !== "" && clean(a) !== clean(b);
+  if (changed(prev.name, next.name)) out.push("işletme adı");
+  if (changed(prev.licenseTitle, next.licenseTitle)) out.push("belge ünvanı");
+  if (changed(prev.addressLine, next.addressLine)) out.push("adres");
+  if ((next.provinceId && prev.provinceId !== next.provinceId) || (next.districtId && prev.districtId !== next.districtId)) {
+    if (!out.includes("adres")) out.push("adres (il/ilçe)");
+  }
+  return out;
+}
+
+/** Tadil hatırlatma metni (tek kaynak: görev + bildirim). */
+export function licenseAmendmentMessage(changes: readonly string[]): { title: string; body: string } {
+  return {
+    title: "Yetki belgesi tadili: ünvan/adres değişti",
+    body:
+      `Değişen bilgi: ${changes.join(", ")}. Yetki belgesindeki bilgilerin değişikliğinden itibaren ${LICENSE_AMENDMENT_DAYS} gün içinde ` +
+      "tadil başvurusu yapılması beklenir (süreyi ve başvuru yerini güncel mevzuattan doğrulayın).",
+  };
+}
+
+/**
+ * Yıllık yetki belgesi harcı/ödeme kontrolü hatırlatması: ofis ayarındaki ay (1-12; 0 = kapalı) geldiğinde yılda bir kez.
+ * Tutar veya son gün YAZILMAZ (ofis kendi belgesinden doğrular). `todayKey` = trDayKey(); saf.
+ */
+export function annualLicenseFeeReminderDue(month: number, todayKey: string): boolean {
+  if (!Number.isInteger(month) || month < 1 || month > 12) return false;
+  return Number(todayKey.slice(5, 7)) === month;
+}
+
+/** Cron'un 60/30/7 gün + süresi dolan kademesi (tek seferlik bildirim anahtarı için). Bildirim gerekmiyorsa null. */
+export function licenseExpiryReminderStep(validUntil: string | null | undefined, todayKey: string): "60" | "30" | "7" | "expired" | null {
+  if (!validUntil) return null;
+  const s = licenseStatus({ licenseNo: "x", validUntil }, todayKey);
+  if (s.state === "expired") return s.daysLeft !== null && s.daysLeft >= -30 ? "expired" : null;
+  if (s.state !== "expiring" || s.threshold === null) return null;
+  return String(s.threshold) as "60" | "30" | "7";
+}
+
+/**
  * İlan yayınında uyarı: yetki belgesi no yoksa ya da süresi dolmuşsa metin döner (yayını ENGELLEMEZ).
  * Kararı kullanıcı verir; yalnız uyarı.
  */

@@ -6,8 +6,9 @@
  * aynı metni BURADAN alır.
  *
  * DÜRÜSTLÜK KURALLARI (bilgi kartında ve testte korunur):
- *  - Zorunluluk tarihi kodda KESİN olarak yazılmaz: kaynaklarda 1 Temmuz, 1 Ekim ve 1 Aralık 2026 geçiyor
- *    (`GOS_DATE_NOTE`). Güncel resmî duyuru ofis tarafından doğrulanmalıdır.
+ *  - Zorunluluk tarihi TEK SABİTTİR (`GOS_EFFECTIVE_DATE` = 1 Aralık 2026; Resmî Gazete 01.10.2026 tarihli değişiklik,
+ *    önceki 1 Temmuz ve 1 Ekim tarihleri ertelenmişti). Metinler tarihi bu sabitten üretir; yeni bir erteleme olursa
+ *    yalnız burası değişir. Kart yine "resmî metni doğrulayın" der (hukuki danışmanlık değildir).
  *  - Para ürünün içinden GEÇMEZ: ürün ödeme almaz, tutmaz, aktarmaz. GÖS bankalar/tapu süreci üzerinden
  *    yürür; burası yalnız hazırlık adımlarını ve bilgiyi taşır.
  *  - Hukuki danışmanlık değildir; sözleşme maddesi isteğe bağlıdır ve ofis sorumluluğundadır.
@@ -33,9 +34,31 @@ export const GOS_SOURCES: GosSource[] = [
   },
 ];
 
-/** Tarih dürüstlük notu — kartta ve testte birebir aranır. */
+/** Zorunluluk başlangıcı (TR günü, `YYYY-MM-DD`). Tek kaynak: kart, geri sayım ve kontrol listesi bundan okur. */
+export const GOS_EFFECTIVE_DATE = "2026-12-01";
+/** Tarihin dayanağı (ürün sahibi bildirimi; resmî metin bu depoda açılmadı). */
+export const GOS_EFFECTIVE_SOURCE = "Resmî Gazete, 01.10.2026 tarihli değişiklik";
+/** Görünür tarih metni ("1 Aralık 2026"). */
+export const GOS_EFFECTIVE_LABEL = "1 Aralık 2026";
+
+/** Tarih notu — kartta ve testte birebir aranır. */
 export const GOS_DATE_NOTE =
-  "Zorunluluk başlangıcı kaynaklarda farklı tarihlerle geçiyor (1 Temmuz, 1 Ekim, 1 Aralık 2026). Tarih kaynaklarda farklı; güncel resmi duyuruyu doğrulayın.";
+  `Zorunluluk başlangıcı ${GOS_EFFECTIVE_LABEL} (${GOS_EFFECTIVE_SOURCE}; daha önce duyurulan 1 Temmuz ve 1 Ekim tarihleri ertelendi). ` +
+  "Uygulama ayrıntıları için güncel resmi duyuruyu doğrulayın.";
+
+/** GÖS başlangıcına kalan gün (bugün dahil değil; geçmişse negatif). `todayKey` = `trDayKey()` (clock.ts); saf. */
+export function gosDaysLeft(todayKey: string): number {
+  const a = Date.parse(`${todayKey}T00:00:00Z`);
+  const b = Date.parse(`${GOS_EFFECTIVE_DATE}T00:00:00Z`);
+  return Math.round((b - a) / 86_400_000);
+}
+
+/** Kart rozeti: başlamadan önce geri sayım, sonra "yürürlükte". */
+export function gosStatusLabel(todayKey: string): { label: string; active: boolean } {
+  const left = gosDaysLeft(todayKey);
+  if (left <= 0) return { label: `${GOS_EFFECTIVE_LABEL} itibarıyla yürürlükte`, active: true };
+  return { label: `${GOS_EFFECTIVE_LABEL} başlangıcına ${left} gün`, active: false };
+}
 
 export const GOS_SUMMARY =
   "Nakit, havale veya EFT ile ödenen taşınmaz satışlarında bedelin satıcıya doğrudan değil, tescille eş zamanlı olarak " +
@@ -49,8 +72,9 @@ export const GOS_NO_MONEY_NOTE =
 export const GOS_CHECKLIST_PREFIX = "GÖS — ";
 
 /**
- * Kapanış kontrol listesi maddeleri. `required: false`: zorunluluk tarihi doğrulanana kadar
- * "duruma bağlı" hatırlatıcı olarak durur ve kapanış yüzdesini düşürmez.
+ * Kapanış kontrol listesi maddeleri. `required: false`: GÖS yalnız nakit/havale/EFT ile ödenen kısma uygulanır
+ * (kredili kısım ve bazı işlemler kapsam dışı); bu yüzden "duruma bağlı" hatırlatıcı olarak durur ve kapanış
+ * yüzdesini düşürmez. Anlaşmada GÖS referans no ve tapu randevu tarihi ayrıca kaydedilir (`deal-gos.ts`).
  */
 export const GOS_CHECKLIST_ITEMS: ChecklistTemplateItem[] = [
   { label: `${GOS_CHECKLIST_PREFIX}Alıcı ve satıcının kişisel TL IBAN'ı güvenli ödeme sistemine tanımlandı`, required: false },

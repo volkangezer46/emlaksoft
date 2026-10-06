@@ -6,11 +6,14 @@ import {
   GOS_CLAUSE_MARKER,
   GOS_CLAUSE_TEXT,
   GOS_DATE_NOTE,
+  GOS_EFFECTIVE_DATE,
   GOS_NO_MONEY_NOTE,
   GOS_SOURCES,
   GOS_SUMMARY,
   appendGosClause,
   gosClauseApplies,
+  gosDaysLeft,
+  gosStatusLabel,
 } from "./gos-info";
 import { RENT_CHECKLIST, SALE_CHECKLIST, templateForDealType } from "./deal-checklist-templates";
 import { FOREIGN_SALE_CHECKLIST, FOREIGN_SALE_GUIDE, guideCardVerification } from "./foreign-sale-checklist";
@@ -40,16 +43,25 @@ describe("GÖS tek kaynak", () => {
     }
   });
 
-  it("dürüstlük: tarih kaynaklarda farklı notu, kaynak URL'leri ve 'para üründen geçmez'", () => {
-    expect(GOS_DATE_NOTE).toMatch(/Tarih kaynaklarda farklı/);
+  it("dürüstlük: tek tarih sabiti (1 Aralık 2026, RG 01.10.2026), kaynak URL'leri ve 'para üründen geçmez'", () => {
+    expect(GOS_EFFECTIVE_DATE).toBe("2026-12-01");
+    expect(GOS_DATE_NOTE).toMatch(/1 Aralık 2026/);
+    expect(GOS_DATE_NOTE).toMatch(/01\.10\.2026/);
     expect(GOS_DATE_NOTE).toMatch(/güncel resmi duyuruyu doğrulayın/);
     expect(GOS_SOURCES.length).toBeGreaterThanOrEqual(3);
     for (const s of GOS_SOURCES) expect(s.url).toMatch(/^https:\/\//);
     expect(GOS_NO_MONEY_NOTE).toMatch(/Para EmlakSoft'tan geçmez/);
     const all = [GOS_SUMMARY, GOS_CLAUSE_TEXT, GOS_NO_MONEY_NOTE, ...GOS_CHECKLIST_ITEMS.map((i) => i.label)].join("\n");
     expect(all).not.toMatch(/ödeme sistemimiz/i);
-    // Kesin tek tarih iddiası yok: "zorunlu ... 1 Aralık" kalıbı sabit olgu olarak yazılmaz.
+    // Tarih yalnız sabitten üretilir: özet metne elle tarih yazılmaz (erteleme olursa tek yer değişir).
     expect(GOS_SUMMARY).not.toMatch(/1 Aralık|1 Ekim|1 Temmuz/);
+  });
+
+  it("geri sayım saf ve sabitten: başlangıçtan önce gün, sonra yürürlükte", () => {
+    expect(gosDaysLeft("2026-11-30")).toBe(1);
+    expect(gosDaysLeft("2026-12-01")).toBe(0);
+    expect(gosStatusLabel("2026-10-06")).toEqual({ label: "1 Aralık 2026 başlangıcına 56 gün", active: false });
+    expect(gosStatusLabel("2026-12-02").active).toBe(true);
   });
 
   it("sözleşme maddesi isteğe bağlı, idempotent ve yalnız satış/kapora türlerinde", () => {

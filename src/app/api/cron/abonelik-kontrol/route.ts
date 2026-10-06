@@ -5,6 +5,8 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setting-keys";
 import { authorizeCron } from "@/lib/cron-auth";
+import { runLicenseReminders } from "@/lib/license-reminders";
+import { trDayKey } from "@/lib/clock";
 
 export const maxDuration = 60;
 
@@ -150,7 +152,15 @@ export async function GET(req: NextRequest) {
     cancelled = cancelSubIds.length;
   }
 
-  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması, ${suspended} askıya alma, ${cancelled} iptal tamamlandı`);
+  // Yetki belgesi hatırlatmaları (60/30/7 gün + yıllık harç ayı; ofis ayarı kapalı doğar). Hata asıl işi bozmaz.
+  let license = { expiry: 0, annualFee: 0, skipped: true };
+  try {
+    license = await runLicenseReminders(admin, trDayKey(nowMs));
+  } catch (e) {
+    console.error("abonelik-kontrol license", e instanceof Error ? e.message : "hata");
+  }
 
-  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended });
+  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması, ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}`);
+
+  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license });
 }

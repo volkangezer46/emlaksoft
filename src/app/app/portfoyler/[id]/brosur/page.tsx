@@ -8,6 +8,7 @@ import { moneyTry } from "@/lib/leak-shield";
 import { getBaseUrl } from "@/lib/base-url";
 import { PrintButton } from "./print-button";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { buildQrListingUrl, qrImageSrc } from "@/lib/qr-source";
 
 type Rel = { name?: string } | { name?: string }[] | null;
 
@@ -122,11 +123,13 @@ export default async function PropertyBrochurePage({
   })();
 
   const baseUrl = getBaseUrl();
-  const vitrinUrl = tenant?.slug ? `${baseUrl}/vitrin/${tenant.slug}/${property.id}` : null;
   // Harici QR servisi (goqr.me) — vitrin-qr.tsx deseni; yalnız public ilan URL'i iletilir.
-  const qrSrc = vitrinUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=2&format=png&data=${encodeURIComponent(vitrinUrl)}`
-    : null;
+  // QR hedefi `?kaynak=qr` taşır: taramadan gelen başvurular kaynak raporunda "QR tabela" olarak görünür.
+  const qrTarget = buildQrListingUrl(baseUrl, tenant?.slug, property.id);
+  const qrSrc = qrTarget ? qrImageSrc(qrTarget) : null;
+  // EİDS taşınmaz no (20260826002950): sütun yoksa gösterilmez.
+  const { data: eidsRow, error: eidsError } = await supabase.from("properties").select("eids_property_no").eq("id", property.id).maybeSingle();
+  const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -261,7 +264,7 @@ export default async function PropertyBrochurePage({
               </div>
             )}
           </div>
-          <LicenseNotice officeName={tenant?.name} licenseNo={tenant?.license_no} phone={tenant?.phone} addressLine={tenant?.address_line} className="mt-3" />
+          <LicenseNotice officeName={tenant?.name} licenseNo={tenant?.license_no} phone={tenant?.phone} addressLine={tenant?.address_line} eidsNo={eidsNo} className="mt-3" />
           <p className="mt-3 text-center text-xs text-text-faint">EmlakSoft ile hazırlandı</p>
         </footer>
       </article>

@@ -147,7 +147,9 @@ export function templateContent(kind: ContentKind, input: PropertyContentInput):
 const PROMPTS: Record<ContentKind, string> = {
   listing: "Portföy için profesyonel, SEO uyumlu, ikna edici bir Türkçe ilan açıklaması yaz (2-3 paragraf + madde imli özellikler).",
   whatsapp: "Bu portföyü bir müşteriye tanıtmak için kısa, samimi ve profesyonel bir WhatsApp mesajı yaz (emoji kullan, kısa tut).",
-  social: "Bu portföy için Instagram/Facebook paylaşımı yaz (dikkat çekici, emoji ve ilgili hashtag'ler ile).",
+  social:
+    "Bu portföy için Instagram/Facebook paylaşımı yaz (dikkat çekici, emoji ve ilgili hashtag'ler ile). " +
+    "Hiçbir bağlantı/URL yazma: EİDS'te doğrulanmış ilan bağlantısı ve belge numaraları metnin sonuna sistem tarafından eklenecek.",
   email: "Bu portföyü tanıtan resmi ama sıcak bir Türkçe e-posta metni yaz (konu satırı dahil).",
 };
 

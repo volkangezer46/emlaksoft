@@ -41,6 +41,7 @@ import {
   NotesSkeleton,
 } from "./sections";
 import { KapanisPanel } from "./kapanis-panel";
+import { DealGosSection } from "./deal-gos-section";
 import { DealLinkPanel } from "./deal-link-panel";
 import { parseOutcomeParam } from "./kapanis-model";
 /*
@@ -774,6 +775,12 @@ export default async function DealDetailPage({
                     canEdit={(perms.commissions ?? []).includes("edit")}
                   />
                 </Suspense>
+
+                {deal.deal_type === "sale" ? (
+                  <Suspense fallback={null}>
+                    <DealGosSection dealId={deal.id} canEdit={(perms.commissions ?? []).includes("edit")} />
+                  </Suspense>
+                ) : null}
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}
