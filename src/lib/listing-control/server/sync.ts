@@ -95,6 +95,11 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
       .in("id", ids),
   );
   if (props.failed) return { ...out, skipped: ids.length, schemaMissing: props.missing };
+  // properties.assigned_at (takım modeli migration'ı): ayrı, hataya dayanıklı okuma; kolon yoksa boş harita (eski davranış).
+  const assignedAtQ = await rows<{ id: string; assigned_at: string | null }>(
+    db.from("properties").select("id, assigned_at").eq("tenant_id", tenantId).in("id", ids).not("assigned_at", "is", null),
+  );
+  const propAssignedAt = new Map(assignedAtQ.data.map((r) => [r.id, r.assigned_at]));
 
   const [listingsQ, poolQ, dealsQ, anomaliesQ, ownerQ, prevQ, closuresQ] = await Promise.all([
     rows<ListingRow>(
@@ -203,10 +208,10 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
     const explainedKeys = existing.filter((a) => a.status === "explained").map((a) => a.dedupe_key);
     const missingSince = existing.filter((a) => a.type === "portal_missing").map((a) => Date.parse(a.first_seen_at));
     const advisor = p.assigned_to ? profileById.get(p.assigned_to) : undefined;
-    // Atama zamanı için güvenilir kaynak yok (properties.assigned_at yok): danışman değişmediyse önceki değer korunur,
-    // yoksa/değiştiyse "şimdi" (sahte "yayınlanmadı" alarmı üretmez; 24/48 saat sayacı ilk değerlendirmeden başlar).
+    // Atama zamanı: önce properties.assigned_at (tetikleyiciyle yazılır); yoksa (eski kayıt / migration yok) danışman
+    // değişmediyse önceki değer korunur, yoksa/değiştiyse "şimdi" (sahte "yayınlanmadı" alarmı üretmez; 24/48 saat sayacı ilk değerlendirmeden başlar).
     const prev = prevState.get(p.id);
-    const assignedAtIso = p.assigned_to ? (prev && prev.advisor_id === p.assigned_to && prev.assigned_at ? prev.assigned_at : nowIso) : null;
+    const assignedAtIso = p.assigned_to ? (propAssignedAt.get(p.id) ?? (prev && prev.advisor_id === p.assigned_to && prev.assigned_at ? prev.assigned_at : nowIso)) : null;
     const snapshot: PropertySnapshot = {
       propertyId: p.id,
       propertyCode: p.property_code,

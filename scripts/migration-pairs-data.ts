@@ -133,6 +133,8 @@ const F = {
   insights: "20260826002500_insights.sql",
   platformInsights: "20260826002600_platform_insights.sql",
   insightSupport: "20260826002700_insight_support.sql",
+  // Takim modeli: teams + profiles.team_id + properties.assigned_at (ilan kontrol takim lideri kapsami/SLA alicisi).
+  takimTeams: "20260826002900_takim_teams.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -230,6 +232,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcQueueRpcs]: "ek", // kuyruk talep/hasat + supheli->onayli kayip durum makinesi RPC'leri (portal_listings'e YAZMAZ)
     [F.lcAnomalyRpcs]: "ek", // anomali esitleme/SLA yukseltme (service_role) + acikla/kapat (authenticated, JWT'den)
     [F.lcSummaryMarket]: "ek", // KPI/liste/dunden-beri RPC'leri (invoker) + property_status_history'ye 2 nullable kolon + anonim agregat gorunum (service_role)
+    [F.takimTeams]: "ek", // teams (yeni tablo+RLS) + profiles.team_id / properties.assigned_at (nullable) + 2 tetikleyici; veri degismez
     [F.lcWorkerEvents]: "ek", // listing_control_events (yeni tablo, Realtime) + 3 tetikleyici (yalniz ilan kontrol tablolari) + 4 authenticated worker RPC
   },
 
@@ -327,6 +330,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB31-ilan-kontrol-rpc", order: 29.82, title: "Ilan kontrol: kuyruk/durum makinesi + anomali RPC'leri + KPI/liste RPC'leri + anonim agregat gorunum", files: [F.lcQueueRpcs, F.lcAnomalyRpcs, F.lcSummaryMarket] },
     { id: "PB32-icgoru-temeli", order: 29.83, title: "Zeka katmani: icgoru kuyrugu (insights) + platform ikizi + set-tabanli olgu RPC'leri/kalite gorunumu/temizlik (cron insight-engine bunlari kullanir)", files: [F.insights, F.platformInsights, F.insightSupport] },
     { id: "PB33-ilan-kontrol-worker", order: 29.84, title: "Ilan kontrol: tarayici destekli dogrulama RPC'leri + olay gunlugu + Realtime (ana ekran sayaclari)", files: [F.lcWorkerEvents] },
+    { id: "PB34-takim-modeli", order: 29.85, title: "Takim modeli: teams + profiles.team_id + properties.assigned_at (ilan kontrol SLA takim lideri alicisi)", files: [F.takimTeams] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
