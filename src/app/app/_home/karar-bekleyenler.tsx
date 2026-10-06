@@ -1,31 +1,20 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { DashCard, SectionHeader, kpiColumns } from "@/components/ui/dashboard-grid";
 import { Skeleton } from "@/components/ui/skeleton";
-import { moneyTry } from "@/lib/leak-shield";
-import { cn } from "@/lib/utils";
-import { loadDecisions, type HomeCtx } from "./data";
+import { loadDecisions, loadExpiringAuthority, type HomeCtx } from "./data";
+import { buildDecisionItems } from "./home-metrics";
 
-type Tone = "danger" | "warn" | "brand";
-type Item = { key: string; value: string; label: string; hint: string; href: string; tone: Tone };
-
-const TONE: Record<Tone, string> = {
-  danger: "text-danger-500",
-  warn: "text-amber-600",
-  brand: "text-brand-600",
-};
-
-const CARD_MIN = "min-h-[9.5rem]";
+/** Kart yüksekliği iskelet ve içerikte aynı (4 satır + başlık; CLS yok). */
+const CARD_MIN = "min-h-[13.5rem]";
 
 export function KararBekleyenlerIskelet() {
   return (
-    <div role="status" aria-busy="true" className={`${CARD_MIN} rounded-[var(--radius-panel)] border border-line bg-surface p-5`}>
+    <div role="status" aria-busy="true" className={`${CARD_MIN} pm-c1 p-4`}>
       <span className="sr-only">Yükleniyor</span>
-      <Skeleton className="h-5 w-48" />
-      <Skeleton className="mt-2 h-4 w-full sm:hidden" />
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Skeleton className="h-3 w-40" />
+      <div className="mt-3 space-y-2">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className={cn("h-24 rounded-[var(--radius-card)] sm:h-16", i === 3 && "max-sm:hidden")} />
+          <Skeleton key={i} className="h-9 w-full" />
         ))}
       </div>
     </div>
@@ -33,79 +22,57 @@ export function KararBekleyenlerIskelet() {
 }
 
 /**
- * Yönetim rolleri (ofis sahibi / genel müdür / şube müdürü) için ana ekranın ilk bloğu.
- * Yalnız GERÇEK sayı > 0 olan kalemler görünür; hiçbiri yoksa blok hiç çizilmez. Her kalem
- * filtrelenmiş listeye gider (sıfır çıkmaz metrik).
+ * Sağ kolon "KARAR BEKLEYENLER": çerçeveli birincil kart (--elev-1), kart içinde kart yok, satırlar ayırıcı çizgiyle.
+ * Her satır filtrelenmiş listeye gider; hiçbiri yoksa "karar bekleyen yok" durumu (kolon boş kalmaz).
  */
 export async function KararBekleyenler({ ctx }: { ctx: HomeCtx }) {
-  const d = await loadDecisions(ctx);
-  const items: Item[] = [];
-  if (d.approvals) {
-    items.push({
-      key: "onay",
-      value: String(d.approvals),
-      label: "Onay bekleyen talep",
-      hint: "Senin kararını bekliyor",
-      href: "/app/onaylar?kim=bana",
-      tone: "warn",
-    });
-  }
-  if (d.lostThisMonth && d.lostThisMonth > 0) {
-    items.push({
-      key: "kacan",
-      value: moneyTry(d.lostThisMonth),
-      label: "Bu ay kaçan komisyon",
-      hint: "Kapanan ilanlardan tahmini",
-      href: "/app/kayip-kacak",
-      tone: "danger",
-    });
-  }
-  if (d.overdueRent) {
-    items.push({
-      key: "tahsilat",
-      value: String(d.overdueRent),
-      label: "Geciken kira tahsilatı",
-      hint: "Gecikmiş tahakkuk",
-      href: "/app/kiralama?durum=overdue",
-      tone: "danger",
-    });
-  }
-  if (d.passiveAdvisors) {
-    items.push({
-      key: "pasif",
-      value: String(d.passiveAdvisors),
-      label: "Hareketsiz danışman",
-      hint: `${d.passiveDays} gündür anlaşma hareketi yok`,
-      href: "/app/ekip",
-      tone: "brand",
-    });
-  }
-  if (items.length === 0) return null;
+  const [d, expiring] = await Promise.all([loadDecisions(ctx), loadExpiringAuthority(ctx)]);
+  const items = buildDecisionItems({
+    approvals: d.approvals,
+    overdueRent: d.overdueRent,
+    passiveAdvisors: d.passiveAdvisors,
+    passiveDays: d.passiveDays,
+    expiringAuthority: expiring.data.length,
+  });
+  const total = items.reduce((t, i) => t + i.value, 0);
 
   return (
-    <DashCard aria-labelledby="karar-baslik" className={CARD_MIN}>
-      <SectionHeader
-        title={<span id="karar-baslik">Bugün karar bekleyenler</span>}
-        eyebrow="Yönetim"
-        description="Senin kararına ya da müdahalene bağlı kalemler. Tıklayınca ilgili liste açılır."
-      />
-      <ul className={cn("grid gap-3", kpiColumns(items.length))}>
-        {items.map((it) => (
-          <li key={it.key} className="min-w-0">
-            <Link
-              href={it.href}
-              className="focus-ring group flex h-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 transition hover:border-brand-300 hover:bg-surface"
-            >
-              <span className="min-w-0 flex-1">
-                <span className={cn("block font-display text-2xl font-bold tabular-nums", TONE[it.tone])}>{it.value}</span>
-                <span className="block text-sm font-semibold text-ink-950">{it.label}</span>
-                <span className="block text-xs text-text-muted">{it.hint}</span>
-              </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-text-faint group-hover:text-brand-600" aria-hidden="true" />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </DashCard>
+    <section aria-labelledby="karar-baslik" className={`pm-c1 ${CARD_MIN} flex flex-col p-4`}>
+      <div className="flex items-center justify-between gap-2 px-1">
+        <h2 id="karar-baslik" className="pm-bx-eyebrow">
+          Karar bekleyenler
+        </h2>
+        {total > 0 ? (
+          <span className="pm-num rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-xs">
+            {total}
+            <span className="sr-only"> kalem</span>
+          </span>
+        ) : null}
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-3 flex flex-1 items-center gap-2 px-1 text-sm text-text-muted">
+          <span className="pm-dot pm-t-success" aria-hidden="true" />
+          Karar bekleyen kalem yok.
+        </p>
+      ) : (
+        <ul className="pm-sep mt-2">
+          {items.map((it) => (
+            <li key={it.key}>
+              <Link href={it.href} className={`pm-r36 focus-ring group pm-t-${it.tone} min-h-11`}>
+                <span className="pm-dot" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink-950">{it.label}</span>
+                  <span className="block truncate text-xs text-text-muted">{it.hint}</span>
+                </span>
+                <span className="pm-num text-lg" style={{ color: "var(--t-text)" }}>
+                  {it.value}
+                </span>
+                <ChevronRight className="h-4 w-4 flex-none text-[var(--text-faint)] group-hover:text-[var(--t-text)]" aria-hidden="true" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

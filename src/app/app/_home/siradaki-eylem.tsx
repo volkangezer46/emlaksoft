@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { ArrowRight } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
-import { DashCard } from "@/components/ui/dashboard-grid";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
@@ -20,19 +19,20 @@ import { overdueListingsOf } from "./helpers";
 import { SKIP_COOKIE, buildNextActions, parseSkipCookie, pickNextAction, type NextActionTone } from "./siradaki";
 import { SiradakiGec } from "./siradaki-gec";
 
-const TONE_BAR: Record<NextActionTone, string> = {
-  brand: "bg-brand-600",
-  danger: "bg-danger-500",
-  warn: "bg-amber-400",
-  success: "bg-mint-500",
+/** Ton → premium ton sınıfı (odak kartının sol şeridi `--t` ile boyanır). */
+const TONE_CLS: Record<NextActionTone, string> = {
+  brand: "pm-t-brand",
+  danger: "pm-t-danger",
+  warn: "pm-t-warn",
+  success: "pm-t-success",
 };
 
 /** Kart yüksekliği iskelet ve gerçek kartta aynı (CLS yok). */
-const CARD_MIN = "min-h-[13.5rem] sm:min-h-[9.5rem]";
+const CARD_MIN = "min-h-[16rem]";
 
 export function SiradakiEylemIskelet() {
   return (
-    <div role="status" aria-busy="true" className={`${CARD_MIN} rounded-[var(--radius-panel)] border border-line bg-surface p-5`}>
+    <div role="status" aria-busy="true" className={`${CARD_MIN} pm-focus p-5 sm:p-6`}>
       <span className="sr-only">Yükleniyor</span>
       <Skeleton className="h-3 w-28" />
       <Skeleton className="mt-3 h-7 w-2/3" />
@@ -80,23 +80,26 @@ export async function SiradakiEylem({ ctx }: { ctx: HomeCtx }) {
   const canSkip = action.key !== "musteri-ekle" && actions.some((a) => a.key !== action.key && !dismissed.includes(a.key));
 
   return (
-    <DashCard className={`relative overflow-hidden ${CARD_MIN}`} aria-labelledby="siradaki-eylem-baslik">
-      <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1.5 ${TONE_BAR[action.tone]}`} />
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 pl-2">
-        <div className="min-w-0 flex-1">
-          <p className="pm-bx-eyebrow">Sıradaki en iyi eylem</p>
-          <h2 id="siradaki-eylem-baslik" className="mt-1 font-display text-xl font-bold leading-tight text-ink-950">
-            {action.title}
-          </h2>
-          <p className="mt-1 text-sm text-text-muted">{action.reason}</p>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <ButtonLink href={action.href} size="lg" iconRight={ArrowRight}>
-            {action.label}
-          </ButtonLink>
-          {canSkip ? <SiradakiGec actionKey={action.key} dismissed={dismissed} todayKey={todayKey} /> : null}
-        </div>
+    <section
+      aria-labelledby="siradaki-eylem-baslik"
+      className={`pm-focus ${TONE_CLS[action.tone]} flex h-full flex-col justify-between gap-5 p-5 pl-6 sm:p-6 sm:pl-7`}
+    >
+      <div className="min-w-0">
+        <p className="pm-bx-eyebrow">Sıradaki en iyi eylem</p>
+        <h2 id="siradaki-eylem-baslik" className="mt-1 font-display text-2xl font-bold leading-tight text-ink-950">
+          {action.title}
+        </h2>
+        <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-text-muted">
+          <span className="font-semibold text-ink-950">Neden? </span>
+          {action.reason}
+        </p>
       </div>
-    </DashCard>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <ButtonLink href={action.href} size="lg" iconRight={ArrowRight}>
+          {action.label}
+        </ButtonLink>
+        {canSkip ? <SiradakiGec actionKey={action.key} dismissed={dismissed} todayKey={todayKey} /> : null}
+      </div>
+    </section>
   );
 }
