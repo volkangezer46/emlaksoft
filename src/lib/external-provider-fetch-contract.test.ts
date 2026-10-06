@@ -60,6 +60,7 @@ describe("external provider request contract", () => {
       "src/app/vitrin/[slug]/favoriler/favoriler-client.tsx",
       "src/components/admin/command-palette.tsx",
       "src/components/admin/notification-bell.tsx",
+      "src/components/public/vitrin-chat.tsx",
       "src/hooks/use-api.ts",
     ].sort();
 

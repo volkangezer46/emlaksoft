@@ -36,6 +36,9 @@ import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { VitrinChat } from "@/components/public/vitrin-chat";
+import { readTenantSettings } from "@/lib/settings/tenant-read";
+import { VITRIN_AI_CHAT_KEY } from "@/lib/settings/registry/tenant";
 import { normalizeExternalHref } from "@/lib/external-href";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import {
@@ -236,6 +239,8 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
 
   const price = property.list_price != null ? Number(property.list_price) : null;
+  const chatEnabled =
+    Boolean(process.env.OPENAI_API_KEY) && (await readTenantSettings(admin, tenant.id, [VITRIN_AI_CHAT_KEY]))[VITRIN_AI_CHAT_KEY] === true;
 
   // Açıklama + benzer ilanlar yalnızca property'ye bağlı → paralel.
   // Benzerlik: aynı işlem türü + aynı İLÇE (ilçe yoksa aynı İL) + fiyat ±%30,
@@ -634,6 +639,9 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
             {isSale && price != null && price > 0 ? (
               <InvestmentPanel price={price} leadAnchorId="talep-formu" />
             ) : null}
+
+            {/* Vitrin AI ilan asistanı — ofis ayarı (varsayılan kapalı) + AI anahtarı; insan devri talep formuna */}
+            {chatEnabled ? <VitrinChat slug={slug} propertyId={property.id} leadAnchorId={leadOpen ? "talep-formu" : undefined} /> : null}
           </div>
 
           {/* Lead form — id: hesaplayıcının "bize ulaşın" düğmesi buraya kaydırır */}

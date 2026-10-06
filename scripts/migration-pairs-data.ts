@@ -171,6 +171,7 @@ const F = {
   dealGosFields: "20261007000300_deal_gos_fields.sql",
   customFields: "20261007000310_custom_fields.sql",
   webhooksApiKeys: "20261007000320_webhooks_api_keys.sql",
+  vitrinChatContext: "20261007000330_vitrin_chat_context.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -288,6 +289,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcLifecycleEvents]: "ek", // yeni append-only tablo lc_lifecycle_events + property_control_state AFTER tetikleyicisi (yalniz olay yazar, hata yutulur)
     [F.lcInventoryMatching]: "ek", // yeni tablo listing_inventory_imports + 2 authenticated RPC (lc_inventory_import, lc_match_decide) mevcut service_role cekirdeklerini sarar
     [F.lcDistrictSlaReset]: "davranis", // 2 yeni invoker RPC (ilce kirilimi) + listing_anomalies tetikleyicisi: yeniden acilan uyarinin eski SLA asama kayitlarini siler (yukseltme bastan isler)
+    [F.vitrinChatContext]: "ek", // yeni anon DEFINER RPC vitrin_chat_context (ofis ayari acik + ilan yayinda ise yalniz public ilan alanlari)
     [F.webhooksApiKeys]: "ek", // yeni api_keys/webhook_endpoints/webhook_deliveries + RLS (ayarlar:edit) + 3 DEFINER RPC (api_v1_list anon'a acik, yalniz anahtar ozetiyle okur)
     [F.customFields]: "ek", // yeni custom_field_defs/values + RLS (okuma ust kayit gorunurlugu, yazma modul edit) + 2 INVOKER yardimci fonksiyon
     [F.dealGosFields]: "ek", // deals'a 2 nullable kolon (gos_reference_no + CHECK, title_deed_appointment_at) + kismi indeks; politika degismez
@@ -397,7 +399,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
     { id: "PB45-bekleyen-isler", order: 29.96, title: "Bekleyen isler: eski 9 arg fulfill overload DROP -> rapor/komisyon ozetleri ornek veri kapsami -> sahiplik devri JWT RPC'leri", files: [F.planSubscriptionAmount, F.reportingSampleScope, F.ownershipTransferRpc] },
     { id: "PB46-ilan-kontrol-veri-yollari", order: 29.97, title: "Ilan kontrol veri yollari: yasam dongusu gecis kaydi -> envanter ice aktarma + eslesme kuyrugu (JWT RPC) -> ilce kirilimi + SLA yeniden acilis duzeltmesi", files: [F.lcLifecycleEvents, F.lcInventoryMatching, F.lcDistrictSlaReset] },
-    { id: "PB47-crm-ozellikleri", order: 29.98, title: "CRM ozellik turu: GOS anlasma alanlari -> ozel alanlar -> API anahtari + giden webhook", files: [F.dealGosFields, F.customFields, F.webhooksApiKeys] },
+    { id: "PB47-crm-ozellikleri", order: 29.98, title: "CRM ozellik turu: GOS anlasma alanlari -> ozel alanlar -> API anahtari + giden webhook -> vitrin AI sohbet baglami", files: [F.dealGosFields, F.customFields, F.webhooksApiKeys, F.vitrinChatContext] },
     { id: "PB48-medya-belge-isareti", order: 29.985, title: "KVKK P0-9: property_media.is_document (belge public'e cikmaz) + ad kurali fonksiyonu + INSERT tetikleyicisi; kod sutun yokken ad kuralina duser (sira serbest)", files: [F.mediaIsDocument] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
