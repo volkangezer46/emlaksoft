@@ -23,11 +23,24 @@ import {
   quoteCreditPack,
   suggestPack,
 } from "@/lib/billing/credit-pack-purchase-core";
+import { AreaChart, RadialGauge } from "@/components/ui/viz";
+import {
+  FORECAST_MIN_SPAN_DAYS,
+  FORECAST_MIN_SPEND_ROWS,
+  balanceSeries,
+  forecastDepletion,
+  stackedBalance,
+  thresholdTopPct,
+} from "@/lib/ef-credits/balance-viz";
+import { Celebration } from "@/components/ui/illustrations";
+import { isCreditPurchaseMoment } from "@/lib/celebration-conditions";
+import { StackedBalance } from "./stacked-balance";
 import { KontorPanel, type KontorPackCard } from "./kontor-panel";
 import type { WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
+const shortDay = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", timeZone: "Europe/Istanbul" });
 const renewalFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" });
 const BASE = "/app/abonelik";
 
@@ -95,6 +108,14 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
     allowance && allowance.units > 0 && history?.enabled
       ? monthlyAllowanceView({ entitlement: allowance.units, rows: history.rows, available: balance?.available ?? null, nowMs: now() })
       : null;
+  const stacked = balance ? stackedBalance({ available: balance.available, reserved: balance.reserved, spent: balance.committed_total }) : null;
+  const stackedLabels = { available: "Kullanılabilir", reserved: "İşlemde (rezerve)", spent: "Toplam harcanan" } as const;
+  const stackedColors = { available: "var(--viz-1)", reserved: "var(--viz-5)", spent: "var(--viz-neutral)" } as const;
+  const stackedHrefs = { available: hrefOf({}), reserved: hrefOf({}), spent: hrefOf({ kalem: "degerleme" }) } as const;
+  const series = history?.enabled ? balanceSeries(history.rows) : { values: [] as number[], atMs: [] as number[] };
+  const thresholdTop =
+    low && low.threshold > 0 && series.values.length >= 2 ? thresholdTopPct(low.threshold, Math.max(...series.values)) : null;
+  const forecast = balance && history?.enabled ? forecastDepletion(history.rows, balance.available, now()) : null;
   const canOneClick = canBuy && efState.purchasable && ready && iyzicoConfigured && suggested !== null && sellable.length > 0;
   const oneClickHref = `${BASE}?sekme=kontor&onerilen=1#paketler`;
 
@@ -116,6 +137,12 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
 
   return (
     <div className="space-y-6">
+      {isCreditPurchaseMoment(latestInvoice, invoiceIsRecent) ? (
+        <div className="relative flex justify-center">
+          <Celebration tick label="Kontör paketi satın alındı" />
+        </div>
+      ) : null}
+
       {latestInvoice && invoiceIsRecent ? (
         latestInvoice.status === "paid" ? (
           <Alert tone="success" title="Kontör paketi ödemeniz alındı">
@@ -154,27 +181,75 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         </Alert>
       ) : null}
 
-      <section id="bakiye" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-        <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Coins className="h-4 w-4" /> EmlakFiyati kontörü</p>
-        <h2 className="mt-1 font-display font-bold text-ink-950">Kontör bakiyeniz</h2>
+      <section id="bakiye" className="rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-3)]">
+        <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Coins className="h-4 w-4" /> EmlakFiyati kontörü</p>
+        <h2 className="mt-1 font-display font-bold text-text">Kontör bakiyeniz</h2>
         {balance ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Link href={hrefOf({})} className="focus-ring rounded-[var(--radius-card)] border border-line bg-canvas/50 p-4 transition hover:border-brand-300">
-              <p className="text-xs font-semibold text-text-muted">Kullanılabilir</p>
-              <p className="numeric font-display text-2xl font-extrabold text-ink-950">{fmt.format(balance.available)}</p>
-            </Link>
-            <Link href={hrefOf({})} className="focus-ring rounded-[var(--radius-card)] border border-line bg-canvas/50 p-4 transition hover:border-brand-300">
-              <p className="text-xs font-semibold text-text-muted">İşlemde (rezerve)</p>
-              <p className="numeric font-display text-2xl font-extrabold text-ink-950">{fmt.format(balance.reserved)}</p>
-            </Link>
-            <Link href={hrefOf({ kalem: "satin-alma" })} className="focus-ring rounded-[var(--radius-card)] border border-line bg-canvas/50 p-4 transition hover:border-brand-300">
-              <p className="text-xs font-semibold text-text-muted">Toplam yüklenen</p>
-              <p className="numeric font-display text-2xl font-extrabold text-ink-950">{fmt.format(balance.granted_total)}</p>
-            </Link>
-            <Link href={hrefOf({ kalem: "degerleme" })} className="focus-ring rounded-[var(--radius-card)] border border-line bg-canvas/50 p-4 transition hover:border-brand-300">
-              <p className="text-xs font-semibold text-text-muted">Toplam harcanan</p>
-              <p className="numeric font-display text-2xl font-extrabold text-ink-950">{fmt.format(balance.committed_total)}</p>
-            </Link>
+          <div className="mt-4 space-y-5">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-center">
+              <Link href={hrefOf({})} className="focus-ring block rounded-[var(--radius-control)] p-2 hover:bg-surface-hover">
+                <p className="text-xs font-semibold text-text-muted">Kullanılabilir kontör</p>
+                <p className="numeric font-display text-4xl font-extrabold text-text">{fmt.format(balance.available)}</p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Defter bakiyesi (yüklenen − harcanan): <span className="numeric font-semibold">{fmt.format(balance.granted_total - balance.committed_total)}</span>
+                </p>
+              </Link>
+              {stacked ? (
+                <StackedBalance
+                  ariaLabel="Kontör dağılımı"
+                  note="Çubuk: kullanılabilir, işlemde (rezerve) ve bugüne dek harcanan kontörün payları."
+                  items={stacked.segments.map((seg) => ({
+                    key: seg.key,
+                    pct: seg.pct,
+                    label: stackedLabels[seg.key],
+                    valueText: fmt.format(seg.value),
+                    href: stackedHrefs[seg.key],
+                    color: stackedColors[seg.key],
+                  }))}
+                />
+              ) : (
+                <p className="text-sm text-text-muted">Henüz kontör hareketi yok: ilk yükleme veya değerlemeden sonra dağılım burada görünür.</p>
+              )}
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-sm font-semibold text-text">Bakiye geçmişi</h3>
+                <Link href={hrefOf({})} className="text-xs font-semibold text-accent-text hover:underline">Tüm hareketler</Link>
+              </div>
+              {series.values.length >= 2 ? (
+                <div className="mt-2">
+                  <div className="relative">
+                    <AreaChart
+                      series={[{ name: "Bakiye (kontör)", values: series.values }]}
+                      pointLabels={series.atMs.map((t) => shortDay.format(t))}
+                      height={176}
+                      format="number"
+                      ariaLabel={`Bakiye geçmişi: ${fmt.format(series.values[0]!)} kontörden ${fmt.format(series.values[series.values.length - 1]!)} kontöre`}
+                    />
+                    {thresholdTop !== null ? (
+                      <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: 176 }} aria-hidden="true">
+                        <div className="absolute inset-x-0 border-t border-dashed border-danger-strong" style={{ top: `${thresholdTop}%` }} />
+                        <span className="absolute left-0 -translate-y-full rounded bg-surface px-1 text-xs font-semibold text-danger-strong" style={{ top: `${thresholdTop}%` }}>
+                          Düşük bakiye eşiği: {fmt.format(low!.threshold)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                  {forecast ? (
+                    <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                      <span className="rounded-full bg-warning-soft px-2 py-0.5 font-bold text-warning-strong">TAHMİN</span>
+                      Son 60 günlük kullanım hızıyla (günde yaklaşık {fmt.format(Math.max(1, Math.round(forecast.burnPerDay)))} kontör) bakiye yaklaşık{" "}
+                      {renewalFmt.format(forecast.dateMs)} tarihinde biter. Kesin değildir; kullanım değişirse kayar.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-text-faint">Bitiş tahmini için en az {FORECAST_MIN_SPEND_ROWS} harcama hareketi ve {FORECAST_MIN_SPAN_DAYS} günlük geçmiş gerekir.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-text-muted">Çizgi için en az iki bakiyeli hareket gerekir: değerleme veya paket alımından sonra burada görünür.</p>
+              )}
+            </div>
           </div>
         ) : (
           <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Kontör bakiyesi etkinleşince bakiyeniz burada görünür."}</p>
@@ -182,39 +257,55 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         {allowance && allowance.units > 0 ? (
           <Link
             href={hrefOf({ kalem: "satin-alma" })}
-            className="focus-ring mt-4 block rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 p-4 transition hover:border-mint-500/60"
+            className="focus-ring @container mt-5 block rounded-[var(--radius-control)] bg-success-soft p-4 transition hover:bg-surface-hover"
           >
-            <p className="text-xs font-semibold text-mint-700">{allowance.planName} paketinin aylık kontör hakkı</p>
-            <p className="numeric font-display text-xl font-extrabold text-ink-950">
-              Her ay {fmt.format(allowance.units)} kontör
-              {efUnitsFor("valuation_arsa", tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efUnitsFor("valuation_arsa", tariff)))} değerleme)` : ""}
-            </p>
-            <p className="mt-1 text-xs text-text-muted">
-              Otomatik yüklenir, kullanılmayan kontör devreder.
-              {allowance.perExtraSeat > 0
-                ? ` Hak, her ek kullanıcı için ${fmt.format(allowance.perExtraSeat)} kontör artar (şu an ${fmt.format(allowance.extraSeats)} ek kullanıcı).`
-                : ""}
-              {" "}Yetmezse aşağıdan ek paket alabilirsiniz.
-            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              {monthly ? (
+                <RadialGauge
+                  value={monthly.remainingOfMonthly}
+                  max={monthly.entitlement}
+                  size={88}
+                  stroke={9}
+                  tone="success"
+                  ariaLabel="Aylık haktan kalan kontör"
+                >
+                  <span className="numeric font-display text-base font-extrabold text-text">{fmt.format(monthly.remainingOfMonthly)}</span>
+                </RadialGauge>
+              ) : null}
+              <div className="min-w-0 flex-1 basis-60">
+                <p className="text-xs font-semibold text-success-strong">{allowance.planName} paketinin aylık kontör hakkı</p>
+                <p className="numeric font-display text-xl font-extrabold text-text [text-wrap:balance]">
+                  Her ay {fmt.format(allowance.units)} kontör
+                  {efUnitsFor("valuation_arsa", tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efUnitsFor("valuation_arsa", tariff)))} değerleme)` : ""}
+                </p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Otomatik yüklenir, kullanılmayan kontör devreder.
+                  {allowance.perExtraSeat > 0
+                    ? ` Hak, her ek kullanıcı için ${fmt.format(allowance.perExtraSeat)} kontör artar (şu an ${fmt.format(allowance.extraSeats)} ek kullanıcı).`
+                    : ""}
+                  {" "}Yetmezse aşağıdan ek paket alabilirsiniz.
+                </p>
+              </div>
+            </div>
             {monthly ? (
               <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <dt className="font-semibold text-text-muted">Bu ay verilen plan kontörü</dt>
-                  <dd className="numeric font-display text-base font-extrabold text-ink-950">
+                  <dd className="numeric font-display text-base font-extrabold text-text">
                     {fmt.format(monthly.grantedThisMonth)} / {fmt.format(monthly.entitlement)}
                   </dd>
                 </div>
                 <div>
                   <dt className="font-semibold text-text-muted">Bu ay harcanan</dt>
-                  <dd className="numeric font-display text-base font-extrabold text-ink-950">{fmt.format(monthly.spentThisMonth)}</dd>
+                  <dd className="numeric font-display text-base font-extrabold text-text">{fmt.format(monthly.spentThisMonth)}</dd>
                 </div>
                 <div>
                   <dt className="font-semibold text-text-muted">Aylık haktan kalan</dt>
-                  <dd className="numeric font-display text-base font-extrabold text-ink-950">{fmt.format(monthly.remainingOfMonthly)}</dd>
+                  <dd className="numeric font-display text-base font-extrabold text-text">{fmt.format(monthly.remainingOfMonthly)}</dd>
                 </div>
                 <div>
                   <dt className="font-semibold text-text-muted">Sonraki yenileme</dt>
-                  <dd className="font-display text-base font-extrabold text-ink-950">{renewalFmt.format(monthly.nextRenewalMs)}</dd>
+                  <dd className="font-display text-base font-extrabold text-text">{renewalFmt.format(monthly.nextRenewalMs)}</dd>
                 </div>
               </dl>
             ) : (
@@ -250,21 +341,21 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         ) : null}
       </section>
 
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-        <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Info className="h-4 w-4" /> Tarife</p>
-        <h2 className="mt-1 font-display font-bold text-ink-950">Hangi işlem kaç kontör?</h2>
+      <section className="rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">
+        <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Info className="h-4 w-4" /> Tarife</p>
+        <h2 className="mt-1 font-display font-bold text-text">Hangi işlem kaç kontör?</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {tariffItems.map((t) => (
             <Link
               key={t.label}
               href={hrefOf({ kalem: t.kalem })}
-              className="focus-ring group rounded-[var(--radius-card)] border border-line bg-canvas/50 p-4 transition hover:border-brand-300"
+              className="focus-ring group rounded-[var(--radius-control)] bg-[var(--surface-sunken)] p-4 transition hover:bg-surface-hover"
             >
               <div className="flex items-start justify-between">
                 <p className="text-xs font-semibold text-text-muted">{t.label}</p>
-                <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
+                <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-accent-text" />
               </div>
-              <p className="numeric mt-1 font-display text-xl font-extrabold text-ink-950">
+              <p className="numeric mt-1 font-display text-xl font-extrabold text-text">
                 {t.units > 0 ? `${fmt.format(t.units)} kontör` : "Ücretsiz"}
               </p>
             </Link>
@@ -276,9 +367,9 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         </p>
       </section>
 
-      <section id="paketler" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-        <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Coins className="h-4 w-4" /> Paketler</p>
-        <h2 className="mt-1 font-display font-bold text-ink-950">Kontör paketi satın alın</h2>
+      <section id="paketler" className="scroll-mt-24 rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">
+        <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Coins className="h-4 w-4" /> Paketler</p>
+        <h2 className="mt-1 font-display font-bold text-text">Kontör paketi satın alın</h2>
         <div className="mt-4">
           {cards.length === 0 ? (
             <EmptyState
@@ -295,11 +386,11 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         <p className="mt-3 text-xs text-text-muted">Kupon kodları kontör paketlerinde geçerli değildir. Fiyatlara %20 KDV eklenir.</p>
       </section>
 
-      <section id="gecmis" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section id="gecmis" className="scroll-mt-24 rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><History className="h-4 w-4" /> Geçmiş</p>
-            <h2 className="mt-1 font-display font-bold text-ink-950">Kontör kullanım geçmişi</h2>
+            <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><History className="h-4 w-4" /> Geçmiş</p>
+            <h2 className="mt-1 font-display font-bold text-text">Kontör kullanım geçmişi</h2>
           </div>
           <nav aria-label="Kalem süzgeci" className="flex flex-wrap gap-1.5">
             {([null, "degerleme", "pdf", "satin-alma", "iade"] as const).map((k) => (
@@ -308,14 +399,14 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 href={hrefOf({ kalem: k ?? undefined, kullanici: props.kullanici })}
                 aria-current={(category ?? null) === k ? "true" : undefined}
                 className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold ${
-                  (category ?? null) === k ? "bg-ink-950 text-white" : "bg-brand-600/10 text-brand-600 hover:bg-brand-600/15"
+                  (category ?? null) === k ? "bg-ink-950 text-white" : "bg-surface-accent-soft text-accent-text hover:bg-brand-600/15"
                 }`}
               >
                 {k ? EF_CATEGORY_LABEL[k] : "Hepsi"}
               </Link>
             ))}
             {props.kullanici ? (
-              <Link href={hrefOf({ kalem: category ?? undefined })} className="focus-ring rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-700">
+              <Link href={hrefOf({ kalem: category ?? undefined })} className="focus-ring rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-warning-strong">
                 Kullanıcı süzgeci: kaldır
               </Link>
             ) : null}
@@ -352,20 +443,20 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                       <TR key={r.id}>
                         <TD className="text-text-muted">{r.at && Number.isFinite(Date.parse(r.at)) ? dt.format(Date.parse(r.at)) : "—"}</TD>
                         <TD>
-                          <Link href={hrefOf({ kalem: r.category, kullanici: props.kullanici })} className="font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                          <Link href={hrefOf({ kalem: r.category, kullanici: props.kullanici })} className="font-semibold text-text hover:text-accent-text hover:underline">
                             {r.label}
                           </Link>
                         </TD>
                         <TD className="text-text-muted">
                           {r.userId ? (
-                            <Link href={hrefOf({ kalem: category ?? undefined, kullanici: r.userId })} className="hover:text-brand-600 hover:underline">
+                            <Link href={hrefOf({ kalem: category ?? undefined, kullanici: r.userId })} className="hover:text-accent-text hover:underline">
                               {history.userNames[r.userId] ?? "Kullanıcı"}
                             </Link>
                           ) : (
                             "Sistem"
                           )}
                         </TD>
-                        <TD align="right" className={`numeric font-bold ${r.units < 0 ? "text-ink-950" : "text-mint-700"}`}>
+                        <TD align="right" className={`numeric font-bold ${r.units < 0 ? "text-text" : "text-success-strong"}`}>
                           {r.units > 0 ? "+" : ""}
                           {fmt.format(r.units)}
                         </TD>

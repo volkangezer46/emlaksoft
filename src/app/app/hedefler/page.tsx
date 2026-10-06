@@ -11,6 +11,9 @@ import { EmptyState } from "@/components/app/empty-state";
 import { TargetFormDialog, type TargetFormValues } from "./target-form-dialog";
 import { TargetCreatePanel, TargetCreateTrigger } from "./target-create-panel";
 
+import { RadialGauge } from "@/components/ui/viz";
+import { Celebration } from "@/components/ui/illustrations";
+import { isTargetReachedMoment } from "@/lib/celebration-conditions";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
@@ -35,40 +38,6 @@ function elapsedPct(periodStart: string, period: string) {
   if (!(total > 0)) return 100;
   const elapsed = now() - startMs;
   return Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)));
-}
-
-/**
- * İlerleme halkası — sunucuda çizilen SVG donut. Renk duruma göre:
- * hedef tamam → mint, tempo geride → amber, aksi halde brand.
- */
-function ProgressRing({ value, tone, size = 64 }: { value: number; tone: "mint" | "amber" | "brand"; size?: number }) {
-  const stroke = 6;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const off = c * (1 - Math.min(100, Math.max(0, value)) / 100);
-  const color = tone === "mint" ? "var(--mint-500)" : tone === "amber" ? "var(--amber-400)" : "var(--brand-600)";
-  return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`İlerleme %${value}`}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={off}
-          style={{ transition: "stroke-dashoffset 600ms ease" }}
-        />
-      </svg>
-      <span className="numeric absolute inset-0 grid place-items-center font-display text-sm font-extrabold text-ink-950">
-        %{value}
-      </span>
-    </div>
-  );
 }
 
 /** "Bu hızla dönem sonunda ~X" projeksiyonu; dönem başlamadıysa/bittiyse null. */
@@ -170,8 +139,8 @@ canCreate ? <TargetCreateTrigger /> : null
       {showRace ? (
         <section id="takim-kiyas" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">
-              <Users className="h-4 w-4 text-brand-600" /> Takım kıyası · {racePeriodLabel}
+            <h2 className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-[0.08em] text-text">
+              <Users className="h-4 w-4 text-accent-text" /> Takım kıyası · {racePeriodLabel}
             </h2>
             <span className="text-xs text-text-faint">En iyi ilerleme yüzdesine göre</span>
           </div>
@@ -184,23 +153,23 @@ canCreate ? <TargetCreateTrigger /> : null
                 <Link
                   key={e.t.id}
                   href={pid ? `/app/ekip/${pid}` : "/app/raporlar"}
-                  className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] px-1.5 py-1.5 transition hover:bg-canvas"
+                  className="focus-ring group flex items-center gap-3 rounded-[var(--radius-card)] px-1.5 py-1.5 transition hover:bg-[var(--surface-sunken)]"
                 >
                   <span
                     className={`numeric grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold ${
-                      i === 0 ? "bg-amber-400/20 text-amber-600" : "bg-canvas text-text-muted"
+                      i === 0 ? "bg-amber-400/20 text-warning-strong" : "bg-[var(--surface-sunken)] text-text-muted"
                     }`}
                   >
                     {i + 1}
                   </span>
-                  <span className="w-32 truncate text-xs font-semibold text-ink-950 group-hover:text-brand-600 sm:w-44">{name}</span>
+                  <span className="w-32 truncate text-xs font-semibold text-text group-hover:text-accent-text sm:w-44">{name}</span>
                   <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-line">
                     <span
                       className={`block h-full rounded-full transition-all ${e.done ? "bg-mint-500" : e.behind ? "bg-amber-400" : "bg-brand-600"}`}
                       style={{ width: `${Math.max(2, e.progress)}%` }}
                     />
                   </span>
-                  <span className="numeric w-12 shrink-0 text-right text-xs font-extrabold text-ink-950">%{e.progress}</span>
+                  <span className="numeric w-12 shrink-0 text-right text-xs font-extrabold text-text">%{e.progress}</span>
                 </Link>
               );
             })}
@@ -209,7 +178,7 @@ canCreate ? <TargetCreateTrigger /> : null
       ) : null}
 
       {targets.length > 0 && !hasCurrentPeriod ? (
-        <p role="status" className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-ink-950">
+        <p role="status" className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-text">
           Güncel dönem için tanımlı hedef yok; aşağıda geçmiş dönem hedefleri listelenir.
           {canCreate ? " Yukarıdaki düğmeyle bu ay için yeni hedef ekleyebilirsiniz." : ""}
         </p>
@@ -250,17 +219,31 @@ canCreate ? <TargetCreateTrigger /> : null
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     {/* İlerleme halkası: hedef tamam mint, tempo geride amber, aksi brand */}
-                    <ProgressRing value={progress} tone={done ? "mint" : behind ? "amber" : "brand"} size={56} />
+                    <RadialGauge
+                      value={Math.min(100, progress)}
+                      max={100}
+                      target={elapsed > 0 && elapsed < 100 ? elapsed : undefined}
+                      size={64}
+                      stroke={7}
+                      color={done ? "var(--viz-2)" : behind ? "var(--viz-4)" : "var(--viz-1)"}
+                      format="percent"
+                      ariaLabel="Hedef ilerlemesi (çentik: dönemin geçen kısmı)"
+                    >
+                      <span className="numeric font-display text-sm font-extrabold text-text">%{progress}</span>
+                    </RadialGauge>
                     <div>
                       <p className="text-xs font-semibold text-text-muted">{period}</p>
-                      <p className="mt-0.5 font-display font-bold text-ink-950 group-hover:text-brand-600">{profileLabel(t.profile)}</p>
+                      <p className="mt-0.5 font-display font-bold text-text group-hover:text-accent-text">{profileLabel(t.profile)}</p>
                       {done ? (
-                        <p className="mt-0.5 text-xs font-bold text-mint-600">Hedef tamamlandı</p>
+                        <p className="mt-0.5 flex items-center gap-2 text-xs font-bold text-success-strong">
+                          {isTargetReachedMoment(progress, 100) && elapsed < 100 ? <Celebration tick label="Hedef tamamlandı" /> : null}
+                          Hedef tamamlandı
+                        </p>
                       ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="rounded-full bg-brand-600/10 px-2 py-1 text-xs font-bold text-brand-600">
+                    <span className="rounded-full bg-surface-accent-soft px-2 py-1 text-xs font-bold text-accent-text">
                       {t.period === "monthly" ? "Aylık" : t.period === "quarterly" ? "Çeyrek" : "Yıllık"}
                     </span>
                     {canEdit ? <TargetFormDialog members={memberList} target={formValues} /> : null}
@@ -270,7 +253,7 @@ canCreate ? <TargetCreateTrigger /> : null
                           <button
                             type="button"
                             aria-label="Hedefi sil"
-                            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-danger-500 transition hover:border-danger-500/40"
+                            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-danger-strong transition hover:border-danger-500/40"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -290,7 +273,7 @@ canCreate ? <TargetCreateTrigger /> : null
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Anlaşma</span>
-                      <Link href="/app/teklifler?durum=accepted" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                      <Link href="/app/teklifler?durum=accepted" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
                         {t.actual_deals} / {t.target_deals}
                       </Link>
                     </div>
@@ -307,7 +290,7 @@ canCreate ? <TargetCreateTrigger /> : null
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">{(Array.isArray(t.profile) ? t.profile[0] : t.profile) ? "Gelir (komisyon payı)" : "Ofis komisyonu (brüt)"}</span>
-                      <Link href="/app/komisyon?durum=tahsil" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-ink-950 hover:text-brand-600 hover:underline">
+                      <Link href="/app/komisyon?durum=tahsil" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
                         {t.revVisible ? money(Number(t.actual_revenue)) : "Gizli"} / {money(Number(t.target_revenue))}
                       </Link>
                     </div>
@@ -324,7 +307,7 @@ canCreate ? <TargetCreateTrigger /> : null
                   <div className="border-t border-hairline pt-2.5">
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="text-text-muted">Tempo · dönemin %{elapsed}&apos;i geçti</span>
-                      <span className={`font-semibold ${behind ? "text-amber-600" : "text-mint-600"}`}>İlerleme %{progress}</span>
+                      <span className={`font-semibold ${behind ? "text-warning-strong" : "text-success-strong"}`}>İlerleme %{progress}</span>
                     </div>
                     <div className="relative h-1.5 overflow-hidden rounded-full bg-line">
                       <div
@@ -332,10 +315,10 @@ canCreate ? <TargetCreateTrigger /> : null
                         style={{ width: `${progress}%` }}
                       />
                       {/* Dönemin geçen yüzdesini gösteren referans çizgisi */}
-                      <div className="absolute inset-y-0 w-0.5 bg-ink-950/40" style={{ left: `${elapsed}%` }} />
+                      <div className="absolute inset-y-0 w-0.5 bg-text/40" style={{ left: `${elapsed}%` }} />
                     </div>
                     {behind ? (
-                      <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-amber-600">
+                      <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-warning-strong">
                         <AlertTriangle className="h-3.5 w-3.5" />
                         Tempo geride: dönemin %{elapsed}&apos;i geçti, ilerleme %{progress}.
                       </p>
@@ -344,11 +327,11 @@ canCreate ? <TargetCreateTrigger /> : null
                       <p className="mt-1.5 text-xs text-text-muted">
                         Bu hızla dönem sonunda{" "}
                         {projDeals != null ? (
-                          <span className="font-bold text-ink-950">~{Math.round(projDeals)} anlaşma</span>
+                          <span className="font-bold text-text">~{Math.round(projDeals)} anlaşma</span>
                         ) : null}
                         {projDeals != null && projRevenue != null ? " · " : null}
                         {projRevenue != null ? (
-                          <span className="font-bold text-ink-950">~{money(Math.round(projRevenue))}</span>
+                          <span className="font-bold text-text">~{money(Math.round(projRevenue))}</span>
                         ) : null}
                       </p>
                     ) : null}

@@ -109,7 +109,7 @@ export function ExpensesTable({
               <TableEmptyRow colSpan={hasActions ? 5 : 4}>
                 <span className="inline-flex flex-col items-center gap-2">
                   <SearchX className="h-7 w-7 text-text-faint" />
-                  <span className="font-semibold text-ink-950">
+                  <span className="font-semibold text-text">
                     {query ? "Aramanızla eşleşen kayıt yok" : "Kayıt yok"}
                   </span>
                   <span className="max-w-sm text-text-muted">Arama terimini değiştirip tekrar deneyin.</span>
@@ -118,7 +118,7 @@ export function ExpensesTable({
             ) : (
               filtered.map((e) => (
                 <TR key={e.id} interactive={canEdit}>
-                  <TD className="font-semibold text-ink-950">
+                  <TD className="font-semibold text-text">
                     {canEdit ? (
                       // Satırı kaplayan görünmez buton — YALNIZ sm+. Mobilde abs katman
                       // iOS Safari'de yatay-kaydırılabilir tabloyu belge scroll'una

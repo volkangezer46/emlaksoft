@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Award, Clock3, HeartHandshake, MousePointerClick, UserPlus, Wallet, Hourglass, CheckCircle2, Undo2, PiggyBank } from "lucide-react";
+import { Award, HeartHandshake, MousePointerClick, UserPlus, Wallet, Hourglass, CheckCircle2, Undo2, PiggyBank } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { getBaseUrl } from "@/lib/base-url";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FunnelChart } from "@/components/ui/viz";
+import { Celebration } from "@/components/ui/illustrations";
+import { isFirstInviteRewardMoment } from "@/lib/celebration-conditions";
+import { inviteFunnel } from "@/lib/growth/funnel";
 import { Alert } from "@/components/ui/alert";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -37,6 +41,22 @@ const STAGE_BADGE: Record<InviteStage, BadgeVariant> = {
   cancelled: "danger",
 };
 
+const FUNNEL_LABEL = {
+  click: "Bağlantı tıklaması",
+  signup: "Kayıt olan",
+  trial: "Deneme",
+  paid: "Ödedi",
+  reward: "Davet ödülü",
+} as const;
+
+const FUNNEL_HREF = {
+  click: "#davet-baglantisi",
+  signup: inviteFilterHref("tumu"),
+  trial: inviteFilterHref("deneme"),
+  paid: inviteFilterHref("bekliyor"),
+  reward: inviteFilterHref("odedi"),
+} as const;
+
 function monthsText(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1).replace(".", ",");
 }
@@ -57,13 +77,14 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
 
   const shown = d ? filterInvites(d.invites, durum) : [];
   const tiers = d ? tierProgress(d.paid, d.tiers) : null;
+  const funnel = inviteFunnel(d ?? { clicks: 0, signups: 0, trial: 0, waiting: 0, paid: 0, cancelled: 0 });
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Davet et ve kazan"
         description="Bir meslektaşınız EmlakSoft'u denemek isterse size özel bağlantıyı paylaşın. Meslektaşınız ilk ödemesini yaptığında ve bekleme süresi dolduğunda hesap krediniz yüklenir. Kredi nakde çevrilmez; yalnız EmlakSoft faturalarınızdan düşer."
-        icon={<HeartHandshake className="h-6 w-6 text-brand-600" aria-hidden />}
+        icon={<HeartHandshake className="h-6 w-6 text-accent-text" aria-hidden />}
       />
 
       {!ov.available || !ov.enabled ? (
@@ -73,15 +94,42 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
       ) : (
         <>
           {d ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Bağlantı tıklaması" value={d.clicks} icon={MousePointerClick} href="#davet-baglantisi" />
-              <StatCard label="Kayıt olan" value={d.signups} icon={UserPlus} href={inviteFilterHref("tumu")} />
-              <StatCard label="Denemede" value={d.trial} icon={Clock3} href={inviteFilterHref("deneme")} />
-              <StatCard label="Ödedi, bekleme süresinde" value={d.waiting} icon={Hourglass} tone="warning" href={inviteFilterHref("bekliyor")} />
-              <StatCard label="Ödül yüklendi" value={d.paid} icon={CheckCircle2} tone="mint" href={inviteFilterHref("odedi")} />
-              <StatCard label="İptal / iade" value={d.cancelled} icon={Undo2} tone="danger" href={inviteFilterHref("iptal")} />
-              <StatCard label="Kazanılan kredi" value={d.money_visible ? formatTry(d.earned_try) : "Ofis sahibine açık"} icon={Wallet} tone="mint" href={TRY_WALLET_LINKS.wallet} />
-              <StatCard label="Bekleyen kredi" value={d.money_visible ? formatTry(d.pending_try) : "Ofis sahibine açık"} icon={PiggyBank} tone="warning" href={inviteFilterHref("bekliyor")} />
+            <div className="space-y-4">
+              <Card className="shadow-[var(--elev-3)]">
+                <CardHeader>
+                  <CardTitle>Davet hunisi</CardTitle>
+                  <CardDescription>
+                    Bağlantı tıklamasından ödüle: her aşama kendi filtrelenmiş listesine gider.
+                    {funnel.ardisik ? "" : " Doğrudan kayıtlar nedeniyle aşamalar arası dönüşüm oranı gösterilmez."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {isFirstInviteRewardMoment(d.paid) ? (
+                    <div className="relative flex items-center gap-3 rounded-[var(--radius-control)] bg-success-soft px-4 py-2" role="status">
+                      <Celebration tick label="İlk davet ödülü" />
+                      <p className="text-sm font-semibold text-success-strong">İlk davet ödülünüz yüklendi.</p>
+                    </div>
+                  ) : null}
+                  <FunnelChart
+                    ariaLabel="Davet hunisi"
+                    ardisik={funnel.ardisik}
+                    emptyText="Henüz davet hareketi yok: bağlantınızı paylaşınca ilk tıklama burada görünür."
+                    stages={funnel.stages.map((s) => ({ label: FUNNEL_LABEL[s.key], value: s.value, href: FUNNEL_HREF[s.key] }))}
+                  />
+                  <p className="text-xs text-text-muted">
+                    <Link href={inviteFilterHref("iptal")} className="font-semibold text-accent-text hover:underline">
+                      İptal / iade: {funnel.cancelled}
+                    </Link>{" "}
+                    (huniye dahil değildir; iptal olan davetin ödülü geri alınır).
+                  </p>
+                </CardContent>
+              </Card>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Ödül yüklendi" value={d.paid} icon={CheckCircle2} tone="mint" href={inviteFilterHref("odedi")} />
+                <StatCard label="İptal / iade" value={d.cancelled} icon={Undo2} tone="danger" href={inviteFilterHref("iptal")} />
+                <StatCard label="Kazanılan kredi" value={d.money_visible ? formatTry(d.earned_try) : "Ofis sahibine açık"} icon={Wallet} tone="mint" href={TRY_WALLET_LINKS.wallet} />
+                <StatCard label="Bekleyen kredi" value={d.money_visible ? formatTry(d.pending_try) : "Ofis sahibine açık"} icon={PiggyBank} tone="warning" href={inviteFilterHref("bekliyor")} />
+              </div>
             </div>
           ) : null}
 
@@ -104,9 +152,9 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
             <CardContent className="space-y-2 text-sm text-text-muted">
               {ov.rewardText ? (
                 <p>
-                  Her başarılı davet için: {ov.rewardText}. Ödül, davet ettiğiniz ofis ilk gerçek ödemesini yaptıktan, <strong className="text-ink-950">bir kez yenileyip</strong> aboneliği aktif kaldıktan ve
+                  Her başarılı davet için: {ov.rewardText}. Ödül, davet ettiğiniz ofis ilk gerçek ödemesini yaptıktan, <strong className="text-text">bir kez yenileyip</strong> aboneliği aktif kaldıktan ve
                   bekleme süresi dolduktan sonra yüklenir; deneme süresi veya kayıt tek başına ödül vermez. İade, iptal ya da ters ibrazda ödül geri alınır.{" "}
-                  <Link href="/davet-kosullari" className="font-semibold text-brand-600 hover:underline">Davet ve Ortaklık Programı Koşulları</Link>
+                  <Link href="/davet-kosullari" className="font-semibold text-accent-text hover:underline">Davet ve Ortaklık Programı Koşulları</Link>
                 </p>
               ) : (
                 <p>Şu an tanımlı bir ödül kuralı yok; bu sayfa yalnız davetlerinizi takip eder ve ödül vaat etmez.</p>
@@ -135,10 +183,10 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
                   {tiers.badges.map((b) => (
                     <li
                       key={b.key}
-                      className={`rounded-[var(--radius-card)] border p-3 text-sm ${b.unlocked ? "border-mint-500/40 bg-mint-500/10" : "border-hairline bg-surface"}`}
+                      className={`rounded-[var(--radius-control)] px-3 py-2.5 text-sm ${b.unlocked ? "bg-success-soft" : "bg-[var(--surface-sunken)]"}`}
                     >
-                      <p className="flex items-center gap-2 font-semibold text-ink-950">
-                        <Award className={`h-4 w-4 ${b.unlocked ? "text-mint-600" : "text-text-muted"}`} aria-hidden />
+                      <p className="flex items-center gap-2 font-semibold text-text">
+                        <Award className={`h-4 w-4 ${b.unlocked ? "text-success-strong" : "text-text-muted"}`} aria-hidden />
                         {b.label}
                         <Badge variant={b.unlocked ? "success" : "neutral"}>{b.unlocked ? "Kazanıldı" : "Kilitli"}</Badge>
                       </p>
@@ -153,7 +201,7 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
                     <Progress value={tiers.pct} label={`${tiers.next.label} ilerlemesi`} />
                     <p className="text-xs text-text-muted">
                       {tiers.next.label} için {tiers.next.remaining} başarılı davet daha gerekiyor.{" "}
-                      <Link className="font-semibold text-brand-600 hover:underline" href={inviteFilterHref("odedi")}>
+                      <Link className="font-semibold text-accent-text hover:underline" href={inviteFilterHref("odedi")}>
                         Başarılı davetlerim
                       </Link>
                     </p>
@@ -178,7 +226,7 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
                     href={inviteFilterHref(f)}
                     aria-current={durum === f ? "page" : undefined}
                     className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                      durum === f ? "border-brand-600 bg-brand-600/10 text-brand-700" : "border-hairline bg-surface text-text-muted hover:bg-canvas"
+                      durum === f ? "border-accent bg-surface-accent-soft text-accent-text" : "border-hairline bg-surface text-text-muted hover:bg-surface-hover"
                     }`}
                   >
                     {INVITE_FILTER_LABEL[f]}
@@ -201,9 +249,9 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
                 <ul className="divide-y divide-line">
                   {shown.map((i, idx) => (
                     <li key={`${i.at}-${idx}`} className="flex items-center justify-between gap-3 py-2 text-sm">
-                      <span className="text-ink-950">{shown.length - idx}. davet</span>
+                      <span className="text-text">{shown.length - idx}. davet</span>
                       <span className="flex items-center gap-3">
-                        {i.stage === "paid" && i.amount > 0 ? <span className="text-xs font-semibold text-mint-700">{formatTry(i.amount)}</span> : null}
+                        {i.stage === "paid" && i.amount > 0 ? <span className="text-xs font-semibold text-success-strong">{formatTry(i.amount)}</span> : null}
                         <span className="text-xs text-text-muted">{formatDateTr(i.at)}</span>
                         <Badge variant={STAGE_BADGE[i.stage]}>{INVITE_STAGE_LABEL[i.stage]}</Badge>
                       </span>
@@ -238,26 +286,26 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
               <StatCard label="Ödenen komisyon" value={formatTry(ov.partner.paid_try)} icon={Wallet} tone="mint" href="#ortak-komisyon" />
               <StatCard label="Geri alınacak" value={formatTry(ov.partner.clawback_due_try)} icon={Undo2} tone="danger" href="#ortak-komisyon" />
             </div>
-            <div id="ortak-baglanti" className="rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-sm">
+            <div id="ortak-baglanti" className="rounded-[var(--radius-control)] bg-[var(--surface-sunken)] px-3 py-2 text-sm">
               <p className="text-xs font-semibold text-text-muted">Ortak bağlantı</p>
-              <code className="block overflow-x-auto text-sm text-ink-950">{buildPartnerUrl(base, ov.partner.code)}</code>
+              <code className="block overflow-x-auto text-sm text-text">{buildPartnerUrl(base, ov.partner.code)}</code>
             </div>
             <dl id="ortak-komisyon" className="grid gap-2 text-sm sm:grid-cols-2">
               <div className="flex justify-between gap-3 border-b border-line py-1">
                 <dt className="text-text-muted">Bekleme süresindeki komisyon</dt>
-                <dd className="font-semibold text-ink-950">{formatTry(ov.partner.pending_try)}</dd>
+                <dd className="font-semibold text-text">{formatTry(ov.partner.pending_try)}</dd>
               </div>
               <div className="flex justify-between gap-3 border-b border-line py-1">
                 <dt className="text-text-muted">Ödenebilir (onaylı) komisyon</dt>
-                <dd className="font-semibold text-ink-950">{formatTry(ov.partner.payable_try)}</dd>
+                <dd className="font-semibold text-text">{formatTry(ov.partner.payable_try)}</dd>
               </div>
               <div className="flex justify-between gap-3 border-b border-line py-1">
                 <dt className="text-text-muted">Ödenen komisyon</dt>
-                <dd className="font-semibold text-ink-950">{formatTry(ov.partner.paid_try)}</dd>
+                <dd className="font-semibold text-text">{formatTry(ov.partner.paid_try)}</dd>
               </div>
               <div className="flex justify-between gap-3 border-b border-line py-1">
                 <dt className="text-text-muted">Sonraki ödemeden mahsup edilecek</dt>
-                <dd className="font-semibold text-ink-950">{formatTry(ov.partner.clawback_due_try)}</dd>
+                <dd className="font-semibold text-text">{formatTry(ov.partner.clawback_due_try)}</dd>
               </div>
             </dl>
             <p className="text-xs text-text-muted">

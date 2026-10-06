@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { CategoryDonut } from "./category-donut-lazy";
+import { CategoryBars } from "./category-bars";
+import { categoryChartMode } from "@/lib/expense-category-chart";
 import { ExpensesTable } from "./expenses-table";
 import { ExpenseCreateForm } from "./expense-create-form";
 
@@ -127,6 +129,8 @@ export default async function GiderlerPage({
     .sort((a, b) => b.total - a.total)
     .map((c) => ({ name: c.label, value: c.total, category: c.value }));
 
+  const barsMode = categoryChartMode(activeCategories.length) === "bars";
+
   // Son 6 ay trendi — filtrelerden bağımsız, RPC'den (İstanbul ay sınırlarıyla)
   const ayFmt = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "Europe/Istanbul" });
   const trendChart = aggregate.monthly.map((row) => ({
@@ -201,8 +205,8 @@ export default async function GiderlerPage({
               aria-current={active ? "page" : undefined}
               className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                 active
-                  ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
-                  : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
+                  ? "border-brand-400/50 bg-surface-accent-soft text-accent-text"
+                  : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-accent-text"
               }`}
             >
               {p.label}
@@ -230,7 +234,7 @@ export default async function GiderlerPage({
             Filtrele
           </button>
           {fromF || toF ? (
-            <Link href={href({ from: null, to: null })} className="text-xs font-semibold text-text-muted hover:text-danger-500">
+            <Link href={href({ from: null, to: null })} className="text-xs font-semibold text-text-muted hover:text-danger-strong">
               Tarihi temizle
             </Link>
           ) : null}
@@ -251,15 +255,15 @@ export default async function GiderlerPage({
                 href={href({ from: m.preset.from, to: m.preset.to })}
                 aria-current={aktif ? "page" : undefined}
                 className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 transition hover:border-brand-300 ${
-                  aktif ? "border-brand-400 bg-brand-600/5" : "border-line bg-surface"
+                  aktif ? "border-brand-400 bg-surface-accent-soft" : "border-line bg-surface"
                 }`}
               >
                 <p className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
                   {m.sub} · {m.label}
-                  <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
                 </p>
-                <p className="numeric mt-1 font-display text-xl font-extrabold text-ink-950">{money(m.tutar)}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
+                <p className="numeric mt-1 font-display text-xl font-extrabold text-text">{money(m.tutar)}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
                   <div className={`h-full rounded-full ${m.bar}`} style={{ width: `${Math.round((m.tutar / kiyasMax) * 100)}%` }} />
                 </div>
               </Link>
@@ -268,7 +272,7 @@ export default async function GiderlerPage({
           <div className="px-1 text-center sm:px-3">
             <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Aylık değişim</p>
             {aylikDegisim !== null ? (
-              <p className={`mt-1 font-display text-xl font-extrabold ${aylikFark > 0 ? "text-danger-500" : "text-mint-600"}`}>
+              <p className={`mt-1 font-display text-xl font-extrabold ${aylikFark > 0 ? "text-danger-strong" : "text-success-strong"}`}>
                 {aylikFark > 0 ? "+" : ""}%{Math.abs(aylikDegisim) > 999 ? "999+" : aylikDegisim}
               </p>
             ) : (
@@ -284,7 +288,22 @@ export default async function GiderlerPage({
       {/* Kategori özet — dağılım + aylık trend + kırılım kartları */}
       {activeCategories.length > 0 || hasTrend ? (
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,340px)_minmax(0,340px)_1fr]">
-          {activeCategories.length > 0 ? (
+          {activeCategories.length > 0 && barsMode ? (
+            <ChartFrame
+              title="Kategori dağılımı"
+              subtitle={`${activeCategories.length} kalem · büyükten küçüğe · satıra tıklayın`}
+              height={Math.max(250, activeCategories.length * 40 + 8)}
+              className="lg:col-span-2 xl:col-span-2"
+            >
+              <CategoryBars
+                items={activeCategories.map((c) => ({ value: c.value, label: c.label, total: c.total }))}
+                activeValue={kategoriF}
+                hrefFor={(v) => href({ kategori: v })}
+                formatMoney={money}
+              />
+            </ChartFrame>
+          ) : null}
+          {activeCategories.length > 0 && !barsMode ? (
             <ChartFrame
               title="Kategori dağılımı"
               subtitle={fromF || toF ? "Seçili tarih aralığı · segmente tıklayın" : "Tüm gider kayıtları · segmente tıklayın"}
@@ -305,7 +324,7 @@ export default async function GiderlerPage({
               />
             </ChartFrame>
           ) : null}
-          {activeCategories.length > 0 ? (
+          {activeCategories.length > 0 && !barsMode ? (
             <div className="grid content-start grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-2 xl:col-span-1">
               {activeCategories.map((c) => {
                 const active = kategoriF === c.value;
@@ -315,14 +334,14 @@ export default async function GiderlerPage({
                     href={href({ kategori: active ? null : c.value })}
                     aria-current={active ? "page" : undefined}
                     className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition ${
-                      active ? "border-brand-400 bg-brand-600/5" : "border-line bg-surface hover:border-brand-300"
+                      active ? "border-brand-400 bg-surface-accent-soft" : "border-line bg-surface hover:border-brand-300"
                     }`}
                   >
                     <p className="flex items-center justify-center gap-1 text-xs font-semibold text-text-muted">
                       {c.label}
-                      <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                      <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
                     </p>
-                    <p className="mt-1 font-display text-base font-bold text-ink-950">{money(c.total)}</p>
+                    <p className="mt-1 font-display text-base font-bold text-text">{money(c.total)}</p>
                   </Link>
                 );
               })}
@@ -334,7 +353,7 @@ export default async function GiderlerPage({
       {/* Yeni gider formu */}
       {canCreate && (
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-          <h2 className="mb-4 font-display font-bold text-ink-950">Yeni Gider Ekle</h2>
+          <h2 className="mb-4 font-display font-bold text-text">Yeni Gider Ekle</h2>
           <ExpenseCreateForm
             categories={categories}
             defaultDate={new Date(nowMs()).toISOString().slice(0, 10)}
@@ -347,7 +366,7 @@ export default async function GiderlerPage({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-muted">Filtre:</span>
           {kategoriF ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-accent-soft px-3 py-1 text-xs font-semibold text-accent-text">
               {catLabel(kategoriF)}
               <Link href={href({ kategori: null })} aria-label="Kategori filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
                 <X className="h-3.5 w-3.5" />
@@ -355,7 +374,7 @@ export default async function GiderlerPage({
             </span>
           ) : null}
           {fromF || toF ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-accent-soft px-3 py-1 text-xs font-semibold text-accent-text">
               {fromF ? tarihKisa(fromF) : "…"} — {toF ? tarihKisa(toF) : "…"}
               <Link href={href({ from: null, to: null })} aria-label="Tarih filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
                 <X className="h-3.5 w-3.5" />
@@ -371,8 +390,8 @@ export default async function GiderlerPage({
         fromF || toF ? (
           <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
             <Receipt className="h-8 w-8 text-text-faint" />
-            <h2 className="mt-3 font-display text-lg font-bold text-ink-950">Seçili tarih aralığında gider kaydı yok</h2>
-            <Link href={href({ from: null, to: null })} className="mt-2 text-sm font-semibold text-brand-600 hover:underline">
+            <h2 className="mt-3 font-display text-lg font-bold text-text">Seçili tarih aralığında gider kaydı yok</h2>
+            <Link href={href({ from: null, to: null })} className="mt-2 text-sm font-semibold text-accent-text hover:underline">
               Tarih filtresini temizle
             </Link>
           </div>
@@ -396,7 +415,7 @@ export default async function GiderlerPage({
         <div className="text-center">
           <Link
             href={qs({ kategori: kategoriF || null, from: fromF, to: toF, adet: String(adet + 200) })}
-            className="focus-ring inline-flex rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-brand-600 hover:border-brand-300"
+            className="focus-ring inline-flex rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-accent-text hover:border-brand-300"
           >
             Daha fazla göster ({adet} kayıt gösteriliyor)
           </Link>

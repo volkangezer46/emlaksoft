@@ -43,12 +43,12 @@ export function CardsPanel({
 
   return (
     <section id="kartlar" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-      <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+      <p className="flex items-center gap-2 text-xs font-semibold text-accent-text">
         <CreditCard className="h-4 w-4" /> Kayıtlı kartlar
       </p>
-      <h2 className="mt-1 font-display font-bold text-ink-950">Ödeme kartlarınız</h2>
+      <h2 className="mt-1 font-display font-bold text-text">Ödeme kartlarınız</h2>
       <p className="mt-1 flex items-start gap-1.5 text-xs text-text-muted">
-        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" />
+        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-strong" />
         Kart bilgileriniz EmlakSoft&apos;ta tutulmaz; iyzico güvenli kasasında saklanır. Burada yalnızca maskeli özet görünür.
       </p>
 
@@ -62,13 +62,13 @@ export function CardsPanel({
             <li key={c.id} className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-4 py-3">
               <CreditCard className="h-5 w-5 text-text-muted" />
               <div className="min-w-0 flex-1">
-                <p className="numeric text-sm font-semibold text-ink-950">{maskedCardLabel(c)}</p>
+                <p className="numeric text-sm font-semibold text-text">{maskedCardLabel(c)}</p>
                 <p className="text-xs text-text-faint">
                   {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(c.created_at))} tarihinde eklendi
                 </p>
               </div>
               {c.is_default ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/15 px-2.5 py-1 text-xs font-bold text-mint-600">
+                <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/15 px-2.5 py-1 text-xs font-bold text-success-strong">
                   <Star className="h-3 w-3" /> Varsayılan
                 </span>
               ) : null}
@@ -79,7 +79,7 @@ export function CardsPanel({
                       type="button"
                       disabled={pending}
                       onClick={() => run(c.id, () => setDefaultPaymentCard(c.id))}
-                      className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-400 disabled:opacity-60"
+                      className="rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text transition hover:border-brand-400 disabled:opacity-60"
                     >
                       {busyId === c.id && pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Varsayılan yap"}
                     </button>
@@ -103,7 +103,7 @@ export function CardsPanel({
                       type="button"
                       aria-label={`${maskedCardLabel(c)} kartını sil`}
                       onClick={() => setConfirmId(c.id)}
-                      className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500"
+                      className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-strong"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -117,7 +117,7 @@ export function CardsPanel({
 
       {autoRenewAvailable && cards.length > 0 && canManage ? (
         <div className="mt-5 rounded-[var(--radius-card)] border border-line p-4">
-          <p className="text-sm font-semibold text-ink-950">Otomatik yenileme</p>
+          <p className="text-sm font-semibold text-text">Otomatik yenileme</p>
           {autoRenewEnabled ? (
             <>
               <p className="mt-1 text-xs text-text-muted">
@@ -129,7 +129,7 @@ export function CardsPanel({
                 type="button"
                 disabled={pending}
                 onClick={() => run("auto", () => setAutoRenewConsent({ enabled: false }))}
-                className="mt-2 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-400 disabled:opacity-60"
+                className="mt-2 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text hover:border-brand-400 disabled:opacity-60"
               >
                 Otomatik yenilemeyi kapat
               </button>
@@ -156,7 +156,7 @@ export function CardsPanel({
         </div>
       ) : null}
 
-      {error ? <p className="mt-3 text-xs text-danger-500" role="alert">{error}</p> : null}
+      {error ? <p className="mt-3 text-xs text-danger-strong" role="alert">{error}</p> : null}
     </section>
   );
 }
