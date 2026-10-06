@@ -1,3 +1,4 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Award, HeartHandshake, MousePointerClick, UserPlus, Wallet, Hourglass, CheckCircle2, Undo2, PiggyBank } from "lucide-react";
@@ -63,12 +64,12 @@ function monthsText(n: number): string {
 
 export default async function BuyumePage({ searchParams }: { searchParams: Promise<{ durum?: string }> }) {
   const { tenantId, perms, role } = await requireModulePage("settings", "/app/buyume");
+  if (!tenantId) return <StaffNoTenantNotice feature="Büyüme ve davetler" />;
   // R1: kazanc/davet verisi yalniz owner/gm (SQL tarafi growth_my_dashboard da ayni kapiyi uygular).
   if (role !== "owner" && role !== "gm") redirect("/app?yetki=yok");
   const sp = await searchParams;
   const durum = parseInviteFilter(sp.durum);
 
-  if (!tenantId) return null;
   const ov = await getReferralOverview(tenantId);
   const base = getBaseUrl();
   const url = ov.code ? buildShortInviteUrl(base, ov.code) : null;

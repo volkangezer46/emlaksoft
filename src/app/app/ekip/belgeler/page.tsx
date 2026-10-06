@@ -1,3 +1,4 @@
+import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
@@ -46,7 +47,8 @@ function dateTr(day: string): string {
  */
 export default async function BelgeTakibiPage({ searchParams }: { searchParams?: Promise<Sp> }) {
   const ctx = await requireModulePage("team", "/app/ekip");
-  if (!ctx.tenantId || (ctx.role !== "owner" && ctx.role !== "gm")) redirect("/app/ekip");
+  if (!ctx.tenantId) return <StaffNoTenantNotice feature="Belge takibi" />;
+  if (ctx.role !== "owner" && ctx.role !== "gm") redirect("/app/ekip");
 
   const sp = (await searchParams) ?? {};
   const durumRaw = one(sp.durum);

@@ -1,7 +1,7 @@
-import Link from "next/link";
+import { RoleNotAllowedNotice, StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { canViewTv } from "@/lib/tv/tv-logic";
+import { canViewTv, TV_VIEW_ROLES } from "@/lib/tv/tv-logic";
 import { TvBoard } from "./tv-board";
 import "./tv.css";
 
@@ -15,18 +15,16 @@ export const metadata = { title: "Ofis Panosu · TV" };
 export default async function PanoTvPage() {
   const { tenantId, role, userId } = await requireModulePage("reports", "/app/pano-tv");
 
-  if (!tenantId || !canViewTv(role)) {
+  // Platform personeli ofis bağlamı olmadan gelir (tenantId null): yetki değil bağlam eksik.
+  if (!tenantId) return <StaffNoTenantNotice feature="Pano TV" />;
+  if (!canViewTv(role)) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <h1 className="font-display text-xl font-extrabold text-ink-950">Bu panoyu görme yetkiniz yok</h1>
-        <p className="mt-2 text-sm text-text-muted">
-          Ofis Panosu (TV) yalnız ofis geneli kapsamı olan roller (ofis sahibi, genel müdür, şube müdürü) içindir. Kendi
-          performansınız için Performansım sayfasını kullanın.
-        </p>
-        <Link href="/app/performansim" className="focus-ring press mt-5 inline-flex h-10 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white">
-          Performansım
-        </Link>
-      </div>
+      <RoleNotAllowedNotice
+        feature="Pano TV"
+        allowedRoles={TV_VIEW_ROLES}
+        role={role}
+        alternative={{ href: "/app/performansim", label: "Performansım" }}
+      />
     );
   }
 

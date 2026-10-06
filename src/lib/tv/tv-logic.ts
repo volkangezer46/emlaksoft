@@ -233,8 +233,11 @@ export function newIds(prev: ReadonlySet<string> | null, next: readonly string[]
 /* -------------------------------------------------------------------------- */
 
 /** TV yalnız ofis geneli kapsam rolleri içindir (owner, gm, branch_manager). */
+/** Ofis Panosu'nu (TV) görebilen roller (ofis geneli kapsam). */
+export const TV_VIEW_ROLES = ["owner", "gm", "branch_manager"] as const;
+
 export function canViewTv(role: string | null | undefined): boolean {
-  return role === "owner" || role === "gm" || role === "branch_manager";
+  return (TV_VIEW_ROLES as readonly string[]).includes(role ?? "");
 }
 
 /** Burn-in önleme: çok yavaş ±2px kayma (dakikada bir adım), saf fonksiyon. */
