@@ -183,22 +183,26 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     "compliance", "support",
   ];
 
-  it("ekip menü öğesi performans sekmelerini tek kabukta toplar; Performans başlığında tekrar yok", () => {
+  it("Ekip Merkezi yönetim sekmeleri; performans TEK 'Ekip performansı' öğesinde (Özet/Lig/Kıyas), tekrar yok", () => {
     const ofis = visibleSections(ALL).find((s) => s.id === "ofis")!;
     const item = ofis.items.find((i) => i.href === "/app/ekip")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Kıyas", "Danışman KPI", "Ekip Ligi", "Hedefler", "Devir / Atama", "Şubeler", "Takımlar"]);
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Hedefler", "Devir / Atama", "Şubeler", "Takımlar"]);
     const perf = visibleSections(ALL).find((s) => s.id === "performans")!;
     expect(perf.items.some((i) => i.href === "/app/hedefler")).toBe(false);
-    expect(perf.items.some((i) => i.href === "/app/danisman-kpi" || i.href === "/app/lig")).toBe(false);
+    const ekipPerf = perf.items.find((i) => i.label === "Ekip performansı")!;
+    expect(ekipPerf.tabs?.map((t) => t.href)).toEqual(["/app/danisman-kpi", "/app/lig", "/app/ekip/kiyas"]);
     expect(ALL_NAV_HREFS).toContain("/app/danisman-kpi");
     expect(ALL_NAV_HREFS).toContain("/app/lig");
     expect(ALL_NAV_HREFS).toContain("/app/hedefler");
   });
 
-  it("sekme sayfaları Ekip Merkezi öğesini etkin yapar", () => {
+  it("sekme sayfaları sahibi öğeyi etkin yapar (yönetim: Ekip Merkezi, performans: Ekip performansı)", () => {
     const sections = visibleSections(ALL);
-    for (const p of ["/app/ekip/kiyas", "/app/danisman-kpi", "/app/lig", "/app/ekip/devir", "/app/hedefler"]) {
+    for (const p of ["/app/ekip/devir", "/app/hedefler", "/app/ekip/subeler"]) {
       expect(resolveActiveNav(p, sections).href, p).toBe("/app/ekip");
+    }
+    for (const p of ["/app/ekip/kiyas", "/app/danisman-kpi", "/app/lig"]) {
+      expect(resolveActiveNav(p, sections).href, p).toBe("/app/danisman-kpi");
     }
   });
 
@@ -210,7 +214,7 @@ describe("Ekip Merkezi menü ve kapılar", () => {
 
   it("yetkisiz sekme gizlenir: ekip modülü olan ama hedef izni olmayan rolde Hedefler çıkmaz", () => {
     const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip Merkezi")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Kıyas", "Danışman KPI", "Ekip Ligi", "Devir / Atama", "Şubeler", "Takımlar"]);
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Devir / Atama", "Şubeler", "Takımlar"]);
   });
 
   it("Kazanç tek sayfa: Finans > Komisyon sekmesi, Ekip Merkezi'nde ayrı Kazanç sekmesi yok", () => {
