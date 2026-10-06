@@ -113,6 +113,15 @@ const F = {
   tenantLicenseDetails: "20260826001800_tenant_license_details.sql",
   // growth_my_dashboard B12 geri getirme (001000, 000900 duzeltmesini ezdi). 000900 + 001000 SONRASI.
   growthDashboardB12Reapply: "20260826001900_growth_dashboard_b12_reapply.sql",
+  // Portfoy-Ilan Yasam Dongusu ve Kayip/Kacak Denetimi (WP-2..7): portal ilan zinciri, kapsam yardimcilari, kontrol tablolari/RPC'leri.
+  lcPortalChain: "20260826002000_lc_portal_listing_chain.sql",
+  lcScopeHelpers: "20260826002010_lc_scope_helpers.sql",
+  lcVerificationTables: "20260826002020_lc_verification_tables.sql",
+  lcAnomalyTables: "20260826002030_lc_anomaly_tables.sql",
+  lcControlState: "20260826002040_lc_property_control_state.sql",
+  lcQueueRpcs: "20260826002050_lc_queue_and_check_rpcs.sql",
+  lcAnomalyRpcs: "20260826002060_lc_anomaly_rpcs.sql",
+  lcSummaryMarket: "20260826002070_lc_summary_rpcs_market_view.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -195,6 +204,14 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efPlanExpiry]: "ek", // yeni service_role RPC (ef_credit_expire_plan) + source CHECK'e 'expire' + ayar seed'i; mevcut satir/davranis ayni
     [F.paymentCards]: "ek", // yeni 2 tablo + service_role RPC; kod tablolar yokken zarifce kapali (kart saklama + otomatik yenileme altyapisi)
     [F.notificationsDedupeKey]: "ek", // nullable dedupe_key kolonu + kismi benzersiz indeks; mevcut satir/davranis ayni, kod kolon yokken eski davranisa duser
+    [F.lcPortalChain]: "davranis", // portal_listings: yeni kolonlar + (ofis, portal, ilan no) acik tekil indeksi (yinelenen canli satir varsa DURUR) + 'superseded' durumu + bind/rotate service_role RPC'leri
+    [F.lcScopeHelpers]: "ek", // lc_row_visible/lc_current_*_id yardimcilari + oversight_settings.listing_control jsonb kolonu
+    [F.lcVerificationTables]: "ek", // portal_listing_health, listing_verifications, listing_verification_jobs, verification_clients (yazma yalniz service_role)
+    [F.lcAnomalyTables]: "ek", // listing_anomalies/actions, listing_sla_events, listing_matching_candidates (yazma yalniz service_role/RPC)
+    [F.lcControlState]: "ek", // property_control_state (turetilmis asama/skor/KPI bayraklari)
+    [F.lcQueueRpcs]: "ek", // kuyruk talep/hasat + supheli->onayli kayip durum makinesi RPC'leri (portal_listings'e YAZMAZ)
+    [F.lcAnomalyRpcs]: "ek", // anomali esitleme/SLA yukseltme (service_role) + acikla/kapat (authenticated, JWT'den)
+    [F.lcSummaryMarket]: "ek", // KPI/liste/dunden-beri RPC'leri (invoker) + property_status_history'ye 2 nullable kolon + anonim agregat gorunum (service_role)
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -282,6 +299,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB23-yetki-belgesi-alanlari", order: 29.74, title: "Ofis yetki belgesi unvani + gecerlilik tarihi (tenants, 2 nullable sutun)", files: [F.tenantLicenseDetails] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "PB24-buyume-b12-geri-getirme", order: 29.75, title: "growth_my_dashboard B12 geri getirme (001000 ezmesi duzeltilir: money_visible + yuvarli davet tutari + rol kapisi)", files: [F.growthDashboardB12Reapply] },
+    { id: "PB25-ilan-kontrol-zincir", order: 29.80, title: "Ilan kontrol: portal ilan zinciri (supersedes, acik tekil indeks, bind/rotate RPC) + rol kapsami yardimcilari + ofis ayar kolonu", files: [F.lcPortalChain, F.lcScopeHelpers] },
+    { id: "PB26-ilan-kontrol-tablolar", order: 29.81, title: "Ilan kontrol: saglik/sonuc/kuyruk/cihaz + anomali/SLA/eslestirme + portfoy kontrol ozeti tablolari", files: [F.lcVerificationTables, F.lcAnomalyTables, F.lcControlState] },
+    { id: "PB27-ilan-kontrol-rpc", order: 29.82, title: "Ilan kontrol: kuyruk/durum makinesi + anomali RPC'leri + KPI/liste RPC'leri + anonim agregat gorunum", files: [F.lcQueueRpcs, F.lcAnomalyRpcs, F.lcSummaryMarket] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -374,6 +394,18 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.growthHotfix, F.defaultProgram],
     [F.growthDashboardB12Reapply, F.growthHotfix],
     [F.growthDashboardB12Reapply, F.growthDashboardRoles],
+    // Ilan kontrol: zincir -> kapsam yardimcilari -> tablolar -> RPC'ler.
+    [F.lcVerificationTables, F.lcPortalChain],
+    [F.lcVerificationTables, F.lcScopeHelpers],
+    [F.lcAnomalyTables, F.lcScopeHelpers],
+    [F.lcControlState, F.lcScopeHelpers],
+    [F.lcQueueRpcs, F.lcVerificationTables],
+    [F.lcQueueRpcs, F.lcControlState],
+    [F.lcAnomalyRpcs, F.lcControlState],
+    [F.lcAnomalyRpcs, F.lcAnomalyTables],
+    [F.lcSummaryMarket, F.lcControlState],
+    [F.lcSummaryMarket, F.lcAnomalyTables],
+    [F.lcSummaryMarket, F.lcVerificationTables],
   ],
 
   externalPending: [

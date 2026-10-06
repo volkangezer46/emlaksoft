@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { normalizeCloseFlags } from "@/lib/leak-shield";
 import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { isMissingSchema } from "@/lib/listing-control/server/db";
 
 export type PortalResult = { error?: string; ok?: boolean };
 
@@ -28,22 +29,84 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
   const references = await validateTenantReferences(gate.tenantId, { propertyId });
   if (!references.ok) return { error: references.error };
 
-  const now = new Date().toISOString();
-  const { error } = await admin.from("portal_listings").insert({
-    tenant_id: gate.tenantId,
-    property_id: propertyId,
-    portal_name: portalName,
-    portal_listing_id: portalListingId || null,
-    portal_url: portalUrl || null,
-    status: "live",
-    last_confirmed_at: now,
-    published_at: now,
-    published_by: gate.userId,
-  });
-
-  if (error) {
-    console.error("createPortalListing", error);
-    return { error: "Portal ilanı eklenemedi." };
+  // İlan no DEĞİŞİMİ: eski satır kapanır ('superseded'), yenisi supersedes_id ile zincirlenir (yeni geçmiş tablosu yok).
+  const supersedesId = String(formData.get("supersedes_id") ?? "").trim();
+  const candidateId = String(formData.get("candidate_id") ?? "").trim();
+  if (supersedesId) {
+    if (!portalListingId) return { error: "Yeni ilan numarası zorunlu." };
+    const { data: old } = await admin
+      .from("portal_listings")
+      .select("property_id")
+      .eq("id", supersedesId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (!old || (old as { property_id: string }).property_id !== propertyId) return { error: "Değiştirilecek portal ilanı bulunamadı." };
+    const { data: rot, error: rotError } = await admin.rpc("lc_rotate_portal_listing", {
+      p_tenant_id: gate.tenantId,
+      p_actor_id: gate.userId,
+      p_listing_id: supersedesId,
+      p_new_external_id: portalListingId,
+      p_new_url: portalUrl || null,
+      p_reason: null,
+    });
+    if (rotError) {
+      console.error("createPortalListing rotate", { code: rotError.code });
+      return { error: isMissingSchema(rotError) ? "İlan numarası değişimi için sistem güncellemesi bekleniyor." : "İlan numarası değiştirilemedi." };
+    }
+    const rotOutcome = String((rot as { outcome?: string } | null)?.outcome ?? "");
+    if (rotOutcome === "external_id_in_use") return { error: "Bu ilan numarası bu portalda zaten başka bir ilana bağlı." };
+    if (rotOutcome === "unchanged") return { error: "İlan numarası aynı; değişiklik yok." };
+    if (rotOutcome === "not_live") return { error: "Yalnız yayındaki ilanın numarası değiştirilebilir." };
+    if (rotOutcome !== "applied") return { error: "İlan numarası değiştirilemedi." };
+  } else {
+    // Bağlama: aynı (ofis, portal, ilan no) açıkken tekrar = replay; başka portföye bağlıysa reddedilir.
+    const { data: bound, error: bindError } = await admin.rpc("lc_bind_portal_listing", {
+      p_tenant_id: gate.tenantId,
+      p_actor_id: gate.userId,
+      p_property_id: propertyId,
+      p_portal_name: portalName,
+      p_external_id: portalListingId || null,
+      p_url: portalUrl || null,
+      p_source_kind: "manual",
+      p_created_via: candidateId ? "matching" : "bind",
+    });
+    if (bindError && !isMissingSchema(bindError)) {
+      console.error("createPortalListing bind", { code: bindError.code });
+      return { error: "Portal ilanı eklenemedi." };
+    }
+    if (bindError) {
+      // Migration uygulanmamış: eski doğrudan ekleme yolu (davranış değişmez).
+      const now = new Date().toISOString();
+      const { error } = await admin.from("portal_listings").insert({
+        tenant_id: gate.tenantId,
+        property_id: propertyId,
+        portal_name: portalName,
+        portal_listing_id: portalListingId || null,
+        portal_url: portalUrl || null,
+        status: "live",
+        last_confirmed_at: now,
+        published_at: now,
+        published_by: gate.userId,
+      });
+      if (error) {
+        console.error("createPortalListing", error);
+        return { error: "Portal ilanı eklenemedi." };
+      }
+    } else {
+      const outcome = String((bound as { outcome?: string } | null)?.outcome ?? "");
+      if (outcome === "bound_to_other_property") return { error: "Bu ilan numarası bu portalda başka bir portföye bağlı." };
+      if (outcome !== "applied" && outcome !== "replay") return { error: "Portal ilanı eklenemedi." };
+      if (candidateId) {
+        // Kayıtsız ilan eşleştirme adayını bağlandı olarak işaretle (en iyi çaba).
+        await admin.rpc("lc_decide_matching_candidate", {
+          p_tenant_id: gate.tenantId,
+          p_candidate_id: candidateId,
+          p_status: "linked",
+          p_actor_id: gate.userId,
+          p_linked_listing_id: (bound as { listing_id?: string } | null)?.listing_id ?? null,
+        });
+      }
+    }
   }
 
   revalidatePath("/app/portallar");
