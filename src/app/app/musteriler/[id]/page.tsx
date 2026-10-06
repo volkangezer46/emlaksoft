@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -596,6 +597,12 @@ export default async function CustomerDetailPage({
       <KpiStrip items={kpis} label="Müşteri özeti" />
 
       {tenantId ? <CustomerOwnedListings tenantId={tenantId} customerId={customer.id} /> : null}
+
+      {tenantId ? (
+        <Suspense fallback={null}>
+          <CustomFieldsPanel entity="customer" recordId={customer.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
+        </Suspense>
+      ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">

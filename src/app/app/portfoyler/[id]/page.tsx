@@ -41,6 +41,7 @@ import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
 import { SocialCardPanel } from "@/components/app/social-card-panel";
+import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
 import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
@@ -637,6 +638,12 @@ export default async function PropertyDetailPage({
               provinceId={property.province_id}
             />
           </Suspense>
+
+          {tenantId ? (
+            <Suspense fallback={null}>
+              <CustomFieldsPanel entity="property" recordId={property.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
+            </Suspense>
+          ) : null}
             </div>
           ) : null}
 

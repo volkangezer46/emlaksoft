@@ -17,6 +17,7 @@ import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { filterCustomersByHeatSegment } from "@/lib/customer-heat-export";
 import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
+import { customFieldCsvColumns } from "@/lib/custom-fields/load";
 
 /**
  * Liste CSV'leri ekranla AYNI kapsamı uygular: eski rol kuralı (`hasOfficeWideDataScope`) taban, ofis bayrağı
@@ -83,7 +84,7 @@ export async function exportCustomersCsv(filters: Partial<CustomerListFilters> =
   let q = applyCustomerFilters(
     supabase
       .from("customers")
-      .select("full_name, phone, email, customer_types, tags, source, created_at")
+      .select("id, full_name, phone, email, customer_types, tags, source, created_at")
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -110,7 +111,8 @@ export async function exportCustomersCsv(filters: Partial<CustomerListFilters> =
     console.error("exportCustomersCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((r) => mapCustomer(r));
+  const custom = await customFieldCsvColumns(supabase, gate.tenantId, "customer", (data ?? []).map((r) => String((r as { id?: string }).id ?? "")));
+  const rows = (data ?? []).map((r) => ({ ...mapCustomer(r), ...custom.forRecord(String((r as { id?: string }).id ?? "")) }));
   // Segmentli dışa aktarmada tam akış (segment bilmez) önerilmez: yalnız filtreyi daraltma uyarısı kalır.
   return exportResult(gate, "musteriler", rows, `musteriler-${trDayKey()}.csv`, segmentApplied);
 }
@@ -187,7 +189,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
   let q = supabase
     .from("properties")
     .select(
-      "property_code, title, transaction_type, property_type, status, list_price, assigned_to, created_at, province:geo_provinces(name), district:geo_districts(name)",
+      "id, property_code, title, transaction_type, property_type, status, list_price, assigned_to, created_at, province:geo_provinces(name), district:geo_districts(name)",
     )
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
@@ -212,7 +214,8 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
     for (const p of profiles ?? []) names.set(p.id, p.full_name);
   }
 
-  const rows = (data ?? []).map((r) => mapProperty(r, names));
+  const custom = await customFieldCsvColumns(supabase, gate.tenantId, "property", (data ?? []).map((r) => String(r.id)));
+  const rows = (data ?? []).map((r) => ({ ...mapProperty(r, names), ...custom.forRecord(String(r.id)) }));
   return exportResult(gate, "portfoyler", rows, `portfoyler-${trDayKey()}.csv`);
 }
 
@@ -319,7 +322,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
   let q = supabase
     .from("customer_demands")
     .select(
-      "transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!customer_demands_customer_id_fkey!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
+      "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!customer_demands_customer_id_fkey!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId);
@@ -337,7 +340,8 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
     console.error("exportDemandsCsv", error);
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
-  const rows = (data ?? []).map((r) => mapDemand(r));
+  const custom = await customFieldCsvColumns(supabase, gate.tenantId, "demand", (data ?? []).map((r) => String(r.id)));
+  const rows = (data ?? []).map((r) => ({ ...mapDemand(r), ...custom.forRecord(String(r.id)) }));
   return exportResult(gate, "talepler", rows, `talepler-${today10()}.csv`);
 }
 
@@ -384,7 +388,7 @@ export async function exportDealsCsv(): Promise<ExportResult> {
   let q = supabase
     .from("deals")
     .select(
-      "stage, deal_type, deal_value, probability, updated_at, property:properties!deals_property_id_fkey(property_code, title, tenant_id), customer:customers!deals_customer_id_fkey(full_name, tenant_id)",
+      "id, stage, deal_type, deal_value, probability, updated_at, property:properties!deals_property_id_fkey(property_code, title, tenant_id), customer:customers!deals_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -399,7 +403,9 @@ export async function exportDealsCsv(): Promise<ExportResult> {
     return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
   }
   const stageNames = stageLabelMap(await getStageLabels());
-  const rows = (data ?? []).map(mapDealWith(stageNames));
+  const custom = await customFieldCsvColumns(supabase, gate.tenantId, "deal", (data ?? []).map((r) => String(r.id)));
+  const mapDealRow = mapDealWith(stageNames);
+  const rows = (data ?? []).map((r) => ({ ...mapDealRow(r), ...custom.forRecord(String(r.id)) }));
   return exportResult(gate, "anlasmalar", rows, `anlasmalar-${today10()}.csv`);
 }
 
