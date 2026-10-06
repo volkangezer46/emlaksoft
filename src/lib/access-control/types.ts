@@ -75,7 +75,7 @@ export interface ScopePermissionContext {
   targetUserId?: string;
   targetBranchId?: string;
   targetTeamId?: string;
-  action: "view" | "edit" | "delete" | "sign" | "reject" | "approve";
+  action: "view" | "edit" | "delete" | "create" | "sign" | "reject" | "approve";
 }
 
 /**

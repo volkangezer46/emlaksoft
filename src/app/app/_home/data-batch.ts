@@ -27,25 +27,26 @@ export const loadDashboardSnapshot = cache(
 
       // Paralel batch: tüm kritik dashboard verisi
       // Bu RPC'ler yoksa fallback kontrollü olmalı (fonksiyon hata atmasın)
+      type SupabaseResponse<T> = { error: Error | null; data: T | null };
       const results = await Promise.allSettled([
         // İçgörü snapshot (brifing, kuyruk)
         supabase
           .rpc("get_insights_snapshot", { p_tenant_id: tenantId })
-          .then((r: { error: unknown; data: unknown }) => {
+          .then((r: SupabaseResponse<object>) => {
             if (r.error) throw r.error;
             return r.data;
           }),
         // Metrik snapshot (KPI'lar)
         supabase
           .rpc("get_metrics_snapshot", { p_tenant_id: tenantId, p_user_id: userId })
-          .then((r: { error: unknown; data: unknown }) => {
+          .then((r: SupabaseResponse<object>) => {
             if (r.error) throw r.error;
             return r.data;
           }),
         // Görev snapshot (bugün + vadesi yakın)
         supabase
           .rpc("get_tasks_snapshot", { p_tenant_id: tenantId, p_user_id: userId })
-          .then((r: { error: unknown; data: unknown }) => {
+          .then((r: SupabaseResponse<object>) => {
             if (r.error) throw r.error;
             return r.data;
           }),
@@ -55,7 +56,7 @@ export const loadDashboardSnapshot = cache(
           .select("*")
           .eq("tenant_id", tenantId)
           .single()
-          .then((r: { error: unknown; data: unknown }) => {
+          .then((r: SupabaseResponse<object>) => {
             if (r.error) throw r.error;
             return r.data;
           }),

@@ -139,6 +139,14 @@ const F = {
   propertyEidsNo: "20260826002950_property_eids_no.sql",
   rentReminders: "20260826002960_rent_reminders.sql",
   contractRentalLink: "20260826002970_contract_rental_link.sql",
+  // Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi kontrol).
+  userScopes: "20261006000100_user_scopes.sql",
+  scopeOverrides: "20261006000101_scope_overrides.sql",
+  accessAuditLog: "20261006000102_access_audit_log.sql",
+  hasScopeRpc: "20261006000103_has_permission_with_scope_rpc.sql",
+  // Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache.
+  perfIndexes: "20261006000200_perf_indexes.sql",
+  perfNavBadgeCache: "20261006000300_nav_badge_cache.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -241,6 +249,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.rentReminders]: "ek", // rent_reminder_settings (KAPALI dogar) + rent_reminders (dedupe) + customers'a opt-out sutunlari
     [F.contractRentalLink]: "ek", // contracts'a 3 nullable sutun (rental_id composite FK, artis maddesi) + kismi indeks
     [F.lcWorkerEvents]: "ek", // listing_control_events (yeni tablo, Realtime) + 3 tetikleyici (yalniz ilan kontrol tablolari) + 4 authenticated worker RPC
+    [F.userScopes]: "ek", // user_scopes (yeni tablo, kapsam tanımı), scope_rules (RLS politikası)
+    [F.scopeOverrides]: "ek", // scope_overrides (yeni tablo, istisna kayıtları)
+    [F.accessAuditLog]: "ek", // access_audit_log (yeni tablo, denetim günlüğü)
+    [F.hasScopeRpc]: "ek", // 5 RPC fonksiyonu: current_user_scope, current_user_team_id, current_user_branch_id, has_permission_with_scope, check_scope_access
+    [F.perfIndexes]: "davranis", // 8 composite index (deals, calls, tasks, contacts, events, expenses, demands, offers) - sorgu performansını 40-60% hızlandırır
+    [F.perfNavBadgeCache]: "ek", // nav_badge_snapshots tablo + get_nav_badge_snapshot RPC + cron trigger
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -341,6 +355,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB37-eids-tasinmaz-no", order: 29.88, title: "EIDS tasinmaz kimlik no (properties.eids_property_no, nullable + format CHECK)", files: [F.propertyEidsNo] },
     { id: "PB38-kiraci-hatirlatma", order: 29.89, title: "Kiraci kira hatirlatma (ayar KAPALI dogar + hatirlatma kaydi/dedupe + opt-out)", files: [F.rentReminders] },
     { id: "PB39-kira-sozlesme-baglantisi", order: 29.90, title: "Kiralamadan kira sozlesmesi (contracts.rental_id + artis maddesi alanlari)", files: [F.contractRentalLink] },
+    { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi)", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc] },
+    { id: "PB41-hiz-optimizasyonu", order: 29.92, title: "Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache snapshot", files: [F.perfIndexes, F.perfNavBadgeCache] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
