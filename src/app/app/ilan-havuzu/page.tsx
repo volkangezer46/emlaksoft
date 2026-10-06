@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Hand, Inbox, Layers, Settings2 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -192,12 +193,12 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard label="Bekleyen ilan" value={pendingRes.count ?? 0} icon={Inbox} tone="brand" href={href("bekleyen")} />
         <StatCard label="SLA'sı geçen" value={lateRes.count ?? 0} icon={AlertTriangle} tone={(lateRes.count ?? 0) > 0 ? "danger" : "warning"} href={href("gecikmis")} />
         <StatCard label="Sahiplenmeye açık" value={claimRes.count ?? 0} icon={Hand} tone="warning" href={href("sahiplen")} />
         <StatCard label="Son 7 gün atanan" value={assignedRes.count ?? 0} icon={CheckCircle2} tone="success" href={href("atanan")} />
-      </div>
+      </KpiGrid>
 
       {canConfigure ? (
         <details className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]" open={!enabled}>

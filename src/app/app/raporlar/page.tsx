@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -283,7 +284,7 @@ export default async function ReportsPage() {
         }
       />
 
-      <section aria-label="Öne çıkan göstergeler" className="list-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiGrid label="Öne çıkan göstergeler">
         <KpiCard
           label="Aylık komisyon"
           value={money(commissionTotal)}
@@ -326,7 +327,7 @@ export default async function ReportsPage() {
           trend={demandFlowMoM}
           previousText={`Bu ay yeni ${summary.month_new_demands} · önceki ay ${summary.prev_month_new_demands}`}
         />
-      </section>
+      </KpiGrid>
 
       <section className={SECTION} style={{ boxShadow: "var(--elev-3)" }}>
         <div className="flex flex-wrap items-center gap-2">

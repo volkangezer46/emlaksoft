@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
@@ -241,7 +242,7 @@ export default async function OnaylarPage({
       />
 
       {/* KPI şeridi — her kart filtrelenmiş listeye gider */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard
           label={geciken > 0 ? `Bekleyen · ${geciken} gecikmiş` : "Bekleyen onay"}
           value={bekleyen.length}
@@ -260,7 +261,7 @@ export default async function OnaylarPage({
           tone={ortSaat !== null && ortSaat > 48 ? "warning" : "neutral"}
           href="/app/onaylar?durum=onaylandi"
         />
-      </div>
+      </KpiGrid>
 
       {/* Sekmeler + filtreler */}
       <div className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">

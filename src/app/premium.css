@@ -501,6 +501,18 @@ html[data-density="compact"] {
   .ds-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out); }
 }
 .ds-card:hover { box-shadow: var(--card-shadow-hover); }
+/* ---- KpiGrid (ui/dashboard-grid): boşluksuz esnek KPI ızgarası. Satır başına --kpi-cols kart (sınıf kırılıma göre
+   yazar); flex-grow son satırı eşit genişlikte doldurur → satır sonunda yarım/boş hücre yok, tek kalan kart tam genişlik.
+   Aynı satırdaki kartlar eşit yükseklik (stretch). Kart dar kalırsa (≈ < 11,5 rem) ikon karosu gizlenir, değer sığar. */
+.kpi-flow { --kpi-gap: var(--space-3); display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--kpi-gap); }
+.kpi-flow > * {
+  flex: 1 1 calc((100% - (var(--kpi-cols, 2) - 1) * var(--kpi-gap)) / var(--kpi-cols, 2) - 0.5px);
+  min-width: 0;
+  container-type: inline-size;
+}
+@container (max-width: 11.5rem) {
+  .pm-card-inline > .pm-ico { display: none; }
+}
 .ds-pad { padding: var(--space-4); }
 @media (min-width: 640px) { .ds-pad { padding: var(--space-5); } }
 .ds-head { display: flex; align-items: flex-start; gap: var(--space-3); }

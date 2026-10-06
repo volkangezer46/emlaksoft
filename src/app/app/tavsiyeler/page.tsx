@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
@@ -233,7 +234,7 @@ export default async function ReferralsPage({
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard
           label="Aktif tavsiye linki"
           value={(activeLinkCount ?? 0).toLocaleString("tr-TR")}
@@ -259,7 +260,7 @@ export default async function ReferralsPage({
           tone="success"
           href="/app/tavsiyeler?durum=kazanildi"
         />
-      </div>
+      </KpiGrid>
 
       {/* ---------------- Gelen tavsiyeler ---------------- */}
       <section id="gelenler" className="space-y-3">

@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -184,7 +185,7 @@ export default async function ForeignSalePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard
           label="Yabancı müşteri"
           value={foreignCustomers.length}
@@ -213,7 +214,7 @@ export default async function ForeignSalePage() {
           tone={wonThisYear > 0 ? "success" : "warning"}
           href="/app/anlasmalar"
         />
-      </div>
+      </KpiGrid>
 
       {/* Mevzuat kartları */}
       <section className="space-y-3">

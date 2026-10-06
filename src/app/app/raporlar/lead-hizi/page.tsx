@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
@@ -152,7 +153,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
         </p>
       ) : null}
 
-      <section aria-label="Özet" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid label="Özet">
         <StatCard
           label="Ortalama ilk yanıt"
           value={formatMinutes(overall.avgMin)}
@@ -181,7 +182,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
           tone={overall.overdueWaiting > 0 ? "danger" : "success"}
           href={href({ ...base, durum: "gecikmis" })}
         />
-      </section>
+      </KpiGrid>
 
       {officeWide ? (
         <section aria-label="Danışman görünümü" className="surface-card rounded-[var(--radius-panel)]">

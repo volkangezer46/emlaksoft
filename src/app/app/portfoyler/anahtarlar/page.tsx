@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
@@ -188,7 +189,7 @@ export default async function PropertyKeysBoardPage({
         description="Ofisteki, dışarıdaki ve iadesi geciken tüm anahtarlar tek ekranda."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard label="Ofiste" value={officeCount} icon={Building2} tone="success" href={href({ durum: "ofiste", sayfa: 1 })} />
         <StatCard label="Dışarıda" value={outCount} icon={LogOut} tone="warning" href={href({ durum: "disarida", sayfa: 1 })} />
         <StatCard
@@ -199,7 +200,7 @@ export default async function PropertyKeysBoardPage({
           href={href({ durum: "gecikmis", sayfa: 1 })}
         />
         <StatCard label="Kayıp" value={lostCount} icon={Siren} tone="danger" href={href({ durum: "kayip", sayfa: 1 })} />
-      </div>
+      </KpiGrid>
 
       <form
         action="/app/portfoyler/anahtarlar"
