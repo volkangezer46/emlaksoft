@@ -10,7 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 import { sendCustomerSms } from "@/app/actions/communications";
 import { useToast } from "@/components/app/toast-provider";
 

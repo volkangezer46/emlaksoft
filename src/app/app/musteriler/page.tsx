@@ -27,6 +27,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { formatLeadSource } from "@/lib/lead-sources";
 import { exportCustomersCsv } from "@/app/actions/export";
 import { HEAT_POOL_LIMIT, hasCustomerFilters, normalizeCustomerFilters } from "@/lib/customer-list-filters";
+import { LEAD_CHANNEL_OPTIONS, leadChannelLabel } from "@/lib/lead-channel";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { SavedViews } from "@/components/app/saved-views";
 import { CustomerBulkBar, CustomerBulkProvider } from "./customer-bulk-actions";
@@ -172,6 +173,7 @@ export default async function CustomersPage({
   if (q)         baseParams.q = q;
   if (typeF)     baseParams.type = typeF;
   if (sourceF)   baseParams.source = sourceF;
+  if (filters.kanal) baseParams.kanal = filters.kanal;
   if (etiketF)   baseParams.etiket = etiketF;
   if (assignedF) baseParams.assigned = assignedF;
   if (segmentF)  baseParams.segment = segmentF;
@@ -245,6 +247,7 @@ export default async function CustomersPage({
     { key: "q", label: "Arama" },
     { key: "type", label: "Tip" },
     { key: "source", label: "Kaynak", format: (v) => formatLeadSource(v, sourceLabel) ?? v },
+    { key: "kanal", label: "Başvuru kanalı", format: (v) => leadChannelLabel(v) ?? v },
     { key: "etiket", label: "Etiket" },
     { key: "assigned", label: "Danışman", format: (v) => advisorName.get(v) ?? v },
     { key: "from", label: "Başlangıç" },
@@ -332,7 +335,7 @@ export default async function CustomersPage({
         params={baseParams}
         searchPlaceholder="Ad, telefon, e-posta ara…"
         searchLabel="Müşteri ara"
-        panelParamKeys={["source", "etiket", "assigned", "from", "to"]}
+        panelParamKeys={["source", "kanal", "etiket", "assigned", "from", "to"]}
         panel={
           <>
             <FilterGrid>
@@ -341,6 +344,16 @@ export default async function CustomersPage({
                 label="Kaynak"
                 value={sourceF}
                 options={[{ value: "", label: "Tüm kaynaklar" }, ...sourceEntries.map(([v, l]) => ({ value: v, label: l }))]}
+              />
+              <FilterSelect
+                name="kanal"
+                label="Başvuru kanalı"
+                value={filters.kanal}
+                options={[
+                  { value: "", label: "Tüm kanallar" },
+                  ...(filters.kanal && !(LEAD_CHANNEL_OPTIONS as readonly string[]).includes(filters.kanal) ? [{ value: filters.kanal, label: filters.kanal }] : []),
+                  ...LEAD_CHANNEL_OPTIONS.map((v) => ({ value: v, label: leadChannelLabel(v) ?? v })),
+                ]}
               />
               {tenantTags.length > 0 || etiketF ? (
                 <FilterSelect

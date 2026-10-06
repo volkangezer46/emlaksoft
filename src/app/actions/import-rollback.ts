@@ -29,15 +29,32 @@ import {
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const IMPORT_ACTIONS = ["customer.import", "property.import", "demand.import"] as const;
+const IMPORT_ACTIONS = ["customer.import", "property.import", "demand.import", "task.import", "appointment.import", "expense.import"] as const;
 
 const TARGET_BY_ACTION: Record<string, ImportTarget> = {
   "customer.import": "customers",
   "property.import": "properties",
   "demand.import": "demands",
+  "task.import": "tasks",
+  "appointment.import": "appointments",
+  "expense.import": "expenses",
 };
-const MODULE_BY_TARGET = { customers: "customers", properties: "properties", demands: "demands" } as const;
-const PATH_BY_TARGET = { customers: "/app/musteriler", properties: "/app/portfoyler", demands: "/app/talepler" } as const;
+const MODULE_BY_TARGET = {
+  customers: "customers",
+  properties: "properties",
+  demands: "demands",
+  tasks: "tasks",
+  appointments: "appointments",
+  expenses: "expenses",
+} as const;
+const PATH_BY_TARGET = {
+  customers: "/app/musteriler",
+  properties: "/app/portfoyler",
+  demands: "/app/talepler",
+  tasks: "/app/gorevler",
+  appointments: "/app/randevular",
+  expenses: "/app/giderler",
+} as const;
 
 export type ImportBatch = {
   batchId: string;

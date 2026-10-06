@@ -9,7 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 
 /** Pazarlık turu ekleme diyaloğu — taraf + tutar + not; round_no server'da son+1. */
 export function OfferRoundDialog({ offerId }: { offerId: string }) {

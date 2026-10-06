@@ -25,6 +25,7 @@ import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs, CUSTOMER_TAB_IDS, CUSTOMER_TAB_ALIASES } from "./customer-360-tabs";
 import { resolveTab } from "@/components/app/detail-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
+import { RentReminderPref } from "./rent-reminder-pref";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
@@ -356,6 +357,25 @@ export default async function CustomerDetailPage({
         customer.phone ? toTelHref(customer.phone) : null,
       );
 
+  // Kira hatırlatması tercihi (H3 sütunları): yalnız "İletişim tercihleri" sekmesinde; sütun yoksa kart çizilmez.
+  let rentPref: { optOut: boolean; atLabel: string | null } | null = null;
+  if (tab === "izinler") {
+    const prefRes = await supabase
+      .from("customers")
+      .select("rent_reminder_opt_out, rent_reminder_opt_out_at")
+      .eq("id", customer.id)
+      .maybeSingle();
+    if (!prefRes.error && prefRes.data) {
+      const row = prefRes.data as { rent_reminder_opt_out?: boolean | null; rent_reminder_opt_out_at?: string | null };
+      rentPref = {
+        optOut: row.rent_reminder_opt_out === true,
+        atLabel: row.rent_reminder_opt_out_at
+          ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(row.rent_reminder_opt_out_at))
+          : null,
+      };
+    }
+  }
+
   // Zaman çizelgesi — yalnız o sekme açıkken derlenir; kategori süzgeci sunucuda uygulanır.
   let events: Awaited<ReturnType<typeof buildCustomerEvents>> = [];
   let allEvents: typeof events = [];
@@ -669,6 +689,16 @@ export default async function CustomerDetailPage({
                   <SatisfactionSection customerId={customer.id} appUrl={publicBase} />
                 </Suspense>
               </>
+            }
+            preferencesSlot={
+              tab === "izinler" && rentPref ? (
+                <RentReminderPref
+                  customerId={customer.id}
+                  optOut={rentPref.optOut}
+                  optOutAtLabel={rentPref.atLabel}
+                  canEdit={canEdit}
+                />
+              ) : null
             }
             tasksSlot={
               canTaskView ? (

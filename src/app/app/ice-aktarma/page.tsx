@@ -39,15 +39,26 @@ export default async function ImportPage() {
   const { perms } = await requireModulePage("customers");
   const canImportProperties = effectiveHasPermission(perms, "properties", "create");
   const canImportDemands = effectiveHasPermission(perms, "demands", "create");
+  const canImportActivity = {
+    tasks: effectiveHasPermission(perms, "tasks", "create"),
+    appointments: effectiveHasPermission(perms, "appointments", "create"),
+    expenses: effectiveHasPermission(perms, "expenses", "create"),
+  };
   const updateAllowed = {
     customers: effectiveHasPermission(perms, "customers", "edit"),
     properties: effectiveHasPermission(perms, "properties", "edit"),
     demands: false,
+    tasks: false,
+    appointments: false,
+    expenses: false,
   };
   const rollbackAllowed = {
     customers: effectiveHasPermission(perms, "customers", "delete"),
     properties: effectiveHasPermission(perms, "properties", "delete"),
     demands: effectiveHasPermission(perms, "demands", "delete"),
+    tasks: effectiveHasPermission(perms, "tasks", "delete"),
+    appointments: effectiveHasPermission(perms, "appointments", "delete"),
+    expenses: effectiveHasPermission(perms, "expenses", "delete"),
   };
   const supabase = await createClient();
   const since30 = daysAgoIso(30);
@@ -207,6 +218,7 @@ export default async function ImportPage() {
       <ImportWizard
         canImportProperties={canImportProperties}
         canImportDemands={canImportDemands}
+        canImportActivity={canImportActivity}
         updateAllowed={updateAllowed}
         rollbackAllowed={rollbackAllowed}
         team={team}

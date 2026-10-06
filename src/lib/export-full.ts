@@ -182,7 +182,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
     let q = sb
       .from("contracts")
       .select(
-        "title, contract_type, status, created_at, signed_at, expires_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
+        "title, contract_type, status, created_at, signed_at, expires_at, cancelled_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
       )
       .eq("tenant_id", gate.tenantId)
       .eq("property.tenant_id", gate.tenantId)

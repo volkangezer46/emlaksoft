@@ -114,6 +114,15 @@ function TargetCreateForm({ members, onDone }: { members: Member[]; onDone: () =
       <FormField label="Hedef gelir (₺)" htmlFor="target-revenue" required>
         <Input id="target-revenue" name="target_revenue" type="number" min={0} step="any" required placeholder="Örn. 250000" />
       </FormField>
+      <FormField label="Hedef randevu" htmlFor="target-appointments" hint="Gösterim/görüşme sayısı (0 = takip edilmez).">
+        <Input id="target-appointments" name="target_appointments" type="number" min={0} step={1} defaultValue={0} />
+      </FormField>
+      <FormField label="Hedef yeni portföy" htmlFor="target-listings" hint="Dönemde eklenen portföy (0 = takip edilmez).">
+        <Input id="target-listings" name="target_listings" type="number" min={0} step={1} defaultValue={0} />
+      </FormField>
+      <FormField label="Not" htmlFor="target-notes" className="sm:col-span-2">
+        <Input id="target-notes" name="notes" maxLength={1000} placeholder="Örn. Kadıköy bölgesine odak" />
+      </FormField>
 
       {state.error ? (
         <p className="text-xs font-semibold text-danger-600 sm:col-span-2" role="alert">

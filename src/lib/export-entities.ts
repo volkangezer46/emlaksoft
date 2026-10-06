@@ -237,6 +237,7 @@ export const mapContract = (k: RawRow) => ({
   olusturuldu: k.created_at,
   imzalandi: k.signed_at ?? "",
   bitis: k.expires_at ?? "",
+  iptal: k.cancelled_at ?? "",
 });
 export const mapReferral = (r: RawRow) => ({
   tavsiye_edilen: r.referred_name,

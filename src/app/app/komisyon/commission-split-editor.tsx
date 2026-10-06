@@ -9,7 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 import { updateCommissionSplits } from "@/app/actions/commissions";
 import { useAutoAnimate } from "@/components/ui/auto-animate";
 import { AnimatedNumber } from "@/components/ui/animated-number";

@@ -244,7 +244,8 @@ export async function exportExpensesCsv(ids?: string[]): Promise<ExportResult> {
   return exportResult(gate, "giderler", rows, `giderler-${trDayKey()}.csv`);
 }
 
-export async function exportOffersCsv(): Promise<ExportResult> {
+/** `ids` verilirse yalnız seçili teklifler (liste toplu işlemi). */
+export async function exportOffersCsv(ids?: string[]): Promise<ExportResult> {
   const gate = await requirePermission("offers", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
@@ -259,6 +260,8 @@ export async function exportOffersCsv(): Promise<ExportResult> {
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const pickOffers = selectedIds(ids);
+  if (pickOffers) q = q.in("id", pickOffers);
   const { data, error } = await q;
   if (error) {
     console.error("exportOffersCsv", error);
@@ -601,14 +604,15 @@ export async function exportDuesCsv(): Promise<ExportResult> {
   return exportResult(gate, "aidatlar", rows, `aidatlar-${today10()}.csv`);
 }
 
-export async function exportContractsCsv(): Promise<ExportResult> {
+/** `ids` verilirse yalnız seçili sözleşmeler (liste toplu işlemi). */
+export async function exportContractsCsv(ids?: string[]): Promise<ExportResult> {
   const gate = await requirePermission("contracts", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   let q = supabase
     .from("contracts")
     .select(
-      "title, contract_type, status, created_at, signed_at, expires_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
+      "title, contract_type, status, created_at, signed_at, expires_at, cancelled_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -616,6 +620,8 @@ export async function exportContractsCsv(): Promise<ExportResult> {
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const pickContracts = selectedIds(ids);
+  if (pickContracts) q = q.in("id", pickContracts);
   const { data, error } = await q;
   if (error) {
     console.error("exportContractsCsv", error);

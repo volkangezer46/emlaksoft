@@ -29,6 +29,8 @@ export type CustomerVM = {
   lead: { score: number; hot: boolean } | null;
   blacklist: boolean;
   sourceLabel: string | null;
+  /** Başvuru kanalı rozeti (customers.lead_channel); kanaldan gelmeyen kayıtta null. */
+  channelLabel?: string | null;
   phone: string | null;
   phoneDisplay: string | null;
   telHref: string | null;
@@ -155,6 +157,11 @@ export function CustomerTable({
                           {c.province}
                         </span>
                         {c.sourceLabel ? <span>· {c.sourceLabel}</span> : null}
+                        {c.channelLabel ? (
+                          <span className="rounded-full bg-brand-600/8 px-1.5 py-0.5 font-semibold text-brand-700" title="Başvuru kanalı">
+                            {c.channelLabel}
+                          </span>
+                        ) : null}
                       </p>
                     </div>
                   </div>

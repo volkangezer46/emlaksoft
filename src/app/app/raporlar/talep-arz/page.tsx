@@ -1,6 +1,7 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
+import { ReportExportBar } from "@/components/app/report-export-bar";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { SkeletonCard } from "@/components/ui/viz";
@@ -220,7 +221,23 @@ export default async function TalepArzPage({
         eyebrow="Rapor merkezi"
         title="Talep-Arz Haritası"
         description={`${donem.label.toLowerCase()}de açılan açık talepler ile şu an yayındaki portföy stoku ilçe kırılımında karşılaştırılır — nerede portföy toplamalı, nerede talep üretmeli.`}
-        actions={<ButtonLink href="/app/raporlar" variant="secondary" icon={BarChart3}>Rapor merkezi</ButtonLink>}
+        actions={
+          <span className="flex flex-wrap items-center gap-2">
+            <ReportExportBar
+              rows={rows.map((r) => ({
+                il: r.provinceName,
+                ilce: r.districtName ?? "(belirtilmedi)",
+                talep: r.demandCount,
+                arz: r.supplyCount,
+                arz_talep_orani: r.ratio === null ? null : Math.round(r.ratio * 10) / 10,
+                medyan_butce: r.medianBudget,
+                medyan_fiyat: r.medianPrice,
+              }))}
+              filename={`talep-arz-${islem.key || "tumu"}-${donem.key}.csv`}
+            />
+            <ButtonLink href="/app/raporlar" variant="secondary" icon={BarChart3}>Rapor merkezi</ButtonLink>
+          </span>
+        }
       />
 
       {/* Filtreler — işlem türü + dönem pill'leri, il seçimi form (JS'siz GET) */}

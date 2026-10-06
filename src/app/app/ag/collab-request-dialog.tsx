@@ -9,7 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea, FormField } from "@/components/ui/input";
 import { sendCollabRequest, type NetworkResult } from "@/app/actions/network";

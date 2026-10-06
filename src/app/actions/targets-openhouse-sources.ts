@@ -25,6 +25,15 @@ function parseTargetFields(fd: FormData) {
 
   const targetDeals   = parseInt(String(fd.get("target_deals")   ?? "0"));
   const targetRevenue = parseFloat(String(fd.get("target_revenue") ?? "0"));
+  // Faaliyet hedefleri (20260816000800) + not: alan formda yoksa DOKUNULMAZ (eski formlar veri silmesin).
+  const intOrZero = (key: string) => {
+    const n = parseInt(String(fd.get(key) ?? "0"));
+    return isNaN(n) || n < 0 ? 0 : Math.min(n, 100_000);
+  };
+  const activity: Record<string, number | string | null> = {};
+  if (fd.has("target_appointments")) activity.target_appointments = intOrZero("target_appointments");
+  if (fd.has("target_listings")) activity.target_listings = intOrZero("target_listings");
+  if (fd.has("notes")) activity.notes = String(fd.get("notes") ?? "").trim().slice(0, 1000) || null;
 
   return {
     profileId,
@@ -32,6 +41,7 @@ function parseTargetFields(fd: FormData) {
     periodStart,
     targetDeals:   isNaN(targetDeals)   || targetDeals   < 0 ? 0 : targetDeals,
     targetRevenue: isNaN(targetRevenue) || targetRevenue < 0 ? 0 : targetRevenue,
+    activity,
   };
 }
 
@@ -60,6 +70,7 @@ export async function createTarget(
       period_start:   f.periodStart,
       target_deals:   f.targetDeals,
       target_revenue: f.targetRevenue,
+      ...f.activity,
     })
     .select("id")
     .single();
@@ -100,6 +111,7 @@ export async function updateTarget(
       period_start:   f.periodStart,
       target_deals:   f.targetDeals,
       target_revenue: f.targetRevenue,
+      ...f.activity,
       updated_at:     new Date().toISOString(),
     })
     .eq("id", id)
@@ -134,7 +146,7 @@ export async function listTargets(period?: string) {
   const supabase = await createClient();
   let query = supabase
     .from("targets")
-    .select("id, period, period_start, target_deals, target_revenue, actual_deals, actual_revenue, profile:profiles!targets_profile_id_fkey(id, full_name)")
+    .select("id, period, period_start, target_deals, target_revenue, target_appointments, target_listings, notes, actual_deals, actual_revenue, profile:profiles!targets_profile_id_fkey(id, full_name)")
     .eq("tenant_id", gate.tenantId)
     .order("period_start", { ascending: false })
     .limit(50);

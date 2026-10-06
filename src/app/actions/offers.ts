@@ -314,3 +314,30 @@ export async function convertOfferToDeal(offerId: string): Promise<ConvertOfferR
   revalidateTenantData(gate.tenantId);
   return { ok: true, dealId, linked };
 }
+
+export type BulkOfferResult = { error?: string; updated?: number; failed?: number; firstError?: string };
+
+/**
+ * Toplu teklif kapatma (liste toplu işlemi): yalnız "reddedildi" ya da "geri çekildi". Her teklif tek tek
+ * atomik geçiş RPC'sinden (`updateOfferStatus`) geçer; kabul/karşı teklif toplu yapılmaz (tutar/anlaşma etkisi).
+ */
+export async function bulkUpdateOfferStatus(ids: string[], status: string): Promise<BulkOfferResult> {
+  const gate = await requirePermission("offers", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (status !== "rejected" && status !== "withdrawn") return { error: "Toplu işlemde yalnız reddet / geri çek yapılabilir." };
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const list = Array.isArray(ids) ? [...new Set(ids.map((v) => String(v)).filter((v) => uuid.test(v)))].slice(0, 100) : [];
+  if (list.length === 0) return { error: "Teklif seçin." };
+  let updated = 0;
+  let failed = 0;
+  let firstError: string | undefined;
+  for (const id of list) {
+    const res = await updateOfferStatus(id, status);
+    if (res.ok) updated += 1;
+    else {
+      failed += 1;
+      firstError ??= res.error;
+    }
+  }
+  return { updated, failed, firstError };
+}

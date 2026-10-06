@@ -20,6 +20,9 @@ export type TargetFormValues = {
   target_deals: number;
   target_revenue: number;
   profile_id: string | null;
+  target_appointments?: number;
+  target_listings?: number;
+  notes?: string | null;
 };
 
 const PERIODS = [
@@ -68,7 +71,7 @@ export function TargetFormDialog({
       error={state.error}
       summary
       hiddenFields={target ? <input type="hidden" name="id" value={target.id} /> : null}
-      fieldLabels={{ period: "Dönem", period_start: "Başlangıç", profile_id: "Danışman", target_deals: "Hedef anlaşma", target_revenue: "Hedef gelir (₺)" }}
+      fieldLabels={{ period: "Dönem", period_start: "Başlangıç", profile_id: "Danışman", target_deals: "Hedef anlaşma", target_revenue: "Hedef gelir (₺)", target_appointments: "Hedef randevu", target_listings: "Hedef yeni portföy", notes: "Not" }}
       trigger={({ onClick, ...aria }) => (
         <button
           type="button"
@@ -81,7 +84,7 @@ export function TargetFormDialog({
           <Pencil className="h-4 w-4" />
         </button>
       )}
-      tabs={[{ id: "hedef", label: "Hedef", fields: ["period", "period_start", "profile_id", "target_deals", "target_revenue"] }]}
+      tabs={[{ id: "hedef", label: "Hedef", fields: ["period", "period_start", "profile_id", "target_deals", "target_revenue", "target_appointments", "target_listings", "notes"] }]}
       panels={{
         hedef: (
           <>
@@ -114,6 +117,15 @@ export function TargetFormDialog({
             </FormField>
             <FormField label="Hedef gelir (₺)" htmlFor="target-revenue" required>
               <Input id="target-revenue" name="target_revenue" type="number" min={0} step="any" required defaultValue={target ? target.target_revenue : ""} placeholder="Örn. 250000" />
+            </FormField>
+            <FormField label="Hedef randevu" htmlFor="target-appointments" hint="Gösterim/görüşme sayısı (0 = takip edilmez).">
+              <Input id="target-appointments" name="target_appointments" type="number" min={0} step={1} defaultValue={target.target_appointments ?? 0} />
+            </FormField>
+            <FormField label="Hedef yeni portföy" htmlFor="target-listings" hint="Dönemde eklenen portföy (0 = takip edilmez).">
+              <Input id="target-listings" name="target_listings" type="number" min={0} step={1} defaultValue={target.target_listings ?? 0} />
+            </FormField>
+            <FormField label="Not" htmlFor="target-notes" className="sm:col-span-2">
+              <Input id="target-notes" name="notes" maxLength={1000} defaultValue={target.notes ?? ""} placeholder="Örn. Kadıköy bölgesine odak" />
             </FormField>
           </>
         ),

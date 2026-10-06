@@ -7,13 +7,19 @@ import { now } from "@/lib/clock";
  * sonuç sayaçlarında görünür.
  */
 
-export type UndoTarget = "customers" | "properties" | "demands";
+export type UndoTarget = "customers" | "properties" | "demands" | "tasks" | "appointments" | "expenses";
 
 export const TABLE_BY_TARGET = {
   customers: "customers",
   properties: "properties",
   demands: "customer_demands",
+  tasks: "tasks",
+  appointments: "appointments",
+  expenses: "expenses",
 } as const;
+
+/** Silinmiş-işareti (deleted_at) olmayan tablolar: geri almada kayıt silinir. */
+const HARD_DELETE: ReadonlySet<UndoTarget> = new Set(["demands", "tasks", "appointments", "expenses"]);
 
 /** Geri alınırken kayda bağlı iş verisi varsa kayıt dokunulmadan bırakılır: [tablo, kayda işaret eden kolon]. */
 export const LINK_CHECKS: Record<UndoTarget, readonly (readonly [string, string])[]> = {
@@ -30,6 +36,9 @@ export const LINK_CHECKS: Record<UndoTarget, readonly (readonly [string, string]
     ["appointments", "property_id"],
   ],
   demands: [["network_demands", "demand_id"]],
+  tasks: [],
+  appointments: [],
+  expenses: [],
 };
 
 const ID_CHUNK = 200;
@@ -82,12 +91,12 @@ export async function removeCreated(
       }
     }
     if (!ids.length) continue;
-    const q =
-      opts.target === "demands"
-        ? supabase.from(table).delete()
-        : supabase.from(table).update({ deleted_at: new Date(now()).toISOString() });
+    const hard = HARD_DELETE.has(opts.target);
+    const q = hard
+      ? supabase.from(table).delete()
+      : supabase.from(table).update({ deleted_at: new Date(now()).toISOString() });
     let query = q.in("id", ids).eq("tenant_id", opts.tenantId);
-    if (opts.target !== "demands") query = query.is("deleted_at", null);
+    if (!hard) query = query.is("deleted_at", null);
     const { data, error } = await query.select("id");
     if (error) {
       console.error("import undo remove", opts.target, error);

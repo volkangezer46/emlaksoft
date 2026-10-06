@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, Eye, FileSignature, User } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
+import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
@@ -52,13 +53,18 @@ function Flags({ c }: { c: ContractVM }) {
 }
 
 /** md+ tablo görünümü. */
-export function ContractTable({ rows, density }: { rows: ContractVM[]; density: Density }) {
+export function ContractTable({ rows, density, selectable = false }: { rows: ContractVM[]; density: Density; selectable?: boolean }) {
   return (
     <div className="hidden md:block">
       <TableFrame minWidth={900} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
+              {selectable ? (
+                <TH className="w-10">
+                  <BulkSelectAll ids={rows.map((r) => r.id)} noun="sözleşme" />
+                </TH>
+              ) : null}
               <TH>Sözleşme</TH>
               <TH>Tür</TH>
               <TH>Durum</TH>
@@ -72,6 +78,11 @@ export function ContractTable({ rows, density }: { rows: ContractVM[]; density: 
           <TBody>
             {rows.map((c) => (
               <TR key={c.id} interactive>
+                {selectable ? (
+                  <TD>
+                    <BulkRowCheckbox id={c.id} label={`${c.title} sözleşmesini`} />
+                  </TD>
+                ) : null}
                 <TD>
                   <IntentLink href={c.href} className="absolute inset-0" aria-label={`${c.title} detayları`} />
                   <div className="flex items-center gap-3">

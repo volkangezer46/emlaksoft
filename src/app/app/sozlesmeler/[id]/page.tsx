@@ -23,6 +23,7 @@ import { ContractSignPanel } from "./contract-sign-panel";
 import { SignerEditPanel } from "./signer-edit-panel";
 import { CancelContractButton } from "./cancel-contract-button";
 import { CopySignLink } from "./copy-sign-link";
+import { RemindSigner } from "./remind-signer";
 import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
@@ -77,7 +78,7 @@ export default async function ContractDetailPage({
 
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, contract_type, body, status, signed_at, expires_at, created_at, updated_at, property:properties!contracts_property_id_fkey(id,property_code,title,commission_rate,address_line,list_price), customer:customers!contracts_customer_id_fkey(id,full_name,phone,email)")
+    .select("id, title, contract_type, body, status, signed_at, expires_at, cancelled_at, created_at, updated_at, property:properties!contracts_property_id_fkey(id,property_code,title,commission_rate,address_line,list_price), customer:customers!contracts_customer_id_fkey(id,full_name,phone,email)")
     .eq("id", id)
     .maybeSingle();
 
@@ -166,7 +167,7 @@ export default async function ContractDetailPage({
           ? { title: `${ozet.error} hatayı giderin`, reason: "Sözleşme kontrolünde hata var; imzaya göndermeden önce düzeltin.", href: sekmeHref("icerik"), label: "Kontrole git" }
           : contract.status === "draft"
             ? { title: signers.length === 0 ? "İmzaya gönderin" : "Taslağı imzaya gönderin", reason: "İçerik hazırsa imzalayanları ekleyip gönderin.", href: sekmeHref("imza"), label: "İmza paneli" }
-            : { title: `${pendingCount} imza bekleniyor`, reason: "İmza linkini elle iletmek için imza sekmesini kullanın.", href: sekmeHref("imza"), label: "İmzalayanlar" };
+            : { title: `${pendingCount} imza bekleniyor`, reason: "İmzalayanlar sekmesinden \"Hatırlat\" ile WhatsApp hatırlatması gönderin ya da bağlantıyı kopyalayın.", href: sekmeHref("imza"), label: "Hatırlat" };
 
   const tabDefs: DetailTabDef[] = [
     { id: "icerik", label: "İçerik & kontrol", icon: FileText, count: riskler.length },
@@ -418,9 +419,17 @@ export default async function ContractDetailPage({
                               </div>
                               {/* SMS ulaşmadıysa imza linki elle iletilebilsin — token
                                   gönderimde DB tarafında üretiliyor, /imza/{token} */}
-                              {canEdit && s.status === "pending" && "token" in s && s.token
-                                ? <CopySignLink token={String(s.token)} />
-                                : null}
+                              {canEdit && s.status === "pending" && "token" in s && s.token ? (
+                                <>
+                                  <RemindSigner
+                                    token={String(s.token)}
+                                    fullName={String(s.full_name)}
+                                    phone={(s.phone as string | null) ?? null}
+                                    contractTitle={contract.title}
+                                  />
+                                  <CopySignLink token={String(s.token)} />
+                                </>
+                              ) : null}
                               {canEdit && s.status === "pending" ? (
                                 <SignerEditPanel
                                   signer={{
@@ -494,6 +503,14 @@ export default async function ContractDetailPage({
               />
             </div>
             <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
+              {contract.status === "cancelled" && contract.cancelled_at ? (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-text-muted">İptal tarihi</dt>
+                  <dd className="font-semibold text-danger-600">
+                    {new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" }).format(new Date(contract.cancelled_at))}
+                  </dd>
+                </div>
+              ) : null}
               <div className="flex justify-between gap-3">
                 <dt className="text-text-muted">İmza</dt>
                 <dd className="font-semibold text-ink-950">{signedCount}/{signers.length}</dd>

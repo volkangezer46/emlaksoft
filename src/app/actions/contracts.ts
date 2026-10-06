@@ -807,3 +807,26 @@ export async function restoreContractVersion(
   revalidatePath(`/app/sozlesmeler/${contractId}`);
   return { ok: true };
 }
+
+export type BulkContractResult = { error?: string; cancelled?: number; failed?: number; firstError?: string };
+
+/** Toplu iptal (liste toplu işlemi): her sözleşme tek tek `cancelContract` atomik yolundan geçer; imzalı/reddedilmiş atlanır. */
+export async function bulkCancelContracts(ids: string[]): Promise<BulkContractResult> {
+  const gate = await requirePermission("contracts", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const list = Array.isArray(ids) ? [...new Set(ids.map((v) => String(v)).filter((v) => uuid.test(v)))].slice(0, 100) : [];
+  if (list.length === 0) return { error: "Sözleşme seçin." };
+  let cancelled = 0;
+  let failed = 0;
+  let firstError: string | undefined;
+  for (const id of list) {
+    const res = await cancelContract(id);
+    if (res.ok) cancelled += 1;
+    else {
+      failed += 1;
+      firstError ??= res.error;
+    }
+  }
+  return { cancelled, failed, firstError };
+}

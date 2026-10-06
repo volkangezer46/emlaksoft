@@ -86,6 +86,40 @@ export default async function HedeflerPage() {
   });
   const memberList = (members ?? []) as { id: string; full_name: string }[];
 
+  // Faaliyet hedefleri (randevu / yeni portföy) gerçekleşmesi: canlı sayım, yalnız hedefi > 0 olanlar.
+  // Randevu = iptal edilmemiş, dönem içinde planlanan (atanan danışmana göre); portföy = dönemde eklenen, örnek veri hariç.
+  type ActivityRow = { id: string; period: string; period_start: string; target_appointments?: number | null; target_listings?: number | null; profile: unknown };
+  const activityById = new Map<string, { appointments: number | null; listings: number | null }>();
+  await Promise.all(
+    (rawTargets as unknown as ActivityRow[]).map(async (t) => {
+      const wantA = Number(t.target_appointments ?? 0) > 0;
+      const wantL = Number(t.target_listings ?? 0) > 0;
+      if (!wantA && !wantL) return;
+      const r = targetPeriodRange(t.period_start, t.period);
+      const startIso = new Date(r.start).toISOString();
+      const endIso = new Date(r.end).toISOString();
+      const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
+      const pid = (prof as { id?: string } | null)?.id ?? null;
+      const [ap, li] = await Promise.all([
+        wantA
+          ? (() => {
+              let q = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).neq("status", "cancelled").gte("scheduled_at", startIso).lt("scheduled_at", endIso);
+              if (pid) q = q.eq("assigned_to", pid);
+              return q;
+            })()
+          : Promise.resolve({ count: null }),
+        wantL
+          ? (() => {
+              let q = supabase.from("properties").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).is("deleted_at", null).eq("is_sample", false).gte("created_at", startIso).lt("created_at", endIso);
+              if (pid) q = q.eq("assigned_to", pid);
+              return q;
+            })()
+          : Promise.resolve({ count: null }),
+      ]);
+      activityById.set(t.id, { appointments: wantA ? (ap.count ?? 0) : null, listings: wantL ? (li.count ?? 0) : null });
+    }),
+  );
+
   // Kart hesapları tek yerde: özet KPI'lar, takım kıyası ve kartlar aynı sayıları okur.
   // Varsayılan görünüm GÜNCEL dönem: şimdi içinde bulunduğumuz dönemin hedefleri listenin ve takım kıyasının başına
   // alınır (eskiden en yeni period_start gelirdi; eski dönem hedefleri güncelmiş gibi görünüyordu). Sıra korunur.
@@ -208,7 +242,13 @@ canCreate ? <TargetCreateTrigger /> : null
               target_deals:   t.target_deals,
               target_revenue: Number(t.target_revenue),
               profile_id:     profId,
+              target_appointments: Number((t as { target_appointments?: number | null }).target_appointments ?? 0),
+              target_listings:     Number((t as { target_listings?: number | null }).target_listings ?? 0),
+              notes:               (t as { notes?: string | null }).notes ?? null,
             };
+            const act = activityById.get(t.id);
+            const tAppt = Number((t as { target_appointments?: number | null }).target_appointments ?? 0);
+            const tList = Number((t as { target_listings?: number | null }).target_listings ?? 0);
             return (
               <div key={t.id} className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-400/40">
                 <Link
@@ -302,6 +342,37 @@ canCreate ? <TargetCreateTrigger /> : null
                     </div>
                     <p className="mt-0.5 text-right text-xs text-text-faint">{t.revVisible ? `%${revPct}` : "Kazanç gizliliği"}</p>
                   </div>
+
+                  {/* Faaliyet hedefleri (yalnız tanımlıysa) */}
+                  {act?.appointments != null ? (
+                    <div>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="text-text-muted">Randevu</span>
+                        <Link href={profId ? `/app/randevular?danisman=${profId}` : "/app/randevular"} className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
+                          {act.appointments} / {tAppt}
+                        </Link>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-line">
+                        <div className="h-full rounded-full bg-cyan-500 transition-all" style={{ width: `${pct(act.appointments, tAppt)}%` }} />
+                      </div>
+                    </div>
+                  ) : null}
+                  {act?.listings != null ? (
+                    <div>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="text-text-muted">Yeni portföy</span>
+                        <Link href={profId ? `/app/portfoyler?danisman=${profId}` : "/app/portfoyler"} className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
+                          {act.listings} / {tList}
+                        </Link>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-line">
+                        <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct(act.listings, tList)}%` }} />
+                      </div>
+                    </div>
+                  ) : null}
+                  {formValues.notes ? (
+                    <p className="rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 text-xs text-text-muted">{formValues.notes}</p>
+                  ) : null}
 
                   {/* Tempo: dönemin geçen kısmı vs hedef ilerlemesi */}
                   <div className="border-t border-hairline pt-2.5">

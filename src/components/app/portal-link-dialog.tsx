@@ -14,7 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 
 /**
  * Malik portalı (/malik-portali/[token]) link diyaloğu. Müşteri portalı artık sayfa içi panel:

@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 import { Button } from "@/components/ui/button";
 import { updateContractBody, type ContractResult } from "@/app/actions/contracts";
 
