@@ -8,7 +8,7 @@ import { STAGE_LABELS, EXIT_LABELS, type ExitKind, type LifecycleStage } from "@
 import { Panel, VisualChip } from "./ui-parts";
 import { CHECK_STATE_LABELS, checkStateVisual } from "./check-labels";
 import { anomalyTypeLabel, durationLabel, type KpiVisual } from "./helpers";
-import { tristateLabel } from "./lifecycle-model";
+import { tristateLabel, unionPublishedDays } from "./lifecycle-model";
 import { getDb, loadLifecycle, type LifecycleData } from "./readers";
 import { loadClosureChecklist } from "./closure-reader";
 import { PortalBindForm } from "./portal-bind-form";
@@ -66,7 +66,7 @@ async function LifecycleBody({ propertyId, tenantId, canCreate }: { propertyId: 
         ) : null}
         <div className="grid gap-4 lg:grid-cols-2">
           <HealthScoreCard data={data} />
-          <PortalChains chains={chains} />
+          <PortalChains chains={chains} total={unionPublishedDays(data.listings, nowMs)} />
         </div>
       </Panel>
 
@@ -151,10 +151,19 @@ function HealthScoreCard({ data }: { data: LifecycleData }) {
   );
 }
 
-function PortalChains({ chains }: { chains: ReturnType<typeof buildChainStats> }) {
+function PortalChains({ chains, total }: { chains: ReturnType<typeof buildChainStats>; total: ReturnType<typeof unionPublishedDays> }) {
   return (
     <div className="rounded-[var(--radius-card)] border border-line p-4">
       <h3 className="text-sm font-semibold text-text">Portal geçmişi</h3>
+      {total ? (
+        <p className="mt-1 text-sm text-text">
+          Toplam yayın süresi: <span className="font-semibold tabular-nums">{durationLabel(total.days * 24)}</span>
+          <span className="text-text-muted">
+            {total.firstPublishedAt ? ` · ilk yayın ${formatDateTr(total.firstPublishedAt)}` : ""}
+            {total.liveNow ? " · şu an yayında" : " · şu an yayında değil"}
+          </span>
+        </p>
+      ) : null}
       {chains.length === 0 ? (
         <p className="mt-2 text-sm text-text-muted">Bu portföy henüz hiçbir portala bağlanmadı.</p>
       ) : (

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LISTING_CONTROL_CONFIG } from "@/lib/listing-control/config";
 import { computeHealthScore } from "@/lib/listing-control/health-score";
-import { averageLeadHours, averageResolveHours, buildHealthInputs, buildLifecycleTimeline, rankAdvisors, tristateLabel } from "./lifecycle-model";
+import { averageLeadHours, averageResolveHours, buildHealthInputs, buildLifecycleTimeline, rankAdvisors, tristateLabel, unionPublishedDays } from "./lifecycle-model";
 
 const NOW = Date.parse("2026-10-06T12:00:00Z");
 
@@ -100,5 +100,43 @@ describe("süre ortalamaları ve sıralama", () => {
     expect(tristateLabel(null)).toBe("Ölçülemedi");
     expect(tristateLabel(true)).toBe("Tamam");
     expect(tristateLabel(false)).toBe("Eksik");
+  });
+});
+
+describe("yaşam döngüsü kaydı ve toplam yayın süresi", () => {
+  it("aşama geçişleri kim/ne zaman/neden ile; çıkarılan kullanıcı etiketli; portal kaldırma nedeni ve kaldıran", () => {
+    const tl = buildLifecycleTimeline({
+      createdAt: null,
+      assignedAt: null,
+      stage: { stage: "sold", since: "2026-10-05T10:00:00Z" },
+      stageEvents: [
+        { at: "2026-10-05T10:00:00Z", from: "published", to: "sold", actorName: "Ayşe Yılmaz", actorSource: "inferred", reason: "live -> sold" },
+        { at: "2026-09-01T10:00:00Z", from: null, to: "published", actorName: null, actorSource: "system", reason: null },
+      ],
+      listings: [
+        { id: "a", portal: "Sahibinden", externalId: "1234567", status: "removed", publishedAt: "2026-09-01T00:00:00Z", removedAt: "2026-10-05T09:00:00Z", supersedesId: null, endedReason: "sold", removedByName: "Ayşe Yılmaz" },
+      ],
+      verifications: [],
+      prices: [],
+      anomalies: [],
+    });
+    const stage = tl.filter((e) => e.kind === "stage");
+    expect(stage.map((e) => e.title)).toEqual(["Aşama: Portalda yayında → Satıldı", "Aşama: Portalda yayında"]);
+    expect(stage[0]?.detail).toBe("Ayşe Yılmaz (ilgili kayıttan) · live -> sold");
+    expect(stage[1]?.detail).toBe("Sistem tespit etti");
+    expect(tl.find((e) => e.kind === "removed")?.detail).toBe("Neden: Satıldı · Kaldıran: Ayşe Yılmaz");
+  });
+  it("toplam yayın süresi: portallar arası çakışma bir kez sayılır; canlı ilan bugüne kadar", () => {
+    const r = unionPublishedDays(
+      [
+        { publishedAt: "2026-09-01T00:00:00Z", removedAt: "2026-09-11T00:00:00Z", status: "superseded" },
+        { publishedAt: "2026-09-05T00:00:00Z", removedAt: "2026-09-15T00:00:00Z", status: "removed" },
+        { publishedAt: "2026-10-01T00:00:00Z", removedAt: null, status: "live" },
+        { publishedAt: null, removedAt: null, status: "live" },
+      ],
+      Date.parse("2026-10-06T00:00:00Z"),
+    );
+    expect(r).toEqual({ days: 19, firstPublishedAt: "2026-09-01T00:00:00Z", liveNow: true });
+    expect(unionPublishedDays([], NOW)).toBeNull();
   });
 });

@@ -30,6 +30,7 @@ import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
 import { DuyuruSatiri } from "./_home/duyuru-satiri";
 import { Gorevler } from "./_home/gorevler";
 import { KayipKacak } from "./_home/kayip-kacak";
+import { PortfoySagligi } from "./_home/portfoy-sagligi";
 import { KiralamaProje } from "./_home/kiralama-proje";
 import { PortalSagligi } from "./_home/portal-ekip";
 import { CanliAkis } from "./_home/canli-akis";
@@ -377,6 +378,7 @@ export default async function AppHomePage({
             <div className="flex min-w-0 flex-col gap-5">
               {kpis}
               {rows}
+              {off("portals") ? null : <PortfoySagligi ctx={ctx} />}
 
               {moreCells.length > 0 ? (
                 <section aria-label="Daha fazla" className="flex flex-col gap-4">
