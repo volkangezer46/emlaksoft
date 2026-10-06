@@ -211,7 +211,7 @@ export function defaultSiteContent(): SiteContent {
     demo: { title: "Ofisini ücretsiz kur", text: "Kredi kartı gerekmez — kurulum sihirbazı ofisini dakikalar içinde hazırlar." },
     register: {
       title: "Ücretsiz başlayın",
-      text: "3 kısa adımda çalışma alanınız hazır.",
+      text: "Birkaç kısa adımda ofisiniz demo verisiyle hazır.",
       panelText: "{deneme_uzun}, kredi kartsız ve taahhütsüz. Kurulum sihirbazı ofisinizi adım adım hazırlar; verileriniz rol, yetki ve denetim kontrolleriyle korunur.",
     },
   };
