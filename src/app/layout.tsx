@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Caveat, Inter, Manrope } from "next/font/google";
+import { Geist_Mono, Inter, Manrope } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -33,15 +33,6 @@ const geistMono = Geist_Mono({
   fallback: ["monospace"],
 });
 
-// Yalnız ana sayfadaki el yazısı not için (marketing.css --font-hand); preload kapalı, kullanılmayan sayfalarda indirilmez.
-const caveat = Caveat({
-  variable: "--font-hand",
-  weight: "600",
-  subsets: ["latin", "latin-ext"],
-  display: "swap",
-  preload: false,
-  fallback: ["Segoe Script", "cursive"],
-});
 
 // Başlık, açıklama, Open Graph, Twitter ve arama motoru doğrulama kodları /admin/seo "Genel" sekmesinden
 // gelir (src/lib/seo/store.ts buildRootMetadata); ayar yokken değerler eskisiyle birebir aynıdır.
@@ -98,11 +89,9 @@ export default async function RootLayout({
       lang="tr"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
-      className={`${manrope.variable} ${inter.variable} ${geistMono.variable} ${caveat.variable} h-full antialiased`}
+      className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">

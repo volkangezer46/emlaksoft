@@ -10,6 +10,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
+import { measure } from "@/lib/server-timing";
 import {
   parseInsightsSnapshot,
   parseMetricsSnapshot,
@@ -61,11 +62,11 @@ export const loadDashboardSnapshot = cache(async (tenantId: string, userId: stri
   if (!tenantId || !userId) return EMPTY_SNAPSHOT;
   try {
     const supabase = await createClient();
-    const [insights, metrics, tasks] = await Promise.all([
+    const [insights, metrics, tasks] = await measure("home-snapshot", () => Promise.all([
       callRpc(supabase, RPC.insights, { p_tenant_id: tenantId }, parseInsightsSnapshot),
       callRpc(supabase, RPC.metrics, { p_tenant_id: tenantId, p_user_id: userId }, parseMetricsSnapshot),
       callRpc(supabase, RPC.tasks, { p_tenant_id: tenantId, p_user_id: userId }, parseTasksSnapshot),
-    ]);
+    ]));
     return { insights, metrics, tasks };
   } catch {
     // İstemci kurulamadı (oturum yok vb.): yükleyiciler kendi sorgularına düşer.

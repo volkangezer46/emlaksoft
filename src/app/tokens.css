@@ -289,7 +289,8 @@
 @supports (color: color-mix(in oklch, #000 50%, transparent)) {
   :root,
   .theme-dark,
-  .brand-scope {
+  .brand-scope,
+  .app-frame:has(> [data-brand-scope]) {
     --surface-hover: color-mix(in oklch, var(--text) 4%, transparent);
     --surface-pressed: color-mix(in oklch, var(--text) 8%, transparent);
     --surface-selected: color-mix(in oklch, var(--brand-600) 12%, transparent);

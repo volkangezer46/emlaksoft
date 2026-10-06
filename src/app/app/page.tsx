@@ -4,8 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
-import { createClient } from "@/lib/supabase/server";
-import { loadSampleKpiScope } from "@/lib/sample-scope";
+import { getRequestSampleScope } from "@/lib/cache/request";
+import { measure } from "@/lib/server-timing";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getClosedFeatures } from "@/lib/modules/state";
 import type { FeatureKey } from "@/lib/modules/registry";
@@ -63,19 +63,29 @@ export default async function AppHomePage({
 }: {
   searchParams?: Promise<{ tv?: string; donem?: string; kapsam?: string; daha?: string; icgoru?: string }>;
 }) {
-  const { tv = "", donem, kapsam, daha, icgoru } = (await searchParams) ?? {};
+  // searchParams ile oturum/yetki kapısı birbirinden bağımsız: aynı turda.
+  const [sp, gate] = await Promise.all([searchParams, measure("home-gate", () => requireModulePage("dashboard"))]);
+  const { tv = "", donem, kapsam, daha, icgoru } = sp ?? {};
   // Eski `/app?tv=1` bağlantıları tek TV rotasına gider (kabuksuz, canlı, tam ekran).
   if (tv === "1") redirect("/app/pano-tv");
 
-  const { tenantId, perms, role, userId } = await requireModulePage("dashboard");
+  const { tenantId, perms, role, userId } = gate;
   // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.
   preloadDashboardSnapshot(tenantId, userId);
+  // Hoş geldin kapısı, kapalı modüller, örnek veri kapsamı ve kullanıcı birbirinden bağımsız: TEK turda
+  // (eskiden 4 seri tur). Profil/tenant satırı istek-içi tek kimlik okumasından gelir (lib/cache/request).
+  const [showWelcome, closedFeatures, sample, user] = await measure("home-ctx", () =>
+    Promise.all([
+      tenantId ? loadShouldShowWelcome(userId, role) : Promise.resolve(false),
+      getClosedFeatures(tenantId),
+      getRequestSampleScope(tenantId),
+      getRequestUser(),
+    ]),
+  );
   // Yeni danışman ilk girişinde kısa "Hoş geldin" akışına yönlenir (bir kez; çerez tercihi).
-  if (tenantId && (await loadShouldShowWelcome(userId, role))) redirect("/app/hos-geldin");
+  if (showWelcome) redirect("/app/hos-geldin");
   // Kapalı modüllerin ana ekran blokları çizilmez (tek kapı: lib/modules/state).
-  const closedFeatures = await getClosedFeatures(tenantId);
   const off = (key: FeatureKey) => closedFeatures.includes(key);
-  const user = await getRequestUser();
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
 
   const isManagement = hasOfficeWideDataScope(role);
@@ -98,7 +108,7 @@ export default async function AppHomePage({
     canSeeRentals: (perms.rentals ?? []).includes("view") && !off("rentals"),
     canSeeProjects: (perms.projects ?? []).includes("view") && !off("projects"),
     canSeeProperties: (perms.properties ?? []).includes("view"),
-    sample: await loadSampleKpiScope(await createClient(), tenantId),
+    sample,
     period: parsePeriod(donem),
     fullName,
     firstName: fullName.split(" ")[0] || "hoş geldiniz",

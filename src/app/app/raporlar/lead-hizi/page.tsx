@@ -68,7 +68,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
 
   const donem = DONEM_FILTERS.find((f) => f.key === sp.donem) ?? DONEM_FILTERS[1];
   // Ofis Tanımları Merkezi: ilk yanıt SLA varsayılanı (ayar yoksa kod varsayılanı 60 dk).
-  const officeSla = Number(await getSetting<string>("office.sla.lead_first_response_min", { tenantId }));
+  const officeSla = Number(await getSetting<string>("office.sla.lead_first_response_min", { tenantId: tenantId ?? undefined }));
   const esikParsed = Number(sp.esik);
   const esik = (SLA_OPTIONS_MIN as readonly number[]).includes(esikParsed) ? esikParsed : officeSla;
   const durum = DURUM_FILTERS.find((f) => f.key === sp.durum) ?? DURUM_FILTERS[0];

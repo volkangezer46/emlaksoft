@@ -39,7 +39,7 @@ begin
   if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'tasks' and column_name = 'is_sample')
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'deals' and column_name = 'is_sample')
      or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'properties' and column_name = 'authorization_end') then
-    raise exception 'is_sample (tasks/deals) veya properties.authorization_end sutunu yok; once 20260816001600 uygulanmali.';
+    raise exception 'is_sample (tasks/deals; 20260726000086/096) veya properties.authorization_end sutunu yok; once ilgili migrationlar uygulanmali.';
   end if;
   if pg_catalog.to_regprocedure('public.current_tenant_id()') is null then
     raise exception 'current_tenant_id() yok.';

@@ -96,7 +96,8 @@
   }
   /* Beyaz etiket kapsamı rol token'larını kendi üstünde yeniden çözer (tokens.css); kenar
      adları burada da tam renge bağlanır. İkisi de var() olduğundan açık/koyu fark etmez. */
-  :root .brand-scope {
+  :root .brand-scope,
+  :root .app-frame:has(> [data-brand-scope]) {
     --border-interactive: var(--line-strong);
     --border-strong: var(--text-muted);
   }

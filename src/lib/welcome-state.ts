@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestIdentity } from "@/lib/cache/request";
 import { now } from "@/lib/clock";
 import { welcomeDoneCookieName } from "@/lib/setup-skip";
 import { shouldShowWelcome } from "@/lib/welcome-flow";
@@ -14,13 +14,13 @@ export async function loadShouldShowWelcome(userId: string, role: string): Promi
   if (role !== "advisor") return false;
   const jar = await cookies();
   if (jar.get(welcomeDoneCookieName(userId))?.value === "1") return false;
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("profiles").select("created_at").eq("id", userId).maybeSingle();
+  // Profil satırı istek-içi tek kimlik okumasından (ek sorgu yok).
+  const { data, error } = await getRequestIdentity(userId);
   if (error) return false;
   return shouldShowWelcome({
     role,
     dismissed: false,
-    profileCreatedAt: (data as { created_at: string | null } | null)?.created_at,
+    profileCreatedAt: data?.created_at,
     nowMs: now(),
   });
 }

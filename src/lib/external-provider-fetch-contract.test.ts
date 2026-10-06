@@ -61,7 +61,6 @@ describe("external provider request contract", () => {
       "src/components/admin/command-palette.tsx",
       "src/components/admin/notification-bell.tsx",
       "src/hooks/use-api.ts",
-      "src/hooks/use-app-api.ts",
     ].sort();
 
     expect(directFetchFiles).toEqual([
