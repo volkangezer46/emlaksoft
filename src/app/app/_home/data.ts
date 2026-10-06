@@ -220,9 +220,9 @@ export const loadTodayAppointments = cache(async (ctx: HomeCtx) => {
   // count: brifingde gerçek toplam gerekir. Açık ilişki adı ipucu korunur.
   let apptQ = ctx.sample.apply(supabase
     .from("appointments")
-    .select("id, appointment_type, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)", { count: "exact" }))
+    .select("id, appointment_type, scheduled_at, status, duration_min, location, customer:customers!appointments_customer_id_fkey(full_name, phone), property:properties!appointments_property_id_fkey(lat, lng)", { count: "exact" }))
     .gte("scheduled_at", ctx.dayStartIso).lt("scheduled_at", ctx.dayEndIso)
-    .order("scheduled_at", { ascending: true }).limit(5);
+    .order("scheduled_at", { ascending: true }).limit(8);
   if (ctx.scopeMine) apptQ = apptQ.eq("assigned_to", ctx.userId);
   const result = await apptQ;
   assertQueryBatchSucceeded([result], ["today-appointments"], "Ana panel");

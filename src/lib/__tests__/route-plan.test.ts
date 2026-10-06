@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRoutePlan,
+  directionsHref,
+  routeDirectionsHref,
   haversineKm,
   travelMinutes,
   DEFAULT_DURATION_MIN,
@@ -106,5 +108,21 @@ describe("buildRoutePlan", () => {
     expect(empty.stops).toEqual([]);
     expect(empty.totalKm).toBe(0);
     expect(empty.tightCount).toBe(0);
+  });
+});
+
+describe("harita bağlantıları", () => {
+  it("tek durak: koordinat > konum metni > null", () => {
+    expect(directionsHref({ lat: 41, lng: 29, location: "Kadıköy" })).toBe("https://www.google.com/maps/dir/?api=1&destination=41,29");
+    expect(directionsHref({ lat: null, lng: null, location: "Kadıköy Moda" })).toBe(
+      "https://www.google.com/maps/dir/?api=1&destination=Kad%C4%B1k%C3%B6y%20Moda",
+    );
+    expect(directionsHref({ lat: null, lng: null, location: "  " })).toBeNull();
+  });
+  it("günün rotası: saat sırası, son durak varış, koordinatsız atlanır, <2 durakta null", () => {
+    expect(routeDirectionsHref([{ lat: 41, lng: 29 }])).toBeNull();
+    expect(
+      routeDirectionsHref([{ lat: 41, lng: 29 }, { lat: null, lng: null, location: "x" }, { lat: 40.9, lng: 29.1 }, { lat: 40.8, lng: 29.2 }]),
+    ).toBe(`https://www.google.com/maps/dir/?api=1&destination=40.8,29.2&waypoints=${encodeURIComponent("41,29|40.9,29.1")}`);
   });
 });
