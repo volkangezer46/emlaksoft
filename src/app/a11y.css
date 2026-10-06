@@ -6,7 +6,14 @@
 /* `touch:` varyantı: dokunmatik (kaba imleç) VEYA dar ekran (<768px).
    Bileşenler `touch:min-h-11` ile 44px dokunma hedefi alır; masaüstünde yoğun
    yerleşim korunur. Playwright/axe dar viewport'ta da aynı kuralı görür. */
-@custom-variant touch (@media (pointer: coarse), (max-width: 767.98px));
+@custom-variant touch {
+  @media (pointer: coarse) {
+    @slot;
+  }
+  @media (max-width: 767.98px) {
+    @slot;
+  }
+}
 
 /* Windows Yüksek Kontrast / forced-colors: gölge tabanlı odak halkası ve
    yüzeyler sistem renklerinde kaybolur; kalıcı outline + kenar zorunlu. */
