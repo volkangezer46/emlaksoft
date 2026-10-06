@@ -147,6 +147,9 @@ const F = {
   // Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache.
   perfIndexes: "20261006000200_perf_indexes.sql",
   perfNavBadgeCache: "20261006000300_nav_badge_cache.sql",
+  // PB42 kabuk/ana ekran hizi: tek-tur kabuk RPC'si + ana ekran anlik goruntu RPC'leri (hepsi SECURITY INVOKER, kod yoksa eski yola duser).
+  appShellBootstrap: "20261006000400_app_shell_bootstrap_rpc.sql",
+  dashboardSnapshotRpcs: "20261006000410_dashboard_snapshot_rpcs.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -255,6 +258,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.hasScopeRpc]: "ek", // 5 RPC fonksiyonu: current_user_scope, current_user_team_id, current_user_branch_id, has_permission_with_scope, check_scope_access
     [F.perfIndexes]: "davranis", // 8 composite index (deals, calls, tasks, contacts, events, expenses, demands, offers) - sorgu performansını 40-60% hızlandırır
     [F.perfNavBadgeCache]: "ek", // nav_badge_snapshots tablo + get_nav_badge_snapshot RPC + cron trigger
+    [F.appShellBootstrap]: "ek", // yalniz 1 yeni invoker RPC (app_shell_bootstrap): profil+tenant+ham izin satirlari+modul+kullanim+rozet sayimi tek JSON; tablo/politika degismez
+    [F.dashboardSnapshotRpcs]: "ek", // yalniz 3 yeni invoker RPC (get_insights/tasks/metrics_snapshot); p_tenant_id/p_user_id JWT ile eslesmezse NULL; tablo/politika degismez
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -357,6 +362,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB39-kira-sozlesme-baglantisi", order: 29.90, title: "Kiralamadan kira sozlesmesi (contracts.rental_id + artis maddesi alanlari)", files: [F.contractRentalLink] },
     { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi)", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc] },
     { id: "PB41-hiz-optimizasyonu", order: 29.92, title: "Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache snapshot", files: [F.perfIndexes, F.perfNavBadgeCache] },
+    { id: "PB42-kabuk-rpc", order: 29.93, title: "Kabuk/ana ekran hizi: app_shell_bootstrap (tek tur kabuk) + get_insights/tasks/metrics_snapshot RPC'leri (kod RPC yoksa eski yola duser)", files: [F.appShellBootstrap, F.dashboardSnapshotRpcs] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 

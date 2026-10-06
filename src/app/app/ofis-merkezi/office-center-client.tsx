@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Users, Settings, BarChart3, Layers, Plus, Trash2, Edit2 } from "lucide-react";
+import { Users, Settings, BarChart3, Layers, Plus, Edit2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,11 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
  * RLS: tenant_id kontrol, role kontrol, requireModulePage("office_center")
  */
 
-type Tab = "advisors" | "assignments" | "settings" | "definitions" | "stats";
-
 export function OfficeCenterClient() {
-  const [activeTab, setActiveTab] = useState<Tab>("advisors");
-
   return (
     <div className="space-y-6 pb-8">
       <PageHeader

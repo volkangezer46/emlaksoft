@@ -34,7 +34,11 @@ import {
   effectiveHasPermission,
   getEffectivePermissions,
   immutableReadonlyPermissions,
+  mergeEffectivePermissions,
 } from "@/lib/permissions-effective";
+import { loadShellBootstrap, shellRpcKnownMissing } from "@/lib/app-shell/bootstrap";
+import { navBadgesFromCounts, usageRowsFromCounts } from "@/lib/app-shell/bootstrap-core";
+import { resolveModuleState } from "@/lib/modules/logic";
 import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
@@ -101,6 +105,9 @@ async function NotificationBellStream() {
 /**
  * Kabuk (oturum/izin/rozet sorgulari) Suspense icinde: kok loading.tsx kaldirildigi icin
  * acilis ekrani burada, kabugun HEMEN ustunde verilir (davranis ayni: kabuk hazir olana dek splash).
+ *
+ * Veri yolu: `app_shell_bootstrap` RPC'si varsa profil/izin/modul/kullanim/rozet TEK turda gelir
+ * (src/lib/app-shell); yoksa eski cok sorgulu yol (spekulatif izin/rozet + profil + kullanim + modul) calisir.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -130,13 +137,18 @@ async function AppShell({
         .maybeSingle()
     : Promise.resolve({ data: null });
 
-  // Spekülatif başlangıç: JWT claim'indeki rol/tenant, middleware'de profile ile
-  // birebir doğrulanıyor (canonicalTenantUser). İzin/skor/rozet sorgularını profil
-  // beklemeden BAŞLAT; profil gelince claim ile eşleşmezse sonuçlar atılıp eski
-  // (profil temelli) yoldan yeniden hesaplanır. Yetkisiz modül rozetleri aşağıda
-  // etkin izinle süzülür → yetki kapısı gevşemez.
+  // HIZLI YOL: tek tur kabuk RPC'si (`app_shell_bootstrap`: profil + ofis + ham izin satırları + modüller +
+  // kullanım + rozet sayımları). Impersonation'da çağrılmaz (RPC zaten NULL verir; eski yol readonly tavanını kurar).
+  // RPC yoksa (migration henüz uygulanmadı) `null` döner ve aşağıdaki eski yol aynen çalışır.
+  const bootPromise = user && !impersonating ? loadShellBootstrap() : Promise.resolve(null);
+
+  // Spekülatif başlangıç (ESKİ yol, yalnız RPC'nin bu süreçte eksik olduğu bilinirken; yoksa RPC'nin yanında
+  // boşa 3 sorgu atardı): JWT claim'indeki rol/tenant, middleware'de profile ile birebir doğrulanıyor
+  // (canonicalTenantUser). İzin/skor/rozet sorgularını profil beklemeden BAŞLAT; profil gelince claim ile
+  // eşleşmezse sonuçlar atılıp eski (profil temelli) yoldan yeniden hesaplanır. Yetkisiz modül rozetleri
+  // aşağıda etkin izinle süzülür → yetki kapısı gevşemez.
   const claimedRole = typeof user?.app_metadata?.role === "string" ? user.app_metadata.role.trim() : "";
-  const canSpeculate = Boolean(user && !impersonating && claimedTenantId && claimedRole);
+  const canSpeculate = Boolean(user && !impersonating && claimedTenantId && claimedRole) && shellRpcKnownMissing();
   const specPermsPromise = canSpeculate
     ? getEffectivePermissions(claimedTenantId, claimedRole, user!.id)
     : null;
@@ -147,19 +159,25 @@ async function AppShell({
     ? getNavBadges({ supabase, tenantId: claimedTenantId, userId: user!.id, role: claimedRole, accessible: NAV_MODULES }).catch(() => [])
     : null;
 
-  // profile ve platformStaff ikisi de yalnız `user`'a bağlı, birbirine değil →
-  // her navigasyonda seri iki round-trip yerine paralel (bootstrap hızlanır).
-  const [{ data: profile }, platformStaff, { data: impersonatedTenant }] = await Promise.all([
-    user
-      ? supabase
-          .from("profiles")
-          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug, trial_ends_at)")
-          .eq("id", user.id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+  // boot, platformStaff ve impersonatedTenant yalnız `user`'a bağlı, birbirine değil → tek turda paralel.
+  const [boot, platformStaff, { data: impersonatedTenant }] = await Promise.all([
+    bootPromise,
     getPlatformStaffIdentity(),
     impersonatedTenantPromise,
   ]);
+  type ShellProfile = { full_name: string | null; role: string | null; tenant_id: string | null; tenants: OfficeSummary | OfficeSummary[] | null };
+  // Profil: RPC'den (tek tur) ya da eski sorgudan (RPC yok / impersonation / RPC NULL verdi).
+  const profile: ShellProfile | null = boot
+    ? { full_name: boot.profile.fullName, role: boot.profile.role, tenant_id: boot.profile.tenantId, tenants: boot.office }
+    : user
+      ? ((
+          await supabase
+            .from("profiles")
+            .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug, trial_ends_at)")
+            .eq("id", user.id)
+            .maybeSingle()
+        ).data as ShellProfile | null)
+      : null;
 
   const tenant = profile?.tenants as
     | OfficeSummary
@@ -188,13 +206,17 @@ async function AppShell({
   const speculationValid = Boolean(
     canSpeculate && profile && profile.tenant_id === claimedTenantId && profile.role === claimedRole,
   );
+  // Kabuk RPC verisi yalnız profil/tenant ile birebir tutarlıysa kullanılır (aksi halde eski sorgular).
+  const bootUsable = Boolean(boot && !impersonating && tenantId && boot.profile.tenantId === tenantId && boot.profile.role === effectiveRole);
   const effectivePermsPromise = platformStaffFullAccess
     ? Promise.resolve(null)
     : impersonating
       ? Promise.resolve(immutableReadonlyPermissions())
-      : speculationValid && specPermsPromise
-        ? specPermsPromise
-        : getEffectivePermissions(tenantId, effectiveRole, user?.id);
+      : bootUsable && boot
+        ? Promise.resolve(mergeEffectivePermissions(effectiveRole, boot.roleOverrides, boot.userOverrides))
+        : speculationValid && specPermsPromise
+          ? specPermsPromise
+          : getEffectivePermissions(tenantId, effectiveRole, user?.id);
   // Skor (navigasyonlar arası cache'li, 3 dk; anahtar tenantId içerir).
   const scorePromise =
     speculationValid && specScorePromise
@@ -202,11 +224,20 @@ async function AppShell({
       : user && tenantId
         ? getOfficeScoreCached(tenantId).catch(() => null)
         : Promise.resolve(null);
-  // Plan kullanım kartı (gerçek head-count) yalnız tenant+plana bağlı: profil gelir gelmez başlar.
-  const usagePromise = user && tenantId && !platformStaffFullAccess ? getPlanUsage(supabase, tenantId, office?.plan).catch(() => []) : Promise.resolve([]);
+  // Plan kullanım kartı (gerçek sayım) yalnız tenant+plana bağlı: RPC'den ya da head-count sorgularından.
+  const usagePromise =
+    user && tenantId && !platformStaffFullAccess
+      ? bootUsable && boot
+        ? Promise.resolve(usageRowsFromCounts(office?.plan, boot.usage))
+        : getPlanUsage(supabase, tenantId, office?.plan).catch(() => [])
+      : Promise.resolve([]);
   // Ofisin kapattığı modüller (menü, sekme, palet ve hızlı oluşturmadan çıkar). Platform personeli etkilenmez.
   const closedModulesPromise: Promise<string[]> =
-    tenantId && !platformStaffFullAccess ? getClosedFeatures(tenantId).catch(() => []) : Promise.resolve([]);
+    tenantId && !platformStaffFullAccess
+      ? bootUsable && boot
+        ? Promise.resolve(resolveModuleState(boot.modules).closed)
+        : getClosedFeatures(tenantId).catch(() => [])
+      : Promise.resolve([]);
   const [effectivePerms, scoreComputed, planUsage, specBadges, closedModules] = await Promise.all([
     effectivePermsPromise,
     scorePromise,
@@ -233,9 +264,11 @@ async function AppShell({
   // etkin izinle süzülür; geçersizse (claim != profil) eski sıralı yol çalışır.
   const navBadges = platformStaffFullAccess
     ? []
-    : specBadges
-      ? filterNavBadgesByAccess(specBadges, accessibleModules)
-      : await getNavBadges({ supabase, tenantId, userId: user?.id ?? null, role: effectiveRole, accessible: accessibleModules }).catch(() => []);
+    : bootUsable && boot
+      ? navBadgesFromCounts({ counts: boot.badges, role: effectiveRole, accessible: accessibleModules })
+      : specBadges
+        ? filterNavBadgesByAccess(specBadges, accessibleModules)
+        : await getNavBadges({ supabase, tenantId, userId: user?.id ?? null, role: effectiveRole, accessible: accessibleModules }).catch(() => []);
   // Sekme sayaçları: yalnız mevcut head-count'lar (müşteri/portföy/ekip); sayı yoksa gösterilmez.
   const tabCounts = tabCountsFromUsage(planUsage);
   const vitrinHref = office?.slug && !impersonating ? `/vitrin/${office.slug}` : null;

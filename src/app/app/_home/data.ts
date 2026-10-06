@@ -26,6 +26,23 @@ import {
   type ListingRow,
   lastSixMonthKeys,
 } from "./helpers";
+import { EMPTY_SNAPSHOT, loadDashboardSnapshot, type DashboardSnapshot } from "./data-batch";
+import { periodStatsFromSnapshot, type TaskOpenRow } from "./snapshot-core";
+
+/**
+ * Anlık görüntü RPC'leri (tek tur) — yükleyiciler ÖNCE buna bakar. Örnek-veri kararı (`sample_included`) kodun
+ * kararıyla (`ctx.sample.include`) aynı değilse o alan kullanılmaz (aynı kural, iki farklı anda hesaplanmış olabilir).
+ * RPC yoksa/hata verdiyse alanlar null → mevcut sorgular aynen çalışır.
+ */
+const snapshotFor = cache(async (ctx: HomeCtx): Promise<DashboardSnapshot> => {
+  if (!ctx.tenantId) return EMPTY_SNAPSHOT;
+  const snap = await loadDashboardSnapshot(ctx.tenantId, ctx.userId);
+  return {
+    insights: snap.insights,
+    metrics: snap.metrics && snap.metrics.sampleIncluded === ctx.sample.include ? snap.metrics : null,
+    tasks: snap.tasks && snap.tasks.sampleIncluded === ctx.sample.include ? snap.tasks : null,
+  };
+});
 
 export type HomeCtx = {
   tenantId: string | null;
@@ -118,10 +135,17 @@ const PERIOD_SERIES_LIMIT = 500;
  * `null` döner (kırpık seri çizilmez — uydurma yok).
  */
 export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
-  const supabase = await createClient();
   const days = ctx.period;
   const curStart = daysAgoIso(days);
   const prevStart = daysAgoIso(days * 2);
+  // Anlık görüntü: sayaçlar + 90 günlük seriden türetilen dönem serisi. Seri TAM değilse (tavan) eski sorgu
+  // çalışır ki 7/30 günlük kısa seri yine çizilebilsin (kural değişmez: kırpık seri çizilmez).
+  const snapMetrics = (await snapshotFor(ctx)).metrics;
+  if (snapMetrics) {
+    const s = periodStatsFromSnapshot(snapMetrics, days, curStart);
+    if (s.customerDates !== null && s.demandDates !== null) return s;
+  }
+  const supabase = await createClient();
   const customers = () => ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null));
   const demands = () => ctx.sample.apply(supabase.from("customer_demands").select("id", { count: "exact", head: true }));
   const results = await Promise.all([
@@ -154,6 +178,11 @@ export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
 /* ------------------------------ Bugünün işleri ------------------------------ */
 
 export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
+  const snapTasks = (await snapshotFor(ctx)).tasks;
+  if (snapTasks) {
+    const t = ctx.scopeMine ? snapTasks.mine : snapTasks.office;
+    return { dueToday: t.dueToday, overdue: t.overdue, open: t.open };
+  }
   const supabase = await createClient();
   // Danışman kapsamı: yalnız bana atanan görevler (ofis görünümünde süzgeç yok).
   // Bugün vadesi gelen açık görevler (yalnız sayaç)
@@ -177,7 +206,7 @@ export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
   return {
     dueToday: due.count ?? 0,
     overdue: overdue.count ?? 0,
-    open: open.data ?? [],
+    open: (open.data ?? []) as TaskOpenRow[],
   };
 });
 
@@ -252,6 +281,10 @@ export type ExpiringAuthority = { id: string; property_code: string | null; titl
  * Danışman kapsamında yalnız bana atanan portföyler.
  */
 export const loadExpiringAuthority = cache(async (ctx: HomeCtx) => {
+  const snapMetrics = (await snapshotFor(ctx)).metrics;
+  if (snapMetrics) {
+    return { data: (ctx.scopeMine ? snapMetrics.expiringAuthority.mine : snapMetrics.expiringAuthority.office) as ExpiringAuthority[] };
+  }
   const supabase = await createClient();
   let q = supabase
     .from("properties")
@@ -369,6 +402,8 @@ export const loadClosures = cache(async (ctx: HomeCtx) => {
 
 /** Talep durumları: ham satır çekmek yerine üç sayaç (200 satır sınırı sayıyı kırpıyordu). */
 export const loadDemandCounts = cache(async (ctx: HomeCtx): Promise<DemandCounts> => {
+  const snapMetrics = (await snapshotFor(ctx)).metrics;
+  if (snapMetrics) return { new: snapMetrics.demands.new, active: snapMetrics.demands.active, matched: snapMetrics.demands.matched };
   const supabase = await createClient();
   const count = (status: string) =>
     ctx.sample.apply(supabase.from("customer_demands").select("id", { count: "exact", head: true })).eq("status", status);
@@ -400,6 +435,20 @@ export const loadProfiles = cache(async () => {
 /* ---------------------------------- KPI ------------------------------------ */
 
 export const loadKpiCounts = cache(async (ctx: HomeCtx) => {
+  const snapMetrics = (await snapshotFor(ctx)).metrics;
+  if (snapMetrics) {
+    const k = snapMetrics.kpi;
+    return {
+      customerCount: k.customerCount,
+      propertyCount: k.propertyCount,
+      callsToday: k.callsToday,
+      customersThisMonth: k.customersThisMonth,
+      customersPrevMonth: k.customersPrevMonth,
+      callsYesterday: k.callsYesterday,
+      callDates: k.callDates,
+      customerDates: k.customerDates,
+    };
+  }
   const supabase = await createClient();
   const liveCustomers = () => ctx.sample.apply(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null));
   const results = await Promise.all([
@@ -656,6 +705,19 @@ const DEALS_LIMIT = 1000;
  *   kırpılmadıysa hesaplanır; 30 günden yeni kaydolanlar sayılmaz)
  */
 export const loadDecisions = cache(async (ctx: HomeCtx) => {
+  // Anlık görüntü: sayaçlar RLS'in verdiği satırlardan SQL'de sayılır (anlaşma 1000 tavanı yok); gösterim kapıları
+  // (komisyon/kazanç/kiralama yetkisi) burada, eski yolla aynı.
+  const snapMetrics = (await snapshotFor(ctx)).metrics;
+  if (snapMetrics) {
+    const d = snapMetrics.decisions;
+    return {
+      approvals: ctx.canSeeCommissions ? d.approvalsPending : null,
+      lostThisMonth: ctx.seeAllEarnings ? d.lostThisMonth : null,
+      overdueRent: ctx.canSeeRentals ? d.overdueRent : null,
+      passiveAdvisors: d.passiveAdvisors as number | null,
+      passiveDays: d.passiveDays,
+    };
+  }
   const supabase = await createClient();
   let approvalsQ = supabase
     .from("approval_requests")
