@@ -10,7 +10,7 @@ import {
   MATCHING_WEIGHT_LABELS,
   matchingWeightsPercent,
   type MatchingWeights,
-} from "@/lib/matching";
+} from "@/lib/matching-weights";
 
 const CRITERIA_DESC: Record<keyof MatchingWeights, string> = {
   budget: "Talep bütçesi ile liste fiyatı örtüşmesi",
