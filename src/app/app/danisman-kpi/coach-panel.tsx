@@ -7,17 +7,17 @@ export type CoachActionWithLink = CoachAction & { href?: string; hrefLabel?: str
 
 const STIL: Record<CoachAction["kind"], { cls: string; icon: typeof AlertTriangle; etiket: string }> = {
   urgent: {
-    cls: "border-danger-500/35 bg-danger-500/[0.06]",
+    cls: "border-[color:var(--viz-neg)]/35 bg-[color-mix(in_srgb,var(--viz-neg)_6%,transparent)]",
     icon: AlertTriangle,
     etiket: "Acil",
   },
   improve: {
-    cls: "border-amber-400/35 bg-amber-400/[0.07]",
+    cls: "border-[color:var(--viz-5)]/35 bg-[color-mix(in_srgb,var(--viz-5)_7%,transparent)]",
     icon: TrendingUp,
     etiket: "Geliştir",
   },
   praise: {
-    cls: "border-mint-500/35 bg-mint-500/[0.06]",
+    cls: "border-[color:var(--viz-pos)]/35 bg-[color-mix(in_srgb,var(--viz-pos)_6%,transparent)]",
     icon: ThumbsUp,
     etiket: "İyi gidiyor",
   },
@@ -42,10 +42,10 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[
     <section className="surface-card rounded-[var(--radius-panel)] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+          <p className="flex items-center gap-2 text-xs font-semibold text-accent-text">
             <Sparkles className="h-4 w-4" /> Kişisel koç
           </p>
-          <h2 className="mt-1 font-display font-bold text-ink-950">
+          <h2 className="mt-1 font-display font-bold text-text">
             {adSoyad ? `${adSoyad} · bu hafta` : "Bu hafta"}
           </h2>
         </div>
@@ -64,12 +64,12 @@ export function CoachPanel({ actions, adSoyad }: { actions: CoachActionWithLink[
                 <Ikon className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-ink-950">{a.title}</p>
+                <p className="text-sm font-semibold text-text">{a.title}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{a.detail}</p>
                 {a.href ? (
                   <Link
                     href={a.href}
-                    className="focus-ring mt-1.5 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-brand-700 hover:underline"
+                    className="focus-ring mt-1.5 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-accent-text hover:underline"
                   >
                     {a.hrefLabel ?? "İlgili ekrana git"}
                     <ArrowUpRight className="h-3.5 w-3.5" />

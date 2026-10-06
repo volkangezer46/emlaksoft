@@ -7,7 +7,8 @@
  */
 
 import dynamic from "next/dynamic";
+import { SkeletonCard } from "@/components/ui/viz";
 
 export const RevenueChart = dynamic(() => import("./revenue-chart").then((m) => m.RevenueChart), {
-  loading: () => <div className="h-full w-full animate-pulse rounded-[var(--radius-card)] bg-ink-950/8" />,
+  loading: () => <SkeletonCard height="100%" label="Grafik yükleniyor" />,
 });

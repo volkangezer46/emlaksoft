@@ -123,7 +123,7 @@ export function CommissionActions({
             type="button"
             onClick={markPaid}
             disabled={busy !== null}
-            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-mint-500/15 px-2.5 py-1.5 text-xs font-bold text-mint-700 transition hover:bg-mint-500/25 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-2.5 py-1.5 text-xs font-bold text-[color:var(--viz-pos)] transition hover:bg-[color-mix(in_srgb,var(--viz-pos)_22%,transparent)] disabled:opacity-50"
           >
             {busy === "paid" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
             Tahsil et
@@ -134,7 +134,7 @@ export function CommissionActions({
               <button
                 type="button"
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-amber-400 hover:text-amber-600 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-[color:var(--viz-5)] hover:text-[color:var(--pm-warn-text)] disabled:opacity-50"
               >
                 {busy === "revert" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />}
                 Tahsilatı geri al
@@ -153,7 +153,7 @@ export function CommissionActions({
               <button
                 type="button"
                 disabled={busy !== null}
-                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-brand-600 transition hover:border-brand-300 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-accent-text transition hover:border-border-interactive disabled:opacity-50"
               >
                 {busy === "link" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
                 Ödeme linki
@@ -170,7 +170,7 @@ export function CommissionActions({
           type="button"
           onClick={toggleLinks}
           aria-expanded={linksOpen}
-          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-brand-300"
+          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-bold text-text-muted transition hover:border-border-interactive"
         >
           Linkler <ChevronDown className={`h-3.5 w-3.5 transition ${linksOpen ? "rotate-180" : ""}`} />
         </button>
@@ -185,7 +185,7 @@ export function CommissionActions({
             links.map((l) => (
               <li key={l.id} className="rounded-[var(--radius-control)] bg-surface p-2 text-xs">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-ink-950">{l.title}</span>
+                  <span className="font-semibold text-text">{l.title}</span>
                   <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-bold text-text-muted">
                     {{ open: "Açık", paid: "Ödendi", cancelled: "İptal", expired: "Süresi doldu" }[l.status]}
                   </span>
@@ -196,14 +196,14 @@ export function CommissionActions({
                 </p>
                 {l.status === "open" ? (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <a href={l.url} target="_blank" rel="noreferrer" className="rounded-[var(--radius-control)] border border-line px-2 py-1 font-bold text-brand-600 hover:border-brand-300">
+                    <a href={l.url} target="_blank" rel="noreferrer" className="rounded-[var(--radius-control)] border border-line px-2 py-1 font-bold text-accent-text hover:border-border-interactive">
                       Aç
                     </a>
                     <button
                       type="button"
                       disabled={linkBusy !== null}
                       onClick={() => extendLink(l.id)}
-                      className="rounded-[var(--radius-control)] border border-line px-2 py-1 font-bold text-text-muted hover:border-brand-300 disabled:opacity-50"
+                      className="rounded-[var(--radius-control)] border border-line px-2 py-1 font-bold text-text-muted hover:border-border-interactive disabled:opacity-50"
                     >
                       +7 gün
                     </button>
@@ -212,7 +212,7 @@ export function CommissionActions({
                         <button
                           type="button"
                           disabled={linkBusy !== null}
-                          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 py-1 font-bold text-danger-500 hover:border-danger-500 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 py-1 font-bold text-[color:var(--viz-neg)] hover:border-[color:var(--viz-neg)] disabled:opacity-50"
                         >
                           <XCircle className="h-3 w-3" /> İptal et
                         </button>
@@ -230,7 +230,7 @@ export function CommissionActions({
         </ul>
       ) : null}
       {linkUrl ? (
-        <a href={linkUrl} target="_blank" rel="noreferrer" className="max-w-[220px] truncate text-xs font-semibold text-brand-600 hover:underline">
+        <a href={linkUrl} target="_blank" rel="noreferrer" className="max-w-[220px] truncate text-xs font-semibold text-accent-text hover:underline">
           {linkUrl}
         </a>
       ) : null}

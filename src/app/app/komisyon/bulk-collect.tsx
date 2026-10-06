@@ -49,7 +49,7 @@ export function BulkCollectCheckbox({ id, label }: { id: string; label?: string 
       checked={ctx.selected.has(id)}
       onChange={() => ctx.toggle(id)}
       aria-label={label ?? "Kaydı seç"}
-      className="focus-ring relative z-10 h-4 w-4 cursor-pointer rounded border-line accent-[var(--brand-600)]"
+      className="focus-ring relative z-10 h-4 w-4 cursor-pointer rounded border-line accent-[var(--accent)]"
     />
   );
 }
@@ -86,20 +86,20 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
           checked={allSelected}
           onChange={() => (allSelected ? ctx.clear() : ctx.setAll(allIds))}
           aria-label="Bekleyen tüm kayıtları seç"
-          className="focus-ring h-4 w-4 cursor-pointer rounded border-line accent-[var(--brand-600)]"
+          className="focus-ring h-4 w-4 cursor-pointer rounded border-line accent-[var(--accent)]"
         />
         Tümünü seç
       </label>
       {count > 0 ? (
         <>
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+          <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-xs font-bold text-accent-text">
             {count} seçili
           </span>
           <button
             type="button"
             onClick={collect}
             disabled={busy}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/15 px-3 py-1.5 text-xs font-bold text-mint-700 transition hover:bg-mint-500/25 disabled:opacity-50"
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--viz-pos)] transition hover:bg-[color-mix(in_srgb,var(--viz-pos)_22%,transparent)] disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
             Seçilenleri tahsil edildi işaretle
@@ -108,7 +108,7 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
             type="button"
             onClick={ctx.clear}
             disabled={busy}
-            className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-muted transition hover:text-danger-500 disabled:opacity-50"
+            className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2 py-1.5 text-xs font-semibold text-text-muted transition hover:text-[color:var(--viz-neg)] disabled:opacity-50"
           >
             <X className="h-3.5 w-3.5" /> Seçimi bırak
           </button>

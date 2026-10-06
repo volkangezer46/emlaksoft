@@ -55,7 +55,7 @@ function RevenueTooltip({
           {label}
         </p>
       ) : null}
-      <p className="flex items-center gap-2 text-sm text-ink-950">
+      <p className="flex items-center gap-2 text-sm text-text">
         <span
           className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40"
           style={{ background: CHART_COLORS[0] }}
@@ -85,7 +85,7 @@ export function RevenueChart({ data }: { data: RevenueDatum[] }) {
         <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical horizontal={false} />
         <XAxis type="number" {...axisProps} tickFormatter={(v: number) => compactFormatter.format(v)} />
         <YAxis type="category" dataKey="name" {...axisProps} width={110} />
-        <Tooltip content={<RevenueTooltip />} cursor={{ fill: "var(--brand-600)", fillOpacity: 0.05 }} />
+        <Tooltip content={<RevenueTooltip />} cursor={{ fill: "var(--accent)", fillOpacity: 0.05 }} />
         <Bar
           dataKey="revenue"
           name="Gelir"

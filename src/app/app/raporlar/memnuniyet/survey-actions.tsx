@@ -21,9 +21,9 @@ export function CopySurveyLinkButton({ url }: { url: string }) {
         }
       }}
       title="Anket linkini kopyala"
-      className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
+      className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-text transition hover:bg-canvas"
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Link2 className="h-3.5 w-3.5" />}
+      {copied ? <Check className="h-3.5 w-3.5 text-[color:var(--viz-pos)]" /> : <Link2 className="h-3.5 w-3.5" />}
       {copied ? "Kopyalandı" : "Linki kopyala"}
     </button>
   );
@@ -42,7 +42,7 @@ export function CreateSurveyButton({ dealId }: { dealId: string }) {
   if (url) {
     return (
       <span className="inline-flex items-center gap-2">
-        <span className="text-xs font-semibold text-mint-600">Anket hazır</span>
+        <span className="text-xs font-semibold text-[color:var(--viz-pos)]">Anket hazır</span>
         <CopySurveyLinkButton url={url} />
       </span>
     );
@@ -66,7 +66,7 @@ export function CreateSurveyButton({ dealId }: { dealId: string }) {
             setUrl(res.url ?? null);
           });
         }}
-        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3 text-xs font-bold text-white transition hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-55"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         Anket oluştur

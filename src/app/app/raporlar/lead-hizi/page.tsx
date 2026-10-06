@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/app/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { createClient } from "@/lib/supabase/server";
@@ -39,10 +40,10 @@ const DURUM_FILTERS: readonly { key: string; label: string; match: LeadResponseS
 ];
 
 const STATUS_BADGE: Record<LeadResponseStatus, { label: string; cls: string }> = {
-  bekliyor_gec: { label: "Yanıtsız · gecikti", cls: "bg-danger-500/10 text-danger-600" },
-  bekliyor: { label: "Yanıt bekliyor", cls: "bg-amber-400/15 text-amber-600" },
-  gecikti: { label: "Geç yanıtlandı", cls: "bg-amber-400/15 text-amber-600" },
-  hizli: { label: "Süresinde", cls: "bg-mint-500/12 text-mint-600" },
+  bekliyor_gec: { label: "Yanıtsız · gecikti", cls: "bg-[color-mix(in_srgb,var(--viz-neg)_12%,transparent)] text-[color:var(--viz-neg)]" },
+  bekliyor: { label: "Yanıt bekliyor", cls: "bg-[color-mix(in_srgb,var(--viz-5)_14%,transparent)] text-[color:var(--pm-warn-text)]" },
+  gecikti: { label: "Geç yanıtlandı", cls: "bg-[color-mix(in_srgb,var(--viz-5)_14%,transparent)] text-[color:var(--pm-warn-text)]" },
+  hizli: { label: "Süresinde", cls: "bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] text-[color:var(--viz-pos)]" },
 };
 
 const LIST_LIMIT = 60;
@@ -116,7 +117,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
             key={f.key}
             href={href({ ...base, donem: f.key, durum: sp.durum })}
             aria-current={f.key === donem.key ? "true" : undefined}
-            className={`focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${f.key === donem.key ? "border-brand-600 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:border-brand-300"}`}
+            className={`focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${f.key === donem.key ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
           >
             {f.label}
           </Link>
@@ -130,7 +131,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
             key={m}
             href={href({ ...base, esik: m, durum: sp.durum })}
             aria-current={m === esik ? "true" : undefined}
-            className={`focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${m === esik ? "border-brand-600 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:border-brand-300"}`}
+            className={`focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${m === esik ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
           >
             {formatMinutes(m)}
           </Link>
@@ -138,11 +139,11 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
       </div>
 
       {res.failed ? (
-        <p className="rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/8 px-3.5 py-3 text-sm text-danger-600" role="alert">
+        <p className="rounded-[var(--radius-control)] border border-[color:var(--viz-neg)]/30 bg-[color-mix(in_srgb,var(--viz-neg)_8%,transparent)] px-3.5 py-3 text-sm text-[color:var(--viz-neg)]" role="alert">
           Veriler okunurken hata oluştu; aşağıdaki sayılara güvenmeyin. Sayfayı yenileyin.
         </p>
       ) : res.partial ? (
-        <p className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3.5 py-3 text-sm text-amber-700" role="status">
+        <p className="rounded-[var(--radius-control)] border border-[color:var(--viz-5)]/40 bg-[color-mix(in_srgb,var(--viz-5)_10%,transparent)] px-3.5 py-3 text-sm text-[color:var(--pm-warn-text)]" role="status">
           Kayıt sayısı tarama sınırına ulaştı; sayılar eksik olabilir. Pencereyi daraltın.
         </p>
       ) : null}
@@ -179,9 +180,9 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
       </section>
 
       {officeWide ? (
-        <section aria-label="Danışman görünümü" className="rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-          <h2 className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-bold text-ink-950">
-            <Users className="h-4 w-4 text-brand-600" /> Danışman bazında
+        <section aria-label="Danışman görünümü" className="surface-card rounded-[var(--radius-panel)]">
+          <h2 className="flex items-center gap-2 border-b border-line px-4 py-3 text-sm font-bold text-text">
+            <Users className="h-4 w-4 text-accent-text" /> Danışman bazında
           </h2>
           {byAdvisor.length === 0 ? (
             <p className="px-4 py-6 text-sm text-text-muted">Bu pencerede yeni müşteri kaydı yok.</p>
@@ -202,24 +203,35 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
                     const key = a.advisorId ?? "atanmamis";
                     return (
                       <tr key={key} className="border-t border-line">
-                        <td className="px-4 py-2.5 font-semibold text-ink-950">
+                        <td className="px-4 py-2 font-semibold text-text">
                           <Link
                             href={href({ ...base, danisman: key, durum: sp.durum })}
-                            className="focus-ring rounded hover:text-brand-600"
+                            className="focus-ring rounded hover:text-accent-text"
                           >
                             {advisorName(a.advisorId)}
                           </Link>
                         </td>
-                        <td className="px-3 py-2.5 text-text-muted">{a.summary.total}</td>
-                        <td className="px-3 py-2.5 text-text-muted">{formatMinutes(a.summary.avgMin)}</td>
-                        <td className="px-3 py-2.5 text-text-muted">
-                          {a.summary.withinSlaPct === null ? "Veri yok" : `%${a.summary.withinSlaPct}`}
+                        <td className="px-3 py-2 tabular-nums text-text-muted">{a.summary.total}</td>
+                        <td className="px-3 py-2 tabular-nums text-text-muted">{formatMinutes(a.summary.avgMin)}</td>
+                        <td className="px-3 py-2 tabular-nums text-text-muted">
+                          {a.summary.withinSlaPct === null ? (
+                            "Veri yok"
+                          ) : (
+                            <span className="flex min-w-24 flex-col gap-1">
+                              <span>%{a.summary.withinSlaPct}</span>
+                              <Progress
+                                value={a.summary.withinSlaPct}
+                                label={`${advisorName(a.advisorId)} hedef süre içinde`}
+                                tone={a.summary.withinSlaPct >= 80 ? "success" : a.summary.withinSlaPct >= 50 ? "warning" : "danger"}
+                              />
+                            </span>
+                          )}
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2">
                           {a.summary.overdueWaiting > 0 ? (
                             <Link
                               href={href({ ...base, danisman: key, durum: "gecikmis" })}
-                              className="focus-ring rounded font-semibold text-danger-600 hover:underline"
+                              className="focus-ring rounded font-semibold text-[color:var(--viz-neg)] hover:underline"
                             >
                               {a.summary.overdueWaiting}
                             </Link>
@@ -237,7 +249,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
           {danismanFilter ? (
             <p className="border-t border-line px-4 py-2 text-xs text-text-muted">
               Liste {advisorName(danismanFilter === "atanmamis" ? null : danismanFilter)} ile sınırlı.{" "}
-              <Link href={href({ ...base, danisman: undefined, durum: sp.durum })} className="font-semibold text-brand-600 hover:underline">
+              <Link href={href({ ...base, danisman: undefined, durum: sp.durum })} className="font-semibold text-accent-text hover:underline">
                 Süzgeci kaldır
               </Link>
             </p>
@@ -245,15 +257,15 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
         </section>
       ) : null}
 
-      <section aria-label="Kayıt listesi" className="rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+      <section aria-label="Kayıt listesi" className="surface-card rounded-[var(--radius-panel)]">
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-          <h2 className="mr-2 text-sm font-bold text-ink-950">Kayıtlar</h2>
+          <h2 className="mr-2 text-sm font-bold text-text">Kayıtlar</h2>
           {DURUM_FILTERS.map((f) => (
             <Link
               key={f.key}
               href={href({ ...base, durum: f.key })}
               aria-current={f.key === durum.key ? "true" : undefined}
-              className={`focus-ring press rounded-full border px-3 py-1 text-xs font-semibold transition ${f.key === durum.key ? "border-brand-600 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:border-brand-300"}`}
+              className={`focus-ring press rounded-full border px-3 py-1 text-xs font-semibold transition ${f.key === durum.key ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
             >
               {f.label}
             </Link>
@@ -277,15 +289,15 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
             {list.map((r) => {
               const badge = STATUS_BADGE[r.status];
               return (
-                <li key={r.customerId} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
+                <li key={r.customerId} className="flex min-h-10 flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
                   <Link
                     href={`/app/musteriler/${r.customerId}`}
-                    className="focus-ring min-w-0 flex-1 truncate rounded text-sm font-semibold text-ink-950 hover:text-brand-600"
+                    className="focus-ring min-w-0 flex-1 truncate rounded text-sm font-semibold text-text hover:text-accent-text"
                   >
                     {r.name}
                   </Link>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badge.cls}`}>{badge.label}</span>
-                  <span className="text-xs text-text-muted">
+                  <span className="text-xs tabular-nums text-text-muted">
                     {r.responded ? "İlk yanıt" : "Bekleme"}: {formatMinutes(r.minutes)}
                   </span>
                   {officeWide ? <span className="text-xs text-text-faint">{advisorName(r.assignedTo)}</span> : null}
