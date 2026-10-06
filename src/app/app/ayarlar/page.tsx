@@ -30,7 +30,7 @@ import { loadSampleStatus } from "@/lib/sample-status";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
-import { sanitizeMatchingWeights, type MatchingWeights } from "@/lib/matching";
+import { sanitizeMatchingWeights, type MatchingWeights } from "@/lib/matching-weights";
 import { CompanyForm } from "./company-form";
 import { LicenseStatusCard } from "@/components/app/license-status-card";
 import { loadTenantLicense, tenantLicenseStatus } from "@/lib/license-server";
@@ -40,6 +40,7 @@ import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
 import { ReadOnlyGate } from "./read-only-gate";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
+import { loadNotificationChannels } from "@/lib/notification-channels";
 import { planLabel } from "@/lib/billing/plans";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { canManageModules } from "@/lib/modules/permissions";
@@ -87,15 +88,28 @@ export default async function SettingsPage() {
   // Modüller kartı yalnız ofis sahibi ve genel müdür içindir.
   const visibleCards = cards.filter((c) => (c.href !== "/app/ayarlar/moduller" && c.href !== "/app/ayarlar/ai-kullanim") || canManageModules(role));
   const supabase = await createClient();
-  const provinces = await getProvinceOptions();
-
-  const [user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
-    getRequestUser(),
+  // Tek tur: tüm bağımsız okumalar paralel (eskiden il listesi önce, lisans/örnek veri/kurulum durumu sonra sırayla bekleniyordu).
+  // Ofis satırı bir kez çalıştırılır (PostgREST sorgusu her `then`de yeniden gider): örnek veri durumu ona zincirlenir.
+  const tenantPromise = Promise.resolve(
     supabase
       .from("tenants")
       .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, province_id, district_id, logo_url, website, sample_seeded_at, matching_weights")
       .limit(1)
       .maybeSingle(),
+  );
+  const sampleStatusPromise = tenantId
+    ? tenantPromise
+        .then(({ data }) => loadSampleStatus(supabase, tenantId, (data as { sample_seeded_at?: string | null } | null)?.sample_seeded_at ?? null))
+        .catch(() => null)
+    : Promise.resolve(null);
+
+  const [provinces, tenantLicense, snap, sampleStatus, user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
+    getProvinceOptions(),
+    loadTenantLicense(),
+    tenantId ? loadOnboardingSnapshot(tenantId) : Promise.resolve(null),
+    sampleStatusPromise,
+    getRequestUser(),
+    tenantPromise,
     getNotificationPrefs(),
     supabase.from("iys_consents").select("id", { count: "exact", head: true }),
     supabase.from("iys_consents").select("id", { count: "exact", head: true }).eq("status", "granted"),
@@ -112,12 +126,8 @@ export default async function SettingsPage() {
   ]);
 
   const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, province_id: null, district_id: null, logo_url: null, website: null, sample_seeded_at: null };
-  const tenantLicense = await loadTenantLicense();
   const licenseStatus = tenantLicenseStatus(tenantLicense);
   const sampleSeededAt = (tenant as { sample_seeded_at?: string | null }).sample_seeded_at ?? null;
-  const sampleStatus = tenantId
-    ? await loadSampleStatus(supabase, tenantId, sampleSeededAt).catch(() => null)
-    : null;
   // matching_weights null = varsayılan set kullanılıyor; form başlangıcı için güvenli ayrıştır.
   const rawMatchingWeights = (tenant as { matching_weights?: unknown }).matching_weights ?? null;
   const matchingWeights: MatchingWeights | null = rawMatchingWeights
@@ -180,7 +190,6 @@ export default async function SettingsPage() {
   ];
   // Kurulum yüzdesi: ana ekran şeridi ve /app/baslangic sihirbazıyla AYNI kaynak (onboarding-state).
   // Okunamazsa (null) eski profil alanı hesabına düşülür.
-  const snap = tenantId ? await loadOnboardingSnapshot(tenantId) : null;
   const items = snap
     ? snap.state.steps.map((st) => ({ label: st.title, done: st.done, href: `/app/baslangic?adim=${st.id}` }))
     : checklist;
@@ -309,7 +318,7 @@ export default async function SettingsPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-        <NotificationPrefsPanel initial={notifPrefs} />
+        <NotificationPrefsPanel initial={notifPrefs} channels={await loadNotificationChannels(tenantId)} />
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="font-display font-bold text-ink-950">Hızlı bağlantılar</h2>
           <p className="mt-1 text-xs text-text-muted">Operasyon ve uyum kısayolları</p>

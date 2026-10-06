@@ -8,13 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { notifyTenant } from "@/lib/notify";
+import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { daysFromNowIso } from "@/lib/clock";
+import { daysFromNowIso, trDayKey } from "@/lib/clock";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 export type CustomerResult = { error?: string; ok?: boolean; id?: string };
@@ -320,6 +320,24 @@ export async function bulkAssignCustomers(
   const supabase = await createClient();
   const validIds = await resolveTenantCustomerIds(supabase, gate.tenantId, ids);
   if (!validIds.length) return { error: "Güncellenecek müşteri bulunamadı." };
+  // Hedef danışman bu ofisin AKTİF kullanıcısı olmalı (tekil `reassignCustomer` ile aynı kural; başka ofisin kimliği yazılamaz).
+  if (assignedTo) {
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", assignedTo)
+      .eq("tenant_id", gate.tenantId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!target) return { error: "Seçilen danışman bu ofiste aktif değil." };
+  }
+  // Bildirim için: gerçekten el değiştiren müşteri sayısı (zaten o danışmandaysa devir sayılmaz).
+  const { data: before } = await supabase
+    .from("customers")
+    .select("id, assigned_to")
+    .in("id", validIds)
+    .eq("tenant_id", gate.tenantId);
+  const movedCount = ((before ?? []) as { id: string; assigned_to: string | null }[]).filter((c) => (c.assigned_to ?? "") !== (assignedTo || "")).length;
 
   const { error } = await supabase
     .from("customers")
@@ -329,6 +347,16 @@ export async function bulkAssignCustomers(
   if (error) {
     console.error("bulkAssignCustomers", error);
     return { error: "Danışman ataması yapılamadı." };
+  }
+  if (assignedTo && assignedTo !== gate.userId && movedCount > 0) {
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: assignedTo,
+      title: movedCount === 1 ? "Size 1 müşteri devredildi" : `Size ${movedCount} müşteri devredildi`,
+      body: "Toplu atama ile müşteriler size devredildi. Listeyi açıp ilk temas planını yapın.",
+      href: `/app/musteriler?assigned=${assignedTo}`,
+      dedupeKey: `customer-bulk-assign:${assignedTo}:${idsDigest(validIds)}:${trDayKey()}`,
+    });
   }
 
   // Audit log (tek kayıt, toplu temsil — bkz. bulkUpdatePropertyStatus deseni)
@@ -985,19 +1013,14 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
     newValue: { assigned_to: assignedTo || null },
   });
   if (assignedTo && assignedTo !== gate.userId) {
-    try {
-      await notifyTenant({
-        tenantId: gate.tenantId,
-        userId: assignedTo,
-        title: `Size müşteri atandı: ${(current as { full_name: string }).full_name}`,
-        body: "Müşteri kartını inceleyip ilk temas planını yapın.",
-        href: `/app/musteriler/${id}`,
-        kind: "info",
-      });
-    } catch (e) {
-      // Bildirim başarısızlığı atamayı geri almaz (atama + denetim kaydı yazıldı).
-      console.error("reassignCustomer notify", e);
-    }
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: assignedTo,
+      title: `Size müşteri atandı: ${(current as { full_name: string }).full_name}`,
+      body: "Müşteri kartını inceleyip ilk temas planını yapın.",
+      href: `/app/musteriler/${id}`,
+      dedupeKey: `customer-assign:${id}:${previous ?? "yok"}:${assignedTo}:${trDayKey()}`,
+    });
   }
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);

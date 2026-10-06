@@ -10,6 +10,8 @@ import {
   AUDIENCE_LABELS,
   DEFAULT_DELAY_DAYS,
   DEFAULT_MAX_ATTEMPTS,
+  EVENT_AUDIENCES,
+  EVENT_DEFAULT_DELAY_DAYS,
   EVENT_DESCRIPTIONS,
   EVENT_LABELS,
   SURVEY_EVENT_TYPES,
@@ -17,8 +19,9 @@ import {
   isSurveyEventType,
   type SurveyEventType,
 } from "@/lib/surveys/types";
+import { isTenantSmsAvailable, isTenantWhatsAppAvailable } from "@/lib/messaging/tenant-providers";
 import { SurveyNav, SurveyNotReady } from "../survey-nav";
-import { AssigneeToggle, AssignmentForm, DistributeButton, TriggerForm } from "../settings-forms";
+import { AssigneeToggle, AssignmentForm, AudienceToggle, DistributeButton, TriggerForm } from "../settings-forms";
 import { TemplateEditor, type TemplateQuestionVM } from "../template-editor";
 
 /**
@@ -63,6 +66,14 @@ export default async function SurveySettingsPage() {
 
   const trigger = new Map<string, { enabled: boolean; delay: number; attempts: number }>();
   for (const t of triggerRows ?? []) trigger.set(String(t.event_type), { enabled: t.enabled === true, delay: Number(t.delay_days), attempts: Number(t.max_attempts) });
+  // Kitle × tetik matrisi: (olay, kitle) şablonu aktif mi?
+  const audienceOn = new Map<string, boolean>();
+  for (const t of templates ?? []) audienceOn.set(`${t.event_type}:${t.audience}`, t.active === true);
+  // Kanal durumu (ofisin kendi sağlayıcısı; platform yedeği yalnız açıkça izinliyse).
+  const [smsReady, waReady] = await Promise.all([
+    isTenantSmsAvailable(tenantId).catch(() => false),
+    isTenantWhatsAppAvailable(tenantId).catch(() => false),
+  ]);
   const assigneeSet = new Set((assigneeRows ?? []).map((a) => String(a.user_id)));
   const people = (profiles ?? []).map((p) => ({ id: String(p.id), name: String(p.full_name ?? "Kullanıcı"), role: roleLabel(String(p.role)) }));
   const assigneeOptions = people.filter((p) => assigneeSet.has(p.id)).map((p) => ({ id: p.id, name: p.name }));
@@ -78,7 +89,7 @@ export default async function SurveySettingsPage() {
         label: String(q.label),
         options: Array.isArray(q.options) ? (q.options as unknown[]).map(String) : [],
         required: q.required === true,
-        tag: q.tag === "primary" || q.tag === "reason" ? q.tag : null,
+        tag: q.tag === "primary" || q.tag === "reason" || q.tag === "advisor" ? q.tag : null,
       },
     ]);
   }
@@ -98,15 +109,17 @@ export default async function SurveySettingsPage() {
       ) : null}
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-        <h2 className="font-display font-bold text-ink-950">Tetikleyiciler</h2>
+        <h2 className="font-display font-bold text-ink-950">Kitle × tetik matrisi</h2>
         <p className="mt-1 flex items-start gap-1.5 text-xs text-text-muted">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          Her olay için ayrı açılır. Bir tetikleyici açıldığında yalnız bundan sonraki olaylar için anket üretilir. Aynı olay için ikinci anket oluşmaz.
+          Her olay ayrı açılır; satırdaki kitle anahtarlarıyla o olayda kime sorulacağını seçersiniz. Bir tetikleyici açıldığında yalnız bundan
+          sonraki olaylar için anket üretilir ve aynı olay için ikinci anket oluşmaz. Tüm puanlar 0-10 ölçeğindedir.
           Talep kapanışında kapanış zamanı tutulmadığından yalnız tetikleyici açıldıktan sonra oluşturulup kapanan talepler alınır.
         </p>
         <ul className="mt-4 grid gap-3">
           {SURVEY_EVENT_TYPES.map((event) => {
             const t = trigger.get(event);
+            const pulse = event === "advisor_pulse";
             return (
               <TriggerForm
                 key={event}
@@ -114,10 +127,25 @@ export default async function SurveySettingsPage() {
                 label={EVENT_LABELS[event]}
                 description={EVENT_DESCRIPTIONS[event]}
                 enabled={t?.enabled ?? false}
-                delayDays={t?.delay ?? DEFAULT_DELAY_DAYS}
+                delayDays={t?.delay ?? EVENT_DEFAULT_DELAY_DAYS[event] ?? DEFAULT_DELAY_DAYS}
                 maxAttempts={t?.attempts ?? DEFAULT_MAX_ATTEMPTS}
                 readOnly={!canConfigure}
-              />
+                delayLabel={pulse ? "Davet: ayın 1. gününden kaç gün sonra" : event === "rent_renewal" || event === "tenant_annual" ? "Olay gününden sonra (gün)" : "Bekleme (gün)"}
+                showAttempts={!pulse}
+              >
+                {pulse
+                  ? null
+                  : EVENT_AUDIENCES[event].map((audience) => (
+                      <AudienceToggle
+                        key={audience}
+                        event={event}
+                        audience={audience}
+                        label={AUDIENCE_LABELS[audience]}
+                        enabled={audienceOn.get(`${event}:${audience}`) ?? true}
+                        readOnly={!canConfigure}
+                      />
+                    ))}
+              </TriggerForm>
             );
           })}
         </ul>
@@ -134,7 +162,7 @@ export default async function SurveySettingsPage() {
           ))}
         </ul>
         <div className="mt-5 border-t border-line pt-4">
-          <AssignmentForm initial={settings} assignees={assigneeOptions} readOnly={!canConfigure} />
+          <AssignmentForm initial={settings} assignees={assigneeOptions} readOnly={!canConfigure} channels={{ sms: smsReady, whatsapp: waReady }} />
         </div>
         {canConfigure ? (
           <div className="mt-4">

@@ -42,6 +42,7 @@ export const SCHEMA_CHECKS: SchemaCheck[] = [
   { label: "Duyurular", table: "announcements", migration: "20260727000106_announcements.sql" },
   { label: "Vitrin fiyat alarmı", table: "vitrin_price_alerts", migration: "20260727000105_vitrin_price_alerts.sql" },
   { label: "Anketler", table: "surveys", migration: "20260727000104_surveys.sql" },
+  { label: "Anket sistemi (ekip nabzı, düşük puan zinciri)", table: "survey_pulse_responses", migration: "20261007000400_survey_matrix_channels.sql" },
   { label: "Anlaşma kontrol listesi", table: "deal_checklist_items", migration: "20260727000103_deal_checklist.sql" },
   { label: "Sunumlar", table: "presentations", migration: "20260726000100_presentations.sql" },
   { label: "Hata kayıtları", table: "error_logs", migration: "error_logs (üretim izleme)" },

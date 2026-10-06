@@ -22,6 +22,7 @@ import { trMonthContext } from "@/lib/team/scorecard";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { loadMemberMonth } from "./advisor-data";
 import { AdvisorListingOpsCard } from "@/components/listing-control/advisor-ops-card";
+import { AdvisorSurveyCard } from "@/components/surveys/advisor-survey-card";
 import {
   ActivityTab,
   CoachTab,
@@ -234,6 +235,7 @@ export async function AdvisorDetailView({
 
       {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} /> : null}
       {active === "ozet" && effectiveCanAccessModule(perms, "portals") ? <AdvisorListingOpsCard advisorId={id} /> : null}
+      {active === "ozet" && effectiveCanAccessModule(perms, "surveys") ? <AdvisorSurveyCard advisorId={id} /> : null}
       {active === "aktivite" ? <ActivityTab ctx={ctx} /> : null}
       {active === "aktivite" ? <ActivityExtra supabase={supabase} id={id} /> : null}
       {active === "oncul" ? <LeadTab ctx={ctx} /> : null}

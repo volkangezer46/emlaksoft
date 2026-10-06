@@ -117,7 +117,8 @@ function str(v: unknown): string | null {
  *  - property_new      → properties: created_at aralıkta, silinmemiş, assigned_to
  *  - appointment_done  → appointments: status='completed', scheduled_at aralıkta
  *  - task_done         → tasks: status='done', completed_at aralıkta
- *  - nps_promoter      → surveys: status='answered', score>=9, answered_at aralıkta
+ *  - nps_promoter      → surveys: status='answered', score>=9, answered_at aralıkta + survey_tasks (satıcı/ev sahibi/
+ *    malik kitlesi, completed, score>=9, completed_at aralıkta; alıcı/kiracı `surveys`'e yansıdığı için hariç)
  *  - leak_sla_response → listing_closures: created_at aralıkta ve
  *    `sla_warning_sent_at IS NULL`. Yorum: kayıp-kaçak kapanışı danışman
  *    tarafından kaydedilmiş ve proaktif SLA uyarısının (7 gün) HİÇ ateşlenmesi
@@ -171,6 +172,7 @@ export async function loadLeagueData(
     streakApptRes,
     streakTasksRes,
     streakPropsRes,
+    surveyTaskPromotersRes,
   ] = await Promise.all([
     client.from("profiles").select("id, full_name, role, branch_id")
       .eq("tenant_id", tenantId).eq("is_active", true).limit(200),
@@ -206,6 +208,12 @@ export async function loadLeagueData(
       .gte("completed_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
     client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
       .gte("created_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
+
+    // Anket modülü destekleyenleri (9-10): satıcı/ev sahibi/malik kitleleri. Alıcı/kiracı cevabı `surveys`'e zaten
+    // yansıtıldığı için burada SAYILMAZ (çift puan yok). Tablo yoksa hata = boş (rowsOf).
+    client.from("survey_tasks").select("agent_id, completed_at").eq("tenant_id", tenantId).eq("status", "completed")
+      .in("audience", ["seller", "landlord", "owner"]).gte("score", 9)
+      .gte("completed_at", startIso).lt("completed_at", endIso).not("agent_id", "is", null).limit(ROW_LIMIT),
   ]);
 
   // ── Yarışan danışman listesi ────────────────────────────────────────────
@@ -234,6 +242,7 @@ export async function loadLeagueData(
   push(rowsOf(apptRes), "assigned_to", "scheduled_at", "appointment_done");
   push(rowsOf(tasksRes), "assigned_to", "completed_at", "task_done");
   push(rowsOf(surveysRes), "agent_id", "answered_at", "nps_promoter");
+  push(rowsOf(surveyTaskPromotersRes), "agent_id", "completed_at", "nps_promoter");
   push(rowsOf(closuresRes), "created_by", "created_at", "leak_sla_response");
 
   const scores = computeAgentScores(activity);

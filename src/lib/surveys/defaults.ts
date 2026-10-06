@@ -3,7 +3,8 @@ import type { SurveyAudience, SurveyEventType, SurveyQuestionDef } from "@/lib/s
 /**
  * Olay türüne göre hazır gelen Türkçe şablonlar (saf veri).
  * Ofis ilk açışta bunlar veritabanına kopyalanır; sonra ofis sahibi düzenler.
- * `tag: "primary"` puan sorusu görevin ana puanıdır; `tag: "reason"` neden/şikayet dağılımına girer.
+ * TEK ÖLÇEK 0-10: `tag: "primary"` puan sorusu görevin ana puanıdır (NPS/CSAT bu puandan hesaplanır),
+ * `tag: "advisor"` danışman puanıdır (danışman kartı), `tag: "reason"` neden/şikayet dağılımına girer.
  */
 export type DefaultTemplate = {
   event: SurveyEventType;
@@ -13,6 +14,14 @@ export type DefaultTemplate = {
 };
 
 const score = (label: string): SurveyQuestionDef => ({ kind: "score", label, options: [], required: true, tag: "primary" });
+const advisorScore = (label = "Danışmanınızı 0-10 arası puanlar mısınız?"): SurveyQuestionDef => ({
+  kind: "score",
+  label,
+  options: [],
+  required: false,
+  tag: "advisor",
+});
+const plainScore = (label: string): SurveyQuestionDef => ({ kind: "score", label, options: [], required: false, tag: null });
 const yesno = (label: string): SurveyQuestionDef => ({ kind: "yesno", label, options: [], required: false, tag: null });
 const text = (label = "Eklemek istedikleriniz var mı?"): SurveyQuestionDef => ({ kind: "text", label, options: [], required: false, tag: null });
 const choice = (label: string, options: string[], tag: "reason" | null = null, required = false): SurveyQuestionDef => ({
@@ -23,15 +32,17 @@ const choice = (label: string, options: string[], tag: "reason" | null = null, r
   tag,
 });
 
-function dealWon(audience: SurveyAudience, name: string, who: string, verb: string): DefaultTemplate {
+/** NPS sorusu (tavsiye olasılığı) — müşteri ve malik kitlelerinde ana puan. */
+const NPS_QUESTION = "Ofisimizi bir yakınınıza tavsiye etme olasılığınızı 0-10 arası puanlar mısınız?";
+
+function dealWon(audience: SurveyAudience, name: string, who: string): DefaultTemplate {
   return {
     event: "deal_won",
     audience,
     name,
     questions: [
-      score(`${verb} sürecindeki genel memnuniyetinizi 1-10 arası puanlar mısınız?`),
-      yesno(`Danışmanımız süreç boyunca ulaşılabilir ve bilgilendirici miydi?`),
-      yesno(`Bizi yakınlarınıza tavsiye eder misiniz?`),
+      score(NPS_QUESTION),
+      advisorScore(),
       choice(
         `Memnun kalmadığınız bir nokta oldu mu?`,
         ["Hayır, memnunum", "İletişim ve ulaşılabilirlik", "Komisyon / ücret", "Süreç hızı", "Bilgilendirme eksikliği", "Diğer"],
@@ -46,7 +57,7 @@ export const DEFAULT_TEMPLATES: readonly DefaultTemplate[] = [
   {
     event: "property_unpublished",
     audience: "owner",
-    name: "Yayından kalkan ilan: malik anketi",
+    name: "Yayından kalkan ilan / yetki bitimi: malik anketi",
     questions: [
       choice(
         "İlan neden yayından kalktı?",
@@ -62,8 +73,8 @@ export const DEFAULT_TEMPLATES: readonly DefaultTemplate[] = [
         "reason",
         true,
       ),
-      yesno("Danışmanımızın hizmetinden memnun kaldınız mı?"),
-      score("Hizmetimizi 1-10 arası puanlar mısınız?"),
+      score(NPS_QUESTION),
+      advisorScore(),
       choice("Rakip bir ofisle veya sahibinden ile çalıştınız mı?", ["Hayır", "Başka bir emlak ofisi", "Sahibinden / kendi imkanlarım"]),
       text(),
     ],
@@ -92,14 +103,14 @@ export const DEFAULT_TEMPLATES: readonly DefaultTemplate[] = [
         "Daha iyi fotoğraf ve tanıtım",
         "Beklentim yok, süreç iyi gidiyor",
       ]),
-      score("Şu ana kadarki hizmetimizi 1-10 arası puanlar mısınız?"),
+      score("Şu ana kadarki hizmetimizi 0-10 arası puanlar mısınız?"),
       text(),
     ],
   },
-  dealWon("buyer", "İşlem gören anlaşma: alıcı anketi", "Alıcı", "Satın alma"),
-  dealWon("seller", "İşlem gören anlaşma: satıcı anketi", "Satıcı", "Satış"),
-  dealWon("tenant", "İşlem gören anlaşma: kiracı anketi", "Kiracı", "Kiralama"),
-  dealWon("landlord", "İşlem gören anlaşma: ev sahibi anketi", "Ev sahibi", "Kiraya verme"),
+  dealWon("buyer", "Anlaşma kapanışı: alıcı anketi", "Alıcı"),
+  dealWon("seller", "Anlaşma kapanışı: satıcı anketi", "Satıcı"),
+  dealWon("tenant", "Anlaşma kapanışı: kiracı anketi", "Kiracı"),
+  dealWon("landlord", "Anlaşma kapanışı: ev sahibi anketi", "Ev sahibi"),
   {
     event: "deal_lost",
     audience: "customer",
@@ -120,7 +131,7 @@ export const DEFAULT_TEMPLATES: readonly DefaultTemplate[] = [
         true,
       ),
       yesno("İleride tekrar bizimle çalışır mısınız?"),
-      score("Hizmetimizi 1-10 arası puanlar mısınız?"),
+      score("Hizmetimizi 0-10 arası puanlar mısınız?"),
       text(),
     ],
   },
@@ -143,19 +154,66 @@ export const DEFAULT_TEMPLATES: readonly DefaultTemplate[] = [
         true,
       ),
       yesno("Size uygun portföyler önerildi mi?"),
-      score("Hizmetimizi 1-10 arası puanlar mısınız?"),
+      score("Hizmetimizi 0-10 arası puanlar mısınız?"),
       text(),
     ],
   },
   {
     event: "appointment_done",
     audience: "visitor",
-    name: "Ziyaret sonrası kısa geri bildirim",
+    name: "Gösterim sonrası kısa memnuniyet",
     questions: [
-      score("Ziyaret / görüşme deneyiminizi 1-10 arası puanlar mısınız?"),
+      score("Gösterim deneyiminizi 0-10 arası puanlar mısınız?"),
       yesno("Mülk beklentinize uygun muydu?"),
       choice("Beğenmediğiniz bir yön var mı?", ["Hayır", "Fiyat", "Konum", "Mülkün durumu", "Danışmanın ilgisi", "Diğer"], "reason"),
       text(),
+    ],
+  },
+  {
+    event: "rent_renewal",
+    audience: "tenant",
+    name: "Kira bitişine 60 gün: yenileme niyeti",
+    questions: [
+      choice(
+        "Sözleşme bitiminde kiracılığa devam etmeyi düşünüyor musunuz?",
+        ["Evet, yenilemek istiyorum", "Kararsızım", "Hayır, taşınmayı düşünüyorum"],
+        "reason",
+        true,
+      ),
+      score("Kiracılık süresince ofisimizden memnuniyetinizi 0-10 arası puanlar mısınız?"),
+      choice("Taşınmayı düşünüyorsanız başlıca neden nedir?", ["Kira artışı", "Daha büyük / küçük ev ihtiyacı", "Konum / iş değişikliği", "Ev sahibiyle sorunlar", "Mülkün durumu", "Diğer"]),
+      text(),
+    ],
+  },
+  {
+    event: "tenant_annual",
+    audience: "tenant",
+    name: "Kiracı yıllık memnuniyet anketi",
+    questions: [
+      score("Bu yıl ofisimizden memnuniyetinizi 0-10 arası puanlar mısınız?"),
+      choice(
+        "Bu yıl en çok neye ihtiyaç duydunuz?",
+        ["Bakım / arıza desteği", "Ev sahibiyle iletişim", "Kira ödeme kolaylığı", "Sözleşme bilgilendirmesi", "İhtiyacım olmadı"],
+        "reason",
+      ),
+      yesno("Sözleşme bitiminde devam etmeyi düşünüyor musunuz?"),
+      text(),
+    ],
+  },
+  {
+    event: "advisor_pulse",
+    audience: "advisor",
+    name: "Ekip nabzı: aylık ofis içi anket (anonim)",
+    questions: [
+      score("Ofisimizi çalışılacak yer olarak bir arkadaşınıza tavsiye etme olasılığınızı 0-10 arası puanlar mısınız?"),
+      plainScore("Yönetimden aldığınız desteği 0-10 arası puanlar mısınız?"),
+      choice(
+        "Şu an en çok neye ihtiyaç duyuyorsunuz?",
+        ["Eğitim ve koçluk", "Daha fazla portföy / talep", "Pazarlama ve ilan desteği", "Teknoloji ve araçlar", "Yönetimle iletişim", "Komisyon / prim yapısı", "Diğer"],
+        "reason",
+        true,
+      ),
+      text("Önerinizi yazabilirsiniz (anonim)."),
     ],
   },
 ];

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { BellRing, Check, Loader2 } from "lucide-react";
+import { BellOff, BellRing, Check, Loader2, MessageSquareOff } from "lucide-react";
 import { useToast } from "@/components/app/toast-provider";
 import { saveNotificationPrefs } from "@/app/actions/notification-prefs";
 import { PushSubscribeToggle } from "@/components/app/push-subscribe";
@@ -19,6 +19,10 @@ export type NotifPrefs = {
   rentOverdue: boolean;
   network: boolean;
   insight: boolean;
+  support: boolean;
+  assignment: boolean;
+  authority: boolean;
+  survey: boolean;
 };
 
 const KEY = "es_notif_prefs_v1";
@@ -35,6 +39,10 @@ const DEFAULTS: NotifPrefs = {
   rentOverdue: true,
   network: true,
   insight: true,
+  support: true,
+  assignment: true,
+  authority: true,
+  survey: true,
 };
 
 /** Geriye dönük: bell hâlâ local cache okuyabilir; sunucu öncelikli */
@@ -62,9 +70,13 @@ const ROWS: { key: keyof NotifPrefs; label: string; desc: string }[] = [
   { key: "rentOverdue", label: "Kira gecikmeleri", desc: "Geciken kira tahakkuk ve kira yenileme bildirimleri" },
   { key: "network", label: "Ağ iş birliği talepleri", desc: "Ofisler arası iş birliği bildirimleri" },
   { key: "insight", label: "Önemli öneriler", desc: "Yüksek öncelikli içgörüler (günde en çok 3 bildirim)" },
+  { key: "support", label: "Destek talepleri", desc: "Destek talebinize gelen yanıt ve durum değişiklikleri" },
+  { key: "assignment", label: "Devir ve atamalar", desc: "Size devredilen müşteri, portföy, iş yükü ve sizin adınıza açılan randevular" },
+  { key: "authority", label: "Portföy yetki bitimi", desc: "Portföy yetkisinin bitişine 30 / 7 gün kala ve bittiğinde" },
+  { key: "survey", label: "Anket sonuçları", desc: "Düşük puan takibi, destekleyen müşteri ve ekip nabzı daveti" },
 ];
 
-export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
+export function NotificationPrefsPanel({ initial, channels }: { initial?: NotifPrefs; channels?: { push: boolean; sms: boolean } }) {
   const { push } = useToast();
   const [prefs, setPrefs] = useState<NotifPrefs>(initial ?? DEFAULTS);
   const [pending, startTransition] = useTransition();
@@ -95,6 +107,28 @@ export function NotificationPrefsPanel({ initial }: { initial?: NotifPrefs }) {
           <p className="text-xs text-text-muted">Hesabınıza kaydedilir · cron ve zil aynı kuralları kullanır.</p>
         </div>
       </div>
+      {channels && (!channels.push || !channels.sms) ? (
+        <ul className="mt-3 space-y-1.5" aria-label="Kapalı bildirim kanalları">
+          {!channels.push ? (
+            <li className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-xs text-amber-800">
+              <BellOff className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                <strong className="font-semibold">Tarayıcı bildirimi (push) kanalı kapalı.</strong> Bu ortamda push anahtarı tanımlı değil; bildirimler
+                yalnız uygulama içindeki zile düşer.
+              </span>
+            </li>
+          ) : null}
+          {!channels.sms ? (
+            <li className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-xs text-amber-800">
+              <MessageSquareOff className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                <strong className="font-semibold">SMS kanalı kapalı.</strong> Ofisin SMS (Netgsm) entegrasyonu yok; müşterilere otomatik SMS (anket
+                bağlantısı, hatırlatma) gönderilmez. Ayarlar &gt; Entegrasyonlar bölümünden bağlanabilir.
+              </span>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
       <div className="mt-4 space-y-2">
         {ROWS.map((row) => (
           <button
@@ -137,5 +171,9 @@ export function filterByNotifPrefs(title: string, body: string | null, prefs: No
   if (!prefs.dunning && (t.includes("ödemeniz gecikti") || t.includes("fatura"))) return false;
   if (!prefs.rentOverdue && (t.includes("kira tahakkuku") || t.includes("kira yenileme"))) return false;
   if (!prefs.network && t.includes("iş birliği")) return false;
+  if (prefs.support === false && t.includes("destek talebi")) return false;
+  if (prefs.assignment === false && (t.includes("size devredildi") || t.includes("size atandı") || t.includes("iş yükü devri"))) return false;
+  if (prefs.authority === false && t.includes("portföy yetkisi")) return false;
+  if (prefs.survey === false && (t.includes("anket") || t.includes("ekip nabzı"))) return false;
   return true;
 }

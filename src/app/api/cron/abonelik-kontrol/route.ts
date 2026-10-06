@@ -7,6 +7,7 @@ import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setti
 import { authorizeCron } from "@/lib/cron-auth";
 import { runLicenseReminders } from "@/lib/license-reminders";
 import { runOfferExpiryReminders } from "@/lib/offer-expiry-reminders";
+import { runPropertyAuthorityReminders } from "@/lib/property-authority-reminders";
 import { trDayKey } from "@/lib/clock";
 import { sendTrialEndingEmails } from "@/lib/email/trial-reminder";
 import { getBaseUrl } from "@/lib/base-url";
@@ -184,7 +185,19 @@ export async function GET(req: NextRequest) {
     console.error("abonelik-kontrol offer-expiry", e instanceof Error ? e.message : "hata");
   }
 
-  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, teklif bitimi ${offerExpiry.notified}`);
+  // Portföy yetkisi bitiş hatırlatması (30/7/0 gün; varsayılan açık bildirim, tercih "authority"). Hata asıl işi bozmaz.
+  let authority = { candidates: 0, written: 0, skipped: true };
+  try {
+    authority = await runPropertyAuthorityReminders(admin, trDayKey(nowMs));
+  } catch (e) {
+    console.error("abonelik-kontrol authority", e instanceof Error ? e.message : "hata");
+  }
 
-  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license, offerExpiry });
+  await recordHeartbeat(
+    "abonelik-kontrol",
+    "ok",
+    `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}`,
+  );
+
+  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry });
 }

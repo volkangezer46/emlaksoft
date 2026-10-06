@@ -20,6 +20,10 @@ const DEFAULTS: NotifPrefs = {
   rentOverdue: true,
   network: true,
   insight: true,
+  support: true,
+  assignment: true,
+  authority: true,
+  survey: true,
 };
 
 // Helper function (not exported, not a server action)
@@ -75,6 +79,10 @@ export async function saveNotificationPrefs(prefs: NotifPrefs): Promise<{ error?
     rentOverdue: prefs.rentOverdue !== false,
     network: prefs.network !== false,
     insight: prefs.insight !== false,
+    support: prefs.support !== false,
+    assignment: prefs.assignment !== false,
+    authority: prefs.authority !== false,
+    survey: prefs.survey !== false,
   };
 
   const supabase = await createClient();

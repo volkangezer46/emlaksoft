@@ -6,6 +6,7 @@ import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
+import { loadNotificationChannels } from "@/lib/notification-channels";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -63,6 +64,7 @@ export default async function AccountPage({
       : [];
   const devices = summarizeDevices(events);
   const prefs = active === "bildirimler" ? await getNotificationPrefs() : undefined;
+  const channels = active === "bildirimler" ? await loadNotificationChannels(auth.tenantId) : undefined;
 
   return (
     <div className="space-y-6">
@@ -212,7 +214,7 @@ export default async function AccountPage({
         </div>
       ) : null}
 
-      {active === "bildirimler" ? <NotificationPrefsPanel initial={prefs} /> : null}
+      {active === "bildirimler" ? <NotificationPrefsPanel initial={prefs} channels={channels} /> : null}
     </div>
   );
 }
