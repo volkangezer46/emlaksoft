@@ -1,36 +1,23 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { AnimatePresence } from "motion/react";
-import * as m from "motion/react-m";
-import { useReducedMotion } from "@/components/ui/use-reduced-motion";
-import { MotionProvider } from "./motion-provider";
-import { EASE_OUT, MOTION_MS, seconds } from "./tokens";
+import { useState, type ReactNode } from "react";
 
 /**
- * FadeSwap — filtre/dönem değişince içerik yumuşakça yer değiştirir (eski 150 ms'de çekilir,
- * yeni 220 ms'de 4 px yükselerek gelir). `swapKey` değişmedikçe hiçbir şey oynamaz; ilk
- * boyamada animasyon yok (sunucu çıktısı aynen görünür). Hareket azaltmada süre 0 (ağaç aynı
- * kalır; hidrasyon sonrası yeniden bağlanma olmaz).
+ * FadeSwap — filtre/dönem değişince yeni içerik yumuşakça gelir (220 ms, opacity + 4 px).
+ * `swapKey` ilk değerinden farklıysa içerik anahtarla yeniden bağlanır ve motion.css
+ * `.motion-swap` giriş animasyonu bir kez oynar; ilk boyamada animasyon YOK (sunucu çıktısı
+ * aynen görünür). Hareket azaltmada animasyon tanımlı değildir (CSS no-preference bloğu).
  *
- * Arama parametresi değişimi sayfayı yeniden BAĞLAMAZ (Next template belgesi), bu yüzden
- * `?donem=` gibi URL filtrelerinde çalışır. Sunucu bileşeni çocuk alabilir.
+ * Neden motion/AnimatePresence değil: çıkış animasyonu için ilk yük JS'ine ~10 KB ekliyordu
+ * (ölçüm 2026-10-06); giriş geçişi aynı algıyı 0 KB ile verir. Arama parametresi değişimi
+ * sayfayı yeniden BAĞLAMAZ (Next template belgesi), bu yüzden `?donem=` gibi filtrelerde çalışır.
  */
 export function FadeSwap({ swapKey, children, className }: { swapKey: string | number; children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
+  const [firstKey] = useState(swapKey);
+  const changed = swapKey !== firstKey;
   return (
-    <MotionProvider>
-      <AnimatePresence mode="wait" initial={false}>
-        <m.div
-          key={swapKey}
-          className={className}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0, transition: reduce ? { duration: 0 } : { duration: seconds(MOTION_MS.base), ease: EASE_OUT } }}
-          exit={{ opacity: 0, transition: reduce ? { duration: 0 } : { duration: seconds(MOTION_MS.exitBase), ease: EASE_OUT } }}
-        >
-          {children}
-        </m.div>
-      </AnimatePresence>
-    </MotionProvider>
+    <div key={swapKey} className={[changed ? "motion-swap" : "", className ?? ""].filter(Boolean).join(" ") || undefined}>
+      {children}
+    </div>
   );
 }
