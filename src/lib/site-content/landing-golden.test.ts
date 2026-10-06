@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { PLANS } from "@/lib/billing/plans";
 import { defaultSiteContent } from "./defaults";
 
+// next/font yükleyicisi yalnız Next derleyicisinde çalışır; golden render için sınıf adı yeterli.
+vi.mock("next/font/google", () => ({
+  Caveat: () => ({ className: "font-caveat", variable: "--font-hand", style: { fontFamily: "Caveat" } }),
+}));
+
 vi.mock("@/lib/billing/plan-definitions", async () => {
   const mod = await import("@/lib/billing/plans");
   return { getPublicPlanDefinitions: async () => mod.PLANS };

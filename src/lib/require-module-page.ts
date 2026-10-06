@@ -10,8 +10,10 @@ import {
   effectiveCanAccessModule,
   getEffectivePermissions,
   immutableReadonlyPermissions,
+  mergeEffectivePermissions,
   type EffectivePermissions,
 } from "@/lib/permissions-effective";
+import { loadShellBootstrap } from "@/lib/app-shell/bootstrap";
 
 /**
  * Sayfa seviyesi yetki — sidebar URL bypass’ını keser.
@@ -43,7 +45,11 @@ export async function requireModulePage(mod: AppModule, href?: string) {
     return { userId: user.id, role: "owner" as string, tenantId: null as string | null, perms: ownerPerms };
   }
 
-  const profile = await getRequestProfile(user.id);
+  // Kabuk RPC'si (layout ile AYNI istek-içi cache): varsa profil + izin satırları + paket bağlamı tek turdan
+  // gelir ve bu kapı ek sorgu atmaz. Yoksa (migration uygulanmadı / impersonation) eski sorgular aynen çalışır.
+  const boot = impersonating ? null : await loadShellBootstrap();
+  const bootOwn = boot && boot.profile.id === user.id ? boot : null;
+  const profile = bootOwn ? { role: bootOwn.profile.role, tenant_id: bootOwn.profile.tenantId } : await getRequestProfile(user.id);
   // B12: fail-closed — profil/rol okunamıyorsa "advisor" yetkisi uydurulmaz.
   const role = resolvePageRole(impersonating, profile);
   if (!role) redirect("/giris");
@@ -54,12 +60,18 @@ export async function requireModulePage(mod: AppModule, href?: string) {
 
   const perms = impersonating
     ? immutableReadonlyPermissions()
-    : await getEffectivePermissions(tenantId, role, user.id);
+    : bootOwn && bootOwn.profile.tenantId === tenantId
+      ? mergeEffectivePermissions(role, bootOwn.roleOverrides, bootOwn.userOverrides)
+      : await getEffectivePermissions(tenantId, role, user.id);
   if (!effectiveCanAccessModule(perms, mod)) {
     redirect("/app?yetki=yok");
   }
   if (href && tenantId) {
-    const gate = lockedGate(href, await getTenantGateContext(tenantId));
+    const gateCtx =
+      bootOwn && bootOwn.profile.tenantId === tenantId && bootOwn.office
+        ? { plan: bootOwn.office.plan ?? null, trial: bootOwn.office.status === "trial", tenantCreatedAt: bootOwn.office.created_at ?? null }
+        : await getTenantGateContext(tenantId);
+    const gate = lockedGate(href, gateCtx);
     if (gate) redirect(`/app/paket?ozellik=${encodeURIComponent(gate.href)}`);
   }
   // Sıra: oturum -> yetki -> paket -> modül. Ofisin kapattığı modül 404 değil, açıklayıcı sayfa gösterir.

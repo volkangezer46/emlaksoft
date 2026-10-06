@@ -17,6 +17,28 @@ import type { AppModule } from "@/lib/permissions";
  * Sekmeli menü öğesi (Komisyon / Cüzdanım / Onaylar gibi) etkinse altında ikinci
  * bir sekme satırı çıkar; yetkisiz sekmeler nav-config süzgecinde zaten yoktur.
  */
+/**
+ * Kabuk verisi (izinler) akarken sekme çubuğunun yerini tutan iskelet: aktif başlık TAM erişimde ≥2 sayfa
+ * içeriyorsa sekme satırı yüksekliği kadar yer ayrılır (içerik geldiğinde sayfa aşağı kaymasın). Link çizmez
+ * (yetkisiz sekme bir an bile görünmez).
+ */
+export function SectionTabsPlaceholder({ allModules }: { allModules: AppModule[] }) {
+  const pathname = usePathname();
+  const sections = useMemo(() => visibleSections(allModules, { closed: [] }), [allModules]);
+  const { section, href: activeHref } = resolveActiveNav(pathname, sections);
+  if (!section) return null;
+  const current = sections.find((s) => s.id === section.id)!;
+  const activeItem = current.items.find((i) => i.href === activeHref);
+  const hasSub = Boolean(activeItem?.tabs && activeItem.tabs.length > 1);
+  if (current.items.length < 2 && !hasSub) return null;
+  return (
+    <div className="mb-4" aria-hidden="true">
+      {current.items.length >= 2 ? <div className="skeleton h-10 w-full max-w-xl rounded-[var(--radius-control)]" /> : null}
+      {hasSub ? <div className="skeleton mt-3 h-9 w-full max-w-md rounded-[var(--radius-control)]" /> : null}
+    </div>
+  );
+}
+
 export function SectionTabs({
   accessibleModules,
   lockedHrefs = [],

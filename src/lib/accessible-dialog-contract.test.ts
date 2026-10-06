@@ -20,7 +20,7 @@ const sharedDialogSurfaces = [
 const fullscreenDialogSurfaces = [
   { file: "src/components/public/gallery-lightbox.tsx", count: 1 },
   { file: "src/components/public/compare-table.tsx", count: 1 },
-  { file: "src/app/app/belgeler/document-list.tsx", count: 1 },
+  { file: "src/app/app/belgeler/document-lightbox.tsx", count: 1 },
   { file: "src/app/app/product-tour.tsx", count: 2 },
 ] as const;
 

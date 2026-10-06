@@ -79,22 +79,24 @@ async function DashboardBody({ group }: { group: GroupParam }) {
   const sentences = buildExecutiveSummary(summary, { overdueSla: anomalies.overdue });
 
   // Gruplu tablo (ofis dışı kırılım): rol kapsamı RLS'te; grup adları sayfa-yerel çözülür.
-  let groupRows: GroupRowView[] = [];
-  if (group !== "ofis") {
-    const grouped = await getControlSummary(db, scopeOfGroup(group));
-    const names = await resolveGroupNames(db, scopeOfGroup(group), grouped.rows.map((r) => r.group_id));
-    groupRows = grouped.rows
-      .map((r) => ({
-        ...r,
-        id: r.group_id,
-        name: r.group_id ? (names.get(r.group_id) ?? "Bilinmeyen") : "Atanmamış",
-        ratio: healthyPercent(r),
-      }))
-      .sort((a, b) => b.total_active - a.total_active);
-  }
-
+  // Grup zinciri (özet → adlar) ile bugünün portföy künyeleri birbirinden bağımsız: aynı turda beklenir.
   const todayRows = today.available ? today.rows : [];
-  const briefs = await loadPropertyBriefs(db, todayRows.map((r) => r.property_id));
+  const groupRowsPromise: Promise<GroupRowView[]> =
+    group === "ofis"
+      ? Promise.resolve([])
+      : (async () => {
+          const grouped = await getControlSummary(db, scopeOfGroup(group));
+          const names = await resolveGroupNames(db, scopeOfGroup(group), grouped.rows.map((r) => r.group_id));
+          return grouped.rows
+            .map((r) => ({
+              ...r,
+              id: r.group_id,
+              name: r.group_id ? (names.get(r.group_id) ?? "Bilinmeyen") : "Atanmamış",
+              ratio: healthyPercent(r),
+            }))
+            .sort((a, b) => b.total_active - a.total_active);
+        })();
+  const [groupRows, briefs] = await Promise.all([groupRowsPromise, loadPropertyBriefs(db, todayRows.map((r) => r.property_id))]);
   const todayView: TodayCheckView[] = todayRows.map((r) => ({
     ...r,
     code: briefs.get(r.property_id)?.code ?? "-",

@@ -1,7 +1,8 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { isFeatureEnabledIn, stateFromQuery, type ModuleRow, type TenantModuleState } from "@/lib/modules/logic";
+import { loadShellBootstrap } from "@/lib/app-shell/bootstrap";
+import { isFeatureEnabledIn, resolveModuleState, stateFromQuery, type ModuleRow, type TenantModuleState } from "@/lib/modules/logic";
 import { isFeatureKey, normalizeClosed, type FeatureKey } from "@/lib/modules/registry";
 
 /**
@@ -24,6 +25,10 @@ export async function loadTenantModuleState(client: SupabaseClient, tenantId: st
 }
 
 export const getTenantModuleState = cache(async (tenantId: string): Promise<TenantModuleState> => {
+  // Kabuk RPC'si aynı istekte zaten modül satırlarını getirdiyse (layout/sayfa kapısı) ek sorgu atılmaz.
+  // Yalnız oturumun kendi tenant'ı için geçerlidir; başka tenant istenirse (olmamalı) eski sorgu çalışır.
+  const boot = await loadShellBootstrap();
+  if (boot && boot.profile.tenantId === tenantId) return resolveModuleState(boot.modules);
   const supabase = await createClient();
   return loadTenantModuleState(supabase, tenantId);
 });

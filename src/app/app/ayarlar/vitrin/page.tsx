@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, ExternalLink, Info } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -12,10 +13,13 @@ export const metadata = { title: "Vitrin ayarları" };
 
 export default async function VitrinSettingsPage() {
   const ctx = await requireModulePage("settings");
+  // Ofis bağlamı yoksa (platform personeli, impersonation dışı) vitrin ayarı yoktur.
+  if (!ctx.tenantId) redirect("/app");
+  const tenantId = ctx.tenantId;
   const supabase = await createClient();
   const [state, { data: tenant }] = await Promise.all([
-    loadVitrinSettings(supabase, ctx.tenantId),
-    supabase.from("tenants").select("slug").eq("id", ctx.tenantId).maybeSingle(),
+    loadVitrinSettings(supabase, tenantId),
+    supabase.from("tenants").select("slug").eq("id", tenantId).maybeSingle(),
   ]);
   const slug = (tenant as { slug: string | null } | null)?.slug ?? null;
   const canEdit = (ctx.perms.settings ?? []).includes("edit");

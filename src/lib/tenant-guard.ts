@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
+import { getRequestIdentity } from "@/lib/cache/request";
 import {
   TWO_FACTOR_COOKIE,
   isTwoFactorCookieValid,
@@ -59,12 +60,11 @@ export async function twoFactorSatisfied(userId: string): Promise<boolean> {
   if (!user || user.id !== userId) return false;
 
   const supabase = await createClient();
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("is_active, two_factor_sms, two_factor_version")
-    .eq("id", userId)
-    .maybeSingle();
+  const { data: identity, error } = await getRequestIdentity(userId);
   if (error) return false;
+  const profile = identity
+    ? { is_active: Boolean(identity.is_active), two_factor_sms: identity.two_factor_sms, two_factor_version: identity.two_factor_version }
+    : null;
 
   if (!profile?.is_active) {
     // Platform personelinin aktif bir tenant profili olmak zorunda degildir;
@@ -89,15 +89,22 @@ async function resolveActiveTenant(allowSuspended: boolean): Promise<ActiveTenan
   if (!user) return { ok: false, error: "Oturum bulunamadı." };
 
   const supabase = await createClient();
-  const [{ data: profile, error: profileError }, staff] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("tenant_id, role, is_active, two_factor_sms, two_factor_version")
-      .eq("id", user.id)
-      .maybeSingle(),
+  // Profil + kendi tenant'ı: istek-içi TEK okuma (kabuk/sayfa kapısı/hoş geldin aynı satırı paylaşır).
+  // Aşağıdaki kanonik kimlik, 2FA ve askıya alma kontrolleri AYNEN uygulanır.
+  const [{ data: identity, error: profileError }, staff] = await Promise.all([
+    getRequestIdentity(user.id),
     getPlatformStaffIdentity(),
   ]);
   if (profileError) return { ok: false, error: "Kimlik profili doğrulanamadı." };
+  const profile = identity
+    ? {
+        tenant_id: identity.tenant_id,
+        role: identity.role,
+        is_active: Boolean(identity.is_active),
+        two_factor_sms: identity.two_factor_sms,
+        two_factor_version: identity.two_factor_version,
+      }
+    : null;
 
   const meta = (user.app_metadata ?? {}) as Record<string, unknown>;
   const tenantId = typeof meta.tenant_id === "string" ? meta.tenant_id : "";
@@ -150,11 +157,12 @@ async function resolveActiveTenant(allowSuspended: boolean): Promise<ActiveTenan
     return { ok: false, error: "İki adımlı doğrulama tamamlanmadı." };
   }
 
-  const { data: tenant, error: tenantError } = await supabase
-    .from("tenants")
-    .select("status")
-    .eq("id", tenantId)
-    .maybeSingle();
+  // Kanonik kullanıcıda JWT tenant'ı = profil tenant'ı (yukarıda doğrulandı) → gömülü satır kullanılır;
+  // impersonation'da (hedef tenant) ya da gömme boşsa eskisi gibi doğrudan okunur.
+  const ownTenant = identity && identity.tenant_id === tenantId && identity.tenant?.status ? { status: identity.tenant.status } : null;
+  const { data: tenant, error: tenantError } = ownTenant
+    ? { data: ownTenant, error: null }
+    : await supabase.from("tenants").select("status").eq("id", tenantId).maybeSingle();
   if (tenantError || !tenant) return { ok: false, error: "Ofis bulunamadı." };
   if (BLOCKED.has(tenant.status) && !(staff && !impersonating)) {
     // P0-12: askıdaki (iptal edilmemiş) ofis yalnız ödeme akışına girebilir.

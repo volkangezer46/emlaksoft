@@ -1,3 +1,4 @@
+import { Caveat } from "next/font/google";
 import { AlertTriangle, CalendarClock, Sparkles } from "lucide-react";
 import { HeroDashboard, HeroKpiOverlay, HeroPhoneScreen, HeroSkyline } from "./hero-art";
 
@@ -6,9 +7,20 @@ import { HeroDashboard, HeroKpiOverlay, HeroPhoneScreen, HeroSkyline } from "./h
  * Hareket: marketing-motion.css tek zaman çizelgesi (.mk-demo; ~14 sn, sonda duraklama); temel CSS = SON KARE. Fare takibi yok.
  * Sunucu bileşeni; oranlar sabit (aspect-ratio) olduğu için CLS=0. Kart ve ekran içeriği ÖRNEK veridir.
  */
+// El yazısı not fontu YALNIZ bu sahnede: @font-face CSS'i ve değişkeni yalnız sahneyi çizen sayfalara iner (kök layout'tan taşındı).
+// next/font kendi sunucusundan servis eder (CSP font-src self); Google'a bağlantı yok.
+const caveat = Caveat({
+  variable: "--font-hand",
+  weight: "600",
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  preload: false,
+  fallback: ["Segoe Script", "cursive"],
+});
+
 export function HeroScene() {
   return (
-    <div className="mk-scene mk-demo" role="group" aria-label="Ürün görünümü: örnek ekranlar">
+    <div className={`mk-scene mk-demo ${caveat.variable}`} role="group" aria-label="Ürün görünümü: örnek ekranlar">
       <div className="mk-scene-sky"><HeroSkyline /></div>
 
       <svg className="mk-scene-note-arrow" viewBox="0 0 90 70" aria-hidden="true" focusable="false">

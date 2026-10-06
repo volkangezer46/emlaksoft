@@ -4,18 +4,21 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
-import { createClient } from "@/lib/supabase/server";
-import { loadSampleKpiScope } from "@/lib/sample-scope";
+import { getRequestSampleScope } from "@/lib/cache/request";
+import type { SampleKpiScope } from "@/lib/sample-scope";
+import { measure } from "@/lib/server-timing";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getClosedFeatures } from "@/lib/modules/state";
 import type { FeatureKey } from "@/lib/modules/registry";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboard-grid";
+import { DeferredSection } from "@/components/ui/deferred-section";
 import { parsePeriod } from "@/components/ui/premium";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
+import { preloadDashboardSnapshot } from "./_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
 import { OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
 import { UstSatir } from "./_home/ust-satir";
@@ -61,17 +64,29 @@ export default async function AppHomePage({
 }: {
   searchParams?: Promise<{ tv?: string; donem?: string; kapsam?: string; daha?: string; icgoru?: string }>;
 }) {
-  const { tv = "", donem, kapsam, daha, icgoru } = (await searchParams) ?? {};
+  // searchParams ile oturum/yetki kapısı birbirinden bağımsız: aynı turda.
+  const [sp, gate] = await Promise.all([searchParams, measure("home-gate", () => requireModulePage("dashboard"))]);
+  const { tv = "", donem, kapsam, daha, icgoru } = sp ?? {};
   // Eski `/app?tv=1` bağlantıları tek TV rotasına gider (kabuksuz, canlı, tam ekran).
   if (tv === "1") redirect("/app/pano-tv");
 
-  const { tenantId, perms, role, userId } = await requireModulePage("dashboard");
+  const { tenantId, perms, role, userId } = gate;
+  // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.
+  preloadDashboardSnapshot(tenantId, userId);
+  // Hoş geldin kapısı, kapalı modüller, örnek veri kapsamı ve kullanıcı birbirinden bağımsız: TEK turda
+  // (eskiden 4 seri tur). Profil/tenant satırı istek-içi tek kimlik okumasından gelir (lib/cache/request).
+  const [showWelcome, closedFeatures, sample, user] = await measure("home-ctx", () =>
+    Promise.all([
+      tenantId ? loadShouldShowWelcome(userId, role) : Promise.resolve(false),
+      getClosedFeatures(tenantId),
+      getRequestSampleScope(tenantId) as Promise<SampleKpiScope>,
+      getRequestUser(),
+    ]),
+  );
   // Yeni danışman ilk girişinde kısa "Hoş geldin" akışına yönlenir (bir kez; çerez tercihi).
-  if (tenantId && (await loadShouldShowWelcome(userId, role))) redirect("/app/hos-geldin");
+  if (showWelcome) redirect("/app/hos-geldin");
   // Kapalı modüllerin ana ekran blokları çizilmez (tek kapı: lib/modules/state).
-  const closedFeatures = await getClosedFeatures(tenantId);
   const off = (key: FeatureKey) => closedFeatures.includes(key);
-  const user = await getRequestUser();
   const fullName = (user?.user_metadata?.full_name as string | undefined) ?? "";
 
   const isManagement = hasOfficeWideDataScope(role);
@@ -94,7 +109,7 @@ export default async function AppHomePage({
     canSeeRentals: (perms.rentals ?? []).includes("view") && !off("rentals"),
     canSeeProjects: (perms.projects ?? []).includes("view") && !off("projects"),
     canSeeProperties: (perms.properties ?? []).includes("view"),
-    sample: await loadSampleKpiScope(await createClient(), tenantId),
+    sample,
     period: parsePeriod(donem),
     fullName,
     firstName: fullName.split(" ")[0] || "hoş geldiniz",
@@ -196,11 +211,6 @@ export default async function AppHomePage({
     }
   };
   const BOTTOM_WIDGET: Record<string, string | undefined> = { program: "program", "kisisel-hedef": "kisisel-hedef", "gider-ozeti": "gider" };
-  const bottomCells = (span: 4 | 6 | 12) =>
-    layout.bottom.flatMap((k) => {
-      const node = bottomNode(k);
-      return node ? [cell(span, node, `b-${k}`, { widget: BOTTOM_WIDGET[k] })] : [];
-    });
 
   /* ----------------- Ana (varsayılan görünür) satırlar — rol yerleşimi ----------------- */
   const rows: ReactNode[] = [];
@@ -210,6 +220,35 @@ export default async function AppHomePage({
         {cells}
       </DashboardGrid>
     );
+  /**
+   * Ekran-altı satır: ilk HTML'de aynı ızgarada iskelet; gerçek bloklar görünür alana yaklaşınca bağlanır
+   * (DeferredSection). Veri yine sunucuda hazırlanır; yalnız istemci bağlama/hidrasyon maliyeti ertelenir.
+   * İskelet hücreleri gerçek hücrelerle aynı span'ı taşır (CLS=0).
+   */
+  type DeferredItem = { span: 3 | 4 | 5 | 6 | 7 | 8 | 12; node: ReactNode };
+  const deferredGrid = (key: string, items: DeferredItem[], cls?: string) => {
+    const live = items.filter((it) => it.node !== null && it.node !== undefined);
+    if (live.length === 0) return null;
+    return (
+      <DeferredSection
+        key={key}
+        label="Ek bloklar"
+        fallback={
+          <DashboardGrid className={cls}>
+            {live.map((it, i) => cell(it.span, <PanelIskelet rows={3} className="min-h-[15rem]" />, `${key}-sk-${i}`))}
+          </DashboardGrid>
+        }
+      >
+        <DashboardGrid className={cls}>{live.map((it, i) => cell(it.span, it.node, `${key}-${i}`))}</DashboardGrid>
+      </DeferredSection>
+    );
+  };
+  const widgetWrap = (id: string | undefined, node: ReactNode) => (id ? <Widget id={id} className="h-full">{node}</Widget> : node);
+  const bottomItems = (span: 4 | 6 | 12): DeferredItem[] =>
+    layout.bottom.flatMap((k) => {
+      const node = bottomNode(k);
+      return node ? [{ span, node: widgetWrap(BOTTOM_WIDGET[k], node) }] : [];
+    });
 
   switch (layout.variant) {
     case "management":
@@ -229,11 +268,11 @@ export default async function AppHomePage({
           ],
           "items-start",
         ),
-        grid("r2", [
-          ...(layout.team && !off("team_perf") ? [cell(7, ekip, "ekip", { widget: "ekip-perf" })] : []),
-          ...(layout.funnelTarget && !off("team_perf") ? [cell(5, huniHedef, "huni-hedef", { widget: "huni-hedef" })] : []),
+        deferredGrid("r2", [
+          ...(layout.team && !off("team_perf") ? [{ span: 7 as const, node: widgetWrap("ekip-perf", ekip) }] : []),
+          ...(layout.funnelTarget && !off("team_perf") ? [{ span: 5 as const, node: widgetWrap("huni-hedef", huniHedef) }] : []),
         ]),
-        grid("r3", bottomCells(4)),
+        deferredGrid("r3", bottomItems(4)),
       );
       break;
     case "advisor":
@@ -243,9 +282,9 @@ export default async function AppHomePage({
           cell(7, brifing("Sıradaki eylem", 2), "brifing"),
           ...(layout.callList ? [cell(5, ara, "ara", { widget: "ara" })] : []),
         ]),
-        ...(layout.team && !off("team_perf") ? [grid("rt", [cell(12, ekip, "ekip", { widget: "ekip-perf" })])] : []),
-        grid("r2", bottomCells(4)),
-        grid("r3", [cell(12, metrik(true), "metrik", { widget: "metrik" })]),
+        ...(layout.team && !off("team_perf") ? [deferredGrid("rt", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
+        deferredGrid("r2", bottomItems(4)),
+        deferredGrid("r3", [{ span: 12, node: layout.metrics.length > 0 ? widgetWrap("metrik", metrik(true)) : null }]),
       );
       break;
     case "accounting":
@@ -264,13 +303,13 @@ export default async function AppHomePage({
           ],
           "items-start",
         ),
-        grid("r2", bottomCells(6)),
+        deferredGrid("r2", bottomItems(6)),
       );
       break;
     case "call_center":
       rows.push(
         grid("r1", [cell(8, ara, "ara", { widget: "ara" }), cell(4, metrik(), "metrik", { widget: "metrik" })], "items-start"),
-        grid("r2", bottomCells(12)),
+        deferredGrid("r2", bottomItems(12)),
       );
       break;
   }
@@ -355,7 +394,18 @@ export default async function AppHomePage({
                     {moreOpen ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
                     {moreOpen ? "Daha az göster" : "Daha fazla göster"}
                   </Link>
-                  {moreOpen ? <DashboardGrid>{moreCells}</DashboardGrid> : null}
+                  {moreOpen ? (
+                    <DeferredSection
+                      label="Daha fazla"
+                      fallback={
+                        <DashboardGrid>
+                          {layout.more.map((k) => cell(MORE_SPAN[k], <PanelIskelet rows={3} className="min-h-[15rem]" />, `m-sk-${k}`))}
+                        </DashboardGrid>
+                      }
+                    >
+                      <DashboardGrid>{moreCells}</DashboardGrid>
+                    </DeferredSection>
+                  ) : null}
                 </section>
               ) : null}
             </div>
