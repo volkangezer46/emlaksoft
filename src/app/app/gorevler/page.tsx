@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
+import { applyScopeFilter, getListScope } from "@/lib/access-control";
+import { ScopeBadge } from "@/components/app/scope-badge";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { orIlike } from "@/lib/pgrst";
@@ -100,6 +102,9 @@ export default async function TasksPage({
 
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
+  // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; sayaçlar da aynı kapsamla.
+  const listScope = await getListScope({ userId: ctx.userId, tenantId: ctx.tenantId, role: ctx.role });
+  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   // Atama / düzenleme / filtre için ofis üyeleri (kiracı RLS ile sınırlı).
   const [{ data: memberRows }] = await batchAll("Görevler", ["members"], [
     supabase.from("profiles").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("full_name").limit(200),
@@ -115,6 +120,7 @@ export default async function TasksPage({
       { count: "exact" },
     )
     .eq("tenant_id", ctx.tenantId);
+  query = scoped(query);
 
   if (mine) query = query.eq("assigned_to", ctx.userId);
   if (danismanF) query = query.eq("assigned_to", danismanF);
@@ -143,7 +149,7 @@ export default async function TasksPage({
   }
   query = query.range(offset, offset + PAGE_SIZE - 1);
 
-  const head = () => supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId);
+  const head = () => scoped(supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId));
 
   const [
     { data: tasksData, count: taskTotal },
@@ -271,6 +277,7 @@ export default async function TasksPage({
       <PageHeader
         title="Görevler"
         description="Arama, ziyaret, evrak ve takip görevlerini planlayın; ekibe atayın, gecikmeleri anında görün."
+        meta={<ScopeBadge text={listScope.badge} />}
         actions={canCreate ? <ButtonLink href="/app/gorevler/yeni" icon={Plus}>Yeni görev</ButtonLink> : null}
       />
       {canCreate ? <QuickTask /> : null}

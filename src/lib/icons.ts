@@ -238,6 +238,8 @@ export const ICONS = {
   denetim: ScrollText,
   /** Uyum / güvenlik. */
   uyum: ShieldCheck,
+  /** Yetkilendirme (kullanıcı kapsamı, izin istisnası): kullanıcı + dişli. */
+  yetkilendirme: UserCog,
   /** Destek. */
   destek: LifeBuoy,
   /** Ayarlar. TEK doğru: Settings (Settings2 DEĞİL). */

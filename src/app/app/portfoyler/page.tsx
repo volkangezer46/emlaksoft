@@ -40,6 +40,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { applyScopeFilter, getListScope } from "@/lib/access-control";
+import { ScopeBadge } from "@/components/app/scope-badge";
 import { HelpTip } from "@/components/ui/help-tip";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -208,7 +210,10 @@ export default async function PropertiesPage({
     yetki?: string;
   }>;
 }) {
-  const { perms } = await requireModulePage("properties");
+  const { perms, tenantId, userId, role } = await requireModulePage("properties");
+  // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
+  const listScope = await getListScope({ userId, tenantId, role });
+  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   const canCreate = (perms.properties ?? []).includes("create");
   const canEditProperty = (perms.properties ?? []).includes("edit");
   const params = (await searchParams) ?? {};
@@ -297,7 +302,7 @@ export default async function PropertiesPage({
   // dağılımı çipleri her sağlık değeri için ayrı sayıldığından temel sorguda
   // sağlık filtresi olmaz (aksi halde çip sayıları kendi filtresini yer).
   const buildBaseQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
-    let query = supabase.from("properties").select(select, opts).is("deleted_at", null);
+    let query = scoped(supabase.from("properties").select(select, opts).is("deleted_at", null));
     if (statusValues) query = query.in("status", statusValues);
     if (kategoriF) query = query.eq("property_type", kategoriF);
     if (addedSince) query = query.gte("created_at", addedSince);
@@ -394,20 +399,20 @@ export default async function PropertiesPage({
     fetchLatestRates(supabase),
     // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
     // gerçek toplamlar çekilir (satır taşımaz, yalnızca sayım döner).
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null).in("status", STATUS_DB_VALUES.live),
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)),
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).in("status", STATUS_DB_VALUES.live),
     supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "live"),
     // Sağlık dağılımı — aktif q+durum bağlamında (sağlık HARİÇ) gerçek sayımlar
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
     buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
     // Son 4 haftada eklenen (KPI) — ?eklenen=28 hedefiyle aynı koşul.
-    supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null).gte("created_at", daysAgoIso(28)),
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).gte("created_at", daysAgoIso(28)),
     // Tek hafif tarama: portföy değeri + tip sayaçları + haftalık seri (en yeni SCAN_LIMIT kayıt).
-    supabase
+    scoped(supabase
       .from("properties")
       .select("list_price, property_type, created_at")
-      .is("deleted_at", null)
+      .is("deleted_at", null))
       .order("created_at", { ascending: false })
       .limit(SCAN_LIMIT),
     getDefinitionsOrDefault("property_type"),
@@ -610,6 +615,7 @@ export default async function PropertiesPage({
       <PageHeader
         title="Portföyler"
         description={<>Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde. <HelpTip topic="fiyat-sagligi" /></>}
+        meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
             <ExportCsvButton
