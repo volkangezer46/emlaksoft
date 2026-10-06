@@ -237,7 +237,7 @@ export function Pricing({
                 {trialCta} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
               </Link>
               <p className={`mt-3 flex items-center justify-center gap-1.5 text-xs ${plan.popular ? "text-white/65" : "text-text-muted"}`}>
-                <ShieldCheck aria-hidden className="h-3.5 w-3.5" /> Kredi kartı gerekmez, deneme boyunca tüm özellikler açık
+                <ShieldCheck aria-hidden className="h-3.5 w-3.5" /> {trialDays ? `${trialDays} gün ücretsiz, ` : ""}kredi kartı gerekmez, deneme boyunca tüm özellikler açık
               </p>
             </div>
           );

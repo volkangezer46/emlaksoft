@@ -91,6 +91,11 @@ const GATE_PATTERNS: Array<{ kind: GateKind; re: RegExp }> = [
  * yeniden gözden geçirilmeli. Buraya yalnız GERÇEKTEN okunmuş kayıt eklenir.
  */
 const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: string }> = {
+  "src/app/actions/team.ts::createTeamMember": {
+    tenantFilter: "var",
+    evidence:
+      "admin istemcisi src/lib/team/provision-member.ts provisionTeamMember'a verilir; tenantId kapıdan (requireManager) gelir, şube/koltuk sorguları .eq(\"tenant_id\", tenantId), profil insert tenant_id: input.tenantId",
+  },
   "src/app/api/health/route.ts::GET": {
     tenantFilter: "uygulanamaz",
     evidence: "route.ts:51 detailedHealthAuthorized (HEALTHCHECK_SECRET Bearer); yalnız tenants(id) limit 1 ve schema_migrations okur",

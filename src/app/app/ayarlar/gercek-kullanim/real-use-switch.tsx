@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, CheckCircle2, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { clearSampleData, type SampleDataResult } from "@/app/actions/sample-data";
 import { REAL_USE_NEXT_STEPS } from "@/lib/sample-data/real-use";
 
@@ -78,9 +78,9 @@ export function RealUseSwitch({ rows, total, canClear }: { rows: RealUseRow[]; t
         <Button type="button" variant="danger" icon={Trash2} loading={pending} disabled={!ack || !canClear} onClick={run}>
           {result?.error ? "Tekrar dene" : "Gerçek kullanıma geç"}
         </Button>
-        <Button href="/app/ayarlar" variant="ghost" disabled={pending}>
+        <ButtonLink href="/app/ayarlar" variant="ghost" aria-disabled={pending}>
           Vazgeç
-        </Button>
+        </ButtonLink>
       </div>
     </section>
   );

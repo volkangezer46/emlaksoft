@@ -145,7 +145,9 @@ export function RegisterForm({
   const [loadingDistricts, startDistricts] = useTransition();
   const [workDistricts, setWorkDistricts] = useState<string[]>([]);
   const [demo, setDemo] = useState(true);
-  const stepRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+  const formRef = useRef<HTMLFormElement>(null);
+  // Sunucu yanıtı işlendi mi (hata dönünce ilgili adıma geçiş, render sırasında durum ayarı; efekt yok).
+  const [handledState, setHandledState] = useState(state);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const errorTargetStep = state.error ? errorStep(state.error) : null;
@@ -157,10 +159,7 @@ export function RegisterForm({
 
   // Çalışılan ilçeler: ofis ili seçilince o ilin ilçeleri gelir (coğrafya tek merkez, aynı sunucu ucu).
   useEffect(() => {
-    if (!provinceId) {
-      setDistricts([]);
-      return;
-    }
+    if (!provinceId) return;
     let stale = false;
     startDistricts(async () => {
       const rows = await listDistricts(provinceId);
@@ -172,9 +171,10 @@ export function RegisterForm({
   }, [provinceId]);
 
   // Sunucu hatası dönünce ilgili adıma dön (kullanıcı 6. adımda kalıp hatayı görmesin).
-  useEffect(() => {
+  if (state !== handledState) {
+    setHandledState(state);
     if (errorTargetStep) setStep(errorTargetStep);
-  }, [errorTargetStep, state]);
+  }
 
   function commitSeats(n: number) {
     const v = Math.min(MAX_SEATS_INPUT, Math.max(1, Math.floor(Number.isFinite(n) ? n : 1)));
@@ -183,8 +183,9 @@ export function RegisterForm({
     setSeatsTouched(true);
   }
 
-  function validateStep(ref: React.RefObject<HTMLDivElement | null>) {
-    const inputs = ref.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select");
+  function validateStep(no: number) {
+    const panel = formRef.current?.querySelector<HTMLElement>(`[data-step="${no}"]`);
+    const inputs = panel?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select");
     if (!inputs) return true;
     for (const el of Array.from(inputs)) {
       if (!el.reportValidity()) return false;
@@ -193,8 +194,7 @@ export function RegisterForm({
   }
 
   function next() {
-    const ref = stepRefs[step - 1];
-    if (ref && !validateStep(ref)) return;
+    if (!validateStep(step)) return;
     setStep((s) => Math.min(s + 1, LAST));
   }
   function back() {
@@ -286,7 +286,7 @@ export function RegisterForm({
 
         <InviteBanner invite={invite} />
 
-        <form action={action} className="mt-6" encType="multipart/form-data">
+        <form ref={formRef} action={action} className="mt-6" encType="multipart/form-data">
           <input type="hidden" name="plan" value={selectedPlanId} />
           <input type="hidden" name="cycle" value={initialCycle} />
           <input type="hidden" name="agents" value={selection.teamSize} />
@@ -306,7 +306,7 @@ export function RegisterForm({
           </h2>
 
           {/* ADIM 1 — Hesap */}
-          <div ref={stepRefs[0]} className={step === 1 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          <div data-step="1" className={step === 1 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="name">Ad soyad</label>
               <div className="relative">
@@ -360,7 +360,7 @@ export function RegisterForm({
           </div>
 
           {/* ADIM 2 — Ofis */}
-          <div ref={stepRefs[1]} className={step === 2 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          <div data-step="2" className={step === 2 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="company">Ofis / firma adı</label>
               <div className="relative">
@@ -375,7 +375,10 @@ export function RegisterForm({
                 withNeighborhood={false}
                 names={{ province: FIELD.provinceId, district: FIELD.districtId }}
                 onSelectionChange={(sel) => {
-                  if (sel.province_id !== provinceId) setWorkDistricts([]);
+                  if (sel.province_id !== provinceId) {
+                    setWorkDistricts([]);
+                    setDistricts([]);
+                  }
                   setProvinceId(sel.province_id);
                 }}
               />
@@ -454,7 +457,7 @@ export function RegisterForm({
           </div>
 
           {/* ADIM 3 — Marka */}
-          <div ref={stepRefs[2]} className={step === 3 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          <div data-step="3" className={step === 3 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <div className="flex items-center gap-4">
               <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas">
                 {logoPreview ? (
@@ -467,7 +470,7 @@ export function RegisterForm({
                 <p className="text-sm font-semibold text-ink-900">
                   Ofis logosu <span className="font-normal text-text-faint">(opsiyonel)</span>
                 </p>
-                <p className="text-xs text-text-muted">PNG, JPG veya WebP · en çok 2 MB. Sonradan Ayarlar'dan değiştirilebilir.</p>
+                <p className="text-xs text-text-muted">PNG, JPG veya WebP · en çok 2 MB. Sonradan Ayarlar&apos;dan değiştirilebilir.</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button type="button" onClick={() => logoInputRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface">
                     <Upload className="h-3.5 w-3.5" /> {logoPreview ? "Değiştir" : "Logo seç"}
@@ -552,7 +555,7 @@ export function RegisterForm({
           </div>
 
           {/* ADIM 4 — Odak */}
-          <div ref={stepRefs[3]} className={step === 4 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          <div data-step="4" className={step === 4 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <fieldset>
               <legend className="mb-2 text-sm font-semibold text-ink-900">Çalışma alanın (birden fazla seçebilirsin)</legend>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -621,7 +624,7 @@ export function RegisterForm({
           </div>
 
           {/* ADIM 5 — Ekip daveti (opsiyonel) */}
-          <div ref={stepRefs[4]} className={step === 5 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          <div data-step="5" className={step === 5 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <p className="text-sm text-text-muted">
               En çok {MAX_INVITES} danışmanın e-postasını yaz; ofis açılır açılmaz erişim bağlantısı gider. Sonradan Ekip sayfasından
               dilediğin kadar davet edebilirsin.
@@ -649,7 +652,7 @@ export function RegisterForm({
           </div>
 
           {/* ADIM 6 — Demo veri + onay */}
-          <div ref={stepRefs[5]} className={step === LAST ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          <div data-step="6" className={step === LAST ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <label className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border px-3.5 py-3 text-xs leading-relaxed transition ${demo ? "border-brand-300/60 bg-brand-600/[0.04]" : "border-line bg-surface"}`}>
               <input type="checkbox" name="demo_data" defaultChecked onChange={(e) => setDemo(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
               <span className="text-text-muted">

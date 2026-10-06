@@ -181,11 +181,11 @@ describe("EmlakFiyati değerleme bölümü", () => {
     expect(efValuationStatus(null, null)).toBe("soon");
   });
 
-  it("canlı değilken 'Yakında' + ücretsiz deneme CTA'sı; 'Hemen deneyin' yok", () => {
+  it("canlı değilken 'Yakında' + ücretsiz kurulum CTA'sı; 'Hemen deneyin' yok", () => {
     const out = html("soon");
     expect(out).toContain('id="degerleme"');
     expect(out).toContain("Yakında");
-    expect(out).toMatch(/cretsiz dene/);
+    expect(out).toMatch(/Ofisini ücretsiz kur/);
     expect(out).toContain('href="/kayit"');
     expect(out).not.toContain("Hemen deneyin");
     expect(out).toContain("ÖRNEK");

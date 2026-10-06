@@ -1,5 +1,7 @@
 import { PIONEER_CLAIM } from "./claims";
 import type { SiteContent } from "./schema";
+// Otomatik görev sayısı cron envanterinden türetilir (sabit sayı yazılmaz; check:cron ile doğrulanır).
+import { CRON_JOBS } from "@/lib/cron-jobs";
 
 /**
  * Hiç yayın yokken siteyi BUGÜNKÜ metinle gösteren varsayılan içerik. Ana sayfa bileşenleri bu metinleri artık
@@ -14,7 +16,7 @@ export function defaultSiteContent(): SiteContent {
       title: "Emlak işlerinizi",
       em: "tek platformda",
       tail: "yönetin",
-      lead: "Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve 27 otomatik görev ofisinizle birlikte çalışır.",
+      lead: `Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve ${CRON_JOBS.length} otomatik görev ofisinizle birlikte çalışır.`,
       primary: { label: "{deneme_dene}", href: "/kayit" },
       secondary: { label: "Paketleri ve fiyatları gör", href: "/fiyatlar" },
       checks: [
@@ -40,7 +42,7 @@ export function defaultSiteContent(): SiteContent {
       { id: "rol", title: "Rol ve izin kontrolü", text: "Danışman, muhasebe ve yönetici erişimi ayrı ayrı tanımlanır.", href: "/#guvenlik", hidden: false },
       { id: "kacak", title: "Kaçan komisyonu ölçün", text: "Zorunlu kapanış formu ve danışman bazında kaçak karnesi.", href: "/#kayip-kacak", hidden: false },
       { id: "veri", title: "Ofis verisi ayrı tutulur", text: "Satır düzeyinde güvenlik; ana veritabanı Frankfurt bölgesinde.", href: "/#guvenlik", hidden: false },
-      { id: "gorev", title: "Arka planda çalışan görevler", text: "Hatırlatma, teyit ve özet işleri 27 otomatik görevle yürür.", href: "/#ozellikler", hidden: false },
+      { id: "gorev", title: "Arka planda çalışan görevler", text: `Hatırlatma, teyit ve özet işleri ${CRON_JOBS.length} otomatik görevle yürür.`, href: "/#ozellikler", hidden: false },
     ],
     trust: [
       { id: "deneme", label: "ücretsiz deneme, kartsız", href: "/#fiyat", hidden: false },
