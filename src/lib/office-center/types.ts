@@ -1,88 +1,139 @@
 /**
- * Ofis Merkezi veri modeli
+ * Ofis Merkezi veri modeli (SAF tipler: sunucu/istemci ortak).
+ * Rol etiketi `@/lib/role-labels`, metrik tanımı `@/lib/team/advisor-metrics`, puan `smart-assign.ts`.
  */
 
-export type AdvisorRole = "advisor" | "team_lead" | "branch_manager" | "gm" | "owner";
+export type OfficeCenterTab = "danismanlar" | "atamalar" | "ayarlar" | "tanimlamalar" | "istatistikler";
+export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }[] = [
+  { id: "danismanlar", label: "Danışmanlar" },
+  { id: "atamalar", label: "Atamalar" },
+  { id: "ayarlar", label: "Ayarlar" },
+  { id: "tanimlamalar", label: "Tanımlamalar" },
+  { id: "istatistikler", label: "İstatistikler" },
+];
+export const OFFICE_CENTER_PATH = "/app/ofis-merkezi";
 
-export interface OfficeAdvisor {
+/** Danışmanlar sekmesi satırı: her sayı filtreli hedefe gider (sıfır çıkmaz metrik). */
+export type OfficeAdvisorRow = {
   id: string;
-  tenantId: string;
   fullName: string;
-  phone: string | null;
-  email: string;
-  role: AdvisorRole;
-  branchId?: string;
-  teamId?: string;
+  role: string;
+  title: string | null;
   isActive: boolean;
+  branchId: string | null;
+  branchName: string | null;
+  teamId: string | null;
+  teamName: string | null;
   createdAt: string;
-  updatedAt: string;
-  joinedAt?: string;
-}
+  /** Açık portföy (draft/live/reserved, silinmemiş). */
+  openProperties: number;
+  /** Açık talep (müşterisi bu danışmana atanmış, status new/active/matched). */
+  openDemands: number;
+  /** Bu TR ayında kazanılan anlaşma (deals.stage=won, updated_at bu ayda). */
+  wonThisMonth: number;
+  /** İlk yanıt SLA uyumu (%) bu ay; ölçülecek kayıt yoksa null. */
+  slaWithinPct: number | null;
+  /** Son aktivite (arama/iletişim/portföy kaydı), ISO; 90 günde yoksa null. */
+  lastActivityAt: string | null;
+  onLeaveToday: boolean;
+};
 
-export interface PoolAssignment {
+export type AdvisorSortKey = "ad" | "portfoy" | "talep" | "kapanis" | "sla" | "aktivite";
+export type AdvisorStatusFilter = "" | "aktif" | "pasif";
+
+export type AdvisorListFilters = {
+  q: string;
+  durum: AdvisorStatusFilter;
+  rol: string;
+  sube: string;
+  sirala: AdvisorSortKey;
+  yon: "asc" | "desc";
+};
+
+/** Havuzda/atanmamış bekleyen ilan (Atamalar sekmesi). */
+export type UnassignedProperty = {
   id: string;
-  tenantId: string;
+  title: string;
+  propertyCode: string | null;
+  propertyType: string | null;
+  transactionType: string | null;
+  listPrice: number | null;
+  place: string;
+  branchId: string | null;
+  createdAt: string;
+  /** Havuz kaydı varsa (listing_pool_entries pending). */
+  poolEntryId: string | null;
+  poolSince: string | null;
+  poolSlaDueAt: string | null;
+  slaState: "ok" | "due_soon" | "breached";
+};
+
+export type AssignmentMethod = "manual" | "smart" | "rule";
+export type AssignmentStatus = "active" | "cancelled" | "reassigned";
+
+export type PoolAssignmentRow = {
+  id: string;
   propertyId: string;
-  assignedToId: string; // advisor id
-  assignedAt: string;
-  assignedBy: string; // user id
-  slaDeadlineAt: string;
-  cancelledAt?: string;
-  cancelledReason?: string;
-  completedAt?: string;
-}
+  propertyTitle: string;
+  assignedTo: string;
+  assignedToName: string;
+  previousAssignee: string | null;
+  previousAssigneeName: string | null;
+  assignedBy: string | null;
+  assignedByName: string | null;
+  method: AssignmentMethod;
+  scoreTotal: number | null;
+  reasonSummary: string | null;
+  reason: string | null;
+  status: AssignmentStatus;
+  createdAt: string;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+};
 
-export interface OfficeSettings {
-  key: string;
-  value: unknown;
-  tenantId: string;
-  updatedAt: string;
-  updatedBy: string;
-  version: number;
-}
+export type AssignmentHistoryFilter = "" | "aktif" | "iptal" | "yeniden";
 
-export interface SLADefinition {
-  assignmentSLAHours: number;
-  escalationSLAHours: number;
-  closureSLADays: number;
-}
+/** Tanımlamalar sekmesi yapıları — hepsi registry anahtarlarına eşlenir (definitions.ts). */
+export type SlaDefinition = {
+  /** office.sla.lead_first_response_min (dakika; SLA_OPTIONS_MIN seçeneklerinden) */
+  leadFirstResponseMin: number;
+  /** office.assign.unassigned_sla_hours */
+  unassignedSlaHours: number;
+};
 
-export interface CommissionDefinition {
-  advisorCommissionPercent: number;
-  officeCommissionPercent: number;
-  specialtyBonuses: Record<string, number>;
-}
+export type CommissionDefinition = {
+  defaultRate: number;
+  splitAdvisorShare: number;
+  simulatorRate: number;
+  simulatorAdvisorShare: number;
+};
 
-export interface AlertThreshold {
-  unassignedPropertyCount: number;
-  slaBreach: number; // hours
-  noActivityDays: number;
-}
+export type AlertThresholdDefinition = {
+  dealStaleDays: number;
+  demandAgingDays: number;
+  unassignedPoolCount: number;
+  customerQuietDays: number;
+  listingStaleDays: number;
+  dormantDays: number;
+};
 
-export interface OfficeStatistics {
+export type NotificationChannelDefinition = Record<string, boolean>;
+
+export type OfficeStatistics = {
   totalProperties: number;
-  totalDeals: number;
-  totalRentals: number;
-  salesRatio: number; // 0-1
-  rentalRatio: number; // 0-1
-  averageProcessTime: number; // days
-  alertCount: number;
-}
-
-export interface AdvisorLeagueEntry {
-  advisorId: string;
-  name: string;
-  rank: number;
-  sales: number;
-  rentals: number;
-  commission: number;
-  activityScore: number;
-}
-
-export interface TeamHealthMetrics {
-  averageProcessTime: number;
+  liveProperties: number;
+  unassignedProperties: number;
+  wonDealsThisMonth: number;
+  activeRentals: number;
+  assignmentsThisMonth: number;
+  cancelledAssignmentsThisMonth: number;
   activeAdvisors: number;
   inactiveAdvisors: number;
-  alertCount: number;
-  systemHealth: "healthy" | "warning" | "critical";
-}
+  /** Veri kaynaklarından biri okunamadı (sayılara güvenilmez). */
+  failed: boolean;
+};
+
+export type TeamHealth = {
+  level: "healthy" | "warning" | "critical";
+  alerts: { text: string; href: string }[];
+};

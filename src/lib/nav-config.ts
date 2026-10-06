@@ -245,7 +245,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         needsItemModule: true,
         tier: "core",
       },
-      { href: "/app/ofis-merkezi", label: "Ofis Merkezi", icon: ICONS.ayar, module: "office_center", tier: "more" },
+      { href: "/app/ofis-merkezi", label: "Ofis Merkezi", icon: ICONS.ofisMerkezi, module: "office_center", tier: "more" },
       {
         // Otomasyon: kurallar + iş akışları (motorlar ayrı kalır, yalnız sayfa düzeyinde tek öğe).
         href: "/app/otomasyonlar",
