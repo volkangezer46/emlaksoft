@@ -139,6 +139,9 @@ export async function clearSampleData(): Promise<SampleDataResult> {
   if (!canSwitchToRealUse(gate.role)) {
     return { error: "Gerçek kullanıma geçiş yalnız ofis sahibi veya genel müdür tarafından yapılabilir." };
   }
+  if (!(await canMutateEverySampleModule({ ...gate, action: "delete" }))) {
+    return { error: "Örnek verinin dokunduğu modüllerden birinde silme yetkiniz yok." };
+  }
   const tenantId = gate.tenantId;
 
   // Eski yol için service_role (RPC varsa kullanılmaz); her sorgu açık tenant_id + is_sample=true süzgeciyle sınırlıdır.
