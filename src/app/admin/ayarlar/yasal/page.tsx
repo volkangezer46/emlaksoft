@@ -30,7 +30,7 @@ export default async function LegalSettingsPage() {
       <RegistrySettings
         id="metinler"
         title="Başvuru formu metinleri"
-        description="Ofislerin herkese açık başvuru formunda (/lead/...) gösterilir. Varsayılan metin koddaki değerdir; Varsayılana dön ile geri alınır."
+        description="Ofislerin herkese açık başvuru formunda gösterilir. Varsayılan metin koddaki değerdir; Varsayılana dön ile geri alınır."
         keys={["legal.lead_consent_text", "legal.lead_notice_text", "legal.lead_marketing_text"]}
         canEdit={staff.role === "super_admin"}
       />

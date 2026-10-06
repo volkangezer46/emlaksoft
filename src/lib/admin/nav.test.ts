@@ -83,6 +83,14 @@ describe("özellik bayrakları ve tek-yer ayarlar", () => {
     expect(new Set(FEATURE_FLAGS.map((f) => f.key)).size).toBe(FEATURE_FLAGS.length);
   });
 
+  it("mesajlaşma yedeği aynası asıl kapıyla aynı ifadeyi kullanır", () => {
+    const expr = 'ALLOW_PLATFORM_MESSAGING_FALLBACK?.trim().toLowerCase() === "true"';
+    expect(read("src/lib/messaging/tenant-providers.ts")).toContain(expr);
+    expect(read("src/lib/feature-flags/registry.ts")).toContain(expr);
+    expect(read("src/app/actions/billing.ts")).toContain("billingDemoAllowed()");
+    expect(read("src/app/actions/payment-links.ts")).toContain("paymentLinkDemoAllowed()");
+  });
+
   it("konuya ait ayarın evi gerçek bir sayfadır ve o sayfa ayarı RegistrySettings ile çizer", () => {
     const homes = new Map<string, string[]>();
     for (const key of ["platform.registration_open", "platform.maintenance_mode", "billing.default_trial_days", "legal.lead_consent_text"]) {

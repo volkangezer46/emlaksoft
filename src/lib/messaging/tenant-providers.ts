@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { platformMessagingFallbackEnv } from "@/lib/feature-flags/registry";
 import {
   getNetgsmConfig,
   getWhatsAppConfig,
@@ -57,7 +56,7 @@ export type TenantWhatsAppSender = (
  * without credentials from silently sending through another/global account.
  */
 export function platformMessagingFallbackAllowed(): boolean {
-  return platformMessagingFallbackEnv(); // tek tanım: lib/feature-flags/registry.ts
+  return process.env.ALLOW_PLATFORM_MESSAGING_FALLBACK?.trim().toLowerCase() === "true";
 }
 
 function objectValue(value: unknown): CredentialMap | null {

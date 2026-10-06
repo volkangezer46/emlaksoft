@@ -378,7 +378,7 @@ const legal: AnySettingDef[] = [
     multiline: true,
     category: "uyum",
     label: "Başvuru formu zorunlu onay metni",
-    description: "Ofis başvuru formundaki (/lead/...) zorunlu kişisel veri onay kutusunun metni.",
+    description: "Ofis başvuru formundaki zorunlu kişisel veri onay kutusunun metni.",
     impact: "Yeni başvurularda gösterilir; rıza kanıtındaki sürüm metnin iziyle değişir. Eski kanıtlar etkilenmez.",
     risk: "high",
   }),

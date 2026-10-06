@@ -114,7 +114,7 @@ describe("cam yüzey bütçesi", () => {
     };
     const supportsBody = body(a11y, supports);
     const mediaBody = body(a11y, media);
-    for (const sel of [...CSS_ENVANTERI["src/app/globals.css"]!, ...CSS_ENVANTERI["src/app/premium.css"]!]) {
+    for (const sel of [...CSS_ENVANTERI["src/app/globals.css"]!, ...(CSS_ENVANTERI["src/app/premium.css"] ?? [])] /* .pm-glass GlassKpi ile silindi (2026-10-06) */) {
       expect(supportsBody, `@supports not: ${sel}`).toMatch(new RegExp(`:root \\${sel}[,\\s{]`));
       expect(mediaBody, `media: ${sel}`).toMatch(new RegExp(`:root \\${sel}[,\\s{]`));
     }

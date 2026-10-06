@@ -42,7 +42,11 @@ export function paymentLinkDemoAllowed(env: NodeJS.ProcessEnv = process.env): bo
   return env.NODE_ENV !== "production" || env.ALLOW_PAYMENT_LINK_DEMO === "1";
 }
 
-/** ALLOW_PLATFORM_MESSAGING_FALLBACK: kendi sağlayıcısı olmayan ofisin platform SMS/WhatsApp hesabından göndermesi. */
+/**
+ * ALLOW_PLATFORM_MESSAGING_FALLBACK: kendi sağlayıcısı olmayan ofisin platform SMS/WhatsApp hesabından göndermesi.
+ * Asıl kapı `messaging/tenant-providers.platformMessagingFallbackAllowed` (kampanya sözleşme testi env adını orada arar);
+ * bu ayna yalnız bayrak ekranı içindir ve aynı ifadeyi kullanır (feature-flags testi eşitliği doğrular).
+ */
 export function platformMessagingFallbackEnv(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.ALLOW_PLATFORM_MESSAGING_FALLBACK?.trim().toLowerCase() === "true";
 }
