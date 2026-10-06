@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
 
   // İlan Kontrol SLA yükseltmesi (en iyi çaba; hata kapanış SLA işini bozmaz).
   let escalated = 0;
+  let escalationTasks = 0;
   let escalationFailed = false;
   try {
     const disabledForControl = new Set(tenantsDisabledFor(await getDisabledModulesByTenant(admin), "portals"));
@@ -84,6 +85,7 @@ export async function GET(req: NextRequest) {
       },
     });
     escalated = esc.escalated;
+    escalationTasks = esc.tasksCreated;
   } catch (e) {
     escalationFailed = true;
     console.error("leak-sla anomali SLA yükseltme", e);
@@ -181,7 +183,7 @@ export async function GET(req: NextRequest) {
     processed: processed,
     failed: failed + (escalationFailed ? 1 : 0),
     timedOut,
-    summary: `${sent} SLA uyarısı · ${escalated} anomali SLA aşaması${skippedTenantsNote(disabledModules, "leak")}`,
+    summary: `${sent} SLA uyarısı · ${escalated} anomali SLA aşaması · ${escalationTasks} danışman görevi${skippedTenantsNote(disabledModules, "leak")}`,
   });
   await recordHeartbeat("leak-sla", hb.status, hb.detail);
 

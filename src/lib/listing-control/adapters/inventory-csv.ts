@@ -28,10 +28,14 @@ function foldHeader(s: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-/** RFC4180 benzeri; ayraç `,` ya da `;` (ilk satırdan sezilir). */
+/** RFC4180 benzeri; ayraç `,`, `;` ya da sekme (Excel'den kopyala-yapıştır) — ilk satırdan sezilir. */
 export function parseCsv(text: string): string[][] {
   const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
-  const delim = (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
+  const count = (re: RegExp) => firstLine.match(re)?.length ?? 0;
+  const tabs = count(/\t/g);
+  const semis = count(/;/g);
+  const commas = count(/,/g);
+  const delim = tabs > 0 && tabs >= semis && tabs >= commas ? "\t" : semis > commas ? ";" : ",";
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";

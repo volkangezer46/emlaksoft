@@ -13,11 +13,43 @@ export type TimelineKind = "created" | "assigned" | "stage" | "published" | "rem
 
 export type TimelineEvent = { at: string; kind: TimelineKind; title: string; detail?: string };
 
+/** Yaşam döngüsü aşama geçişi (lc_lifecycle_events). `actorSource`: user = kendisi yaptı, inferred = ilgili kayıttan çıkarıldı. */
+export type StageEvent = { at: string; from: string | null; to: string; actorName: string | null; actorSource: "user" | "inferred" | "system"; reason: string | null };
+
+/** Portal ilanı bitiş nedeni etiketleri (portal_listings.ended_reason). */
+export const ENDED_REASON_LABELS: Record<string, string> = {
+  id_changed: "İlan no değişti",
+  sold: "Satıldı",
+  rented: "Kiralandı",
+  owner_withdrew: "Mal sahibi kaldırdı",
+  authority_expired: "Yetki sona erdi",
+  price_will_update: "Fiyat güncellenecek",
+  portal_removed: "Portal kaldırdı",
+  will_republish: "Yeniden yayınlanacak",
+  mistake: "Yanlışlıkla kaldırıldı",
+  duplicate: "Kopya ilan",
+  other: "Diğer",
+};
+
 export type LifecycleSource = {
   createdAt: string | null;
   assignedAt: string | null;
   stage: { stage: string; since: string | null } | null;
-  listings: { id: string; portal: string; externalId: string | null; status: string; publishedAt: string | null; removedAt: string | null; supersedesId: string | null }[];
+  /** Varsa tek "aşama" satırı yerine bütün geçişler (kim, ne zaman, neden) gösterilir. */
+  stageEvents?: StageEvent[];
+  listings: {
+    id: string;
+    portal: string;
+    externalId: string | null;
+    status: string;
+    publishedAt: string | null;
+    removedAt: string | null;
+    supersedesId: string | null;
+    endedReason?: string | null;
+    removalReason?: string | null;
+    removedByName?: string | null;
+    publishedByName?: string | null;
+  }[];
   verifications: { checkedAt: string; portal: string; result: string; stateAfter: string | null }[];
   prices: { at: string; oldPrice: number | null; newPrice: number | null }[];
   anomalies: { type: string; firstSeenAt: string; explainedAt: string | null; explainedReason: string | null; resolvedAt: string | null }[];
@@ -33,7 +65,18 @@ export function buildLifecycleTimeline(src: LifecycleSource): TimelineEvent[] {
   };
   add(src.createdAt, "created", "Portföy oluşturuldu");
   add(src.assignedAt, "assigned", "Danışmana atandı");
-  if (src.stage?.since) {
+  if (src.stageEvents && src.stageEvents.length > 0) {
+    for (const e of src.stageEvents) {
+      const to = STAGE_LABELS[e.to as LifecycleStage] ?? e.to;
+      const from = e.from ? (STAGE_LABELS[e.from as LifecycleStage] ?? e.from) : null;
+      const who = e.actorName
+        ? e.actorSource === "inferred"
+          ? `${e.actorName} (ilgili kayıttan)`
+          : e.actorName
+        : "Sistem tespit etti";
+      add(e.at, "stage", from ? `Aşama: ${from} → ${to}` : `Aşama: ${to}`, [who, e.reason].filter(Boolean).join(" · "));
+    }
+  } else if (src.stage?.since) {
     const label = STAGE_LABELS[src.stage.stage as LifecycleStage];
     if (label) add(src.stage.since, "stage", `Aşama: ${label}`);
   }
@@ -42,11 +85,15 @@ export function buildLifecycleTimeline(src: LifecycleSource): TimelineEvent[] {
     const no = l.externalId ? ` (ilan no ${l.externalId})` : "";
     if (l.supersedesId) {
       const prev = byId.get(l.supersedesId);
-      add(l.publishedAt, "id_changed", `${l.portal} ilan numarası değişti`, `${prev?.externalId ?? "?"} → ${l.externalId ?? "?"}`);
+      add(l.publishedAt, "id_changed", `${l.portal} ilan numarası değişti`, [`${prev?.externalId ?? "?"} → ${l.externalId ?? "?"}`, l.publishedByName].filter(Boolean).join(" · "));
     } else {
-      add(l.publishedAt, "published", `${l.portal} portalında yayınlandı${no}`);
+      add(l.publishedAt, "published", `${l.portal} portalında yayınlandı${no}`, l.publishedByName ?? undefined);
     }
-    if (l.removedAt && l.status !== "superseded") add(l.removedAt, "removed", `${l.portal} ilanı kaldırıldı${no}`);
+    if (l.removedAt && l.status !== "superseded") {
+      const reason = (l.endedReason ? ENDED_REASON_LABELS[l.endedReason] : null) ?? l.removalReason ?? null;
+      const detail = [reason ? `Neden: ${reason}` : null, l.removedByName ? `Kaldıran: ${l.removedByName}` : null].filter(Boolean).join(" · ");
+      add(l.removedAt, "removed", `${l.portal} ilanı kaldırıldı${no}`, detail || undefined);
+    }
   }
   for (const p of src.prices) {
     if (p.newPrice === null) continue;
@@ -62,6 +109,39 @@ export function buildLifecycleTimeline(src: LifecycleSource): TimelineEvent[] {
     if (a.resolvedAt) add(a.resolvedAt, "resolved", `Uyarı çözüldü: ${anomalyTypeLabel(a.type)}`);
   }
   return ev.sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
+}
+
+/**
+ * Portföyün TOPLAM yayın süresi (gün): bütün portallardaki ilan satırlarının yayın aralıklarının BİRLEŞİMİ (aynı anda iki
+ * portalda yayında olmak iki kez sayılmaz; ilan no değişimi zinciri kesintisiz sayılır). Tarihsiz satır alınmaz.
+ */
+export function unionPublishedDays(
+  rows: readonly { publishedAt: string | null; removedAt: string | null; status: string }[],
+  nowMs: number,
+): { days: number; firstPublishedAt: string | null; liveNow: boolean } | null {
+  const spans = rows
+    .map((r) => {
+      const start = r.publishedAt ? Date.parse(r.publishedAt) : Number.NaN;
+      const end = r.removedAt ? Date.parse(r.removedAt) : r.status === "live" ? nowMs : Number.NaN;
+      return { start, end };
+    })
+    .filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end >= s.start)
+    .sort((a, b) => a.start - b.start);
+  if (spans.length === 0) return null;
+  let total = 0;
+  let curStart = spans[0].start;
+  let curEnd = spans[0].end;
+  for (const s of spans.slice(1)) {
+    if (s.start <= curEnd) curEnd = Math.max(curEnd, s.end);
+    else {
+      total += curEnd - curStart;
+      curStart = s.start;
+      curEnd = s.end;
+    }
+  }
+  total += curEnd - curStart;
+  const first = rows.map((r) => r.publishedAt).filter((x): x is string => !!x && Number.isFinite(Date.parse(x))).sort()[0] ?? null;
+  return { days: Math.round((total / 86_400_000) * 10) / 10, firstPublishedAt: first, liveNow: rows.some((r) => r.status === "live") };
 }
 
 export type HealthFacts = {

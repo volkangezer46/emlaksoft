@@ -7,14 +7,16 @@ import { TableFrame, Table, THead, TBody, TR, TH, TD } from "@/components/ui/tab
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatDateTimeTr, formatTry } from "@/lib/format";
-import { listControlProperties } from "@/lib/listing-control/server/readers";
+import { listControlProperties, listControlPropertiesByDistrict } from "@/lib/listing-control/server/readers";
 import { KPI_KEYS, KPI_LABELS, STAGE_LABELS, type KpiKey, type LifecycleStage } from "@/lib/listing-control/types";
 import {
   CONTROL_BASE,
   decodeCursor,
+  districtListHref,
   encodeCursor,
   isKpiKey,
   kpiHref,
+  parseDistrictParam,
   parseGroupParam,
   scopeOfGroup,
   KPI_VISUAL,
@@ -38,13 +40,19 @@ export default async function IlanKontrolListePage({ searchParams }: { searchPar
   const kpi: KpiKey = isKpiKey(kpiRaw) ? kpiRaw : "active";
   const group = parseGroupParam(sp.gruplama);
   const groupId = typeof sp.grup === "string" && /^[0-9a-fA-F-]{36}$/.test(sp.grup) ? sp.grup : null;
+  // İlçe filtresi (bölge kırılımından): varsa gruplama yerine ilçe listesi (aynı k_* kolonu).
+  const district = parseDistrictParam(sp.ilce);
   const cursor = decodeCursor(sp.imlec);
   return (
     <>
       <PageHeader
         eyebrow="İlan Kontrol"
         title={KPI_LABELS[kpi]}
-        description="Bu liste, ana ekrandaki sayıyla aynı kaynaktan gelir; risk puanı en yüksek portföy en üstte."
+        description={
+          district === undefined
+            ? "Bu liste, ana ekrandaki sayıyla aynı kaynaktan gelir; risk puanı en yüksek portföy en üstte."
+            : "Bölge kırılımındaki sayıyla aynı kaynaktan gelir (seçili ilçe); risk puanı en yüksek portföy en üstte."
+        }
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: KPI_LABELS[kpi] }]}
       />
       <ControlSubNav active="liste" closures={effectiveCanAccessModule(perms, "leak")} />
@@ -52,7 +60,7 @@ export default async function IlanKontrolListePage({ searchParams }: { searchPar
         {KPI_KEYS.map((k) => (
           <Link
             key={k}
-            href={kpiHref(k, group, groupId)}
+            href={district === undefined ? kpiHref(k, group, groupId) : districtListHref(k, district)}
             aria-current={k === kpi ? "page" : undefined}
             className={`focus-ring inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-semibold ${k === kpi ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`}
           >
@@ -61,15 +69,30 @@ export default async function IlanKontrolListePage({ searchParams }: { searchPar
         ))}
       </nav>
       <Suspense fallback={<SkeletonCard height={420} label="Liste yükleniyor" />}>
-        <ListBody kpi={kpi} group={group} groupId={groupId} cursor={cursor} />
+        <ListBody kpi={kpi} group={group} groupId={groupId} district={district} cursor={cursor} />
       </Suspense>
     </>
   );
 }
 
-async function ListBody({ kpi, group, groupId, cursor }: { kpi: KpiKey; group: GroupParam; groupId: string | null; cursor: { riskScore: number; propertyId: string } | null }) {
+async function ListBody({
+  kpi,
+  group,
+  groupId,
+  district,
+  cursor,
+}: {
+  kpi: KpiKey;
+  group: GroupParam;
+  groupId: string | null;
+  district: string | null | undefined;
+  cursor: { riskScore: number; propertyId: string } | null;
+}) {
   const db = await getDb();
-  const res = await listControlProperties(db, kpi, { groupBy: scopeOfGroup(group), groupId, limit: 50, after: cursor });
+  const res =
+    district === undefined
+      ? await listControlProperties(db, kpi, { groupBy: scopeOfGroup(group), groupId, limit: 50, after: cursor })
+      : await listControlPropertiesByDistrict(db, kpi, district, { limit: 50, after: cursor });
   if (!res.available) return <ControlUnavailable />;
   if (res.rows.length === 0) {
     return (
@@ -85,8 +108,11 @@ async function ListBody({ kpi, group, groupId, cursor }: { kpi: KpiKey; group: G
   const names = await loadProfileNames(db, res.rows.map((r) => r.advisor_id));
   const next = encodeCursor(res.nextCursor);
   const q = new URLSearchParams({ kpi });
-  if (group !== "ofis") q.set("gruplama", group);
-  if (groupId) q.set("grup", groupId);
+  if (district !== undefined) q.set("ilce", district ?? "yok");
+  else {
+    if (group !== "ofis") q.set("gruplama", group);
+    if (groupId) q.set("grup", groupId);
+  }
   return (
     <div className="space-y-3">
       <TableFrame minWidth={820}>

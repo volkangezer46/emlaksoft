@@ -53,6 +53,8 @@ const eslintConfig = defineConfig([
     // Claude Code çalışma ağaçları (izole git worktree kopyaları) — projenin parçası değil.
     ".claude/**",
     "test-results/**",
+    // Tarayıcı eklentisi derleme çıktısı (npm run build:extension).
+    "extensions/*/dist/**",
   ]),
 ]);
 

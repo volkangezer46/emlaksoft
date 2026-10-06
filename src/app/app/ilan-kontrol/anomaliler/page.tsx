@@ -42,6 +42,8 @@ export default async function AnomalilerPage({ searchParams }: { searchParams: S
   const type = parseAnomalyType(sp.tur);
   const advisorRaw = Array.isArray(sp.danisman) ? sp.danisman[0] : sp.danisman;
   const advisorId = advisorRaw && /^[0-9a-fA-F-]{36}$/.test(advisorRaw) ? advisorRaw : null;
+  const propertyRaw = Array.isArray(sp.portfoy) ? sp.portfoy[0] : sp.portfoy;
+  const propertyId = propertyRaw && /^[0-9a-fA-F-]{36}$/.test(propertyRaw) ? propertyRaw : null;
   const page = Math.max(1, Math.floor(Number(Array.isArray(sp.sayfa) ? sp.sayfa[0] : sp.sayfa) || 1));
   return (
     <>
@@ -52,31 +54,32 @@ export default async function AnomalilerPage({ searchParams }: { searchParams: S
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Uyarı kuyruğu" }]}
       />
       <ControlSubNav active="anomaliler" closures={effectiveCanAccessModule(perms, "leak")} />
-      <TypeFilters active={type} advisorId={advisorId} />
+      <TypeFilters active={type} advisorId={advisorId} propertyId={propertyId} />
       <Suspense fallback={<SkeletonCard height={480} label="Uyarılar yükleniyor" />}>
-        <QueueBody type={type} advisorId={advisorId} page={page} canEdit={canEdit} tenantId={tenantId} />
+        <QueueBody type={type} advisorId={advisorId} propertyId={propertyId} page={page} canEdit={canEdit} tenantId={tenantId} />
       </Suspense>
     </>
   );
 }
 
-function hrefFor(type: string | null, advisorId: string | null, page = 1) {
+function hrefFor(type: string | null, advisorId: string | null, page = 1, propertyId: string | null = null) {
   const q = new URLSearchParams();
   if (type) q.set("tur", type);
   if (advisorId) q.set("danisman", advisorId);
+  if (propertyId) q.set("portfoy", propertyId);
   if (page > 1) q.set("sayfa", String(page));
   const s = q.toString();
   return `${CONTROL_BASE}/anomaliler${s ? `?${s}` : ""}`;
 }
 
-function TypeFilters({ active, advisorId }: { active: string | null; advisorId: string | null }) {
+function TypeFilters({ active, advisorId, propertyId }: { active: string | null; advisorId: string | null; propertyId: string | null }) {
   const chip = (on: boolean) =>
     `focus-ring inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-semibold transition ${on ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`;
   return (
     <nav aria-label="Uyarı türü" className="mb-4 flex flex-wrap gap-1.5">
-      <Link href={hrefFor(null, advisorId)} aria-current={active === null ? "page" : undefined} className={chip(active === null)}>Tümü</Link>
+      <Link href={hrefFor(null, advisorId, 1, propertyId)} aria-current={active === null ? "page" : undefined} className={chip(active === null)}>Tümü</Link>
       {ANOMALY_FILTERS.map((f) => (
-        <Link key={f.value} href={hrefFor(f.value, advisorId)} aria-current={active === f.value ? "page" : undefined} className={chip(active === f.value)}>
+        <Link key={f.value} href={hrefFor(f.value, advisorId, 1, propertyId)} aria-current={active === f.value ? "page" : undefined} className={chip(active === f.value)}>
           {f.label}
         </Link>
       ))}
@@ -84,18 +87,19 @@ function TypeFilters({ active, advisorId }: { active: string | null; advisorId: 
   );
 }
 
-async function QueueBody({ type, advisorId, page, canEdit, tenantId }: { type: string | null; advisorId: string | null; page: number; canEdit: boolean; tenantId: string | null | undefined }) {
+async function QueueBody({ type, advisorId, propertyId, page, canEdit, tenantId }: { type: string | null; advisorId: string | null; propertyId: string | null; page: number; canEdit: boolean; tenantId: string | null | undefined }) {
   const db = await getDb();
-  const res = await listAnomalies(db, { type, advisorId, page, pageSize: PAGE_SIZE });
+  const res = await listAnomalies(db, { type, advisorId, propertyId, page, pageSize: PAGE_SIZE });
   if (!res.available) return <ControlUnavailable />;
+  const filtered = Boolean(type || advisorId || propertyId);
   if (res.rows.length === 0) {
     return (
       <EmptyState
         icon={ShieldAlert}
         variant="panel"
-        title={type || advisorId ? "Bu filtrede açık uyarı yok" : "Açık uyarı yok"}
+        title={filtered ? "Bu filtrede açık uyarı yok" : "Açık uyarı yok"}
         description="Şu an ilgilenmeniz gereken bir sorun görünmüyor. Yeni bir sorun tespit edilirse burada listelenir."
-        secondary={type || advisorId ? { href: `${CONTROL_BASE}/anomaliler`, label: "Filtreyi temizle" } : { href: CONTROL_BASE, label: "Genel görünüme dön" }}
+        secondary={filtered ? { href: `${CONTROL_BASE}/anomaliler`, label: "Filtreyi temizle" } : { href: CONTROL_BASE, label: "Genel görünüme dön" }}
       />
     );
   }
@@ -117,6 +121,8 @@ async function QueueBody({ type, advisorId, page, canEdit, tenantId }: { type: s
           const sla = r.status === "explained" ? null : slaCountdown(r.sla_due_at, nowMs);
           const lost = anomalyLostCommission(r.type, { listPrice: b?.price ?? null, commissionRate: b?.commissionRate ?? null, defaultRate });
           const priceDetail = r.type === "price_mismatch" ? (r.details as { crmPrice?: number; portals?: { portal: string; price: number }[] }) : null;
+          const dupDetail = r.type === "duplicate" ? (r.details as { otherPropertyId?: string; otherCode?: string; label?: string; signals?: string[] }) : null;
+          const unregDetail = r.type === "unregistered_listing" ? (r.details as { portal?: string; externalId?: string; score?: number }) : null;
           return (
             <li key={r.id} className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -146,6 +152,22 @@ async function QueueBody({ type, advisorId, page, canEdit, tenantId }: { type: s
                         {priceDetail.portals.map((p) => ` · ${p.portal} ${formatTry(p.price)}`).join("")}
                       </p>
                     ) : null}
+                    {dupDetail?.otherPropertyId ? (
+                      <p className="text-sm text-text-muted">
+                        {dupDetail.label ?? "Olası kopya"}:{" "}
+                        <Link href={`/app/portfoyler/${dupDetail.otherPropertyId}`} className="focus-ring rounded font-semibold text-accent-text hover:underline">
+                          {dupDetail.otherCode ?? "diğer portföy"}
+                        </Link>
+                        {dupDetail.signals?.length ? ` · ${dupDetail.signals.join(", ")}` : ""}
+                      </p>
+                    ) : null}
+                    {unregDetail?.externalId ? (
+                      <p className="text-sm text-text-muted">
+                        {unregDetail.portal ?? "Portal"} ilan no <span className="font-mono">{unregDetail.externalId}</span> CRM&apos;de kayıtlı değil
+                        {typeof unregDetail.score === "number" ? ` · bu portföy olma olasılığı %${Math.round(unregDetail.score)}` : ""} ·{" "}
+                        <Link href={`/app/portfoyler/${r.property_id}?sekme=portallar#portal-bagla`} className="focus-ring rounded font-semibold text-accent-text hover:underline">Bu portföye bağla</Link>
+                      </p>
+                    ) : null}
                     {r.explained_reason_code ? (
                       <p className="text-sm text-text-muted">Açıklama: {REASON_LABELS[r.explained_reason_code as ReasonCode] ?? "-"}</p>
                     ) : null}
@@ -168,9 +190,9 @@ async function QueueBody({ type, advisorId, page, canEdit, tenantId }: { type: s
       </ul>
       {totalPages > 1 ? (
         <nav aria-label="Sayfalama" className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={hrefFor(type, advisorId, page - 1)} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">← Önceki</Link> : <span />}
+          {page > 1 ? <Link href={hrefFor(type, advisorId, page - 1, propertyId)} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">← Önceki</Link> : <span />}
           <span className="text-text-muted">Sayfa {page} / {totalPages}</span>
-          {page < totalPages ? <Link href={hrefFor(type, advisorId, page + 1)} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">Sonraki →</Link> : <span />}
+          {page < totalPages ? <Link href={hrefFor(type, advisorId, page + 1, propertyId)} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">Sonraki →</Link> : <span />}
         </nav>
       ) : null}
     </div>
