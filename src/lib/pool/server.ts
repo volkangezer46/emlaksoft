@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
-import { availabilityAt, decidePoolAction, isPoolMode, type PoolDecision, type PoolMode } from "./modes";
+import { availabilityAt, bulkPoolDecision, decidePoolAction, isPoolMode, type PoolDecision, type PoolMode } from "./modes";
 import {
   rankCandidates,
   toStoredSuggestions,
@@ -379,6 +379,99 @@ export async function enqueueListingPool(db: Db, input: EnqueueInput): Promise<E
   } catch (e) {
     console.error("enqueueListingPool", e);
     return { queued: false, reason: "error" };
+  }
+}
+
+export type BulkEnqueueResult = {
+  /** Havuza alınan ilan sayısı. */
+  queued: number;
+  /** Havuz kapalı / şema yok: hiçbir şey yapılmadı. */
+  disabled: boolean;
+  /** Havuz kaydı açılamayan ilanlar (danışmansız kalır; yönetici listeden atar). */
+  failed: number;
+};
+
+/**
+ * TOPLU havuz girişi (içe aktarma). Yalnız DANIŞMANI OLMAYAN (assigned_to null, silinmemiş) ilanlar alınır;
+ * kural ve aday listesi BİR kez okunur, her ilan ayrı puanlanır, kayıtlar tek INSERT'le açılır.
+ * Otomatik atama YAPILMAZ (`bulkPoolDecision`). İdempotent: açık kaydı olan ilan atlanır (kısmi benzersiz indeks
+ * `uq_listing_pool_open_per_property` + ön okuma). Hata ASLA fırlatılmaz; havuz kapalıysa hiçbir şey yapmaz.
+ */
+export async function enqueueListingPoolBatch(
+  db: Db,
+  input: { tenantId: string; actorId: string | null; source: PoolSource; propertyIds: readonly string[] },
+): Promise<BulkEnqueueResult> {
+  const ids = [...new Set(input.propertyIds)].slice(0, 1000);
+  if (!ids.length) return { queued: 0, disabled: false, failed: 0 };
+  try {
+    if (!(await isPoolEnabled(db, input.tenantId))) return { queued: 0, disabled: true, failed: 0 };
+    const [props, open] = await Promise.all([
+      safeRows(
+        db
+          .from("properties")
+          .select("id, property_type, transaction_type, province_id, district_id, neighborhood_id, list_price")
+          .eq("tenant_id", input.tenantId)
+          .in("id", ids)
+          .is("assigned_to", null)
+          .is("deleted_at", null),
+      ),
+      safeRows(
+        db
+          .from("listing_pool_entries")
+          .select("property_id")
+          .eq("tenant_id", input.tenantId)
+          .in("property_id", ids)
+          .eq("status", "pending"),
+      ),
+    ]);
+    const already = new Set(open.map((r) => String(r.property_id)));
+    const todo = props.filter((p) => !already.has(String(p.id)));
+    if (!todo.length) return { queued: 0, disabled: false, failed: 0 };
+
+    const nowMs = now();
+    const rule = await loadPoolRule(db, input.tenantId, input.source);
+    const { candidates, officeAvgOpen } = await loadPoolCandidates(db, input.tenantId, nowMs, rule.id);
+    const slaDue = rule.slaMinutes ? new Date(nowMs + rule.slaMinutes * 60_000).toISOString() : null;
+    const rows = todo.map((p) => {
+      const suggestions = rankCandidates(candidates, toPoolProperty(p), { nowMs, officeAvgOpen });
+      const top = suggestions.find((s) => !s.excluded) ?? null;
+      const decision = bulkPoolDecision(
+        decidePoolAction({ mode: rule.mode, suggestions, minScore: rule.minScore, slaMinutes: rule.slaMinutes, nowMs }),
+      );
+      return {
+        tenant_id: input.tenantId,
+        property_id: String(p.id),
+        source: input.source,
+        status: "pending",
+        rule_id: rule.id,
+        suggestions: toStoredSuggestions(suggestions),
+        top_score: top ? top.score : null,
+        suggested_at: new Date(nowMs).toISOString(),
+        sla_due_at: slaDue,
+        claim_open_until: decision.kind === "open_claim" ? new Date(decision.claimOpenUntilMs).toISOString() : null,
+        created_by: input.actorId,
+      };
+    });
+
+    const { data, error } = await db.from("listing_pool_entries").insert(rows).select("id, property_id");
+    if (error || !data) {
+      if (!isMissingSchemaError(error)) console.error("enqueueListingPoolBatch", error);
+      return { queued: 0, disabled: false, failed: rows.length };
+    }
+    const created = data as Row[];
+    await db.from("listing_pool_events").insert(
+      created.map((r) => ({
+        tenant_id: input.tenantId,
+        entry_id: String(r.id),
+        event: "created",
+        actor_id: input.actorId,
+        detail: { source: input.source, mode: rule.mode, bulk: true },
+      })),
+    );
+    return { queued: created.length, disabled: false, failed: rows.length - created.length };
+  } catch (e) {
+    console.error("enqueueListingPoolBatch", e);
+    return { queued: 0, disabled: false, failed: ids.length };
   }
 }
 
