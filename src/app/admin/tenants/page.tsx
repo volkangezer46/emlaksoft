@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { daysAgoIso } from "@/lib/clock";
+import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { Activity, ArrowUpRight, Building2, Plus, Search, Settings2, ShieldAlert, X } from "lucide-react";
 import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { startImpersonation } from "@/app/actions/platform";
@@ -45,12 +45,24 @@ const dataStateLabel: Record<string, string> = {
   gercek: "Gerçek veri",
 };
 
-function buildHref(p: { q?: string; durum?: string; plan?: string; veri?: string; sayfa?: number }) {
+/** Sanal durum: `durum=risk` = gecikmiş + askıda (kontrol paneli "riskli ofis" hedefi). */
+const durumLabel: Record<string, string> = { ...statusLabel, risk: "Riskli (gecikmiş + askıda)" };
+
+/** Kayıt tarihi penceresi (`yeni=7|30|90` gün) ve deneme bitişi (`deneme=bitiyor|bitti`, `gun` penceresi). */
+const DAY_WINDOWS = new Set(["7", "30", "90"]);
+const trialLabel: Record<string, string> = { bitiyor: "Deneme 7 gün içinde bitiyor", bitti: "Denemesi biten" };
+
+type HrefParams = { q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; sayfa?: number };
+
+function buildHref(p: HrefParams) {
   const sp = new URLSearchParams();
   if (p.q) sp.set("q", p.q);
   if (p.durum) sp.set("durum", p.durum);
   if (p.plan) sp.set("plan", p.plan);
   if (p.veri) sp.set("veri", p.veri);
+  if (p.yeni) sp.set("yeni", p.yeni);
+  if (p.deneme) sp.set("deneme", p.deneme);
+  if (p.deneme === "bitti" && p.gun) sp.set("gun", p.gun);
   if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
   const s = sp.toString();
   return s ? `/admin/tenants?${s}` : "/admin/tenants";
@@ -59,19 +71,24 @@ function buildHref(p: { q?: string; durum?: string; plan?: string; veri?: string
 export default async function AdminTenantsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; sayfa?: string; audit?: string }>;
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; sayfa?: string; audit?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
   const canCreate = officeAdminCan(staff.role, "create");
   const canImpersonate =staff.role === "super_admin" || staff.role === "ops" || staff.role === "support";
   const sp = (await searchParams) ?? {};
   const query = (sp.q ?? "").trim();
-  const durum = sp.durum && statusLabel[sp.durum] ? sp.durum : undefined;
+  const durum = sp.durum && durumLabel[sp.durum] ? sp.durum : undefined;
   const plan = sp.plan && isPlanId(sp.plan) ? sp.plan : undefined;
   const veri = sp.veri && dataStateLabel[sp.veri] ? (sp.veri as "demo" | "gercek") : undefined;
   const auditFailed = sp.audit === "failed";
   const page = parsePage(sp.sayfa);
-  const filtered = Boolean(query || durum || plan || veri);
+  const yeni = sp.yeni && DAY_WINDOWS.has(sp.yeni) ? sp.yeni : undefined;
+  const deneme = sp.deneme && trialLabel[sp.deneme] ? sp.deneme : undefined;
+  const gun = deneme === "bitti" ? (sp.gun && DAY_WINDOWS.has(sp.gun) ? sp.gun : "30") : undefined;
+  const filtered = Boolean(query || durum || plan || veri || yeni || deneme);
+  // Etkin pencere süzgeçleri her bağlantıda taşınır (filtre kontratı: URL ↔ sunucu sorgusu).
+  const href = (p: HrefParams) => buildHref({ yeni, deneme, gun, ...p });
 
   const admin = createAdminClient();
 
@@ -81,7 +98,11 @@ export default async function AdminTenantsPage({
     .order("created_at", { ascending: false })
     .range(...pageRange(page));
   if (query) tenantQuery = tenantQuery.ilike("name", `%${query}%`);
-  if (durum) tenantQuery = tenantQuery.eq("status", durum);
+  if (durum === "risk") tenantQuery = tenantQuery.in("status", ["past_due", "suspended"]);
+  else if (durum) tenantQuery = tenantQuery.eq("status", durum);
+  if (yeni) tenantQuery = tenantQuery.gte("created_at", daysAgoIso(Number(yeni)));
+  if (deneme === "bitiyor") tenantQuery = tenantQuery.eq("status", "trial").gte("trial_ends_at", daysAgoIso(0)).lte("trial_ends_at", daysFromNowIso(7));
+  if (deneme === "bitti") tenantQuery = tenantQuery.gte("trial_ends_at", daysAgoIso(Number(gun))).lte("trial_ends_at", daysAgoIso(0));
   if (plan) tenantQuery = tenantQuery.eq("plan", plan);
   // Filtre kontratı: URL'deki `veri` sunucu sorgusuna yansır (demo = damga dolu, gercek = damga boş).
   if (veri === "demo") tenantQuery = tenantQuery.not("sample_seeded_at", "is", null);
@@ -192,13 +213,13 @@ export default async function AdminTenantsPage({
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
               {[
                 { label: "Toplam ofis", value: stats.length, href: buildHref({}) },
-                { label: "Aktif", value: statusCounts[0].count, href: buildHref({ q: query, plan, veri, durum: "active" }) },
-                { label: "Denemede", value: statusCounts[1].count, href: buildHref({ q: query, plan, veri, durum: "trial" }) },
-                { label: "Demo veri var", value: demoCount, href: buildHref({ q: query, plan, durum, veri: veri === "demo" ? undefined : "demo" }) },
+                { label: "Aktif", value: statusCounts[0].count, href: href({ q: query, plan, veri, durum: "active" }) },
+                { label: "Denemede", value: statusCounts[1].count, href: href({ q: query, plan, veri, durum: "trial" }) },
+                { label: "Demo veri var", value: demoCount, href: href({ q: query, plan, durum, veri: veri === "demo" ? undefined : "demo" }) },
                 {
                   label: "Askıda / gecikmiş",
                   value: statusCounts[2].count + statusCounts[3].count,
-                  href: buildHref({ q: query, plan, veri, durum: statusCounts[3].count > 0 ? "suspended" : "past_due" }),
+                  href: href({ q: query, plan, veri, durum: "risk" }),
                 },
               ].map((k) => (
                 <Link
@@ -217,7 +238,7 @@ export default async function AdminTenantsPage({
                 return (
                   <Link
                     key={p.key}
-                    href={buildHref({ q: query, durum, veri, plan: active ? undefined : p.key })}
+                    href={href({ q: query, durum, veri, plan: active ? undefined : p.key })}
                     aria-current={active ? "page" : undefined}
                     title={active ? "Paket filtresini kaldır" : `Yalnızca ${p.label} paketini göster`}
                     className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[var(--radius-control)] pb-1 transition ${
@@ -267,7 +288,7 @@ export default async function AdminTenantsPage({
                 return (
                   <Link
                     key={s.key}
-                    href={buildHref({ q: query, plan, veri, durum: active ? undefined : s.key })}
+                    href={href({ q: query, plan, veri, durum: active ? undefined : s.key })}
                     aria-current={active ? "page" : undefined}
                     title={active ? "Durum filtresini kaldır" : `Yalnızca "${s.label}" ofisleri göster`}
                     className={`focus-ring flex items-center gap-2 rounded-[7px] px-1.5 py-0.5 transition ${
@@ -291,6 +312,9 @@ export default async function AdminTenantsPage({
             {durum ? <input type="hidden" name="durum" value={durum} /> : null}
             {plan ? <input type="hidden" name="plan" value={plan} /> : null}
             {veri ? <input type="hidden" name="veri" value={veri} /> : null}
+            {yeni ? <input type="hidden" name="yeni" value={yeni} /> : null}
+            {deneme ? <input type="hidden" name="deneme" value={deneme} /> : null}
+            {gun ? <input type="hidden" name="gun" value={gun} /> : null}
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
             <input
               type="text"
@@ -302,7 +326,7 @@ export default async function AdminTenantsPage({
           </form>
           {query ? (
             <Link
-              href={buildHref({ durum, plan, veri })}
+              href={href({ durum, plan, veri })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Arama: {query} <X className="h-3 w-3" />
@@ -310,15 +334,15 @@ export default async function AdminTenantsPage({
           ) : null}
           {durum ? (
             <Link
-              href={buildHref({ q: query, plan, veri })}
+              href={href({ q: query, plan, veri })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
-              Durum: {statusLabel[durum]} <X className="h-3 w-3" />
+              Durum: {durumLabel[durum]} <X className="h-3 w-3" />
             </Link>
           ) : null}
           {plan ? (
             <Link
-              href={buildHref({ q: query, durum, veri })}
+              href={href({ q: query, durum, veri })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Paket: {planLabel(plan)} <X className="h-3 w-3" />
@@ -326,10 +350,27 @@ export default async function AdminTenantsPage({
           ) : null}
           {veri ? (
             <Link
-              href={buildHref({ q: query, durum, plan })}
+              href={href({ q: query, durum, plan })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Veri: {dataStateLabel[veri]} <X className="h-3 w-3" />
+            </Link>
+          ) : null}
+          {yeni ? (
+            <Link
+              href={buildHref({ q: query, durum, plan, veri, deneme, gun })}
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
+            >
+              Kayıt: son {yeni} gün <X className="h-3 w-3" />
+            </Link>
+          ) : null}
+          {deneme ? (
+            <Link
+              href={buildHref({ q: query, durum, plan, veri, yeni })}
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
+            >
+              {trialLabel[deneme]}
+              {deneme === "bitti" ? ` · son ${gun} gün` : ""} <X className="h-3 w-3" />
             </Link>
           ) : null}
           <p className="ml-auto flex items-center gap-2 text-xs text-text-muted">
@@ -382,7 +423,7 @@ export default async function AdminTenantsPage({
                 </span>
                 {/* Veri durumu: deneme (status) ayrı rozet; burada örnek veri var mı (tenants.sample_seeded_at). Tıklanınca süzer. */}
                 <Link
-                  href={buildHref({ q: query, durum, plan, veri: t.sample_seeded_at ? "demo" : "gercek" })}
+                  href={href({ q: query, durum, plan, veri: t.sample_seeded_at ? "demo" : "gercek" })}
                   className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold ${t.sample_seeded_at ? "bg-amber-400/15 text-amber-600" : "bg-mint-500/12 text-mint-600"}`}
                   title={t.sample_seeded_at ? "Ofiste örnek (demo) veri yüklü; gerçek kullanıma geçmedi" : "Örnek veri yok: ofis gerçek verisiyle çalışıyor"}
                 >
@@ -449,7 +490,7 @@ export default async function AdminTenantsPage({
       <Pagination
         page={page}
         total={tenantCount ?? 0}
-        hrefFor={(p) => buildHref({ q: query, durum, plan, veri, sayfa: p })}
+        hrefFor={(p) => href({ q: query, durum, plan, veri, sayfa: p })}
       />
     </div>
   );
