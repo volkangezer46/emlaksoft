@@ -232,6 +232,7 @@ yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasy
 
 `docs/design/BIRLESIK_YOL_HARITASI.md` (yol haritası, terim sözlüğü, 15 çelişki kararı) · `ONERI_LISTESI_KARSILASTIRMA.md` (113 madde) ·
 `ISLEM_TAMLIK_DENETIMI.md` · `DANISMAN_UZMANLIK_HAVUZ_DEMO_SPEC.md` · `PIYASA_VE_FARK_YARATAN_OZELLIKLER.md` (F1-F5) ·
+`OZELLIK_ARASTIRMASI_2026_10.md` (2026-10-06: piyasa+mevzuat taraması, VAR/KISMEN/YOK, ilk 10; en zamana duyarlı: Güvenli Ödeme Sistemi zorunluluğu 1 Aralık 2026 + EİDS taşınmaz kimlik no; uygulanmadı, yalnız öneri) ·
 `ORGANIK_BUYUME_PLANI.md` · `REFERANS_PROGRAMI.md` · `BILLING_PAUSE_PRORATION_DESIGN.md` · `OFIS_SAHIPLIGI_DEVRI.md` · `GUVENLIK_DENETIMI_3.md` ·
 `docs/DURUM.md`, `MIMARI.md`, `ROADMAP.md`, `DEPLOY.md`, `DESIGN_SYSTEM.md` · `docs/security/` (admin client envanteri) ·
 `.claude/agents/` (birlestirme, canli-qa, guvenlik, hiz, migration ajanları).
