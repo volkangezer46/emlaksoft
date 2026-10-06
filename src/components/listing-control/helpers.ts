@@ -154,6 +154,7 @@ export const ANOMALY_TYPE_LABELS: Record<string, string> = {
   sold_still_listed: "Satılmış, portalda hâlâ yayında",
   incomplete_closure: "Eksik kapanış",
   authority_expiring: "Yetki bitiyor/bitmiş",
+  closure_loss: "Kapanışta kaçan komisyon",
 };
 
 /** Kuyruk filtre çipleri (URL: ?tur=). */
@@ -168,6 +169,7 @@ export const ANOMALY_FILTERS: readonly { value: string; label: string }[] = [
   { value: "sold_still_listed", label: "Satılmış, hâlâ portalda" },
   { value: "authority_expiring", label: "Yetki" },
   { value: "incomplete_closure", label: "Eksik kapanış" },
+  { value: "closure_loss", label: "Kapanışta kaçan" },
 ];
 
 export function parseAnomalyType(raw: string | string[] | undefined): string | null {

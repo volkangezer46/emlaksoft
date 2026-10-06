@@ -38,6 +38,8 @@ export const ANOMALY_TYPES = [
   "sold_still_listed",
   "incomplete_closure",
   "authority_expiring",
+  /** Kapanış formunda kaçan komisyon (kaynak listing_closures tetikleyicisi, 20261007000610). Motor eşitlemez. */
+  "closure_loss",
 ] as const;
 export type AnomalyType = (typeof ANOMALY_TYPES)[number];
 

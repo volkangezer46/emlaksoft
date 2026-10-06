@@ -22,6 +22,8 @@ import { InteractiveChart } from "@/components/app/interactive-chart";
 import { RadialGauge } from "@/components/ui/viz/radial-gauge";
 import { now, trMonthStartMs } from "@/lib/clock";
 import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton";
+import { loadPotentialLosses } from "@/lib/listing-control/server/potential-loss";
+import { summarizeLosses, type PotentialLossRow } from "@/lib/listing-control/potential-loss-core";
 
 export const metadata = { title: "Kayıp-kaçak kalkanı" };
 
@@ -123,6 +125,8 @@ type Ctx = {
 /** Sayfa düzeyinde BAŞLATILAN (await edilmeyen) sorgular — her bölüm kendi Suspense sınırında bekler. */
 type Pending = {
   closuresP: Promise<Closure[]>;
+  /** "Kaçan komisyon" TEK KAYNAK: listing_anomalies (closure_loss + potential_lost_deal). available=false → eski kapanış toplamı. */
+  lossP: Promise<{ available: boolean; rows: PotentialLossRow[]; capped: boolean }>;
   liveP: Promise<Listing[]>;
   listP: Promise<{ rows: Closure[]; count: number }>;
   totalP: Promise<number>;
@@ -184,7 +188,12 @@ export default async function LeakShieldPage({
 
   // Sorgular burada BAŞLATILIR ama await edilmez: başlık/hero iskeleti hemen akar,
   // her bölüm kendi Suspense sınırında ilgili promise'i bekler (bağımsız, paralel).
+  // Potansiyel kayıp okuması İlan Kontrol uyarılarına (portals:view RLS) dayanır; yetki yoksa eski kaynak.
+  const lossP = effectiveCanAccessModule(perms, "portals")
+    ? loadPotentialLosses(supabase, { fromIso: fromF || null, toIso: toF ? `${toF}T23:59:59.999` : null }).catch(() => ({ available: false, rows: [], capped: false }))
+    : Promise.resolve({ available: false, rows: [] as PotentialLossRow[], capped: false });
   const pending: Pending = {
+    lossP,
     closuresP: Promise.resolve(closuresQuery).then((res) => {
       assertQueryBatchSucceeded([res], ["kapanışlar"], "Kayıp-kaçak");
       return (res.data ?? []) as Closure[];
@@ -311,14 +320,16 @@ function ClosuresSkeleton() {
 
 async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
   const { rangeActive, filterHref } = ctx;
-  const [rows, live, totalClosuresCount] = await Promise.all([pending.closuresP, pending.liveP, pending.totalP]);
+  const [rows, live, totalClosuresCount, loss] = await Promise.all([pending.closuresP, pending.liveP, pending.totalP, pending.lossP]);
   const nowMs = now();
   // Ay başı Türkiye takvimine göre (UTC sunucuda ayın ilk 3 saati önceki aya yazılmasın).
   const monthStartMs = trMonthStartMs(nowMs);
   const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
+  // TEK KAYNAK: anomaliler okunabiliyorsa kaçan komisyon oradan (kapanış kayıpları + portaldan kalkıp işlemi olmayanlar).
+  const lossSum = loss.available ? summarizeLosses(loss.rows, nowMs, monthStartMs) : null;
   const monthRows = rows.filter((r) => new Date(r.created_at).getTime() >= monthStartMs);
-  const lostMonth = monthRows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
-  const lostAll = rows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
+  const lostMonth = lossSum ? lossSum.month : monthRows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
+  const lostAll = lossSum ? lossSum.all : rows.reduce((s, r) => s + Number(r.estimated_lost_commission || 0), 0);
   const competitor = rows.filter((r) => r.competitor_closed).length;
   return (
             <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -345,20 +356,33 @@ async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                   <p className="text-xs text-white/45">{k.label}</p>
                 </Link>
               ))}
+              {lossSum ? (
+                <p className="col-span-2 text-xs text-white/50 sm:col-span-4">
+                  Kaynak: İlan Kontrol uyarıları ·{" "}
+                  <Link href="/app/ilan-kontrol/anomaliler?tur=closure_loss" className="underline decoration-white/30 underline-offset-2 hover:text-white">{lossSum.closureCount} kapanış kaybı</Link>
+                  {" + "}
+                  <Link href="/app/ilan-kontrol/anomaliler?tur=potential_lost_deal" className="underline decoration-white/30 underline-offset-2 hover:text-white">{lossSum.portalCount} olası kayıp işlem</Link>
+                  {" (tahmin)"}{loss.capped ? " · ilk 1000 kayıt" : ""}
+                </p>
+              ) : null}
             </div>
   );
 }
 
 async function HeroTrend({ pending }: { pending: Pending }) {
-  const rows = await pending.closuresP;
+  const [rows, loss] = await Promise.all([pending.closuresP, pending.lossP]);
   const nowMs = now();
-  // 8-week lost commission buckets
+  // 8-week lost commission buckets (tek kaynak: anomaliler; okunamazsa eski kapanış kayıtları)
   const weekMs = 7 * 86_400_000;
-  const buckets = Array.from({ length: 8 }, () => 0);
-  rows.forEach((r) => {
-    const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);
-    if (idx >= 0 && idx < 8) buckets[idx] += Number(r.estimated_lost_commission || 0);
-  });
+  let buckets = Array.from({ length: 8 }, () => 0);
+  if (loss.available) {
+    buckets = summarizeLosses(loss.rows, nowMs, trMonthStartMs(nowMs)).weeks;
+  } else {
+    rows.forEach((r) => {
+      const idx = 7 - Math.floor((nowMs - new Date(r.created_at).getTime()) / weekMs);
+      if (idx >= 0 && idx < 8) buckets[idx] += Number(r.estimated_lost_commission || 0);
+    });
+  }
   // Hafta etiketi: kovanın başladığı günün kısa tarihi (etkileşimli grafik + tooltip)
   const weekFmt = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
   const trendWeeks = buckets.map((b, i) => ({
