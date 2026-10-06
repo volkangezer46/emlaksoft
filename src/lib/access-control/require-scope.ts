@@ -3,11 +3,10 @@
  * `requirePermission` üzerine built-in; kapsam kontrol ekler.
  */
 
-import type { AppAction, AppModule } from "@/lib/permissions";
-import { requirePermission, type PermissionGate } from "@/lib/require-permission";
+import type { AppAction, AppModule, AppRole } from "@/lib/permissions";
+import { requirePermission } from "@/lib/require-permission";
 import { getUserScope, loadScopeOverrides, checkScopeOverride } from "./scope-cache";
 import { evaluateScopeAccess } from "./scope-rules";
-import type { ScopePermissionContext, AccessDecision } from "./types";
 
 export type ScopePermissionGate =
   | {
@@ -57,7 +56,7 @@ export async function requireScopePermission(
 
   // Scope kontrol et
   try {
-    const userScope = await getUserScope(permissionGate.userId, permissionGate.tenantId, permissionGate.role as any);
+    const userScope = await getUserScope(permissionGate.userId, permissionGate.tenantId, permissionGate.role as AppRole);
     const overrides = await loadScopeOverrides(permissionGate.userId, permissionGate.tenantId);
 
     // Override varsa kontrol et

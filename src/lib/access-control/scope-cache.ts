@@ -1,13 +1,44 @@
 /**
  * Kullanıcı kapsamı önbellek (server-side caching).
- * Başına bir kez hesaplanır.
+ * İstek başına bir kez hesaplanır.
+ *
+ * Kaynak sırası: `user_scopes` satırı (ofis yöneticisi yazmış) → yoksa rol varsayılanı
+ * (`defaultUserScopeForRole`) + profilden takım/şube bağlamı. Tablo henüz yoksa (migration
+ * uygulanmadı) sessizce rol varsayılanına düşer.
  */
 
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import type { AccessScope, UserScope } from "./types";
-import { getDefaultScopeForRole } from "./scope-rules";
+import type { UserScope } from "./types";
+import { defaultUserScopeForRole, SCOPE_RANK } from "./scope-rules";
+import { minimumScopeForRole } from "./admin-rules";
 import type { AppRole } from "@/lib/permissions";
+
+type ScopeRow = {
+  scope_type: UserScope["scope_type"];
+  team_id: string | null;
+  branch_id: string | null;
+  can_view_all_data: boolean;
+  can_edit_team_members: boolean;
+  can_override_permissions: boolean;
+  can_see_earnings: boolean;
+};
+
+/** Takım/şube bağlamı profilden (team_id sütunu yoksa yalnız branch_id). */
+async function loadProfileContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  tenantId: string,
+): Promise<{ teamId: string | null; branchId: string | null }> {
+  const full = await supabase.from("profiles").select("team_id, branch_id").eq("id", userId).eq("tenant_id", tenantId).maybeSingle();
+  if (!full.error && full.data) {
+    const row = full.data as { team_id?: string | null; branch_id?: string | null };
+    return { teamId: row.team_id ?? null, branchId: row.branch_id ?? null };
+  }
+  // team_id sütunu henüz yok (takım migration'ı uygulanmadı): yalnız şube.
+  const lite = await supabase.from("profiles").select("branch_id").eq("id", userId).eq("tenant_id", tenantId).maybeSingle();
+  return { teamId: null, branchId: (lite.data as { branch_id?: string | null } | null)?.branch_id ?? null };
+}
 
 /**
  * Kullanıcının kapsam türünü, takım/şube bağlamını ve yetkilendirmesini yükle.
@@ -18,44 +49,43 @@ export const getUserScope = cache(async function getUserScope(
   tenantId: string,
   role: AppRole,
 ): Promise<UserScope> {
-  // Varsayılan scope rol tarafından belirlenir
-  const scopeType = getDefaultScopeForRole(role);
-
-  let branchId: string | null = null;
-  let teamId: string | null = null;
-
-  // Roller spesifik scope'a sahipse (team_lead, branch_manager), konteksti yükle
-  if (role === "team_lead" || role === "branch_manager") {
-    try {
-      const supabase = await createClient();
-
-      // Takım/Şube bilgisini profiles tablosundan yükle
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("team_id, branch_id")
-        .eq("id", userId)
+  let ctx: { teamId: string | null; branchId: string | null } = { teamId: null, branchId: null };
+  let row: ScopeRow | null = null;
+  try {
+    const supabase = await createClient();
+    const [profileCtx, scopeRes] = await Promise.all([
+      loadProfileContext(supabase, userId, tenantId),
+      supabase
+        .from("user_scopes")
+        .select("scope_type, team_id, branch_id, can_view_all_data, can_edit_team_members, can_override_permissions, can_see_earnings")
+        .eq("user_id", userId)
         .eq("tenant_id", tenantId)
-        .single();
-
-      if (!error && profile) {
-        teamId = profile.team_id;
-        branchId = profile.branch_id;
-      }
-    } catch (e) {
-      console.error(`[getUserScope] Takım/şube yükleme hatası: ${userId}`, e);
-    }
+        .maybeSingle(),
+    ]);
+    ctx = profileCtx;
+    // Tablo yok / erişim yok: error döner, satır yok sayılır (rol varsayılanı).
+    if (!scopeRes.error && scopeRes.data) row = scopeRes.data as ScopeRow;
+  } catch (e) {
+    console.error(`[getUserScope] kapsam yükleme hatası: ${userId}`, e);
   }
 
+  const fallback = defaultUserScopeForRole(role, { userId, tenantId, teamId: ctx.teamId, branchId: ctx.branchId });
+  if (!row) return fallback;
+
+  // Güvenlik tabanı: owner/gm satırı ne derse desin office altına inmez (eski/bozuk satır kilitlemesin).
+  const floor = minimumScopeForRole(role);
+  const scopeType = SCOPE_RANK[row.scope_type] < SCOPE_RANK[floor] ? floor : row.scope_type;
   return {
     user_id: userId,
-    scope_type: scopeType,
     tenant_id: tenantId,
-    branch_id: branchId,
-    team_id: teamId,
-    can_view_all_data: ["owner", "gm", "accounting"].includes(role),
-    can_edit_team_members: ["owner", "gm", "branch_manager", "team_lead"].includes(role),
-    can_override_permissions: ["owner", "gm"].includes(role),
-    can_see_earnings: ["owner", "gm", "accounting"].includes(role),
+    scope_type: scopeType,
+    // Satırda takım/şube yoksa profildeki bağlam kullanılır (takım değişince satır bayatlamasın).
+    team_id: row.team_id ?? ctx.teamId,
+    branch_id: row.branch_id ?? ctx.branchId,
+    can_view_all_data: row.can_view_all_data,
+    can_edit_team_members: row.can_edit_team_members,
+    can_override_permissions: row.can_override_permissions,
+    can_see_earnings: row.can_see_earnings,
   };
 });
 
@@ -78,9 +108,10 @@ export async function loadScopeOverrides(
       .eq("tenant_id", tenantId);
 
     if (!error && data) {
+      const nowMs = Date.now();
       for (const row of data) {
         // Süresi geçmiş override'ı yok say
-        if (row.expires_at && new Date(row.expires_at) < new Date()) {
+        if (row.expires_at && new Date(row.expires_at).getTime() <= nowMs) {
           continue;
         }
 
