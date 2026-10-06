@@ -4,6 +4,8 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
+import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
+import { tenantsDisabledFor } from "@/lib/modules/state";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
 
 /**
@@ -211,13 +213,25 @@ export async function GET(req: NextRequest) {
     else sent += rows.length;
   }
 
+  // İlan Kontrol raporu teslimi (ofis ayarı açık ofisler; en iyi çaba, özet işini bozmaz; dedupe dönem başına tek).
+  let controlReports = 0;
+  try {
+    const lc = await runControlReportDelivery(admin, "weekly", Date.now(), {
+      disabledTenantIds: new Set(tenantsDisabledFor(disabledModules, "portals")),
+    });
+    controlReports = lc.sent;
+    failed += lc.failed;
+  } catch (e) {
+    console.error("haftalik-ozet ilan kontrol raporu", e);
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
   });
   await recordHeartbeat("haftalik-ozet", hb.status, hb.detail);
 

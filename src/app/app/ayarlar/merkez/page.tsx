@@ -34,6 +34,8 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.insight.customer_quiet_days": { label: "Ana ekran içgörüleri", href: "/app" },
   "office.insight.listing_stale_days": { label: "Ana ekran içgörüleri", href: "/app" },
   "office.insight.dormant_days": { label: "Uykuda müşteriler", href: "/app/musteriler?segment=uykuda" },
+  "office.listing_control.report_daily": { label: "İlan Kontrol raporu", href: "/app/ilan-kontrol/rapor" },
+  "office.listing_control.report_weekly": { label: "İlan Kontrol raporu", href: "/app/ilan-kontrol/rapor" },
 };
 const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };
 

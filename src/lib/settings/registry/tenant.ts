@@ -190,4 +190,31 @@ const notify: AnySettingDef[] = NOTIFY_DEFAULTS.map((n) =>
   }),
 );
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify];
+/** İlan Kontrol rapor teslimi: AÇIK/KAPALI (varsayılan kapalı = bugünkü davranış, hiçbir bildirim eklenmez). */
+export const LC_REPORT_DAILY_KEY = "office.listing_control.report_daily";
+export const LC_REPORT_WEEKLY_KEY = "office.listing_control.report_weekly";
+
+const lcReport: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    category: "bildirim",
+    key: LC_REPORT_DAILY_KEY,
+    group: "bildirim",
+    default: false,
+    label: "Günlük İlan Kontrol raporu bildirimi",
+    description: "Her sabah ofis sahibi ve genel müdüre açık/gecikmiş portal ilanı uyarılarının özeti zil bildirimi olarak gönderilir.",
+    impact: "Açılırsa yöneticilere günde en çok 1 özet bildirimi gider (günlük özet tercihini kapatanlara gitmez). Kapalıyken hiçbir bildirim üretilmez.",
+  }),
+  defineBool({
+    ...TENANT,
+    category: "bildirim",
+    key: LC_REPORT_WEEKLY_KEY,
+    group: "bildirim",
+    default: false,
+    label: "Haftalık İlan Kontrol raporu bildirimi",
+    description: "Her pazartesi ofis sahibi ve genel müdüre geçen haftanın portal ilanı uyarı özeti zil bildirimi olarak gönderilir.",
+    impact: "Açılırsa yöneticilere haftada en çok 1 özet bildirimi gider. Kapalıyken hiçbir bildirim üretilmez.",
+  }),
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport];
