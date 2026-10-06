@@ -330,6 +330,9 @@ export default async function PropertyDetailPage({
   // Kayıp toplamı kapanış kayıtlarından gelir; o bölüm akarak geldiği için
   // künyedeki rozet de kendi sınırında bekler.
   const propertyRaw = property as unknown as Record<string, string | null>;
+  // EİDS taşınmaz no ayrı, hataya dayanıklı okunur: sütun henüz yoksa (migration uygulanmamış) sayfa düşmez.
+  const eidsRes = await supabase.from("properties").select("eids_property_no").eq("id", id).maybeSingle();
+  const eidsNo = eidsRes.error ? null : ((eidsRes.data as { eids_property_no?: string | null } | null)?.eids_property_no ?? null);
 
   // Sağ sütun "sonraki en iyi eylem": teşhisin en öncelikli engeli → ilgili sekme
   const nextBlocker = saleDiagnosis?.blockers[0] ?? null;
@@ -919,6 +922,7 @@ export default async function PropertyDetailPage({
               authEnd:   propertyRaw.authorization_end   ?? null,
               authType:  propertyRaw.authorization_type  ?? null,
               authNotes: propertyRaw.authorization_notes ?? null,
+              eidsNo,
             }}
           />
 

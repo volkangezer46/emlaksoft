@@ -7,6 +7,7 @@ import { isCheckStale } from "./cadence";
 import type { ListingControlConfig } from "./config";
 import { DEFAULT_LISTING_CONTROL_CONFIG } from "./config";
 import type { ExitKind, LifecycleStage } from "./types";
+import { eidsHealthValue } from "@/lib/eids/health";
 
 /**
  * Portföy değerlendirme ÇEKİRDEĞİ (SAF): anlık görüntü → anomali kümesi + sağlık + risk + KPI bayrakları.
@@ -20,7 +21,10 @@ export type EvaluationExtras = {
   daysSinceUpdate: number | null;
   advisorActive: boolean | null;
   ownerInfoPresent: boolean | null;
-  authorityDocPresent: boolean | null;
+  /** EİDS taşınmaz numarası girilmiş mi (properties.eids_property_no); okunamadıysa null = ölçülemedi. */
+  eidsNoPresent: boolean | null;
+  /** Yetki süresi 3 aydan kısa (EİDS en az 3 ay kuralı); bilinmiyorsa belirtilmez. */
+  authorityShort?: boolean;
   /** Kayıp anomalisi ilk görüldüğünden beri açıklamasız saat (yoksa 0). */
   hoursUnexplained: number;
   exitKind: ExitKind | null;
@@ -97,7 +101,7 @@ export function evaluateProperty(
     freshness: freshnessValue(extras.daysSinceUpdate),
     idUrlValid: idUrlOk,
     contact: extras.ownerInfoPresent === null ? null : extras.ownerInfoPresent ? 1 : 0,
-    eids: extras.authorityDocPresent === null ? null : extras.authorityDocPresent ? 1 : 0,
+    eids: eidsHealthValue(extras.eidsNoPresent, extras.authorityShort ?? false),
     checkRecency: recency,
   };
   const health = computeHealthScore(healthInputs, cfg.healthWeights, cfg.healthColors);

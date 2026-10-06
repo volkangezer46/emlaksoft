@@ -4,6 +4,8 @@ import { getControlSummary, type ControlSummaryRow } from "@/lib/listing-control
 import { computeHealthScore, type HealthResult } from "@/lib/listing-control/health-score";
 import { normalizeListingControlConfig, type ListingControlConfig } from "@/lib/listing-control/config";
 import { daysAgoIso } from "@/lib/clock";
+import { hasValidEidsNo } from "@/lib/eids/property-no";
+import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
 import type { MissingEvent } from "@/lib/listing-control/advisor-patterns";
 import type { ScopeKind } from "@/lib/listing-control/types";
 import { ANOMALY_TYPE_LABELS, type TypeCounts } from "./helpers";
@@ -192,7 +194,7 @@ export type LifecycleData = {
 export async function loadLifecycle(db: Db, tenantId: string | null, propertyId: string, nowMs: number): Promise<LifecycleData> {
   const empty: LifecycleData = { available: false, controlAvailable: false, listings: [], health: new Map(), timeline: [], score: null, storedScore: null, stage: null, exitKind: null, listPrice: null, openAnomalies: [], config: null };
   const [prop, listings, health, verifs, anomalies, prices, state] = await Promise.all([
-    db.from("properties").select("created_at, updated_at, list_price, assigned_to, authorization_end").eq("id", propertyId).maybeSingle(),
+    db.from("properties").select("created_at, updated_at, list_price, assigned_to, authorization_start, authorization_end").eq("id", propertyId).maybeSingle(),
     db.from("portal_listings").select("id, portal_name, portal_listing_id, portal_url, status, published_at, removed_at, supersedes_id").eq("property_id", propertyId).order("published_at", { ascending: true }),
     db.from("portal_listing_health").select("portal_listing_id, check_state, confidence, last_check_at, last_success_at, last_seen_at, last_check_result, portal_price").eq("property_id", propertyId),
     db.from("listing_verifications").select("checked_at, result, state_after, portal_listing_id").eq("property_id", propertyId).order("checked_at", { ascending: false }).limit(40),
@@ -206,7 +208,7 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
     return empty;
   }
   const schemaOk = !health.error && !state.error && !anomalies.error;
-  const p = (prop.data ?? null) as { created_at: string | null; updated_at: string | null; list_price: number | null; assigned_to: string | null; authorization_end: string | null } | null;
+  const p = (prop.data ?? null) as { created_at: string | null; updated_at: string | null; list_price: number | null; assigned_to: string | null; authorization_start: string | null; authorization_end: string | null } | null;
   const ls = ((listings.data ?? []) as Record<string, string | null>[]).map((r) => ({
     id: String(r.id), portal: String(r.portal_name), externalId: r.portal_listing_id, url: r.portal_url, status: String(r.status),
     publishedAt: r.published_at, removedAt: r.removed_at, supersedesId: r.supersedes_id ?? null,
@@ -232,12 +234,17 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
   });
 
   const config = tenantId ? await loadListingControlConfig(db, tenantId) : normalizeListingControlConfig(null);
+  // EİDS taşınmaz no ayrı, hataya dayanıklı okunur (sütun yoksa ölçülemedi).
+  const eidsRes = await db.from("properties").select("eids_property_no").eq("id", propertyId).maybeSingle();
+  const eidsPresent = eidsRes.error ? null : hasValidEidsNo((eidsRes.data as { eids_property_no?: string | null } | null)?.eids_property_no);
   const inputs = buildHealthInputs(
     {
       hasAdvisor: !!p?.assigned_to,
       listPrice: p?.list_price === null || p?.list_price === undefined ? null : Number(p.list_price),
       updatedAt: p?.updated_at ?? null,
       authorizationEnd: p?.authorization_end ?? null,
+      eidsNoPresent: eidsPresent,
+      authorityShort: p ? evaluateAuthorityTerm({ start: p.authorization_start, end: p.authorization_end }, nowMs).short : false,
       listings: ls.map((l) => {
         const h = healthMap.get(l.id);
         return { live: l.status === "live" && !["probable_missing", "confirmed_missing"].includes(h?.check_state ?? ""), verified: h?.check_state === "verified", externalId: l.externalId, url: l.url, portalPrice: h?.portal_price ?? null, lastSuccessAt: h?.last_success_at ?? null };

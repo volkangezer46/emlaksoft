@@ -4,6 +4,8 @@ import type { ListingSnapshot, PropertySnapshot } from "../anomaly-rules";
 import { deriveLifecycle } from "../lifecycle";
 import { PROPERTY_MANAGED_ANOMALY_TYPES, type CheckState } from "../types";
 import { chunk, isMissingSchema, type Db } from "./db";
+import { hasValidEidsNo } from "@/lib/eids/property-no";
+import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
 
 /**
  * Portföy kontrol SENKRONU (sunucu): anlık görüntüyü topla → saf motor (`engine.ts`) → `lc_sync_anomalies` (anomali
@@ -41,6 +43,7 @@ type PropRow = {
   deleted_at: string | null;
   list_price: number | null;
   assigned_to: string | null;
+  authorization_start: string | null;
   authorization_end: string | null;
   updated_at: string | null;
 };
@@ -90,7 +93,7 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
   const props = await rows<PropRow>(
     db
       .from("properties")
-      .select("id, property_code, status, deleted_at, list_price, assigned_to, authorization_end, updated_at")
+      .select("id, property_code, status, deleted_at, list_price, assigned_to, authorization_start, authorization_end, updated_at")
       .eq("tenant_id", tenantId)
       .in("id", ids),
   );
@@ -155,6 +158,12 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
     ? await rows<ProfileRow>(db.from("profiles").select("id, full_name, is_active").eq("tenant_id", tenantId).in("id", assigneeIds))
     : { data: [] as ProfileRow[], missing: false, failed: false };
   const profileById = new Map(profiles.data.map((p) => [p.id, p]));
+
+  // EİDS taşınmaz no ayrı ve hataya dayanıklı okunur: sütun yoksa (migration uygulanmamış) bileşen "ölçülemedi" kalır.
+  const eidsQ = await rows<{ id: string; eids_property_no: string | null }>(
+    db.from("properties").select("id, eids_property_no").eq("tenant_id", tenantId).in("id", ids),
+  );
+  const eidsInfo = eidsQ.failed ? null : new Map(eidsQ.data.map((r) => [r.id, { no: r.eids_property_no }]));
 
   const poolPending = new Set(poolQ.data.map((r) => r.property_id));
   const ownerInfo = ownerQ.failed ? null : new Set(ownerQ.data.map((r) => r.property_id));
@@ -228,7 +237,8 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
       daysSinceUpdate: p.updated_at ? Math.max(0, Math.floor((nowMs - Date.parse(p.updated_at)) / DAY)) : null,
       advisorActive: advisor ? advisor.is_active !== false : null,
       ownerInfoPresent: ownerInfo ? ownerInfo.has(p.id) : null,
-      authorityDocPresent: null,
+      eidsNoPresent: eidsInfo ? hasValidEidsNo(eidsInfo.get(p.id)?.no) : null,
+      authorityShort: evaluateAuthorityTerm({ start: p.authorization_start, end: p.authorization_end }, nowMs).short,
       hoursUnexplained: missingSince.length ? Math.max(0, (nowMs - Math.min(...missingSince)) / HOUR) : 0,
       exitKind: life.exitKind,
     };

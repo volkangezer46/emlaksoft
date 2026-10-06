@@ -3,6 +3,8 @@ import { parseEidsPropertyNo, hasValidEidsNo } from "./property-no";
 import { addMonthsDay, evaluateAuthorityTerm, shortAuthorityWarning } from "./authority-term";
 import { isEidsFilter, summarizeEids } from "./status";
 import { computeHealthScore } from "@/lib/listing-control/health-score";
+import { checkAuthorityShield } from "@/lib/authority-shield";
+import { eidsHealthValue } from "./health";
 
 const NOW = Date.parse("2026-10-06T09:00:00+03:00");
 
@@ -85,6 +87,27 @@ describe("summarizeEids", () => {
   it("isEidsFilter", () => {
     expect(isEidsFilter("kisa")).toBe(true);
     expect(isEidsFilter("x")).toBe(false);
+  });
+});
+
+describe("authority-shield EİDS notları", () => {
+  it("yazılı yetki varsa ok kalır; EİDS eksikse yalnız not döner", () => {
+    const r = checkAuthorityShield({ hasWrittenAuthority: true, eidsNoPresent: false, authorityShort: true });
+    expect(r.ok).toBe(true);
+    expect(r.notes).toHaveLength(2);
+  });
+  it("ölçülemediyse (null) not üretmez; yetki yoksa engeller", () => {
+    expect(checkAuthorityShield({ hasWrittenAuthority: true, eidsNoPresent: null }).notes).toBeUndefined();
+    expect(checkAuthorityShield({ hasWrittenAuthority: false, eidsNoPresent: true }).ok).toBe(false);
+  });
+});
+
+describe("eidsHealthValue", () => {
+  it("null ölçülemedi, yok 0, var 1, kısa yetki 0.5", () => {
+    expect(eidsHealthValue(null)).toBeNull();
+    expect(eidsHealthValue(false)).toBe(0);
+    expect(eidsHealthValue(true)).toBe(1);
+    expect(eidsHealthValue(true, true)).toBe(0.5);
   });
 });
 

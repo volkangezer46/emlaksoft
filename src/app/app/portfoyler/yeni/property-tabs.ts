@@ -53,6 +53,7 @@ export const PROPERTY_TABS = [
       "commission_kind",
       "authorization_start",
       "authorization_end",
+      "eids_property_no",
       "min_price",
       "negotiation_margin_pct",
       "owner_customer_notes",

@@ -28,6 +28,8 @@ import { enqueueListingPool, isPoolEnabled, toPoolProperty } from "@/lib/pool/se
 import { assignPoolEntryAsSystem } from "@/lib/pool/system-assign";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { notifyNewListing, notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
+import { shortAuthorityWarning } from "@/lib/eids/authority-term";
+import { now as clockNow } from "@/lib/clock";
 
 export type PropertyResult = {
   error?: string;
@@ -39,6 +41,8 @@ export type PropertyResult = {
   ownerMissing?: string[];
   /** İlan havuzuna gönderildi (atama bekliyor / sahiplenme / otomatik atandı). */
   pooled?: boolean;
+  /** Yetki süresi EİDS kuralına (en az 3 ay) uymuyorsa uyarı; kayıt yapılmıştır. */
+  authorityWarning?: string;
 };
 
 /** Havuza yönlendirmede "kendi adına ekleyen" sayılan roller; diğer roller (ör. çağrı merkezi) ilanı atanmamış açar. */
@@ -338,6 +342,8 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
             authorization_type: ownerInfo.authorizationType || null,
             authorization_start: ownerInfo.authorizationStart || null,
             authorization_end: ownerInfo.authorizationEnd || null,
+            // Yalnız girildiyse yazılır: sütun henüz yoksa (migration 20260826002950 uygulanmamış) eski kayıt akışı bozulmaz.
+            ...(ownerInfo.eidsNo ? { eids_property_no: ownerInfo.eidsNo } : {}),
           }
         : {}),
     })
@@ -498,7 +504,10 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   revalidatePath(`/app/portfoyler/${data.id}`);
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, matchedDemands, ownerInfoScore, ownerMissing, pooled };
+  const authorityWarning = ownerInfo
+    ? (shortAuthorityWarning(ownerInfo.authorizationStart, ownerInfo.authorizationEnd, clockNow()) ?? undefined)
+    : undefined;
+  return { ok: true, matchedDemands, ownerInfoScore, ownerMissing, pooled, authorityWarning };
 }
 
 export async function updateProperty(formData: FormData): Promise<PropertyResult> {

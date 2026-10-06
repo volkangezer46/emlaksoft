@@ -9,6 +9,9 @@ import { logActivity } from "@/lib/activity";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { checkAuthorityShield } from "@/lib/authority-shield";
+import { hasValidEidsNo } from "@/lib/eids/property-no";
+import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
+import { now as clockNow } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -46,9 +49,30 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   const hasAuthority = String(formData.get("has_authority") ?? "") === "1";
 
   // Pipeline girişinde yetki; erken aşamada uyarı zorunlu değil — müzakere/won için şart
+  let shieldNotes: string[] = [];
   if (stage === "negotiation" || stage === "won") {
-    const shield = checkAuthorityShield({ hasWrittenAuthority: hasAuthority });
+    // EİDS ölçümü (yumuşak): portföyde taşınmaz no / yetki süresi. Sütun yoksa ölçülemedi sayılır (uyarı yok).
+    let eidsNoPresent: boolean | null = null;
+    let authorityShort = false;
+    if (propertyId) {
+      const sb = await createClient();
+      const { data: eidsRow, error: eidsErr } = await sb
+        .from("properties")
+        .select("eids_property_no, authorization_start, authorization_end")
+        .eq("id", propertyId)
+        .eq("tenant_id", gate.tenantId)
+        .maybeSingle();
+      if (!eidsErr && eidsRow) {
+        eidsNoPresent = hasValidEidsNo((eidsRow as { eids_property_no?: string | null }).eids_property_no);
+        authorityShort = evaluateAuthorityTerm(
+          { start: (eidsRow as { authorization_start?: string | null }).authorization_start, end: (eidsRow as { authorization_end?: string | null }).authorization_end },
+          clockNow(),
+        ).short;
+      }
+    }
+    const shield = checkAuthorityShield({ hasWrittenAuthority: hasAuthority, eidsNoPresent, authorityShort });
     if (!shield.ok) return { error: shield.warning ?? "Yetki belgesi gerekli." };
+    shieldNotes = shield.notes ?? [];
   }
   if (stage === "negotiation" && (!propertyId || !customerId)) {
     return { error: "Müzakere aşaması için portföy ve müşteri zorunludur." };
@@ -89,6 +113,23 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
     entityId: deal.id,
     newValue: { stage, deal_type: dealType },
   });
+
+  // EİDS yumuşak uyarısı: işlemi engellemez; ofise TEK KEZ bildirim düşer (portföy sayfasına gider).
+  if (shieldNotes.length > 0 && propertyId) {
+    try {
+      await notifyTenant({
+        tenantId: gate.tenantId,
+        userId: gate.userId,
+        title: "EİDS / yetki kontrolü",
+        body: shieldNotes.join(" "),
+        href: `/app/portfoyler/${propertyId}`,
+        kind: "warning",
+        dedupeKey: `eids-shield:${propertyId}:${deal.id}`,
+      });
+    } catch (e) {
+      console.error("createPipelineDeal eids notify", e);
+    }
+  }
 
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");

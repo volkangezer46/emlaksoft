@@ -8,6 +8,10 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { isDefinitionCategory, isSystemDefinitionValue } from "@/lib/definition-defaults";
 import { addDefinition, deleteDefinition, renameDefinition } from "@/app/actions/definitions";
 import { queueAuthorityExtensionSurvey } from "@/lib/surveys/events";
+import { isMissingSchemaError } from "@/lib/property-owner/info";
+import { parseEidsPropertyNo } from "@/lib/eids/property-no";
+import { shortAuthorityWarning } from "@/lib/eids/authority-term";
+import { now } from "@/lib/clock";
 
 const MANUAL_STATUSES = [
   "draft", "pending_docs", "pending_auth", "photo_needed", "ready", "active",
@@ -15,7 +19,7 @@ const MANUAL_STATUSES = [
   "auth_expired", "archived",
 ] as const;
 
-export type PropertyActionResult = { ok?: boolean; error?: string };
+export type PropertyActionResult = { ok?: boolean; error?: string; warning?: string };
 
 // ---------------------------------------------------------------------------
 // P1-3: Portföy durum geçmişi
@@ -80,6 +84,8 @@ export async function updatePropertyAuthorization(
     authEnd?: string;
     authType?: string;
     authNotes?: string;
+    /** EİDS Taşınmaz Kimlik Numarası; undefined = dokunma, boş metin = temizle. */
+    eidsNo?: string;
   },
 ): Promise<PropertyActionResult> {
   const gate = await requirePermission("properties", "edit");
@@ -93,25 +99,44 @@ export async function updatePropertyAuthorization(
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  const { error } = await supabase
+  let eidsNo: string | null | undefined;
+  if (data.eidsNo !== undefined) {
+    const parsed = parseEidsPropertyNo(data.eidsNo);
+    if (!parsed.ok) return { error: parsed.error };
+    eidsNo = parsed.value;
+  }
+  const baseUpdate = {
+    authorization_start: data.authStart || null,
+    authorization_end:   data.authEnd   || null,
+    authorization_type:  data.authType  || null,
+    authorization_notes: data.authNotes || null,
+    updated_at:          new Date().toISOString(),
+  };
+  let warning: string | undefined;
+  let { error } = await supabase
     .from("properties")
-    .update({
-      authorization_start: data.authStart || null,
-      authorization_end:   data.authEnd   || null,
-      authorization_type:  data.authType  || null,
-      authorization_notes: data.authNotes || null,
-      updated_at:          new Date().toISOString(),
-    })
+    .update(eidsNo === undefined ? baseUpdate : { ...baseUpdate, eids_property_no: eidsNo })
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId);
+  // Sütun henüz yoksa (migration 20260826002950 uygulanmamış) yetki alanları yine de kaydedilir.
+  if (error && eidsNo !== undefined && isMissingSchemaError(error)) {
+    warning = "EİDS numarası kaydedilemedi: veritabanı güncellemesi henüz uygulanmamış. Yetki bilgileri kaydedildi.";
+    ({ error } = await supabase
+      .from("properties")
+      .update(baseUpdate)
+      .eq("id", propertyId)
+      .eq("tenant_id", gate.tenantId));
+  }
 
   if (error) return { error: "Yetki belgesi güncellenemedi." };
 
   // Yalnız tarih gerçekten uzatıldıysa (önceki bitiş vardı ve yenisi daha ileri). Hata asıl işlemi etkilemez.
   await queueAuthorityExtensionSurvey(supabase, gate.tenantId, propertyId, (before?.authorization_end as string | null) ?? null, data.authEnd || null);
 
+  const shortWarning = shortAuthorityWarning(data.authStart, data.authEnd, now());
   revalidatePath(`/app/portfoyler/${propertyId}`);
-  return { ok: true };
+  revalidatePath("/app/uyum");
+  return { ok: true, warning: [warning, shortWarning].filter(Boolean).join(" ") || undefined };
 }
 
 // Yetki süresi dolacak portföyleri getir (cron + dashboard için)
