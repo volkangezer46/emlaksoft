@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -62,6 +64,96 @@ function toPayload(property: PropertyRow): PropertyPayload {
   };
 }
 
+type LedgerInput = {
+  tenantId: string;
+  userId: string;
+  propertyId: string;
+  portalName: string;
+  externalId: string | null;
+  externalUrl: string | null;
+  nowIso: string;
+};
+
+/** Yayın sonrası yerel portal_listings kaydı. Hata yoksa null. (admin istemcisi çağıran işlevden gelir.) */
+async function recordPublishedListing(
+  admin: SupabaseClient,
+  i: LedgerInput,
+): Promise<{ code?: string | null } | null> {
+  const { data: live } = await admin
+    .from("portal_listings")
+    .select("id, portal_listing_id")
+    .eq("tenant_id", i.tenantId)
+    .eq("property_id", i.propertyId)
+    .eq("portal_name", i.portalName)
+    .eq("status", "live")
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const existing = live as { id: string; portal_listing_id: string | null } | null;
+
+  if (existing && i.externalId && existing.portal_listing_id !== i.externalId) {
+    const { data, error } = await admin.rpc("lc_rotate_portal_listing", {
+      p_tenant_id: i.tenantId,
+      p_actor_id: i.userId,
+      p_listing_id: existing.id,
+      p_new_external_id: i.externalId,
+      p_new_url: i.externalUrl,
+      p_reason: null,
+    });
+    if (!error) {
+      const outcome = (data as { outcome?: string } | null)?.outcome;
+      return outcome === "applied" || outcome === "unchanged" ? null : { code: String(outcome ?? "rotate_failed") };
+    }
+    if (!isMissingSchema(error)) return error;
+  } else if (!existing) {
+    const { data, error } = await admin.rpc("lc_bind_portal_listing", {
+      p_tenant_id: i.tenantId,
+      p_actor_id: i.userId,
+      p_property_id: i.propertyId,
+      p_portal_name: i.portalName,
+      p_external_id: i.externalId,
+      p_url: i.externalUrl,
+      p_source_kind: "api",
+      p_created_via: "api",
+    });
+    if (!error) {
+      const outcome = (data as { outcome?: string } | null)?.outcome;
+      return outcome === "applied" || outcome === "replay" ? null : { code: String(outcome ?? "bind_failed") };
+    }
+    if (!isMissingSchema(error)) return error;
+  } else {
+    // Aynı ilan no zaten canlı (ya da portal yeni no döndürmedi): yalnız teyit zamanını yenile.
+    const { error } = await admin
+      .from("portal_listings")
+      .update({ last_confirmed_at: i.nowIso, portal_url: i.externalUrl ?? undefined })
+      .eq("id", existing.id)
+      .eq("tenant_id", i.tenantId);
+    return error ?? null;
+  }
+
+  // RPC yok (migration uygulanmamış): doğrudan ekleme / güncelleme.
+  if (existing) {
+    const { error } = await admin
+      .from("portal_listings")
+      .update({ portal_listing_id: i.externalId, portal_url: i.externalUrl, last_confirmed_at: i.nowIso })
+      .eq("id", existing.id)
+      .eq("tenant_id", i.tenantId);
+    return error ?? null;
+  }
+  const { error } = await admin.from("portal_listings").insert({
+    tenant_id: i.tenantId,
+    property_id: i.propertyId,
+    portal_name: i.portalName,
+    portal_listing_id: i.externalId,
+    portal_url: i.externalUrl,
+    status: "live",
+    last_confirmed_at: i.nowIso,
+    published_at: i.nowIso,
+    published_by: i.userId,
+  });
+  return error ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // İlanı portale gönder
 // ---------------------------------------------------------------------------
@@ -107,20 +199,18 @@ export async function publishPropertyToPortal(
   // portal_listings kaydını güncelle / oluştur
   const now = new Date().toISOString();
   const admin = createAdminClient();
-  const { error: localError } = await admin.from("portal_listings").upsert(
-    {
-      tenant_id:         gate.tenantId,
-      property_id:       propertyId,
-      portal_name:       portalName,
-      portal_listing_id: result.externalId ?? null,
-      portal_url:        result.externalUrl ?? null,
-      status:            "live",
-      last_confirmed_at: now,
-      published_at:      now,
-      published_by:      gate.userId,
-    },
-    { onConflict: "tenant_id,property_id,portal_name" },
-  );
+  // Eski upsert onConflict 'tenant_id,property_id,portal_name' için unique index HİÇ olmadığından 42P10 verirdi ve aynı
+  // portalda ilan no değişimini/çoklu ilanı dışlıyordu. Yerine: mevcut canlı satır varsa ilan no değiştiyse zincirle
+  // (supersedes), aynıysa dokun; yoksa bağla. RPC yoksa (migration uygulanmamış) doğrudan ekleme/güncelleme.
+  const localError = await recordPublishedListing(admin, {
+    tenantId: gate.tenantId,
+    userId: gate.userId,
+    propertyId,
+    portalName,
+    externalId: result.externalId ?? null,
+    externalUrl: result.externalUrl ?? null,
+    nowIso: now,
+  });
   if (localError) {
     console.error("publishPropertyToPortal local ledger", { code: localError.code });
     return {

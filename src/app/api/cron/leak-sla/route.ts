@@ -6,18 +6,12 @@ import { authorizeCron } from "@/lib/cron-auth";
 import { cronDeadline, heartbeatFor, isPastDeadline } from "@/lib/cron-run";
 import { insertNotificationsDetailed } from "@/lib/notify-batch";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
+import { leakSeverity } from "@/lib/listing-control/sla-plan";
 
 /** Toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
 export const maxDuration = 300;
 
-function leakSeverity(dealAmount: number | null, daysOpen: number): "low" | "medium" | "high" | "critical" {
-  const amount = dealAmount ?? 0;
-  if (daysOpen >= 30 && amount > 500_000) return "critical";
-  if (daysOpen >= 14 && amount > 300_000) return "high";
-  if (daysOpen >= 7 && amount > 100_000) return "medium";
-  return "low";
-}
-
+type PropertyEmbed = { id?: string; property_code?: string; title?: string | null };
 type ClosureRow = {
   id: string;
   tenant_id: string;
@@ -26,10 +20,33 @@ type ClosureRow = {
   estimated_lost_commission: number | null;
   created_at: string;
   portal_listing:
-    | { property: { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null }
-    | { property: { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null }[]
+    | { property: PropertyEmbed | PropertyEmbed[] | null }
+    | { property: PropertyEmbed | PropertyEmbed[] | null }[]
     | null;
 };
+
+function propertyOf(c: ClosureRow): PropertyEmbed | undefined {
+  const listing = Array.isArray(c.portal_listing) ? c.portal_listing[0] : c.portal_listing;
+  const prop = listing?.property;
+  return Array.isArray(prop) ? prop[0] : (prop ?? undefined);
+}
+
+/** Açık `potential_lost_deal` anomalisi olan portföy kimlikleri. Tablo yoksa/hata olursa boş küme (eski davranış). */
+async function propertiesWithOpenLostDealAnomaly(admin: ReturnType<typeof createAdminClient>, propertyIds: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  const ids = [...new Set(propertyIds)];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await admin
+      .from("listing_anomalies")
+      .select("property_id")
+      .eq("type", "potential_lost_deal")
+      .in("status", ["open", "acknowledged"])
+      .in("property_id", ids.slice(i, i + 200));
+    if (error) return new Set<string>();
+    for (const r of (data ?? []) as { property_id: string }[]) out.add(r.property_id);
+  }
+  return out;
+}
 
 /** Proaktif kayıp-kaçak: deal olmadan kapanmış + uyarısı gitmemiş + SLA aşımı → bildir */
 export async function GET(req: NextRequest) {
@@ -43,7 +60,7 @@ export async function GET(req: NextRequest) {
   const { data: closures, error } = await admin
     .from("listing_closures")
     .select(
-      "id, tenant_id, reason, deal_amount, estimated_lost_commission, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(property:properties!portal_listings_property_id_fkey(property_code,title))",
+      "id, tenant_id, reason, deal_amount, estimated_lost_commission, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(property:properties!portal_listings_property_id_fkey(id,property_code,title))",
     )
     .is("sla_warning_sent_at", null)
     .not("deal_happened", "is", true)
@@ -59,6 +76,12 @@ export async function GET(req: NextRequest) {
 
   // Modül kapısı: "Kaçan komisyonlar" (ya da bağlı olduğu Portal Kontrol) kapalı ofis için uyarı üretilmez.
   const disabledModules = await getDisabledModulesByTenant(admin);
+  // Çoğaltma yok: aynı portföy için ilan kontrol sisteminde AÇIK "potansiyel kayıp işlem" anomalisi varsa (kendi SLA
+  // zinciri bildirim yapıyor) bu cron ek "SLA uyarısı" üretmez; yalnız işaretler. Tablo yoksa eski davranış.
+  const covered = await propertiesWithOpenLostDealAnomaly(
+    admin,
+    ((closures ?? []) as ClosureRow[]).map((c) => propertyOf(c)?.id).filter((x): x is string => !!x),
+  );
   let sent = 0;
   let failed = 0;
   let processed = 0;
@@ -75,11 +98,18 @@ export async function GET(req: NextRequest) {
     const amount = c.estimated_lost_commission != null ? Number(c.estimated_lost_commission) : c.deal_amount != null ? Number(c.deal_amount) : null;
     const severity = leakSeverity(amount, daysOpen);
 
-    const listing = Array.isArray(c.portal_listing) ? c.portal_listing[0] : c.portal_listing;
-    const prop = listing?.property;
-    const property = Array.isArray(prop) ? prop[0] : prop;
+    const property = propertyOf(c);
     const propCode = property?.property_code ?? "—";
     const title = property?.title ?? "";
+
+    if (property?.id && covered.has(property.id)) {
+      const { error: coveredMarkError } = await admin
+        .from("listing_closures")
+        .update({ sla_warning_sent_at: new Date().toISOString(), leak_severity: severity })
+        .eq("id", c.id);
+      if (coveredMarkError) failed += 1;
+      continue;
+    }
 
     const body = `${propCode}${title ? ` · ${title}` : ""} · ${daysOpen} gün sonuçsuz · ${severity}`;
 
