@@ -4,7 +4,7 @@ import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
 import { KpiCardSkeleton } from "@/components/ui/kpi-card";
 
 /**
- * StatCard — dashboard KPI kartı (eski imza korunur). Görünüm artık TEK uygulama olan
+ * StatCard — dashboard KPI kartı (eski imza korunur; v4 `layout="inline"`). Görünüm artık TEK uygulama olan
  * `KpiTile`'dan gelir (KpiCard / KpiStrip ile aynı kart); bu bileşen yalnız eski prop'ları eşler.
  *
  * Tıklanabilirlik standardı ("sıfır çıkmaz metrik"): `href` verilen kart Link olur.
@@ -84,7 +84,7 @@ export function StatCard({
     return (
       <div role="status" aria-busy="true" className="h-full">
         <span className="sr-only">{label} yükleniyor</span>
-        <KpiCardSkeleton layout="stack" />
+        <KpiCardSkeleton layout="inline" />
       </div>
     );
   }
@@ -102,6 +102,7 @@ export function StatCard({
       previousText={previousText}
       series={sparkline}
       seriesUnit="dönem"
+      layout="inline"
     />
   );
 }

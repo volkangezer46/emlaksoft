@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature,
@@ -512,8 +513,10 @@ export default async function DanismanKpiPage({
           yapmaliyim" sorusunu cevaplamak danismanin isi olarak kaliyordu.
           Koc kisisel bir arac; resmi karne cikisina girmez (no-print sarici —
           CoachPanel paylasilan bir bilesen, kendisine dokunulmuyor). */}
-      {/* Koçluk içgörüsü için yer: içgörü okuyucusu bağlanana dek hiçbir şey çizilmez (sahte içgörü yok). */}
-      <CoachInsightSlot />
+      {/* Koçluk içgörüleri: TEK okuyucu (getInsightsForUser, kişinin kendi içgörüleri); satır yoksa hiçbir şey çizilmez. */}
+      <Suspense fallback={null}>
+        <CoachInsightSlot tenantId={tenantId} userId={userId} role={role} perms={perms} />
+      </Suspense>
       {isCurrentMonth ? (
         <div className="no-print">
           <CoachPanel actions={coachActions} adSoyad={ben?.full_name ?? null} />
