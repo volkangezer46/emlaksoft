@@ -37,6 +37,8 @@ export const OFFICE_SETTING_GROUPS = [
   { id: "esik", label: "Uyarı eşikleri", description: "Hareketsiz anlaşma ve bekleyen talep gibi uyarıların kaç günde başlayacağı." },
   { id: "komisyon", label: "Komisyon varsayılanları", description: "Komisyon hesaplayıcı ve bölüşüm ekranlarının başlangıç oran ve payları." },
   { id: "bildirim", label: "Bildirim varsayılanları", description: "Kendi tercihini kaydetmemiş kullanıcıların bildirim tercihleri." },
+  { id: "atama", label: "Akıllı atama", description: "Ofis Merkezi'nde havuzdan danışman önerisinin ölçüt ağırlıkları ve atanmamış ilan SLA'sı." },
+  { id: "erisim", label: "Erişim kapsamı", description: "Liste ekranlarının kullanıcı kapsamıyla (kendi / takım / şube) daraltılması." },
 ] as const;
 export type OfficeSettingGroupId = (typeof OFFICE_SETTING_GROUPS)[number]["id"];
 

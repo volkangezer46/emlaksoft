@@ -49,6 +49,8 @@ import { CustomerPortalPanel } from "./customer-portal-panel";
 import { CustomerMobileList, CustomerTable } from "./customer-rows";
 import { heatTone } from "./customer-list-logic";
 import { HEAT_SEGMENT_KEYS, PAGE_SIZE, WINDOW_DAYS, loadCustomersData } from "./data";
+import { getListScope } from "@/lib/access-control";
+import { ScopeBadge } from "@/components/app/scope-badge";
 
 export const metadata = { title: "Müşteriler" };
 
@@ -107,7 +109,9 @@ export default async function CustomersPage({
     yeni?: string;
   }>;
 }) {
-  const { perms, tenantId } = await requireModulePage("customers");
+  const { perms, tenantId, userId, role } = await requireModulePage("customers");
+  // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
+  const listScope = await getListScope({ userId, tenantId, role });
   const canCreate = (perms.customers ?? []).includes("create");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -161,7 +165,7 @@ export default async function CustomersPage({
     savedViews,
     segmentCounts,
     poolLimited,
-  } = await loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset });
+  } = await loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter });
 
   // ---- Link kurucu: filtreler sayfa/sıralama linklerinde korunur ----------
   const baseParams: Record<string, string> = {};
@@ -261,6 +265,7 @@ export default async function CustomersPage({
       <PageHeader
         title="Müşteriler"
         description={<>Talep, iletişim ve müşteri durumu tek ekranda. <HelpTip topic="sicaklik" label="Müşteri sıcaklığı" /></>}
+        meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>

@@ -19,6 +19,7 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 
 import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
+import { syncScopeForRoleChange } from "@/lib/access-control/scope-sync";
 import { ensureBranchBelongsToTenant, ensureSeatAvailable, provisionTeamMember } from "@/lib/team/provision-member";
 
 export type TeamResult = { error?: string; ok?: boolean; id?: string };
@@ -179,6 +180,19 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
       }
       return { error: "Rol kimliği güncellenemedi; değişiklik geri alındı." };
     }
+  }
+
+  // Rol değişti: kapsam satırı rol varsayılanına çekilir (eski "office" kapsamı danışmanda kalmasın,
+  // yeni takım lideri "user"da kilitlenmesin). Şema yoksa sessiz atlar; hatası ana akışı bozmaz.
+  if (patch.role && patch.role !== target.role) {
+    await syncScopeForRoleChange(admin, {
+      tenantId,
+      userId: id,
+      newRole: patch.role as TeamRole,
+      oldRole: String(target.role),
+      actorId: user.id,
+      branchId: ("branch_id" in patch ? (patch.branch_id as string | null) : target.branch_id) ?? null,
+    });
   }
 
   if ("is_active" in patch && patch.is_active === false) {

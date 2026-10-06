@@ -1,6 +1,6 @@
 import { ICONS } from "@/lib/icons";
 import { featureForHref } from "@/lib/modules/registry";
-import { visibleSections, type NavIcon } from "@/lib/nav-config";
+import { navSearchText, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
 import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
@@ -19,7 +19,15 @@ export const PALETTE_SETTINGS_GROUP = "Ayarlar";
 /** Yan menüdeki arama düğmesi komut paletini bu olayla açar (ikinci bir arama kutusu YOK). */
 export const OPEN_PALETTE_EVENT = "es-open-palette";
 
-export type PaletteEntry = { label: string; href: string; icon: NavIcon; shortcut?: string };
+export type PaletteEntry = {
+  label: string;
+  href: string;
+  icon: NavIcon;
+  /** Klavye kısayolu ("n m", "g p"); palet satırında rozet olarak gösterilir. */
+  shortcut?: string;
+  /** Satırın altında görünen tek cümle (nav-config `description`). */
+  description?: string;
+};
 
 /** Türkçe duyarlı (İ/ı) büyük-küçük harf bağımsız içerme kontrolü. */
 export function matchesQuery(label: string, q: string): boolean {
@@ -82,13 +90,32 @@ export function getAppActions(
       matchesQuery(a.label, q),
   ).map(({ label, href, icon, shortcut }) => ({ label, href, icon, shortcut }));
 }
-/** "Git" grubu: nav-config'teki yetkili sayfalar (menüyle birebir aynı süzgeç). */
+/**
+ * "Git" grubu: nav-config'teki yetkili sayfalar (menüyle birebir aynı süzgeç). Arama etiket +
+ * açıklama + eş anlamlılarda yapılır ("lead" → Talepler); sekmeler "Öğe · Sekme" adıyla listelenir
+ * (Raporlar · Bölge), öğenin kendi sekmesi öğe adını ve `g` kısayolunu taşır.
+ */
 export function getAppGoItems(accessible: readonly AppModule[], q = "", closed: readonly string[] = []): PaletteEntry[] {
   return visibleSections(accessible, { closed })
     .flatMap((s) => s.items)
-    .flatMap((i) => (i.tabs && i.tabs.length > 1 ? i.tabs : [i]))
-    .filter((i) => matchesQuery(i.label, q))
-    .map(({ label, href, icon }) => ({ label, href, icon }));
+    .flatMap((i) => {
+      if (!i.tabs || i.tabs.length <= 1) {
+        return [{ label: i.label, href: i.href, icon: i.icon, description: i.description, keywords: i.keywords, shortcut: i.shortcut }];
+      }
+      return i.tabs.map((t) => {
+        const own = t.href === i.href;
+        return {
+          label: own ? i.label : `${i.label} · ${t.label}`,
+          href: t.href,
+          icon: t.icon,
+          description: own ? i.description : t.description,
+          keywords: own ? i.keywords : t.keywords,
+          shortcut: own ? i.shortcut : undefined,
+        };
+      });
+    })
+    .filter((e) => matchesQuery(navSearchText(e), q))
+    .map(({ label, href, icon, description, shortcut }) => ({ label, href, icon, description, shortcut }));
 }
 
 /* ------------------------------ Görünüm komutları ------------------------------ */

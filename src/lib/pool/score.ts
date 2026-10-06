@@ -108,7 +108,8 @@ export function exclusionReason(c: PoolCandidate, ctx: ScoreContext): string | n
   return null;
 }
 
-function regionPoints(c: PoolCandidate, p: PoolProperty, ctx: ScoreContext): ScoreReason {
+/** Bölge bileşeni (0..POOL_MAX.region). Ofis Merkezi akıllı atama motoru da bu hesabı ölçekleyerek kullanır. */
+export function regionPoints(c: PoolCandidate, p: PoolProperty, ctx: ScoreContext): ScoreReason {
   let best = 0;
   let detail = "Bölge uzmanlığı eşleşmedi";
   for (const r of c.regions) {
@@ -155,7 +156,8 @@ function priceDeviationPoints(row: SpecialtyRow, price: number): number {
   return POOL_MAX.price;
 }
 
-function specialtyReasons(c: PoolCandidate, p: PoolProperty): ScoreReason[] {
+/** Tür / işlem / fiyat bandı bileşenleri (sırasıyla type, transaction, price). Ofis Merkezi motoru da kullanır. */
+export function specialtyReasons(c: PoolCandidate, p: PoolProperty): ScoreReason[] {
   const typeRows = c.specialties.filter(
     (s) => s.kind === "property_type" && p.propertyType && norm(s.value) === norm(p.propertyType),
   );

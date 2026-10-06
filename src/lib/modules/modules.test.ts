@@ -47,8 +47,8 @@ function allHrefs(sections: ReturnType<typeof visibleSections>) {
 }
 
 describe("modül kayıt defteri", () => {
-  it("27 kapatılabilir modül, anahtarlar benzersiz ve DB biçimine uyar", () => {
-    expect(PERMISSION_MODULES_SOURCE.length).toBe(27);
+  it("28 kapatılabilir modül (27 + office_center), anahtarlar benzersiz ve DB biçimine uyar", () => {
+    expect(PERMISSION_MODULES_SOURCE.length).toBe(28);
     expect(new Set(FEATURE_KEYS).size).toBe(FEATURE_KEYS.length);
     for (const key of FEATURE_KEYS) expect(key).toMatch(/^[a-z][a-z0-9_]{1,40}$/);
   });
@@ -231,9 +231,9 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 });
 
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
-  it("menü öğesi sayısı 38 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol)", () => {
+  it("menü öğesi sayısı 42 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + yetim sayfalar: Bildirimler, İçe aktarma, Mahalle notları)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(38);
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(42);
   });
 
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {

@@ -37,7 +37,8 @@ export type AppModule =
   | "projects"
   | "network"
   | "surveys"
-  | "earnings_all";
+  | "earnings_all"
+  | "office_center";
 
 export type AppAction = "view" | "create" | "edit" | "delete";
 
@@ -85,6 +86,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
         "network",
         "surveys",
         "earnings_all",
+        "office_center",
       ] as AppModule[]
     ).map((m) => [m, ALL]),
   ),
@@ -119,6 +121,8 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     surveys:      ALL,
     // Başkasının kazancını görme (belge 3e). DB permission_defaults seed: Faz 2 migration.
     earnings_all: VIEW,
+    // Ofis Merkezi (DB seed: 20261006000500).
+    office_center: ALL,
   },
   branch_manager: {
     dashboard:    VIEW,
@@ -143,6 +147,8 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     surveys:      CRUD_NO_DEL,
     // DB seed'i (20260726000075) ile senkron: proje satış şube müdüründe tam yetki
     projects:     ALL,
+    // DB seed'i (20261006000500) ile senkron: şube müdürü kendi şubesinde atama/düzenleme yapar, danışman ekleyemez.
+    office_center: ["view", "edit"],
   },
   team_lead: {
     dashboard:    VIEW,
@@ -160,6 +166,8 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     campaigns:    VIEW,
     contracts:    CRUD_NO_DEL,
     surveys:      VIEW,
+    // DB seed'i (20261006000500) ile senkron: takım lideri ofis merkezini yalnız görür.
+    office_center: VIEW,
   },
   advisor: {
     dashboard:    VIEW,

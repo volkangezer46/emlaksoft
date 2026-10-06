@@ -101,6 +101,8 @@ export default async function RootLayout({
       className={`${manrope.variable} ${inter.variable} ${geistMono.variable} ${caveat.variable} h-full antialiased`}
     >
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
