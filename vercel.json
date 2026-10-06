@@ -145,6 +145,10 @@
     {
       "path": "/api/cron/insight-engine",
       "schedule": "12,42 * * * *"
+    },
+    {
+      "path": "/api/cron/nav-badges-refresh",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { now } from "@/lib/clock";
 import { isApprovalDeciderRole } from "@/lib/approvals";
 import type { AppModule } from "@/lib/permissions";
 import { getPlan } from "@/lib/billing/plans";
@@ -53,42 +52,45 @@ export function tabCountsFromUsage(usage: readonly PlanUsageRow[]): Record<strin
 
 export async function getNavBadges({ supabase, tenantId, userId, role, accessible }: Input): Promise<NavBadge[]> {
   if (!tenantId || !userId) return [];
-  const nowIso = new Date(now()).toISOString();
-  const jobs: Promise<NavBadge | null>[] = [];
 
-  if (accessible.includes("tasks")) {
-    jobs.push(
-      (async () => {
-        const { count, error } = await supabase
-          .from("tasks")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
-          .eq("status", "open")
-          .eq("assigned_to", userId)
-          .lt("due_at", nowIso);
-        if (error || !count) return null;
-        return { itemHref: "/app/gorevler", href: "/app/gorevler?filter=overdue&mine=1", count, label: "geciken görevin", tone: "danger" as const };
-      })(),
-    );
+  const badges: NavBadge[] = [];
+
+  // Cache'den oku (5 dakika geçerli)
+  const { data: snapshot, error: cacheError } = await supabase.rpc(
+    "get_nav_badge_snapshot",
+    { p_tenant_id: tenantId, p_user_id: userId },
+  );
+
+  if (cacheError) {
+    // Cache düşmüşse boş dön (yedek yok; yavaş çalışmak yerine bilgi yok deyin)
+    return [];
   }
 
-  if (accessible.includes("commissions") && isApprovalDeciderRole(role)) {
-    jobs.push(
-      (async () => {
-        const { count, error } = await supabase
-          .from("approval_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
-          .eq("status", "bekliyor")
-          .neq("requested_by", userId);
-        if (error || !count) return null;
-        return { itemHref: "/app/onaylar", href: "/app/onaylar?kim=bana", count, label: "onayınızı bekleyen talebin", tone: "warn" as const };
-      })(),
-    );
+  if (snapshot && Array.isArray(snapshot) && snapshot.length > 0) {
+    const snap = snapshot[0] as { overdue_tasks_count: number; pending_approvals_count: number };
+
+    if (accessible.includes("tasks") && snap.overdue_tasks_count > 0) {
+      badges.push({
+        itemHref: "/app/gorevler",
+        href: "/app/gorevler?filter=overdue&mine=1",
+        count: snap.overdue_tasks_count,
+        label: "geciken görevin",
+        tone: "danger",
+      });
+    }
+
+    if (accessible.includes("commissions") && isApprovalDeciderRole(role) && snap.pending_approvals_count > 0) {
+      badges.push({
+        itemHref: "/app/onaylar",
+        href: "/app/onaylar?kim=bana",
+        count: snap.pending_approvals_count,
+        label: "onayınızı bekleyen talebin",
+        tone: "warn",
+      });
+    }
   }
 
-  const settled = await Promise.allSettled(jobs);
-  return settled.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
+  return badges;
 }
 
 /**
