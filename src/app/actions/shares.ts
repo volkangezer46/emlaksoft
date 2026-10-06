@@ -1,19 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { getBaseUrl } from "@/lib/base-url";
+import { insertPropertyShareLink } from "@/lib/share-links";
 
 export type ShareResult = { error?: string; ok?: boolean; url?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function appUrl() {
-  return getBaseUrl();
-}
 
 export async function createPropertyShareLink(formData: FormData): Promise<ShareResult> {
   const gate = await requirePermission("properties", "edit");
@@ -31,20 +26,9 @@ export async function createPropertyShareLink(formData: FormData): Promise<Share
     .maybeSingle();
   if (!property) return { error: "Portföy bulunamadı." };
 
-  const token = randomBytes(12).toString("hex");
-  const { error } = await supabase.from("share_links").insert({
-    tenant_id: gate.tenantId,
-    token,
-    entity_type: "property",
-    entity_id: propertyId,
-    label: "Portföy paylaşımı",
-    created_by: gate.userId,
-    expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
-  });
-  if (error) {
-    console.error("createPropertyShareLink", error);
-    return { error: "Paylaşım linki oluşturulamadı." };
-  }
+  const link = await insertPropertyShareLink(supabase, { tenantId: gate.tenantId, userId: gate.userId, propertyId, label: "Portföy paylaşımı" });
+  if (!link.ok) return { error: "Paylaşım linki oluşturulamadı." };
+  const token = link.token;
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -54,5 +38,5 @@ export async function createPropertyShareLink(formData: FormData): Promise<Share
     newValue: { token },
   });
   revalidatePath(`/app/portfoyler/${propertyId}`);
-  return { ok: true, url: `${appUrl()}/paylas/${token}` };
+  return { ok: true, url: link.url };
 }

@@ -6,6 +6,9 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+import { insertPropertyShareLink } from "@/lib/share-links";
+import { buildMatchShareMessage, toSmsHref } from "@/lib/match-share-message";
+import { toWhatsAppLink } from "@/lib/phone";
 
 export type MatchActionResult = { error?: string; ok?: boolean; score?: number };
 
@@ -113,4 +116,81 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
   revalidatePath("/app/talepler");
   if (demand.customer_id) revalidatePath(`/app/musteriler/${demand.customer_id}`);
   return { ok: true, score: scored.score };
+}
+
+export type SendMatchResult =
+  | { error: string }
+  | { ok: true; url: string; message: string; whatsappHref: string | null; smsHref: string | null; hasPhone: boolean };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Eşleşmeyi müşteriye tek tıkla gönder: token'lı paylaşım bağlantısı (share_links, 30 gün; portföy detayıyla AYNI yardımcı)
+ * + hazır WhatsApp/SMS metni. Gönderim danışmanın kendi telefonundan yapılır (wa.me / sms:); "önerildi" kaydı denetim
+ * günlüğüne (`match.sent`, müşteri zaman çizelgesinde görünür). Örnek portföy/müşteri paylaşılamaz (public sayfa göstermez).
+ */
+export async function sendMatchToCustomer(formData: FormData): Promise<SendMatchResult> {
+  const gate = await requirePermission("matching", "create");
+  if (!gate.ok) return { error: gate.error };
+  // share_links INSERT RLS'i properties:edit ister: uygulama kapısı aynı kuralı önce söyler (RLS yine son söz).
+  const shareGate = await requirePermission("properties", "edit");
+  if (!shareGate.ok) return { error: "Paylaşım bağlantısı için portföy düzenleme yetkisi gerekir." };
+  const demandId = String(formData.get("demand_id") ?? "").trim();
+  const propertyId = String(formData.get("property_id") ?? "").trim();
+  if (!UUID.test(demandId) || !UUID.test(propertyId)) return { error: "Talep ve portföy zorunlu." };
+
+  const supabase = await createClient();
+  const [{ data: demand }, { data: property }, { data: me }, { data: tenant }] = await Promise.all([
+    supabase
+      .from("customer_demands")
+      .select("id, customer_id, customer:customers!customer_demands_customer_id_fkey(id, full_name, phone, is_sample, blacklist)")
+      .eq("id", demandId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle(),
+    supabase
+      .from("properties")
+      .select("id, property_code, title, list_price, is_sample")
+      .eq("id", propertyId)
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase.from("profiles").select("full_name").eq("id", gate.userId).maybeSingle(),
+    supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle(),
+  ]);
+  if (!demand || !property) return { error: "Kayıt bulunamadı." };
+  type Cust = { id: string; full_name: string | null; phone: string | null; is_sample?: boolean | null; blacklist?: boolean | null };
+  const custRel = demand.customer as Cust | Cust[] | null;
+  const customer = Array.isArray(custRel) ? custRel[0] : custRel;
+  if (property.is_sample) return { error: "Örnek portföy müşteriye gönderilemez." };
+  if (customer?.blacklist) return { error: "Bu müşteri iletişim engelli listesinde." };
+
+  const link = await insertPropertyShareLink(supabase, {
+    tenantId: gate.tenantId,
+    userId: gate.userId,
+    propertyId,
+    label: `Eşleşme · ${customer?.full_name ?? "müşteri"}`,
+  });
+  if (!link.ok) return { error: "Paylaşım bağlantısı oluşturulamadı." };
+
+  const message = buildMatchShareMessage({
+    customerName: customer?.full_name ?? null,
+    propertyTitle: (property.title as string | null) ?? null,
+    propertyCode: (property.property_code as string | null) ?? null,
+    listPrice: property.list_price != null ? Number(property.list_price) : null,
+    url: link.url,
+    advisorName: (me?.full_name as string | null | undefined) ?? null,
+    officeName: (tenant?.name as string | null | undefined) ?? null,
+  });
+  const phone = customer?.phone ?? null;
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "match.sent",
+    entityType: "customer",
+    entityId: customer?.id ?? demand.customer_id ?? demandId,
+    newValue: { demand_id: demandId, property_id: propertyId, property_code: property.property_code, share_token: link.token },
+  });
+  if (customer?.id) revalidatePath(`/app/musteriler/${customer.id}`);
+  return { ok: true, url: link.url, message, whatsappHref: toWhatsAppLink(phone, message), smsHref: toSmsHref(phone, message), hasPhone: Boolean(phone) };
 }
