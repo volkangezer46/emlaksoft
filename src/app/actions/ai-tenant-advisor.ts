@@ -13,6 +13,7 @@ import { getEffectivePermissions } from "@/lib/permissions-effective";
 import { buildAdvisorScope, gated, type AdvisorScope } from "@/lib/ai/advisor-scope";
 import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
+import { faqContextForMessages, selectFaqForQuestion } from "@/lib/ai/faq-context";
 
 // ---------------------------------------------------------------------------
 // Ofis (tenant) yapay zeka asistanı — admin danışman deseninin tenant uyarlaması.
@@ -346,6 +347,8 @@ async function callOpenAI(
         { role: "system", content: SYSTEM_PROMPT },
         { role: "system", content: `OFİSİN GÜNCEL VERİLERİ:
 ${contextToText(context)}` },
+        // Ürün kullanımı sorusu ise resmî SSS'den ilgili kayıtlar (eşleşme yoksa hiçbir şey eklenmez).
+        ...(faqContextForMessages(messages) ? [{ role: "system" as const, content: faqContextForMessages(messages) }] : []),
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     },
@@ -374,6 +377,13 @@ function fallbackTenantAdvisor(messages: TenantAdvisorMessage[], c: TenantAdviso
   const topic = detectTopics(messages);
   const focused = topic.call || topic.performance || topic.price || topic.tasks;
   const parts: string[] = [];
+
+  // Yapay zeka yokken de ürün kullanımı sorusuna resmî SSS yanıtı (CRM konusu değilse; eşleşme yoksa eski davranış).
+  if (!focused) {
+    const lastQ = messages.filter((m) => m.role === "user").pop()?.content ?? "";
+    const hit = selectFaqForQuestion(lastQ, undefined, 1, 3)[0];
+    if (hit) return `**${hit.item.q}**\n${hit.item.a}${hit.item.href ? `\nİlgili sayfa: ${hit.item.href}` : ""}`;
+  }
 
   if (topic.call || !focused) {
     if (c.hotLeadCount > 0) {
@@ -619,7 +629,7 @@ export async function prepareTenantAdvisorTurn(
     userId: gate.userId,
     clean,
     systemPrompt: SYSTEM_PROMPT,
-    contextText: `OFİSİN GÜNCEL VERİLERİ:\n${contextToText(context)}`,
+    contextText: `OFİSİN GÜNCEL VERİLERİ:\n${contextToText(context)}${faqContextForMessages(clean) ? `\n\n${faqContextForMessages(clean)}` : ""}`,
     fallbackReply: fallbackTenantAdvisor(clean, context),
     fallbackActions: fallbackAdvisorActions(clean, context),
     hotCustomers: context.hotLeads,
