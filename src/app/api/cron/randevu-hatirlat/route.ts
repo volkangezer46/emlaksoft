@@ -7,6 +7,7 @@ import { authorizeCron } from "@/lib/cron-auth";
 import { fetchAllPaged, heartbeatFor } from "@/lib/cron-run";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
 import { formatDateTimeTr } from "@/lib/format";
+import { runWebhookRetries } from "@/lib/integrations-api/webhooks";
 
 const APP_URL = getBaseUrl();
 
@@ -94,13 +95,22 @@ export async function GET(req: NextRequest) {
   const result = await insertNotificationsDetailed(admin, toInsert);
   const notified = result.written;
 
+  // Giden webhook yeniden denemeleri (30 dk'lık bu cron'un adımı; YENİ cron yok). Kanal kapalı/şema yoksa atlanır.
+  let webhookNote = "";
+  try {
+    const wh = await runWebhookRetries(admin, Date.now());
+    if (wh.attempted > 0) webhookNote = `, webhook ${wh.delivered}/${wh.attempted}`;
+  } catch (e) {
+    console.error("randevu-hatirlat webhook", e instanceof Error ? e.message : "hata");
+  }
+
   const hb = heartbeatFor({
     total: list.length,
     processed: list.length,
     failed: result.failed,
     timedOut: false,
     listError,
-    summary: `${notified} hatırlatma, ${skipped + result.duplicates} atlandı`,
+    summary: `${notified} hatırlatma, ${skipped + result.duplicates} atlandı${webhookNote}`,
   });
   await recordHeartbeat("randevu-hatirlat", hb.status, hb.detail);
 

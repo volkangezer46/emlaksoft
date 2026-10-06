@@ -1,5 +1,6 @@
 "use server";
 
+import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
@@ -122,6 +123,7 @@ export async function createCustomer(
     },
   });
 
+  emitWebhook("customer.created", "customer", data.id);
   revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
   return { ok: true, id: data.id };
@@ -196,6 +198,7 @@ export async function updateCustomer(
     newValue: { full_name: fullName },
   });
 
+  emitWebhook("customer.updated", "customer", id);
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
   revalidateTenantData(gate.tenantId);

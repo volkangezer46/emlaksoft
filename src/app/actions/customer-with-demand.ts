@@ -1,5 +1,6 @@
 "use server";
 
+import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
@@ -115,6 +116,7 @@ export async function createCustomerWithDemand(
   if (linkMatch) {
     await linkRecordToCustomer(linkMatch[1].toLowerCase() === "a" ? "call" : "comm", linkMatch[2], customer.id);
   }
+  emitWebhook("customer.created", "customer", customer.id);
   if (!wantsDemand) return { ok: true, id: customer.id };
 
   const demandForm = new FormData();
