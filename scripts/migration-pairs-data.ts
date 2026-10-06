@@ -16,7 +16,8 @@ import type { GroupSpec } from "../src/lib/migration-pairs";
  * oldugu icin taban ilerletilirse bu arac onu "uygulanmis" sanar. Uygulanan pencereler basliklarinda isaretlidir;
  * kesin bekleyen listesi icin salt-okunur `npm run db:migrate -- --dry-run` esastir.
  * GUNCELLEME (sahip bildirimi): PB1..PB8 (20260825000100..001300) ve P12 (20260816000500) de CANLIDA UYGULANDI.
- * Bekleyen tek pencere PB9-ef-kontor (20260826000100..000300). Taban bu aracta bilerek ilerletilmedi (pencere
+ * GUNCELLEME (2026-10-06 sahip bildirimi): PB9-PB11 (20260826000100..000800), 000900/001000/001100 ve PB40/PB42/PB43/PB44
+ * (20261006000100..000600) de CANLIDA. Depoda bekleyen: PB45 (20261006000700..000720). Taban bu aracta bilerek ilerletilmedi (pencere
  * sirasi/bagimlilik denetimi gecmis pencereler icin de calismaya devam etsin); kesin liste yine --dry-run.
  */
 export const APPLIED_HEAD = "20260813000300";
@@ -374,7 +375,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB37-eids-tasinmaz-no", order: 29.88, title: "EIDS tasinmaz kimlik no (properties.eids_property_no, nullable + format CHECK)", files: [F.propertyEidsNo] },
     { id: "PB38-kiraci-hatirlatma", order: 29.89, title: "Kiraci kira hatirlatma (ayar KAPALI dogar + hatirlatma kaydi/dedupe + opt-out)", files: [F.rentReminders] },
     { id: "PB39-kira-sozlesme-baglantisi", order: 29.90, title: "Kiralamadan kira sozlesmesi (contracts.rental_id + artis maddesi alanlari)", files: [F.contractRentalLink] },
-    { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi); 000100-103 CANLIDA, 000104 bekliyor", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc, F.accessWritePolicies] },
+    { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi); 000100-104 CANLIDA", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc, F.accessWritePolicies] },
     { id: "PB42-kabuk-rpc", order: 29.93, title: "Kabuk/ana ekran hizi: app_shell_bootstrap (tek tur kabuk) + get_insights/tasks/metrics_snapshot RPC'leri (kod RPC yoksa eski yola duser)", files: [F.appShellBootstrap, F.dashboardSnapshotRpcs] },
     { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
     { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
