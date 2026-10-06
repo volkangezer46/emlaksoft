@@ -52,7 +52,7 @@ export const DOC_REQUEST_STATUS_LABELS: Record<RequestStatus | "expired" | "full
 /**
  * ESKİ yer tutucu — CANLIDA GÖSTERİLMEZ (yalnız geriye dönük import uyumu).
  * Evrak sayfası bunun yerine KVKK_PLATFORM_NOTICE_TEXT + KVKK_PLATFORM_NOTICE_HREF gösterir.
- * AVUKAT ONAYI GEREKİR: ofise özgü aydınlatma metni modeli henüz yok; eklenince burası ofis metnine yönlenir.
+ * Not: ofise özgü aydınlatma metni modeli henüz yok; eklenince burası ofis metnine yönlenir.
  */
 export const KVKK_PLACEHOLDER_TEXT =
   "[KVKK aydınlatma metni yer tutucusu] Yüklediğiniz belgeler yalnızca ilgili emlak ofisi tarafından, işlemin yürütülmesi amacıyla işlenir. Güncel aydınlatma metni ofisiniz tarafından hazırlanıp buraya eklenmelidir.";

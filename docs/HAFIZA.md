@@ -108,7 +108,7 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 - Üretim env: `ADVISOR_PII_KEY`, `PLATFORM_MFA_ENFORCEMENT=on` (yayın öncesi), `IYZICO_BASE_URL=https://api.iyzipay.com` (sandbox değeriyle canlı ödeme alınmaz), `PLATFORM_SECRETS_KEY`, `EMLAKFIYATI_API_KEY`/admin anahtarı.
 - iyzico iade OTOMATİK DEĞİL: panelden elle + `recordInvoiceRefund` + kontör/kredi clawback (`docs/runbooks/IYZICO_IADE.md`). Günlük `manual_review`/`refund_required` kontrolü (Admin > Faturalama > Ödeme uyarıları).
 - Admin "Hesap kredisi yükle/geri al" ekranı YOK: TL kredi RPC'leri service_role ister ve bu iş için `admin-client-allowlist.ts`'te kayıtlı yol yok. Eklenecekse allowlist satırı sahibin/denetim akışının kararıdır (`scripts/audit-admin-client.ts --write`).
-- Ortak/nakit ödeme bayrakları (`growth_partner_enabled`, `growth_cash_payout_enabled`) KAPALI; vergi/stopaj ve sözleşme metni mali müşavir/avukat onayı bekler.
+- Ortak/nakit ödeme bayrakları (`growth_partner_enabled`, `growth_cash_payout_enabled`) KAPALI; vergi/stopaj ve sözleşme metni mali müşavir onayı bekler.
 - Kazanç gizliliği (P12) ve sec3 rol smoke senaryoları: runbook'taki duman testleri; `properties` UPDATE RLS açığı sahip kararı (eski madde, hâlâ geçerli).
 - Kayıtlı kartla otomatik yenileme (`billing.auto_renew_enabled`) KAPALI; iyzico off-session onayı ve CF retrieve alanları doğrulanmadan açılmaz.
 - Dış uptime izleyici (cron kaçırma/site erişimi) kurulmadı: öneri `docs/runbooks/IYZICO_IADE.md` §Alarm.
@@ -223,10 +223,12 @@ Günlük `ef-kontor-saglik` cron'u damgayı yeniler/siler.
 
 ## 8. Sahip kararları / işleri (özet)
 
+Karar (2026-10-06): avukat onayı aşaması kaldırıldı; hukuki metinlerin sorumluluğu ofis/şirket sahibindedir (kodda/belgede 'avukat onayı bekliyor' işareti tutulmaz).
+
 Migration uygulama (sıra §2) · `git push` (§1) · `ADVISOR_PII_KEY` üretimi (`openssl rand -hex 32`, kaybedilirse TC/IBAN geri gelmez) ·
 Supabase redirect allowlist'e `/app/hesabim?eposta=onay` · fiyat/DB tutarı kararı (§3) · Google Search Console'a sitemap ekleme ·
 yayın öncesi güvenlik (MFA bayrağı, demo kartlarını kapat, anahtar rotasyonu, yedek/PITR) · TÜFE/kredi faizi/harç doğrulaması ·
-ödül/ortak programı oranları · KVKK açık rıza metni ("tanıtım amacıyla", `src/lib/legal-copy.ts`; asıl amaç talebe dönüş) AVUKAT ONAYI GEREKİR · **Vercel production env `EMLAKFIYATI_API_KEY` tanımla** (sunucu sırrı; yoksa piyasa endeksi "bağlantı yok" görünür) · canlı QA (mobil form çubuğu, menü yoğunluğu, pano sürükle-bırak, ofis açma, yeni TV/tur/sihirbaz).
+ödül/ortak programı oranları · KVKK açık rıza metni ("tanıtım amacıyla", `src/lib/legal-copy.ts`; asıl amaç talebe dönüş) · **Vercel production env `EMLAKFIYATI_API_KEY` tanımla** (sunucu sırrı; yoksa piyasa endeksi "bağlantı yok" görünür) · canlı QA (mobil form çubuğu, menü yoğunluğu, pano sürükle-bırak, ofis açma, yeni TV/tur/sihirbaz).
 
 ## 9. Belge dizini (nerede ne var)
 

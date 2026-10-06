@@ -34,7 +34,7 @@ hukukçu / mali müşavir / resmî kaynakla doğrulanmalıdır.
 - Not: yalnız testten import edilen eski `rent-increase.ts` ve `tapu-cost.ts` kaldırıldı (canlı kod `tufe.ts` ve `purchase-costs.ts`). Eski kira modülü kuruşa, canlı `tufe.ts` tam liraya yuvarlıyordu; tavan mantığı (12 aylık ort. TÜFE) ikisinde de aynıydı.
 - KARAR GEREKİR: TÜFE tablosunun (2024-2025) resmi TÜİK verisiyle doğrulanması ve 2026-08 sonrası ayların girilmesi hukukçu/mali müşavir kararıdır. Kod artık gömülü değerleri resmi saymaz; resmi değerler yalnız yönetici ekranından girilir (rakam koda eklenmedi).
 - Adlandırma: Ticaret Bakanlığı sistemi TTBS = Taşınmaz Ticareti Bilgi Sistemi; EİDS = Elektronik İlan Doğrulama Sistemi (ilan yetki doğrulaması) AYRI sistemdir. Ürün metinlerinde karıştırılmamalıdır; uygulama ikisine de henüz bağlı değildir (ofis beyanı/onayı).
-- Yetki belgesi: ilan ve reklamlarda yetki belgesi no + işletme unvanı + iletişim gösterimi (Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i; madde numarası resmi metinden DOĞRULANAMADI, AVUKAT TEYİDİ GEREKİR). Danışman bazlı belge alanları ekip/belgeler kapsamında yok; yalnız ofis belgesi alanları eklendi.
+- Yetki belgesi: ilan ve reklamlarda yetki belgesi no + işletme unvanı + iletişim gösterimi (Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i; madde numarası resmi metinden DOĞRULANAMADI). Danışman bazlı belge alanları ekip/belgeler kapsamında yok; yalnız ofis belgesi alanları eklendi.
 
 ## Entegrasyon önerisi
 

@@ -113,7 +113,7 @@ PDF/detay: `POST /api/v1/rapor` → `{ raporId, durum }` (aynı requestId ile te
 - Kontör kesintisi **yalnız sunucuda**; istemciden tutar/kontör ALINMAZ. Her ücretli eylem `requirePermission` + ofis kapsamı + hız sınırı + denetim kaydı.
 - Tenant izolasyonu: ledger RLS (kendi ofisi select), yazım service_role RPC; `tenantRef` tek yönlü HMAC (geri çözülemez).
 - PDF URL'leri tek kullanımlık/kısa ömürlü; EmlakSoft kopya tutmaz → KVKK saklama yükü yok.
-- Hukuki/KVKK metinleri yer tutucu (avukat onayı).
+- Hukuki/KVKK metinleri yer tutucu (ofis/şirket sahibi doldurur).
 
 ## 9. Aşamalar
 1. **Faz 1 (EmlakSoft tek başına, güvenli):** `ef` birimi + tarife/paket yönetimi + rezerve/kesinleştir/serbest bırak RPC + `getEndeks` sarmalayıcısı (fail-closed) + kontör rozeti + admin ekranları. Endeks özet ücretsiz.

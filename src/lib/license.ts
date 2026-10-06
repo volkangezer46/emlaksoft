@@ -1,7 +1,7 @@
 /**
  * Yetki belgesi (emlak ofisi) yardımcıları — saf, sunucu/istemci güvenli.
  *
- * Hukuki dayanak notu (AVUKAT TEYİDİ GEREKİR): Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i uyarınca ilan
+ * Dayanak notu: Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i uyarınca ilan
  * ve reklamlarda yetki belgesi numarası ile işletme unvanı/iletişim bilgisinin yer alması beklenir.
  * Madde numarası ve kapsam bu belgede resmi metinden DOĞRULANAMADI; bkz. docs/MEVZUAT_SABITLERI.md.
  */

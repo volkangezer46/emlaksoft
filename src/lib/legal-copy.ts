@@ -1,19 +1,19 @@
 /**
  * Hukuki metin sabitleri (TEK kaynak). İstemciden de import edilebilir (sunucu modülü içermez).
  *
- * AVUKAT ONAYI GEREKİR: Aşağıdaki metinler avukat onayı olmadan YENİDEN YAZILMAZ. Bu dosyada yalnız YAPI
+ * Not: Metin sorumluluğu ofis/şirket sahibindedir. Bu dosyada yalnız YAPI
  * (aydınlatma bilgisi / zorunlu onay / ayrı opsiyonel pazarlama kutusu) ve nötr amaç ifadesi düzeltildi;
  * eski "tanıtım amacıyla" ifadesi formun gerçek amacıyla (talebe dönüş) örtüşmediği için "talebime dönüş
- * yapılması" olarak değiştirildi. Metnin hukuki yeterliliği avukat incelemesine bağlıdır (docs/HAFIZA.md §8).
+ * yapılması" olarak değiştirildi.
  */
 
-/** Form onay kutusu (zorunlu): amaç = başvurunun yanıtlanması. AVUKAT ONAYI GEREKİR. */
+/** Form onay kutusu (zorunlu): amaç = başvurunun yanıtlanması. */
 export const LEAD_FORM_CONSENT_TEXT = "Kişisel verilerimin talebime dönüş yapılması amacıyla işlenmesini kabul ediyorum.";
 
-/** Bilgi satırı (onay kutusu DEĞİL): aydınlatma metnine yönlendirir. AVUKAT ONAYI GEREKİR. */
+/** Bilgi satırı (onay kutusu DEĞİL): aydınlatma metnine yönlendirir. */
 export const LEAD_FORM_NOTICE_TEXT = "Başvurunuzdaki bilgilerin nasıl işlendiği aydınlatma metninde açıklanır.";
 
-/** Opsiyonel, AYRI pazarlama izni kutusu (varsayılan işaretsiz; talep bu kutuya bağlı değildir). AVUKAT ONAYI GEREKİR. */
+/** Opsiyonel, AYRI pazarlama izni kutusu (varsayılan işaretsiz; talep bu kutuya bağlı değildir). */
 export const LEAD_FORM_MARKETING_TEXT = "Ofisten kampanya ve tanıtım iletileri almak istiyorum (isteğe bağlı).";
 
 /** Gönderilen metin sürümü: rıza kanıtında (public_lead_consent_events.consent_version) saklanır. Metin değişince artırın. */

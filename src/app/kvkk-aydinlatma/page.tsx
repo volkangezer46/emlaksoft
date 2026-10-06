@@ -6,7 +6,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/kvkk-aydinlatma");
 }
 
-// AVUKAT ONAYI GEREKİR: alıcı/yurt dışı aktarım satırları ve veri sorumlusu ünvan/adres (VERBİS) alanları hukuki incelemeye tabidir.
+// Not: alıcı/yurt dışı aktarım satırları ve veri sorumlusu ünvan/adres (VERBİS) alanları işletme sahibince doldurulur.
 export default function KvkkAydinlatmaPage() {
   return (
     <LegalPage

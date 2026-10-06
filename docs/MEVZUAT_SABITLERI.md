@@ -2,7 +2,7 @@
 
 Bu belge hukuki danışmanlık DEĞİLDİR. Kodda gömülü mevzuat/vergi/harç sabitlerinin YERİNİ, kaynağını ve doğrulama
 durumunu listeler. **Kod davranışı bu belgeyle değişmez**; yalnız envanterdir. Resmi kaynaktan doğrulama bu çalışmada
-YAPILAMADI: "Doğrulama tarihi" sütunları bilerek boştur. Doğrulayan kişi (avukat / mali müşavir) tarihi ve kaynağı doldurur.
+YAPILAMADI: "Doğrulama tarihi" sütunları bilerek boştur. Doğrulayan kişi (mali müşavir / ofis sahibi) tarihi ve kaynağı doldurur.
 
 Durum kodları: `DOĞRULANAMADI` = resmi metne erişilip teyit edilmedi; `ÜRÜN KARARI` = mevzuat değil, ürün eşiği;
 `KULLANICI GİRDİSİ` = kod varsayılanı yalnız başlangıç değeridir, kullanıcı/yönetici değiştirir.
@@ -62,7 +62,7 @@ Durum kodları: `DOĞRULANAMADI` = resmi metne erişilip teyit edilmedi; `ÜRÜN
 
 | Konu | Yer | Kaynak (iddia) | Durum |
 |---|---|---|---|
-| İlan/reklamda yetki belgesi no + işletme unvanı + iletişim | `src/components/public/license-notice.tsx`; alanlar `tenants.license_no`, `license_title`, `license_valid_until` (migration `20260826001800`) | Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i (kullanıcı raporundan; madde no resmi metinden doğrulanamadı) | AVUKAT TEYİDİ GEREKİR |
+| İlan/reklamda yetki belgesi no + işletme unvanı + iletişim | `src/components/public/license-notice.tsx`; alanlar `tenants.license_no`, `license_title`, `license_valid_until` (migration `20260826001800`) | Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i (kullanıcı raporundan; madde no resmi metinden doğrulanamadı) | Sorumluluk ofis/şirket sahibinde |
 | Belge süresi uyarısı | `src/lib/license.ts` 60/30/7 gün | Ürün kararı (yeni cron yok; uygulama içi kart + ayar rozeti) | ÜRÜN KARARI |
 | Yetki belgesi no biçimi | `license.ts` `normalizeLicenseNo` (esnek: harf/rakam/boşluk/.-/_) | Resmi biçim doğrulanamadı | DOĞRULANAMADI |
 

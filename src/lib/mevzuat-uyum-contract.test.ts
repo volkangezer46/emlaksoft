@@ -72,8 +72,8 @@ describe("KVKK: bilgi, zorunlu onay ve ayrı pazarlama kutusu", () => {
     const route = read("src/app/api/leads/[token]/route.ts");
     expect(route).toContain("buildLeadConsentVersion(isConsentAccepted(body.marketing_opt_in))");
   });
-  it("legal-copy 'AVUKAT ONAYI GEREKİR' notunu korur; evrak sayfası yer tutucuyu göstermez", () => {
-    expect(read("src/lib/legal-copy.ts")).toContain("AVUKAT ONAYI GEREKİR");
+  it("legal-copy avukat-onayı bekleme işareti taşımaz (karar 2026-10-06); evrak sayfası yer tutucuyu göstermez", () => {
+    expect(read("src/lib/legal-copy.ts")).not.toContain("AVUKAT ONAYI GEREKİR");
     const page = read("src/app/evrak/[token]/page.tsx");
     expect(page).not.toContain("KVKK_PLACEHOLDER_TEXT");
     expect(page).toContain("KVKK_PLATFORM_NOTICE_HREF");

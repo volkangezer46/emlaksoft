@@ -19,7 +19,7 @@ export default function MesafeliSatisPage() {
           <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>.
           Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme sayfasındaki sözleşme onay ekranında ve faturada da yer alır.
         </p>
-        {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. AVUKAT ONAYI GEREKİR. */}
+        {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. */}
         <ul className="list-disc space-y-1 pl-5">
           <li><b>Ticari ünvan:</b> [ŞİRKET ÜNVANI — DOLDURULACAK]</li>
           <li><b>Adres:</b> [TEBLİGAT ADRESİ — DOLDURULACAK]</li>
