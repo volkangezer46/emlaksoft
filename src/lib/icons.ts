@@ -261,6 +261,8 @@ export const ICONS = {
   /** Raporlar sekmesi: anketör kuyruğu ve anket sonuçları. */
   anketor: Headphones,
   leadHizi: Timer,
+  /** Ofis Merkezi: danışman yönetimi + atama + ofis ayarları (kişi + dişli). Ayarlar (Settings) ile çakışmaz. */
+  ofisMerkezi: UserCog,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

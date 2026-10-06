@@ -1,275 +1,102 @@
-"use client";
-
-import { useState } from "react";
-import { Users, Settings, BarChart3, Layers, Plus, Trash2, Edit2 } from "lucide-react";
+import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { parseTab, tabHref } from "@/lib/office-center/logic";
+import { OFFICE_CENTER_PATH, OFFICE_CENTER_TABS } from "@/lib/office-center/types";
+import { getEffectivePermissions } from "@/lib/permissions-effective";
+import { requireModulePage } from "@/lib/require-module-page";
+import { now } from "@/lib/clock";
+import { createClient } from "@/lib/supabase/server";
+import { AdvisorsTab } from "./_tabs/advisors-tab";
+import { AssignmentsTab } from "./_tabs/assignments-tab";
+import { DefinitionsTab } from "./_tabs/definitions-tab";
+import { SettingsTab } from "./_tabs/settings-tab";
+import { StatsTab } from "./_tabs/stats-tab";
+import type { TabContext } from "./_tabs/context";
 
 export const metadata = { title: "Ofis Merkezi" };
 
+/** URL filtre kontratı: sekme + sekme içi filtreler (sunucu sorgusu aynı değerleri okur). */
+type Sp = {
+  sekme?: string;
+  /** danışmanlar: aktif|pasif · atamalar: bekleyen|gecikmis|gecmis|aktif|iptal|yeniden */
+  durum?: string;
+  q?: string;
+  rol?: string;
+  sube?: string;
+  sirala?: string;
+  yon?: string;
+  /** ayarlar: grup kimliği · ayar=degisen */
+  grup?: string;
+  ayar?: string;
+};
+
 /**
- * Ofis Merkezi — Ofis sahibi ve yöneticinin danışman yönetimi, havuzdan atama,
- * ayar ve tanımlamalar, istatistikleri yönettiği merkezi platform.
- *
- * Kapsamı:
- * 1. Danışman Yönetimi: Liste, ekle/sil/güncelle, rol atama, şube/ofis/takım ataması, etkinlik
- * 2. Havuzdan Atama: Portföy havuzundan danışmana oto/manuel atama, geçmiş, iptal, SLA
- * 3. Ofis Ayarları: 18 ayarın web yönetim merkezi, değişim tarihi ve kişi
- * 4. Tanımlamalar: SLA vakitleri, komisyon %, uyarı eşikleri, bildirim kanalları, TÜFE
- * 5. İstatistikler: Ofis performansı, danışman performans ligi, ekip sağlığı
- *
- * Yetki: office_center modülü, owner/gm tam (create/edit/delete), diğer roller view
- * RLS: tenant_id kontrol, role kontrol, requireModulePage("office_center")
+ * Ofis Merkezi — ofis sahibi/yöneticinin tek ekranı: danışmanlar, havuzdan (akıllı) atama, ofis ayarları,
+ * tanımlamalar, istatistikler. Sekme ve filtreler URL'dedir (?sekme=, ?durum=, ?q= ...): sunucu sorgusu aynı
+ * değerleri okur. Yetki: sayfa kapısı office_center modülü + paket/modül kilidi (href ile); yazma eylemleri kendi kapılarından geçer.
  */
+export default async function OfficeCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
+  const { userId, role, tenantId, perms } = await requireModulePage("office_center", OFFICE_CENTER_PATH);
+  const sp = await searchParams;
+  const tab = parseTab(sp.sekme);
 
-type Tab = "advisors" | "assignments" | "settings" | "definitions" | "stats";
+  if (!tenantId) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow="Ekip ve yetkiler" title="Ofis Merkezi" description="Ofis Merkezi yalnız ofis hesabıyla çalışır." />
+      </div>
+    );
+  }
 
-export default function OfficeCenter() {
-  const [activeTab, setActiveTab] = useState<Tab>("advisors");
+  const supabase = await createClient();
+  const effective = await getEffectivePermissions(tenantId, role, userId);
+  const ctx: TabContext = {
+    tenantId,
+    userId,
+    role,
+    perms: effective,
+    canEdit: (perms.office_center ?? []).includes("edit"),
+    canCreate: (perms.office_center ?? []).includes("create"),
+    canEditSettings: (perms.settings ?? []).includes("edit"),
+    // Filtre kontratı: yalnız bilinen parametreler sekmelere geçer (sunucu sorgusu bunları okur).
+    sp: { sekme: sp.sekme, durum: sp.durum, q: sp.q, rol: sp.rol, sube: sp.sube, sirala: sp.sirala, yon: sp.yon, grup: sp.grup, ayar: sp.ayar },
+    nowMs: now(),
+    supabase,
+  };
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6">
       <PageHeader
+        eyebrow="Ekip ve yetkiler"
+        icon={<Building2 className="h-6 w-6 text-accent" aria-hidden="true" />}
         title="Ofis Merkezi"
-        description="Danışman yönetimi, havuzdan atama, ayarlar ve tanımlamalar"
+        description="Danışmanları yönetin, danışmansız ilanları akıllı öneriyle atayın, ofis ayar ve tanımlarını tek yerden değiştirin."
+        actions={
+          <Link href="/app/ekip" className="focus-ring inline-flex items-center rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2">
+            Ekip Merkezi
+          </Link>
+        }
       />
 
-      <Tabs defaultValue="advisors" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="advisors" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Danışmanlar</span>
-          </TabsTrigger>
-          <TabsTrigger value="assignments" className="flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            <span className="hidden sm:inline">Atamalar</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Ayarlar</span>
-          </TabsTrigger>
-          <TabsTrigger value="definitions" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Tanımlamalar</span>
-          </TabsTrigger>
-          <TabsTrigger value="stats" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">İstatistikler</span>
-          </TabsTrigger>
-        </TabsList>
+      <nav aria-label="Ofis Merkezi sekmeleri" className="flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">
+        {OFFICE_CENTER_TABS.map((t) => (
+          <Link
+            key={t.id}
+            href={tabHref(t.id)}
+            aria-current={tab === t.id ? "page" : undefined}
+            className={`focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"}`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </nav>
 
-        {/* DANIŞMAN YÖNETİMİ */}
-        <TabsContent value="advisors" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold">Danışman Yönetimi</h2>
-              <p className="text-sm text-muted-foreground">Danışmanları ekleyin, düzenleyin, rolleri yönetin</p>
-            </div>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Yeni Danışman
-            </Button>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Danışmanlar (0)</CardTitle>
-              <CardDescription>Ofisteki aktif ve pasif danışmanlar</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Henüz danışman eklenmemiş</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* HAVUZDAN ATAMA */}
-        <TabsContent value="assignments" className="space-y-4">
-          <div>
-            <h2 className="text-2xl font-bold">Havuzdan Atama</h2>
-            <p className="text-sm text-muted-foreground">Portföy havuzundan danışmana oto/manuel atama, SLA takibi</p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Atanmayan Portföy</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">KPI: azaltılmalı</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">SLA Bekleyenleri</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">Atanmayı bekleyen</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Bu Ay Atanan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">Atama geçmişi</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Atama Kuralları</CardTitle>
-              <CardDescription>Havuz ilanlarının otomatik atama kuralları</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <Layers className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Kurallar yükleniyor...</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* OFIS AYARLARI */}
-        <TabsContent value="settings" className="space-y-4">
-          <div>
-            <h2 className="text-2xl font-bold">Ofis Ayarları</h2>
-            <p className="text-sm text-muted-foreground">18 ofis ayarını yönetin, tarihi ve değişimini izleyin</p>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Genel Ayarlar</CardTitle>
-              <CardDescription>Ofis temel yapılandırması</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="rounded-lg border p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">Ofis Adı</p>
-                        <p className="text-sm text-muted-foreground">Henüz veri yok</p>
-                      </div>
-                      <Button variant="ghost" size="sm">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* TANIMLAMALAR */}
-        <TabsContent value="definitions" className="space-y-4">
-          <div>
-            <h2 className="text-2xl font-bold">Tanımlamalar</h2>
-            <p className="text-sm text-muted-foreground">SLA, komisyon, uyarı eşikleri ve bildirim kanalları</p>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>SLA Vakitleri</CardTitle>
-              <CardDescription>Standart hizmet seviyeleri sürelerini tanımlayın</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded p-4">
-                  <p className="text-sm font-medium">Portföy atama SLA</p>
-                  <p className="text-muted-foreground text-sm">Tanımlanmadı</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Komisyon Yüzdeleri</CardTitle>
-              <CardDescription>Danışman ve ofis komisyon oranları</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center text-muted-foreground py-8">
-                Komisyon tanımlamaları yükleniyor...
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* İSTATİSTİKLER */}
-        <TabsContent value="stats" className="space-y-4">
-          <div>
-            <h2 className="text-2xl font-bold">İstatistikler ve KPI</h2>
-            <p className="text-sm text-muted-foreground">Ofis performansı, danışman ligi ve ekip sağlığı</p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ofis Performansı</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Toplam Portföy</span>
-                    <span className="font-semibold">0</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Satış Oranı</span>
-                    <span className="font-semibold">%0</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Kiralama Oranı</span>
-                    <span className="font-semibold">%0</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Danışman Performans Ligi</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center text-muted-foreground py-8">
-                  Danışman verisi yükleniyor...
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ekip Sağlığı</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="text-sm">Ortalama İşlem Süresi</span>
-                  <span className="font-semibold">-</span>
-                </div>
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="text-sm">Uyarı Sayısı</span>
-                  <span className="font-semibold">0</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Sistem Durumu</span>
-                  <span className="font-semibold text-green-600">Sağlıklı</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {tab === "danismanlar" ? <AdvisorsTab ctx={ctx} /> : null}
+      {tab === "atamalar" ? <AssignmentsTab ctx={ctx} /> : null}
+      {tab === "ayarlar" ? <SettingsTab ctx={ctx} /> : null}
+      {tab === "tanimlamalar" ? <DefinitionsTab ctx={ctx} /> : null}
+      {tab === "istatistikler" ? <StatsTab ctx={ctx} /> : null}
     </div>
   );
 }

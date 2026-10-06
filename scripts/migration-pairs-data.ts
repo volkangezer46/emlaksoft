@@ -147,6 +147,9 @@ const F = {
   // Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache.
   perfIndexes: "20261006000200_perf_indexes.sql",
   perfNavBadgeCache: "20261006000300_nav_badge_cache.sql",
+  // Ofis Merkezi: office_center permission_defaults seed'i (4. kayit noktasi) + havuzdan atama gecmisi tablosu.
+  officeCenterPerms: "20261006000500_office_center_permission_defaults.sql",
+  poolAssignments: "20261006000510_pool_assignments.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -255,6 +258,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.hasScopeRpc]: "ek", // 5 RPC fonksiyonu: current_user_scope, current_user_team_id, current_user_branch_id, has_permission_with_scope, check_scope_access
     [F.perfIndexes]: "davranis", // 8 composite index (deals, calls, tasks, contacts, events, expenses, demands, offers) - sorgu performansını 40-60% hızlandırır
     [F.perfNavBadgeCache]: "ek", // nav_badge_snapshots tablo + get_nav_badge_snapshot RPC + cron trigger
+    [F.officeCenterPerms]: "ek", // yalniz VERI seed: office_center izin varsayilani (owner/gm ALL, branch_manager view+edit, team_lead view); idempotent
+    [F.poolAssignments]: "ek", // yeni tablo pool_assignments + RLS (okuma: office_center view / atanan; yazma: office_center edit); mevcut davranis degismez
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -357,6 +362,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB39-kira-sozlesme-baglantisi", order: 29.90, title: "Kiralamadan kira sozlesmesi (contracts.rental_id + artis maddesi alanlari)", files: [F.contractRentalLink] },
     { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi)", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc] },
     { id: "PB41-hiz-optimizasyonu", order: 29.92, title: "Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache snapshot", files: [F.perfIndexes, F.perfNavBadgeCache] },
+    { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -471,6 +477,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcWorkerEvents, F.lcAnomalyTables],
     // Icgoru destek RPC/gorunum/temizlik insights tablosuna baglidir (platform ikizi bagimsiz).
     [F.insightSupport, F.insights],
+    // Ofis Merkezi: pool_assignments RLS'i has_effective_permission('office_center', ...) kullanir -> seed ONCE.
+    [F.poolAssignments, F.officeCenterPerms],
   ],
 
   externalPending: [
