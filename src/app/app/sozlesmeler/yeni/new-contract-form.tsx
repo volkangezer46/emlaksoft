@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FilePlus2, FileSignature } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
@@ -20,6 +21,14 @@ import { Combobox } from "@/components/ui/combobox";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { CONTRACT_DRAFT_FIELDS, CONTRACT_FORM_ID, CONTRACT_TABS } from "./contract-tabs";
+import type { RentalContractContext } from "./rental-context";
+import {
+  INCREASE_BASES,
+  buildRentalContractBody,
+  fillRentalTokens,
+  parseFixedPct,
+  type IncreaseBasis,
+} from "@/lib/rental-contract/build";
 import {
   createContract,
   saveContractTemplate,
@@ -170,6 +179,7 @@ export function NewContractForm({
   prefillCustomer = "",
   prefillProperty = "",
   prefillTur = "",
+  rentalContext = null,
   userId,
 }: {
   contractTypes?: { value: string; label: string }[];
@@ -179,6 +189,8 @@ export function NewContractForm({
   prefillCustomer?: string;
   prefillProperty?: string;
   prefillTur?: string;
+  /** Kiralama kaydından gelindiyse (?kira=): ön dolgu ve artış maddesi alanı. */
+  rentalContext?: RentalContractContext | null;
   userId: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -196,14 +208,44 @@ export function NewContractForm({
   const activeTemplate = TEMPLATES[selectedType];
 
   // "Şablondan başla" adımı: ön dolguyla gelinmediyse ve şablon varsa önce galeri.
+  // Kiralamadan gelindiyse ofisin kira şablonları varsa galeri önce açılır (hazır taslak da orada); yoksa doğrudan form.
+  const hasKiraTemplates = templates.some((t) => t.type === "kira");
   const [step, setStep] = useState<"template" | "form">(
-    hasPrefill || templates.length === 0 ? "form" : "template",
+    rentalContext ? (hasKiraTemplates ? "template" : "form") : hasPrefill || templates.length === 0 ? "form" : "template",
   );
-  const [body, setBody] = useState(activeTemplate ?? "");
+  const [body, setBody] = useState(rentalContext?.defaultBody ?? activeTemplate ?? "");
+  const [generatedBody, setGeneratedBody] = useState(rentalContext?.defaultBody ?? "");
+  const [increaseBasis, setIncreaseBasis] = useState<IncreaseBasis>("tufe");
+  const [fixedPct, setFixedPct] = useState("");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
 
+  /** Kira kaydı verisi + seçili artış maddesiyle sözleşme verisi. */
+  function rentalData(basis: IncreaseBasis, pct: string) {
+    const parsed = parseFixedPct(pct);
+    return { ...rentalContext!.data, increaseBasis: basis, fixedPct: parsed.ok ? parsed.value : null };
+  }
+
+  /** Artış maddesi değişince: metin hâlâ otomatik üretilen taslaksa güncellenir (elle düzenlenmiş metne dokunulmaz). */
+  function changeIncrease(basis: IncreaseBasis, pct: string) {
+    setIncreaseBasis(basis);
+    setFixedPct(pct);
+    if (rentalContext && body === generatedBody) {
+      const next = buildRentalContractBody(rentalData(basis, pct));
+      setBody(next);
+      setGeneratedBody(next);
+    }
+  }
+
+  function applyBuiltInRentalDraft() {
+    const next = buildRentalContractBody(rentalData(increaseBasis, fixedPct));
+    setBody(next);
+    setGeneratedBody(next);
+    setStep("form");
+  }
+
   function applyDbTemplate(t: ContractTemplateOption) {
-    setBody(t.content);
+    // Kiralamadan gelindiyse ofis şablonundaki {kiraci}, {kira_bedeli} gibi alanlar kira kaydıyla dolar.
+    setBody(rentalContext ? fillRentalTokens(t.content, rentalData(increaseBasis, fixedPct)) : t.content);
     if (contractTypes.some((ct) => ct.value === t.type)) setSelectedType(t.type);
     setStep("form");
   }
@@ -256,9 +298,30 @@ export function NewContractForm({
         breadcrumbs={crumbs}
       >
         <div className="space-y-3">
+          {rentalContext ? (
+            <>
+              <button
+                type="button"
+                onClick={applyBuiltInRentalDraft}
+                className="focus-ring press flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-brand-300 bg-brand-600/5 px-4 py-3 text-left transition hover:border-brand-400"
+              >
+                <FileSignature className="h-5 w-5 shrink-0 text-brand-600" />
+                <span>
+                  <span className="block text-sm font-semibold text-ink-950">Hazır kira taslağı (kira kaydı bilgileriyle dolu)</span>
+                  <span className="block text-xs text-text-muted">Kiracı, bedel, vade, depozito ve süre otomatik gelir; artış maddesini sonraki adımda seçersiniz.</span>
+                </span>
+              </button>
+              <p className="rounded-[var(--radius-control)] bg-canvas/70 px-3 py-2 text-xs text-text-muted">
+                Kendi avukat onaylı şablonunuz mu var? <Link href="/app/ayarlar/sozlesme-sablonlari" className="font-semibold text-brand-600 hover:underline">Ayarlar &gt; Sözleşme şablonları</Link>’ndan ekleyin; metindeki {"{kiraci}"}, {"{kira_bedeli}"}, {"{vade_gunu}"}, {"{baslangic}"}, {"{bitis}"}, {"{depozito}"}, {"{kiraya_veren}"}, {"{artis_maddesi}"} alanları kira kaydıyla otomatik dolar.
+              </p>
+            </>
+          ) : null}
           <button
             type="button"
-            onClick={() => setStep("form")}
+            onClick={() => {
+              if (rentalContext) setBody("");
+              setStep("form");
+            }}
             className="focus-ring press flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas/60 px-4 py-3 text-left transition hover:border-brand-300"
           >
             <FilePlus2 className="h-5 w-5 shrink-0 text-brand-600" />
@@ -309,6 +372,7 @@ export function NewContractForm({
   const tabPanels = {
     bilgiler: (
       <>
+        {rentalContext ? <input type="hidden" name="rental_id" value={rentalContext.rentalId} /> : null}
         {prefillCustomer ? <input type="hidden" name="customer_id" value={prefillCustomer} /> : null}
         {prefillProperty ? <input type="hidden" name="property_id" value={prefillProperty} /> : null}
         {/* Ön dolgu yoksa müşteri / portföy aramalı seçiciyle bağlanabilir (bağsız sözleşme kalmasın). */}
@@ -340,7 +404,9 @@ export function NewContractForm({
         ) : null}
         {prefillCustomer || prefillProperty ? (
           <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700 sm:col-span-2">
-            {isYerGosterme
+            {rentalContext
+              ? "Kiralama kaydından gelindi — kiracı, portföy ve kira kaydı bağı sözleşmeye otomatik eklenecek; sözleşme sayfasından kiralamaya geri dönülebilir."
+              : isYerGosterme
               ? "Randevu akışından gelindi — müşteri ve portföy bağı otomatik eklenecek; içerikte yer gösterme tutanağı şablonu hazır."
               : "Teklif akışından gelindi — portföy ve müşteri bağı sözleşmeye otomatik eklenecek."}
           </p>
@@ -350,7 +416,7 @@ export function NewContractForm({
             name="title"
             type="text"
             required
-            defaultValue={isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
+            defaultValue={rentalContext ? rentalContext.title : isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
             placeholder="ör. Daire Kira Sözleşmesi — Ahmet Yılmaz"
           />
         </FormField>
@@ -367,8 +433,37 @@ export function NewContractForm({
           </FormSelect>
         </FormField>
         <FormField label="Son geçerlilik tarihi (opsiyonel)" htmlFor="sozl-expires">
-          <FormInput name="expires_at" type="date" />
+          <FormInput name="expires_at" type="date" defaultValue={rentalContext?.expiresAt ?? undefined} />
         </FormField>
+        {rentalContext ? (
+          <>
+            <FormField label="Kira artışı maddesi" htmlFor="sozl-increase" hint="TBK m.344: yenileme döneminde artış, bir önceki 12 aylık TÜFE ortalamasını aşamaz.">
+              <FormSelect
+                id="sozl-increase"
+                name="rent_increase_basis"
+                value={increaseBasis}
+                onChange={(e) => changeIncrease(e.target.value as IncreaseBasis, fixedPct)}
+                className="appearance-none"
+              >
+                {INCREASE_BASES.map((b) => (
+                  <option key={b.value} value={b.value}>{b.label}</option>
+                ))}
+              </FormSelect>
+            </FormField>
+            {increaseBasis === "sabit" ? (
+              <FormField label="Sabit artış yüzdesi (%)" htmlFor="sozl-increase-pct" required>
+                <FormInput
+                  id="sozl-increase-pct"
+                  name="rent_increase_fixed_pct"
+                  inputMode="decimal"
+                  placeholder="ör. 25"
+                  value={fixedPct}
+                  onChange={(e) => changeIncrease(increaseBasis, e.target.value)}
+                />
+              </FormField>
+            ) : null}
+          </>
+        ) : null}
       </>
     ),
     icerik: (
@@ -379,7 +474,13 @@ export function NewContractForm({
             {activeTemplate && (
               <button
                 type="button"
-                onClick={() => setBody(activeTemplate)}
+                onClick={() => {
+                  if (rentalContext) {
+                    const next = buildRentalContractBody(rentalData(increaseBasis, fixedPct));
+                    setBody(next);
+                    setGeneratedBody(next);
+                  } else setBody(activeTemplate);
+                }}
                 className="text-xs font-semibold text-brand-600 hover:underline"
               >
                 Şablonu uygula

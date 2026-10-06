@@ -9,6 +9,7 @@ import {
   FileSignature,
   FileText,
   History,
+  KeyRound,
   ShieldAlert,
   User,
   XCircle,
@@ -103,6 +104,12 @@ export default async function ContractDetailPage({
   const signers = signerRows ?? [];
   const propertyName = entityName(contract.property as Parameters<typeof entityName>[0]);
   const customerName = entityName(contract.customer as Parameters<typeof entityName>[0]);
+
+  // Bağlı kira kaydı (H6, iki yönlü bağ): ayrı ve hataya dayanıklı okunur; sütun yoksa (migration uygulanmamış) chip gizlenir.
+  const rentalLinkRes = await supabase.from("contracts").select("rental_id, rent_increase_basis").eq("id", id).maybeSingle();
+  const rentalLink = rentalLinkRes.error ? null : (rentalLinkRes.data as { rental_id?: string | null; rent_increase_basis?: string | null } | null);
+  const linkedRentalId = rentalLink?.rental_id ?? null;
+  const INCREASE_LABELS: Record<string, string> = { tufe: "TÜFE (TBK m.344)", sabit: "Sabit yüzde", yok: "Artış maddesi yok" };
 
   /*
    * Risk taramasi (X4). Onceden HICBIR kontrol yoktu: `createContract`
@@ -214,6 +221,16 @@ export default async function ContractDetailPage({
                 propertyName
               )}
             </span>
+          </div>
+        )}
+        {linkedRentalId && (
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
+            <KeyRound className="h-4 w-4 text-brand-700" />
+            <span className="text-text-muted">Kira kaydı:</span>
+            <Link href={`/app/kiralama/${linkedRentalId}?sekme=sozlesme`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-text hover:underline">
+              Kiralama detayını aç
+            </Link>
+            {rentalLink?.rent_increase_basis ? <span className="text-xs text-text-muted">· {INCREASE_LABELS[rentalLink.rent_increase_basis] ?? rentalLink.rent_increase_basis}</span> : null}
           </div>
         )}
         {contract.expires_at && (

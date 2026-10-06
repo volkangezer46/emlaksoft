@@ -1,7 +1,8 @@
 /**
  * Yeni sözleşme formunun sekme tanımı (veri: ikon yok) — form bileşeni ve
  * `src/lib/form-tabs-contract.test.ts` aynı kaynağı kullanır.
- * `customer_id` / `property_id` yalnız teklif/randevu akışından gelen gizli ön dolgudur.
+ * `customer_id` / `property_id` yalnız teklif/randevu akışından gelen gizli ön dolgudur; `rental_id`,
+ * `rent_increase_basis`, `rent_increase_fixed_pct` yalnız kiralama kaydından (?kira=) gelindiğinde çizilir.
  */
 export const CONTRACT_FORM_ID = "yeni-sozlesme";
 
@@ -10,7 +11,7 @@ export const CONTRACT_TABS = [
     id: "bilgiler",
     label: "Sözleşme bilgileri",
     description: "Başlık, tür ve (varsa) son geçerlilik tarihi.",
-    fields: ["title", "contract_type", "expires_at", "customer_id", "property_id"],
+    fields: ["title", "contract_type", "expires_at", "customer_id", "property_id", "rental_id", "rent_increase_basis", "rent_increase_fixed_pct"],
     required: ["title"],
   },
   {

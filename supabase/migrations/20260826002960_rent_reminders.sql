@@ -20,8 +20,9 @@ begin
      or pg_catalog.to_regclass('public.customers') is null then
     raise exception 'tenants/rentals/customers yok; once temel migrationlar uygulanmali.';
   end if;
-  if pg_catalog.to_regprocedure('public.current_tenant_id()') is null then
-    raise exception 'current_tenant_id() yok.';
+  if pg_catalog.to_regprocedure('public.current_tenant_id()') is null
+     or pg_catalog.to_regprocedure('public.current_profile_role()') is null then
+    raise exception 'current_tenant_id()/current_profile_role() yok.';
   end if;
   if not exists (select 1 from pg_catalog.pg_indexes where schemaname = 'public' and indexname = 'idx_rentals_id_tenant_unique') then
     raise exception 'idx_rentals_id_tenant_unique yok; 20260809000020 once uygulanmali.';
@@ -80,7 +81,7 @@ comment on table public.rent_reminders is
   'Kiraci hatirlatma kaydi. unique(rental_id, period, kind, channel) ayni hatirlatmanin ikinci kez uretilmesini keser.';
 
 -- ---------------------------------------------------------------------------
--- RLS: tenant izolasyonu. Ayari ofis kullanicisi yazar (yetki kapisi action'da); kaydi cron (service_role) yazar,
+-- RLS: tenant izolasyonu. Ayari yalniz owner/gm/branch_manager yazar (ofis ayari; action'da da rol kapisi var); kaydi cron (service_role) yazar,
 -- ofis yalniz okur ve "ofis kanali" satirini gonderildi diye isaretleyebilir (update).
 -- ---------------------------------------------------------------------------
 alter table public.rent_reminder_settings enable row level security;
@@ -91,12 +92,16 @@ create policy rent_reminder_settings_select on public.rent_reminder_settings
   for select to authenticated using (tenant_id = (select public.current_tenant_id()));
 drop policy if exists rent_reminder_settings_insert on public.rent_reminder_settings;
 create policy rent_reminder_settings_insert on public.rent_reminder_settings
-  for insert to authenticated with check (tenant_id = (select public.current_tenant_id()));
+  for insert to authenticated
+  with check (tenant_id = (select public.current_tenant_id())
+    and (select public.current_profile_role()) in ('owner', 'gm', 'branch_manager'));
 drop policy if exists rent_reminder_settings_update on public.rent_reminder_settings;
 create policy rent_reminder_settings_update on public.rent_reminder_settings
   for update to authenticated
-  using (tenant_id = (select public.current_tenant_id()))
-  with check (tenant_id = (select public.current_tenant_id()));
+  using (tenant_id = (select public.current_tenant_id())
+    and (select public.current_profile_role()) in ('owner', 'gm', 'branch_manager'))
+  with check (tenant_id = (select public.current_tenant_id())
+    and (select public.current_profile_role()) in ('owner', 'gm', 'branch_manager'));
 
 drop policy if exists rent_reminders_select on public.rent_reminders;
 create policy rent_reminders_select on public.rent_reminders

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Banknote, Building2, CalendarClock, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
+import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
@@ -12,6 +12,9 @@ import { ChargesPanel } from "./charges-panel";
 import { MaintenancePanel } from "./maintenance-panel";
 import { EndRentalButton } from "./end-rental-button";
 import { RentalEditPanel } from "./rental-edit-panel";
+import { RemindersPanel } from "./reminders-panel";
+import { loadReminderTab } from "./reminder-data";
+import { trDayKey } from "@/lib/clock";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -28,7 +31,9 @@ function rel<T>(v: Rel<T>): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-const RENTAL_TAB_IDS = ["tahakkuk", "bakim", "notlar"] as const;
+const CONTRACT_STATUS_LABELS: Record<string, string> = { draft: "Taslak", sent: "Gönderildi", signed: "İmzalandı", rejected: "Reddedildi", cancelled: "İptal" };
+
+const RENTAL_TAB_IDS = ["tahakkuk", "bakim", "hatirlatma", "sozlesme", "notlar"] as const;
 
 export default async function KiraDetayPage({
   params,
@@ -37,7 +42,9 @@ export default async function KiraDetayPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms } = await requireModulePage("rentals", "/app/kiralama");
+  const { perms, tenantId } = await requireModulePage("rentals", "/app/kiralama");
+  const canCreateContract = perms.contracts?.includes("create") ?? false;
+  const canViewContracts = perms.contracts?.includes("view") ?? false;
   const canCreate = perms.rentals?.includes("create") ?? false;
   const canEdit = perms.rentals?.includes("edit") ?? false;
   const { id } = await params;
@@ -54,6 +61,13 @@ export default async function KiraDetayPage({
     .maybeSingle();
 
   if (!rental) notFound();
+
+  // Kiralamadan oluşturulan sözleşmeler (H6, iki yönlü bağ). Hataya dayanıklı: sütun yoksa (migration uygulanmamış) liste boş kalır.
+  const contractsRes = canViewContracts
+    ? await supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20)
+    : null;
+  const linkedContracts = contractsRes && !contractsRes.error ? (contractsRes.data ?? []) : [];
+  const contractsAvailable = !contractsRes || !contractsRes.error;
 
   const prop = rel(rental.property);
   const renter = rel(rental.renter);
@@ -72,6 +86,18 @@ export default async function KiraDetayPage({
   const daysToEnd = rental.end_date
     ? Math.ceil((new Date(`${rental.end_date}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000)
     : null;
+
+  const reminderData =
+    tab === "hatirlatma"
+      ? await loadReminderTab({
+          supabase,
+          today: trDayKey(Date.now()),
+          rental: { id: rental.id, due_day: rental.due_day, monthly_rent: Number(rental.monthly_rent) },
+          renter: renter ? { id: renter.id, full_name: renter.full_name, phone: renter.phone } : null,
+          charges: charges.map((c) => ({ id: c.id, period: c.period, amount: Number(c.amount), status: c.status })),
+          tenantId,
+        })
+      : null;
 
   const overdueCount = charges.filter((c) => c.status === "overdue").length;
   const pendingCount = charges.filter((c) => c.status === "pending").length;
@@ -95,6 +121,8 @@ export default async function KiraDetayPage({
   const tabDefs: DetailTabDef[] = [
     { id: "tahakkuk", label: "Tahakkuklar", icon: Banknote, count: charges.length },
     { id: "bakim", label: "Bakım talepleri", icon: Wrench, count: maintenance.length },
+    { id: "hatirlatma", label: "Hatırlatma", icon: BellRing },
+    { id: "sozlesme", label: "Sözleşme", icon: FileSignature, count: linkedContracts.length },
     { id: "notlar", label: "Notlar & araçlar", icon: StickyNote },
   ];
 
@@ -124,6 +152,14 @@ export default async function KiraDetayPage({
                   notes: rental.notes ?? null,
                 }}
               />
+            ) : null}
+            {canCreateContract && active ? (
+              <Link
+                href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`}
+                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/20"
+              >
+                <FileSignature className="h-3.5 w-3.5" /> Sözleşme oluştur
+              </Link>
             ) : null}
             {canEdit && active ? <EndRentalButton rentalId={rental.id} /> : null}
           </div></div>
@@ -209,6 +245,65 @@ export default async function KiraDetayPage({
               {/* Bakım talepleri */}
               <MaintenancePanel rentalId={rental.id} requests={maintenance} canCreate={canCreate} canEdit={canEdit} />
             </div>
+          ) : null}
+
+          {tab === "hatirlatma" && reminderData ? (
+            <RemindersPanel
+              rentalId={rental.id}
+              renterName={renter?.full_name ?? null}
+              phoneDisplay={reminderData.phoneDisplay}
+              optOut={reminderData.optOut}
+              automationEnabled={reminderData.automationEnabled}
+              suggestion={reminderData.suggestion}
+              logs={reminderData.logs}
+              canEdit={canEdit}
+            />
+          ) : null}
+
+          {tab === "sozlesme" ? (
+            <section className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                  <FileSignature className="h-4 w-4 text-brand-600" /> Kira sözleşmesi
+                </h2>
+                {canCreateContract ? (
+                  <Link
+                    href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`}
+                    className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-brand-700"
+                  >
+                    Sözleşme oluştur
+                  </Link>
+                ) : null}
+              </div>
+              {!contractsAvailable ? (
+                <p className="text-sm text-text-muted">Sözleşme bağlantısı henüz etkin değil (veritabanı güncellemesi uygulanmamış olabilir).</p>
+              ) : linkedContracts.length === 0 ? (
+                <EmptyStateV3
+                  variant="compact"
+                  title="Bu kiraya bağlı sözleşme yok."
+                  description="“Sözleşme oluştur” kiracı, bedel, vade, depozito ve süreyi kira kaydından doldurur; imza altyapısıyla gönderebilirsiniz. Kendi avukat onaylı şablonunuzu da kullanabilirsiniz."
+                />
+              ) : (
+                <ul className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
+                  {linkedContracts.map((c) => (
+                    <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm">
+                      <Link href={`/app/sozlesmeler/${c.id}`} className="focus-ring min-w-0 truncate rounded-[var(--radius-control)] font-semibold text-ink-950 hover:underline">
+                        {c.title}
+                      </Link>
+                      <span className="flex items-center gap-2 text-xs text-text-muted">
+                        <Badge variant={c.status === "signed" ? "success" : c.status === "cancelled" || c.status === "rejected" ? "outline" : "warning"} size="sm">
+                          {CONTRACT_STATUS_LABELS[c.status] ?? c.status}
+                        </Badge>
+                        {dateLabel(String(c.created_at).slice(0, 10))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-text-muted">
+                Metin yer tutucudur ve hukuki danışmanlık değildir; imza, SMS doğrulamalı e-imza akışıyla yapılır (nitelikli e-imza değildir).
+              </p>
+            </section>
           ) : null}
 
           {tab === "notlar" ? (

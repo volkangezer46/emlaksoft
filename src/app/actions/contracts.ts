@@ -17,6 +17,8 @@ import {
   sendSignerSms,
 } from "@/app/imza/_lib/sms";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { parseFixedPct, parseIncreaseBasis } from "@/lib/rental-contract/build";
+import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 
 type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
@@ -50,16 +52,37 @@ export async function createContract(
   const title        = String(fd.get("title")        ?? "").trim();
   const contractType = String(fd.get("contract_type") ?? "diger").trim() as typeof CONTRACT_TYPES[number];
   const body         = String(fd.get("body")         ?? "").trim();
-  const propertyId   = String(fd.get("property_id")  ?? "").trim() || null;
-  const customerId   = String(fd.get("customer_id")  ?? "").trim() || null;
+  let propertyId     = String(fd.get("property_id")  ?? "").trim() || null;
+  let customerId     = String(fd.get("customer_id")  ?? "").trim() || null;
   const expiresAt    = String(fd.get("expires_at")   ?? "").trim() || null;
+  // Kiralamadan oluşturma (H6): kira kaydı + artış maddesi alanı. Boşsa mevcut akış aynen çalışır.
+  const rentalId     = String(fd.get("rental_id")    ?? "").trim() || null;
+  const increaseBasis = parseIncreaseBasis(fd.get("rent_increase_basis"));
+  const fixedPct     = parseFixedPct(fd.get("rent_increase_fixed_pct"));
 
   if (!title) return { error: "Sözleşme başlığı zorunludur." };
+  if (!fixedPct.ok) return { error: "Sabit artış oranı 0 ile 100 arasında olmalı." };
+  if (increaseBasis === "sabit" && fixedPct.value == null) return { error: "Sabit artış için yüzde girin." };
   if (!body)  return { error: "Sözleşme içeriği boş olamaz." };
   if (!CONTRACT_TYPES.includes(contractType)) return { error: "Geçersiz sözleşme türü." };
   if (expiresAt && !isIsoDate(expiresAt)) return { error: "Geçerli bir son tarih girin." };
   if (expiresAt && new Date(`${expiresAt}T23:59:59.999Z`).getTime() <= Date.now()) {
     return { error: "Son geçerlilik tarihi gelecekte olmalı." };
+  }
+
+  const supabase = await createClient();
+  if (rentalId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rentalId)) return { error: "Kira kaydı bulunamadı." };
+    const { data: rental } = await supabase
+      .from("rentals")
+      .select("id, property_id, renter_customer_id")
+      .eq("id", rentalId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (!rental) return { error: "Kira kaydı bulunamadı." };
+    // Portföy/kiracı bağı kira kaydından gelir (forma gizli alan olarak taşınan değer güvenilmez).
+    propertyId = (rental as { property_id: string }).property_id;
+    customerId = (rental as { renter_customer_id: string }).renter_customer_id;
   }
 
   const references = await validateTenantReferences(gate.tenantId, {
@@ -68,7 +91,6 @@ export async function createContract(
   });
   if (!references.ok) return { error: references.error };
 
-  const supabase = await createClient();
   const { data, error } = await supabase
     .from("contracts")
     .insert({
@@ -81,13 +103,27 @@ export async function createContract(
       customer_id:   customerId,
       expires_at:    expiresAt ? `${expiresAt}T23:59:59.999Z` : null,
       status:        "draft",
+      // Yalnız kiralamadan oluşturulurken yazılır: sütunlar yoksa eski akış etkilenmez.
+      ...(rentalId
+        ? {
+            rental_id: rentalId,
+            rent_increase_basis: increaseBasis ?? "tufe",
+            rent_increase_fixed_pct: increaseBasis === "sabit" ? fixedPct.value : null,
+          }
+        : {}),
     })
     .select("id")
     .single();
 
-  if (error || !data) return { error: "Sözleşme oluşturulamadı." };
+  if (error || !data) {
+    if (rentalId && isMissingSchemaError(error)) {
+      return { error: "Kiralamadan sözleşme için veritabanı güncellemesi henüz uygulanmamış." };
+    }
+    return { error: "Sözleşme oluşturulamadı." };
+  }
 
   revalidatePath("/app/sozlesmeler");
+  if (rentalId) revalidatePath(`/app/kiralama/${rentalId}`);
   return { ok: true, id: data.id };
 }
 
