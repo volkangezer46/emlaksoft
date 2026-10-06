@@ -14,7 +14,7 @@ import { EndRentalButton } from "./end-rental-button";
 import { RentalEditPanel } from "./rental-edit-panel";
 import { RemindersPanel } from "./reminders-panel";
 import { loadReminderTab } from "./reminder-data";
-import { trDayKey } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -91,7 +91,7 @@ export default async function KiraDetayPage({
     tab === "hatirlatma"
       ? await loadReminderTab({
           supabase,
-          today: trDayKey(Date.now()),
+          today: trDayKey(now()),
           rental: { id: rental.id, due_day: rental.due_day, monthly_rent: Number(rental.monthly_rent) },
           renter: renter ? { id: renter.id, full_name: renter.full_name, phone: renter.phone } : null,
           charges: charges.map((c) => ({ id: c.id, period: c.period, amount: Number(c.amount), status: c.status })),
