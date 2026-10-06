@@ -9,6 +9,7 @@ import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "../content-link";
 import { SectionHeading } from "../section-heading";
 import { AutomationScreen, CommissionScreen, CustomersScreen, DealsScreen, PortfolioScreen, ReportsScreen, TodayScreen } from "./screens";
+import { CRON_JOBS } from "@/lib/cron-jobs";
 
 /**
  * JS'siz ürün turu: radyo girdileri + kardeş seçiciler (marketing-sections.css). Tüm ekranlar DOM'dadır (SEO),
@@ -26,7 +27,7 @@ function buildTabs(plans: readonly { id: string; name: string }[]): Tab[] {
   { id: "4", label: "Anlaşmalar", text: "Tekliften tamamlanmaya anlaşmalar aşamalarına göre sütunlarda ilerler.", points: ["Teklif ve sözleşme aynı kayıtta", `SMS onaylı dijital imza${at("/app/sozlesmeler")}`, "Aşama bazlı takip"], screen: <DealsScreen /> },
   { id: "5", label: "Komisyon", text: "Komisyon kayıtları, bölüşüm ve hakediş durumu aylık dağılımla birlikte.", points: ["Bölüşüm ve hakediş kayıt altında", "Onay akışı", "Cüzdan, gider ve aidat takibi"], screen: <CommissionScreen /> },
   { id: "6", label: "Raporlar", text: "Satış hunisi, danışman karnesi ve kaçan komisyon özeti.", points: ["Satış hunisi ve trendler", "Danışman KPI ve ekip ligi", `Kayıp-kaçak karnesi${at("/app/kayip-kacak")}`], screen: <ReportsScreen /> },
-  { id: "7", label: "Otomasyon", text: "Hatırlatma, teyit ve özet işleri arka planda zamanlanmış görevlerle çalışır.", points: ["27 otomatik görev", `İş akışı ve onay akışları${at("/app/onaylar")}`, "Çalışmalar kayıt altına alınır"], screen: <AutomationScreen /> },
+  { id: "7", label: "Otomasyon", text: "Hatırlatma, teyit ve özet işleri arka planda zamanlanmış görevlerle çalışır.", points: [`${CRON_JOBS.length} otomatik görev`, `İş akışı ve onay akışları${at("/app/onaylar")}`, "Çalışmalar kayıt altına alınır"], screen: <AutomationScreen /> },
   ];
 }
 

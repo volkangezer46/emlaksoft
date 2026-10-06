@@ -17,7 +17,7 @@ const EMPTY: AttentionInput = {
   openTickets: 0,
   risk: 0,
   trialsEnding: 0,
-  demoRequests: 0,
+  newTrials: 0,
 };
 
 describe("homeVariantFor / platformHomeSections", () => {
@@ -85,7 +85,7 @@ describe("buildAttentionQueue", () => {
 
   it("her satırın href'i /admin ile başlar ve sayı pozitiftir", () => {
     const q = buildAttentionQueue(
-      { refundRequired: 1, manualReview: 1, cronErrors: 1, efReconciliation: "drift", urgentTickets: 1, openTickets: 3, risk: 1, trialsEnding: 1, demoRequests: 1 },
+      { refundRequired: 1, manualReview: 1, cronErrors: 1, efReconciliation: "drift", urgentTickets: 1, openTickets: 3, risk: 1, trialsEnding: 1, newTrials: 1 },
       "super_admin",
     );
     expect(q.length).toBeLessThanOrEqual(ATTENTION_LIMIT);

@@ -17,7 +17,7 @@ import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
-import { OrnekVeri, OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
+import { OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
 import { UstSatir } from "./_home/ust-satir";
 import { DurumCubugu } from "./_home/durum-cubugu";
 import { KontorBandi } from "./_home/kontor-bandi";
@@ -319,9 +319,6 @@ export default async function AppHomePage({
           <UstSatir ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
           {layout.statusBar ? (
             <DurumCubugu>
-              <Suspense fallback={null}>
-                <OrnekVeri ctx={ctx} />
-              </Suspense>
               <Suspense fallback={null}>
                 <OrnekVeriYenileBandi ctx={ctx} />
               </Suspense>

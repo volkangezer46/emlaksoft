@@ -22,6 +22,8 @@ import { AppPrefetcher } from "@/components/app/app-prefetcher";
 import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
+import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
+import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { SectionTabs } from "@/components/app/section-tabs";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
@@ -90,6 +92,7 @@ type OfficeSummary = {
   created_at?: string | null;
   slug?: string | null;
   trial_ends_at?: string | null;
+  sample_seeded_at?: string | null;
 };
 
 /** Bildirim listesi (requireActiveTenant zinciri) Suspense içinde akar. */
@@ -125,7 +128,7 @@ async function AppShell({
   const impersonatedTenantPromise = user && impersonating && claimedTenantId
     ? supabase
         .from("tenants")
-        .select("name, plan, status, brand_color, created_at, slug, trial_ends_at")
+        .select("name, plan, status, brand_color, created_at, slug, trial_ends_at, sample_seeded_at")
         .eq("id", claimedTenantId)
         .maybeSingle()
     : Promise.resolve({ data: null });
@@ -153,7 +156,7 @@ async function AppShell({
     user
       ? supabase
           .from("profiles")
-          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug, trial_ends_at)")
+          .select("full_name, role, tenant_id, tenants(name, plan, status, brand_color, created_at, slug, trial_ends_at, sample_seeded_at)")
           .eq("id", user.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -251,6 +254,8 @@ async function AppShell({
     cookieValue: jar.get(FONT_SCALE_COOKIE)?.value,
     metadataValue: user?.user_metadata?.[FONT_SCALE_META_KEY],
   });
+  // Deneme sayacı tek kez hesaplanır: yan menü ve kabuk şeridi aynı sayıyı gösterir.
+  const trialDaysLeft = office?.status === "trial" && office.trial_ends_at ? Math.max(0, Math.ceil(msUntil(office.trial_ends_at) / DAY_MS)) : null;
   const impName = impersonationCookieMatches
     ? (jar.get("es_impersonate_name")?.value ?? office?.name ?? "Hedef ofis")
     : (office?.name ?? "Hedef ofis");
@@ -279,7 +284,7 @@ async function AppShell({
           officeName={office?.name ?? "EmlakSoft Ofis"}
           plan={planLabel(office?.plan ?? "office")}
           trial={office?.status === "trial"}
-          trialDaysLeft={office?.status === "trial" && office.trial_ends_at ? Math.max(0, Math.ceil(msUntil(office.trial_ends_at) / DAY_MS)) : null}
+          trialDaysLeft={trialDaysLeft}
           accessibleModules={accessibleModules}
           creatableModules={creatableModules}
           lockedHrefs={lockedNavHrefs}
@@ -293,6 +298,10 @@ async function AppShell({
         />
         <div className="flex min-w-0 flex-1 flex-col">
           {impersonating && platformStaff ? <OpsImpersonationBanner tenantName={impName || office?.name || "Ofis"} /> : null}
+          {/* Demo/deneme şeridi: örnek veri varsa veya deneme sürüyorsa her sayfada, ince ve kapatılamaz (platform personeli hariç). */}
+          {!platformStaffFullAccess && tenantId ? (
+            <DemoTrialStrip sampleActive={Boolean(office?.sample_seeded_at)} trialDaysLeft={trialDaysLeft} canSwitch={!impersonating && canSwitchToRealUse(effectiveRole)} />
+          ) : null}
           <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
             <AppBreadcrumb accessibleModules={accessibleModules} />
             <CommandSearch accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedNavHrefs} storageScope={user && tenantId ? `${tenantId}:${user.id}` : undefined} uiPrefCookie={uiPrefCookie} />

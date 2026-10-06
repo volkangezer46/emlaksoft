@@ -10,9 +10,17 @@ export function trialShort(trialDays?: number): string {
   return trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz";
 }
 
-/** "30 gün ücretsiz dene" düğme/etiket metni. */
+/**
+ * Birincil CTA: "Ofisini ücretsiz kur — 14 gün, kart gerekmez" (gün bilinmiyorsa "Ofisini ücretsiz kur — kart gerekmez").
+ * Satış demosu/görüşme talebi akışı yoktur; tek yol self-servis kurulum sihirbazıdır (/kayit).
+ */
 export function trialCtaLabel(trialDays?: number): string {
-  return `${trialShort(trialDays)} dene`;
+  return trialDays ? `Ofisini ücretsiz kur — ${trialDays} gün, kart gerekmez` : "Ofisini ücretsiz kur — kart gerekmez";
+}
+
+/** Paket kartı gibi dar yerler için kısa CTA (gün/kart cümlesi kartın altında ayrıca yazılır). */
+export function trialCtaShort(): string {
+  return "Ofisini ücretsiz kur";
 }
 
 /**

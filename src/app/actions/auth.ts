@@ -24,6 +24,8 @@ import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEMO_SEED_FAILED_COOKIE, seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
+import { FIELD as WIZARD_FIELD, readWizardOfficeProfile } from "@/lib/sample-data/office-profile";
+import { applyWizardOfficeProfile } from "@/lib/sample-data/apply-office-profile";
 import { createClient } from "@/lib/supabase/server";
 import {
   generateLoginCode,
@@ -420,10 +422,20 @@ export async function signUp(
 
   await recordSignupAttributionFromRequest(tenantId, formData); // büyüme atfı: en iyi çaba, asla fırlatmaz
 
-  // "Demo verileriyle başla": is_sample işaretli tam demo set; hata kaydı engellemez, ofis sahibi
-  // ana ekran / Başlangıç sihirbazından yükleyebilir. Aynı admin client (yeni service_role kullanımı yok).
+  // Sihirbaz profili (konum, ofis türü, marka, odak, ekip daveti): best-effort, kayıt akışını kesmez; uyarılar
+  // etkinlik günlüğüne düşer. Aynı admin client (yeni service_role kullanımı yok).
+  const wizard = readWizardOfficeProfile(formData, email);
+  const logoField = formData.get(WIZARD_FIELD.logo);
+  const logo = typeof logoField === "object" && logoField !== null && "arrayBuffer" in logoField ? (logoField as File) : null;
+  const publicClient = await createClient();
+  await applyWizardOfficeProfile(admin, publicClient, { tenantId, ownerId: created.user.id, profile: wizard, logo }).catch((e) =>
+    console.error("signUp applyWizardOfficeProfile", e),
+  );
+
+  // "Demo verileriyle başla": is_sample işaretli tam demo set (paket = odak seçimi); hata kaydı engellemez,
+  // ofis sahibi ana ekran / Başlangıç sihirbazından yükleyebilir. Aynı admin client (yeni service_role kullanımı yok).
   if (wantsDemoData(formData)) {
-    const demoSeed = await seedDemoDataForNewTenant(admin, tenantId, created.user.id);
+    const demoSeed = await seedDemoDataForNewTenant(admin, tenantId, created.user.id, wizard.pack);
     if (!demoSeed.ok) {
       // Kayıt başarılı ama örnek veri yüklenemedi: ana ekran "yeniden dene" bandı için kısa ömürlü işaret.
       (await cookies()).set(DEMO_SEED_FAILED_COOKIE, "1", {
@@ -436,7 +448,7 @@ export async function signUp(
     }
   }
 
-  const supabase = await createClient();
+  const supabase = publicClient;
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password,

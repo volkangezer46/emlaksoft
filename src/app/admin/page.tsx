@@ -135,7 +135,6 @@ function derive(data: Data) {
     openTickets: Number(summary.open_ticket_count),
     urgentTickets: Number(summary.urgent_ticket_count),
     soon: Number(summary.trials_ending_7d),
-    demoCount: Number(summary.new_demo_count),
     members: Number(summary.member_count),
     mrr: exactMrr(aggregate.plan_stats, priceMapOf(data.planDefs)),
     conversion: totalTenants ? Math.round((active / totalTenants) * 100) : 0,
@@ -210,7 +209,7 @@ async function AttentionSection({ period, role }: { period: Period; role: Platfo
     openTickets: d.openTickets,
     risk: d.risk,
     trialsEnding: d.soon,
-    demoRequests: d.demoCount,
+    newTrials: data.newTenants,
   };
   const queue = buildAttentionQueue(input, role);
   const insights = await getPlatformInsights({ limit: 5 });

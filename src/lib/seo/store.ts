@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSetting, getPlatformSettingsMany, setPlatformSetting } from "@/lib/platform-settings";
 import { resolvePageMetadata, resolveRootMetadata, type ExtraMetadata } from "./metadata";
-import { buildRedirectMap, normalizeRedirectPath, type RedirectMap } from "./redirects";
+import { buildRedirectMap, normalizeRedirectPath, withLegacyRedirects, type RedirectMap } from "./redirects";
 import type { AuditSummary, Finding } from "./audit-rules";
 import {
   DEFAULT_SEO_GLOBAL,
@@ -93,7 +93,7 @@ let redirectCache: { at: number; map: RedirectMap } | null = null;
 export async function getRedirectMap(nowMs: number): Promise<RedirectMap> {
   if (redirectCache && nowMs - redirectCache.at < 60_000) return redirectCache.map;
   const s = await getSeoSettings();
-  const map = buildRedirectMap(s.redirects);
+  const map = buildRedirectMap(withLegacyRedirects(s.redirects));
   redirectCache = { at: nowMs, map };
   return map;
 }

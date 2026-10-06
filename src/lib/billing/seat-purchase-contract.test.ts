@@ -42,8 +42,12 @@ describe("koltuk satın alma sözleşmesi", () => {
   });
 
   it("ekip aksiyonu etkin limiti (plan + ek) kullanır ve koltuk bağlantısı verir", () => {
+    // Koltuk kapısı tek çekirdekte (ekip aksiyonu + kayıt sihirbazı daveti aynısını kullanır).
+    const core = read("src/lib/team/provision-member.ts");
+    expect(core).toContain("getExtraSeats(");
+    expect(core).toContain("/app/abonelik#koltuk");
     const team = read("src/app/actions/team.ts");
-    expect(team).toContain("getExtraSeats(");
-    expect(team).toContain("/app/abonelik#koltuk");
+    expect(team).toContain("provisionTeamMember(");
+    expect(team).toContain("ensureSeatAvailable(");
   });
 });

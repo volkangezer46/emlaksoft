@@ -26,12 +26,11 @@ function refreshAdmin() {
   revalidatePath("/admin/site");
 }
 
-/** Canlı içeriği etkileyen yazmalar: etiketli önbelleği düşürür, ana sayfa/demo/kayıt statik çıktılarını yeniler. */
+/** Canlı içeriği etkileyen yazmalar: etiketli önbelleği düşürür, ana sayfa/kayıt statik çıktılarını yeniler. */
 function refreshLive() {
   updateTag(SITE_CONTENT_CACHE_TAG);
   refreshAdmin();
   revalidatePath("/");
-  revalidatePath("/demo");
   revalidatePath("/kayit");
 }
 
