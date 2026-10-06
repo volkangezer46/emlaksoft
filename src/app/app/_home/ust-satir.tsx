@@ -1,3 +1,4 @@
+import { DataFreshness } from "@/components/ui/data-freshness";
 import Link from "next/link";
 import { Phone, Plus, Receipt, Tv } from "lucide-react";
 import { PeriodToggle, type Period } from "@/components/ui/premium";
@@ -57,6 +58,7 @@ export function UstSatir({
           {hasName ? <span className="pm-money"> {ctx.firstName}</span> : null}
           <span className="ml-2 text-sm font-medium text-text-muted sm:ml-3 sm:text-base">· {dateLine(nowMs)}</span>
         </h1>
+        <DataFreshness asOf={nowMs} className="mt-0.5" />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {layout.periodToggle ? (

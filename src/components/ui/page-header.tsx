@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
+import { DataFreshness } from "@/components/ui/data-freshness";
 
 /**
  * PageHeader — /app ve /admin için TEK sayfa başlığı.
@@ -19,6 +20,7 @@ export function PageHeader({
   actions,
   meta,
   icon,
+  freshness,
   className,
 }: {
   title: string;
@@ -32,10 +34,12 @@ export function PageHeader({
   meta?: ReactNode;
   /** Başlığın solunda: ikon veya avatar. */
   icon?: ReactNode;
+  /** "Son güncelleme SS:DD · Taze" damgası: true = bu istekte okundu, değer = verinin gerçek zamanı. */
+  freshness?: boolean | string | number | Date;
   className?: string;
 }) {
   return (
-    <header className={cn("mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <header className={cn("mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div className={cn("min-w-0", icon ? "flex items-start gap-3" : undefined)}>
         {icon ? <div className="shrink-0">{icon}</div> : null}
         <div className="min-w-0">
@@ -48,6 +52,7 @@ export function PageHeader({
           {meta}
         </div>
         {description ? <div className="mt-1 max-w-2xl text-sm text-text-muted">{description}</div> : null}
+        {freshness ? <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1.5" /> : null}
         </div>
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

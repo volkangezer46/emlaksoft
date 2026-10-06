@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformStaff } from "@/lib/platform";
 import { daysAgoIso, now, trParts } from "@/lib/clock";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { DataFreshness } from "@/components/ui/data-freshness";
 import { PeriodToggle, TrendPill, computeTrend, parsePeriod, type Period } from "@/components/ui/premium";
 import { StatRow } from "@/components/ui/stat-row";
 import { AreaChart, ChartCard, SkeletonCard } from "@/components/ui/viz";
@@ -448,15 +449,15 @@ async function CompositionSection({ period }: { period: Period }) {
   );
 }
 
-/** Son ofisler + aktivite akışı: çerçevesiz ikincil listeler, 40 px satır. */
+/** Son ofisler + aktivite akışı: diğer bloklarla aynı kart dili (pm-c1), 40 px satır. */
 async function ActivitySection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const list = data.tenants;
   const auditRows = data.audit;
   return (
-    <section aria-label="Son hareketler" className="grid gap-x-8 gap-y-5 md:grid-cols-2">
-      <div className="min-w-0">
-        <div className="mb-1 flex items-center justify-between">
+    <section aria-label="Son hareketler" className="grid gap-4 md:grid-cols-2">
+      <div className="pm-c1 min-w-0 p-4">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="font-display text-sm font-bold text-text">Son ofisler</h2>
           <Link href="/admin/tenants" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-accent-text hover:text-text">Tümü</Link>
         </div>
@@ -478,8 +479,8 @@ async function ActivitySection({ period }: { period: Period }) {
           </ul>
         )}
       </div>
-      <div className="min-w-0">
-        <div className="mb-1 flex items-center justify-between">
+      <div className="pm-c1 min-w-0 p-4">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="flex items-center gap-1.5 font-display text-sm font-bold text-text"><Activity className="h-4 w-4 text-text-faint" aria-hidden /> Platform aktivite akışı</h2>
           <Link href="/admin/aktivite" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-accent-text hover:text-text">Tümü</Link>
         </div>
@@ -536,7 +537,7 @@ const SKELETON_HEIGHT: Record<HomeSection, number> = {
   health: 220,
   growth: 268,
   composition: 268,
-  activity: 260,
+  activity: 268,
   geo: 200,
 };
 
@@ -594,6 +595,7 @@ export default async function AdminHomePage({
           <Suspense fallback={<p className="mt-1 text-sm text-text-muted">Platform özeti hazırlanıyor…</p>}>
             <HeaderSummary period={period} />
           </Suspense>
+          <DataFreshness asOf={nowMs} className="mt-1.5" />
         </div>
         <PeriodToggle current={period} basePath="/admin" params={params} label="Özet dönemi" />
       </header>

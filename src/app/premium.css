@@ -60,7 +60,7 @@ html[data-theme="dark"] {
   flex-direction: column;
   gap: 0.25rem;
   border-radius: var(--pm-r);
-  padding: 1.1rem 1.15rem 1rem;
+  padding: var(--pm-card-pad, 1.1rem 1.15rem 1rem);
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
   box-shadow: var(--inner-top), var(--pm-shadow);
@@ -546,7 +546,7 @@ html[data-theme="dark"] {
 /* İkincil liste: çerçevesiz, satırlar ayırıcı çizgiyle (kart içinde kart yok). */
 .pm-flat { min-width: 0; color: var(--text); }
 .pm-sep > li + li { border-top: 1px solid var(--hairline); }
-.pm-r36 { display: flex; align-items: center; gap: 0.6rem; min-height: 2.25rem; padding: 0.25rem 0.5rem; border-radius: var(--radius-control); color: var(--text); text-decoration: none; }
+.pm-r36 { display: flex; align-items: center; gap: 0.6rem; min-height: var(--pm-r36-h, 2.25rem); padding: 0.25rem 0.5rem; border-radius: var(--radius-control); color: var(--text); text-decoration: none; }
 .pm-r36:hover { background: var(--surface-hover); }
 .pm-r36:active { background: var(--surface-pressed); }
 .pm-dot { display: inline-block; width: 0.5rem; height: 0.5rem; flex: none; border-radius: 999px; background: var(--t, var(--text-muted)); }
@@ -555,8 +555,8 @@ html[data-theme="dark"] {
 .pm-tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
 .pm-tbl th { padding: 0.35rem 0.5rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); text-align: right; white-space: nowrap; }
 .pm-tbl th:first-child, .pm-tbl td:first-child { text-align: left; }
-.pm-tbl td { height: 2.375rem; padding: 0 0.5rem; text-align: right; border-top: 1px solid var(--hairline); }
-.pm-tbl tbody th { height: 2.375rem; max-width: 10rem; padding: 0 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); border-top: 1px solid var(--hairline); }
+.pm-tbl td { height: var(--pm-row-h, 2.375rem); padding: 0 0.5rem; text-align: right; border-top: 1px solid var(--hairline); }
+.pm-tbl tbody th { height: var(--pm-row-h, 2.375rem); max-width: 10rem; padding: 0 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text); border-top: 1px solid var(--hairline); }
 .pm-tbl tbody tr:hover td, .pm-tbl tbody tr:hover th { background: var(--surface-hover); }
 .pm-tbl th.pm-l, .pm-tbl td.pm-l { text-align: left; }
 .pm-tbl td.pm-wrap { height: auto; padding-block: 0.4rem; }
@@ -626,3 +626,13 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 }
 input[type="range"]:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 3px; border-radius: 9999px; }
+
+/* ---- Yoğunluk tercihi (Görünüm > Yoğunluk; html[data-density="compact"]) ----------------
+   Tercih tema ile aynı mekanizmada (lib/theme.ts: localStorage + çerez, önyükleme betiği, ThemeController).
+   Satır yükseklikleri ve kart boşlukları token'dan okunur; yalnız bu üç token değişir (dokunma hedefi
+   olan düğmeler küçülmez). */
+html[data-density="compact"] {
+  --pm-row-h: 2rem;
+  --pm-r36-h: 1.875rem;
+  --pm-card-pad: 0.75rem 0.9rem 0.7rem;
+}

@@ -43,10 +43,17 @@ export const ACCENTS: {
 
 export const THEME_STORAGE_KEY = "es-theme";
 export const ACCENT_STORAGE_KEY = "es-accent";
+export const DENSITY_STORAGE_KEY = "es-density";
 export const THEME_EVENT = "es-theme-change";
 export const THEMED_PATH = /^\/(app|admin)(\/|$)/;
 export const DEFAULT_ACCENT: AccentPref = "ocean";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
+export type DensityPref = "comfortable" | "compact";
+export const DEFAULT_DENSITY: DensityPref = "comfortable";
+export function isDensityPref(value: unknown): value is DensityPref {
+  return value === "comfortable" || value === "compact";
+}
 
 export function isThemePref(value: unknown): value is ThemePref {
   return value === "system" || value === "light" || value === "dark";
@@ -105,6 +112,16 @@ export function writeAccentPref(pref: AccentPref): void {
   window.dispatchEvent(new Event(THEME_EVENT));
 }
 
+export function readDensityPref(): DensityPref {
+  const raw = readStored(DENSITY_STORAGE_KEY);
+  return isDensityPref(raw) ? raw : DEFAULT_DENSITY;
+}
+
+export function writeDensityPref(pref: DensityPref): void {
+  writeStored(DENSITY_STORAGE_KEY, pref);
+  window.dispatchEvent(new Event(THEME_EVENT));
+}
+
 export function subscribeTheme(onChange: () => void): () => void {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   window.addEventListener(THEME_EVENT, onChange);
@@ -126,12 +143,15 @@ export function applyTheme(): void {
   const accent = readAccentPref();
   if (accent === DEFAULT_ACCENT) root.removeAttribute("data-accent");
   else root.setAttribute("data-accent", accent);
+  if (readDensityPref() === "compact") root.setAttribute("data-density", "compact");
+  else root.removeAttribute("data-density");
 }
 
 /** Çıkışta (public sayfaya geçiş) tüm tema özniteliklerini kaldırır. */
 export function clearTheme(): void {
   document.documentElement.removeAttribute("data-theme");
   document.documentElement.removeAttribute("data-accent");
+  document.documentElement.removeAttribute("data-density");
 }
 
 /**
@@ -145,4 +165,4 @@ export function clearTheme(): void {
 const BOOT_ACCENTS = ACCENTS.filter((a) => a.value !== DEFAULT_ACCENT)
   .map((a) => a.value)
   .join("|");
-export const THEME_BOOT_SCRIPT = `(function(){try{if(!/^\\/(app|admin)(\\/|$)/.test(location.pathname))return;var g=function(k){var v=null;try{v=localStorage.getItem(k)}catch(e){}if(v===null){var m=document.cookie.match(new RegExp("(?:^|; )"+k+"=([^;]*)"));if(m)v=decodeURIComponent(m[1])}return v};var r=document.documentElement;var t=g("${THEME_STORAGE_KEY}");var d=t==="dark"||((t===null||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)r.setAttribute("data-theme","dark");var a=g("${ACCENT_STORAGE_KEY}");if(a&&/^(${BOOT_ACCENTS})$/.test(a))r.setAttribute("data-accent",a)}catch(e){}})()`;
+export const THEME_BOOT_SCRIPT = `(function(){try{if(!/^\\/(app|admin)(\\/|$)/.test(location.pathname))return;var g=function(k){var v=null;try{v=localStorage.getItem(k)}catch(e){}if(v===null){var m=document.cookie.match(new RegExp("(?:^|; )"+k+"=([^;]*)"));if(m)v=decodeURIComponent(m[1])}return v};var r=document.documentElement;var t=g("${THEME_STORAGE_KEY}");var d=t==="dark"||((t===null||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)r.setAttribute("data-theme","dark");var a=g("${ACCENT_STORAGE_KEY}");if(a&&/^(${BOOT_ACCENTS})$/.test(a))r.setAttribute("data-accent",a);if(g("${DENSITY_STORAGE_KEY}")==="compact")r.setAttribute("data-density","compact")}catch(e){}})()`;

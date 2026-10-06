@@ -5,7 +5,7 @@ import { loadDecisions, loadExpiringAuthority, type HomeCtx } from "./data";
 import { buildDecisionItems } from "./home-metrics";
 
 /** Kart yüksekliği iskelet ve içerikte aynı (4 satır + başlık; CLS yok). */
-const CARD_MIN = "min-h-[13.5rem]";
+const CARD_MIN = "lg:min-h-[13.5rem]";
 
 export function KararBekleyenlerIskelet() {
   return (

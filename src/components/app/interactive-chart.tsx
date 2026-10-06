@@ -52,6 +52,7 @@ type Props = {
 };
 
 const nfNumber = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
+const nfCompact = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 });
 
 function fmt(v: number, format: "money" | "number") {
   return format === "money" ? `${nfNumber.format(v)} ₺` : nfNumber.format(v);
@@ -114,7 +115,7 @@ export function InteractiveChart({
       for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
       return Math.ceil(len) + 8;
     };
-    return { x, y, pts1, pts2, lineOf, areaOf, lenOf, baseline: height - PAD_BOTTOM };
+    return { x, y, max, pts1, pts2, lineOf, areaOf, lenOf, baseline: height - PAD_BOTTOM };
   }, [width, height, n, data, dual]);
 
   const nearestIndex = (clientX: number) => {
@@ -217,6 +218,16 @@ export function InteractiveChart({
                 const gy = PAD_TOP + (1 - f) * (height - PAD_TOP - PAD_BOTTOM);
                 return (
                   <line key={f} x1={PAD_X} x2={width - PAD_X} y1={gy} y2={gy} stroke="var(--ink-950)" strokeOpacity="0.05" strokeWidth="1" />
+                );
+              })}
+              {/* Y ekseni: orta ve üst ızgara değerleri (grafik alanını daraltmadan, çizginin üstünde) */}
+              {[0.5, 1].map((f) => {
+                const gy = PAD_TOP + (1 - f) * (height - PAD_TOP - PAD_BOTTOM);
+                return (
+                  <text key={`y${f}`} x={PAD_X + 2} y={gy - 3} fontSize="11" fill="var(--text-faint)" className="tabular-nums">
+                    {nfCompact.format(geo.max * f)}
+                    {format === "money" ? " ₺" : ""}
+                  </text>
                 );
               })}
 
