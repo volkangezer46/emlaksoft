@@ -29,7 +29,7 @@ function DonutTooltip({
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
-      <p className="flex items-center gap-2 text-sm text-ink-950">
+      <p className="flex items-center gap-2 text-sm text-text">
         <span
           className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40"
           style={{ background: payload[0]?.payload?.fill ?? CHART_COLORS[0] }}
@@ -79,7 +79,7 @@ export function CategoryDonut({ data, centerLabel }: { data: CategoryDatum[]; ce
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-x-0 top-[38%] -translate-y-1/2 text-center">
-        <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-ink-950">
+        <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-text">
           {tryFormatter.format(total)}
         </p>
         {centerLabel ? (

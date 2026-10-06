@@ -71,7 +71,7 @@ export function KontorPanel({
   return (
     <div className="space-y-3">
       {reason ? (
-        <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-700">
+        <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-warning-strong">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" /> {reason}
         </p>
       ) : null}
@@ -81,10 +81,10 @@ export function KontorPanel({
           return (
             <div
               key={p.id}
-              className={`rounded-[var(--radius-card)] border p-4 ${p.popular ? "border-brand-600/50 bg-brand-600/5" : "border-line bg-canvas/50"}`}
+              className={`rounded-[var(--radius-card)] p-4 ${p.popular ? "bg-surface-accent-soft ring-1 ring-[var(--accent)]" : "bg-[var(--surface-sunken)]"}`}
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+                <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-surface-accent-soft text-accent-text">
                   <Coins className="h-4.5 w-4.5" />
                 </span>
                 <span className="flex flex-wrap justify-end gap-1">
@@ -94,15 +94,15 @@ export function KontorPanel({
                     </span>
                   ) : null}
                   {p.suggested && !p.popular ? (
-                    <span className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-700">Önerilen</span>
+                    <span className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-success-strong">Önerilen</span>
                   ) : null}
                 </span>
               </div>
               <p className="mt-3 text-xs font-semibold text-text-muted">{p.name}</p>
-              <p className="numeric font-display text-2xl font-extrabold text-ink-950">
+              <p className="numeric font-display text-2xl font-extrabold text-text">
                 {fmt.format(p.units)} <span className="text-sm font-semibold text-text-faint">kontör</span>
               </p>
-              <p className="numeric mt-1 text-sm font-bold text-ink-950">
+              <p className="numeric mt-1 text-sm font-bold text-text">
                 {tl(p.netTry)} <span className="text-xs font-semibold text-text-faint">+ KDV</span>
               </p>
               <p className="numeric text-xs text-text-muted">
@@ -110,7 +110,7 @@ export function KontorPanel({
               </p>
               {open ? (
                 <div className="mt-3 space-y-2 rounded-[var(--radius-control)] border border-line bg-surface p-3 text-xs">
-                  <p className="font-semibold text-ink-950">
+                  <p className="font-semibold text-text">
                     {fmt.format(p.units)} kontör için {tl2(p.totalTry)} (KDV dahil) ödeyeceksiniz.
                   </p>
                   <p className="text-text-muted">
@@ -142,7 +142,7 @@ export function KontorPanel({
                         setConfirmId(null);
                         setError(null);
                       }}
-                      className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 font-semibold text-ink-950 disabled:opacity-60"
+                      className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 font-semibold text-text disabled:opacity-60"
                     >
                       Vazgeç
                     </button>

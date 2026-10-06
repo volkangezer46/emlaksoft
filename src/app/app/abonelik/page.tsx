@@ -208,8 +208,8 @@ export default async function BillingPage({
     ? publicPlans
     : [currentPlanDef, ...publicPlans];
   const usage = [
-    { label: "Kullanıcı", value: memberCount ?? 0, limit: seatLimit, icon: Users2, href: "/app/ekip", tone: "text-brand-600 bg-brand-600/10" },
-    { label: "Aktif portföy", value: propertyCount ?? 0, limit: currentPlanDef.limits.activeProperties, icon: Building2, href: "/app/portfoyler", tone: "text-mint-600 bg-mint-500/10" },
+    { label: "Kullanıcı", value: memberCount ?? 0, limit: seatLimit, icon: Users2, href: "/app/ekip", tone: "text-accent-text bg-surface-accent-soft" },
+    { label: "Aktif portföy", value: propertyCount ?? 0, limit: currentPlanDef.limits.activeProperties, icon: Building2, href: "/app/portfoyler", tone: "text-success-strong bg-mint-500/10" },
     { label: "Müşteri kaydı", value: customerCount ?? 0, limit: currentPlanDef.limits.customers, icon: Contact2, href: "/app/musteriler", tone: "text-amber-600 bg-amber-400/10" },
     { label: "Aktif şube", value: branchCount ?? 0, limit: currentPlanDef.limits.branches, icon: GitBranch, href: "/app/ekip", tone: "text-cyan-600 bg-cyan-400/10" },
   ];
@@ -236,7 +236,7 @@ export default async function BillingPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/app/ayarlar" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
+      <Link href="/app/ayarlar" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-accent-text">
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
@@ -268,7 +268,7 @@ export default async function BillingPage({
 } />
 
       {sp.paid ? (
-        <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-mint-700">
+        <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-success-strong">
           <span className="inline-flex items-center gap-2">
             <Check className="h-4 w-4" />
             Ödeme alındı{sp.demo ? " (demo)" : ""}. {packInvoiceRecent && packInvoice?.status === "paid" ? "Kontör paketiniz bakiyenize eklenir (Kontör sekmesinden görebilirsiniz)." : sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
@@ -286,7 +286,7 @@ export default async function BillingPage({
       {billingMissing.length > 0 && isSeatOwner ? (
         <Link
           href="/app/ayarlar#marka-kimlik"
-          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-700"
+          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-warning-strong"
         >
           Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Şirket bölümünden tamamlayın.
         </Link>
@@ -295,7 +295,7 @@ export default async function BillingPage({
       {seatShortfall > 0 && isSeatOwner ? (
         <Link
           href={seatSupport.displayEnabled ? "#koltuk" : "/app/ekip"}
-          className="block rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/5 px-4 py-3 text-sm font-medium text-ink-950"
+          className="block rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/5 px-4 py-3 text-sm font-medium text-text"
         >
           Kayıtta {teamSizeLabel} kullanıcı seçtiniz; planınızda {seatLimit} koltuk var, en fazla {seatShortfall} ek koltuk gerekebilir. Koltukları görün.
         </Link>
@@ -304,7 +304,7 @@ export default async function BillingPage({
       {pendingCancel && cancelSupported ? (
         <Link
           href="/app/abonelik?sekme=iptal"
-          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-700"
+          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-warning-strong"
         >
           İptal talebiniz var: aboneliğiniz{periodEndLabel ? ` ${periodEndLabel} tarihinde` : " dönem sonunda"} sona erecek. Ayrıntı ve geri alma için tıklayın.
         </Link>
@@ -322,7 +322,7 @@ export default async function BillingPage({
             className={`block rounded-[var(--radius-card)] border px-4 py-3 text-sm font-medium ${
               u.value >= (u.limit ?? 0)
                 ? "border-danger-500/30 bg-danger-500/10 text-danger-600"
-                : "border-amber-400/40 bg-amber-400/10 text-amber-700"
+                : "border-amber-400/40 bg-amber-400/10 text-warning-strong"
             }`}
           >
             {u.label}: {u.value}/{u.limit}{" "}
@@ -334,7 +334,7 @@ export default async function BillingPage({
 
       {active === "iptal" && cancelSupported ? (
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="font-display font-bold text-ink-950">Aboneliği iptal et</h2>
+          <h2 className="font-display font-bold text-text">Aboneliği iptal et</h2>
           <div className="mt-3">
             <CancelPanel canCancel={canCancel} pendingCancel={pendingCancel} endsAtLabel={periodEndLabel} />
           </div>
@@ -372,10 +372,10 @@ export default async function BillingPage({
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Gauge className="h-4 w-4" /> Kullanım</p>
-            <h2 className="mt-1 font-display font-bold text-ink-950">Hesap kullanım göstergeleri</h2>
+            <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Gauge className="h-4 w-4" /> Kullanım</p>
+            <h2 className="mt-1 font-display font-bold text-text">Hesap kullanım göstergeleri</h2>
           </div>
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{planLabel(currentPlan)} paketi</span>
+          <span className="rounded-full bg-surface-accent-soft px-2.5 py-1 text-xs font-bold text-accent-text">{planLabel(currentPlan)} paketi</span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {usage.map((u) => {
@@ -390,10 +390,10 @@ export default async function BillingPage({
                   <span className={`grid h-9 w-9 place-items-center rounded-[var(--radius-control)] ${u.tone}`}>
                     <u.icon className="h-4.5 w-4.5" />
                   </span>
-                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                  <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
                 </div>
                 <p className="mt-3 text-xs font-semibold text-text-muted">{u.label}</p>
-                <p className="numeric mt-0.5 font-display text-xl font-extrabold text-ink-950">
+                <p className="numeric mt-0.5 font-display text-xl font-extrabold text-text">
                   {u.value.toLocaleString("tr-TR")}
                   {u.limit ? <span className="ml-1 text-sm font-semibold text-text-faint">/ {u.limit}</span> : null}
                 </p>
@@ -405,7 +405,7 @@ export default async function BillingPage({
                         style={{ width: `${Math.max(4, doluluk)}%` }}
                       />
                     </div>
-                    <p className={`mt-1 text-xs font-semibold ${doluluk >= 100 ? "text-danger-500" : "text-text-muted"}`}>
+                    <p className={`mt-1 text-xs font-semibold ${doluluk >= 100 ? "text-danger-strong" : "text-text-muted"}`}>
                       {doluluk >= 100 ? "Paket limiti doldu — üst pakete geçin" : `Limitin %${doluluk}'i kullanımda`}
                     </p>
                   </>
@@ -439,7 +439,7 @@ export default async function BillingPage({
         />
       ) : (
         <section id="koltuk" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-5">
-          <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Users2 className="h-4 w-4" /> Kullanıcı ekle / çıkar</p>
+          <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Users2 className="h-4 w-4" /> Kullanıcı ekle / çıkar</p>
           <p className="mt-2 text-sm text-text-muted">
             Etkin değil: yönetici hazırlığı tamamlanıyor. Şu an paketinize dahil {currentPlanDef.limits.seats} kullanıcıdan {memberCount ?? 0} tanesini kullanıyorsunuz;
             daha fazlası için aşağıdan üst pakete geçebilirsiniz.
@@ -471,7 +471,7 @@ export default async function BillingPage({
           Yıllık · {yearlyOfferLabel(publicPlans[0] ?? {})}
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
-          <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />
+          <ShieldCheck className="h-3.5 w-3.5 text-success-strong" />
           {configured ? "Güvenli ödeme" : "Demo mod"}
         </span>
       </div>
@@ -489,13 +489,13 @@ export default async function BillingPage({
               }`}
             >
               {current ? (
-                <span className="absolute right-4 top-4 rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-600">
+                <span className="absolute right-4 top-4 rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-success-strong">
                   Aktif
                 </span>
               ) : null}
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-600">{plan.blurb}</p>
-              <h2 className="mt-1 font-display text-xl font-extrabold text-ink-950">{plan.name}</h2>
-              <p className="mt-3 font-display text-3xl font-extrabold text-ink-950">
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-accent-text">{plan.blurb}</p>
+              <h2 className="mt-1 font-display text-xl font-extrabold text-text">{plan.name}</h2>
+              <p className="mt-3 font-display text-3xl font-extrabold text-text">
                 {money(amount)}
                 <span className="ml-1 text-sm font-semibold text-text-muted">
                   /{cycle === "yearly" ? "yıl" : "ay"}
@@ -510,7 +510,7 @@ export default async function BillingPage({
               <ul className="mt-4 flex-1 space-y-2">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-xs text-text-muted">
-                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" />
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success-strong" />
                     {f}
                   </li>
                 ))}
@@ -550,10 +550,10 @@ export default async function BillingPage({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-amber-500" />
-            <h2 className="font-display font-bold text-ink-950">Fatura geçmişi</h2>
+            <h2 className="font-display font-bold text-text">Fatura geçmişi</h2>
           </div>
           {(invoices ?? []).length > 0 ? (
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+            <span className="rounded-full bg-surface-accent-soft px-2.5 py-1 text-xs font-bold text-accent-text">
               Son {(invoices ?? []).length} fatura
             </span>
           ) : null}
@@ -578,7 +578,7 @@ export default async function BillingPage({
               <TBody>
                 {(invoices ?? []).map((inv) => (
                   <TR key={inv.id}>
-                    <TD className="font-semibold text-ink-950"><Link href={`/app/abonelik/fatura/${inv.id}`} className="hover:text-brand-600 hover:underline">{inv.invoice_no}</Link></TD>
+                    <TD className="font-semibold text-text"><Link href={`/app/abonelik/fatura/${inv.id}`} className="hover:text-accent-text hover:underline">{inv.invoice_no}</Link></TD>
                     <TD className="text-text-muted">
                       {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
                     </TD>
@@ -590,17 +590,17 @@ export default async function BillingPage({
                     <TD>
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                          inv.status === "paid" ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-600"
+                          inv.status === "paid" ? "bg-mint-500/10 text-success-strong" : "bg-amber-400/15 text-amber-600"
                         }`}
                       >
                         {{ paid: "Ödendi", open: "Ödeme bekliyor", void: "İptal", uncollectible: "Tahsil edilemedi" }[inv.status as string] ?? inv.status}
                       </span>
                     </TD>
-                    <TD align="right" className="numeric font-display font-bold text-ink-950">
+                    <TD align="right" className="numeric font-display font-bold text-text">
                       {money(Number(inv.total_try))}
                     </TD>
                     <TD align="right">
-                      <Link href={`/app/abonelik/fatura/${inv.id}`} className="text-xs font-semibold text-brand-600 hover:underline">
+                      <Link href={`/app/abonelik/fatura/${inv.id}`} className="text-xs font-semibold text-accent-text hover:underline">
                         Aç / yazdır
                       </Link>
                     </TD>

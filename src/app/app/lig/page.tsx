@@ -70,10 +70,10 @@ function dateLabel(iso: string) {
  */
 function Cell({ href, value, label }: { href: string; value: number; label: string }) {
   return (
-    <TD align="right" className={value > 0 ? "text-ink-950" : "text-text-faint"}>
+    <TD align="right" className={value > 0 ? "text-text" : "text-text-faint"}>
       <Link
         href={href}
-        className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold hover:text-brand-600 hover:underline"
+        className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold hover:text-accent-text hover:underline"
         aria-label={label}
       >
         {value}
@@ -91,7 +91,7 @@ function RankTrend({ current, previous }: { current: number; previous: number | 
     return (
       <span
         title="Geçen ay ligde mühürlü kaydı yok — ilk kez sıralandı"
-        className="inline-flex items-center rounded-full bg-brand-600/10 px-1.5 py-0.5 text-xs font-bold text-brand-700"
+        className="inline-flex items-center rounded-full bg-surface-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-text"
       >
         yeni
       </span>
@@ -109,7 +109,7 @@ function RankTrend({ current, previous }: { current: number; previous: number | 
   return (
     <span
       title={`Geçen aya göre ${Math.abs(delta)} sıra ${up ? "yükseldi" : "geriledi"}`}
-      className={`inline-flex items-center gap-0.5 text-xs font-bold tabular-nums ${up ? "text-mint-600" : "text-danger-500"}`}
+      className={`inline-flex items-center gap-0.5 text-xs font-bold tabular-nums ${up ? "text-success-strong" : "text-danger-strong"}`}
     >
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {Math.abs(delta)}
@@ -306,13 +306,13 @@ export default async function LigPage({
                       </span>
                     </TD>
                     <TD>
-                      <span className="font-display text-xl font-bold text-ink-950">{r.agent!.fullName}</span>
+                      <span className="font-display text-xl font-bold text-text">{r.agent!.fullName}</span>
                     </TD>
                     <TD align="right">
-                      <span className="numeric font-display text-2xl font-extrabold text-brand-600">{r.total}</span>
+                      <span className="numeric font-display text-2xl font-extrabold text-accent-text">{r.total}</span>
                     </TD>
                     <TD align="right">
-                      <span className="numeric text-xl font-bold text-ink-950">{r.breakdown.deal_won.count}</span>
+                      <span className="numeric text-xl font-bold text-text">{r.breakdown.deal_won.count}</span>
                     </TD>
                     <TD align="right">
                       <span className="numeric text-xl font-bold text-amber-600">
@@ -444,7 +444,7 @@ export default async function LigPage({
                 <p className={`flex items-center gap-2 text-xs font-semibold text-amber-600 ${podium.length === 1 ? "justify-center" : ""}`}>
                   <Crown className="h-4 w-4" /> Podyum
                 </p>
-                <h2 className="mt-1 font-display text-lg font-bold text-ink-950 first-letter:uppercase">
+                <h2 className="mt-1 font-display text-lg font-bold text-text first-letter:uppercase">
                   {podium.length === 1 ? `${range.label} lideri` : `${range.label} ilk üçü`}
                 </h2>
                 <div className={`mt-6 grid gap-3 sm:items-end ${podiumColumns(podium.length)}`}>
@@ -460,10 +460,10 @@ export default async function LigPage({
                         <span className={`mx-auto grid h-14 w-14 place-items-center rounded-full font-display text-base font-extrabold ${s.ring}`}>
                           {monogram(r.agent!.fullName)}
                         </span>
-                        <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-ink-950 group-hover:text-brand-600">
+                        <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-text group-hover:text-accent-text">
                           <span aria-hidden="true">{s.medal}</span> {r.agent!.fullName}
                         </p>
-                        <p className="numeric font-display text-2xl font-extrabold text-brand-600">{r.total}</p>
+                        <p className="numeric font-display text-2xl font-extrabold text-accent-text">{r.total}</p>
                         <p className="text-xs text-text-muted">
                           puan · {r.badges.length} rozet
                           {r.streak > 0 ? ` · 🔥 ${r.streak} gün` : ""}
@@ -499,7 +499,7 @@ export default async function LigPage({
                 {rows.map((r) => {
                   const ben = r.staffId === userId;
                   return (
-                    <TR key={r.staffId} interactive className={ben ? "bg-brand-600/[0.06]" : undefined}>
+                    <TR key={r.staffId} interactive className={ben ? "bg-surface-accent-soft" : undefined}>
                       <TD>
                         <div className="flex items-center gap-2">
                           <span
@@ -521,10 +521,10 @@ export default async function LigPage({
                           className="absolute inset-0"
                           aria-label={`${r.agent!.fullName} danışman detayı`}
                         />
-                        <p className="font-semibold text-ink-950 group-hover:text-brand-600">
+                        <p className="font-semibold text-text group-hover:text-accent-text">
                           {r.agent!.fullName}
                           {ben ? (
-                            <span className="ml-1.5 rounded-full bg-brand-600/12 px-1.5 py-0.5 text-xs font-bold text-brand-700">
+                            <span className="ml-1.5 rounded-full bg-surface-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-text">
                               sen
                             </span>
                           ) : null}
@@ -532,7 +532,7 @@ export default async function LigPage({
                         <p className="text-xs text-text-faint">{roleLabel(r.agent!.role)}</p>
                       </TD>
                       <TD align="right">
-                        <span className="numeric font-display text-base font-extrabold text-brand-600">{r.total}</span>
+                        <span className="numeric font-display text-base font-extrabold text-accent-text">{r.total}</span>
                       </TD>
                       {/* Kırılım hücreleri: filtreyi destekleyen hedefte filtreli link */}
                       <Cell
@@ -559,7 +559,7 @@ export default async function LigPage({
                         {metricsById.has(r.staffId) ? (
                           <Link
                             href={`/app/teklifler?danisman=${r.staffId}&durum=accepted`}
-                            className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold hover:text-brand-600 hover:underline"
+                            className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold hover:text-accent-text hover:underline"
                             aria-label={`${r.agent!.fullName} kabul edilen teklifleri`}
                           >
                             {metricsById.get(r.staffId)!.dealCount}
@@ -568,7 +568,7 @@ export default async function LigPage({
                           "—"
                         )}
                       </TD>
-                      <TD align="right" className="font-semibold text-mint-700">
+                      <TD align="right" className="font-semibold text-success-strong">
                         {metricsById.get(r.staffId)?.revenue ? (
                           <Link
                             href={r.staffId === userId ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis"}
@@ -627,15 +627,15 @@ export default async function LigPage({
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+            <p className="flex items-center gap-2 text-xs font-semibold text-accent-text">
               <Award className="h-4 w-4" /> Rozet galerisi
             </p>
-            <h2 className="mt-1 font-display text-lg font-bold text-ink-950">
+            <h2 className="mt-1 font-display text-lg font-bold text-text">
               {myRow ? `${myRow.agent!.fullName} — rozetlerin` : "Rozetler"}
             </h2>
           </div>
           <p className="text-xs text-text-muted">
-            <span className="numeric font-bold text-ink-950">{myEarned.size}</span> / {BADGES.length} rozet kazanıldı
+            <span className="numeric font-bold text-text">{myEarned.size}</span> / {BADGES.length} rozet kazanıldı
           </p>
         </div>
 
@@ -666,7 +666,7 @@ export default async function LigPage({
                     <Icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 font-display text-sm font-bold text-ink-950">
+                    <p className="flex items-center gap-1.5 font-display text-sm font-bold text-text">
                       {b.name}
                       <span className="rounded-full bg-ink-950/5 px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
                         {b.scope === "monthly" ? "aylık" : "kalıcı"}
@@ -675,7 +675,7 @@ export default async function LigPage({
                     {kazanildi ? (
                       <>
                         <p className="mt-0.5 text-xs text-text-muted">{b.description}</p>
-                        <p className="mt-1 text-xs font-semibold text-mint-700">
+                        <p className="mt-1 text-xs font-semibold text-success-strong">
                           {earnedAt ? `Kazanıldı · ${dateLabel(earnedAt)}` : "Kazanıldı · bu dönem"}
                         </p>
                       </>
@@ -708,14 +708,14 @@ function ScoreRulesCard() {
   ];
   return (
     <section className="surface-card rounded-[var(--radius-panel)] p-5">
-      <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+      <p className="flex items-center gap-2 text-xs font-semibold text-accent-text">
         <Target className="h-4 w-4" /> Nasıl puan kazanılır
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
           <div key={it.key} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] bg-canvas px-3 py-2.5">
             <span className="text-xs text-text-muted">{it.hint}</span>
-            <span className="numeric shrink-0 font-display text-sm font-extrabold text-ink-950">
+            <span className="numeric shrink-0 font-display text-sm font-extrabold text-text">
               +{SCORE_RULES[it.key]}
             </span>
           </div>

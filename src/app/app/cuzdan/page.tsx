@@ -5,7 +5,6 @@ import {
   HandCoins,
   Info,
   ReceiptText,
-  TrendingUp,
   Users,
   Wallet,
 } from "lucide-react";
@@ -28,6 +27,9 @@ import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/deta
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { currentMonthPeriod, earningInRange, fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { OfficeEarnings } from "./office-earnings";
+import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
+import { Celebration } from "@/components/ui/illustrations";
+import { isFirstCollectionMoment } from "@/lib/celebration-conditions";
 
 type CommissionRow = {
   id: string;
@@ -161,8 +163,12 @@ export default async function CuzdanPage({
     const idx = trendIndex.get(`${p.year}-${String(p.month + 1).padStart(2, "0")}`);
     if (idx !== undefined) trendMonths[idx].amount += share.amount;
   }
-  const trendMax = Math.max(1, ...trendMonths.map((m) => m.amount));
   const hasTrendData = trendMonths.some((m) => m.amount > 0);
+
+  const firstCollection = isFirstCollectionMoment(
+    mine.filter(({ row }) => isPaid(row.status)).map(({ row }) => row.created_at),
+    nowTs,
+  );
 
   const listed = mine.slice(0, LIST_LIMIT);
 
@@ -200,10 +206,10 @@ export default async function CuzdanPage({
       <article className="print-only print-sheet">
         <header className="hairline-b flex flex-wrap items-start justify-between gap-4 pb-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent-text">
               {office?.name ?? "Emlak ofisi"}
             </p>
-            <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">
+            <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-text">
               Dönem bordrosu
             </h1>
             <p className="mt-1 text-sm text-text-muted">{fullName ?? "Danışman"}</p>
@@ -211,17 +217,17 @@ export default async function CuzdanPage({
           <dl className="text-right text-xs text-text-muted">
             <div className="flex justify-end gap-2">
               <dt>Dönem</dt>
-              <dd className="font-semibold text-ink-950">{donem}</dd>
+              <dd className="font-semibold text-text">{donem}</dd>
             </div>
             <div className="mt-1 flex justify-end gap-2">
               <dt>Düzenlenme tarihi</dt>
-              <dd className="font-semibold text-ink-950">
+              <dd className="font-semibold text-text">
                 {new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" }).format(now)}
               </dd>
             </div>
             <div className="mt-1 flex justify-end gap-2">
               <dt>Kayıt sayısı</dt>
-              <dd className="numeric font-semibold text-ink-950">{bordroItems.length}</dd>
+              <dd className="numeric font-semibold text-text">{bordroItems.length}</dd>
             </div>
           </dl>
         </header>
@@ -252,7 +258,7 @@ export default async function CuzdanPage({
                       <TD className="text-text-muted">
                         {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}
                       </TD>
-                      <TD className="font-semibold text-ink-950">
+                      <TD className="font-semibold text-text">
                         {property?.title ?? "Komisyon kaydı"}
                         {property?.property_code ? (
                           <span className="block text-xs font-normal text-text-faint">{property.property_code}</span>
@@ -260,7 +266,7 @@ export default async function CuzdanPage({
                       </TD>
                       <TD align="right">{money(Number(row.gross_amount))}</TD>
                       <TD className="text-text-muted">{share.note}</TD>
-                      <TD align="right" className="font-bold text-ink-950">{money(share.amount)}</TD>
+                      <TD align="right" className="font-bold text-text">{money(share.amount)}</TD>
                       <TD className="text-text-muted">{isPaid(row.status) ? "Tahsil edildi" : "Bekliyor"}</TD>
                     </TR>
                   );
@@ -280,7 +286,7 @@ export default async function CuzdanPage({
           ].map(([k, v]) => (
             <div key={k} className="rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
               <dt className="text-xs text-text-faint">{k}</dt>
-              <dd className="numeric text-sm font-bold text-ink-950">{v}</dd>
+              <dd className="numeric text-sm font-bold text-text">{v}</dd>
             </div>
           ))}
         </dl>
@@ -308,30 +314,31 @@ export default async function CuzdanPage({
         <StatCard label="Toplam kayıt" value={mine.length} icon={ReceiptText} href="/app/komisyon" />
       </KpiGrid>
 
+      {firstCollection ? (
+        <div className="no-print relative flex items-center gap-3 overflow-hidden rounded-[var(--radius-panel)] bg-success-soft px-5 py-3" role="status">
+          <Celebration tick label="İlk tahsilat" />
+          <p className="text-sm font-semibold text-success-strong">İlk tahsilatınız gerçekleşti: tahsil edilen payınız aşağıda kayıtlıdır.</p>
+        </div>
+      ) : null}
+
       {hasTrendData ? (
-        <section className="no-print rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><TrendingUp className="h-4 w-4" /> Trend</p>
-            <h2 className="mt-1 font-display font-bold text-ink-950">Son 6 ay hakediş</h2>
-          </div>
-          <div className="mt-5 grid grid-cols-6 gap-2 sm:gap-4">
-            {trendMonths.map((m, i) => (
-              <div key={m.key} className="flex flex-col items-center">
-                <div className="flex h-32 w-full items-end justify-center rounded-[var(--radius-card)] bg-canvas px-2 pb-2 pt-4">
-                  <div
-                    className="bar-live w-full max-w-[26px] rounded-t-[6px] bg-mint-500"
-                    style={{ height: `${Math.max(m.amount > 0 ? 6 : 0, (m.amount / trendMax) * 100)}%`, animationDelay: `${i * 70}ms` }}
-                    title={`Hakediş: ${money(m.amount)}`}
-                  />
-                </div>
-                <p className="mt-2 text-center text-xs font-semibold text-ink-950">{m.label}</p>
-                <p className="text-center text-xs font-bold tabular-nums text-mint-600">
-                  {new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(m.amount)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <div className="no-print">
+          <ChartFrame
+            title="Son 6 ay hakediş"
+            subtitle="Aylık hakediş"
+            href="/app/komisyon?durum=tahsil"
+            hrefLabel="Komisyon defteri"
+            height={208}
+            className="shadow-[var(--elev-1)]"
+          >
+            <BarCompare
+              data={trendMonths.map((m) => ({ ay: m.label, hakedis: m.amount }))}
+              xKey="ay"
+              series={[{ key: "hakedis", label: "Hakediş", color: "var(--viz-1)" }]}
+              format="money"
+            />
+          </ChartFrame>
+        </div>
       ) : null}
 
       {mine.length === 0 ? (
@@ -345,10 +352,10 @@ export default async function CuzdanPage({
           />
         </div>
       ) : (
-        <section className="no-print overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+        <section className="no-print overflow-hidden rounded-[var(--radius-panel)] bg-surface shadow-[var(--elev-1)]">
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-            <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><ReceiptText className="h-4 w-4" /> Hakediş kayıtları</p><h2 className="mt-1 font-display font-bold text-ink-950">Hareket zaman çizelgesi</h2></div>
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{listed.length} kayıt</span>
+            <div><p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><ReceiptText className="h-4 w-4" /> Hakediş kayıtları</p><h2 className="mt-1 font-display font-bold text-text">Hareket zaman çizelgesi</h2></div>
+            <span className="rounded-full bg-surface-accent-soft px-2.5 py-1 text-xs font-bold text-accent-text">{listed.length} kayıt</span>
           </div>
           <div className="px-5 pt-3">
             <ListLimitNotice
@@ -365,9 +372,9 @@ export default async function CuzdanPage({
               <div key={group.key}>
                 <div className="flex items-center justify-between gap-3 pb-2 pt-4">
                   <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.1em] text-text-faint">
-                    <CalendarDays className="h-3.5 w-3.5 text-brand-600" /> {group.label}
+                    <CalendarDays className="h-3.5 w-3.5 text-accent-text" /> {group.label}
                   </p>
-                  <span className="numeric rounded-full bg-mint-500/10 px-2.5 py-0.5 text-xs font-bold text-mint-700">
+                  <span className="numeric rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-bold text-success-strong">
                     {money(group.toplam)}
                   </span>
                 </div>
@@ -379,7 +386,7 @@ export default async function CuzdanPage({
                     return (
                       <article
                         key={row.id}
-                        className="group relative grid gap-2 rounded-[var(--radius-card)] py-3 pl-5 pr-2 transition hover:bg-brand-600/[0.02] md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-center"
+                        className="group relative grid gap-2 rounded-[var(--radius-card)] py-3 pl-5 pr-2 transition hover:bg-surface-hover md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-center"
                       >
                         {/* Zaman çizelgesi noktası — durum rengi */}
                         <span
@@ -395,20 +402,20 @@ export default async function CuzdanPage({
                           <Link href={`/app/anlasmalar/${row.deal_id}`} className="absolute inset-0" aria-label="Bağlı anlaşmayı aç" />
                         ) : null}
                         <div>
-                          <p className="text-sm font-semibold text-ink-950">{property?.title ?? "Komisyon kaydı"}</p>
+                          <p className="text-sm font-semibold text-text">{property?.title ?? "Komisyon kaydı"}</p>
                           <p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? (row.deal_id ? "Portföysüz anlaşma" : "Genel işlem")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p>
                         </div>
                         <div>
                           <p className="text-xs text-text-faint">Brüt komisyon</p>
-                          <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
+                          <p className="font-display text-sm font-bold text-text">{money(Number(row.gross_amount))}</p>
                         </div>
                         <div>
                           <p className="text-xs text-text-faint">Danışman payı</p>
-                          <p className="font-display text-sm font-bold text-mint-700">{money(share.amount)}</p>
+                          <p className="font-display text-sm font-bold text-success-strong">{money(share.amount)}</p>
                           <p className="mt-0.5 text-xs text-text-muted">{share.note}</p>
                         </div>
                         <div>
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${paid ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${paid ? "bg-success-soft text-success-strong" : "bg-amber-400/15 text-warning-strong"}`}>
                             {paid ? "Tahsil edildi" : "Bekliyor"}
                           </span>
                         </div>
@@ -420,8 +427,8 @@ export default async function CuzdanPage({
             ))}
           </div>
           {/* Metodoloji notu — pay hangi kaynaktan hesaplanıyor? */}
-          <div className="flex items-start gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-xs text-text-muted">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
+          <div className="flex items-start gap-2 border-t border-line bg-[var(--surface-sunken)] px-5 py-3 text-xs text-text-muted">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-text" />
             <span>
               Pay hesabı: paylaşım satırında <strong>adınla birebir eşleşen</strong> etiketin oranı; adın yoksa ve anlaşma
               sana atanmışsa jenerik <strong>&quot;Danışman&quot;</strong> satırının oranı; paylaşım hiç tanımlanmamışsa brüt tutarın

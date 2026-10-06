@@ -1,13 +1,16 @@
+import { SkeletonCard } from "@/components/ui/viz";
+
+/** Sabit yükseklikli iskelet: içerik gelince düzen kaymaz (CLS=0). */
 export default function Loading() {
   return (
-    <div className="animate-pulse space-y-6">
-      <div className="h-44 rounded-[var(--radius-panel)] bg-ink-950/8" />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-28 rounded-[var(--radius-panel)] bg-ink-950/8" />
-        ))}
+    <div className="space-y-6" aria-busy="true">
+      <SkeletonCard height={176} label="Sayfa yükleniyor" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <SkeletonCard variant="card" height={128} lines={2} label="Kart yükleniyor" />
+        <SkeletonCard variant="card" height={128} lines={2} label="Kart yükleniyor" />
+        <SkeletonCard variant="card" height={128} lines={2} label="Kart yükleniyor" />
       </div>
-      <div className="h-96 rounded-[var(--radius-panel)] bg-ink-950/8" />
+      <SkeletonCard height={320} label="Grafik yükleniyor" />
     </div>
   );
 }

@@ -13,7 +13,7 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
-const LINK = "focus-ring rounded-[var(--radius-control)] hover:text-brand-600 hover:underline";
+const LINK = "focus-ring rounded-[var(--radius-control)] hover:text-accent-text hover:underline";
 
 /**
  * Kazanç / "Ofis geneli" sekmesi (eski Ekip Merkezi / Kazanç sayfası). Yalnız `earnings_all` izni olan ve Ofis paketi
@@ -101,7 +101,7 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
                   {table.map(({ m, pending, collected, count }) => (
                     <TR key={m.id}>
                       <TD>
-                        <Link href={`/app/ekip/${m.id}?sekme=kazanc`} className={`${LINK} font-semibold text-ink-950`}>
+                        <Link href={`/app/ekip/${m.id}?sekme=kazanc`} className={`${LINK} font-semibold text-text`}>
                           {m.fullName}
                         </Link>
                       </TD>
@@ -114,7 +114,7 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
                       <TD align="right">
                         <Link href="/app/komisyon?durum=tahsil" className={LINK}>{collected > 0 ? money(collected) : "—"}</Link>
                       </TD>
-                      <TD align="right" className="font-bold text-mint-700">
+                      <TD align="right" className="font-bold text-success-strong">
                         {pending + collected > 0 ? money(pending + collected) : "—"}
                       </TD>
                     </TR>

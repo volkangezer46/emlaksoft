@@ -28,7 +28,7 @@ export function TargetCreateTrigger({ variant = "solid" }: { variant?: "hero" | 
   return variant === "hero" ? (
     <InlinePanelTrigger
       panelId={TARGET_PANEL_ID}
-      className="btn-shine bg-white px-4 py-2.5 font-bold text-ink-950 shadow-[var(--elev-2)] hover:bg-white/90"
+      className="btn-shine bg-white px-4 py-2.5 font-bold text-text shadow-[var(--elev-2)] hover:bg-white/90"
     >
       <Plus className="h-4 w-4" /> Yeni hedef
     </InlinePanelTrigger>
