@@ -1,3 +1,4 @@
+import { formatTry } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -339,7 +340,7 @@ export default async function ContractDetailPage({
                                     : null,
                                   propertyAddress: propertyRel?.address_line ?? null,
                                   priceText:       propertyRel?.list_price != null
-                                    ? `${new Intl.NumberFormat("tr-TR").format(Number(propertyRel.list_price))} TL`
+                                    ? formatTry(Number(propertyRel.list_price))
                                     : null,
                                   todayText: new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date(now())),
                                 }}

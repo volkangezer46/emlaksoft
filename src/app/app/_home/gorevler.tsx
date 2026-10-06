@@ -5,7 +5,7 @@ import { DAY_MS } from "@/lib/clock";
 import { TaskQuickRow } from "../dashboard-quick-actions";
 import { Widget } from "../dashboard-widgets";
 import { loadTaskSummary, type HomeCtx } from "./data";
-import { timeFmt } from "./format";
+import { formatTrTime } from "@/lib/clock";
 import { PanelLink } from "./ortak";
 
 export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
@@ -22,7 +22,7 @@ export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
       meta: t.due_at
         ? overdueDays > 0
           ? `${overdueDays} gün gecikmiş`
-          : `Bugün ${timeFmt.format(new Date(t.due_at))}`
+          : `Bugün ${formatTrTime(t.due_at)}`
         : "Vadesiz",
       urgent: overdueDays > 0 || t.priority === "high",
     };

@@ -86,8 +86,8 @@ describe("tanım listeleri tek kaynak sözleşmesi", () => {
     expect(labels.portal_sahibinden).toBe("Sahibinden.com");
   });
 
-  it("lookup_values tablosu yalnız adaptör dosyasından okunur", () => {
+  it("lookup_values tablosu kodda okunmaz/yazılmaz (çağıranı olmayan adaptör 2026-10'da silindi; tanımlar tek kaynak)", () => {
     const readers = files.filter((f) => /\.from\("lookup_values"\)/.test(f.text)).map((f) => f.rel);
-    expect(readers).toEqual(["app/actions/property-management.ts"]);
+    expect(readers).toEqual([]);
   });
 });

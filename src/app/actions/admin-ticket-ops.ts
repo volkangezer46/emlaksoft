@@ -6,7 +6,6 @@ import { requirePlatformModule } from "@/lib/platform";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { logPlatformActivity } from "@/lib/platform-activity";
-import { replyTicketAsStaff } from "@/app/actions/tickets";
 import { loadTicketCategoryOptionsForTenant } from "@/lib/support/ticket-category-options";
 import {
   TICKET_LIMITS,
@@ -14,7 +13,6 @@ import {
   isTicketStatus,
   isUuid,
   uniqueValidTicketIds,
-  validateTicketBody,
   validateTicketCategory,
 } from "@/lib/support/ticket-contract";
 
@@ -168,25 +166,6 @@ export async function updateTicketCategory(formData: FormData): Promise<AdminTic
   const rateError = await adminRate(staff.id, "category");
   if (rateError) return { error: rateError };
   return updateAdminField(staff.id, id, "category", category, expectedVersion(formData));
-}
-
-/** Internal note is stored as a staff message hidden by tenant RLS and Realtime. */
-export async function addInternalTicketNote(
-  _prev: AdminTicketOpsResult,
-  formData: FormData,
-): Promise<AdminTicketOpsResult> {
-  await requirePlatformModule("tickets");
-  const body = String(formData.get("body") ?? "").trim();
-  const bodyError = validateTicketBody(body);
-  if (bodyError) return { error: bodyError };
-  formData.set("visibility", "internal");
-  const result = await replyTicketAsStaff({}, formData);
-  return {
-    ok: result.ok,
-    error: result.error,
-    ticketId: result.ticketId,
-    messageId: result.messageId,
-  };
 }
 
 /** Max 50 ticket; RPC is atomic, so an invalid row rolls the whole batch back. */

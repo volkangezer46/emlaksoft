@@ -6,7 +6,7 @@ import { msSince } from "@/lib/clock";
 import { listCampaigns } from "@/app/actions/campaigns";
 import { ButtonLink } from "@/components/ui/button";
 import { CampaignActions } from "./campaign-actions";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DataTable, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
 
 import { PageHeader } from "@/components/ui/page-header";

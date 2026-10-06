@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { checkAuthorityShield as runShield } from "@/lib/authority-shield";
 
 export type ComplianceResult = { error?: string; ok?: boolean };
 
@@ -52,11 +51,4 @@ export async function upsertIysConsent(formData: FormData): Promise<ComplianceRe
   revalidatePath("/app/uyum");
   revalidatePath(`/app/musteriler/${customerId}`);
   return { ok: true };
-}
-
-export async function checkAuthorityShield(input: {
-  hasWrittenAuthority: boolean;
-  transactionType?: string;
-}): Promise<{ ok: boolean; warning?: string }> {
-  return runShield({ hasWrittenAuthority: input.hasWrittenAuthority });
 }

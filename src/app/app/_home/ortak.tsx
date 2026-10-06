@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
 import { sparklineGeometry } from "@/lib/sparkline";
-import { Skeleton, SkeletonRow } from "@/components/app/skeleton";
+import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 import type { TrendInfo } from "./helpers";
 
 export const toneText: Record<string, string> = {

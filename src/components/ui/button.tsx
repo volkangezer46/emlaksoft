@@ -32,8 +32,8 @@ const VARIANTS = {
 const SIZES = {
   xs: "h-7 touch:h-11 gap-1 rounded-[var(--radius-control)] px-2.5 text-xs",
   sm: "h-8 touch:h-11 gap-1.5 rounded-[var(--radius-control)] px-3 text-xs",
-  md: "h-10 touch:h-11 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
-  lg: "h-11 gap-2 rounded-[var(--radius-control)] px-5 text-sm",
+  md: "h-9 touch:h-11 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
+  lg: "h-10 touch:h-11 gap-2 rounded-[var(--radius-control)] px-5 text-sm",
 } as const;
 
 /** İkon boyu boy ölçeğiyle birlikte büyür — elle `h-4 w-4` yazmaya gerek yok. */

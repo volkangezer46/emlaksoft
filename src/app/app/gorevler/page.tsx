@@ -8,7 +8,7 @@ import { DAY_MS, daysFromNowIso, now, trDayStartMs } from "@/lib/clock";
 import { QuickTask } from "./quick-task";
 import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";

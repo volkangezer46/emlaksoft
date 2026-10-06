@@ -109,15 +109,17 @@ async function NotificationBellStream() {
 /** Ofis skoru rozeti: kabuğu BEKLETMEZ (ilk hesap 5 sorgu; 3 dk önbellekli), kendi sınırında akar. */
 async function OfficeScoreBadge({ tenantId }: { tenantId: string | null }) {
   const score = tenantId ? await getOfficeScoreCached(tenantId).catch(() => null) : null;
-  return <OfficeScoreLink text={score ? `Ofis skoru ${score.score} · ${score.label}` : "Ofis skoru —"} />;
+  return <OfficeScoreLink text={score ? `Skor ${score.score}` : "Skor —"} label={score ? `Ofis skoru ${score.score}, ${score.label}` : "Ofis skoru hesaplanıyor"} />;
 }
 
-function OfficeScoreLink({ text }: { text: string }) {
+/** Üst çubukta kompakt skor hapı (kısa metin; tam ad ve seviye erişilebilir adda ve ipucunda). */
+function OfficeScoreLink({ text, label = "Ofis skoru" }: { text: string; label?: string }) {
   return (
     <Link
       href="/app/raporlar"
+      aria-label={`${label}. Rapor merkezini aç`}
       title="Kural tabanlı ofis skoru (yapay zekâ değil): açık talepler, canlı portal ilanları, son 7 günün randevu ve aramaları ile son 30 günün kapanışları puan ekler; gecikmiş portal teyitleri puan düşürür. Başlangıç 42. Rapor merkezini açmak için tıklayın."
-      className="focus-ring hidden items-center gap-2 rounded-full border border-mint-500/20 bg-mint-500/10 px-3 py-1.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 xl:flex"
+      className="focus-ring hidden h-8 items-center gap-1.5 rounded-full border border-mint-500/20 bg-mint-500/10 px-2.5 text-xs font-semibold text-mint-600 transition hover:border-mint-500/45 hover:bg-mint-500/15 xl:flex"
     >
       <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" />
       {text}
@@ -356,10 +358,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 tam olarak kullanılabilir genişliğe sabitlenir; içteki geniş tablonun
                 overflow-x-auto kabı düzgün kaydırılır ve belgeyi (ICB'yi) şişiremez.
                 iOS Safari `overflow:clip`'i viewport'a propagate etmiyor (sayfa yana
-                kayıyordu) — minmax(0,1fr) track bunu kökten keser. */}
+                kayıyordu) — minmax(0,…) track bunu kökten keser. İçerik en çok 1600 px ve ortalı
+                (geniş ekranda satırlar okunur kalır; liste/tablo bu sınır içinde tam genişlik). */}
             <main
               id="main-content"
-              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-28 md:px-6 md:pt-6 lg:p-8"
+              className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip p-4 pb-28 md:px-5 md:pt-5 lg:px-6 lg:pb-6 lg:pt-5"
             >
               <Suspense fallback={<SectionTabsPlaceholder allModules={NAV_MODULES} />}>
                 <ShellTabs />
@@ -448,7 +451,7 @@ async function ShellHeader() {
           {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={null}><EfCreditBadge tenantId={m.tenantId} role={m.effectiveRole} canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")} valuationClosed={m.closedModules.includes("valuation")} impersonating={m.impersonating} /></Suspense> : null}
           {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
           {m.hasQuickCreate ? <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} /> : null}
-          <Suspense fallback={<OfficeScoreLink text="Ofis skoru —" />}>
+          <Suspense fallback={<OfficeScoreLink text="Skor —" />}>
             <OfficeScoreBadge tenantId={m.userId ? m.tenantId : null} />
           </Suspense>
           {m.platformStaffFullAccess ? (

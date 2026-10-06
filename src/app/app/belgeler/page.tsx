@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -15,7 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { now } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
@@ -638,7 +639,7 @@ export default async function DocumentsPage({
       <PageHeader title="Ofisin tüm dosyaları" eyebrow="Belge merkezi" description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada." actions={<Link href="/app/belgeler/evrak-linkleri" className="focus-ring inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700">Evrak linkleri</Link>} />
 
       {/* --- 4 href'li StatCard ------------------------------------------- */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard
           label="Toplam belge"
           value={total.toLocaleString("tr-TR")}
@@ -666,7 +667,7 @@ export default async function DocumentsPage({
           tone={(health?.deals_missing_docs ?? missingDeals.length) > 0 ? "warning" : "neutral"}
           href="/app/anlasmalar"
         />
-      </div>
+      </KpiGrid>
 
       {/* --- Depolama dökümü ---------------------------------------------- */}
       <section

@@ -4,6 +4,7 @@ import { ArrowRight, Phone, Plus, Receipt, Tv } from "lucide-react";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { ScopeSwitch } from "@/components/ui/scope-switch";
 import { PERIODS } from "@/components/ui/premium";
 import { now, trParts } from "@/lib/clock";
 import { WidgetEditToggle } from "../dashboard-widgets";
@@ -54,8 +55,9 @@ const iconBtn =
 
 /**
  * ANA EKRAN HERO (tasarım sistemi v4 `DashboardHero`, /admin kontrol paneliyle aynı dil): tarih + rol bağlamı satırı,
- * rol bazlı selamlama (tek h1), tek cümle öncelik, tazelik damgası; sağda dönem seçici (7|30|90, URL ?donem=),
- * yönetimde Ofis|Ben kapsamı (URL ?kapsam=) ve hızlı eylemler. Komut araması üst çubukta (Ctrl K) olduğu için burada yok.
+ * rol bazlı selamlama (tek h1), tek cümle öncelik, tazelik damgası; sağ üstte AYNI HİZADA yönetimde kapsam geçişi
+ * (`ScopeSwitch`: Ofis geneli | Benim işlerim, URL ?kapsam= + son seçim çerezi) ve dönem seçici (7|30|90, URL ?donem=);
+ * altında hızlı eylemler. Komut araması üst çubukta (Ctrl K) olduğu için burada yok.
  */
 export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: HomeCtx; layout: HomeLayout; params: HomeParams; officeView: boolean; hasName: boolean }) {
   const nowMs = now();
@@ -71,16 +73,14 @@ export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: Hom
       }
       freshness={<DataFreshness asOf={nowMs} />}
       aside={
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+          <div className="flex w-full flex-wrap items-start gap-2 sm:w-auto sm:justify-end">
             {layout.scopeSwitch ? (
-              <SegmentedControl
+              <ScopeSwitch
                 label="Ana ekran kapsamı"
                 value={officeView ? "ofis" : "ben"}
-                options={[
-                  { value: "ofis", label: "Ofis", href: homeHref(params, { kapsam: "ofis" }) },
-                  { value: "ben", label: "Ben", href: homeHref(params, { kapsam: undefined }) },
-                ]}
+                office={{ href: homeHref(params, { kapsam: "ofis" }), hint: "Ofisin tüm danışmanları ve kayıtları" }}
+                mine={{ href: homeHref(params, { kapsam: "ben" }), hint: "Yalnız size atanmış kayıtlar" }}
               />
             ) : null}
             {layout.periodToggle ? (

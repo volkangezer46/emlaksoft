@@ -14,7 +14,7 @@ import {
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";

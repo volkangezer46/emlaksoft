@@ -471,22 +471,6 @@ export type DealCost = {
   created_at: string;
 };
 
-/** Anlaşmanın işlem dosyası kalemlerini kronolojik sırayla getirir. */
-export async function listDealCosts(dealId: string): Promise<DealCost[]> {
-  const gate = await requirePermission("commissions", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("deal_costs")
-    .select("id, kind, label, amount, paid, paid_at, notes, created_at")
-    .eq("deal_id", dealId)
-    .eq("tenant_id", gate.tenantId)
-    .order("created_at", { ascending: true });
-
-  return (data as DealCost[] | null) ?? [];
-}
-
 /** İşlem dosyasına kalem ekler; kapora kaleminde anlaşma aktivitesine düşer. */
 export async function addDealCost(_prev: DealResult, fd: FormData): Promise<DealResult> {
   const gate = await requirePermission("commissions", "edit");
@@ -604,33 +588,6 @@ export type DealNote = {
   author_name: string | null;
   created_at: string;
 };
-
-/** Anlaşmanın notlarını kronolojik (eski → yeni) sırayla getirir. */
-export async function listDealNotes(dealId: string): Promise<DealNote[]> {
-  const gate = await requirePermission("commissions", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("deal_notes")
-    .select("id, body, author_id, created_at, author:profiles!deal_notes_author_id_fkey(full_name)")
-    .eq("deal_id", dealId)
-    .eq("tenant_id", gate.tenantId)
-    .order("created_at", { ascending: true })
-    .limit(200);
-
-  return (data ?? []).map((n) => {
-    const author = n.author as { full_name?: string } | { full_name?: string }[] | null;
-    const a = Array.isArray(author) ? author[0] : author;
-    return {
-      id: n.id as string,
-      body: n.body as string,
-      author_id: (n.author_id as string | null) ?? null,
-      author_name: a?.full_name ?? null,
-      created_at: n.created_at as string,
-    };
-  });
-}
 
 /** Anlaşmaya not ekler — 1-2000 karakter (DB check ile aynı sınır). */
 export async function addDealNote(_prev: DealResult, fd: FormData): Promise<DealResult> {

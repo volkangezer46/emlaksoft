@@ -43,7 +43,7 @@ export function FormPage({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-auto w-full max-w-3xl", className)}>
+    <div className={cn("mx-auto w-full max-w-4xl", className)}>
       <PageHeader title={title} description={description} eyebrow={eyebrow} breadcrumbs={breadcrumbs} actions={actions} />
       <div className="space-y-5">{children}</div>
     </div>

@@ -2,6 +2,8 @@ import { ShortcutBar } from "@/components/ui/shortcut-bar";
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { resolveScope, SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getRequestSampleScope } from "@/lib/cache/request";
@@ -97,8 +99,9 @@ export default async function AppHomePage({
 
   const isManagement = hasOfficeWideDataScope(role);
   const layout = homeLayoutFor(role);
-  // Kapsam: varsayılan "ben"; yalnız yönetim rolleri ?kapsam=ofis ile ofis geneline açabilir.
-  const officeView = isManagement && kapsam === "ofis";
+  // Kapsam: URL (?kapsam=) > son seçim çerezi > "ben"; yalnız yönetim rolleri ofis geneline açabilir (lib/ui/scope).
+  const { scope, explicit: kapsamParam } = resolveScope({ canSwitch: isManagement, param: kapsam, cookie: (await cookies()).get(SCOPE_COOKIE)?.value });
+  const officeView = scope === "ofis";
 
   const ctx: HomeCtx = {
     tenantId,
@@ -124,7 +127,7 @@ export default async function AppHomePage({
 
   const params: HomeParams = {
     donem: donem && donem !== "30" ? donem : undefined,
-    kapsam: officeView ? "ofis" : undefined,
+    kapsam: kapsamParam ?? undefined,
     daha: daha === "1" ? "1" : undefined,
     icgoru: icgoru === "tum" ? "tum" : undefined,
   };
@@ -148,7 +151,7 @@ export default async function AppHomePage({
   const kpis =
     layout.metrics.length === 0 ? null : (
       <div data-tour="kpi">
-        <Suspense fallback={<MetrikSeridiIskelet rows={layout.metrics.length} />}>
+        <Suspense fallback={<MetrikSeridiIskelet rows={layout.metrics.length} caption={isManagement} />}>
           <FadeSwap swapKey={swapKey}>
             <MetrikSeridi ctx={ctx} keys={layout.metrics} />
           </FadeSwap>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowUpRight, Download, ShieldAlert } from "lucide-react";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { getPlan } from "@/lib/billing/plans";
 import { relativeTimeTR } from "@/lib/admin-format";
 import {

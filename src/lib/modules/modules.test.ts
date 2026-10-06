@@ -231,9 +231,9 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 });
 
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
-  it("menü öğesi sayısı 40 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + Bildirimler + Mahalle notları; eylem sayfaları İçe aktarma ve Ofis kurulumu menüden çıktı)", () => {
+  it("menü öğesi sayısı 39 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + Bildirimler + Mahalle notları; eylem sayfaları İçe aktarma ve Ofis kurulumu menüden çıktı; 2026-10: Kaçan komisyonlar İlan Kontrol alt sekmesi, TV panosu düğme, Kıyas/KPI/Lig tek Ekip performansı öğesi)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(40);
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(39);
   });
 
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {

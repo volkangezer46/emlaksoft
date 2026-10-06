@@ -81,7 +81,7 @@ export function LedgerEntryForm({
       <FormField label="İşlem tarihi" htmlFor="lg-date" required>
         <FormInput id="lg-date" name="transaction_date" type="date" defaultValue={c?.transaction_date ?? todayIso} />
       </FormField>
-      <FormField label="Tutar (TL)" htmlFor="lg-amount" required hint="Örn. 1.250.000 veya 1250000,50">
+      <FormField label="Tutar (₺)" htmlFor="lg-amount" required hint="Örn. 1.250.000 veya 1250000,50">
         <FormInput id="lg-amount" name="amount_try" inputMode="decimal" defaultValue={c ? String(c.amount_try) : ""} />
       </FormField>
       <FormField label="Taraf (ad soyad / unvan)" htmlFor="lg-party" required hint="Yalnız ad. Kimlik numarası YAZILMAZ.">
@@ -154,10 +154,10 @@ export function LedgerSettingsForm({
   const [state, action, pending] = useActionState(saveLedgerSettings, initial);
   return (
     <form action={action} className="grid gap-4 sm:grid-cols-3">
-      <FormField label="Nakit işaret eşiği (TL)" htmlFor="ls-cash" hint="0 = kapalı. Ofis ayarıdır.">
+      <FormField label="Nakit işaret eşiği (₺)" htmlFor="ls-cash" hint="0 = kapalı. Ofis ayarıdır.">
         <FormInput id="ls-cash" name="cash_threshold_try" inputMode="decimal" defaultValue={String(cash)} />
       </FormField>
-      <FormField label="Tutar işaret eşiği (TL)" htmlFor="ls-amount" hint="0 = kapalı. Ofis ayarıdır.">
+      <FormField label="Tutar işaret eşiği (₺)" htmlFor="ls-amount" hint="0 = kapalı. Ofis ayarıdır.">
         <FormInput id="ls-amount" name="amount_threshold_try" inputMode="decimal" defaultValue={String(amount)} />
       </FormField>
       <FormField label="Saklama süresi (yıl)" htmlFor="ls-years" hint="Ofis ayarı; doğrulanmalı.">

@@ -1,5 +1,6 @@
 "use server";
 
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { daysAgoIso, daysFromNowIso, trDayKey } from "@/lib/clock";
@@ -342,7 +343,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
 }
 
 // ── Randevular — ekranın tip/durum/müşteri/portföy filtresini uygular ────────
-const APPT_TYPE_TR: Record<string, string> = { showing: "Yer gösterme", office: "Ofis görüşmesi", valuation: "Değerleme", contract: "Sözleşme" };
+const APPT_TYPE_TR = APPOINTMENT_TYPE_LABELS;
 
 export type AppointmentExportFilters = { tip?: string; durum?: string; customer?: string; property?: string };
 

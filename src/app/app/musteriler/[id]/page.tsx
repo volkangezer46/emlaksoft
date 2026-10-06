@@ -37,6 +37,7 @@ import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activi
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { CustomerOwnedListings } from "@/components/app/customer-owned-listings";
 import { Wallet } from "lucide-react";
+import { ReassignAdvisorForm } from "./reassign-advisor-form";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
@@ -555,6 +556,9 @@ export default async function CustomerDetailPage({
                     advisors={(editAdvisors ?? []) as { id: string; full_name: string }[]}
                     sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
                   />
+                ) : null}
+                {canEdit && (editAdvisors ?? []).length > 0 ? (
+                  <ReassignAdvisorForm customerId={customer.id} current={customer.assigned_to} advisors={(editAdvisors ?? []) as { id: string; full_name: string }[]} />
                 ) : null}
                 {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}
                 </MoreActions>

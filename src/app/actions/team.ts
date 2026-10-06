@@ -340,14 +340,6 @@ export async function deleteBranch(formData: FormData): Promise<TeamResult> {
   return { ok: true };
 }
 
-export async function setBranchAction(formData: FormData): Promise<void> {
-  await updateBranch(formData);
-}
-
-export async function deleteBranchAction(formData: FormData): Promise<void> {
-  await deleteBranch(formData);
-}
-
 /**
  * İş yükü devri — bir danışmanın (ör. ekipten ayrılan) seçilen iş kalemlerini başka bir danışmana aktarır:
  * müşteri, portföy, AÇIK anlaşma, açık görev, yaklaşan randevu (açık talepler müşteri sahipliğiyle taşınır;

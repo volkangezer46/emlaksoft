@@ -21,7 +21,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysAgoIso, msSince, now, trDayStartMs } from "@/lib/clock";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { SmsReplyButton, SmsReplyPanel } from "./sms-panel";

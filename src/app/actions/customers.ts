@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { notifyTenant } from "@/lib/notify";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
@@ -919,7 +920,11 @@ export async function mergeCustomers(
   };
 }
 
-/** Danışman (assigned_to) yeniden atama — ekip yönetimi ve devir için. */
+/**
+ * Müşteri kartındaki "Danışmanı değiştir" (tek müşteri). Hedef danışman bu ofisin AKTİF kullanıcısı olmalı
+ * (başka ofisin kimliği yazılamaz); değişiklik denetim kaydına eski/yeni değerle düşer ve yeni danışmana
+ * zil bildirimi gider (kendine atamada bildirim yok). Toplu atama: `bulkAssignCustomers`.
+ */
 export async function reassignCustomer(formData: FormData): Promise<void> {
   const gate = await requirePermission("customers", "edit");
   if (!gate.ok) return;
@@ -928,6 +933,27 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
   if (!id) return;
 
   const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("customers")
+    .select("id, full_name, assigned_to")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!current) return;
+  const previous = (current as { assigned_to: string | null }).assigned_to ?? null;
+  if ((assignedTo || null) === previous) return;
+  if (assignedTo) {
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", assignedTo)
+      .eq("tenant_id", gate.tenantId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!target) return;
+  }
+
   const { error } = await supabase
     .from("customers")
     .update({ assigned_to: assignedTo || null })
@@ -943,8 +969,24 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
     action: "customer.reassign",
     entityType: "customer",
     entityId: id,
+    oldValue: { assigned_to: previous },
     newValue: { assigned_to: assignedTo || null },
   });
+  if (assignedTo && assignedTo !== gate.userId) {
+    try {
+      await notifyTenant({
+        tenantId: gate.tenantId,
+        userId: assignedTo,
+        title: `Size müşteri atandı: ${(current as { full_name: string }).full_name}`,
+        body: "Müşteri kartını inceleyip ilk temas planını yapın.",
+        href: `/app/musteriler/${id}`,
+        kind: "info",
+      });
+    } catch (e) {
+      // Bildirim başarısızlığı atamayı geri almaz (atama + denetim kaydı yazıldı).
+      console.error("reassignCustomer notify", e);
+    }
+  }
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
   revalidateTenantData(gate.tenantId);

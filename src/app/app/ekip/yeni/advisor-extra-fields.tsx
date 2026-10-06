@@ -284,8 +284,8 @@ export function SpecialtiesField({
             <FormSelect aria-label="Seviye" value={r.level} onChange={(e) => patch(r.uid, { level: e.target.value })}>
               {SPECIALTY_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
             </FormSelect>
-            <FormInput aria-label="En düşük fiyat (TL)" type="number" min={0} step={1000} inputMode="decimal" placeholder="En az TL" value={r.price_min} onChange={(e) => patch(r.uid, { price_min: e.target.value })} />
-            <FormInput aria-label="En yüksek fiyat (TL)" type="number" min={0} step={1000} inputMode="decimal" placeholder="En çok TL" value={r.price_max} onChange={(e) => patch(r.uid, { price_max: e.target.value })} />
+            <FormInput aria-label="En düşük fiyat (₺)" type="number" min={0} step={1000} inputMode="decimal" placeholder="En az ₺" value={r.price_min} onChange={(e) => patch(r.uid, { price_min: e.target.value })} />
+            <FormInput aria-label="En yüksek fiyat (₺)" type="number" min={0} step={1000} inputMode="decimal" placeholder="En çok ₺" value={r.price_max} onChange={(e) => patch(r.uid, { price_max: e.target.value })} />
             <FormInput aria-label="Deneyim (yıl)" type="number" min={0} max={60} step={1} inputMode="numeric" placeholder="Deneyim (yıl)" value={r.experience_years} onChange={(e) => patch(r.uid, { experience_years: e.target.value })} />
             <div className="sm:col-span-3 sm:text-right">
               <Button type="button" variant="ghost" size="sm" icon={Trash2} onClick={() => setRows((cur) => cur.filter((x) => x.uid !== r.uid))}>

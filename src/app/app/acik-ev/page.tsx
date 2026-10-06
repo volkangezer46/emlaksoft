@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -15,7 +16,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { listOpenHouses } from "@/app/actions/targets-openhouse-sources";
 import { isPast, msUntil, DAY_MS } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 
@@ -114,7 +115,7 @@ export default async function AcikEvPage({
 } />
 
       {/* KPI şeridi — hepsi listeyi süzer */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiGrid>
         <StatCard label="Yaklaşan etkinlik" value={upcoming.length} icon={Clock3} href="/app/acik-ev?durum=yaklasan" />
         <StatCard
           label="Devam eden"
@@ -133,7 +134,7 @@ export default async function AcikEvPage({
           trendLabel={avgVisitors > 0 ? `ort. ${avgVisitors}/etkinlik` : undefined}
           href="/app/acik-ev"
         />
-      </div>
+      </KpiGrid>
 
       {/* Sıradaki etkinlik — spot kart */}
       {nextEvent ? (

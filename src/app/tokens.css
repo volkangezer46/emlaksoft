@@ -72,10 +72,11 @@
   --space-12: 5rem;
 
   /* ---- Gösterge tipografisi (KPI / hero). Gövde ölçeği --fs-* aşağıda. */
-  --fs-eyebrow: 0.6875rem;
-  --fs-kpi: 1.75rem;
-  --fs-kpi-lg: 2.25rem;
-  --fs-money-hero: clamp(2rem, 1.6rem + 1.4vw, 2.625rem);
+  /* Kurumsal yoğun ölçek (2026-10, kabukta kök 15 px): en küçük metin 12 px; KPI sayısı ~24 px, büyük KPI ~26 px. */
+  --fs-eyebrow: max(12px, 0.75rem);
+  --fs-kpi: 1.625rem;
+  --fs-kpi-lg: 1.75rem;
+  --fs-money-hero: clamp(1.75rem, 1.45rem + 0.8vw, 2.125rem);
   --tracking-eyebrow: 0.08em;
 
   --ink-950: var(--navy-900);
@@ -324,7 +325,7 @@
   --fs-h2: 1.25rem;
   --fs-body: 0.9375rem;
   --fs-small: 0.8125rem;
-  --fs-caption: 0.75rem;
+  --fs-caption: max(12px, 0.75rem);
 }
 
 /* ---- ROL ADLI ETKİLEŞİM TOKEN'LARI (Radix 4 / 5 / 7 / 8. adımların karşılığı) ----

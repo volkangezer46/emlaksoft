@@ -10,7 +10,6 @@ import { createClient } from "@/lib/supabase/server";
 import { AdvisorsTab } from "./_tabs/advisors-tab";
 import { AssignmentsTab } from "./_tabs/assignments-tab";
 import { DefinitionsTab } from "./_tabs/definitions-tab";
-import { SettingsTab } from "./_tabs/settings-tab";
 import { StatsTab } from "./_tabs/stats-tab";
 import type { TabContext } from "./_tabs/context";
 
@@ -19,21 +18,18 @@ export const metadata = { title: "Ofis Merkezi" };
 /** URL filtre kontratı: sekme + sekme içi filtreler (sunucu sorgusu aynı değerleri okur). */
 type Sp = {
   sekme?: string;
-  /** danışmanlar: aktif|pasif · atamalar: bekleyen|gecikmis|gecmis|aktif|iptal|yeniden */
+  /** danışmanlar: aktif|pasif */
   durum?: string;
   q?: string;
   rol?: string;
   sube?: string;
   sirala?: string;
   yon?: string;
-  /** ayarlar: grup kimliği · ayar=degisen */
-  grup?: string;
-  ayar?: string;
 };
 
 /**
- * Ofis Merkezi — ofis sahibi/yöneticinin tek ekranı: danışmanlar, havuzdan (akıllı) atama, ofis ayarları,
- * tanımlamalar, istatistikler. Sekme ve filtreler URL'dedir (?sekme=, ?durum=, ?q= ...): sunucu sorgusu aynı
+ * Ofis Merkezi — ofis sahibi/yöneticinin tek ekranı: danışmanlar, atama özeti (atama İlan Havuzu'nda), tanımlar,
+ * istatistikler. Sekme ve filtreler URL'dedir (?sekme=, ?durum=, ?q= ...): sunucu sorgusu aynı
  * değerleri okur. Yetki: sayfa kapısı office_center modülü + paket/modül kilidi (href ile); yazma eylemleri kendi kapılarından geçer.
  */
 export default async function OfficeCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
@@ -60,7 +56,7 @@ export default async function OfficeCenterPage({ searchParams }: { searchParams:
     canCreate: (perms.office_center ?? []).includes("create"),
     canEditSettings: (perms.settings ?? []).includes("edit"),
     // Filtre kontratı: yalnız bilinen parametreler sekmelere geçer (sunucu sorgusu bunları okur).
-    sp: { sekme: sp.sekme, durum: sp.durum, q: sp.q, rol: sp.rol, sube: sp.sube, sirala: sp.sirala, yon: sp.yon, grup: sp.grup, ayar: sp.ayar },
+    sp: { sekme: sp.sekme, durum: sp.durum, q: sp.q, rol: sp.rol, sube: sp.sube, sirala: sp.sirala, yon: sp.yon },
     nowMs: now(),
     supabase,
   };
@@ -71,7 +67,7 @@ export default async function OfficeCenterPage({ searchParams }: { searchParams:
         eyebrow="Ekip ve yetkiler"
         icon={<Building2 className="h-6 w-6 text-accent" aria-hidden="true" />}
         title="Ofis Merkezi"
-        description="Danışmanları yönetin, danışmansız ilanları akıllı öneriyle atayın, ofis ayar ve tanımlarını tek yerden değiştirin."
+        description="Danışmanları yönetin, atama durumunu izleyin, ofis tanımlarını tek yerden değiştirin."
         actions={
           <Link href="/app/ekip" className="focus-ring inline-flex items-center rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2">
             Ekip Merkezi
@@ -94,8 +90,7 @@ export default async function OfficeCenterPage({ searchParams }: { searchParams:
 
       {tab === "danismanlar" ? <AdvisorsTab ctx={ctx} /> : null}
       {tab === "atamalar" ? <AssignmentsTab ctx={ctx} /> : null}
-      {tab === "ayarlar" ? <SettingsTab ctx={ctx} /> : null}
-      {tab === "tanimlamalar" ? <DefinitionsTab ctx={ctx} /> : null}
+      {tab === "tanimlar" ? <DefinitionsTab ctx={ctx} /> : null}
       {tab === "istatistikler" ? <StatsTab ctx={ctx} /> : null}
     </div>
   );

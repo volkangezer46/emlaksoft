@@ -1,3 +1,4 @@
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Link from "next/link";
 import { formatTrTime, trParts, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -28,12 +29,7 @@ const TYPE_COLOR: Record<string, string> = {
   contract:  "bg-mint-500",
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  showing:   "Yer gösterme",
-  office:    "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract:  "Sözleşme",
-};
+const TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
 // Saat ızgarası: 07:00–21:00
 const HOUR_START = 7;

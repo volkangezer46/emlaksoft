@@ -23,6 +23,7 @@ const MANAGER_CORE = [
   "/app/komisyon",
   "/app/gelen-kutusu",
   "/app/raporlar",
+  "/app/danisman-kpi",
   "/app/ekip",
 ] as const;
 

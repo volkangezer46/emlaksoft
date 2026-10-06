@@ -84,8 +84,8 @@ describe("homeLayoutFor rol matrisi", () => {
     }
   });
   it("hero bağlam etiketi role ve kapsama göre", () => {
-    expect(heroContextLabel(homeLayoutFor("owner"), true)).toBe("Ofis görünümü");
-    expect(heroContextLabel(homeLayoutFor("owner"), false)).toBe("Benim günüm");
+    expect(heroContextLabel(homeLayoutFor("owner"), true)).toBe("Ofis geneli");
+    expect(heroContextLabel(homeLayoutFor("owner"), false)).toBe("Benim işlerim");
     expect(heroContextLabel(homeLayoutFor("accounting"), false)).toBe("Tahsilat özeti");
   });
 });

@@ -22,7 +22,7 @@ import {
   Tag,
   User,
 } from "lucide-react";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { formatCount } from "@/lib/ui/filter-params";
 import { formatTrTime } from "@/lib/clock";
 import { cn } from "@/lib/utils";

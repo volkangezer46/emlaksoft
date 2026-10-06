@@ -3,7 +3,7 @@ import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DepositReturnControl } from "./deposit-return";

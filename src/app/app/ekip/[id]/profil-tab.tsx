@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { BadgeCheck, FileWarning, ShieldCheck } from "lucide-react";
 import type { createClient } from "@/lib/supabase/server";
 import { Alert } from "@/components/ui/alert";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { piiEnabled } from "@/lib/advisor/pii-crypto";
 import { loadPrivateSummary } from "@/lib/advisor/advisor-store";

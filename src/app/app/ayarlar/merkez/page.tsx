@@ -37,12 +37,12 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.insight.dormant_days": { label: "Uykuda müşteriler", href: "/app/musteriler?segment=uykuda" },
   "office.listing_control.report_daily": { label: "İlan Kontrol raporu", href: "/app/ilan-kontrol/rapor" },
   "office.listing_control.report_weekly": { label: "İlan Kontrol raporu", href: "/app/ilan-kontrol/rapor" },
-  "office.assign.weight_workload": { label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar" },
-  "office.assign.weight_specialty": { label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar" },
-  "office.assign.weight_region": { label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar" },
-  "office.assign.weight_performance": { label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar" },
-  "office.assign.weight_availability": { label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar" },
-  "office.assign.unassigned_sla_hours": { label: "Ofis Merkezi > Atamalar (SLA'sı geçen)", href: "/app/ofis-merkezi?sekme=atamalar&durum=gecikmis" },
+  "office.assign.weight_workload": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
+  "office.assign.weight_specialty": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
+  "office.assign.weight_region": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
+  "office.assign.weight_performance": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
+  "office.assign.weight_availability": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
+  "office.assign.unassigned_sla_hours": { label: "İlan Havuzu > SLA'sı geçen", href: "/app/ilan-havuzu?atama=gecikmis" },
   "office.alert.unassigned_pool_count": { label: "Ofis Merkezi > İstatistikler", href: "/app/ofis-merkezi?sekme=istatistikler" },
 };
 const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };

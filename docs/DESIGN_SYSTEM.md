@@ -126,10 +126,37 @@ Hepsi `src/components/ui`; ton/ikon karosu mevcut `.pm-t-*` + `.pm-ico` (yeni to
 - **İllüstrasyon:** `CitySkyline` (hero), `ev`, `anahtar`, `haritaPin` (+ mevcut `liste`, `basari` …); hepsi
   `currentColor` + token, < 6 KB.
 - **Kabuk:** iki yan menü + çekmece `.sb-surface` (lacivert degrade); aktif öğe DOLGULU vurgu hapı (beyaz yazı
-  `--accent` üstünde AA) + kayan altın çizgi; admin menüsünde "Sistem durumu" kartı gerçek sağlık verisinden
-  (`getAdminHealth`: DB yanıt süresi, cron sayısı/hatalı iş adı, "Son kontrol" = ölçüm anı). Üst çubuk: ev ikonlu konum
-  şeridi, yuvarlak arama kapsülü (Ctrl K), dolgulu "Hızlı erişim", canlı saat hapı, zil, `UserMenuFace` (tek yüz).
+  `--accent` üstünde AA) + kayan altın çizgi. Durum bilgisi KART DEĞİL ÇİP: /admin üst çubukta `SystemStatusChip`
+  (`getAdminHealth`), /app yan menü altında `OfficeStatusChip` (nokta + paket + deneme günü / en dolu kullanım yüzdesi +
+  ince çubuk; daraltılmış menüde yalnız nokta; tıklayınca popover: paket, kullanım kalemleri, "Paketi yönet"; saf karar
+  `lib/app-shell/office-status.ts`). Yan menüde arama kutusu YOK (üst çubuk Ctrl K tek arama). Üst çubuk: ev ikonlu konum
+  şeridi, yuvarlak arama kapsülü (Ctrl K), dolgulu "Hızlı erişim", kompakt skor hapı, zil, `UserMenuFace` (tek yüz).
   Bilgi şeridi (MFA/geliştirme modu) içerikte yuvarlak `tone-warning` kart.
+- **ScopeSwitch (`ui/scope-switch`):** "Ofis geneli | Benim işlerim" (Building2 / User), `.ds-seg` ailesi, kayan hap,
+  altında tek satır açıklama, `role=radiogroup` + `aria-checked` + ok tuşları; URL `?kapsam=` + son seçim çerezi `es_scope`
+  (`lib/ui/scope.ts`: URL > çerez > "ben"; yönetim rolü değilse daima "ben"). Yalnız yönetim rollerinde çizilir.
+
+### Kurumsal yoğun ölçek ve yerleşim (2026-10)
+
+| Öğe | Normal (kök 15 px) | Kaynak |
+|---|---|---|
+| Kök yazı | %93,75 (Küçük %87,5, Büyük %112,5 = erişilebilirlik, 44 px dokunma) | `console.css` + `lib/font-scale.ts` |
+| Gövde / küçük / en küçük | 14 / 13 / 12 px (12'nin altı yok, `max(12px, …)`) | kabukta `--text-base/sm/xs` |
+| Sayfa başlığı (`PageHeader` h1, `text-2xl`) | 20 px | `--text-2xl` |
+| Hero selamlaması | 21-26 px (mobil 21) | `.ds-hero-title` |
+| KPI sayısı | ~24 px (`--fs-kpi`), büyük ~26 px | `.pm-value` |
+| Kart başlığı | 14 px (`SectionHeader` `text-base`) | |
+| Düğme / girdi | 34 px (`md`), girdi `py-[0.4375rem]`; dokunmada 44 px | `button.tsx`, `input.tsx` |
+| Yan menü öğesi | 13 px / 34 px | `.nav-row lg:min-h-9` |
+
+- **Genişlik:** /app ve /admin içerik izi `minmax(0,1600px)` ve ortalı (`justify-center`); liste/tablo bu sınırda tam
+  genişlik. Form sayfası `FormPage` `max-w-4xl` ortalı. `PageHeader` eylemleri başlık satırıyla aynı hizada.
+- **KpiGrid (TEK, `ui/dashboard-grid`; `ui/kpi-card` yeniden dışa aktarır):** esnek satır (`.kpi-flow`): satır başına
+  `--kpi-cols` kart (`kpiFlowCols(n)`: mobil 2; 5 → xl'de 5, 6 → xl'de 6, 7+ → md'de 4), `flex-grow` son satırı eşit
+  genişlikte doldurur → yarım/boş hücre yok, tek kalan kart tam genişlik; boşluk tek token `--kpi-gap`; dar kartta
+  (< 11,5 rem, container query) ikon karosu gizlenir. Sabit `grid-cols-4/5/6` KPI şeridi YAZILMAZ.
+- **DashboardGrid:** doğrudan `DashCell` çocuklarının span'ları her kırılımda `fillRowSpans` ile satırı tamamlar
+  (md'de 3+3+3 → 3+3+6, tek kalan 7 → 12); `span.xxl` ile 2xl (1536+) ayrı düzen.
 
 ### Hareket katmanı (`src/components/ui/motion`)
 

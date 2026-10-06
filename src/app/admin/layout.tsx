@@ -79,7 +79,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
         <main
           id="main-content"
-          className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start gap-4 overflow-x-clip p-4 pb-24 md:p-6 md:pb-6"
+          className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center gap-4 overflow-x-clip p-4 pb-24 md:px-5 md:pt-5 lg:px-6 lg:pb-6 lg:pt-5"
         >
           {mfaSyncIssue === "env_on_db_off" || !isPlatformMfaRequired() ? (
             <div className="space-y-2">

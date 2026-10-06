@@ -18,7 +18,6 @@ const portalListings = read("src/app/actions/portal-listings.ts");
 const paymentLinks = read("src/app/actions/payment-links.ts");
 const properties = read("src/app/actions/properties.ts");
 const bulkProperties = read("src/app/actions/bulk-property.ts");
-const propertyManagement = read("src/app/actions/property-management.ts");
 const automationEngine = read("src/lib/automation-engine.ts");
 
 describe("core workflow invariant contract", () => {
@@ -175,7 +174,7 @@ describe("core workflow invariant contract", () => {
     expect(migration).toContain("commission_rate_required");
     expect(properties).toContain('admin.rpc("transition_property_status_atomic"');
     expect(bulkProperties).toContain('admin.rpc("transition_property_status_atomic"');
-    expect(propertyManagement).toContain('admin.rpc("transition_property_status_atomic"');
+    // (property-management.ts'teki çağıransız changePropertyStatus 2026-10'da silindi; durum geçişi yukarıdaki iki yoldan.)
     expect(bulkProperties).not.toContain('from("property_status_history").insert');
   });
 

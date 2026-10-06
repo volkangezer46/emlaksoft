@@ -314,21 +314,3 @@ export async function convertOfferToDeal(offerId: string): Promise<ConvertOfferR
   revalidateTenantData(gate.tenantId);
   return { ok: true, dealId, linked };
 }
-
-export async function listOffers(propertyId?: string) {
-  const gate = await requirePermission("offers", "view");
-  if (!gate.ok) return [];
-
-  const supabase = await createClient();
-  let query = supabase
-    .from("offers")
-    .select("id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, property:properties!offers_property_id_fkey(property_code, title, list_price), customer:customers!offers_customer_id_fkey(full_name)")
-    .eq("tenant_id", gate.tenantId)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (propertyId) query = query.eq("property_id", propertyId);
-
-  const { data } = await query;
-  return data ?? [];
-}

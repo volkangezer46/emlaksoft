@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatRow } from "@/components/ui/stat-row";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTry } from "@/lib/format";
-import { buildLeague, computeTeamHealth, tabHref } from "@/lib/office-center/logic";
+import { assignHref, buildLeague, computeTeamHealth, tabHref } from "@/lib/office-center/logic";
 import { loadOfficeAdvisors, loadOfficeStatistics, loadUnassignedProperties } from "@/lib/office-center/store";
 import { getSettings } from "@/lib/settings/read";
 import { ASSIGN_SLA_HOURS_KEY, UNASSIGNED_ALERT_KEY } from "@/lib/settings/registry/tenant";
@@ -40,10 +40,10 @@ export async function StatsTab({ ctx }: { ctx: TabContext }) {
         items={[
           { label: "Açık portföy", value: stats.totalProperties, href: "/app/portfoyler" },
           { label: "Yayında", value: stats.liveProperties, href: "/app/portfoyler?status=live" },
-          { label: "Danışmansız", value: stats.unassignedProperties, href: tabHref("atamalar"), attention: stats.unassignedProperties > 0 },
+          { label: "Danışmansız", value: stats.unassignedProperties, href: assignHref(), attention: stats.unassignedProperties > 0 },
           { label: "Kazanılan anlaşma", value: stats.wonDealsThisMonth, href: "/app/anlasmalar?gorunum=liste&asama=won", hint: "bu ay" },
           { label: "Aktif kiralama", value: stats.activeRentals, href: "/app/kiralama" },
-          { label: "Havuz ataması", value: stats.assignmentsAvailable ? stats.assignmentsThisMonth : "—", href: tabHref("atamalar", { durum: "gecmis" }), hint: "bu ay" },
+          { label: "Havuz ataması", value: stats.assignmentsAvailable ? stats.assignmentsThisMonth : "—", href: assignHref("gecmis"), hint: "bu ay" },
           { label: "Aktif / pasif üye", value: `${stats.activeAdvisors} / ${stats.inactiveAdvisors}`, href: tabHref("danismanlar") },
         ]}
       />

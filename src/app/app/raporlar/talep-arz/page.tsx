@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { daysAgoIso } from "@/lib/clock";
 import { compareTr } from "@/lib/tr-text";
 import {
@@ -291,7 +292,7 @@ export default async function TalepArzPage({
         </form>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard
           label={`Açık talep · ${donem.label.toLowerCase()}`}
           value={totalDemand}
@@ -321,7 +322,7 @@ export default async function TalepArzPage({
           tone={unmetBudgetTotal > 0 ? "danger" : "neutral"}
           href="/app/talepler"
         />
-      </div>
+      </KpiGrid>
 
       {totalDemand === 0 ? (
         <EmptyState illustration="rapor"

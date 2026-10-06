@@ -1,5 +1,6 @@
 "use client";
 
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { useState } from "react";
 import { trDayKey, formatTrTime } from "@/lib/clock";
 import Link from "next/link";
@@ -19,12 +20,7 @@ const TYPE_COLOR: Record<string, string> = {
   contract:  "bg-mint-500",
 };
 
-const TYPE_LABEL: Record<string, string> = {
-  showing:   "Yer gösterme",
-  office:    "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract:  "Sözleşme",
-};
+const TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
 const TR_MONTHS = [
   "Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",

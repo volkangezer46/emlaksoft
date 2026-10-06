@@ -163,7 +163,7 @@ export function showsSalesBlocks(layout: HomeLayout): boolean {
 export function heroContextLabel(layout: HomeLayout, officeView: boolean): string {
   switch (layout.variant) {
     case "management":
-      return officeView ? "Ofis görünümü" : "Benim günüm";
+      return officeView ? "Ofis geneli" : "Benim işlerim";
     case "accounting":
       return "Tahsilat özeti";
     case "call_center":

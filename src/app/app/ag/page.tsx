@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import {
   Building2,
   Globe2,
@@ -33,7 +34,7 @@ import {
   type NetworkContact,
 } from "@/app/actions/network";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ShareNetworkPanel, ShareNetworkTrigger } from "./share-network-panel";
 import { CollabRequestDialog } from "./collab-request-dialog";
@@ -253,7 +254,7 @@ export default async function AgPage({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <KpiGrid>
         <StatCard label="Havuzdaki ilan" value={pool.length} icon={Globe2} href="#havuz" />
         <StatCard label="Paylaştıklarım" value={myListings.length} icon={Share2} href="#paylastiklarim" />
         <StatCard
@@ -271,7 +272,7 @@ export default async function AgPage({
           tone={demandIncomingPending + demandOutgoingPending > 0 ? "warning" : "neutral"}
           href={demandIncomingPending > 0 ? "#paylastigim-talepler" : "#talep-yanitlarim"}
         />
-      </div>
+      </KpiGrid>
 
       {/* ============ (a) AĞ HAVUZU ============ */}
       <section id="havuz" className="scroll-mt-24 space-y-4">
@@ -279,7 +280,7 @@ export default async function AgPage({
 
         {/* Havuz nabzı — filtrelenmiş havuzun canlı istatistikleri */}
         {pool.length > 0 ? (
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <KpiGrid>
             {[
               { label: "Açık ilan", value: String(pool.length), icon: Globe2, tint: "bg-brand-600/10 text-brand-600" },
               { label: "Katılımcı ofis", value: String(poolOffices), icon: Building2, tint: "bg-mint-500/12 text-mint-600" },
@@ -300,7 +301,7 @@ export default async function AgPage({
                 </span>
               </a>
             ))}
-          </div>
+          </KpiGrid>
         ) : null}
 
         <PoolFilters

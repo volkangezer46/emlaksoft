@@ -1,45 +1,4 @@
-/** Admin panel ortak biçimlendirme yardımcıları (saf, yan etkisiz). */
-
-export function moneyTRY(n: number): string {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 0,
-  }).format(Math.round(n));
-}
-
-export function greetingTR(): string {
-  const hour = Number(
-    new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", hour12: false, timeZone: "Europe/Istanbul" }).format(new Date()),
-  );
-  if (hour < 6) return "İyi geceler";
-  if (hour < 12) return "Günaydın";
-  if (hour < 18) return "İyi günler";
-  return "İyi akşamlar";
-}
-
-export function todayTR(): string {
-  return new Intl.DateTimeFormat("tr-TR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Europe/Istanbul",
-  }).format(new Date());
-}
-
-/** ISO tarih dizisinden son N haftalık sayım kovaları üretir. */
-export function weekBuckets(dates: (string | null | undefined)[], weeks = 8): number[] {
-  const weekMs = 7 * 86_400_000;
-  const nowMs = Date.now();
-  const buckets = Array.from({ length: weeks }, () => 0);
-  for (const d of dates) {
-    if (!d) continue;
-    const idx = weeks - 1 - Math.floor((nowMs - new Date(d).getTime()) / weekMs);
-    if (idx >= 0 && idx < weeks) buckets[idx] += 1;
-  }
-  return buckets;
-}
+/** Admin panel ortak biçimlendirme yardımcıları (saf, yan etkisiz). Para biçimi TEK kaynak `@/lib/format` (formatTry). */
 
 /** audit_logs ve platform_audit_logs.action için insana okunur etiket. */
 export function auditActionLabel(action: string): string {

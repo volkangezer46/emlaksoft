@@ -10,7 +10,7 @@ import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
 import { createClient } from "@/lib/supabase/server";
 import { computeFragileDealType, detectLostSaleRisks, estimateLostRevenue } from "@/lib/lost-sale-detector";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { dismissLostSaleRisk } from "./actions";
 
 import { PageHeader } from "@/components/ui/page-header";

@@ -53,8 +53,8 @@ describe("sade görünüm: rol çekirdek eşlemesi", () => {
     }
   });
 
-  it("ofis sahibi çekirdeği 12 sayfa (İlan Kontrol dahil), muhasebe/sekreter kendi çekirdeğini görür", () => {
-    expect(coreHrefsFor("owner").size).toBe(12);
+  it("ofis sahibi çekirdeği 13 sayfa (İlan Kontrol ve Ekip performansı dahil), muhasebe/sekreter kendi çekirdeğini görür", () => {
+    expect(coreHrefsFor("owner").size).toBe(13);
     const acc = hrefs(visibleSections(accessibleOf("accounting"), { mode: "simple", role: "accounting" }));
     expect(acc).toEqual(expect.arrayContaining(["/app/komisyon", "/app/abonelik", "/app/raporlar"]));
     const cc = hrefs(visibleSections(accessibleOf("call_center"), { mode: "simple", role: "call_center" }));
