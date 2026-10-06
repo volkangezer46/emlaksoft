@@ -13,7 +13,7 @@
  * │ kararıyla, döner sermaye/ekspertiz tutarları her yıl, sigorta primleri   │
  * │ tarife değişikliğiyle güncellenir. Çıktı YAKLAŞIK bilgilendirmedir;      │
  * │ resmi teklif, taahhüt ya da mali müşavirlik hizmeti DEĞİLDİR.            │
- * │ Güncelleme yeri: yalnızca `DEFAULT_RATES`.                               │
+ * │ Güncelleme yeri: yalnızca `src/lib/legal-constants` (tek kaynak).        │
  * └──────────────────────────────────────────────────────────────────────────┘
  *
  * KAPSAM DIŞI (bilinçli): taşınma, tadilat/boya, aidat ve demirbaş, abonelik
@@ -22,6 +22,7 @@
  */
 
 import { formatTryAmount } from "@/lib/format";
+import { legalValue } from "@/lib/legal-constants";
 
 // ---------------------------------------------------------------------------
 // ORANLAR VE SABİTLER — kaynak + tarih notlarıyla
@@ -98,38 +99,39 @@ export type PurchaseCostRates = {
 };
 
 export const DEFAULT_RATES: PurchaseCostRates = {
-  deedFeeTotalPct: 4,
-  landRegistryServiceFeeTry: 6_000,
-  commissionPct: 2,
-  vatPct: 20,
-  rentCommissionMonths: 1,
+  deedFeeTotalPct: legalValue("deedFeeTotalPct"),
+  landRegistryServiceFeeTry: legalValue("landRegistryServiceFeeTry"),
+  // Alıcı tarafı varsayılanı: satış tavanının yarısı (kullanıcı değiştirebilir).
+  commissionPct: legalValue("saleCommissionCapPct") / 2,
+  vatPct: legalValue("vatGeneralPct"),
+  rentCommissionMonths: legalValue("rentCommissionCapMonths"),
 
-  daskPerSqmTry: 25,
-  daskMinTry: 900,
-  daskMaxTry: 6_000,
-  daskFallbackTry: 2_500,
+  daskPerSqmTry: legalValue("daskPerSqmTry"),
+  daskMinTry: legalValue("daskMinTry"),
+  daskMaxTry: legalValue("daskMaxTry"),
+  daskFallbackTry: legalValue("daskFallbackTry"),
 
-  homeInsurancePerSqmTry: 20,
-  homeInsuranceMinTry: 800,
-  homeInsuranceFallbackTry: 2_000,
+  homeInsurancePerSqmTry: legalValue("homeInsurancePerSqmTry"),
+  homeInsuranceMinTry: legalValue("homeInsuranceMinTry"),
+  homeInsuranceFallbackTry: legalValue("homeInsuranceFallbackTry"),
 
-  appraisalFeeTry: 9_000,
-  loanAllocationFeePct: 0.5,
-  mortgageRegistrationFeeTry: 3_500,
+  appraisalFeeTry: legalValue("appraisalFeeTry"),
+  loanAllocationFeePct: legalValue("loanAllocationFeePct"),
+  mortgageRegistrationFeeTry: legalValue("mortgageRegistrationFeeTry"),
 
-  newBuildVatResidentialSmallPct: 1,
-  newBuildVatLargePct: 20,
-  rentWithholdingPct: 20,
+  newBuildVatResidentialSmallPct: legalValue("newBuildVatResidentialSmallPct"),
+  newBuildVatLargePct: legalValue("newBuildVatLargePct"),
+  rentWithholdingPct: legalValue("rentWithholdingPct"),
 };
 
 /** Konut kredisinde yasal azami vade (BDDK) — 120 ay. */
-export const MAX_LOAN_MONTHS = 120;
+export const MAX_LOAN_MONTHS = legalValue("maxLoanMonths");
 export const MIN_LOAN_MONTHS = 12;
 
 /** Kredi/değer (LTV) üst sınırı — konut kredisinde kredi tutarı, teminat
  *  gösterilen konutun değerinin bu yüzdesini aşamaz (BDDK sınırı; konut
  *  değerine göre kademelendiği için burada en geniş kademe kullanılmıştır). */
-export const MAX_LOAN_TO_VALUE_PCT = 90;
+export const MAX_LOAN_TO_VALUE_PCT = legalValue("maxLtvPct");
 
 /** Hesaplayıcı formlarının başlangıç değeri — piyasa değiştikçe kullanıcı
  *  kendisi günceller, bu yalnızca makul bir başlangıçtır (aylık %). */
