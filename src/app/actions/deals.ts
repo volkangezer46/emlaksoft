@@ -1,5 +1,6 @@
 "use server";
 
+import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -135,6 +136,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   revalidatePath("/app/komisyon");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
+  emitWebhook("deal.created", "deal", deal.id);
   return { ok: true, dealId: deal.id };
 }
 
@@ -297,6 +299,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
+  emitWebhook("deal.updated", "deal", id);
   return { ok: true, dealId: id };
 }
 
@@ -371,6 +374,7 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");
   revalidateTenantData(gate.tenantId);
+  emitWebhook("deal.updated", "deal", id);
   return { ok: true, dealId: id };
 }
 

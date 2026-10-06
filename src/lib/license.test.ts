@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  annualLicenseFeeReminderDue,
   daysBetweenDayKeys,
+  LICENSE_AMENDMENT_DAYS,
+  licenseAmendmentChanges,
+  licenseAmendmentMessage,
+  licenseExpiryReminderStep,
   licenseStatus,
   listingPublishLicenseWarning,
   normalizeLicenseNo,
@@ -65,5 +70,35 @@ describe("listingPublishLicenseWarning", () => {
     expect(listingPublishLicenseWarning(licenseStatus({ licenseNo: "A1", validUntil: "2026-01-01" }, "2026-10-06"))).toMatch(/doldu/);
     expect(listingPublishLicenseWarning(licenseStatus({ licenseNo: "A1", validUntil: "2026-10-20" }, "2026-10-06"))).toBeNull();
     expect(listingPublishLicenseWarning(licenseStatus({ licenseNo: "A1", validUntil: null }, "2026-10-06"))).toBeNull();
+  });
+});
+
+describe("yetki belgesi tadil + yıllık harç + bitiş kademesi", () => {
+  const base = { name: "Örnek Emlak", addressLine: "Atatürk Cd. 1", licenseTitle: "Örnek Gayrimenkul", provinceId: "p1", districtId: "d1" };
+  it("ünvan/adres değişikliği yakalanır; boşluk/harf farkı ve temizleme değişiklik değildir", () => {
+    expect(licenseAmendmentChanges(base, { ...base, name: "  örnek   emlak " })).toEqual([]);
+    expect(licenseAmendmentChanges(base, { ...base, licenseTitle: "" })).toEqual([]);
+    expect(licenseAmendmentChanges(base, { ...base, name: "Yeni Emlak" })).toEqual(["işletme adı"]);
+    expect(licenseAmendmentChanges(base, { ...base, districtId: "d2" })).toEqual(["adres (il/ilçe)"]);
+    expect(licenseAmendmentChanges(base, { ...base, addressLine: "Cumhuriyet Cd. 5", districtId: "d2" })).toEqual(["adres"]);
+  });
+  it("tadil metni süreyi tek sabitten verir ve doğrulama notu taşır", () => {
+    const m = licenseAmendmentMessage(["adres"]);
+    expect(m.body).toContain(`${LICENSE_AMENDMENT_DAYS} gün`);
+    expect(m.body).toMatch(/doğrulayın/);
+  });
+  it("yıllık harç hatırlatması yalnız seçilen ayda; 0 = kapalı", () => {
+    expect(annualLicenseFeeReminderDue(1, "2027-01-03")).toBe(true);
+    expect(annualLicenseFeeReminderDue(1, "2027-02-03")).toBe(false);
+    expect(annualLicenseFeeReminderDue(0, "2027-01-03")).toBe(false);
+  });
+  it("bitiş kademesi 60/30/7 ve en çok 30 gün geçmiş", () => {
+    expect(licenseExpiryReminderStep("2027-03-01", "2027-01-15")).toBe("60");
+    expect(licenseExpiryReminderStep("2027-03-01", "2027-02-20")).toBe("30");
+    expect(licenseExpiryReminderStep("2027-03-01", "2027-02-25")).toBe("7");
+    expect(licenseExpiryReminderStep("2027-03-01", "2026-10-01")).toBeNull();
+    expect(licenseExpiryReminderStep("2027-03-01", "2027-03-10")).toBe("expired");
+    expect(licenseExpiryReminderStep("2027-03-01", "2027-05-10")).toBeNull();
+    expect(licenseExpiryReminderStep(null, "2027-03-10")).toBeNull();
   });
 });

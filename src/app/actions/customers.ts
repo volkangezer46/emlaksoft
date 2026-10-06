@@ -1,5 +1,6 @@
 "use server";
 
+import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
@@ -123,6 +124,7 @@ export async function createCustomer(
     },
   });
 
+  emitWebhook("customer.created", "customer", data.id);
   revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
   return { ok: true, id: data.id };
@@ -197,6 +199,7 @@ export async function updateCustomer(
     newValue: { full_name: fullName },
   });
 
+  emitWebhook("customer.updated", "customer", id);
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
   revalidateTenantData(gate.tenantId);
@@ -243,16 +246,25 @@ export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDe
 }
 
 export async function deleteCustomer(formData: FormData): Promise<void> {
-  const gate = await requirePermission("customers", "delete");
-  if (!gate.ok) return;
-  const id = String(formData.get("id") ?? "");
   const redirectTo = String(formData.get("redirect_to") ?? "").trim();
-  if (!id) return;
+  const res = await deleteCustomerWithResult(formData);
+  if (res.ok && redirectTo) redirect(redirectTo);
+}
+
+/**
+ * Yumuşak silme (çöp kutusu) — sonucu döndüren sürüm: "Silindi · Geri al" bildirimi yalnız gerçekten silindiyse gösterilir.
+ * Form alanları `deleteCustomer` ile aynı (id, confirm_linked).
+ */
+export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok?: boolean; error?: string }> {
+  const gate = await requirePermission("customers", "delete");
+  if (!gate.ok) return { error: gate.error };
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Müşteri bulunamadı." };
   const supabase = await createClient();
   // Açık anlaşması olan müşteri, bağlı kayıt özeti gösterilip onaylanmadan (confirm_linked=1) silinmez.
   if (String(formData.get("confirm_linked") ?? "") !== "1") {
     const impact = await getCustomerDeleteImpact([id]);
-    if (impact.openDeals > 0) return;
+    if (impact.openDeals > 0) return { error: "Açık anlaşması olan müşteri onay olmadan silinemez." };
   }
   const { error } = await supabase
     .from("customers")
@@ -261,7 +273,7 @@ export async function deleteCustomer(formData: FormData): Promise<void> {
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deleteCustomer", error);
-    return;
+    return { error: "Müşteri silinemedi." };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -272,7 +284,7 @@ export async function deleteCustomer(formData: FormData): Promise<void> {
   });
   revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
-  if (redirectTo) redirect(redirectTo);
+  return { ok: true };
 }
 
 export type BulkCustomerResult = { ok?: boolean; error?: string; updatedCount?: number };

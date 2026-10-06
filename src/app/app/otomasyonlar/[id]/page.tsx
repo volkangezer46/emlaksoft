@@ -9,6 +9,7 @@ import { AutomationWizard, type WizardInitial } from "../automation-wizard";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { TRIGGER_LABELS, ACTION_LABELS, STATUS_LABELS, TRIGGER_CONFIG_LABELS, CONDITION_OP_LABELS } from "../labels";
+import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 
 function dateTime(iso: string | null) {
   if (!iso) return "—";
@@ -137,6 +138,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
               />
             ) : null}
             {canEdit ? <AutomationToggleButton id={rule.id} status={rule.status} /> : null}
+            {canEdit ? <DuplicateRecordButton kind="automation" id={rule.id} /> : null}
           </>
         }
       />

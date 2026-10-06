@@ -301,4 +301,60 @@ const access: AnySettingDef[] = [
   }),
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access];
+/**
+ * Malik/müşteri iletişimi (hepsi varsayılan KAPALI = bugünkü davranış). Okuyucular: haftalık rapor `src/lib/owner-report/**`
+ * (haftalik-ozet cron adımı + malik portalı), güncel değer özeti `src/lib/home-value/**` (müşteri portalı), vitrin sohbeti
+ * `src/lib/ai/vitrin-chat.ts`.
+ */
+export const OWNER_WEEKLY_REPORT_KEY = "office.owner_report.weekly_enabled";
+export const HOME_VALUE_SUMMARY_KEY = "office.customer_portal.home_value_enabled";
+export const VITRIN_AI_CHAT_KEY = "office.vitrin.ai_chat_enabled";
+/** Yetki belgesi yıllık harç kontrolü hatırlatma ayı ("0" = kapalı). Okuyucu: abonelik-kontrol cron'u (`license-reminders.ts`). */
+export const LICENSE_FEE_MONTH_KEY = "office.license.annual_fee_month";
+
+const TR_MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+const contact: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    key: OWNER_WEEKLY_REPORT_KEY,
+    group: "iletisim",
+    default: false,
+    label: "Malike haftalık pazarlama raporu",
+    description: "Her pazartesi aktif malik paneli bağlantısı olan portföyler için son 7 günün gösterim, teklif, ziyaretçi geri bildirimi ve vitrin görüntülenme özeti hazırlanır; malik panelinde \"Haftalık rapor\" bölümü görünür.",
+    impact: "Ofisin kendi SMS hesabı bağlı ve malik telefonu kayıtlıysa malike rapor bağlantısı SMS ile gider; değilse sorumlu danışmana \"bağlantıyı malike gönderin\" bildirimi düşer. Kapalıyken hiçbir rapor/bildirim üretilmez.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: HOME_VALUE_SUMMARY_KEY,
+    group: "iletisim",
+    default: false,
+    label: "Müşteri portalında \"Evinizin güncel değeri\"",
+    description: "Ofisten ev almış müşterinin portalında, ofisin emsal motoruna göre güncel değer ARALIĞI gösterilir (tahmin etiketli; emsal yetersizse hiç gösterilmez).",
+    impact: "Açılırsa yalnız kazanılmış satış anlaşması olan müşterilerin portalında görünür. Kişisel veri veya başka müşterinin fiyatı gösterilmez; yalnız aralık ve emsal sayısı.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: VITRIN_AI_CHAT_KEY,
+    group: "iletisim",
+    default: false,
+    label: "Vitrinde yapay zekâ sohbet asistanı",
+    description: "Vitrin ilan sayfasında ziyaretçi ilan hakkında soru sorabilir; asistan yalnız ilanın kayıtlı bilgileriyle yanıtlar, fiyat pazarlığı/kesin söz vermez ve her yanıtta danışmana bağlanma (talep formu) önerir.",
+    impact: "AI kotanızdan harcar. Ziyaretçinin yazdığı telefon/e-posta/TC gibi kişisel veriler yapay zekâya gitmeden maskelenir. Kapalıyken asistan hiç görünmez.",
+  }),
+];
+
+const compliance: AnySettingDef[] = [
+  defineEnum({
+    ...TENANT,
+    key: LICENSE_FEE_MONTH_KEY,
+    group: "uyum",
+    default: "0",
+    options: [{ value: "0", label: "Kapalı" }, ...TR_MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))],
+    label: "Yetki belgesi yıllık harç hatırlatma ayı",
+    description: "Seçilen ayın ilk günü ofis sahibi ve genel müdüre yetki belgesi yıllık harç/ödeme ve belge geçerlilik kontrolü hatırlatması düşer (yılda bir kez).",
+    impact: "Tutar veya son gün yazılmaz; belgenizden ve güncel mevzuattan doğrulayın. Kapalıyken hatırlatma üretilmez.",
+  }),
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...compliance];

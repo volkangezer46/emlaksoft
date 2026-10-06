@@ -169,6 +169,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/ayarlar/merkez", "Ayar merkezi", "Tüm ayarlar, geçmiş, gizli anahtarlar", ["sistem"]),
           L("/admin/ayarlar/bayraklar", "Özellik bayrakları", "Açma/kapama bayrakları ve etkisi", ["sistem"]),
           L("/admin/ayarlar/yasal", "Yasal metinler", "Form onay metinleri ve mevzuat sabitleri", ["sistem"]),
+          L("/admin/ayarlar/eposta", "E-posta şablonları", "E-posta kanalı durumu ve işlemsel şablonlar", ["sistem"]),
           L("/admin/ayarlar/tufe", "TÜFE tablosu", "Kira artışı oranları", ["sistem"]),
         ],
       },

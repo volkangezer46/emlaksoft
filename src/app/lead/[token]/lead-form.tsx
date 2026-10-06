@@ -6,6 +6,7 @@ import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { DEFAULT_LEAD_FORM_COPY, type LeadFormCopy } from "@/lib/legal-copy";
+import { QR_SOURCE_PARAM, parseUrlSource } from "@/lib/qr-source";
 
 type Province = { id: string; name: string };
 
@@ -52,7 +53,9 @@ export function LeadForm({
           ...payload,
           request_id: crypto.randomUUID(),
           channel: "web_form",
-          source: "web_form",
+          // QR'lı tabela/broşürden gelindiyse (`?kaynak=qr`) kaynak raporunda "QR tabela" olarak ayrışır.
+          // Gönderim anında okunur: vitrin sayfası önbellekli (ISR) kalır, searchParams sunucuya taşınmaz.
+          source: parseUrlSource(new URLSearchParams(window.location.search).get(QR_SOURCE_PARAM)) ?? "web_form",
         }),
       });
       const json = await res.json().catch(() => ({}));

@@ -40,6 +40,12 @@ import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
+import { SocialCardPanel } from "@/components/app/social-card-panel";
+import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
+import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
+import { VitrinQr } from "@/components/public/vitrin-qr";
+import { getBaseUrl } from "@/lib/base-url";
+import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
 import { PropertyAuthorizationPanel } from "./property-extras";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
@@ -482,6 +488,14 @@ export default async function PropertyDetailPage({
               </Link>
               <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
+              {(perms.properties ?? []).includes("create") ? (
+                <DuplicateRecordButton
+                  kind="property"
+                  id={property.id}
+                  label="Kaydı çoğalt"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-60"
+                />
+              ) : null}
               {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
               <CopyListingText title={listingText.title} description={listingText.description} warnings={listingText.warnings} />
               </MoreActions>
@@ -633,6 +647,12 @@ export default async function PropertyDetailPage({
               provinceId={property.province_id}
             />
           </Suspense>
+
+          {tenantId ? (
+            <Suspense fallback={null}>
+              <CustomFieldsPanel entity="property" recordId={property.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
+            </Suspense>
+          ) : null}
             </div>
           ) : null}
 
@@ -650,6 +670,12 @@ export default async function PropertyDetailPage({
           </Suspense>
 
           <AiContentPanel propertyId={property.id} canEdit={canEdit} />
+
+          {tenantId ? (
+            <Suspense fallback={null}>
+              <SocialCardPanel propertyId={property.id} tenantId={tenantId} />
+            </Suspense>
+          ) : null}
             </div>
           ) : null}
 
@@ -873,6 +899,15 @@ export default async function PropertyDetailPage({
           <Suspense fallback={null}>
             <ClosuresSection portalIds={portalIds} />
           </Suspense>
+
+          {/* QR'lı tabela: vitrin ilan sayfasına `?kaynak=qr` ile gider; taramadan gelen talepler kaynak raporunda ayrışır */}
+          <VitrinQr
+            vitrinUrl={buildQrListingUrl(getBaseUrl(), vitrinSlug, property.id) ?? ""}
+            heading="QR'lı tabela ve afiş"
+            hint={`Tabelaya, cama veya ilan afişine basın. Tarayan kişi bu ilanın vitrin sayfasına gider; oradan bıraktığı talep kaynak raporunda "${QR_SOURCE_LABEL}" olarak görünür.${isLiveListing ? "" : " Not: portföy yayında değil; QR yayına alınana kadar vitrinde açılmaz."}`}
+            emptyHint="QR kodu için önce ofis vitrin adresi (slug) tanımlanmalı (Ayarlar)."
+            fileName={`tabela-qr-${(property.property_code ?? "ilan").replace(/[^A-Za-z0-9-]/g, "") || "ilan"}.png`}
+          />
             </div>
           ) : null}
 

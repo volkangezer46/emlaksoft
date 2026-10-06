@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "next/link";
 import Image from "next/image";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
@@ -85,7 +86,7 @@ const isSaleTx = (v: string) => ["satılık", "satilik", "sale", "satış", "sat
 const isRentTx = (v: string) => ["kiralık", "kiralik", "rent", "kira"].some((x) => v.includes(x));
 
 export default async function DemandDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { perms } = await requireModulePage("demands");
+  const { perms, tenantId } = await requireModulePage("demands");
   const canEdit = (perms.demands ?? []).includes("edit");
   const { id } = await params;
   const supabase = await createClient();
@@ -512,6 +513,11 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
               </p>
             ) : null}
           </section>
+          {tenantId ? (
+            <Suspense fallback={null}>
+              <CustomFieldsPanel entity="demand" recordId={demand.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
+            </Suspense>
+          ) : null}
         </div>
       </div>
     </div>

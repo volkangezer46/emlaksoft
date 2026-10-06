@@ -7,6 +7,9 @@ import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
 import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
 import { tenantsDisabledFor } from "@/lib/modules/state";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
+import { runOwnerWeeklyReports } from "@/lib/owner-report/run";
+import { trDayKey } from "@/lib/clock";
+import { getBaseUrl } from "@/lib/base-url";
 
 /**
  * Haftalık yönetici özeti — her aktif tenant için GEÇEN haftanın (Pzt–Paz)
@@ -225,13 +228,24 @@ export async function GET(req: NextRequest) {
     console.error("haftalik-ozet ilan kontrol raporu", e);
   }
 
+  // Malik haftalık pazarlama raporu (ofis ayarı açık ofisler; varsayılan KAPALI). En iyi çaba; özet işini bozmaz.
+  let ownerReports = 0;
+  if (!isPastDeadline(Date.now(), deadline)) {
+    try {
+      const r = await runOwnerWeeklyReports(admin, { todayKey: trDayKey(Date.now()), nowIso: new Date().toISOString(), baseUrl: getBaseUrl() });
+      ownerReports = r.notified;
+    } catch (e) {
+      console.error("haftalik-ozet malik raporu", e instanceof Error ? e.message : "hata");
+    }
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${ownerReports} malik raporu,${skippedEmpty} boş, ${skippedDone} zaten gönderilmiş, ${skippedPrefs} tercih kapalı${skippedTenantsNote(disabledModules, "reports")}`,
   });
   await recordHeartbeat("haftalik-ozet", hb.status, hb.detail);
 

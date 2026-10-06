@@ -41,6 +41,8 @@ import {
   NotesSkeleton,
 } from "./sections";
 import { KapanisPanel } from "./kapanis-panel";
+import { DealGosSection } from "./deal-gos-section";
+import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import { DealLinkPanel } from "./deal-link-panel";
 import { parseOutcomeParam } from "./kapanis-model";
 /*
@@ -104,7 +106,7 @@ export default async function DealDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId, role } = await requireModulePage("commissions");
+  const { perms, userId, role, tenantId } = await requireModulePage("commissions");
   const seeAllEarnings = canSeeAllEarnings(perms);
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
@@ -611,6 +613,11 @@ export default async function DealDetailPage({
                     </dl>
                   </section>
                 </div>
+                {tenantId ? (
+                  <Suspense fallback={null}>
+                    <CustomFieldsPanel entity="deal" recordId={deal.id} tenantId={tenantId} canEdit={(perms.commissions ?? []).includes("edit")} canManage={(perms.settings ?? []).includes("edit")} />
+                  </Suspense>
+                ) : null}
             </div>
           ) : null}
 
@@ -774,6 +781,12 @@ export default async function DealDetailPage({
                     canEdit={(perms.commissions ?? []).includes("edit")}
                   />
                 </Suspense>
+
+                {deal.deal_type === "sale" ? (
+                  <Suspense fallback={null}>
+                    <DealGosSection dealId={deal.id} canEdit={(perms.commissions ?? []).includes("edit")} />
+                  </Suspense>
+                ) : null}
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   {/* Teklifler ve sözleşmeler: yaklaşık eşleşme, bu açıkça yazılıyor */}

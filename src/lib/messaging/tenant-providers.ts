@@ -418,3 +418,63 @@ export async function sendTenantWhatsApp(
   const sender = await prepareTenantWhatsAppSender(tenantId);
   return sender(to, template);
 }
+
+/** Ofisin KENDİ WhatsApp entegrasyonu hazır mı (pencere içi serbest yanıt için; platform yedeği sayılmaz). */
+export async function isTenantWhatsAppSessionReady(tenantId: string): Promise<boolean> {
+  const lookup = await getActiveTenantIntegration(tenantId, "whatsapp");
+  return lookup.state === "ready";
+}
+
+/**
+ * 24 saatlik müşteri hizmet penceresi içinde SERBEST METİN yanıt (Meta "session message"). Yalnız ofisin KENDİ doğrulanmış
+ * WhatsApp entegrasyonuyla (gelen mesaj o numaraya geldi; platform yedeği KULLANILMAZ). Pencere kontrolü çağıranın işidir
+ * (`whatsapp-window.ts`); pencere dışında Meta da reddeder. Sonuç belirsizse otomatik tekrar yapılmaz.
+ */
+export async function sendTenantWhatsAppSessionText(
+  tenantId: string,
+  to: string,
+  text: string,
+): Promise<TenantWhatsAppSendResult> {
+  const lookup = await getActiveTenantIntegration(tenantId, "whatsapp");
+  if (lookup.state !== "ready") {
+    return { ok: false, code: "tenant_provider_unconfigured", error: "Bu ofis için WhatsApp kanalı kapalı (entegrasyon yok)." };
+  }
+  const integration = lookup.integration;
+  const token = stringValue(integration.credentials, "access_token", "accessToken", "api_token", "apiToken", "token");
+  const endpoint = tenantWhatsAppEndpoint(integration);
+  const phone = normalizeTrMobile(to);
+  if (!isValidWhatsAppAccessToken(token) || !endpoint) {
+    return { ok: false, code: "provider_config_invalid", error: "WhatsApp sağlayıcı ayarı geçersiz." };
+  }
+  if (!phone) return { ok: false, code: "invalid_phone", error: "Geçersiz telefon numarası." };
+  const body = text.trim();
+  if (!body || body.length > 4096) return { ok: false, code: "invalid_text", error: "Mesaj 1-4096 karakter olmalı." };
+  let response: Response;
+  try {
+    response = await fetchExternal(
+      endpoint,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body } }),
+        redirect: "error",
+      },
+      { timeoutMs: PROVIDER_TIMEOUT_MS },
+    );
+  } catch {
+    return { ok: false, code: "unknown_provider_outcome", error: "WhatsApp gönderim sonucu belirsiz; otomatik tekrar güvenli değil." };
+  }
+  if (!response.ok) {
+    await discardExternalResponse(response);
+    if (isAmbiguousWhatsAppHttpStatus(response.status)) {
+      return { ok: false, code: "unknown_provider_outcome", error: "WhatsApp gönderim sonucu belirsiz; manuel mutabakat gerekli." };
+    }
+    return { ok: false, code: `http_${response.status}`, error: `WhatsApp sağlayıcısı HTTP ${response.status} hatası döndürdü (pencere kapanmış olabilir).` };
+  }
+  const data = await readExternalJson<{ messages?: Array<{ id?: unknown }> }>(response, PROVIDER_MAX_RESPONSE_BYTES).catch(() => null);
+  const messageId = data?.messages?.[0]?.id;
+  if (typeof messageId !== "string" || !/^[\x21-\x7e]{1,512}$/.test(messageId)) {
+    return { ok: false, code: "unknown_provider_outcome", error: "WhatsApp kabul yanıtı teslimat kimliği içermedi; manuel mutabakat gerekli." };
+  }
+  return { ok: true, messageId };
+}

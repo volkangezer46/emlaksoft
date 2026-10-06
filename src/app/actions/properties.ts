@@ -1,5 +1,6 @@
 "use server";
 
+import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { revalidateTenantData } from "@/lib/revalidate";
@@ -500,6 +501,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     },
   });
 
+  emitWebhook("property.created", "property", data.id);
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${data.id}`);
   revalidatePath("/app");
@@ -692,6 +694,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   revalidateVitrinPaths(); // live ilanın başlık/fiyat/özellik değişikliği vitrine yansısın
+  emitWebhook("property.updated", "property", id);
   return { ok: true };
 }
 
@@ -752,7 +755,7 @@ export async function deleteProperty(formData: FormData): Promise<{ error?: stri
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deleteProperty", error);
-    return;
+    return { error: "Portföy arşivlenemedi." };
   }
   await logActivity({
     tenantId: gate.tenantId,

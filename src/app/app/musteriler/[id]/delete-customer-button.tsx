@@ -1,14 +1,31 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { deleteCustomer, getCustomerDeleteImpact, type CustomerDeleteImpact } from "@/app/actions/customers";
+import { deleteCustomerWithResult, getCustomerDeleteImpact, type CustomerDeleteImpact } from "@/app/actions/customers";
+import { useToast } from "@/components/app/toast-provider";
+import { useUndoDelete } from "@/components/app/record-ops-buttons";
 import { describeDeleteImpact } from "../delete-impact";
 
 export function DeleteCustomerButton({ customerId }: { customerId: string }) {
   const [confirming, setConfirming] = useState(false);
   const [impact, setImpact] = useState<CustomerDeleteImpact | null>(null);
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const { push } = useToast();
+  const undo = useUndoDelete();
+
+  async function remove(fd: FormData) {
+    const res = await deleteCustomerWithResult(fd);
+    if (res.error) {
+      push(res.error, "err");
+      setConfirming(false);
+      return;
+    }
+    undo("customer", customerId, "Müşteri çöp kutusuna taşındı");
+    router.push("/app/musteriler");
+  }
 
   function begin() {
     startTransition(async () => {
@@ -30,9 +47,8 @@ export function DeleteCustomerButton({ customerId }: { customerId: string }) {
           <p className="text-xs text-danger-100/90">Bağlı açık kayıt yok. Çöp kutusundan geri alınabilir.</p>
         )}
         <div className="flex items-center gap-2">
-          <form action={deleteCustomer}>
+          <form action={remove}>
             <input type="hidden" name="id" value={customerId} />
-            <input type="hidden" name="redirect_to" value="/app/musteriler" />
             <input type="hidden" name="confirm_linked" value="1" />
             <button type="submit" className="rounded-[var(--radius-control)] bg-danger-500 px-2.5 py-1 text-xs font-bold text-white hover:bg-danger-600">
               Evet, sil

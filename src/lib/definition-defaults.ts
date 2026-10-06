@@ -45,6 +45,8 @@ export const LEAD_SOURCES = [
   { value: "web_sitesi", label: "Web Sitesi" },
   { value: "telefon", label: "Telefon" },
   { value: "ofis_ziyareti", label: "Ofis Ziyareti" },
+  // QR'lı tabela/broşür taraması (vitrin `?kaynak=qr`; tek kaynak `src/lib/qr-source.ts`).
+  { value: "qr", label: "QR tabela" },
   { value: "diger", label: "Diğer" },
 ] as const;
 

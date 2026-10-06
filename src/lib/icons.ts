@@ -125,6 +125,9 @@ import {
   Zap,
   Crown,
   type LucideIcon,
+  ListPlus,
+  BadgeTurkishLira,
+  Webhook,
 } from "lucide-react";
 
 /** Sözlükteki kavram anahtarları — otomatik tamamlama ve tip güvenliği için. */
@@ -280,6 +283,12 @@ export const ICONS = {
   moduller: ToggleRight,
   /** Ofis sahipliği devri (Ayarlar sekmesi + devir paneli). */
   sahiplik: Crown,
+  /** Kâr / zarar raporu (gelir − gider dengesi). */
+  karZarar: BadgeTurkishLira,
+  /** Ofise özel alan tanımları. */
+  ozelAlan: ListPlus,
+  /** API anahtarı ve webhook olayları. */
+  apiWebhook: Webhook,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

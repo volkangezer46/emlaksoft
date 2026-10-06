@@ -34,6 +34,9 @@ import { LinkToCustomer } from "./link-to-customer";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { WhatsAppWindowReply } from "./whatsapp-window-reply";
+import { whatsappWindowState, windowLabel } from "@/lib/messaging/whatsapp-window";
+import { isTenantWhatsAppSessionReady } from "@/lib/messaging/tenant-providers";
 
 /**
  * Gelen Kutusu — birleşik iletişim akışı (v1: salt görünüm + navigasyon).
@@ -226,6 +229,10 @@ export async function InboxView({
     waPromise,
     savedViewsPromise,
   ]);
+
+  // WhatsApp pencere içi serbest yanıt: yalnız ofisin kendi WhatsApp entegrasyonu hazırsa (gelen WA mesajı varsa sorgulanır).
+  const hasWaInbound = ((commRows ?? []) as { channel: string; direction: string }[]).some((r) => r.channel === "whatsapp" && r.direction === "inbound");
+  const waSessionReady = hasWaInbound && inboxTenantId ? await isTenantWhatsAppSessionReady(inboxTenantId).catch(() => false) : false;
 
   // ---- Birleştirme ---------------------------------------------------------
   const items: UnifiedItem[] = [];
@@ -507,6 +514,10 @@ export async function InboxView({
                     ) : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-text-muted">{item.summary}</p>
+                  {item.key.startsWith("c-") && item.channel === "whatsapp" && item.direction === "inbound" ? (() => {
+                    const win = whatsappWindowState(item.at, now());
+                    return <WhatsAppWindowReply communicationId={item.key.slice(2)} open={win.open} label={windowLabel(win)} channelReady={waSessionReady} />;
+                  })() : null}
                   {!item.customerId && (item.key.startsWith("a-") || item.key.startsWith("c-")) ? (
                     <LinkToCustomer
                       kind={item.key.startsWith("a-") ? "call" : "comm"}

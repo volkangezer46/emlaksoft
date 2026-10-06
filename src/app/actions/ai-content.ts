@@ -7,6 +7,8 @@ import { generateContent, translateListingText, type ContentKind } from "@/lib/a
 import { TRANSLATE_MAX_SOURCE_CHARS, isTranslateLang } from "@/lib/ai/translate-logic";
 import { logActivity } from "@/lib/activity";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
+import { SOCIAL_LINK_REQUIRED_MESSAGE, ensureSocialCompliance, pickListingLink, type SocialCompliance } from "@/lib/social-card/core";
+import { loadSocialCardData } from "@/lib/social-card/load";
 
 export type AiContentResult = { text?: string; source?: "ai" | "template"; error?: string };
 
@@ -28,6 +30,15 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
     .maybeSingle();
 
   if (!property) return { error: "Portföy bulunamadı." };
+
+  // Sosyal medya metni: EİDS doğrulamalı ilan bağlantısı (yayındaki portal ilanı) ZORUNLU; yoksa metin üretilmez.
+  let social: SocialCompliance | null = null;
+  if (kind === "social") {
+    const cardData = await loadSocialCardData(supabase, gate.tenantId, propertyId);
+    const link = cardData ? pickListingLink(cardData.listings) : null;
+    if (!cardData || !link?.portalUrl) return { error: SOCIAL_LINK_REQUIRED_MESSAGE };
+    social = { listingUrl: link.portalUrl, eidsNo: cardData.eidsNo, licenseNo: cardData.office.licenseNo, officeName: cardData.office.name };
+  }
 
   const { data: tenant } = await supabase
     .from("tenants")
@@ -57,7 +68,7 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
     features,
   }, { tenantId: gate.tenantId, actorId: gate.userId });
 
-  return { text, source };
+  return { text: social ? ensureSocialCompliance(text, social) : text, source };
 }
 
 export type TranslateResult = { text?: string; error?: string };

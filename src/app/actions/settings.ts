@@ -8,7 +8,16 @@ import { MATCHING_WEIGHT_KEYS, type MatchingWeights } from "@/lib/matching";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { resolveOfficeGeo } from "@/lib/geo/resolve";
-import { normalizeLicenseNo, normalizeLicenseTitle, normalizeLicenseValidUntil } from "@/lib/license";
+import {
+  LICENSE_AMENDMENT_DAYS,
+  licenseAmendmentChanges,
+  licenseAmendmentMessage,
+  normalizeLicenseNo,
+  normalizeLicenseTitle,
+  normalizeLicenseValidUntil,
+} from "@/lib/license";
+import { daysFromNowIso } from "@/lib/clock";
+import { notifyTenant } from "@/lib/notify";
 
 export type SettingsResult = { error?: string; ok?: boolean };
 
@@ -110,6 +119,12 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
     return { error: "IBAN formatı geçersiz. Örnek: TR330006100519786457841326" };
   }
 
+  // Yetki belgesi tadil hatırlatması için ÖNCEKİ değerler (unvan sütunu yoksa yalnız temel alanlar).
+  const prevFull = await supabase.from("tenants").select("name, address_line, province_id, district_id, license_no, license_title").eq("id", tenantId).maybeSingle();
+  const prevRow = (prevFull.error
+    ? (await supabase.from("tenants").select("name, address_line, province_id, district_id, license_no").eq("id", tenantId).maybeSingle()).data
+    : prevFull.data) as { name?: string | null; address_line?: string | null; province_id?: string | null; district_id?: string | null; license_no?: string | null; license_title?: string | null } | null;
+
   const { error } = await supabase
     .from("tenants")
     .update({
@@ -155,6 +170,42 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
     entityId: tenantId,
     newValue: { name },
   });
+
+  // Ünvan/adres değişti ve ofisin yetki belgesi varsa: tadil için görev (vade LICENSE_AMENDMENT_DAYS) + bildirim.
+  if (prevRow && (licenseNo || prevRow.license_no)) {
+    const changes = licenseAmendmentChanges(
+      {
+        name: prevRow.name ?? null,
+        addressLine: prevRow.address_line ?? null,
+        licenseTitle: prevRow.license_title ?? null,
+        provinceId: prevRow.province_id ?? null,
+        districtId: prevRow.district_id ?? null,
+      },
+      {
+        name,
+        addressLine: addressLine || null,
+        licenseTitle: hasLicenseExtras ? licTitle.value : (prevRow.license_title ?? null),
+        provinceId: geo.provinceId ?? prevRow.province_id ?? null,
+        districtId: geo.provinceId ? (geo.districtId ?? null) : (prevRow.district_id ?? null),
+      },
+    );
+    if (changes.length > 0) {
+      const msg = licenseAmendmentMessage(changes);
+      const { error: taskError } = await supabase.from("tasks").insert({
+        tenant_id: tenantId,
+        title: msg.title,
+        notes: msg.body,
+        kind: "followup",
+        priority: "high",
+        status: "open",
+        due_at: daysFromNowIso(LICENSE_AMENDMENT_DAYS),
+        assigned_to: gate.userId,
+        created_by: gate.userId,
+      });
+      if (taskError) console.error("updateTenantInfo amendment task", { code: taskError.code });
+      await notifyTenant({ tenantId, userId: gate.userId, title: msg.title, body: msg.body, href: "/app/gorevler", kind: "warning" }).catch(() => undefined);
+    }
+  }
 
   revalidatePath("/app/ayarlar");
   revalidatePath("/app");

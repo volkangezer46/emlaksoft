@@ -8,6 +8,7 @@ import { IysForm } from "./iys-form";
 import { listErasureLog } from "@/app/actions/kvkk";
 import { KvkkPanel } from "./kvkk-panel";
 import { GosCard } from "./gos-card";
+import { KvkkTransferCard } from "./kvkk-transfer-card";
 import { loadEidsStatus } from "@/lib/eids/load";
 import { EIDS_FILTER_LABELS, EIDS_FILTER_VALUES } from "@/lib/eids/status";
 
@@ -167,6 +168,7 @@ export default async function CompliancePage({
       </div>
 
       <GosCard />
+      <KvkkTransferCard />
       {/* EİDS / yetki durumu — her sayaç filtrelenmiş portföy listesine gider. Resmî doğrulama DEĞİL: ofisin kendi kaydı ölçülür. */}
       <section aria-labelledby="eids-baslik" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">

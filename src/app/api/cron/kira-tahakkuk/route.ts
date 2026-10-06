@@ -7,6 +7,7 @@ import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@
 import { authorizeCron } from "@/lib/cron-auth";
 import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
 import { trDayKey } from "@/lib/clock";
+import { findNotifiedKeys, insertNotifications } from "@/lib/notify-batch";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
 
@@ -247,10 +248,43 @@ export async function GET(req: NextRequest) {
     reminderNote = ", hatırlatma atlandı (hata)";
   }
 
+  // ---- 5) Mart: kira geliri beyanı hatırlatması (ofise yılda bir; tutar YAZILMAZ). Anahtar kolonu yoksa yazılmaz. ----
+  let declarationNotified = 0;
+  try {
+    const today = trDayKey(Date.now());
+    if (today.slice(5, 7) === "03") {
+      const year = today.slice(0, 4);
+      const tenantIds = [...new Set(((rentals ?? []) as { tenant_id: string }[]).map((r) => r.tenant_id))].filter(
+        (id) => !isDisabledFor(disabledModules, id, "rentals"),
+      );
+      const keys = tenantIds.map((id) => `rent-decl:${id}:${year}`);
+      const seen = tenantIds.length > 0 ? await findNotifiedKeys(admin, { tenantIds, keys }) : new Set<string>();
+      if (seen !== null) {
+        declarationNotified = await insertNotifications(
+          admin,
+          tenantIds
+            .filter((id) => !seen.has(`rent-decl:${id}:${year}`))
+            .map((id) => ({
+              tenant_id: id,
+              title: "Kira geliri beyanı dönemi",
+              body:
+                "Maliklerinize geçen yılın kira ekstresini (malik paneli > Kira ekstresi) hatırlatabilirsiniz. " +
+                "Beyan yükümlülüğü ve tutarlar için mali müşavirlerine yönlendirin.",
+              href: "/app/kiralama",
+              kind: "info",
+              dedupe_key: `rent-decl:${id}:${year}`,
+            })),
+        );
+      }
+    }
+  } catch (e) {
+    console.error("kira-tahakkuk cron beyan hatirlatma", e instanceof Error ? e.message : "hata");
+  }
+
   await recordHeartbeat(
     "kira-tahakkuk",
     "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${skippedTenantsNote(disabledModules, "rentals")}`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
   );
 
   return NextResponse.json({

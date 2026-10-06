@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Landmark } from "lucide-react";
-import { GOS_CHECKLIST_ITEMS, GOS_DATE_NOTE, GOS_NO_MONEY_NOTE, GOS_SOURCES, GOS_SUMMARY } from "@/lib/gos-info";
+import { GOS_CHECKLIST_ITEMS, GOS_DATE_NOTE, GOS_NO_MONEY_NOTE, GOS_SOURCES, GOS_SUMMARY, gosStatusLabel } from "@/lib/gos-info";
+import { now, trDayKey } from "@/lib/clock";
 
 /**
- * Güvenli Ödeme Sistemi (GÖS) bilgi kartı — kaynaklı ve dürüst: tarih kaynaklarda farklıdır, para üründen geçmez.
+ * Güvenli Ödeme Sistemi (GÖS) bilgi kartı — kaynaklı ve dürüst: tarih tek sabitten (geri sayım), para üründen geçmez.
  * Metinler tek kaynak `src/lib/gos-info.ts`; kapanış listesi ve yabancıya satış listesi aynı maddeleri taşır.
  */
 export function GosCard() {
+  const status = gosStatusLabel(trDayKey(now()));
   return (
     <section
       id="gos"
@@ -16,13 +18,20 @@ export function GosCard() {
       <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
         <Landmark className="h-4 w-4" aria-hidden /> Taşınmaz satışında yeni dönem
       </p>
-      <h2 id="gos-baslik" className="mt-1 font-display font-bold text-ink-950">
-        Güvenli Ödeme Sistemi (GÖS) hazırlığı
-      </h2>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <h2 id="gos-baslik" className="font-display font-bold text-ink-950">
+          Güvenli Ödeme Sistemi (GÖS) hazırlığı
+        </h2>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${status.active ? "bg-danger-500/10 text-danger-600" : "bg-amber-400/15 text-amber-700"}`}
+        >
+          {status.label}
+        </span>
+      </div>
       <p className="mt-2 text-sm leading-relaxed text-text-muted">{GOS_SUMMARY}</p>
 
       <p className="mt-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.07] px-3 py-2 text-xs leading-relaxed text-text-muted">
-        <span className="font-bold text-amber-700">Tarih uyarısı: </span>
+        <span className="font-bold text-amber-700">Tarih: </span>
         {GOS_DATE_NOTE}
       </p>
 

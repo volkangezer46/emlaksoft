@@ -407,6 +407,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/anketler", label: "Anketler", icon: ICONS.anketor, module: "surveys", description: "Anketör kuyruğu, şablonlar ve sonuçlar", keywords: ["anket", "anketör"] },
           { href: "/app/raporlar/lead-hizi", label: "Aday hızı", icon: ICONS.leadHizi, module: "reports", description: "Adaya ilk dönüş süresi", keywords: ["hız", "dönüş süresi", "lead"] },
           { href: "/app/franchise", label: "Şube", icon: ICONS.sube, module: "reports", description: "Şube ve ofis bazlı karşılaştırma", keywords: ["franchise", "şube"] },
+          { href: "/app/raporlar/kar-zarar", label: "Kâr / zarar", icon: ICONS.karZarar, module: "reports", description: "Komisyon, gider ve danışman payıyla aylık net sonuç", keywords: ["kâr", "zarar", "net", "gelir gider"] },
         ],
         tier: "core",
         description: "Ofis, bölge, talep-arz, memnuniyet, anket ve şube raporları",
@@ -540,6 +541,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/ayarlar/roller", label: "Roller", icon: ICONS.roller, module: "settings", description: "Rol izin matrisi ve kullanıcı istisnaları", keywords: ["rol", "izin", "yetki", "matris"] },
           { href: "/app/ayarlar/yetkilendirme", label: "Yetkilendirme", icon: ICONS.yetkilendirme, module: "settings", description: "Kapsamlar, istisnalar, denetim günlüğü", keywords: ["kapsam", "istisna", "yetkilendirme", "erişim"] },
           { href: "/app/ayarlar/moduller", label: "Modüller", icon: ICONS.moduller, module: "settings", description: "Kullanılmayan alanları kapat, menü sadeleşsin", keywords: ["modül", "aç kapa", "sadeleştir"] },
+          { href: "/app/ayarlar/ozel-alanlar", label: "Özel alanlar", icon: ICONS.ozelAlan, module: "settings", description: "Müşteri, portföy, talep ve anlaşmaya ofise özel alanlar ekle", keywords: ["özel alan", "custom field", "alan ekle"] },
+          { href: "/app/ayarlar/api-webhook", label: "API ve webhook", icon: ICONS.apiWebhook, module: "settings", description: "API anahtarı ve imzalı webhook olayları", keywords: ["api", "webhook", "entegrasyon"] },
           // Sayfa her üyeye açıktır (devralması istenen kişi onayı burada verir; bildirim buraya götürür); sekme ayar yetkisiyle görünür.
           { href: "/app/ayarlar/sahiplik-devri", label: "Sahiplik devri", icon: ICONS.sahiplik, module: "settings", description: "Ofis sahipliğini ekipten birine iki adımda devret", keywords: ["sahip", "devir", "devret", "ofis sahibi"] },
         ],
