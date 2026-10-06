@@ -113,6 +113,10 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 - Kazanç gizliliği (P12) ve sec3 rol smoke senaryoları: runbook'taki duman testleri; `properties` UPDATE RLS açığı sahip kararı (eski madde, hâlâ geçerli).
 - Kayıtlı kartla otomatik yenileme (`billing.auto_renew_enabled`) KAPALI; iyzico off-session onayı ve CF retrieve alanları doğrulanmadan açılmaz.
 - Dış uptime izleyici (cron kaçırma/site erişimi) kurulmadı: öneri `docs/runbooks/IYZICO_IADE.md` §Alarm.
+- **Menü IA (2026-10-06, menü ajanı dalı):** `main`'de Ofis Merkezi iskeletiyle gelen 2 kırmızı test menü ajanının sahası değil, Ofis Merkezi
+  ajanına ait: `modules.test.ts` "27 kapatılabilir modül" (registry 28) ve "kapatılabilir her rota requireModulePage'e href geçirir"
+  (`/app/ofis-merkezi/page.tsx` istemci bileşeni, kapı yok). Ayrıca `/app/ayarlar/yetkilendirme` nav-config'te Ayarlar sekmesi olarak
+  TANIMLI ama sayfa dosyası başka ajanın dalında; birleşmeden önce o dal gelmeli (yoksa sekme 404'e gider).
 
 - **Uzman paneli kararı (2026-10-05):** canlıya almadan zorunlu paketler (P1-P7), ilk 30 gün planı, sahip kararları (S1-S13) ve "asla yapılmayacaklar" için `docs/design/PANEL_KARAR_1.md`.
 - **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Public medya sorguları
@@ -168,7 +172,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Telefon | `src/lib/phone-rules.ts` (`parsePhoneStrict`), `PhoneInput` |
 | Rol etiketi / terim | `src/lib/role-labels.ts`, `src/lib/terminology.ts` |
 | Zaman | `src/lib/clock.ts` (TR ay sınırları `trMonth*`) |
-| Menü | `src/lib/nav-config.ts` (37 öğe/9 başlık sözleşmesi, ikonlar benzersiz `src/lib/icons.ts`) |
+| Menü | `src/lib/nav-config.ts` (9 başlık/42 öğe sözleşmesi; `description`/`keywords`/`advanced`/`shortcut` alanları, `NAV_SHORTCUTS`, `HIDDEN_APP_PAGES`, `MOBILE_TAB_SECTIONS`; ikonlar benzersiz `src/lib/icons.ts`; yetim sayfa testi `nav-pages-contract.test.ts`; tasarım `docs/design/MENU_IA_2026_10.md`) |
 | Modül aç/kapa | `src/lib/modules/**` (registry, guard, pending-defs); tablo yokken hepsi açık |
 | Onay kuralları | `src/lib/oversight/approval-gate.ts` (varsayılan kapalı, 48 sa tek kullanımlık; muafiyet yalnız owner/gm, `APPROVAL_EXEMPT_ROLES`; karar yetkisi `APPROVAL_DECIDER_ROLES`; tek mesaj `APPROVAL_PENDING_MESSAGE`) |
 | AI | yalnız `src/lib/ai/openai-client.ts` + `redact.ts`; kredi `src/lib/ai/credits/**` |
@@ -306,3 +310,20 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **H2 EİDS:** saf mantık `src/lib/eids/**` (`property-no.ts` normalize/doğrulama — resmî biçim DOĞRULANAMADI, gevşek kalıp; `authority-term.ts` 3 ay kuralı + 15/7/3 gün; `status.ts` Uyum/portföy süzgeci tek kaynağı; `health.ts` skor bileşeni; `load.ts`). Form alanı: yeni portföy "İlan sahibi" sekmesi + portföy detay "Yetki belgesi" paneli. Sağlık skoru `eids` bileşeni hem `engine.ts`/`sync.ts` (depolanan) hem `lifecycle-model.ts`/`readers.ts` (canlı) tarafında ölçülür; sütun okunamazsa "ölçülemedi". `authority-shield.ts` yumuşak `notes` döner (engellemez); `createPipelineDeal` müzakere/kazanıldı aşamasında ofise tek seferlik bildirim yazar. Uyum merkezi "EİDS ve yetki durumu" bölümü her sayaçtan `/app/portfoyler?yetki=<eids_eksik|yetki_eksik|kisa|bitiyor|dolmus>` süzgecine gider.
 - **H3 kiracı hatırlatma:** saf mantık `src/lib/rent-reminders/logic.ts`, çalıştırıcı `run.ts` (admin istemci PARAMETRE; allowlist'e satır eklenmedi), `kira-tahakkuk` cron'unun 4. adımı (36 cron sabit). KAPALI doğar; kanal 1 ofise bildirim + kiralama "Hatırlatma" sekmesinde wa.me tek tık; kanal 2 SMS yalnız `sms_enabled` + ofisin kendi Netgsm'i + TR cep (`parsePhoneStrict`) + sessiz saat dışı + kiracı başına 20 saatte 1 + ofis başına çalıştırmada 100. Kiracı opt-out iki kanalı da keser. Ayar kartı `/app/kiralama` (id `hatirlatma-ayarlari`). SMS'in işlem iletisi mi ticari ileti mi olduğu (İYS) SAHİP SORUMLULUĞUNDADIR; ayar kapalı doğar.
 - **H6 kiralamadan sözleşme:** `src/lib/rental-contract/build.ts` (taslak gövde, TÜFE/sabit/yok artış maddesi, ofis şablonu `{kiraci}`… alan doldurma), `sozlesmeler/yeni?tur=kira&kira=<id>` (`rental-context.ts` salt-okunur ön dolgu), `createContract` `rental_id` + artış alanı, iki yönlü bağ: kiralama "Sözleşme" sekmesi + header butonu ↔ sözleşme sayfasında "Kira kaydı" chip'i. Metin yer tutucudur; hukuki/nitelikli e-imza iddiası yok.
+
+## 16. Menü bilgi mimarisi düzeni — 2026-10-06 (menü ajanı dalı; birleşme bekliyor)
+
+- **Tek kaynak genişledi (`src/lib/nav-config.ts`):** 9 başlık korunur (id'ler sabit), 42 öğe. Yeni alanlar `description` (zorunlu; palet satırı + menü ipucu),
+  `keywords` (yalnız arama eş anlamlısı; "lead" yalnız Talepler), `advanced` (yan menüde "İleri düzey" ayracının altı), `shortcut` (`g m`…; `NAV_SHORTCUTS`
+  → `keyboard-shortcuts.tsx` GIT listesi ve palet rozeti). `HIDDEN_APP_PAGES` (8 gerekçeli gizli sayfa) + `nav-pages-contract.test.ts` (her statik page.tsx
+  menüde / üst öğe altında / gizli listede). `MOBILE_TAB_SECTIONS` alt çubuk (Bugün, Müşteriler, Portföy, Anlaşmalar + Daha fazla; "Yeni" FAB kaldırıldı,
+  hızlı kayıt üst çubuk Yeni menüsünde ve `n h`).
+- **Taşımalar:** Randevular+Görevler → Bugün; AI Asistan → Araçlar; Ofis kurulumu → Ofis; Bildirimler/İçe aktarma/Mahalle notları menüye bağlandı;
+  Ayarlar sekmeli (Genel, Roller, Yetkilendirme, Modüller); Portal Kontrol → "Portal ilanları". Başlık adları: Müşteriler ve Talepler, Portföy ve İlanlar,
+  Anlaşmalar ve Sözleşmeler, İletişim ve Pazarlama, Performans ve Raporlar, Ofis ve Ayarlar. İkon: Ofis Merkezi `ICONS.ofisMerkezi` (Ayarlar çakışması giderildi).
+- **Palet:** `getAppGoItems` etiket+açıklama+eş anlamlıda arar, sekmeler "Öğe · Sekme" adıyla; açıklama satırı gösterilir.
+- **Zenginleştirme (9 sayfa):** Akıllı Listeler `?segment=` filtre kontratı + grup bazlı boş durum + hızlı eylemler; Takımlar, Şubeler, Etiketler, Sözleşme
+  şablonları, KVKK talepleri, Evrak linkleri, Otomasyonlar, Denetim: EmptyState + CTA. Talepler KPI "Yeni" eklendi. Dashboard KPI yerleşimi yalnız ÖNERİ
+  (`docs/design/MENU_IA_2026_10.md` §6; `page.tsx`/`_home` hız ajanında, dokunulmadı).
+- **Doğrulama (bu dalda):** tsc 0, eslint 0, check:links 0; tam vitest: 5008 geçti / 4 kırmızı — hepsi main'den gelen başka ajan işleri (Ofis Merkezi 2 test,
+  cron sayısı 37 ↔ belgelerde 36). Menüyle ilgili tüm sözleşme testleri yeşil.
