@@ -11,11 +11,11 @@ import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now as clockNow } from "@/lib/clock";
 import { planLabel } from "@/lib/billing/plans";
-import type { CSSProperties } from "react";
+import { AreaChart } from "@/components/ui/viz";
+import { StackedBar } from "@/components/admin/admin-bars";
+import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { BillingNav } from "./billing-nav";
 import { CaptureActions } from "./capture-actions";
-
-const RING_C = 2 * Math.PI * 42;
 
 const subStatus: Record<string, string> = {
   trialing: "Deneme",
@@ -31,14 +31,6 @@ const invStatus: Record<string, string> = {
   paid: "Ödendi",
   void: "İptal",
   uncollectible: "Tahsil edilemez",
-};
-
-const statusColor: Record<string, string> = {
-  trialing: "var(--amber-400)",
-  active: "var(--mint-500)",
-  past_due: "var(--danger-500)",
-  cancelled: "rgba(10,18,36,0.25)",
-  paused: "var(--cyan-400)",
 };
 
 type Rel = { id?: string; name?: string } | { id?: string; name?: string }[] | null;
@@ -161,141 +153,105 @@ export default async function AdminBillingPage({
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
-  // Synthetic MRR trend from subscription created_at buckets (8 months)
+  // Aylık yinelenen gelir eğrisi: her ay sonu itibarıyla aktif abonelik tutarı toplamı (8 ay, gerçek kayıttan).
   const now = new Date(clockNow());
   const months = Array.from({ length: 8 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (7 - i), 1);
-    return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString("tr-TR", { month: "short" }), value: 0 };
+    return {
+      label: d.toLocaleDateString("tr-TR", { month: "short" }),
+      cutoff: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999),
+    };
   });
-  subRows.forEach((s) => {
-    const d = new Date(s.created_at);
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    const bucket = months.find((m) => m.key === key);
-    if (bucket && (s.status === "active" || s.status === "trialing")) {
-      bucket.value += Number(s.amount_try || 0);
-    }
-  });
-  // Cumulative-ish display for visual continuity
-  let running = 0;
-  const trend = months.map((m) => {
-    running = Math.max(running, m.value) || running + m.value * 0.3;
-    if (m.value > 0) running = Math.max(running, mrr * ((months.indexOf(m) + 1) / 8));
-    return { ...m, display: m.value > 0 ? m.value : Math.round(running * 0.85) };
-  });
-  // Prefer real cumulative active MRR approximation
-  const trendVals = months.map((m, i) => {
-    const cutoff = new Date(now.getFullYear(), now.getMonth() - (7 - i) + 1, 0);
-    return subRows
-      .filter((s) => s.status === "active" && new Date(s.created_at) <= cutoff)
-      .reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
-  });
-  const maxTrend = Math.max(1, ...trendVals, mrr);
-  const pts = trendVals.map((v, i) => ({
-    x: (i / 7) * 280,
-    y: 72 - (v / maxTrend) * 52 - 8,
-  }));
-  const line = pts.map((p) => `${p.x},${p.y}`).join(" ");
-  const area = `0,80 ${line} 280,80`;
-  const last = pts[pts.length - 1] ?? { x: 280, y: 40 };
+  const trendVals = months.map((m) =>
+    subRows
+      .filter((s) => s.status === "active" && new Date(s.created_at) <= m.cutoff)
+      .reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
+  );
+  const hasCurve = trendVals.some((v) => v > 0);
+  const mrrTrend = computeTrend(trendVals[7] ?? 0, trendVals[6] ?? 0);
 
   const statusKeys = ["active", "trialing", "past_due", "cancelled", "paused"] as const;
   const statusCounts = statusKeys.map((k) => ({
     key: k,
     label: subStatus[k],
     count: subRows.filter((s) => s.status === k).length,
-    color: statusColor[k],
   }));
-  const totalSubs = Math.max(1, subRows.length);
-  let offset = 0;
-  const arcs = statusCounts.map((s) => {
-    const len = (s.count / totalSubs) * RING_C;
-    const item = { ...s, dash: len, offset };
-    offset += len;
-    return item;
-  });
 
   return (
     <div className="space-y-6">
       <BillingNav active="genel" />
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-amber-400/20 blur-[80px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:items-center">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-amber-400">
-              <CreditCard className="h-4 w-4" /> Abonelik & fatura
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white">Gelir operasyonu</h1>
-            <p className="mt-1 text-sm text-white/75">Altyapı hazır · iyzico bağlanınca tahsilat otomatikleşecek</p>
-            <div className="mt-4">
-              <ExportButton action={exportSubscriptionsCsv} label="Abonelikleri indir" />
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              {[
-                { key: "active", value: money(mrr), label: "Aktif aylık gelir", tone: "text-white" },
-                { key: "trialing", value: String(trialing), label: "Deneme", tone: "text-amber-300" },
-                { key: "past_due", value: String(pastDue), label: "Gecikmiş", tone: "text-danger-400" },
-              ].map((k) => {
-                const active = durum === k.key;
-                return (
-                  <Link
-                    key={k.key}
-                    href={billingHref({ durum: active ? undefined : k.key, from, to, q: query })}
-                    aria-current={active ? "page" : undefined}
-                    className={`focus-ring press group relative block rounded-[var(--radius-card)] border p-3 transition ${
-                      active
-                        ? "border-amber-300/50 bg-white/15"
-                        : "border-white/12 bg-white/8 hover:border-white/25 hover:bg-white/12"
-                    }`}
-                  >
-                    <ArrowUpRight className="hover-action absolute right-2.5 top-2.5 h-3.5 w-3.5 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
-                    <p className={`font-display text-xl font-extrabold ${k.tone}`}>{k.value}</p>
-                    <p className="text-xs text-white/70">{k.label}</p>
-                  </Link>
-                );
-              })}
-            </div>
+      <section aria-label="Gelir operasyonu" className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="bx-eyebrow flex items-center gap-1.5">
+              <CreditCard className="h-4 w-4 text-text-faint" aria-hidden /> Abonelik & fatura
+            </p>
+            <h1 className="mt-0.5 font-display text-2xl font-extrabold text-text">Gelir operasyonu</h1>
+            <p className="mt-1 text-sm text-text-muted">Altyapı hazır · iyzico bağlanınca tahsilat otomatikleşecek</p>
+          </div>
+          <ExportButton action={exportSubscriptionsCsv} label="Abonelikleri indir" />
+        </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+            {[
+              { key: "active", value: money(mrr), label: "Aktif aylık gelir", tone: "text-text" },
+              { key: "trialing", value: String(trialing), label: "Deneme", tone: "text-amber-700" },
+              { key: "past_due", value: String(pastDue), label: "Gecikmiş", tone: "text-danger-600" },
+            ].map((k) => {
+              const active = durum === k.key;
+              return (
+                <Link
+                  key={k.key}
+                  href={billingHref({ durum: active ? undefined : k.key, from, to, q: query })}
+                  aria-current={active ? "page" : undefined}
+                  className={`focus-ring group flex min-h-16 items-center justify-between gap-3 rounded-[var(--radius-card)] border px-3 py-2 transition-colors ${
+                    active ? "border-[var(--accent)] bg-[var(--surface-sunken)]" : "border-hairline hover:bg-[var(--surface-sunken)]"
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-xs text-text-muted">{k.label}</span>
+                    <span className={`num block text-2xl font-semibold tabular-nums ${k.tone}`}>{k.value}</span>
+                  </span>
+                  {k.key === "active" && hasCurve ? (
+                    <span className="hidden w-24 shrink-0 sm:block">
+                      <AreaChart
+                        series={[{ name: "Aylık gelir", values: trendVals, tone: "gold" }]}
+                        height={36}
+                        formatValue={money}
+                        ariaLabel="Aylık gelir eğrisi (özet)"
+                      />
+                    </span>
+                  ) : (
+                    <ArrowUpRight className="h-4 w-4 shrink-0 text-text-faint transition-colors group-hover:text-text" aria-hidden />
+                  )}
+                </Link>
+              );
+            })}
           </div>
 
-          <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75">
-                <TrendingUp className="h-3.5 w-3.5 text-amber-400" /> Aylık gelir trendi · 8 ay
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-text">
+                <TrendingUp className="h-4 w-4 text-text-faint" aria-hidden /> Aylık gelir trendi · 8 ay
               </p>
-              <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-300">{money(mrr)}</span>
+              <span className="inline-flex items-center gap-2 text-sm tabular-nums">
+                <span className="font-semibold text-text">{money(mrr)}</span>
+                <TrendPill trend={mrrTrend} />
+              </span>
             </div>
-            <svg viewBox="0 0 280 80" className="mt-3 h-24 w-full overflow-visible" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="mrrFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--mint-400)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--mint-400)" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <polygon points={area} fill="url(#mrrFill)" />
-              <polyline
-                className="chart-draw"
-                style={{ "--len": 420 } as CSSProperties}
-                points={line}
-                fill="none"
-                stroke="var(--mint-400)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <polyline className="flow-line" points={line} fill="none" stroke="rgba(52,211,153,0.45)" strokeWidth="1.5" />
-              <circle cx={last.x} cy={last.y} r="4" fill="var(--mint-400)" opacity="0.35" className="glow-halo" />
-              <circle cx={last.x} cy={last.y} r="3" fill="#fff" />
-              {/* Nokta başına native tooltip: ay + o ayki kümülatif gelir */}
-              {pts.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r="8" fill="transparent" className="cursor-help">
-                  <title>{`${months[i]?.label ?? ""}: ${money(trendVals[i] ?? 0)}`}</title>
-                </circle>
-              ))}
-            </svg>
-            <div className="mt-1 flex justify-between text-xs text-white/35">
-              {trend.map((m) => (
-                <span key={m.key}>{m.label}</span>
-              ))}
+            <div style={{ minHeight: 148 }}>
+              {hasCurve ? (
+                <AreaChart
+                  series={[{ name: "Aylık yinelenen gelir", values: trendVals, tone: "gold" }]}
+                  pointLabels={months.map((m) => m.label)}
+                  formatValue={money}
+                  height={132}
+                  ariaLabel="Son 8 ay aylık gelir trendi"
+                  href="/admin/muhasebe"
+                />
+              ) : (
+                <p className="py-8 text-center text-sm text-text-muted">Aktif abonelik oluştukça gelir eğrisi burada çizilir.</p>
+              )}
             </div>
           </div>
         </div>
@@ -458,58 +414,27 @@ export default async function AdminBillingPage({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-          <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">
-            <Activity className="h-4 w-4" /> Abonelik durumu
+        <section className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-1)" }}>
+          <p className="bx-eyebrow flex items-center gap-1.5">
+            <Activity className="h-4 w-4 text-text-faint" aria-hidden /> Abonelik durumu
           </p>
-          <h2 className="mt-1 font-display font-bold text-ink-950">Durum halkası</h2>
-          <div className="mt-5 flex items-center gap-4">
-            <div className="relative grid h-28 w-28 place-items-center">
-              <div
-                className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
-                style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--amber-400), var(--mint-500))" }}
+          <h2 className="mt-0.5 font-display font-bold text-text">Durum dağılımı</h2>
+          <div className="mt-4">
+            {subRows.length > 0 ? (
+              <StackedBar
+                ariaLabel={`${subRows.length} abonelik durumlarına göre dağılım`}
+                rows={statusCounts
+                  .filter((s) => s.count > 0 || ["active", "trialing"].includes(s.key))
+                  .map((s) => ({
+                    label: s.label,
+                    value: s.count,
+                    hint: durum === s.key ? "filtre açık" : undefined,
+                    href: billingHref({ durum: durum === s.key ? undefined : s.key, from, to, q: query }),
+                  }))}
               />
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--line)" strokeWidth="10" />
-                {arcs.filter((a) => a.count > 0).map((a) => (
-                  <circle
-                    key={a.key}
-                    cx="50"
-                    cy="50"
-                    r="42"
-                    fill="none"
-                    stroke={a.color}
-                    strokeWidth="10"
-                    strokeDasharray={`${a.dash} ${RING_C - a.dash}`}
-                    strokeDashoffset={-a.offset}
-                  />
-                ))}
-              </svg>
-              <div className="absolute text-center">
-                <p className="font-display text-lg font-extrabold text-ink-950">{subRows.length}</p>
-                <p className="text-xs text-text-faint">abonelik</p>
-              </div>
-            </div>
-            <div className="space-y-1 text-xs">
-              {statusCounts.filter((s) => s.count > 0 || ["active", "trialing"].includes(s.key)).map((s) => {
-                const active = durum === s.key;
-                return (
-                  <Link
-                    key={s.key}
-                    href={billingHref({ durum: active ? undefined : s.key, from, to, q: query })}
-                    aria-current={active ? "page" : undefined}
-                    title={active ? "Durum filtresini kaldır" : `Yalnızca "${s.label}" abonelikleri listele`}
-                    className={`focus-ring flex items-center gap-2 rounded-[7px] px-1.5 py-0.5 transition ${
-                      active ? "bg-brand-600/10 text-ink-950" : "text-text-muted hover:bg-canvas hover:text-ink-950"
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                    <span className={`flex-1 ${active ? "font-bold" : ""}`}>{s.label}</span>
-                    <span className="font-bold text-ink-950">{s.count}</span>
-                  </Link>
-                );
-              })}
-            </div>
+            ) : (
+              <p className="text-sm text-text-muted">Abonelik kaydı yok.</p>
+            )}
           </div>
         </section>
 

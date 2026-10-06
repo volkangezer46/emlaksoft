@@ -8,14 +8,15 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { moneyTRY } from "@/lib/admin-format";
 import { now as clockNow } from "@/lib/clock";
-import type { CSSProperties } from "react";
+import { AreaChart } from "@/components/ui/viz";
+import { StackedBar } from "@/components/admin/admin-bars";
+import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { exactMrr, exactTrendMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingData } from "@/lib/reporting/result";
 
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
-const statusColor: Record<string, string> = { trial: "bg-cyan-400", active: "bg-mint-500", past_due: "bg-amber-400", suspended: "bg-danger-500", cancelled: "bg-ink-950/25" };
 
 const ADOPTION_MODULES = [
   ["customers", "Müşteriler"], ["demands", "Talepler"], ["properties", "Portföyler"],
@@ -75,11 +76,8 @@ export default async function AdminReportsPage({
     return { label: d.toLocaleDateString("tr-TR", { month: "short" }) };
   });
   const trendFallback = aggregate.mrr_trend.map((row) => exactTrendMrr(row, prices));
-  const maxTrend = Math.max(1, ...trendFallback);
-  const W = 560, H = 130;
-  const pts = trendFallback.map((v, i) => ({ x: (i / 11) * W, y: H - (v / maxTrend) * (H - 16) - 8 }));
-  const line = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const area = `0,${H} ${line} ${W},${H}`;
+  const hasCohort = trendFallback.length >= 2 && trendFallback.some((v) => v > 0);
+  const cohortTrend = computeTrend(trendFallback[trendFallback.length - 1] ?? 0, trendFallback[trendFallback.length - 2] ?? 0);
 
   // Plan geliri
   // Gizli planlar yalnız ofisi varsa listelenir; kayıtlı abonelik MRR'ı değişmez, katalog yalnız aboneliği eksik ofiste kullanılır.
@@ -95,7 +93,6 @@ export default async function AdminReportsPage({
         + Math.max(0, Number(row?.active_count ?? 0) - Number(row?.subscription_count ?? 0)) * plan.monthlyTry,
     };
   });
-  const maxRev = Math.max(1, ...planRevenue.map((p) => p.revenue));
 
   // Durum dağılımı
   const statuses = ["trial", "active", "past_due", "suspended", "cancelled"].map((s) => ({
@@ -103,7 +100,6 @@ export default async function AdminReportsPage({
     label: statusLabel[s],
     count: Number(aggregate.status_stats.find((row) => row.status === s)?.tenant_count ?? 0),
   }));
-  const statusTotal = Math.max(1, tenantCount);
 
   // Top tenant (plan değerine göre)
   const topTenants = aggregate.top_tenants
@@ -210,30 +206,27 @@ export default async function AdminReportsPage({
         )}
       </form>
 
-      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-        <div className="flex items-center justify-between">
-          <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><LineChart className="h-4 w-4 text-brand-600" /> Aktif abonelik kohortu · 12 ay</p>
-          <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">{moneyTRY(trendFallback[11] ?? 0)}</span>
+      <section className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="flex items-center gap-2 text-sm font-semibold text-text"><LineChart className="h-4 w-4 text-text-faint" aria-hidden /> Aktif abonelik kohortu · 12 ay</p>
+          <span className="inline-flex items-center gap-2 text-sm tabular-nums">
+            <span className="font-semibold text-text">{moneyTRY(trendFallback[trendFallback.length - 1] ?? 0)}</span>
+            <TrendPill trend={cohortTrend} />
+          </span>
         </div>
         <p className="mt-1 text-xs text-text-faint">Bugün aktif aboneliklerin başlangıç tarihine göre kümülatif MRR görünümü.</p>
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full overflow-visible" style={{ height: H }} preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="repTrend" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--mint-500)" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="var(--mint-500)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <polygon points={area} fill="url(#repTrend)" />
-          <polyline className="chart-draw" style={{ "--len": W * 1.6 } as CSSProperties} points={line} fill="none" stroke="var(--mint-500)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          {/* Nokta başına native tooltip: ay + o ayki kümülatif gelir */}
-          {pts.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r="10" fill="transparent" className="cursor-help">
-              <title>{`${months[i]?.label ?? ""}: ${moneyTRY(trendFallback[i] ?? 0)}`}</title>
-            </circle>
-          ))}
-        </svg>
-        <div className="mt-1 flex justify-between text-xs text-text-faint">
-          {months.map((m, i) => <span key={i}>{m.label}</span>)}
+        <div className="mt-4" style={{ minHeight: 176 }}>
+          {hasCohort ? (
+            <AreaChart
+              series={[{ name: "Kümülatif MRR", values: trendFallback, tone: "gold" }]}
+              pointLabels={months.map((m) => m.label)}
+              formatValue={moneyTRY}
+              ariaLabel="Son 12 ay aktif abonelik kohortu kümülatif MRR"
+              href="/admin/billing"
+            />
+          ) : (
+            <p className="py-10 text-center text-sm text-text-muted">Aktif abonelik oluştukça kohort eğrisi burada çizilir.</p>
+          )}
         </div>
       </section>
 
@@ -241,36 +234,31 @@ export default async function AdminReportsPage({
         {/* plan revenue */}
         <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><Building2 className="h-4 w-4 text-amber-600" /> Plan geliri</p>
-          <div className="mt-4 space-y-3">
-            {planRevenue.map((p, i) => (
-              <Link key={p.key} href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{p.label} <span className="text-text-faint">· {p.count} ofis</span></span>
-                  <span className="tabular-nums text-text-muted">{moneyTRY(p.revenue)}</span>
-                </div>
-                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-950/5">
-                  <div className="bar-live h-full rounded-full bg-[image:var(--grad-brand)] transition group-hover:brightness-110" style={{ width: `${Math.max((p.revenue / maxRev) * 100, 3)}%`, animationDelay: `${i * 0.08}s` }} />
-                </div>
-              </Link>
-            ))}
+          <div className="mt-4">
+            {planRevenue.some((p) => p.revenue > 0) ? (
+              <StackedBar
+                format={moneyTRY}
+                ariaLabel="Plan bazında aylık yinelenen gelir payı"
+                rows={planRevenue.map((p) => ({ label: p.label, value: p.revenue, hint: `${p.count} ofis`, href: `/admin/tenants?plan=${p.key}` }))}
+              />
+            ) : (
+              <p className="text-sm text-text-muted">Henüz gelir getiren plan yok.</p>
+            )}
           </div>
         </section>
 
         {/* status distribution */}
         <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink-950"><PieChart className="h-4 w-4 text-brand-600" /> Durum dağılımı</p>
-          <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-ink-950/5">
-            {statuses.map((s) => s.count > 0 ? (
-              <div key={s.key} className={statusColor[s.key]} style={{ width: `${(s.count / statusTotal) * 100}%` }} title={`${s.label}: ${s.count}`} />
-            ) : null)}
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {statuses.map((s) => (
-              <Link key={s.key} href={`/admin/tenants?durum=${s.key}`} className="focus-ring group flex items-center justify-between rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 text-xs transition hover:border-brand-300">
-                <span className="flex items-center gap-2 transition group-hover:text-brand-600"><span className={`h-2 w-2 rounded-full ${statusColor[s.key]}`} /> {s.label}</span>
-                <span className="font-bold tabular-nums text-ink-950">{s.count}</span>
-              </Link>
-            ))}
+          <div className="mt-4">
+            {statuses.some((s) => s.count > 0) ? (
+              <StackedBar
+                ariaLabel="Ofis durumlarına göre dağılım"
+                rows={statuses.map((s) => ({ label: s.label, value: s.count, href: `/admin/tenants?durum=${s.key}` }))}
+              />
+            ) : (
+              <p className="text-sm text-text-muted">Henüz ofis kaydı yok.</p>
+            )}
           </div>
           <Link href="/admin/tickets" className="focus-ring group mt-4 flex items-center justify-between border-t border-line pt-3 text-xs">
             <span className="text-text-muted transition group-hover:text-brand-600">Destek çözüm oranı</span>
@@ -313,7 +301,7 @@ export default async function AdminReportsPage({
           </span>
         </div>
         <div className="mt-4 space-y-3">
-          {adoption.map((a, i) => (
+          {adoption.map((a) => (
             <Link key={a.mod} href="/admin/aktivite" className="focus-ring group block rounded-[var(--radius-control)]">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">
@@ -321,14 +309,12 @@ export default async function AdminReportsPage({
                 </span>
                 <span className="font-bold tabular-nums text-text-muted">%{a.pct}</span>
               </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-950/5">
-                <div
-                  className={`bar-live h-full rounded-full transition group-hover:brightness-110 ${
-                    lowestMods.has(a.mod) ? "bg-amber-400" : "bg-[image:var(--grad-brand)]"
-                  }`}
-                  style={{ width: `${Math.max(a.pct, 2)}%`, animationDelay: `${i * 0.06}s` }}
-                />
-              </div>
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+                  <div
+                    className={`h-full rounded-full ${lowestMods.has(a.mod) ? "bg-amber-400" : ""}`}
+                    style={{ width: `${Math.max(a.pct, 2)}%`, ...(lowestMods.has(a.mod) ? {} : { background: "var(--viz-1)" }) }}
+                  />
+                </div>
               {lowestMods.has(a.mod) ? (
                 <p className="mt-1 text-xs font-semibold text-amber-700">
                   {a.mod} %{a.pct} — tanıtım fırsatı: ofislere bu modülü anlatan bir duyuru/eğitim planlayın.

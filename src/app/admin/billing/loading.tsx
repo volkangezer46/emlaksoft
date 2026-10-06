@@ -1,12 +1,14 @@
+import { SkeletonCard } from "@/components/ui/viz/skeleton-card";
+
 export default function Loading() {
   return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-52 rounded-[var(--radius-panel)] bg-ink-950/8" />
+    <div className="space-y-6">
+      <SkeletonCard height={208} label="Gelir operasyonu yükleniyor" />
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-        <div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" />
-        <div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" />
+        <SkeletonCard height={256} />
+        <SkeletonCard height={256} />
       </div>
-      <div className="h-48 rounded-[var(--radius-panel)] bg-ink-950/8" />
+      <SkeletonCard height={192} />
     </div>
   );
 }
