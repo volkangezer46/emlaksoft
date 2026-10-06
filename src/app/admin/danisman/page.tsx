@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, Building2, CreditCard, Handshake, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { buildAdvisorContext, isAiConfigured } from "@/lib/ai-advisor";
-import { AdvisorChat } from "./advisor-chat";
+import { AdvisorChat } from "./advisor-chat-lazy";
 
 const money = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 

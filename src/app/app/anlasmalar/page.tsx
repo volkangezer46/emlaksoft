@@ -118,8 +118,8 @@ export default async function DealsPage({
   const sp = (await searchParams) ?? {};
   if (sp.yeni === "1") redirect("/app/anlasmalar/yeni");
   const { perms, role, userId, tenantId } = await requireModulePage("commissions");
-  // Ofis Tanımları Merkezi: hareketsiz anlaşma eşiği (ayar yoksa kod varsayılanı 14 gün).
-  const STALE_DAYS = tenantId ? await getSetting<number>("office.alert.deal_stale_days", { tenantId }) : DEFAULT_STALE_DAYS;
+  // Ofis Tanımları Merkezi: hareketsiz anlaşma eşiği (ayar yoksa kod varsayılanı 14 gün). Arama ön sorgusuyla aynı turda beklenir.
+  const staleDaysPromise = tenantId ? getSetting<number>("office.alert.deal_stale_days", { tenantId }) : Promise.resolve(DEFAULT_STALE_DAYS);
   const canCreate = (perms.commissions ?? []).includes("create");
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
@@ -148,7 +148,10 @@ export default async function DealsPage({
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
-  const search = await relatedSearchClause(supabase, q, { customerColumn: "customer_id", propertyColumn: "property_id" });
+  const [STALE_DAYS, search] = await Promise.all([
+    staleDaysPromise,
+    relatedSearchClause(supabase, q, { customerColumn: "customer_id", propertyColumn: "property_id" }),
+  ]);
   const staleIso = daysAgoIso(STALE_DAYS);
   const scope: Record<string, string> = danismanF ? { assigned_to: danismanF } : {};
 

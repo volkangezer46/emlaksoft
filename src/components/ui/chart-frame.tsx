@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Illustration, type IllustrationKind } from "@/components/ui/illustrations";
@@ -11,8 +11,10 @@ import { SkeletonCard } from "@/components/ui/viz/skeleton-card";
  * Eski kullanım (title, subtitle, action, children, className, height) aynen çalışır.
  * Ek: `period` (dönem çipi), `href` (ayrıntı bağlantısı: sıfır çıkmaz metrik), `loading`
  * (sabit yükseklikli iskelet), `empty` (veri yoksa anlamlı boş durum; gövde çizilmez).
+ * `memo`: her zaman istemci kapısından (`_ui/lazy-chart`, `ui/chart`) çizilir; grafik veri/filtre state'i
+ * değişip çerçeve prop'ları aynı kalınca başlık/çerçeve yeniden üretilmez (davranış değişmez).
  */
-export function ChartFrame({
+export const ChartFrame = memo(function ChartFrame({
   title,
   subtitle,
   action,
@@ -79,6 +81,6 @@ export function ChartFrame({
       </div>
     </section>
   );
-}
+});
 
 export { ChartFrame as ChartCard };

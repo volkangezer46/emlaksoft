@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import {
-  ChevronLeft,
-  ChevronRight,
   Download,
   Eye,
   File as FileIcon,
@@ -13,16 +12,9 @@ import {
   ImageIcon,
   Link2,
   Trash2,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogDescription,
-  DialogFullscreenContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkDeleteDocuments, deleteDocument } from "@/app/actions/documents";
 import {
@@ -33,6 +25,9 @@ import {
   formatBytes,
   type DocumentRow,
 } from "@/lib/documents";
+
+/** Görsel önizleme (tam ekran dialog): yalnız açılınca iner; SSR'da hiç çizilmez (açık değilken zaten yok). */
+const Lightbox = dynamic(() => import("./document-lightbox").then((m) => m.DocumentLightbox), { ssr: false });
 
 /** Uzantı grubuna göre satır ikonu. */
 const KIND_ICON = {
@@ -324,114 +319,5 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
         <Lightbox images={images} index={lightboxIndex} onIndex={(i) => setLightboxKey(images[i].key)} onClose={() => setLightboxKey(null)} />
       ) : null}
     </div>
-  );
-}
-
-/**
- * Görsel önizleme — ortak Radix tam ekran primitive'i ile body portalına basılır.
- * `GalleryLightbox` yeniden kullanılamadı: o bileşen kaynağı sabit olarak
- * `/api/property-media/[id]` kuruyor; belge merkezinde görseller iki farklı
- * yetkili uçtan gelir. Esc, focus trap, scroll kilidi ve focus dönüşünü ortak
- * dialog sağlar; görseller arası ok tuşu davranışı burada kalır.
- */
-function Lightbox({
-  images,
-  index,
-  onIndex,
-  onClose,
-}: {
-  images: DocumentRow[];
-  index: number;
-  onIndex: (i: number) => void;
-  onClose: () => void;
-}) {
-  const count = images.length;
-  const prev = useCallback(() => onIndex((index - 1 + count) % count), [index, count, onIndex]);
-  const next = useCallback(() => onIndex((index + 1) % count), [index, count, onIndex]);
-
-  const current = images[index];
-
-  return (
-    <Dialog open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogFullscreenContent
-        overlayClassName="bg-ink-950/95 backdrop-blur-sm"
-        className="flex flex-col bg-ink-950/95"
-        onClick={onClose}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowLeft") {
-            event.preventDefault();
-            prev();
-          } else if (event.key === "ArrowRight") {
-            event.preventDefault();
-            next();
-          }
-        }}
-      >
-      <DialogTitle className="sr-only">{current.name} önizleme</DialogTitle>
-      <DialogDescription className="sr-only">
-        {count} görsellik belge önizlemesi. Önceki ve sonraki görsele ok tuşlarıyla geçebilirsiniz.
-      </DialogDescription>
-      <div className="flex items-center justify-between gap-3 px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
-        <span className="min-w-0 truncate text-sm font-semibold text-white/85">
-          {current.name}
-          <span className="ml-2 text-white/45">
-            {index + 1} / {count}
-          </span>
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          {current.downloadUrl ? (
-            <a
-              href={current.downloadUrl}
-              download={current.name}
-              className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-              aria-label="Bu görseli indir"
-            >
-              <Download className="h-5 w-5" />
-            </a>
-          ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Önizlemeyi kapat (Esc)"
-            className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </span>
-      </div>
-
-      <div className="relative flex flex-1 items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-        {/* Yetkili uçtan gelen, ölçüsü bilinmeyen belge görseli — next/image
-            optimizasyonu burada kazanç sağlamaz, düz <img> kullanılıyor. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          key={current.key}
-          src={current.previewUrl ?? ""}
-          alt={current.name}
-          className="max-h-full max-w-full object-contain"
-        />
-        {count > 1 ? (
-          <>
-            <button
-              type="button"
-              onClick={prev}
-              aria-label="Önceki görsel"
-              className="focus-ring absolute left-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-            <button
-              type="button"
-              onClick={next}
-              aria-label="Sonraki görsel"
-              className="focus-ring absolute right-3 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
-          </>
-        ) : null}
-      </div>
-      </DialogFullscreenContent>
-    </Dialog>
   );
 }

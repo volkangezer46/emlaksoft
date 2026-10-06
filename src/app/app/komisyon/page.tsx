@@ -143,11 +143,10 @@ export default async function CommissionPage({
 }) {
   const { perms, userId, tenantId } = await requireModulePage("commissions");
   // Ofis Tanımları Merkezi: simülatör başlangıç oranı/payı (ayar yoksa kod varsayılanları 3 / 60).
-  const simDefaults = tenantId
-    ? await getSettings(["office.commission.simulator_rate", "office.commission.simulator_advisor_share"], { tenantId })
-    : {};
-  const simRate = Number(simDefaults["office.commission.simulator_rate"] ?? 3);
-  const simShare = Number(simDefaults["office.commission.simulator_advisor_share"] ?? 60);
+  // Kayıtlı görünümlerle aynı turda beklenir (aşağıda).
+  const simDefaultsPromise = tenantId
+    ? getSettings(["office.commission.simulator_rate", "office.commission.simulator_advisor_share"], { tenantId })
+    : Promise.resolve({} as Record<string, unknown>);
   const canEdit = (perms.commissions ?? []).includes("edit");
   // Kazanç gizliliği: danışman bazlı pay dağılımı ve split etiketleri başkasının kazancını gösterir.
   const seeAllEarnings = canSeeAllEarnings(perms);
@@ -171,7 +170,9 @@ export default async function CommissionPage({
   ];
 
   const supabase = await createClient();
-  const savedViews = await listSavedViews("/app/komisyon");
+  const [simDefaults, savedViews] = await Promise.all([simDefaultsPromise, listSavedViews("/app/komisyon")]);
+  const simRate = Number(simDefaults["office.commission.simulator_rate"] ?? 3);
+  const simShare = Number(simDefaults["office.commission.simulator_advisor_share"] ?? 60);
   // Onay merkezi rozeti — tek head-count sorgusu (bkz. /app/onaylar).
   // Kayıtlı görünümler için aktif filtre paramları (sayfa hariç)
   const savedViewParams: Record<string, string> = {};

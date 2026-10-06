@@ -187,6 +187,10 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Site içeriği | `src/lib/site-content/**`, admin `/admin/site-icerik` (public sayfa metinleri tek yerden) |
 | EF kontör cüzdanı/servis | `src/lib/ef-credits/wallet.ts` (service_role RPC: rezerv/kesinleştir/bırak, rapor), `service.ts` (ortak uç çağrısı + kontör sırası), `plan-credits.ts` (aylık hak), `credit-reader.ts` (okuma) |
 | Kayıtta örnek veri | `src/lib/sample-registration-seed.ts` (kayıtta "demo verileriyle başla" seçeneği; `auth.ts` signUp çağırır; örnek veri `sample-scope.ts` kurallarına tabidir) |
+| /app kabuğu tek tur verisi | `src/lib/app-shell/` (`bootstrap.ts` `loadShellBootstrap()` istek-içi cache + `bootstrap-core.ts` saf parse/kullanım/rozet); SQL `app_shell_bootstrap()` (20261006000400). İzin birleşimi TEK: `permissions-effective.mergeEffectivePermissions` |
+| "RPC henüz yok" yoklaması | `src/lib/supabase/rpc-probe.ts` (`rpcKnownMissing`/`recordRpcOutcome`, 60 sn; PGRST202/42883) — migration'dan önce yayınlanan RPC çağıran her kod bunu kullanır |
+| Ana ekran anlık görüntüsü | `src/app/app/_home/data-batch.ts` (`loadDashboardSnapshot`, 3 RPC: 20261006000410) + saf `snapshot-core.ts`; yükleyiciler (`data.ts`, `insight-veri.ts`) önce buradan okur, yoksa mevcut sorgular |
+| Ekran-altı erteleme | `src/components/ui/deferred-section.tsx` (IntersectionObserver; sunucu bileşenlerini children alır; veri çekimini ERTELEMEZ, yalnız istemci bağlamayı) |
 | Piyasa endeksi (EmlakFiyati) | `src/lib/integrations/emlakfiyati/` (`contract.ts` saf: zod yanıt, slug yolu, tip eşlemesi `konut`/`arsa`; `client.ts` yalnız `adapter.ts` üzerinden: `getEndeks`, `getEndeksForPlace`, 12 sa `unstable_cache` + kısa negatif önbellek; 429'da Retry-After YOK, geri çekilme adaptörde); panel `src/components/app/emlakfiyati-endeks-panel.tsx`; değerleme kaynağı `src/lib/valuation.ts`. Endeksa ve TapuSor KALDIRILDI (kullanıcı kararı); eski `platform_settings` anahtarları (`endeksa_*`, `tapusor_*`) kodda okunmaz, temizlik migration'ı yazılmadı |
 
 ### 6b. EmlakFiyati: sahip işleri ve "ortak uçlar bekliyor" (2026-10-05)

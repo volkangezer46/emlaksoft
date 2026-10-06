@@ -2,7 +2,7 @@ import { Palette } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { requirePlatformModule } from "@/lib/platform";
 import { readBrandMetaFresh } from "@/lib/brand/store";
-import { BrandManager } from "./brand-manager";
+import { BrandManager } from "./brand-manager-lazy";
 
 export const metadata = { title: "Marka" };
 
