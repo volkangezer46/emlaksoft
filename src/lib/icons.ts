@@ -123,6 +123,7 @@ import {
   SquarePlus,
   Wallet,
   Zap,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -277,6 +278,8 @@ export const ICONS = {
   /** Ayarlar sekmeleri: roller/izin matrisi, yetkilendirme kapsamları, modül aç/kapa. */
   roller: Fingerprint,
   moduller: ToggleRight,
+  /** Ofis sahipliği devri (Ayarlar sekmesi + devir paneli). */
+  sahiplik: Crown,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

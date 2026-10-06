@@ -154,6 +154,11 @@ const F = {
   dashboardSnapshotRpcs: "20261006000410_dashboard_snapshot_rpcs.sql",
   // PB44 self-servis kurulum: ornek veri tek-tus temizleme RPC'si + sihirbaz ofis profili sutunlari (tek dosya).
   purgeSampleRpc: "20261006000600_purge_sample_data_rpc.sql",
+  // PB45 bekleyen isler: eski 9 arg fulfill overload temizligi, rapor/komisyon toplulastirmalarinda ornek veri kapsami,
+  // ofis sahibinin kendi baslattigi sahiplik devri (JWT kimlikli atomik RPC + ayni islemde denetim kaydi).
+  planSubscriptionAmount: "20261006000700_fix_plan_subscription_amount.sql",
+  reportingSampleScope: "20261006000710_reporting_aggregates_sample_scope.sql",
+  ownershipTransferRpc: "20261006000720_ownership_transfer_rpc.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -265,6 +270,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.accessWritePolicies]: "ek", // access_audit_log INSERT politikasi (owner/gm/branch_manager, kendi ofisi, created_by = auth.uid()) + grant insert
     [F.appShellBootstrap]: "ek", // yalniz 1 yeni invoker RPC (app_shell_bootstrap): profil+tenant+ham izin satirlari+modul+kullanim+rozet sayimi tek JSON; tablo/politika degismez
     [F.dashboardSnapshotRpcs]: "ek", // yalniz 3 yeni invoker RPC (get_insights/tasks/metrics_snapshot); p_tenant_id/p_user_id JWT ile eslesmezse NULL; tablo/politika degismez
+    [F.planSubscriptionAmount]: "davranis", // 9 argumanli ESKI fulfill_billing_payment overload DROP (kod cagirmaz); 9 argumanli cagri artik 10 argumanli dogru tanima cozulur
+    [F.reportingSampleScope]: "davranis", // tenant_commission/reporting_aggregates imzasina p_sample_threshold (varsayilan 5); esik ustu ofiste ornek kayitlar toplamlardan DUSER
+    [F.ownershipTransferRpc]: "ek", // yeni authenticated RPC'ler ownership_transfer_request/accept/resolve (JWT kimligi, ayni islemde audit_logs); mevcut 3 service_role RPC degismez
     [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
   },
 
@@ -370,6 +378,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB42-kabuk-rpc", order: 29.93, title: "Kabuk/ana ekran hizi: app_shell_bootstrap (tek tur kabuk) + get_insights/tasks/metrics_snapshot RPC'leri (kod RPC yoksa eski yola duser)", files: [F.appShellBootstrap, F.dashboardSnapshotRpcs] },
     { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
     { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
+    { id: "PB45-bekleyen-isler", order: 29.96, title: "Bekleyen isler: eski 9 arg fulfill overload DROP -> rapor/komisyon ozetleri ornek veri kapsami -> sahiplik devri JWT RPC'leri", files: [F.planSubscriptionAmount, F.reportingSampleScope, F.ownershipTransferRpc] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -486,6 +495,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.insightSupport, F.insights],
     // Ofis Merkezi: pool_assignments RLS'i has_effective_permission('office_center', ...) kullanir -> seed ONCE.
     [F.poolAssignments, F.officeCenterPerms],
+    // PB45: overload temizliginin on-kosulu fiyat butunlugu (000300) govdesidir; sahiplik devri RPC'leri tabloya (001300) dayanir.
+    [F.planSubscriptionAmount, F.billingAmount],
+    [F.ownershipTransferRpc, F.ownership],
   ],
 
   externalPending: [
