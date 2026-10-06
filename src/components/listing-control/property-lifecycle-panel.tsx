@@ -74,21 +74,12 @@ async function LifecycleBody({ propertyId, tenantId, canCreate }: { propertyId: 
         <PriceAndChecks data={data} />
       </Panel>
 
-      <Panel title="Zaman çizelgesi" description="Portföyün baştan bugüne olayları (yeniden eskiye)">
-        {data.timeline.length === 0 ? (
-          <p className="text-sm text-text-muted">Henüz kayıtlı olay yok.</p>
-        ) : (
-          <ol className="relative space-y-3 border-l border-line pl-5">
-            {data.timeline.slice(0, 40).map((e, i) => (
-              <li key={`${e.at}-${i}`} className="relative">
-                <span aria-hidden="true" className="absolute -left-[1.62rem] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-brand-500" />
-                <p className="text-sm font-medium text-text">{e.title}</p>
-                <p className="text-xs text-text-muted">{formatDateTimeTr(e.at)}{e.detail ? ` · ${e.detail}` : ""}</p>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Panel>
+      {/* Olaylar TEK tünelde: portföyün "Zaman çizelgesi" sekmesi (CRM + İlan Kontrol olayları birlikte). */}
+      <p className="text-sm">
+        <Link href={`/app/portfoyler/${propertyId}?sekme=zaman&kategori=ilan-kontrol`} className="focus-ring rounded font-semibold text-accent-text hover:underline">
+          Aşama geçişleri, portal yayın/kaldırma ve uyarı geçmişi: Zaman çizelgesi
+        </Link>
+      </p>
 
       {closure ? (
         <Panel title="Kapanış kontrol listesi" description={`Tamamlanma %${closure.percent}${closure.unmeasured.length ? `; ${closure.unmeasured.length} madde ölçülemedi` : ""}`}>
