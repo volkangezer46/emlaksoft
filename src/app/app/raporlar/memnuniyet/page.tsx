@@ -18,6 +18,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { CopySurveyLinkButton, CreateSurveyButton } from "./survey-actions";
 import { formatDateTr } from "@/lib/format";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { breakdownByAudienceGroup, combinedNpsScores, scoreStats, type StatTask } from "@/lib/surveys/logic";
 
 function appUrl() {
   return getBaseUrl();
@@ -77,7 +78,8 @@ export default async function SatisfactionReportPage() {
   const ctx = await requireModulePage("reports", "/app/raporlar");
   const supabase = await createClient();
 
-  const [{ data: surveys }, { data: wonDeals }, { data: profiles }] = await Promise.all([
+  const canSurveys = effectiveCanAccessModule(ctx.perms, "surveys");
+  const [{ data: surveys }, { data: wonDeals }, { data: profiles }, { data: taskData }] = await Promise.all([
     supabase
       .from("surveys")
       .select("id, deal_id, agent_id, public_token, score, comment, status, sent_at, answered_at, customer:customers!surveys_customer_id_fkey(id, full_name)")
@@ -90,20 +92,36 @@ export default async function SatisfactionReportPage() {
       .order("updated_at", { ascending: false })
       .limit(200),
     supabase.from("profiles").select("id, full_name").limit(500),
+    // Anket modülü görevleri (satıcı/malik, ziyaretçi, kira, kayıp kitleleri). Tablo yoksa / yetki yoksa boş.
+    canSurveys
+      ? supabase
+          .from("survey_tasks")
+          .select("id, event_type, audience, status, score, agent_id, assigned_to, deal_id, completed_at")
+          .neq("event_type", "advisor_pulse")
+          .eq("status", "completed")
+          .limit(2000)
+      : Promise.resolve({ data: [] as StatTask[] }),
   ]);
 
   const agentName = new Map((profiles ?? []).map((p) => [String(p.id), String(p.full_name)]));
   const rows = surveys ?? [];
   const answered = rows.filter((s) => s.status === "answered" && s.score !== null);
   const pending = rows.filter((s) => s.status === "pending");
-  const allScores = answered.map((s) => Number(s.score));
+  const tasks = (taskData ?? []) as (StatTask & { deal_id?: string | null })[];
+  // Birleşik NPS: kapanış link anketi + anket modülü (satıcı/malik dahil; aynı anlaşmanın alıcı/kiracı cevabı tek sayılır).
+  const allScores = combinedNpsScores(
+    tasks,
+    rows.map((s) => ({ deal_id: (s.deal_id as string | null) ?? null, score: s.score === null ? null : Number(s.score), status: String(s.status) })),
+  );
+  const combined = scoreStats(allScores);
+  const groups = breakdownByAudienceGroup(tasks);
 
-  const nps = npsOf(allScores);
-  const avg = avgOf(allScores);
+  const nps = combined?.nps ?? null;
+  const avg = combined?.avg ?? null;
   const responseRate = rows.length > 0 ? Math.round((answered.length / rows.length) * 100) : null;
-  const promoters = allScores.filter((s) => s >= 9).length;
-  const passives = allScores.filter((s) => s >= 7 && s <= 8).length;
-  const detractors = allScores.filter((s) => s <= 6).length;
+  const promoters = combined?.promoters ?? 0;
+  const passives = combined?.passives ?? 0;
+  const detractors = combined?.detractors ?? 0;
 
   // Danışman bazlı tablo — yalnız cevaplanan anketler puana girer.
   const byAgent = new Map<string, { name: string; total: number; scores: number[] }>();
@@ -150,7 +168,7 @@ export default async function SatisfactionReportPage() {
           . Anketörün telefonla aldığı kapanış cevapları bu NPS raporuna da yansır.
         </p>
       ) : null}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           {
             label: "NPS skoru",
@@ -161,9 +179,17 @@ export default async function SatisfactionReportPage() {
             href: "#danisman",
           },
           {
+            label: "Memnuniyet (CSAT)",
+            value: combined ? `%${combined.csat}` : "—",
+            sub: combined ? `${combined.n} cevap · 7-10 veren oranı` : "Henüz yanıt yok",
+            icon: Smile,
+            tone: "text-[color:var(--viz-pos)]",
+            href: canSurveys ? "/app/anketler#kitle" : "#yorumlar",
+          },
+          {
             label: "Yanıt oranı",
             value: responseRate === null ? "—" : `%${responseRate}`,
-            sub: `${answered.length} yanıt / ${rows.length} anket`,
+            sub: `${answered.length} yanıt / ${rows.length} kapanış anketi`,
             icon: Send,
             tone: "text-accent-text",
             href: "#bekleyen",
@@ -200,6 +226,36 @@ export default async function SatisfactionReportPage() {
           </a>
         ))}
       </div>
+
+      {/* Kitle bazlı NPS — anket modülü (satıcı/malik, ziyaretçi, kayıp, kira) */}
+      {canSurveys && tasks.length > 0 ? (
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex flex-wrap items-center gap-2">
+            <Users className="h-4 w-4 text-accent-text" />
+            <h2 className="font-display font-bold text-text">Kitle bazlı NPS</h2>
+            <span className="ml-auto text-xs text-text-muted">Anket modülü cevapları · 0-10</span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {groups.map((g) => (
+              <Link
+                key={g.id}
+                href={`/app/anketler?kitle=${g.id}#liste`}
+                className="focus-ring press lift block rounded-[var(--radius-card)] border border-line bg-canvas/40 p-4 transition hover:border-border-interactive"
+              >
+                <span className="text-xs font-semibold text-text-muted">{g.label}</span>
+                <span
+                  className={`numeric mt-1 block font-display text-xl font-extrabold ${
+                    g.stats === null ? "text-text-faint" : g.stats.nps >= 30 ? "text-[color:var(--viz-pos)]" : g.stats.nps >= 0 ? "text-amber-700" : "text-danger-500"
+                  }`}
+                >
+                  {g.stats === null ? "—" : g.stats.nps}
+                </span>
+                <span className="block text-xs text-text-faint">{g.stats ? `${g.stats.n} cevap · CSAT %${g.stats.csat}` : "cevap yok"}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* Anket oluştur — kapanan ve anketi olmayan anlaşmalar */}
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

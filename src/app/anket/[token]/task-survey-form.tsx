@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2, Send } from "lucide-react";
+import { CheckCircle2, Heart, Loader2, Send } from "lucide-react";
 import { submitSurveyTaskByToken } from "@/app/actions/survey-public";
 
 export type PublicQuestion = {
@@ -25,7 +25,7 @@ function toneClasses(n: number, selected: boolean): string {
  */
 export function TaskSurveyForm({ token, questions }: { token: string; questions: PublicQuestion[] }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [done, setDone] = useState<null | { already: boolean }>(null);
+  const [done, setDone] = useState<null | { already: boolean; referralUrl: string | null }>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -49,7 +49,7 @@ export function TaskSurveyForm({ token, questions }: { token: string; questions:
         setError(res.error);
         return;
       }
-      setDone({ already: res.alreadyAnswered === true });
+      setDone({ already: res.alreadyAnswered === true, referralUrl: res.referralUrl ?? null });
     });
   }
 
@@ -63,6 +63,21 @@ export function TaskSurveyForm({ token, questions }: { token: string; questions:
         <p className="mt-1 text-xs leading-relaxed text-text-muted">
           {done.already ? "Bu anket daha önce cevaplandı." : "Değerlendirmeniz kaydedildi. Geri bildiriminiz hizmetimizi geliştirmemize yardımcı olur."}
         </p>
+        {done.referralUrl ? (
+          <div className="mt-5 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-4 text-left">
+            <p className="text-sm font-bold text-ink-950">Bizi çevrenize tavsiye eder misiniz?</p>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">
+              Ev arayan veya mülkünü satmak isteyen bir yakınınız varsa size özel tavsiye sayfamızdan bize iletebilirsiniz.
+            </p>
+            <a
+              href={done.referralUrl}
+              className="focus-ring press mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700"
+            >
+              <Heart className="h-4 w-4" aria-hidden="true" />
+              Tavsiye sayfasını aç
+            </a>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -78,8 +93,8 @@ export function TaskSurveyForm({ token, questions }: { token: string; questions:
           </legend>
           {q.kind === "score" ? (
             <>
-              <div className="grid grid-cols-5 gap-2 sm:grid-cols-10" role="radiogroup" aria-label={q.label}>
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              <div className="grid grid-cols-6 gap-2 sm:grid-cols-11" role="radiogroup" aria-label={q.label}>
+                {Array.from({ length: 11 }, (_, i) => i).map((n) => (
                   <button
                     key={n}
                     type="button"
@@ -93,8 +108,8 @@ export function TaskSurveyForm({ token, questions }: { token: string; questions:
                 ))}
               </div>
               <div className="flex items-center justify-between px-0.5 text-xs text-text-faint">
-                <span>Hiç memnun kalmadım</span>
-                <span>Çok memnun kaldım</span>
+                <span>0 · En düşük</span>
+                <span>10 · En yüksek</span>
               </div>
             </>
           ) : null}

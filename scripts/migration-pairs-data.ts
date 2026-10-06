@@ -17,7 +17,7 @@ import type { GroupSpec } from "../src/lib/migration-pairs";
  * kesin bekleyen listesi icin salt-okunur `npm run db:migrate -- --dry-run` esastir.
  * GUNCELLEME (sahip bildirimi): PB1..PB8 (20260825000100..001300) ve P12 (20260816000500) de CANLIDA UYGULANDI.
  * GUNCELLEME (2026-10-06 sahip bildirimi): PB9-PB11 (20260826000100..000800), 000900/001000/001100 ve PB40/PB42/PB43/PB44
- * (20261006000100..000600) de CANLIDA. PB46 (20261007000200..000220) CANLIDA (koordinator bildirimi). Depoda bekleyen: PB45 (20261006000700..000720; kesin durum --dry-run), PB48 (20261007000100). Taban bu aracta bilerek ilerletilmedi (pencere
+ * (20261006000100..000600) de CANLIDA. PB46 (20261007000200..000220) CANLIDA (koordinator bildirimi). Depoda bekleyen: PB45 (20261006000700..000720; kesin durum --dry-run), PB48 (20261007000100), PB49 (20261007000400). Taban bu aracta bilerek ilerletilmedi (pencere
  * sirasi/bagimlilik denetimi gecmis pencereler icin de calismaya devam etsin); kesin liste yine --dry-run.
  */
 export const APPLIED_HEAD = "20260813000300";
@@ -172,6 +172,8 @@ const F = {
   customFields: "20261007000310_custom_fields.sql",
   webhooksApiKeys: "20261007000320_webhooks_api_keys.sql",
   vitrinChatContext: "20261007000330_vitrin_chat_context.sql",
+  // PB49 anket sistemi (2026-10-07): kitle x tetik matrisi, otomatik gonderim izi, dusuk puan zinciri, ekip nabzi.
+  surveyMatrix: "20261007000400_survey_matrix_channels.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -229,6 +231,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.billingPauseSeats]: "ek", // D bolumu CIKARILMIS halde: sutunlar + yeni RPC'ler + effective_seat_limit
     [F.seatFulfillment]: "davranis", // koltuk tetikleyicileri extra_seats'i sayar; fulfill extra_seats faturasini isler
     [F.survey]: "ek", // yeni anket tablolari + permission_defaults seed (on conflict do nothing)
+    [F.surveyMatrix]: "davranis", // CHECK genisler + guard yeniden (anketor icin sikilasir) + soru metni 1-10 -> 0-10
     [F.growthReferral]: "ek", // yeni growth_* tablolari + hesap kredisi defteri (yazma yalniz service_role)
     [F.growthClicks]: "ek", // sayac tablosu + service_role RPC
     [F.aiCredit]: "ek", // defter sutun/kisit genisletme + service_role RPC; olcum kodda etkinlesir
@@ -400,6 +403,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB45-bekleyen-isler", order: 29.96, title: "Bekleyen isler: eski 9 arg fulfill overload DROP -> rapor/komisyon ozetleri ornek veri kapsami -> sahiplik devri JWT RPC'leri", files: [F.planSubscriptionAmount, F.reportingSampleScope, F.ownershipTransferRpc] },
     { id: "PB46-ilan-kontrol-veri-yollari", order: 29.97, title: "Ilan kontrol veri yollari: yasam dongusu gecis kaydi -> envanter ice aktarma + eslesme kuyrugu (JWT RPC) -> ilce kirilimi + SLA yeniden acilis duzeltmesi", files: [F.lcLifecycleEvents, F.lcInventoryMatching, F.lcDistrictSlaReset] },
     { id: "PB47-crm-ozellikleri", order: 29.98, title: "CRM ozellik turu: GOS anlasma alanlari -> ozel alanlar -> API anahtari + giden webhook -> vitrin AI sohbet baglami", files: [F.dealGosFields, F.customFields, F.webhooksApiKeys, F.vitrinChatContext] },
+    { id: "PB49-anket-sistemi", order: 29.99, title: "Anket sistemi: kitle x tetik matrisi (rent_renewal/tenant_annual/advisor_pulse + advisor kitlesi) + otomatik gonderim izi + dusuk puan zinciri RPC + ekip nabzi RPC; kod yokken eski davranis", files: [F.surveyMatrix] },
     { id: "PB48-medya-belge-isareti", order: 29.985, title: "KVKK P0-9: property_media.is_document (belge public'e cikmaz) + ad kurali fonksiyonu + INSERT tetikleyicisi; kod sutun yokken ad kuralina duser (sira serbest)", files: [F.mediaIsDocument] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
@@ -526,6 +530,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcInventoryMatching, F.lcQueueRpcs],
     [F.lcDistrictSlaReset, F.lcControlState],
     [F.lcDistrictSlaReset, F.lcAnomalyTables],
+    // PB49: anket genisletmesi anket modulu tablolarina ve survey_is_manager'a dayanir.
+    [F.surveyMatrix, F.survey],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

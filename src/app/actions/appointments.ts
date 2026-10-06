@@ -8,6 +8,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isAppointmentOutcome } from "@/lib/appointment-outcome";
+import { appointmentTypeLabel } from "@/lib/appointment-labels";
+import { notifyAssignment } from "@/lib/assignment-notify";
+import { formatDateTr } from "@/lib/format";
+import { formatTrTime } from "@/lib/clock";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { advisorAssignmentDecision } from "@/lib/workflow-rules";
 import {
@@ -158,23 +162,42 @@ export async function createAppointment(formData: FormData): Promise<Appointment
     if (warning) return { conflictWarning: warning };
   }
 
-  const { error } = await supabase.from("appointments").insert({
-    tenant_id: gate.tenantId,
-    customer_id: customerId || null,
-    property_id: propertyId || null,
-    appointment_type: appointmentType,
-    scheduled_at: scheduledAt.toISOString(),
-    duration_min: durationMin,
-    location: location || null,
-    notes: notes || null,
-    status: "pending",
-    assigned_to: advisor.advisorId,
-    created_by: gate.userId,
-  });
+  const { data: created, error } = await supabase
+    .from("appointments")
+    .insert({
+      tenant_id: gate.tenantId,
+      customer_id: customerId || null,
+      property_id: propertyId || null,
+      appointment_type: appointmentType,
+      scheduled_at: scheduledAt.toISOString(),
+      duration_min: durationMin,
+      location: location || null,
+      notes: notes || null,
+      status: "pending",
+      assigned_to: advisor.advisorId,
+      created_by: gate.userId,
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     console.error("createAppointment", error);
     return { error: "Randevu oluşturulamadı. Lütfen tekrar deneyin." };
+  }
+
+  // Başkası adına açılan randevu: atanan danışmana bildirim (tercih "Randevu", tek seferlik anahtar).
+  if (advisor.advisorId && advisor.advisorId !== gate.userId) {
+    const { data: creator } = await supabase.from("profiles").select("full_name").eq("id", gate.userId).maybeSingle();
+    const when = `${formatDateTr(scheduledAt.toISOString(), { day: "numeric", month: "long" })} ${formatTrTime(scheduledAt)}`;
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: advisor.advisorId,
+      title: `Adınıza randevu açıldı: ${when} · ${appointmentTypeLabel(appointmentType)}`,
+      body: `${(creator?.full_name as string | undefined) ?? "Bir ekip arkadaşınız"} sizin adınıza randevu oluşturdu${location ? ` (${location.slice(0, 80)})` : ""}.`,
+      href: "/app/randevular",
+      dedupeKey: `appt-assigned:${created?.id ?? `${advisor.advisorId}:${scheduledAt.toISOString()}`}`,
+      prefKey: "appointment",
+    });
   }
 
   await logActivity({
