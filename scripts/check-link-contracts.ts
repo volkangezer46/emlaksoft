@@ -47,6 +47,9 @@ function collectRoutes(dir: string, segs: string[], out: Route[]) {
       collectRoutes(full, next, out);
     } else if (entry === "page.tsx" || entry === "page.ts") {
       out.push({ pattern: segs, pagePath: full });
+    } else if (entry === "route.ts" && /export\s+async\s+function\s+GET\b/.test(readFileSync(full, "utf8"))) {
+      // GET rota işleyicisi (ör. /app/ara?tel= kısayolu, vCard indirme) da geçerli bağlantı hedefidir.
+      out.push({ pattern: segs, pagePath: full });
     }
   }
 }
@@ -105,6 +108,9 @@ function targetParams(pagePath: string): Target {
       if (key) params.add(key[1]);
     }
   }
+
+  // a2) Rota işleyicisi: req.nextUrl.searchParams.get("X") / new URL(req.url).searchParams.get("X")
+  for (const m of src.matchAll(/searchParams\.get\(\s*["']([\w-]+)["']\s*\)/g)) params.add(m[1]);
 
   // c) sp.X erişimi (sp = await searchParams yaygın deseni)
   if (/=\s*\(?await\s+searchParams/.test(src)) {
