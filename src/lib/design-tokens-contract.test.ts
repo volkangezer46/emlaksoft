@@ -217,16 +217,16 @@ describe("premium konsol paleti", () => {
   it("hero: beyaz ve altın metin lacivert zeminde AA; cam kutu üstünde de", () => {
     for (const bg of NAVY) {
       expect(contrast("#ffffff", bg), `beyaz/${bg}`).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(hex(premiumCss, "--gold-300"), bg), `altın/${bg}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(hex(tokensCss, "--gold-300"), bg), `altın/${bg}`).toBeGreaterThanOrEqual(4.5);
       // Cam kutu: en açık uçta %11 beyaz katman; soluk yazı (%80 beyaz) bu zeminde
       const glass = mix("#ffffff", bg, 0.11);
       expect(contrast(mix("#ffffff", glass, 0.8), glass), `soluk beyaz/${glass}`).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(hex(premiumCss, "--gold-300"), glass), `altın/${glass}`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(hex(tokensCss, "--gold-300"), glass), `altın/${glass}`).toBeGreaterThanOrEqual(4.5);
     }
   });
 
   it("altın aktif segment ve düğme: koyu yazı altın dolguda AA", () => {
-    for (const g of ["--gold-300", "--gold-400"]) expect(contrast("#1a1200", hex(premiumCss, g))).toBeGreaterThanOrEqual(4.5);
+    for (const g of ["--gold-300", "--gold-400"]) expect(contrast(hex(tokensCss, "--gold-ink"), hex(tokensCss, g))).toBeGreaterThanOrEqual(4.5);
   });
 
   it("yan menü aktif öğe: beyaz yazı altın-lacivert degrade zeminde AA", () => {
@@ -244,8 +244,9 @@ describe("premium konsol paleti", () => {
       danger: ["#dc3b3b", "#f87171"],
     };
     const alpha: Record<string, number> = { success: 0.13, warn: 0.14, danger: 0.12 };
-    const light = block(premiumCss, ":root");
-    const dark = block(premiumCss, 'html[data-theme="dark"]');
+    // Durum metin tonları TEK KAYNAK: tokens.css (:root) + theme-dark.css (koyu blok).
+    const light = LIGHT;
+    const dark = DARK;
     for (const [name, [lf, df]] of Object.entries(toneFill)) {
       const t = hex(light, `--pm-${name}-text`);
       const td = hex(dark, `--pm-${name}-text`);
@@ -272,8 +273,8 @@ describe("premium konsol paleti", () => {
       expect(contrast(resolve(dark, darkCss, t), darkSurface), `koyu ${t}`).toBeGreaterThanOrEqual(3);
     }
     // Altın dolgu/halka (grafik işareti) iki temada
-    expect(contrast(hex(premiumCss, "--gold-500"), lightSurface)).toBeGreaterThanOrEqual(2.1); // dekoratif dolgu; değer metni ayrıca AA (--pm-gold-text)
-    expect(contrast(hex(premiumCss, "--gold-300"), darkSurface)).toBeGreaterThanOrEqual(3);
+    expect(contrast(hex(tokensCss, "--gold-500"), lightSurface)).toBeGreaterThanOrEqual(2.1); // dekoratif dolgu; değer metni ayrıca AA (--pm-gold-text)
+    expect(contrast(hex(tokensCss, "--gold-300"), darkSurface)).toBeGreaterThanOrEqual(3);
   });
 
   it("ana ekran kart dili: radius 16, hover hareketsiz, gölge iki katmanlı", () => {
@@ -292,4 +293,44 @@ describe("premium konsol paleti", () => {
       for (const s of DARK_SURFACES) expect(contrast(a.textDark, mix(a.fillDark, s, 0.1)), `koyu/${s}`).toBeGreaterThanOrEqual(4.5);
     });
   }
+});
+
+// ---- Token tek kaynak (tokens.css): lacivert/altın/boşluk/rozet --------------------
+describe("token tek kaynak", () => {
+  const premiumCss = read("src/app/premium.css");
+  const strip = (c: string) => c.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("lacivert, altın, boşluk ve gösterge tipografisi tokens.css'te tanımlı", () => {
+    for (const t of ["--navy-950", "--navy-900", "--navy-800", "--navy-700", "--navy-600", "--gold-300", "--gold-500", "--gold-ink", "--sb-bg-top", "--sb-bg-bottom", "--fs-kpi", "--fs-eyebrow", "--card-shadow", "--card-shadow-hover"]) {
+      expect(LIGHT, t).toContain(`${t}:`);
+    }
+    for (let i = 1; i <= 12; i++) expect(LIGHT, `--space-${i}`).toContain(`--space-${i}:`);
+  });
+
+  it("altın/lacivert ölçeği premium.css'te yeniden tanımlanmaz (tek tanım)", () => {
+    expect(strip(premiumCss)).not.toMatch(/--(gold|navy)-\d+\s*:/);
+    expect(strip(premiumCss)).not.toMatch(/--pm-(success|warn|danger|gold)-text\s*:/);
+  });
+
+  it("lacivert ham hex yalnız tokens.css'te (kabuk CSS'leri token kullanır)", () => {
+    for (const f of ["src/app/console.css", "src/app/premium.css", "src/app/a11y.css", "src/app/globals.css", "src/app/theme-dark.css"]) {
+      expect(strip(read(f)), f).not.toMatch(/#(071a38|0a2247|0a2147|050f24)/i);
+    }
+  });
+
+  it("yan menü zemini ve rozetleri: beyaz yazı AA (açık + koyu)", () => {
+    const navy = (body: string, t: string): string => {
+      const raw = body.match(new RegExp(`${t}:\s*([^;]+);`))?.[1]?.trim() ?? "";
+      const ref = raw.match(/^var\((--[a-z0-9-]+)\)$/);
+      return ref ? hex(LIGHT, ref[1]) : raw;
+    };
+    for (const body of [LIGHT, DARK]) {
+      for (const t of ["--sb-bg-top", "--sb-bg-mid", "--sb-bg-bottom"]) {
+        expect(contrast("#ffffff", navy(body, t)), t).toBeGreaterThanOrEqual(7);
+      }
+    }
+    for (const t of ["--nav-badge-danger", "--nav-badge-warn", "--nav-badge-ok"]) {
+      expect(contrast("#ffffff", hex(LIGHT, t)), t).toBeGreaterThanOrEqual(4.5);
+    }
+  });
 });

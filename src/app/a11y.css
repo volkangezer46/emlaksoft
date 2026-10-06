@@ -127,7 +127,7 @@
   :root .glass-bar,
   :root .glass { background: var(--surface); }
   :root .glass-card { background: var(--surface-raised); }
-  :root .glass-dark { background: #071a38; }
+  :root .glass-dark { background: var(--navy-900); }
   :root .pm-glass { background: #1b3156; }
   :root .pm-glass:hover { background: #223a63; }
   :root .mega-backdrop { background: rgba(4, 17, 39, 0.66); }
@@ -147,7 +147,7 @@
   :root .glass-bar,
   :root .glass { background: var(--surface); }
   :root .glass-card { background: var(--surface-raised); }
-  :root .glass-dark { background: #071a38; }
+  :root .glass-dark { background: var(--navy-900); }
   :root .pm-glass { background: #1b3156; }
   :root .pm-glass:hover { background: #223a63; }
   :root .mega-backdrop { background: rgba(4, 17, 39, 0.66); }

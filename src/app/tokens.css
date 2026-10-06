@@ -9,11 +9,75 @@
    EmlakSoft — Command Center design system
    Palette: ink · brand blue · cyan · mint · amber (money) · danger
    No purple / no AI-slop. Fresh, premium, high-signal.
+
+   TEK KAYNAK (docs/DESIGN_SYSTEM.md "Token katmanı"): renk ölçekleri (lacivert, marka
+   mavisi, kontrollü altın, durum), yüzey, boşluk, tipografi, radius ve gölge burada
+   tanımlanır. Koyu tema aynı adları theme-dark.css'te yeniden tanımlar; vurgu
+   temaları yalnız --brand-* ölçeğini çevirir (themes.css). Hareket süre/eğri
+   token'ları tek tanımla motion.css'tedir (sözleşme testleri oradan okur).
    ============================================================ */
 
 :root {
-  --ink-950: #071a38;
-  --ink-900: #0a2247;
+  /* ---- Lacivert (marka zemini) — DEĞİŞMEZ ölçek: koyu temada ve .theme-dark
+     kapsamında yeniden tanımlanmaz. Sabit lacivert gereken her yer (yan menü,
+     hero, native option yazısı, koyu bölüm kurtarma kuralları) bunları kullanır;
+     ham hex yazılmaz. Kontrast: beyaz ve --gold-300 hepsinde ≥4.5:1 (test). */
+  --navy-950: #050f24;
+  --navy-900: #071a38;
+  --navy-800: #0a2247;
+  --navy-700: #0d2b5e;
+  --navy-600: #163a78;
+  --grad-navy: linear-gradient(135deg, var(--navy-800) 0%, var(--navy-900) 52%, var(--navy-950) 100%);
+
+  /* ---- Kontrollü altın: para, premium an, aktif işaret. Metin olarak değil
+     dolgu/çizgi olarak; altın METİN tonu --pm-gold-text (AA). */
+  --gold-200: #f8e0a8;
+  --gold-300: #f0c36a;
+  --gold-400: #e5b04d;
+  --gold-500: #d4a24c;
+  --gold-700: #7a5200;
+  /* Altın dolgu üstünde metin (aktif segment, altın düğme): --gold-300/400 üzerinde ≥4.5:1 */
+  --gold-ink: #1a1200;
+  --grad-gold-active: linear-gradient(135deg, rgba(240, 195, 106, 0.3) 0%, rgba(154, 103, 0, 0.26) 100%);
+
+  /* ---- Durum METİN tonları (yumuşak ton zemininde AA; koyu karşılığı theme-dark.css) */
+  --pm-success-text: #0b6b57;
+  --pm-warn-text: #8a5300;
+  --pm-danger-text: #b42318;
+  --pm-gold-text: #7a5200;
+
+  /* ---- Yan menü zemini (iki temada lacivert; koyuda bir ton derin) */
+  --sb-bg-top: var(--navy-700);
+  --sb-bg-mid: var(--navy-800);
+  --sb-bg-bottom: var(--navy-900);
+  /* Menü sayı rozetleri (beyaz yazı ≥4.5:1, lacivert zeminde ayırt edilir) */
+  --nav-badge-danger: #c8323a;
+  --nav-badge-warn: #a35a00;
+  --nav-badge-ok: #0f6b4a;
+
+  /* ---- Boşluk ölçeği (4 px tabanlı). Bileşen iç boşluğu ve ızgara aralığı buradan. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3rem;
+  --space-10: 3.5rem;
+  --space-11: 4rem;
+  --space-12: 5rem;
+
+  /* ---- Gösterge tipografisi (KPI / hero). Gövde ölçeği --fs-* aşağıda. */
+  --fs-eyebrow: 0.6875rem;
+  --fs-kpi: 1.75rem;
+  --fs-kpi-lg: 2.25rem;
+  --fs-money-hero: clamp(2rem, 1.6rem + 1.4vw, 2.625rem);
+  --tracking-eyebrow: 0.08em;
+
+  --ink-950: var(--navy-900);
+  --ink-900: var(--navy-800);
   --ink-800: #0a2c63;
   --ink-700: #123a7d;
 
@@ -70,7 +134,7 @@
   /* gradients */
   --grad-brand: linear-gradient(120deg, var(--brand-600), var(--cyan-400) 55%, var(--mint-500));
   --grad-brand-soft: linear-gradient(120deg, rgba(20, 99, 255, 0.12), rgba(16, 185, 163, 0.12));
-  --grad-ink: linear-gradient(160deg, #0a2247 0%, #071a38 60%, #05122a 100%);
+  --grad-ink: linear-gradient(160deg, var(--navy-800) 0%, var(--navy-900) 60%, var(--navy-950) 100%);
 
   /* shadows: tek kaynak --elev-1..5 (aşağıda); --shadow-* yalnız takma ad */
   --shadow-xs: var(--elev-1);
@@ -99,6 +163,11 @@
   --elev-3: 0 1px 3px rgba(10, 34, 71, 0.06), 0 12px 28px -8px rgba(10, 34, 71, 0.10);
   --elev-4: 0 2px 4px rgba(10, 34, 71, 0.07), 0 24px 56px -16px rgba(10, 34, 71, 0.16);
   --elev-5: 0 3px 6px rgba(10, 34, 71, 0.08), 0 40px 88px -24px rgba(10, 34, 71, 0.22);
+
+  /* Kart dinlenme / üzerine gelme gölgesi (KpiCard, ChartCard, panel). Hover'da kart
+     1-2 px yükselir (yalnız no-preference) ve gölge bir kademe derinleşir. */
+  --card-shadow: var(--inner-top), var(--elev-1);
+  --card-shadow-hover: var(--inner-top), var(--elev-3);
 
   /* Üst iç parlaklık — açık yüzeylerde kenar ışığı */
   --inner-top: inset 0 1px 0 rgba(255, 255, 255, 0.75);

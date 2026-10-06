@@ -110,8 +110,8 @@ a.bx:hover, .bx-hover:hover { box-shadow: var(--elev-2); border-color: color-mix
   flex-shrink: 0; white-space: nowrap; width: max-content; max-width: 3.25rem; overflow: hidden; text-overflow: clip;
 }
 .nav-badge:hover { transform: scale(1.08); }
-.nav-badge.is-danger { background: #b4232f; }
-.nav-badge.is-warn { background: #a35a00; }
+.nav-badge.is-danger { background: var(--nav-badge-danger); }
+.nav-badge.is-warn { background: var(--nav-badge-warn); }
 .nav-badge:focus-visible { outline: 2px solid var(--gold-300); outline-offset: 2px; }
 html[data-sidebar="collapsed"] .shell-aside .nav-badge-inline { display: none; }
 
@@ -125,7 +125,7 @@ html[data-sidebar="collapsed"] .shell-aside .nav-badge-inline { display: none; }
 .nav-flyout {
   position: fixed; z-index: 70; min-width: 13rem; max-width: 18rem; padding: 0.375rem;
   border-radius: var(--radius-card); border: 1px solid var(--border-interactive);
-  background: linear-gradient(180deg, #0b2147 0%, #071a38 100%); color: #fff;
+  background: linear-gradient(180deg, var(--navy-800) 0%, var(--navy-900) 100%); color: #fff;
   box-shadow: 0 24px 48px -16px rgba(2, 8, 23, 0.7);
   animation: nav-flyout-in var(--motion-fast) var(--ease-out) both;
 }
@@ -161,7 +161,7 @@ a.nav-flyout-title:hover { background: var(--surface-hover); }
 html[data-sidebar="collapsed"] .shell-aside .sb-rail { display: block; }
 html[data-sidebar="collapsed"] .shell-aside .sb-expanded { display: none; }
 html[data-sidebar="collapsed"] .shell-aside .nav-search { justify-content: center; padding-inline: 0; }
-.nav-badge.is-ok { background: #0f6b4a; }
+.nav-badge.is-ok { background: var(--nav-badge-ok); }
 
 /* ---- Kabukta kayma önleme (kullanıcı menüsü / açılır paneller) ----
    KÖK NEDEN: html `overflow-x: clip` olduğundan Radix modal kilidi (react-remove-scroll) body'ye
