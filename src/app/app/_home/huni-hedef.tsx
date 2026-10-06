@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Funnel, Goal } from "lucide-react";
+import { ChartCard } from "@/components/ui/chart-frame";
 import { FunnelChart } from "@/components/ui/viz";
 import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/lib/clock";
@@ -11,7 +13,7 @@ const CARD_MIN = "lg:min-h-[22rem]";
 
 export function HuniHedefIskelet({ className = CARD_MIN }: { className?: string }) {
   return (
-    <div role="status" aria-busy="true" className={`pm-c1 ${className} p-4`}>
+    <div role="status" aria-busy="true" className={`ds-card ds-pad ${className}`}>
       <span className="sr-only">Yükleniyor</span>
       <Skeleton className="h-3 w-36" />
       <div className="mt-4 space-y-3">
@@ -45,7 +47,8 @@ function TargetBar({
   needText,
 }: {
   label: string;
-  actualText: string;
+  /** null: gerçekleşen tutar KPI'da zaten gösteriliyor → yalnız hedef yazılır (aynı sayı iki kez yok). */
+  actualText: string | null;
   targetText: string;
   pace: TargetPace;
   needText: string;
@@ -55,10 +58,17 @@ function TargetBar({
     <div className={STATE_TONE[pace.state]}>
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className="font-semibold text-text-muted">{label}</span>
-        <span className="pm-num text-sm">
-          {actualText}
-          <span className="font-medium text-text-muted"> / {targetText}</span>
-        </span>
+        {actualText ? (
+          <span className="pm-num text-sm">
+            {actualText}
+            <span className="font-medium text-text-muted"> / {targetText}</span>
+          </span>
+        ) : (
+          <span className="pm-num text-sm">
+            <span className="font-medium text-text-muted">Hedef </span>
+            {targetText}
+          </span>
+        )}
       </div>
       <div
         role="progressbar"
@@ -96,7 +106,7 @@ function targetBars(args: { target: TargetRow; revenueActual: number | null; dea
       {rev ? (
         <TargetBar
           label="Komisyon geliri"
-          actualText={moneyTry(args.revenueActual ?? 0)}
+          actualText={null}
           targetText={moneyTry(tRev)}
           pace={rev}
           needText={rev.state === "exceeded" ? "Gerekli hız yok" : `Gerekli hız ${moneyTry(rev.requiredPerDay)}/gün · ${rev.daysLeft} gün kaldı`}
@@ -136,21 +146,27 @@ export async function HuniHedef({ ctx }: { ctx: HomeCtx }) {
   const stages = funnelRows({ newDemand: demand.new, activeDemand: demand.active, matchedDemand: demand.matched, won: dealWon });
 
   return (
-    <section aria-labelledby="huni-baslik" className={`pm-c1 ${CARD_MIN} flex h-full flex-col gap-4 p-4`}>
-      <div>
-        <h2 id="huni-baslik" className="pm-bx-eyebrow px-1">
-          Satış hunisi
-        </h2>
-        <FunnelChart
-          className="mt-1"
-          stages={stages.map((s) => ({ label: s.label, value: s.value, href: s.href, sub: s.sub }))}
-          ardisik={FUNNEL_SEQUENTIAL}
-          ariaLabel="Talep ve anlaşma hunisi"
-          emptyText="Henüz talep ya da anlaşma yok"
-        />
-      </div>
-      <div className="border-t border-line pt-4">
-        <h2 className="pm-bx-eyebrow mb-2 px-1">Aylık hedef</h2>
+    <ChartCard
+      as="h2"
+      title="Satış hunisi"
+      subtitle="Talep aşamaları ve son 90 gün kazanılan anlaşma"
+      icon={Funnel}
+      tone="brand"
+      href="/app/talepler"
+      hrefLabel="Talepler"
+      height={0}
+      className={`${CARD_MIN} h-full`}
+    >
+      <FunnelChart
+        stages={stages.map((s) => ({ label: s.label, value: s.value, href: s.href, sub: s.sub }))}
+        ardisik={FUNNEL_SEQUENTIAL}
+        ariaLabel="Talep ve anlaşma hunisi"
+        emptyText="Henüz talep ya da anlaşma yok"
+      />
+      <div className="mt-4 border-t border-hairline pt-4">
+        <p className="ds-eyebrow mb-2 flex items-center gap-1.5">
+          <Goal className="h-3.5 w-3.5" aria-hidden="true" /> Ofis hedefi · bu ay
+        </p>
         {targetBars({
           target,
           revenueActual: ctx.canSeeCommissions ? (commission.monthTotals[5] ?? 0) : null,
@@ -158,7 +174,7 @@ export async function HuniHedef({ ctx }: { ctx: HomeCtx }) {
           nowMs: now(),
         })}
       </div>
-    </section>
+    </ChartCard>
   );
 }
 
@@ -167,11 +183,8 @@ export async function KisiselHedef({ ctx }: { ctx: HomeCtx }) {
   const [target, commission, deals] = await Promise.all([loadMyTarget(ctx), loadCommissionSummary(ctx), loadDeals(ctx)]);
   const mine = deals.filter((d) => d.assigned_to === ctx.userId && d.stage === "won" && (d.updated_at ?? "") >= ctx.monthStartIso).length;
   return (
-    <section aria-labelledby="kisisel-hedef-baslik" className="pm-c1 flex h-full min-h-[13rem] flex-col gap-3 p-4">
-      <h2 id="kisisel-hedef-baslik" className="pm-bx-eyebrow px-1">
-        Kişisel hedefim · bu ay
-      </h2>
+    <ChartCard as="h2" title="Kişisel hedefim" subtitle="Bu ay gerçekleşme ve gerekli hız" icon={Goal} tone="success" href="/app/hedefler" hrefLabel="Hedefler" height={0} className="h-full min-h-[13rem]">
       {targetBars({ target, revenueActual: ctx.canSeeCommissions ? (commission.monthTotals[5] ?? 0) : null, dealsActual: mine, nowMs: now() })}
-    </section>
+    </ChartCard>
   );
 }

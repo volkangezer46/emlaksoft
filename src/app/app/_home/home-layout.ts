@@ -1,28 +1,31 @@
 /**
  * Ana ekran ROL YERLEŞİMİ — saf fonksiyon (React/DB yok; vitest kapsamında).
  *
- * Tek karar noktası: hangi rol hangi odak bloğunu, hangi metrik şeridini ve hangi alt blokları görür.
+ * Tek karar noktası: hangi rol hangi odak bloğunu, hangi KPI'ları ve hangi alt blokları görür.
  * `page.tsx` yalnız bu tarifi okuyup bloklara çevirir; rol dallanması başka yerde YOKTUR.
  *
- *  - management  (owner/gm/branch_manager): Brifing odağı + karar bekleyenler + metrik şeridi + ekip tablosu + huni/hedef.
+ * Tasarım sistemi v4 (referans: /admin kontrol paneli): her rolde üstte DashboardHero (tarih, rol bazlı selamlama,
+ * tek cümle öncelik, tazelik, dönem seçici) + KpiGrid. Altında role göre:
+ *  - management  (owner/gm/branch_manager): Dikkat gerektirenler (+ içgörüler) + aylık komisyon eğrisi
+ *                → ekip tablosu + satış hunisi/hedef → program/görev/kaçan komisyon.
  *  - advisor     (advisor, readonly): "Sıradaki eylem" odağı + "Bugün ara" (nedenli) + program/görev/kişisel hedef.
- *  - team_lead   : danışman yerleşimi + ekip satırı (ekip tablosu; yetki kapsamı metrik kütüphanesinde).
+ *  - team_lead   : danışman yerleşimi + ekip satırı.
  *  - accounting  : odak = Tahsilat durumu; satış/müşteri blokları YOK.
  *  - call_center : yalnız arama ve yanıt süresi odaklı sade yerleşim.
  *
- * Karar notu (marka sahibi onaylamadı): /app ana ekranında gece-şehri (CityNight) hero'su KALDIRILDI;
- * yerini ince başlık satırı + metrik şeridi aldı. CityNight yalnız /admin hero'larında kalır.
+ * "Bir metrik ekranda bir kez": teyitsiz ilan, yetkisi dolan portföy, bekleyen komisyon ve geciken görev
+ * yönetimde YALNIZ Dikkat listesindedir (KPI'da ve risk bloğunda tekrarlanmaz). Danışmana ofis geneli
+ * teyit metriği gösterilmez (portal teyidi yönetimin işi).
  */
 
 export type HomeVariant = "management" | "advisor" | "team_lead" | "accounting" | "call_center";
 
-export type HomeFocus = "briefing" | "next-action" | "collections" | "calls";
+export type HomeFocus = "attention" | "next-action" | "collections" | "calls";
 
 export type MetricKey =
   | "ciro"
   | "aktif-anlasma"
   | "yeni-talep"
-  | "teyit"
   | "komisyon-bu-ay"
   | "yeni-musteri"
   | "arama"
@@ -33,27 +36,21 @@ export type MetricKey =
   | "yanit-suresi";
 
 export type BottomBlock = "program" | "gorevler" | "risk" | "kisisel-hedef" | "gider-ozeti";
-export type MoreBlock =
-  | "kuyruk"
-  | "canli-akis"
-  | "portal-sagligi"
-  | "kaynak-dagilimi"
-  | "yetki"
-  | "portfoy"
-  | "kiralama"
-  | "hizli";
+export type MoreBlock = "canli-akis" | "portal-sagligi" | "kaynak-dagilimi" | "yetki" | "portfoy" | "kiralama" | "hizli";
 
 export type HomeLayout = {
   variant: HomeVariant;
   focus: HomeFocus;
-  /** Üst satırda "Ofis | Ben" anahtarı (yalnız ofis geneli veri kapsamı olan roller). */
+  /** Hero'da "Ofis | Ben" anahtarı (yalnız ofis geneli veri kapsamı olan roller). */
   scopeSwitch: boolean;
   periodToggle: boolean;
   /** Durum çubuğu (örnek veri, kontör, kurulum, duyuru…). */
   statusBar: boolean;
-  /** Sağ kolonda "Karar bekleyenler" (metrik şeridi bunun altındadır). */
-  decisions: boolean;
-  /** Bağlamlı metrik şeridi; her metrik ekranda YALNIZ BİR KEZ. */
+  /** "Dikkat gerektirenler" listesi (+ içgörüler); yalnız yönetim. */
+  attention: boolean;
+  /** Aylık komisyon/ciro alan grafiği (komisyon görme izniyle). */
+  revenueChart: boolean;
+  /** KPI ızgarası; her metrik ekranda YALNIZ BİR KEZ. */
   metrics: MetricKey[];
   /** Ekip performansı tablosu. */
   team: boolean;
@@ -61,6 +58,8 @@ export type HomeLayout = {
   funnelTarget: "office" | null;
   /** "Bugün ara" nedenli arama tablosu. */
   callList: boolean;
+  /** Canlı akış başlığındaki "Denetim kaydı" bağlantısı (denetim yönetimin işi). */
+  auditLink: boolean;
   bottom: BottomBlock[];
   more: MoreBlock[];
 };
@@ -77,18 +76,20 @@ export function homeVariantOf(role: string | null | undefined): HomeVariant {
 
 const MANAGEMENT: HomeLayout = {
   variant: "management",
-  focus: "briefing",
+  focus: "attention",
   scopeSwitch: true,
   periodToggle: true,
   statusBar: true,
-  decisions: true,
-  metrics: ["ciro", "aktif-anlasma", "yeni-talep", "teyit"],
+  attention: true,
+  revenueChart: true,
+  metrics: ["ciro", "aktif-anlasma", "yeni-talep", "yeni-musteri", "arama"],
   team: true,
   funnelTarget: "office",
   callList: false,
+  auditLink: true,
   bottom: ["program", "gorevler", "risk"],
-  // "yetki" yok: yetkisi dolan portföy sayısı zaten Karar bekleyenler'de (aynı sayı iki kez gösterilmez).
-  more: ["kuyruk", "portfoy", "kiralama", "canli-akis", "portal-sagligi", "kaynak-dagilimi", "hizli"],
+  // "yetki" yok: yetkisi dolan portföy Dikkat listesinde (aynı sayı iki kez gösterilmez).
+  more: ["portfoy", "kiralama", "canli-akis", "portal-sagligi", "kaynak-dagilimi", "hizli"],
 };
 
 const ADVISOR: HomeLayout = {
@@ -97,14 +98,16 @@ const ADVISOR: HomeLayout = {
   scopeSwitch: false,
   periodToggle: true,
   statusBar: true,
-  decisions: false,
-  metrics: ["komisyon-bu-ay", "yeni-musteri", "arama", "teyit"],
+  attention: false,
+  revenueChart: false,
+  metrics: ["komisyon-bu-ay", "yeni-musteri", "arama", "gorev"],
   team: false,
   // Kişisel hedef alt sıradaki "kisisel-hedef" bloğudur; ofis hunisi danışmanda çizilmez (ofis geneli veri).
   funnelTarget: null,
   callList: true,
+  auditLink: false,
   bottom: ["program", "gorevler", "kisisel-hedef"],
-  more: ["kuyruk", "yetki", "portfoy", "kiralama", "canli-akis", "hizli"],
+  more: ["yetki", "portfoy", "kiralama", "canli-akis", "hizli"],
 };
 
 const LAYOUTS: Record<HomeVariant, HomeLayout> = {
@@ -117,12 +120,14 @@ const LAYOUTS: Record<HomeVariant, HomeLayout> = {
     scopeSwitch: false,
     periodToggle: false,
     statusBar: true,
-    decisions: false,
-    // Bekleyen komisyon odak bloğunda (Tahsilat) büyük gösterilir; şeritte tekrarlanmaz.
+    attention: false,
+    revenueChart: false,
+    // Bekleyen komisyon odak bloğunda (Tahsilat) büyük gösterilir; KPI'da tekrarlanmaz.
     metrics: ["tahsil-edilen", "geciken-kira"],
     team: false,
     funnelTarget: null,
     callList: false,
+    auditLink: false,
     bottom: ["gider-ozeti"],
     more: [],
   },
@@ -132,11 +137,13 @@ const LAYOUTS: Record<HomeVariant, HomeLayout> = {
     scopeSwitch: false,
     periodToggle: false,
     statusBar: false,
-    decisions: false,
+    attention: false,
+    revenueChart: false,
     metrics: ["arama", "yanit-suresi", "gorev"],
     team: false,
     funnelTarget: null,
     callList: true,
+    auditLink: false,
     bottom: ["gorevler"],
     more: [],
   },
@@ -147,15 +154,21 @@ export function homeLayoutFor(role: string | null | undefined): HomeLayout {
   return { ...l, metrics: [...l.metrics], bottom: [...l.bottom], more: [...l.more] };
 }
 
-/**
- * "Bir metrik ekranda bir kez": teyit sayısı metrik şeridindeyse risk bloğu aynı sayıyı tekrar basmaz
- * (yalnız "kaçan komisyon" satırlarını gösterir).
- */
-export function riskShowsTeyit(layout: HomeLayout): boolean {
-  return !layout.metrics.includes("teyit");
-}
-
 /** Satış/müşteri blokları (muhasebe ve arama merkezinde çizilmez). */
 export function showsSalesBlocks(layout: HomeLayout): boolean {
   return layout.variant !== "accounting" && layout.variant !== "call_center";
+}
+
+/** Hero tarih satırının ikinci parçası (rol bazlı bağlam). */
+export function heroContextLabel(layout: HomeLayout, officeView: boolean): string {
+  switch (layout.variant) {
+    case "management":
+      return officeView ? "Ofis görünümü" : "Benim günüm";
+    case "accounting":
+      return "Tahsilat özeti";
+    case "call_center":
+      return "Arama merkezi";
+    default:
+      return "Benim günüm";
+  }
 }

@@ -1,7 +1,8 @@
-import Link from "next/link";
-import { Sparkline, TrendPill, bucketCountFor, bucketDates } from "@/components/ui/premium";
-import { CountUp } from "@/components/ui/count-up";
-import { Skeleton } from "@/components/ui/skeleton";
+import type { ComponentType } from "react";
+import { AlarmClock, BadgeCheck, Handshake, Hourglass, ListChecks, PhoneIncoming, Target, Timer, UserPlus, Wallet } from "lucide-react";
+import { bucketCountFor, bucketDates } from "@/components/ui/premium";
+import { KpiCard, KpiCardSkeleton } from "@/components/ui/kpi-card";
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { createClient } from "@/lib/supabase/server";
@@ -10,29 +11,42 @@ import {
   loadCommissionSummary,
   loadDeals,
   loadKpiCounts,
-  loadLiveListings,
   loadPeriodStats,
   loadRentalsAndProjects,
   loadTaskSummary,
   type HomeCtx,
 } from "./data";
-import { portalHealth, overdueListingsOf, weekBuckets } from "./helpers";
+import { weekBuckets } from "./helpers";
 import type { MetricKey } from "./home-layout";
 import { comparedMetric, contextMetric, dedupeMetrics, hasContext, type MetricSpec } from "./home-metrics";
 
-/** Her satır sabit yükseklikte (2 satır); iskelet ve içerik aynı (CLS yok). */
-const ROW_H = "min-h-[4.25rem]";
+const ICON: Record<MetricKey, ComponentType<{ className?: string }>> = {
+  ciro: Wallet,
+  "komisyon-bu-ay": Wallet,
+  "aktif-anlasma": Handshake,
+  "yeni-talep": Target,
+  "yeni-musteri": UserPlus,
+  arama: PhoneIncoming,
+  gorev: ListChecks,
+  "bekleyen-komisyon": Hourglass,
+  "tahsil-edilen": BadgeCheck,
+  "geciken-kira": AlarmClock,
+  "yanit-suresi": Timer,
+};
 
+/** 360 px'te iki sütun (KpiGrid'in 1-2-3 kartlık düzenleri tek sütunla başlar). */
+const NARROW_TWO = "grid-cols-2";
+
+/** KPI ızgarası iskeleti: gerçek kartlarla aynı ızgara ve ölçü (CLS yok). */
 export function MetrikSeridiIskelet({ rows = 4 }: { rows?: number }) {
   return (
-    <div role="status" aria-busy="true" className="pm-c1 p-4">
-      <span className="sr-only">Yükleniyor</span>
-      <Skeleton className="h-3 w-32" />
-      <div className="mt-2 space-y-1">
+    <div role="status" aria-busy="true">
+      <span className="sr-only">Göstergeler yükleniyor</span>
+      <KpiGrid count={rows} stagger={false} label="Göstergeler yükleniyor" className={rows > 1 ? NARROW_TWO : undefined}>
         {Array.from({ length: rows }).map((_, i) => (
-          <Skeleton key={i} className={`${ROW_H} w-full`} />
+          <KpiCardSkeleton key={i} />
         ))}
-      </div>
+      </KpiGrid>
     </div>
   );
 }
@@ -55,7 +69,8 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         previousText: `Geçen ay ${moneyTry(prev)}`,
         format: "money",
         tone: "gold",
-        href: "/app/komisyon",
+        // Bu ayın tahakkuku: komisyon defteri aynı ay aralığıyla (created_at, TR günü) süzülür.
+        href: `/app/komisyon?from=${ctx.monthStartKey}&to=${trDayKey(nowMs)}`,
         series: c.monthTotals,
         seriesLabel: "Son 6 ay komisyon tahakkuku",
       });
@@ -70,7 +85,8 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         value: open.length,
         context: `Son 90 günde ${won} kazanıldı`,
         tone: "brand",
-        href: "/app/anlasmalar",
+        // Açık aşama süzgeci (won/lost hariç) liste görünümünde sunucu sorgusuna iner.
+        href: "/app/anlasmalar?gorunum=liste&asama=acik",
         series: weekBuckets(
           deals.map((d) => d.updated_at ?? "").filter(Boolean),
           nowMs,
@@ -87,7 +103,8 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         previous: p.demandsPrev,
         previousText: `Önceki ${ctx.period} gün ${p.demandsPrev}`,
         tone: "success",
-        href: "/app/talepler",
+        // Dönemde açılan TÜM talepler (kapalılar dahil) — sayımla aynı koşul.
+        href: `/app/talepler?status=all&eklenen=${ctx.period}`,
         series: p.demandDates ? bucketDates(p.demandDates, nowMs, ctx.period, bucketCountFor(ctx.period)) : null,
         seriesLabel: `Son ${ctx.period} gün yeni talep dağılımı`,
       });
@@ -104,22 +121,6 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         href: `/app/musteriler?from=${trDayKey(daysAgoIso(ctx.period))}&to=${trDayKey(nowMs)}`,
         series: p.customerDates ? bucketDates(p.customerDates, nowMs, ctx.period, bucketCountFor(ctx.period)) : null,
         seriesLabel: `Son ${ctx.period} gün yeni müşteri dağılımı`,
-      });
-    }
-    case "teyit": {
-      const listings = await loadLiveListings(ctx);
-      if (listings.length === 0) return null; // canlı ilan yoksa "%100" uydurulmaz
-      const { pct } = portalHealth(listings);
-      const late = overdueListingsOf(listings).length;
-      return contextMetric({
-        key,
-        label: "Teyit sağlığı",
-        value: pct,
-        format: "percent",
-        tone: pct >= 90 ? "success" : pct >= 70 ? "warn" : "danger",
-        context: late > 0 ? `${late} ilan 7+ gündür teyitsiz` : `${listings.length} ilanın tümü teyitli`,
-        href: "/app/portallar?durum=teyit",
-        seriesLabel: "",
       });
     }
     case "arama": {
@@ -144,7 +145,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         value: t.dueToday + t.overdue,
         context: t.overdue > 0 ? `${t.overdue} gecikmiş` : t.dueToday > 0 ? "Hepsi zamanında" : "Açık görev yok",
         tone: t.overdue > 0 ? "danger" : "brand",
-        href: t.overdue > 0 ? "/app/gorevler?filter=overdue" : "/app/gorevler",
+        href: `/app/gorevler${t.overdue > 0 ? "?filter=overdue" : ""}${ctx.scopeMine ? `${t.overdue > 0 ? "&" : "?"}mine=1` : ""}`,
         seriesLabel: "",
       });
     }
@@ -207,62 +208,39 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
   }
 }
 
-function MetricRow({ m }: { m: MetricSpec }) {
-  return (
-    <li>
-      <Link href={m.href} className={`pm-metric focus-ring pm-t-${m.tone} ${ROW_H}`} aria-label={`${m.label}: ${m.format === "money" ? moneyTry(m.value) : m.value}${m.suffix ?? ""}. ${m.context}`}>
-        <span className="min-w-0 truncate text-xs font-semibold text-text-muted [grid-area:label]">{m.label}</span>
-        <CountUp
-          value={m.value}
-          format={m.format}
-          suffix={m.suffix}
-          className={`pm-num pm-metric-val ${m.format === "money" ? "pm-money" : ""}`}
-        />
-        <span className="flex min-w-0 items-center gap-2 [grid-area:ctx]">
-          {m.trend ? <TrendPill trend={m.trend} /> : null}
-          <span className="min-w-0 truncate text-xs text-text-muted">{m.context}</span>
-        </span>
-        {m.series ? (
-          <span className="pm-metric-spark">
-            <Sparkline data={m.series} tone={m.tone} height={26} label={m.seriesLabel} />
-          </span>
-        ) : null}
-      </Link>
-    </li>
-  );
+function shownValue(m: MetricSpec): string {
+  if (m.format === "money") return moneyTry(m.value);
+  if (m.format === "percent") return `%${m.value.toLocaleString("tr-TR")}`;
+  return `${m.value.toLocaleString("tr-TR")}${m.suffix ?? ""}`;
 }
 
 /**
- * BAĞLAMLI METRİK ŞERİDİ: her metrik değer (tabular) + önceki döneme fark oku + mini sparkline + hedef bağlantı.
+ * KPI IZGARASI (tasarım sistemi v4 `KpiCard`): ikon karosu, büyük sayaç değeri, gerçek önceki döneme göre trend hapı,
+ * bağlam cümlesi, yalnız gerçek seri varsa mini çubuklar; her kart filtrelenmiş hedefe gider (sıfır çıkmaz metrik).
  * Bağlamı (fark/bağlam cümlesi/seri) olmayan metrik çizilmez; bir metrik ekranda yalnız BİR kez (anahtar tekilleştirilir).
  */
-export async function MetrikSeridi({
-  ctx,
-  keys,
-  title = "Metrikler",
-  wide = false,
-}: {
-  ctx: HomeCtx;
-  keys: MetricKey[];
-  title?: string;
-  /** Tam genişlik yerleşim: geniş konteynerde iki sütun (konteyner sorgusu). */
-  wide?: boolean;
-}) {
+export async function MetrikSeridi({ ctx, keys, label = "Özet göstergeler" }: { ctx: HomeCtx; keys: MetricKey[]; label?: string }) {
   const built = await Promise.all(keys.map((k) => buildMetric(k, ctx).catch(() => null)));
   const metrics = dedupeMetrics(built.filter((m): m is MetricSpec => m !== null && hasContext(m)));
   if (metrics.length === 0) return null;
   return (
-    <section aria-labelledby="metrik-baslik" className="pm-c1 p-4">
-      <h2 id="metrik-baslik" className="pm-bx-eyebrow px-1">
-        {title}
-      </h2>
-      <div className="pm-cq mt-1">
-        <ul className={`pm-sep ${wide ? "pm-metric-wide" : ""}`}>
-          {metrics.map((m) => (
-            <MetricRow key={m.key} m={m} />
-          ))}
-        </ul>
-      </div>
-    </section>
+    <KpiGrid count={metrics.length} label={label} className={metrics.length > 1 ? NARROW_TWO : undefined}>
+      {metrics.map((m) => (
+        <KpiCard
+          key={m.key}
+          layout="inline"
+          tinted={m.tone === "gold" || m.tone === "danger"}
+          label={m.label}
+          value={shownValue(m)}
+          href={m.href}
+          icon={ICON[m.key as MetricKey] ?? Target}
+          tone={m.tone}
+          trend={m.trend ?? undefined}
+          hint={m.context}
+          series={m.series ?? undefined}
+          seriesLabel={m.series ? m.seriesLabel : undefined}
+        />
+      ))}
+    </KpiGrid>
   );
 }

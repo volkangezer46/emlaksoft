@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useRouter } from "next/navigation";
@@ -152,19 +153,19 @@ export function RolePermissionsMatrix({
       {error ? <p className="mt-3 text-sm text-danger-500" role="alert">{error}</p> : null}
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[560px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-              <th scope="col" className="py-2 pr-3">Modül</th>
+        <Table className="w-full min-w-[560px] border-collapse text-sm">
+          <THead>
+            <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+              <TH scope="col" className="py-2 pr-3">Modül</TH>
               {ACTIONS.map((a) => (
-                <th scope="col" key={a.value} className="px-2 py-2 text-center">{a.label}</th>
+                <TH scope="col" key={a.value} className="px-2 py-2 text-center">{a.label}</TH>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TR>
+          </THead>
+          <TBody>
             {modules.map((mod) => (
-              <tr key={mod} className="border-b border-line/60 last:border-0">
-                <th scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">{MODULE_LABELS[mod]}</th>
+              <TR key={mod} className="border-b border-line/60 last:border-0">
+                <TH scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">{MODULE_LABELS[mod]}</TH>
                 {ACTIONS.map((a) => {
                   const key = cellKey(mod, a.value);
                   const allowed = isAllowed(mod, a.value);
@@ -172,7 +173,7 @@ export function RolePermissionsMatrix({
                   const isDefault = (defaults[mod] ?? []).includes(a.value);
                   const busy = busyCell === key;
                   return (
-                    <td key={key} className="px-2 py-2 text-center">
+                    <TD key={key} className="px-2 py-2 text-center">
                       <button
                         type="button"
                         disabled={readOnly || busy}
@@ -191,13 +192,13 @@ export function RolePermissionsMatrix({
                           <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
                         ) : null}
                       </button>
-                    </td>
+                    </TD>
                   );
                 })}
-              </tr>
+              </TR>
             ))}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       </div>
 
       <p className="mt-4 flex items-center gap-1.5 text-xs text-text-faint">

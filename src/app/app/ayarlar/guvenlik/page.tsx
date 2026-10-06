@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { History, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -118,35 +119,35 @@ export default async function SecuritySettingsPage() {
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <th className="py-2.5 pr-4">Tarih</th>
-                  <th className="py-2.5 pr-4">IP adresi</th>
-                  <th className="py-2.5 pr-4">Cihaz</th>
-                  <th className="py-2.5">Sonuç</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full min-w-[560px] text-sm">
+              <THead>
+                <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                  <TH className="py-2.5 pr-4">Tarih</TH>
+                  <TH className="py-2.5 pr-4">IP adresi</TH>
+                  <TH className="py-2.5 pr-4">Cihaz</TH>
+                  <TH className="py-2.5">Sonuç</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {loginEvents.map((e) => {
                   const badge = RESULT_BADGE[e.result] ?? { label: e.result, variant: "default" as BadgeVariant };
                   return (
-                    <tr key={e.id} className="border-b border-line/60 last:border-0">
-                      <td className="py-2.5 pr-4 whitespace-nowrap text-ink-900">{formatDate(e.created_at)}</td>
-                      <td className="py-2.5 pr-4 font-mono text-xs text-text-muted">{e.ip ?? "—"}</td>
-                      <td className="py-2.5 pr-4 text-text-muted" title={e.user_agent ?? undefined}>
+                    <TR key={e.id} className="border-b border-line/60 last:border-0">
+                      <TD className="py-2.5 pr-4 whitespace-nowrap text-ink-900">{formatDate(e.created_at)}</TD>
+                      <TD className="py-2.5 pr-4 font-mono text-xs text-text-muted">{e.ip ?? "—"}</TD>
+                      <TD className="py-2.5 pr-4 text-text-muted" title={e.user_agent ?? undefined}>
                         {deviceLabel(e.user_agent)}
-                      </td>
-                      <td className="py-2.5">
+                      </TD>
+                      <TD className="py-2.5">
                         <Badge variant={badge.variant} size="sm">
                           {badge.label}
                         </Badge>
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         )}
       </section>

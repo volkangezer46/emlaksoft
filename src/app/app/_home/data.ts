@@ -28,6 +28,11 @@ import {
 } from "./helpers";
 import { EMPTY_SNAPSHOT, loadDashboardSnapshot, type DashboardSnapshot } from "./data-batch";
 import { periodStatsFromSnapshot, type TaskOpenRow } from "./snapshot-core";
+import { getSetting } from "@/lib/settings/read";
+import { moneyTry } from "@/lib/leak-shield";
+import { STALE_DAYS as DEFAULT_STALE_DAYS } from "../anlasmalar/deal-list-logic";
+import { overdueListingsOf } from "./helpers";
+import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
 
 /**
  * Anlık görüntü RPC'leri (tek tur) — yükleyiciler ÖNCE buna bakar. Örnek-veri kararı (`sample_included`) kodun
@@ -628,18 +633,6 @@ export const loadPropertyStrip = cache(async () => {
 
 /* ------------------------------ Liste/akış bölümleri ------------------------- */
 
-export const loadLatestCustomers = cache(async () => {
-  const supabase = await createClient();
-  const result = await supabase
-    .from("customers")
-    .select("id, full_name, customer_types, created_at")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(4);
-  assertQueryBatchSucceeded([result], ["latest-customers"], "Ana panel");
-  return result.data ?? [];
-});
-
 export const loadActivityFeed = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   const results = await Promise.all([
@@ -746,4 +739,57 @@ export const loadDecisions = cache(async (ctx: HomeCtx) => {
     passiveAdvisors,
     passiveDays: PASSIVE_DAYS,
   };
+});
+
+/* ------------------------- Dikkat gerektirenler (tek yükleyici) ------------------------- */
+
+/** Yükleyicinin tavanı (`loadExpiringAuthority` limit 12): tavana ulaşan sayı kesin değildir. */
+const EXPIRING_CAP = 12;
+
+/**
+ * Riskli anlaşma = eşik (Ofis Tanımları `office.alert.deal_stale_days`, varsayılan 14) gündür hareketsiz AÇIK anlaşma.
+ * /app/anlasmalar?bayat=1 süzgeciyle AYNI koşul (head count, kırpılmaz). Hata → null (sahte sıfır yok).
+ */
+export const loadStaleDeals = cache(async (ctx: HomeCtx) => {
+  const days = ctx.tenantId ? await getSetting<number>("office.alert.deal_stale_days", { tenantId: ctx.tenantId }) : DEFAULT_STALE_DAYS;
+  const supabase = await createClient();
+  let q = ctx.sample
+    .apply(supabase.from("deals").select("id", { count: "exact", head: true }))
+    .not("stage", "in", "(won,lost)")
+    .lt("updated_at", daysAgoIso(days));
+  if (ctx.scopeMine) q = q.eq("assigned_to", ctx.userId);
+  const res = await q;
+  return { count: res.error ? null : (res.count ?? 0), days };
+});
+
+/**
+ * "Dikkat gerektirenler" kalemleri — hero cümlesi ve Dikkat listesi AYNI kaynaktan (istek içi tek hesap).
+ * Kapsam `ctx.scopeMine` ile tüm kalemlerde aynı (ben/ofis). Teyitsiz ilan yalnız yönetimde (portal teyidi yönetimin işi).
+ */
+export const loadAttention = cache(async (ctx: HomeCtx): Promise<HomeAttentionItem[]> => {
+  const salesRole = ctx.role !== "accounting" && ctx.role !== "call_center";
+  const [tasks, decisions, stale, listings, expiring, commission] = await Promise.all([
+    loadTaskSummary(ctx).catch(() => null),
+    ctx.isManagement ? loadDecisions(ctx).catch(() => null) : Promise.resolve(null),
+    salesRole ? loadStaleDeals(ctx).catch(() => null) : Promise.resolve(null),
+    ctx.isManagement ? loadLiveListings(ctx).catch(() => null) : Promise.resolve(null),
+    salesRole && ctx.canSeeProperties ? loadExpiringAuthority(ctx).catch(() => null) : Promise.resolve(null),
+    ctx.canSeeCommissions && ctx.role !== "accounting" ? loadCommissionSummary(ctx).catch(() => null) : Promise.resolve(null),
+  ]);
+  return buildAttentionItems({
+    overdueTasks: tasks?.overdue ?? null,
+    approvals: decisions?.approvals ?? null,
+    overdueRent: decisions?.overdueRent ?? null,
+    staleDeals: stale?.count ?? null,
+    staleDays: stale?.days ?? DEFAULT_STALE_DAYS,
+    unconfirmedListings: listings ? overdueListingsOf(listings).length : null,
+    expiringAuthority: expiring ? expiring.data.length : null,
+    expiringCapped: (expiring?.data.length ?? 0) >= EXPIRING_CAP,
+    pendingCommission: commission?.pending ?? null,
+    pendingCommissionText: moneyTry(commission?.pending ?? 0),
+    passiveAdvisors: decisions?.passiveAdvisors ?? null,
+    passiveDays: decisions?.passiveDays ?? PASSIVE_DAYS,
+    mine: ctx.scopeMine,
+    userId: ctx.userId,
+  });
 });

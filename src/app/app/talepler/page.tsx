@@ -21,6 +21,7 @@ export default async function DemandsPage({
   status?: string;
   aciliyet?: string;
   yas?: string;
+  eklenen?: string;
   il?: string;
   butce?: string;
   danisman?: string;

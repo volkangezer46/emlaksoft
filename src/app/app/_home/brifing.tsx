@@ -135,7 +135,7 @@ export async function Brifing({
   const rows = [...brief.rows, ...extra];
 
   return (
-    <div className="flex flex-col gap-3" data-brifing-mode="insight" data-tour="brifing">
+    <div className="flex flex-col gap-3" data-brifing-mode="insight">
       <FocusCard insight={brief.focus} eyebrow={eyebrow} canTask={canTask} />
       {rows.length > 0 ? (
         <ol aria-label="Diğer içgörüler" className="pm-flat pm-sep">

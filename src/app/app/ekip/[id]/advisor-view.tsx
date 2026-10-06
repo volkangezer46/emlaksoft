@@ -59,6 +59,7 @@ export async function AdvisorDetailView({
   backHref,
   searchParams,
   auth,
+  headingAs = "h1",
 }: {
   memberId: string;
   /** Sekme bağlantılarının kökü. */
@@ -67,6 +68,8 @@ export async function AdvisorDetailView({
   backHref?: { href: string; label: string };
   searchParams: Record<string, string | string[] | undefined>;
   auth: { userId: string; role: string; tenantId: string | null; perms: EffectivePermissions };
+  /** Performansım üstünde DashboardHero (tek h1) olduğu için orada "h2". */
+  headingAs?: "h1" | "h2";
 }) {
   const { perms, userId, role, tenantId } = auth;
   const id = memberId;
@@ -167,6 +170,7 @@ export async function AdvisorDetailView({
 
       <PageHeader
         className="mb-0"
+        as={headingAs}
         icon={
           <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
             {initials(member.full_name)}

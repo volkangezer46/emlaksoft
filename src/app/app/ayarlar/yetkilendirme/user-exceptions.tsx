@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Check, RotateCcw, UserRound } from "lucide-react";
@@ -293,24 +294,24 @@ export function UserExceptions({
           </p>
 
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[620px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <th scope="col" className="py-2 pr-3">Modül</th>
+            <Table className="w-full min-w-[620px] border-collapse text-sm">
+              <THead>
+                <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                  <TH scope="col" className="py-2 pr-3">Modül</TH>
                   {ACTIONS.map((a) => (
-                    <th scope="col" key={a.value} className="px-2 py-2 text-center">{a.label}</th>
+                    <TH scope="col" key={a.value} className="px-2 py-2 text-center">{a.label}</TH>
                   ))}
-                  <th scope="col" className="px-2 py-2 text-right">İstisna</th>
-                </tr>
-              </thead>
-              <tbody>
+                  <TH scope="col" className="px-2 py-2 text-right">İstisna</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {modules.map((mod) => {
                   const { actions, override } = effectiveFor(mod);
                   const stored = localOverrides.get(mod);
                   const expired = stored && !isActiveAt(stored, todayKey);
                   return (
-                    <tr key={mod} className={`border-b border-line/60 last:border-0 ${override ? "bg-amber-400/[0.04]" : ""}`}>
-                      <th scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">
+                    <TR key={mod} className={`border-b border-line/60 last:border-0 ${override ? "bg-amber-400/[0.04]" : ""}`}>
+                      <TH scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">
                         {moduleLabels[mod]}
                         {override?.expires_at ? (
                           <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">
@@ -322,13 +323,13 @@ export function UserExceptions({
                             Süresi doldu
                           </span>
                         ) : null}
-                      </th>
+                      </TH>
                       {ACTIONS.map((a) => {
                         const key = `${mod}:${a.value}`;
                         const allowed = actions.includes(a.value);
                         const busy = busyKey === key;
                         return (
-                          <td key={key} className="px-2 py-2 text-center">
+                          <TD key={key} className="px-2 py-2 text-center">
                             <button
                               type="button"
                               disabled={readOnly || busy}
@@ -357,10 +358,10 @@ export function UserExceptions({
                                 <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
                               ) : null}
                             </button>
-                          </td>
+                          </TD>
                         );
                       })}
-                      <td className="px-2 py-2 text-right">
+                      <TD className="px-2 py-2 text-right">
                         {override && !readOnly ? (
                           <button
                             type="button"
@@ -373,12 +374,12 @@ export function UserExceptions({
                         ) : (
                           <span className="text-xs text-text-faint">{override ? "İstisna" : "—"}</span>
                         )}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-text-faint">

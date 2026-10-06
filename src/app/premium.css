@@ -648,3 +648,12 @@ html[data-theme="dark"] .ds-hero {
 .ds-seg-opt[data-on="1"] { color: var(--accent-fg); }
 .ds-seg-opt:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 @media (pointer: coarse) { .ds-seg-opt { min-height: 44px; } }
+
+/* ---- Mobil (360 px) ana ekran ve KPI: dar ekranda 2 sütun KPI sığar, dokunma hedefi 44 px ---------------------- */
+@media (max-width: 767.98px) { .ds-seg-opt { min-height: 44px; } }
+@media (max-width: 479px) {
+  .pm-card-inline { gap: 0.6rem; padding: 0.85rem 0.8rem; min-height: 5.5rem; }
+  .pm-card-inline .pm-ico { width: 2.125rem; height: 2.125rem; }
+  .pm-card-inline .pm-card-bars { display: none; }
+  .ds-hero-row > .relative { width: 100%; }
+}

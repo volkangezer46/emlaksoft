@@ -1,12 +1,13 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
-import { CountUp } from "@/components/ui/count-up";
 import { formatCount } from "@/lib/ui/filter-params";
+import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { KpiTile } from "@/components/ui/premium/kpi-card";
 
 /**
- * StatRow — kompakt, tıklanabilir KPI satırı. "Sıfır çıkmaz metrik": `href` zorunlu,
- * her öğe filtrelenmiş hedefe gider. Değer 0 ise sönük gösterilir (yine tıklanabilir).
+ * StatRow — tıklanabilir KPI şeridi (eski imza korunur). Görünüm tasarım sistemi v4'ün TEK kart uygulaması
+ * `KpiTile` (`layout="inline"`: ikon karosu solda, sayaç değer, alt bilgi) + `KpiGrid` ızgarası; /admin ve /app
+ * ana ekranıyla aynı kart. "Sıfır çıkmaz metrik": `href` zorunlu, her öğe filtrelenmiş hedefe gider.
+ * Değer 0 ise sönük gösterilir (yine tıklanabilir); `attention` sıfır değilse değer tehlike tonunda.
  */
 export type StatRowItem = {
   label: string;
@@ -34,47 +35,26 @@ export function StatRow({
   className?: string;
 }) {
   return (
-    <nav
-      aria-label={label}
-      className={cn(
-        "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]",
-        className,
-      )}
-    >
+    <KpiGrid count={items.length} label={label} className={className}>
       {items.map((it) => {
         const zero = isZero(it.value);
-        const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
+        const alert = Boolean(it.attention) && !zero;
         return (
-          <Link
+          <KpiTile
             key={`${it.label}-${it.href}`}
+            layout="inline"
+            label={it.label}
+            value={typeof it.value === "number" ? formatCount(it.value) : it.value}
             href={it.href}
-            className={cn(
-              "focus-ring surface-interactive flex min-h-12 min-w-0 flex-col justify-between gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400",
-              zero && "opacity-60 hover:opacity-100",
-            )}
-          >
-            <span className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
-              {it.icon ? (
-                <span aria-hidden="true" className="inline-flex shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">
-                  {it.icon}
-                </span>
-              ) : null}
-              <span className="line-clamp-2 min-w-0 [overflow-wrap:normal] hyphens-auto" title={it.label}>{it.label}</span>
-            </span>
-            <span className="flex flex-col">
-              <span
-                className={cn(
-                  "text-lg font-semibold tabular-nums",
-                  it.attention && !zero ? "text-danger-600" : "text-text",
-                )}
-              >
-                {typeof shown === "number" || typeof shown === "string" ? <CountUp value={shown} /> : shown}
-              </span>
-              {it.hint ? <span className="line-clamp-1 min-w-0 text-xs text-text-muted" title={it.hint}>{it.hint}</span> : null}
-            </span>
-          </Link>
+            iconNode={it.icon}
+            tone={alert ? "danger" : "brand"}
+            tinted={alert}
+            attention={alert}
+            dim={zero && !it.attention}
+            hint={it.hint}
+          />
         );
       })}
-    </nav>
+    </KpiGrid>
   );
 }

@@ -1,3 +1,4 @@
+import { Table, TBody, TR, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -81,30 +82,30 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           </div>
         </dl>
 
-        <table className="mt-6 w-full text-sm">
-          <tbody>
-            <tr className="border-t border-line">
-              <td className="py-2 text-text-muted">Ara tutar</td>
-              <td className="py-2 text-right tabular-nums">{money(Number(inv.amount_try))}</td>
-            </tr>
-            <tr className="border-t border-line">
-              <td className="py-2 text-text-muted">KDV</td>
-              <td className="py-2 text-right tabular-nums">{money(Number(inv.tax_try))}</td>
-            </tr>
-            <tr className="border-t border-line font-bold text-ink-950">
-              <td className="py-2">Toplam</td>
-              <td className="py-2 text-right tabular-nums">{money(Number(inv.total_try))}</td>
-            </tr>
+        <Table className="mt-6 w-full text-sm">
+          <TBody>
+            <TR>
+              <TD className="py-2 text-text-muted">Ara tutar</TD>
+              <TD className="py-2 text-right tabular-nums">{money(Number(inv.amount_try))}</TD>
+            </TR>
+            <TR>
+              <TD className="py-2 text-text-muted">KDV</TD>
+              <TD className="py-2 text-right tabular-nums">{money(Number(inv.tax_try))}</TD>
+            </TR>
+            <TR className="font-bold text-ink-950">
+              <TD className="py-2">Toplam</TD>
+              <TD className="py-2 text-right tabular-nums">{money(Number(inv.total_try))}</TD>
+            </TR>
             {showWallet ? (
-              <tr className="border-t border-line text-text-muted">
-                <td className="py-2">Ödeme dağılımı</td>
-                <td className="py-2 text-right tabular-nums">
+              <TR className="text-text-muted">
+                <TD className="py-2">Ödeme dağılımı</TD>
+                <TD className="py-2 text-right tabular-nums">
                   Hesap kredisi: {money(walletCredit)} / Kart: {money(Number.isFinite(walletCash) ? walletCash : 0)}
-                </td>
-              </tr>
+                </TD>
+              </TR>
             ) : null}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
 
         {inv.iyzico_payment_id ? (
           <p className="mt-4 text-xs text-text-faint">Ödeme referansı: {inv.iyzico_payment_id}</p>
