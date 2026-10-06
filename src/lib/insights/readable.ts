@@ -42,7 +42,7 @@ export const INSIGHT_SELECT =
 
 const oneOf = <T extends string>(list: readonly T[], v: string, fallback: T): T => ((list as readonly string[]).includes(v) ? (v as T) : fallback);
 
-function toEvidence(raw: unknown): InsightEvidence[] {
+export function toEvidence(raw: unknown): InsightEvidence[] {
   if (!Array.isArray(raw)) return [];
   const out: InsightEvidence[] = [];
   for (const e of raw) {
