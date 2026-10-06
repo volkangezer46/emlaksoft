@@ -3,6 +3,8 @@
  * Telefon biçimi burada doğrulanmaz: sunucu action `parsePhoneStrict` ile doğrular; burada yalnız "dolu mu" bakılır.
  */
 
+import { parseEidsPropertyNo } from "@/lib/eids/property-no";
+
 export const OWNER_RELATIONS = [
   { value: "malik", label: "Malik (tapu sahibi)" },
   { value: "vekil", label: "Vekil" },
@@ -58,6 +60,8 @@ export type OwnerInfoInput = {
   authorizationType: string;
   authorizationStart: string;
   authorizationEnd: string;
+  /** EİDS Taşınmaz Kimlik Numarası (normalize; boş = girilmedi). Resmî doğrulama değildir. */
+  eidsNo: string;
   commissionKind: string;
   minPrice: number | null;
   negotiationMarginPct: number | null;
@@ -90,6 +94,7 @@ export function emptyOwnerInfo(): OwnerInfoInput {
     authorizationType: "",
     authorizationStart: "",
     authorizationEnd: "",
+    eidsNo: "",
     commissionKind: "yuzde",
     minPrice: null,
     negotiationMarginPct: null,
@@ -136,6 +141,7 @@ export function parseOwnerInfoForm(get: (name: string) => string | null | undefi
   const min = num("min_price", 1_000_000_000_000);
   const margin = num("negotiation_margin_pct", 100);
   const ck = s("commission_kind");
+  const eids = parseEidsPropertyNo(s("eids_property_no"));
   const value: OwnerInfoInput = {
     ownerCustomerId: s("owner_customer_id"),
     ownerName: s("owner_name"),
@@ -147,6 +153,7 @@ export function parseOwnerInfoForm(get: (name: string) => string | null | undefi
     authorizationType: AUTH_SET.has(s("authorization_type")) ? s("authorization_type") : "",
     authorizationStart: /^\d{4}-\d{2}-\d{2}$/.test(s("authorization_start")) ? s("authorization_start") : "",
     authorizationEnd: /^\d{4}-\d{2}-\d{2}$/.test(s("authorization_end")) ? s("authorization_end") : "",
+    eidsNo: eids.ok ? (eids.value ?? "") : s("eids_property_no"),
     commissionKind: KIND_SET.has(ck) ? ck : "yuzde",
     minPrice: min.v,
     negotiationMarginPct: margin.v,
@@ -156,6 +163,7 @@ export function parseOwnerInfoForm(get: (name: string) => string | null | undefi
     kvkkConsent: s("kvkk_consent") === "1",
     contactPermission: s("contact_permission") === "1",
   };
+  if (!eids.ok) return { value, error: eids.error };
   if (min.bad) return { value, error: "Geçerli bir minimum fiyat girin." };
   if (margin.bad) return { value, error: "Pazarlık payı 0 ile 100 arasında olmalıdır." };
   if (value.authorizationStart && value.authorizationEnd && value.authorizationEnd < value.authorizationStart) {
@@ -168,7 +176,7 @@ export function parseOwnerInfoForm(get: (name: string) => string | null | undefi
 export function isOwnerInfoBlank(i: OwnerInfoInput): boolean {
   return !(
     i.ownerCustomerId || i.ownerName || i.ownerPhone || i.ownerEmail || i.relation || i.deedStatus || i.authorizationType ||
-    i.listingSource || i.customerNotes || i.contactHistory || i.kvkkConsent || i.contactPermission || i.minPrice != null ||
+    i.eidsNo || i.listingSource || i.customerNotes || i.contactHistory || i.kvkkConsent || i.contactPermission || i.minPrice != null ||
     i.negotiationMarginPct != null
   );
 }

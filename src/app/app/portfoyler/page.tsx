@@ -60,6 +60,8 @@ import {
 import { buildHref } from "@/lib/ui/filter-params";
 import { applyPropertyNlFilters, hasPropertyNlFilters, normalizePropertyNlParams, propertyNlUrlParams } from "@/lib/nl-search/property-filters";
 import { fetchPhotoGapIds } from "@/lib/photo-quality/load";
+import { EIDS_ID_CAP, loadEidsStatus } from "@/lib/eids/load";
+import { EIDS_FILTER_LABELS, isEidsFilter } from "@/lib/eids/status";
 import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
@@ -202,6 +204,8 @@ export default async function PropertiesPage({
     ilce?: string;
     mahalle?: string;
     foto?: string;
+    // EİDS / yetki süzgeci (Uyum merkezi sayaçları buraya iner): eids_eksik | yetki_eksik | kisa | bitiyor | dolmus
+    yetki?: string;
   }>;
 }) {
   const { perms } = await requireModulePage("properties");
@@ -226,6 +230,11 @@ export default async function PropertiesPage({
   const nlFilters = normalizePropertyNlParams(params);
   // "Foto eksik" (F3): sayı + kapak kuralıyla eksik portföy id'leri (en çok PHOTO_GAP_ID_CAP).
   const photoGap = nlFilters.fotoEksik ? await fetchPhotoGapIds(supabase) : null;
+  // EİDS / yetki süzgeci: sayaçlarla AYNI saf mantıktan (src/lib/eids/status.ts) kimlik listesi; sorguya `id in (...)` iner.
+  const eidsFilter = isEidsFilter(params.yetki) ? params.yetki : null;
+  const eidsLoad = eidsFilter ? await loadEidsStatus(supabase) : null;
+  const eidsIds = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.ids[eidsFilter] : null;
+  const eidsTotal = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.counts[eidsFilter] : 0;
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews(PATH);
 
@@ -238,6 +247,7 @@ export default async function PropertiesPage({
   if (kategoriF) urlParams.kategori = kategoriF;
   if (danismanF) urlParams.danisman = danismanF;
   if (eklenenDays) urlParams.eklenen = String(eklenenDays);
+  if (eidsFilter) urlParams.yetki = eidsFilter;
   Object.assign(urlParams, propertyNlUrlParams(nlFilters));
   if (siralaF) urlParams.sirala = siralaF;
   if (view !== "liste") urlParams.gorunum = view;
@@ -295,6 +305,7 @@ export default async function PropertiesPage({
     if (danismanF) query = query.eq("assigned_to", danismanF);
     query = applyPropertyNlFilters(query, nlFilters);
     if (photoGap) query = query.in("id", photoGap.ids.length > 0 ? photoGap.ids : ["00000000-0000-0000-0000-000000000000"]);
+    if (eidsIds) query = query.in("id", eidsIds.length > 0 ? eidsIds.slice(0, EIDS_ID_CAP) : ["00000000-0000-0000-0000-000000000000"]);
     return query;
   };
   const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
@@ -303,7 +314,7 @@ export default async function PropertiesPage({
     return query;
   };
 
-  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !hasPropertyNlFilters(nlFilters);
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters);
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
@@ -590,6 +601,7 @@ export default async function PropertiesPage({
     { key: "ilce", label: "İlçe", format: () => "seçili" },
     { key: "mahalle", label: "Mahalle", format: () => "seçili" },
     { key: "foto", label: "Fotoğraf", format: () => "eksik" },
+    { key: "yetki", label: "EİDS / yetki", format: (v) => (isEidsFilter(v) ? EIDS_FILTER_LABELS[v] : v) },
   ]);
   const anyFilter = chips.length > 0;
 
@@ -622,8 +634,23 @@ export default async function PropertiesPage({
         >
           Foto eksik{photoGap?.enabled ? ` (${photoGap.total})` : ""}
         </ButtonLink>
+        <ButtonLink
+          href={hrefWith({ yetki: eidsFilter === "eids_eksik" ? "" : "eids_eksik", sayfa: "" })}
+          variant={eidsFilter === "eids_eksik" ? "secondary" : "ghost"}
+          size="sm"
+        >
+          EİDS no eksik{eidsFilter === "eids_eksik" && eidsLoad?.enabled ? ` (${eidsTotal})` : ""}
+        </ButtonLink>
         <ButtonLink href="/app/mahalle-notlari" variant="ghost" size="sm">Mahalle notları</ButtonLink>
       </div>
+      {eidsLoad && !eidsLoad.enabled ? (
+        <p className="text-xs text-text-muted">EİDS süzgeci etkin değil: portföy EİDS alanı okunamadı (veritabanı güncellemesi uygulanmamış olabilir).</p>
+      ) : null}
+      {eidsLoad?.enabled && eidsTotal > EIDS_ID_CAP ? (
+        <p className="text-xs text-text-muted">
+          {EIDS_FILTER_LABELS[eidsFilter!]}: {eidsTotal} portföy var; en yeni {EIDS_ID_CAP} tanesi listeleniyor. Diğer filtrelerle daraltın.
+        </p>
+      ) : null}
       {photoGap && !photoGap.enabled ? (
         <p className="text-xs text-text-muted">Foto denetimi etkin değil: medya kayıtları okunamadı.</p>
       ) : null}

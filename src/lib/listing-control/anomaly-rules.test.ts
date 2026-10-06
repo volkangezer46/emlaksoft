@@ -139,7 +139,7 @@ describe("yaşam döngüsü aşaması", () => {
 });
 
 describe("KPI bayrakları ve motor (sayı = liste)", () => {
-  const extras: EvaluationExtras = { photoScore: 80, daysSinceUpdate: 3, advisorActive: true, ownerInfoPresent: true, authorityDocPresent: null, hoursUnexplained: 0, exitKind: null };
+  const extras: EvaluationExtras = { photoScore: 80, daysSinceUpdate: 3, advisorActive: true, ownerInfoPresent: true, eidsNoPresent: null, hoursUnexplained: 0, exitKind: null };
 
   it("sağlıklı aktif portföy: aktif + portallarda + sağlıklı, anomali yok", () => {
     const ev = evaluateProperty(snap(), extras, NOW);

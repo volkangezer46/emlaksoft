@@ -2,6 +2,7 @@ import { freshnessValue, priceConsistencyValue, type HealthInputs } from "@/lib/
 import type { ListingControlConfig } from "@/lib/listing-control/config";
 import { REASON_LABELS, STAGE_LABELS, type LifecycleStage, type ReasonCode } from "@/lib/listing-control/types";
 import { anomalyTypeLabel } from "./helpers";
+import { eidsHealthValue } from "@/lib/eids/health";
 
 /**
  * Portföy "Yaşam döngüsü & portal geçmişi" SAF modeli: zaman çizelgesi birleştirme, sağlık girdileri, süre ortalamaları,
@@ -68,10 +69,14 @@ export type HealthFacts = {
   listPrice: number | null;
   updatedAt: string | null;
   authorizationEnd: string | null;
+  /** EİDS taşınmaz no girilmiş mi; okunamadıysa null/belirtilmez = ölçülemedi. */
+  eidsNoPresent?: boolean | null;
+  /** Yetki süresi 3 aydan kısa mı (EİDS kuralı). */
+  authorityShort?: boolean;
   listings: { live: boolean; verified: boolean; externalId: string | null; url: string | null; portalPrice: number | null; lastSuccessAt: string | null }[];
 };
 
-/** Ölçülemeyen girdi = null (paydadan çıkar, ekranda "ölçülemedi"). Fotoğraf/iletişim/EİDS ayrı kaynak: burada ölçülmez. */
+/** Ölçülemeyen girdi = null (paydadan çıkar, ekranda "ölçülemedi"). Fotoğraf/iletişim ayrı kaynak: burada ölçülmez. EİDS yalnız `eidsNoPresent` verilirse ölçülür. */
 export function buildHealthInputs(f: HealthFacts, nowMs: number, cfg: Pick<ListingControlConfig, "price" | "cadence">): HealthInputs {
   const live = f.listings.filter((l) => l.live);
   const anyListing = f.listings.length > 0;
@@ -90,7 +95,7 @@ export function buildHealthInputs(f: HealthFacts, nowMs: number, cfg: Pick<Listi
     freshness: f.updatedAt ? freshnessValue((nowMs - Date.parse(f.updatedAt)) / 86_400_000) : null,
     idUrlValid: live.length === 0 ? null : live.filter((l) => (l.externalId ?? "").trim() !== "" || (l.url ?? "").trim() !== "").length / live.length,
     contact: null,
-    eids: null,
+    eids: eidsHealthValue(f.eidsNoPresent ?? null, f.authorityShort ?? false),
     checkRecency: newest === null ? null : nowMs - newest <= staleMs ? 1 : 0,
   };
 }

@@ -10,7 +10,9 @@ import {
 } from "@/app/actions/property-management";
 import { publishPropertyToPortal } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
-import { DAY_MS, msSince, msUntil } from "@/lib/clock";
+import { DAY_MS, msSince, now } from "@/lib/clock";
+import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
+import { hasValidEidsNo } from "@/lib/eids/property-no";
 
 // ---------------------------------------------------------------------------
 // Durum geçmişi paneli
@@ -109,19 +111,17 @@ export function PropertyAuthorizationPanel({
     authEnd?: string | null;
     authType?: string | null;
     authNotes?: string | null;
+    eidsNo?: string | null;
   };
 }) {
   const [editing, setEditing] = useState(false);
-  const [result, setResult] = useState<{ ok?: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{ ok?: boolean; error?: string; warning?: string } | null>(null);
   const [saving, start] = useTransition();
 
-  const daysLeft = initial.authEnd
-    ? Math.floor(msUntil(initial.authEnd) / DAY_MS)
-    : null;
-
-  const urgency = daysLeft !== null
-    ? daysLeft < 0 ? "expired" : daysLeft <= 7 ? "critical" : daysLeft <= 15 ? "warning" : "ok"
-    : "none";
+  // 15/7/3 gün pencereleri + "en az 3 ay" kuralı: tek kaynak src/lib/eids/authority-term.ts
+  const term = evaluateAuthorityTerm({ start: initial.authStart, end: initial.authEnd }, now());
+  const daysLeft = term.daysLeft;
+  const urgency = term.state === "expired" ? "expired" : term.state === "expiring" ? (term.urgency ?? "soon") : term.state === "ok" ? "ok" : "none";
 
   function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -132,6 +132,7 @@ export function PropertyAuthorizationPanel({
         authEnd:   String(fd.get("auth_end")   ?? ""),
         authType:  String(fd.get("auth_type")  ?? ""),
         authNotes: String(fd.get("auth_notes") ?? ""),
+        eidsNo:    String(fd.get("eids_no")    ?? ""),
       });
       setResult(res);
       if (res.ok) setEditing(false);
@@ -145,8 +146,9 @@ export function PropertyAuthorizationPanel({
           <FileCheck2 className="h-4 w-4 text-amber-600" /> Yetki belgesi
         </h2>
         {urgency === "expired"  && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600">Süresi doldu</span>}
-        {urgency === "critical" && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600">{daysLeft} gün kaldı</span>}
-        {urgency === "warning"  && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-600">{daysLeft} gün kaldı</span>}
+        {urgency === "critical" && <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-bold text-red-600">{daysLeft === 0 ? "Bugün bitiyor" : `${daysLeft} gün kaldı`}</span>}
+        {urgency === "warning"  && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{daysLeft} gün kaldı</span>}
+        {urgency === "soon"     && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{daysLeft} gün kaldı</span>}
         {urgency === "ok"       && <span className="rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-700">{daysLeft} gün kaldı</span>}
         <button type="button" onClick={() => setEditing((s) => !s)} className="text-xs font-semibold text-brand-600 hover:underline">
           {editing ? "İptal" : "Düzenle"}
@@ -159,6 +161,9 @@ export function PropertyAuthorizationPanel({
           {initial.authEnd   && <p>Bitiş:     <span className="font-semibold text-ink-950">{new Date(initial.authEnd).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</span></p>}
           {initial.authType  && <p>Tür:       <span className="font-semibold text-ink-950">{initial.authType === "exclusive" ? "Tek Yetkili" : initial.authType === "open" ? "Açık Yetki" : "Sınırlı Yetki"}</span></p>}
           {initial.authNotes && <p className="mt-1 text-xs">{initial.authNotes}</p>}
+          <p>EİDS no: {hasValidEidsNo(initial.eidsNo) ? <span className="font-semibold text-ink-950">{initial.eidsNo}</span> : <span className="font-semibold text-amber-700">girilmemiş</span>}</p>
+          {result?.ok && result.warning ? <p role="status" className="mt-1 text-xs font-medium text-amber-700">{result.warning}</p> : null}
+          {term.message && term.state !== "expiring" ? <p role="status" className="mt-1 rounded-[var(--radius-control)] bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700">{term.message}</p> : null}
           {!initial.authStart && !initial.authEnd && (
             <p className="text-text-faint">Yetki belgesi bilgisi girilmemiş.</p>
           )}
@@ -183,6 +188,11 @@ export function PropertyAuthorizationPanel({
                 <option value="limited">Sınırlı Yetki</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label htmlFor="pe-eids-no" className="mb-1 block text-xs font-semibold text-ink-950">EİDS taşınmaz numarası</label>
+            <input id="pe-eids-no" name="eids_no" type="text" maxLength={40} autoComplete="off" defaultValue={initial.eidsNo ?? ""} placeholder="e-Devlet EİDS Yetki İşlemleri’nde üretilen numara" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
+            <p className="mt-1 text-xs text-text-muted">Yetki en az 3 ay olmalıdır. Numara elle girilir; resmî doğrulama değildir.</p>
           </div>
           <textarea name="auth_notes" aria-label="Yetki notu" rows={2} defaultValue={initial.authNotes ?? ""} placeholder="Not (opsiyonel)" className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
           {result?.error && <p role="alert" className="text-xs text-red-600">{result.error}</p>}

@@ -8,6 +8,8 @@ import { IysForm } from "./iys-form";
 import { listErasureLog } from "@/app/actions/kvkk";
 import { KvkkPanel } from "./kvkk-panel";
 import { GosCard } from "./gos-card";
+import { loadEidsStatus } from "@/lib/eids/load";
+import { EIDS_FILTER_LABELS, EIDS_FILTER_VALUES } from "@/lib/eids/status";
 
 const channelLabel: Record<string, string> = {
   sms: "SMS",
@@ -54,7 +56,7 @@ export default async function CompliancePage({
   // yapabilecegi bir sey olmamali.
   const canErase = (perms.customers ?? []).includes("delete");
 
-  const [erasureLog, { data: consents }, { data: customers }] = await Promise.all([
+  const [erasureLog, { data: consents }, { data: customers }, eids] = await Promise.all([
     listErasureLog(50),
     supabase
       .from("iys_consents")
@@ -67,6 +69,7 @@ export default async function CompliancePage({
       .is("deleted_at", null)
       .order("full_name")
       .limit(200),
+    loadEidsStatus(supabase),
   ]);
 
   const filteredConsents = (consents ?? []).filter(
@@ -164,6 +167,47 @@ export default async function CompliancePage({
       </div>
 
       <GosCard />
+      {/* EİDS / yetki durumu — her sayaç filtrelenmiş portföy listesine gider. Resmî doğrulama DEĞİL: ofisin kendi kaydı ölçülür. */}
+      <section aria-labelledby="eids-baslik" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+          <FileCheck2 className="h-4 w-4" /> EİDS ve yetki durumu
+        </p>
+        <h2 id="eids-baslik" className="mt-1 font-display font-bold text-ink-950">Portföy yetki ve taşınmaz numarası</h2>
+        <p className="mt-0.5 text-xs text-text-muted">
+          İlan yayını için mal sahibinin e-Devlet EİDS’te yetkiyi onaylaması ve yetkinin en az 3 ay olması gerekir. Burada ofis kaydınız ölçülür; EİDS’in kendisini sorgulamaz.
+        </p>
+        {eids.enabled ? (
+          <>
+            <p className="mt-3 text-sm text-text-muted">
+              <Link href="/app/portfoyler" className="font-semibold text-brand-600 hover:underline">
+                {eids.summary.scope} aktif portföyün {eids.summary.withEidsNo} tanesinde
+              </Link>{" "}
+              EİDS taşınmaz numarası kayıtlı.
+              {eids.truncated ? " (İlk 2.000 portföy taranır.)" : ""}
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {EIDS_FILTER_VALUES.map((k) => {
+                const n = eids.summary.counts[k];
+                const bad = n > 0;
+                return (
+                  <Link
+                    key={k}
+                    href={`/app/portfoyler?yetki=${k}`}
+                    className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 transition hover:border-brand-300"
+                  >
+                    <p className={`numeric font-display text-2xl font-extrabold ${bad ? "text-amber-700" : "text-mint-700"}`}>{n}</p>
+                    <p className="text-xs text-text-muted group-hover:text-brand-600">{EIDS_FILTER_LABELS[k]}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-text-muted">
+            EİDS durumu okunamadı: portföy EİDS alanı henüz etkin değil (veritabanı güncellemesi uygulanmamış olabilir).
+          </p>
+        )}
+      </section>
 
       {channelRisk.length > 0 ? (
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

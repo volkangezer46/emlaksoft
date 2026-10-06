@@ -33,6 +33,9 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { RentalMobileList, RentalTable, type RentalVM } from "./rental-rows";
+import { ReminderSettingsCard } from "./reminder-settings-card";
+import { normalizeReminderSettings } from "@/lib/rent-reminders/logic";
+import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import {
   DURUM_FILTERS,
   DURUM_LABELS,
@@ -84,7 +87,7 @@ export default async function KiralamaPage({
     yogunluk?: string;
   }>;
 }) {
-  const { perms } = await requireModulePage("rentals", "/app/kiralama");
+  const { perms, tenantId, role } = await requireModulePage("rentals", "/app/kiralama");
   const params = (await searchParams) ?? {};
   // Kazanılan KİRA anlaşmasının köprüsü (?portfoy=&musteri=&tutar=) artık tam sayfa forma gider.
   if (params.portfoy || params.musteri || params.tutar) {
@@ -119,6 +122,11 @@ export default async function KiralamaPage({
   const in60 = daysFromNowIso(60).slice(0, 10);
 
   const supabase = await createClient();
+  // Kiracı hatırlatma ayarı (KAPALI doğar): tablo yoksa (migration uygulanmamış) kart "etkin değil" der, sayfa düşmez.
+  const reminderRes = await supabase.from("rent_reminder_settings").select("*").maybeSingle();
+  const reminderSchemaReady = !reminderRes.error;
+  const reminderSettings = normalizeReminderSettings(reminderRes.error ? null : (reminderRes.data as Record<string, unknown> | null));
+  const smsAvailable = tenantId ? await isTenantSmsAvailable(tenantId).catch(() => false) : false;
   const savedViewsPromise = listSavedViews(PATH);
   const [rentalRes, curChargeRes, overdueChargeRes, overdueHead, maintRes, activeHead, savedViews] = await batchAll("Kiralama", [
     "rentals", "charges-current", "charges-overdue", "charges-overdue-count", "maintenance", "rentals-active", "saved-views",
@@ -275,6 +283,8 @@ export default async function KiralamaPage({
           </>
         }
       />
+
+      <ReminderSettingsCard initial={reminderSettings} smsAvailable={smsAvailable} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={reminderSchemaReady} />
 
       {rentals.length === 0 && rentalTotal === 0 ? (
         <EmptyState illustration="portfoy"

@@ -5,6 +5,8 @@ import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
+import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
+import { trDayKey } from "@/lib/clock";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
 
@@ -54,6 +56,8 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
  *  3. Yenileme radarı: yıldönümüne (ya da sözleşme bitişine) 60 gün kala
  *     TÜFE tavanlı önerilen yeni kirayla TEK SEFERLİK bildirim yazar —
  *     mükerrer koruması href'teki `?yenileme={yıl}` işaretiyle sağlanır.
+ *  4. Kiracı hatırlatması (H3): ofis ayarı AÇIKSA (KAPALI doğar) vade yaklaşan/gelen/geciken kiralar için ofise wa.me
+ *     bildirimi ve (ayrıca açıksa + ofisin kendi SMS entegrasyonu hazırsa) kiracıya SMS. Ayrıntı: src/lib/rent-reminders/run.ts.
  *
  * NOT: vercel.json'a bilerek DOKUNULMADI — cron path: /api/cron/kira-tahakkuk
  * (CRON_SECRET Bearer başlığıyla çağrılır).
@@ -225,11 +229,35 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ---- 4) Kiracı hatırlatması (kapalı doğar; hata cron'un asıl işini bozmaz) ----
+  let reminderNote = "";
+  let reminders: Awaited<ReturnType<typeof runRentReminders>> | null = null;
+  try {
+    reminders = await runRentReminders({
+      admin,
+      rentals: (rentals ?? []) as unknown as RentalForReminder[],
+      today: trDayKey(Date.now()),
+      nowMs: Date.now(),
+    });
+    if (reminders.enabledTenants > 0) {
+      reminderNote = `, hatırlatma: ${reminders.office} ofis / ${reminders.sms} SMS${reminders.smsFailed ? ` (${reminders.smsFailed} SMS hatası)` : ""}`;
+    }
+  } catch (e) {
+    console.error("kira-tahakkuk cron hatirlatma", e);
+    reminderNote = ", hatırlatma atlandı (hata)";
+  }
+
   await recordHeartbeat(
     "kira-tahakkuk",
     "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${skippedTenantsNote(disabledModules, "rentals")}`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${skippedTenantsNote(disabledModules, "rentals")}`,
   );
 
-  return NextResponse.json({ ok: true, created, overdue: overdueCount, renewals: renewalNotified });
+  return NextResponse.json({
+    ok: true,
+    created,
+    overdue: overdueCount,
+    renewals: renewalNotified,
+    reminders: reminders ? { office: reminders.office, sms: reminders.sms, skippedOptOut: reminders.skippedOptOut } : null,
+  });
 }

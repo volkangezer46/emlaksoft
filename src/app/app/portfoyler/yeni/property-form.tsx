@@ -98,6 +98,7 @@ export function PropertyForm({
     const result = await createProperty(formData);
     if (result.ok) {
       clearFormDraft(userId, PROPERTY_FORM_ID);
+      if (result.authorityWarning) push(result.authorityWarning, "info");
       if (result.pooled) push("Portföy taslak olarak oluşturuldu ve ilan havuzuna gönderildi", "ok");
       else if (result.ownerMissing && result.ownerMissing.length > 0) {
         push(`Portföy taslak olarak oluşturuldu. İlan sahibi bilgisi %${result.ownerInfoScore ?? 0} tamam: yayın için ${result.ownerMissing.length} eksik var`, "info");
