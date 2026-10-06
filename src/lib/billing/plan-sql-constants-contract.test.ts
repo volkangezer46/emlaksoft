@@ -46,27 +46,11 @@ const SUPERSEDED_BY: Readonly<Record<string, string>> = {
   "20260731000140_atomic_registration_provisioning.sql": "20260825000300_billing_plan_amount_integrity.sql", // provision_registration
   "20260802000300_identity_session_authorization_hardening.sql": "20260825000300_billing_plan_amount_integrity.sql", // update_tenant_plan_subscription
   "20260802000400_atomic_demo_conversion.sql": "20260825000300_billing_plan_amount_integrity.sql", // convert_demo_request_to_tenant
+  // Dosyadaki tek sabitli işlev 9 argümanlı ESKİ fulfill_billing_payment overload'udur; 20261006000700 onu DÜŞÜRÜR (drop function).
+  "20260731000138_atomic_billing_fulfillment.sql": "20261006000700_fix_plan_subscription_amount.sql",
 };
 
 const KNOWN_OPEN: readonly OpenItem[] = [
-  {
-    file: "20260731000138_atomic_billing_fulfillment.sql",
-    kind: "price",
-    fn: "fulfill_billing_payment (9 argümanlı ESKİ overload; 10 argümanlı tanım ayrı imzadır)",
-    why: "TODO(P2): 990/5990 sabitleri; 20260825000300 yalnız 10 argümanlı imzayı yeniden tanımlar, 9 argümanlı overload canlıda kalır (kod çağırmıyor). Ayrı temizlik migration'ı (drop function, 9 arg) gerekir.",
-  },
-  {
-    file: "20260731000138_atomic_billing_fulfillment.sql",
-    kind: "yearly",
-    fn: "fulfill_billing_payment (9 argümanlı ESKİ overload)",
-    why: "TODO(P2): yıllık tutar `* 12 * 0.8` (%20); onaylı kural '10 öde 12'. 9 argümanlı overload temizlik migration'ı bekliyor.",
-  },
-  {
-    file: "20260731000138_atomic_billing_fulfillment.sql",
-    kind: "business-missing",
-    fn: "fulfill_billing_payment (9 argümanlı ESKİ overload)",
-    why: "TODO(P2): 'business' için tutar yok (9 argümanlı overload); temizlik migration'ı bekliyor.",
-  },
   {
     file: "20260802000320_plan_entitlements.sql",
     kind: "entitlement",

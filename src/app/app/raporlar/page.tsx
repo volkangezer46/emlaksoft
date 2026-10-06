@@ -15,7 +15,7 @@ import { NetDiffChart } from "./net-diff-chart";
 import { hasNetData, netSeries, shareOfMax, shareOfTotal } from "./report-math";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
-import { SAMPLE_DATA_LABEL, loadSampleKpiScope } from "@/lib/sample-scope";
+import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
 import { SampleDataBadge } from "@/components/ui/sample-data-badge";
 import { getDefinitionsOrDefault, getLossReasonOptions, toLabelMap } from "@/lib/definitions";
 import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
@@ -50,6 +50,8 @@ type TenantReportingAggregate = {
   loss_reasons: { reason: string; deal_count: number; deal_value: number }[];
   roi: { source: string; customers: number; won_count: number; won_value: number }[];
   monthly: { month_start: string; income: number; expense: number }[];
+  /** 20261006000710 sonrası: örnek kayıtlar toplamlara dahil mi (yoksa undefined). */
+  sample_included?: boolean;
 };
 
 function money(n: number) {
@@ -82,13 +84,13 @@ export default async function ReportsPage() {
     getLossReasonOptions(),
     loadSampleKpiScope(supabase, tenantId),
   ]);
-  // Rapor özetleri veritabanında toplanır (tenant_reporting_aggregates) ve is_sample süzmez: örnek veri yüklüyse
-  // eşiğe bakılmaksızın etiketlenir (eşik süzgeci için SQL değişikliği gerekir, bkz. docs/DURUM.md).
-  const sampleLabel = sample.seeded ? SAMPLE_DATA_LABEL : null;
   const aggregate = requireReportingData(
     "tenant-reporting-aggregates",
     aggregateResult,
   ) as unknown as TenantReportingAggregate;
+  // Rapor özetleri SQL'de toplanır; örnek veri eşik kararını RPC verir (20261006000710, `sample_included`).
+  // Migration yoksa RPC is_sample süzmez ve yüklü örnek veri her zaman etiketlenir.
+  const sampleLabel = aggregateSampleLabel(sample.seeded, aggregate.sample_included);
   const summary = aggregate.summary;
   const scoreInputs: OfficeScoreInputs = {
     openDemands: Number(summary.demands),

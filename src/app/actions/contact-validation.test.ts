@@ -15,6 +15,8 @@ vi.mock("@/lib/activity", () => ({ logActivity: vi.fn(async () => ({ ok: true })
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: vi.fn(async () => ({ allowed: true })) }));
 vi.mock("@/lib/automation-engine", () => ({ dispatchAutomationEvent: vi.fn() }));
 vi.mock("@/lib/playbook-trigger", () => ({ triggerPlaybooks: vi.fn() }));
+vi.mock("@/lib/pool/server", () => ({ enqueueListingPoolBatch: vi.fn(async () => ({ queued: 0, disabled: true, failed: 0 })) }));
+vi.mock("@/lib/pool/notify", () => ({ notifyPoolBatch: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => {
     throw new Error("admin client doğrulamadan önce çağrılmamalı");

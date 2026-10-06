@@ -1,7 +1,11 @@
 # Ofis sahipliği devri (ofis sahibi tarafından, iki adımlı)
 
-Durum: TASARIM + TASLAK MİGRATION. Kod YAZILMADI; neden aşağıda. Taslak: `supabase/proposed/20261005000700_ownership_transfers.sql`
-(+ `.rollback.sql`). Uygulanmadı, `supabase/migrations`'a taşınmadı.
+Durum (2026-10-06): KOD YAZILDI. Tablo + service_role RPC'ler `20260825001300_ownership_transfers.sql` (CANLIDA). Ofis sahibinin akışı
+JWT kimlikli üç RPC ile çalışır: `20261006000720_ownership_transfer_rpc.sql` (PB45, canlıya UYGULANMADI): `ownership_transfer_request/accept/resolve`
+(kimlik `auth.uid()` + `current_tenant_id()`, destek oturumu reddi, rol takası + JWT claim + `audit_logs` tek işlemde, süre dolumu kalıcı yazılır).
+Kod: `src/app/actions/ownership-transfer.ts` (service_role YOK; parola yeniden doğrulaması, hız sınırı, `notifyTenant` uygulama içi bildirim),
+sayfa `/app/ayarlar/sahiplik-devri` (Ayarlar sekmesi; onay paneli Hesabım yerine bu sayfada, bildirim buraya götürür), saf sözleşme
+`src/lib/ownership-transfer.ts` + `ownership-transfer.test.ts`. Aşağıdaki "Neden kod yazılmadı" bölümü TARİHSELDİR.
 
 ## Mevcut durum
 

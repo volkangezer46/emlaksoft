@@ -99,6 +99,35 @@ export async function notifyPoolEntry(
   }
 }
 
+/**
+ * Toplu havuz girişi (içe aktarma): ilan başına değil TEK özet bildirim (yöneticilere) + tek atama görevi.
+ * Görev ilk ilana bağlanır (tasks.property_id tekil); ayrıntı havuz listesindedir.
+ */
+export async function notifyPoolBatch(
+  db: Db,
+  input: { tenantId: string; actorId: string | null; count: number; firstPropertyId: string; sourceLabel: string },
+) {
+  if (input.count <= 0) return;
+  const managers = await loadOfficeManagers(db, input.tenantId);
+  const title = `${input.sourceLabel}: ${input.count} ilan havuza düştü`;
+  const body = "Danışmanı olmayan ilanlar ilan havuzunda öneri listesiyle atama bekliyor.";
+  for (const m of managers) {
+    if (m.id === input.actorId) continue;
+    await safeNotify({ tenantId: input.tenantId, userId: m.id, title, body, href: POOL_HREF, kind: "warning" });
+  }
+  const target = managers[0]?.id ?? input.actorId;
+  if (target) {
+    await safeTask(db, {
+      tenantId: input.tenantId,
+      assignedTo: target,
+      createdBy: input.actorId,
+      propertyId: input.firstPropertyId,
+      title: `Havuzdaki ${input.count} ilana danışman ata`,
+      notes: `${body} İlan havuzundan önerilere bakıp atama yapın.`,
+    });
+  }
+}
+
 /** Atama sonrası: atanan danışmana ve (otomatikse) yöneticilere bildirim. */
 export async function notifyPoolAssigned(
   db: Db,

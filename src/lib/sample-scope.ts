@@ -166,6 +166,16 @@ export function sampleDataHint(threshold: number = SAMPLE_KPI_THRESHOLD): string
 }
 
 /**
+ * SQL toplulaştırma RPC'leri (tenant_reporting_aggregates / tenant_commission_aggregates, 20261006000710) örnek veri
+ * kararını kendi içinde AYNI kuralla verir ve `sample_included` döner. Etiket: örnek veri yüklü VE RPC dahil ettiyse.
+ * `sample_included` yoksa (migration uygulanmadı: RPC is_sample süzmüyor) yüklü örnek veri her zaman etiketlenir.
+ */
+export function aggregateSampleLabel(seeded: boolean, sampleIncluded: unknown): string | null {
+  if (!seeded) return null;
+  return sampleIncluded === false ? null : SAMPLE_DATA_LABEL;
+}
+
+/**
  * KPI kapsamı — TEK karar noktası. Ana ekran, danışman metrikleri, pano-tv, ofis raporları
  * ve ofis skoru AYNI nesneyi kullanır; eşik/süzgeç mantığı başka yerde kopyalanmaz.
  */

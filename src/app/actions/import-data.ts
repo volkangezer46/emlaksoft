@@ -10,6 +10,8 @@ import { IMPORT_CHUNK_SIZE, IMPORT_ROW_LIMIT } from "@/app/app/ice-aktarma/impor
 import { checkRateLimit } from "@/lib/rate-limit";
 import { neutralizeFormulaCells } from "@/lib/import-sanitize";
 import { removeCreated, restoreUpdated } from "@/lib/import-undo";
+import { enqueueListingPoolBatch } from "@/lib/pool/server";
+import { notifyPoolBatch } from "@/lib/pool/notify";
 import {
   buildCustomerLookup,
   collectCustomerKeys,
@@ -130,6 +132,8 @@ export type ChunkResult = {
   seen?: string[];
   created?: number;
   updated?: number;
+  /** Yalnız portföy + danışmansız içe aktarma: ilan havuzuna alınan kayıt sayısı (havuz açıksa). */
+  pooled?: number;
 };
 
 const ENTITY: Record<ImportTarget, { action: string; entityType: string; path: string; module: "customers" | "properties" | "demands" }> = {
@@ -513,9 +517,32 @@ async function runChunk(
     };
   }
 
+  // İlan havuzu: danışmansız içe aktarılan portföyler (ofiste havuz açıksa) tek seferde havuza alınır.
+  // Havuz kapalıysa/şema yoksa hiçbir şey olmaz; hata içe aktarmayı bozmaz (kayıtlar zaten yazıldı ve denetlendi).
+  let pooled = 0;
+  if (target === "properties" && assignee.id === null && createdIds.length > 0) {
+    const pool = await enqueueListingPoolBatch(supabase, {
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      source: "import",
+      propertyIds: createdIds,
+    });
+    pooled = pool.queued;
+    if (pooled > 0) {
+      await notifyPoolBatch(supabase, {
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        count: pooled,
+        firstPropertyId: createdIds[0]!,
+        sourceLabel: "İçe aktarma",
+      });
+      revalidatePath("/app/ilan-havuzu");
+    }
+  }
+
   revalidatePath(meta.path);
   revalidateTenantData(gate.tenantId);
-  return { ok: true, rows: toView(target, rows, plans, false), counters, created, updated };
+  return { ok: true, rows: toView(target, rows, plans, false), counters, created, updated, ...(pooled ? { pooled } : {}) };
 }
 
 /** Önizleme: yazmaz; satır bazlı durum + sayaçlar döner. Parça parça çağrılır. */

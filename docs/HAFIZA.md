@@ -2,7 +2,7 @@
 
 Bu dosya projenin **tek kayıt defteridir**. Yeni bir oturum/ajan işe başlarken önce bunu okur; durumu sıfırdan
 taramaz. Bir iş bittiğinde, bir karar alındığında ya da bir şey yayınlandığında BURASI güncellenir.
-Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son güncelleme: 2026-10-05.
+Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son güncelleme: 2026-10-06.
 
 ## 1. Yayın durumu (en kritik)
 
@@ -13,11 +13,13 @@ Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son gün
 
 ## 2. Migration durumu (KRİTİK: hepsi sahibin işi)
 
-**CANLI DB (2026-10-05): `20260826000100 … 20260826000800` UYGULANDI; bekleyen migration YOK.** Bunlar: EF kontör (000100-000300), TL hesap kredisi (000400-000500),
-referans/ortak motoru (000600), kayıtlı kart (000700), varsayılan program seed (000800). Önceki pencereler (P1-P12, `20260825000100..001300`) da uygulanmıştır.
-**Depoda YENİ, canlıda UYGULANMAMIŞ dosyalar:** `20260826000900` (hotfix, başka ajan), `20260826001000_growth_dashboard_roles.sql` (PB15: `growth_my_dashboard` /
-`growth_my_partner_dashboard` yalnız owner/gm; +rollback), `20260826001100` (başka ajan). Uygulama sırası ve doğrulama: `docs/runbooks/YAYIN_PENCERESI_2.md` §8; her biri
-backup/PITR teyidi + `check:migrations -- --database` + `db:migrate -- --dry-run` sonrası `--only` ile. Düz `npm run db:migrate` YASAK değildir ama pencere sırasını sahip bilir; bekleyen listesi için dry-run esastır.
+**CANLI DB (2026-10-06, sahip bildirimi):** `20260826000100 … 000800` (EF kontör, TL hesap kredisi, referans motoru, kayıtlı kart, program seed), `20260826000900/001000/001100`
+(dry-run bekleyen göstermiyor) ve `20261006000100 … 000600` (PB40 000100-104, PB42 000400/410, PB43 000500/510, PB44 000600) UYGULANDI. Önceki pencereler
+(P1-P11b, `20260825000100..001300` = PB1-PB8, P12 `20260816000500` kazanç gizliliği; `scripts/migration-pairs-data.ts` başlığındaki sahip bildirimi) da uygulanmıştır.
+**Depoda YENİ, canlıda UYGULANMAMIŞ (PB45, order 29.96, 2026-10-06):** `20261006000700_fix_plan_subscription_amount` → `20261006000710_reporting_aggregates_sample_scope` →
+`20261006000720_ownership_transfer_rpc` (her biri +rollback, ön koşul bloğu eksikte yazmadan durur; ayrıntı §22). Aradaki `20260826001200..002970` dosyalarının canlı durumu bu
+belgede teyitli DEĞİL (§13 insights canlıda; §15 PB37-39 "uygulanmadı" notu bayat olabilir): kesin bekleyen listesi için salt-okunur `npm run db:migrate -- --dry-run` esastır.
+Her uygulama backup/PITR teyidi + `check:migrations -- --database` + `db:migrate -- --dry-run` sonrası `--only` ile.
 **Migration sırası uyarısı:** aynı fonksiyonu yeniden yazan migration'lar önceki düzeltmeyi ezebilir; 001000 B12'yi ezdi (money_visible + yuvarlanmış davet tutarı kayboldu), `20260826001900_growth_dashboard_b12_reapply.sql` geri getirdi (DOGRULANMADI; sahip uygulayacak).
 Aşağıdaki §2 devamı TARİHSELDİR (uygulama anındaki notlar); güncel durum yalnız bu paragraftır.
 
@@ -103,36 +105,36 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 ## 3. Bekleyen / engelli işler
 
 **GÜNCEL AÇIK İŞLER (2026-10-06; aşağıdaki eski maddeler tarihsel olabilir, çelişirse bu liste geçerlidir):**
-- **PB44 self-servis kurulum (2026-10-06, KODDA; migration CANLIYA UYGULANMADI):** `20261006000600_purge_sample_data_rpc.sql` (+rollback; order 29.95): `purge_tenant_sample_data` RPC + tenants'a `office_type`/`focus_segments`/`work_district_ids`. Kod RPC/sütun yokken eski yola düşer (§19).
+- **PB45 (2026-10-06, KODDA; migration'lar CANLIYA UYGULANMADI, §22):** sıra `000700` (eski 9 arg fulfill overload DROP) → `000710` (rapor/komisyon özetleri örnek veri kapsamı) → `000720` (sahiplik devri JWT RPC'leri). Kod üçü de yokken eski davranışla çalışır.
+- **Admin "Hesap kredisi yükle/geri al" EKRANI bağlanmadı:** server action'lar hazır (`src/app/actions/admin-account-credit.ts`: `grantAccountCredit`, `reverseAccountCredit`; süper admin, denetim-önce, çift gönderim anahtarı `request_id`). Önerilen yer: `/admin/tenants/[id]` abonelik paneli (`subscription-panel.tsx`) altına "Hesap kredisi" bölümü (/admin alanı başka ajanda). Bakiye göstermek için `try_credit_balance` okuması ayrıca service_role ister (yeni allowlist satırı).
+- **PB44 self-servis kurulum CANLIDA (2026-10-06):** `20261006000600_purge_sample_data_rpc.sql` uygulandı (§19).
+- **PB42 kabuk/ana ekran RPC'leri CANLIDA (2026-10-06):** `20261006000400/410` uygulandı; gerçek süre `EMLAKSOFT_SERVER_TIMING=1` ile ÖLÇÜLMEDİ (açık iş).
+- **PB43 Ofis Merkezi CANLIDA (2026-10-06):** `20261006000500` → `000510` uygulandı.
 - **Perf turu 1 (2026-10-06) KARARI:** ajan yazımı `20261006000200_perf_indexes` ve `20261006000300_nav_badge_cache` + `nav-badges-refresh` cron'u SİLİNDİ (uygulanmadı): DB zaten indeksli (pg_indexes doğrulandı: idx_deals_tenant_stage, idx_offers_tenant_status, idx_demands_tenant_status_created, idx_tasks_assignee, idx_customers_phone...), dosya var olmayan tablolara (contacts/events/demands) yazıyordu, `CONCURRENTLY` runner transaction'ında çalışmaz, nav cache SQLite `changes()` içeriyordu. Rozetler RLS'li gerçek sayımda kaldı; cron sayısı 36. Yeni indeks önerisi için önce pg_indexes'e bak. Kalıcı hız işi: kabuk tek RPC (`app_shell_bootstrap`, rozet sayımları dahil) + dashboard snapshot RPC'leri (`data-batch.ts` imzaları) + `loading.tsx` + dinamik import (perf turu 2).
-- **Kurumsal kapsam sistemi (PB40) CANLIDA (2026-10-06):** `20261006000100..000103` uygulandı (user_scopes, scope_overrides, access_audit_log, has_permission_with_scope RPC — RPC `customer_demands`+`customers.assigned_to` ve `deals.assigned_to` üzerinden çalışır; `demands` tablosu YOKTUR).
-- Yeni migration dosyaları canlıda değil: `000900` (hotfix), `001000` (büyüme paneli rol kapısı), `001100` (§2). Sırası/doğrulaması: `docs/runbooks/YAYIN_PENCERESI_2.md` §8.
-- Ofis Merkezi (PB43, §16): `20261006000500` (office_center izin seed'i) → `20261006000510` (pool_assignments); seed uygulanmadan 000510 ön koşul bloğu DURUR.
-- Hız turu 2 (PB42, §20): `20261006000400` (app_shell_bootstrap) → `20261006000410` (dashboard snapshot RPC'leri) CANLIYA UYGULANMADI; kod RPC yokken eski yola düşer (60 sn yoklama). Uygulandıktan sonra gerçek süre `EMLAKSOFT_SERVER_TIMING=1` ile ölçülmeli.
+- **Kurumsal kapsam sistemi (PB40) CANLIDA (2026-10-06):** `20261006000100..000104` uygulandı (user_scopes, scope_overrides, access_audit_log + INSERT politikası, has_permission_with_scope RPC — RPC `customer_demands`+`customers.assigned_to` ve `deals.assigned_to` üzerinden çalışır; `demands` tablosu YOKTUR).
+- `20260826000900` (hotfix), `001000` (büyüme paneli rol kapısı), `001100` CANLIDA (2026-10-06, dry-run bekleyen göstermiyor).
 - Release çifti (`RELEASE_MIGRATION` + `_CHECKSUM`) her yeni uygulamadan sonra güncellenir (DEPLOY.md).
 - Üretim env: `ADVISOR_PII_KEY`, `PLATFORM_MFA_ENFORCEMENT=on` (yayın öncesi), `IYZICO_BASE_URL=https://api.iyzipay.com` (sandbox değeriyle canlı ödeme alınmaz), `PLATFORM_SECRETS_KEY`, `EMLAKFIYATI_API_KEY`/admin anahtarı.
 - iyzico iade OTOMATİK DEĞİL: panelden elle + `recordInvoiceRefund` + kontör/kredi clawback (`docs/runbooks/IYZICO_IADE.md`). Günlük `manual_review`/`refund_required` kontrolü (Admin > Faturalama > Ödeme uyarıları).
-- Admin "Hesap kredisi yükle/geri al" ekranı YOK: TL kredi RPC'leri service_role ister ve bu iş için `admin-client-allowlist.ts`'te kayıtlı yol yok. Eklenecekse allowlist satırı sahibin/denetim akışının kararıdır (`scripts/audit-admin-client.ts --write`).
 - Ortak/nakit ödeme bayrakları (`growth_partner_enabled`, `growth_cash_payout_enabled`) KAPALI; vergi/stopaj ve sözleşme metni mali müşavir onayı bekler.
-- Kazanç gizliliği (P12) ve sec3 rol smoke senaryoları: runbook'taki duman testleri; `properties` UPDATE RLS açığı sahip kararı (eski madde, hâlâ geçerli).
+- Kazanç gizliliği (P12) CANLIDA (sahip bildirimi, `migration-pairs-data.ts` başlığı); P12 ve sec3 rol smoke senaryoları (runbook duman testleri) HENÜZ yapılmadı; `properties` UPDATE RLS açığı sahip kararı (eski madde, hâlâ geçerli).
 - Kayıtlı kartla otomatik yenileme (`billing.auto_renew_enabled`) KAPALI; iyzico off-session onayı ve CF retrieve alanları doğrulanmadan açılmaz.
 - Dış uptime izleyici (cron kaçırma/site erişimi) kurulmadı: öneri `docs/runbooks/IYZICO_IADE.md` §Alarm.
-- **Menü IA (2026-10-06, menü ajanı dalı):** `main`'de Ofis Merkezi iskeletiyle gelen 2 kırmızı test menü ajanının sahası değil, Ofis Merkezi
-  ajanına ait: `modules.test.ts` "27 kapatılabilir modül" (registry 28) ve "kapatılabilir her rota requireModulePage'e href geçirir"
-  (`/app/ofis-merkezi/page.tsx` istemci bileşeni, kapı yok). Ayrıca `/app/ayarlar/yetkilendirme` nav-config'te Ayarlar sekmesi olarak
-  TANIMLI ama sayfa dosyası başka ajanın dalında; birleşmeden önce o dal gelmeli (yoksa sekme 404'e gider).
+- **Menü IA kırmızı test notları ÇÖZÜLDÜ (2026-10-06):** `modules.test.ts` (kapatılabilir modül sayısı, `requireModulePage` href) ve `/app/ayarlar/yetkilendirme` sayfası main'de; tam vitest turu yeşil (§22 doğrulama).
 
 - **Uzman paneli kararı (2026-10-05):** canlıya almadan zorunlu paketler (P1-P7), ilk 30 gün planı, sahip kararları (S1-S13) ve "asla yapılmayacaklar" için `docs/design/PANEL_KARAR_1.md`.
 - **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Public medya sorguları
   `is_document` sütununa bağlı → migration uygulanmadan `main`'e alınmaz (public vitrinde görsel kaybolur).
-- **Fiyat kararı (sahip):** veritabanı fonksiyonu `update_tenant_plan_subscription` plan değişince tutarı eski sabit
-  990/2490/5990/12900'e yazıyor ve kayıtlı tutarı eziyor; kampanya/kilitli fiyat ödemeye YANSIMIYOR (`price_lock_*` yazılmıyor).
+- **Fiyat (ÇÖZÜLDÜ, 2026-10-06 denetimi):** `update_tenant_plan_subscription` tutar ezme hatası `20260825000300` ile düzeltildi (canlıda; son tanım o dosya:
+  plan değişmiyorsa kayıtlı tutar + `price_lock_*` korunur, değişirse `plan_monthly_amount()` + Founders kilidi). Kalan son eski-sabit yolu 9 arg fulfill
+  overload'u `000700` ile düşer (PB45). Sözleşme: `plan-subscription-amount-contract.test.ts`. Mevcut abonelik tutarlarının veri düzeltmesi ayrı sahip kararı.
 - "Öncelikli destek / Özel onboarding / SLA" gibi mekanizması olmayan hizmet vaatleri varsayılan kataloglardan ÇIKARILDI (admin plan editöründen elle eklenebilir).
 - Admin "Önerilen kataloğu uygula" yapılana dek `plan_entitlements` limitleri eski (Profesyonel 20, yeni 15).
-- Havuza yalnız elle ilan ekleme bağlı (içe aktarma/portal/ağ `enqueueListingPool`'a bağlı DEĞİL).
+- İlan havuzu girişleri: elle ilan ekleme (`enqueueListingPool`) + danışmansız İÇE AKTARMA (`enqueueListingPoolBatch`, toplu, otomatik atamasız, tek özet bildirim; 2026-10-06).
+  Portal formu / ofis ağı akışlarında ofise PORTFÖY YAZAN yol YOK (ağ yalnız iş birliği talebi yazar), bağlanacak nokta yok; böyle bir akış yazılırsa `source: portal_form|network` ile aynı yardımcı kullanılır.
 - Aktivite akışı tek zaman çizgisi değil; AI asistan SMS kartı ve gelen kutusu `SmsDialog` popup'ı kaldı; "Lead skoru" metni "Aday skoru" yapıldı.
-- Raporlar/ana ekran komisyon özeti SQL toplulaştırmalarından beslenir (is_sample süzmez; eşik uygulanamadı, migration ister).
-- Sahiplik devri kodu YOK (atomik RPC yok; taslak + tasarım var). Abonelik duraklatma/oransal yükseltme sadece taslak.
+- Raporlar/Komisyon/ana ekran komisyon özeti: `000710` ile SQL toplulaştırmaları örnek veri eşik kuralını uygular (`p_sample_threshold` varsayılan 5, `sample_included` döner; PB45, canlıda değil). Ana ekran `_home/data.ts` RPC'yi `{p_as_of}` ile çağırır, değişiklik gerekmez. `tenant_expense_aggregates` (Giderler) hâlâ süzmez (kapsam dışı bırakıldı).
+- Sahiplik devri KODU VAR (2026-10-06): `/app/ayarlar/sahiplik-devri` + `actions/ownership-transfer.ts` + JWT RPC'ler `000720` (PB45, canlıda değil; RPC yokken sayfa/aksiyon "etkin değil" der). Abonelik duraklatma/oransal yükseltme sadece taslak.
 - Ö-7, Ö-8 (oneri listesi) ve organik büyüme paketlerinin geri kalanı, F1-F5 (aşağıda ajanlar), devir dosyası + Codex komutu.
 
 ## 4. Çalışan ajanlar (2026-10-06; raporlar gelince bu bölümü güncelle)
@@ -188,6 +190,9 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Danışman kimlik şifreleme | `src/lib/advisor/pii-crypto.ts` (`ADVISOR_PII_KEY`; anahtar yoksa alanlar kapalı) |
 | Havuz/atama puanı | `src/lib/pool/score.ts` (havuz sayfası sabit ağırlık); Ofis Merkezi akıllı atama `src/lib/office-center/smart-assign.ts` (bölge/uzmanlık alt hesabı score.ts'ten, ağırlıklar ofis ayarı `office.assign.weight_*`) |
 | Ofis Merkezi (danışman yönetimi, akıllı atama, tanımlar) | `src/lib/office-center/**` (types, logic saf, smart-assign saf, definitions ⇄ registry eşlemesi, store/smart-assign-load sunucu), action `src/app/actions/office-center.ts`, sayfa `/app/ofis-merkezi?sekme=`; atama geçmişi tablosu `pool_assignments` (20261006000510) |
+| İlan havuzuna giriş | `src/lib/pool/server.ts`: tekil `enqueueListingPool` (elle ilan; otomatik atama dahil), toplu `enqueueListingPoolBatch` (içe aktarma; `bulkPoolDecision` ile otomatik atama yok) + `src/lib/pool/notify.ts` (`notifyPoolEntry` / `notifyPoolBatch`). Yeni giriş kaynağı bunlardan birini kullanır |
+| Ofis sahipliği devri | saf `src/lib/ownership-transfer.ts` (rol listesi, RPC adları, kod→mesaj), action `src/app/actions/ownership-transfer.ts`, sayfa `/app/ayarlar/sahiplik-devri`, SQL `20261006000720` (JWT kimlikli; 001300'ün service_role RPC'leri yalnız platform/destek için kalır). Platform tarafı devir `transferTenantOwnershipByAdmin` ayrı |
+| Admin TL kredi yükle/geri al | saf doğrulama `src/lib/try-credits/admin-credit-input.ts` (`ADMIN_CREDIT_MAX_TRY` yazım güvenliği), action `src/app/actions/admin-account-credit.ts` (ekran bağlanmadı) |
 | Anket | `src/lib/surveys/**` (mevcut memnuniyet anketini genişletir) |
 | Ürün turu | `src/lib/product-tour-data.ts` |
 | Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (36 rota, `npm run check:cron`) |
@@ -330,7 +335,7 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 
 ## 16. Ofis Merkezi modülü (office_center) — 2026-10-06, CANLIDA (PB43 000500+000510 uygulandı 2026-10-06)
 
-- **Migration (uygulanmadı; sahibi `--only` ile, sıra: 000500 → 000510):** `20261006000500_office_center_permission_defaults.sql` (4. kayıt noktası: owner/gm ALL, branch_manager view+edit,
+- **Migration (CANLIDA 2026-10-06; sıra: 000500 → 000510):** `20261006000500_office_center_permission_defaults.sql` (4. kayıt noktası: owner/gm ALL, branch_manager view+edit,
   team_lead view; `permissions.ts` DEFAULT_MATRIX ile birebir — readonly'den office_center KALDIRILDI) → `20261006000510_pool_assignments.sql` (atama geçmişi: method manual|smart|rule,
   score jsonb kişisel verisiz, status active|cancelled|reassigned, ilan başına tek aktif satır; RLS okuma office_center view VEYA atanan kişi, yazma office_center edit; DELETE yok). Rollback'ler var; pencere `PB43-ofis-merkezi` (order 29.94).
   Kod tablo yokken atamayı yine yapar (ilan + bildirim) ve "geçmiş etkin değil" uyarısı verir.
@@ -345,7 +350,7 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Kabul edilen örtüşme:** Ayarlar sekmesi (tek anahtar düzenleme + geçmiş) ile Tanımlamalar (gruplu form) aynı anahtarlara yazar; iki ekran ama tek depo. Sadeleştirme isterseniz Tanımlamalar kaldırılabilir.
 - **Test edilemeyen:** gerçek DB'de RLS/RPC akışı, tarayıcıda sekme/panel davranışı. DOGRULANDI: tsc, eslint (dokunulan), vitest tam tur, check:links/cron/migrations/migration-pairs, audit:actions, build (rapor).
 
-## 17. Yetkilendirme ekranı + kapsam uygulaması (kurumsal erişim kontrolü) — 2026-10-06, KODDA; 000100-103 CANLIDA, migration 000104 CANLIYA UYGULANMADI (PB40 kuyruğu)
+## 17. Yetkilendirme ekranı + kapsam uygulaması (kurumsal erişim kontrolü) — 2026-10-06, CANLIDA (PB40 000100-104 uygulandı, sahip bildirimi)
 
 - **Yeni migration (PB40, 000100-103 ile AYNI pencere, onlardan SONRA):** `20261006000104_access_control_write_policies.sql` (+rollback) — `access_audit_log` INSERT politikası (tenant eşitliği + `created_by = auth.uid()` + owner/gm/branch_manager) + `grant insert`. 000102 yalnız SELECT veriyordu; server action'lar kullanıcı istemcisiyle günlük yazamıyordu. Uygulanmazsa yetkilendirme yazmaları "denetim kaydı yazılamadı" diyerek GERİ ALINIR (kayıtsız yetki değişikliği yok).
 - **Ekran `/app/ayarlar/yetkilendirme`** (kapı `settings`; ayrı `roles` modülü YOK, roller ekranıyla aynı; yazma yalnız owner/gm). Sekmeler `?sekme=`: `kapsamlar` (ofis bayrağı + satır içi kapsam düzenleme), `istisnalar` (scope_overrides: arama ile kaynak seçimi, gerekçe zorunlu, varsayılan 30 gün, iptal = expires_at=now, süresi geçen soluk), `izinler` (kişi bazlı `user_permission_overrides` matrisi — roller ekranından BURAYA TAŞINDI; `/app/ayarlar/roller?tab=istisnalar[&user=]` yönlendirir), `gunluk` (`access_audit_log`, URL filtre kontratı `kullanici|yapan|tur|from|to|sayfa`, gerçek sayfalama, CSV aynı süzgeçle). Menü: Ayarlar öğesinin sekmesi (`ICONS.yetkilendirme` = UserCog); Ayarlar kartı eklendi.
@@ -372,7 +377,7 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Doğrulama (bu dalda):** tsc 0, eslint 0, check:links 0; tam vitest: 5008 geçti / 4 kırmızı — hepsi main'den gelen başka ajan işleri (Ofis Merkezi 2 test,
   cron sayısı 37 ↔ belgelerde 36). Menüyle ilgili tüm sözleşme testleri yeşil.
 
-## 19. Self-servis kurulum sihirbazı + demo veri + tek tuş gerçek kullanım (PB44) — 2026-10-06, KODDA; migration CANLIYA UYGULANMADI
+## 19. Self-servis kurulum sihirbazı + demo veri + tek tuş gerçek kullanım (PB44) — 2026-10-06, CANLIDA (000600 uygulandı, sahip bildirimi)
 
 - **Karar:** satış "demo talebi / görüşme" akışı YOK. `/demo` sayfası, `requestDemo` action'ı ve `demo-intake` testi SİLİNDİ; eski adres kalıcı olarak `/kayit` (`next.config.ts` + yerleşik `LEGACY_REDIRECTS` `src/lib/seo/redirects.ts`, admin kuralı önce gelir); SEO envanterinde `/demo` yok (`seo-legacy-redirects.test.ts`). `demo_requests` tablosuna dokunulmadı; `/admin/satis` "Satış adayları (demo talepleri arşivi)". Admin ana panel dikkat satırı "Yeni demo talebi" → "Yeni deneme başlatan ofis" (`/admin/tenants?durum=trial`). Site içerik `demo` anahtarı şemada geriye dönük duruyor (editör kartı kaldırıldı).
 - **Akış:** `/kayit` 6 adım (hesap → ofis [ad, il/ilçe GeoSelect, tür, danışman sayısı] → marka [logo, renk + brand-scope önizleme] → odak [segment, çalışılan ilçeler] → ekip daveti (≤3, atlanabilir) → "Demo veriyle başla" (varsayılan AÇIK) + yasal onay). İlerleme çubuğu, adım başına tek soru, `tfs-panel` geçişi (reduced-motion'a saygılı). Kayıt: provision_registration → `applyWizardOfficeProfile` (best-effort, uyarılar etkinlik günlüğüne) → `ensureSampleData` (idempotent; paket odaktan). Senkron yükleme (arka plan işi YAZILMADI: ölçülmedi; VARSAYIM birkaç saniye — 15 sn'yi aşarsa outbox'a taşınmalı).
@@ -382,7 +387,7 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Admin:** `/admin/tenants` "Veri" rozeti (Demo veri var / Gerçek veri, tıklanınca süzer) + `veri=demo|gercek` filtre kontratı + KPI.
 - **Test edilemeyenler:** gerçek DB'de RPC ve sihirbaz sütunları (migration uygulanmadı), logo storage yüklemesi, davet e-postası, tarayıcıda sihirbaz/şerit görünümü, build.
 
-## 20. Hız turu 2 (kabuk + ana ekran) — 2026-10-06, KODDA; PB42 migration'ları CANLIYA UYGULANMADI
+## 20. Hız turu 2 (kabuk + ana ekran) — 2026-10-06, CANLIDA (PB42 000400/410 uygulandı, sahip bildirimi; süre ölçümü yapılmadı)
 
 - **Migration (PB42, order 29.93, `--only` ile, backup/PITR sonrası):** `20261006000400_app_shell_bootstrap_rpc.sql` (`app_shell_bootstrap()` SECURITY INVOKER, kimlik `auth.uid()`, profil tenant'ı `current_tenant_id()` ile eşleşmezse NULL; profil + ofis + ham izin satırları + modül satırları + kullanım + rozet sayımları tek JSON) → `20261006000410_dashboard_snapshot_rpcs.sql` (`get_insights_snapshot/get_tasks_snapshot/get_metrics_snapshot`, INVOKER, `p_tenant_id`/`p_user_id` JWT ile eşleşmezse NULL; örnek veri kuralı `sample-scope` ile aynı, kod `sample_included` uyuşmazsa sonucu kullanmaz). Rollback'ler var; tablo/politika değişmez. Kolon adları şema dosyalarına karşı doğrulandı (customer_demands'ta assigned_to YOK, kullanılmadı).
 - **Kod:** `src/app/app/layout.tsx` artık sayfayı BEKLETMEZ (çerçeve + iskeletler ilk baytta, kabuk dilimleri ayrı Suspense, cache'li `loadShellModel`); ofis skoru ayrı sınır. RPC varsa kabuk 1 tur, yoksa eski yol + istek-içi tek kimlik okuması. `requireModulePage` ve `modules/state` kabuk verisini paylaşır. Ana ekran: seri turlar paralel, ekran-altı satırlar `DeferredSection`, yükleyiciler anlık görüntüden okur. `loading.tsx` tüm /app segmentlerinde (redirect-only `ekip/kazanc` hariç). Kaldırılan: AppPrefetcher + `/api/app/bootstrap` + `use-app-api` (kimse okumuyordu), Google Fonts preconnect; Caveat yalnız hero sahnesinde. DataTable satırı/ChartFrame memo; admin danışman sohbeti, marka yöneticisi, belge lightbox'ı `next/dynamic`.
@@ -403,3 +408,14 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Birleştirme notu:** `dashboard-layout.ts`'te "trial-ending" satırı (href `?deneme=bitiyor`) main'in "new-trial" satırının hemen üstünde; çatışma çözüldü (ikisi korunur).
 - **Sonraki aşama (B):** AdminStatCard (6 importer, koyu hero varyantı) ve StatRow'u KpiCard'a taşımak; importer'sız kalan HeroBanner/GlassKpi/CityNight'ı silmek; viz `SkeletonCard` ile ui `SkeletonCard` ad çakışmasını gidermek; ham `<table>` (36 dosya) → DataTable; diğer admin sayfalarının koyu hero'larını DashboardHero'ya almak.
 - **Test edilemeyenler:** tarayıcıda görsel/mobil 360 px/koyu tema kontrolü, canlı DB'de yeni sorgular (gömülü sayım + embedded filtre, `cancel_reason`, `account_credit_ledger` sayfalama), Recharts tahmin çizgisi görünümü.
+
+## 22. Bekleyen işler turu (PB45) — 2026-10-06, KODDA (dal: bu worktree); migration'lar CANLIYA UYGULANMADI
+
+- **Uygulama sırası (PB45, order 29.96, `--only` ile, backup/PITR + `check:migrations -- --database` + dry-run sonrası):**
+  1. `20261006000700_fix_plan_subscription_amount.sql` — 9 argümanlı ESKİ `fulfill_billing_payment` overload'u DROP (990/5990, x12x0.8, business yok; kod çağırmaz). Ön koşul: `update_tenant_plan_subscription` gövdesi `plan_monthly_amount()` kullanıyor (= 000300 canlıda), 10 arg tanım var. Rollback eski gövdeyi 20260731000138'den bayt bayt geri getirir.
+  2. `20261006000710_reporting_aggregates_sample_scope.sql` — `tenant_commission_aggregates` / `tenant_reporting_aggregates` imzası `(timestamptz, integer default 5)`; eski imza düşer (iki varsayılanlı overload belirsizliği). Eşik üstü ofiste is_sample kayıtlar toplamlardan çıkar, `sample_included` döner. Rollback 20260802000340 gövdeleri.
+  3. `20261006000720_ownership_transfer_rpc.sql` — `ownership_transfer_request/accept/resolve` (authenticated, SECURITY DEFINER, `search_path=''`, kimlik `auth.uid()` + `current_tenant_id()`, destek oturumu reddi, audit_logs aynı işlemde, beklenen sonuçlar `{ok:false, code}`; süre dolumu kalıcı yazılır — 001300'deki accept'te güncelleme hata ile geri alınıyordu). 001300'ün service_role RPC'lerine dokunulmaz.
+- **Kod:** sahiplik devri sayfası `/app/ayarlar/sahiplik-devri` (Ayarlar sekmesi; sayfa kapısı `dashboard`: hedef kullanıcı onayı burada; başlatma yalnız owner + parola), action'lar service_role KULLANMAZ; içe aktarma → ilan havuzu (§3); admin TL kredi action'ları (§3, ekran yok); Raporlar etiketi RPC kararına bakar (`aggregateSampleLabel`).
+- **Görev 1 notu:** istenen "update_tenant_plan_subscription düzeltmesi" zaten 000300'de (canlı) vardı; aynı gövdeyi yeniden yazmak yalnız sapma riski doğuracağı için yazılmadı. `plan_entitlements` Profesyonel 20↔15 farkı (KNOWN_OPEN) panel kaydı/sahip kararıdır, bu turda dokunulmadı.
+- **Doğrulama (bu dal):** `npm run type-check` 0 · `npm run lint` 0 · `npx vitest run --testTimeout=120000` 474 dosya / 5175 test geçti · `check:migrations` · `check:migration-pairs` (0 hata; 3 uyarı önceden vardı) · `check:links` · `check:cron` (36) · `audit:actions` (bulgu yok) · `audit-admin-client --write` (2 yeni satır: admin-account-credit, platform kapısı) · build (sahte env) BUILD_EXIT=0.
+- **Test edilemeyenler:** gerçek DB'de üç migration (ön koşul blokları, RPC davranışı, `refreshSession` sonrası yeni claim), tarayıcıda sahiplik devri paneli, içe aktarmada havuz bildirimi, admin kredi action'larının gerçek cüzdana yazması.
