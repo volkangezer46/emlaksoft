@@ -4,11 +4,15 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 
 type Tone = "ok" | "err" | "info";
-type Toast = { id: number; message: string; tone: Tone; leaving?: boolean };
+/** İsteğe bağlı tek eylem (ör. "Geri al"): tıklanınca çalışır ve bildirim kapanır. Eylemli bildirim daha uzun kalır. */
+export type ToastAction = { label: string; onClick: () => void };
+type Toast = { id: number; message: string; tone: Tone; action?: ToastAction; leaving?: boolean };
+type PushFn = (message: string, tone?: Tone, opts?: { action?: ToastAction }) => void;
 
-const Ctx = createContext<{ push: (message: string, tone?: Tone) => void } | null>(null);
+const Ctx = createContext<{ push: PushFn } | null>(null);
 
 const DURATION = 4000;
+const ACTION_DURATION = 8000;
 const EXIT_MS = 160;
 
 const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: string }> = {
@@ -61,11 +65,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [remove],
   );
 
-  const push = useCallback(
-    (message: string, tone: Tone = "ok") => {
+  const push = useCallback<PushFn>(
+    (message, tone = "ok", opts) => {
       const id = Date.now() + Math.random();
-      setItems((prev) => [...prev, { id, message, tone }]);
-      schedule(id, DURATION);
+      setItems((prev) => [...prev, { id, message, tone, action: opts?.action }]);
+      schedule(id, opts?.action ? ACTION_DURATION : DURATION);
     },
     [schedule],
   );
@@ -108,6 +112,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <span className={`absolute inset-y-0 left-0 w-[3px] ${s.bar}`} />
               <span className="mt-0.5 shrink-0">{s.icon}</span>
               <p className={`flex-1 text-sm font-semibold ${s.text}`}>{t.message}</p>
+              {t.action ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    t.action?.onClick();
+                    remove(t.id);
+                  }}
+                  className="focus-ring shrink-0 rounded-[var(--radius-control)] px-2 py-1 text-sm font-bold text-brand-600 transition hover:bg-brand-600/10"
+                >
+                  {t.action.label}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => remove(t.id)}
@@ -126,6 +142,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 export function useToast() {
   const ctx = useContext(Ctx);
-  if (!ctx) return { push: (_m: string, _t?: Tone) => undefined };
+  if (!ctx) return { push: ((_m: string, _t?: Tone, _o?: { action?: ToastAction }) => undefined) as PushFn };
   return ctx;
 }

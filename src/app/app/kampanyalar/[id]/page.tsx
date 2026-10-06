@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Pencil, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Copy, Pencil, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getCampaign, listCampaignRecipients } from "@/app/actions/campaigns";
 import { Badge } from "@/components/ui/badge";
@@ -148,7 +148,7 @@ export default async function CampaignDetailPage({
         <ArrowLeft className="h-4 w-4" /> Kampanyalara dön
       </Link>
 
-      <PageHeader actions={canEdit && campaign.status === "draft" ? <ButtonLink href={`/app/kampanyalar/${id}/duzenle`} variant="secondary" size="sm" icon={Pencil}>Taslağı düzenle</ButtonLink> : undefined} title={campaign.title} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
+      <PageHeader actions={<>{canEdit && campaign.status === "draft" ? <ButtonLink href={`/app/kampanyalar/${id}/duzenle`} variant="secondary" size="sm" icon={Pencil}>Taslağı düzenle</ButtonLink> : null}{(perms.campaigns ?? []).includes("create") ? <ButtonLink href={`/app/kampanyalar/yeni?kopya=${id}`} variant="secondary" size="sm" icon={Copy}>Çoğalt</ButtonLink> : null}</>} title={campaign.title} eyebrow={`${CHANNEL_LABELS[campaign.channel] ?? campaign.channel} kampanyası`} description={`${tarih(campaign.created_at)} tarihinde oluşturuldu${campaign.sent_at ? ` · ${tarih(campaign.sent_at)} tarihinde gönderildi` : ""}`} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[

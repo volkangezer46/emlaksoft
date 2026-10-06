@@ -31,16 +31,26 @@ const FIELD_LABELS = {
   whatsappTemplateLanguage: "Dil kodu",
 };
 
-export function NewCampaignForm({ userId }: { userId: string }) {
+/** "Kaydı çoğalt": mevcut kampanyanın içeriğiyle ön doldurma (alıcı kuyruğu yeniden oluşturulur). */
+export type CampaignInitial = {
+  title: string;
+  channel: "sms" | "whatsapp";
+  message: string;
+  filter: string;
+  whatsappTemplateName: string;
+  whatsappTemplateLanguage: string;
+};
+
+export function NewCampaignForm({ userId, initial }: { userId: string; initial?: CampaignInitial | null }) {
   const router = useRouter();
   const { push } = useToast();
   const [state, setState] = useState<CampaignResult>(init);
   const [isPending, startTransition] = useTransition();
   const [templatesPending, startTemplatesTransition] = useTransition();
-  const [channel, setChannel] = useState<"sms" | "whatsapp">("sms");
-  const [message, setMessage] = useState("");
-  const [whatsappTemplateName, setWhatsAppTemplateName] = useState("");
-  const [whatsappTemplateLanguage, setWhatsAppTemplateLanguage] = useState("tr");
+  const [channel, setChannel] = useState<"sms" | "whatsapp">(initial?.channel ?? "sms");
+  const [message, setMessage] = useState(initial?.message ?? "");
+  const [whatsappTemplateName, setWhatsAppTemplateName] = useState(initial?.whatsappTemplateName ?? "");
+  const [whatsappTemplateLanguage, setWhatsAppTemplateLanguage] = useState(initial?.whatsappTemplateLanguage || "tr");
   const [approvedTemplates, setApprovedTemplates] = useState<Array<{ name: string; language: string }>>([]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -96,7 +106,7 @@ export function NewCampaignForm({ userId }: { userId: string }) {
     kanal: (
       <>
         <FormField label="Kampanya başlığı" htmlFor="kamp-title" required className="sm:col-span-2">
-          <FormInput name="title" type="text" required placeholder="ör. Temmuz Fırsat Kampanyası" />
+          <FormInput name="title" type="text" required defaultValue={initial?.title} placeholder="ör. Temmuz Fırsat Kampanyası" />
         </FormField>
 
         <FormField
@@ -122,7 +132,7 @@ export function NewCampaignForm({ userId }: { userId: string }) {
         </FormField>
 
         <FormField label="Hedef kitle" htmlFor="kamp-filter">
-          <FormSelect name="filter" defaultValue="all" className="appearance-none">
+          <FormSelect name="filter" defaultValue={initial?.filter && FILTERS.some((f) => f.value === initial.filter) ? initial.filter : "all"} className="appearance-none">
             {FILTERS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}

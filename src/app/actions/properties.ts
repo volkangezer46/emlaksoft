@@ -755,7 +755,7 @@ export async function deleteProperty(formData: FormData): Promise<{ error?: stri
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deleteProperty", error);
-    return;
+    return { error: "Portföy arşivlenemedi." };
   }
   await logActivity({
     tenantId: gate.tenantId,

@@ -42,6 +42,7 @@ import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions
 import { AiContentPanel } from "./ai-content-panel";
 import { SocialCardPanel } from "@/components/app/social-card-panel";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
+import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
 import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
@@ -487,6 +488,14 @@ export default async function PropertyDetailPage({
               </Link>
               <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}
+              {(perms.properties ?? []).includes("create") ? (
+                <DuplicateRecordButton
+                  kind="property"
+                  id={property.id}
+                  label="Kaydı çoğalt"
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-60"
+                />
+              ) : null}
               {/* Portal ara çözümü: ilan metnini üret, portala yapıştır */}
               <CopyListingText title={listingText.title} description={listingText.description} warnings={listingText.warnings} />
               </MoreActions>

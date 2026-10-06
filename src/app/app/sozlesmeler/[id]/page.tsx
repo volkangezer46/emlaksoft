@@ -27,6 +27,7 @@ import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
 import { now } from "@/lib/clock";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 
 const TYPE_LABELS: Record<string, string> = {
   satis:        "Satış",
@@ -67,6 +68,7 @@ export default async function ContractDetailPage({
 }) {
   const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const canEdit = perms.contracts?.includes("edit") ?? false;
+  const canCreate = perms.contracts?.includes("create") ?? false;
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; sürüm geçmişi yalnız o sekmede sorgulanır
   const tab = resolveTab(await searchParams, CONTRACT_TAB_IDS, "icerik", { ozet: "icerik", imzalayanlar: "imza" });
@@ -191,6 +193,7 @@ export default async function ContractDetailPage({
             {statusInfo.icon} {statusInfo.label}
           </span>
         }
+        actions={canCreate ? <DuplicateRecordButton kind="contract" id={id} /> : undefined}
       />
       <div className="mb-6 flex flex-wrap gap-3">
         {customerName && (

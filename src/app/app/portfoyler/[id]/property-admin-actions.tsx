@@ -1,19 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Trash2, UserRoundCog } from "lucide-react";
 import { deleteProperty, reassignProperty } from "@/app/actions/properties";
+import { useUndoDelete } from "@/components/app/record-ops-buttons";
 
 export function DeletePropertyButton({ propertyId }: { propertyId: string }) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const undo = useUndoDelete();
 
   async function archive(fd: FormData) {
     const r = await deleteProperty(fd);
     if (r && r.error) {
       setError(r.error);
       setConfirming(false);
+      return;
     }
+    // Başarılı: listeye dön + "Silindi · Geri al" (çöp kutusu; 8 sn içinde tek tıkla geri alınır).
+    undo("property", propertyId, "Portföy arşivlendi ve çöp kutusuna taşındı");
+    router.push("/app/portfoyler");
   }
 
   if (confirming) {
@@ -22,7 +30,6 @@ export function DeletePropertyButton({ propertyId }: { propertyId: string }) {
         <span className="text-xs font-semibold text-danger-100">Arşivlensin mi?</span>
         <form action={archive}>
           <input type="hidden" name="id" value={propertyId} />
-          <input type="hidden" name="redirect_to" value="/app/portfoyler" />
           <button type="submit" className="rounded-[var(--radius-control)] bg-danger-500 px-2.5 py-1 text-xs font-bold text-white hover:bg-danger-600">
             Evet, arşivle
           </button>
