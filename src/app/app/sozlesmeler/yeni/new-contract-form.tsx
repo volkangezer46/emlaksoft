@@ -19,6 +19,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { Combobox } from "@/components/ui/combobox";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { DAY_MS, msUntil } from "@/lib/clock";
+import { GOS_CLAUSE_MARKER, appendGosClause, gosClauseApplies } from "@/lib/gos-info";
 import { CONTRACT_DRAFT_FIELDS, CONTRACT_FORM_ID, CONTRACT_TABS } from "./contract-tabs";
 import {
   createContract,
@@ -386,6 +387,19 @@ export function NewContractForm({
               </button>
             )}
           </div>
+          {gosClauseApplies(selectedType) ? (
+            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 text-xs text-text-muted">
+              <button
+                type="button"
+                onClick={() => setBody((b) => appendGosClause(b))}
+                disabled={body.includes(GOS_CLAUSE_MARKER)}
+                className="font-semibold text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-text-faint disabled:no-underline"
+              >
+                {body.includes(GOS_CLAUSE_MARKER) ? "GÖS maddesi eklendi" : "Güvenli Ödeme Sistemi (GÖS) maddesi ekle"}
+              </button>
+              <span>İsteğe bağlı; metni ofisiniz gözden geçirir, hukuki danışmanlık değildir.</span>
+            </div>
+          ) : null}
           <textarea
             id="sozl-body"
             name="body"

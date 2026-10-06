@@ -7,6 +7,16 @@ YAPILAMADI: "Doğrulama tarihi" sütunları bilerek boştur. Doğrulayan kişi (
 Durum kodları: `DOĞRULANAMADI` = resmi metne erişilip teyit edilmedi; `ÜRÜN KARARI` = mevzuat değil, ürün eşiği;
 `KULLANICI GİRDİSİ` = kod varsayılanı yalnız başlangıç değeridir, kullanıcı/yönetici değiştirir.
 
+## GÜNCEL DURUM (2026-10-06): TEK KAYNAK KODDA
+
+Aşağıdaki tablolardaki "Yer" sütunu tarihseldir. Yasal sabitlerin TAMAMI artık `src/lib/legal-constants/index.ts` içindedir
+(değer + kaynak + `status` + `verifiedAt`); `purchase-costs.ts`, `commission-cap.ts`, `commission.ts` ve satıcı net hesaplayıcı
+(`src/lib/seller-proceeds.ts`, `/app/hesaplayici?sekme=satici`) değerlerini oradan okur. Doğrulama: ilgili satırın `status: "verified"` ve
+`verifiedAt: "YYYY-MM-DD"` alanı birlikte girilir; ikisinden biri eksikse arayüz "Doğrulanmadı" rozeti basar (`LegalStatusBadge`).
+Şu an hepsi `unverified`. Eklenenler: gelir vergisi dilimleri (tahmin), değer artış istisnası 150.000 TL, 5 yıl (60 ay), Yİ-ÜFE endeksleme
+eşiği %10, DKV eşik/dilimler, ikamet izni 200.000 USD, vatandaşlık 400.000 USD / 3 yıl, yabancı kotası. Döner sermaye (6.000 TL)
+çelişkisi tek yerde ve notla duruyor. GÖS metinleri: `src/lib/gos-info.ts`. Testler: `legal-constants.test.ts`, `seller-proceeds.test.ts`, `gos-info.test.ts`.
+
 ## Komisyon (hizmet bedeli)
 
 | Sabit | Değer | Yer | Kaynak (iddia) | Durum | Doğrulama tarihi / kaynak |

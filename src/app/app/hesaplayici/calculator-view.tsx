@@ -10,6 +10,8 @@ import {
   MIN_LOAN_MONTHS,
   type DeedFeeShare,
 } from "@/lib/purchase-costs";
+import { LegalConstantsPanel } from "@/components/app/legal-constants-panel";
+import { describeLegalMany } from "@/lib/legal-constants";
 import { PurchaseCalculator, type CalculatorProperty } from "./calculator";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -49,6 +51,10 @@ export type CalculatorSearchParams = {
     harc?: string;
     m2?: string;
     sekme?: string;
+    /** Satıcı net hesabı sekmesi: satış bedeli, alış bedeli, elde tutma (ay). */
+    satis?: string;
+    alis?: string;
+    ay?: string;
 };
 
 /** Alım maliyeti sekmesi gövdesi; kapı (valuation) çağıran sayfadadır. */
@@ -117,8 +123,8 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
       <PageHeader title="Alım maliyeti & kredi hesaplayıcı" eyebrow={"Müşteri sorusu: \"cebimden ne çıkar?\""} description="Tapu harcı, döner sermaye, komisyon, sigorta ve kredi masraflarını kalem kalem çıkarır; peşinat + masraf toplamını ve aylık taksidi tek ekranda gösterir. Sonucu tek tıkla müşteriye link olarak gönderin." />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-4 inline-flex items-start gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-            Oranlar mevzuata göre sabitlenmiştir ({DEFAULT_RATES.deedFeeTotalPct}% tapu harcı, %
-            {DEFAULT_RATES.loanAllocationFeePct} kredi tahsis tavanı). Mevzuat değişirse tek dosyadan güncellenir —
+            Oranlar tek kaynak dosyadadır (%{DEFAULT_RATES.deedFeeTotalPct} tapu harcı, %
+            {DEFAULT_RATES.loanAllocationFeePct} kredi tahsis tavanı); doğrulama durumu aşağıda rozetle görünür —
             çıktı her hâlükârda <strong className="text-white">yaklaşıktır</strong>.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -155,6 +161,20 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
           sqm,
           tab: sp.sekme === "kredi" ? "kredi" : "maliyet",
         }}
+      />
+
+      <LegalConstantsPanel
+        title="Bu hesaptaki yasal sabitler"
+        items={describeLegalMany([
+          "deedFeeTotalPct",
+          "landRegistryServiceFeeTry",
+          "saleCommissionCapPct",
+          "vatGeneralPct",
+          "loanAllocationFeePct",
+          "mortgageRegistrationFeeTry",
+          "maxLoanMonths",
+          "maxLtvPct",
+        ])}
       />
     </div>
   );

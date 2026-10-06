@@ -1,20 +1,22 @@
 import Link from "next/link";
-import { Calculator, LineChart } from "lucide-react";
+import { Banknote, Calculator, LineChart } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { cn } from "@/lib/utils";
 import { CalculatorView, type CalculatorSearchParams } from "./calculator-view";
+import { SellerView } from "./seller-view";
 import { InvestmentView, type InvestmentSearchParams } from "../yatirim/investment-view";
 
 export const metadata = { title: "Hesaplayıcılar" };
 
 const TABS = [
   { id: "maliyet", label: "Alım maliyeti & kredi", href: "/app/hesaplayici", icon: Calculator },
+  { id: "satici", label: "Satıcı net hesabı", href: "/app/hesaplayici?sekme=satici", icon: Banknote },
   { id: "yatirim", label: "Yatırım getirisi", href: "/app/hesaplayici?sekme=yatirim", icon: LineChart },
 ] as const;
 
 /**
  * Hesaplayıcılar: alım maliyeti & kredi + yatırım getirisi tek sayfada, iki sekme.
- * `?sekme=yatirim` yatırım analizini açar; diğer değerler ("kredi", "maliyet", boş)
+ * `?sekme=satici` satıcı net/vergi hesabını, `?sekme=yatirim` yatırım analizini açar; diğer değerler ("kredi", "maliyet", boş)
  * alım maliyeti sekmesine gider (eski `?sekme=kredi` bağlantıları çalışır).
  * Eski /app/yatirim yolu parametreleri koruyarak buraya yönlendirir.
  *
@@ -27,7 +29,7 @@ export default async function CalculatorsPage({
 }) {
   await requireModulePage("valuation", "/app/hesaplayici");
   const sp = await searchParams;
-  const active = sp.sekme === "yatirim" ? "yatirim" : "maliyet";
+  const active = sp.sekme === "yatirim" ? "yatirim" : sp.sekme === "satici" ? "satici" : "maliyet";
 
   return (
     <div className="space-y-6">
@@ -52,7 +54,13 @@ export default async function CalculatorsPage({
           ))}
         </ul>
       </nav>
-      {active === "yatirim" ? <InvestmentView sp={sp} /> : <CalculatorView sp={sp} />}
+      {active === "yatirim" ? (
+        <InvestmentView sp={sp} />
+      ) : active === "satici" ? (
+        <SellerView sp={sp} />
+      ) : (
+        <CalculatorView sp={sp} />
+      )}
     </div>
   );
 }

@@ -19,8 +19,10 @@
  * Arayüzde bunun mali müşavir yerine geçmediği açıkça yazılı.
  */
 
+import { legalValue } from "@/lib/legal-constants";
+
 /** 07/2023'ten beri genel KDV oranı. Girdi olarak da geçilebilir. */
-export const DEFAULT_VAT_RATE = 20;
+export const DEFAULT_VAT_RATE = legalValue("vatGeneralPct");
 
 /** Emlak komisyonunda yaygın oran; portföyde `commission_rate` boşsa kullanılır. */
 export const DEFAULT_COMMISSION_RATE = 3;

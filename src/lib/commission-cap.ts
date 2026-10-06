@@ -11,12 +11,14 @@
  * toplamı) üzerinden değerlendirilir; KDV ayrıca eklenir.
  */
 
+import { legalValue } from "@/lib/legal-constants";
+
 /** Doğrulanmalı: satış hizmet bedeli üst sınırı, yüzde (KDV hariç, taraflar toplamı). */
-export const DEFAULT_SALE_CAP_RATE = 4;
+export const DEFAULT_SALE_CAP_RATE = legalValue("saleCommissionCapPct");
 /** Doğrulanmalı: kira hizmet bedeli üst sınırı, aylık kira katı (KDV hariç). */
-export const DEFAULT_RENT_CAP_MONTHS = 1;
+export const DEFAULT_RENT_CAP_MONTHS = legalValue("rentCommissionCapMonths");
 /** Doğrulanmalı: genel KDV oranı, yüzde (src/lib/commission.ts ile aynı değer). */
-export const DEFAULT_CAP_VAT_RATE = 20;
+export const DEFAULT_CAP_VAT_RATE = legalValue("vatGeneralPct");
 /** Tavanı yaklaşmış sayma eşiği (tavanın kaçı). */
 export const NEAR_CAP_RATIO = 0.9;
 

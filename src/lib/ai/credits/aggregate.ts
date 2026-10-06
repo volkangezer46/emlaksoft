@@ -75,6 +75,7 @@ const FEATURE_LABELS: Record<string, string> = {
   tenant_chat: "AI asistan sohbeti",
   tenant_advisor: "AI asistan sohbeti",
   property_content: "İlan metni üretimi",
+  property_translate: "İlan metni çevirisi",
   briefing_summary: "Günlük özet",
   call_summary: "Görüşme özeti",
   ocr: "Belge okuma (OCR)",
