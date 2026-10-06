@@ -1,13 +1,13 @@
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { fetchExternal } from "@/lib/external-fetch";
+import { safeWebhookPost } from "@/lib/integrations-api/safe-delivery";
 import { deriveEndpointSecret, signWebhookBody, signingSecretReady, type WebhookEvent } from "@/lib/integrations-api/core";
 
 /**
  * Giden webhook teslimi. Olay üretimi server action'ların başarılı yazmasından SONRA `after()` içinde yapılır
  * (yanıtı geciktirmez, hata asıl işlemi bozmaz). Akış: `webhook_enqueue` RPC (oturumlu istemci; veri kayıttan, örnek kayıt
- * olay üretmez) → anında imzalı POST (5 sn) → `webhook_mark_delivery`. Başarısızlar `public-mutation-outbox` cron'unun
+ * olay üretmez) → anında imzalı POST (5 sn; SSRF korumalı `safeWebhookPost`) → `webhook_mark_delivery`. Başarısızlar `public-mutation-outbox` cron'unun
  * adımıyla (`runWebhookRetries`, çağıranın service_role istemcisi) geri çekilmeli yeniden denenir (en çok 6 deneme).
  * `WEBHOOK_SIGNING_SECRET` yoksa kanal KAPALI: kuyruğa da yazılmaz.
  */
@@ -26,29 +26,19 @@ export async function postWebhook(target: DeliveryTarget, serverSecret: string, 
   const body = JSON.stringify(target.payload);
   const secret = deriveEndpointSecret(serverSecret, target.endpointId, target.secretVersion);
   const event = (target.payload as { event?: string } | null)?.event ?? "unknown";
-  try {
-    const res = await fetchExternal(
-      target.url,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "EmlakSoft-Webhook/1",
-          "X-EmlakSoft-Event": event,
-          "X-EmlakSoft-Delivery": target.id,
-          "X-EmlakSoft-Signature": signWebhookBody(secret, nowSeconds, body),
-        },
-        body,
-      },
-      { timeoutMs: TIMEOUT_MS },
-    );
-    // Gövde okunmaz (boyut/zaman sınırı); bağlantı kapatılır.
-    await res.body?.cancel().catch(() => undefined);
-    return { ok: res.ok, status: res.status, error: res.ok ? null : `HTTP ${res.status}` };
-  } catch (e) {
-    const name = e instanceof Error ? e.name : "Error";
-    return { ok: false, status: null, error: name === "TimeoutError" || name === "AbortError" ? "Zaman aşımı" : "Bağlantı hatası" };
-  }
+  // SSRF / DNS rebinding: hedef TESLİM ANINDA çözülür, iç/ayrılmış adres reddedilir, yönlendirme izlenmez (safe-delivery.ts).
+  return safeWebhookPost(
+    target.url,
+    {
+      "Content-Type": "application/json",
+      "User-Agent": "EmlakSoft-Webhook/1",
+      "X-EmlakSoft-Event": event,
+      "X-EmlakSoft-Delivery": target.id,
+      "X-EmlakSoft-Signature": signWebhookBody(secret, nowSeconds, body),
+    },
+    body,
+    { timeoutMs: TIMEOUT_MS },
+  );
 }
 
 type EnqueueRow = { delivery_id: string; endpoint_id: string; url: string; secret_version: number; payload: unknown };

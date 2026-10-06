@@ -66,9 +66,10 @@ describe("webhook", () => {
     expect(sql).toContain("is_sample = false");
   });
 
-  it("teslim yalnız fetchExternal (yönlendirme reddi + zaman sınırı) ile; yeni cron yok", () => {
+  it("teslim yalnız SSRF korumalı safeWebhookPost (teslim anı DNS denetimi, yönlendirme yok, zaman sınırı) ile; yeni cron yok", () => {
     const src = readFileSync("src/lib/integrations-api/webhooks.ts", "utf8");
-    expect(src).toContain("fetchExternal(");
+    expect(src).toContain("safeWebhookPost(");
+    expect(src).not.toContain("fetchExternal(");
     expect(src).not.toMatch(/\bfetch\s*\(/);
     const vercel = readFileSync("vercel.json", "utf8");
     expect(vercel).not.toContain("webhook");
