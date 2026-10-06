@@ -3,10 +3,8 @@ import {
   ArrowUpRight,
   Building2,
   CalendarRange,
-  Crown,
   Fingerprint,
   IdCard,
-  PalmtreeIcon,
   FileWarning,
   ShieldCheck,
   UserPlus,
@@ -16,16 +14,12 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireModulePage } from "@/lib/require-module-page";
-import { setMemberRole } from "@/app/actions/team";
 import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import { AddBranchPanel, AddBranchTrigger } from "./team-panels";
 import { BranchCard } from "./branch-card";
-import { formatTurkishPhone } from "@/lib/phone";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { now, trDayKey } from "@/lib/clock";
 import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
-import { TR_OFFSET_MIN } from "@/lib/booking-slots";
-import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import type { CSSProperties } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -36,6 +30,9 @@ import { ROLE_LABELS } from "@/lib/role-labels";
 import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
 import { ReferralNudge } from "@/components/app/referral-nudge";
 import { loadSeatUsageSummary } from "@/lib/billing/seat-purchase";
+import { AdvisorTable } from "@/components/app/office-center/advisor-table";
+import { loadOfficeAdvisors } from "@/lib/office-center/store";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 
 export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
@@ -73,19 +70,16 @@ function relName(value: Rel) {
   return Array.isArray(value) ? (value[0]?.name ?? null) : value.name;
 }
 
-function initials(name: string) {
-  return name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
-}
+/** Pasife almada iş devralabilecek roller (Ofis Merkezi ile aynı). */
+const ADVISOR_LIKE = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
+
 
 export default async function TeamPage() {
-  const { perms, tenantId, role: viewerRole } = await requireModulePage("team", "/app/ekip");
+  const { perms, tenantId, role: viewerRole, userId } = await requireModulePage("team", "/app/ekip");
   const assignableRoles = assignableRolesFor(viewerRole);
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
 
-  // Bugün izinli olanlar — listede küçük "İzinde" rozeti için (bkz. /app/ekip/izinler).
-  // TR duvar günü: booking-slots ile aynı sabit ofset kararı (TR'de DST yok).
-  const todayKey = new Date(now() + TR_OFFSET_MIN * 60_000).toISOString().slice(0, 10);
 
   /*
    * Son giriş bilgisi — login_events'ten üye başına en son başarılı giriş.
@@ -118,10 +112,10 @@ export default async function TeamPage() {
     { data: branchesData },
     { data: provincesData },
     { data: advisorCounts },
-    { data: leaveRows },
     loginRows,
     docAlerts,
     seatSummary,
+    advisorList,
   ] = await Promise.all([
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches!profiles_branch_id_fkey(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
@@ -130,13 +124,6 @@ export default async function TeamPage() {
     tenantId
       ? supabase.rpc("customer_counts_by_advisor", { p_tenant_id: tenantId })
       : Promise.resolve({ data: [] as { assigned_to: string; cnt: number }[] }),
-    supabase
-      .from("staff_leaves")
-      .select("staff_id, starts_on, ends_on, status")
-      .eq("status", "onayli")
-      .lte("starts_on", todayKey)
-      .gte("ends_on", todayKey)
-      .limit(200),
     loginPromise,
     // Belge bitiş uyarıları — yalnız ofis sahibi / genel müdür görür; şema yoksa kart gösterilmez.
     tenantId && (viewerRole === "owner" || viewerRole === "gm")
@@ -151,10 +138,11 @@ export default async function TeamPage() {
           .maybeSingle()
           .then(({ data }) => loadSeatUsageSummary(supabase, tenantId, String(data?.plan ?? "office")))
       : Promise.resolve(null),
+    // Danışman listesi: Ofis Merkezi > Danışmanlar ile TEK kaynak + TEK bileşen (AdvisorTable).
+    tenantId ? loadOfficeAdvisors(supabase, tenantId, { userId, role: viewerRole, perms }, now()) : Promise.resolve(null),
   ]);
 
   const members =(membersData ?? []) as Member[];
-  const todayLeaves = (leaveRows ?? []) as LeaveLike[];
 
   const lastLoginByUser = new Map<string, string>();
   const loginDataAvailable = loginRows !== null;
@@ -199,6 +187,36 @@ export default async function TeamPage() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.count));
+
+  const canOfficeCenter = effectiveCanAccessModule(perms, "office_center");
+  const canOfficeCenterEdit = (perms.office_center ?? []).includes("edit");
+  // Sayfaya özgü satır rozeti: son giriş / hiç girmedi (+ daveti yinele) ve yayındaki kartvizit.
+  const memberExtras = new Map(
+    members.map((m) => [
+      m.id,
+      <span key={m.id} className="mt-1 flex flex-wrap items-center gap-1.5">
+        {m.is_public && m.public_slug ? (
+          <a href={`/danisman/${m.public_slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20">
+            <IdCard className="h-3 w-3" /> Kartvizit
+          </a>
+        ) : null}
+        {loginDataAvailable ? (
+          lastLoginByUser.has(m.id) ? (
+            <span className="text-xs text-text-faint">Son giriş: {relativeTimeTR(lastLoginByUser.get(m.id)!)}</span>
+          ) : (
+            <>
+              <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Hiç giriş yapmadı</span>
+              {canManage && m.role !== "owner" ? (
+                <Link href={`/app/ekip/${m.id}?sekme=bilgi`} className="rounded-[var(--radius-control)] border border-line px-2 py-0.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">
+                  Daveti yinele
+                </Link>
+              ) : null}
+            </>
+          )
+        ) : null}
+      </span>,
+    ]),
+  );
 
   // KPI'lar sayfa içi bölüm çapalarına iner (#uyeler / #subeler)
   const kpis = [
@@ -346,113 +364,37 @@ export default async function TeamPage() {
 
       
 
-      {/* team list */}
-      <section id="uyeler" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+      {/* Ekip üyeleri: Ofis Merkezi > Danışmanlar ile aynı liste (AdvisorTable + loadOfficeAdvisors); burada yalnız son giriş/kartvizit rozeti ek. */}
+      <section id="uyeler" className="scroll-mt-24 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Ekip üyeleri</h2>
             <p className="text-xs text-text-muted">{members.length} kişi · {activeCount} aktif</p>
           </div>
+          {canOfficeCenter ? (
+            <Link href="/app/ofis-merkezi?sekme=danismanlar" className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              Filtrele ve sırala <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          ) : null}
         </div>
-
-        <div className="divide-y divide-line">
-          {members.map((m) => {
-            const meta = roleMeta[m.role] ?? { label: m.role, cls: "bg-ink-950/8 text-text-muted" };
-            const isOwner = m.role === "owner";
-            const custCount = assignedCount.get(m.id) ?? 0;
-            return (
-              <article key={m.id} className={`grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.4fr_1fr_0.8fr_auto] lg:items-center ${!m.is_active ? "opacity-60" : ""}`}>
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
-                    {initials(m.full_name)}
-                    {isOwner ? <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-amber-400 text-ink-950"><Crown className="h-2.5 w-2.5" /></span> : null}
-                  </span>
-                  <div className="min-w-0">
-                    <Link href={`/app/ekip/${m.id}`} className="group inline-flex items-center gap-1 truncate text-sm font-semibold text-ink-950 transition hover:text-brand-600">
-                      <span className="truncate">{m.full_name}</span>
-                      <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 opacity-0 transition group-hover:opacity-100" />
-                    </Link>
-                    <p className="mt-0.5 truncate text-xs text-text-muted">{m.phone ? formatTurkishPhone(m.phone) : "Telefon yok"}{relName(m.branch) ? ` · ${relName(m.branch)}` : ""}</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${meta.cls}`}>{meta.label}</span>
-                  {!m.is_active ? <span className="rounded-full bg-ink-950/8 px-2 py-0.5 text-xs font-semibold text-text-muted">Pasif</span> : null}
-                  {m.is_public && m.public_slug ? (
-                    <a
-                      href={`/danisman/${m.public_slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600 transition hover:bg-brand-600/20"
-                    >
-                      <IdCard className="h-3 w-3" /> Kartvizit
-                    </a>
-                  ) : null}
-                  {isOnLeave(todayLeaves, m.id, todayKey) ? (
-                    <Link href="/app/ekip/izinler" className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600 transition hover:bg-amber-400/25">
-                      <PalmtreeIcon className="h-3 w-3" /> İzinde
-                    </Link>
-                  ) : null}
-                  {loginDataAvailable ? (
-                    lastLoginByUser.has(m.id) ? (
-                      <span className="text-xs text-text-faint">Son giriş: {relativeTimeTR(lastLoginByUser.get(m.id)!)}</span>
-                    ) : (
-                      <>
-                        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Hiç giriş yapmadı</span>
-                        {canManage && !isOwner ? (
-                          <Link
-                            href={`/app/ekip/${m.id}?sekme=bilgi`}
-                            className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
-                          >
-                            Daveti yinele
-                          </Link>
-                        ) : null}
-                      </>
-                    )
-                  ) : null}
-                </div>
-
-                <Link
-                  href={`/app/musteriler?assigned=${m.id}`}
-                  className="focus-ring rounded-[var(--radius-control)] text-xs text-text-muted transition hover:text-brand-600"
-                  aria-label={`${m.full_name} müşterileri`}
-                >
-                  <span className="font-display text-base font-extrabold text-ink-950">{custCount}</span> müşteri
-                </Link>
-
-                <div className="flex items-center justify-end gap-2">
-                  {canManage && !isOwner ? (
-                    <>
-                      <form action={setMemberRole} className="flex flex-wrap items-center gap-1.5">
-                        <input type="hidden" name="id" value={m.id} />
-                        <select name="role" defaultValue={m.role} className="rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
-                          {assignableRoles.map((r) => <option key={r} value={r}>{roleMeta[r].label}</option>)}
-                        </select>
-                        {branches.length > 0 ? (
-                          <select name="branch_id" defaultValue={m.branch_id ?? ""} className="rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-1.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
-                            <option value="">Şubesiz</option>
-                            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                          </select>
-                        ) : null}
-                        <button type="submit" className="rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">Uygula</button>
-                      </form>
-                      {/* Pasifleştirme / aktifleştirme onay ve sonuç mesajıyla üye kartındaki Bilgiler sekmesindedir. */}
-                      <Link
-                        href={`/app/ekip/${m.id}?sekme=bilgi`}
-                        className={`rounded-[var(--radius-control)] border px-2.5 py-1.5 text-xs font-semibold transition ${m.is_active ? "border-line text-text-muted hover:border-brand-300 hover:text-brand-600" : "border-mint-500/30 text-mint-600 hover:bg-mint-500/8"}`}
-                      >
-                        {m.is_active ? "Düzenle / pasifleştir" : "Aktifleştir"}
-                      </Link>
-                    </>
-                  ) : (
-                    <span className="text-xs text-text-faint">{isOwner ? "Ofis sahibi" : "—"}</span>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        {advisorList ? (
+          <AdvisorTable
+            rows={advisorList.rows}
+            extra={memberExtras}
+            actions={
+              canManage && canOfficeCenterEdit
+                ? {
+                    viewerId: userId,
+                    roles: assignableRoles,
+                    branches: advisorList.branches,
+                    teams: advisorList.teams,
+                    teamsAvailable: advisorList.teamsAvailable,
+                    handoffTargets: advisorList.rows.filter((r) => r.isActive && ADVISOR_LIKE.includes(r.role)).map((r) => ({ id: r.id, name: r.fullName })),
+                  }
+                : null
+            }
+          />
+        ) : null}
       </section>
 
       {/* branches */}

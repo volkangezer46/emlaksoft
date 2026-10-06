@@ -218,10 +218,6 @@ export async function setMemberActive(formData: FormData): Promise<void> {
   await updateTeamMember(formData);
 }
 
-export async function setMemberRole(formData: FormData): Promise<void> {
-  await updateTeamMember(formData);
-}
-
 export async function createBranch(_prev: TeamResult, formData: FormData): Promise<TeamResult> {
   const ctx = await requireManager();
   if ("error" in ctx) return { error: ctx.error };
