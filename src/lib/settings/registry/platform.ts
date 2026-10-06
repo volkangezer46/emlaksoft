@@ -11,6 +11,7 @@ import {
 import { TRY_DEFAULT_MAX_SHARE, TRY_MAX_SHARE_SETTING_KEY } from "@/lib/try-credits/constants";
 import { parseMaxShare } from "@/lib/try-credits/config";
 import { DEFAULT_LEAD_FORM_COPY } from "@/lib/legal-copy";
+import { EMAIL_TEMPLATES, templateSettingKey } from "@/lib/email/templates";
 import type { AnySettingDef } from "../types";
 import { defineBool, defineEnum, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
 
@@ -410,6 +411,37 @@ const legal: AnySettingDef[] = [
   }),
 ];
 
+/**
+ * İşlemsel e-posta şablonları (konu + gövde). Varsayılan = `src/lib/email/templates.ts`. Gönderim yalnız e-posta kanalı
+ * (RESEND_API_KEY + EMAIL_FROM) açıkken yapılır; kanal kapalıyken metinler düzenlenebilir ama kullanılmaz.
+ */
+export const EMAIL_HOME = { href: "/admin/ayarlar/eposta", label: "Ayarlar > E-posta şablonları" } as const;
+const emailTemplates: AnySettingDef[] = EMAIL_TEMPLATES.flatMap((t) => [
+  defineString({
+    key: templateSettingKey(t.key, "subject"),
+    home: EMAIL_HOME,
+    default: t.defaultSubject,
+    maxLength: 200,
+    minLength: 3,
+    category: "bildirim",
+    label: `${t.label}: e-posta konusu`,
+    description: `Değişkenler: ${t.variables.map((v) => `{${v}}`).join(", ")}.`,
+    impact: `Bu şablonla giden e-postaların konu satırı değişir. Gönderen akış: ${t.usedBy}`,
+  }),
+  defineString({
+    key: templateSettingKey(t.key, "body"),
+    home: EMAIL_HOME,
+    default: t.defaultBody,
+    maxLength: 4000,
+    minLength: 10,
+    multiline: true,
+    category: "bildirim",
+    label: `${t.label}: e-posta gövdesi`,
+    description: `Düz metin. Değişkenler: ${t.variables.map((v) => `{${v}}`).join(", ")}.`,
+    impact: `Bu şablonla giden e-postaların metni değişir. Gönderen akış: ${t.usedBy}`,
+  }),
+]);
+
 export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...general,
   ...security,
@@ -418,4 +450,5 @@ export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...bridges,
   ...integrations,
   ...portals,
+  ...emailTemplates,
 ];

@@ -7,6 +7,8 @@ import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setti
 import { authorizeCron } from "@/lib/cron-auth";
 import { runLicenseReminders } from "@/lib/license-reminders";
 import { trDayKey } from "@/lib/clock";
+import { sendTrialEndingEmails } from "@/lib/email/trial-reminder";
+import { getBaseUrl } from "@/lib/base-url";
 
 export const maxDuration = 60;
 
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
   // Deneme bitimi hatırlatması: 3 gün ve 1 gün kala, abonelik başına kademe başına BİR kez (marker ile).
   // Kademe: kalan <=1 gün → trial1, <=3 gün → trial3. Aynı kademe 5 günlük pencerede tekrar yazılmaz.
   let trialReminded = 0;
+  let trialEmailed = 0;
   const nowMs = Date.now();
   const { data: endingTrials } = await admin
     .from("subscriptions")
@@ -83,6 +86,18 @@ export async function GET(req: NextRequest) {
       });
     }
     trialReminded = await insertNotifications(admin, reminderRows);
+    // E-posta kanalı açıksa (RESEND_API_KEY + EMAIL_FROM) aynı hatırlatma ofis sahibine e-postayla da gider; kapalıysa no-op.
+    if (trialReminded > 0) {
+      try {
+        trialEmailed = await sendTrialEndingEmails(
+          admin,
+          reminderRows.map((r) => ({ tenantId: r.tenant_id, days: r.title.includes("1 gün") ? 1 : 3 })),
+          `${getBaseUrl()}${BILLING_HREF}`,
+        );
+      } catch (e) {
+        console.error("abonelik-kontrol trial email", e instanceof Error ? e.message : "hata");
+      }
+    }
   }
 
   // Tolerans sonrası otomatik askı: deneme bitti, ödeme yapılmadı (past_due + dönem hiç başlamadı) ve
@@ -160,7 +175,7 @@ export async function GET(req: NextRequest) {
     console.error("abonelik-kontrol license", e instanceof Error ? e.message : "hata");
   }
 
-  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması, ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}`);
+  await recordHeartbeat("abonelik-kontrol", "ok", `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}`);
 
   return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license });
 }
