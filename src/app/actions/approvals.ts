@@ -202,6 +202,41 @@ export async function decideApproval(
   return { ok: true, id };
 }
 
+export type BulkApprovalResult = { error?: string; decided?: number; skipped?: number; firstError?: string };
+
+/**
+ * Toplu onay/ret: her talep TEK TEK `decideApproval` yolundan geçer (kademe, "kendi talebini
+ * onaylayamaz", yarış koşulu, bildirim ve denetim kaydı aynen). Ret için gerekçe zorunlu ve
+ * seçilen tüm taleplere aynı gerekçe yazılır. En fazla 50 talep.
+ */
+export async function decideApprovalsBulk(ids: string[], decision: string, note: string): Promise<BulkApprovalResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (decision !== "onaylandi" && decision !== "reddedildi") return { error: "Geçersiz karar." };
+  const cleanNote = String(note ?? "").trim().slice(0, 2000);
+  if (decision === "reddedildi" && !cleanNote) return { error: "Ret için gerekçe zorunludur." };
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const list = Array.isArray(ids) ? [...new Set(ids.map((v) => String(v)).filter((v) => uuid.test(v)))].slice(0, 50) : [];
+  if (list.length === 0) return { error: "Talep seçin." };
+
+  let decided = 0;
+  let skipped = 0;
+  let firstError: string | undefined;
+  for (const id of list) {
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set("decision", decision);
+    fd.set("decision_note", cleanNote);
+    const res = await decideApproval({}, fd);
+    if (res.ok) decided += 1;
+    else {
+      skipped += 1;
+      firstError ??= res.error;
+    }
+  }
+  return { decided, skipped, firstError };
+}
+
 /** Talebi geri çek — YALNIZ sahibi, YALNIZ bekliyorken. Satır silinmez, `iptal` olur. */
 export async function cancelApprovalRequest(
   _prev: ApprovalResult,

@@ -15,6 +15,7 @@ import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
 import { now as clockNow } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { parseMoneyInput } from "@/lib/money-input";
 import { getLossReasonOptionsFresh } from "@/lib/definitions";
 import { validateLossReason } from "@/lib/loss-reason";
@@ -662,4 +663,96 @@ export async function deleteDealNote(fd: FormData): Promise<void> {
 
   if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
   revalidatePath("/app/anlasmalar");
+}
+
+/** Toplu işlem üst sınırı (liste sayfası 50 satır; birkaç sayfalık seçim için pay). */
+const BULK_DEAL_MAX = 100;
+/** Toplu aşama değişimi YALNIZ açık aşamalar arasında: kazanma (komisyon/portföy) ve kayıp (neden) tek tek yapılır. */
+const BULK_STAGES = ["new", "qualified", "negotiation"] as const;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type BulkDealResult = { error?: string; updated?: number; failed?: number; firstError?: string };
+
+function cleanIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return [];
+  return [...new Set(ids.map((v) => String(v).trim()).filter((v) => UUID_RE.test(v)))].slice(0, BULK_DEAL_MAX);
+}
+
+/**
+ * Toplu aşama değişimi: her anlaşma TEK TEK `updateDealStage` yolundan geçer (geçiş kuralı,
+ * atomik RPC, otomasyon ve webhook aynı kalır; kısayol yok). Kazanılmış anlaşma geri açılmaz
+ * (komisyon kapısı tekil ekranda).
+ */
+export async function bulkUpdateDealStage(ids: string[], stage: string): Promise<BulkDealResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!(BULK_STAGES as readonly string[]).includes(stage)) {
+    return { error: "Toplu işlemde yalnız açık aşamalar seçilebilir; kazanma ve kayıp tek tek kaydedilir." };
+  }
+  const list = cleanIds(ids);
+  if (list.length === 0) return { error: "Anlaşma seçin." };
+  let updated = 0;
+  let failed = 0;
+  let firstError: string | undefined;
+  for (const id of list) {
+    const fd = new FormData();
+    fd.set("deal_id", id);
+    fd.set("stage", stage);
+    const res = await updateDealStage(fd);
+    if (res.ok) updated += 1;
+    else {
+      failed += 1;
+      firstError ??= res.error;
+    }
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "deal.bulk_stage",
+    entityType: "deal",
+    newValue: { stage, count: list.length, updated, failed },
+  });
+  return { updated, failed, firstError };
+}
+
+/**
+ * Toplu danışman ataması. Yalnız ofis geneli veri kapsamına sahip roller (yönetim) yapabilir:
+ * danışman başkasının anlaşmasını kendine çekemez. Kazanılmış anlaşmanın da danışmanı değişebilir
+ * (komisyon payı kapanışta yazıldığı için etkilenmez).
+ */
+export async function bulkAssignDeals(ids: string[], assignedTo: string): Promise<BulkDealResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!hasOfficeWideDataScope(gate.role)) return { error: "Toplu atama yalnız yönetim rollerine açıktır." };
+  const list = cleanIds(ids);
+  if (list.length === 0) return { error: "Anlaşma seçin." };
+  const profileId = String(assignedTo ?? "").trim();
+  if (!UUID_RE.test(profileId)) return { error: "Danışman seçin." };
+  const references = await validateTenantReferences(gate.tenantId, { profileId });
+  if (!references.ok) return { error: references.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("deals")
+    .update({ assigned_to: profileId, updated_at: new Date().toISOString() })
+    .in("id", list)
+    .eq("tenant_id", gate.tenantId)
+    .select("id");
+  if (error) {
+    console.error("bulkAssignDeals", error);
+    return { error: "Atama yapılamadı." };
+  }
+  const changed = (data ?? []).map((r) => r.id as string);
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "deal.bulk_assign",
+    entityType: "deal",
+    newValue: { assigned_to: profileId, count: changed.length },
+  });
+  for (const id of changed) emitWebhook("deal.updated", "deal", id);
+  revalidatePath("/app/anlasmalar");
+  revalidatePath("/app/komisyon");
+  revalidateTenantData(gate.tenantId);
+  return { updated: changed.length, failed: list.length - changed.length };
 }

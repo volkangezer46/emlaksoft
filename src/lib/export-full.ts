@@ -85,7 +85,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
   giderler: (sb, gate) => {
     let q = sb
       .from("expenses")
-      .select("title, amount, category, expense_date, notes, created_at")
+      .select("title, amount, category, expense_date, notes, receipt_url, created_at, property:properties!expenses_property_id_fkey(property_code, tenant_id)")
       .eq("tenant_id", gate.tenantId)
       .order("expense_date", { ascending: false })
       .order("id", ID_ORDER);

@@ -8,7 +8,9 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
+  CalendarClock,
   Clock3,
+  History,
   Crosshair,
   MapPin,
   MessageCircle,
@@ -37,6 +39,12 @@ import { EditDemandDialog } from "../../musteriler/[id]/edit-demand-dialog";
 import { DemandStatusSwitch } from "./demand-status-switch";
 import { extraCriteriaChips, parseDemandCriteria } from "@/lib/demand-criteria";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { ActivityTimeline } from "@/components/ui/activity-timeline";
+import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activity-timeline";
+import { APPT_STATUS_LABEL, APPT_TYPE_LABEL } from "@/lib/activity-timeline-sources";
+import { CustomerTasks, type CustomerTaskRow } from "../../musteriler/[id]/customer-tasks";
+import { buildDemandEvents, DEMAND_TIMELINE_CATEGORIES, type DemandApptRow, type DemandTaskRow } from "./demand-events";
+import { DemandReminder } from "./demand-followup";
 
 type Rel = { id?: string; name?: string; full_name?: string } | { id?: string; name?: string; full_name?: string }[] | null;
 
@@ -79,16 +87,33 @@ function longDate(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric" }).format(new Date(iso));
 }
 
+function longDateTime(iso: string) {
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
+
 // Eşleştirme motorundaki SQL ön filtre deseniyle aynı işlem türü varyantları
 const SALE_VARIANTS = ["Satılık", "satılık", "Satilik", "satilik", "SATILIK", "sale", "Sale", "Satış", "satış", "Satis", "satis"];
 const RENT_VARIANTS = ["Kiralık", "kiralık", "Kiralik", "kiralik", "KİRALIK", "rent", "Rent", "Kira", "kira"];
 const isSaleTx = (v: string) => ["satılık", "satilik", "sale", "satış", "satis"].some((x) => v.includes(x));
 const isRentTx = (v: string) => ["kiralık", "kiralik", "rent", "kira"].some((x) => v.includes(x));
 
-export default async function DemandDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DemandDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ kategori?: string; adet?: string }>;
+}) {
   const { perms, tenantId } = await requireModulePage("demands");
   const canEdit = (perms.demands ?? []).includes("edit");
+  const taskPerms = perms.tasks ?? [];
+  const canTaskView = taskPerms.includes("view");
+  const canApptView = (perms.appointments ?? []).includes("view");
+  const canApptCreate = (perms.appointments ?? []).includes("create");
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const activeCategory = resolveCategory(sp.kategori, DEMAND_TIMELINE_CATEGORIES.map((c) => c.key));
+  const timelineLimit = Math.min(400, Math.max(40, Number.parseInt(sp.adet ?? "", 10) || 40));
   const supabase = await createClient();
 
   const { data: demandData } = await supabase
@@ -144,6 +169,8 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
     { data: feedbackData },
     { data: networkRow },
     { data: agentProfile },
+    { data: taskRows },
+    { data: apptRows },
   ] = await Promise.all([
     provinceOptionsResult({ includeInactive: true }),
     fetchTenantMatchingWeights(supabase),
@@ -162,7 +189,36 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
     customer?.assigned_to
       ? supabase.from("profiles").select("full_name").eq("id", customer.assigned_to).maybeSingle()
       : Promise.resolve({ data: null as { full_name: string } | null }),
+    // Görev/randevu: talep ile görev arasında sütun yok; bağ talebin müşterisi üzerindendir.
+    customer && canTaskView
+      ? supabase
+          .from("tasks")
+          .select("id, title, kind, priority, status, due_at, completed_at, created_at")
+          .eq("customer_id", customer.id)
+          .order("status", { ascending: true })
+          .order("due_at", { ascending: true, nullsFirst: false })
+          .limit(50)
+      : Promise.resolve({ data: [] as DemandTaskRow[] }),
+    customer && canApptView
+      ? supabase
+          .from("appointments")
+          .select("id, appointment_type, scheduled_at, location, status")
+          .eq("customer_id", customer.id)
+          .order("scheduled_at", { ascending: false })
+          .limit(30)
+      : Promise.resolve({ data: [] as DemandApptRow[] }),
   ]);
+  const tasks = (taskRows ?? []) as DemandTaskRow[];
+  const appts = (apptRows ?? []) as DemandApptRow[];
+  const allEvents = await buildDemandEvents(
+    supabase,
+    { id: demand.id, created_at: demand.created_at, customerId: customer?.id ?? null },
+    { tasks, appts },
+  );
+  const eventCounts = countByCategory(allEvents);
+  const timelineBase = `/app/talepler/${demand.id}`;
+  const timelineCategories = DEMAND_TIMELINE_CATEGORIES.map((c) => ({ key: c.key, label: c.label, count: eventCounts[c.key] ?? 0 }));
+  const recentAppts = appts.filter((a) => a.status !== "cancelled").slice(0, 6);
 
   // Ofise özel kriter ağırlıkları — merkez yardımcı (lib/matching tek doğruluk kaynağı)
   const tenantWeights: MatchingWeights | null = fetchedWeights ?? null;
@@ -438,7 +494,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
           )}
         </section>
 
-        <div className="space-y-4">
+        <div className="space-y-4 lg:row-span-2">
           {/* Mahalle notları (F5): talebin mahallesi için ofis içi saha notları */}
           <Suspense fallback={null}>
             <NeighborhoodNotesPanel neighborhoodId={demand.neighborhood_id} neighborhoodName={neighborhoodName} />
@@ -484,6 +540,14 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
                     </a>
                   </div>
                 ) : null}
+                {taskPerms.includes("create") ? (
+                  <div className="mt-3 border-t border-line pt-3">
+                    <DemandReminder
+                      customerId={customer.id}
+                      title={`Talep takibi: ${customer.full_name} · ${demand.transaction_type}${demand.property_type ? ` ${demand.property_type}` : ""}`}
+                    />
+                  </div>
+                ) : null}
               </>
             ) : (
               <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
@@ -518,6 +582,78 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ i
               <CustomFieldsPanel entity="demand" recordId={demand.id} tenantId={tenantId} canEdit={canEdit} canManage={(perms.settings ?? []).includes("edit")} />
             </Suspense>
           ) : null}
+        </div>
+
+        {/* Görevler, randevular ve zaman çizelgesi (sol sütunun devamı) */}
+        <div className="space-y-4 lg:col-start-1">
+          {customer && canTaskView ? (
+            <CustomerTasks
+              customerId={customer.id}
+              tasks={tasks as CustomerTaskRow[]}
+              canCreate={taskPerms.includes("create")}
+              canEdit={taskPerms.includes("edit")}
+              canDelete={taskPerms.includes("delete")}
+            />
+          ) : null}
+
+          {customer && canApptView ? (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                    <CalendarClock className="h-4 w-4 text-brand-600" /> Randevular
+                  </h2>
+                  <p className="text-xs text-text-muted">Bu talebin müşterisiyle planlanan gösterim ve görüşmeler</p>
+                </div>
+                {canApptCreate ? (
+                  <Link
+                    href={`/app/randevular/yeni?customer=${customer.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white hover:bg-ink-800"
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" /> Randevu oluştur
+                  </Link>
+                ) : null}
+              </div>
+              {recentAppts.length === 0 ? (
+                <p className="py-6 text-center text-sm text-text-muted">Bu müşteri için randevu yok.</p>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {recentAppts.map((a) => (
+                    <li key={a.id}>
+                      <Link
+                        href={`/app/randevular?customer=${customer.id}`}
+                        className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line px-3 py-2.5 text-sm transition hover:border-brand-300"
+                      >
+                        <span className="min-w-0 truncate">
+                          <span className="font-semibold text-ink-950">{APPT_TYPE_LABEL[a.appointment_type] ?? "Randevu"}</span>
+                          {a.location ? <span className="ml-2 text-xs text-text-muted">{a.location}</span> : null}
+                        </span>
+                        <span className="shrink-0 text-xs text-text-muted">
+                          {longDateTime(a.scheduled_at)} · {APPT_STATUS_LABEL[a.status] ?? a.status}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <h2 className="mb-3 flex items-center gap-2 font-display font-bold text-ink-950">
+              <History className="h-4 w-4 text-brand-600" /> Zaman çizelgesi
+            </h2>
+            <ActivityTimeline
+              events={filterByCategory(allEvents, activeCategory)}
+              categories={timelineCategories}
+              activeCategory={activeCategory}
+              hrefForCategory={(k) => `${timelineBase}${k ? `?kategori=${k}` : ""}`}
+              pageSize={timelineLimit}
+              loadMoreHref={`${timelineBase}?${activeCategory ? `kategori=${activeCategory}&` : ""}adet=${timelineLimit + 40}`}
+              emptyTitle={activeCategory ? "Bu kategoride olay yok." : "Bu talep için henüz olay yok."}
+              emptyHint="Talep güncellemeleri ile müşterinin görev, randevu, görüşme ve teklifleri oluştukça burada listelenir."
+            />
+          </section>
         </div>
       </div>
     </div>

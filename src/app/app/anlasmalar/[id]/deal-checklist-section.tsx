@@ -22,6 +22,7 @@ import {
 } from "@/app/actions/deal-checklist";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/app/toast-provider";
+import { ChecklistFileControl } from "./checklist-file";
 
 /**
  * Evrak dosyası — kapanışta gereken belgelerin kontrol listesi.
@@ -35,11 +36,15 @@ export function DealChecklistSection({
   dealType,
   items,
   canEdit,
+  customerId = null,
+  canUpload = false,
 }: {
   dealId: string;
   dealType: string;
   items: ChecklistItem[];
   canEdit: boolean;
+  customerId?: string | null;
+  canUpload?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -213,6 +218,15 @@ export function DealChecklistSection({
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
+                    <ChecklistFileControl
+                      itemId={item.id}
+                      dealId={dealId}
+                      label={item.label}
+                      fileUrl={item.file_url ?? null}
+                      customerId={customerId}
+                      canEdit={canEdit}
+                      canUpload={canUpload}
+                    />
                     {item.is_done && item.done_by_name ? (
                       <span className="text-xs text-text-faint" title={item.done_at ?? undefined}>
                         {item.done_by_name}

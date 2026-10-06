@@ -38,7 +38,12 @@ import {
   type ApprovalStatus,
 } from "@/lib/approvals";
 import { ButtonLink } from "@/components/ui/button";
-import { ApprovalCommentForm, CancelApprovalButton, DecisionDialog } from "./approval-actions";
+import { ApprovalBulkBar, ApprovalCommentForm, CancelApprovalButton, DecisionControls } from "./approval-actions";
+import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportApprovalsCsv } from "@/app/actions/export";
+import { listSavedViews } from "@/app/actions/saved-views";
+import { SavedViews } from "@/components/app/saved-views";
 
 const PAGE_SIZE = 20;
 
@@ -110,7 +115,7 @@ function dtFmt(iso: string) {
 export default async function OnaylarPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; tur?: string; kim?: string; sayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; tur?: string; kim?: string; sayfa?: string; talep_eden?: string; bas?: string; bit?: string }>;
 }) {
   const { userId, role } = await requireModulePage("commissions", "/app/onaylar");
   const params = (await searchParams) ?? {};
@@ -120,13 +125,20 @@ export default async function OnaylarPage({
   const tur = isApprovalKind(params.tur ?? "") ? params.tur! : "";
   const kim = params.kim === "benim" || params.kim === "bana" ? params.kim : "";
   const sayfa = Math.max(1, Number.parseInt(params.sayfa ?? "1", 10) || 1);
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const talepEden = UUID.test(params.talep_eden ?? "") ? params.talep_eden! : "";
+  const bas = DATE.test(params.bas ?? "") ? params.bas! : "";
+  const bit = DATE.test(params.bit ?? "") ? params.bit! : "";
+  const basIso = bas ? new Date(Date.parse(`${bas}T00:00:00+03:00`)).toISOString() : null;
+  const bitIso = bit ? new Date(Date.parse(`${bit}T00:00:00+03:00`) + 86_400_000).toISOString() : null;
 
   const manager = isApprovalDeciderRole(role);
   const supabase = await createClient();
   const t = nowMs();
 
   /** Filtreleri koruyan link üretici (sayfa değişince 1'e döner). */
-  const href = (next: { durum?: string; tur?: string | null; kim?: string | null; sayfa?: number }) => {
+  const href = (next: { durum?: string; tur?: string | null; kim?: string | null; sayfa?: number; talepEden?: string | null; tarih?: null }) => {
     const sp = new URLSearchParams();
     const d = next.durum ?? durum;
     if (d && d !== "bekliyor") sp.set("durum", d);
@@ -134,6 +146,12 @@ export default async function OnaylarPage({
     if (k) sp.set("tur", k);
     const w = next.kim === undefined ? kim : (next.kim ?? "");
     if (w) sp.set("kim", w);
+    const te = next.talepEden === undefined ? talepEden : (next.talepEden ?? "");
+    if (te) sp.set("talep_eden", te);
+    if (next.tarih !== null) {
+      if (bas) sp.set("bas", bas);
+      if (bit) sp.set("bit", bit);
+    }
     if (next.sayfa && next.sayfa > 1) sp.set("sayfa", String(next.sayfa));
     const qs = sp.toString();
     return qs ? `/app/onaylar?${qs}` : "/app/onaylar";
@@ -152,6 +170,9 @@ export default async function OnaylarPage({
   // ?kim=benim → kendi taleplerim; ?kim=bana → başkalarının, yani karar bekleyenim.
   if (kim === "benim") listQuery = listQuery.eq("requested_by", userId);
   else if (kim === "bana") listQuery = listQuery.neq("requested_by", userId);
+  if (talepEden) listQuery = listQuery.eq("requested_by", talepEden);
+  if (basIso) listQuery = listQuery.gte("created_at", basIso);
+  if (bitIso) listQuery = listQuery.lt("created_at", bitIso);
 
   // Ayın ilk günü — "bu ay onaylanan/reddedilen" KPI'ları için.
   // Türkiye takvimine göre ay başı (UTC ay sınırı ayın ilk 3 saatini önceki aya yazardı).
@@ -164,6 +185,8 @@ export default async function OnaylarPage({
     { count: redAy },
     { data: kararRows },
     { data: turRows },
+    savedViews,
+    { data: requesterRows },
   ] = await batchAll("Onaylar", [], [
     listQuery,
     // Gecikme vurgusu için bekleyenlerin yaş+türü (sayfa dışı da dahil).
@@ -173,7 +196,22 @@ export default async function OnaylarPage({
     supabase.from("approval_requests").select("created_at, decided_at").not("decided_at", "is", null).gte("decided_at", ayBasi).limit(500),
     // Tür çipi sayaçları — mevcut durum sekmesi içinde.
     supabase.from("approval_requests").select("kind").eq("status", durum).limit(1000),
+    listSavedViews("/app/onaylar"),
+    // "Talep eden" filtresi seçenekleri (yalnız karar yetkililer başkalarının taleplerini süzer).
+    manager
+      ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
   ]);
+  const requesters = ((requesterRows ?? []) as { id: string; full_name: string | null }[]).map((p) => ({ id: p.id, name: p.full_name ?? "İsimsiz" }));
+  const savedViewParams: Record<string, string | undefined> = {
+    durum: durum !== "bekliyor" ? durum : undefined,
+    tur: tur || undefined,
+    kim: kim || undefined,
+    talep_eden: talepEden || undefined,
+    bas: bas || undefined,
+    bit: bit || undefined,
+  };
+  const bulkEnabled = manager && durum === "bekliyor";
 
   const list = (rows ?? []) as Row[];
   const toplam = total ?? 0;
@@ -231,6 +269,11 @@ export default async function OnaylarPage({
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <ExportCsvButton
+              action={exportApprovalsCsv.bind(null, { durum, tur, kim, talepEden, bas, bit })}
+              label="CSV"
+              hint="Ekrandaki filtrelerle en fazla 2000 talep"
+            />
             {manager ? (
               <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
                 Onay kuralları
@@ -336,6 +379,43 @@ export default async function OnaylarPage({
             );
           })}
         </div>
+
+        {/* Talep eden + tarih aralığı: GET formu (URL ↔ sunucu sorgusu), diğer filtreler gizli alanla korunur */}
+        <form action="/app/onaylar" className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
+          {durum !== "bekliyor" ? <input type="hidden" name="durum" value={durum} /> : null}
+          {tur ? <input type="hidden" name="tur" value={tur} /> : null}
+          {kim ? <input type="hidden" name="kim" value={kim} /> : null}
+          {manager && requesters.length > 0 ? (
+            <label className="text-xs font-semibold text-text-muted">
+              Talep eden
+              <select name="talep_eden" defaultValue={talepEden} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs">
+                <option value="">Herkes</option>
+                {requesters.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <label className="text-xs font-semibold text-text-muted">
+            Başlangıç
+            <input type="date" name="bas" defaultValue={bas} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
+          </label>
+          <label className="text-xs font-semibold text-text-muted">
+            Bitiş
+            <input type="date" name="bit" defaultValue={bit} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs" />
+          </label>
+          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+            Uygula
+          </button>
+          {talepEden || bas || bit ? (
+            <Link href={href({ talepEden: null, tarih: null, sayfa: 1 })} className="text-xs font-semibold text-text-muted hover:text-danger-600">
+              Temizle
+            </Link>
+          ) : null}
+          <span className="ml-auto">
+            <SavedViews route="/app/onaylar" views={savedViews} currentParams={savedViewParams} />
+          </span>
+        </form>
       </div>
 
       {/* Liste */}
@@ -357,7 +437,15 @@ export default async function OnaylarPage({
           />
         )
       ) : (
+        <BulkSelectionProvider>
+        {bulkEnabled ? <ApprovalBulkBar /> : null}
         <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+          {bulkEnabled ? (
+            <div className="flex items-center gap-2 border-b border-line px-5 py-2 text-xs font-semibold text-text-muted">
+              <BulkSelectAll ids={list.filter((r) => r.requested_by !== userId).map((r) => r.id)} noun="talep" />
+              Bu sayfadaki karar verilebilir talepleri seç
+            </div>
+          ) : null}
           <div className="divide-y divide-line">
             {list.map((r) => {
               const meta = kindMeta(r.kind);
@@ -377,6 +465,7 @@ export default async function OnaylarPage({
               return (
                 <details key={r.id} className="group px-5 py-4 transition open:bg-brand-600/[0.02]">
                   <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
+                    {bulkEnabled && !benim ? <BulkRowCheckbox id={r.id} label={`${r.title} talebini`} /> : null}
                     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${TONE_CHIP[meta.tone]}`}>
                       <Icon className="h-4 w-4" />
                     </span>
@@ -417,10 +506,7 @@ export default async function OnaylarPage({
                     <span className={`numeric shrink-0 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-bold ${deltaCls}`}>{delta.text}</span>
                     <span className="flex shrink-0 flex-wrap items-center gap-2">
                       {r.status === "bekliyor" && manager && !benim ? (
-                        <>
-                          <DecisionDialog requestId={r.id} decision="onaylandi" requestTitle={r.title} />
-                          <DecisionDialog requestId={r.id} decision="reddedildi" requestTitle={r.title} />
-                        </>
+                        <DecisionControls requestId={r.id} requestTitle={r.title} />
                       ) : null}
                       {r.status === "bekliyor" && benim ? (
                         <CancelApprovalButton requestId={r.id} requestTitle={r.title} />
@@ -505,6 +591,7 @@ export default async function OnaylarPage({
             </nav>
           ) : null}
         </section>
+        </BulkSelectionProvider>
       )}
     </div>
   );

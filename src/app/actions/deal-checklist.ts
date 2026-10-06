@@ -25,6 +25,8 @@ export type ChecklistItem = {
   done_by_name: string | null;
   note: string | null;
   sort_order: number;
+  /** Bağlı evrak dosyası (güvenli müşteri belgesi ucu ya da eski serbest bağlantı). */
+  file_url?: string | null;
 };
 
 /** Anlaşmanın tenant'a ait olduğunu doğrular — tüm mutasyonların ön koşulu. */
@@ -265,4 +267,83 @@ export async function deleteItem(fd: FormData): Promise<void> {
 
   revalidatePath(`/app/anlasmalar/${dealId || item.deal_id}`);
   revalidatePath("/app/anlasmalar");
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Evrak dosyası bağlantısı: güvenli müşteri belgesi indirme ucu (yetki + tenant + imza denetimli). */
+function customerFileUrl(fileId: string): string {
+  return `/api/customer-files/${fileId}/download`;
+}
+
+/**
+ * Evrak maddesine yüklenen dosyayı bağlar. Dosya MEVCUT güvenli yükleme hattıyla
+ * (`prepare/finalizeCustomerFileUpload`: imzalı tek nesne, bayt doğrulaması) anlaşmanın
+ * MÜŞTERİSİNE belge olarak yüklenir; burada yalnız aynı ofis + aynı müşteri doğrulanıp
+ * maddeye bağlanır ve madde tamamlandı işaretlenir. Belge Merkezi'nde "Evrak" olarak görünür.
+ */
+export async function attachChecklistFile(itemId: string, dealId: string, fileId: string): Promise<ChecklistResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(itemId) || !UUID_RE.test(dealId) || !UUID_RE.test(fileId)) return { error: "Geçersiz istek." };
+
+  const supabase = await createClient();
+  const [{ data: item }, { data: deal }, { data: file }] = await Promise.all([
+    supabase.from("deal_checklist_items").select("id, deal_id, label, is_done").eq("id", itemId).eq("tenant_id", gate.tenantId).maybeSingle(),
+    supabase.from("deals").select("id, customer_id").eq("id", dealId).eq("tenant_id", gate.tenantId).maybeSingle(),
+    supabase.from("customer_files").select("id, customer_id, file_name").eq("id", fileId).eq("tenant_id", gate.tenantId).maybeSingle(),
+  ]);
+  if (!item || item.deal_id !== dealId) return { error: "Madde bulunamadı." };
+  if (!deal?.customer_id) return { error: "Dosya yüklemek için anlaşmaya müşteri bağlayın." };
+  if (!file || file.customer_id !== deal.customer_id) return { error: "Dosya bu anlaşmanın müşterisine ait değil." };
+
+  const { error } = await supabase
+    .from("deal_checklist_items")
+    .update({
+      file_url: customerFileUrl(fileId),
+      ...(item.is_done ? {} : { is_done: true, done_at: new Date().toISOString(), done_by: gate.userId }),
+    })
+    .eq("id", itemId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) return { error: "Dosya maddeye bağlanamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "deal.checklist.file",
+    entityType: "deal",
+    entityId: dealId,
+    newValue: { label: item.label, file_id: fileId },
+  });
+  revalidatePath(`/app/anlasmalar/${dealId}`);
+  revalidatePath("/app/belgeler");
+  return { ok: true };
+}
+
+/** Maddenin dosya bağını kaldırır (dosya müşteri belgelerinde kalır; tamamlandı durumu korunur). */
+export async function detachChecklistFile(itemId: string, dealId: string): Promise<ChecklistResult> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!UUID_RE.test(itemId) || !UUID_RE.test(dealId)) return { error: "Geçersiz istek." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("deal_checklist_items")
+    .update({ file_url: null })
+    .eq("id", itemId)
+    .eq("deal_id", dealId)
+    .eq("tenant_id", gate.tenantId)
+    .select("id, label")
+    .maybeSingle();
+  if (error || !data) return { error: "Dosya bağı kaldırılamadı." };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "deal.checklist.file_remove",
+    entityType: "deal",
+    entityId: dealId,
+    oldValue: { label: data.label },
+  });
+  revalidatePath(`/app/anlasmalar/${dealId}`);
+  revalidatePath("/app/belgeler");
+  return { ok: true };
 }

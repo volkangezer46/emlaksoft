@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SearchX, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Building2, Receipt, SearchX, Trash2 } from "lucide-react";
+import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";
+import { ExpenseBulkBar } from "./expense-bulk-bar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableEmptyRow, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
 import { ExpenseEditDialog, type Expense } from "./expense-edit-dialog";
@@ -71,9 +74,13 @@ export function ExpensesTable({
 
   const total = filtered.reduce((s, e) => s + Number(e.amount), 0);
   const hasActions = canDelete;
+  const selectable = canEdit || canDelete;
+  const colCount = (hasActions ? 5 : 4) + (selectable ? 1 : 0);
 
   return (
+    <BulkSelectionProvider>
     <div className="space-y-3">
+      {selectable ? <ExpenseBulkBar categories={categories} canEdit={canEdit} canDelete={canDelete} /> : null}
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="search"
@@ -93,6 +100,11 @@ export function ExpensesTable({
         <Table>
           <THead>
             <TR>
+              {selectable ? (
+                <TH className="w-10">
+                  <BulkSelectAll ids={filtered.map((x) => x.id)} noun="gider" />
+                </TH>
+              ) : null}
               <TH>Başlık</TH>
               <TH className="hidden sm:table-cell">Kategori</TH>
               <TH align="right">Tutar</TH>
@@ -106,7 +118,7 @@ export function ExpensesTable({
           </THead>
           <TBody>
             {filtered.length === 0 ? (
-              <TableEmptyRow colSpan={hasActions ? 5 : 4}>
+              <TableEmptyRow colSpan={colCount}>
                 <span className="inline-flex flex-col items-center gap-2">
                   <SearchX className="h-7 w-7 text-text-faint" />
                   <span className="font-semibold text-text">
@@ -118,6 +130,11 @@ export function ExpensesTable({
             ) : (
               filtered.map((e) => (
                 <TR key={e.id} interactive={canEdit}>
+                  {selectable ? (
+                    <TD>
+                      <BulkRowCheckbox id={e.id} label={`${e.title} giderini`} />
+                    </TD>
+                  ) : null}
                   <TD className="font-semibold text-text">
                     {canEdit ? (
                       // Satırı kaplayan görünmez buton — YALNIZ sm+. Mobilde abs katman
@@ -143,6 +160,20 @@ export function ExpensesTable({
                     )}
                     {e.notes ? (
                       <span className="mt-0.5 block text-xs font-normal text-text-faint">{e.notes}</span>
+                    ) : null}
+                    {e.property_id || e.receipt_url ? (
+                      <span className="relative z-10 mt-1 flex flex-wrap items-center gap-3 text-xs font-normal">
+                        {e.property_id ? (
+                          <Link href={`/app/portfoyler/${e.property_id}`} className="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                            <Building2 className="h-3 w-3" /> {e.property_label ?? "Portföy"}
+                          </Link>
+                        ) : null}
+                        {e.receipt_url ? (
+                          <a href={e.receipt_url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                            <Receipt className="h-3 w-3" /> Fiş
+                          </a>
+                        ) : null}
+                      </span>
                     ) : null}
                   </TD>
                   <TD className="hidden sm:table-cell">{catLabel(e.category)}</TD>
@@ -184,6 +215,7 @@ export function ExpensesTable({
           {filtered.length > 0 ? (
             <TFoot>
               <TR>
+                {selectable ? <TD /> : null}
                 <TD>Toplam</TD>
                 <TD className="hidden sm:table-cell" />
                 <TD align="right">{tryFormatter.format(total)}</TD>
@@ -207,5 +239,6 @@ export function ExpensesTable({
         />
       ) : null}
     </div>
+    </BulkSelectionProvider>
   );
 }

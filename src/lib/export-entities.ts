@@ -144,6 +144,8 @@ export const mapExpense = (e: RawRow) => ({
   kategori: e.category,
   tarih: e.expense_date,
   not: e.notes,
+  portfoy_kodu: relOne(e.property)?.property_code ?? "",
+  fis_baglantisi: e.receipt_url ?? "",
   kayit: e.created_at,
 });
 export const mapOffer = (o: RawRow) => {

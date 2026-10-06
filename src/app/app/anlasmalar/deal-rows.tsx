@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Building2, Eye, FileCheck2, Handshake, MessageSquare, User } from "lucide-react";
+import { Building2, Eye, FileCheck2, Handshake, Layers, MessageSquare, User } from "lucide-react";
+import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
@@ -31,6 +32,8 @@ export type DealVM = {
   stale: boolean;
   checklist: { done: number; total: number } | null;
   noteCount: number;
+  /** Proje dairesi bağı (deals.project_unit_id): etiket + proje sayfası. */
+  unit?: { label: string; href: string } | null;
 };
 
 const LINK = "focus-ring relative z-10 rounded-[var(--radius-control)] transition hover:text-brand-600 hover:underline";
@@ -57,13 +60,18 @@ function Badges({ d }: { d: DealVM }) {
 }
 
 /** md+ tablo görünümü. */
-export function DealTable({ rows, density }: { rows: DealVM[]; density: Density }) {
+export function DealTable({ rows, density, selectable = false }: { rows: DealVM[]; density: Density; selectable?: boolean }) {
   return (
     <div className="hidden md:block">
       <TableFrame minWidth={940} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
+              {selectable ? (
+                <TH className="w-10">
+                  <BulkSelectAll ids={rows.map((r) => r.id)} noun="anlaşma" />
+                </TH>
+              ) : null}
               <TH>Anlaşma</TH>
               <TH>Aşama</TH>
               <TH align="right">Değer</TH>
@@ -78,6 +86,11 @@ export function DealTable({ rows, density }: { rows: DealVM[]; density: Density 
           <TBody>
             {rows.map((d) => (
               <TR key={d.id} interactive>
+                {selectable ? (
+                  <TD>
+                    <BulkRowCheckbox id={d.id} label={`${d.propertyLabel ?? d.customerName ?? "Anlaşma"} anlaşmasını`} />
+                  </TD>
+                ) : null}
                 <TD>
                   <IntentLink href={d.href} className="absolute inset-0" aria-label={`${d.propertyLabel ?? d.customerName ?? "Anlaşma"} detayını aç`} />
                   <div className="flex items-center gap-3">
@@ -100,6 +113,11 @@ export function DealTable({ rows, density }: { rows: DealVM[]; density: Density 
                         )}
                         <Badges d={d} />
                       </p>
+                      {d.unit ? (
+                        <Link href={d.unit.href} prefetch={false} className={`${LINK} mt-0.5 inline-flex items-center gap-1 text-xs text-text-muted`}>
+                          <Layers aria-hidden="true" className="h-3 w-3" /> {d.unit.label}
+                        </Link>
+                      ) : null}
                     </div>
                   </div>
                 </TD>

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { orIlike } from "@/lib/pgrst";
 import type { ComboboxOption } from "@/components/ui/combobox";
+import { DEAL_OPTION_SELECT, dealOptionLabel, type DealOptionSource } from "@/lib/deal-option-label";
 
 /**
  * Seçici kutuları için sunucu taraflı arama.
@@ -182,4 +183,41 @@ export async function searchLivePropertiesForPresentation(
       district: (Array.isArray(rel) ? rel[0]?.name : rel?.name) ?? null,
     };
   });
+}
+
+/**
+ * Anlaşma seçici araması (görev/gider bağları): müşteri adı ya da portföy kodu/başlığı.
+ * PostgREST gömülü tabloda OR yapamadığı için önce eşleşen müşteri/portföy kimlikleri bulunur.
+ */
+export async function searchDeals(query: string): Promise<ComboboxOption[]> {
+  const gate = await requirePermission("commissions", "view");
+  if (!gate.ok) return [];
+  const q = query.trim();
+  if (q.length < MIN_QUERY) return [];
+
+  const supabase = await createClient();
+  const [{ data: cust }, { data: props }] = await Promise.all([
+    supabase.from("customers").select("id").is("deleted_at", null).or(orIlike(["full_name"], q)).limit(LIMIT),
+    supabase.from("properties").select("id").is("deleted_at", null).or(orIlike(["property_code", "title"], q)).limit(LIMIT),
+  ]);
+  const custIds = (cust ?? []).map((c) => c.id as string);
+  const propIds = (props ?? []).map((p) => p.id as string);
+  if (custIds.length === 0 && propIds.length === 0) return [];
+  const clauses = [
+    custIds.length ? `customer_id.in.(${custIds.join(",")})` : null,
+    propIds.length ? `property_id.in.(${propIds.join(",")})` : null,
+  ].filter(Boolean);
+  const { data, error } = await supabase
+    .from("deals")
+    .select(`${DEAL_OPTION_SELECT}, stage`)
+    .eq("tenant_id", gate.tenantId)
+    .or(clauses.join(","))
+    .order("updated_at", { ascending: false })
+    .limit(LIMIT);
+  if (error || !data) return [];
+  return (data as unknown as (DealOptionSource & { stage: string })[]).map((d) => ({
+    value: d.id,
+    label: dealOptionLabel(d),
+    hint: d.stage === "won" ? "Kazanıldı" : d.stage === "lost" ? "Kaybedildi" : "Açık",
+  }));
 }

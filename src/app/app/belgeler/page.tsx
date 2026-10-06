@@ -578,7 +578,8 @@ export default async function DocumentsPage({
       uploaderName: one(r.marker)?.full_name ?? null,
       relatedLabel: dealLabel || "Anlaşma",
       relatedHref: `/app/anlasmalar/${r.deal_id}`,
-      previewUrl: r.file_url,
+      // Güvenli müşteri belgesi ucuna bağlı evrak (anlaşma evrak yüklemesi) satır içi önizlenir.
+      previewUrl: r.file_url.startsWith("/api/customer-files/") ? `${r.file_url}?onizle=1` : r.file_url,
       downloadUrl: r.file_url,
       canDelete: canDelete.evrak,
     });

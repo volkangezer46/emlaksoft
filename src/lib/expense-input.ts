@@ -3,6 +3,7 @@ export const EXPENSE_INPUT_LIMITS = {
   notes: 2_000,
   category: 60,
   amountTry: 9_999_999_999.99,
+  receiptUrl: 500,
 } as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -17,7 +18,26 @@ export type ExpenseInput = {
   expenseDate: string;
   notes: string | null;
   propertyId: string | null;
+  /** Fiş/fatura bağlantısı (yalnız https; e-Arşiv, bulut klasörü vb.). */
+  receiptUrl: string | null;
 };
+
+/** Fiş bağlantısı doğrulaması: yalnız https, kimlik bilgisi içermeyen, makul uzunlukta URL. */
+export function parseReceiptUrl(raw: string): { ok: true; value: string | null } | { ok: false; error: string } {
+  const value = raw.trim();
+  if (!value) return { ok: true, value: null };
+  if (value.length > EXPENSE_INPUT_LIMITS.receiptUrl) return { ok: false, error: "Fiş bağlantısı çok uzun." };
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, error: "Fiş bağlantısı geçerli bir adres olmalı (https://…)." };
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    return { ok: false, error: "Fiş bağlantısı https:// ile başlamalı." };
+  }
+  return { ok: true, value: url.toString() };
+}
 
 export type ExpenseInputResult =
   | { ok: true; value: ExpenseInput }
@@ -82,6 +102,9 @@ export function parseExpenseForm(
     return { ok: false, error: "Seçilen portföy geçersiz." };
   }
 
+  const receipt = parseReceiptUrl(String(formData.get("receipt_url") ?? ""));
+  if (!receipt.ok) return { ok: false, error: receipt.error };
+
   return {
     ok: true,
     value: {
@@ -91,6 +114,7 @@ export function parseExpenseForm(
       expenseDate,
       notes: rawNotes || null,
       propertyId: rawPropertyId || null,
+      receiptUrl: receipt.value,
     },
   };
 }

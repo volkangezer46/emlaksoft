@@ -39,15 +39,21 @@ export async function ChecklistLoader({
   dealId,
   dealType,
   canEdit,
+  customerId = null,
+  canUpload = false,
 }: {
   dealId: string;
   dealType: string;
   canEdit: boolean;
+  /** Anlaşmanın müşterisi: evrak dosyası müşteri belgesi olarak yüklenir. */
+  customerId?: string | null;
+  /** Müşteri belgesi yükleme izni (customers.edit). */
+  canUpload?: boolean;
 }) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("deal_checklist_items")
-    .select("id, label, is_required, is_done, done_at, note, sort_order, done_by:profiles!deal_checklist_items_done_by_fkey(full_name)")
+    .select("id, label, is_required, is_done, done_at, note, sort_order, file_url, done_by:profiles!deal_checklist_items_done_by_fkey(full_name)")
     .eq("deal_id", dealId)
     .order("sort_order", { ascending: true });
 
@@ -62,10 +68,11 @@ export async function ChecklistLoader({
       done_by_name: doneBy?.full_name ?? null,
       note: (r.note as string | null) ?? null,
       sort_order: Number(r.sort_order ?? 0),
+      file_url: (r.file_url as string | null) ?? null,
     };
   });
 
-  return <DealChecklistSection dealId={dealId} dealType={dealType} items={items} canEdit={canEdit} />;
+  return <DealChecklistSection dealId={dealId} dealType={dealType} items={items} canEdit={canEdit} customerId={customerId} canUpload={canUpload} />;
 }
 
 /**
