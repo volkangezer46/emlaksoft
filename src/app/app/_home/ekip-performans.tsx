@@ -9,7 +9,7 @@ import { monthProgress, rankTeam, teamStatus, TEAM_STATUS_LABEL, type TeamStatus
 
 const MAX_ROWS = 8;
 /** 8 satır * 38px + başlık: iskelet ve içerik aynı yükseklikte (CLS yok). */
-const CARD_MIN = "min-h-[22rem]";
+const CARD_MIN = "lg:min-h-[22rem]";
 
 export function EkipPerformansIskelet() {
   return (

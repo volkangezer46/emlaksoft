@@ -1,3 +1,4 @@
+import { ShortcutBar } from "@/components/ui/shortcut-bar";
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -363,6 +364,15 @@ export default async function AppHomePage({
             </div>
           </BosOfisKapisi>
         </Suspense>
+        <ShortcutBar
+          items={[
+            { keys: ["mod", "K"], label: "Ara ve komut" },
+            { keys: ["G", "M"], label: "Müşteriler" },
+            { keys: ["G", "P"], label: "Portföyler" },
+            { keys: ["G", "K"], label: "Komisyon" },
+            { keys: ["?"], label: "Tüm kısayollar" },
+          ]}
+        />
       </DashboardStack>
     </DashboardWidgetProvider>
   );

@@ -49,9 +49,10 @@ export function MorphTabFace({ icon: Icon, label, description, progress, badge, 
   const ring = progress != null;
   const style = ring ? ({ "--mt-p": ringPercent(progress) } as CSSProperties) : undefined;
   const hasCount = count != null;
+  const hasGlyph = Boolean(Icon) || ring || Boolean(badge) || hasCount || Boolean(locked);
   return (
     <>
-      <span
+      {hasGlyph ? (<span
         className={cn("mt-ico transition-colors duration-(--motion-fast)", capsule && active && "bg-brand-600/10")}
         data-ring={ring ? "1" : undefined}
         style={style}
@@ -75,7 +76,7 @@ export function MorphTabFace({ icon: Icon, label, description, progress, badge, 
           </span>
         ) : null}
         {locked ? <Lock className="absolute -bottom-0.5 -right-0.5 h-3 w-3 text-amber-600" /> : null}
-      </span>
+      </span>) : null}
       <span className="mt-lw">
         <span className="mt-li py-1 pl-2 pr-2.5">
           <span className="block truncate leading-5">{label}</span>
@@ -153,7 +154,7 @@ export function MorphNav({
       >
         {items.map((item) => {
           const active = item.id === activeId;
-          const density: MorphDensity = tabDensity({ active, orientation: "horizontal", inactive: "icon" });
+          const density: MorphDensity = tabDensity({ active, orientation: "horizontal", inactive: item.icon ? "icon" : "label" });
           return (
             <li key={item.id} className="shrink-0">
               <Link

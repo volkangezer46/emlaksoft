@@ -330,12 +330,12 @@ export function AdminSidebar({
                 : ""}
             </span>
             {health.failedJobs && health.failedJobs.length > 0 ? (
-              <span className="mt-1 block truncate text-xs text-amber-300" title={health.failedJobs.join(", ")}>
+              <span className="mt-1 block line-clamp-2 break-words text-xs text-amber-300" title={health.failedJobs.join(", ")}>
                 Hatalı: {health.failedJobs.join(", ")}
               </span>
             ) : null}
             {health.unknownJobs && health.unknownJobs.length > 0 ? (
-              <span className="mt-1 block truncate text-xs text-white/50" title={health.unknownJobs.join(", ")}>
+              <span className="mt-1 block line-clamp-2 break-words text-xs text-white/50" title={health.unknownJobs.join(", ")}>
                 Tanımsız iş (eski kayıt): {health.unknownJobs.join(", ")}
               </span>
             ) : null}

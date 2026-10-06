@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { CountUp } from "@/components/ui/count-up";
 import { cn } from "@/lib/utils";
 import { MiniBars } from "./mini-bars";
 import { hasSeries, type PremiumTone, type Trend } from "./premium-math";
@@ -80,7 +81,9 @@ export function KpiTile({
     className,
   );
   // Uzun biçimli tutar ("44.300.000 ₺") kartı taşırmasın: boyut küçülür, ₺ ayrılmaz boşlukla yapışır.
-  const rawValue = typeof value === "string" ? value.replace(/ (?=₺)/g, "\u00a0") : value;
+  const plainValue = typeof value === "string" ? value.replace(/ (?=₺)/g, "\u00a0") : value;
+  // İlk görünümde bir kez sayar (CountUp: reduced-motion'da kapalı; sunucu çıktısı sonuç değeri; kısaltmalı/ondalıklı metin aynen kalır).
+  const rawValue = typeof plainValue === "string" || typeof plainValue === "number" ? <CountUp value={plainValue} /> : plainValue;
   const valueCls = typeof value === "string" && value.length >= 11 ? "pm-value-long" : "";
   const valueStyle = attention ? { color: "var(--t-text)" } : undefined;
 

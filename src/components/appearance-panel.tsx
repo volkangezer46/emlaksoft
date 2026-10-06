@@ -1,15 +1,18 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { Check, Monitor, Moon, Rows2, Rows3, Sun } from "lucide-react";
 import {
   ACCENTS,
   readAccentPref,
+  readDensityPref,
   readThemePref,
   subscribeTheme,
   writeAccentPref,
+  writeDensityPref,
   writeThemePref,
   type AccentPref,
+  type DensityPref,
   type ThemePref,
 } from "@/lib/theme";
 import { FontScalePicker } from "@/components/font-scale-picker";
@@ -19,6 +22,11 @@ const MODES: { value: ThemePref; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "Sistem", icon: Monitor },
   { value: "light", label: "Açık", icon: Sun },
   { value: "dark", label: "Koyu", icon: Moon },
+];
+
+const DENSITIES: { value: DensityPref; label: string; icon: typeof Sun }[] = [
+  { value: "comfortable", label: "Rahat", icon: Rows2 },
+  { value: "compact", label: "Sıkı", icon: Rows3 },
 ];
 
 function readResolvedDark(): boolean {
@@ -34,6 +42,7 @@ function readResolvedDark(): boolean {
 export function AppearancePanel({ className }: { className?: string }) {
   const mode = useSyncExternalStore(subscribeTheme, readThemePref, () => "system" as ThemePref);
   const accent = useSyncExternalStore(subscribeTheme, readAccentPref, () => "ocean" as AccentPref);
+  const density = useSyncExternalStore(subscribeTheme, readDensityPref, () => "comfortable" as DensityPref);
   const dark = useSyncExternalStore(subscribeTheme, readResolvedDark, () => false);
 
   return (
@@ -63,6 +72,34 @@ export function AppearancePanel({ className }: { className?: string }) {
             );
           })}
         </div>
+      </section>
+
+      <section aria-labelledby="gorunum-yogunluk">
+        <h3 id="gorunum-yogunluk" className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+          Yoğunluk
+        </h3>
+        <div role="radiogroup" aria-labelledby="gorunum-yogunluk" className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] bg-surface-sunken p-1">
+          {DENSITIES.map(({ value, label, icon: Icon }) => {
+            const active = density === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => writeDensityPref(value)}
+                className={cn(
+                  "focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-chip)] text-sm font-medium transition-colors",
+                  active ? "bg-surface text-text shadow-[var(--elev-1)]" : "text-text-muted hover:text-text",
+                )}
+              >
+                <Icon className="h-4 w-4" aria-hidden />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-xs text-text-muted">Sıkı: tablo ve liste satırları ile kart boşlukları daralır.</p>
       </section>
 
       <section aria-labelledby="gorunum-vurgu">

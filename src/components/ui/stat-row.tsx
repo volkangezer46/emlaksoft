@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { CountUp } from "@/components/ui/count-up";
 import { formatCount } from "@/lib/ui/filter-params";
 
 /**
@@ -48,7 +49,7 @@ export function StatRow({
             key={`${it.label}-${it.href}`}
             href={it.href}
             className={cn(
-              "focus-ring surface-interactive flex min-h-12 min-w-0 flex-col justify-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400",
+              "focus-ring surface-interactive flex min-h-12 min-w-0 flex-col justify-between gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-400",
               zero && "opacity-60 hover:opacity-100",
             )}
           >
@@ -60,16 +61,16 @@ export function StatRow({
               ) : null}
               <span className="line-clamp-2 min-w-0 [overflow-wrap:normal] hyphens-auto" title={it.label}>{it.label}</span>
             </span>
-            <span className="flex items-baseline gap-1.5">
+            <span className="flex flex-col">
               <span
                 className={cn(
                   "text-lg font-semibold tabular-nums",
                   it.attention && !zero ? "text-danger-600" : "text-text",
                 )}
               >
-                {shown}
+                {typeof shown === "number" || typeof shown === "string" ? <CountUp value={shown} /> : shown}
               </span>
-              {it.hint ? <span className="line-clamp-2 min-w-0 text-xs text-text-muted" title={it.hint}>{it.hint}</span> : null}
+              {it.hint ? <span className="line-clamp-1 min-w-0 text-xs text-text-muted" title={it.hint}>{it.hint}</span> : null}
             </span>
           </Link>
         );

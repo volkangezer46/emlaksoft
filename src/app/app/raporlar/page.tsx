@@ -224,7 +224,7 @@ export default async function ReportsPage() {
   }));
   const sourceItems = sourceBars.map((b) => ({
     key: b.label,
-    label: b.label,
+    label: b.value ? sourceLabel(b.value) : b.label,
     href: b.value ? `/app/musteriler?source=${encodeURIComponent(b.value)}` : "/app/musteriler",
     pct: shareOfMax(b.count, sourceMax),
     valueText: `${b.count} · %${shareOfTotal(b.count, sourceTotal)}`,
@@ -250,6 +250,7 @@ export default async function ReportsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Rapor merkezi"
+        freshness
         title="Ofis sağlık & performans"
         meta={<SampleDataBadge label={sampleLabel} />}
         description="Gerçek toplulaştırma · sahte satış hattı yok."

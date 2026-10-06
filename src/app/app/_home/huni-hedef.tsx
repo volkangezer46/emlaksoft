@@ -7,7 +7,7 @@ import { loadCommissionSummary, loadDeals, loadDemandCounts, loadMyTarget, loadO
 import { pipelineStats } from "./helpers";
 import { FUNNEL_SEQUENTIAL, funnelRows, monthProgress, targetPace, type TargetPace } from "./home-metrics";
 
-const CARD_MIN = "min-h-[22rem]";
+const CARD_MIN = "lg:min-h-[22rem]";
 
 export function HuniHedefIskelet({ className = CARD_MIN }: { className?: string }) {
   return (

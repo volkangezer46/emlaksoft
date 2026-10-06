@@ -327,6 +327,7 @@ export default async function CommissionPage({
       <PageHeader
         title="Komisyon & hakediş"
         eyebrow="Finans merkezi"
+        freshness
         description={<>Komisyon paylaşımı, KDV ve tahsilat durumu tek defterde. <HelpTip topic="komisyon-payi" /></>}
         actions={
           <Link
@@ -417,11 +418,11 @@ export default async function CommissionPage({
       {advisorDist.length > 0 || hasAylikSeri ? (
         <div className="grid items-stretch gap-4 lg:grid-cols-2">
           {advisorDist.length > 0 ? (
-            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section className="flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>
               <h2 className="mt-1 font-display font-bold text-text">Danışman bazlı dağılım</h2>
               <p className="mt-0.5 text-xs text-text-muted">Tüm defterden hesaplanan en yüksek 8 danışman payı</p>
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-4 mb-4 space-y-3">
                 {advisorDist.map((a) => {
                   const memberId = memberIdByName.get(a.label);
                   return (
@@ -444,6 +445,13 @@ export default async function CommissionPage({
                   );
                 })}
               </ul>
+              <Link
+                href={filterHref({})}
+                className="focus-ring mt-auto flex items-center justify-between gap-2 rounded-[var(--radius-control)] border-t border-line pt-3 text-xs font-semibold text-text-muted hover:text-text"
+              >
+                <span>{advisorDist.length} danışman · toplam pay</span>
+                <span className="numeric font-display text-sm font-bold text-text">{money(advisorDist.reduce((t, a) => t + a.pay, 0))}</span>
+              </Link>
             </section>
           ) : null}
           {hasAylikSeri ? (
@@ -619,9 +627,9 @@ export default async function CommissionPage({
                     <div>
                       <p className="text-xs text-text-faint">Brüt komisyon</p>
                       <p className="font-display text-sm font-bold text-text">{money(Number(row.gross_amount))}</p>
-                      {seeAllEarnings && Array.isArray(row.splits) && row.splits.length > 0 ? (
+                      {seeAllEarnings && Array.isArray(row.splits) && row.splits.some((s) => s.rate != null && Number.isFinite(Number(s.rate))) ? (
                         <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-text-muted">
-                          {row.splits.map((s, i) => {
+                          {row.splits.filter((s) => s.rate != null && Number.isFinite(Number(s.rate))).map((s, i, arr) => {
                             const memberId = s.label ? memberIdByName.get(s.label) : undefined;
                             return (
                               <span key={i}>
@@ -633,9 +641,9 @@ export default async function CommissionPage({
                                     {s.label}
                                   </Link>
                                 ) : (
-                                  s.label
+                                  s.label || "Pay"
                                 )}
-                                {" "}%{s.rate}{i < row.splits!.length - 1 ? " ·" : ""}
+                                {" "}%{s.rate}{i < arr.length - 1 ? " ·" : ""}
                               </span>
                             );
                           })}
