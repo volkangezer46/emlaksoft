@@ -3,37 +3,13 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const insertMock = vi.fn();
-const logMock = vi.fn();
-vi.mock("@/lib/sample-data-seed", () => ({
-  insertSampleRecords: (...a: unknown[]) => insertMock(...a),
-  SAMPLE_DATA_COUNTS: { customers: 12 },
-}));
-vi.mock("@/lib/activity", () => ({ logActivity: (...a: unknown[]) => logMock(...a) }));
+const ensureMock = vi.fn();
+vi.mock("@/lib/sample-data/seed", () => ({ ensureSampleData: (...a: unknown[]) => ensureMock(...a) }));
 
 import { seedDemoDataForNewTenant, wantsDemoData } from "./sample-registration-seed";
 
-function fakeDb(markError: unknown = null) {
-  const updates: { payload: Record<string, unknown>; id: unknown }[] = [];
-  const db = {
-    from: (table: string) => {
-      expect(table).toBe("tenants");
-      return {
-        update: (payload: Record<string, unknown>) => ({
-          eq: (_col: string, id: unknown) => {
-            updates.push({ payload, id });
-            return Promise.resolve({ error: "sample_seeded_at" in payload ? markError : null });
-          },
-        }),
-      };
-    },
-  } as unknown as SupabaseClient;
-  return { db, updates };
-}
-
 beforeEach(() => {
-  insertMock.mockReset();
-  logMock.mockReset();
+  ensureMock.mockReset();
 });
 
 describe("wantsDemoData", () => {
@@ -48,33 +24,16 @@ describe("wantsDemoData", () => {
 });
 
 describe("seedDemoDataForNewTenant", () => {
-  it("yalnız verilen tenant'a yükler, damgalar ve etkinlik günlüğüne yazar", async () => {
-    insertMock.mockResolvedValue({ counts: { customers: 12 }, skipped: [], failed: [] });
-    const { db, updates } = fakeDb();
-    const res = await seedDemoDataForNewTenant(db, "t-1", "u-1");
-    expect(res.ok).toBe(true);
-    expect(insertMock).toHaveBeenCalledWith(db, "t-1", "u-1", { extrasDb: db, pack: "konut" });
-    expect(updates.every((u) => u.id === "t-1")).toBe(true);
-    expect(updates[0].payload).toHaveProperty("sample_seeded_at");
-    expect(logMock).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: "t-1", actorId: "u-1", action: "sample_data.seed" }),
-    );
+  const db = {} as SupabaseClient;
+  it("idempotent çekirdeğe (ensureSampleData) kayıt kaynağı ve paketle delege eder", async () => {
+    ensureMock.mockResolvedValue({ ok: true, skipped: null, report: { counts: {}, skipped: [], failed: [] } });
+    expect((await seedDemoDataForNewTenant(db, "t-1", "u-1", "arsa")).ok).toBe(true);
+    expect(ensureMock).toHaveBeenCalledWith(db, "t-1", "u-1", { pack: "arsa", by: "registration" });
   });
-
-  it("yükleme hatasını yutar (kayıt akışı bozulmaz) ve ok=false döner", async () => {
-    insertMock.mockRejectedValue(new Error("boom"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const { db } = fakeDb();
+  it("paket verilmezse konut; çekirdek ok=false dönerse ok=false (fırlatmaz)", async () => {
+    ensureMock.mockResolvedValue({ ok: false, skipped: null, report: null });
     expect((await seedDemoDataForNewTenant(db, "t-1", "u-1")).ok).toBe(false);
-    expect(logMock).not.toHaveBeenCalled();
-  });
-
-  it("damga yazılamazsa günlüğe yazmaz ve ok=false döner", async () => {
-    insertMock.mockResolvedValue({ counts: {}, skipped: [], failed: [] });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const { db } = fakeDb({ message: "x" });
-    expect((await seedDemoDataForNewTenant(db, "t-1", "u-1")).ok).toBe(false);
-    expect(logMock).not.toHaveBeenCalled();
+    expect(ensureMock).toHaveBeenCalledWith(db, "t-1", "u-1", { pack: "konut", by: "registration" });
   });
 });
 
@@ -84,23 +43,27 @@ describe("kayıt demo veri sözleşmesi", () => {
   it("signUp provizyondan SONRA, aynı admin client ile ve yeni createAdminClient çağrısı eklemeden tohumlar", () => {
     const src = read("src/app/actions/auth.ts");
     const fn = src.slice(src.indexOf("export async function signUp"), src.indexOf("export async function signOut"));
-    expect(fn.indexOf("provision_registration")).toBeLessThan(fn.indexOf("seedDemoDataForNewTenant(admin"));
+    expect(fn.indexOf("provision_registration")).toBeLessThan(fn.indexOf("applyWizardOfficeProfile(admin"));
+    expect(fn.indexOf("applyWizardOfficeProfile(admin")).toBeLessThan(fn.indexOf("seedDemoDataForNewTenant(admin"));
     expect(fn.match(/createAdminClient\(\)/g)).toHaveLength(1);
     expect(fn).toContain("wantsDemoData(formData)");
   });
 
-  it("kayıt formunda 'Örnek veriyle başla' kutusu varsayılan açıktır", () => {
+  it("kayıt sihirbazında 'Demo veriyle başla' kutusu varsayılan açıktır ve açıklaması tek tuşla temizlemeyi söyler", () => {
     const src = read("src/app/kayit/register-form.tsx");
-    expect(src).toMatch(/name="demo_data"\s+defaultChecked/);
-    expect(src).toContain("Örnek veriyle başla");
+    expect(src).toMatch(/name="demo_data"[\s\S]{0,200}defaultChecked/);
+    expect(src).toContain("Demo veriyle başla");
+    expect(src).toContain("tek tuşla");
   });
 
-  it("geri dönüş: temizleme yalnız is_sample + tenant_id ile ve izin kapılı", () => {
+  it("temizleme: RPC öncelikli, geri dönüş yalnız is_sample + tenant_id ile; eylem owner/gm kapılı", () => {
     const clear = read("src/lib/sample-clear.ts");
     expect(clear).toContain('.eq("tenant_id", tenantId)');
     expect(clear).toContain('.eq("is_sample", true)');
     const action = read("src/app/actions/sample-data.ts");
     expect(action).toMatch(/clearSampleData[\s\S]*requirePermission\("settings", "edit"\)/);
+    expect(action).toMatch(/clearSampleData[\s\S]*canSwitchToRealUse\(gate\.role\)/);
+    expect(action).toContain("purgeSampleData(");
     expect(action).toContain("sample_data.clear");
   });
 });

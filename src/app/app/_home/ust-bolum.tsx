@@ -5,12 +5,9 @@ import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
 import { readTryOverview } from "@/lib/try-credits/reader";
 import { readMyDashboard } from "@/lib/growth/engine";
 import { OrnekVeriYenile } from "./ornek-veri-yenile";
-import { gatesLockedAfterTrial } from "@/lib/billing/page-gates";
-import { DemoModeBanner } from "@/components/app/demo-mode-banner";
 import { createClient } from "@/lib/supabase/server";
-import { loadSampleStatus } from "@/lib/sample-status";
-import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
 import { DAY_MS, msUntil } from "@/lib/clock";
+import { getCachedOfficeScore, getOfficeScoreCached } from "@/lib/office-score";
 import { TvAutoRefresh, TvClock } from "../tv-mode";
 import { loadExpiringAuthority, loadTenantRow, type HomeCtx } from "./data";
 
@@ -48,49 +45,6 @@ export async function TvUst({ ctx }: { ctx: HomeCtx }) {
         </div>
       </div>
     </>
-  );
-}
-
-/**
- * Demo modu bandı: örnek veri yüklüyken ana ekranın üstünde "Demo modundasınız — gerçek kullanıma başla"
- * şeridi (kapatılabilir; gerçek veri girildikçe öneri değişir). Onay satır içi panelde, sayılarla; bkz.
- * actions/sample-data.ts. TV modunda hiç gösterilmez. Sorgular hata verirse bant gösterilmez (sahte durum yok).
- */
-export async function OrnekVeri({ ctx }: { ctx: HomeCtx }) {
-  const tenant = await loadTenantRow(ctx);
-  const sampleSeededAt = tenant?.sample_seeded_at ?? null;
-  if (!ctx.tenantId) return null;
-  const status = await loadSampleStatus(await createClient(), ctx.tenantId, sampleSeededAt).catch(() => null);
-  if (!status || !status.active || status.total === 0) return null;
-  // Deneme günü sayacı: abonelik sayfasıyla aynı kaynak (subscriptions.trial_ends_at, durum trialing).
-  const supabase = await createClient();
-  const { data: sub } = await supabase
-    .from("subscriptions")
-    .select("status, trial_ends_at")
-    .eq("tenant_id", ctx.tenantId)
-    .maybeSingle();
-  // Deneme bandı: deneme sonrası kilitlenecek sayfalar PLAN_GATES'ten üretilir (planı okunamazsa liste gösterilmez).
-  const { data: tenantPlan } = await supabase.from("tenants").select("plan, created_at").eq("id", ctx.tenantId).maybeSingle();
-  const trialDaysLeft =
-    sub?.status === "trialing" && sub.trial_ends_at
-      ? Math.max(0, Math.ceil(msUntil(new Date(sub.trial_ends_at)) / DAY_MS))
-      : null;
-  return (
-    <DemoModeBanner
-      trialDaysLeft={trialDaysLeft}
-      lockedAfterTrial={
-        trialDaysLeft != null && tenantPlan
-          ? gatesLockedAfterTrial({ plan: tenantPlan.plan as string | null, tenantCreatedAt: tenantPlan.created_at as string | null }).map((g) => ({
-              title: g.title,
-              href: g.href,
-            }))
-          : []
-      }
-      variant={status.variant}
-      rows={status.rows.map((r) => ({ label: r.label, count: r.count }))}
-      total={status.total}
-      canClear={ctx.isManagement}
-    />
   );
 }
 

@@ -21,6 +21,8 @@ import { cookies } from "next/headers";
 import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
+import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
+import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { SectionTabs, SectionTabsPlaceholder } from "@/components/app/section-tabs";
 import { RealtimeRefresh } from "@/components/app/realtime-refresh";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
@@ -95,6 +97,7 @@ type OfficeSummary = {
   created_at?: string | null;
   slug?: string | null;
   trial_ends_at?: string | null;
+  sample_seeded_at?: string | null;
 };
 
 /** Bildirim listesi (requireActiveTenant zinciri) Suspense içinde akar. */
@@ -142,7 +145,7 @@ async function buildShellModel() {
   const impersonatedTenantPromise = user && impersonating && claimedTenantId
     ? supabase
         .from("tenants")
-        .select("name, plan, status, brand_color, created_at, slug, trial_ends_at")
+        .select("name, plan, status, brand_color, created_at, slug, trial_ends_at, sample_seeded_at")
         .eq("id", claimedTenantId)
         .maybeSingle()
     : Promise.resolve({ data: null });
@@ -195,6 +198,7 @@ async function buildShellModel() {
                 created_at: identity.tenant.created_at,
                 slug: identity.tenant.slug,
                 trial_ends_at: identity.tenant.trial_ends_at,
+                sample_seeded_at: identity.tenant.sample_seeded_at,
               }
             : null,
         }
@@ -289,6 +293,8 @@ async function buildShellModel() {
     cookieValue: jar.get(FONT_SCALE_COOKIE)?.value,
     metadataValue: user?.user_metadata?.[FONT_SCALE_META_KEY],
   });
+  // Deneme sayacı tek kez hesaplanır: yan menü ve kabuk şeridi aynı sayıyı gösterir.
+  const trialDaysLeft = office?.status === "trial" && office.trial_ends_at ? Math.max(0, Math.ceil(msUntil(office.trial_ends_at) / DAY_MS)) : null;
   const impName = impersonationCookieMatches
     ? (jar.get("es_impersonate_name")?.value ?? office?.name ?? "Hedef ofis")
     : (office?.name ?? "Hedef ofis");
@@ -318,6 +324,7 @@ async function buildShellModel() {
     uiPrefs,
     fontScale,
     impName,
+    trialDaysLeft,
     storageScope: user && tenantId ? `${tenantId}:${user.id}` : undefined,
   };
 }
@@ -406,7 +413,7 @@ async function ShellSidebar() {
         officeName={office?.name ?? "EmlakSoft Ofis"}
         plan={planLabel(office?.plan ?? "office")}
         trial={office?.status === "trial"}
-        trialDaysLeft={office?.status === "trial" && office.trial_ends_at ? Math.max(0, Math.ceil(msUntil(office.trial_ends_at) / DAY_MS)) : null}
+        trialDaysLeft={m.trialDaysLeft}
         accessibleModules={m.accessibleModules}
         creatableModules={m.creatableModules}
         lockedHrefs={m.lockedNavHrefs}
@@ -428,6 +435,11 @@ async function ShellHeader() {
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       {m.impersonating && m.platformStaff ? <OpsImpersonationBanner tenantName={m.impName || m.office?.name || "Ofis"} /> : null}
+      {/* Demo/deneme şeridi: örnek veri varsa veya deneme sürüyorsa her sayfada, ince ve kapatılamaz (platform personeli hariç).
+          Ofis verisine (örnek veri/deneme) bağlı olduğu için kabuk diliminde; üst çubukla aynı anda çizilir. */}
+      {!m.platformStaffFullAccess && m.tenantId ? (
+        <DemoTrialStrip sampleActive={Boolean(m.office?.sample_seeded_at)} trialDaysLeft={m.trialDaysLeft} canSwitch={!m.impersonating && canSwitchToRealUse(m.effectiveRole)} />
+      ) : null}
       <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
         <AppBreadcrumb accessibleModules={m.accessibleModules} />
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />

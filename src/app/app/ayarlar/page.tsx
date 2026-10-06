@@ -24,7 +24,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { RealUsePanel } from "@/components/app/real-use-panel";
+import { REAL_USE_HREF, canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { loadSampleStatus } from "@/lib/sample-status";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
@@ -360,28 +360,31 @@ export default async function SettingsPage() {
         })}
       </div>
 
-      {/* Örnek veriler — onboarding seti durumu + kalıcı temizleme */}
+      {/* Örnek veriler — durum + tek tuş geçiş sayfasına bağlantı (silme işlemi o sayfada, onaylı) */}
       <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div className="flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-500">
             <Sparkles className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="font-display font-bold text-ink-950">Örnek veriler</h2>
+            <h2 className="font-display font-bold text-ink-950">Örnek veriler ve gerçek kullanım</h2>
             <p className="text-xs text-text-muted">
-              {sampleSeededAt
-                ? `Keşif için yüklenen örnek kayıtlar aktif (${new Date(sampleSeededAt).toLocaleDateString("tr-TR")}). Temizleme gerçek kayıtlara dokunmaz.`
-                : "Yüklü örnek kayıt yok. Boş ofiste panelden tek tıkla yükleyebilirsiniz."}
+              {sampleStatus && sampleStatus.total > 0
+                ? `${sampleStatus.total} örnek kayıt yüklü${sampleSeededAt ? ` (${new Date(sampleSeededAt).toLocaleDateString("tr-TR")})` : ""}. Tek tuşla temizle; gerçek kayıtlarına dokunulmaz.`
+                : "Ofis gerçek kullanımda: yüklü örnek kayıt yok."}
             </p>
           </div>
         </div>
         {sampleStatus && sampleStatus.total > 0 ? (
-          <div className="flex w-full flex-col gap-3">
-            <span className="w-fit rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-600">Yüklü · {sampleStatus.total} kayıt</span>
-            <RealUsePanel rows={sampleStatus.rows} total={sampleStatus.total} canClear={canEditSettings} />
-          </div>
+          <Link
+            href={REAL_USE_HREF}
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-ink-800"
+            title={canSwitchToRealUse(role) ? undefined : "Yalnız ofis sahibi veya genel müdür geçiş yapabilir"}
+          >
+            Gerçek kullanıma geç <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
         ) : (
-          <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-xs font-bold text-text-muted">Yüklü değil</span>
+          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600">Gerçek kullanım</span>
         )}
       </section>
 

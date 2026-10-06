@@ -21,6 +21,7 @@ export type ShellOffice = {
   created_at?: string | null;
   slug?: string | null;
   trial_ends_at?: string | null;
+  sample_seeded_at?: string | null;
 };
 
 export type RoleOverrideRow = { module: string; action: string; allowed: boolean };
@@ -64,6 +65,7 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
         created_at: strOrNull(raw.tenant.created_at),
         slug: strOrNull(raw.tenant.slug),
         trial_ends_at: strOrNull(raw.tenant.trial_ends_at),
+        sample_seeded_at: strOrNull(raw.tenant.sample_seeded_at),
       }
     : null;
 

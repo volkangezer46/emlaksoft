@@ -152,6 +152,8 @@ const F = {
   // PB42 kabuk/ana ekran hizi: tek-tur kabuk RPC'si + ana ekran anlik goruntu RPC'leri (hepsi SECURITY INVOKER, kod yoksa eski yola duser).
   appShellBootstrap: "20261006000400_app_shell_bootstrap_rpc.sql",
   dashboardSnapshotRpcs: "20261006000410_dashboard_snapshot_rpcs.sql",
+  // PB44 self-servis kurulum: ornek veri tek-tus temizleme RPC'si + sihirbaz ofis profili sutunlari (tek dosya).
+  purgeSampleRpc: "20261006000600_purge_sample_data_rpc.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -263,6 +265,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.accessWritePolicies]: "ek", // access_audit_log INSERT politikasi (owner/gm/branch_manager, kendi ofisi, created_by = auth.uid()) + grant insert
     [F.appShellBootstrap]: "ek", // yalniz 1 yeni invoker RPC (app_shell_bootstrap): profil+tenant+ham izin satirlari+modul+kullanim+rozet sayimi tek JSON; tablo/politika degismez
     [F.dashboardSnapshotRpcs]: "ek", // yalniz 3 yeni invoker RPC (get_insights/tasks/metrics_snapshot); p_tenant_id/p_user_id JWT ile eslesmezse NULL; tablo/politika degismez
+    [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -366,6 +369,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi); 000100-103 CANLIDA, 000104 bekliyor", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc, F.accessWritePolicies] },
     { id: "PB42-kabuk-rpc", order: 29.93, title: "Kabuk/ana ekran hizi: app_shell_bootstrap (tek tur kabuk) + get_insights/tasks/metrics_snapshot RPC'leri (kod RPC yoksa eski yola duser)", files: [F.appShellBootstrap, F.dashboardSnapshotRpcs] },
     { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
+    { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 

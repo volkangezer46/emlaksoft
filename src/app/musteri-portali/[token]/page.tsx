@@ -102,6 +102,7 @@ export default async function CustomerPortalPage({
       .select("assigned_to, tenant:tenants(slug)")
       .eq("id", customer.id)
       .eq("tenant_id", tenant.id)
+      .eq("is_sample", false)
       .is("deleted_at", null)
       .maybeSingle(),
     matchIds.length > 0

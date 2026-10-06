@@ -81,7 +81,8 @@ begin
            'brand_color', t.brand_color,
            'created_at', t.created_at,
            'slug', t.slug,
-           'trial_ends_at', t.trial_ends_at
+           'trial_ends_at', t.trial_ends_at,
+           'sample_seeded_at', t.sample_seeded_at
          )
     into v_tenant
   from public.tenants t

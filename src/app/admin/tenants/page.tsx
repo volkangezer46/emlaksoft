@@ -39,11 +39,18 @@ const statusTone: Record<string, string> = {
   cancelled: "rgba(10,18,36,0.25)",
 };
 
-function buildHref(p: { q?: string; durum?: string; plan?: string; sayfa?: number }) {
+/** Veri durumu süzgeci (URL `veri=`): demo = örnek veri yüklü (tenants.sample_seeded_at dolu), gercek = yüklü değil. */
+const dataStateLabel: Record<string, string> = {
+  demo: "Demo veri var",
+  gercek: "Gerçek veri",
+};
+
+function buildHref(p: { q?: string; durum?: string; plan?: string; veri?: string; sayfa?: number }) {
   const sp = new URLSearchParams();
   if (p.q) sp.set("q", p.q);
   if (p.durum) sp.set("durum", p.durum);
   if (p.plan) sp.set("plan", p.plan);
+  if (p.veri) sp.set("veri", p.veri);
   if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
   const s = sp.toString();
   return s ? `/admin/tenants?${s}` : "/admin/tenants";
@@ -52,7 +59,7 @@ function buildHref(p: { q?: string; durum?: string; plan?: string; sayfa?: numbe
 export default async function AdminTenantsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; sayfa?: string; audit?: string }>;
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; sayfa?: string; audit?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
   const canCreate = officeAdminCan(staff.role, "create");
@@ -61,20 +68,24 @@ export default async function AdminTenantsPage({
   const query = (sp.q ?? "").trim();
   const durum = sp.durum && statusLabel[sp.durum] ? sp.durum : undefined;
   const plan = sp.plan && isPlanId(sp.plan) ? sp.plan : undefined;
+  const veri = sp.veri && dataStateLabel[sp.veri] ? (sp.veri as "demo" | "gercek") : undefined;
   const auditFailed = sp.audit === "failed";
   const page = parsePage(sp.sayfa);
-  const filtered = Boolean(query || durum || plan);
+  const filtered = Boolean(query || durum || plan || veri);
 
   const admin = createAdminClient();
 
   let tenantQuery = admin
     .from("tenants")
-    .select("id, name, slug, plan, status, trial_ends_at, created_at", { count: "exact" })
+    .select("id, name, slug, plan, status, trial_ends_at, created_at, sample_seeded_at", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(...pageRange(page));
   if (query) tenantQuery = tenantQuery.ilike("name", `%${query}%`);
   if (durum) tenantQuery = tenantQuery.eq("status", durum);
   if (plan) tenantQuery = tenantQuery.eq("plan", plan);
+  // Filtre kontratı: URL'deki `veri` sunucu sorgusuna yansır (demo = damga dolu, gercek = damga boş).
+  if (veri === "demo") tenantQuery = tenantQuery.not("sample_seeded_at", "is", null);
+  if (veri === "gercek") tenantQuery = tenantQuery.is("sample_seeded_at", null);
 
   // Sağlık skoru: son 14 günün audit aktivitesi — tek toplu sorgu, bellekte grupla
   const activitySince = daysAgoIso(14);
@@ -82,7 +93,7 @@ export default async function AdminTenantsPage({
   // Halka ve paket barları her zaman TÜM envanteri gösterir — filtre yalnızca listeyi daraltır
   const [{ data: tenants, count: tenantCount }, { data: allTenants }, { data: profiles }, { data: auditRows }] = await Promise.all([
     tenantQuery,
-    admin.from("tenants").select("id, plan, status").limit(2000),
+    admin.from("tenants").select("id, plan, status, sample_seeded_at").limit(2000),
     admin.from("profiles").select("tenant_id").limit(2000),
     admin.from("audit_logs").select("tenant_id").gte("created_at", activitySince).limit(10000),
   ]);
@@ -124,6 +135,7 @@ export default async function AdminTenantsPage({
     return item;
   });
   const activeRate = stats.filter((t) => t.status === "active").length / total;
+  const demoCount = stats.filter((t) => Boolean((t as { sample_seeded_at?: string | null }).sample_seeded_at)).length;
 
   // Gizli planlar (örn. Business) yalnız bu planda ofis varsa listelenir; sayım hiçbir ofisi düşürmez.
   const planDefs = await getPlanDefinitions();
@@ -177,15 +189,16 @@ export default async function AdminTenantsPage({
               ) : null}
               <ExportButton action={exportTenantsCsv} label="Excel'e aktar" />
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
               {[
                 { label: "Toplam ofis", value: stats.length, href: buildHref({}) },
-                { label: "Aktif", value: statusCounts[0].count, href: buildHref({ q: query, plan, durum: "active" }) },
-                { label: "Denemede", value: statusCounts[1].count, href: buildHref({ q: query, plan, durum: "trial" }) },
+                { label: "Aktif", value: statusCounts[0].count, href: buildHref({ q: query, plan, veri, durum: "active" }) },
+                { label: "Denemede", value: statusCounts[1].count, href: buildHref({ q: query, plan, veri, durum: "trial" }) },
+                { label: "Demo veri var", value: demoCount, href: buildHref({ q: query, plan, durum, veri: veri === "demo" ? undefined : "demo" }) },
                 {
                   label: "Askıda / gecikmiş",
                   value: statusCounts[2].count + statusCounts[3].count,
-                  href: buildHref({ q: query, plan, durum: statusCounts[3].count > 0 ? "suspended" : "past_due" }),
+                  href: buildHref({ q: query, plan, veri, durum: statusCounts[3].count > 0 ? "suspended" : "past_due" }),
                 },
               ].map((k) => (
                 <Link
@@ -204,7 +217,7 @@ export default async function AdminTenantsPage({
                 return (
                   <Link
                     key={p.key}
-                    href={buildHref({ q: query, durum, plan: active ? undefined : p.key })}
+                    href={buildHref({ q: query, durum, veri, plan: active ? undefined : p.key })}
                     aria-current={active ? "page" : undefined}
                     title={active ? "Paket filtresini kaldır" : `Yalnızca ${p.label} paketini göster`}
                     className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[var(--radius-control)] pb-1 transition ${
@@ -254,7 +267,7 @@ export default async function AdminTenantsPage({
                 return (
                   <Link
                     key={s.key}
-                    href={buildHref({ q: query, plan, durum: active ? undefined : s.key })}
+                    href={buildHref({ q: query, plan, veri, durum: active ? undefined : s.key })}
                     aria-current={active ? "page" : undefined}
                     title={active ? "Durum filtresini kaldır" : `Yalnızca "${s.label}" ofisleri göster`}
                     className={`focus-ring flex items-center gap-2 rounded-[7px] px-1.5 py-0.5 transition ${
@@ -277,6 +290,7 @@ export default async function AdminTenantsPage({
           <form className="relative w-full max-w-xs">
             {durum ? <input type="hidden" name="durum" value={durum} /> : null}
             {plan ? <input type="hidden" name="plan" value={plan} /> : null}
+            {veri ? <input type="hidden" name="veri" value={veri} /> : null}
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
             <input
               type="text"
@@ -288,7 +302,7 @@ export default async function AdminTenantsPage({
           </form>
           {query ? (
             <Link
-              href={buildHref({ durum, plan })}
+              href={buildHref({ durum, plan, veri })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Arama: {query} <X className="h-3 w-3" />
@@ -296,7 +310,7 @@ export default async function AdminTenantsPage({
           ) : null}
           {durum ? (
             <Link
-              href={buildHref({ q: query, plan })}
+              href={buildHref({ q: query, plan, veri })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Durum: {statusLabel[durum]} <X className="h-3 w-3" />
@@ -304,10 +318,18 @@ export default async function AdminTenantsPage({
           ) : null}
           {plan ? (
             <Link
-              href={buildHref({ q: query, durum })}
+              href={buildHref({ q: query, durum, veri })}
               className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
             >
               Paket: {planLabel(plan)} <X className="h-3 w-3" />
+            </Link>
+          ) : null}
+          {veri ? (
+            <Link
+              href={buildHref({ q: query, durum, plan })}
+              className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
+            >
+              Veri: {dataStateLabel[veri]} <X className="h-3 w-3" />
             </Link>
           ) : null}
           <p className="ml-auto flex items-center gap-2 text-xs text-text-muted">
@@ -358,6 +380,14 @@ export default async function AdminTenantsPage({
                 <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                   {planLabel(t.plan)}
                 </span>
+                {/* Veri durumu: deneme (status) ayrı rozet; burada örnek veri var mı (tenants.sample_seeded_at). Tıklanınca süzer. */}
+                <Link
+                  href={buildHref({ q: query, durum, plan, veri: t.sample_seeded_at ? "demo" : "gercek" })}
+                  className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold ${t.sample_seeded_at ? "bg-amber-400/15 text-amber-600" : "bg-mint-500/12 text-mint-600"}`}
+                  title={t.sample_seeded_at ? "Ofiste örnek (demo) veri yüklü; gerçek kullanıma geçmedi" : "Örnek veri yok: ofis gerçek verisiyle çalışıyor"}
+                >
+                  {t.sample_seeded_at ? dataStateLabel.demo : dataStateLabel.gercek}
+                </Link>
                 {(() => {
                   const h = healthOf(t.id);
                   return (
@@ -419,7 +449,7 @@ export default async function AdminTenantsPage({
       <Pagination
         page={page}
         total={tenantCount ?? 0}
-        hrefFor={(p) => buildHref({ q: query, durum, plan, sayfa: p })}
+        hrefFor={(p) => buildHref({ q: query, durum, plan, veri, sayfa: p })}
       />
     </div>
   );

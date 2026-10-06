@@ -31,6 +31,22 @@ export function isProtectedFrom(from: string): boolean {
 
 export type RedirectMap = Map<string, SeoRedirectRule>;
 
+/**
+ * Yerleşik (kodla gelen) kalıcı yönlendirmeler — kaldırılan public sayfaların eski adresleri. Admin kuralları
+ * (/admin/seo) bunların ÖNÜNE geçer (aynı kaynak için admin kuralı varsa o kazanır). `next.config.ts` aynı listeyi
+ * ayrıca kenarda uygular (sayfa akışına hiç girmeden 308); burası sayfa dosyası silinince çalışan güvenlik ağıdır.
+ * Sözleşme testi iki yerin tutarlılığını doğrular (src/lib/seo/seo-legacy-redirects.test.ts).
+ */
+export const LEGACY_REDIRECTS: readonly SeoRedirectRule[] = [
+  // Satış demosu talebi akışı kaldırıldı (2026-10-06): tek yol self-servis kurulum sihirbazı.
+  { id: "legacydemo", from: "/demo", to: "/kayit", status: 308, enabled: true, note: "Demo talebi sayfası kaldırıldı; kurulum sihirbazı" },
+];
+
+/** Admin kuralları + yerleşikler (admin önce; aynı kaynakta ilk kazanır). */
+export function withLegacyRedirects(rules: readonly SeoRedirectRule[]): SeoRedirectRule[] {
+  return [...rules, ...LEGACY_REDIRECTS];
+}
+
 export function buildRedirectMap(rules: readonly SeoRedirectRule[]): RedirectMap {
   const map: RedirectMap = new Map();
   for (const r of rules) {
