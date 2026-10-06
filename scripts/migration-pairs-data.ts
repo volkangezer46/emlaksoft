@@ -133,6 +133,10 @@ const F = {
   insights: "20260826002500_insights.sql",
   platformInsights: "20260826002600_platform_insights.sql",
   insightSupport: "20260826002700_insight_support.sql",
+  // H2/H3/H6 (Ekim 2026 ozellik arastirmasi): EIDS tasinmaz no, kiraci hatirlatma, kiralama-sozlesme baglantisi.
+  propertyEidsNo: "20260826002950_property_eids_no.sql",
+  rentReminders: "20260826002960_rent_reminders.sql",
+  contractRentalLink: "20260826002970_contract_rental_link.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -230,6 +234,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcQueueRpcs]: "ek", // kuyruk talep/hasat + supheli->onayli kayip durum makinesi RPC'leri (portal_listings'e YAZMAZ)
     [F.lcAnomalyRpcs]: "ek", // anomali esitleme/SLA yukseltme (service_role) + acikla/kapat (authenticated, JWT'den)
     [F.lcSummaryMarket]: "ek", // KPI/liste/dunden-beri RPC'leri (invoker) + property_status_history'ye 2 nullable kolon + anonim agregat gorunum (service_role)
+    [F.propertyEidsNo]: "ek", // properties'e 1 nullable sutun (eids_property_no) + format CHECK + kismi indeks
+    [F.rentReminders]: "ek", // rent_reminder_settings (KAPALI dogar) + rent_reminders (dedupe) + customers'a opt-out sutunlari
+    [F.contractRentalLink]: "ek", // contracts'a 3 nullable sutun (rental_id composite FK, artis maddesi) + kismi indeks
     [F.lcWorkerEvents]: "ek", // listing_control_events (yeni tablo, Realtime) + 3 tetikleyici (yalniz ilan kontrol tablolari) + 4 authenticated worker RPC
   },
 
@@ -327,6 +334,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB31-ilan-kontrol-rpc", order: 29.82, title: "Ilan kontrol: kuyruk/durum makinesi + anomali RPC'leri + KPI/liste RPC'leri + anonim agregat gorunum", files: [F.lcQueueRpcs, F.lcAnomalyRpcs, F.lcSummaryMarket] },
     { id: "PB32-icgoru-temeli", order: 29.83, title: "Zeka katmani: icgoru kuyrugu (insights) + platform ikizi + set-tabanli olgu RPC'leri/kalite gorunumu/temizlik (cron insight-engine bunlari kullanir)", files: [F.insights, F.platformInsights, F.insightSupport] },
     { id: "PB33-ilan-kontrol-worker", order: 29.84, title: "Ilan kontrol: tarayici destekli dogrulama RPC'leri + olay gunlugu + Realtime (ana ekran sayaclari)", files: [F.lcWorkerEvents] },
+    { id: "PB37-eids-tasinmaz-no", order: 29.88, title: "EIDS tasinmaz kimlik no (properties.eids_property_no, nullable + format CHECK)", files: [F.propertyEidsNo] },
+    { id: "PB38-kiraci-hatirlatma", order: 29.89, title: "Kiraci kira hatirlatma (ayar KAPALI dogar + hatirlatma kaydi/dedupe + opt-out)", files: [F.rentReminders] },
+    { id: "PB39-kira-sozlesme-baglantisi", order: 29.90, title: "Kiralamadan kira sozlesmesi (contracts.rental_id + artis maddesi alanlari)", files: [F.contractRentalLink] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
