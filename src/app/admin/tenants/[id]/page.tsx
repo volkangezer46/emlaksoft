@@ -17,6 +17,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { AccountCreditPanel, type CreditGrantOption } from "./account-credit-panel";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
 import { getPlan, planLabel, PLANS } from "@/lib/billing/plans";
@@ -255,6 +256,8 @@ export default async function AdminTenantDetailPage({
         .limit(60),
     ]);
     const seatInfo = await loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats);
+    // Hesap kredisi yalnız süper admin: geri alma seçimi için son yüklemeler (aynı admin istemcisi; bakiye gösterilmez).
+    const creditGrants = staff.role === "super_admin" ? await loadCreditGrantOptions(admin, id) : null;
     content = (
       <div className="space-y-6">
         {access.billing ? (
@@ -268,6 +271,7 @@ export default async function AdminTenantDetailPage({
           captures={captures ?? []}
           billingHref={billingHref}
         />
+        {creditGrants ? <AccountCreditPanel tenantId={id} grants={creditGrants} /> : null}
       </div>
     );
   } else if (active === "destek") {
@@ -443,4 +447,28 @@ export default async function AdminTenantDetailPage({
       {content}
     </div>
   );
+}
+
+/**
+ * Geri alma seçimi: ofisin son TL kredi yüklemeleri (account_credit_ledger, unit=try, feature try_grant:*). Defter anahtarı
+ * `try:grant:<ofis>:<idem>`; geri alma eylemi `original_idem` olarak <idem> bekler. Hata/tablo yoksa boş liste (form genel
+ * geri almayla çalışır). Bakiye hesaplanmaz/gösterilmez.
+ */
+async function loadCreditGrantOptions(admin: ReturnType<typeof createAdminClient>, tenantId: string): Promise<CreditGrantOption[]> {
+  const { data, error } = await admin
+    .from("account_credit_ledger")
+    .select("idempotency_key, amount, feature, created_at")
+    .eq("tenant_id", tenantId)
+    .eq("unit", "try")
+    .like("feature", "try_grant:%")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (error || !data) return [];
+  const prefix = `try:grant:${tenantId}:`;
+  return (data as { idempotency_key: string; amount: number | string; feature: string | null; created_at: string }[])
+    .filter((r) => r.idempotency_key.startsWith(prefix))
+    .map((r) => ({
+      idem: r.idempotency_key.slice(prefix.length),
+      label: `${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(r.created_at))} · ${Number(r.amount).toLocaleString("tr-TR")} TL · ${(r.feature ?? "").replace("try_grant:", "")}`,
+    }));
 }
