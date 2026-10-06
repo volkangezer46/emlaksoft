@@ -26,6 +26,10 @@ import {
 } from "@/components/public/portal-kit";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { formatDateTr, formatDateTimeTr } from "@/lib/format";
+import { readTenantSettings } from "@/lib/settings/tenant-read";
+import { OWNER_WEEKLY_REPORT_KEY } from "@/lib/settings/registry/tenant";
+import { OwnerRentStatementSection, OwnerWeeklyReportSection } from "./owner-extras";
+import { OwnerRentStatementView } from "./rent-statement-view";
 
 export const dynamic = "force-dynamic";
 
@@ -74,10 +78,14 @@ type TenantRel = { phone?: string | null } | { phone?: string | null }[] | null;
 
 export default async function MalikPortaliPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { token } = await params;
+  const sp = await searchParams;
+  const ekstreRaw = Array.isArray(sp.ekstre) ? sp.ekstre[0] : sp.ekstre;
   const data = await getOwnerPortalData(token);
 
   if (!data) {
@@ -97,6 +105,24 @@ export default async function MalikPortaliPage({
   // + liste fiyatı geçmişi (yalnızca list_price — min/gizli fiyat malike sızmaz).
   const admin = createAdminClient();
   if (await isPublicFeatureClosed(admin, tenant.id, "client_portals")) return <PublicModuleClosed officeName={tenant.name} />;
+
+  // Kira ekstresi görünümü (?ekstre=<yıl>): aynı token + aynı modül kapısı; yazdırılabilir tek sayfa.
+  if (ekstreRaw !== undefined) {
+    return (
+      <OwnerRentStatementView
+        db={admin}
+        token={token}
+        tenantId={tenant.id}
+        tenantName={tenant.name}
+        propertyId={property.id}
+        propertyLabel={property.title ?? property.code}
+        ownerName={ownerName}
+        rawYear={Number(ekstreRaw)}
+      />
+    );
+  }
+  const ownerSettings = await readTenantSettings(admin, tenant.id, [OWNER_WEEKLY_REPORT_KEY]);
+  const weeklyReportOn = ownerSettings[OWNER_WEEKLY_REPORT_KEY] === true;
   const [{ data: propertyRel }, { data: coverRow }, { data: priceRows }] = await Promise.all([
     admin
       .from("properties")
@@ -251,6 +277,9 @@ export default async function MalikPortaliPage({
           </div>
         </section>
 
+        {/* Haftalık pazarlama raporu (ofis ayarı açıksa) */}
+        {weeklyReportOn ? <OwnerWeeklyReportSection db={admin} tenantId={tenant.id} propertyId={property.id} /> : null}
+
         {/* Yayın durumu */}
         <PortalSection id="yayinlar" icon={RadioTower} title="Portal Yayınları" iconClassName="text-brand-600">
           {portalListings.length === 0 ? (
@@ -389,6 +418,9 @@ export default async function MalikPortaliPage({
             </div>
           )}
         </PortalSection>
+
+        {/* Kira ekstresi (portföyde kira kaydı varsa) */}
+        <OwnerRentStatementSection db={admin} tenantId={tenant.id} propertyId={property.id} token={token} />
 
         {/* Açıklama */}
         {property.description && (

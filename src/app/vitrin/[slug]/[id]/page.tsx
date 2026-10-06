@@ -206,6 +206,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .select("eids_property_no")
     .eq("id", property.id)
     .eq("tenant_id", tenant.id)
+    .eq("is_sample", false)
     .maybeSingle();
   const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
 

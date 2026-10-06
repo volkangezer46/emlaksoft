@@ -13,6 +13,8 @@ import { DEAL_MIN_IDLE_DAYS, DEAL_RISK_RULE_ID, evaluateDealRisk } from "@/lib/i
 import { PRICE_ACTION_RULE_ID, PRICE_MIN_DAYS, evaluatePriceAction } from "@/lib/insights/rules/price-action";
 import { DEADLINE_RULE_ID, evaluateDeadlines } from "@/lib/insights/rules/deadline";
 import { ANOMALY_RULE_ID, evaluateAnomalies } from "@/lib/insights/rules/anomaly";
+import { LIFECYCLE_RULE_ID, evaluateLifecycle } from "@/lib/insights/rules/lifecycle";
+import { loadLifecycleFacts } from "@/lib/insights/lifecycle-facts";
 
 /**
  * KURAL KAYIT LİSTESİ (tek ortak dosya). Sonraki rol paketleri (danışman 5a, yönetim 5b, muhasebe 5c)
@@ -76,6 +78,12 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     id: ANOMALY_RULE_ID,
     kind: "anomaly",
     run: async (admin, tenantId, nowMs) => evaluateAnomalies(await loadWeeklySeries(admin, tenantId), nowMs),
+  },
+  {
+    // Satış sonrası / yeniden satış / çapraz satış (alımın 3-5. yılı, kira bitişine 90 gün, evini satan malik).
+    id: LIFECYCLE_RULE_ID,
+    kind: "match_suggestion",
+    run: async (admin, tenantId, nowMs) => evaluateLifecycle(await loadLifecycleFacts(admin, tenantId, nowMs), nowMs),
   },
 ];
 

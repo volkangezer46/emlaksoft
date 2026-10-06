@@ -51,7 +51,7 @@ export async function runLicenseReminders(db: Db, todayKey: string): Promise<Lic
   const { data: tenants, error } = await db
     .from("tenants")
     .select("id, license_no, license_valid_until, status")
-    .in("status", ["active", "trialing", "past_due"])
+    .in("status", ["active", "trial", "past_due"])
     .not("license_valid_until", "is", null)
     .gte("license_valid_until", addDays(todayKey, -30))
     .lte("license_valid_until", addDays(todayKey, 60))

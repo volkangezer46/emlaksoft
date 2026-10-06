@@ -30,6 +30,10 @@ import {
 import type { MatchFeedbackVerdict } from "@/app/actions/customer-portal-feedback";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { formatDateTimeTr } from "@/lib/format";
+import { readTenantSettings } from "@/lib/settings/tenant-read";
+import { HOME_VALUE_SUMMARY_KEY } from "@/lib/settings/registry/tenant";
+import { loadHomeValues } from "@/lib/home-value/load";
+import { HOME_VALUE_NOTE } from "@/lib/home-value/core";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +147,10 @@ export default async function CustomerPortalPage({
           .in("property_id", matchIds)
       : Promise.resolve({ data: [] as { property_id: string; verdict: string }[] }),
   ]);
+
+  // "Evinizin güncel değeri" (ofis ayarı; varsayılan kapalı): yalnız kazanılmış satış + orta/yüksek güvenli emsal aralığı.
+  const homeValueOn = (await readTenantSettings(admin, tenant.id, [HOME_VALUE_SUMMARY_KEY]))[HOME_VALUE_SUMMARY_KEY] === true;
+  const homeValues = homeValueOn ? await loadHomeValues(admin, tenant.id, customer.id) : [];
 
   const advisorId = (customerRel?.assigned_to as string | null) ?? null;
   const { data: advisor } = advisorId
@@ -422,6 +430,25 @@ export default async function CustomerPortalPage({
                 </div>
               ))}
             </div>
+          </PortalSection>
+        )}
+
+        {homeValues.length > 0 && (
+          <PortalSection id="guncel-deger" icon={Building2} title="Evinizin güncel değeri (tahmin)">
+            <div className="space-y-2">
+              {homeValues.map((h) => (
+                <div key={h.propertyId} className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
+                  <p className="text-sm font-semibold text-ink-950">{h.label}</p>
+                  <p className="mt-1 font-display text-lg font-extrabold text-ink-950">
+                    {money(h.display.low)} – {money(h.display.high)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    Tahmin · {h.display.compCount} emsal · güven: {h.display.confidence}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-text-faint">{HOME_VALUE_NOTE}</p>
           </PortalSection>
         )}
 
