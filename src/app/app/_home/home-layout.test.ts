@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { heroContextLabel, homeLayoutFor, homeVariantOf, showsSalesBlocks } from "./home-layout";
 
@@ -76,6 +77,11 @@ describe("homeLayoutFor rol matrisi", () => {
     const a = homeLayoutFor("owner");
     a.metrics.pop();
     expect(homeLayoutFor("owner").metrics).toHaveLength(5);
+  });
+  it("ilk yük bütçesi: ana ekran `ui/motion` barrel'ını içe aktarmaz (Reveal/MotionProvider motion çekirdeğini ~19 KB ekler; ölçüm 2026-10-06)", () => {
+    for (const f of ["src/app/app/page.tsx", "src/app/app/_home/ana-hero.tsx", "src/app/app/_home/dikkat.tsx", "src/app/app/_home/metrik-seridi.tsx"]) {
+      expect(readFileSync(f, "utf8"), f).not.toMatch(/from\s+["']@\/components\/ui\/motion["']/);
+    }
   });
   it("hero bağlam etiketi role ve kapsama göre", () => {
     expect(heroContextLabel(homeLayoutFor("owner"), true)).toBe("Ofis görünümü");

@@ -14,7 +14,8 @@ import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboard-grid";
 import { DeferredSection } from "@/components/ui/deferred-section";
-import { FadeSwap } from "@/components/ui/motion";
+// Doğrudan dosyadan: `ui/motion` barrel'ı Reveal/MotionProvider (motion çekirdeği ~19 KB) ile birlikte gelir; FadeSwap 0 KB CSS.
+import { FadeSwap } from "@/components/ui/motion/fade-swap";
 import { parsePeriod } from "@/components/ui/premium";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
