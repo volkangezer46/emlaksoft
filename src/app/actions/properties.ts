@@ -30,7 +30,8 @@ import { assignPoolEntryAsSystem } from "@/lib/pool/system-assign";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { notifyNewListing, notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
 import { shortAuthorityWarning } from "@/lib/eids/authority-term";
-import { now as clockNow } from "@/lib/clock";
+import { now as clockNow, trDayKey } from "@/lib/clock";
+import { notifyAssignment } from "@/lib/assignment-notify";
 
 export type PropertyResult = {
   error?: string;
@@ -780,6 +781,27 @@ export async function reassignProperty(formData: FormData): Promise<void> {
   if (!id) return;
 
   const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("properties")
+    .select("id, property_code, title, assigned_to")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!current) return;
+  const previous = (current.assigned_to as string | null) ?? null;
+  if ((assignedTo || null) === previous) return;
+  // Hedef danışman bu ofisin AKTİF kullanıcısı olmalı (müşteri devriyle aynı kural; başka ofisin kimliği yazılamaz).
+  if (assignedTo) {
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", assignedTo)
+      .eq("tenant_id", gate.tenantId)
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!target) return;
+  }
   const { error } = await supabase
     .from("properties")
     .update({ assigned_to: assignedTo || null, updated_at: new Date().toISOString() })
@@ -795,8 +817,20 @@ export async function reassignProperty(formData: FormData): Promise<void> {
     action: "property.reassign",
     entityType: "property",
     entityId: id,
+    oldValue: { assigned_to: previous },
     newValue: { assigned_to: assignedTo || null },
   });
+  if (assignedTo && assignedTo !== gate.userId) {
+    const label = [current.property_code, current.title].filter(Boolean).join(" ") || "Portföy";
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: assignedTo,
+      title: `Size portföy atandı: ${String(label).slice(0, 80)}`,
+      body: "Portföy kartını inceleyin; malik ve ilan durumunu kontrol edip ilk adımı planlayın.",
+      href: `/app/portfoyler/${id}`,
+      dedupeKey: `property-assign:${id}:${previous ?? "yok"}:${assignedTo}:${trDayKey()}`,
+    });
+  }
   revalidatePath("/app/portfoyler");
   revalidatePath(`/app/portfoyler/${id}`);
   revalidateTenantData(gate.tenantId);

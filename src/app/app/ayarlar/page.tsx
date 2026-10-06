@@ -40,6 +40,7 @@ import { LogoUploadForm } from "./logo-upload-form";
 import { IntegrationsForm } from "./integrations-form";
 import { ReadOnlyGate } from "./read-only-gate";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
+import { loadNotificationChannels } from "@/lib/notification-channels";
 import { planLabel } from "@/lib/billing/plans";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { canManageModules } from "@/lib/modules/permissions";
@@ -309,7 +310,7 @@ export default async function SettingsPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-        <NotificationPrefsPanel initial={notifPrefs} />
+        <NotificationPrefsPanel initial={notifPrefs} channels={await loadNotificationChannels(tenantId)} />
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="font-display font-bold text-ink-950">Hızlı bağlantılar</h2>
           <p className="mt-1 text-xs text-text-muted">Operasyon ve uyum kısayolları</p>

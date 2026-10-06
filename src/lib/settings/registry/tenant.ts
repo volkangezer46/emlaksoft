@@ -173,6 +173,10 @@ export const NOTIFY_DEFAULTS: { id: string; label: string; description: string; 
   { id: "rentOverdue", label: "Geciken kira", description: "Geciken kira tahsilatı uyarıları", default: true },
   { id: "network", label: "Ofis ağı", description: "Ofis ağı paylaşım bildirimleri", default: true },
   { id: "insight", label: "İçgörüler", description: "Akıllı içgörü bildirimleri", default: true },
+  { id: "support", label: "Destek talepleri", description: "Destek talebi yanıt ve durum", default: true },
+  { id: "assignment", label: "Devir ve atamalar", description: "Size devredilen müşteri, portföy, iş yükü ve başkasının sizin adınıza açtığı randevu", default: true },
+  { id: "authority", label: "Portföy yetki bitimi", description: "Portföy yetki (satış/kiralama yetkisi) bitiş hatırlatmaları", default: true },
+  { id: "survey", label: "Anket sonuçları", description: "Düşük puan takibi, destekleyen müşteri ve ekip nabzı daveti", default: true },
 ];
 
 export const notifyKey = (id: string) => `office.notify.default_${id.toLowerCase()}`;
