@@ -27,6 +27,12 @@ import {
 } from "@/components/public/portal-kit";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { formatDateTr, formatDateTimeTr } from "@/lib/format";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +99,7 @@ export default async function MalikPortaliPage({
   // + liste fiyatı geçmişi (yalnızca list_price — min/gizli fiyat malike sızmaz).
   const admin = createAdminClient();
   if (await isPublicFeatureClosed(admin, tenant.id, "client_portals")) return <PublicModuleClosed officeName={tenant.name} />;
-  const [{ data: propertyRel }, { data: coverRow }, { data: priceRows }] = await Promise.all([
+  const [{ data: propertyRel }, { data: coverRows }, { data: priceRows }] = await Promise.all([
     admin
       .from("properties")
       .select("assigned_to, tenant:tenants(phone)")
@@ -102,16 +108,18 @@ export default async function MalikPortaliPage({
       .eq("is_sample", false)
       .is("deleted_at", null)
       .maybeSingle(),
-    admin
-      .from("property_media")
-      .select("id")
-      .eq("property_id", property.id)
-      .eq("tenant_id", tenant.id)
-      .eq("kind", "image")
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+    // KVKK P0-9: kapak belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
+    selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", property.id)
+        .eq("tenant_id", tenant.id)
+        .eq("kind", "image")
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .limit(50),
+    ),
     admin
       .from("property_price_history")
       .select("id, old_price, new_price, change_pct, created_at")
@@ -143,7 +151,7 @@ export default async function MalikPortaliPage({
     contactPhone,
     `Merhaba, ${property.title ?? property.code} malik paneli üzerinden yazıyorum.`,
   );
-  const coverId = coverRow?.id ?? null;
+  const coverId = firstPublicImageByProperty(coverRows).get(property.id) ?? null;
   const coverSrc = coverId
     ? createShortLivedPropertyMediaUrl(coverId, "owner-portal")
     : null;

@@ -26,6 +26,12 @@ import { AgentShareCard } from "./agent-share-card";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
 
 /**
  * Danışman dijital kartviziti — PUBLIC mini profil sitesi.
@@ -189,19 +195,22 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
   const totalListings = listingCount ?? listings.length;
 
   // Kapak görselleri — vitrin kartıyla aynı seçim kuralı (kapak > sıra).
-  const coverMap = new Map<string, string>();
+  let coverMap = new Map<string, string>();
   if (listings.length) {
-    const { data: media } = await admin
-      .from("property_media")
-      .select("id, property_id, is_cover, sort_order")
-      .eq("kind", "image")
-      .in(
-        "property_id",
-        listings.map((p) => p.id),
-      )
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true });
-    for (const m of media ?? []) if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
+    // KVKK P0-9: kapak belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
+    const { data: media } = await selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("kind", "image")
+        .in(
+          "property_id",
+          listings.map((p) => p.id),
+        )
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true }),
+    );
+    coverMap = firstPublicImageByProperty(media);
   }
 
   /*

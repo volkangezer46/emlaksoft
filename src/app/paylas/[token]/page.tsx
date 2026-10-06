@@ -11,10 +11,20 @@ import { ShareFeedback } from "@/components/public/share-feedback";
 import { ShareButton } from "@/components/public/share-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicTenantActive } from "@/lib/public-tenant";
-import { isPublicListingImage } from "@/lib/public-property-media";
+import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { normalizeExternalHref } from "@/lib/external-href";
+
+type ShareMediaRow = {
+  id: string;
+  kind: string;
+  file_type: string | null;
+  file_name: string | null;
+  external_url: string | null;
+  is_cover: boolean;
+  is_document?: boolean | null;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -172,13 +182,16 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       .eq("is_sample", false)
       .is("deleted_at", null)
       .maybeSingle(),
-    admin
-      .from("property_media")
-      .select("id, kind, file_type, file_name, external_url, is_cover")
-      .eq("property_id", share.entity_id)
-      .eq("tenant_id", share.tenant_id)
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true }),
+    // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
+    selectWithDocumentFlag<ShareMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover", (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", share.entity_id)
+        .eq("tenant_id", share.tenant_id)
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true }),
+    ),
     share.created_by
       ? admin
           .from("profiles")
@@ -211,7 +224,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const description = await fetchDescription(admin, share.entity_id, share.tenant_id, property.features);
 
   const media = mediaRows ?? [];
-  // KVKK P0-9: belge gibi görünen görsel (tapu, yetki belgesi...) paylaşım linkinde gösterilmez (tek kural).
+  // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel paylaşım linkinde gösterilmez (tek kural).
   const images = media.filter((m) => isPublicListingImage(m));
   const tours = media.flatMap((item) => {
     const externalUrl = normalizeExternalHref(item.external_url);

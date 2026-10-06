@@ -17,7 +17,7 @@ import type { GroupSpec } from "../src/lib/migration-pairs";
  * kesin bekleyen listesi icin salt-okunur `npm run db:migrate -- --dry-run` esastir.
  * GUNCELLEME (sahip bildirimi): PB1..PB8 (20260825000100..001300) ve P12 (20260816000500) de CANLIDA UYGULANDI.
  * GUNCELLEME (2026-10-06 sahip bildirimi): PB9-PB11 (20260826000100..000800), 000900/001000/001100 ve PB40/PB42/PB43/PB44
- * (20261006000100..000600) de CANLIDA. Depoda bekleyen: PB45 (20261006000700..000720). Taban bu aracta bilerek ilerletilmedi (pencere
+ * (20261006000100..000600) de CANLIDA. PB46 (20261007000200..000220) CANLIDA (koordinator bildirimi). Depoda bekleyen: PB45 (20261006000700..000720; kesin durum --dry-run), PB48 (20261007000100). Taban bu aracta bilerek ilerletilmedi (pencere
  * sirasi/bagimlilik denetimi gecmis pencereler icin de calismaya devam etsin); kesin liste yine --dry-run.
  */
 export const APPLIED_HEAD = "20260813000300";
@@ -68,7 +68,6 @@ const F = {
   p5Notes: "20260824001100_p5_neighborhood_notes_owner_scope.sql",
   p5DocReq: "20260824001200_p5_document_requests_write_scope.sql",
   p5Revoke: "20260824001300_p5_service_rpc_revoke_anon_authenticated.sql",
-  k4IsDocument: "20260818000400_property_media_is_document.sql",
   // 2026-10-05: supabase/proposed/ taslaklarindan TERFI (eski ad -> yeni ad, YAYIN_PENCERESI_2.md tablosu).
   // Sira bagimliliga gore: fiyat butunlugu -> (koltuk kilidi) -> duraklatma/extra_seats (D'siz) -> koltuk satisi.
   ownerLink: "20260825000100_properties_owner_customer_link.sql", // eski 20261005000100
@@ -160,6 +159,9 @@ const F = {
   planSubscriptionAmount: "20261006000700_fix_plan_subscription_amount.sql",
   reportingSampleScope: "20261006000710_reporting_aggregates_sample_scope.sql",
   ownershipTransferRpc: "20261006000720_ownership_transfer_rpc.sql",
+  // PB48 KVKK P0-9 kalici cozum: property_media.is_document + ad kurali SQL fonksiyonu + INSERT tetikleyicisi.
+  // (Eski K4 dalindaki 20260818000400_property_media_is_document HIC main'e girmedi/uygulanmadi; bu dosya onun yerine.)
+  mediaIsDocument: "20261007000100_property_media_is_document.sql",
   // PB46 ilan kontrol veri yollari: yasam dongusu gecis kaydi (append-only) -> envanter ice aktarma + eslesme kuyrugu
   // (JWT RPC) -> ilce kirilimi RPC'leri + SLA yeniden acilis duzeltmesi.
   lcLifecycleEvents: "20261007000200_lc_lifecycle_events.sql",
@@ -214,7 +216,6 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.p5Notes]: "siki", // mahalle notu sahip/yonetici kapsami; yonetici olmayan baskasinin notunu silemez
     [F.p5DocReq]: "siki", // evrak linki: authenticated UPDATE yalniz iptal (active -> revoked)
     [F.p5Revoke]: "siki", // increment_listing_view / increment_referral_click: anon+authenticated EXECUTE geri alinir
-    [F.k4IsDocument]: "ek",
     // 2026-10-05 terfi edenler
     [F.ownerLink]: "ek", // nullable sutun + FK + ayni-ofis trigger'i (yalniz owner_customer_id yazilinca calisir)
     [F.geo]: "ek", // yeni geo_* tablolari/sutunlari + service_role RPC'leri; ofis bildirimi INSERT'i durum alanlarini kilitler
@@ -279,6 +280,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.planSubscriptionAmount]: "davranis", // 9 argumanli ESKI fulfill_billing_payment overload DROP (kod cagirmaz); 9 argumanli cagri artik 10 argumanli dogru tanima cozulur
     [F.reportingSampleScope]: "davranis", // tenant_commission/reporting_aggregates imzasina p_sample_threshold (varsayilan 5); esik ustu ofiste ornek kayitlar toplamlardan DUSER
     [F.ownershipTransferRpc]: "ek", // yeni authenticated RPC'ler ownership_transfer_request/accept/resolve (JWT kimligi, ayni islemde audit_logs); mevcut 3 service_role RPC degismez
+    [F.mediaIsDocument]: "davranis", // public gorunurluk daralir: is_document=true medya hicbir public yuzeyde/serviste yok; belge adli mevcut satirlar true; INSERT tetikleyicisi belge adini isaretler + kapak yapmaz
     [F.lcLifecycleEvents]: "ek", // yeni append-only tablo lc_lifecycle_events + property_control_state AFTER tetikleyicisi (yalniz olay yazar, hata yutulur)
     [F.lcInventoryMatching]: "ek", // yeni tablo listing_inventory_imports + 2 authenticated RPC (lc_inventory_import, lc_match_decide) mevcut service_role cekirdeklerini sarar
     [F.lcDistrictSlaReset]: "davranis", // 2 yeni invoker RPC (ilce kirilimi) + listing_anomalies tetikleyicisi: yeniden acilan uyarinin eski SLA asama kayitlarini siler (yukseltme bastan isler)
@@ -319,7 +321,6 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P10-ofis-kontrol", order: 10, title: "(UYGULANDI) Ofis kontrol merkezi + onay istekleri RLS", files: [F.oversight, F.sec3Approval] },
     { id: "P11-f-modulleri", order: 11, title: "(UYGULANDI) Mahalle notlari, yasal kayit defteri, evrak linkleri", files: [F.neighborhood, F.ledger, F.docRequests, F.p5Notes, F.p5DocReq] },
     { id: "P11b-sayac-revoke", order: 11.5, title: "(UYGULANDI) Servis RPC sayaclari: anon/authenticated EXECUTE revoke", files: [F.p5Revoke] },
-    { id: "PK4-is-document", order: 13, title: "K4 is_document (dal main'e girerse): migration KODDAN ONCE", files: [F.k4IsDocument] },
     // ---- 2026-10-05 terfi: YAYIN_PENCERESI_2.md sirasi (PB1..PB8 UYGULANDI; PB9 BEKLIYOR) ----
     { id: "PB1-malik-baglantisi", order: 14, title: "Malik-musteri baglantisi (properties.owner_customer_id, ikinci properties->customers FK)", files: [F.ownerLink] },
     { id: "PB2-cografya", order: 15, title: "Cografya tek merkez yonetimi (surum, alias, ofis bildirimi, birlestir/tasi RPC)", files: [F.geo] },
@@ -389,6 +390,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
     { id: "PB45-bekleyen-isler", order: 29.96, title: "Bekleyen isler: eski 9 arg fulfill overload DROP -> rapor/komisyon ozetleri ornek veri kapsami -> sahiplik devri JWT RPC'leri", files: [F.planSubscriptionAmount, F.reportingSampleScope, F.ownershipTransferRpc] },
     { id: "PB46-ilan-kontrol-veri-yollari", order: 29.97, title: "Ilan kontrol veri yollari: yasam dongusu gecis kaydi -> envanter ice aktarma + eslesme kuyrugu (JWT RPC) -> ilce kirilimi + SLA yeniden acilis duzeltmesi", files: [F.lcLifecycleEvents, F.lcInventoryMatching, F.lcDistrictSlaReset] },
+    { id: "PB48-medya-belge-isareti", order: 29.985, title: "KVKK P0-9: property_media.is_document (belge public'e cikmaz) + ad kurali fonksiyonu + INSERT tetikleyicisi; kod sutun yokken ad kuralina duser (sira serbest)", files: [F.mediaIsDocument] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -516,12 +518,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcDistrictSlaReset, F.lcAnomalyTables],
   ],
 
-  externalPending: [
-    {
-      file: F.k4IsDocument,
-      branch: "worktree-agent-aaa0895d41f425d97 (K4)",
-      rule: "migration-once",
-      note: "public medya sorgulari is_document sutununa bagli: migration KODDAN ONCE uygulanmali (kod once yayinlanirsa vitrinde gorsel kaybolur).",
-    },
-  ],
+  // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
+  // yokken ad kuralina dustugu icin "migration once" kurali artik gerekmez.
+  externalPending: [],
 };

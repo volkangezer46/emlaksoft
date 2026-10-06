@@ -329,6 +329,11 @@ Rol smoke'u §6'da.
 
 ### K4 `is_document` (yalnız K4 dalı main'e girerse)
 
+> **2026-10-06: İPTAL.** K4 dosyası `20260818000400` main'e girmedi ve uygulanmadı. Yerine **PB48
+> `20261007000100_property_media_is_document`** (+rollback): kod sütun yokken ad kuralına düşer, bu yüzden "migration önce"
+> istisnası artık YOK (sıra serbest). Aşağıdaki doğrulama sorgusu ve smoke PB48 için de geçerlidir; ayrıca
+> `select public.media_file_name_looks_like_document('Tapu.jpg')` -> true, `('IMG_1.jpg')` -> false.
+
 ```sql
 select column_name, data_type, column_default from information_schema.columns
 where table_schema='public' and table_name='property_media' and column_name='is_document';   -- 1 satır
@@ -398,7 +403,7 @@ select pg_get_functiondef('public.can_view_commission_earnings(uuid,uuid,uuid)':
   ya da boş durum; uydurma veri yok). Kod yayını = doğrulanmış `main`'in sahip tarafından push'lanması (Vercel deploy'u push tetikler;
   `docs/DEPLOY.md`). Deploy yeşil (`/api/health`) olmadan migration penceresine girmeyin.
 - Migration uygulandıktan sonra özellik kendiliğinden "etkin" olur (kod probe'ları şemayı görür); ayrıca deploy gerekmez.
-- **İSTİSNA 1 — K4 `is_document`: migration ÖNCE, kod SONRA.** Public medya sorguları `is_document` sütununa bağlıdır; sütun yokken kod yayınlanırsa
+- **(İPTAL 2026-10-06; PB48 sıra serbest) İSTİSNA 1 — K4 `is_document`: migration ÖNCE, kod SONRA.** Public medya sorguları `is_document` sütununa bağlıdır; sütun yokken kod yayınlanırsa
   public vitrinde görseller kaybolur. K4 dalı `main`'e alınmadan migration'ı uygulayın.
 - **İSTİSNA 2 — P12 kazanç gizliliği:** kodun rol bazlı davranışı (etki taraması) ÖNCE yayında olmalı, sonra migration (zaten "kod önce"); fakat
   ayrı gün ve geri alma hazır.

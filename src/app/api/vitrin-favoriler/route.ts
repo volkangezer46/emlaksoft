@@ -4,6 +4,12 @@ import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
+import {
   clientIpFromHeaders,
   readRequestBodyLimited,
   requestBodyTooLarge,
@@ -135,20 +141,23 @@ export async function POST(req: NextRequest) {
     if (propertiesError) return databaseUnavailable(operation, propertiesError);
 
     const rows = props ?? [];
-    const coverMap = new Map<string, string>();
+    let coverMap = new Map<string, string>();
     if (rows.length) {
       operation = "media_lookup";
-      const { data: media, error: mediaError } = await admin
-        .from("property_media")
-        .select("id, property_id, is_cover, sort_order")
-        .eq("kind", "image")
-        .in("property_id", rows.map((p) => p.id))
-        .order("is_cover", { ascending: false })
-        .order("sort_order", { ascending: true });
+      // KVKK P0-9: kapak belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
+      const { data: media, error: mediaError } = await selectWithDocumentFlag<PublicCoverCandidate[]>(
+        PUBLIC_COVER_COLUMNS,
+        (columns) =>
+          admin
+            .from("property_media")
+            .select(columns)
+            .eq("kind", "image")
+            .in("property_id", rows.map((p) => p.id))
+            .order("is_cover", { ascending: false })
+            .order("sort_order", { ascending: true }),
+      );
       if (mediaError) return databaseUnavailable(operation, mediaError);
-      for (const m of media ?? []) {
-        if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
-      }
+      coverMap = firstPublicImageByProperty(media);
     }
 
     // İstenen sıra korunur (ziyaretçinin favori ekleme sırası)

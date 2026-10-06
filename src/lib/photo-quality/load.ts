@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { selectWithDocumentFlag } from "@/lib/public-property-media";
 import { evaluatePhotoQuality, isPhotoGap, type PhotoMedia, type PhotoQualityReport } from "./evaluate";
 
 /**
@@ -11,22 +12,18 @@ const BASE_COLS = "id, kind, is_cover, file_size, file_type, file_name, sort_ord
 
 type MediaRow = Omit<PhotoMedia, "is_document"> & { is_document?: boolean | null };
 
-/** is_document kolonu bazı ortamlarda henüz yok: önce onunla dener, hata olursa onsuz tekrar eder. */
+/** is_document kolonu bazı ortamlarda henüz yok: tek kaynak yardımcı önce onunla dener, yoksa onsuz tekrar eder. */
 async function readPropertyMedia(supabase: SupabaseClient, propertyId: string): Promise<MediaRow[] | null> {
-  const run = async (cols: string) => {
-    const res = await supabase
+  const { data, error } = await selectWithDocumentFlag<MediaRow[]>(BASE_COLS, (cols) =>
+    supabase
       .from("property_media")
       .select(cols)
       .eq("property_id", propertyId)
       .eq("kind", "image")
       .order("sort_order", { ascending: true })
-      .limit(300);
-    return { rows: res.error ? null : ((res.data ?? []) as unknown as MediaRow[]), error: res.error };
-  };
-  const withDoc = await run(`${BASE_COLS}, is_document`);
-  if (withDoc.rows) return withDoc.rows;
-  const plain = await run(BASE_COLS);
-  return plain.rows;
+      .limit(300),
+  );
+  return error ? null : (data ?? []);
 }
 
 export type PhotoQualityLoad = { enabled: false } | { enabled: true; report: PhotoQualityReport };

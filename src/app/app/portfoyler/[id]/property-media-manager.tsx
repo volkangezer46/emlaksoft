@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useActionState } from "react";
 import Image from "next/image";
-import { AlertCircle, Camera, Check, Copy, Droplets, Film, GripVertical, ImagePlus, Link2, Loader2, RefreshCw, ScanText, Sparkles, Star, Trash2, Upload, View, X } from "lucide-react";
+import { AlertCircle, Camera, Check, Copy, Droplets, FileLock2, Film, GripVertical, ImageIcon, ImagePlus, Link2, Loader2, LockKeyhole, RefreshCw, ScanText, Sparkles, Star, Trash2, Upload, View, X } from "lucide-react";
 import {
   addPropertyMediaUrl,
   applyDocFieldsToProperty,
@@ -14,6 +14,7 @@ import {
   preparePropertyMediaUpload,
   reorderPropertyMedia,
   setCoverPropertyMedia,
+  setPropertyMediaDocument,
   type MediaResult,
   type PropertyDocFields,
 } from "@/app/actions/property-media";
@@ -37,6 +38,8 @@ export type MediaItem = {
   is_cover: boolean;
   has_watermark?: boolean | null;
   sort_order?: number | null;
+  /** KVKK P0-9: belge (tapu, yetki belgesi...) — public yüzeylerde gösterilmez. Sunucu etkin değeri hesaplar. */
+  is_document?: boolean | null;
 };
 
 /** OCR sonuç dialogundaki düzenlenebilir alanlar (C8). */
@@ -70,6 +73,8 @@ type QueueItem = {
   name: string;
   status: UploadStatus;
   error?: string;
+  /** Yükleme türü "Belge" seçiliyken kuyruğa girdi (yeniden denemede de korunur). */
+  asDocument: boolean;
 };
 
 /** Uzun kenar bu değeri aşan görseller yüklemeden önce küçültülür (süre + kota). */
@@ -134,10 +139,13 @@ export function PropertyMediaManager({
   watermark = DEFAULT_WATERMARK,
   officeName = "",
   logoUrl = null,
+  documentFlagAvailable = true,
 }: {
   propertyId: string;
   media: MediaItem[];
   canEdit: boolean;
+  /** `property_media.is_document` sütunu var mı (migration öncesi işaret anahtarları gizlenir, ad kuralı geçerli). */
+  documentFlagAvailable?: boolean;
   /** Ofis filigran ayarı (Ayarlar › Fotoğraf filigranı) */
   watermark?: WatermarkSettings;
   officeName?: string;
@@ -149,6 +157,8 @@ export function PropertyMediaManager({
   const [queue, setQueue] = useState<QueueItem[]>([]);
   // Son parti kameradan mı geldi? → yükleme bitince "Bir daha çek" göster (art arda çekim akışı)
   const [lastFromCamera, setLastFromCamera] = useState(false);
+  // Yükleme türü: Fotoğraf (paylaşımda gösterilir) / Belge (tapu, yetki belgesi — dışarıda gösterilmez)
+  const [uploadAsDocument, setUploadAsDocument] = useState(false);
   const [, startTransition] = useTransition();
 
   // Filigran logosu bir kez yüklenip önbelleğe alınır (20 fotoğrafta 20 istek olmasın).
@@ -176,7 +186,8 @@ export function PropertyMediaManager({
       // ölçeklenir, küçültme damgayı bulanıklaştırmaz.
       let file = resized;
       let stamped = false;
-      if (watermark.enabled) {
+      // Belgeye filigran basılmaz (okunurluk; zaten dışarıda gösterilmez).
+      if (watermark.enabled && !item.asDocument) {
         patchQueue(item.key, { status: "stamping" });
         const logo = watermark.mode === "text" ? null : await getLogo();
         const res = await applyWatermarkToFile(resized, watermark, {
@@ -193,6 +204,7 @@ export function PropertyMediaManager({
         fileSize: file.size,
         fileType: file.type,
         hasWatermark: stamped,
+        isDocument: item.asDocument,
       });
       if (!prepared.ok) {
         patchQueue(item.key, { status: "error", error: prepared.error });
@@ -205,7 +217,7 @@ export function PropertyMediaManager({
         return;
       }
 
-      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId);
+      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId, item.asDocument);
       if (!finalized.ok) {
         patchQueue(item.key, { status: "error", error: finalized.error });
         return;
@@ -225,6 +237,7 @@ export function PropertyMediaManager({
       file,
       name: file.name || "fotoğraf.jpg",
       status: "queued",
+      asDocument: uploadAsDocument,
     }));
     // Önceki partinin biten satırları temizlenir, hatalılar yeniden dene için kalır
     setQueue((prev) => [
@@ -333,9 +346,12 @@ export function PropertyMediaManager({
     }
   }
 
-  const serverImages = media.filter((m) => m.kind === "image");
+  // KVKK P0-9: belge işaretli görseller ayrı bölümde; public yüzeylerde (paylaşım, sunum, vitrin...) gösterilmez.
+  const allImages = media.filter((m) => m.kind === "image");
+  const serverImages = allImages.filter((m) => !m.is_document);
+  const documents = allImages.filter((m) => m.is_document);
   const links = media.filter((m) => m.kind !== "image");
-  const imageKey = serverImages.map((m) => m.id).join(",");
+  const imageKey = allImages.map((m) => m.id).join(",");
 
   // ---------------------------------------------------------------------
   // Sürükle-bırak sıralama (anlaşma tahtasıyla AYNI teknik: HTML5 native
@@ -348,10 +364,11 @@ export function PropertyMediaManager({
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
 
-  const byId = new Map(serverImages.map((m) => [m.id, m]));
+  const byId = new Map(allImages.map((m) => [m.id, m]));
+  const photoById = new Map(serverImages.map((m) => [m.id, m]));
   const images = order
     ? [
-        ...order.map((id) => byId.get(id)).filter((m): m is MediaItem => Boolean(m)),
+        ...order.map((id) => photoById.get(id)).filter((m): m is MediaItem => Boolean(m)),
         ...serverImages.filter((m) => !order.includes(m.id)),
       ]
     : serverImages;
@@ -383,7 +400,7 @@ export function PropertyMediaManager({
     setSavingOrder(true);
     setOrderError(null);
     startTransition(async () => {
-      const r = await reorderPropertyMedia(propertyId, [...ids, ...links.map((l) => l.id)]);
+      const r = await reorderPropertyMedia(propertyId, [...ids, ...documents.map((d) => d.id), ...links.map((l) => l.id)]);
       setSavingOrder(false);
       if (r.error) {
         setOrderError(r.error);
@@ -405,12 +422,12 @@ export function PropertyMediaManager({
   if (syncedKey !== imageKey) {
     setSyncedKey(imageKey);
     setOrder(null);
-    const alive = new Set(serverImages.map((m) => m.id));
+    const alive = new Set(allImages.map((m) => m.id));
     setSelected((prev) => prev.filter((id) => alive.has(id)));
   }
 
   const selectedSet = new Set(selected);
-  const allSelected = images.length > 0 && selected.length === images.length;
+  const allSelected = allImages.length > 0 && selected.length === allImages.length;
 
   function toggleSelect(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -421,6 +438,17 @@ export function PropertyMediaManager({
     setBulkError(null);
     startTransition(async () => {
       const r = await bulkDeletePropertyMedia(propertyId, ids);
+      if (r.error) setBulkError(r.error);
+      else setSelected([]);
+    });
+  }
+
+  /** Seçili (ya da tek) görselleri Belge / Fotoğraf olarak işaretler (KVKK P0-9). */
+  function markDocument(ids: string[], isDocument: boolean) {
+    if (ids.length === 0) return;
+    setBulkError(null);
+    startTransition(async () => {
+      const r = await setPropertyMediaDocument(propertyId, ids, isDocument);
       if (r.error) setBulkError(r.error);
       else setSelected([]);
     });
@@ -448,7 +476,8 @@ export function PropertyMediaManager({
             <ImagePlus className="h-4 w-4 text-brand-600" /> Medya galerisi
           </h2>
           <p className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
-            {images.length} fotoğraf · {links.length} video/tur — paylaşım sayfasında gösterilir
+            {images.length} fotoğraf · {documents.length} belge · {links.length} video/tur — fotoğraflar paylaşımda
+            gösterilir, belgeler gösterilmez
             {canEdit ? (
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
@@ -485,6 +514,39 @@ export function PropertyMediaManager({
               className="hidden"
               onChange={(e) => onFileChange(e, true)}
             />
+            {/* Yükleme türü (KVKK P0-9): Belge seçilirse kayıt ilk andan "dışarıda gösterilmez" işaretli doğar. */}
+            <div
+              role="radiogroup"
+              aria-label="Yükleme türü"
+              className="inline-flex rounded-[var(--radius-control)] border border-line bg-canvas p-0.5 text-xs font-semibold"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!uploadAsDocument}
+                onClick={() => setUploadAsDocument(false)}
+                disabled={uploading}
+                title="İlan fotoğrafı: paylaşım, sunum ve vitrinde gösterilir."
+                className={`inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2.5 py-1.5 ${
+                  !uploadAsDocument ? "bg-surface text-ink-950 shadow-sm" : "text-text-muted hover:text-ink-950"
+                }`}
+              >
+                <ImageIcon className="h-3.5 w-3.5" /> Fotoğraf
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={uploadAsDocument}
+                onClick={() => setUploadAsDocument(true)}
+                disabled={uploading}
+                title="Tapu, yetki belgesi, kimlik gibi belgeler: paylaşım, sunum ve vitrinde ASLA gösterilmez."
+                className={`inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2.5 py-1.5 ${
+                  uploadAsDocument ? "bg-surface text-ink-950 shadow-sm" : "text-text-muted hover:text-ink-950"
+                }`}
+              >
+                <FileLock2 className="h-3.5 w-3.5" /> Belge
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => cameraRef.current?.click()}
@@ -500,7 +562,7 @@ export function PropertyMediaManager({
               className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
             >
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Fotoğraf yükle
+              {uploadAsDocument ? "Belge yükle" : "Fotoğraf yükle"}
             </button>
           </div>
         ) : null}
@@ -572,19 +634,19 @@ export function PropertyMediaManager({
           </div>
         ) : null}
 
-        {images.length === 0 && links.length === 0 ? (
+        {allImages.length === 0 && links.length === 0 ? (
           <p className="py-8 text-center text-sm text-text-muted">
             Henüz medya yok. Fotoğraf yükleyin veya video/360° tur bağlantısı ekleyin.
           </p>
         ) : null}
 
-        {images.length > 0 && canEdit ? (
+        {allImages.length > 0 && canEdit ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
             <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-950">
               <input
                 type="checkbox"
                 checked={allSelected}
-                onChange={() => setSelected(allSelected ? [] : images.map((m) => m.id))}
+                onChange={() => setSelected(allSelected ? [] : allImages.map((m) => m.id))}
                 className="h-4 w-4 accent-[var(--brand-600)]"
               />
               Tümünü seç
@@ -593,7 +655,7 @@ export function PropertyMediaManager({
               {selected.length > 0 ? `${selected.length} görsel seçili` : "Sıralamak için sürükleyip bırakın"}
             </span>
             <span className="flex-1" />
-            {selected.length === 1 && !byId.get(selected[0])?.is_cover ? (
+            {selected.length === 1 && !byId.get(selected[0])?.is_cover && !byId.get(selected[0])?.is_document ? (
               <button
                 type="button"
                 onClick={() => makeCover(selected[0])}
@@ -601,6 +663,30 @@ export function PropertyMediaManager({
               >
                 <Star className="h-3.5 w-3.5 text-amber-500" /> Kapak yap
               </button>
+            ) : null}
+            {selected.length > 0 && documentFlagAvailable ? (
+              <>
+                {selected.some((id) => !byId.get(id)?.is_document) ? (
+                  <button
+                    type="button"
+                    onClick={() => markDocument(selected.filter((id) => !byId.get(id)?.is_document), true)}
+                    title="Seçilenler paylaşım, sunum ve vitrinde gösterilmez."
+                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
+                  >
+                    <FileLock2 className="h-3.5 w-3.5" /> Belge yap ({selected.filter((id) => !byId.get(id)?.is_document).length})
+                  </button>
+                ) : null}
+                {selected.some((id) => byId.get(id)?.is_document) ? (
+                  <button
+                    type="button"
+                    onClick={() => markDocument(selected.filter((id) => byId.get(id)?.is_document), false)}
+                    title="Seçilenler ilan fotoğrafı olur ve paylaşımda gösterilir."
+                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
+                  >
+                    <ImageIcon className="h-3.5 w-3.5" /> Fotoğraf yap ({selected.filter((id) => byId.get(id)?.is_document).length})
+                  </button>
+                ) : null}
+              </>
             ) : null}
             {selected.length > 0 ? (
               <ConfirmDialog
@@ -726,6 +812,17 @@ export function PropertyMediaManager({
                         <Star className="h-3.5 w-3.5" />
                       </button>
                     ) : null}
+                    {documentFlagAvailable ? (
+                      <button
+                        type="button"
+                        title="Belge olarak işaretle (dışarıda gösterilmez)"
+                        aria-label="Belge olarak işaretle (dışarıda gösterilmez)"
+                        onClick={() => markDocument([m.id], true)}
+                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white"
+                      >
+                        <FileLock2 className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
                     <ConfirmDialog
                       trigger={
                         <button
@@ -746,6 +843,96 @@ export function PropertyMediaManager({
                 ) : null}
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {/* KVKK P0-9: belgeler ayrı bölümde, kilit rozetiyle; public yüzeylere çıkmaz. */}
+        {documents.length > 0 ? (
+          <div className="mt-5">
+            <h3 className="mb-1 flex items-center gap-1.5 text-sm font-bold text-ink-950">
+              <LockKeyhole className="h-4 w-4 text-text-muted" /> Belgeler ({documents.length})
+            </h3>
+            <p className="mb-3 text-xs text-text-muted">
+              Tapu, yetki belgesi gibi belgeler yalnız ofis içinde görünür; paylaşım linki, sunum, vitrin ve portallarda
+              gösterilmez.
+              {documentFlagAvailable
+                ? ""
+                : " Şimdilik dosya adına göre ayrıldı; işaretleme veritabanı güncellemesinden sonra açılır."}
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {documents.map((m) => (
+                <div
+                  key={m.id}
+                  className={`group relative aspect-[4/3] overflow-hidden rounded-[var(--radius-card)] border bg-canvas ${
+                    selectedSet.has(m.id) ? "border-brand-400 ring-2 ring-brand-400/35" : "border-line"
+                  }`}
+                >
+                  <Image
+                    src={`/api/property-media/${m.id}/download`}
+                    alt="Portföy belgesi"
+                    fill
+                    sizes="(max-width: 640px) 50vw, 25vw"
+                    className="object-cover"
+                    unoptimized
+                    draggable={false}
+                  />
+                  {canEdit ? (
+                    <label className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[var(--radius-control)] bg-ink-950/55 backdrop-blur-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedSet.has(m.id)}
+                        onChange={() => toggleSelect(m.id)}
+                        aria-label="Belgeyi seç"
+                        className="h-4 w-4 accent-[var(--brand-600)]"
+                      />
+                    </label>
+                  ) : null}
+                  <span className="absolute left-1/2 top-2 z-10 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-xs font-bold text-white">
+                    <LockKeyhole className="h-3 w-3" /> Dışarıda gösterilmez
+                  </span>
+                  {canEdit ? (
+                    <div className="hover-action absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-ink-950/80 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
+                      <button
+                        type="button"
+                        title="AI ile oku (tapu/yetki belgesi)"
+                        disabled={ocrPending}
+                        onClick={() => runOcr(m.id)}
+                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60"
+                      >
+                        {ocrBusyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />}
+                      </button>
+                      {documentFlagAvailable ? (
+                        <button
+                          type="button"
+                          title="Fotoğraf yap (paylaşımda gösterilir)"
+                          aria-label="Fotoğraf yap (paylaşımda gösterilir)"
+                          onClick={() => markDocument([m.id], false)}
+                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white"
+                        >
+                          <ImageIcon className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                      <ConfirmDialog
+                        trigger={
+                          <button
+                            type="button"
+                            title="Sil"
+                            className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        }
+                        title="Belge silinsin mi?"
+                        description="Bu belge kalıcı olarak silinir."
+                        confirmLabel="Sil"
+                        formAction={deletePropertyMedia}
+                        hiddenFields={{ id: m.id, property_id: propertyId }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
 

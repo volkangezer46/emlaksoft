@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { now } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
+import { isDocumentMedia, selectWithDocumentFlag } from "@/lib/public-property-media";
 import {
   DOC_KINDS,
   DOC_SOURCES,
@@ -307,10 +308,14 @@ export default async function DocumentsPage({
   /** Kaynağın sayfa penceresi. Kaynak filtre dışıysa SORGU HİÇ ATILMAZ. */
   async function fetchRows(source: DocSource, enabled: boolean): Promise<Record<string, unknown>[]> {
     if (!enabled) return [];
-    const { data, error } = await applyFilters(
-      supabase.from(TABLE[source]).select(COLS[source]).order("created_at", { ascending: false }),
-      source,
-    ).limit(fetchLimit);
+    const run = (columns: string) =>
+      applyFilters(
+        supabase.from(TABLE[source]).select(columns).order("created_at", { ascending: false }),
+        source,
+      ).limit(fetchLimit);
+    // Portföy medyasında belge işareti (KVKK P0-9) seçilir; sütun yoksa sütunsuz tekrar (ad kuralı).
+    const { data, error } =
+      source === "portfoy" ? await selectWithDocumentFlag<unknown[]>(COLS[source], run) : await run(COLS[source]);
     // R1: hata "kayıt yok" gibi görünmesin; error.tsx sınırına düşer.
     if (error) {
       console.error(`belgeler ${source} rows`, error);
@@ -464,21 +469,25 @@ export default async function DocumentsPage({
     property_id: string;
     property: PropertyRef;
     uploader: ProfileRef;
+    is_document?: boolean | null;
   };
   for (const r of mediaRows as unknown as MediaRow[]) {
     const property = one(r.property);
     const displayName =
       r.file_name ?? (r.external_url ? (r.kind === "tour" ? "360° sanal tur bağlantısı" : "Video bağlantısı") : "Adsız medya");
     const kind = r.storage_path ? kindOf(r.file_type, displayName) : "diger";
+    // KVKK P0-9: belge işaretli portföy medyası (sütun yoksa belge adlı) burada "belge" olarak görünür.
+    const isDoc = r.kind === "image" && isDocumentMedia(r);
+    const category = categoryOf("portfoy", displayName, null, kind);
     rows.push({
       key: `portfoy:${r.id}`,
       source: "portfoy",
       id: r.id,
       name: displayName,
-      label: r.kind === "image" ? null : r.kind === "video" ? "Video" : "360° tur",
+      label: isDoc ? "Belge · dışarıda gösterilmez" : r.kind === "image" ? null : r.kind === "video" ? "Video" : "360° tur",
       size: r.file_size,
       kind,
-      category: categoryOf("portfoy", displayName, null, kind),
+      category: isDoc && category === "fotograf" ? "diger" : category,
       createdAt: r.created_at,
       uploaderName: one(r.uploader)?.full_name ?? null,
       relatedLabel: property ? `${property.property_code}${property.title ? ` · ${property.title}` : ""}` : null,

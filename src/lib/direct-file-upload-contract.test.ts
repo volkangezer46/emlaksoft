@@ -50,7 +50,8 @@ describe("customer/property signed direct upload production contract", () => {
     expect(customerUi).toContain("finalizeCustomerFileUpload(customerId, prepared.upload.sessionId)");
     expect(propertyUi).toContain("preparePropertyMediaUpload");
     expect(propertyUi).toContain("uploadToDirectFileTarget");
-    expect(propertyUi).toContain("finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId)");
+    // Üçüncü argüman yalnız belge türü bayrağıdır (KVKK P0-9); dosya meta verisi değil — kimlik yine oturum id'si.
+    expect(propertyUi).toMatch(/finalizePropertyMediaUpload\(propertyId, prepared\.upload\.sessionId(, item\.asDocument)?\)/);
     expect(customerAction).not.toContain("export async function uploadCustomerFile");
     expect(propertyAction).not.toContain("export async function uploadPropertyMedia");
     expect(server).toContain("checkRateLimit(");
