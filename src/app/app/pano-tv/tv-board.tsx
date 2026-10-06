@@ -25,6 +25,7 @@ import {
 import { Brand } from "@/components/brand/brand";
 import { Celebration } from "@/components/ui/illustrations";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { RadialGauge } from "@/components/ui/viz/radial-gauge";
 import { now, trParts } from "@/lib/clock";
 import type { TvData } from "@/lib/tv/tv-data";
 import {
@@ -413,8 +414,6 @@ function Sections({
   const rotorNow = rotor.length ? rotor[Math.floor(tick) % rotor.length] : null;
   const { goal, stats, alerts } = data;
   const sales = settings.template === "satis";
-  const ringR = 42;
-  const circ = 2 * Math.PI * ringR;
   const pct = goal.dealPct ?? 0;
 
   return (
@@ -446,14 +445,13 @@ function Sections({
         <Card title={`Aylık hedef · ${data.monthLabel}`} icon={<Gauge style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
           <div className="tv-goal">
             {goal.dealTarget ? (
-              <div className="tv-ring" role="img" aria-label={`Anlaşma hedefi yüzde ${pct}`}>
-                <svg viewBox="0 0 100 100" aria-hidden>
-                  <circle className="tv-ring-bg" cx="50" cy="50" r={ringR} />
-                  <circle className="tv-ring-fg" cx="50" cy="50" r={ringR} strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} />
-                </svg>
-                <div className="tv-ring-label">
-                  <AnimatedNumber value={pct} kind="percent" />
-                </div>
+              <div className="tv-ring">
+                {/* Tek grafik seti: RadialGauge (canlı değer → akıcı geçiş), renkler pano token'larından. */}
+                <RadialGauge value={pct} max={100} size={100} stroke={9} color="var(--tv-accent)" trackColor="var(--tv-line)" format="percent" ariaLabel="Anlaşma hedefi" fluid live>
+                  <div className="tv-ring-label">
+                    <AnimatedNumber value={pct} kind="percent" />
+                  </div>
+                </RadialGauge>
               </div>
             ) : null}
             <div style={{ minWidth: 0 }}>

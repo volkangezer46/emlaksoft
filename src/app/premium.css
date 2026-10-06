@@ -338,8 +338,8 @@ html[data-theme="dark"] {
 }
 
 /* ==== Ana ekran v2 (yalnız YENİ sınıflar: pm-top / pm-focus / pm-c1 / pm-flat / pm-tbl / pm-status / pm-cq) ====
-   Karar notu: /app ana ekranında CityNight hero'su kaldırıldı (marka sahibi onaylamadı); yerine ince başlık
-   satırı + metrik şeridi geldi. Hiçbir sonsuz animasyon/cam yok; giriş yalnız bir kez ve progressive enhancement. */
+   Ana ekran başlığı v4'te DashboardHero'dur; buradaki sınıflar kalan kompakt parçalar içindir.
+   Hiçbir sonsuz animasyon/cam yok; giriş yalnız bir kez ve progressive enhancement. */
 
 /* Üst başlık satırı (~64px): açık zeminde PeriodToggle bu bağlamda nötr segment olur. */
 .pm-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; min-height: 4rem; }

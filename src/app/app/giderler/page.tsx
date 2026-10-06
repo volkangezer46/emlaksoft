@@ -9,9 +9,8 @@ import { listExpenses } from "@/app/actions/expenses";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { requireReportingData } from "@/lib/reporting/result";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ChartFrame } from "@/app/app/_ui/lazy-chart";
+import { ChartFrame, DonutSplit } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import { CategoryDonut } from "./category-donut-lazy";
 import { CategoryBars } from "./category-bars";
 import { categoryChartMode } from "@/lib/expense-category-chart";
 import { ExpensesTable } from "./expenses-table";
@@ -127,7 +126,8 @@ export default async function GiderlerPage({
   const activeCategories = byCategory.filter((c) => c.total > 0);
   const categoryChart = activeCategories
     .sort((a, b) => b.total - a.total)
-    .map((c) => ({ name: c.label, value: c.total, category: c.value }));
+    // href: dilime tıklayınca liste o kategoriye süzülür, tarih filtresi korunur (kanonik DonutSplit `hrefKey`)
+    .map((c) => ({ name: c.label, value: c.total, href: href({ kategori: c.value }) }));
 
   const barsMode = categoryChartMode(activeCategories.length) === "bars";
 
@@ -309,7 +309,7 @@ export default async function GiderlerPage({
               subtitle={fromF || toF ? "Seçili tarih aralığı · segmente tıklayın" : "Tüm gider kayıtları · segmente tıklayın"}
               height={250}
             >
-              <CategoryDonut data={categoryChart} centerLabel="Toplam gider" />
+              <DonutSplit data={categoryChart} format="money" centerLabel="Toplam gider" hrefKey="href" hint="Kategoriye süzmek için tıklayın" />
             </ChartFrame>
           ) : null}
           {hasTrend ? (

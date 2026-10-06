@@ -128,8 +128,9 @@ describe("viz kiti: eski dışa aktarımlar ve cam bütçesi", () => {
   it("Recharts grafikleri reduced-motion'da animasyonu kapatır", () => {
     // Recharts'ı doğrudan import eden HER dosyada, her seri bileşeni (Area/Bar/Pie/Line/Radar/Scatter)
     // isAnimationActive={!reduce} taşımalı (CSS reduced-motion kuralı Recharts'ın JS animasyonunu kapatmaz).
-    const rechartsFiles = files("src", /\.tsx?$/).filter((f) => /from "recharts"/.test(read(f)));
-    expect(rechartsFiles.length).toBeGreaterThanOrEqual(4);
+    // Tek grafik seti: Recharts yalnız ui/chart.tsx'ten içe aktarılır (viz-depth-contract.test.ts); yorumlar sayılmaz.
+    const rechartsFiles = files("src", /\.tsx?$/).filter((f) => /^import[^;]*from "recharts"/m.test(read(f)));
+    expect(rechartsFiles).toContain("src/components/ui/chart.tsx");
     for (const file of rechartsFiles) {
       const src = read(file);
       const series = (src.match(/<(Area|Bar|Pie|Line|Radar|RadialBar|Scatter)\b/g) ?? []).length;

@@ -12,8 +12,7 @@ import {
 import { calculateCommission } from "@/lib/commission";
 import { CommissionCapNotice } from "@/components/app/commission-cap-notice";
 import { AnimatedNumber } from "@/components/ui/animated-number";
-
-const DONUT_C = 2 * Math.PI * 42;
+import { DonutRing } from "@/components/ui/viz/donut-ring";
 
 function parseNumber(value: string) {
   const normalized = value.replace(/[^\d.,]/g, "").replace(/\./g, "").replace(",", ".");
@@ -162,36 +161,22 @@ export function CommissionSimulator({ defaultRate = 3, defaultAdvisorShare = 60 
 
         <div className="p-5">
           <div className="grid gap-5 sm:grid-cols-[180px_1fr] sm:items-center">
-            <div className="relative mx-auto grid h-40 w-40 place-items-center">
-              {/* static conic glow behind the donut */}
-              <div className="pointer-events-none absolute inset-1 rounded-full opacity-40 blur-md" style={{ background: "conic-gradient(from 0deg, var(--accent), var(--viz-pos), var(--accent))" }} />
-              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-pos)" strokeWidth="9" opacity="0.9" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="9"
-                  strokeLinecap="round"
-                  strokeDasharray={`${DONUT_C * (result.advisorRate / 100)} ${DONUT_C}`}
-                  style={{ transition: "stroke-dasharray .7s cubic-bezier(0.16, 1, 0.3, 1)" }}
-                />
-                {/* boundary marker at end of advisor arc */}
-                <circle
-                  cx={50 + 42 * Math.cos((result.advisorRate / 100) * 2 * Math.PI)}
-                  cy={50 + 42 * Math.sin((result.advisorRate / 100) * 2 * Math.PI)}
-                  r="3.2"
-                  className="glow-dot"
-                  fill="#fff"
-                  style={{ transition: "cx .7s cubic-bezier(0.16, 1, 0.3, 1), cy .7s cubic-bezier(0.16, 1, 0.3, 1)" }}
-                />
-              </svg>
-              <div className="relative grid h-24 w-24 place-items-center rounded-full bg-surface text-center shadow-[0_8px_24px_-10px_rgba(15,23,42,0.4)]">
+            {/* Pay dağılımı: tek grafik setinden DonutRing (değer değişince dilimler akıcı kayar; reduce'ta anlık). */}
+            <DonutRing
+              className="mx-auto"
+              size={160}
+              stroke={14}
+              format="percent"
+              ariaLabel="Komisyon dağılımı"
+              segments={[
+                { label: "Danışman payı", value: result.advisorRate, color: "var(--accent)" },
+                { label: "Ofis payı", value: 100 - result.advisorRate, color: "var(--viz-pos)" },
+              ]}
+            >
+              <div className="grid h-24 w-24 place-items-center rounded-full bg-surface text-center shadow-[var(--elev-2)]">
                 <div><p className="text-xs text-text-faint">Dağıtılacak</p><p className="font-display text-base font-extrabold tabular-nums text-text"><AnimatedNumber value={result.gross} kind="currency" /></p></div>
               </div>
-            </div>
+            </DonutRing>
             <div className="space-y-3">
               {[
                 { icon: UserRound, label: `Danışman payı · %${result.advisorRate}`, value: result.advisor, color: "text-accent-text", bg: "bg-accent-subtle" },
