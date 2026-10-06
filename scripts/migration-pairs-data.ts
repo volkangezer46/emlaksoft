@@ -118,6 +118,15 @@ const F = {
   tenantSettings: "20260826002200_tenant_settings.sql",
   platformSettingsGuard: "20260826002300_platform_settings_guard.sql",
   writeSettingRpc: "20260826002400_write_setting_rpc.sql",
+  // Portfoy-Ilan Yasam Dongusu ve Kayip/Kacak Denetimi (WP-2..7): portal ilan zinciri, kapsam yardimcilari, kontrol tablolari/RPC'leri.
+  lcPortalChain: "20260826002000_lc_portal_listing_chain.sql",
+  lcScopeHelpers: "20260826002010_lc_scope_helpers.sql",
+  lcVerificationTables: "20260826002020_lc_verification_tables.sql",
+  lcAnomalyTables: "20260826002030_lc_anomaly_tables.sql",
+  lcControlState: "20260826002040_lc_property_control_state.sql",
+  lcQueueRpcs: "20260826002050_lc_queue_and_check_rpcs.sql",
+  lcAnomalyRpcs: "20260826002060_lc_anomaly_rpcs.sql",
+  lcSummaryMarket: "20260826002070_lc_summary_rpcs_market_view.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -204,6 +213,14 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efPlanExpiry]: "ek", // yeni service_role RPC (ef_credit_expire_plan) + source CHECK'e 'expire' + ayar seed'i; mevcut satir/davranis ayni
     [F.paymentCards]: "ek", // yeni 2 tablo + service_role RPC; kod tablolar yokken zarifce kapali (kart saklama + otomatik yenileme altyapisi)
     [F.notificationsDedupeKey]: "ek", // nullable dedupe_key kolonu + kismi benzersiz indeks; mevcut satir/davranis ayni, kod kolon yokken eski davranisa duser
+    [F.lcPortalChain]: "davranis", // portal_listings: yeni kolonlar + (ofis, portal, ilan no) acik tekil indeksi (yinelenen canli satir varsa DURUR) + 'superseded' durumu + bind/rotate service_role RPC'leri
+    [F.lcScopeHelpers]: "ek", // lc_row_visible/lc_current_*_id yardimcilari + oversight_settings.listing_control jsonb kolonu
+    [F.lcVerificationTables]: "ek", // portal_listing_health, listing_verifications, listing_verification_jobs, verification_clients (yazma yalniz service_role)
+    [F.lcAnomalyTables]: "ek", // listing_anomalies/actions, listing_sla_events, listing_matching_candidates (yazma yalniz service_role/RPC)
+    [F.lcControlState]: "ek", // property_control_state (turetilmis asama/skor/KPI bayraklari)
+    [F.lcQueueRpcs]: "ek", // kuyruk talep/hasat + supheli->onayli kayip durum makinesi RPC'leri (portal_listings'e YAZMAZ)
+    [F.lcAnomalyRpcs]: "ek", // anomali esitleme/SLA yukseltme (service_role) + acikla/kapat (authenticated, JWT'den)
+    [F.lcSummaryMarket]: "ek", // KPI/liste/dunden-beri RPC'leri (invoker) + property_status_history'ye 2 nullable kolon + anonim agregat gorunum (service_role)
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -295,6 +312,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB26-ofis-ayarlari", order: 29.77, title: "Ayar Kayit Defteri: tenant_settings (ofis/sube/kullanici ayar deposu)", files: [F.tenantSettings] },
     { id: "PB27-platform-ayar-korumasi", order: 29.78, title: "Ayar Kayit Defteri: platform_settings version + dogrudan yazim algilama tetikleyicisi", files: [F.platformSettingsGuard] },
     { id: "PB28-ayar-yazma-rpc", order: 29.79, title: "Ayar Kayit Defteri: write_setting RPC (atomik yazim + gecmis)", files: [F.writeSettingRpc] },
+    { id: "PB29-ilan-kontrol-zincir", order: 29.80, title: "Ilan kontrol: portal ilan zinciri (supersedes, acik tekil indeks, bind/rotate RPC) + rol kapsami yardimcilari + ofis ayar kolonu", files: [F.lcPortalChain, F.lcScopeHelpers] },
+    { id: "PB30-ilan-kontrol-tablolar", order: 29.81, title: "Ilan kontrol: saglik/sonuc/kuyruk/cihaz + anomali/SLA/eslestirme + portfoy kontrol ozeti tablolari", files: [F.lcVerificationTables, F.lcAnomalyTables, F.lcControlState] },
+    { id: "PB31-ilan-kontrol-rpc", order: 29.82, title: "Ilan kontrol: kuyruk/durum makinesi + anomali RPC'leri + KPI/liste RPC'leri + anonim agregat gorunum", files: [F.lcQueueRpcs, F.lcAnomalyRpcs, F.lcSummaryMarket] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -392,6 +412,18 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.writeSettingRpc, F.settingsHistory],
     [F.writeSettingRpc, F.platformSettingsGuard],
     [F.writeSettingRpc, F.tenantSettings],
+    // Ilan kontrol: zincir -> kapsam yardimcilari -> tablolar -> RPC'ler.
+    [F.lcVerificationTables, F.lcPortalChain],
+    [F.lcVerificationTables, F.lcScopeHelpers],
+    [F.lcAnomalyTables, F.lcScopeHelpers],
+    [F.lcControlState, F.lcScopeHelpers],
+    [F.lcQueueRpcs, F.lcVerificationTables],
+    [F.lcQueueRpcs, F.lcControlState],
+    [F.lcAnomalyRpcs, F.lcControlState],
+    [F.lcAnomalyRpcs, F.lcAnomalyTables],
+    [F.lcSummaryMarket, F.lcControlState],
+    [F.lcSummaryMarket, F.lcAnomalyTables],
+    [F.lcSummaryMarket, F.lcVerificationTables],
   ],
 
   externalPending: [

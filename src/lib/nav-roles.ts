@@ -10,12 +10,13 @@ import type { AppRole } from "@/lib/permissions";
 
 const HOME = "/app";
 
-/** Ofis sahibi / genel müdür / şube müdürü: 11 çekirdek sayfa (Eşleşme, Talepler sekmesidir). */
+/** Ofis sahibi / genel müdür / şube müdürü: 12 çekirdek sayfa (İlan Kontrol dahil; Eşleşme, Talepler sekmesidir). */
 const MANAGER_CORE = [
   HOME,
   "/app/musteriler",
   "/app/talepler",
   "/app/portfoyler",
+  "/app/ilan-kontrol",
   "/app/randevular",
   "/app/gorevler",
   "/app/anlasmalar",
@@ -32,6 +33,7 @@ const ADVISOR_CORE = [
   "/app/musteriler",
   "/app/talepler",
   "/app/portfoyler",
+  "/app/ilan-kontrol",
   "/app/randevular",
   "/app/gorevler",
   "/app/anlasmalar",

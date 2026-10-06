@@ -1,0 +1,151 @@
+import { Suspense } from "react";
+import { PageHeader } from "@/components/ui/page-header";
+import { ButtonLink } from "@/components/ui/button";
+import { SkeletonCard } from "@/components/ui/viz";
+import { requireModulePage } from "@/lib/require-module-page";
+import { daysAgoIso } from "@/lib/clock";
+import { getChangesSince, getControlSummary, listTodayChecks } from "@/lib/listing-control/server/readers";
+import {
+  buildExecutiveSummary,
+  parseGroupParam,
+  scopeCaption,
+  scopeOfGroup,
+  sumSummaryRows,
+  healthyPercent,
+  type GroupParam,
+} from "@/components/listing-control/helpers";
+import {
+  ChangesSince,
+  CriticalJobs,
+  ExecutiveSummaryCard,
+  GroupSwitcher,
+  GroupTable,
+  HealthGauge,
+  KpiStrip,
+  MismatchCard,
+  TodayChecks,
+  type GroupRowView,
+  type TodayCheckView,
+} from "@/components/listing-control/dashboard-sections";
+import { ControlSubNav } from "@/components/listing-control/sub-nav";
+import { ControlUnavailable } from "@/components/listing-control/ui-parts";
+import { countOpenAnomalies, getDb, loadPropertyBriefs, resolveGroupNames, loadPublishLeadTimes } from "@/components/listing-control/readers";
+import { durationLabel } from "@/components/listing-control/helpers";
+
+export const metadata = { title: "İlan Kontrol Merkezi" };
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function IlanKontrolPage({ searchParams }: { searchParams: SearchParams }) {
+  const { role } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const sp = await searchParams;
+  const group = parseGroupParam(sp.gruplama);
+  return (
+    <>
+      <PageHeader
+        eyebrow="Portföy"
+        title="İlan Kontrol Merkezi"
+        description={`Hiçbir portföy gözden kaybolmasın: portallarda yayında olanlar, kaybolanlar ve ilgilenmeniz gerekenler. Kapsam: ${scopeCaption(role)}.`}
+        actions={
+          <>
+            <ButtonLink href="/app/ilan-kontrol/anomaliler" size="md">Uyarı kuyruğu</ButtonLink>
+            <ButtonLink href="/app/ilan-kontrol/rapor" size="md" variant="secondary">Günlük rapor</ButtonLink>
+          </>
+        }
+      />
+      <ControlSubNav active="genel" />
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardBody group={group} />
+      </Suspense>
+    </>
+  );
+}
+
+async function DashboardBody({ group }: { group: GroupParam }) {
+  const db = await getDb();
+  
+  const nowIso = daysAgoIso(0);
+  const [tenantRes, anomalies, changes, today, publishStats] = await Promise.all([
+    getControlSummary(db, "tenant"),
+    countOpenAnomalies(db, nowIso),
+    getChangesSince(db, daysAgoIso(1)),
+    listTodayChecks(db, nowIso, 8),
+    loadPublishLeadTimes(db, daysAgoIso(90)),
+  ]);
+  if (!tenantRes.available) return <ControlUnavailable />;
+
+  const summary = sumSummaryRows(tenantRes.rows);
+  const sentences = buildExecutiveSummary(summary, { overdueSla: anomalies.overdue });
+
+  // Gruplu tablo (ofis dışı kırılım): rol kapsamı RLS'te; grup adları sayfa-yerel çözülür.
+  let groupRows: GroupRowView[] = [];
+  if (group !== "ofis") {
+    const grouped = await getControlSummary(db, scopeOfGroup(group));
+    const names = await resolveGroupNames(db, scopeOfGroup(group), grouped.rows.map((r) => r.group_id));
+    groupRows = grouped.rows
+      .map((r) => ({
+        ...r,
+        id: r.group_id,
+        name: r.group_id ? (names.get(r.group_id) ?? "Bilinmeyen") : "Atanmamış",
+        ratio: healthyPercent(r),
+      }))
+      .sort((a, b) => b.total_active - a.total_active);
+  }
+
+  const todayRows = today.available ? today.rows : [];
+  const briefs = await loadPropertyBriefs(db, todayRows.map((r) => r.property_id));
+  const todayView: TodayCheckView[] = todayRows.map((r) => ({
+    ...r,
+    code: briefs.get(r.property_id)?.code ?? "-",
+    title: briefs.get(r.property_id)?.title ?? "Portföy",
+  }));
+
+  return (
+    <div className="space-y-6">
+      <ExecutiveSummaryCard sentences={sentences} />
+      <KpiStrip summary={summary} group="ofis" />
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <HealthGauge summary={summary} />
+        <CriticalJobs counts={anomalies.counts} inReview={summary.in_review} />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChangesSince changes={changes.available ? changes.changes : null} sinceLabel="Son 24 saat" />
+        <MismatchCard summary={summary} counts={anomalies.counts} />
+      </div>
+      <section aria-label="Kırılım" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-text">Nerede problem var?</h2>
+          <GroupSwitcher active={group} />
+        </div>
+        {group === "ofis" ? (
+          <p className="text-sm text-text-muted">
+            Şube, takım veya danışman seçerek sorunların nerede toplandığını görün.
+            {publishStats.available && publishStats.overallHours !== null ? ` Ortalama yayına alma süresi: ${durationLabel(publishStats.overallHours)}.` : ""}
+          </p>
+        ) : groupRows.length === 0 ? (
+          <p className="text-sm text-text-muted">Bu kırılım için gösterilecek veri yok.</p>
+        ) : (
+          <GroupTable rows={groupRows} group={group} />
+        )}
+      </section>
+      <TodayChecks rows={todayView} unverifiable={summary.unverifiable} />
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true">
+      <SkeletonCard height={112} variant="card" label="Günün özeti yükleniyor" />
+      <SkeletonCard height={168} label="Göstergeler yükleniyor" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SkeletonCard height={260} label="Portföy sağlığı yükleniyor" />
+        <SkeletonCard height={260} label="Kritik işler yükleniyor" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SkeletonCard height={200} label="Değişenler yükleniyor" />
+        <SkeletonCard height={200} label="Uyuşmazlık yükleniyor" />
+      </div>
+    </div>
+  );
+}

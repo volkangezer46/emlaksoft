@@ -7,6 +7,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
 import { authorizeCron } from "@/lib/cron-auth";
+import { runControlStepBroad } from "@/lib/listing-control/server/cron-steps";
 
 /** Toplu işlem + fiyat sağlığı adımı: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -94,6 +95,25 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
   return updated;
 }
 
+/** Son `sinceIso`'dan beri `portal_listing_health.last_success_at` kaydı olan ilanlar. Tablo yoksa/hata olursa boş küme. */
+async function recentlyVerifiedListingIds(
+  admin: ReturnType<typeof createAdminClient>,
+  ids: string[],
+  sinceIso: string,
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await admin
+      .from("portal_listing_health")
+      .select("portal_listing_id")
+      .in("portal_listing_id", ids.slice(i, i + 200))
+      .gte("last_success_at", sinceIso);
+    if (error) return out; // şema yok ya da okuma hatası: eski davranışa düş (uyarı üret)
+    for (const r of (data ?? []) as { portal_listing_id: string }[]) out.add(r.portal_listing_id);
+  }
+  return out;
+}
+
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
@@ -124,7 +144,12 @@ export async function GET(req: NextRequest) {
   // Döngü içi insert yerine toplu yazma (500'lük parçalar hâlinde).
   // Modül kapısı: "Portal Kontrol" kapalı ofislere teyit uyarısı yazılmaz (fiyat sağlığı adımı etkilenmez).
   const disabledModules = await getDisabledModulesByTenant(admin);
-  const eligible = listings.filter((row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals"));
+  // Çoğaltma yok: ilan kontrol sistemi (portal_listing_health) son 7 günde başarılı kontrol kaydettiyse "teyit gecikti"
+  // uyarısı yazılmaz; yalnız gerçekten kontrolsüz kalanlar bildirilir. Tablo yoksa eski davranış (hepsi).
+  const recentlyVerified = await recentlyVerifiedListingIds(admin, listings.map((l) => String(l.id)), due);
+  const eligible = listings.filter(
+    (row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals") && !recentlyVerified.has(String(row.id)),
+  );
 
   // Tekrar önleme: ilan başına 24 saatte en fazla 1 bildirim (cron 6 saatte bir çalışır).
   // dedupe_key kolonu yoksa (migration uygulanmamış) `recent` null → eski davranış (dedupe yok).
@@ -169,13 +194,16 @@ export async function GET(req: NextRequest) {
     console.error("portal-teyit refreshPriceHealth", e);
   }
 
+  // Ek adım: kontrol işi planlama + lease hasadı (yeni cron yok; en iyi çaba, teyidi bozmaz).
+  const control = await runControlStepBroad(admin);
+
   const hb = heartbeatFor({
     total: listings.length,
     processed: listings.length,
     failed: insertResult.failed,
     timedOut: false,
     listError,
-    summary: `${notified} teyit uyarısı · ${skippedRecent + insertResult.duplicates} son 24 saatte bildirilmiş · ${priceHealthUpdated} fiyat sağlığı${skippedTenantsNote(disabledModules, "portals")}`,
+    summary: `${notified} teyit uyarısı · ${skippedRecent + insertResult.duplicates} son 24 saatte bildirilmiş · ${recentlyVerified.size} kontrol sistemince doğrulanmış · ${priceHealthUpdated} fiyat sağlığı · ${control.text}${skippedTenantsNote(disabledModules, "portals")}`,
   });
   await recordHeartbeat("portal-teyit", hb.status, hb.detail);
 
