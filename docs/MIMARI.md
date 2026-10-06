@@ -7,7 +7,7 @@ Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `sup
 | Katman | Yol | Koruma |
 |---|---|---|
 | Landing + public | `/`, `/demo`, `/kayit`, `/giris`, KVKK/politika sayfaları, `robots`, `sitemap`, OG image | Açık |
-| Tenant paneli | `/app/*` (menü 9 iş başlığı, tek kaynak `src/lib/nav-config.ts`; müşteriler, talepler, portföyler, anlaşmalar, komisyon/kazanç, kiralama, projeler, asistan, ekip, uyum, abonelik, ayarlar…) | Oturum + `requireModulePage` + ofis modül kapısı + paket kapısı |
+| Tenant paneli | `/app/*` (menü 9 iş başlığı / 42 öğe, tek kaynak `src/lib/nav-config.ts`; bkz. "Menü" bölümü) | Oturum + `requireModulePage` + ofis modül kapısı + paket kapısı |
 | Ofis panosu (TV) | `/app/pano-tv` (kabuksuz, tam ekran, canlı) | Oturum + ofis geneli rol (`canViewTv`) |
 | Platform admin | `/admin/*` (tenant, fatura, ticket, cron sağlık, SEO, impersonation) | `platform_staff` + `PLATFORM_ADMIN_EMAILS` bootstrap |
 | Vitrin | `/vitrin/[slug]` — tenant'ın halka açık ofis sitesi | Açık, slug bazlı |
@@ -15,6 +15,24 @@ Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `sup
 | API | `/api/cron/*` (36), `/api/app/*` (bootstrap, tv-data), `/api/export/[entity]`, `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
 
 Veri erişimi: Server Component + server action ağırlıklı; mutasyonlar `src/app/actions/*` ve modül içi `actions.ts`.
+
+## Menü (/app bilgi mimarisi; tek kaynak `src/lib/nav-config.ts`, tasarım `docs/design/MENU_IA_2026_10.md`)
+
+9 iş başlığı (id'ler sabit, testler doğrular): **Bugün** (Ana ekran, Randevular, Görevler, Bildirimler) · **Müşteriler ve Talepler**
+(Müşteriler [Akıllı Listeler, Tavsiyeler], Talepler, İçe aktarma) · **Portföy ve İlanlar** (Portföyler [Anahtar, Sunum, Havuz], İlan Kontrol,
+Kiralama [Kira artışı], Projeler, Açık Ev, Portal ilanları, Ofisler Arası Ağ) · **Anlaşmalar ve Sözleşmeler** · **İletişim ve Pazarlama**
+(Gelen Kutusu, Kampanyalar) · **Finans** (Komisyon [Kazanç, Onaylar], Giderler, Aidat) · **Performans ve Raporlar** (Performansım, Raporlar
+[7 sekme], Kaçan komisyonlar, Ofis Panosu) · **Araçlar** (Değerleme, Hesaplayıcılar, AI Asistan, Mahalle notları, Yabancıya Satış) ·
+**Ofis ve Ayarlar** (Ekip Merkezi [8 sekme], Ofis Merkezi, Ayarlar [Genel, Roller, Yetkilendirme, Modüller], Abonelik, Yardım ve Destek,
+Ofis kurulumu, Otomasyon, Uyum, Belge Merkezi, Denetim, Davet et ve kazan).
+
+Öğe alanları: `description` (palet + menü ipucu, zorunlu), `keywords` (yalnız arama eş anlamlıları; "lead" → Talepler), `advanced`
+(yan menüde ayracın altı), `shortcut` ("g m"; `NAV_SHORTCUTS` → `keyboard-shortcuts.tsx` ve palet rozeti), `tier` (sade görünüm çekirdeği,
+`nav-roles.ts`). Türetilenler: `ALL_NAV_HREFS` (öğe+sekme+eski yol), `HIDDEN_APP_PAGES` (menüde bilerek olmayan 8 sayfa, gerekçeli),
+`MOBILE_TAB_SECTIONS` (alt çubuk: Bugün, Müşteriler, Portföy, Anlaşmalar + Daha fazla). Tüketiciler aynı kaynaktan beslenir: `app-sidebar`,
+`section-tabs`, `app-breadcrumb`, `palette-core` (Git/Eylemler), `product-tour-data`, `trust-strip` (başlık sayısı).
+**Yeni sayfa kuralı:** `page.tsx` eklenince ya nav-config'e öğe/sekme eklenir ya da `HIDDEN_APP_PAGES`'e gerekçesiyle yazılır; aksi hâlde
+`nav-pages-contract.test.ts` kırılır. Yollar değişmez; eski yollar `NAV_ALIASES` ile yönlendirir.
 
 ## Veri modeli ana hatları (243 migration dosyası; TL hesap kredisi, referans/ortak motoru, kayıtlı kart ve EF kontör için `docs/HAFIZA.md` §2/§6)
 

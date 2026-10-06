@@ -4,11 +4,10 @@ import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Plus, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, Lock, Menu, Pin, PinOff, Search, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
-import { findActiveNavigationHref } from "@/lib/navigation";
-import { moreSections, resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
+import { MOBILE_TAB_SECTIONS, moreSections, resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, MAX_RECENT_SHOWN, pushRecent, togglePin } from "@/lib/nav-memory";
 import { getAppActions, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
@@ -156,7 +155,7 @@ export function AppSidebar({
           data-nav-link
           data-nav-active={active ? "true" : undefined}
           aria-current={active ? "page" : undefined}
-          title={item.label}
+          title={item.description ? `${item.label} — ${item.description}` : item.label}
           onClick={() => setOpen(false)}
           className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-8 ${
             badge ? "pr-16" : "pr-9"
@@ -195,6 +194,24 @@ export function AppSidebar({
     );
   };
 
+  /**
+   * Bir başlığın öğeleri: temel öğeler üstte, `advanced` (ileri düzey / nadir) öğeler ince bir
+   * ayracın altında. Sıra nav-config'teki sıradır (en sık kullanılan üstte).
+   */
+  const renderItems = (items: readonly NavItem[], group: string) => {
+    const base = items.filter((i) => !i.advanced);
+    const adv = items.filter((i) => i.advanced);
+    return (
+      <>
+        {base.map((i) => renderItem(i, { group, pinnable: true }))}
+        {base.length > 0 && adv.length > 0 ? (
+          <div role="separator" aria-label="İleri düzey" className="mx-3 my-1.5 h-px bg-white/10" />
+        ) : null}
+        {adv.map((i) => renderItem(i, { group, pinnable: true }))}
+      </>
+    );
+  };
+
   const groupHeader = (id: string, title: string, opts?: { collapsible?: boolean; expanded?: boolean }) => (
     <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-1.5 text-white/70">
       {opts?.collapsible ? (
@@ -203,17 +220,18 @@ export function AppSidebar({
           onClick={() => toggleSection(id)}
           aria-expanded={opts.expanded}
           aria-controls={`sb-${id}`}
+          title={title}
           className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
         >
-          <span className="shrink-0">{title}</span>
-          <span className="h-px flex-1 bg-white/10" aria-hidden />
+          <span className="min-w-0 truncate">{title}</span>
+          <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />
           <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${opts.expanded ? "" : "-rotate-90"}`} aria-hidden />
           <span className="sr-only">{opts.expanded ? "bölümü daralt" : "bölümü aç"}</span>
         </button>
       ) : (
         <>
-          <span className="shrink-0 uppercase">{title}</span>
-          <span className="h-px flex-1 bg-white/10" aria-hidden />
+          <span className="min-w-0 truncate uppercase" title={title}>{title}</span>
+          <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />
         </>
       )}
     </div>
@@ -267,7 +285,7 @@ export function AppSidebar({
                 {groupHeader(section.id, section.title, { collapsible: section.id !== activeId, expanded })}
                 {expanded ? (
                   <div id={`sb-${section.id}`} className="space-y-0.5">
-                    {section.items.map((i) => renderItem(i, { group: section.id, pinnable: true }))}
+                    {renderItems(section.items, section.id)}
                   </div>
                 ) : null}
               </div>
@@ -293,7 +311,7 @@ export function AppSidebar({
                   {more.map((section) => (
                     <div key={section.id}>
                       <p className="px-3 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-white/55">{section.title}</p>
-                      {section.items.map((i) => renderItem(i, { group: `more-${section.id}`, pinnable: true }))}
+                      {renderItems(section.items, `more-${section.id}`)}
                     </div>
                   ))}
                 </div>
@@ -441,22 +459,14 @@ export function AppSidebar({
     </>
   );
 
-  // Mobil alt gezinme: en sık kullanılan dört rota + menü çekmecesi.
-  // İzin filtresi sidebar ile aynı kaynaktan (accessibleModules) beslenir.
-  const tabItems = [
-    { href: "/app", label: "Ana ekran", icon: ICONS.dashboard, module: "dashboard" as AppModule },
-    { href: "/app/musteriler", label: "Müşteri", icon: ICONS.musteri, module: "customers" as AppModule },
-    { href: "/app/portfoyler", label: "Portföy", icon: ICONS.portfoy, module: "properties" as AppModule },
-    { href: "/app/randevular", label: "Randevu", icon: ICONS.randevu, module: "appointments" as AppModule },
-  ].filter((t) => accessibleModules.includes(t.module));
-  // "Yeni": sahada hızlı kayıt sayfası (müşteri / görüşme / randevu); en az birine create izni gerekir.
-  const showQuickNew = ["customers", "calls", "appointments"].some((m) => creatable.includes(m as AppModule));
-  const quickActive = pathname === "/app/hizli";
-  const activeTabHref = findActiveNavigationHref(
-    pathname,
-    tabItems.map((item) => item.href),
-    "/app",
-  );
+  // Mobil alt gezinme: 4 ana iş başlığı (Bugün, Müşteriler, Portföy, Anlaşmalar) + "Daha fazla" çekmecesi.
+  // Tek kaynak nav-config `MOBILE_TAB_SECTIONS`; sekme başlığın ilk görünen sayfasına gider ve
+  // izin/kapalı-modül süzgeci menüyle aynıdır (başlık görünmüyorsa sekme de çıkmaz).
+  // Hızlı kayıt ("Yeni") üst çubuktaki Yeni menüsünde ve komut paletinde kalır.
+  const tabItems = MOBILE_TAB_SECTIONS.flatMap((t) => {
+    const section = allSections.find((s) => s.id === t.id);
+    return section ? [{ id: t.id, href: section.href, label: t.label, icon: section.icon }] : [];
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -482,51 +492,42 @@ export function AppSidebar({
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta; mobil kaydırmada bulanıklık pahalı).
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1 + (showQuickNew ? 1 : 0)}, minmax(0, 1fr))` }}>
+        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
-            const active = tab.href === activeTabHref;
+            // Etkin sekme = etkin iş başlığı (alt sayfalar dahil; nav-config ile aynı çözümleme).
+            const active = tab.id === activeId && !activeInMore;
             return (
               <Link
-                key={tab.href}
+                key={tab.id}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 whitespace-nowrap py-2 text-xs font-semibold transition ${
+                className={`focus-ring flex min-h-14 flex-col items-center justify-center gap-1 whitespace-nowrap py-2 text-xs font-semibold transition ${
                   active ? "text-brand-600" : "text-text-faint hover:text-ink-950"
                 }`}
               >
                 <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-brand-600/12" : ""}`}>
-                  <tab.icon className="h-[18px] w-[18px]" />
+                  <tab.icon className="h-[18px] w-[18px]" aria-hidden />
                 </span>
                 {tab.label}
               </Link>
             );
           })}
-          {showQuickNew ? (
-            <Link
-              href="/app/hizli"
-              aria-current={quickActive ? "page" : undefined}
-              aria-label="Yeni kayıt: hızlı kayıt"
-              onClick={() => setOpen(false)}
-              className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-brand-600 transition"
-            >
-              <span className={`grid h-7 w-11 place-items-center rounded-full bg-brand-600 text-white ${quickActive ? "ring-2 ring-brand-300" : ""}`}>
-                <Plus className="h-[18px] w-[18px]" />
-              </span>
-              Yeni
-            </Link>
-          ) : null}
           <DialogTrigger asChild>
-            <button type="button" className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-text-faint transition hover:text-ink-950">
+            <button
+              type="button"
+              aria-label={totalBadges > 0 ? `Daha fazla: tüm menü, ${totalBadges} bekleyen iş` : "Daha fazla: tüm menü"}
+              className="focus-ring flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-text-faint transition hover:text-ink-950"
+            >
               <span className="relative grid h-7 w-11 place-items-center rounded-full">
-                <Menu className="h-[18px] w-[18px]" />
+                <Menu className="h-[18px] w-[18px]" aria-hidden />
                 {totalBadges > 0 ? (
-                  <span className="nav-badge is-danger absolute -right-0.5 -top-1" aria-label={`${totalBadges} bekleyen iş`}>
+                  <span className="nav-badge is-danger absolute -right-0.5 -top-1" aria-hidden>
                     {totalBadges > 99 ? "99+" : totalBadges}
                   </span>
                 ) : null}
               </span>
-              Menü
+              Daha fazla
             </button>
           </DialogTrigger>
         </div>

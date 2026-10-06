@@ -103,8 +103,10 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 ## 3. Bekleyen / engelli işler
 
 **GÜNCEL AÇIK İŞLER (2026-10-06; aşağıdaki eski maddeler tarihsel olabilir, çelişirse bu liste geçerlidir):**
-- **Perf optimizasyonu (2026-10-06, kod hazır, migration uygulanmamış):** DB index'leri `20261006000200` (8 composite index), nav badge cache `20261006000300` (snapshot tablosu + RPC + 5 dakikalık cron). FCP <1.8s, LCP <3.2s hedefi doğrultusunda. Dashboard batch query (`data-batch.ts`) yardımcı hazır, RPC'ler migration sonrası canlanır. Font preconnect hint eklendi.
-- Yeni migration dosyaları canlıda değil: `000900` (hotfix), `001000` (büyüme paneli rol kapısı), `001100` (§2). Sırası/doğrulaması: `docs/runbooks/YAYIN_PENCERESI_2.md` §8. + **perf index'ler `000200`, nav cache `000300`**.
+- **Perf turu 1 (2026-10-06) KARARI:** ajan yazımı `20261006000200_perf_indexes` ve `20261006000300_nav_badge_cache` + `nav-badges-refresh` cron'u SİLİNDİ (uygulanmadı): DB zaten indeksli (pg_indexes doğrulandı: idx_deals_tenant_stage, idx_offers_tenant_status, idx_demands_tenant_status_created, idx_tasks_assignee, idx_customers_phone...), dosya var olmayan tablolara (contacts/events/demands) yazıyordu, `CONCURRENTLY` runner transaction'ında çalışmaz, nav cache SQLite `changes()` içeriyordu. Rozetler RLS'li gerçek sayımda kaldı; cron sayısı 36. Yeni indeks önerisi için önce pg_indexes'e bak. Kalıcı hız işi: kabuk tek RPC (`app_shell_bootstrap`, rozet sayımları dahil) + dashboard snapshot RPC'leri (`data-batch.ts` imzaları) + `loading.tsx` + dinamik import (perf turu 2).
+- **Kurumsal kapsam sistemi (PB40) CANLIDA (2026-10-06):** `20261006000100..000103` uygulandı (user_scopes, scope_overrides, access_audit_log, has_permission_with_scope RPC — RPC `customer_demands`+`customers.assigned_to` ve `deals.assigned_to` üzerinden çalışır; `demands` tablosu YOKTUR).
+- Yeni migration dosyaları canlıda değil: `000900` (hotfix), `001000` (büyüme paneli rol kapısı), `001100` (§2). Sırası/doğrulaması: `docs/runbooks/YAYIN_PENCERESI_2.md` §8.
+- Ofis Merkezi (PB43, §16): `20261006000500` (office_center izin seed'i) → `20261006000510` (pool_assignments); seed uygulanmadan 000510 ön koşul bloğu DURUR.
 - Release çifti (`RELEASE_MIGRATION` + `_CHECKSUM`) her yeni uygulamadan sonra güncellenir (DEPLOY.md).
 - Üretim env: `ADVISOR_PII_KEY`, `PLATFORM_MFA_ENFORCEMENT=on` (yayın öncesi), `IYZICO_BASE_URL=https://api.iyzipay.com` (sandbox değeriyle canlı ödeme alınmaz), `PLATFORM_SECRETS_KEY`, `EMLAKFIYATI_API_KEY`/admin anahtarı.
 - iyzico iade OTOMATİK DEĞİL: panelden elle + `recordInvoiceRefund` + kontör/kredi clawback (`docs/runbooks/IYZICO_IADE.md`). Günlük `manual_review`/`refund_required` kontrolü (Admin > Faturalama > Ödeme uyarıları).
@@ -113,6 +115,10 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 - Kazanç gizliliği (P12) ve sec3 rol smoke senaryoları: runbook'taki duman testleri; `properties` UPDATE RLS açığı sahip kararı (eski madde, hâlâ geçerli).
 - Kayıtlı kartla otomatik yenileme (`billing.auto_renew_enabled`) KAPALI; iyzico off-session onayı ve CF retrieve alanları doğrulanmadan açılmaz.
 - Dış uptime izleyici (cron kaçırma/site erişimi) kurulmadı: öneri `docs/runbooks/IYZICO_IADE.md` §Alarm.
+- **Menü IA (2026-10-06, menü ajanı dalı):** `main`'de Ofis Merkezi iskeletiyle gelen 2 kırmızı test menü ajanının sahası değil, Ofis Merkezi
+  ajanına ait: `modules.test.ts` "27 kapatılabilir modül" (registry 28) ve "kapatılabilir her rota requireModulePage'e href geçirir"
+  (`/app/ofis-merkezi/page.tsx` istemci bileşeni, kapı yok). Ayrıca `/app/ayarlar/yetkilendirme` nav-config'te Ayarlar sekmesi olarak
+  TANIMLI ama sayfa dosyası başka ajanın dalında; birleşmeden önce o dal gelmeli (yoksa sekme 404'e gider).
 
 - **Uzman paneli kararı (2026-10-05):** canlıya almadan zorunlu paketler (P1-P7), ilk 30 gün planı, sahip kararları (S1-S13) ve "asla yapılmayacaklar" için `docs/design/PANEL_KARAR_1.md`.
 - **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Public medya sorguları
@@ -163,18 +169,20 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 |---|---|
 | İl/ilçe/mahalle (YENİ, ajan yazıyor) | `src/lib/geo/**`, yönetim `/admin/geo` |
 | Plan/fiyat/paket/deneme günü | `src/lib/billing/plan-definitions.ts` (+ `public-pricing.ts`, `plan-overrides.ts`); admin `/admin/billing/planlar` |
+| Erişim kapsamı (kim neyi görür) | `src/lib/access-control/**` (saf: `scope-rules`, `admin-rules`, `query-scope`; sunucu: `scope-cache`, `list-scope`, `audit`); ofis bayrağı `office.access.scope_enforcement`; ekran `/app/ayarlar/yetkilendirme`; action `actions/access-control.ts` |
 | Örnek veri | `src/lib/sample-scope.ts` (+ `sample-clear.ts`, `sample-data-seed.ts`) |
 | Danışman metriği/gelir | `src/lib/team/advisor-metrics.ts` (ofis brüt yalnız `earnings_all`) |
 | Telefon | `src/lib/phone-rules.ts` (`parsePhoneStrict`), `PhoneInput` |
 | Rol etiketi / terim | `src/lib/role-labels.ts`, `src/lib/terminology.ts` |
 | Zaman | `src/lib/clock.ts` (TR ay sınırları `trMonth*`) |
-| Menü | `src/lib/nav-config.ts` (37 öğe/9 başlık sözleşmesi, ikonlar benzersiz `src/lib/icons.ts`) |
+| Menü | `src/lib/nav-config.ts` (9 başlık/42 öğe sözleşmesi; `description`/`keywords`/`advanced`/`shortcut` alanları, `NAV_SHORTCUTS`, `HIDDEN_APP_PAGES`, `MOBILE_TAB_SECTIONS`; ikonlar benzersiz `src/lib/icons.ts`; yetim sayfa testi `nav-pages-contract.test.ts`; tasarım `docs/design/MENU_IA_2026_10.md`) |
 | Modül aç/kapa | `src/lib/modules/**` (registry, guard, pending-defs); tablo yokken hepsi açık |
 | Onay kuralları | `src/lib/oversight/approval-gate.ts` (varsayılan kapalı, 48 sa tek kullanımlık; muafiyet yalnız owner/gm, `APPROVAL_EXEMPT_ROLES`; karar yetkisi `APPROVAL_DECIDER_ROLES`; tek mesaj `APPROVAL_PENDING_MESSAGE`) |
 | AI | yalnız `src/lib/ai/openai-client.ts` + `redact.ts`; kredi `src/lib/ai/credits/**` |
 | SEO | `src/lib/seo/**`, admin `/admin/seo`, sitemap/robots dinamik |
 | Danışman kimlik şifreleme | `src/lib/advisor/pii-crypto.ts` (`ADVISOR_PII_KEY`; anahtar yoksa alanlar kapalı) |
-| Havuz/atama puanı | `src/lib/pool/score.ts` |
+| Havuz/atama puanı | `src/lib/pool/score.ts` (havuz sayfası sabit ağırlık); Ofis Merkezi akıllı atama `src/lib/office-center/smart-assign.ts` (bölge/uzmanlık alt hesabı score.ts'ten, ağırlıklar ofis ayarı `office.assign.weight_*`) |
+| Ofis Merkezi (danışman yönetimi, akıllı atama, tanımlar) | `src/lib/office-center/**` (types, logic saf, smart-assign saf, definitions ⇄ registry eşlemesi, store/smart-assign-load sunucu), action `src/app/actions/office-center.ts`, sayfa `/app/ofis-merkezi?sekme=`; atama geçmişi tablosu `pool_assignments` (20261006000510) |
 | Anket | `src/lib/surveys/**` (mevcut memnuniyet anketini genişletir) |
 | Ürün turu | `src/lib/product-tour-data.ts` |
 | Cron envanteri | `vercel.json` + `src/lib/cron-jobs.ts` (36 rota, `npm run check:cron`) |
@@ -310,3 +318,47 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **H2 EİDS:** saf mantık `src/lib/eids/**` (`property-no.ts` normalize/doğrulama — resmî biçim DOĞRULANAMADI, gevşek kalıp; `authority-term.ts` 3 ay kuralı + 15/7/3 gün; `status.ts` Uyum/portföy süzgeci tek kaynağı; `health.ts` skor bileşeni; `load.ts`). Form alanı: yeni portföy "İlan sahibi" sekmesi + portföy detay "Yetki belgesi" paneli. Sağlık skoru `eids` bileşeni hem `engine.ts`/`sync.ts` (depolanan) hem `lifecycle-model.ts`/`readers.ts` (canlı) tarafında ölçülür; sütun okunamazsa "ölçülemedi". `authority-shield.ts` yumuşak `notes` döner (engellemez); `createPipelineDeal` müzakere/kazanıldı aşamasında ofise tek seferlik bildirim yazar. Uyum merkezi "EİDS ve yetki durumu" bölümü her sayaçtan `/app/portfoyler?yetki=<eids_eksik|yetki_eksik|kisa|bitiyor|dolmus>` süzgecine gider.
 - **H3 kiracı hatırlatma:** saf mantık `src/lib/rent-reminders/logic.ts`, çalıştırıcı `run.ts` (admin istemci PARAMETRE; allowlist'e satır eklenmedi), `kira-tahakkuk` cron'unun 4. adımı (36 cron sabit). KAPALI doğar; kanal 1 ofise bildirim + kiralama "Hatırlatma" sekmesinde wa.me tek tık; kanal 2 SMS yalnız `sms_enabled` + ofisin kendi Netgsm'i + TR cep (`parsePhoneStrict`) + sessiz saat dışı + kiracı başına 20 saatte 1 + ofis başına çalıştırmada 100. Kiracı opt-out iki kanalı da keser. Ayar kartı `/app/kiralama` (id `hatirlatma-ayarlari`). SMS'in işlem iletisi mi ticari ileti mi olduğu (İYS) SAHİP SORUMLULUĞUNDADIR; ayar kapalı doğar.
 - **H6 kiralamadan sözleşme:** `src/lib/rental-contract/build.ts` (taslak gövde, TÜFE/sabit/yok artış maddesi, ofis şablonu `{kiraci}`… alan doldurma), `sozlesmeler/yeni?tur=kira&kira=<id>` (`rental-context.ts` salt-okunur ön dolgu), `createContract` `rental_id` + artış alanı, iki yönlü bağ: kiralama "Sözleşme" sekmesi + header butonu ↔ sözleşme sayfasında "Kira kaydı" chip'i. Metin yer tutucudur; hukuki/nitelikli e-imza iddiası yok.
+
+## 16. Ofis Merkezi modülü (office_center) — 2026-10-06, CANLIDA (PB43 000500+000510 uygulandı 2026-10-06)
+
+- **Migration (uygulanmadı; sahibi `--only` ile, sıra: 000500 → 000510):** `20261006000500_office_center_permission_defaults.sql` (4. kayıt noktası: owner/gm ALL, branch_manager view+edit,
+  team_lead view; `permissions.ts` DEFAULT_MATRIX ile birebir — readonly'den office_center KALDIRILDI) → `20261006000510_pool_assignments.sql` (atama geçmişi: method manual|smart|rule,
+  score jsonb kişisel verisiz, status active|cancelled|reassigned, ilan başına tek aktif satır; RLS okuma office_center view VEYA atanan kişi, yazma office_center edit; DELETE yok). Rollback'ler var; pencere `PB43-ofis-merkezi` (order 29.94).
+  Kod tablo yokken atamayı yine yapar (ilan + bildirim) ve "geçmiş etkin değil" uyarısı verir.
+- **Sayfa `/app/ofis-merkezi?sekme=danismanlar|atamalar|ayarlar|tanimlamalar|istatistikler`** (URL filtre kontratı: `durum`, `q`, `rol`, `sube`, `sirala`, `yon`, `grup`, `ayar`). Danışmanlar: liste (açık portföy/talep, bu ay kazanılan, SLA uyumu,
+  son aktivite = çağrı/iletişim/portföy kaydı 90 gün; her sayı filtreli hedefe gider), satırdan rol/şube/takım, pasife alma (+ iş yükü devri `handoffMemberWorkload`), hızlı davet (`createAdvisor` akışı; tam form `/app/ekip/yeni`).
+  Atamalar: danışmansız ilanlar (havuz kaydı varsa `assign_pool_entry` RPC ile atomik), "Akıllı öner" → 3 kart gerekçeli → tek tık ata, elle ata, geçmiş/iptal/yeniden ata; şube müdürü yalnız kendi şubesi.
+  Ayarlar: `SettingField` (merkez ile aynı bileşen/eylemler, geçmiş+geri alma) + modül kısa yolu (`setModuleEnabled`). Tanımlamalar: SLA/komisyon/eşik/ağırlık/bildirim formları → aynı registry anahtarları (yazım `writeSetting`, kapı `settings:edit`).
+  İstatistikler: gerçek sayımlar, danışman ligi `advisor-metrics` (kazanç yalnız `earnings_all`), ekip sağlığı eşikleri ofis ayarından.
+- **Yeni ofis ayarları (registry/tenant.ts, grup `atama` + `esik`):** `office.assign.weight_workload|specialty|region|performance|availability` (25/20/25/15/15, motor oransal normalize eder), `office.assign.unassigned_sla_hours` (24), `office.alert.unassigned_pool_count` (5).
+  Yeni `OFFICE_SETTING_GROUPS` girişi `atama`. Ayrıca `src/lib/pool/score.ts` `regionPoints`/`specialtyReasons` dışa açıldı (tek hesap).
+- **service_role YOK** (iskeletteki 10 `createAdminClient` kaldırıldı); audit:actions temiz. Bildirim `notifyTenant` dedupe `oc-assign:<id>` / `oc-cancel:<id>` (sütun yoksa anahtarsız tek deneme).
+- **Kabul edilen örtüşme:** Ayarlar sekmesi (tek anahtar düzenleme + geçmiş) ile Tanımlamalar (gruplu form) aynı anahtarlara yazar; iki ekran ama tek depo. Sadeleştirme isterseniz Tanımlamalar kaldırılabilir.
+- **Test edilemeyen:** gerçek DB'de RLS/RPC akışı, tarayıcıda sekme/panel davranışı. DOGRULANDI: tsc, eslint (dokunulan), vitest tam tur, check:links/cron/migrations/migration-pairs, audit:actions, build (rapor).
+
+## 17. Yetkilendirme ekranı + kapsam uygulaması (kurumsal erişim kontrolü) — 2026-10-06, KODDA; 000100-103 CANLIDA, migration 000104 CANLIYA UYGULANMADI (PB40 kuyruğu)
+
+- **Yeni migration (PB40, 000100-103 ile AYNI pencere, onlardan SONRA):** `20261006000104_access_control_write_policies.sql` (+rollback) — `access_audit_log` INSERT politikası (tenant eşitliği + `created_by = auth.uid()` + owner/gm/branch_manager) + `grant insert`. 000102 yalnız SELECT veriyordu; server action'lar kullanıcı istemcisiyle günlük yazamıyordu. Uygulanmazsa yetkilendirme yazmaları "denetim kaydı yazılamadı" diyerek GERİ ALINIR (kayıtsız yetki değişikliği yok).
+- **Ekran `/app/ayarlar/yetkilendirme`** (kapı `settings`; ayrı `roles` modülü YOK, roller ekranıyla aynı; yazma yalnız owner/gm). Sekmeler `?sekme=`: `kapsamlar` (ofis bayrağı + satır içi kapsam düzenleme), `istisnalar` (scope_overrides: arama ile kaynak seçimi, gerekçe zorunlu, varsayılan 30 gün, iptal = expires_at=now, süresi geçen soluk), `izinler` (kişi bazlı `user_permission_overrides` matrisi — roller ekranından BURAYA TAŞINDI; `/app/ayarlar/roller?tab=istisnalar[&user=]` yönlendirir), `gunluk` (`access_audit_log`, URL filtre kontratı `kullanici|yapan|tur|from|to|sayfa`, gerçek sayfalama, CSV aynı süzgeçle). Menü: Ayarlar öğesinin sekmesi (`ICONS.yetkilendirme` = UserCog); Ayarlar kartı eklendi.
+- **Kapsam uygulaması = OFİS BAYRAĞI, varsayılan KAPALI:** `office.access.scope_enforcement` (tenant ayarı, grup `erisim`, risk high → gerekçe zorunlu; Tanımlar Merkezi'nde de görünür). KAPALI = bugünkü davranış birebir. AÇIK = `getListScope` (`src/lib/access-control/list-scope.ts`) kullanıcı kapsamını (user → `assigned_to=self`, team/branch → `in(üyeler+self)`, office/platform → süzgeç yok) talep (customer.assigned_to, `!inner`), müşteri (+KPI sayıları), portföy (+KPI), anlaşma, görev LİSTE sayfalarına ve `exportCustomersCsv/Properties/Demands/Deals`'a uygular. **Kapsam yalnız DARALTIR**: eski rol kuralı (`hasOfficeWideDataScope`, anlaşmalar `officeWide`) `tightenScopeFilter` ile taban kalır. Rozet `ScopeBadge` ("Kapsam: Takım (Satış A)") yalnız daraltma varken çizilir, yetkilendirme ekranına gider. Takım/şube üyesi yoksa fail-closed self.
+- **Saf kurallar (vitest):** `admin-rules.ts` (`canChangeScope`: yalnız owner/gm; kendini değiştiremez; owner kapsamını yalnız owner; owner/gm office altına inmez; platform atanmaz; team/branch bağlam zorunlu; `can_view_all_data` yalnız office — `canCreateOverride`: gerekçe ≥5, uuid kaynak, izin süresiz olamaz/≤365 gün, kendine/ofis sahibine yazılamaz — `canEditPermissionOverride`: kendine izin istisnası yazamaz [eski açık kapandı]), `query-scope.ts`, `audit-filters.ts`. `scope-cache.getUserScope` artık `user_scopes` satırını okur, yoksa `defaultUserScopeForRole`; owner/gm tabanı office. `SCOPE_RESOURCE_TABLES`: `demand` → `customer_demands` (şemada `demands` tablosu YOK; talep sahipliği `customers.assigned_to`).
+- **Action'lar `src/app/actions/access-control.ts`:** `upsertUserScope`, `resetUserScope`, `createScopeOverride`, `cancelScopeOverride`, `searchScopeResources`, `listAccessAudit`, `exportAccessAuditCsv` — Zod, tenant eşitliği (hedef profil + takım/şube + kaynak aynı ofis), her yazma önce/sonra ile `access_audit_log`; denetim yazılamazsa telafi (geri al). `actions/permissions.ts` istisnalar da `permission_granted/revoked` yazar (tablo yoksa ana işlemi bozmaz). Yalnız DEĞİŞİKLİK yazılır; aktif kapsam izi/okuma yazılmaz.
+- **Rol değişimi:** `updateTeamMember` rol değişince `syncScopeForRoleChange(admin, …)` ile kapsam satırını rol varsayılanına çeker (+günlük, `source: role_change`; şema yoksa atlar). Süresi 90+ gün önce dolan istisnalar `operational-retention` cron'unun adımı `purgeExpiredScopeOverrides` ile silinir (YENİ cron yok; allowlist satırı değişmedi).
+- **Bilinen/sahip:** (1) `has_permission_with_scope` RPC `customer_demands`/`customers.assigned_to` ile düzeltildi (main, canlıda). (2) `/api/export/[entity]` tam akış dışa aktarma ve ana ekran `scopeMine` hâlâ yalnız eski rol kuralı (kapsam bağlanmadı; sonraki adım). (3) Bayrağı AÇMA kararı sahibin: açınca danışman yalnız kendi müşteri/portföyünü görür (bugün tüm ofisi görüyor). (4) Pre-existing kırmızılar (bu işten değil): `nav-config.test` ikon çakışması "Ofis Merkezi"/"Ayarlar" (ikisi `ICONS.ayar`), `admin-client-tenant-contract` office-center.ts için allowlist satırı yok (Ofis Merkezi ajanı).
+
+## 18. Menü bilgi mimarisi düzeni — 2026-10-06 (main'e birleşti)
+
+- **Tek kaynak genişledi (`src/lib/nav-config.ts`):** 9 başlık korunur (id'ler sabit), 42 öğe. Yeni alanlar `description` (zorunlu; palet satırı + menü ipucu),
+  `keywords` (yalnız arama eş anlamlısı; "lead" yalnız Talepler), `advanced` (yan menüde "İleri düzey" ayracının altı), `shortcut` (`g m`…; `NAV_SHORTCUTS`
+  → `keyboard-shortcuts.tsx` GIT listesi ve palet rozeti). `HIDDEN_APP_PAGES` (8 gerekçeli gizli sayfa) + `nav-pages-contract.test.ts` (her statik page.tsx
+  menüde / üst öğe altında / gizli listede). `MOBILE_TAB_SECTIONS` alt çubuk (Bugün, Müşteriler, Portföy, Anlaşmalar + Daha fazla; "Yeni" FAB kaldırıldı,
+  hızlı kayıt üst çubuk Yeni menüsünde ve `n h`).
+- **Taşımalar:** Randevular+Görevler → Bugün; AI Asistan → Araçlar; Ofis kurulumu → Ofis; Bildirimler/İçe aktarma/Mahalle notları menüye bağlandı;
+  Ayarlar sekmeli (Genel, Roller, Yetkilendirme, Modüller); Portal Kontrol → "Portal ilanları". Başlık adları: Müşteriler ve Talepler, Portföy ve İlanlar,
+  Anlaşmalar ve Sözleşmeler, İletişim ve Pazarlama, Performans ve Raporlar, Ofis ve Ayarlar. İkon: Ofis Merkezi `ICONS.ofisMerkezi` (Ayarlar çakışması giderildi).
+- **Palet:** `getAppGoItems` etiket+açıklama+eş anlamlıda arar, sekmeler "Öğe · Sekme" adıyla; açıklama satırı gösterilir.
+- **Zenginleştirme (9 sayfa):** Akıllı Listeler `?segment=` filtre kontratı + grup bazlı boş durum + hızlı eylemler; Takımlar, Şubeler, Etiketler, Sözleşme
+  şablonları, KVKK talepleri, Evrak linkleri, Otomasyonlar, Denetim: EmptyState + CTA. Talepler KPI "Yeni" eklendi. Dashboard KPI yerleşimi yalnız ÖNERİ
+  (`docs/design/MENU_IA_2026_10.md` §6; `page.tsx`/`_home` hız ajanında, dokunulmadı).
+- **Doğrulama (bu dalda):** tsc 0, eslint 0, check:links 0; tam vitest: 5008 geçti / 4 kırmızı — hepsi main'den gelen başka ajan işleri (Ofis Merkezi 2 test,
+  cron sayısı 37 ↔ belgelerde 36). Menüyle ilgili tüm sözleşme testleri yeşil.

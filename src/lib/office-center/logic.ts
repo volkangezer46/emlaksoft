@@ -1,185 +1,147 @@
 /**
- * Ofis Merkezi saf mantık (işlem yok, veri dönüştürme ve hesaplamalar)
+ * Ofis Merkezi saf mantık (veri çekmez, saat okumaz): liste süzme/sıralama, URL filtre kontratı,
+ * atanmamış ilan SLA durumu, ekip sağlığı uyarıları, danışman ligi (kazanç gizliliği korunur).
  */
+import type { AdvisorMetricRow } from "@/lib/team/advisor-metrics";
+import { OFFICE_CENTER_PATH, OFFICE_CENTER_TABS, type AdvisorListFilters, type AdvisorSortKey, type OfficeAdvisorRow, type OfficeCenterTab, type OfficeStatistics, type TeamHealth } from "./types";
 
-import type {
-  OfficeAdvisor,
-  SLADefinition,
-  CommissionDefinition,
-  AlertThreshold,
-  AdvisorLeagueEntry,
-} from "./types";
+type Sp = Record<string, string | string[] | undefined>;
+const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? v[0] ?? "" : v ?? "");
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SORT_KEYS: readonly AdvisorSortKey[] = ["ad", "portfoy", "talep", "kapanis", "sla", "aktivite"];
 
-/**
- * Danışman sıralaması (performans puanına göre)
- */
-export function rankAdvisors(
-  advisors: OfficeAdvisor[],
-  metrics: Record<string, { sales: number; commission: number; activityScore: number }>,
-  sortBy: "sales" | "commission" | "activity" = "sales"
-): AdvisorLeagueEntry[] {
-  const entries: AdvisorLeagueEntry[] = advisors.map((advisor, index) => {
-    const m = metrics[advisor.id] || { sales: 0, commission: 0, activityScore: 0 };
-    return {
-      advisorId: advisor.id,
-      name: advisor.fullName,
-      rank: index + 1,
-      sales: m.sales,
-      rentals: 0, // TODO: add to metrics
-      commission: m.commission,
-      activityScore: m.activityScore,
-    };
-  });
-
-  // Sıralamaya göre sırala ve rank'i güncelle
-  entries.sort((a, b) => {
-    const aVal = sortBy === "sales" ? a.sales : sortBy === "commission" ? a.commission : a.activityScore;
-    const bVal = sortBy === "sales" ? b.sales : sortBy === "commission" ? b.commission : b.activityScore;
-    return bVal - aVal; // azalan sıra
-  });
-
-  return entries.map((e, idx) => ({ ...e, rank: idx + 1 }));
+export function parseTab(raw: string | string[] | undefined): OfficeCenterTab {
+  const v = first(raw);
+  return OFFICE_CENTER_TABS.some((t) => t.id === v) ? (v as OfficeCenterTab) : "danismanlar";
 }
 
-/**
- * SLA hesaplaması - atama zamanından ne kadar geçti
- */
-export function calculateSLAStatus(
-  assignedAt: string,
-  definition: SLADefinition,
-  cancelledAt?: string
-): {
-  status: "ok" | "warning" | "breached";
-  hoursElapsed: number;
-  percentageUsed: number;
-} {
-  const now = new Date();
-  const assigned = new Date(assignedAt);
-  const elapsed = (now.getTime() - assigned.getTime()) / (1000 * 60 * 60); // hours
-
-  const sla = definition.assignmentSLAHours;
-  const percentageUsed = (elapsed / sla) * 100;
-
-  let status: "ok" | "warning" | "breached" = "ok";
-  if (percentageUsed >= 100) status = "breached";
-  else if (percentageUsed >= 75) status = "warning";
-
+/** Danışmanlar sekmesi URL -> filtre (bozuk değer varsayılana düşer). */
+export function parseAdvisorFilters(sp: Sp): AdvisorListFilters {
+  const durum = first(sp.durum);
+  const sirala = first(sp.sirala);
+  const yon = first(sp.yon);
   return {
-    status,
-    hoursElapsed: Math.round(elapsed),
-    percentageUsed: Math.round(percentageUsed),
+    q: first(sp.q).trim().slice(0, 80),
+    durum: durum === "aktif" || durum === "pasif" ? durum : "",
+    rol: /^[a-z_]{2,20}$/.test(first(sp.rol)) ? first(sp.rol) : "",
+    sube: UUID_RE.test(first(sp.sube)) ? first(sp.sube) : "",
+    sirala: SORT_KEYS.includes(sirala as AdvisorSortKey) ? (sirala as AdvisorSortKey) : "ad",
+    yon: yon === "desc" ? "desc" : yon === "asc" ? "asc" : sirala && sirala !== "ad" ? "desc" : "asc",
   };
 }
 
-/**
- * Komis yonu hesapla (temel)
- */
-export function calculateCommission(
-  dealAmount: number,
-  definition: CommissionDefinition,
-  specialtyKey?: string
-): {
-  advisorShare: number;
-  officeShare: number;
-  total: number;
-} {
-  let advisorPercent = definition.advisorCommissionPercent / 100;
-  const officePercent = definition.officeCommissionPercent / 100;
-
-  // Uzmanlık bonusu varsa
-  if (specialtyKey && definition.specialtyBonuses[specialtyKey]) {
-    advisorPercent += definition.specialtyBonuses[specialtyKey] / 100;
-  }
-
-  const advisorShare = dealAmount * advisorPercent;
-  const officeShare = dealAmount * officePercent;
-  const total = advisorShare + officeShare;
-
-  return {
-    advisorShare: Math.round(advisorShare * 100) / 100,
-    officeShare: Math.round(officeShare * 100) / 100,
-    total: Math.round(total * 100) / 100,
-  };
+export function tabHref(tab: OfficeCenterTab, extra?: Record<string, string | undefined>): string {
+  const p = new URLSearchParams();
+  if (tab !== "danismanlar") p.set("sekme", tab);
+  for (const [k, v] of Object.entries(extra ?? {})) if (v) p.set(k, v);
+  const s = p.toString();
+  return s ? `${OFFICE_CENTER_PATH}?${s}` : OFFICE_CENTER_PATH;
 }
 
-/**
- * Uyarı tetikleyicileri kontrol et
- */
-export function checkAlerts(
-  unassignedCount: number,
-  slaBreachedCount: number,
-  noActivityDays: number,
-  thresholds: AlertThreshold
-): {
-  alertType: "none" | "warning" | "critical";
-  alerts: string[];
-} {
-  const alerts: string[] = [];
+const norm = (s: string) => s.toLocaleLowerCase("tr-TR");
 
-  if (unassignedCount >= thresholds.unassignedPropertyCount) {
-    alerts.push(`${unassignedCount} atanmamış portföy (eşik: ${thresholds.unassignedPropertyCount})`);
-  }
-
-  if (slaBreachedCount > 0) {
-    alerts.push(`${slaBreachedCount} SLA ihlali`);
-  }
-
-  if (noActivityDays >= thresholds.noActivityDays) {
-    alerts.push(`${noActivityDays} gün hiç aktivite yok`);
-  }
-
-  const alertType = alerts.length > 2 ? "critical" : alerts.length > 0 ? "warning" : "none";
-
-  return { alertType, alerts };
+export function filterAdvisors(rows: readonly OfficeAdvisorRow[], f: AdvisorListFilters): OfficeAdvisorRow[] {
+  const needle = norm(f.q);
+  return rows.filter((r) => {
+    if (f.durum === "aktif" && !r.isActive) return false;
+    if (f.durum === "pasif" && r.isActive) return false;
+    if (f.rol && r.role !== f.rol) return false;
+    if (f.sube && r.branchId !== f.sube) return false;
+    if (needle && !norm(r.fullName).includes(needle) && !norm(r.title ?? "").includes(needle) && !norm(r.teamName ?? "").includes(needle)) return false;
+    return true;
+  });
 }
 
-/**
- * Performans ligi hesapla (basit sıralama)
- */
-export function calculateLeagueStats(
-  advisors: OfficeAdvisor[],
-  metricsMap: Record<string, { sales: number; commission: number }>
-): {
-  totalSales: number;
-  averageCommission: number;
-  topAdvisor?: OfficeAdvisor;
-} {
-  let totalSales = 0;
-  let totalCommission = 0;
-  let topAdvisor = advisors[0];
-  let maxSales = 0;
-
-  for (const advisor of advisors) {
-    const metrics = metricsMap[advisor.id];
-    if (!metrics) continue;
-
-    totalSales += metrics.sales;
-    totalCommission += metrics.commission;
-
-    if (metrics.sales > maxSales) {
-      maxSales = metrics.sales;
-      topAdvisor = advisor;
+export function sortAdvisors(rows: readonly OfficeAdvisorRow[], key: AdvisorSortKey, dir: "asc" | "desc"): OfficeAdvisorRow[] {
+  const sign = dir === "desc" ? -1 : 1;
+  const nullLast = (a: number | null, b: number | null) => (a == null && b == null ? 0 : a == null ? 1 : b == null ? -1 : sign * (a - b));
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case "portfoy":
+        return sign * (a.openProperties - b.openProperties) || a.fullName.localeCompare(b.fullName, "tr");
+      case "talep":
+        return sign * (a.openDemands - b.openDemands) || a.fullName.localeCompare(b.fullName, "tr");
+      case "kapanis":
+        return sign * (a.wonThisMonth - b.wonThisMonth) || a.fullName.localeCompare(b.fullName, "tr");
+      case "sla":
+        return nullLast(a.slaWithinPct, b.slaWithinPct) || a.fullName.localeCompare(b.fullName, "tr");
+      case "aktivite":
+        return nullLast(a.lastActivityAt ? Date.parse(a.lastActivityAt) : null, b.lastActivityAt ? Date.parse(b.lastActivityAt) : null) || a.fullName.localeCompare(b.fullName, "tr");
+      default:
+        return sign * a.fullName.localeCompare(b.fullName, "tr");
     }
-  }
-
-  return {
-    totalSales,
-    averageCommission: advisors.length > 0 ? totalCommission / advisors.length : 0,
-    topAdvisor,
-  };
+  });
 }
 
-/**
- * Danışman durumu (etkin/pasif/inzivada vs.)
- */
-export function getAdvisorStatus(advisor: OfficeAdvisor): {
-  status: "active" | "inactive" | "onleave";
-  label: string;
-} {
-  // TODO: is_active, leave_status vs. kontrolü
-  if (!advisor.isActive) {
-    return { status: "inactive", label: "Pasif" };
-  }
+/** Atanmamış ilan SLA durumu: ofis ayarı (saat) ile ilanın beklediği süre. */
+export function unassignedSlaState(sinceMs: number, nowMs: number, slaHours: number): "ok" | "due_soon" | "breached" {
+  const waited = nowMs - sinceMs;
+  const limit = Math.max(slaHours, 1) * 3_600_000;
+  if (waited >= limit) return "breached";
+  return limit - waited <= limit * 0.2 ? "due_soon" : "ok";
+}
 
-  return { status: "active", label: "Aktif" };
+/** Ekip sağlığı: eşiklere göre uyarı listesi; her uyarı tıklanabilir hedef taşır. */
+export function computeTeamHealth(input: {
+  stats: OfficeStatistics;
+  breachedUnassigned: number;
+  unassignedThreshold: number;
+  advisorsWithoutActivity30d: number;
+}): TeamHealth {
+  const alerts: TeamHealth["alerts"] = [];
+  if (input.stats.unassignedProperties >= input.unassignedThreshold) {
+    alerts.push({ text: `${input.stats.unassignedProperties} ilan danışmansız (eşik ${input.unassignedThreshold})`, href: tabHref("atamalar") });
+  }
+  if (input.breachedUnassigned > 0) {
+    alerts.push({ text: `${input.breachedUnassigned} ilan atama SLA'sını aştı`, href: tabHref("atamalar", { durum: "gecikmis" }) });
+  }
+  if (input.advisorsWithoutActivity30d > 0) {
+    alerts.push({ text: `${input.advisorsWithoutActivity30d} aktif danışmanın 30 gündür aktivitesi yok`, href: tabHref("danismanlar", { sirala: "aktivite", yon: "asc", durum: "aktif" }) });
+  }
+  if (input.stats.assignmentsThisMonth > 0 && input.stats.cancelledAssignmentsThisMonth / input.stats.assignmentsThisMonth >= 0.3) {
+    alerts.push({ text: `Bu ay atamaların %${Math.round((input.stats.cancelledAssignmentsThisMonth / input.stats.assignmentsThisMonth) * 100)}'i iptal edildi`, href: tabHref("atamalar", { durum: "iptal" }) });
+  }
+  if (input.stats.failed) alerts.push({ text: "Bazı sayılar okunamadı; sağlık değerlendirmesi eksik olabilir", href: tabHref("istatistikler") });
+  const level: TeamHealth["level"] = alerts.length === 0 ? "healthy" : alerts.length >= 3 || input.breachedUnassigned > 0 ? "critical" : "warning";
+  return { level, alerts };
+}
+
+export type LeagueEntry = {
+  rank: number;
+  advisorId: string;
+  name: string;
+  dealCount: number;
+  offerCount: number;
+  conversionPct: number | null;
+  appointCount: number;
+  callCount: number;
+  /** Yalnız `revenueVisible` ise sayı; aksi halde null (kazanç gizliliği). */
+  revenue: number | null;
+};
+
+/**
+ * Danışman ligi: anlaşma, dönüşüm, randevu, çağrı sırasıyla; kazanç yalnız izleyici görebiliyorsa (advisor-metrics
+ * başkasının gelirini zaten null verir; burada ayrıca `seeAllEarnings` yoksa kendi dışındakiler null kalır).
+ */
+export function buildLeague(rows: readonly AdvisorMetricRow[], opts: { viewerId: string; seeAllEarnings: boolean }): LeagueEntry[] {
+  return [...rows]
+    .sort(
+      (a, b) =>
+        b.dealCount - a.dealCount ||
+        (b.conversionPct ?? -1) - (a.conversionPct ?? -1) ||
+        b.appointCount - a.appointCount ||
+        b.callCount - a.callCount ||
+        a.fullName.localeCompare(b.fullName, "tr"),
+    )
+    .map((r, i) => ({
+      rank: i + 1,
+      advisorId: r.id,
+      name: r.fullName,
+      dealCount: r.dealCount,
+      offerCount: r.offerCount,
+      conversionPct: r.conversionPct,
+      appointCount: r.appointCount,
+      callCount: r.callCount,
+      revenue: opts.seeAllEarnings || r.id === opts.viewerId ? r.revenue : null,
+    }));
 }

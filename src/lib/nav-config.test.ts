@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ALL_NAV_HREFS, NAV_SECTIONS, resolveActiveNav, visibleSections } from "./nav-config";
+import {
+  ALL_NAV_HREFS,
+  HIDDEN_APP_PAGES,
+  MOBILE_TAB_SECTIONS,
+  NAV_SECTIONS,
+  NAV_SHORTCUTS,
+  resolveActiveNav,
+  visibleSections,
+} from "./nav-config";
 import type { AppModule } from "./permissions";
 
 // Eski menüdeki 55 öğenin yolları: yeniden düzenleme hiçbir sayfayı menüden kaybettirmemeli.
@@ -128,6 +136,91 @@ describe("sekmeli menü öğeleri", () => {
     expect(resolveActiveNav("/app/danisman-kpi", sections).href).toBe("/app/ekip");
     expect(resolveActiveNav("/app/kira-artis", sections).href).toBe("/app/kiralama");
     expect(resolveActiveNav("/app/hesaplayici", sections).href).toBe("/app/hesaplayici");
+  });
+});
+
+describe("bilgi mimarisi 2026-10 (docs/design/MENU_IA_2026_10.md)", () => {
+  const sectionOf = (href: string) => NAV_SECTIONS.find((s) => s.items.some((i) => i.href === href))?.id;
+  const sections = visibleSections(ALL_MODULES);
+
+  it("Bugün = günün işi: randevu ve görev; AI Asistan Araçlar'a, Ofis kurulumu Ofis'e taşındı", () => {
+    expect(sectionOf("/app/randevular")).toBe("bugun");
+    expect(sectionOf("/app/gorevler")).toBe("bugun");
+    expect(sectionOf("/app/asistan")).toBe("araclar");
+    expect(sectionOf("/app/baslangic")).toBe("ofis");
+    expect(sectionOf("/app/gelen-kutusu")).toBe("iletisim");
+    expect(sectionOf("/app/kampanyalar")).toBe("iletisim");
+  });
+
+  it("yetim sayfalar menüye bağlandı: Bildirimler, İçe aktarma, Mahalle notları, Ayarlar sekmeleri", () => {
+    expect(sectionOf("/app/bildirimler")).toBe("bugun");
+    expect(sectionOf("/app/ice-aktarma")).toBe("musteriler");
+    expect(sectionOf("/app/mahalle-notlari")).toBe("araclar");
+    for (const h of ["/app/ayarlar/roller", "/app/ayarlar/yetkilendirme", "/app/ayarlar/moduller"]) {
+      expect(ALL_NAV_HREFS, h).toContain(h);
+      expect(resolveActiveNav(h, sections).href, h).toBe("/app/ayarlar");
+    }
+    // Ayarlar altındaki diğer sayfalar (sekme olmayan) yine Ayarlar öğesini etkin yapar.
+    expect(resolveActiveNav("/app/ayarlar/etiketler", sections).href).toBe("/app/ayarlar");
+  });
+
+  it("her öğenin ve ikincil sekmenin Türkçe açıklaması var; ekranda 'lead' geçmez", () => {
+    for (const s of NAV_SECTIONS) {
+      expect(s.description.length, s.id).toBeGreaterThan(8);
+      for (const i of s.items) {
+        expect(i.description.length, i.href).toBeGreaterThanOrEqual(12);
+        expect(i.description.length, i.href).toBeLessThanOrEqual(90);
+        expect(`${i.label} ${i.description} ${s.title}`, i.href).not.toMatch(/\blead\b/i);
+        for (const t of i.tabs ?? []) {
+          if (t.href === i.href) continue;
+          expect(t.description, t.href).toBeTruthy();
+          expect(`${t.label} ${t.description}`, t.href).not.toMatch(/\blead\b/i);
+        }
+      }
+    }
+  });
+
+  it("'lead' eş anlamlısı yalnız aramada çalışır ve Talepler'e götürür", () => {
+    const withLead = NAV_SECTIONS.flatMap((s) => s.items).filter((i) => i.keywords?.includes("lead"));
+    expect(withLead.map((i) => i.href)).toEqual(["/app/talepler"]);
+  });
+
+  it("g-kısayolları tek kaynaktan: benzersiz, 'g <harf>' biçiminde, hedefi menüde", () => {
+    const keys = NAV_SHORTCUTS.map((k) => k.keys);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(new Set(NAV_SHORTCUTS.map((k) => k.href)).size).toBe(keys.length);
+    for (const k of NAV_SHORTCUTS) {
+      expect(k.keys, k.href).toMatch(/^g [a-z]$/);
+      const path = k.href.split("?")[0]!;
+      expect(ALL_NAV_HREFS, k.href).toContain(path);
+    }
+    const byHref = Object.fromEntries(NAV_SHORTCUTS.map((k) => [k.href, k.keys]));
+    expect(byHref["/app/musteriler"]).toBe("g m");
+    expect(byHref["/app/portfoyler"]).toBe("g p");
+    expect(byHref["/app"]).toBe("g h");
+  });
+
+  it("ileri düzey öğeler ayracın altında: her başlıkta en az bir temel öğe kalır", () => {
+    for (const s of NAV_SECTIONS) {
+      expect(s.items.some((i) => !i.advanced), s.id).toBe(true);
+      // Çekirdek (sade görünüm) öğe ileri düzey olamaz: ikisi birbirini dışlar.
+      for (const i of s.items) if (i.advanced) expect(i.tier, i.href).toBe("more");
+    }
+  });
+
+  it("mobil alt sekmeler var olan başlıklara bağlıdır ve ofis sahibinde dördü de görünür", () => {
+    const ids = new Set(NAV_SECTIONS.map((s) => s.id));
+    for (const t of MOBILE_TAB_SECTIONS) expect(ids.has(t.id), t.id).toBe(true);
+    const visible = new Set(sections.map((s) => s.id));
+    for (const t of MOBILE_TAB_SECTIONS) expect(visible.has(t.id), t.id).toBe(true);
+    expect(MOBILE_TAB_SECTIONS).toHaveLength(4);
+  });
+
+  it("gizli sayfa listesi menüyle çakışmaz", () => {
+    for (const h of Object.keys(HIDDEN_APP_PAGES)) {
+      expect(ALL_NAV_HREFS, h).not.toContain(h);
+      expect(HIDDEN_APP_PAGES[h]!.length, h).toBeGreaterThan(10);
+    }
   });
 });
 

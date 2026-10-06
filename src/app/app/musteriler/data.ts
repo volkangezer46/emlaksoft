@@ -23,6 +23,7 @@ import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
 import { getSetting } from "@/lib/settings/read";
 import { formatDateTr } from "@/lib/format";
+import { applyScopeFilter, type ScopeFilter } from "@/lib/access-control/query-scope";
 import type { CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
@@ -116,11 +117,15 @@ export type CustomersDataInput = {
   sortKey: "ad" | "tarih";
   sortDir: "asc" | "desc";
   offset: number;
+  /** Kullanıcı kapsamı (assigned_to); verilmezse süzgeç yok (eski davranış). Liste + KPI sayıları aynı kapsamla. */
+  scopeFilter?: ScopeFilter;
 };
 
 export async function loadCustomersData(input: CustomersDataInput) {
   const { tenantId, filters, segmentF, sortF, sortKey, sortDir, offset } = input;
   const { q, type: typeF, source: sourceF, etiket: etiketF, from: fromF, to: toF, assigned: assignedF } = filters;
+  const scopeFilter: ScopeFilter = input.scopeFilter ?? { kind: "none" };
+  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, scopeFilter, { ownerColumn: "assigned_to" });
   const supabase = await createClient();
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews("/app/musteriler");
@@ -132,7 +137,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
 
   // Aynı filtre seti hem ana listeye hem sıcaklık havuzuna uygulanır.
   const buildFilteredQuery = (select: string, opts?: { count: "exact" }) =>
-    applyCustomerFilters(supabase.from("customers").select(select, opts).is("deleted_at", null), filters);
+    applyCustomerFilters(scoped(supabase.from("customers").select(select, opts).is("deleted_at", null)), filters);
 
   // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister;
   // sayı aynı yanıtta gelir, ek gidiş-dönüş yok.
@@ -214,33 +219,33 @@ export async function loadCustomersData(input: CustomersDataInput) {
     signalsP,
     // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
     // gerçek toplamlar çekilir (satır taşımaz, yalnızca sayım döner).
-    supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase
+    scoped(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)),
+    scoped(supabase
       .from("customers")
       .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
+      .is("deleted_at", null))
       .contains("customer_types", ["Alıcı"]),
-    supabase
+    scoped(supabase
       .from("customers")
       .select("id", { count: "exact", head: true })
-      .is("deleted_at", null)
+      .is("deleted_at", null))
       .contains("customer_types", ["Mülk sahibi"]),
     // Özel günler — sayfa dilimi yerine tarihli tüm kayıtlardan (dar seçim)
-    supabase
+    scoped(supabase
       .from("customers")
       .select("id, full_name, birth_date, anniversary_date, anniversary_note")
-      .is("deleted_at", null)
+      .is("deleted_at", null))
       .or("birth_date.not.is.null,anniversary_date.not.is.null")
       .limit(1000),
     // Büyüme grafiği — son 8 haftanın kayıt tarihleri
-    supabase
+    scoped(supabase
       .from("customers")
       .select("created_at")
-      .is("deleted_at", null)
+      .is("deleted_at", null))
       .gte("created_at", eightWeeksAgo)
       .limit(2000),
     // Tip çipi sayaçları — hafif tek kolon taraması (TYPE_SCAN_LIMIT'i aşarsa sayaç gösterilmez).
-    supabase.from("customers").select("customer_types").is("deleted_at", null).limit(TYPE_SCAN_LIMIT),
+    scoped(supabase.from("customers").select("customer_types").is("deleted_at", null)).limit(TYPE_SCAN_LIMIT),
     // Etiket filtresi + toplu etiketleme önerileri — tenant'taki distinct etiketler
     fetchTenantTags(supabase),
     getDefinitionsOrDefault("customer_type"),

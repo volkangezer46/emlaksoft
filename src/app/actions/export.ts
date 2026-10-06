@@ -16,6 +16,15 @@ import { logActivity } from "@/lib/activity";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { filterCustomersByHeatSegment } from "@/lib/customer-heat-export";
 import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
+import { applyScopeFilter, getListScope } from "@/lib/access-control";
+
+/**
+ * Liste CSV'leri ekranla AYNI kapsamı uygular: eski rol kuralı (`hasOfficeWideDataScope`) taban, ofis bayrağı
+ * açıksa kullanıcı kapsamı (kendi/takım/şube) onu yalnız daraltır (`getListScope`).
+ */
+async function exportScope(gate: { userId: string; tenantId: string; role: string }) {
+  return getListScope({ userId: gate.userId, tenantId: gate.tenantId, role: gate.role, mineOnly: !hasOfficeWideDataScope(gate.role) });
+}
 
 export type ExportResult = {
   error?: string;
@@ -81,7 +90,7 @@ export async function exportCustomersCsv(filters: Partial<CustomerListFilters> =
       .limit(EXPORT_LIMIT),
     normalizeCustomerFilters(filters),
   );
-  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  q = applyScopeFilter(q, (await exportScope(gate)).filter, { ownerColumn: "assigned_to" });
   let { data, error } = await q;
   const normalized = normalizeCustomerFilters(filters);
   let segmentApplied = false;
@@ -183,7 +192,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
-  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  q = applyScopeFilter(q, (await exportScope(gate)).filter, { ownerColumn: "assigned_to" });
   const { data, error } = await q;
   if (error) {
     console.error("exportPropertiesCsv", error);
@@ -312,7 +321,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
     )
     .eq("tenant_id", gate.tenantId)
     .eq("customer.tenant_id", gate.tenantId);
-  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("customer.assigned_to", gate.userId);
+  q = applyScopeFilter(q, (await exportScope(gate)).filter, { ownerColumn: "customer.assigned_to" });
   if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
   else if (!filters.status) q = q.in("status", ["new", "active", "matched"]);
   if (aciliyet.length > 0) q = q.in("urgency", aciliyet);
@@ -379,7 +388,7 @@ export async function exportDealsCsv(): Promise<ExportResult> {
     .eq("customer.tenant_id", gate.tenantId)
     .order("updated_at", { ascending: false })
     .limit(EXPORT_LIMIT);
-  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  q = applyScopeFilter(q, (await exportScope(gate)).filter, { ownerColumn: "assigned_to" });
   const { data, error } = await q;
   if (error) {
     console.error("exportDealsCsv", error);

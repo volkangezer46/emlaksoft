@@ -347,14 +347,19 @@ npm run test:e2e -- access-control.spec.ts
 
 ---
 
+## Yönetim ekranı ve liste kapsamı (2026-10-06)
+
+- **Ekran:** `/app/ayarlar/yetkilendirme` (kapı `settings`; yazma yalnız owner/gm). Sekmeler: `kapsamlar`, `istisnalar`, `izinler` (kişi bazlı izin matrisi — roller ekranından taşındı), `gunluk`.
+- **Action'lar:** `src/app/actions/access-control.ts` (`upsertUserScope`, `resetUserScope`, `createScopeOverride`, `cancelScopeOverride`, `searchScopeResources`, `listAccessAudit`, `exportAccessAuditCsv`). Her yazma `access_audit_log`'a önce/sonra yazar; denetim yazılamazsa değişiklik geri alınır. INSERT politikası: migration `20261006000104`.
+- **Saf kurallar:** `admin-rules.ts` (kim kimi değiştirebilir), `query-scope.ts` (liste süzgeci), `audit-filters.ts` (günlük filtre kontratı). Testli.
+- **Liste kapsamı:** `getListScope()` (`list-scope.ts`) → `applyScopeFilter(query, filter, { ownerColumn })`. Ofis bayrağı `office.access.scope_enforcement` KAPALIYKEN eski davranış; AÇIKKEN kapsam yalnız daraltır. Bağlı sayfalar: talepler, müşteriler, portföyler, anlaşmalar, görevler + ilgili CSV'ler. Rozet: `components/app/scope-badge.tsx`.
+- **Kaynak adları:** `demand` = `customer_demands` (şemada `demands` yok; sahiplik `customers.assigned_to`).
+
 ## Bilinen Sorunlar & TODO
 
-- [ ] RLS politikaları mevcut tablolara eklenmesi (demands, properties, deals, commissions)
-- [ ] Nav'a "Yetkilendirme" modülü eklenmesi (`/app/ayarlar/yetkilendirme`)
-- [ ] UI bileşenleri (scope yönetimi, override yönetimi)
-- [ ] Server actions (scope/override oluştur/güncelle/sil)
+- [ ] RLS politikaları mevcut tablolara eklenmesi (customer_demands, properties, deals, commissions) — bugün kontrol uygulama katmanında + tenant RLS
+- [ ] `/api/export/[entity]` tam akış ve ana ekran `scopeMine` kapsam bağlantısı
 - [ ] E2E testler
-- [ ] Denetim dashboard
 - [ ] Cron yetkilendirme kontrol
 
 ---

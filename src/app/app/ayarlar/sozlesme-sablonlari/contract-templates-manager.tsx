@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/contract-templates";
 import { useToast } from "@/components/app/toast-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 
 export type ContractTemplateRow = {
@@ -202,9 +203,17 @@ export function ContractTemplatesManager({ templates, canEdit }: { templates: Co
         <p className="text-xs text-text-muted">Şablonları düzenlemek için ayar düzenleme yetkisi gerekir; bu ekran salt okunurdur.</p>
       )}
       {templates.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
-          Henüz şablon yok. &quot;Yeni şablon&quot; ile ilk şablonunuzu ekleyin.
-        </p>
+        <EmptyState
+          variant="compact"
+          icon={FileText}
+          title="Henüz sözleşme şablonu yok"
+          description={
+            canEdit
+              ? "Yukarıdaki \"Yeni şablon\" ile satış, kira veya yetki sözleşmesi metninizi bir kez yazın; Yeni sözleşme formunda tek tıkla seçilir."
+              : "Ofis şablonu eklemek için ayar düzenleme yetkisi gerekir; mevcut sözleşmeleri Sözleşmeler sayfasından yönetebilirsiniz."
+          }
+          action={{ href: "/app/sozlesmeler", label: "Sözleşmelere git" }}
+        />
       ) : (
         <ul className="space-y-2.5">
           {templates.map((t) => (

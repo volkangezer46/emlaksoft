@@ -7,6 +7,7 @@ import { Building2, Check, Pencil, Phone, Plus, Power, Trash2, UserRound, X } fr
 import { createBranch, deleteBranch, updateBranch } from "@/app/actions/team";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { formatTurkishPhone } from "@/lib/phone";
@@ -128,9 +129,14 @@ export function BranchManager({
       ) : null}
 
       {branches.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-          Henüz şube tanımlanmadı. Tek ofis olarak da çalışabilirsiniz.
-        </p>
+        <EmptyState
+          variant="compact"
+          icon={Building2}
+          title="Henüz şube tanımlanmadı"
+          description="Tek ofis olarak da çalışabilirsiniz. Şube tanımlayınca üyeler şubeye bağlanır, şube müdürü atanır ve raporlar şube bazında ayrışır."
+          action={canManage && !adding ? { node: <Button type="button" icon={Plus} onClick={() => setAdding(true)}>İlk şubeyi ekle</Button> } : undefined}
+          secondary={{ href: "/app/ekip", label: "Ekip üyeleri" }}
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {branches.map((b) =>

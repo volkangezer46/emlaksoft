@@ -1,12 +1,16 @@
-import { SkeletonPage, SkeletonPageHeader, SkeletonPanel } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
-/** Ofis Merkezi: başlık + sekme panelleri. */
 export default function Loading() {
   return (
-    <SkeletonPage label="Ofis Merkezi yükleniyor">
-      <SkeletonPageHeader actions={1} />
-      <SkeletonPanel rows={4} />
-      <SkeletonPanel rows={3} />
-    </SkeletonPage>
+    <div className="space-y-6" aria-busy="true" aria-label="Ofis Merkezi yükleniyor">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-12 w-full" />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-14" />
+        ))}
+      </div>
+      <Skeleton className="h-72 w-full" />
+    </div>
   );
 }

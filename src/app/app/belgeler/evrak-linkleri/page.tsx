@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { formatBytes } from "@/lib/documents";
@@ -232,9 +233,19 @@ export default async function EvrakLinkleriPage({
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
-            <p className="py-6 text-center text-sm text-text-muted">
-              {filterActive ? "Bu filtreyle link yok." : "Henüz evrak linki yok. İlk linki yukarıdan oluşturun."}
-            </p>
+            <EmptyState
+              variant="compact"
+              bare
+              icon={FileUp}
+              tone={filterActive ? "brand" : "mint"}
+              title={filterActive ? "Bu süzgeçle evrak linki yok" : "Henüz evrak linki yok"}
+              description={
+                filterActive
+                  ? "Durum veya müşteri süzgecini kaldırıp tüm linkleri görün."
+                  : "Müşteriden kimlik, tapu veya vekâlet gibi evrakı güvenli bağlantıyla isteyin; yüklenen dosyalar müşteri kartına bağlanır."
+              }
+              action={filterActive ? { href: BASE, label: "Filtreyi temizle" } : { href: "/app/belgeler", label: "Belge Merkezi" }}
+            />
           ) : (
             <ul className="divide-y divide-line">
               {rows.map((r) => {

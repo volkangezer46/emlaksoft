@@ -53,7 +53,12 @@ import {
   Wrench,
   BarChart3,
   Bell,
+  Building,
   Building2,
+  FileUp,
+  Fingerprint,
+  NotebookPen,
+  ToggleRight,
   CalendarClock,
   CalendarDays,
   CalendarHeart,
@@ -238,6 +243,8 @@ export const ICONS = {
   denetim: ScrollText,
   /** Uyum / güvenlik. */
   uyum: ShieldCheck,
+  /** Yetkilendirme (kullanıcı kapsamı, izin istisnası): kullanıcı + dişli. */
+  yetkilendirme: UserCog,
   /** Destek. */
   destek: LifeBuoy,
   /** Ayarlar. TEK doğru: Settings (Settings2 DEĞİL). */
@@ -261,6 +268,15 @@ export const ICONS = {
   /** Raporlar sekmesi: anketör kuyruğu ve anket sonuçları. */
   anketor: Headphones,
   leadHizi: Timer,
+  /** Ofis Merkezi (danışman yönetimi, havuzdan atama, ofis tanımları) — portföy binasından (Building2) ayrı. */
+  ofisMerkezi: Building,
+  /** Excel/CSV içe aktarma. */
+  iceAktarma: FileUp,
+  /** Mahalle saha notları. */
+  mahalleNotu: NotebookPen,
+  /** Ayarlar sekmeleri: roller/izin matrisi, yetkilendirme kapsamları, modül aç/kapa. */
+  roller: Fingerprint,
+  moduller: ToggleRight,
 
   // --- Menü başlıkları (sayfa ikonlarından AYRI: başlık = kategori metaforu) -
   baslikBugun: Sun,

@@ -144,9 +144,11 @@ const F = {
   scopeOverrides: "20261006000101_scope_overrides.sql",
   accessAuditLog: "20261006000102_access_audit_log.sql",
   hasScopeRpc: "20261006000103_has_permission_with_scope_rpc.sql",
-  // Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache.
-  perfIndexes: "20261006000200_perf_indexes.sql",
-  perfNavBadgeCache: "20261006000300_nav_badge_cache.sql",
+  // Ofis Merkezi: office_center permission_defaults seed'i (4. kayit noktasi) + havuzdan atama gecmisi tablosu.
+  officeCenterPerms: "20261006000500_office_center_permission_defaults.sql",
+  poolAssignments: "20261006000510_pool_assignments.sql",
+  // PB40 ile AYNI pencere, 000103'ten SONRA: access_audit_log INSERT politikasi (kullanici istemcisi gunluk yazabilsin).
+  accessWritePolicies: "20261006000104_access_control_write_policies.sql",
   // PB42 kabuk/ana ekran hizi: tek-tur kabuk RPC'si + ana ekran anlik goruntu RPC'leri (hepsi SECURITY INVOKER, kod yoksa eski yola duser).
   appShellBootstrap: "20261006000400_app_shell_bootstrap_rpc.sql",
   dashboardSnapshotRpcs: "20261006000410_dashboard_snapshot_rpcs.sql",
@@ -255,9 +257,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.userScopes]: "ek", // user_scopes (yeni tablo, kapsam tanımı), scope_rules (RLS politikası)
     [F.scopeOverrides]: "ek", // scope_overrides (yeni tablo, istisna kayıtları)
     [F.accessAuditLog]: "ek", // access_audit_log (yeni tablo, denetim günlüğü)
-    [F.hasScopeRpc]: "ek", // 5 RPC fonksiyonu: current_user_scope, current_user_team_id, current_user_branch_id, has_permission_with_scope, check_scope_access
-    [F.perfIndexes]: "davranis", // 8 composite index (deals, calls, tasks, contacts, events, expenses, demands, offers) - sorgu performansını 40-60% hızlandırır
-    [F.perfNavBadgeCache]: "ek", // nav_badge_snapshots tablo + get_nav_badge_snapshot RPC + cron trigger
+    [F.hasScopeRpc]: "ek", // 4 RPC: current_user_scope, current_user_team_id, current_user_branch_id, has_permission_with_scope (yalniz ekler)
+    [F.officeCenterPerms]: "ek", // yalniz VERI seed: office_center izin varsayilani (owner/gm ALL, branch_manager view+edit, team_lead view); idempotent
+    [F.poolAssignments]: "ek", // yeni tablo pool_assignments + RLS (okuma: office_center view / atanan; yazma: office_center edit); mevcut davranis degismez
+    [F.accessWritePolicies]: "ek", // access_audit_log INSERT politikasi (owner/gm/branch_manager, kendi ofisi, created_by = auth.uid()) + grant insert
     [F.appShellBootstrap]: "ek", // yalniz 1 yeni invoker RPC (app_shell_bootstrap): profil+tenant+ham izin satirlari+modul+kullanim+rozet sayimi tek JSON; tablo/politika degismez
     [F.dashboardSnapshotRpcs]: "ek", // yalniz 3 yeni invoker RPC (get_insights/tasks/metrics_snapshot); p_tenant_id/p_user_id JWT ile eslesmezse NULL; tablo/politika degismez
   },
@@ -360,9 +363,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB37-eids-tasinmaz-no", order: 29.88, title: "EIDS tasinmaz kimlik no (properties.eids_property_no, nullable + format CHECK)", files: [F.propertyEidsNo] },
     { id: "PB38-kiraci-hatirlatma", order: 29.89, title: "Kiraci kira hatirlatma (ayar KAPALI dogar + hatirlatma kaydi/dedupe + opt-out)", files: [F.rentReminders] },
     { id: "PB39-kira-sozlesme-baglantisi", order: 29.90, title: "Kiralamadan kira sozlesmesi (contracts.rental_id + artis maddesi alanlari)", files: [F.contractRentalLink] },
-    { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi)", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc] },
-    { id: "PB41-hiz-optimizasyonu", order: 29.92, title: "Sayfa açılış hızı optimizasyonu: DB indexes + nav badge cache snapshot", files: [F.perfIndexes, F.perfNavBadgeCache] },
+    { id: "PB40-kurumsal-yetkilendirme", order: 29.91, title: "Kurumsal rol tabanlı erişim kontrol + kapsam sistemi (danışman kısıtlaması, veri seviyesi); 000100-103 CANLIDA, 000104 bekliyor", files: [F.userScopes, F.scopeOverrides, F.accessAuditLog, F.hasScopeRpc, F.accessWritePolicies] },
     { id: "PB42-kabuk-rpc", order: 29.93, title: "Kabuk/ana ekran hizi: app_shell_bootstrap (tek tur kabuk) + get_insights/tasks/metrics_snapshot RPC'leri (kod RPC yoksa eski yola duser)", files: [F.appShellBootstrap, F.dashboardSnapshotRpcs] },
+    { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -477,6 +480,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcWorkerEvents, F.lcAnomalyTables],
     // Icgoru destek RPC/gorunum/temizlik insights tablosuna baglidir (platform ikizi bagimsiz).
     [F.insightSupport, F.insights],
+    // Ofis Merkezi: pool_assignments RLS'i has_effective_permission('office_center', ...) kullanir -> seed ONCE.
+    [F.poolAssignments, F.officeCenterPerms],
   ],
 
   externalPending: [

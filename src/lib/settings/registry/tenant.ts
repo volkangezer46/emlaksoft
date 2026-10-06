@@ -217,4 +217,88 @@ const lcReport: AnySettingDef[] = [
   }),
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport];
+/**
+ * Ofis Merkezi — akıllı atama. Ağırlıklar `src/lib/office-center/smart-assign.ts` DEFAULT_WEIGHTS ile aynı başlar
+ * (smart-assign.test.ts kilitler); toplam 100 olmak zorunda değildir, motor oransal normalize eder.
+ */
+export const ASSIGN_WEIGHT_KEYS = {
+  workload: "office.assign.weight_workload",
+  specialty: "office.assign.weight_specialty",
+  region: "office.assign.weight_region",
+  performance: "office.assign.weight_performance",
+  availability: "office.assign.weight_availability",
+} as const;
+export const ASSIGN_SLA_HOURS_KEY = "office.assign.unassigned_sla_hours";
+export const UNASSIGNED_ALERT_KEY = "office.alert.unassigned_pool_count";
+
+const ASSIGN_WEIGHT_DEFAULTS: Record<keyof typeof ASSIGN_WEIGHT_KEYS, { def: number; label: string; description: string }> = {
+  workload: { def: 25, label: "Ağırlık: iş yükü", description: "Açık portföy + açık talep sayısı ofis ortalamasının altındaki danışman daha yüksek puan alır." },
+  specialty: { def: 20, label: "Ağırlık: uzmanlık", description: "İlanın türü (konut/ticari/arsa) ve işlem türü (satılık/kiralık) danışmanın uzmanlık kaydıyla eşleşirse puan verir." },
+  region: { def: 25, label: "Ağırlık: bölge", description: "İlanın il/ilçe/mahallesi danışmanın bölge kaydıyla eşleşirse puan verir (mahalle > ilçe > il)." },
+  performance: { def: 15, label: "Ağırlık: son 90 gün performansı", description: "Son 90 gün kapanış oranı ve ilk yanıt SLA uyumu; veri yetersizse nötr puan." },
+  availability: { def: 15, label: "Ağırlık: müsaitlik", description: "Mesai içi/dışı ve son aktivite yakınlığı; izinli veya pasif danışman zaten elenir." },
+};
+
+const assign: AnySettingDef[] = [
+  ...(Object.keys(ASSIGN_WEIGHT_KEYS) as (keyof typeof ASSIGN_WEIGHT_KEYS)[]).map((k) =>
+    defineInt({
+      ...TENANT,
+      key: ASSIGN_WEIGHT_KEYS[k],
+      group: "atama",
+      default: ASSIGN_WEIGHT_DEFAULTS[k].def,
+      min: 0,
+      max: 100,
+      label: ASSIGN_WEIGHT_DEFAULTS[k].label,
+      description: ASSIGN_WEIGHT_DEFAULTS[k].description,
+      impact: "Yalnız Ofis Merkezi > Atamalar'daki \"Akıllı öner\" sıralaması değişir; mevcut atamalar ve ilan havuzu puanı etkilenmez. 0 = bu ölçüt sayılmaz.",
+      unit: "puan",
+    }),
+  ),
+  defineInt({
+    ...TENANT,
+    key: ASSIGN_SLA_HOURS_KEY,
+    group: "atama",
+    default: 24,
+    min: 1,
+    max: 168,
+    label: "Atanmamış ilan SLA süresi",
+    description: "Danışmanı olmayan bir ilan kaç saatten uzun beklerse Ofis Merkezi'nde \"SLA aşıldı\" sayılsın.",
+    impact: "Ofis Merkezi > Atamalar'daki \"SLA'sı geçen\" sayacı ve satır işareti değişir. Düşürürseniz daha çok ilan uyarı alır; bildirim üretmez.",
+    unit: "saat",
+  }),
+  defineInt({
+    ...TENANT,
+    key: UNASSIGNED_ALERT_KEY,
+    group: "esik",
+    default: 5,
+    min: 1,
+    max: 500,
+    label: "Atanmamış ilan uyarı eşiği",
+    description: "Danışmanı olmayan ilan sayısı bu eşiğe ulaşınca Ofis Merkezi ekip sağlığı \"uyarı\" verir.",
+    impact: "Yalnız Ofis Merkezi > İstatistikler'deki ekip sağlığı uyarısı değişir; atama yapılmaz, bildirim gönderilmez.",
+    unit: "ilan",
+  }),
+];
+
+
+/**
+ * Kapsam uygulaması: AÇIK/KAPALI (varsayılan KAPALI = bugünkü davranış: listeler yalnız rol kuralıyla süzülür).
+ * Açılınca talep/müşteri/portföy/anlaşma/görev listeleri ve CSV'leri kullanıcı kapsamına (kendi/takım/şube) daralır;
+ * kapsam yalnız daraltır, mevcut rol kuralını asla genişletmez. Yönetimi: /app/ayarlar/yetkilendirme.
+ */
+export const SCOPE_ENFORCEMENT_KEY = "office.access.scope_enforcement";
+
+const access: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    key: SCOPE_ENFORCEMENT_KEY,
+    group: "erisim",
+    default: false,
+    risk: "high",
+    label: "Liste kapsamını uygula",
+    description: "Açıkken talep, müşteri, portföy, anlaşma ve görev listeleri kullanıcının kapsamıyla (kendi kayıtları / takım / şube) sınırlanır; ofis geneli kapsamdaki yöneticiler etkilenmez.",
+    impact: "Danışmanlar yalnız kendilerine atanmış kayıtları, takım liderleri takımlarını, şube müdürleri şubelerini görür. Kapatınca eski görünüm hemen geri gelir; veri silinmez veya değişmez.",
+  }),
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access];

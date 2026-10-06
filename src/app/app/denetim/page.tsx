@@ -26,6 +26,7 @@ import {
 import { daysAgoIso, now } from "@/lib/clock";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
 
@@ -279,24 +280,27 @@ export default async function AuditPage({
           ) : null}
         </form>
         {rows.length === 0 ? (
-          <div className="grid place-items-center px-6 py-16 text-center">
-            <ScrollText className="h-8 w-8 text-text-faint" />
-            <p className="mt-3 text-sm text-text-muted">
-              {total > 0
-                ? "Bu sayfada kayıt yok — sayfa numarası aralık dışında."
-                : hasFilter
-                  ? "Filtreye uyan denetim kaydı yok."
-                  : "Henüz denetim kaydı yok. İlk yazma işlemi burada görünecek."}
-            </p>
-            {total > 0 ? (
-              <Link href={pageHref(1)} className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
-                İlk sayfaya dön
-              </Link>
-            ) : hasFilter ? (
-              <Link href="/app/denetim" className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
-                Filtreleri temizle
-              </Link>
-            ) : null}
+          <div className="px-6 py-10">
+            <EmptyState
+              variant="compact"
+              bare
+              icon={ScrollText}
+              title={total > 0 ? "Bu sayfada kayıt yok" : hasFilter ? "Süzgece uyan denetim kaydı yok" : "Henüz denetim kaydı yok"}
+              description={
+                total > 0
+                  ? "Sayfa numarası aralık dışında; ilk sayfaya dönün."
+                  : hasFilter
+                    ? "Tarih aralığını genişletin ya da aktör, risk veya işlem türü süzgecini kaldırın."
+                    : "Ofisteki ilk yazma işlemi (kayıt, düzenleme, silme, dışa aktarma) burada kim/ne zaman bilgisiyle görünür."
+              }
+              action={
+                total > 0
+                  ? { href: pageHref(1), label: "İlk sayfaya dön" }
+                  : hasFilter
+                    ? { href: "/app/denetim", label: "Filtreleri temizle" }
+                    : { href: "/app/ofis-kontrol", label: "Ofis Kontrol Merkezi" }
+              }
+            />
           </div>
         ) : (
           <div>
