@@ -294,7 +294,7 @@ describe("cron: growth-claims", () => {
   });
   it("sayı belgelerde güncel", () => {
     const n = CRON_JOBS.length;
-    expect(n).toBe(37);
+    expect(n).toBe(36);
     expect(read("CLAUDE.md")).toContain(`Cron:** ${n} route`);
     expect(read("docs/DURUM.md")).toContain(`| ${n} / ${n} |`);
     expect(read("docs/MIMARI.md")).toContain(`Cron envanteri (${n}`);

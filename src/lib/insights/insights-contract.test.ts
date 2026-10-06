@@ -164,7 +164,7 @@ describe("cron kablolaması", () => {
     const vercel = JSON.parse(read("vercel.json")) as { crons: { path: string; schedule: string }[] };
     expect(vercel.crons.find((c) => c.path === job?.path)?.schedule).toBe(job?.schedule);
     expect(vercel.crons.length).toBe(CRON_JOBS.length);
-    expect(CRON_JOBS.length).toBe(37);
+    expect(CRON_JOBS.length).toBe(36);
   });
 
   it("route: authorizeCron + recordHeartbeat literal + maxDuration 300; service_role yalnız kapalı iş seçiciden", () => {

@@ -112,13 +112,15 @@ begin
 
   -- 2. Scope kontrol (resource-specific)
   if p_resource_type is not null and p_resource_id is not null then
-    -- Danışman talep kontrolü: sadece atandığı talepleri görebilir
+    -- Danışman talep kontrolü: talep (customer_demands) müşterisi kendisine atanmış olmalı
     if p_resource_type = 'demand' and v_role = 'advisor' and p_action = 'view' then
       return exists(
-        select 1 from demands
-        where id = p_resource_id
-          and tenant_id = v_tenant_id
-          and (assigned_to = v_user_id or created_by = v_user_id)
+        select 1
+        from customer_demands cd
+        join customers c on c.id = cd.customer_id and c.tenant_id = cd.tenant_id
+        where cd.id = p_resource_id
+          and cd.tenant_id = v_tenant_id
+          and (c.assigned_to = v_user_id or c.created_by = v_user_id)
       );
     end if;
 
@@ -140,14 +142,13 @@ begin
       if v_role = 'team_lead' then
         return true;
       end if;
-      -- Danışman talep sahibiyse imzalayabilir
+      -- Danışman anlaşmanın sorumlusuysa imzalayabilir
       if v_role = 'advisor' then
         return exists(
-          select 1 from demands d
-          join deals de on de.demand_id = d.id
+          select 1 from deals de
           where de.id = p_resource_id
-            and d.assigned_to = v_user_id
-            and d.tenant_id = v_tenant_id
+            and de.tenant_id = v_tenant_id
+            and de.assigned_to = v_user_id
         );
       end if;
     end if;
