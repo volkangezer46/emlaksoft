@@ -22,11 +22,13 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
   });
 
   it("yükleme iskeletleri animate-pulse yerine SkeletonCard kullanır", () => {
-    for (const p of ["src/app/admin/billing/loading.tsx", "src/app/admin/raporlar/loading.tsx", "src/app/admin/_dashboards/shared.tsx"]) {
+    for (const p of ["src/app/admin/billing/loading.tsx", "src/app/admin/raporlar/loading.tsx"]) {
       const src = read(p);
       expect(src).not.toContain("animate-pulse");
       expect(src).toContain("SkeletonCard");
     }
+    // _dashboards/shared.tsx'teki çağıransız GlassSkeleton/KpiGridSkeleton kopyaları silindi (KPI iskeleti ui/kpi-card).
+    expect(read("src/app/admin/_dashboards/shared.tsx")).not.toContain("animate-pulse");
   });
 
   it("billing ve raporlar ortak AreaChart'ı kullanır (el yapımı svg çizgi yok)", () => {

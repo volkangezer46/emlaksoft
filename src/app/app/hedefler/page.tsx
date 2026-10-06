@@ -7,7 +7,7 @@ import { targetPeriodRange } from "@/lib/team/target-actuals";
 import { loadTargetActualsLive } from "@/lib/team/advisor-metrics";
 import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { TargetFormDialog, type TargetFormValues } from "./target-form-dialog";
 import { TargetCreatePanel, TargetCreateTrigger } from "./target-create-panel";
 

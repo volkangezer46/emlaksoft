@@ -371,7 +371,7 @@ export default async function AdminGrowthPage({
                   <strong className="text-ink-950">{r.name}</strong>{" "}
                   <span className="text-text-muted">
                     ({r.kind === "referral" ? "ofis daveti" : "ortak"}) · {describeRewardRule(r) ?? "değer yok"}
-                    {r.monthly_cap_try != null ? ` · aylık tavan ${r.monthly_cap_try} TL` : ""}
+                    {r.monthly_cap_try != null ? ` · aylık tavan ${formatTry(Number(r.monthly_cap_try))}` : ""}
                   </span>
                 </span>
                 <span className="flex items-center gap-2">

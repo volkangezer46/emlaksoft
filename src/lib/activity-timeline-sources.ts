@@ -1,3 +1,4 @@
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TimelineEvent } from "@/lib/activity-timeline";
 
@@ -23,12 +24,7 @@ export const CONTRACT_STATUS_LABEL: Record<string, string> = {
   cancelled: "İptal",
 };
 
-export const APPT_TYPE_LABEL: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
+export const APPT_TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
 export const APPT_STATUS_LABEL: Record<string, string> = {
   pending: "Teyit bekliyor",

@@ -20,7 +20,7 @@ import { ValuationForm } from "./valuation-form";
 import { DegerlemeTabs } from "./degerleme-tabs";
 import { getEfFeatureState } from "@/lib/ef-credits/service";
 import { DataPartnerStatus } from "@/components/app/data-partner-badges";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 
 import { PageHeader } from "@/components/ui/page-header";

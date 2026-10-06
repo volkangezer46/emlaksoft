@@ -8,7 +8,7 @@ import { exportOffersCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { relatedSearchClause } from "@/lib/list-search";

@@ -17,7 +17,7 @@ import type { GroupSpec } from "../src/lib/migration-pairs";
  * kesin bekleyen listesi icin salt-okunur `npm run db:migrate -- --dry-run` esastir.
  * GUNCELLEME (sahip bildirimi): PB1..PB8 (20260825000100..001300) ve P12 (20260816000500) de CANLIDA UYGULANDI.
  * GUNCELLEME (2026-10-06 sahip bildirimi): PB9-PB11 (20260826000100..000800), 000900/001000/001100 ve PB40/PB42/PB43/PB44
- * (20261006000100..000600) de CANLIDA. Depoda bekleyen: PB45 (20261006000700..000720), PB48 (20261007000100). Taban bu aracta bilerek ilerletilmedi (pencere
+ * (20261006000100..000600) de CANLIDA. PB46 (20261007000200..000220) CANLIDA (koordinator bildirimi). Depoda bekleyen: PB45 (20261006000700..000720; kesin durum --dry-run), PB48 (20261007000100). Taban bu aracta bilerek ilerletilmedi (pencere
  * sirasi/bagimlilik denetimi gecmis pencereler icin de calismaya devam etsin); kesin liste yine --dry-run.
  */
 export const APPLIED_HEAD = "20260813000300";
@@ -162,6 +162,11 @@ const F = {
   // PB48 KVKK P0-9 kalici cozum: property_media.is_document + ad kurali SQL fonksiyonu + INSERT tetikleyicisi.
   // (Eski K4 dalindaki 20260818000400_property_media_is_document HIC main'e girmedi/uygulanmadi; bu dosya onun yerine.)
   mediaIsDocument: "20261007000100_property_media_is_document.sql",
+  // PB46 ilan kontrol veri yollari: yasam dongusu gecis kaydi (append-only) -> envanter ice aktarma + eslesme kuyrugu
+  // (JWT RPC) -> ilce kirilimi RPC'leri + SLA yeniden acilis duzeltmesi.
+  lcLifecycleEvents: "20261007000200_lc_lifecycle_events.sql",
+  lcInventoryMatching: "20261007000210_lc_inventory_matching.sql",
+  lcDistrictSlaReset: "20261007000220_lc_district_sla_reset.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -276,6 +281,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.reportingSampleScope]: "davranis", // tenant_commission/reporting_aggregates imzasina p_sample_threshold (varsayilan 5); esik ustu ofiste ornek kayitlar toplamlardan DUSER
     [F.ownershipTransferRpc]: "ek", // yeni authenticated RPC'ler ownership_transfer_request/accept/resolve (JWT kimligi, ayni islemde audit_logs); mevcut 3 service_role RPC degismez
     [F.mediaIsDocument]: "davranis", // public gorunurluk daralir: is_document=true medya hicbir public yuzeyde/serviste yok; belge adli mevcut satirlar true; INSERT tetikleyicisi belge adini isaretler + kapak yapmaz
+    [F.lcLifecycleEvents]: "ek", // yeni append-only tablo lc_lifecycle_events + property_control_state AFTER tetikleyicisi (yalniz olay yazar, hata yutulur)
+    [F.lcInventoryMatching]: "ek", // yeni tablo listing_inventory_imports + 2 authenticated RPC (lc_inventory_import, lc_match_decide) mevcut service_role cekirdeklerini sarar
+    [F.lcDistrictSlaReset]: "davranis", // 2 yeni invoker RPC (ilce kirilimi) + listing_anomalies tetikleyicisi: yeniden acilan uyarinin eski SLA asama kayitlarini siler (yukseltme bastan isler)
     [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
   },
 
@@ -381,6 +389,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB43-ofis-merkezi", order: 29.94, title: "Ofis Merkezi: office_center permission_defaults seed'i -> pool_assignments (atama gecmisi + RLS)", files: [F.officeCenterPerms, F.poolAssignments] },
     { id: "PB44-self-servis-kurulum", order: 29.95, title: "Self-servis kurulum: ornek veri tek-tus temizleme RPC'si (purge_tenant_sample_data) + sihirbaz ofis profili sutunlari", files: [F.purgeSampleRpc] },
     { id: "PB45-bekleyen-isler", order: 29.96, title: "Bekleyen isler: eski 9 arg fulfill overload DROP -> rapor/komisyon ozetleri ornek veri kapsami -> sahiplik devri JWT RPC'leri", files: [F.planSubscriptionAmount, F.reportingSampleScope, F.ownershipTransferRpc] },
+    { id: "PB46-ilan-kontrol-veri-yollari", order: 29.97, title: "Ilan kontrol veri yollari: yasam dongusu gecis kaydi -> envanter ice aktarma + eslesme kuyrugu (JWT RPC) -> ilce kirilimi + SLA yeniden acilis duzeltmesi", files: [F.lcLifecycleEvents, F.lcInventoryMatching, F.lcDistrictSlaReset] },
     { id: "PB48-medya-belge-isareti", order: 29.985, title: "KVKK P0-9: property_media.is_document (belge public'e cikmaz) + ad kurali fonksiyonu + INSERT tetikleyicisi; kod sutun yokken ad kuralina duser (sira serbest)", files: [F.mediaIsDocument] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
@@ -501,6 +510,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // PB45: overload temizliginin on-kosulu fiyat butunlugu (000300) govdesidir; sahiplik devri RPC'leri tabloya (001300) dayanir.
     [F.planSubscriptionAmount, F.billingAmount],
     [F.ownershipTransferRpc, F.ownership],
+    // PB46: gecis kaydi property_control_state'e, envanter/eslesme RPC'leri cekirdek RPC'lere, ilce/SLA duzeltmesi KPI/SLA tablolarina dayanir.
+    [F.lcLifecycleEvents, F.lcControlState],
+    [F.lcInventoryMatching, F.lcAnomalyRpcs],
+    [F.lcInventoryMatching, F.lcQueueRpcs],
+    [F.lcDistrictSlaReset, F.lcControlState],
+    [F.lcDistrictSlaReset, F.lcAnomalyTables],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

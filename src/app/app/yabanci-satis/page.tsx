@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -18,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { now } from "@/lib/clock";
 import { FOREIGN_SALE_CHECKLIST, FOREIGN_SALE_GUIDE, guideCardVerification } from "@/lib/foreign-sale-checklist";
@@ -184,7 +185,7 @@ export default async function ForeignSalePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiGrid>
         <StatCard
           label="Yabancı müşteri"
           value={foreignCustomers.length}
@@ -213,7 +214,7 @@ export default async function ForeignSalePage() {
           tone={wonThisYear > 0 ? "success" : "warning"}
           href="/app/anlasmalar"
         />
-      </div>
+      </KpiGrid>
 
       {/* Mevzuat kartları */}
       <section className="space-y-3">

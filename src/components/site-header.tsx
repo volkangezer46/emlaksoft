@@ -1,14 +1,14 @@
 import { Brand } from "@/components/brand/brand";
 import { AnnouncementBar } from "@/components/site-menu/announcement-bar";
-import { SiteHeaderClient, type ClientGroup } from "@/components/site-menu/mega-menu";
+import { toClientGroups } from "@/components/site-menu/client-groups";
+import { SiteHeaderClient } from "@/components/site-menu/mega-menu";
 import { now } from "@/lib/clock";
-import { renderMenuIcon } from "@/lib/site-menu/icon-node";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
 
 /**
  * Üst bar (sunucu bileşeni): menü verisi TEK KAYNAKTAN, yani admin'in yayınladığı yapılandırmadan (yoksa varsayılan menü)
- * okunur (unstable_cache + "site-menu" etiketi). İstemciye yalnız hazır JSON ve çizilmiş ikonlar geçer; ikon paketi
+ * okunur (unstable_cache + "site-menu" etiketi). İstemciye yalnız hazır JSON, çizilmiş ikonlar ve önizleme sahneleri geçer; ikon paketi
  * herkese açık JS'e girmez. Mega menü davranışı: src/components/site-menu/mega-menu.tsx.
  */
 
@@ -18,11 +18,7 @@ const announcementBoot = (key: string) =>
 
 export async function SiteHeader() {
   const menu = toPublicMenu(await getLiveSiteMenu(), now());
-  const groups: ClientGroup[] = menu.groups.map((g) => ({
-    ...g,
-    columns: g.columns.map((c) => ({ title: c.title, items: c.items.map(({ icon, ...it }) => ({ ...it, iconNode: renderMenuIcon(icon) })) })),
-    featured: g.featured ? { ...g.featured, iconNode: renderMenuIcon(g.featured.icon, 22) } : null,
-  }));
+  const groups = toClientGroups(menu);
   const ann = menu.announcement;
 
   return (

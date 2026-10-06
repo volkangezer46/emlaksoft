@@ -1,3 +1,4 @@
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Image from "next/image";
 import {
   Building2,
@@ -55,12 +56,7 @@ const OFFER_STATUS: Record<string, string> = {
   draft:     "Taslak",
 };
 
-const APPT_TYPE: Record<string, string> = {
-  showing:   "Yer gösterme",
-  office:    "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract:  "Sözleşme",
-};
+const APPT_TYPE = APPOINTMENT_TYPE_LABELS;
 
 function money(n: number | null) {
   if (!n) return "—";

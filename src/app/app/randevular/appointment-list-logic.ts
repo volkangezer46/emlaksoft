@@ -2,12 +2,7 @@ import type { PillTone } from "@/components/ui/list-kit";
 
 /** Randevu listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir). */
 
-export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
+export { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 
 export const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
   pending: "Teyit bekliyor",

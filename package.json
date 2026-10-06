@@ -35,7 +35,8 @@
     "check:cron": "tsx scripts/check-cron-contracts.ts",
     "check:bundle": "tsx scripts/check-bundle-budget.ts",
     "test:e2e:public": "playwright test --project=public",
-    "audit:deps": "tsx scripts/audit-gate.ts"
+    "audit:deps": "tsx scripts/audit-gate.ts",
+    "build:extension": "tsc -p extensions/emlaksoft-ilan-kontrol/tsconfig.json && tsx scripts/build-extension.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
@@ -73,6 +74,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "4.1.10",
     "dotenv": "^17.4.2",
+    "esbuild": "0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",

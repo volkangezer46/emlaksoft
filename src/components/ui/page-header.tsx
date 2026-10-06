@@ -42,23 +42,27 @@ export function PageHeader({
   as?: "h1" | "h2";
 }) {
   return (
-    <header className={cn("mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}>
+    // Eylemler BAŞLIK SATIRIYLA aynı hizada (breadcrumb/eyebrow üstte, açıklama altta tam genişlik);
+    // dar ekranda başlığın altına sarar.
+    <header className={cn("mb-5", className)}>
+      {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="mb-2" /> : null}
       <div className={cn("min-w-0", icon ? "flex items-start gap-3" : undefined)}>
         {icon ? <div className="shrink-0">{icon}</div> : null}
-        <div className="min-w-0">
-        {breadcrumbs && breadcrumbs.length > 0 ? <Breadcrumb items={breadcrumbs} className="mb-2" /> : null}
-        {eyebrow ? (
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Heading className="font-display text-2xl font-bold tracking-tight text-text">{title}</Heading>
-          {meta}
-        </div>
-        {description ? <div className="mt-1 max-w-2xl text-sm text-text-muted">{description}</div> : null}
-        {freshness ? <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1.5" /> : null}
+        <div className="min-w-0 flex-1">
+          {eyebrow ? (
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
+          ) : null}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <Heading className="font-display text-2xl font-bold tracking-tight text-text">{title}</Heading>
+              {meta}
+            </div>
+            {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+          </div>
+          {description ? <div className="mt-1 max-w-3xl text-sm text-text-muted">{description}</div> : null}
+          {freshness ? <DataFreshness asOf={freshness === true ? undefined : freshness} className="mt-1.5" /> : null}
         </div>
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }

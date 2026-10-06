@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Landmark, PlugZap } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { getEfFeatureState, listTenantReports } from "@/lib/ef-credits/service";

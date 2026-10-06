@@ -31,7 +31,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { SavedViews } from "@/components/app/saved-views";
 import { CustomerBulkBar, CustomerBulkProvider } from "./customer-bulk-actions";
 import { HEAT_SEGMENTS, type HeatSegment } from "@/lib/customer-heat";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ICONS } from "@/lib/icons";
 import {
   CategoryChips,

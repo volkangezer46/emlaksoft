@@ -42,6 +42,19 @@ export function kpiHref(kpi: KpiKey, group: GroupParam = "ofis", groupId: string
   return `${CONTROL_BASE}/liste?${q.toString()}`;
 }
 
+/** İlçe parametresi: uuid ya da "yok" (ilçesi girilmemiş portföyler). Geçersizse undefined (filtre yok). */
+export function parseDistrictParam(raw: string | string[] | undefined): string | null | undefined {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (v === "yok") return null;
+  return v && /^[0-9a-fA-F-]{36}$/.test(v) ? v : undefined;
+}
+
+/** İlçe kırılımı satırı → aynı k_* kolonuyla filtreli liste. */
+export function districtListHref(kpi: KpiKey, districtId: string | null): string {
+  const q = new URLSearchParams({ kpi, ilce: districtId ?? "yok" });
+  return `${CONTROL_BASE}/liste?${q.toString()}`;
+}
+
 export type KpiVisual = "healthy" | "pending" | "mismatch" | "critical" | "unverifiable" | "neutral";
 
 /** Renk tek başına anlam taşımaz: her görsel durumun ikon adı + etiketi vardır. */

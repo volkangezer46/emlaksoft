@@ -55,17 +55,6 @@ const LOOKUP_CHUNK = 200;
 const UPDATE_PARALLEL = 10;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type ImportRowError = { row: number; reason: string };
-
-/** Eski sözleşme (importCustomers / importProperties dönüşü). */
-export type ImportSummary = {
-  ok?: boolean;
-  error?: string;
-  inserted?: number;
-  skipped?: number;
-  errors?: ImportRowError[];
-};
-
 export type CustomerImportRow = {
   /** Dosyadaki satır numarası (başlık hariç, 1'den başlar) — hata raporu için. */
   row: number;
@@ -563,38 +552,4 @@ export async function importChunk(
 ): Promise<ChunkResult> {
   if (!(target in ENTITY)) return { error: "Hedef geçersiz." };
   return runChunk(target, rows, options, false, CHUNK_API_MAX_ROWS);
-}
-
-// ---------------------------------------------------------------------------
-// Eski sözleşme (geriye dönük uyum — tek çağrıda tüm satırlar)
-// ---------------------------------------------------------------------------
-
-function legacySummary(res: ChunkResult): ImportSummary {
-  if (res.error || !res.rows) return { error: res.error ?? "İçe aktarma başarısız." };
-  const errors: ImportRowError[] = [];
-  for (const r of res.rows) {
-    if (r.status === "error" || r.status === "skip") {
-      errors.push({ row: r.row, reason: r.issues.map((i) => i.message).join(" ") });
-    }
-  }
-  errors.sort((a, b) => a.row - b.row);
-  return { ok: true, inserted: res.created ?? 0, skipped: res.counters?.skip ?? 0, errors };
-}
-
-export async function importCustomers(rows: CustomerImportRow[], options: ImportOptions = {}): Promise<ImportSummary> {
-  return legacySummary(
-    await runChunk("customers", rows, { ...options, batchId: options.batchId ?? crypto.randomUUID() }, false),
-  );
-}
-
-export async function importProperties(rows: PropertyImportRow[], options: ImportOptions = {}): Promise<ImportSummary> {
-  return legacySummary(
-    await runChunk("properties", rows, { ...options, batchId: options.batchId ?? crypto.randomUUID() }, false),
-  );
-}
-
-export async function importDemands(rows: DemandImportRow[], options: ImportOptions = {}): Promise<ImportSummary> {
-  return legacySummary(
-    await runChunk("demands", rows, { ...options, batchId: options.batchId ?? crypto.randomUUID() }, false),
-  );
 }

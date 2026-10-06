@@ -1,3 +1,4 @@
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeftRight, ArrowUpRight, Building2, CalendarDays, FileText, PhoneCall, Users } from "lucide-react";
@@ -5,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
 import { now, trDayKey } from "@/lib/clock";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { getStageLabels } from "@/lib/definitions";
 import { buildCoachActions } from "@/lib/advisor-coach";
 import { CoachPanel, type CoachActionWithLink } from "@/app/app/danisman-kpi/coach-panel";
@@ -199,7 +200,7 @@ const KIND_META: Record<TimelineEvent["kind"], { label: string; tone: string }> 
 };
 
 const CALL_DIR: Record<string, string> = { inbound: "Gelen çağrı", outbound: "Giden çağrı", missed: "Cevapsız çağrı" };
-const APPT_TYPE: Record<string, string> = { showing: "Yer gösterme", office: "Ofis görüşmesi", valuation: "Değerleme", contract: "Sözleşme" };
+const APPT_TYPE = APPOINTMENT_TYPE_LABELS;
 const TASK_STATUS: Record<string, string> = { open: "açık", done: "tamamlandı", cancelled: "iptal" };
 
 type Rel = { full_name?: string | null; title?: string | null } | { full_name?: string | null; title?: string | null }[] | null;

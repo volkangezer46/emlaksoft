@@ -7,7 +7,7 @@ import { NOTE_TAGS, countByTag, isUuid, noteTagLabel, parseTagFilter } from "@/l
 import { formatDateTr } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { NeighborhoodNoteForm } from "./note-form";
 import { DeleteNoteButton } from "./delete-note-button";
 import { getParentsOf, provinceOptionsResult } from "@/lib/geo/reader";

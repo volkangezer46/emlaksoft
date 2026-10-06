@@ -1,5 +1,6 @@
 "use server";
 
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 
@@ -47,12 +48,7 @@ function tl(n: number | null | undefined): string {
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Number(n)) + " ₺";
 }
 
-const APPT_LABEL: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
+const APPT_LABEL = APPOINTMENT_TYPE_LABELS;
 
 /*
  * `offers.status` bir ENUM: offer_status = draft | submitted | countered |

@@ -1,3 +1,4 @@
+import { formatTry } from "@/lib/format";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
@@ -469,6 +470,6 @@ async function loadCreditGrantOptions(admin: ReturnType<typeof createAdminClient
     .filter((r) => r.idempotency_key.startsWith(prefix))
     .map((r) => ({
       idem: r.idempotency_key.slice(prefix.length),
-      label: `${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(r.created_at))} · ${Number(r.amount).toLocaleString("tr-TR")} TL · ${(r.feature ?? "").replace("try_grant:", "")}`,
+      label: `${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(r.created_at))} · ${formatTry(Number(r.amount))} · ${(r.feature ?? "").replace("try_grant:", "")}`,
     }));
 }

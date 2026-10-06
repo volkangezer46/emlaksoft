@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { Illustration, resolveIllustration, type IllustrationKind } from "./illustrations";
 
 /**
- * EmptyState — projedeki TEK boş durum bileşeni (eski `components/app/empty-state`
- * ve `ui/empty-state-v3` buna re-export eder).
+ * EmptyState — projedeki TEK boş durum bileşeni (`EmptyStateV3` adı da buradan; eski `ui/empty-state-v3` silindi,
+ * `components/app/empty-state` yalnız A ajanının dosyaları birleşene dek @deprecated yeniden dışa aktarımdır).
  *
  * Varyantlar:
  *  - "panel"   (varsayılan): sayfa/liste boşluğu — illüstrasyon + başlık + açıklama + eylem

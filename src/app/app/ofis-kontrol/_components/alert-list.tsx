@@ -3,7 +3,7 @@ import { ArrowUpRight, BellRing, CheckCircle2 } from "lucide-react";
 import type { OversightAlertView } from "@/lib/oversight/load";
 import { SEVERITY_LABEL, type AlertSeverity } from "@/lib/oversight/alert-rules";
 import { ALERT_RULE_META } from "@/lib/oversight/settings";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ReviewForm } from "./review-form";
 
 const SEV_CHIP: Record<AlertSeverity, string> = {

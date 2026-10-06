@@ -23,7 +23,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { ClosePortalDialog, NewPortalPanel, NewPortalTrigger } from "./portal-dialogs";
 import { ConfirmListingButton } from "./confirm-listing-button";
 import { BulkConfirmForm } from "./bulk-confirm-form";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type PortalRow = {
   id: string;

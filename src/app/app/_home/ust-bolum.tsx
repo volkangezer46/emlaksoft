@@ -1,3 +1,4 @@
+import { formatTry } from "@/lib/format";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { AlertTriangle, Gift } from "lucide-react";
@@ -123,7 +124,7 @@ export async function HosgeldinKredisi({ ctx }: { ctx: HomeCtx }) {
     >
       <Gift className="h-4 w-4 shrink-0 text-mint-600" aria-hidden />
       <span>
-        <span className="font-bold">{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(amount)} TL hoş geldin krediniz</span>{" "}
+        <span className="font-bold">{formatTry(amount)} hoş geldin krediniz</span>{" "}
         ödemede kullanılabilir.
       </span>
       <span className="ml-auto text-xs font-semibold underline underline-offset-2">Cüzdanı gör</span>

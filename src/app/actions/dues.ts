@@ -156,20 +156,3 @@ export async function deleteDue(id: string): Promise<DueResult> {
   revalidatePath("/app/aidat");
   return { ok: true };
 }
-
-export async function listDues() {
-  const gate = await requirePermission("expenses", "view");
-  if (!gate.ok) throw new Error(gate.error);
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("property_dues")
-    .select("id, title, amount, period, due_date, status, notes, property:properties!property_dues_property_id_fkey(id, property_code, title)")
-    .eq("tenant_id", gate.tenantId)
-    .order("period", { ascending: false })
-    .limit(300);
-  if (error) {
-    console.error("listDues", { code: error.code || "unknown" });
-    throw new Error("Aidat kayıtları güvenli şekilde yüklenemedi.");
-  }
-  return data ?? [];
-}

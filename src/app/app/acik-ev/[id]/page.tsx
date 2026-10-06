@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -125,7 +126,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <KpiGrid>
         {[
           { label: "Ziyaretçi", value: String(gercekSayi), icon: Users },
           { label: "Telefonu alınan", value: String(telefonlu), icon: Users },
@@ -142,7 +143,7 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
             <p className="text-xs text-text-muted">{k.label}</p>
           </div>
         ))}
-      </div>
+      </KpiGrid>
 
       <div className="flex flex-wrap items-center gap-3">
         {canEdit ? (

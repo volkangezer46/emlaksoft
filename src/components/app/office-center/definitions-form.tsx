@@ -109,7 +109,7 @@ export function DefinitionsForm({ initial, canEdit, notifyLabels }: { initial: D
         description="Müşteriye dönüş ve danışmansız ilan için süre sınırları."
         usedIn={[
           { label: "Aday hızı raporu", href: "/app/raporlar/lead-hizi" },
-          { label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar&durum=gecikmis" },
+          { label: "İlan Havuzu > SLA'sı geçen", href: "/app/ilan-havuzu?atama=gecikmis" },
         ]}
         pending={pending && busy === "sla"}
         onSave={() => run("sla", () => saveSLADefinition(sla))}
@@ -165,7 +165,7 @@ export function DefinitionsForm({ initial, canEdit, notifyLabels }: { initial: D
       <Group
         title="Akıllı atama ağırlıkları"
         description={`"Akıllı öner" ölçütlerinin ağırlığı. Toplam ${weightSum} puan; motor oransal olarak 100'e çevirir, 0 = sayılmaz.`}
-        usedIn={[{ label: "Ofis Merkezi > Atamalar", href: "/app/ofis-merkezi?sekme=atamalar" }]}
+        usedIn={[{ label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" }]}
         pending={pending && busy === "w"}
         onSave={() => run("w", () => saveAssignWeights(w))}
       >

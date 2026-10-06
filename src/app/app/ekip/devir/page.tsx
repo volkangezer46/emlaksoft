@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
 import { ROLE_LABELS } from "@/lib/role-labels";

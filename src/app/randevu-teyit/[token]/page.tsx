@@ -1,3 +1,4 @@
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Building2, CalendarClock, CalendarX2 } from "lucide-react";
@@ -20,12 +21,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const typeLabel: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
+const typeLabel = APPOINTMENT_TYPE_LABELS;
 
 function rel<T>(value: T | T[] | null): T | null {
   if (!value) return null;

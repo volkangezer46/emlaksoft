@@ -4,6 +4,7 @@
  * (`/api/export/[entity]`) aynı yetki modülünü, aynı kolon eşlemesini ve aynı
  * CSV kaçışını buradan kullanır. Saf modül: sunucu/istemci bağımlılığı yok.
  */
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { escapeCsvCell } from "@/lib/csv";
 import type { AppModule } from "@/lib/permissions";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
@@ -55,7 +56,7 @@ const first = (p: { title?: string | null; property_code?: string | null } | nul
 
 const DEMAND_STATUS_TR: Record<string, string> = { new: "Yeni", active: "Aktif", matched: "Eşleşti", closed: "Kapalı" };
 const DEMAND_URGENCY_TR: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil" };
-const APPT_TYPE_TR: Record<string, string> = { showing: "Yer gösterme", office: "Ofis görüşmesi", valuation: "Değerleme", contract: "Sözleşme" };
+const APPT_TYPE_TR = APPOINTMENT_TYPE_LABELS;
 const APPT_STATUS_TR: Record<string, string> = { pending: "Teyit bekliyor", confirmed: "Onaylandı", signature: "İmza eksik", completed: "Tamamlandı", cancelled: "İptal" };
 const PROJECT_STATUS_TR: Record<string, string> = { planning: "Planlama", selling: "Satışta", delivered: "Teslim edildi" };
 const REFERRAL_STATUS_TR: Record<string, string> = { yeni: "Yeni", iletisim: "İletişimde", musteri: "Müşteri oldu", kazanildi: "Kazanıldı", kayip: "Kayıp" };

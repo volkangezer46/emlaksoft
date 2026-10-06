@@ -1,3 +1,4 @@
+import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -13,7 +14,7 @@ import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
 import { HBarList } from "./hbar-list";
 import { NetDiffChart } from "./net-diff-chart";
 import { hasNetData, netSeries, shareOfMax, shareOfTotal } from "./report-math";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
 import { SampleDataBadge } from "@/components/ui/sample-data-badge";
@@ -283,7 +284,7 @@ export default async function ReportsPage() {
         }
       />
 
-      <section aria-label="Öne çıkan göstergeler" className="list-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <KpiGrid label="Öne çıkan göstergeler">
         <KpiCard
           label="Aylık komisyon"
           value={money(commissionTotal)}
@@ -326,7 +327,7 @@ export default async function ReportsPage() {
           trend={demandFlowMoM}
           previousText={`Bu ay yeni ${summary.month_new_demands} · önceki ay ${summary.prev_month_new_demands}`}
         />
-      </section>
+      </KpiGrid>
 
       <section className={SECTION} style={{ boxShadow: "var(--elev-3)" }}>
         <div className="flex flex-wrap items-center gap-2">

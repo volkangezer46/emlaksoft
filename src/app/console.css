@@ -29,7 +29,7 @@ html[data-sidebar="collapsed"] .shell-aside .sb-badge-dot { display: block; }
 .sb-badge-dot { display: none; }
 @media (prefers-reduced-motion: reduce) { .shell-aside { transition: none; } }
 
-.sb-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.sb-eyebrow { font-size: var(--fs-eyebrow); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 
 /* ---- Üst çubuk: platform ayrımı (altın üst çizgi) ---- */
 .topbar-platform { box-shadow: inset 0 2px 0 var(--gold-500); }
@@ -165,7 +165,6 @@ a.nav-flyout-title:hover { background: var(--surface-hover); }
 .sb-rail { display: none; }
 html[data-sidebar="collapsed"] .shell-aside .sb-rail { display: block; }
 html[data-sidebar="collapsed"] .shell-aside .sb-expanded { display: none; }
-html[data-sidebar="collapsed"] .shell-aside .nav-search { justify-content: center; padding-inline: 0; }
 .nav-badge.is-ok { background: var(--nav-badge-ok); }
 
 /* ---- Kabukta kayma önleme (kullanıcı menüsü / açılır paneller) ----
@@ -187,11 +186,31 @@ html:has(.shell-aside) body[data-scroll-locked] {
    Tailwind rem tabanlı olduğundan kök font-size ölçeği tüm arayüzü orantılı büyütür/küçültür.
    Öznitelik yalnız /app ve /admin'de FontScaleController tarafından yazılır; public sayfalar etkilenmez.
    Yüzdeler lib/font-scale.ts FONT_SCALES ile senkron (sözleşme testi doğrular). */
-html[data-font-size="sm"] { font-size: 90%; }
-html[data-font-size="md"] { font-size: 100%; }
+html[data-font-size="sm"] { font-size: 87.5%; }
+html[data-font-size="md"] { font-size: 93.75%; }
 html[data-font-size="lg"] { font-size: 112.5%; }
+/* Kurumsal yoğun ölçek (2026-10): Normal = 15 px kök (1366x768'de hero + KPI + ilk kart satırı tek ekranda).
+   Tailwind metin token'ları kabukta yeniden tanımlanır: Normal'de gövde 14 px, küçük metin 13 px, en küçük 12 px
+   (max() ile 12'nin altı yok), sayfa başlığı (text-2xl) 20 px. rem tabanlı olduğu için Küçük/Büyük aynı oranla
+   ölçeklenir (Büyük = erişilebilirlik, 44 px dokunma hedefleri aşağıda). Seçici öznitelik VEYA kabuk varlığı:
+   SSR ilk boyamada öznitelik yokken de geçerli; portal ile body'ye taşınan paneller de aynı ölçeği alır.
+   Public sayfalar (kabuk yok) etkilenmez. */
+html[data-font-size],
+html:has(.shell-aside) {
+  --text-xs: max(12px, 0.8rem);
+  --text-sm: max(12px, 0.8667rem);
+  --text-base: 0.9333rem;
+  --text-lg: 1.0667rem;
+  --text-xl: 1.2rem;
+  --text-2xl: 1.3333rem;
+  --text-3xl: 1.6rem;
+  --text-4xl: 1.8667rem;
+}
+html[data-font-size] body,
+html:has(.shell-aside) body { font-size: var(--text-base); }
 /* Dokunma hedefi: Büyükte 44px altı etkileşimli öğeler 44px'e çıkar. */
 html[data-font-size="lg"] .nav-row { min-height: 44px; }
+html[data-font-size="lg"] :is(.ds-seg-opt, .scope-opt) { min-height: 44px; }
 html[data-font-size="lg"] .nav-pin { min-width: 44px; min-height: 44px; }
 html[data-font-size="lg"] .pm-seg a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
 html[data-font-size="lg"] :is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]) { min-height: 44px; }

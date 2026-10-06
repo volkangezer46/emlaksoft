@@ -5,7 +5,11 @@ import { SkeletonCard } from "@/components/ui/viz";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso } from "@/lib/clock";
-import { getChangesSince, getControlSummary, listTodayChecks } from "@/lib/listing-control/server/readers";
+import { getChangesSince, getControlSummary, getDistrictSummary, listTodayChecks, type ControlSummaryRow } from "@/lib/listing-control/server/readers";
+import { buildOwnerQuestions, pickRiskDistrict, type OwnerQuestion } from "@/components/listing-control/owner-questions";
+import { DistrictBreakdown, OwnerQuestions } from "@/components/listing-control/owner-sections";
+import { loadOverdueAdvisors } from "@/components/listing-control/ops-readers";
+import { rankAdvisors } from "@/components/listing-control/lifecycle-model";
 import {
   buildExecutiveSummary,
   parseGroupParam,
@@ -37,10 +41,13 @@ export const metadata = { title: "İlan Kontrol Merkezi" };
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+const OWNER_QUESTION_ROLES = new Set(["owner", "gm", "branch_manager", "team_lead"]);
+
 export default async function IlanKontrolPage({ searchParams }: { searchParams: SearchParams }) {
   const { role, perms } = await requireModulePage("portals", "/app/ilan-kontrol");
   const sp = await searchParams;
   const group = parseGroupParam(sp.gruplama);
+  const management = OWNER_QUESTION_ROLES.has(role ?? "");
   return (
     <>
       <PageHeader
@@ -50,33 +57,58 @@ export default async function IlanKontrolPage({ searchParams }: { searchParams: 
         actions={
           <>
             <ButtonLink href="/app/ilan-kontrol/anomaliler" size="md">Uyarı kuyruğu</ButtonLink>
-            <ButtonLink href="/app/ilan-kontrol/rapor" size="md" variant="secondary">Günlük rapor</ButtonLink>
+            <ButtonLink href="/app/ilan-kontrol/envanter" size="md" variant="secondary">Portal listesiyle karşılaştır</ButtonLink>
           </>
         }
       />
       <ControlSubNav active="genel" closures={effectiveCanAccessModule(perms, "leak")} />
       <Suspense fallback={<DashboardSkeleton />}>
-        <DashboardBody group={group} />
+        <DashboardBody group={group} management={management} />
       </Suspense>
     </>
   );
 }
 
-async function DashboardBody({ group }: { group: GroupParam }) {
+async function DashboardBody({ group, management }: { group: GroupParam; management: boolean }) {
   const db = await getDb();
-  
+
   const nowIso = daysAgoIso(0);
-  const [tenantRes, anomalies, changes, today, publishStats] = await Promise.all([
+  const [tenantRes, anomalies, changes, today, publishStats, districts, overdue, advisorRes] = await Promise.all([
     getControlSummary(db, "tenant"),
     countOpenAnomalies(db, nowIso),
     getChangesSince(db, daysAgoIso(1)),
     listTodayChecks(db, nowIso, 8),
     loadPublishLeadTimes(db, daysAgoIso(90)),
+    getDistrictSummary(db),
+    management ? loadOverdueAdvisors(db, nowIso) : Promise.resolve({ available: false, rows: [] as { advisorId: string; count: number }[] }),
+    management ? getControlSummary(db, "advisor") : Promise.resolve({ available: false, rows: [] as ControlSummaryRow[] }),
   ]);
   if (!tenantRes.available) return <ControlUnavailable />;
 
   const summary = sumSummaryRows(tenantRes.rows);
   const sentences = buildExecutiveSummary(summary, { overdueSla: anomalies.overdue });
+
+  // 12 soru: danışman kırılımı + süresi geçen uyarı sahipleri (adlar tek sorguda).
+  let questions: OwnerQuestion[] = [];
+  if (management) {
+    const advisorNames = await resolveGroupNames(db, "advisor", [
+      ...advisorRes.rows.map((r) => r.group_id),
+      ...overdue.rows.slice(0, 3).map((r) => r.advisorId),
+    ]);
+    const ranked = rankAdvisors(
+      advisorRes.rows.map((r) => ({ id: r.group_id, name: r.group_id ? (advisorNames.get(r.group_id) ?? "Danışman") : "Atanmamış", total_active: r.total_active, healthy: r.healthy, portal_missing: r.portal_missing, in_review: r.in_review })),
+    );
+    questions = buildOwnerQuestions({
+      summary,
+      counts: anomalies.counts,
+      changes: changes.available ? changes.changes : null,
+      worstAdvisor: ranked.worst?.id
+        ? { id: ranked.worst.id, name: ranked.worst.name, issues: ranked.worst.portal_missing + ranked.worst.in_review, active: ranked.worst.total_active }
+        : null,
+      overdueAdvisors: overdue.rows.slice(0, 3).map((r) => ({ id: r.advisorId, name: advisorNames.get(r.advisorId) ?? "Danışman", count: r.count })),
+      riskDistrict: districts.available ? pickRiskDistrict(districts.rows) : null,
+    });
+  }
 
   // Gruplu tablo (ofis dışı kırılım): rol kapsamı RLS'te; grup adları sayfa-yerel çözülür.
   // Grup zinciri (özet → adlar) ile bugünün portföy künyeleri birbirinden bağımsız: aynı turda beklenir.
@@ -107,6 +139,7 @@ async function DashboardBody({ group }: { group: GroupParam }) {
     <div className="space-y-6">
       <ExecutiveSummaryCard sentences={sentences} />
       <KpiStrip summary={summary} group="ofis" />
+      {questions.length > 0 ? <OwnerQuestions questions={questions} /> : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <HealthGauge summary={summary} />
         <CriticalJobs counts={anomalies.counts} inReview={summary.in_review} />
@@ -131,6 +164,7 @@ async function DashboardBody({ group }: { group: GroupParam }) {
           <GroupTable rows={groupRows} group={group} />
         )}
       </section>
+      {districts.available ? <DistrictBreakdown rows={districts.rows} /> : null}
       <TodayChecks rows={todayView} unverifiable={summary.unverifiable} />
     </div>
   );

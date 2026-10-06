@@ -220,7 +220,7 @@ export function Combobox({
             aria-label={ariaLabel}
             disabled={disabled || loading}
             className={cn(
-              "focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-left text-sm outline-none transition",
+              "focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-left text-sm outline-none transition",
               "hover:border-brand-300 data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
               "disabled:cursor-not-allowed disabled:opacity-60",
               selected ? "text-ink-950" : "text-text-faint",
@@ -281,7 +281,7 @@ export function Combobox({
                 aria-autocomplete="list"
                 aria-controls={listId}
                 aria-activedescendant={filtered[active] ? `${listId}-${active}` : undefined}
-                className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-text-faint"
+                className="w-full bg-transparent py-[0.4375rem] text-sm outline-none placeholder:text-text-faint"
               />
             </div>
 

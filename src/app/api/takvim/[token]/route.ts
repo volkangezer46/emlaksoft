@@ -1,3 +1,4 @@
+import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { getBaseUrl } from "@/lib/base-url";
@@ -21,12 +22,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const APP_URL = getBaseUrl();
 
-const TYPE_LABEL: Record<string, string> = {
-  showing: "Yer gösterme",
-  office: "Ofis görüşmesi",
-  valuation: "Değerleme",
-  contract: "Sözleşme",
-};
+const TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
 /** RFC 5545 TEXT kaçışı: ters bölü, noktalı virgül, virgül, satır sonu. */
 function escapeICS(s: string): string {

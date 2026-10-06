@@ -13,7 +13,8 @@ describe("target permission semantic contract", () => {
 
     expect(pageSource).toContain('requireModulePage("targets"');
     expect(targetSection).toContain('requirePermission("targets", "view")');
-    expect(targetSection.match(/requirePermission\("targets", "create"\)/g)).toHaveLength(2);
+    // Çağıransız upsertTarget 2026-10'da silindi: oluşturma yalnız createTarget.
+    expect(targetSection.match(/requirePermission\("targets", "create"\)/g)).toHaveLength(1);
     expect(targetSection).toContain('requirePermission("targets", "edit")');
     expect(targetSection).toContain('requirePermission("targets", "delete")');
     expect(targetSection).not.toContain('requirePermission("reports"');
@@ -22,6 +23,6 @@ describe("target permission semantic contract", () => {
   it("tenant-validates every caller-selected target owner before mutation", () => {
     expect(
       targetSection.match(/validateTenantReferences\(gate\.tenantId, \{[\s\S]*?profileId[\s\S]*?\}\)/g),
-    ).toHaveLength(3);
+    ).toHaveLength(2);
   });
 });

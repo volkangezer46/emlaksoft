@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronDown, ExternalLink, Menu, X } from "lucide-react";
 import { FeaturedMedia } from "./featured-media";
-import { FeaturedPreview } from "./featured-preview";
 import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
 
 /**
@@ -16,14 +15,22 @@ import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/pu
  * (titreme yok). Kapalı panel `inert` + görünmez (yumuşak kapanış). Mobilde tam ekran panel + akordeon.
  * Hareket yalnız opacity/transform; reduced-motion'da kapalı. Fare konumu İZLENMEZ (imleç takibi yok): ikon ve kart
  * hareketi yalnız durum tabanlıdır (hover/focus-visible/açık panel). Mobil sheet modal diyalogtur: arka plan inert, odak tuzağı
- * (Tab/Shift+Tab sheet + kapat düğmesi içinde döner), Esc kapatır. Panel alt çubuğu iki hızlı eylem sunar (Tab ile erişilir).
+ * (Tab/Shift+Tab sheet + kapat düğmesi içinde döner), Esc kapatır. Panel alt çubuğu güven notları + iki hızlı eylem sunar (Tab ile erişilir).
+ *
+ * CANLI ÖNİZLEME: öne çıkan kartta sunucuda çizilmiş önizleme katmanları (`previews`, ilki varsayılan) üst üste durur; fare
+ * üzerine gelince veya klavye odağı bir bağlantıya gelince (`data-pv`) o bağlantının katmanı görünür olur (CSS çapraz geçiş,
+ * sahne animasyonu yalnız etkin katmanda bir kez). İstemci yalnız hangi katmanın açık olduğunu seçer; sahne kodu istemci
+ * paketine girmez (client-groups.tsx). Panelden çıkınca varsayılan katmana döner; reduced-motion'da geçiş anlıktır.
  */
 
-export type ClientItem = Omit<PublicItem, "icon"> & { iconNode: ReactNode };
+export type ClientItem = Omit<PublicItem, "icon"> & { iconNode: ReactNode; /** Canlı önizleme türü (client-groups). */ pv?: string | null };
 export type ClientFeatured = Omit<PublicFeatured, "icon"> & { iconNode: ReactNode };
+/** Sunucuda çizilmiş önizleme katmanı; dizideki ilk öğe varsayılandır. */
+export type ClientPreview = { kind: string; node: ReactNode };
 export type ClientGroup = Omit<PublicGroup, "columns" | "featured"> & {
-  columns: Array<{ title: string; items: ClientItem[] }>;
+  columns: Array<{ title: string; iconNode?: ReactNode; items: ClientItem[] }>;
   featured: ClientFeatured | null;
+  previews?: ClientPreview[];
 };
 
 const extProps = (external: boolean) => (external ? { target: "_blank", rel: "noopener noreferrer" } : {});
@@ -59,11 +66,22 @@ function NavAnchor({ href, external, onClick, className, style, children }: { hr
   );
 }
 
-function Featured({ f, onClick, active, index, withMedia }: { f: ClientFeatured; onClick: () => void; active: boolean; index: number; withMedia: boolean }) {
+function Featured({ f, onClick, active, index, withMedia, previews, pv }: { f: ClientFeatured; onClick: () => void; active: boolean; index: number; withMedia: boolean; previews?: ClientPreview[]; pv?: string | null }) {
+  const on = previews?.some((p) => p.kind === pv) ? pv : previews?.[0]?.kind;
   return (
     <NavAnchor href={f.href} external={f.external} onClick={onClick} className="mk-mega-feat" style={{ "--i": index } as CSSProperties}>
       <>
-        {withMedia && f.media ? <FeaturedMedia media={f.media} active={active} /> : withMedia && f.preview ? <FeaturedPreview kind={f.preview} /> : null}
+        {withMedia && f.media ? (
+          <FeaturedMedia media={f.media} active={active} />
+        ) : withMedia && previews?.length ? (
+          <span className="mk-prev-stack" aria-hidden="true">
+            {previews.map((p) => (
+              <span key={p.kind} className="mk-prev-layer" data-on={p.kind === on}>
+                {p.node}
+              </span>
+            ))}
+          </span>
+        ) : null}
         {f.iconNode ? <span className="mk-mega-feat-ico">{f.iconNode}</span> : null}
         {f.eyebrow ? <span className="mk-mega-feat-eyebrow">{f.eyebrow}</span> : null}
         <b>{f.title}</b>
@@ -82,6 +100,8 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  // Canlı önizleme: üzerine gelinen / odaklanılan bağlantının önizleme türü (grup kimliğiyle; başka panelde geçersiz).
+  const [pv, setPv] = useState<{ g: string; k: string } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const burgerRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -211,6 +231,12 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
     links[to]!.focus();
   };
 
+  // Fare ve klavye odağı aynı yoldan: en yakın [data-pv] öğesi kartın etkin katmanını seçer (imleç konumu izlenmez).
+  const pickPreview = (target: EventTarget, g: ClientGroup) => {
+    const k = (target as Element).closest?.<HTMLElement>("[data-pv]")?.dataset.pv;
+    if (k) setPv((cur) => (cur?.g === g.id && cur.k === k ? cur : { g: g.id, k }));
+  };
+
   return (
     <div className="mk-nav" data-scrolled={scrolled} data-open={open} data-menu={menu ?? undefined} data-ann={Boolean(top)} ref={rootRef}>
       {top}
@@ -235,6 +261,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
               const isOpen = menu === g.id;
               const offsets = g.columns.map((_, ci) => g.columns.slice(0, ci).reduce((a, x) => a + x.items.length, 0));
               const total = g.columns.reduce((a, x) => a + x.items.length, 0);
+              const cols = Math.min(Math.max(g.columns.length, 1), 3);
               return (
                 <div
                   key={g.id}
@@ -280,14 +307,26 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                     }}
                     onKeyDown={(e) => onPanelKey(e, g)}
                   >
-                    <div className="mk-mega-in" data-feat={g.featured ? "true" : "false"}>
-                      <div className="mk-mega-cols" data-cols={Math.min(Math.max(g.columns.length, 1), 3)}>
+                    <div
+                      className="mk-mega-in"
+                      data-feat={g.featured ? "true" : "false"}
+                      data-cols={cols}
+                      onPointerOver={(e) => pickPreview(e.target, g)}
+                      onFocus={(e) => pickPreview(e.target, g)}
+                      onPointerLeave={() => setPv(null)}
+                    >
+                      <div className="mk-mega-cols" data-cols={cols}>
                         {g.columns.map((c, ci) => (
                           <div key={c.title || "_"} className="mk-mega-col">
-                            {c.title ? <p className="mk-mega-title">{c.title}</p> : null}
+                            {c.title ? (
+                              <p className="mk-mega-title">
+                                {c.iconNode ? <span className="mk-mega-title-ico" aria-hidden="true">{c.iconNode}</span> : null}
+                                {c.title}
+                              </p>
+                            ) : null}
                             <ul>
                               {c.items.map((it, ii) => (
-                                <li key={it.id} style={{ "--i": offsets[ci]! + ii } as CSSProperties}>
+                                <li key={it.id} data-pv={it.pv ?? undefined} style={{ "--i": offsets[ci]! + ii } as CSSProperties}>
                                   <NavAnchor href={it.href} external={it.external} onClick={close}>
                                     <span className="mk-panel-ico">{it.iconNode}</span>
                                     <span><ItemLabel it={it} /><small>{it.text}</small></span>
@@ -298,9 +337,13 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                           </div>
                         ))}
                       </div>
-                      {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia /> : null}
+                      {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia previews={g.previews} pv={isOpen && pv?.g === g.id ? pv.k : null} /> : null}
                       <div className="mk-mega-bar">
-                        <span>Başlamak için hazır mısınız?</span>
+                        <ul className="mk-mega-trust" aria-label="Deneme koşulları">
+                          <li>Kartsız deneme</li>
+                          <li>Taahhütsüz</li>
+                          <li>KVKK süreç araçları</li>
+                        </ul>
                         <span className="mk-mega-bar-cta">
                           <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={16} aria-hidden="true" /></Link>
                           <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Fiyatlar</Link>

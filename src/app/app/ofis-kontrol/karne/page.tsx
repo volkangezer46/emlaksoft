@@ -8,7 +8,7 @@ import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { DAY_MS, now, trDayKey } from "@/lib/clock";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { loadAlerts } from "@/lib/oversight/load";
 import { loadOversightSettings } from "@/lib/oversight/store";
 import { OversightNav } from "../_components/oversight-nav";

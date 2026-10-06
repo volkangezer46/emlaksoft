@@ -161,7 +161,6 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/projects.ts", fn: "sellUnit", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/properties.ts", fn: "notifyPriceDropToMatchingDemands", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/properties.ts", fn: "setPropertyStatus", calls: 1, tenantFilter: "var" },
-  { file: "src/app/actions/property-management.ts", fn: "changePropertyStatus", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/property-media.ts", fn: "ocrPropertyMediaDocument", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/public-valuation.ts", fn: "estimatePublicValuation", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/public-valuation.ts", fn: "submitValuationLead", calls: 1, tenantFilter: "var" },
