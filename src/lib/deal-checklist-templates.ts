@@ -10,6 +10,8 @@
  * hesabına girmezler ama listede hatırlatıcı olarak dururlar.
  */
 
+import { GOS_CHECKLIST_ITEMS } from "@/lib/gos-info";
+
 export type ChecklistTemplateItem = { label: string; required: boolean };
 
 /** Satış kapanışı evrakları (deal_type = "sale"). */
@@ -23,6 +25,8 @@ export const SALE_CHECKLIST: ChecklistTemplateItem[] = [
   { label: "Enerji kimlik belgesi", required: true },
   { label: "Vekaletname (vekaletle işlemde)", required: false },
   { label: "İskan belgesi (yapı kullanma izni)", required: false },
+  // Güvenli Ödeme Sistemi hazırlık adımları — tek kaynak `gos-info.ts`; tarih doğrulanana kadar "duruma bağlı".
+  ...GOS_CHECKLIST_ITEMS,
 ];
 
 /** Kiralama kapanışı evrakları (deal_type = "rent"). */

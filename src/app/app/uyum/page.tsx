@@ -7,6 +7,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { IysForm } from "./iys-form";
 import { listErasureLog } from "@/app/actions/kvkk";
 import { KvkkPanel } from "./kvkk-panel";
+import { GosCard } from "./gos-card";
 
 const channelLabel: Record<string, string> = {
   sms: "SMS",
@@ -161,6 +162,8 @@ export default async function CompliancePage({
           </a>
         ))}
       </div>
+
+      <GosCard />
 
       {channelRisk.length > 0 ? (
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

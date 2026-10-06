@@ -17,6 +17,8 @@
  */
 
 import type { ChecklistTemplateItem } from "@/lib/deal-checklist-templates";
+import { GOS_CHECKLIST_ITEMS, GOS_DATE_NOTE } from "@/lib/gos-info";
+import { describeLegal, type LegalKey } from "@/lib/legal-constants";
 
 /**
  * Yabancıya satış evrak listesi.
@@ -39,6 +41,8 @@ export const FOREIGN_SALE_CHECKLIST: ChecklistTemplateItem[] = [
   { label: "İskan belgesi (yapı kullanma izni)", required: true },
   { label: "Tapu harcı ve döner sermaye ödeme dekontları", required: true },
   { label: "Tapu müdürlüğü randevusu (webtapu başvurusu)", required: true },
+  // Güvenli Ödeme Sistemi — H1 ile AYNI metin (tek kaynak `gos-info.ts`).
+  ...GOS_CHECKLIST_ITEMS,
   { label: "Yeminli tercüman (alıcı Türkçe bilmiyorsa zorunlu)", required: false },
   { label: "Noter onaylı vekaletname (vekaletle işlemde)", required: false },
   { label: "Döviz Alım Belgesi / DAB (bedel yurt dışından döviz geldiyse)", required: false },
@@ -55,7 +59,22 @@ export type ForeignSaleGuideCard = {
   figure?: string;
   /** Hangi kurumdan teyit alınacağı — "doğrulanmalı" notu. */
   verify: string;
+  /** Karttaki sayıların dayandığı yasal sabitler (`legal-constants`) — doğrulama rozeti buradan çıkar. */
+  constants?: LegalKey[];
+  /** Son doğrulama tarihi (YYYY-MM-DD); yoksa kart "doğrulanmadı" sayılır. */
+  verifiedAt?: string | null;
 };
+
+/** Kartın doğrulama özeti: bağlı TÜM sabitler doğrulandıysa doğrulanmış sayılır. */
+export function guideCardVerification(card: ForeignSaleGuideCard): { verified: boolean; verifiedAt: string | null; source: string } {
+  const items = (card.constants ?? []).map((k) => describeLegal(k));
+  const verified = items.length > 0 && items.every((i) => i.verified);
+  return {
+    verified,
+    verifiedAt: verified ? (items.map((i) => i.verifiedAt ?? "").sort()[0] || null) : null,
+    source: items.map((i) => i.source).join(" · ") || card.verify,
+  };
+}
 
 /**
  * 2026 mevzuat özeti kartları.
@@ -65,6 +84,28 @@ export type ForeignSaleGuideCard = {
  * görüş yerine geçmez.
  */
 export const FOREIGN_SALE_GUIDE: ForeignSaleGuideCard[] = [
+  {
+    title: "İkamet izni: gayrimenkul eşiği 200.000 USD",
+    body:
+      "Taşınmaz edinimi yoluyla ikamet izni için, 16.10.2023 sonrası edinimlerde taşınmaz bedelinin " +
+      "en az 200.000 ABD doları karşılığı olması aranır (önceki eşikler 75.000 ve 50.000 USD idi). " +
+      "SPK lisanslı değerleme (ekspertiz) raporu gerekir; rapor yaklaşık 3 ay geçerli sayılır. " +
+      "Eşik ve şartlar değişebilir; başvuru öncesi Göç İdaresi'nden teyit edin.",
+    figure: "200.000 USD",
+    verify: "Göç İdaresi Başkanlığı (goc.gov.tr) · ilgili il göç idaresi müdürlüğü · SPK lisanslı kuruluş",
+    constants: ["residencePermitMinUsd"],
+  },
+  {
+    title: "Güvenli Ödeme Sistemi (GÖS) — bedel tapu öncesi bloke",
+    body:
+      "Nakit/havale/EFT ile ödenen satışlarda bedelin tescille eş zamanlı güvenli ödeme sistemi üzerinden aktarılması " +
+      "öngörülüyor; yabancı alıcılar için de ödeme planı baştan buna göre kurulmalı. Kredili kısım ve hizmet bedeli " +
+      "sistem dışı anlatılıyor. " +
+      GOS_DATE_NOTE +
+      " Kapanış listesindeki GÖS adımları bu kaynakla aynıdır.",
+    figure: "GÖS hazırlığı",
+    verify: "Güncel resmi duyuru (Ticaret Bakanlığı / TKGM / Resmî Gazete) · Uyum sayfasındaki kaynak listesi",
+  },
   {
     title: "SPK lisanslı değerleme raporu zorunlu",
     body:
@@ -90,10 +131,12 @@ export const FOREIGN_SALE_GUIDE: ForeignSaleGuideCard[] = [
       "yaygın uygulamada %10'u ile sınırlıdır; ayrıca kişi başına ülke genelinde " +
       "30 hektar üst sınırı bulunur. Kotası dolu ilçelerde işlem yapılamaz.",
     figure: "İlçe %10 · Kişi 30 ha",
+    constants: ["foreignDistrictQuotaPct", "foreignPersonMaxHectares"],
     verify: "İlgili Tapu Müdürlüğü kota sorgusu (ilçe bazlı, dönemsel değişir)",
   },
   {
     title: "Vatandaşlık eşiği: 400.000 USD + 3 yıl taahhüdü",
+    constants: ["citizenshipMinUsd", "citizenshipHoldYears"],
     body:
       "Taşınmaz yatırımı yoluyla Türk vatandaşlığı başvurusunda alt sınır 400.000 ABD " +
       "doları karşılığıdır ve tapuya '3 yıl satılmayacaktır' şerhi konur. Bedelin " +
@@ -118,6 +161,7 @@ export const FOREIGN_SALE_GUIDE: ForeignSaleGuideCard[] = [
       "Matrah, belediye rayiç bedelinin altında beyan edilemez. Ayrıca döner sermaye " +
       "ücreti ödenir.",
     figure: "≈ %4 harç",
+    constants: ["deedFeeTotalPct", "landRegistryServiceFeeTry"],
     verify: "Gelir İdaresi Başkanlığı (gib.gov.tr) · Tapu Müdürlüğü harç tarifesi",
   },
   {

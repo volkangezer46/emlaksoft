@@ -21,7 +21,8 @@ import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { now } from "@/lib/clock";
-import { FOREIGN_SALE_CHECKLIST, FOREIGN_SALE_GUIDE } from "@/lib/foreign-sale-checklist";
+import { FOREIGN_SALE_CHECKLIST, FOREIGN_SALE_GUIDE, guideCardVerification } from "@/lib/foreign-sale-checklist";
+import { LegalStatusBadge } from "@/components/app/legal-constants-panel";
 import { ApplyChecklistForm, MarkForeignForm } from "./foreign-sale-forms";
 
 /**
@@ -242,9 +243,12 @@ export default async function ForeignSalePage() {
               </div>
               <h3 className="mt-3 font-display text-sm font-extrabold text-ink-950">{card.title}</h3>
               <p className="mt-2 flex-1 text-xs leading-relaxed text-text-muted">{card.body}</p>
-              <p className="mt-3 border-t border-line pt-2 text-xs leading-relaxed text-text-faint">
-                <span className="font-bold text-amber-600">Doğrulanmalı:</span> {card.verify}
-              </p>
+              <div className="mt-3 space-y-1.5 border-t border-line pt-2">
+                <LegalStatusBadge item={guideCardVerification(card)} />
+                <p className="text-xs leading-relaxed text-text-faint">
+                  <span className="font-bold text-amber-700">Doğrulanmalı:</span> {card.verify}
+                </p>
+              </div>
             </article>
           ))}
         </div>
@@ -260,7 +264,8 @@ export default async function ForeignSalePage() {
             <p className="text-xs text-text-muted">
               {FOREIGN_SALE_CHECKLIST.length} madde ·{" "}
               {FOREIGN_SALE_CHECKLIST.filter((i) => i.required).length} zorunlu. Genel satış
-              şablonunun üstüne biner; anlaşmada zaten olan maddeler tekrarlanmaz.
+              şablonunun üstüne biner; anlaşmada zaten olan maddeler tekrarlanmaz. Güvenli Ödeme Sistemi (GÖS)
+              adımları genel satış listesiyle aynı kaynaktan gelir ve duruma bağlıdır.
             </p>
           </div>
         </div>
