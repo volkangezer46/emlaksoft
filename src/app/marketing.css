@@ -7,15 +7,19 @@
   --mk-bg-2: #eef2fb;
   --mk-card: #fff;
   --mk-line: #e1e7f3;
-  --mk-ink: #0a1736;
-  --mk-navy: #0b1e4a;
+  /* v4 hizası: lacivert/altın tek kaynak tokens.css (--navy-*, --gold-*); public sayfa yine her zaman açık temadır. */
+  --mk-ink: var(--navy-900);
+  --mk-navy: var(--navy-800);
   --mk-body: #38455e;
   --mk-muted: #55627b;
   --mk-blue: #1d5cff;
   --mk-blue-text: #1649d6;
-  --mk-violet: #7a3cf0;
-  --mk-violet-text: #6428d8;
-  --mk-grad: linear-gradient(96deg, #1d5cff 0%, #5a55f2 52%, #8a3df0 100%);
+  --mk-violet: var(--navy-600);
+  --mk-violet-text: var(--navy-600);
+  --mk-gold: var(--gold-400);
+  --mk-gold-text: var(--gold-700);
+  /* Mor kaldırıldı: mavi -> lacivert (başlık vurgusu ve birincil düğme; beyaz yazı kontrastı her noktada >= 4.5:1). */
+  --mk-grad: linear-gradient(96deg, #1d5cff 0%, #1f4fd8 50%, var(--navy-700) 100%);
   --mk-gain: #0e9f7e;
   --mk-gain-text: #0a7a62;
   --mk-loss: #cf3438;
@@ -80,7 +84,7 @@
 .mk-dark .mk-h2, .mk-dark .mk-h3, .mk-dark .mk-h1 { color: #fff; }
 .mk-dark .mk-lead { color: rgba(255, 255, 255, 0.8); }
 .mk-dark .mk-eyebrow { color: #9fc0ff; }
-.mk-dark .mk-grad { background: linear-gradient(96deg, #8fb4ff 0%, #b9a3ff 100%); -webkit-background-clip: text; background-clip: text; }
+.mk-dark .mk-grad { background: linear-gradient(96deg, #8fb4ff 0%, var(--gold-300) 100%); -webkit-background-clip: text; background-clip: text; }
 
 /* ---- düğmeler ---- */
 .mk-btn {
@@ -91,8 +95,8 @@
 }
 .mk-btn-primary { background: var(--mk-blue-text); color: #fff; box-shadow: 0 6px 18px rgba(29, 92, 255, 0.32); }
 .mk-btn-primary:hover { background: #123fb8; }
-.mk-btn-grad { background: var(--mk-grad); color: #fff; box-shadow: 0 6px 18px rgba(80, 70, 240, 0.32); min-height: 3rem; padding-inline: 1.5rem; font-size: 1rem; }
-.mk-btn-grad:hover { box-shadow: 0 6px 18px rgba(80, 70, 240, 0.32); filter: brightness(0.92); }
+.mk-btn-grad { background: var(--mk-grad); color: #fff; box-shadow: 0 6px 18px rgba(29, 92, 255, 0.28); min-height: 3rem; padding-inline: 1.5rem; font-size: 1rem; }
+.mk-btn-grad:hover { box-shadow: 0 6px 18px rgba(29, 92, 255, 0.28); filter: brightness(0.92); }
 .mk-btn-ghost { background: rgba(255, 255, 255, 0.9); color: var(--mk-ink); border: 1px solid #cdd6e8; box-shadow: var(--mk-sh-1); min-height: 3rem; font-size: 1rem; }
 .mk-btn-ghost svg { color: var(--mk-blue-text); }
 .mk-btn-ghost:hover { border-color: var(--mk-blue); color: var(--mk-blue-text); }
@@ -124,7 +128,7 @@
 .mk-nav-row { display: flex; align-items: center; gap: 1rem; height: 4.25rem; }
 @media (min-width: 1024px) { .mk-nav-row { height: 4.5rem; } }
 .mk-logo { display: inline-flex; align-items: center; gap: 0.65rem; font-family: var(--font-manrope), system-ui, sans-serif; font-weight: 800; font-size: 1.375rem; letter-spacing: -0.03em; color: var(--mk-ink); text-decoration: none; }
-.mk-logo i { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 0.7rem; background: var(--mk-grad); color: #fff; font-style: normal; font-size: 1.125rem; box-shadow: 0 6px 16px rgba(80, 70, 240, 0.35); }
+.mk-logo i { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 0.7rem; background: var(--mk-grad); color: #fff; font-style: normal; font-size: 1.125rem; box-shadow: 0 6px 16px rgba(29, 92, 255, 0.3); }
 .mk-nav-links { display: none; align-items: center; gap: 0.25rem; margin-left: 1.5rem; }
 .mk-nav-item { display: flex; align-items: center; gap: 0.25rem; }
 @media (min-width: 1024px) { .mk-nav-links { display: flex; } }
@@ -216,10 +220,7 @@
 .mk-float-2 { right: -1%; top: 60%; }
 .mk-float-3 { right: 12%; bottom: 3%; }
 @media (max-width: 559px) { .mk-float-2 { display: none; } .mk-float-1 { top: 1%; } }
-.mk-scene-note { display: none; position: absolute; z-index: 4; left: 13%; top: 0; margin: 0; font-family: var(--font-hand), "Segoe Script", cursive; font-weight: 600; font-size: max(15px, 3cqw); line-height: 1.1; color: #2c3a66; transform: rotate(-5deg); }
-.mk-scene-note-arrow { display: none; position: absolute; z-index: 4; left: 9%; top: 5.5%; width: 9%; height: auto; }
 .mk-scene-tag { position: absolute; z-index: 5; right: 2%; bottom: -2.2%; font-size: 0.6875rem; }
-@media (max-width: 559px) { .mk-scene-note-arrow, .mk-scene-note { display: none; } }
 
 /* ---- portal şeridi ---- */
 .mk-portals { position: relative; z-index: 4; margin-top: var(--mk-s-4); display: grid; gap: var(--mk-s-4) var(--mk-s-6); padding: var(--mk-pad); border-radius: var(--mk-r-panel); background: rgba(255, 255, 255, 0.82); border: 1px solid rgba(255, 255, 255, 0.95); box-shadow: var(--mk-sh-2); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
@@ -246,7 +247,7 @@
 /* 5'li dar sütunda ikon üstte (metin <=4 satır) */
 @media (min-width: 1100px) { .mk-value { flex-direction: column; gap: var(--mk-s-3); } }
 .mk-tint-mint { background: #d9f6ec; color: #0a7a62; }
-.mk-tint-violet { background: #ece3ff; color: #5b2fc4; }
+.mk-tint-violet { background: #e7ecf7; color: var(--navy-600); }
 .mk-tint-amber { background: #ffeccb; color: #8a5200; }
 .mk-tint-blue { background: #dce8ff; color: #1649d6; }
 .mk-tint-rose { background: #ffe0e2; color: #b4232a; }

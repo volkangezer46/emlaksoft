@@ -40,7 +40,7 @@ export function ValuationArt() {
     <svg className="mk-svg" viewBox="0 0 340 150" role="img" aria-label="Örnek emsal dağılımı: noktalar emsal portföyleri, vurgulu bant fiyat aralığı sinyalini gösterir">
       <rect className="mk-a-fillx" x="86" y="24" width="170" height="104" rx="12" fill="rgba(29,92,255,.1)" stroke="#1d5cff" strokeOpacity="0.35" strokeDasharray="4 5" />
       {dots.map(([x, y], i) => (
-        <circle key={i} className="mk-a-pop" style={{ "--i": i } as CSSProperties} cx={x} cy={y + 14} r={i === 4 ? 7 : 5} fill={i === 4 ? "#7a3cf0" : "#7fa3f5"} />
+        <circle key={i} className="mk-a-pop" style={{ "--i": i } as CSSProperties} cx={x} cy={y + 14} r={i === 4 ? 7 : 5} fill={i === 4 ? "#163a78" : "#7fa3f5"} />
       ))}
       <path d="M20 118 L320 118" stroke="#d6dcea" />
       <text x="86" y="144" fontSize="12" fontWeight="700" fill="#55627b">alt sınır</text>

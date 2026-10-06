@@ -1,16 +1,20 @@
 import type { CSSProperties, ReactNode } from "react";
 
-/* Ürün ekranı illüstrasyonlarının ortak SVG parçaları. Tüm içerik ÖRNEK veridir (jenerik isimler). */
+/* Ürün ekranı illüstrasyonlarının ortak SVG parçaları. Tüm içerik ÖRNEK veridir (jenerik isimler).
+   Palet tasarım sistemi v4 ile hizalı (tokens.css: --navy-*, --gold-*; SVG sunum özniteliği CSS değişkeni okumadığı için
+   değerler burada aynalanır): lacivert yan menü, beyaz kart, mavi vurgu, para serisinde kontrollü altın. */
 export const C = {
-  ink: "#0a1736",
-  navy: "#0b1e4a",
+  ink: "#071a38",
+  navy: "#0a2247",
   body: "#475569",
   mute: "#64748b",
   line: "#e3e8f2",
   bg: "#f5f7fc",
   blue: "#1d5cff",
-  violet: "#7a3cf0",
+  violet: "#163a78",
   green: "#0e9f7e",
+  gold: "#d4a24c",
+  goldText: "#7a5200",
 };
 
 export const TONES = {
@@ -18,7 +22,8 @@ export const TONES = {
   green: { bg: "#dff5ee", fg: "#0a6b57" },
   amber: { bg: "#fff0d2", fg: "#8a5a00" },
   red: { bg: "#ffe3e4", fg: "#b4232a" },
-  violet: { bg: "#efe6ff", fg: "#5b2fc4" },
+  violet: { bg: "#e7ecf7", fg: "#163a78" },
+  gold: { bg: "#fbf0d6", fg: "#7a5200" },
   slate: { bg: "#eaeef6", fg: "#475569" },
 } as const;
 export type Tone = keyof typeof TONES;
@@ -60,7 +65,8 @@ export function Sidebar({ w, h, active, compact = false }: { w: number; h: numbe
         const on = i === active;
         return (
           <g key={n}>
-            {on ? <rect x={8} y={y - 4} width={w - 16} height={itemH - 4} rx={9} fill="url(#mkBrand)" /> : null}
+            {on ? <rect x={8} y={y - 4} width={w - 16} height={itemH - 4} rx={9} fill={C.blue} /> : null}
+            {on ? <rect x={8} y={y + 2} width={3} height={itemH - 16} rx={1.5} fill={C.gold} /> : null}
             <Icon i={i} x={20} y={y + (itemH - 4) / 2 - 12} size={compact ? 15 : 17} color="#fff" opacity={on ? 1 : 0.62} />
             <text x={46} y={y + (itemH - 4) / 2 + 4} fontSize={compact ? 12.5 : 14} fontWeight={on ? 700 : 500} fill="#fff" opacity={on ? 1 : 0.72}>{n}</text>
           </g>
@@ -75,11 +81,11 @@ export function Defs() {
     <defs>
       <linearGradient id="mkBrand" x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stopColor="#1d5cff" />
-        <stop offset="1" stopColor="#7a3cf0" />
+        <stop offset="1" stopColor="#0d2b5e" />
       </linearGradient>
       <linearGradient id="mkSide" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#14307a" stopOpacity="0.55" />
-        <stop offset="1" stopColor="#071235" stopOpacity="0.2" />
+        <stop offset="0" stopColor="#0d2b5e" stopOpacity="0.9" />
+        <stop offset="1" stopColor="#050f24" stopOpacity="0.35" />
       </linearGradient>
       <linearGradient id="mkBar" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stopColor="#4f86ff" />
@@ -89,8 +95,12 @@ export function Defs() {
         <stop offset="0" stopColor="#1d5cff" stopOpacity="0.28" />
         <stop offset="1" stopColor="#1d5cff" stopOpacity="0" />
       </linearGradient>
+      <linearGradient id="mkGold" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#e5b04d" stopOpacity="0.34" />
+        <stop offset="1" stopColor="#e5b04d" stopOpacity="0" />
+      </linearGradient>
       <filter id="mkShadow" x="-10%" y="-10%" width="120%" height="130%">
-        <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#0a1736" floodOpacity="0.1" />
+        <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#071a38" floodOpacity="0.08" />
       </filter>
     </defs>
   );
@@ -134,8 +144,8 @@ export function Kpi({ x, y, w, label, value, delta, tone = "green", icon = 0, co
 }
 
 export function Avatar({ x, y, r = 14, text, hue = 0 }: { x: number; y: number; r?: number; text: string; hue?: number }) {
-  const fills = ["#dbe7ff", "#e6dcff", "#d8f3ea", "#ffe8c7", "#ffdfe0"];
-  const fg = ["#1546c2", "#5b2fc4", "#0a6b57", "#8a5a00", "#b4232a"];
+  const fills = ["#dbe7ff", "#e7ecf7", "#d8f3ea", "#ffe8c7", "#ffdfe0"];
+  const fg = ["#1546c2", "#163a78", "#0a6b57", "#8a5a00", "#b4232a"];
   return (
     <g>
       <circle cx={x} cy={y} r={r} fill={fills[hue % 5]} />
@@ -158,10 +168,10 @@ export function AppShell({ w, h, sw, active, title, sub, label, cta = "+ Yeni", 
         <circle cx="18" cy="17" r="5.5" fill="none" stroke={C.mute} strokeWidth="1.8" />
         <path d="M22 21l5 5" stroke={C.mute} strokeWidth="1.8" strokeLinecap="round" />
         <text x="34" y="22" fontSize="12.5" fill={C.mute}>Ara…  Ctrl K</text>
-        <rect x="182" width="86" height="34" rx="10" fill="url(#mkBrand)" />
+        <rect x="182" width="86" height="34" rx="10" fill={C.blue} />
         <text x="225" y="22" textAnchor="middle" fontSize="13" fontWeight="700" fill="#fff">{cta}</text>
-        <circle cx="288" cy="17" r="15" fill="#e6dcff" />
-        <text x="288" y="22" textAnchor="middle" fontSize="12.5" fontWeight="800" fill="#5b2fc4">EO</text>
+        <circle cx="288" cy="17" r="15" fill="#1d5cff" />
+        <text x="288" y="22" textAnchor="middle" fontSize="12.5" fontWeight="800" fill="#fff">EO</text>
       </g>
       {children}
     </svg>
@@ -184,13 +194,13 @@ export function Bars({ x, y, w, h, vals, hl = -1, labels, anim = false }: { x: n
   );
 }
 
-export function Line({ x, y, w, h, vals, color = C.blue, area = true, anim = false }: { x: number; y: number; w: number; h: number; vals: number[]; color?: string; area?: boolean; anim?: boolean }) {
-  const max = Math.max(...vals), min = Math.min(...vals);
+export function Line({ x, y, w, h, vals, color = C.blue, area = true, anim = false, fill = "url(#mkArea)", min: minIn }: { x: number; y: number; w: number; h: number; vals: number[]; color?: string; area?: boolean; anim?: boolean; fill?: string; min?: number }) {
+  const max = Math.max(...vals), min = minIn ?? Math.min(...vals);
   const pts = vals.map((v, i) => [(w / (vals.length - 1)) * i, h - ((v - min) / (max - min || 1)) * (h - 8) - 4] as const);
   const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   return (
     <g transform={`translate(${x} ${y})`}>
-      {area ? <path className={anim ? "mk-a-area" : undefined} d={`${d} L${w} ${h} L0 ${h} Z`} fill="url(#mkArea)" /> : null}
+      {area ? <path className={anim ? "mk-a-area" : undefined} d={`${d} L${w} ${h} L0 ${h} Z`} fill={fill} /> : null}
       <path className={anim ? "mk-a-line" : undefined} pathLength={anim ? 1 : undefined} d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       <circle className={anim ? "mk-a-dot" : undefined} cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="4.5" fill="#fff" stroke={color} strokeWidth="2.5" />
     </g>
