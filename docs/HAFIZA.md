@@ -102,8 +102,9 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 
 ## 3. Bekleyen / engelli işler
 
-**GÜNCEL AÇIK İŞLER (2026-10-05; aşağıdaki eski maddeler tarihsel olabilir, çelişirse bu liste geçerlidir):**
-- Yeni migration dosyaları canlıda değil: `000900` (hotfix), `001000` (büyüme paneli rol kapısı), `001100` (§2). Sırası/doğrulaması: `docs/runbooks/YAYIN_PENCERESI_2.md` §8.
+**GÜNCEL AÇIK İŞLER (2026-10-06; aşağıdaki eski maddeler tarihsel olabilir, çelişirse bu liste geçerlidir):**
+- **Perf optimizasyonu (2026-10-06, kod hazır, migration uygulanmamış):** DB index'leri `20261006000200` (8 composite index), nav badge cache `20261006000300` (snapshot tablosu + RPC + 5 dakikalık cron). FCP <1.8s, LCP <3.2s hedefi doğrultusunda. Dashboard batch query (`data-batch.ts`) yardımcı hazır, RPC'ler migration sonrası canlanır. Font preconnect hint eklendi.
+- Yeni migration dosyaları canlıda değil: `000900` (hotfix), `001000` (büyüme paneli rol kapısı), `001100` (§2). Sırası/doğrulaması: `docs/runbooks/YAYIN_PENCERESI_2.md` §8. + **perf index'ler `000200`, nav cache `000300`**.
 - Release çifti (`RELEASE_MIGRATION` + `_CHECKSUM`) her yeni uygulamadan sonra güncellenir (DEPLOY.md).
 - Üretim env: `ADVISOR_PII_KEY`, `PLATFORM_MFA_ENFORCEMENT=on` (yayın öncesi), `IYZICO_BASE_URL=https://api.iyzipay.com` (sandbox değeriyle canlı ödeme alınmaz), `PLATFORM_SECRETS_KEY`, `EMLAKFIYATI_API_KEY`/admin anahtarı.
 - iyzico iade OTOMATİK DEĞİL: panelden elle + `recordInvoiceRefund` + kontör/kredi clawback (`docs/runbooks/IYZICO_IADE.md`). Günlük `manual_review`/`refund_required` kontrolü (Admin > Faturalama > Ödeme uyarıları).
@@ -126,9 +127,9 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 - Sahiplik devri kodu YOK (atomik RPC yok; taslak + tasarım var). Abonelik duraklatma/oransal yükseltme sadece taslak.
 - Ö-7, Ö-8 (oneri listesi) ve organik büyüme paketlerinin geri kalanı, F1-F5 (aşağıda ajanlar), devir dosyası + Codex komutu.
 
-## 4. Çalışan ajanlar (2026-10-05; raporlar gelince bu bölümü güncelle)
+## 4. Çalışan ajanlar (2026-10-06; raporlar gelince bu bölümü güncelle)
 
-Yerelde birleşenler (hepsi `main`'de, push bekliyor): güvenlik denetimi 3 (kod + SQL düzeltmeleri; rapor `docs/design/GUVENLIK_DENETIMI_3.md`),
+Yerelde birleşenler (hepsi `main`'de, push bekliyor): **perf optimizasyonu (2026-10-06, code ready),** güvenlik denetimi 3 (kod + SQL düzeltmeleri; rapor `docs/design/GUVENLIK_DENETIMI_3.md`),
 F1/F4 (kayıt defteri, evrak linki), F2/F3/F5 (doğal dil arama, foto kalite, mahalle notu), organik büyüme, AI kredi ölçümü,
 müşteri zekâsı + aday hızı, ar-ge-baskani ajan tanımı (`.claude/agents/ar-ge-baskani.md`).
 Hâlâ çalışanlar: **coğrafya tek merkez** (`src/lib/geo`, `/admin/geo`; üyelik kaydı dahil tüm formlar), **koltuk fiyatlama motoru**
