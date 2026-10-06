@@ -63,6 +63,7 @@ export const MODULES = [
   { key: "ai_assistant", label: "AI Asistan", desc: "Ofis verilerinizle sohbet eden yardımcı. Kapalıyken yapay zekâ çağrısı yapılmaz.", group: "gelismis", routes: ["/app/asistan"], publicRoutes: [], dependsOn: [], stops: "Yapay zekâ çağrısı yapılmaz." },
   { key: "vitrin", label: "Vitrin ve danışman sayfaları", desc: "Herkese açık ofis vitrini, danışman sayfaları ve randevu al.", group: "gelismis", routes: [], publicRoutes: ["/vitrin", "/danisman", "/randevu-al"], dependsOn: [], stops: "Herkese açık vitrin sayfaları \"kapalı\" gösterir; vitrin alarmları çalışmaz." },
   { key: "client_portals", label: "Müşteri ve malik portalı", desc: "Müşteriye ve ev sahibine özel, bağlantıyla açılan bilgi sayfaları.", group: "gelismis", routes: [], publicRoutes: ["/musteri-portali", "/malik-portali"], dependsOn: [] },
+  { key: "office_center", label: "Ofis Merkezi", desc: "Danışman yönetimi, havuzdan atama, ofis ayarları ve tanımlamalar.", group: "ekip", routes: ["/app/ofis-merkezi"], publicRoutes: [], dependsOn: [], stops: "Ofis merkezi yönetim sayfası gizlenir." },
 ] as const satisfies readonly ModuleDef[];
 
 export type FeatureKey = (typeof MODULES)[number]["key"];
