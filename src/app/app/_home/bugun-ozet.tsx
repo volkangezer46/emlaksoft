@@ -1,157 +1,31 @@
-import Link from "next/link";
-import { Suspense } from "react";
-import { ChevronRight, Sparkles } from "lucide-react";
-import { buildDailyBriefing, type BriefingItem, type BriefingTone } from "@/lib/briefing";
+import { Sparkles } from "lucide-react";
+import type { BriefingItem, BriefingTone } from "@/lib/briefing";
 import { generateBriefingSummary } from "@/lib/ai/briefing-summary";
-import { formatTrTime } from "@/lib/clock";
-import { EmptyState } from "@/components/ui/empty-state";
-import {
-  loadCommissionSummary,
-  loadExpiringAuthority,
-  loadHotLeadCount,
-  loadLiveListings,
-  loadTaskSummary,
-  loadTodayAppointments,
-  type HomeCtx,
-} from "./data";
-import { overdueListingsOf } from "./helpers";
-import { apptTypeLabel } from "./format";
-
-/** Brifing tonu → premium ton sınıfı (renk yalnız durum anlamı taşır). */
-const QUEUE_TONE: Record<BriefingTone, string> = {
-  danger: "pm-t-danger",
-  warn: "pm-t-warn",
-  amber: "pm-t-gold",
-  mint: "pm-t-success",
-  brand: "pm-t-brand",
-};
-
-/** Kuyruğun görünür satır üst sınırı (şartname: en çok 6). */
-const QUEUE_MAX = 6;
-
-/** "YYYY-AA-GG" (date kolonu) → "05 Eki". */
-const dayLabel = (key: string) =>
-  new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "UTC" }).format(new Date(`${key}T00:00:00Z`));
+import type { HomeCtx } from "./data";
+import type { AttentionLevelKey, HomeAttentionItem } from "./home-metrics";
 
 /**
- * Opsiyonel AI özet satırı — Suspense içinde ayrı stream edilir, sayfanın
- * ilk boyamasını bekletmez. OpenAI anahtarı yoksa/hata olursa hiç görünmez.
+ * Opsiyonel AI özet satırı ("Dikkat gerektirenler" kartının altında). Eski "Bugün kuyruğu" listesi KALDIRILDI:
+ * sayılarını diğer bloklar zaten gösteriyordu; kalemler artık tek kaynaktan (`loadAttention`) gelir ve bu satır
+ * yalnız onları tek cümleye indirir. Suspense içinde ayrı akar; OpenAI anahtarı/kota yoksa ya da hata olursa hiç
+ * görünmez. Çıktıdaki her sayı girdide geçmek zorundadır (lib/ai/briefing-summary).
  */
-async function BriefingAiLine({ items, ctx }: { items: BriefingItem[]; ctx: HomeCtx }) {
+const LEVEL_TONE: Record<AttentionLevelKey, BriefingTone> = { acil: "danger", yuksek: "warn", orta: "amber", dusuk: "brand" };
+
+export async function BugunAiOzet({ attention, ctx }: { attention: readonly HomeAttentionItem[]; ctx: HomeCtx }) {
   // audit ZORUNLU (kredi defteri + denetim izi); tenant yoksa çağrı yapılmaz. Günlük önbellek + kota kapısı lib'de.
   if (!ctx.tenantId) return null;
+  if (attention.length === 0) return null;
+  const items: BriefingItem[] = attention.map((i) => ({ icon: "", text: i.brief, href: i.href, tone: LEVEL_TONE[i.level] }));
   const summary = await generateBriefingSummary(items, { tenantId: ctx.tenantId, actorId: ctx.userId });
   if (!summary) return null;
   return (
     <p className="mt-3 flex items-start gap-2 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-3 py-2 text-xs font-medium text-[var(--accent-text)]">
       <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      <span>{summary}</span>
+      <span>
+        <span className="sr-only">Yapay zekâ özeti: </span>
+        {summary}
+      </span>
     </p>
-  );
-}
-
-/**
- * "Bugün kuyruğu" — ana ekranın en önemli bloğu: gecikmiş görev, bugünkü randevu,
- * sıcak müşteri, teyitsiz ilan, bekleyen komisyon, süresi dolan yetki. Kural tabanlı
- * (bkz. lib/briefing); her satır filtrelenmiş hedefe gider. Boşken anlamlı boş durum.
- */
-export async function BugunOzet({ ctx }: { ctx: HomeCtx }) {
-  const [tasks, appts, hotLeadCount, listings, commissionSummary, expiring] = await Promise.all([
-    loadTaskSummary(ctx),
-    loadTodayAppointments(ctx),
-    loadHotLeadCount(ctx),
-    loadLiveListings(ctx),
-    loadCommissionSummary(ctx),
-    loadExpiringAuthority(ctx),
-  ]);
-
-  const first = appts.rows[0];
-  const items = buildDailyBriefing({
-    todayAppointments: appts.total || appts.rows.length,
-    firstAppointment: first
-      ? { time: formatTrTime(first.scheduled_at), type: apptTypeLabel[first.appointment_type] ?? first.appointment_type }
-      : null,
-    expiringAuthority: expiring.data.length,
-    tasksDueToday: tasks.dueToday,
-    tasksOverdue: tasks.overdue,
-    unconfirmedListings: overdueListingsOf(listings).length,
-    hotLeads: hotLeadCount,
-    pendingCommission: commissionSummary.pending,
-  });
-  const shown = items.slice(0, QUEUE_MAX);
-
-  return (
-    <section className="pm-bx flex h-full flex-col p-5" aria-labelledby="bugun-kuyruk-baslik">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="pm-bx-eyebrow">Bugün</p>
-          <h2 id="bugun-kuyruk-baslik" className="pm-bx-title mt-0.5 text-lg">
-            Bugün kuyruğu
-          </h2>
-        </div>
-        {items.length > 0 ? (
-          <span className="pm-num rounded-full bg-[color-mix(in_srgb,var(--accent)_10%,transparent)] px-2.5 py-1 text-sm text-[var(--accent-text)]">
-            {items.length}
-            <span className="sr-only"> iş</span>
-          </span>
-        ) : null}
-      </div>
-
-      {items.length === 0 ? (
-        <EmptyState
-          variant="compact"
-          illustration="basari"
-          tone="mint"
-          className="flex-1 justify-center"
-          title="Bugün için acil iş yok"
-          description="Gecikmiş görev, bekleyen randevu ya da sıcak müşteri görünmüyor."
-          action={{ href: "/app/talepler", label: "Talepleri aç" }}
-        />
-      ) : (
-        <>
-          <ul className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-1">
-            {shown.map((item) => (
-              <li key={item.href} className="min-w-0">
-                <Link href={item.href} className={`pm-row focus-ring group ${QUEUE_TONE[item.tone]}`}>
-                  <span className="pm-row-ico text-base" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-[var(--text)]">{item.text}</span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--t-text)]" aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {items.length > shown.length ? (
-            <p className="mt-2 px-2 text-xs text-[var(--text-muted)]">+{items.length - shown.length} iş daha — görevler ve randevular aşağıda.</p>
-          ) : null}
-          <Suspense fallback={null}>
-            <BriefingAiLine items={items} ctx={ctx} />
-          </Suspense>
-          {expiring.data.length > 0 ? (
-            <div className="mt-4 border-t border-line pt-3">
-              <p className="pm-bx-eyebrow mb-1.5">Yetkisi dolan portföyler · 15 gün</p>
-              <ul className="space-y-1">
-                {expiring.data.slice(0, 3).map((p) => (
-                  <li key={p.id}>
-                    <Link href={`/app/portfoyler/${p.id}`} className="pm-row focus-ring group pm-t-warn">
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">{p.title ?? p.property_code}</span>
-                      <span className="shrink-0 text-xs text-[var(--text-muted)]">{dayLabel(p.authority_expires_at)}</span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-faint)] group-hover:text-[var(--t-text)]" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <Link
-            href="/app/akilli-listeler"
-            className="focus-ring mt-auto inline-flex items-center gap-1 self-start rounded-[var(--radius-control)] pt-4 text-sm font-semibold text-[var(--accent-text)]"
-          >
-            Aranacak müşteriler: Akıllı Listeler <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </>
-      )}
-    </section>
   );
 }

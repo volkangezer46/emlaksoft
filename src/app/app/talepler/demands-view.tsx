@@ -60,6 +60,8 @@ import {
 } from "./demand-list-logic";
 
 const PATH = "/app/talepler";
+/** ?eklenen= pencereleri (gün) — ana ekran dönem seçiciyle aynı (7|30|90). */
+const ADDED_WINDOWS = [7, 30, 90] as const;
 
 type Rel = { id?: string; full_name?: string; name?: string; assigned_to?: string | null } | { id?: string; full_name?: string; name?: string; assigned_to?: string | null }[] | null;
 
@@ -113,6 +115,7 @@ export async function DemandsView({
     status?: string;
     aciliyet?: string;
     yas?: string;
+    eklenen?: string;
     il?: string;
     butce?: string;
     danisman?: string;
@@ -139,6 +142,8 @@ export async function DemandsView({
   const ilF = uuidParam(sp.il);
   const butceF: BandKey | "" = BUDGET_BANDS.some((b) => b.key === sp.butce) ? (sp.butce as BandKey) : "";
   const yasF = sp.yas === String(AGING_DAYS);
+  // ?eklenen=7|30|90: son N günde açılan talepler (ana ekran "Yeni talep · N gün" KPI'sı buraya iner; sayımla aynı koşul).
+  const eklenenF = ADDED_WINDOWS.find((d) => String(d) === sp.eklenen) ?? null;
   // Talepte danışman sütunu yok: danışman = talep sahibi müşterinin atandığı kişi (customers.assigned_to).
   const danismanF = uuidParam(sp.danisman);
   const q = (sp.q ?? "").trim().slice(0, 80);
@@ -155,6 +160,7 @@ export async function DemandsView({
   if (ilF) urlParams.il = ilF;
   if (butceF) urlParams.butce = butceF;
   if (yasF) urlParams.yas = String(AGING_DAYS);
+  if (eklenenF) urlParams.eklenen = String(eklenenF);
   if (danismanF) urlParams.danisman = danismanF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
@@ -196,6 +202,7 @@ export async function DemandsView({
     if (butceF) query = query.or(budgetOrFilter(butceF));
     // Yaşlanan: 30+ gündür açık; kapalılar sayılmaz.
     if (yasF) query = query.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
+    if (eklenenF) query = query.gte("created_at", daysAgoIso(eklenenF));
     if (search.clause) query = query.or(search.clause);
     return query;
   };
@@ -369,6 +376,7 @@ export async function DemandsView({
     { key: "il", label: "İl", format: () => ilName ?? "Seçili il" },
     { key: "butce", label: "Bütçe", format: (v) => BUDGET_BANDS.find((b) => b.key === v)?.label ?? v },
     { key: "yas", label: "Açık süre", format: (v) => `${v}+ gün` },
+    { key: "eklenen", label: "Eklenme", format: (v) => `son ${v} gün` },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
   ]);
 
@@ -421,7 +429,7 @@ export async function DemandsView({
             params={urlParams}
             searchPlaceholder="Müşteri, tip veya oda ara…"
             searchLabel="Talep ara"
-            panelParamKeys={["danisman", "yas"]}
+            panelParamKeys={["danisman", "yas", "eklenen"]}
             panel={
               <FilterGrid>
                 {advisors.length > 0 ? (
@@ -440,6 +448,12 @@ export async function DemandsView({
                     { value: "", label: "Tümü" },
                     { value: String(AGING_DAYS), label: `${AGING_DAYS}+ gündür açık` },
                   ]}
+                />
+                <FilterSelect
+                  name="eklenen"
+                  label="Eklenme"
+                  value={eklenenF ? String(eklenenF) : ""}
+                  options={[{ value: "", label: "Tümü" }, ...ADDED_WINDOWS.map((d) => ({ value: String(d), label: `Son ${d} gün` }))]}
                 />
               </FilterGrid>
             }

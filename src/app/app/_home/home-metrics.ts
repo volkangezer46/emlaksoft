@@ -93,43 +93,174 @@ export function dedupeMetrics<T extends { key: string }>(list: readonly T[]): T[
   return list.filter((m) => (seen.has(m.key) ? false : (seen.add(m.key), true)));
 }
 
-/* --------------------------- Karar bekleyenler ---------------------------- */
+/* --------------------------- Dikkat gerektirenler --------------------------- */
 
-export type DecisionItem = { key: string; value: number; label: string; hint: string; href: string; tone: "danger" | "warn" | "brand" };
+/** Önem düzeyi (AttentionList ile aynı dört düzey; renk tek başına anlam taşımaz). */
+export type AttentionLevelKey = "acil" | "yuksek" | "orta" | "dusuk";
+
+export type HomeAttentionItem = {
+  id: string;
+  label: string;
+  hint: string;
+  href: string;
+  level: AttentionLevelKey;
+  /** Gerçek sayı; tavanlı/tutar kalemlerde verilmez (yanlış sayı gösterilmez). */
+  count?: number;
+  /** Hero cümlesi ve opsiyonel AI özeti için kısa metin ("3 gecikmiş görev"). */
+  brief: string;
+};
 
 /**
- * Karar kalemlerini tek yerde kurar. Yalnız GERÇEK sayı > 0 olan kalem girer.
- * Sıra: onay → geciken tahsilat → hareketsiz danışman → yetkisi dolan portföy.
- * (Kaçan komisyon burada DEĞİL: "Kaçan komisyon/risk" bloğundadır — aynı sayı iki yerde yok.)
+ * Girdiler: her alan GERÇEK sayım; `null` = okunamadı ya da bu rol/izin görmez (kalem çizilmez, sahte sıfır yok).
+ * `mine` kapsamı hedef bağlantılara taşınır (ana ekran "Ben" görünümündeyse liste de kişiye süzülür).
  */
-export function buildDecisionItems(d: {
+export type AttentionInput = {
+  overdueTasks: number | null;
   approvals: number | null;
   overdueRent: number | null;
+  staleDeals: number | null;
+  staleDays: number;
+  unconfirmedListings: number | null;
+  expiringAuthority: number | null;
+  /** Yükleyici tavanına ulaşıldı: sayı kesin değil → sayı gösterilmez. */
+  expiringCapped: boolean;
+  /** Tahsil edilmemiş komisyon tutarı (₺); tutar olduğu için `count` taşımaz. */
+  pendingCommission: number | null;
+  pendingCommissionText: string;
   passiveAdvisors: number | null;
   passiveDays: number;
-  expiringAuthority: number;
-}): DecisionItem[] {
-  const items: DecisionItem[] = [];
-  if (d.approvals) {
-    items.push({ key: "onay", value: d.approvals, label: "Onay bekleyen talep", hint: "Senin kararını bekliyor", href: "/app/onaylar?kim=bana", tone: "warn" });
-  }
+  mine: boolean;
+  userId: string;
+};
+
+const LEVEL_ORDER: Record<AttentionLevelKey, number> = { acil: 0, yuksek: 1, orta: 2, dusuk: 3 };
+
+/**
+ * "Dikkat gerektirenler" kalemlerini tek yerde kurar (eski "Karar bekleyenler" + "Bugün kuyruğu" birleşti).
+ * Yalnız sayısı > 0 olan kalem girer; sıra önem düzeyi, eşitlikte tanım sırası. Her kalem filtrelenmiş listeye gider.
+ * (Kaçan komisyon burada DEĞİL: "Kaçan komisyonlar" bloğundadır — aynı sayı iki yerde yok.)
+ */
+export function buildAttentionItems(d: AttentionInput): HomeAttentionItem[] {
+  const items: HomeAttentionItem[] = [];
+  const mineTask = d.mine ? "&mine=1" : "";
+  const mineOwner = d.mine ? `&danisman=${d.userId}` : "";
   if (d.overdueRent) {
-    items.push({ key: "tahsilat", value: d.overdueRent, label: "Geciken tahsilat", hint: "Gecikmiş kira tahakkuku", href: "/app/kiralama?durum=overdue", tone: "danger" });
-  }
-  if (d.passiveAdvisors) {
     items.push({
-      key: "pasif",
-      value: d.passiveAdvisors,
-      label: "Hareketsiz danışman",
-      hint: `${d.passiveDays} gündür anlaşma hareketi yok`,
-      href: "/app/ekip",
-      tone: "brand",
+      id: "tahsilat",
+      label: "Geciken kira tahsilatı",
+      hint: "Vadesi geçmiş kira tahakkuku",
+      href: "/app/kiralama?durum=overdue",
+      level: "acil",
+      count: d.overdueRent,
+      brief: `${d.overdueRent} geciken kira tahsilatı`,
+    });
+  }
+  if (d.overdueTasks) {
+    items.push({
+      id: "gorev",
+      label: "Geciken görev",
+      hint: "Vadesi geçmiş açık görev",
+      href: `/app/gorevler?filter=overdue${mineTask}`,
+      level: "acil",
+      count: d.overdueTasks,
+      brief: `${d.overdueTasks} gecikmiş görev`,
+    });
+  }
+  if (d.approvals) {
+    items.push({
+      id: "onay",
+      label: "Onay bekleyen talep",
+      hint: "Senin kararını bekliyor",
+      href: "/app/onaylar?kim=bana",
+      level: "yuksek",
+      count: d.approvals,
+      brief: `${d.approvals} onay bekleyen talep`,
+    });
+  }
+  if (d.staleDeals) {
+    items.push({
+      id: "riskli-anlasma",
+      label: "Riskli anlaşma",
+      hint: `${d.staleDays}+ gündür hareketsiz açık anlaşma`,
+      href: `/app/anlasmalar?bayat=1${mineOwner}`,
+      level: "yuksek",
+      count: d.staleDeals,
+      brief: `${d.staleDeals} anlaşma ${d.staleDays}+ gündür hareketsiz`,
+    });
+  }
+  if (d.unconfirmedListings) {
+    items.push({
+      id: "teyit",
+      label: "Teyitsiz ilan",
+      hint: "7+ gündür portalda teyit edilmedi",
+      href: "/app/portallar?durum=teyit",
+      level: "orta",
+      count: d.unconfirmedListings,
+      brief: `${d.unconfirmedListings} ilan 7+ gündür teyitsiz`,
     });
   }
   if (d.expiringAuthority) {
-    items.push({ key: "yetki", value: d.expiringAuthority, label: "Yetkisi dolan portföy", hint: "15 gün içinde bitiyor", href: "/app/portfoyler", tone: "warn" });
+    items.push({
+      id: "yetki",
+      label: "Yetkisi dolan portföy",
+      hint: "Yetki belgesi 15 gün içinde bitiyor",
+      href: `/app/portfoyler?yetki=bitiyor${mineOwner}`,
+      level: "orta",
+      ...(d.expiringCapped ? {} : { count: d.expiringAuthority }),
+      brief: d.expiringCapped ? "Yetkisi 15 gün içinde dolan portföyler var" : `${d.expiringAuthority} portföyün yetkisi 15 gün içinde doluyor`,
+    });
   }
-  return items;
+  if (d.pendingCommission && d.pendingCommission > 0) {
+    items.push({
+      id: "komisyon",
+      label: "Bekleyen komisyon",
+      hint: `${d.pendingCommissionText} tahsil/onay bekliyor`,
+      href: "/app/komisyon?durum=bekleyen",
+      level: "orta",
+      brief: `${d.pendingCommissionText} komisyon tahsil bekliyor`,
+    });
+  }
+  if (d.passiveAdvisors) {
+    items.push({
+      id: "pasif",
+      label: "Hareketsiz danışman",
+      hint: `${d.passiveDays} gündür anlaşma hareketi yok`,
+      href: "/app/ekip",
+      level: "dusuk",
+      count: d.passiveAdvisors,
+      brief: `${d.passiveAdvisors} danışman ${d.passiveDays} gündür hareketsiz`,
+    });
+  }
+  return items
+    .map((it, i) => ({ it, i }))
+    .sort((a, b) => LEVEL_ORDER[a.it.level] - LEVEL_ORDER[b.it.level] || a.i - b.i)
+    .map(({ it }) => it);
+}
+
+/**
+ * Hero özet cümlesi: KPI'ları TEKRARLAMAZ; en öncelikli işi adıyla ve bağlantısıyla söyler.
+ * Kalem yoksa sakin durum + ilerletici tek bağlantı (sahte aciliyet yok).
+ */
+export function heroFocus(items: readonly HomeAttentionItem[]): { lead: string; text: string; href: string; rest: number } {
+  const first = items[0];
+  if (!first) return { lead: "Bugün acil bir konu görünmüyor.", text: "Yeni talepleri gözden geçirin", href: "/app/talepler?status=new", rest: 0 };
+  return { lead: first.level === "acil" ? "Önce bununla başlayın:" : "Öncelik:", text: first.brief, href: first.href, rest: items.length - 1 };
+}
+
+/* ------------------------------ Aylık gelir eğrisi ----------------------------- */
+
+const MONTH_SHORT = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+
+/** "2026-10" → "Eki". */
+export function monthShortLabel(key: string): string {
+  const m = Number(key.slice(5, 7));
+  return MONTH_SHORT[m - 1] ?? key;
+}
+
+/** Eğri yalnız en az iki ay ve sıfırdan farklı bir değer varsa çizilir (düz sıfır çizgisi uydurma bir eğridir). */
+export function revenueSeries(keys: readonly string[], totals: readonly number[]): { label: string; value: number }[] | null {
+  const pts = keys.map((k, i) => ({ label: monthShortLabel(k), value: Number(totals[i] ?? 0) }));
+  return pts.length >= 2 && pts.some((p) => p.value > 0) ? pts : null;
 }
 
 /** Tahsilat oranı: tahsil / tahakkuk (6 ay). Tahakkuk 0 ise null (oran uydurulmaz). */
@@ -191,7 +322,7 @@ export function funnelRows(i: FunnelInput): FunnelRow[] {
     { label: "Yeni talep", value: i.newDemand, href: "/app/talepler?status=new" },
     { label: "Aktif talep", value: i.activeDemand, href: "/app/talepler?status=active" },
     { label: "Eşleşen", value: i.matchedDemand, href: "/app/talepler?status=matched" },
-    { label: "Kazanılan anlaşma", value: i.won, href: "/app/anlasmalar" },
+    { label: "Kazanılan anlaşma", value: i.won, href: "/app/anlasmalar?gorunum=liste&asama=won" },
   ];
   const max = Math.max(0, ...stages.map((s) => s.value));
   return stages.map((s) => ({

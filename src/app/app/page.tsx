@@ -14,6 +14,7 @@ import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboard-grid";
 import { DeferredSection } from "@/components/ui/deferred-section";
+import { FadeSwap } from "@/components/ui/motion";
 import { parsePeriod } from "@/components/ui/premium";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
@@ -21,12 +22,11 @@ import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { preloadDashboardSnapshot } from "./_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
 import { OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
-import { UstSatir } from "./_home/ust-satir";
+import { AnaHero } from "./_home/ana-hero";
 import { DurumCubugu } from "./_home/durum-cubugu";
 import { KontorBandi } from "./_home/kontor-bandi";
 import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
 import { DuyuruSatiri } from "./_home/duyuru-satiri";
-import { BugunOzet } from "./_home/bugun-ozet";
 import { Gorevler } from "./_home/gorevler";
 import { KayipKacak } from "./_home/kayip-kacak";
 import { KiralamaProje } from "./_home/kiralama-proje";
@@ -35,8 +35,9 @@ import { CanliAkis } from "./_home/canli-akis";
 import { HizliAksiyonlar } from "./_home/musteriler-hizli";
 import { PortfoySeridi } from "./_home/portfoy-seridi";
 import { KaynakDagilimi } from "./_home/kaynak-dagilimi";
-import { KararBekleyenler, KararBekleyenlerIskelet } from "./_home/karar-bekleyenler";
 import { Brifing, BrifingIskelet } from "./_home/brifing";
+import { Dikkat, DikkatIskelet } from "./_home/dikkat";
+import { GelirEgrisi } from "./_home/gelir-egrisi";
 import { MetrikSeridi, MetrikSeridiIskelet } from "./_home/metrik-seridi";
 import { EkipPerformans, EkipPerformansIskelet } from "./_home/ekip-performans";
 import { HuniHedef, HuniHedefIskelet, KisiselHedef } from "./_home/huni-hedef";
@@ -45,19 +46,23 @@ import { DanismanAra, DanismanAraIskelet } from "./_home/danisman-ara";
 import { Tahsilat, TahsilatIskelet } from "./_home/tahsilat";
 import { GiderOzeti } from "./_home/gider-ozeti";
 import { homeHref, type HomeParams } from "./_home/kapsam-anahtari";
-import { homeLayoutFor, riskShowsTeyit, type MoreBlock } from "./_home/home-layout";
+import { homeLayoutFor, type MoreBlock } from "./_home/home-layout";
 
 export const metadata = { title: "Ana ekran" };
 
 /**
- * "Bugün" ana ekranı. Sayfa yalnız yetki + bağlam + ROL YERLEŞİMİ (`_home/home-layout.ts`, saf) kurar; her blok
- * `_home/*` içinde kendi verisini yükler ve kendi <Suspense> sınırında, içerik yüksekliğinde iskeletle akar (CLS yok).
+ * "Bugün" ana ekranı — tasarım sistemi v4 (referans: /admin kontrol paneli). Sayfa yalnız yetki + bağlam + ROL YERLEŞİMİ
+ * (`_home/home-layout.ts`, saf) kurar; her blok `_home/*` içinde kendi verisini yükler ve kendi <Suspense> sınırında,
+ * içerik yüksekliğinde iskeletle akar (CLS yok).
  *
- * Yönetim (xl, 12 kolon): ince başlık satırı -> tek Durum çubuğu -> Brifing odağı (8) + Karar bekleyenler/Metrik şeridi (4)
- * -> Ekip performansı (7) + Huni/Hedef (5) -> Program / Görevler / Kaçan komisyon (4+4+4) -> "Daha fazla" (varsayılan kapalı).
- * Danışman: Sıradaki eylem (7) + Bugün ara (5) -> Program / Görevler / Kişisel hedef -> Metrikler. Takım lideri: + ekip tablosu.
- * Muhasebe: Tahsilat odağı + metrikler + gider özeti. Arama merkezi: Bugün ara + arama/yanıt metrikleri + görevler.
- * İçgörü yoksa brifing kural tabanlı "Sıradaki eylem"e düşer (sahte içgörü üretilmez).
+ * Her rol: DashboardHero (tarih · rol bağlamı, selamlama, tek cümle öncelik, tazelik, dönem/kapsam seçici) → durum çubuğu
+ * → KpiGrid (dönem/kapsam değişince FadeSwap). Ardından:
+ *  - Yönetim: Dikkat gerektirenler + içgörüler (7) | Komisyon geliri eğrisi (5) → Ekip performansı (7) | Satış hunisi +
+ *    ofis hedefi (5) → Program / Görevler / Kaçan komisyon → "Daha fazla" (varsayılan kapalı).
+ *  - Danışman: Sıradaki eylem (7) + Bugün ara (5) → Program / Görevler / Kişisel hedef. Takım lideri: + ekip tablosu.
+ *  - Muhasebe: Tahsilat odağı + gider özeti. Arama merkezi: Bugün ara + görevler.
+ * Ekran altı satırlar DeferredSection ile görünür alana yaklaşınca bağlanır. Reveal (motion `m.*`) burada bilinçli
+ * olarak YOK: /app ilk yük bütçesi (≤ 5 KB) motion çekirdeğini (~19 KB) kaldırmaz; giriş CSS'tir (list-stagger, FadeSwap).
  */
 export default async function AppHomePage({
   searchParams,
@@ -73,8 +78,7 @@ export default async function AppHomePage({
   const { tenantId, perms, role, userId } = gate;
   // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.
   preloadDashboardSnapshot(tenantId, userId);
-  // Hoş geldin kapısı, kapalı modüller, örnek veri kapsamı ve kullanıcı birbirinden bağımsız: TEK turda
-  // (eskiden 4 seri tur). Profil/tenant satırı istek-içi tek kimlik okumasından gelir (lib/cache/request).
+  // Hoş geldin kapısı, kapalı modüller, örnek veri kapsamı ve kullanıcı birbirinden bağımsız: TEK turda.
   const [showWelcome, closedFeatures, sample, user] = await measure("home-ctx", () =>
     Promise.all([
       tenantId ? loadShouldShowWelcome(userId, role) : Promise.resolve(false),
@@ -123,6 +127,7 @@ export default async function AppHomePage({
     icgoru: icgoru === "tum" ? "tum" : undefined,
   };
   const moreOpen = daha === "1";
+  const swapKey = `${ctx.period}-${officeView ? "ofis" : "ben"}`;
 
   /** Izgara hücresi; `widget` verilirse "Düzenle" modunda gizlenebilir. */
   const cell = (xl: 3 | 4 | 5 | 6 | 7 | 8 | 12, node: ReactNode, key: string, opts?: { widget?: string; className?: string }) => (
@@ -138,23 +143,38 @@ export default async function AppHomePage({
   );
 
   /* ------------------------------ Bloklar ------------------------------ */
-  const brifing = (eyebrow?: string, maxRows?: number) => (
-    <Suspense fallback={<BrifingIskelet />}>
-      <Brifing ctx={ctx} params={params} eyebrow={eyebrow} maxRows={maxRows} />
-    </Suspense>
+  const kpis =
+    layout.metrics.length === 0 ? null : (
+      <div data-tour="kpi">
+        <Suspense fallback={<MetrikSeridiIskelet rows={layout.metrics.length} />}>
+          <FadeSwap swapKey={swapKey}>
+            <MetrikSeridi ctx={ctx} keys={layout.metrics} />
+          </FadeSwap>
+        </Suspense>
+      </div>
+    );
+  const dikkat = (
+    <div data-tour="brifing" className="h-full">
+      <Suspense fallback={<DikkatIskelet />}>
+        <FadeSwap swapKey={swapKey} className="h-full">
+          <Dikkat ctx={ctx} params={params} />
+        </FadeSwap>
+      </Suspense>
+    </div>
   );
-  const karar =
-    layout.decisions && !(off("approvals") && off("offers")) ? (
-      <Suspense fallback={<KararBekleyenlerIskelet />}>
-        <KararBekleyenler ctx={ctx} />
+  const gelir =
+    layout.revenueChart && ctx.canSeeCommissions ? (
+      <Suspense fallback={<PanelIskelet rows={5} className="h-full min-h-[22rem]" />}>
+        <GelirEgrisi ctx={ctx} />
       </Suspense>
     ) : null;
-  const metrik = (wide = false, title?: string) =>
-    layout.metrics.length === 0 ? null : (
-      <Suspense fallback={<MetrikSeridiIskelet rows={layout.metrics.length} />}>
-        <MetrikSeridi ctx={ctx} keys={layout.metrics} wide={wide} title={title} />
+  const brifing = (eyebrow?: string, maxRows?: number) => (
+    <div data-tour="brifing" className="h-full">
+      <Suspense fallback={<BrifingIskelet />}>
+        <Brifing ctx={ctx} params={params} eyebrow={eyebrow} maxRows={maxRows} />
       </Suspense>
-    );
+    </div>
+  );
   const ekip = (
     <Suspense fallback={<EkipPerformansIskelet />}>
       <EkipPerformans ctx={ctx} />
@@ -177,7 +197,7 @@ export default async function AppHomePage({
   );
   const risk = (
     <Suspense fallback={<PanelIskelet />}>
-      <KayipKacak ctx={ctx} showTeyit={riskShowsTeyit(layout)} />
+      <KayipKacak ctx={ctx} />
     </Suspense>
   );
   const kisiselHedef = (
@@ -253,21 +273,7 @@ export default async function AppHomePage({
   switch (layout.variant) {
     case "management":
       rows.push(
-        grid(
-          "r1",
-          [
-            cell(8, brifing(), "brifing"),
-            cell(
-              4,
-              <div className="flex flex-col gap-4">
-                {karar}
-                {metrik()}
-              </div>,
-              "karar-metrik",
-            ),
-          ],
-          "items-start",
-        ),
+        grid("r1", gelir ? [cell(7, dikkat, "dikkat"), cell(5, gelir, "gelir", { widget: "gelir" })] : [cell(12, dikkat, "dikkat")]),
         deferredGrid("r2", [
           ...(layout.team && !off("team_perf") ? [{ span: 7 as const, node: widgetWrap("ekip-perf", ekip) }] : []),
           ...(layout.funnelTarget && !off("team_perf") ? [{ span: 5 as const, node: widgetWrap("huni-hedef", huniHedef) }] : []),
@@ -284,41 +290,31 @@ export default async function AppHomePage({
         ]),
         ...(layout.team && !off("team_perf") ? [deferredGrid("rt", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
         deferredGrid("r2", bottomItems(4)),
-        deferredGrid("r3", [{ span: 12, node: layout.metrics.length > 0 ? widgetWrap("metrik", metrik(true)) : null }]),
       );
       break;
     case "accounting":
       rows.push(
-        grid(
-          "r1",
-          [
-            cell(
-              8,
-              <Suspense fallback={<TahsilatIskelet />}>
-                <Tahsilat ctx={ctx} />
-              </Suspense>,
-              "tahsilat",
-            ),
-            cell(4, metrik(), "metrik", { widget: "metrik" }),
-          ],
-          "items-start",
-        ),
-        deferredGrid("r2", bottomItems(6)),
+        grid("r1", [
+          cell(
+            12,
+            <Suspense fallback={<TahsilatIskelet />}>
+              <Tahsilat ctx={ctx} />
+            </Suspense>,
+            "tahsilat",
+          ),
+        ]),
+        deferredGrid("r2", bottomItems(12)),
       );
       break;
     case "call_center":
-      rows.push(
-        grid("r1", [cell(8, ara, "ara", { widget: "ara" }), cell(4, metrik(), "metrik", { widget: "metrik" })], "items-start"),
-        deferredGrid("r2", bottomItems(12)),
-      );
+      rows.push(grid("r1", [cell(12, ara, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItems(12)));
       break;
   }
 
   /* ------------------------ "Daha fazla" (varsayılan kapalı) ------------------------ */
   const MORE_SPAN: Record<MoreBlock, 4 | 5 | 7 | 12> = {
-    kuyruk: 5,
     "canli-akis": 7,
-    "portal-sagligi": 4,
+    "portal-sagligi": 5,
     "kaynak-dagilimi": 4,
     yetki: 12,
     portfoy: 12,
@@ -327,9 +323,6 @@ export default async function AppHomePage({
   };
   const moreNode = (key: MoreBlock): { node: ReactNode; className?: string } | null => {
     switch (key) {
-      case "kuyruk":
-        // AI özet cümlesi (generateBriefingSummary) ve kural tabanlı kuyruk burada; tenant guard bugun-ozet.tsx içinde.
-        return { node: <Suspense fallback={<BlokIskelet className="h-[24rem]" />}><BugunOzet ctx={ctx} /></Suspense> };
       case "yetki":
         return { node: <Suspense fallback={null}><YetkiUyari ctx={ctx} /></Suspense>, className: "empty:hidden" };
       case "portfoy":
@@ -337,9 +330,9 @@ export default async function AppHomePage({
       case "kiralama":
         return { node: <Suspense fallback={null}><KiralamaProje ctx={ctx} /></Suspense>, className: "empty:hidden" };
       case "canli-akis":
-        return { node: <Suspense fallback={<BlokIskelet className="h-80" />}><CanliAkis ctx={ctx} /></Suspense> };
+        return { node: <Suspense fallback={<BlokIskelet className="h-80" />}><CanliAkis ctx={ctx} auditLink={layout.auditLink} /></Suspense> };
       case "portal-sagligi":
-        return off("portals") ? null : { node: <Suspense fallback={<PanelIskelet />}><PortalSagligi /></Suspense> };
+        return off("portals") ? null : { node: <Suspense fallback={<PanelIskelet />}><PortalSagligi ctx={ctx} /></Suspense> };
       case "kaynak-dagilimi":
         return { node: <Suspense fallback={<PanelIskelet />}><KaynakDagilimi ctx={ctx} /></Suspense> };
       case "hizli":
@@ -354,8 +347,8 @@ export default async function AppHomePage({
   return (
     <DashboardWidgetProvider>
       <DashboardStack>
-        <div className="flex flex-col">
-          <UstSatir ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
+        <div className="flex flex-col gap-3">
+          <AnaHero ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
           {layout.statusBar ? (
             <DurumCubugu>
               <Suspense fallback={null}>
@@ -380,7 +373,8 @@ export default async function AppHomePage({
         {/* Müşteri + portföy yokken tüm dolu bloklar yerine tek "Başlayalım" kartı */}
         <Suspense fallback={<PanelIskelet rows={2} />}>
           <BosOfisKapisi ctx={ctx}>
-            <div className="flex flex-col gap-6">
+            <div className="flex min-w-0 flex-col gap-5">
+              {kpis}
               {rows}
 
               {moreCells.length > 0 ? (
@@ -389,7 +383,7 @@ export default async function AppHomePage({
                     href={homeHref(params, { daha: moreOpen ? undefined : "1" })}
                     scroll={false}
                     aria-expanded={moreOpen}
-                    className="focus-ring press inline-flex h-10 items-center gap-2 self-start rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
+                    className="focus-ring press inline-flex h-10 touch:h-11 items-center gap-2 self-start rounded-full border border-hairline bg-surface-raised px-4 text-sm font-semibold text-text shadow-[var(--elev-1)] transition hover:bg-surface-hover"
                   >
                     {moreOpen ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
                     {moreOpen ? "Daha az göster" : "Daha fazla göster"}
