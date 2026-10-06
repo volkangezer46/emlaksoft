@@ -280,4 +280,25 @@ const assign: AnySettingDef[] = [
   }),
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign];
+
+/**
+ * Kapsam uygulaması: AÇIK/KAPALI (varsayılan KAPALI = bugünkü davranış: listeler yalnız rol kuralıyla süzülür).
+ * Açılınca talep/müşteri/portföy/anlaşma/görev listeleri ve CSV'leri kullanıcı kapsamına (kendi/takım/şube) daralır;
+ * kapsam yalnız daraltır, mevcut rol kuralını asla genişletmez. Yönetimi: /app/ayarlar/yetkilendirme.
+ */
+export const SCOPE_ENFORCEMENT_KEY = "office.access.scope_enforcement";
+
+const access: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    key: SCOPE_ENFORCEMENT_KEY,
+    group: "erisim",
+    default: false,
+    risk: "high",
+    label: "Liste kapsamını uygula",
+    description: "Açıkken talep, müşteri, portföy, anlaşma ve görev listeleri kullanıcının kapsamıyla (kendi kayıtları / takım / şube) sınırlanır; ofis geneli kapsamdaki yöneticiler etkilenmez.",
+    impact: "Danışmanlar yalnız kendilerine atanmış kayıtları, takım liderleri takımlarını, şube müdürleri şubelerini görür. Kapatınca eski görünüm hemen geri gelir; veri silinmez veya değişmez.",
+  }),
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access];

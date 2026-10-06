@@ -18,6 +18,8 @@ import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
+import { applyScopeFilter, getListScope } from "@/lib/access-control";
+import { ScopeBadge } from "@/components/app/scope-badge";
 import { getStageLabels } from "@/lib/definitions";
 import { daysAgoIso, msSince } from "@/lib/clock";
 import { InteractiveChart } from "@/components/app/interactive-chart";
@@ -133,6 +135,9 @@ export default async function DealsPage({
   // (arama ve dışa aktarma ile aynı kural). ?danisman= başkasının kimliğini açamaz.
   const officeWide = hasOfficeWideDataScope(role);
   const danismanF = officeWide ? uuidParam(sp.danisman) : userId;
+  // Kullanıcı kapsamı (ofis bayrağı açıksa) eski rol kuralını yalnız DARALTIR (takım/şube lideri ofis geneli yerine üyelerini görür).
+  const listScope = await getListScope({ userId, tenantId, role, mineOnly: !officeWide });
+  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   const bayatF = sp.bayat === "1";
   const density = densityOf(sp.yogunluk);
   const page = parsePage(sp.sayfa);
@@ -156,7 +161,7 @@ export default async function DealsPage({
     "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties!deals_property_id_fkey(id, title, property_code), customer:customers!deals_customer_id_fkey(id, full_name, phone), deal_notes!deal_notes_deal_id_fkey(count)";
 
   // Liste/pano ortak filtreleri (danışman kapsamı, arama, bayat); aşama yalnız liste görünümünde.
-  let listQuery = supabase.from("deals").select(SELECT_COLS, { count: "exact" }).match(scope);
+  let listQuery = scoped(supabase.from("deals").select(SELECT_COLS, { count: "exact" }).match(scope));
   if (search.clause) listQuery = listQuery.or(search.clause);
   if (bayatF) listQuery = listQuery.not("stage", "in", "(won,lost)").lt("updated_at", staleIso);
   if (gorunum === "liste") {
@@ -168,7 +173,7 @@ export default async function DealsPage({
     listQuery = listQuery.order("updated_at", { ascending: false }).limit(200);
   }
 
-  const head = () => supabase.from("deals").select("id", { count: "exact", head: true }).match(scope);
+  const head = () => scoped(supabase.from("deals").select("id", { count: "exact", head: true }).match(scope));
 
   const dealsP = Promise.resolve(search.empty ? { data: [], count: 0 } : listQuery);
   const relatedP = dealsP.then(async (res) => {
@@ -201,7 +206,7 @@ export default async function DealsPage({
     relatedP,
     getStageLabels(),
     savedViewsPromise,
-    supabase.from("deals").select("stage, deal_value, probability").match(scope).limit(SUM_SCAN_LIMIT),
+    scoped(supabase.from("deals").select("stage, deal_value, probability").match(scope)).limit(SUM_SCAN_LIMIT),
     head().eq("stage", "new"),
     head().eq("stage", "qualified"),
     head().eq("stage", "negotiation"),
@@ -407,6 +412,7 @@ export default async function DealsPage({
       <PageHeader
         title="Anlaşma tahtası"
         eyebrow="Anlaşma hattı"
+        meta={<ScopeBadge text={listScope.badge} />}
         description={`${stageLabels.new.label} → ${stageLabels.qualified.label} → ${stageLabels.negotiation.label} → ${stageLabels.won.label}/${stageLabels.lost.label}. Kazanıldığında komisyon otomatik üretilir.`}
         actions={
           <>

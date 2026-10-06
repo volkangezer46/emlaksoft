@@ -3,7 +3,7 @@
  * Role göre hangi kaynaklara erişim izni verilir.
  */
 
-import type { AccessScope, ScopePermissionContext, AccessDecision } from "./types";
+import type { AccessScope, ScopePermissionContext, AccessDecision, ScopeOverride, UserScope } from "./types";
 import type { AppRole } from "@/lib/permissions";
 
 /**
@@ -28,6 +28,72 @@ export function getDefaultScopeForRole(role: AppRole): AccessScope {
       return "user";
   }
 }
+
+/** Hiyerarşi sırası: user < team < branch < office < platform. */
+export const SCOPE_RANK: Record<AccessScope, number> = { user: 0, team: 1, branch: 2, office: 3, platform: 4 };
+
+/** Yönetim ekranında seçilebilir kapsamlar (platform yalnız süper admin içindir, ofisten atanmaz). */
+export const ASSIGNABLE_SCOPES: readonly AccessScope[] = ["user", "team", "branch", "office"];
+
+/** Kapsam türü → Türkçe etiket (rozet, tablo, denetim günlüğü TEK kaynak). */
+export const SCOPE_LABELS: Record<AccessScope, string> = {
+  user: "Kendi kayıtları",
+  team: "Takım",
+  branch: "Şube",
+  office: "Ofis geneli",
+  platform: "Platform",
+};
+
+/** "Takım (Satış A)" gibi bağlamlı etiket; takım/şube adı bilinmiyorsa yalnız tür. */
+export function scopeLabel(scope: AccessScope, ctx?: { teamName?: string | null; branchName?: string | null }): string {
+  const base = SCOPE_LABELS[scope];
+  if (scope === "team" && ctx?.teamName) return `${base} (${ctx.teamName})`;
+  if (scope === "branch" && ctx?.branchName) return `${base} (${ctx.branchName})`;
+  return base;
+}
+
+/**
+ * Rolün varsayılan bayrakları. `scope-cache` (DB satırı yokken) ve yönetim ekranındaki
+ * "varsayılana dön" önerisi aynı tabloyu kullanır; iki yerde kopya yazılmaz.
+ */
+export function defaultScopeFlagsForRole(role: AppRole): Pick<
+  UserScope,
+  "can_view_all_data" | "can_edit_team_members" | "can_override_permissions" | "can_see_earnings"
+> {
+  return {
+    can_view_all_data: ["owner", "gm", "accounting"].includes(role),
+    can_edit_team_members: ["owner", "gm", "branch_manager", "team_lead"].includes(role),
+    can_override_permissions: ["owner", "gm"].includes(role),
+    can_see_earnings: ["owner", "gm", "accounting"].includes(role),
+  };
+}
+
+/** Rolün varsayılan kapsam satırı (DB satırı yokken ve "varsayılana dön" için). */
+export function defaultUserScopeForRole(
+  role: AppRole,
+  ctx: { userId: string; tenantId: string; teamId?: string | null; branchId?: string | null },
+): UserScope {
+  return {
+    user_id: ctx.userId,
+    tenant_id: ctx.tenantId,
+    scope_type: getDefaultScopeForRole(role),
+    team_id: ctx.teamId ?? null,
+    branch_id: ctx.branchId ?? null,
+    ...defaultScopeFlagsForRole(role),
+  };
+}
+
+/**
+ * Kaynak türü → gerçek tablo. DİKKAT: şemada `demands` tablosu YOK; talep kaydı `customer_demands`tır
+ * ve danışman sahipliği müşteri üzerinden (`customers.assigned_to`) yürür.
+ */
+export const SCOPE_RESOURCE_TABLES: Record<ScopeOverride["resource_type"], string> = {
+  demand: "customer_demands",
+  property: "properties",
+  portfolio: "properties",
+  deal: "deals",
+  commission: "commissions",
+};
 
 /**
  * Danışman talep erişim kontrol kuralı.
@@ -133,7 +199,7 @@ export function canRejectCommission(context: ScopePermissionContext): AccessDeci
  * Kendi verisi + yetki alanı.
  */
 export function canViewReport(context: ScopePermissionContext): AccessDecision {
-  const { userRole, userScope, action } = context;
+  const { userScope, action } = context;
 
   if (action !== "view") {
     return { allowed: false, scope: userScope, reason: "Raporlar salt-okunurdur" };

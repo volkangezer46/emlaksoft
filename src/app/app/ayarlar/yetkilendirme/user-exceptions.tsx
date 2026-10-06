@@ -30,8 +30,9 @@ function sameSet(a: Iterable<string>, b: Iterable<string>) {
   return true;
 }
 
-function isActive(row: OverrideRow) {
-  return !row.expires_at || new Date(row.expires_at).getTime() > Date.now();
+/** Süre kontrolü sunucudan gelen `minExpiry` (yarın) gününe göre: dünü/bugünü geçmiş sayar (bileşende Date.now yok). */
+function isActiveAt(row: OverrideRow, todayKey: string) {
+  return !row.expires_at || row.expires_at.slice(0, 10) >= todayKey;
 }
 
 function fmtDate(iso: string) {
@@ -41,20 +42,35 @@ function fmtDate(iso: string) {
 export function UserExceptions({
   members,
   selectedUserId,
+  selfId,
   roleEffective,
   overrides,
   modules,
   moduleLabels,
   readOnly,
+  basePath = "/app/ayarlar/yetkilendirme?sekme=izinler",
+  todayKey,
+  minExpiry,
+  quick30Date,
 }: {
   members: ExceptionMember[];
   selectedUserId: string | null;
+  /** Oturum sahibi: kendine istisna yazamaz (kendini yükseltme yasağı). */
+  selfId: string | null;
   /** Seçili üyenin ROL katmanlı etkin izinleri (kullanıcı istisnası HARİÇ) — soluk taban. */
   roleEffective: Partial<Record<AppModule, AppAction[]>>;
   overrides: OverrideRow[];
   modules: AppModule[];
   moduleLabels: Record<AppModule, string>;
   readOnly: boolean;
+  /** Üye seçimi bu adrese `&user=` ekler (sekmeli sayfa). */
+  basePath?: string;
+  /** Bugünün TR gün anahtarı (YYYY-MM-DD): süresi geçen istisna soluk gösterilir (bileşende Date.now yok). */
+  todayKey: string;
+  /** Date input alt sınırı (yarın, YYYY-MM-DD) — sunucudan gelir. */
+  minExpiry: string;
+  /** "30 gün" çipinin değeri (YYYY-MM-DD) — sunucudan gelir. */
+  quick30Date: string;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -62,8 +78,6 @@ export function UserExceptions({
     () => new Map(overrides.map((o) => [o.module, o])),
   );
   const [expiresAt, setExpiresAt] = useState<string>(""); // yyyy-mm-dd (date input)
-  // Date input alt sınırı (yarın) — render saflığı için tek sefer hesaplanır.
-  const [minExpiry] = useState(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10));
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,19 +85,23 @@ export function UserExceptions({
 
   const options = useMemo(
     () =>
-      members.map((m) => ({
-        value: m.id,
-        label: m.full_name,
-        hint: m.role === "owner" ? `${m.roleLabel} — istisna tanımlanamaz` : m.roleLabel,
-        disabled: m.role === "owner",
-      })),
-    [members],
+      members.map((m) => {
+        const isOwner = m.role === "owner";
+        const isSelf = m.id === selfId;
+        return {
+          value: m.id,
+          label: m.full_name,
+          hint: isOwner ? `${m.roleLabel} — istisna tanımlanamaz` : isSelf ? `${m.roleLabel} — kendinize istisna yazamazsınız` : m.roleLabel,
+          disabled: isOwner || isSelf,
+        };
+      }),
+    [members, selfId],
   );
 
   function selectMember(id: string) {
     setError(null);
     setLocalOverrides(new Map());
-    router.push(id ? `/app/ayarlar/roller?tab=istisnalar&user=${id}` : "/app/ayarlar/roller?tab=istisnalar");
+    router.push(id ? `${basePath}&user=${id}` : basePath);
   }
 
   /** Geçici yetki için ISO son tarih — date input günün sonuna (23:59 yerel) çevrilir. */
@@ -95,7 +113,7 @@ export function UserExceptions({
 
   function effectiveFor(mod: AppModule): { actions: string[]; override: OverrideRow | null } {
     const o = localOverrides.get(mod);
-    if (o && isActive(o)) return { actions: o.actions, override: o };
+    if (o && isActiveAt(o, todayKey)) return { actions: o.actions, override: o };
     return { actions: roleEffective[mod] ?? [], override: null };
   }
 
@@ -165,14 +183,12 @@ export function UserExceptions({
     });
   }
 
-  /** "30 gün" hızlı çipi — bugünden 30 gün sonrası, date input formatında. */
+  /** "30 gün" hızlı çipi — bugünden 30 gün sonrası (sunucu hesapladı). */
   function quick30() {
-    const d = new Date(Date.now() + 30 * 86_400_000);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    setExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    setExpiresAt(quick30Date);
   }
 
-  const overrideCount = Array.from(localOverrides.values()).filter(isActive).length;
+  const overrideCount = Array.from(localOverrides.values()).filter((o) => isActiveAt(o, todayKey)).length;
 
   return (
     <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
@@ -291,7 +307,7 @@ export function UserExceptions({
                 {modules.map((mod) => {
                   const { actions, override } = effectiveFor(mod);
                   const stored = localOverrides.get(mod);
-                  const expired = stored && !isActive(stored);
+                  const expired = stored && !isActiveAt(stored, todayKey);
                   return (
                     <tr key={mod} className={`border-b border-line/60 last:border-0 ${override ? "bg-amber-400/[0.04]" : ""}`}>
                       <th scope="row" className="py-2.5 pr-3 text-left text-sm font-medium text-ink-950">

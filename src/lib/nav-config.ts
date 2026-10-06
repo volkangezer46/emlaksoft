@@ -286,7 +286,18 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/destek", label: "Destek talepleri", icon: ICONS.destek, module: "support" },
         ],
       },
-      { href: "/app/ayarlar", label: "Ayarlar", icon: ICONS.ayar, module: "settings", tier: "more" },
+      {
+        // Ayarlar + Yetkilendirme (kullanıcı kapsamları, kapsam/izin istisnaları, denetim günlüğü) tek menü öğesi.
+        href: "/app/ayarlar",
+        label: "Ayarlar",
+        icon: ICONS.ayar,
+        module: "settings",
+        tabs: [
+          { href: "/app/ayarlar", label: "Ayarlar", icon: ICONS.ayar, module: "settings" },
+          { href: "/app/ayarlar/yetkilendirme", label: "Yetkilendirme", icon: ICONS.yetkilendirme, module: "settings" },
+        ],
+        tier: "more",
+      },
     ],
   },
 ];

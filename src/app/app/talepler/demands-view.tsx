@@ -39,6 +39,8 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { getSetting } from "@/lib/settings/read";
+import { applyScopeFilter, getListScope, isNarrowing } from "@/lib/access-control";
+import { ScopeBadge } from "@/components/app/scope-badge";
 import { DemandMobileList, DemandTable, type DemandVM } from "./demand-rows";
 import { DemandBulkBar, DemandBulkProvider } from "./demand-bulk";
 import {
@@ -118,9 +120,11 @@ export async function DemandsView({
     yogunluk?: string;
   }>;
 }) {
-  const { perms, tenantId } = await requireModulePage("demands");
+  const { perms, tenantId, userId, role } = await requireModulePage("demands");
   // Ofis Tanımları Merkezi: bekleyen talep eşiği (ayar yoksa kod varsayılanı 30 gün).
   const AGING_DAYS = tenantId ? await getSetting<number>("office.alert.demand_aging_days", { tenantId }) : DEFAULT_AGING_DAYS;
+  // Kullanıcı kapsamı (ofis bayrağı açıksa): talep sahipliği müşteri üzerinden (customers.assigned_to), yalnız daraltır.
+  const listScope = await getListScope({ userId, tenantId, role });
   const canCreate = (perms.demands ?? []).includes("create");
   const canEdit = (perms.demands ?? []).includes("edit");
   const canDelete = (perms.demands ?? []).includes("delete");
@@ -161,10 +165,11 @@ export async function DemandsView({
     extraColumns: ["property_type", "rooms"],
   });
 
-  // Danışman filtresi müşteri üzerinden: inner gömme + embed alanı filtresi (FK adıyla).
+  // Danışman filtresi / kullanıcı kapsamı müşteri üzerinden: inner gömme + embed alanı filtresi (FK adıyla).
   const CUSTOMER_FK = "customers!customer_demands_customer_id_fkey";
-  const scopeEmbed = danismanF ? `, customer:${CUSTOMER_FK}!inner(id)` : "";
-  const listCustomerEmbed = danismanF
+  const needCustomerInner = Boolean(danismanF) || isNarrowing(listScope.filter);
+  const scopeEmbed = needCustomerInner ? `, customer:${CUSTOMER_FK}!inner(id)` : "";
+  const listCustomerEmbed = needCustomerInner
     ? `customer:${CUSTOMER_FK}!inner(id, full_name, assigned_to)`
     : `customer:${CUSTOMER_FK}(id, full_name, assigned_to)`;
 
@@ -174,6 +179,7 @@ export async function DemandsView({
   const buildBase = (select: string, opts?: { count: "exact"; head?: boolean }, useUserFilters = true) => {
     let query = supabase.from("customer_demands").select(select, opts);
     if (danismanF) query = query.eq("customer.assigned_to", danismanF);
+    query = applyScopeFilter(query, listScope.filter, { ownerColumn: "customer.assigned_to" });
     if (useUserFilters) {
       if (statusF && statusF !== "all") query = query.eq("status", statusF);
       else if (!statusF) query = query.in("status", OPEN_STATUSES);
@@ -367,6 +373,7 @@ export async function DemandsView({
       <PageHeader
         title="Talepler"
         description="Açık talepleri yönetin, bütçe ve konum kriterlerini eşleştirme motoruna bağlayın."
+        meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
             <ButtonLink href="/app/eslestirme" variant="secondary" size="sm" icon={Crosshair}>
