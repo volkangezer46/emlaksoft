@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Gauge, Headphones, MessageSquareQuote, SearchX, Star, TrendingDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -232,32 +233,32 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="font-display font-bold text-ink-950">Olay türüne göre</h2>
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wider text-text-muted">
-                      <th className="py-2 pr-3">Olay</th>
-                      <th className="py-2 pr-3 text-right">Görev</th>
-                      <th className="py-2 pr-3 text-right">Cevap</th>
-                      <th className="py-2 pr-3 text-right">Oran</th>
-                      <th className="py-2 text-right">Ort.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="w-full text-sm">
+                  <THead>
+                    <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-wider text-text-muted">
+                      <TH className="py-2 pr-3">Olay</TH>
+                      <TH className="py-2 pr-3 text-right">Görev</TH>
+                      <TH className="py-2 pr-3 text-right">Cevap</TH>
+                      <TH className="py-2 pr-3 text-right">Oran</TH>
+                      <TH className="py-2 text-right">Ort.</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
                     {byEvent.map((b) => (
-                      <tr key={b.event} className="border-b border-line/60 last:border-0">
-                        <td className="py-2.5 pr-3 font-semibold text-ink-950">
+                      <TR key={b.event} className="border-b border-line/60 last:border-0">
+                        <TD className="py-2.5 pr-3 font-semibold text-ink-950">
                           <Link href={link({ olay: b.event })} className="focus-ring rounded-[var(--radius-control)] underline-offset-2 hover:underline">
                             {EVENT_LABELS[b.event]}
                           </Link>
-                        </td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums">{b.total}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums">{b.completed}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums">{b.rate === null ? "—" : `%${b.rate}`}</td>
-                        <td className="py-2.5 text-right tabular-nums">{b.avg === null ? "—" : b.avg.toLocaleString("tr-TR")}</td>
-                      </tr>
+                        </TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums">{b.total}</TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums">{b.completed}</TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums">{b.rate === null ? "—" : `%${b.rate}`}</TD>
+                        <TD className="py-2.5 text-right tabular-nums">{b.avg === null ? "—" : b.avg.toLocaleString("tr-TR")}</TD>
+                      </TR>
                     ))}
-                  </tbody>
-                </table>
+                  </TBody>
+                </Table>
               </div>
             </section>
 
@@ -307,30 +308,30 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="font-display font-bold text-ink-950">Danışman bazlı ortalama</h2>
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wider text-text-muted">
-                      <th className="py-2 pr-3">Danışman</th>
-                      <th className="py-2 pr-3 text-right">Görev</th>
-                      <th className="py-2 pr-3 text-right">Cevap</th>
-                      <th className="py-2 text-right">Ort. puan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="w-full text-sm">
+                  <THead>
+                    <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-wider text-text-muted">
+                      <TH className="py-2 pr-3">Danışman</TH>
+                      <TH className="py-2 pr-3 text-right">Görev</TH>
+                      <TH className="py-2 pr-3 text-right">Cevap</TH>
+                      <TH className="py-2 text-right">Ort. puan</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
                     {byAgent.map((a) => (
-                      <tr key={a.agentId ?? "yok"} className="border-b border-line/60 last:border-0">
-                        <td className="py-2.5 pr-3 font-semibold text-ink-950">
+                      <TR key={a.agentId ?? "yok"} className="border-b border-line/60 last:border-0">
+                        <TD className="py-2.5 pr-3 font-semibold text-ink-950">
                           <Link href={link({ danisman: a.agentId ?? "atanmamis" })} className="focus-ring rounded-[var(--radius-control)] underline-offset-2 hover:underline">
                             {a.agentId ? (agentName.get(a.agentId) ?? "Danışman") : "Danışmansız"}
                           </Link>
-                        </td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums">{a.total}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums">{a.completed}</td>
-                        <td className="py-2.5 text-right tabular-nums">{a.avg === null ? "—" : a.avg.toLocaleString("tr-TR")}</td>
-                      </tr>
+                        </TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums">{a.total}</TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums">{a.completed}</TD>
+                        <TD className="py-2.5 text-right tabular-nums">{a.avg === null ? "—" : a.avg.toLocaleString("tr-TR")}</TD>
+                      </TR>
                     ))}
-                  </tbody>
-                </table>
+                  </TBody>
+                </Table>
               </div>
             </section>
           ) : null}

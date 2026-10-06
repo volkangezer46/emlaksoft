@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -123,38 +124,38 @@ function Row({
 
   if (!editing) {
     return (
-      <tr className={`border-b border-line/60 last:border-0 ${custom ? "bg-amber-400/[0.04]" : ""}`}>
-        <th scope="row" className="py-2.5 pr-3 text-left">
+      <TR className={`border-b border-line/60 last:border-0 ${custom ? "bg-amber-400/[0.04]" : ""}`}>
+        <TH scope="row" className="py-2.5 pr-3 text-left">
           <Link href={`/app/ekip/${m.id}`} className="text-sm font-semibold text-ink-950 hover:text-brand-600 hover:underline">{m.name}</Link>
           <p className="text-xs text-text-muted">{m.roleLabel}</p>
-        </th>
-        <td className="px-2 py-2.5">{scopeCell}</td>
-        <td className="px-2 py-2.5 text-xs text-text-muted">
+        </TH>
+        <TD className="px-2 py-2.5">{scopeCell}</TD>
+        <TD className="px-2 py-2.5 text-xs text-text-muted">
           {FLAGS.filter((f) => current[f.key]).map((f) => f.label).join(" · ") || "—"}
-        </td>
-        <td className="px-2 py-2.5 text-xs">
+        </TD>
+        <TD className="px-2 py-2.5 text-xs">
           <Link href={`/app/ayarlar/yetkilendirme?sekme=istisnalar&user=${m.id}`} className="font-semibold text-brand-600 hover:underline">
             {m.overrideCount > 0 ? `${m.overrideCount} istisna` : "İstisna ekle"}
           </Link>
-        </td>
-        <td className="px-2 py-2.5 text-right">
+        </TD>
+        <TD className="px-2 py-2.5 text-right">
           {editable ? (
             <Button size="sm" variant="secondary" icon={Pencil} onClick={() => { setDraft(current); setEditing(true); }}>Düzenle</Button>
           ) : (
             <span className="text-xs text-text-faint">{lockedReason ?? (canEdit ? "Kilitli" : "")}</span>
           )}
-        </td>
-      </tr>
+        </TD>
+      </TR>
     );
   }
 
   return (
-    <tr className="border-b border-line/60 bg-canvas/60 last:border-0">
-      <th scope="row" className="py-3 pr-3 text-left align-top">
+    <TR className="border-b border-line/60 bg-canvas/60 last:border-0">
+      <TH scope="row" className="py-3 pr-3 text-left align-top">
         <p className="text-sm font-semibold text-ink-950">{m.name}</p>
         <p className="text-xs text-text-muted">{m.roleLabel} · varsayılan: {SCOPE_LABELS[getDefaultScopeForRole(m.role as AppRole)]}</p>
-      </th>
-      <td className="px-2 py-3 align-top" colSpan={3}>
+      </TH>
+      <TD className="px-2 py-3 align-top" colSpan={3}>
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="grid gap-1 text-xs font-semibold text-text-muted">
             Kapsam
@@ -210,8 +211,8 @@ function Row({
             );
           })}
         </div>
-      </td>
-      <td className="px-2 py-3 text-right align-top">
+      </TD>
+      <TD className="px-2 py-3 text-right align-top">
         <div className="flex flex-col items-end gap-1.5">
           <Button size="sm" icon={Check} onClick={save} loading={pending}>Kaydet</Button>
           {m.scope ? (
@@ -219,8 +220,8 @@ function Row({
           ) : null}
           <Button size="sm" variant="ghost" icon={X} onClick={() => setEditing(false)} disabled={pending}>Vazgeç</Button>
         </div>
-      </td>
-    </tr>
+      </TD>
+    </TR>
   );
 }
 
@@ -252,22 +253,22 @@ export function ScopeTable({
       </div>
       {message ? <Alert tone={message.tone} className="mt-3">{message.text}</Alert> : null}
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-              <th scope="col" className="py-2 pr-3">Üye</th>
-              <th scope="col" className="px-2 py-2">Kapsam</th>
-              <th scope="col" className="px-2 py-2">Bayraklar</th>
-              <th scope="col" className="px-2 py-2">İstisnalar</th>
-              <th scope="col" className="px-2 py-2 text-right">İşlem</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="w-full min-w-[720px] border-collapse text-sm">
+          <THead>
+            <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+              <TH scope="col" className="py-2 pr-3">Üye</TH>
+              <TH scope="col" className="px-2 py-2">Kapsam</TH>
+              <TH scope="col" className="px-2 py-2">Bayraklar</TH>
+              <TH scope="col" className="px-2 py-2">İstisnalar</TH>
+              <TH scope="col" className="px-2 py-2 text-right">İşlem</TH>
+            </TR>
+          </THead>
+          <TBody>
             {members.map((m) => (
               <Row key={m.id} m={m} teams={teams} branches={branches} self={self} canEdit={canEdit} onMessage={setMessage} />
             ))}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       </div>
     </section>
   );

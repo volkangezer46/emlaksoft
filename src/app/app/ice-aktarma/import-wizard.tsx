@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -672,31 +673,31 @@ export function ImportWizard({
           <div>
             <h3 className="text-sm font-bold text-ink-950">İlk {PREVIEW_ROWS} satır (doğrulanmış haliyle)</h3>
             <div className="relative mt-2 overflow-x-auto rounded-[var(--radius-card)] border border-line">
-              <table className="w-full min-w-[640px] text-left text-xs">
-                <thead className="bg-canvas text-text-muted">
-                  <tr>
-                    <th className="px-3 py-2 font-semibold">Satır</th>
-                    <th className="px-3 py-2 font-semibold">Durum</th>
-                    <th className="px-3 py-2 font-semibold">Kayıt</th>
-                    <th className="px-3 py-2 font-semibold">Not</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="w-full min-w-[640px] text-left text-xs">
+                <THead className="bg-canvas text-text-muted">
+                  <TR>
+                    <TH className="px-3 py-2 font-semibold">Satır</TH>
+                    <TH className="px-3 py-2 font-semibold">Durum</TH>
+                    <TH className="px-3 py-2 font-semibold">Kayıt</TH>
+                    <TH className="px-3 py-2 font-semibold">Not</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {planned.slice(0, PREVIEW_ROWS).map((r) => (
-                    <tr key={r.row} className="border-t border-line align-top">
-                      <td className="numeric px-3 py-2 text-text-muted">{r.row}</td>
-                      <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                      <td className="max-w-56 truncate px-3 py-2 text-ink-950">
+                    <TR key={r.row} className="border-t border-line align-top">
+                      <TD className="numeric px-3 py-2 text-text-muted">{r.row}</TD>
+                      <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
+                      <TD className="max-w-56 truncate px-3 py-2 text-ink-950">
                         {r.label || <span className="text-text-faint">—</span>}
                         {r.existingName ? <span className="block text-text-faint">eşleşen: {r.existingName} ({r.matchedBy})</span> : null}
-                      </td>
-                      <td className="px-3 py-2 text-text-muted">
+                      </TD>
+                      <TD className="px-3 py-2 text-text-muted">
                         {r.issues.length ? r.issues.map((i) => i.message).join(" · ") : <span className="text-text-faint">—</span>}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
           </div>
 
@@ -733,24 +734,24 @@ export function ImportWizard({
             </div>
             {shownRows.length ? (
               <div className="mt-2 max-h-72 overflow-auto rounded-[var(--radius-card)] border border-line">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-canvas text-text-muted">
-                    <tr>
-                      <th className="px-3 py-2 font-semibold">Satır</th>
-                      <th className="px-3 py-2 font-semibold">Durum</th>
-                      <th className="px-3 py-2 font-semibold">Neden</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="w-full text-left text-xs">
+                  <THead className="sticky top-0 bg-canvas text-text-muted">
+                    <TR>
+                      <TH className="px-3 py-2 font-semibold">Satır</TH>
+                      <TH className="px-3 py-2 font-semibold">Durum</TH>
+                      <TH className="px-3 py-2 font-semibold">Neden</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
                     {shownRows.slice(0, MAX_ERRORS_SHOWN).map((r) => (
-                      <tr key={r.row} className="border-t border-line align-top">
-                        <td className="numeric px-3 py-2 text-text-muted">{r.row}</td>
-                        <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                        <td className="px-3 py-2 text-ink-950">{r.issues.map((i) => i.message).join(" · ") || "—"}</td>
-                      </tr>
+                      <TR key={r.row} className="border-t border-line align-top">
+                        <TD className="numeric px-3 py-2 text-text-muted">{r.row}</TD>
+                        <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
+                        <TD className="px-3 py-2 text-ink-950">{r.issues.map((i) => i.message).join(" · ") || "—"}</TD>
+                      </TR>
                     ))}
-                  </tbody>
-                </table>
+                  </TBody>
+                </Table>
               </div>
             ) : (
               <p className="mt-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
@@ -835,27 +836,27 @@ export function ImportWizard({
                     </div>
                   </div>
                   <div className="mt-2 max-h-80 overflow-auto rounded-[var(--radius-card)] border border-line">
-                    <table className="w-full text-left text-xs">
-                      <thead className="sticky top-0 bg-canvas text-text-muted">
-                        <tr>
-                          <th className="px-3 py-2 font-semibold">Satır</th>
-                          <th className="px-3 py-2 font-semibold">Durum</th>
-                          <th className="px-3 py-2 font-semibold">Neden</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    <Table className="w-full text-left text-xs">
+                      <THead className="sticky top-0 bg-canvas text-text-muted">
+                        <TR>
+                          <TH className="px-3 py-2 font-semibold">Satır</TH>
+                          <TH className="px-3 py-2 font-semibold">Durum</TH>
+                          <TH className="px-3 py-2 font-semibold">Neden</TH>
+                        </TR>
+                      </THead>
+                      <TBody>
                         {planned
                           .filter((r) => r.status === "error" || r.status === "skip")
                           .slice(0, MAX_ERRORS_SHOWN)
                           .map((r) => (
-                            <tr key={r.row} className="border-t border-line align-top">
-                              <td className="numeric px-3 py-2 text-text-muted">{r.row}</td>
-                              <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                              <td className="px-3 py-2 text-ink-950">{r.issues.map((i) => i.message).join(" · ")}</td>
-                            </tr>
+                            <TR key={r.row} className="border-t border-line align-top">
+                              <TD className="numeric px-3 py-2 text-text-muted">{r.row}</TD>
+                              <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
+                              <TD className="px-3 py-2 text-ink-950">{r.issues.map((i) => i.message).join(" · ")}</TD>
+                            </TR>
                           ))}
-                      </tbody>
-                    </table>
+                      </TBody>
+                    </Table>
                   </div>
                   <p className="mt-1.5 text-xs text-text-faint">
                     CSV, orijinal kolonlarınızı da içerir: satırları düzeltip aynı dosyayı yeniden yükleyebilirsiniz.
@@ -948,29 +949,29 @@ function ImportJournal({
         </p>
       ) : (
         <div className="relative overflow-x-auto rounded-[var(--radius-card)] border border-line">
-          <table className="w-full min-w-[640px] text-left text-xs">
-            <thead className="bg-canvas text-text-muted">
-              <tr>
-                <th className="px-3 py-2 font-semibold">Tarih</th>
-                <th className="px-3 py-2 font-semibold">Hedef / dosya</th>
-                <th className="px-3 py-2 font-semibold">Eklenen</th>
-                <th className="px-3 py-2 font-semibold">Güncellenen</th>
-                <th className="px-3 py-2 font-semibold">Atlanan / hatalı</th>
-                <th className="px-3 py-2 font-semibold">İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full min-w-[640px] text-left text-xs">
+            <THead className="bg-canvas text-text-muted">
+              <TR>
+                <TH className="px-3 py-2 font-semibold">Tarih</TH>
+                <TH className="px-3 py-2 font-semibold">Hedef / dosya</TH>
+                <TH className="px-3 py-2 font-semibold">Eklenen</TH>
+                <TH className="px-3 py-2 font-semibold">Güncellenen</TH>
+                <TH className="px-3 py-2 font-semibold">Atlanan / hatalı</TH>
+                <TH className="px-3 py-2 font-semibold">İşlem</TH>
+              </TR>
+            </THead>
+            <TBody>
               {batches.map((b) => (
-                <tr key={b.batchId} className="border-t border-line align-top">
-                  <td className="px-3 py-2 text-text-muted">{new Date(b.createdAt).toLocaleString("tr-TR")}</td>
-                  <td className="px-3 py-2 text-ink-950">
+                <TR key={b.batchId} className="border-t border-line align-top">
+                  <TD className="px-3 py-2 text-text-muted">{new Date(b.createdAt).toLocaleString("tr-TR")}</TD>
+                  <TD className="px-3 py-2 text-ink-950">
                     {TARGET_LABEL[b.target]}
                     <span className="block text-text-faint">{b.fileName || "—"}{b.actorName ? ` · ${b.actorName}` : ""}</span>
-                  </td>
-                  <td className="numeric px-3 py-2">{nf.format(b.inserted)}</td>
-                  <td className="numeric px-3 py-2">{nf.format(b.updated)}</td>
-                  <td className="numeric px-3 py-2">{nf.format(b.skipped)} / {nf.format(b.failed)}</td>
-                  <td className="px-3 py-2">
+                  </TD>
+                  <TD className="numeric px-3 py-2">{nf.format(b.inserted)}</TD>
+                  <TD className="numeric px-3 py-2">{nf.format(b.updated)}</TD>
+                  <TD className="numeric px-3 py-2">{nf.format(b.skipped)} / {nf.format(b.failed)}</TD>
+                  <TD className="px-3 py-2">
                     {b.rolledBack ? (
                       <span className="text-text-faint">Geri alındı</span>
                     ) : !rollbackAllowed[b.target] ? (
@@ -987,11 +988,11 @@ function ImportJournal({
                         <Undo2 className="h-3.5 w-3.5" /> Geri al
                       </Button>
                     )}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       )}
       <p className="flex items-start gap-2 text-xs text-text-faint">

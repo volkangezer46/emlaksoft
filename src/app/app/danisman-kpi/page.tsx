@@ -10,7 +10,7 @@ import { KpiGrid, kpiColumns, podiumColumns } from "@/components/ui/dashboard-gr
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
-import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { TBody, TD, TH, THead, TR, Table, TableFrame } from "@/components/ui/table";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
 import { now, TR_OFFSET_MS, trParts } from "@/lib/clock";
@@ -560,25 +560,25 @@ export default async function DanismanKpiPage({
           >
             <RevenueChart data={revenueChart} />
           </ChartFrame>
-          <table className="sr-only">
+          <Table className="sr-only">
             <caption>Danışman bazlı gelir (komisyon payı)</caption>
-            <thead>
-              <tr>
-                <th scope="col">Danışman</th>
-                <th scope="col">Gelir</th>
-              </tr>
-            </thead>
-            <tbody>
+            <THead>
+              <TR>
+                <TH scope="col">Danışman</TH>
+                <TH scope="col">Gelir</TH>
+              </TR>
+            </THead>
+            <TBody>
               {revenueChart.map((r) => (
-                <tr key={r.id}>
-                  <th scope="row">
+                <TR key={r.id}>
+                  <TH scope="row">
                     <Link href={`/app/ekip/${r.id}`}>{r.name}</Link>
-                  </th>
-                  <td>{money(r.revenue)}</td>
-                </tr>
+                  </TH>
+                  <TD>{money(r.revenue)}</TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       ) : null}
 
