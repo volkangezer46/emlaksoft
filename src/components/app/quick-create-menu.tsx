@@ -1,8 +1,10 @@
 "use client";
 
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { AppModule } from "@/lib/permissions";
+import { runWhenIdle } from "@/lib/idle";
+import { lazyPanel } from "@/lib/lazy-panel";
 
 /**
  * Üst çubuk "Yeni" hızlı eylem menüsü — hafif kabuk. Radix DropdownMenu gövdesi
@@ -12,8 +14,8 @@ import type { AppModule } from "@/lib/permissions";
  */
 export type QuickCreateProps = { creatableModules: AppModule[]; lockedHrefs: string[] };
 
-const loadBody = () => import("./quick-create-menu-body").then((m) => ({ default: m.QuickCreateMenuBody }));
-const Body = lazy(loadBody);
+// Parça boşta önceden iner; tık anında yüklüyse askıya alınmadan açılır (`lazyPanel`).
+const body = lazyPanel(() => import("./quick-create-menu-body").then((m) => m.QuickCreateMenuBody));
 
 function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void }) {
   return (
@@ -34,9 +36,10 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
 }
 
 export function QuickCreateMenu({ creatableModules, lockedHrefs }: QuickCreateProps) {
-  const [mounted, setMounted] = useState(false);
-  if (!mounted) {
-    return <Trigger onOpen={() => setMounted(true)} onWarm={() => void loadBody()} />;
+  const [Body, setBody] = useState<ReturnType<typeof body.resolve> | null>(null);
+  useEffect(() => runWhenIdle(body.preload), []);
+  if (!Body) {
+    return <Trigger onOpen={() => setBody(() => body.resolve())} onWarm={body.preload} />;
   }
   return (
     <Suspense fallback={<Trigger />}>

@@ -1,18 +1,19 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import type { NotificationRow } from "@/app/actions/notifications";
 import { runWhenIdle } from "@/lib/idle";
+import { lazyPanel } from "@/lib/lazy-panel";
 import { onNotificationInsert } from "@/lib/realtime";
 
 /**
  * Zil — hafif kabuk. Okunmamış sayacı, canlı bildirim olayı ve uygulama rozeti burada kalır;
  * panel (Radix Popover, sekmeler, tercihler, okundu eylemleri) ilk tıklamada yüklenir
- * (hover/odak önceden ısıtır). Yüklenince gerçek bileşen aynı düğmeyi devralır ve açık gelir.
+ * (hover/odak önceden ısıtır). Yüklenince gerçek bileşen aynı düğmeyi devralır ve açık gelir;
+ * parça önceden indiyse tık anında askıya alınmadan açılır (`lazyPanel`).
  */
-const loadPanel = () => import("./notification-bell-panel").then((m) => ({ default: m.NotificationBellPanel }));
-const Panel = lazy(loadPanel);
+const panel = lazyPanel(() => import("./notification-bell-panel").then((m) => m.NotificationBellPanel));
 
 function Trigger({ unread, shake, onShakeEnd, onOpen, onWarm }: { unread: number; shake?: boolean; onShakeEnd?: () => void; onOpen?: () => void; onWarm?: () => void }) {
   return (
@@ -37,12 +38,13 @@ function Trigger({ unread, shake, onShakeEnd, onOpen, onWarm }: { unread: number
 }
 
 export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
-  const [mounted, setMounted] = useState(false);
+  const [Panel, setPanel] = useState<ReturnType<typeof panel.resolve> | null>(null);
+  const mounted = Panel !== null;
   const [items, setItems] = useState(initial);
   const [shake, setShake] = useState(false);
 
   // Sayfa boşalınca panel parçasını arka planda indir: ilk tıklama beklemesin (hover/odak ısıtması ek güvence).
-  useEffect(() => runWhenIdle(() => void loadPanel()), []);
+  useEffect(() => runWhenIdle(panel.preload), []);
 
   // Canlı bildirim: RealtimeRefresh, notifications INSERT'lerini window event olarak
   // köprüler (bkz. src/lib/realtime.ts). Listeye anında ekle + zili bir kez salla.
@@ -96,11 +98,11 @@ export function NotificationBell({ initial }: { initial: NotificationRow[] }) {
     }
   }, [unread, mounted]);
 
-  if (!mounted) {
+  if (!Panel) {
     return (
       <>
         <style>{BELL_STYLE}</style>
-        <Trigger unread={unread} shake={shake} onShakeEnd={() => setShake(false)} onOpen={() => setMounted(true)} onWarm={() => void loadPanel()} />
+        <Trigger unread={unread} shake={shake} onShakeEnd={() => setShake(false)} onOpen={() => setPanel(() => panel.resolve())} onWarm={panel.preload} />
       </>
     );
   }
