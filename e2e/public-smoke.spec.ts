@@ -45,8 +45,8 @@ test.describe("Kayit sihirbazi (/kayit)", () => {
   test("1. adim alanlari gorunur", async ({ page }) => {
     await page.goto("/kayit");
     await expect(page.getByRole("heading", { name: "Ücretsiz başlayın" })).toBeVisible();
-    // Adim gostergesi (Hesap / Ofisiniz / Guvenlik)
-    await expect(page.getByLabel("Kayıt adımları")).toBeVisible();
+    // Adim gostergesi (6 adimli kurulum sihirbazi, f9777457)
+    await expect(page.getByLabel("Kurulum adımları")).toBeVisible();
     // 1. adim: ad soyad + e-posta + telefon
     await expect(page.locator("#name")).toBeVisible();
     await expect(page.locator("#email")).toBeVisible();
