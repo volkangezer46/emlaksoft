@@ -15,6 +15,7 @@ import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-prope
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { normalizeExternalHref } from "@/lib/external-href";
+import { LicenseNotice } from "@/components/public/license-notice";
 
 type ShareMediaRow = {
   id: string;
@@ -140,7 +141,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const admin = createAdminClient();
   const { data: share } = await admin
     .from("share_links")
-    .select("id, tenant_id, entity_type, entity_id, expires_at, view_count, created_by, tenant:tenants(name, status)")
+    .select("id, tenant_id, entity_type, entity_id, expires_at, view_count, created_by, tenant:tenants(name, status, phone, license_no, address_line)")
     .eq("token", token)
     .maybeSingle();
 
@@ -166,7 +167,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   }
 
   // view_count update + property + media hepsi yalnızca share'e bağlı → paralel
-  const [, { data: property }, { data: mediaRows }, { data: shareCreator }] = await Promise.all([
+  const [, { data: property }, { data: mediaRows }, { data: shareCreator }, eidsRes] = await Promise.all([
     admin
       .from("share_links")
       .update({ view_count: (share.view_count ?? 0) + 1 })
@@ -201,9 +202,18 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
           .eq("is_active", true)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // EİDS taşınmaz no (20260826002950) AYRI sorgu: sütun yoksa yalnız bu satır düşer, sayfa bozulmaz (vitrin ilan detayı ile aynı kural).
+    admin
+      .from("properties")
+      .select("eids_property_no")
+      .eq("id", share.entity_id)
+      .eq("tenant_id", share.tenant_id)
+      .eq("is_sample", false)
+      .maybeSingle(),
   ]);
 
   if (!property) notFound();
+  const eidsNo = eidsRes.error ? null : ((eidsRes.data?.eids_property_no as string | null | undefined) ?? null);
 
   // Paylaşım istihbaratı: İLK açılışta (view_count 0→1 geçişi) linki oluşturan
   // danışmana bildirim — "link gitti mi, açıldı mı?" sorusunun cevabı.
@@ -233,8 +243,10 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       : [];
   });
 
-  const tenant = share.tenant as { name?: string } | { name?: string }[] | null;
-  const office = Array.isArray(tenant) ? tenant[0]?.name : tenant?.name;
+  type ShareTenant = { name?: string; phone?: string | null; license_no?: string | null; address_line?: string | null };
+  const tenantRaw = share.tenant as ShareTenant | ShareTenant[] | null;
+  const tenantRow = Array.isArray(tenantRaw) ? tenantRaw[0] : tenantRaw;
+  const office = tenantRow?.name;
   const province = property.province as { name?: string } | { name?: string }[] | null;
   const district = property.district as { name?: string } | { name?: string }[] | null;
   const pName = Array.isArray(province) ? province[0]?.name : province?.name;
@@ -290,7 +302,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
               </span>
               <span className="flex items-center gap-2">
                 <span className="hidden items-center gap-1.5 text-xs font-semibold text-white/40 sm:flex">
-                  <ShieldCheck className="h-3.5 w-3.5 text-mint-400" /> Doğrulanmış portföy
+                  <ShieldCheck className="h-3.5 w-3.5 text-mint-400" /> {office ? `${office} portföyü` : "Ofis portföyü"}
                 </span>
                 {/* Web Share: link o anki paylaşım adresi (window.location) */}
                 <ShareButton
@@ -376,7 +388,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
             ) : null}
 
             <div className="mt-5 flex flex-wrap gap-2">
-              {["Yetki doğrulandı", "Güncel fiyat", "Aktif ilan"].map((t) => (
+              {[...(eidsNo ? ["EİDS no kayıtlı"] : []), "Güncel fiyat", "Aktif ilan"].map((t) => (
                 <span key={t} className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/60">
                   <Check className="h-3 w-3 text-mint-400" /> {t}
                 </span>
@@ -435,6 +447,16 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
             </p>
           </div>
         </div>
+
+        {/* Taşınmaz Ticareti Yönetmeliği m.14/2-i: unvan + yetki belgesi no; EİDS no yalnız doluysa (tek bileşen). */}
+        <LicenseNotice
+          officeName={office}
+          licenseNo={tenantRow?.license_no}
+          phone={tenantRow?.phone}
+          addressLine={tenantRow?.address_line}
+          eidsNo={eidsNo}
+          className="mt-6"
+        />
 
         <p className="mt-6 text-center text-xs text-white/30">
           <Link href="/" className="font-semibold underline-offset-2 transition hover:text-white/70 hover:underline">
