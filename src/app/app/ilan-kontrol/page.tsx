@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/ui/viz";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso } from "@/lib/clock";
 import { getChangesSince, getControlSummary, listTodayChecks } from "@/lib/listing-control/server/readers";
@@ -37,7 +38,7 @@ export const metadata = { title: "İlan Kontrol Merkezi" };
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function IlanKontrolPage({ searchParams }: { searchParams: SearchParams }) {
-  const { role } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const { role, perms } = await requireModulePage("portals", "/app/ilan-kontrol");
   const sp = await searchParams;
   const group = parseGroupParam(sp.gruplama);
   return (
@@ -53,7 +54,7 @@ export default async function IlanKontrolPage({ searchParams }: { searchParams: 
           </>
         }
       />
-      <ControlSubNav active="genel" />
+      <ControlSubNav active="genel" closures={effectiveCanAccessModule(perms, "leak")} />
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardBody group={group} />
       </Suspense>

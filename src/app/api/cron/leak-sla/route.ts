@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { cronDeadline, heartbeatFor, isPastDeadline } from "@/lib/cron-run";
 import { insertNotificationsDetailed } from "@/lib/notify-batch";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
 import { leakSeverity } from "@/lib/listing-control/sla-plan";
+import { loadListingControlConfig } from "@/lib/listing-control/server/db";
+import { runSlaEscalation } from "@/lib/listing-control/server/escalate";
+import type { ListingControlConfig } from "@/lib/listing-control/config";
 
 /** Toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
 export const maxDuration = 300;
@@ -48,7 +51,13 @@ async function propertiesWithOpenLostDealAnomaly(admin: ReturnType<typeof create
   return out;
 }
 
-/** Proaktif kayıp-kaçak: deal olmadan kapanmış + uyarısı gitmemiş + SLA aşımı → bildir */
+/**
+ * Proaktif kayıp-kaçak: deal olmadan kapanmış + uyarısı gitmemiş + SLA aşımı → bildir.
+ * TEK SLA ZİNCİRİ: aynı çalıştırmada İlan Kontrol anomalilerinin yükseltmesi de yürür (danışman 0-4 saat → takım lideri
+ * → 8. saat şube müdürü → 24. saat ofis sahibi; süreler ofis ayarlı). Yeni cron YOK: bu cron saatlik çalışır ki 4/8/24
+ * saatlik kademeler en çok ~1 saat gecikmeyle tetiklensin. Aşama kaydı (anomali, aşama) tekildir; tekrar çalışma
+ * aynı aşamayı iki kez bildirmez.
+ */
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
@@ -56,6 +65,29 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   const now = Date.now();
   const sla7 = new Date(now - 7 * 86_400_000).toISOString();
+
+  // İlan Kontrol SLA yükseltmesi (en iyi çaba; hata kapanış SLA işini bozmaz).
+  let escalated = 0;
+  let escalationFailed = false;
+  try {
+    const disabledForControl = new Set(tenantsDisabledFor(await getDisabledModulesByTenant(admin), "portals"));
+    const cfgCache = new Map<string, ListingControlConfig>();
+    const esc = await runSlaEscalation(admin, now, {
+      disabledTenantIds: disabledForControl,
+      cfgFor: async (tenantId) => {
+        let c = cfgCache.get(tenantId);
+        if (!c) {
+          c = await loadListingControlConfig(admin, tenantId);
+          cfgCache.set(tenantId, c);
+        }
+        return c;
+      },
+    });
+    escalated = esc.escalated;
+  } catch (e) {
+    escalationFailed = true;
+    console.error("leak-sla anomali SLA yükseltme", e);
+  }
 
   const { data: closures, error } = await admin
     .from("listing_closures")
@@ -147,9 +179,9 @@ export async function GET(req: NextRequest) {
   const hb = heartbeatFor({
     total: (closures ?? []).length,
     processed: processed,
-    failed,
+    failed: failed + (escalationFailed ? 1 : 0),
     timedOut,
-    summary: `${sent} SLA uyarısı${skippedTenantsNote(disabledModules, "leak")}`,
+    summary: `${sent} SLA uyarısı · ${escalated} anomali SLA aşaması${skippedTenantsNote(disabledModules, "leak")}`,
   });
   await recordHeartbeat("leak-sla", hb.status, hb.detail);
 

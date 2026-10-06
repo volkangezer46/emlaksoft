@@ -1,13 +1,14 @@
 import { now } from "@/lib/clock";
 import { loadListingControlConfig, type Db } from "./db";
-import { runSlaEscalation } from "./escalate";
+import { consumeControlEvents } from "./events";
 import { planVerificationJobs, reapJobs } from "./queue";
 import { runControlSweep } from "./sweep";
 
 /**
  * Mevcut cron'lara EKLENEN ilan kontrol adımları (yeni cron YOK; sayı değişmez). Her adım en iyi çabadır: hata mevcut
  * cron işini (havuz atama, portal teyit) BOZMAZ. service_role istemcisi cron GET'inden gelir (zaten kabul listesinde).
- *  - havuz-atama (10 dk): değerlendirme taraması (yayınlanmayan portföy, yetki), SLA yükseltme, lease hasadı, iş planlama.
+ *  - havuz-atama (10 dk): olay tüketimi (tarayıcı işçisi sonuçları), değerlendirme taraması (yayınlanmayan portföy, yetki), lease hasadı, iş planlama.
+ *    SLA YÜKSELTME burada DEĞİL: tek SLA zinciri `leak-sla` cron'unda (saatlik; kapanış SLA'sı ile aynı yerde).
  *  - portal-teyit (6 saat): geniş iş planlama + hasat (aynı iş idempotent; açık iş tekil).
  */
 
@@ -26,13 +27,13 @@ export async function runControlStepFrequent(db: Db, disabledTenantIds: Readonly
   };
   try {
     const reaped = await reapJobs(db);
+    const events = await consumeControlEvents(db, now(), loadCfg, disabledTenantIds);
     const sweep = await runControlSweep(db, startedAt, { limit: 300, deadlineMs: startedAt + 120_000, disabledTenantIds });
     if (sweep.schemaMissing) return { ok: true, text: "ilan kontrol: şema yok (atlandı)" };
-    const sla = await runSlaEscalation(db, now(), { cfgFor: loadCfg, disabledTenantIds });
     const plan = await planVerificationJobs(db, loadCfg, now());
     return {
       ok: true,
-      text: `ilan kontrol: ${sweep.examined} portföy, ${sweep.anomaliesOpened}+${sweep.anomaliesReopened} anomali açıldı, ${sweep.anomaliesClosed} kapandı, ${sla.escalated} SLA aşaması, ${plan.enqueued} iş, ${reaped.requeued}/${reaped.failed} hasat`,
+      text: `ilan kontrol: ${events.taken} olay, ${sweep.examined} portföy, ${sweep.anomaliesOpened}+${sweep.anomaliesReopened} anomali açıldı, ${sweep.anomaliesClosed} kapandı, ${plan.enqueued} iş, ${reaped.requeued}/${reaped.failed} hasat`,
     };
   } catch (err) {
     console.error("runControlStepFrequent", err);

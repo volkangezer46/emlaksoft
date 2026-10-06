@@ -14,6 +14,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { moneyTry } from "@/lib/leak-shield";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { ControlSubNav } from "@/components/listing-control/sub-nav";
+import { RISK_BAND_LABEL } from "@/lib/listing-control/risk-language";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { CSSProperties } from "react";
 import { now, trMonthStartMs } from "@/lib/clock";
@@ -76,10 +79,10 @@ const SEV_FILTERS = ["critical", "high", "medium", "low"] as const;
 type SevFilter = (typeof SEV_FILTERS)[number];
 
 const SEV_META: Record<SevFilter, { label: string; badge: string; dot: string }> = {
-  critical: { label: "Kritik", badge: "bg-danger-500 text-white", dot: "bg-danger-500" },
-  high: { label: "Yüksek", badge: "bg-danger-500/12 text-danger-500", dot: "bg-danger-500" },
-  medium: { label: "Orta", badge: "bg-amber-400/18 text-amber-700", dot: "bg-amber-500" },
-  low: { label: "Düşük", badge: "bg-ink-950/6 text-text-muted", dot: "bg-text-faint" },
+  critical: { label: RISK_BAND_LABEL.critical, badge: "bg-danger-500 text-white", dot: "bg-danger-500" },
+  high: { label: RISK_BAND_LABEL.high, badge: "bg-danger-500/12 text-danger-500", dot: "bg-danger-500" },
+  medium: { label: RISK_BAND_LABEL.medium, badge: "bg-amber-400/18 text-amber-700", dot: "bg-amber-500" },
+  low: { label: RISK_BAND_LABEL.low, badge: "bg-ink-950/6 text-text-muted", dot: "bg-text-faint" },
 };
 
 const PAGE_SIZE = 50;
@@ -221,8 +224,13 @@ export default async function LeakShieldPage({
 
   const ctx: Ctx = { nedenF, tipF, sevF, fromF, toF, rangeActive, hasFilter, pageParam, filterHref, canConfirm };
 
+  // Tek merkez: İlan Kontrol alt gezinmesi (Özet · Liste · Uyarılar · Kapanış kayıpları · Rapor). Yalnız portals izni olana
+  // gösterilir (İlan Kontrol sayfaları o izni ister); modül yoksa Kalkan eskisi gibi tek başına çalışır.
+  const showControlNav = effectiveCanAccessModule(perms, "portals");
+
   return (
     <div className="space-y-6">
+      {showControlNav ? <ControlSubNav active="kapanis" /> : null}
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-danger-500/25 blur-[90px]" />

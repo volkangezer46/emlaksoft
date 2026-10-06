@@ -1,3 +1,4 @@
+import { bandFromScore, RISK_BAND_LABEL } from "@/lib/listing-control/risk-language";
 import { KPI_KEYS, KPI_LABELS, type KpiKey, type ScopeKind } from "@/lib/listing-control/types";
 
 /**
@@ -166,11 +167,9 @@ export function anomalyTypeLabel(type: string): string {
 }
 
 export function riskLabel(score: number | null): { label: string; level: "critical" | "high" | "medium" | "low" | "none" } {
-  if (score === null || !Number.isFinite(score)) return { label: "Ölçülmedi", level: "none" };
-  if (score >= 90) return { label: "Kritik", level: "critical" };
-  if (score >= 70) return { label: "Yüksek", level: "high" };
-  if (score >= 40) return { label: "Orta", level: "medium" };
-  return { label: "Düşük", level: "low" };
+  // TEK risk dili: eşikler ve etiketler `risk-language.ts` (Kayıp-Kaçak Kalkanı ile ortak).
+  const level = bandFromScore(score);
+  return { label: RISK_BAND_LABEL[level], level };
 }
 
 /** SLA geri sayımı: vade geçtiyse "gecikti". Vade yoksa null (gösterilmez). */

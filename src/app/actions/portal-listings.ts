@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { normalizeCloseFlags } from "@/lib/leak-shield";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -117,6 +118,26 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
   return { ok: true };
 }
 
+/**
+ * "Teyit et" = İlan Kontrol'de elle doğrulama. Kalkan'ın `last_confirmed_at` damgası ile doğrulama sonuç günlüğü
+ * (`listing_verifications` / kontrol durumu) AYNI olayı iki yerde tutmasın diye teyit, kullanıcı oturumuyla
+ * `lc_submit_manual_check('present')` RPC'sine de yazılır (JWT'den ofis/kullanıcı, izin + kapsam RPC'de; admin client
+ * KULLANILMAZ). En iyi çaba: şema yoksa/RPC reddederse teyit damgası yine de geçerlidir.
+ */
+async function recordManualPresent(listingIds: readonly string[]): Promise<void> {
+  const ids = [...new Set(listingIds)].slice(0, 100);
+  if (ids.length === 0) return;
+  try {
+    const supabase = await createClient();
+    for (const id of ids) {
+      const { error } = await supabase.rpc("lc_submit_manual_check", { p_listing_id: id, p_result: "present", p_observed: {} });
+      if (error && !isMissingSchema(error)) console.error("recordManualPresent", { code: error.code });
+    }
+  } catch (e) {
+    console.error("recordManualPresent", e);
+  }
+}
+
 export async function confirmPortalListing(formData: FormData): Promise<void> {
   const gate = await requirePermission("portals", "edit");
   if (!gate.ok) return;
@@ -136,6 +157,7 @@ export async function confirmPortalListing(formData: FormData): Promise<void> {
     console.error("confirmPortalListing", error);
     return;
   }
+  await recordManualPresent([id]);
 
   revalidatePath("/app/portallar");
   revalidatePath("/app/kayip-kacak");
@@ -165,6 +187,7 @@ export async function confirmPortalListingsBulk(formData: FormData): Promise<voi
     console.error("confirmPortalListingsBulk", error);
     return;
   }
+  await recordManualPresent(ids);
 
   revalidatePath("/app/portallar");
   revalidatePath("/app/kayip-kacak");

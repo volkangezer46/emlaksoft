@@ -5,6 +5,7 @@ import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/viz";
 import { StatCard } from "@/components/app/stat-card";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso } from "@/lib/clock";
 import { getChangesSince, getControlSummary } from "@/lib/listing-control/server/readers";
@@ -15,15 +16,19 @@ import {
   kpiHref,
   sumSummaryRows,
 } from "@/components/listing-control/helpers";
+import { detectAdvisorPatterns } from "@/lib/listing-control/advisor-patterns";
+import { buildReportFacts, ruleBasedSummary } from "@/components/listing-control/report-facts";
+import { ControlAiSummary } from "@/components/listing-control/control-ai-summary";
+import { now } from "@/lib/clock";
 import { rankAdvisors } from "@/components/listing-control/lifecycle-model";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable, Panel } from "@/components/listing-control/ui-parts";
-import { getDb, loadPublishLeadTimes, loadResolveStats, loadVerifiedRatio, resolveGroupNames } from "@/components/listing-control/readers";
+import { getDb, loadMissingEvents, loadPublishLeadTimes, loadResolveStats, loadVerifiedRatio, resolveGroupNames } from "@/components/listing-control/readers";
 
 export const metadata = { title: "İlan kontrol raporu" };
 
 export default async function RaporPage() {
-  await requireModulePage("portals", "/app/ilan-kontrol");
+  const { perms } = await requireModulePage("portals", "/app/ilan-kontrol");
   return (
     <>
       <PageHeader
@@ -32,7 +37,7 @@ export default async function RaporPage() {
         description="Dün ne yapıldı, bu hafta ne değişti? Hesaplanamayan değerler gösterilmez."
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Rapor" }]}
       />
-      <ControlSubNav active="rapor" />
+      <ControlSubNav active="rapor" closures={effectiveCanAccessModule(perms, "leak")} />
       <Suspense fallback={<div className="space-y-4"><SkeletonCard height={200} label="Günlük rapor yükleniyor" /><SkeletonCard height={260} label="Haftalık rapor yükleniyor" /></div>}>
         <ReportBody />
       </Suspense>
@@ -54,7 +59,7 @@ function Grid({ items }: { items: Item[] }) {
 
 async function ReportBody() {
   const db = await getDb();
-  const [tenantRes, day, week, publishStats, resolve, verified, advisorRes] = await Promise.all([
+  const [tenantRes, day, week, publishStats, resolve, verified, advisorRes, missingRes] = await Promise.all([
     getControlSummary(db, "tenant"),
     getChangesSince(db, daysAgoIso(1)),
     getChangesSince(db, daysAgoIso(7)),
@@ -62,12 +67,16 @@ async function ReportBody() {
     loadResolveStats(db, daysAgoIso(7)),
     loadVerifiedRatio(db),
     getControlSummary(db, "advisor"),
+    loadMissingEvents(db, daysAgoIso(30)),
   ]);
   if (!tenantRes.available) return <ControlUnavailable />;
   const s = sumSummaryRows(tenantRes.rows);
   const pct = healthyPercent(s);
 
-  const names = await resolveGroupNames(db, "advisor", advisorRes.rows.map((r) => r.group_id));
+  const patterns = detectAdvisorPatterns(missingRes.events, now());
+  const names = await resolveGroupNames(db, "advisor", [...advisorRes.rows.map((r) => r.group_id), ...patterns.map((p) => p.advisorId)]);
+  const facts = buildReportFacts(s, day.available ? day.changes : null);
+  const rules = ruleBasedSummary("day", facts);
   const ranks = rankAdvisors(
     advisorRes.rows.map((r) => ({ id: r.group_id, name: r.group_id ? (names.get(r.group_id) ?? "Danışman") : "Atanmamış", total_active: r.total_active, healthy: r.healthy, portal_missing: r.portal_missing, in_review: r.in_review })),
   );
@@ -108,6 +117,9 @@ async function ReportBody() {
 
   return (
     <div className="space-y-6">
+      <Panel title="Özet" description="Doğrudan veriden hazırlanır; isterseniz yapay zekâ ile kısa bir yorum üretilir (sayılar veriyle doğrulanır).">
+        <ControlAiSummary initial={{ rules, facts }} />
+      </Panel>
       <Panel title="Dün" description="Son 24 saatte yapılan kontroller ve yeni tespitler">
         {dayItems.length ? <Grid items={dayItems} /> : <p className="text-sm text-text-muted">Dün için kontrol verisi yok.</p>}
       </Panel>
@@ -117,6 +129,20 @@ async function ReportBody() {
       <Panel title="Son 7 gün" description="Haftalık eğilim">
         {weekItems.length ? <Grid items={weekItems} /> : <p className="text-sm text-text-muted">Haftalık değerler için yeterli veri yok.</p>}
       </Panel>
+      {patterns.length > 0 ? (
+        <Panel title="Tekrarlayan kayıp örüntüsü" description="Son 30 günde en az 3 farklı portföyünde portal kaybı uyarısı açılan danışmanlar (sayım; puan değil)">
+          <ul className="space-y-2 text-sm">
+            {patterns.slice(0, 5).map((p) => (
+              <li key={p.advisorId}>
+                <Link href={`${CONTROL_BASE}/anomaliler?tur=portal_missing&danisman=${p.advisorId}`} className="focus-ring rounded text-accent-text hover:underline">
+                  {names.get(p.advisorId) ?? "Danışman"}
+                </Link>
+                <span className="text-text-muted"> · {p.distinctProperties} farklı portföyde {p.events} uyarı. Nedeni (portal hatası, ilan no değişimi, gerçek kaldırma) uyarı açıklamalarından kontrol edin.</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
       {ranks.best || ranks.worst ? (
         <Panel title="Danışman karşılaştırması" description="En az 3 aktif portföyü olan danışmanlar arasında">
           <ul className="grid gap-3 sm:grid-cols-2">

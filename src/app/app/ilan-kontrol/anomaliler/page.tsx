@@ -4,6 +4,8 @@ import { Clock3, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/viz";
 import { EmptyState } from "@/components/ui/empty-state";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { anomalyLostCommission } from "@/lib/listing-control/lost-commission";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { formatDateTimeTr, formatTry } from "@/lib/format";
@@ -48,7 +50,7 @@ export default async function AnomalilerPage({ searchParams }: { searchParams: S
         description="Risk puanı en yüksek uyarı en üstte. Her uyarı için önce açıklama girilir; açıklamasız uyarı kapatılamaz."
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Uyarı kuyruğu" }]}
       />
-      <ControlSubNav active="anomaliler" />
+      <ControlSubNav active="anomaliler" closures={effectiveCanAccessModule(perms, "leak")} />
       <TypeFilters active={type} advisorId={advisorId} />
       <Suspense fallback={<SkeletonCard height={480} label="Uyarılar yükleniyor" />}>
         <QueueBody type={type} advisorId={advisorId} page={page} canEdit={canEdit} />
@@ -110,6 +112,7 @@ async function QueueBody({ type, advisorId, page, canEdit }: { type: string | nu
           const b = briefs.get(r.property_id);
           const risk = riskLabel(r.risk_score);
           const sla = r.status === "explained" ? null : slaCountdown(r.sla_due_at, nowMs);
+          const lost = anomalyLostCommission(r.type, { listPrice: b?.price ?? null, commissionRate: b?.commissionRate ?? null });
           const priceDetail = r.type === "price_mismatch" ? (r.details as { crmPrice?: number; portals?: { portal: string; price: number }[] }) : null;
           return (
             <li key={r.id} className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
@@ -128,6 +131,12 @@ async function QueueBody({ type, advisorId, page, canEdit }: { type: string | nu
                     <p className="text-sm text-text-muted">
                       Danışman: {r.advisor_id ? (names.get(r.advisor_id) ?? "-") : "Atanmamış"} · Açık kalma: {ageLabel(r.first_seen_at, nowMs)} · {STATUS_LABELS[r.status] ?? r.status}
                     </p>
+                    {lost ? (
+                      <p className="text-sm font-medium text-danger-600">
+                        Tahmini kaçan komisyon: {formatTry(lost.amount)}
+                        <span className="font-normal text-text-muted"> (liste fiyatı üzerinden %{lost.rate}; işlem doğrulanmadı, Kalkan ile aynı hesap)</span>
+                      </p>
+                    ) : null}
                     {priceDetail?.crmPrice && priceDetail.portals?.length ? (
                       <p className="text-sm text-text-muted">
                         CRM {formatTry(priceDetail.crmPrice)}
