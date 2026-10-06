@@ -22,6 +22,12 @@ import { provinceOptionsResult } from "@/lib/geo/reader";
 import { toTelHref } from "@/lib/phone";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
 
 /** Son 7 günde yayına giren ilan "Yeni" rozeti alır (published_at gerçek yayın damgası). */
 function isNewListing(publishedAt: string | null): boolean {
@@ -190,28 +196,25 @@ export default async function VitrinPage({
 
     // Kapak görselleri: çekilen tüm ilanlar için (tx süzmesi bellekte sonradan uygulanır).
     const coverIds = (propsData ?? []).map((p) => p.id);
-    const coverEntries: [string, string][] = [];
+    let coverEntries: [string, string][] = [];
     if (coverIds.length) {
-      const { data: media } = await admin
-        .from("property_media")
-        .select("id, property_id, is_cover, sort_order")
-        .eq("kind", "image")
-        .in("property_id", coverIds)
-        .order("is_cover", { ascending: false })
-        .order("sort_order", { ascending: true });
-      const seen = new Set<string>();
-      for (const m of media ?? []) {
-        if (!seen.has(m.property_id)) {
-          seen.add(m.property_id);
-          coverEntries.push([m.property_id, m.id]);
-        }
-      }
+      // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel kapak olmaz, sıradaki ilan görseline düşülür.
+      const { data: media } = await selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+        admin
+          .from("property_media")
+          .select(columns)
+          .eq("kind", "image")
+          .in("property_id", coverIds)
+          .order("is_cover", { ascending: false })
+          .order("sort_order", { ascending: true }),
+      );
+      coverEntries = [...firstPublicImageByProperty(media)];
     }
     return { propsData: propsData ?? [], roomRows: roomRows ?? [], fxRates, coverEntries };
   };
   const listing = q
     ? await loadListing()
-    : await unstable_cache(loadListing, ["vitrin-listing-v1", tenant.id, String(min ?? ""), String(max ?? ""), oda, sirala, tur], {
+    : await unstable_cache(loadListing, ["vitrin-listing-v2", tenant.id, String(min ?? ""), String(max ?? ""), oda, sirala, tur], {
         revalidate: 60,
         tags: ["vitrin", `vitrin:${tenant.id}`],
       })();

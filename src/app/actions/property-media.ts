@@ -8,6 +8,12 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { extractPropertyDocFields, type PropertyDocFields } from "@/lib/ai/document-ocr";
 import {
+  documentUploadFileName,
+  isMissingDocumentColumnError,
+  isPublicListingImage,
+  selectWithDocumentFlag,
+} from "@/lib/public-property-media";
+import {
   finalizeDirectFileUpload,
   prepareDirectFileUpload,
 } from "@/lib/direct-file-upload-server";
@@ -28,6 +34,8 @@ export type PreparePropertyMediaUploadInput = {
   fileSize: number;
   fileType: string;
   hasWatermark?: boolean;
+  /** Yükleme türü "Belge" (tapu, yetki belgesi...): public yüzeylerde ASLA gösterilmez (KVKK P0-9). */
+  isDocument?: boolean;
 };
 
 async function propertyBelongsToTenant(propertyId: string, tenantId: string) {
@@ -64,7 +72,9 @@ export async function preparePropertyMediaUpload(
     },
     {
       parentId: propertyId,
-      fileName: input.fileName,
+      // Belge türünde ad `belge-` önekiyle kaydedilir: INSERT tetikleyicisi (sütun varken) ve ad kuralı (sütun
+      // yokken) kaydı İLK ANDAN belge sayar; finalize sonrası işaret ayrıca yazılır.
+      fileName: input.isDocument === true ? documentUploadFileName(input.fileName) : input.fileName,
       fileSize: input.fileSize,
       fileType: input.fileType,
       hasWatermark: input.hasWatermark === true,
@@ -76,6 +86,7 @@ export async function preparePropertyMediaUpload(
 export async function finalizePropertyMediaUpload(
   propertyIdValue: string,
   sessionIdValue: string,
+  isDocument = false,
 ): Promise<DirectFileUploadFinalizeResult> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -99,6 +110,12 @@ export async function finalizePropertyMediaUpload(
   );
   if (!result.ok) return result;
 
+  if (isDocument === true) {
+    // Kayıt adı `belge-` önekli olduğu için tetikleyici/ad kuralı zaten belge sayar; işaret burada da açıkça
+    // yazılır (kapak olmaz). Sütun yoksa (migration öncesi) yalnız kapak kaldırılır, ad kuralı korur.
+    await writeDocumentFlag(await createClient(), gate.tenantId, propertyId, [result.id], true);
+  }
+
   if (result.created) {
     await logActivity({
       tenantId: gate.tenantId,
@@ -106,7 +123,7 @@ export async function finalizePropertyMediaUpload(
       action: "property_media.upload",
       entityType: "property",
       entityId: propertyId,
-      newValue: { media_id: result.id, upload_mode: "signed_direct" },
+      newValue: { media_id: result.id, upload_mode: "signed_direct", is_document: isDocument === true },
     });
   }
   revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -203,9 +220,126 @@ export async function setCoverPropertyMedia(formData: FormData): Promise<void> {
   if (!id || !propertyId) return;
 
   const supabase = await createClient();
+  // Belge kapak olamaz (KVKK P0-9): kapak public yüzeylerin ilk görselidir.
+  const { data: target } = await selectWithDocumentFlag<{ id: string; kind: string; file_type: string | null; file_name: string | null; is_document?: boolean | null }>(
+    "id, kind, file_type, file_name",
+    (columns) =>
+      supabase
+        .from("property_media")
+        .select(columns)
+        .eq("id", id)
+        .eq("property_id", propertyId)
+        .eq("tenant_id", gate.tenantId)
+        .maybeSingle(),
+  );
+  if (!target || !isPublicListingImage(target)) return;
   await supabase.from("property_media").update({ is_cover: false }).eq("property_id", propertyId).eq("tenant_id", gate.tenantId);
   await supabase.from("property_media").update({ is_cover: true }).eq("id", id).eq("tenant_id", gate.tenantId);
   revalidatePath(`/app/portfoyler/${propertyId}`);
+}
+
+// ---------------------------------------------------------------------------
+// KVKK P0-9: belge işareti (tapu, yetki belgesi... dışarıda gösterilmez)
+// ---------------------------------------------------------------------------
+
+type ServerClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * `is_document` işaretini yazar. Belge yapılan kayıt kapak olmaz; portföyün kapağı kalmazsa ilk public ilan
+ * görseli kapak yapılır. Sütun yoksa (migration 20261007000100 öncesi) `unavailable` döner; belge yapılırken
+ * yine de kapak kaldırılır (ad kuralı public tarafı korur).
+ */
+async function writeDocumentFlag(
+  supabase: ServerClient,
+  tenantId: string,
+  propertyId: string,
+  ids: string[],
+  isDocument: boolean,
+): Promise<{ ok: boolean; unavailable?: boolean }> {
+  if (ids.length === 0) return { ok: true };
+  const patch = isDocument ? { is_document: true, is_cover: false } : { is_document: false };
+  const { error } = await supabase
+    .from("property_media")
+    .update(patch)
+    .eq("tenant_id", tenantId)
+    .eq("property_id", propertyId)
+    .eq("kind", "image")
+    .in("id", ids);
+  let unavailable = false;
+  if (error) {
+    if (!isMissingDocumentColumnError(error)) {
+      console.error("writeDocumentFlag", { code: error.code });
+      return { ok: false };
+    }
+    unavailable = true;
+    if (!isDocument) return { ok: false, unavailable };
+    await supabase
+      .from("property_media")
+      .update({ is_cover: false })
+      .eq("tenant_id", tenantId)
+      .eq("property_id", propertyId)
+      .in("id", ids);
+  }
+
+  if (isDocument) {
+    const { data: rows } = await selectWithDocumentFlag<
+      { id: string; kind: string; file_type: string | null; file_name: string | null; is_cover: boolean; is_document?: boolean | null }[]
+    >("id, kind, file_type, file_name, is_cover", (columns) =>
+      supabase
+        .from("property_media")
+        .select(columns)
+        .eq("tenant_id", tenantId)
+        .eq("property_id", propertyId)
+        .eq("kind", "image")
+        .order("sort_order", { ascending: true })
+        .limit(300),
+    );
+    const list = rows ?? [];
+    const next = list.some((r) => r.is_cover) ? null : list.find((r) => isPublicListingImage(r));
+    if (next) {
+      await supabase.from("property_media").update({ is_cover: true }).eq("id", next.id).eq("tenant_id", tenantId);
+    }
+  }
+  return unavailable ? { ok: false, unavailable } : { ok: true };
+}
+
+/**
+ * Seçili görselleri "Belge (dışarıda gösterilmez)" ya da "Fotoğraf (paylaşımda gösterilir)" olarak işaretler.
+ * Tek görsel anahtarı ve toplu işaretleme aynı action'ı kullanır.
+ */
+export async function setPropertyMediaDocument(
+  propertyId: string,
+  ids: string[],
+  isDocument: boolean,
+): Promise<MediaResult & { updated?: number }> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const pid = String(propertyId ?? "").trim();
+  if (!UUID_RE.test(pid)) return { error: "Portföy bulunamadı." };
+
+  const supabase = await createClient();
+  const owned = await ownedMediaIds(supabase, gate.tenantId, pid, ids ?? []);
+  if (owned.length === 0) return { error: "İşaretlenecek görsel seçilmedi." };
+
+  const flag = isDocument === true;
+  const res = await writeDocumentFlag(supabase, gate.tenantId, pid, owned, flag);
+  if (res.unavailable) {
+    return { error: "Belge işareti bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor)." };
+  }
+  if (!res.ok) return { error: "İşaret kaydedilemedi." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "property_media.document_flag",
+    entityType: "property",
+    entityId: pid,
+    newValue: { count: owned.length, is_document: flag },
+  });
+
+  revalidatePath(`/app/portfoyler/${pid}`);
+  return { ok: true, updated: owned.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -324,17 +458,21 @@ export async function bulkDeletePropertyMedia(
     return { error: "Görseller silinemedi." };
   }
 
-  // Kapak silindiyse kalan ilk görseli kapak yap
+  // Kapak silindiyse kalan ilk İLAN görselini kapak yap (belge kapak olamaz, KVKK P0-9)
   if ((rows ?? []).some((r) => r.is_cover)) {
-    const { data: next } = await supabase
-      .from("property_media")
-      .select("id")
-      .eq("tenant_id", gate.tenantId)
-      .eq("property_id", pid)
-      .eq("kind", "image")
-      .order("sort_order", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+    const { data: remaining } = await selectWithDocumentFlag<
+      { id: string; kind: string; file_type: string | null; file_name: string | null; is_document?: boolean | null }[]
+    >("id, kind, file_type, file_name", (columns) =>
+      supabase
+        .from("property_media")
+        .select(columns)
+        .eq("tenant_id", gate.tenantId)
+        .eq("property_id", pid)
+        .eq("kind", "image")
+        .order("sort_order", { ascending: true })
+        .limit(300),
+    );
+    const next = (remaining ?? []).find((r) => isPublicListingImage(r));
     if (next?.id) {
       await supabase
         .from("property_media")

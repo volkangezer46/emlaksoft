@@ -8,6 +8,12 @@ import { moneyTry } from "@/lib/leak-shield";
 import { getBaseUrl } from "@/lib/base-url";
 import { PrintButton } from "./print-button";
 import { LicenseNotice } from "@/components/public/license-notice";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
 
 type Rel = { name?: string } | { name?: string }[] | null;
 
@@ -54,7 +60,7 @@ export default async function PropertyBrochurePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: property }, { data: tenant }, { data: cover }] = await Promise.all([
+  const [{ data: property }, { data: tenant }, { data: coverRows }] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -64,18 +70,22 @@ export default async function PropertyBrochurePage({
       .is("deleted_at", null)
       .maybeSingle(),
     supabase.from("tenants").select("name, slug, logo_url, phone, license_no, address_line").maybeSingle(),
-    supabase
-      .from("property_media")
-      .select("id")
-      .eq("property_id", id)
-      .eq("kind", "image")
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+    // Broşür müşteriye verilir (basılı/PDF) -> public kuralı: kapak belge olamaz (KVKK P0-9).
+    selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      supabase
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", id)
+        .eq("kind", "image")
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .limit(50),
+    ),
   ]);
 
   if (!property) notFound();
+  const coverId = firstPublicImageByProperty(coverRows).get(id);
+  const cover = coverId ? { id: coverId } : null;
 
   const [description, { data: advisor }] = await Promise.all([
     fetchDescription(supabase, id, property.features),

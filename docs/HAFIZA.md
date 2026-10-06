@@ -17,7 +17,8 @@ Ayrıntı için ilgili belgeye bağlanır (içerik burada kopyalanmaz). Son gün
 (dry-run bekleyen göstermiyor) ve `20261006000100 … 000600` (PB40 000100-104, PB42 000400/410, PB43 000500/510, PB44 000600) UYGULANDI. Önceki pencereler
 (P1-P11b, `20260825000100..001300` = PB1-PB8, P12 `20260816000500` kazanç gizliliği; `scripts/migration-pairs-data.ts` başlığındaki sahip bildirimi) da uygulanmıştır.
 **Depoda YENİ, canlıda UYGULANMAMIŞ (PB45, order 29.96, 2026-10-06):** `20261006000700_fix_plan_subscription_amount` → `20261006000710_reporting_aggregates_sample_scope` →
-`20261006000720_ownership_transfer_rpc` (her biri +rollback, ön koşul bloğu eksikte yazmadan durur; ayrıntı §22). Aradaki `20260826001200..002970` dosyalarının canlı durumu bu
+`20261006000720_ownership_transfer_rpc` (her biri +rollback, ön koşul bloğu eksikte yazmadan durur; ayrıntı §22). **PB48 (order 29.985):**
+`20261007000100_property_media_is_document` (+rollback; KVKK P0-9 belge işareti, §25b; kod sütun yokken çalışır, sıra serbest). Aradaki `20260826001200..002970` dosyalarının canlı durumu bu
 belgede teyitli DEĞİL (§13 insights canlıda; §15 PB37-39 "uygulanmadı" notu bayat olabilir): kesin bekleyen listesi için salt-okunur `npm run db:migrate -- --dry-run` esastır.
 Her uygulama backup/PITR teyidi + `check:migrations -- --database` + `db:migrate -- --dry-run` sonrası `--only` ile.
 **Migration sırası uyarısı:** aynı fonksiyonu yeniden yazan migration'lar önceki düzeltmeyi ezebilir; 001000 B12'yi ezdi (money_visible + yuvarlanmış davet tutarı kayboldu), `20260826001900_growth_dashboard_b12_reapply.sql` geri getirdi (DOGRULANMADI; sahip uygulayacak).
@@ -32,7 +33,7 @@ Aşağıdaki §2 devamı TARİHSELDİR (uygulama anındaki notlar); güncel duru
 (000500, D bölümü ÇIKARILDI) → koltuk satışı (000600) → anket → büyüme + tıklama sayacı → AI kredi → vitrin ayarları + SEO opt-in → sahiplik devri →
 **EN SON, AYRI gün:** `20260816000500_commission_earnings_privacy.sql` (P12, kazanç gizliliği RLS, davranış değiştirir + rol smoke'u). Düz `npm run db:migrate`
 YASAK: bekleyenleri ad sırasıyla uygular ve P12'yi (en küçük numara) İLK sıraya koyar. `supabase/proposed/`'da yalnız perf indeks önerileri kaldı
-(`CREATE INDEX CONCURRENTLY` runner transaction'ında çalışmaz + ölçülmemiş; terfi ETMEDİ). K4 `is_document` dalda. Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı.
+(`CREATE INDEX CONCURRENTLY` runner transaction'ında çalışmaz + ölçülmemiş; terfi ETMEDİ). (K4 `is_document` dal migration'ı iptal; yerine PB48.) Sec3 rol smoke senaryoları (runbook §5) HENÜZ yapılmadı.
 Aşağıdaki liste TARİHSEL envanterdir (uygulananlar dahil); güncel bekleyenler için `npm run db:migrate -- --dry-run`.
 
 **PB9 EmlakFiyati kontör (CANLIDA UYGULANDI, 2026-10-05):** `20260826000100_ef_credit_wallet`
@@ -100,7 +101,8 @@ Katalog kuralı TS `resolveCatalogSettings` ile birebir aynı (ayar yoksa onayl�
 **KURALLAR:** uygulanmış dosya değiştirilmez (forward-only); enum ADD VALUE + kullanımı ayrı dosya; `properties`↔`customers`
 ikinci FK eklenince PostgREST gömmeleri FK adıyla yazılmalı. **Güvenlik düzeltici migration'lar (denetim 3: approval_requests,
 listing_pool_entries, kvkk_requests, property_owner_info, advisor_private, coupons, anket) ilgili migration'larla AYNI pencerede
-uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı (`20260818000400`, K4 dalında) KODDAN ÖNCE gerekir.
+uygulanmalı; yoksa RLS delikleri açık kalır.** Eski K4 `20260818000400_property_media_is_document` İPTAL (main'e girmedi, uygulanmadı);
+yerine PB48 `20261007000100_property_media_is_document` (§25b; kod sütun yokken ad kuralına düşer, sıra serbest).
 
 ## 3. Bekleyen / engelli işler
 
@@ -123,9 +125,9 @@ uygulanmalı; yoksa RLS delikleri açık kalır.** K4 `is_document` migration'ı
 - **Menü IA kırmızı test notları ÇÖZÜLDÜ (2026-10-06):** `modules.test.ts` (kapatılabilir modül sayısı, `requireModulePage` href) ve `/app/ayarlar/yetkilendirme` sayfası main'de; tam vitest turu yeşil (§22 doğrulama).
 
 - **Uzman paneli kararı (2026-10-05):** canlıya almadan zorunlu paketler (P1-P7), ilk 30 gün planı, sahip kararları (S1-S13) ve "asla yapılmayacaklar" için `docs/design/PANEL_KARAR_1.md`.
-- **P0-9 KALICI ÇÖZÜM SAHİP KARARI (2026-10-06, §25):** main'de belge/ilan görseli ayrımı yapan sütun yok; bugünkü önlem dosya adı kuralı (`public-property-media.ts`). "IMG_1234.jpg" adlı tapu fotoğrafı hâlâ public'e çıkabilir. Kalıcı: K4 `is_document` migration'ı + yüklemede tür seçimi; gelince yalnız `isPublicListingImage` güncellenir.
-- **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Public medya sorguları
-  `is_document` sütununa bağlı → migration uygulanmadan `main`'e alınmaz (public vitrinde görsel kaybolur).
+- **P0-9 KALICI ÇÖZÜM KODDA (2026-10-06, §25b), migration CANLIYA UYGULANMADI:** PB48 `20261007000100_property_media_is_document` (+rollback; order 29.985, etki "davranis"). Uygulanana kadar kod ad kuralıyla çalışır (IMG_ adlı belge fotoğrafı ancak "Belge" türüyle yüklenirse — ad `belge-` önekli — gizlenir); uygulandıktan sonra işaret esastır.
+- **K4 dalı** (`worktree-agent-aaa0895d41f425d97`): portföy düzenleme/mobil/anahtar/açık ev/belge. Dalın `is_document` migration'ı İPTAL (PB48 yerini aldı);
+  dal main'e alınacaksa medya kısmı PB48 sütun/yardımcılarıyla (`selectWithDocumentFlag`, `isPublicListingImage`) uzlaştırılmalı.
 - **Fiyat (ÇÖZÜLDÜ, 2026-10-06 denetimi):** `update_tenant_plan_subscription` tutar ezme hatası `20260825000300` ile düzeltildi (canlıda; son tanım o dosya:
   plan değişmiyorsa kayıtlı tutar + `price_lock_*` korunur, değişirse `plan_monthly_amount()` + Founders kilidi). Kalan son eski-sabit yolu 9 arg fulfill
   overload'u `000700` ile düşer (PB45). Sözleşme: `plan-subscription-amount-contract.test.ts`. Mevcut abonelik tutarlarının veri düzeltmesi ayrı sahip kararı.
@@ -179,7 +181,7 @@ Vercel deploy'u push tetikler; migration uygulamak sahibin işidir).
 | Danışman metriği/gelir | `src/lib/team/advisor-metrics.ts` (ofis brüt yalnız `earnings_all`) |
 | Telefon | `src/lib/phone-rules.ts` (`parsePhoneStrict`), `PhoneInput` |
 | Kayıt sihirbazı hata → adım/alan | `src/lib/signup-errors.ts` (`signUp` alan hatasında `field` döner; metin tarayan eşleme YOK) |
-| Public portföy görseli kuralı (KVKK P0-9) | `src/lib/public-property-media.ts` (`isPublicListingImage`; servis uçları `/api/property-media/[id]` + `/private` ve paylas/sunum/vitrin galerisi) |
+| Public portföy görseli kuralı (KVKK P0-9) | `src/lib/public-property-media.ts` (`isPublicListingImage`, `is_document` sorgusu `selectWithDocumentFlag`, kapak `firstPublicImageByProperty`; SQL eşi `media_file_name_looks_like_document`; yüzey listesi + kaçış koruması `public-property-media.test.ts` `PUBLIC_MEDIA_SURFACES`) |
 | Ofis bağlamı yok / rol yetmez bildirimi (/app) | `src/components/app/staff-no-tenant-notice.tsx` (`StaffNoTenantNotice`, `RoleNotAllowedNotice`) |
 | Proje/daire düzenleme doğrulaması | `src/lib/projects/edit-schemas.ts` (Zod; action `updateProject`/`updateUnit`) |
 | Rol etiketi / terim | `src/lib/role-labels.ts`, `src/lib/terminology.ts` |
@@ -468,3 +470,29 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Proje/daire düzenleme:** `updateProject` (ad, geliştirici, konum, teslim tarihi, açıklama, durum) ve `updateUnit` (blok, kat, no, oda, m², fiyat, not) — `requirePermission("projects","edit")`, Zod, tenant süzgeci, yalnız değişen alanlar `logActivity` (`project.update`, `project_unit.update`). Daire DURUMU düzenlenmez (rezerve/kapora/satış atomik akış). Satılmış dairede fiyat kilitli (DB tetikleyicisi `guard_project_unit_sale_state` de reddeder; değişmeyen fiyat UPDATE'e yazılmaz), ödeme planı olan dairede fiyat değişimi reddedilir. Popup'lar kalktı: `add-units-dialog` → `add-units-panel` (InlinePanel), daire diyaloğu → sayfa içi panel + "Bilgileri düzenle"; proje "Projeyi düzenle" paneli. ConfirmDialog (satış/serbest bırakma onayı) kaldı.
 - **Test edilemeyenler:** tarayıcıda kayıt akışı (adıma dönüş/odak/form sıfırlanmaması), gerçek DB'de updateUnit (tetikleyici + RLS `has_effective_permission('projects','edit')`), platform personeli ile /app sayfaları, public galeride ad kuralının canlı veriye etkisi (kaç görselin gizlendiği ÖLÇÜLMEDİ).
 - **Doğrulama:** type-check 0 · lint 0 · vitest 480 dosya / 5236+ test geçti · check:links 0. Build/check:cron/audit:actions/check:migrations bu turda KOŞULMADI.
+
+### 25b. KVKK P0-9 kalıcı çözüm: `property_media.is_document` (PB48) — 2026-10-06, KODDA (worktree dalı); migration CANLIYA UYGULANMADI
+
+- **Migration** `20261007000100_property_media_is_document.sql` (+`supabase/rollbacks/…rollback.sql`; `migration-pairs-data.ts` PB48, order 29.985, etki `davranis`):
+  `is_document boolean not null default false` (hızlı varsayılan, tablo yeniden yazılmaz) + saf SQL ad kuralı `public.media_file_name_looks_like_document(text)`
+  (TS `DOCUMENT_NAME_TOKENS` ile birebir; sözleşme testi karşılaştırır) + belge adlı mevcut satırlar `true` + yalnız INSERT tetikleyicisi
+  (belge adlı yeni kayıt belge doğar, kapak olmaz). RLS DEĞİŞMEDİ; `is_cover`'a veri olarak dokunulmadı. Kısmi indeks EKLENMEDİ (SQL'de `not is_document` süzgeci yok;
+  public sorgular sütunu seçip uygulamada süzer — sütun yokken de çalışması için). Eski K4 `20260818000400` kaydı/penceresi/externalPending KALDIRILDI.
+  PGlite'ta denendi: ad eşleşmesi (Türkçe büyük harf dahil), tetikleyici, tekrar çalıştırma, rollback. Canlı Postgres'te DENENMEDİ.
+- **Kural** (`src/lib/public-property-media.ts`): `is_document === true` → asla public; sütun yoksa (undefined/null) ad kuralı; sütun varken işaret esastır (ofis yanlış pozitifi
+  "Fotoğraf yap" ile bilinçli kaldırabilir). Sorgular `selectWithDocumentFlag(columns, run)` ile `is_document` seçer; 42703/PGRST204'te aynı sorgu sütunsuz tekrarlanır
+  (migration öncesi ortamda public sayfa başına +1 sorgu; uygulandıktan sonra tek sorgu). Kapak `firstPublicImageByProperty` (belge kapaksa sıradaki ilan görseline düşer).
+- **Yüzeyler:** servis uçları (açık + imzalı), paylas, sunum, vitrin liste (önbellek anahtarı v2) + detay + OG kapak + benzer ilanlar, danışman, malik/müşteri portalı,
+  vitrin favorileri, basılı broşür, ofis TV kapağı. Sözleşme testi `PUBLIC_MEDIA_SURFACES`: her `.from("property_media")` `selectWithDocumentFlag` içinde olmalı ve dosya kuralla
+  süzmeli; `src/app` altında ofis-dışı yeni bir medya okuyucusu listeye eklenmeden test kırmızı.
+- **Yükleme/yönetici:** galeride "Yükleme türü: Fotoğraf | Belge"; Belge seçilirse sunucu adı `belge-` önekiyle kaydeder (tetikleyici/ad kuralı kaydı İLK ANDAN gizler;
+  public görünme penceresi yok), filigran basılmaz, finalize işareti ayrıca yazar. Belgeler ayrı "Belgeler" bölümünde kilit rozetiyle ("Dışarıda gösterilmez"); kart başına
+  "Belge olarak işaretle" / "Fotoğraf yap", toplu "Belge yap (n)" / "Fotoğraf yap (n)" (`setPropertyMediaDocument`, `properties.edit`, denetim `property_media.document_flag`).
+  Belge kapak yapılamaz (`setCoverPropertyMedia` reddeder; toplu silmede yeni kapak ilk ilan görseli). Sütun yokken işaret anahtarları gizli, ayrım ad kuralıyla gösterilir.
+  `/app/belgeler` portföy medyasında belgeyi "Belge · dışarıda gösterilmez" etiketiyle listeler. `photo-quality/load.ts` aynı yardımcıya bağlandı.
+- **Test edilemeyenler:** canlı DB'de migration (ledger/dry-run sahipte), gerçek veride kaç satırın işaretleneceği (ÖLÇÜLMEDİ; uygulama öncesi
+  `select count(*) from property_media where public.media_file_name_looks_like_document(file_name)` fonksiyon olmadığından ILIKE ile elle sayılabilir), tarayıcıda yükleme türü/işaret
+  akışı, OG kartı, ofis TV'si.
+- **Doğrulama (bu dal):** type-check 0 · lint 0 · vitest 480 dosya / 5256 test geçti · check:migrations 0 (286 dosya, son 20261007000100) · check:migration-pairs 0 hata
+  (2 eski proposed/ ad uyarısı; K4 uyarısı kalktı) · check:links 0 · check:cron 0 · audit:actions 0 · admin-client envanteri yenilendi (yeni `createAdminClient` YOK) ·
+  build (sahte env) BUILD_EXIT=0. `direct-file-upload-contract.test.ts` finalize çağrısında 3. argümana (belge bayrağı) izin verecek şekilde güncellendi.
