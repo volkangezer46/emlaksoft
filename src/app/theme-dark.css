@@ -34,6 +34,18 @@ html[data-theme="dark"] {
   --viz-neutral: #94a3b8;
   --viz-gold: #f0c36a;
 
+  /* Durum metin tonları (kendi yumuşak zemininde AA; açık değerler tokens.css) */
+  --pm-success-text: #6ee7c8;
+  --pm-warn-text: #fbbf24;
+  --pm-danger-text: #fca5a5;
+  --pm-gold-text: #f0c36a;
+
+  /* Yan menü: koyu sayfa zemininden ayrışan ama ondan daha derin lacivert */
+  --sb-bg-top: #0c2350;
+  --sb-bg-mid: var(--navy-900);
+  --sb-bg-bottom: var(--navy-950);
+  --hero-art: #3c5f9f;
+
   /* Yüzeyler */
   --canvas: #0a1020;
   --surface: #101a2e;

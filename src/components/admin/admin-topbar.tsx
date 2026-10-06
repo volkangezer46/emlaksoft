@@ -92,18 +92,16 @@ export function AdminTopbar({
   const quickItems = QUICK.filter((q) => modules.includes(q.module));
 
   return (
-    <header className="glass-bar topbar-platform sticky top-0 z-40 flex h-14 items-center gap-3 pl-16 pr-4 md:px-6">
-      {/* Sol: platform konumu (süper admin ofis uygulamasından ayrışsın) */}
+    <header className="glass-bar topbar-platform sticky top-0 z-40 flex h-16 items-center gap-3 pl-16 pr-4 md:px-6">
+      {/* Sol: ev ikonlu konum şeridi — platform / rol / sayfa (süper admin ofis uygulamasından ayrışsın) */}
       <Breadcrumb
         className="hidden shrink-0 lg:block"
-        items={[
-          { label: `Platform · ${roleLabel}`, href: "/admin" },
-          { label: title },
-        ]}
+        home={{ href: "/admin", label: "Kontrol paneli" }}
+        items={[{ label: "Platform", href: "/admin" }, { label: roleLabel }, { label: title }]}
       />
 
-      {/* Orta: arama — flex-1 ile tüm boş alanı kapla */}
-      <div className="min-w-0 flex-1">
+      {/* Orta: arama — flex-1 ile boş alanı kapla, çok geniş ekranda okunur genişlikte kal */}
+      <div className="mx-auto min-w-0 max-w-2xl flex-1">
         <CommandPalette modules={modules} />
       </div>
 
@@ -116,9 +114,9 @@ export function AdminTopbar({
               aria-expanded={quickOpen}
               aria-haspopup="menu"
               aria-controls="admin-quick-menu"
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] px-3 py-2 text-xs font-bold text-white shadow-[0_8px_20px_-8px_rgba(20,99,255,0.7)] transition-[filter] hover:brightness-105"
+              className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-[0_8px_20px_-10px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-colors hover:bg-accent-hover"
             >
-              <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Hızlı erişim</span>
+              <Plus className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Hızlı erişim</span>
             </button>
             {quickOpen ? (
               <div id="admin-quick-menu" role="menu" className="absolute right-0 top-11 w-56 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
@@ -141,8 +139,9 @@ export function AdminTopbar({
           </div>
         ) : null}
 
-        <span className="hidden items-center gap-1.5 rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600 lg:inline-flex">
-          <span className="status-pulse h-1.5 w-1.5 rounded-full bg-mint-500" /> {clock}
+        {/* Canlı saat: gerçek canlı gösterge (tek sonsuz nabız istisnası); dakika hassasiyeti. */}
+        <span className="hidden h-10 items-center gap-2 rounded-full bg-mint-500/10 px-3 text-sm font-bold tabular-nums text-mint-700 lg:inline-flex" aria-label={clock ? `Saat ${clock}` : undefined}>
+          <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" aria-hidden /> {clock}
         </span>
 
         <ThemeToggle />

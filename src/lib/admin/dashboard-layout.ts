@@ -5,7 +5,9 @@
  *  - churn riski satırları (yalnız mevcut veriden: durum, deneme bitişi, 14 gün aktivite).
  *
  * Sahte içgörü ÜRETİLMEZ: her satır gerçek bir sayımdan gelir ve filtrelenmiş bir hedefe bağlanır.
- * Platform içgörüleri ayrı okunur (`src/lib/insights/platform-read.ts`); bkz. `ATTENTION_INSIGHT_SLOT` (page.tsx). Üretici kural henüz yok: veri yoksa boş kalır.
+ * Platform içgörüleri ayrı okunur (`src/lib/insights/platform-read.ts`, üretici `insights/platform-engine.ts`
+ * insight-engine cron'unda); bkz. `ATTENTION_INSIGHT_SLOT` (page.tsx). Okunamaz/boşsa hiçbir şey çizilmez.
+ * Büyüme/gelir metriklerinin saf hesabı ayrı modüldedir: `platform-metrics.ts`.
  */
 import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
 
@@ -18,20 +20,37 @@ export function homeVariantFor(role: PlatformRole): HomeVariant {
   return "platform";
 }
 
-export type HomeSection = "attention" | "mrr" | "churn" | "health" | "growth" | "composition" | "activity" | "geo";
+export type HomeSection =
+  | "attention"
+  | "mrr"
+  | "churn"
+  | "health"
+  | "activation"
+  | "modules"
+  | "unitEconomics"
+  | "usage"
+  | "churnReasons"
+  | "growth"
+  | "composition"
+  | "activity"
+  | "geo";
+
+/** Gelir/fatura verisi taşıyan bölümler: yalnız `billing` modülü olan rol görür. */
+const BILLING_SECTIONS: ReadonlySet<HomeSection> = new Set(["mrr", "composition", "unitEconomics", "usage", "churnReasons"]);
 
 /**
- * Platform panelinin bölüm sırası. super_admin gelir odaklıdır (MRR en üstte, kompozisyon var);
- * ops gelire erişemez (billing modülü yok): MRR/kompozisyon yoktur, sağlık ve churn öne çıkar.
+ * Platform panelinin bölüm sırası. super_admin gelir odaklıdır (MRR en üstte; birim ekonomisi,
+ * tüketim, churn nedenleri, kompozisyon); ops gelire erişemez (billing modülü yok): sağlık, churn,
+ * aktivasyon ve modül kullanımı öne çıkar.
  */
 export function platformHomeSections(role: PlatformRole): HomeSection[] {
   const base: HomeSection[] =
     role === "super_admin"
-      ? ["attention", "mrr", "churn", "health", "growth", "composition", "activity"]
-      : ["attention", "health", "churn", "growth", "activity"];
+      ? ["attention", "mrr", "churn", "health", "activation", "modules", "unitEconomics", "usage", "churnReasons", "composition", "growth", "activity"]
+      : ["attention", "health", "churn", "activation", "modules", "growth", "activity"];
   if (platformCanAccess(role, "geo")) base.push("geo");
   // Bir bölüm yalnız bir kez ve tanımlı modül kapısıyla çıkar.
-  return base.filter((s, i) => base.indexOf(s) === i && (s !== "mrr" && s !== "composition" ? true : platformCanAccess(role, "billing")));
+  return base.filter((s, i) => base.indexOf(s) === i && (!BILLING_SECTIONS.has(s) || platformCanAccess(role, "billing")));
 }
 
 export type AttentionInput = {
@@ -79,10 +98,10 @@ export function buildAttentionQueue(input: AttentionInput, role: PlatformRole): 
     { id: "manual-review", label: "Manuel ödeme incelemesi", hint: "Mutabakat kuyruğunda bekliyor", count: input.manualReview, href: "/admin/billing?odeme=manual_review#mutabakat", tone: "danger", severity: 90, module: "billing" },
     { id: "cron", label: "Hatalı biten zamanlanmış iş", hint: "Son çalışması hata verdi", count: input.cronErrors, href: "/admin/sistem", tone: "danger", severity: 85, module: "sistem" },
     { id: "urgent-ticket", label: "Acil destek talebi", hint: "Yanıt bekliyor", count: input.urgentTickets, href: "/admin/tickets?oncelik=urgent&durum=acik", tone: "danger", severity: 80, module: "tickets" },
-    { id: "risk", label: "Riskli ofis", hint: "Gecikmiş veya askıda; inceleyin", count: input.risk, href: "/admin/tenants?durum=past_due", tone: "warn", severity: 70, module: "tenants" },
+    { id: "risk", label: "Riskli ofis", hint: "Gecikmiş veya askıda; inceleyin", count: input.risk, href: "/admin/tenants?durum=risk", tone: "warn", severity: 70, module: "tenants" },
     { id: "ef-drift", label: "EmlakFiyati mutabakat sapması", hint: input.efReconciliation === "error" ? "Son mutabakat yapılamadı" : "Son mutabakatta fark var", count: efCount, href: "/admin/ef-kontor", tone: "warn", severity: 65, module: "billing" },
     { id: "open-ticket", label: "Açık destek talebi", hint: "Acil olmayanlar", count: nonUrgentOpen, href: "/admin/tickets?durum=acik", tone: "warn", severity: 50, module: "tickets" },
-    { id: "trial-ending", label: "Deneme 7 gün içinde bitiyor", hint: "Dönüşüm fırsatı", count: input.trialsEnding, href: "/admin/tenants?durum=trial", tone: "brand", severity: 45, module: "tenants" },
+    { id: "trial-ending", label: "Deneme 7 gün içinde bitiyor", hint: "Dönüşüm fırsatı", count: input.trialsEnding, href: "/admin/tenants?deneme=bitiyor", tone: "brand", severity: 45, module: "tenants" },
     { id: "new-trial", label: "Yeni deneme başlatan ofis", hint: "Kurulum sihirbazından geldi; ilk hafta karşılayın", count: input.newTrials, href: "/admin/tenants?durum=trial", tone: "brand", severity: 40, module: "tenants" },
   ];
   return candidates
@@ -99,7 +118,7 @@ export type ChurnTenant = {
   trial_ends_at: string | null;
 };
 
-export type ChurnSignal = { key: "past_due" | "trial_ending" | "inactive" | "quiet"; label: string; weight: number };
+export type ChurnSignal = { key: "past_due" | "suspended" | "inactive" | "quiet"; label: string; weight: number };
 
 export type ChurnRow = {
   id: string;
@@ -109,43 +128,66 @@ export type ChurnRow = {
   signals: ChurnSignal[];
   /** Son 14 gün denetim kaydı sayısı (tenant listesindeki "sağlık" rozetiyle aynı kaynak). */
   activity14d: number;
+  /** Son 14 gündeki son denetim kaydının zamanı; yoksa null ("14+ gün"). */
+  lastActivityAt: string | null;
+  level: ChurnLevel;
 };
 
-const DAY_MS = 86_400_000;
+export type ChurnLevel = "yuksek" | "orta" | "dusuk";
+
+/** Risk skoru → düzey: ≥5 yüksek, ≥3 orta, aksi düşük (sinyal ağırlıkları toplamı). */
+export function churnLevel(score: number): ChurnLevel {
+  if (score >= 5) return "yuksek";
+  if (score >= 3) return "orta";
+  return "dusuk";
+}
+
+/** Dikkat satırı şiddeti → önem düzeyi (AttentionList hapı): ≥85 acil, ≥70 yüksek, ≥50 orta, aksi düşük. */
+export function attentionLevel(severity: number): "acil" | "yuksek" | "orta" | "dusuk" {
+  if (severity >= 85) return "acil";
+  if (severity >= 70) return "yuksek";
+  if (severity >= 50) return "orta";
+  return "dusuk";
+}
+
 
 /**
- * Churn riski: yeni hesap UYDURULMAZ; mevcut üç gerçek veriden sinyal çıkarılır
- * (abonelik durumu, deneme bitişi, 14 gün aktivite) ve aynı eşikler tenant listesiyle tutarlıdır
- * (>=10 aktif, 1-9 sessiz, 0 hareketsiz). Sinyali olmayan ofis listelenmez; veri yoksa boş döner.
+ * Riskli ofisler + churn sinyalleri (TEK liste; "Riskli ofis" sayımı ve churn tablosu birleşti):
+ * yeni hesap UYDURULMAZ; mevcut gerçek veriden sinyal çıkarılır (abonelik durumu: gecikmiş/askıda,
+ * 14 gün aktivite) ve eşikler tenant listesiyle tutarlıdır (>=10 aktif, 1-9 sessiz, 0 hareketsiz).
+ * Deneme bitişi churn DEĞİL dönüşüm fırsatıdır: yalnız dikkat kuyruğunda ("Deneme 7 gün içinde
+ * bitiyor") görünür, burada tekrarlanmaz. Sinyali olmayan ofis listelenmez; veri yoksa boş döner.
  */
 export function buildChurnRows(
   tenants: readonly ChurnTenant[],
   activityByTenant: ReadonlyMap<string, number>,
   nowMs: number,
   limit = 8,
+  lastActivityByTenant: ReadonlyMap<string, string> = new Map(),
 ): ChurnRow[] {
+  void nowMs;
   const rows: ChurnRow[] = [];
   for (const t of tenants) {
-    if (t.status !== "active" && t.status !== "trial" && t.status !== "past_due") continue;
+    if (t.status !== "active" && t.status !== "trial" && t.status !== "past_due" && t.status !== "suspended") continue;
     const act = activityByTenant.get(t.id) ?? 0;
     const signals: ChurnSignal[] = [];
-    if (t.status === "past_due") signals.push({ key: "past_due", label: "Ödeme gecikmiş", weight: 3 });
-    if (t.status === "trial" && t.trial_ends_at) {
-      const left = new Date(t.trial_ends_at).getTime() - nowMs;
-      if (left >= 0 && left <= 7 * DAY_MS) signals.push({ key: "trial_ending", label: "Deneme 7 gün içinde bitiyor", weight: 2 });
-    }
+    if (t.status === "past_due") signals.push({ key: "past_due", label: "Ödeme gecikmesi", weight: 3 });
+    if (t.status === "suspended") signals.push({ key: "suspended", label: "Askıda", weight: 3 });
     if (act === 0) signals.push({ key: "inactive", label: "14 gündür hareket yok", weight: 3 });
-    else if (act < 10) signals.push({ key: "quiet", label: `Sessiz (${act} hareket)`, weight: 1 });
+    else if (act < 10) signals.push({ key: "quiet", label: "Düşük kullanım", weight: 1 });
     if (signals.length === 0) continue;
-    // Yeni açılmış, henüz hareketi olmayan deneme tek başına risk sayılmaz.
-    if (signals.length === 1 && signals[0]!.key === "inactive" && t.status === "trial") continue;
+    // Deneme ofisinin hareketsizliği/sessizliği tek başına churn sayılmaz (henüz kurulumda).
+    if (t.status === "trial" && signals.every((s) => s.key === "inactive" || s.key === "quiet")) continue;
+    const score = signals.reduce((n, s) => n + s.weight, 0);
     rows.push({
       id: t.id,
       name: t.name,
       href: `/admin/tenants/${t.id}`,
-      score: signals.reduce((n, s) => n + s.weight, 0),
+      score,
       signals,
       activity14d: act,
+      lastActivityAt: lastActivityByTenant.get(t.id) ?? null,
+      level: churnLevel(score),
     });
   }
   return rows.sort((a, b) => b.score - a.score || a.activity14d - b.activity14d || a.name.localeCompare(b.name, "tr")).slice(0, limit);

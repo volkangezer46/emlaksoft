@@ -11,8 +11,17 @@ Amaç: sayfalar arası tutarlılık. Aynı iş için tek bileşen.
 | Arama + durum sekmesi + filtre paneli + sonuç sayısı | `FilterBar` (`ui/filter-bar`) | Sunucu bileşeni, form GET, URL ile iki yönlü |
 | Tarih aralığı | `DateRangeField` | FilterBar `panel` içinde kullan |
 | Durum etiketi | `StatusBadge` (`ui/status-badge`) | Yalnız 3 anlam: `neutral`, `attention`, `success` |
-| Boş liste/kart | `EmptyStateV3` | `inline` / `compact` / `full` |
+| Boş liste/kart | `EmptyState` (`ui/empty-state`; `EmptyStateV3` eski ad) | `inline` / `compact` / `panel` / `full` |
 | Serbest renkli etiket | `Badge` (eski) | Yeni sayfalarda StatusBadge tercih edilir |
+| Panel KPI kartı | `KpiCard` + `KpiGrid` (`ui/kpi-card`) | `href` zorunlu; `layout="inline"`, `tinted`, `trend`; iskelet `KpiGridSkeleton` |
+| Grafik / panel kartı | `ChartCard` (`ui/chart-frame`) | ikon karosu, `aside`, `href`, `loading`, `empty` |
+| Zaman serisi (para/oran) | `AreaTrendChart` (`ui/lazy-charts`) | son nokta etiketi, kesikli tahmin; ipucu TEK `ChartTooltip` |
+| "Şimdi ne yapmalıyım" kuyruğu | `AttentionList` (`ui/attention-list`) | Acil/Yüksek/Orta/Düşük; `children` = öneriler |
+| Öneri / içgörü | `InsightCard` + `InsightSection` (`ui/insight-card`) | Ertele/Yoksay `actions` yuvası |
+| Panel karşılama | `DashboardHero` (`ui/dashboard-hero`) | tek h1; özet KPI tekrarlamaz; `aside` = dönem seçici |
+| URL filtresi segmenti | `SegmentedControl` (`ui/segmented-control`) | seçenekler bağlantıdır; kayan hap |
+| Durum mini kartı | `StatusTile` (`ui/status-tile`) | ilerleme yalnız gerçek pay ile |
+| Görünürlükte giriş / içerik geçişi | `Reveal`, `Stagger`, `FadeSwap` (`ui/motion`) | ilk ekranın ALTINDA; reduce'ta durağan |
 
 ## Sayfa şablonu
 
@@ -72,6 +81,70 @@ Aşağıdaki özelliklerin HEPSİ opt-in; hiçbiri verilmezse davranış eskisiy
 | `caption` | Ekran okuyucu için tablo adı. |
 
 Kural: yeni tablo sayfasında `keyboardNav`, `densityToggle` + `storageKey` ve çok sütunlu ise `columnMenu`/`mobileCards` açılması önerilir.
+## Tasarım sistemi v4 (2026-10-06): tek dil, /admin kontrol paneli referans
+
+Dil: Linear + Stripe + Vercel + sakin fintech; açık tema ağırlıklı (koyu yalnız /app ve /admin). Lacivert marka zemini
+(yan menü), beyaz/açık mavi yüzeyler, kontrollü altın (para, premium an, aktif işaret çizgisi). Hiyerarşi boşluk ve
+tipografiyle; renk anlam taşır, süs değildir. Referans uygulama: `src/app/admin/page.tsx` (+ `_dashboards/*`).
+
+### Token katmanı (tek kaynak `src/app/tokens.css`)
+
+| Grup | Token | Not |
+|---|---|---|
+| Lacivert (değişmez) | `--navy-950..600`, `--grad-navy` | Koyu temada ve `.theme-dark` kapsamında yeniden tanımlanmaz; sabit lacivert gereken her yer bunu kullanır (ham hex yok, sözleşme testi) |
+| Altın | `--gold-200..700`, `--gold-ink` (altın dolgu üstü metin) | metin olarak `--pm-gold-text` (AA) |
+| Durum metni | `--pm-success/warn/danger/gold-text` | koyu karşılık `theme-dark.css` ilk blok |
+| Boşluk | `--space-1..12` (4 px tabanlı: 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80) | bileşen iç boşluğu `.ds-pad` = `--space-4/5` |
+| Gösterge tipografisi | `--fs-eyebrow`, `--fs-kpi`, `--fs-kpi-lg`, `--fs-money-hero`, `--tracking-eyebrow` | gövde ölçeği `--fs-*` |
+| Gölge | `--elev-1..5`, `--card-shadow`, `--card-shadow-hover` | koyuda koyu gölge + ince üst ışık |
+| Kabuk | `--sb-bg-top/mid/bottom` (yan menü), `--nav-badge-*`, `--hero-art` | koyuda menü bir ton derin |
+| Radius | `--radius-chip/control/card/panel/hero` (`@theme`) | |
+| Hareket | `--motion-*`, `--ease-*` | TEK tanım `motion.css` (sözleşme testleri oradan okur); TS karşılığı `ui/motion/tokens.ts` (test eşitler) |
+
+### Kanonik bileşenler
+
+Hepsi `src/components/ui`; ton/ikon karosu mevcut `.pm-t-*` + `.pm-ico` (yeni ton sınıfı yazılmaz), kart/satır/hap CSS'i
+`premium.css` "Tasarım sistemi v4 (ds-*)" bölümünde. Eski adlar ince sarmalayıcı/yeniden dışa aktarım olarak çalışır:
+`StatCard` → `KpiTile`; `ChartFrame` = `ChartCard`; `app/_ui/lazy-chart` → `ui/lazy-charts`; `EmptyStateV3` ve
+`components/app/empty-state` → `ui/empty-state`; `components/app/skeleton` → `ui/skeleton`; admin `CountUp`/`OdometerNumber` → `ui/count-up`.
+
+- **KpiCard / KpiGrid:** tek uygulama `KpiTile`. `layout="inline"` (ikon solda, etiket, büyük tabular değer + trend hapı,
+  alt metin), `tinted` (tonun hafif degradesi + tonlu kenar), sayaç `CountUp` (ilk görünümde bir kez, reduce'ta anında).
+  Trend yalnız gerçek önceki değerle (`computeTrend`); önceki yoksa hap yok.
+- **ChartCard:** başlık şeridi (ikon karosu, başlık, alt başlık · dönem, `aside`, `action`, ayrıntı bağlantısı), gövde
+  `loading` iskeleti veya `empty` anlamlı boş durum. `height={0}` serbest yükseklik.
+- **ChartTooltip:** TEK ipucu (recharts'sız modül); her Recharts grafiği bunu kullanır. **AreaTrendChart:** altın (para) /
+  mavi seri, degrade dolgu, son gerçek noktada halka + değer etiketi, kesikli TAHMİN uzantısı, `animationKey` ile
+  yeniden çizim (500 ms ease-out), sr-only veri tablosu. Recharts yalnız tembel kapıdan (`ui/lazy-charts`).
+- **AttentionList:** önem dört düzey (Acil/Yüksek/Orta/Düşük; hap metni + ikon), satır tamamı filtreli hedef, boş durum,
+  `children` yuvası (öneriler). **InsightCard:** başlık hedefe, neden, kanıt, önem/tahmin etiketi, Ertele/Yoksay.
+- **DashboardHero:** üst tarih satırı, selamlama (tek h1), tek cümle özet (KPI'ları TEKRARLAMAZ; en öncelikli işi adıyla
+  ve bağlantısıyla söyler), tazelik, sağda dönem seçici; soluk mavi izometrik `CitySkyline`.
+- **SegmentedControl:** URL filtre kontratı (seçenek = bağlantı, JS'siz çalışır); tıklayınca hap anında kayar (CSS
+  transform, `--ease-spring`). `motion` layoutId KULLANILMAZ (domMax +~25 KB gerektirir).
+- **StatusTile:** durum noktası + etiket, değer, alt metin, isteğe bağlı ilerleme çubuğu (`role="meter"`).
+- **İllüstrasyon:** `CitySkyline` (hero), `ev`, `anahtar`, `haritaPin` (+ mevcut `liste`, `basari` …); hepsi
+  `currentColor` + token, < 6 KB.
+- **Kabuk:** iki yan menü + çekmece `.sb-surface` (lacivert degrade); aktif öğe DOLGULU vurgu hapı (beyaz yazı
+  `--accent` üstünde AA) + kayan altın çizgi; admin menüsünde "Sistem durumu" kartı gerçek sağlık verisinden
+  (`getAdminHealth`: DB yanıt süresi, cron sayısı/hatalı iş adı, "Son kontrol" = ölçüm anı). Üst çubuk: ev ikonlu konum
+  şeridi, yuvarlak arama kapsülü (Ctrl K), dolgulu "Hızlı erişim", canlı saat hapı, zil, `UserMenuFace` (tek yüz).
+  Bilgi şeridi (MFA/geliştirme modu) içerikte yuvarlak `tone-warning` kart.
+
+### Hareket katmanı (`src/components/ui/motion`)
+
+- `motion` paketi YALNIZ `LazyMotion` (strict) + `domAnimation` (ayrı parçada tembel) + `m.*`; `MotionConfig
+  reducedMotion="user"`. İçe aktarım yalnız bu klasörde (sözleşme testi `motion-layer.test.ts`). Lottie ve GIF YOK.
+- `Reveal` / `Stagger`: sunucu çıktısı görünür; yalnız ekranın ALTINDAKİ öğe kurulur ve kaydırınca bir kez belirir
+  (opacity + 8 px, 320 ms; stagger 40 ms, ≤ 12 öğe; motion `m.*`). `FadeSwap`: `?donem=` gibi URL filtresi değişince
+  yeni içerik girişi (motion.css `.motion-swap`, 0 KB; AnimatePresence çıkış animasyonu ilk yüke ~10 KB ekliyordu, ölçülüp
+  bırakıldı). Arama parametresi değişimi sayfayı yeniden bağlamaz (Next template belgesi). Sayfa geçişi /app ve /admin `template.tsx` ortak `<ViewTransition>`.
+- Mikro etkileşim: tıklanabilir kart 2 px yükselir + gölge bir kademe (140 ms), yalnız `prefers-reduced-motion:
+  no-preference` ve `hover: hover`; taban `:hover` kuralı hareketsizdir.
+- Hareketli degrade YALNIZ `DashboardHero` (`.ds-hero-ambient`, transform, 18 sn alternate; ekran dışında ve sekme
+  gizliyken `animation-play-state: paused`, reduce'ta hiç yok). Sonsuz döngünün diğer tek istisnası canlı göstergeler
+  (canlı saat, "Çevrimiçi" noktası).
+
 ## Tema sistemi (mod + vurgu)
 
 Dosyalar: `src/app/tokens.css` (ham skala + semantik takma adlar + `@theme`), `theme-dark.css` (yalnız koyu değerler),
@@ -177,9 +250,10 @@ Kurallar:
 - **Ton:** `brand | success | warn | danger | gold | neutral` → `.pm-t-*` sınıfları `--t` (çizgi/ikon), `--t-soft`
   (zemin), `--t-text` (yazı) üretir. Yeni ton eklenirse AA testine de eklenir.
 - **Hareket:** yıldız/pencere ışıltısı ve kart kalkması yalnız `prefers-reduced-motion: no-preference` içindedir.
-- **Yan menü:** aktif öğe `.nav-gold-active` (altın degrade + ince kenar) + `.nav-gold-bar`; menü arama kutusu
-  `.nav-search` (yalnız izinli sayfalarda süzer). "Canlı" sistem kartı yalnız gerçek bir sağlık sinyali varsa eklenir
-  (şu an layout bu sinyali taşımadığı için eklenmedi).
+- **Yan menü (v4 ile güncellendi):** aktif öğe `.nav-pill` = dolgulu vurgu hapı + kayan altın `.nav-bar`; zemin
+  `.sb-surface`. Admin menüsündeki arama kutusu kaldırıldı (üst çubuk Ctrl K); "Sistem durumu" kartı gerçek sağlık
+  verisiyle eklendi. `HeroBanner` / `GlassKpi` / `CityNight` artık importer'sız (admin panelleri `DashboardHero`'ya
+  geçti); sonraki temizlikte silinebilir.
 - **Tema:** "Gece Altın" vurgusu (`data-accent="gold"`): `--brand-600 #9a6700` (beyaz yazı 4.87:1), metin `#7a5200`
   açıkta, `#f0c36a` koyuda; `ACCENTS` tablosu, `themes.css` ve boot script ile senkron.
 
@@ -419,11 +493,14 @@ Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--
 - reduced-motion: genel kural TEK yerde (`a11y.css`); bileşenler bitiş durumunda durağandır; Recharts `isAnimationActive={!reduce}`.
 - `InteractiveChart`: klavye (Tab ile odak, ←/→, Home/End, Esc), `aria-live` duyuru ve sr-only veri tablosu.
 
-### Karar: 3B, GIF, Lottie
+### Karar: 3B, GIF, Lottie, degrade, motion (güncel: 2026-10-06)
 
 - **3B pasta/çubuk yok:** derinlik algıyı bozar (ön dilim büyük görünür); yanıltıcı. Derinlik ipucu yalnız yüzey katmanları, ince iç ışık çizgisi (`--inner-top`), yumuşak gölge ve çizgi altı gradyan ile verilir.
 - **GIF yok:** tema duyarsız (koyu/açık), ağır, erişilemez. Hareket SVG + CSS illüstrasyon animasyonlarıdır (`ui/illustrations`, `motion.css`).
 - **Lottie yok:** yeni bağımlılık + paket büyümesi + tema renklerine bağlanamama; SVG+CSS aynı işi ölçülü ve kurumsal yapar.
+- **Dekoratif degrade:** yalnız `DashboardHero` bandında, çok hafif ve hareketli (yukarıdaki kurallar); kart/panel
+  yüzeylerinde degrade dolgu yok (`pm-card-tint` yalnız %8 ton sönmesi). Bulanık (blur) büyük katman yok.
+- **motion:** kuruldu ama yalnız `LazyMotion` + `domAnimation` + `m.*` (bkz. "Hareket katmanı"); `domMax`/layoutId yok.
 
 ## Marka
 

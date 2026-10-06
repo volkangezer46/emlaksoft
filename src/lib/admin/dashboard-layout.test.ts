@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   ATTENTION_LIMIT,
+  attentionLevel,
   buildAttentionQueue,
   buildChurnRows,
+  churnLevel,
   homeVariantFor,
   platformHomeSections,
   type AttentionInput,
@@ -123,20 +125,53 @@ describe("buildChurnRows", () => {
     expect(rows[0]!.href).toBe("/admin/tenants/p");
   });
 
-  it("yeni deneme tek başına hareketsizlikle risk sayılmaz; bitmek üzere olan sayılır", () => {
+  it("deneme ofisi hareketsiz/sessiz diye churn sayılmaz; deneme bitişi churn sinyali DEĞİL (yalnız dikkat kuyruğunda)", () => {
     const rows = buildChurnRows(
       [
         { id: "n", name: "Yeni", status: "trial", trial_ends_at: new Date(NOW + 20 * day).toISOString() },
         { id: "e", name: "Bitiyor", status: "trial", trial_ends_at: new Date(NOW + 2 * day).toISOString() },
+        { id: "s", name: "Sessiz deneme", status: "trial", trial_ends_at: null },
       ],
-      new Map([["e", 15]]),
+      new Map([["e", 15], ["s", 3]]),
       NOW,
     );
-    expect(rows.map((r) => r.id)).toEqual(["e"]);
+    expect(rows).toEqual([]);
   });
 
-  it("iptal/askıdaki ofisler dışlanır ve limit uygulanır", () => {
+  it("askıdaki ofis riskli listeye girer (riskli ofis + churn tek liste); iptal dışlanır; limit uygulanır", () => {
+    const rows = buildChurnRows(
+      [
+        { id: "a", name: "Askıda", status: "suspended", trial_ends_at: null },
+        { id: "c", name: "İptal", status: "cancelled", trial_ends_at: null },
+      ],
+      new Map([["a", 12]]),
+      NOW,
+    );
+    expect(rows.map((r) => r.id)).toEqual(["a"]);
+    expect(rows[0]!.signals.map((s) => s.label)).toEqual(["Askıda"]);
     const many = Array.from({ length: 20 }, (_, i) => ({ id: `t${i}`, name: `T${i}`, status: "past_due", trial_ends_at: null }));
-    expect(buildChurnRows([...many, { id: "c", name: "C", status: "cancelled", trial_ends_at: null }], new Map(), NOW, 5)).toHaveLength(5);
+    expect(buildChurnRows(many, new Map(), NOW, 5)).toHaveLength(5);
+  });
+
+  it("son hareket zamanı ve risk düzeyi satıra işlenir", () => {
+    const rows = buildChurnRows(
+      [{ id: "p", name: "Gecikmiş", status: "past_due", trial_ends_at: null }],
+      new Map([["p", 4]]),
+      NOW,
+      8,
+      new Map([["p", "2026-10-01T09:00:00Z"]]),
+    );
+    expect(rows[0]!.lastActivityAt).toBe("2026-10-01T09:00:00Z");
+    expect(rows[0]!.signals.map((s) => s.label)).toEqual(["Ödeme gecikmesi", "Düşük kullanım"]);
+    expect(rows[0]!.level).toBe("orta");
+  });
+});
+
+describe("önem / risk düzeyleri", () => {
+  it("dikkat şiddeti → Acil/Yüksek/Orta/Düşük", () => {
+    expect([100, 85, 80, 70, 65, 50, 45, 40].map(attentionLevel)).toEqual(["acil", "acil", "yuksek", "yuksek", "orta", "orta", "dusuk", "dusuk"]);
+  });
+  it("churn skoru → düzey", () => {
+    expect([6, 5, 4, 3, 1].map(churnLevel)).toEqual(["yuksek", "yuksek", "orta", "orta", "dusuk"]);
   });
 });

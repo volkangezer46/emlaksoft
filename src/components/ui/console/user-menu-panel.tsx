@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
+import { LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
+import { USER_MENU_TRIGGER_CLASS, UserMenuFace } from "./user-menu-face";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { clearTourDone, TOUR_RESTART_HREF } from "@/lib/product-tour-storage";
@@ -46,18 +47,8 @@ export function UserMenuPanel({
   const inApp = (usePathname() ?? "").startsWith("/app");
   return (
     <DropdownMenu defaultOpen={initialOpen}>
-      <DropdownMenuTrigger
-        aria-label={`Kullanıcı menüsü: ${name}`}
-        className="focus-ring flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-1 transition-colors hover:border-brand-300 sm:pr-2"
-      >
-        <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white" aria-hidden>
-          {initials}
-        </span>
-        <span className="hidden min-w-0 text-left xl:block">
-          <span className="block max-w-28 truncate text-xs font-semibold text-text">{name}</span>
-          <span className="block max-w-28 truncate text-xs text-text-muted">{subtitle}</span>
-        </span>
-        <ChevronDown className="hidden h-3.5 w-3.5 text-text-faint sm:block" aria-hidden />
+      <DropdownMenuTrigger aria-label={`Kullanıcı menüsü: ${name}`} className={USER_MENU_TRIGGER_CLASS}>
+        <UserMenuFace initials={initials} name={name} subtitle={subtitle} />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-72">
         <DropdownMenuLabel>

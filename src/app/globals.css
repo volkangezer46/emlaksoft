@@ -123,13 +123,12 @@ aside ::selection {
    bu kural onları bozmaz, yalnızca koyu bağlamdakileri kurtarır. */
 option,
 optgroup {
-  /* SABİT koyu hex — var(--ink-950) KULLANMA: koyu hero `.theme-dark` kapsamında
-     --ink-950 #fff'e döner (koyu zeminde "ink metin" beyaz olsun diye). Native
-     option popup'ı DAİMA beyaz sistem zemininde açıldığından yazı her zaman koyu
-     kalmalı; değişkeni kullanmak koyu hero içindeki select'te beyaz-üstüne-beyaz
-     üretiyordu. */
+  /* DEĞİŞMEZ lacivert (--navy-900) — var(--ink-950) KULLANMA: koyu hero `.theme-dark`
+     kapsamında --ink-950 #fff'e döner (koyu zeminde "ink metin" beyaz olsun diye).
+     Native option popup'ı DAİMA beyaz sistem zemininde açıldığından yazı her zaman
+     koyu kalmalı; --navy-* ölçeği hiçbir kapsamda yeniden tanımlanmaz. */
   background-color: #ffffff;
-  color: #071a38;
+  color: var(--navy-900);
 }
 
 /* Native tarih/saat/select ikonları ve popup'ı açık şema izlesin — koyu hero
@@ -600,9 +599,9 @@ p {
 /* Koyu bölüm içindeki açık zeminli öğeler (beyaz/amber pill & buton):
    ink token'ını geri koyulaştır — yoksa beyaz üstüne beyaz metin görünmez olur. */
 .theme-dark :is(.bg-white, .bg-amber-400) {
-  --ink-950: #071a38;
-  --ink-900: #0a2147;
-  --heading: #071a38;
+  --ink-950: var(--navy-900);
+  --ink-900: var(--navy-800);
+  --heading: var(--navy-900);
 }
 
 .photo-stage {
@@ -973,15 +972,7 @@ p {
   .bar-live, .bar-rise { animation: none !important; transform: none !important; }
 }
 
-/* Panel sayfa geçişi — her navigasyonda zarif giriş (template.tsx ile) */
-@keyframes page-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
-}
-.page-in { animation: page-in var(--motion-nav) var(--ease-out-expo) both; }
-@media (prefers-reduced-motion: reduce) {
-  .page-in { animation: none; }
-}
+/* Panel sayfa geçişi: /app ve /admin template.tsx ortak <ViewTransition> + motion.css `.motion-page` (aşağıda ::view-transition kuralları). */
 
 /* ============================================================================
    YAZDIRMA / PDF
@@ -1316,8 +1307,8 @@ p {
    token'lari .theme-dark icinde beyaza dondugu icin burada geri koyulasir.
    (Mevcut `.theme-dark :is(.bg-white, .bg-amber-400)` kuralinin devami.) */
 .theme-dark :is(.tone-success, .tone-warning, .tone-danger, .tone-info, .tone-neutral, .glass-card, .surface-mesh, .skeleton) {
-  --ink-950: #071a38;
-  --ink-900: #0a2147;
+  --ink-950: var(--navy-900);
+  --ink-900: var(--navy-800);
   --text: #172033;
   --text-muted: #667085;
   --text-faint: #98a2b3;
@@ -1337,7 +1328,7 @@ p {
 }
 /* Koyu baglamda ayni doku — beyaz zemin bastirmadan */
 .surface-mesh-dark {
-  background-color: #071a38;
+  background-color: var(--navy-900);
   background-image:
     radial-gradient(60% 55% at 8% 0%, rgba(20, 99, 255, 0.22), transparent 62%),
     radial-gradient(55% 50% at 98% 8%, rgba(34, 211, 238, 0.16), transparent 58%),

@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   Area,
   AreaChart,
@@ -17,6 +18,8 @@ import {
 } from "recharts";
 import { ChartFrame } from "@/components/ui/chart-frame";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
+import { ChartTooltip } from "@/components/ui/chart-tooltip";
+import { formatChartAxis, formatChartValue, type ChartValueFormat } from "@/components/ui/chart-format";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 
 /**
@@ -25,34 +28,15 @@ import { useReducedMotion } from "@/components/ui/use-reduced-motion";
  * Neden Recharts: SVG tabanlı, MIT, React 19 uyumlu ve renkleri doğrudan
  * CSS değişkeni olarak kabul ediyor — yani paletimizi ikinci kez tanımlamıyoruz.
  * Palet `--viz-1..8` tokenlarıdır (chart-colors.ts; iki temada kontrastı
- * sözleşme testiyle korunur).
+ * sözleşme testiyle korunur). İpucu TEK bileşendir: `ChartTooltip` (chart-tooltip.tsx).
  *
  * Props serileştirilebilir (düz dizi + string anahtar), bu yüzden Server
- * Component sayfalardan doğrudan çağrılabilir.
+ * Component sayfalardan doğrudan çağrılabilir. İlk yük JS'ine girmemesi için
+ * sayfalar bu modülü tembel kapıdan (`@/components/ui/lazy-charts`) alır.
  */
 
-export { CHART_COLORS };
-
-const numberFormatter = new Intl.NumberFormat("tr-TR");
-const compactFormatter = new Intl.NumberFormat("tr-TR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const tryFormatter = new Intl.NumberFormat("tr-TR", {
-  style: "currency",
-  currency: "TRY",
-  maximumFractionDigits: 0,
-});
-
-export type ChartValueFormat = "number" | "money" | "percent";
-
-function formatValue(value: number, format: ChartValueFormat = "number") {
-  if (format === "money") return tryFormatter.format(value);
-  if (format === "percent") return `%${numberFormatter.format(value)}`;
-  return numberFormatter.format(value);
-}
-
-export { ChartFrame };
+export { CHART_COLORS, ChartTooltip, ChartFrame };
+export type { ChartValueFormat };
 
 /**
  * Hareket azaltma: Recharts'ın kendi giriş animasyonu (`isAnimationActive`) kapatılır.
@@ -67,48 +51,6 @@ const axisProps = {
   tickLine: false,
   axisLine: false,
 } as const;
-
-type TooltipPayloadItem = {
-  name?: string | number;
-  value?: number | string;
-  color?: string;
-  dataKey?: string | number;
-};
-
-function ChartTooltip({
-  active,
-  payload,
-  label,
-  format,
-}: {
-  active?: boolean;
-  payload?: TooltipPayloadItem[];
-  label?: string | number;
-  format?: ChartValueFormat;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-2 shadow-[var(--inner-top),var(--elev-4)]">
-      {label != null ? (
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-faint">
-          {label}
-        </p>
-      ) : null}
-      {payload.map((item, index) => (
-        <p key={index} className="flex items-center gap-2 text-sm text-[color:var(--viz-tooltip-text)]">
-          <span
-            className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40"
-            style={{ background: item.color ?? CHART_COLORS[0] }}
-          />
-          <span className="text-text-muted">{item.name}</span>
-          <span className="numeric ml-auto font-bold">
-            {formatValue(Number(item.value ?? 0), format)}
-          </span>
-        </p>
-      ))}
-    </div>
-  );
-}
 
 /** Zaman serisi / trend — gradient dolgulu alan grafiği. */
 export function AreaTrend({
@@ -141,23 +83,10 @@ export function AreaTrend({
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--viz-grid)" vertical={false} />
         <XAxis dataKey={xKey} {...axisProps} />
-        <YAxis
-          {...axisProps}
-          width={48}
-          tickFormatter={(v: number) =>
-            compactAxis ? compactFormatter.format(v) : numberFormatter.format(v)
-          }
-        />
-        <Tooltip
-          content={<ChartTooltip format={format} />}
-          cursor={{ stroke: "var(--brand-300)", strokeWidth: 1 }}
-        />
+        <YAxis {...axisProps} width={48} tickFormatter={(v: number) => formatChartAxis(v, compactAxis)} />
+        <Tooltip content={<ChartTooltip format={format} />} cursor={{ stroke: "var(--brand-300)", strokeWidth: 1 }} />
         {series.length > 1 ? (
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }}
-          />
+          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
         ) : null}
         {series.map((s, index) => {
           const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
@@ -211,13 +140,13 @@ export function BarCompare({
         <CartesianGrid strokeDasharray="3 3" stroke="var(--viz-grid)" vertical={horizontal} horizontal={!horizontal} />
         {horizontal ? (
           <>
-            <XAxis type="number" {...axisProps} tickFormatter={(v: number) => compactFormatter.format(v)} />
+            <XAxis type="number" {...axisProps} tickFormatter={(v: number) => formatChartAxis(v)} />
             <YAxis type="category" dataKey={xKey} {...axisProps} width={110} />
           </>
         ) : (
           <>
             <XAxis dataKey={xKey} {...axisProps} />
-            <YAxis {...axisProps} width={48} tickFormatter={(v: number) => compactFormatter.format(v)} />
+            <YAxis {...axisProps} width={48} tickFormatter={(v: number) => formatChartAxis(v)} />
           </>
         )}
         <Tooltip content={<ChartTooltip format={format} />} cursor={{ fill: "var(--brand-600)", fillOpacity: 0.05 }} />
@@ -279,23 +208,162 @@ export function DonutSplit({
             ))}
           </Pie>
           <Tooltip content={<ChartTooltip format={format} />} />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }}
-          />
+          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-x-0 top-[38%] -translate-y-1/2 text-center">
         <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-[color:var(--viz-tooltip-text)]">
-          {formatValue(total, format)}
+          {formatChartValue(total, format)}
         </p>
         {centerLabel ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
-            {centerLabel}
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">{centerLabel}</p>
         ) : null}
       </div>
     </div>
+  );
+}
+
+// ---- AreaTrendChart (tasarım sistemi v4) ---------------------------------------
+
+export type TrendPoint = {
+  label: string;
+  /** Gerçek değer; tahmin noktasında null. */
+  value: number | null;
+  /** Tahmin değeri (kesikli çizgi); son gerçek noktada değerle aynı verilir ki çizgi kopmasın. */
+  forecast?: number | null;
+};
+
+const TREND_TONE = {
+  gold: "var(--viz-gold)",
+  brand: "var(--viz-1)",
+  success: "var(--viz-2)",
+  violet: "var(--viz-4)",
+} as const;
+
+type DotProps = { cx?: number; cy?: number; index?: number; value?: number | null };
+
+/**
+ * AreaTrendChart — tek seri premium alan grafiği: altın (para) veya mavi çizgi, alttan sönen
+ * degrade dolgu, SON gerçek noktada halka + değer etiketi, isteğe bağlı kesikli TAHMİN uzantısı.
+ * Dönem/filtre değişince `animationKey` ile yeniden çizilir (500 ms ease-out; reduce'ta yok).
+ * Ekran okuyucu için sr-only veri tablosu; ipucu ortak `ChartTooltip`.
+ */
+export function AreaTrendChart({
+  data,
+  tone = "gold",
+  format = "money",
+  formatValue,
+  name = "Değer",
+  forecastName = "Tahmin",
+  showLastLabel = true,
+  animationKey,
+  ariaLabel,
+}: {
+  data: readonly TrendPoint[];
+  tone?: keyof typeof TREND_TONE;
+  format?: ChartValueFormat;
+  formatValue?: (n: number) => string;
+  name?: string;
+  forecastName?: string;
+  showLastLabel?: boolean;
+  animationKey?: string | number;
+  ariaLabel?: string;
+}) {
+  const reduce = useReducedMotion();
+  const gid = useId().replace(/:/g, "");
+  const color = TREND_TONE[tone];
+  const fmt = (n: number) => (formatValue ? formatValue(n) : formatChartValue(n, format));
+  let lastIdx = -1;
+  data.forEach((d, i) => {
+    if (d.value !== null && Number.isFinite(d.value)) lastIdx = i;
+  });
+  const hasForecast = data.some((d) => d.forecast !== null && d.forecast !== undefined);
+  const rows = data.map((d) => ({ label: d.label, value: d.value, forecast: d.forecast ?? null }));
+
+  const renderDot = (props: DotProps) => {
+    const { cx, cy, index, value } = props;
+    if (index !== lastIdx || cx === undefined || cy === undefined || value === null || value === undefined) {
+      return <g key={`d-${index}`} />;
+    }
+    const text = fmt(Number(value));
+    const w = Math.max(48, text.length * 7.4 + 18);
+    return (
+      <g key={`d-${index}`}>
+        <circle cx={cx} cy={cy} r={10} fill={color} opacity={0.18} />
+        <circle cx={cx} cy={cy} r={5} fill="var(--surface-raised)" stroke={color} strokeWidth={3} />
+        {showLastLabel ? (
+          <g transform={`translate(${Math.max(4, cx - w + 8)}, ${Math.max(2, cy - 38)})`}>
+            <rect width={w} height={24} rx={8} fill="var(--surface-raised)" stroke="var(--hairline-strong)" />
+            <text x={w / 2} y={16} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--viz-tooltip-text)" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {text}
+            </text>
+          </g>
+        ) : null}
+      </g>
+    );
+  };
+
+  return (
+    <figure className="relative h-full" aria-label={ariaLabel}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart key={animationKey} data={rows} margin={{ top: 40, right: 14, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`atc-${gid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 4" stroke="var(--viz-grid)" vertical={false} />
+          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
+          <YAxis {...axisProps} width={44} tickFormatter={(v: number) => formatChartAxis(v)} />
+          <Tooltip
+            content={<ChartTooltip formatValue={fmt} />}
+            cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: "3 3" }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            name={name}
+            stroke={color}
+            strokeWidth={2.4}
+            fill={`url(#atc-${gid})`}
+            connectNulls={false}
+            dot={renderDot}
+            activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface-raised)" }}
+            isAnimationActive={!reduce}
+            animationDuration={500}
+            animationEasing="ease-out"
+          />
+          {hasForecast ? (
+            <Area
+              type="monotone"
+              dataKey="forecast"
+              name={forecastName}
+              stroke={color}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              fill="none"
+              connectNulls={false}
+              dot={false}
+              activeDot={{ r: 3, strokeWidth: 2, stroke: "var(--surface-raised)" }}
+              isAnimationActive={!reduce}
+              animationDuration={500}
+              animationEasing="ease-out"
+            />
+          ) : null}
+        </AreaChart>
+      </ResponsiveContainer>
+      <table className="sr-only">
+        <caption>{ariaLabel ?? name}</caption>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={`${r.label}-${i}`}>
+              <th scope="row">{r.label}</th>
+              <td>{r.value !== null ? fmt(r.value) : r.forecast !== null ? `${forecastName}: ${fmt(r.forecast)}` : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
   );
 }

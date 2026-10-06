@@ -11,23 +11,15 @@ import {
   YAxis,
 } from "recharts";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
+import { ChartTooltip } from "@/components/ui/chart-tooltip";
+import { formatChartAxis } from "@/components/ui/chart-format";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 
 /**
  * Danışman gelir grafiği — paylaşılan BarCompare'in tıklanabilir sürümü.
  * Çubuğa tıklayınca danışman detayına gider; BarCompare onClick almadığı
- * için (ve paylaşılan bileşen bu iş için değiştirilmediği için) yerel kopya.
+ * için yerel sürüm. İpucu ortak `ChartTooltip` (tek ipucu bileşeni).
  */
-
-const tryFormatter = new Intl.NumberFormat("tr-TR", {
-  style: "currency",
-  currency: "TRY",
-  maximumFractionDigits: 0,
-});
-const compactFormatter = new Intl.NumberFormat("tr-TR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
 
 export type RevenueDatum = { id: string; name: string; revenue: number };
 
@@ -37,38 +29,6 @@ const axisProps = {
   tickLine: false,
   axisLine: false,
 } as const;
-
-function RevenueTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ value?: number | string }>;
-  label?: string | number;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-[var(--radius-control)] border border-hairline bg-surface/95 px-3 py-2 shadow-[var(--inner-top),var(--elev-4)] backdrop-blur-sm">
-      {label != null ? (
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-faint">
-          {label}
-        </p>
-      ) : null}
-      <p className="flex items-center gap-2 text-sm text-text">
-        <span
-          className="h-2 w-2 shrink-0 rounded-full ring-2 ring-inset ring-white/40"
-          style={{ background: CHART_COLORS[0] }}
-        />
-        <span className="text-text-muted">Gelir</span>
-        <span className="numeric ml-auto font-bold">
-          {tryFormatter.format(Number(payload[0]?.value ?? 0))}
-        </span>
-      </p>
-      <p className="mt-1 text-xs text-text-faint">Danışman detayı için tıklayın</p>
-    </div>
-  );
-}
 
 export function RevenueChart({ data }: { data: RevenueDatum[] }) {
   const router = useRouter();
@@ -83,9 +43,9 @@ export function RevenueChart({ data }: { data: RevenueDatum[] }) {
         barGap={4}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical horizontal={false} />
-        <XAxis type="number" {...axisProps} tickFormatter={(v: number) => compactFormatter.format(v)} />
+        <XAxis type="number" {...axisProps} tickFormatter={(v: number) => formatChartAxis(v)} />
         <YAxis type="category" dataKey="name" {...axisProps} width={110} />
-        <Tooltip content={<RevenueTooltip />} cursor={{ fill: "var(--accent)", fillOpacity: 0.05 }} />
+        <Tooltip content={<ChartTooltip format="money" hint="Danışman detayı için tıklayın" />} cursor={{ fill: "var(--accent)", fillOpacity: 0.05 }} />
         <Bar
           dataKey="revenue"
           name="Gelir"

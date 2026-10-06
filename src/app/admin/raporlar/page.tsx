@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { moduleAdoption } from "@/lib/admin/platform-metrics";
 import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -18,13 +19,6 @@ import { requireReportingData } from "@/lib/reporting/result";
 
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
-const ADOPTION_MODULES = [
-  ["customers", "Müşteriler"], ["demands", "Talepler"], ["properties", "Portföyler"],
-  ["deals", "Anlaşmalar"], ["tasks", "Görevler"], ["appointments", "Randevular"],
-  ["commissions", "Komisyon"], ["contracts", "Sözleşmeler"], ["rentals", "Kiralama"],
-  ["campaigns", "Kampanyalar"], ["automations", "Otomasyon"], ["valuations", "Değerleme"],
-  ["projects", "Projeler"], ["network", "Ofis ağı"],
-] as const;
 
 /** `?from=&to=` — yalnızca geçerli YYYY-AA-GG kabul edilir; bozuk değer yok sayılır. */
 function parseDateParam(raw: string | undefined): string | undefined {
@@ -108,12 +102,8 @@ export default async function AdminReportsPage({
     .slice(0, 6);
 
   // Modül benimseme: her modülü son 30 günde en az 1 kez kullanan ofis oranı
-  const tenantDenom = Math.max(1, Number(aggregate.all_tenant_count));
-  const adoption = ADOPTION_MODULES.map(([id, mod]) => ({
-    mod,
-    offices: Number(aggregate.adoption.find((row) => row.module === id)?.offices ?? 0),
-    pct: Math.round((Number(aggregate.adoption.find((row) => row.module === id)?.offices ?? 0) / tenantDenom) * 100),
-  })).sort((a, b) => b.pct - a.pct);
+  // Etiket tablosu ve oran hesabı tek kaynak: lib/admin/platform-metrics (kontrol paneli de kullanır).
+  const adoption = moduleAdoption(aggregate.adoption, Number(aggregate.all_tenant_count)).map((a) => ({ mod: a.label, offices: a.offices, pct: a.pct }));
   // En düşük 2 modül → tanıtım fırsatı altyazısı
   const lowestMods = new Set(adoption.slice(-2).map((a) => a.mod));
 

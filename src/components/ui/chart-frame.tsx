@@ -1,23 +1,31 @@
-import { memo, type ReactNode } from "react";
+import { memo, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Illustration, type IllustrationKind } from "@/components/ui/illustrations";
 import { SkeletonCard } from "@/components/ui/viz/skeleton-card";
+import type { PremiumTone } from "@/components/ui/premium/premium-math";
 
 /* Recharts içermez — grafik paketinden bağımsız tutulur ki yalnız çerçeve isteyen sayfa recharts taşımasın. */
 
 /**
- * Kart çerçevesi (= ChartCard) — panel kartlarıyla aynı yüzey/gölge/köşe değerleri.
- * Eski kullanım (title, subtitle, action, children, className, height) aynen çalışır.
- * Ek: `period` (dönem çipi), `href` (ayrıntı bağlantısı: sıfır çıkmaz metrik), `loading`
- * (sabit yükseklikli iskelet), `empty` (veri yoksa anlamlı boş durum; gövde çizilmez).
- * `memo`: her zaman istemci kapısından (`_ui/lazy-chart`, `ui/chart`) çizilir; grafik veri/filtre state'i
- * değişip çerçeve prop'ları aynı kalınca başlık/çerçeve yeniden üretilmez (davranış değişmez).
+ * ChartCard (= ChartFrame) — TEK grafik/panel kartı (tasarım sistemi v4, `.ds-card`).
+ * Başlık şeridi: isteğe bağlı ikon karosu (`icon` + `tone`), başlık + alt başlık/dönem,
+ * sağda `aside` (mini istatistik), `action` ve ayrıntı bağlantısı (`href`: sıfır çıkmaz metrik).
+ * Gövde: `loading` → sabit yükseklikli iskelet (CLS yok); `empty` → anlamlı boş durum (gövde
+ * çizilmez, sahte grafik yok). Eski kullanım (title, subtitle, action, children, className,
+ * height) aynen çalışır; `height={0}` gövdeyi serbest yükseklikte bırakır.
+ * `memo`: istemci kapısından (`lazy-charts`, `ui/chart`) çizildiğinde grafik veri/filtre state'i değişip
+ * çerçeve prop'ları aynı kalınca başlık/çerçeve yeniden üretilmez (davranış değişmez; sunucudan da çizilir).
  */
 export const ChartFrame = memo(function ChartFrame({
   title,
   subtitle,
   action,
+  aside,
+  icon: Icon,
+  tone = "brand",
+  as: Heading = "h3",
   children,
   className,
   height = 260,
@@ -32,8 +40,15 @@ export const ChartFrame = memo(function ChartFrame({
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  /** Başlık şeridinin sağında mini istatistik (ör. "ARPA ₺2.495"). */
+  aside?: ReactNode;
+  icon?: ComponentType<{ className?: string }>;
+  tone?: PremiumTone;
+  /** Başlık düzeyi (sayfa yapısına göre; varsayılan h3). */
+  as?: "h2" | "h3";
   children?: ReactNode;
   className?: string;
+  /** Gövde yüksekliği (px); 0 = içerik kadar. */
   height?: number;
   /** Dönem etiketi (ör. "Son 30 gün"). */
   period?: string;
@@ -45,34 +60,39 @@ export const ChartFrame = memo(function ChartFrame({
   emptyText?: string;
   emptyIllustration?: IllustrationKind;
 }) {
+  const sub = [subtitle, period].filter(Boolean).join(" · ");
   return (
-    <section className={cn("surface-card rounded-[var(--radius-panel)] p-5", className)}>
-      <header className="mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-display text-base font-bold tracking-[-0.015em] text-ink-950">{title}</h3>
-          {subtitle || period ? (
-            <p className="mt-0.5 text-xs font-medium uppercase tracking-[0.04em] text-text-faint">
-              {[subtitle, period].filter(Boolean).join(" · ")}
-            </p>
-          ) : null}
+    <section className={cn("ds-card ds-pad", className)}>
+      <header className="ds-head mb-4">
+        {Icon ? (
+          <span className={`pm-ico pm-t-${tone}`} aria-hidden="true">
+            <Icon />
+          </span>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <Heading className="ds-title">{title}</Heading>
+          {sub ? <p className="ds-sub mt-0.5">{sub}</p> : null}
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {action}
-          {href ? (
-            <Link href={href} className="text-xs font-semibold text-accent-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
-              {hrefLabel} →
-            </Link>
-          ) : null}
-        </div>
+        {aside || action || href ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {aside}
+            {action}
+            {href ? (
+              <Link href={href} className="ds-link focus-ring">
+                {hrefLabel} <ArrowUpRight aria-hidden="true" />
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </header>
-      <div style={{ height }}>
+      <div style={height ? { height } : undefined}>
         {loading ? (
-          <SkeletonCard height="100%" label={`${title} yükleniyor`} />
+          <SkeletonCard height={height || 160} label={`${title} yükleniyor`} />
         ) : empty ? (
-          <div className="grid h-full place-items-center text-center">
+          <div className="grid h-full min-h-32 place-items-center text-center">
             <div>
-              <Illustration kind={emptyIllustration} size={112} />
-              <p className="mt-2 text-sm text-text-muted">{emptyText}</p>
+              <Illustration kind={emptyIllustration} size={104} />
+              <p className="mx-auto mt-2 max-w-xs text-sm text-text-muted">{emptyText}</p>
             </div>
           </div>
         ) : (

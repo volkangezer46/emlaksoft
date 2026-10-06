@@ -1,8 +1,8 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { USER_MENU_TRIGGER_CLASS, UserMenuFace } from "./user-menu-face";
 import { runWhenIdle } from "@/lib/idle";
 import type { FontScale } from "@/lib/font-scale";
 import type { UiPrefs } from "@/lib/ui-prefs";
@@ -66,16 +66,9 @@ function Trigger({
       aria-haspopup="menu"
       aria-expanded={false}
       aria-label={`Kullanıcı menüsü: ${name}`}
-      className="focus-ring flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-1 transition-colors hover:border-brand-300 sm:pr-2"
+      className={USER_MENU_TRIGGER_CLASS}
     >
-      <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white" aria-hidden>
-        {initials}
-      </span>
-      <span className="hidden min-w-0 text-left xl:block">
-        <span className="block max-w-28 truncate text-xs font-semibold text-text">{name}</span>
-        <span className="block max-w-28 truncate text-xs text-text-muted">{subtitle}</span>
-      </span>
-      <ChevronDown className="hidden h-3.5 w-3.5 text-text-faint sm:block" aria-hidden />
+      <UserMenuFace initials={initials} name={name} subtitle={subtitle} />
     </button>
   );
 }

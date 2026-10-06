@@ -200,6 +200,37 @@ const ART = {
       <path d="M98 62v14M91 69h14" className="ill-pulse" />
     </>
   ),
+  ev: (
+    <>
+      <path d="M30 76V42l36-24 36 24v34z" fill={SOFT} />
+      <path d="M24 46l42-30 42 30" />
+      <path d="M86 22v12" stroke={LINE} />
+      <rect x="57" y="54" width="18" height="22" rx="3" fill={TINT} />
+      <rect x="38" y="48" width="12" height="11" rx="2" stroke={LINE} />
+      <rect x="82" y="48" width="12" height="11" rx="2" stroke={LINE} />
+      <circle cx="98" cy="18" r="5" className="ill-pulse" />
+    </>
+  ),
+  anahtar: (
+    <>
+      <g className="ill-float">
+        <circle cx="46" cy="42" r="16" fill={SOFT} />
+        <circle cx="46" cy="42" r="6" />
+        <path d="M62 42h40M90 42v10M100 42v7" />
+      </g>
+      <path d="M30 70h72" stroke={LINE} />
+    </>
+  ),
+  haritaPin: (
+    <>
+      <ellipse cx="66" cy="74" rx="20" ry="5" fill={TINT} className="ill-pulse" />
+      <g className="ill-float">
+        <path d="M66 70c-12-14-20-24-20-34a20 20 0 0 1 40 0c0 10-8 20-20 34z" fill={SOFT} />
+        <circle cx="66" cy="36" r="7" fill={TINT} />
+      </g>
+      <path d="M26 62l14-4M92 58l14 4" stroke={LINE} />
+    </>
+  ),
   baslangic: (
     <>
       <path d="M66 14c12 10 18 22 18 34 0 8-3 14-8 19H56c-5-5-8-11-8-19 0-12 6-24 18-34z" fill={SOFT} className="ill-float" />
@@ -247,3 +278,6 @@ export function Illustration({
 
 /** Kutlama (konfeti / disk + tik) — tek kaynak `./celebration`. */
 export { Celebration } from "./celebration";
+
+/** Hero için soluk mavi izometrik şehir silüeti (currentColor = `--hero-art`). */
+export { CitySkyline } from "./city-skyline";

@@ -166,12 +166,12 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+        className="focus-ring relative grid h-10 w-10 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted shadow-[var(--elev-1)] transition hover:border-border-interactive hover:text-text"
         aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-[18px] w-[18px]" aria-hidden />
         {unread > 0 ? (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-danger-500 px-1 text-xs font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-[var(--nav-badge-danger)] px-1 text-xs font-bold text-white ring-2 ring-[var(--surface)]">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}

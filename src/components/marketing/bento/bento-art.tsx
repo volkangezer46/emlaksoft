@@ -102,7 +102,7 @@ export function SignatureArt() {
 export function ShowcaseArt() {
   return (
     <div className="mk-showcase">
-      <Image src="/listing-bosphorus-villa.png" alt="" fill sizes="(min-width: 1024px) 380px, 90vw" className="mk-showcase-img" />
+      <Image src="/listing-bosphorus-villa.webp" alt="" fill sizes="(min-width: 1024px) 380px, 90vw" className="mk-showcase-img" />
       <div className="mk-showcase-card mk-a-rise" aria-hidden="true">
         <b>Ofis vitrini</b>
         <small>Portföyleriniz kendi adresinizde</small>
