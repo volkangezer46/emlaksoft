@@ -10,7 +10,7 @@ import { CHECK_RESULTS, type CheckResultKind } from "@/lib/listing-control/types
 
 /**
  * Tarayıcı doğrulama işçisinin sunucu eylemleri. Hepsi `requirePermission("portals","edit")` kapısından geçer ve
- * KULLANICI OTURUMU (JWT) istemcisiyle `lc_worker_*` RPC'lerini çağırır: service_role / createAdminClient YOK, kabul
+ * KULLANICI OTURUMU (JWT) istemcisiyle `lc_worker_*` RPC'lerini çağırır: yönetici (service_role) istemcisi YOK, kabul
  * listesine satır eklenmez. Ofis ve kullanıcı RPC içinde JWT'den çıkar; istemci kimliği (cihaz) kullanıcıya bağlıdır.
  * Sunucu portala istek ATMAZ; yalnız iş dağıtır ve istemcinin bildirdiği sınırlı gözlemi işler.
  */

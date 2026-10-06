@@ -24,7 +24,7 @@ const PATH = "/app/ayarlar/merkez";
 
 /** Ayarın etkisini gösterdiği ekran (sıfır çıkmaz: her ayarın gerçek bir hedefi var). */
 const USED_IN: Record<string, { label: string; href: string }> = {
-  "office.sla.lead_first_response_min": { label: "Lead hızı raporu", href: "/app/raporlar/lead-hizi" },
+  "office.sla.lead_first_response_min": { label: "Aday hızı raporu", href: "/app/raporlar/lead-hizi" },
   "office.alert.deal_stale_days": { label: "Hareketsiz anlaşmalar", href: "/app/anlasmalar?gorunum=liste&bayat=1" },
   "office.alert.demand_aging_days": { label: "Bekleyen talepler", href: "/app/talepler" },
   "office.commission.simulator_rate": { label: "Komisyon hesaplayıcı", href: "/app/komisyon" },

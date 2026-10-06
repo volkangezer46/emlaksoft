@@ -32,8 +32,8 @@ const sla: AnySettingDef[] = [
     default: String(DEFAULT_SLA_MIN),
     options: SLA_OPTIONS_MIN.map((m) => ({ value: String(m), label: m >= 60 ? `${m / 60} saat` : `${m} dakika` })),
     label: "İlk yanıt SLA süresi",
-    description: "Yeni gelen talep/başvuruya ilk dönüşün yapılması gerektiği süre. Lead hızı raporu bu süreye göre \"zamanında\" sayar.",
-    impact: "Lead hızı raporunun varsayılan eşiği değişir; raporda eşik seçicisi yine kullanılabilir. Geçmiş veri silinmez, yalnız zamanında/geç sınıflaması yeniden hesaplanır.",
+    description: "Yeni gelen talep/başvuruya ilk dönüşün yapılması gerektiği süre. Aday hızı raporu bu süreye göre \"zamanında\" sayar.",
+    impact: "Aday hızı raporunun varsayılan eşiği değişir; raporda eşik seçicisi yine kullanılabilir. Geçmiş veri silinmez, yalnız zamanında/geç sınıflaması yeniden hesaplanır.",
     unit: "dakika",
   }),
 ];
