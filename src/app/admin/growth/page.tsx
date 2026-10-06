@@ -1,22 +1,8 @@
 import Link from "next/link";
-import {
-  Activity,
-  Coins,
-  Gauge,
-  Handshake,
-  Hourglass,
-  Megaphone,
-  MousePointerClick,
-  Percent,
-  ShieldAlert,
-  Sprout,
-  Users,
-  Wallet,
-  CheckCircle2,
-  AlertTriangle,
-} from "lucide-react";
+import { Handshake, Hourglass, Megaphone, ShieldAlert, Sprout, Users, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { FunnelChart, RadialGauge } from "@/components/ui/viz";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { AdminEmpty, AdminFilterChip, AdminPanel, AdminScrollArea } from "@/components/admin/admin-table";
 import { describeRewardRule } from "@/lib/growth/settings";
@@ -32,6 +18,7 @@ import {
   type ReadinessCheck,
 } from "@/lib/growth/program";
 import { formatDateTr, formatTry } from "@/lib/format";
+import { buildGrowthFunnel, growthIsIdle, kFactorParts, readinessSummary } from "./funnel-model";
 import { ClaimActions, FlagsForm, PartnerDetailsForm, PartnerForm, PartnerStatus, PayoutForm, RuleForm, RuleToggle, SettingsForm } from "./growth-forms";
 
 export const metadata = { title: "Büyüme" };
@@ -99,11 +86,24 @@ function ReadinessList({ title, checks }: { title: string; checks: ReadinessChec
 }
 
 function ReadinessPanel({ readiness }: { readiness: GrowthReadiness }) {
+  const summary = readinessSummary([readiness.referral, readiness.partner, readiness.cash]);
   return (
-    <div className="grid gap-5 p-5 lg:grid-cols-3">
-      <ReadinessList title="Müşteri-getir-müşteri" checks={readiness.referral} />
-      <ReadinessList title="Profesyonel ortak (komisyon)" checks={readiness.partner} />
-      <ReadinessList title="Nakit ortak ödemesi" checks={readiness.cash} />
+    <div className="@container p-5">
+      <div className="mb-4 flex items-center gap-4">
+        <RadialGauge value={summary.ok} max={Math.max(1, summary.total)} size={64} stroke={7} tone={summary.blocking > 0 ? "danger" : "success"} ariaLabel="Hazırlık maddeleri">
+          <span className="text-xs font-bold tabular-nums text-ink-950">
+            {summary.ok}/{summary.total}
+          </span>
+        </RadialGauge>
+        <p className="text-sm text-text-muted">
+          {summary.blocking > 0 ? `${summary.blocking} engelleyici madde açmadan önce tamamlanmalı.` : "Engelleyici madde yok."}
+        </p>
+      </div>
+      <div className="grid gap-5 @3xl:grid-cols-3">
+        <ReadinessList title="Müşteri-getir-müşteri" checks={readiness.referral} />
+        <ReadinessList title="Profesyonel ortak (komisyon)" checks={readiness.partner} />
+        <ReadinessList title="Nakit ortak ödemesi" checks={readiness.cash} />
+      </div>
     </div>
   );
 }
@@ -130,6 +130,16 @@ export default async function AdminGrowthPage({
   const shown = rows.slice(0, SHOW_LIMIT);
   const partnerRules = ov.rules.filter((r) => r.kind === "partner").map((r) => ({ id: r.id, name: r.name }));
   const pending = ov.statusCounts.pending ?? 0;
+  const idle = growthIsIdle(ov.flags, ov.rules.filter((r) => r.is_active).length);
+  const funnel = m
+    ? buildGrowthFunnel(m, ov.statusCounts.paid ?? 0, {
+        clicks: hrefFor({ kaynak: "referral" }),
+        signups: hrefFor({ kaynak: "referral" }),
+        payers: hrefFor({ kaynak: "odeyen" }),
+        rewards: queueHref("paid"),
+      })
+    : [];
+  const kf = m ? kFactorParts(m) : { invites: null, conversion: null, k: null, selfSustaining: false };
 
   return (
     <div className="space-y-6">
@@ -160,20 +170,80 @@ export default async function AdminGrowthPage({
         </div>
       ) : null}
 
-      <AdminPanel title="Ölçüm" description="Referans programının hunisi. Her kart ilgili süzgece gider." bodyClassName="p-5">
-        <section id="olcum">
-          <AdminStatGrid>
-            <AdminStatCard label="Bağlantı tıklaması" value={m ? m.clicks : null} href={hrefFor({ kaynak: "referral" })} icon={MousePointerClick} emptyHint="Motor etkin değil" />
-            <AdminStatCard label="Davetle kayıt" value={m ? m.signups : null} href={hrefFor({ kaynak: "referral" })} icon={Users} emptyHint="Motor etkin değil" hint={m ? `tıklamadan kayıt ${formatPercent(m.clickToSignup)}` : undefined} />
-            <AdminStatCard label="Deneme → ödeme dönüşümü" value={m ? formatPercent(m.signupToPaid) : null} href={hrefFor({ kaynak: "odeyen" })} icon={Percent} emptyHint="Motor etkin değil" hint={m ? `${m.payers} ödeyen` : undefined} />
-            <AdminStatCard label="Davetçi başına ödeyen" value={m ? formatDecimal(m.payersPerReferrer) : null} href={hrefFor({ kaynak: "referral" })} icon={Gauge} emptyHint="Motor etkin değil" hint={m ? `davetçi başına kayıt ${formatDecimal(m.invitesPerReferrer)}` : undefined} />
-            <AdminStatCard label="K-faktör (davet x dönüşüm)" value={m ? formatDecimal(m.kFactor) : null} href={hrefFor({ kaynak: "referral" })} icon={Activity} emptyHint="Motor etkin değil" hint="1 ve üstü: kendi kendini büyüten döngü" />
-            <AdminStatCard label="Ödül maliyeti" value={m ? formatTry(m.rewardCostTry) : null} href={queueHref("paid")} icon={Coins} emptyHint="Motor etkin değil" hint={m ? `ilk ödeme gelirinin ${formatPercent(m.costRatio)}` : undefined} />
-            <AdminStatCard label="CAC geri dönüşü (gelir / ödül)" value={m ? (m.paybackMultiple == null ? "-" : `${formatDecimal(m.paybackMultiple, 1)}x`) : null} href={queueHref("paid")} icon={Wallet} emptyHint="Motor etkin değil" hint={m ? `ilk ödeme geliri ${formatTry(m.firstPaymentRevenueTry)}` : undefined} />
-            <AdminStatCard label="Kötüye kullanım oranı" value={m ? formatPercent(m.abuseRate) : null} href={queueHref("flagged")} icon={ShieldAlert} emptyHint="Motor etkin değil" hint="bayraklı talep / tüm talepler" />
-          </AdminStatGrid>
+      <AdminPanel title="Ölçüm" description="Referans programının hunisi. Her aşama ve her rakam ilgili süzgece gider; değerler ölçümdür, tahmin değildir." bodyClassName="p-5">
+        <section id="olcum" className="@container">
+          {!m ? (
+            <p role="status" className="py-6 text-center text-sm text-text-muted">
+              {idle ? "Program kapalı ve etkin ödül kuralı yok: ölçülecek davet akışı henüz başlamadı." : "Motor etkin değil: ölçüm referans motoru açılınca hesaplanır."}
+            </p>
+          ) : (
+            <div className="grid gap-6 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <div className="rounded-[var(--radius-card)] p-4" style={{ boxShadow: "var(--elev-3)" }}>
+                <h3 className="mb-2 text-sm font-bold text-ink-950">Referans hunisi</h3>
+                <FunnelChart
+                  stages={funnel}
+                  ariaLabel="Referans hunisi: tıklama, kayıt, ödeyen, ödül"
+                  emptyText="Henüz tıklama ya da kayıt yok"
+                />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <RadialGauge value={kf.k ?? 0} max={Math.max(1, kf.k ?? 0)} target={1} size={96} tone={kf.selfSustaining ? "success" : "brand"} ariaLabel="K-faktör">
+                    <span className="text-lg font-bold tabular-nums text-ink-950">{formatDecimal(kf.k)}</span>
+                  </RadialGauge>
+                  <div className="min-w-0 text-sm">
+                    <p className="font-bold text-ink-950">K-faktör</p>
+                    <p className="tabular-nums text-text-muted">
+                      <Link className="hover:underline" href={hrefFor({ kaynak: "referral" })}>
+                        {formatDecimal(kf.invites)} davet/davetçi
+                      </Link>{" "}
+                      ×{" "}
+                      <Link className="hover:underline" href={hrefFor({ kaynak: "odeyen" })}>
+                        {formatPercent(kf.conversion)} dönüşüm
+                      </Link>
+                    </p>
+                    <p className="text-xs text-text-faint">
+                      {kf.selfSustaining ? "1 ve üstü: kendi kendini büyüten döngü." : "1 altı: büyüme tek başına döngüye girmedi."} Gerçek kayıtlardan ölçülür.
+                    </p>
+                  </div>
+                </div>
+                <ul className="divide-y divide-line text-sm">
+                  <li>
+                    <Link href={hrefFor({ kaynak: "referral" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                      <span className="text-text-muted">Davetçi başına ödeyen</span>
+                      <span className="font-semibold tabular-nums text-ink-950">{formatDecimal(m.payersPerReferrer)}</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={queueHref("paid")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                      <span className="text-text-muted">Ödül maliyeti ({formatPercent(m.costRatio)} gelir payı)</span>
+                      <span className="font-semibold tabular-nums text-[color:var(--viz-gold)]">{formatTry(m.rewardCostTry)}</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={queueHref("paid")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                      <span className="text-text-muted">CAC geri dönüşü (ilk ödeme {formatTry(m.firstPaymentRevenueTry)})</span>
+                      <span className="font-semibold tabular-nums text-[color:var(--viz-gold)]">{m.paybackMultiple == null ? "-" : `${formatDecimal(m.paybackMultiple, 1)}x`}</span>
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={queueHref("flagged")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                      <span className="text-text-muted">Kötüye kullanım oranı</span>
+                      <span className={`font-semibold tabular-nums ${m.abuseRate != null && m.abuseRate > 0 ? "text-danger-500" : "text-ink-950"}`}>{formatPercent(m.abuseRate)}</span>
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
         </section>
       </AdminPanel>
+
+      {idle ? (
+        <p role="status" className="text-sm text-text-muted">
+          Ofis daveti ve ortak programı kapalı, etkin ödül kuralı yok: ofislere ödül vaadi gösterilmez. Aşağıdaki hazırlık kontrolü açılışı yönlendirir.
+        </p>
+      ) : null}
 
       <AdminPanel
         title="Aktivasyon"
@@ -238,10 +308,10 @@ export default async function AdminGrowthPage({
                     <th className="py-2 pr-5">Karar</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-line align-top">
+                <tbody className="divide-y divide-line align-middle">
                   {ov.queue.map((c) => (
-                    <tr key={c.id}>
-                      <td className="px-5 py-2">
+                    <tr key={c.id} className="h-10">
+                      <td className="px-5 py-1">
                         <p className="font-semibold text-ink-950">
                           {c.partner_name ? (
                             c.partner_name
@@ -259,7 +329,7 @@ export default async function AdminGrowthPage({
                         </p>
                       </td>
                       <td className="py-2 pr-3 text-text-muted">{CLAIM_COMPONENT_LABEL[c.component] ?? c.component}</td>
-                      <td className="py-2 pr-3 font-semibold text-ink-950">{formatTry(c.amount_try)}</td>
+                      <td className="py-1 pr-3 font-semibold tabular-nums text-[color:var(--viz-gold)]">{formatTry(c.amount_try)}</td>
                       <td className="py-2 pr-3">
                         {CLAIM_STATUS_LABEL[c.status as ClaimStatus] ?? c.status}
                         {c.clawed_back_at ? <span className="block text-xs text-text-muted">kredi geri alındı</span> : null}
