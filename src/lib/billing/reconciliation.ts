@@ -7,6 +7,10 @@ import { EF_RPC } from "@/lib/ef-credits/config";
 import { compareReconciliation, type EfReconcileResult } from "@/lib/ef-credits/reconcile";
 import { processClaims, type ProcessSummary } from "@/lib/growth/engine";
 import { tryReleaseDead } from "@/lib/try-credits/wallet";
+import { now } from "@/lib/clock";
+import { runInsightEngine, type EngineSummary } from "@/lib/insights/engine";
+import { generateInsightNarrative } from "@/lib/ai/insight-narrative";
+import { notifyTenant } from "@/lib/notify";
 
 type CaptureRow = {
   id: string;
@@ -176,8 +180,10 @@ export async function runBillingReconciliation(
   /**
    * KAPALI iş seçici (rastgele callback YOK: service_role istemcisi çağıran koda verilmez). `growth_claims`: growth-claims
    * cron'u aynı (allowlist'li) istemciyle YALNIZ sabit `processClaims` işini çalıştırır; mutabakat atlanır.
+   * `insight_engine`: insight-engine cron'u aynı istemciyle YALNIZ sabit `runInsightEngine` işini çalıştırır (içgörü yazar,
+   * yüksek şiddette zil bildirimi; başka hiçbir kaydı değiştirmez); mutabakat atlanır.
    */
-  job?: "growth_claims" | "ef_sweep" | "ef_reconcile",
+  job?: "growth_claims" | "ef_sweep" | "ef_reconcile" | "insight_engine",
   /** Yalniz `ef_reconcile`: EF `/kullanim` toplamlari + pencere (veri; callback DEGIL). */
   efUsage?: { windowStart: string; windowEnd: string; degerleme: number | null; pdf: number | null; meta?: Record<string, unknown> },
 ): Promise<
@@ -185,6 +191,7 @@ export async function runBillingReconciliation(
     growthClaims?: ProcessSummary | null;
     efSweep?: number | null;
     efReconcile?: (EfReconcileResult & { saved: boolean }) | null;
+    insightEngine?: EngineSummary;
   }
 > {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
@@ -199,6 +206,28 @@ export async function runBillingReconciliation(
       refundRequired: 0,
       growthClaims: await processClaims(admin, 200),
     };
+  }
+  if (job === "insight_engine") {
+    const insightEngine = await runInsightEngine(
+      admin,
+      { nowMs: now() },
+      {
+        notify: (n) =>
+          notifyTenant({
+            tenantId: n.tenantId,
+            userId: n.userId,
+            title: n.title,
+            body: n.body,
+            href: n.href,
+            kind: "warning",
+            prefKey: "insight",
+            dedupeKey: n.dedupeKey,
+          }),
+        // Yalniz ofis ayari (narrativeEnabled) aciksa engine cagirir; kota kapisi + audit + sayi dogrulamasi icinde.
+        narrate: (a) => generateInsightNarrative(a),
+      },
+    );
+    return { expiredCheckouts: 0, inspected: 0, fulfilled: 0, retryPending: 0, manualReview: 0, refundRequired: 0, insightEngine };
   }
   if (job === "ef_sweep") {
     // EF kontör: 15 dakikadan eski açık rezervleri serbest bırakır. Cüzdan yoksa/RPC hata verirse null (etkin değil).

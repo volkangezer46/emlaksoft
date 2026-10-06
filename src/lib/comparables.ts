@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computePriceHealth, type PriceHealth } from "@/lib/price-health";
+import { computePriceHealth, type PriceHealth, type PriceHealthConfidence, type PriceHealthSource } from "@/lib/price-health";
 import { getDistrictName } from "@/lib/geo/reader";
 
 /**
@@ -342,7 +342,7 @@ export function healthFromDeviation(deviationPct: number): PriceHealth {
  * Hem server action (fiyat güncellenince anında) hem cron (toplu tazeleme)
  * bu fonksiyonu çağırır; hesap mantığı tek yerde kalır.
  */
-export async function resolvePriceHealth(
+export async function resolvePriceHealthWithSource(
   supabase: SupabaseClient,
   input: {
     tenantId: string;
@@ -359,7 +359,7 @@ export async function resolvePriceHealth(
     targetHeating?: string | null;
     targetFacade?: string | null;
   },
-): Promise<PriceHealth> {
+): Promise<{ health: PriceHealth; source: PriceHealthSource; confidence: PriceHealthConfidence }> {
   try {
     const estimate = await estimateFromComparables(supabase, {
       tenantId: input.tenantId,
@@ -374,14 +374,23 @@ export async function resolvePriceHealth(
       targetFacade: input.targetFacade ?? null,
     });
     const position = pricePosition(input.listPrice, estimate);
-    if (position) return healthFromDeviation(position.deviationPct);
+    if (position) return { health: healthFromDeviation(position.deviationPct), source: "emsal", confidence: "orta" };
   } catch (e) {
     console.error("resolvePriceHealth comparables", e);
   }
-  return computePriceHealth({
+  const ref = computePriceHealth({
     listPrice: input.listPrice,
     sqm: input.sqm,
     districtHint: input.districtHint,
     transactionType: input.transactionType,
-  }).health;
+  });
+  return { health: ref.health, source: ref.source, confidence: ref.confidence };
+}
+
+/** Geriye dönük: yalnız sağlık bandı (kaynak etiketi gerekiyorsa resolvePriceHealthWithSource). */
+export async function resolvePriceHealth(
+  supabase: SupabaseClient,
+  input: Parameters<typeof resolvePriceHealthWithSource>[1],
+): Promise<PriceHealth> {
+  return (await resolvePriceHealthWithSource(supabase, input)).health;
 }

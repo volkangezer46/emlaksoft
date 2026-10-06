@@ -6,6 +6,9 @@
  * varsayilanlarla calisilir.
  */
 
+import { normalizeInsightSettings } from "@/lib/insights/settings";
+import type { InsightSettings } from "@/lib/insights/types";
+
 export const ALERT_RULE_IDS = [
   "price_drop",
   "listing_removed",
@@ -100,6 +103,8 @@ export type OversightThresholds = {
   staleCustomerDays: number;
   commissionCutPoints: number;
   enabled: Record<AlertRuleId, boolean>;
+  /** Zeka katmani (Insight Engine) ofis ayari: sessiz kurallar + LLM anlatimi. Alan yoksa varsayilan (kapali). */
+  insights?: InsightSettings;
 };
 
 export const DEFAULT_THRESHOLDS: OversightThresholds = {
@@ -117,7 +122,7 @@ export const DEFAULT_THRESHOLDS: OversightThresholds = {
   enabled: Object.fromEntries(ALERT_RULE_IDS.map((r) => [r, true])) as Record<AlertRuleId, boolean>,
 };
 
-export type ThresholdNumField = Exclude<keyof OversightThresholds, "enabled">;
+export type ThresholdNumField = Exclude<keyof OversightThresholds, "enabled" | "insights">;
 
 /** Alan sinirlari: [min, max]. Form ve sunucu ayni sinirlari kullanir. */
 export const THRESHOLD_LIMITS: Record<ThresholdNumField, readonly [number, number]> = {
@@ -161,6 +166,8 @@ export function normalizeThresholds(raw: unknown): OversightThresholds {
   for (const id of ALERT_RULE_IDS) {
     if (typeof en[id] === "boolean") out.enabled[id] = en[id] as boolean;
   }
+  // Insight ayari bu jsonb'de TASINIR; ofis kontrol formu kaydederken silinmesin diye burada korunur.
+  if (src.insights !== undefined) out.insights = normalizeInsightSettings(src.insights);
   return out;
 }
 

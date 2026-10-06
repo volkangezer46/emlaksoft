@@ -141,6 +141,10 @@
     {
       "path": "/api/cron/ef-kontor-mutabakat",
       "schedule": "10 2 * * *"
+    },
+    {
+      "path": "/api/cron/insight-engine",
+      "schedule": "12,42 * * * *"
     }
   ]
 }

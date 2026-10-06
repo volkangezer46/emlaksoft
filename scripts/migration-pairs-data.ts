@@ -113,6 +113,10 @@ const F = {
   tenantLicenseDetails: "20260826001800_tenant_license_details.sql",
   // growth_my_dashboard B12 geri getirme (001000, 000900 duzeltmesini ezdi). 000900 + 001000 SONRASI.
   growthDashboardB12Reapply: "20260826001900_growth_dashboard_b12_reapply.sql",
+  // Zeka katmani (Insight Engine): icgoru kuyrugu (yeni tablo + set_state RPC), platform ikizi, olgu RPC/gorunum/temizlik.
+  insights: "20260826002500_insights.sql",
+  platformInsights: "20260826002600_platform_insights.sql",
+  insightSupport: "20260826002700_insight_support.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -190,6 +194,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.tenantLicenseDetails]: "ek", // tenants'a 2 nullable sutun (yetki belgesi unvani/gecerlilik); kod sutunlar yokken zarifce atlar
     [F.efReconciliationRuns]: "ek", // yeni tablo (yazma yalniz service_role, okuma platform personeli); kod tablo yokken zarifce atlar
     [F.growthDashboardB12Reapply]: "davranis", // growth_my_dashboard: 000900 B12 govdesi + 001000 rol kapisi (owner/gm degilse NULL); partner_dashboard dokunulmaz (md5 korumali)
+    [F.insights]: "ek", // yeni insights tablosu (RLS: alici kendi + owner/gm ofis; yazma yalniz service_role) + insight_set_state RPC; kod tablo yokken bos dizi doner
+    [F.platformInsights]: "ek", // yeni platform_insights tablosu + platform_insight_set_state RPC (kod henuz uretmez; sema)
+    [F.insightSupport]: "ek", // yalniz service_role olgu RPC'leri + insight_rule_quality gorunumu + temizlik fonksiyonu; tablo/veri degismez
     [F.growthDashboardRoles]: "davranis", // growth_my_dashboard/partner_dashboard yalniz owner/gm icin veri doner (digerlerine NULL); govdeler aksi ayni
     [F.leadSignalsByIds]: "ek", // yeni asiri yukleme customer_lead_signals(uuid, uuid[]); eski imza ve yetkiler ayni, istemci yoksa eskiye duser
     [F.efPlanExpiry]: "ek", // yeni service_role RPC (ef_credit_expire_plan) + source CHECK'e 'expire' + ayar seed'i; mevcut satir/davranis ayni
@@ -282,6 +289,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB23-yetki-belgesi-alanlari", order: 29.74, title: "Ofis yetki belgesi unvani + gecerlilik tarihi (tenants, 2 nullable sutun)", files: [F.tenantLicenseDetails] },
     // Kullanici karari (2026-10-05): kazanc gizliligi SIRADA EN SONDA, ayri pencere.
     { id: "PB24-buyume-b12-geri-getirme", order: 29.75, title: "growth_my_dashboard B12 geri getirme (001000 ezmesi duzeltilir: money_visible + yuvarli davet tutari + rol kapisi)", files: [F.growthDashboardB12Reapply] },
+    { id: "PB30-icgoru-temeli", order: 29.81, title: "Zeka katmani: icgoru kuyrugu (insights) + platform ikizi + set-tabanli olgu RPC'leri/kalite gorunumu/temizlik (cron insight-engine bunlari kullanir)", files: [F.insights, F.platformInsights, F.insightSupport] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -374,6 +382,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.growthHotfix, F.defaultProgram],
     [F.growthDashboardB12Reapply, F.growthHotfix],
     [F.growthDashboardB12Reapply, F.growthDashboardRoles],
+    // Icgoru destek RPC/gorunum/temizlik insights tablosuna baglidir (platform ikizi bagimsiz).
+    [F.insightSupport, F.insights],
   ],
 
   externalPending: [

@@ -72,6 +72,12 @@ export async function saveOversightSettings(_prev: OversightResult, fd: FormData
     if (v !== null && String(v).trim() !== "") rawThresholds[f] = String(v);
   }
   for (const r of ALERT_RULE_IDS) (rawThresholds.enabled as Record<string, boolean>)[r] = fd.get(`en_${r}`) === "on";
+  // Zeka katmani ayari (thresholds.insights) bu formda yok: mevcut deger KORUNUR (aksi halde kayitta silinirdi).
+  {
+    const { data: prev } = await (await createClient()).from("oversight_settings").select("thresholds").eq("tenant_id", gate.tenantId).maybeSingle();
+    const prevInsights = (prev?.thresholds as { insights?: unknown } | null | undefined)?.insights;
+    if (prevInsights !== undefined) rawThresholds.insights = prevInsights;
+  }
   const thresholds = normalizeThresholds(rawThresholds);
 
   const rawRules: Record<string, unknown> = {};
