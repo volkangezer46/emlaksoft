@@ -35,19 +35,21 @@ const statusLabel: Record<string, string> = {
   resolved: "Çözüldü",
   closed: "Kapalı",
 };
-const statusColor: Record<string, string> = {
-  open: "var(--amber-500)",
-  in_progress: "var(--brand-500)",
-  waiting: "var(--amber-400)",
-  resolved: "var(--mint-500)",
-  closed: "rgba(255,255,255,.35)",
+/** Durum hapı tonu (.pm-t-* — açık/koyu temada token'dan; renk tek başına anlam taşımaz, metin hep var). */
+const statusTone: Record<string, string> = {
+  open: "warn",
+  in_progress: "brand",
+  waiting: "warn",
+  resolved: "success",
+  closed: "neutral",
 };
 const priorityLabel: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil" };
-const priorityCls: Record<string, string> = {
-  low: "bg-white/10 text-white/65",
-  normal: "bg-brand-500/20 text-cyan-200",
-  high: "bg-amber-400/20 text-amber-200",
-  urgent: "bg-danger-500/20 text-red-200",
+/** Öncelik hapı tonu (.pm-t-*). */
+const priorityTone: Record<string, string> = {
+  low: "neutral",
+  normal: "brand",
+  high: "warn",
+  urgent: "danger",
 };
 const categoryLabel: Record<string, string> = {
   general: "Genel",
@@ -112,9 +114,9 @@ function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("");
 }
 
-function Avatar({ name, staff = false }: { name: string; staff?: boolean }) {
+function Avatar({ name }: { name: string }) {
   return (
-    <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] text-xs font-extrabold", staff ? "bg-amber-400/15 text-amber-200" : "bg-white/10 text-white")} aria-hidden>
+    <span className="pm-t-brand grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[var(--t-soft)] text-sm font-extrabold text-[color:var(--t-text)]" aria-hidden>
       {initials(name)}
     </span>
   );
@@ -268,41 +270,41 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Destek kuyruğuna dön
       </Link>
 
-      <header className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white sm:p-6">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-brand-500/20 blur-[80px]" />
-        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+      {/* v4 açık bant (DashboardHero dili): koyu başlık kaldırıldı; rozetler tema token'lı .ds-pill. */}
+      <header className="ds-hero">
+        <span className="ds-hero-ambient" aria-hidden="true" />
+        <div className="ds-hero-row">
           <div className="flex min-w-0 items-start gap-3">
             <Avatar name={tenantName} />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-white/55">
-                <span className="inline-flex items-center gap-1"><Hash className="h-3 w-3" />{ticket.ticket_no ?? ticket.id.slice(0, 8).toUpperCase()}</span>
+            <div className="ds-hero-body">
+              <p className="ds-eyebrow flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1"><Hash className="h-3 w-3" aria-hidden />{ticket.ticket_no ?? ticket.id.slice(0, 8).toUpperCase()}</span>
                 <span aria-hidden>·</span>
-                <Link href={`/admin/tenants/${ticket.tenant_id}`} className="inline-flex items-center gap-1 text-cyan-200 transition hover:text-white"><Building2 className="h-3 w-3" />{tenantName}</Link>
+                <Link href={`/admin/tenants/${ticket.tenant_id}`} className="focus-ring inline-flex items-center gap-1 rounded text-accent-text hover:underline"><Building2 className="h-3 w-3" aria-hidden />{tenantName}</Link>
                 <span aria-hidden>·</span>
                 <span>{categoryLabel[ticket.category] ?? ticket.category}</span>
-              </div>
-              <h1 className="mt-2 max-w-3xl text-balance font-display text-2xl font-extrabold tracking-[-0.02em] text-white sm:text-3xl">{ticket.subject}</h1>
-              <p className="mt-2 text-xs text-white/45">Açılış {dt(ticket.created_at)} · Son hareket {dt(ticket.last_activity_at ?? ticket.updated_at)}</p>
+              </p>
+              <h1 className="ds-hero-title max-w-3xl">{ticket.subject}</h1>
+              <p className="ds-hero-summary text-xs">Açılış {dt(ticket.created_at)} · Son hareket {dt(ticket.last_activity_at ?? ticket.updated_at)}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <SlaBadge sla={ticketSla} />
-            <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", priorityCls[ticket.priority] ?? priorityCls.normal)}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.07] px-2.5 py-1 text-xs font-bold text-white"><span className="h-2 w-2 rounded-full" style={{ background: statusColor[ticket.status] ?? "var(--brand-500)" }} />{statusLabel[ticket.status] ?? ticket.status}</span>
+            <span className={cn("ds-pill", `pm-t-${priorityTone[ticket.priority] ?? "brand"}`)}>{priorityLabel[ticket.priority] ?? ticket.priority}</span>
+            <span className={cn("ds-pill", `pm-t-${statusTone[ticket.status] ?? "brand"}`)}><span className="h-2 w-2 rounded-full bg-[var(--t)]" aria-hidden />{statusLabel[ticket.status] ?? ticket.status}</span>
           </div>
         </div>
 
-        <div className="relative mt-5 grid overflow-hidden rounded-[var(--radius-card)] border border-white/10 bg-white/[0.055] sm:grid-cols-2 xl:grid-cols-4">
+        <div className="relative mt-5 grid overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-surface sm:grid-cols-2 xl:grid-cols-4">
           {[
             { icon: Timer, label: "İlk yanıt hedefi", value: relativeTarget(ticket.first_response_due_at, Boolean(ticket.first_response_at)), detail: ticket.first_response_at ? dt(ticket.first_response_at) : dt(ticket.first_response_due_at) },
             { icon: ShieldCheck, label: "Çözüm hedefi", value: relativeTarget(ticket.resolution_due_at, terminal), detail: dt(ticket.resolution_due_at) },
             { icon: UserRound, label: "Sorumlu", value: assignedName ?? "Atanmadı", detail: assignedName ? "Aktif atama" : "Kuyrukta" },
             { icon: MessageSquareText, label: "Konuşma", value: `${rows.length} mesaj`, detail: `${internalCount} iç not · ${attachments.length} ek` },
           ].map((metric) => (
-            <div key={metric.label} className="flex items-center gap-3 border-white/10 p-3.5 sm:[&:nth-child(even)]:border-l xl:[&:not(:first-child)]:border-l">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/10 text-cyan-200"><metric.icon className="h-4 w-4" /></span>
-              <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.06em] text-white/40">{metric.label}</span><span className="block truncate text-sm font-bold text-white">{metric.value}</span><span className="block truncate text-xs text-white/40">{metric.detail}</span></span>
+            <div key={metric.label} className="flex items-center gap-3 border-hairline p-3.5 sm:[&:nth-child(even)]:border-l xl:[&:not(:first-child)]:border-l">
+              <span className="pm-ico pm-t-brand" aria-hidden><metric.icon className="h-4 w-4" /></span>
+              <span className="min-w-0"><span className="block text-xs font-semibold uppercase tracking-[0.06em] text-text-muted">{metric.label}</span><span className="block truncate text-sm font-bold text-text">{metric.value}</span><span className="block truncate text-xs text-text-muted">{metric.detail}</span></span>
             </div>
           ))}
         </div>
@@ -351,7 +353,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
               <Prop label="Kategori">{categoryLabel[ticket.category] ?? ticket.category}</Prop>
               <Prop label="Öncelik">{priorityLabel[ticket.priority] ?? ticket.priority}</Prop>
               <Prop label="Kaynak">{ticket.source ?? "panel"}</Prop>
-              <Prop label="Atanan">{assignedName ? <span className="inline-flex items-center gap-1 text-cyan-700"><UserRound className="h-3 w-3" />{assignedName}</span> : <span className="text-text-faint">Atanmadı</span>}</Prop>
+              <Prop label="Atanan">{assignedName ? <span className="inline-flex items-center gap-1 text-accent-text"><UserRound className="h-3 w-3" />{assignedName}</span> : <span className="text-text-faint">Atanmadı</span>}</Prop>
               <Prop label="Yeniden açılma">{ticket.reopen_count ?? 0}</Prop>
               <Prop label="Sürüm">v{ticket.version ?? 1}</Prop>
             </dl>
