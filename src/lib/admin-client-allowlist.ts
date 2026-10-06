@@ -16,6 +16,8 @@ export type AdminClientAllowEntry = {
 export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/acik-ev-kayit/[token]/page.tsx", fn: "OpenHouseCheckinPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/account.ts", fn: "updateMyProfile", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/admin-account-credit.ts", fn: "grantAccountCredit", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/app/actions/admin-account-credit.ts", fn: "reverseAccountCredit", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-ticket-extra.ts", fn: "searchTicketTenants", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-ticket-extra.ts", fn: "updateTicketMacro", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-ticket-ops.ts", fn: "bulkUpdateTickets", calls: 1, tenantFilter: "yok" },

@@ -52,6 +52,15 @@ export function decidePoolAction(input: {
   }
 }
 
+/**
+ * Toplu giriş (içe aktarma) kararı: aynı anda onlarca ilan aynı aday listesiyle puanlandığı için otomatik atama
+ * hepsini tek danışmana yığar (açık ilan sayısı ilanlar arasında güncellenmez). Toplu girişte otomatik atama
+ * YAPILMAZ; en iyi öneri yöneticinin tek tık onayına düşer. Sahiplenme ve bekleme kararları aynen kalır.
+ */
+export function bulkPoolDecision(decision: PoolDecision): PoolDecision {
+  return decision.kind === "auto_assign" ? { kind: "await_owner", reason: "semi_auto" } : decision;
+}
+
 export type SlaState = "none" | "ok" | "due_soon" | "breached";
 
 /** SLA durumu: süre yoksa none; dolmuşsa breached; son %20 (en çok 15 dk) kala due_soon. */
