@@ -26,7 +26,7 @@ function monthRange(key: string): { from: string; to: string } {
  * görebilenler (earnings_all). Her tutar ilgili filtreli listeye gider. Örnek veri hariç. Yöntem `src/lib/reporting/profit-loss.ts`.
  */
 export default async function ProfitLossPage() {
-  const { perms, tenantId } = await requireModulePage("reports", "/app/raporlar/kar-zarar");
+  const { perms, tenantId } = await requireModulePage("reports", "/app/raporlar");
   const crumbs = [{ label: "Raporlar", href: "/app/raporlar" }, { label: "Kâr / zarar" }];
   if (!tenantId || !canSeeAllEarnings(perms)) {
     return (

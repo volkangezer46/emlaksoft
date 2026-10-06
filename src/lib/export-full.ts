@@ -38,7 +38,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
   musteriler: (sb, gate, params) => {
     const query = sb
       .from("customers")
-      .select("full_name, phone, email, customer_types, tags, source, created_at")
+      .select("id, full_name, phone, email, customer_types, tags, source, created_at")
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -73,7 +73,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
     let q = sb
       .from("properties")
       .select(
-        "property_code, title, transaction_type, property_type, status, list_price, assigned_to, created_at, province:geo_provinces(name), district:geo_districts(name)",
+        "id, property_code, title, transaction_type, property_type, status, list_price, assigned_to, created_at, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
@@ -124,7 +124,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
     let q = sb
       .from("customer_demands")
       .select(
-        "transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!customer_demands_customer_id_fkey!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
+        "id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, customer:customers!customer_demands_customer_id_fkey!inner(full_name, tenant_id, assigned_to), province:geo_provinces(name)",
       )
       .eq("tenant_id", gate.tenantId)
       .eq("customer.tenant_id", gate.tenantId);
@@ -148,7 +148,7 @@ export const EXPORT_QUERIES: Record<string, Builder> = {
     let q = sb
       .from("deals")
       .select(
-        "stage, deal_type, deal_value, probability, updated_at, property:properties!deals_property_id_fkey(property_code, title, tenant_id), customer:customers!deals_customer_id_fkey(full_name, tenant_id)",
+        "id, stage, deal_type, deal_value, probability, updated_at, property:properties!deals_property_id_fkey(property_code, title, tenant_id), customer:customers!deals_customer_id_fkey(full_name, tenant_id)",
       )
       .eq("tenant_id", gate.tenantId)
       .eq("property.tenant_id", gate.tenantId)
