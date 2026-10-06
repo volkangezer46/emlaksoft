@@ -31,13 +31,10 @@ const CACHEABLE_PUBLIC_PAGES = new Set([
 
 const CACHEABLE_PUBLIC_ASSETS = new Set([
   OFFLINE_URL,
-  "/emlaksoft-premium-team.png",
   "/file.svg",
   "/globe.svg",
   "/icon.svg",
-  "/listing-aegean-villa.png",
-  "/listing-bosphorus-villa.png",
-  "/listing-istanbul-penthouse.png",
+  "/listing-bosphorus-villa.webp",
   "/manifest.webmanifest",
   "/next.svg",
   "/vercel.svg",
