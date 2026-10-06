@@ -24,6 +24,7 @@ import {
 } from "@/app/actions/ai-tenant-advisor";
 import { getAsistanInsights } from "./insights";
 import { TenantAdvisorChat } from "./advisor-chat";
+import { ActionProposalPanel } from "./action-proposal-panel";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "AI Asistan" };
@@ -242,6 +243,9 @@ export default async function AsistanPage({
           </div>
         )}
       </section>
+
+      {/* Onaylı eylemli asistan: öneri → önizleme → insan onayı (audit + kota kapısı) */}
+      <ActionProposalPanel aiEnabled={aiEnabled} />
 
       {/* Sohbet — ?q ilk mesaj, ?oturum geçmiş sohbeti açar; key remount garantiler */}
       <TenantAdvisorChat
