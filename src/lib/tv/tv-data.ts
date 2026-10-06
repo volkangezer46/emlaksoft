@@ -11,6 +11,12 @@ import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { OPEN_DEMAND_STATUSES } from "@/lib/team/advisor-360";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import { loadSampleKpiScope } from "@/lib/sample-scope";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
 import { buildTvEvents, leadSourceLabel, shortName, type TvEvent } from "@/lib/tv/tv-logic";
 
 export type TvAppointment = {
@@ -212,8 +218,11 @@ export async function loadTvData(
   const propIds = propRows.map((p) => String(p.id));
   let covers = new Map<string, string>();
   if (propIds.length) {
-    const { data } = await supabase.from("property_media").select("id, property_id").in("property_id", propIds).eq("kind", "image").eq("is_cover", true);
-    covers = new Map(((data ?? []) as { id: string; property_id: string }[]).map((c) => [c.property_id, c.id] as const));
+    // Ofis TV'si ziyaretçiye açık ekrandır -> public kuralı: belge kapak gösterilmez (KVKK P0-9).
+    const { data } = await selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      supabase.from("property_media").select(columns).in("property_id", propIds).eq("kind", "image").eq("is_cover", true),
+    );
+    covers = firstPublicImageByProperty(data);
   }
   const properties: TvProperty[] = propRows.map((p) => {
     const coverId = covers.get(String(p.id));

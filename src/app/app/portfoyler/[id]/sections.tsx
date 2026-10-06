@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { moneyTry } from "@/lib/leak-shield";
 import { DAY_MS, now } from "@/lib/clock";
 import { sanitizeWatermarkSettings } from "@/lib/watermark";
+import { isDocumentMedia, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { computeListingQuality, computePropertyHealth } from "@/lib/property-health";
 import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
@@ -69,14 +70,20 @@ export async function MediaSection({
   canEdit: boolean;
 }) {
   const supabase = await createClient();
-  const [{ data: mediaData }, { data: tenantBrand }] = await Promise.all([
-    // Sıralama sürükle-bırak ile yönetiliyor → `sort_order` TEK ölçüt.
-    supabase
-      .from("property_media")
-      .select("id, kind, storage_path, external_url, is_cover, has_watermark, sort_order")
-      .eq("property_id", propertyId)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true }),
+  type MediaRow = Omit<MediaItem, "is_document"> & { file_name: string | null; is_document?: boolean | null };
+  const [{ data: mediaData, hasDocumentColumn }, { data: tenantBrand }] = await Promise.all([
+    // Sıralama sürükle-bırak ile yönetiliyor → `sort_order` TEK ölçüt. is_document (KVKK P0-9) sütun yoksa
+    // sütunsuz tekrar edilir; belge ayrımı o zaman ad kuralıyla gösterilir (public kuralla aynı).
+    selectWithDocumentFlag<MediaRow[]>(
+      "id, kind, storage_path, external_url, is_cover, has_watermark, sort_order, file_name",
+      (columns) =>
+        supabase
+          .from("property_media")
+          .select(columns)
+          .eq("property_id", propertyId)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: true }),
+    ),
     // Filigran: yükleme sırasında istemcide basılır — ayar + logo + ofis adı gerekir
     tenantId
       ? supabase.from("tenants").select("name, logo_url, watermark_settings").eq("id", tenantId).maybeSingle()
@@ -88,7 +95,11 @@ export async function MediaSection({
   return (
     <PropertyMediaManager
       propertyId={propertyId}
-      media={(mediaData ?? []) as MediaItem[]}
+      media={(mediaData ?? []).map(({ file_name, is_document, ...m }) => ({
+        ...m,
+        is_document: m.kind === "image" && isDocumentMedia({ is_document, file_name }),
+      }))}
+      documentFlagAvailable={hasDocumentColumn}
       canEdit={canEdit}
       watermark={sanitizeWatermarkSettings(brand?.watermark_settings ?? null)}
       officeName={brand?.name ?? ""}

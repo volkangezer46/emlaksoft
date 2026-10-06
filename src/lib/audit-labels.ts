@@ -26,6 +26,7 @@ export const actionLabel: Record<string, string> = {
   "property.reassign": "Portföy devri",
   "property.bulk_status": "Toplu portföy durumu",
   "property_media.upload": "Portföy medyası yüklendi",
+  "property_media.document_flag": "Portföy medyası belge/fotoğraf olarak işaretlendi",
   "valuation.create": "Değerleme oluşturuldu",
   "iys.upsert": "İYS izin kaydı",
   "task.create": "Görev oluşturuldu",

@@ -35,6 +35,12 @@ import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { HOME_VALUE_SUMMARY_KEY } from "@/lib/settings/registry/tenant";
 import { loadHomeValues } from "@/lib/home-value/load";
 import { HOME_VALUE_NOTE } from "@/lib/home-value/core";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
 
 export const dynamic = "force-dynamic";
 
@@ -106,15 +112,18 @@ export default async function CustomerPortalPage({
       .is("deleted_at", null)
       .maybeSingle(),
     matchIds.length > 0
-      ? admin
-          .from("property_media")
-          .select("id, property_id")
-          .eq("tenant_id", tenant.id)
-          .eq("kind", "image")
-          .in("property_id", matchIds)
-          .order("is_cover", { ascending: false })
-          .order("sort_order", { ascending: true })
-      : Promise.resolve({ data: [] as { id: string; property_id: string }[] }),
+      ? // KVKK P0-9: kapak belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
+        selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+          admin
+            .from("property_media")
+            .select(columns)
+            .eq("tenant_id", tenant.id)
+            .eq("kind", "image")
+            .in("property_id", matchIds)
+            .order("is_cover", { ascending: false })
+            .order("sort_order", { ascending: true }),
+        )
+      : Promise.resolve({ data: [] as PublicCoverCandidate[] }),
     matchIds.length > 0
       ? admin
           .from("properties")
@@ -168,11 +177,8 @@ export default async function CustomerPortalPage({
     `Merhaba, ${tenant.name} müşteri paneli üzerinden yazıyorum.`,
   );
 
-  // Her portföy için ilk (kapak öncelikli) görsel
-  const coverMap = new Map<string, string>();
-  for (const m of coverRes.data ?? []) {
-    if (!coverMap.has(m.property_id)) coverMap.set(m.property_id, m.id);
-  }
+  // Her portföy için ilk (kapak öncelikli) PUBLIC görsel — belge atlanır.
+  const coverMap = firstPublicImageByProperty(coverRes.data);
   type PortalPropExtra = {
     id: string;
     status: string | null;

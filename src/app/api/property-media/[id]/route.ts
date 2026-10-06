@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isPublicListingImage } from "@/lib/public-property-media";
+import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -9,12 +9,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const admin = createAdminClient();
 
-  const { data: media } = await admin
-    .from("property_media")
-    .select("kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id)")
-    .eq("id", id)
-    .eq("kind", "image")
-    .maybeSingle();
+  type MediaRow = {
+    kind: string;
+    storage_path: string | null;
+    file_type: string | null;
+    file_name: string | null;
+    is_document?: boolean | null;
+    property:
+      | { status: string | null; deleted_at: string | null; tenant_id: string }
+      | { status: string | null; deleted_at: string | null; tenant_id: string }[]
+      | null;
+  };
+  // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
+  const { data: media } = await selectWithDocumentFlag<MediaRow>(
+    "kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id)",
+    (columns) => admin.from("property_media").select(columns).eq("id", id).eq("kind", "image").maybeSingle(),
+  );
 
   // Yalnızca herkese açık listelenen (taslak/silinmiş olmayan) portföylerin görselleri servis edilir
   const prop = media && (Array.isArray(media.property) ? media.property[0] : media.property);
@@ -31,8 +41,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Görsel bulunamadı" }, { status: 404 });
   }
 
-  // KVKK P0-9: belge gibi görünen görsel (tapu, yetki belgesi...) public uçtan servis edilmez (tek kural).
-  if (!/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "") || !isPublicListingImage(media)) {
+  // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel public uçtan servis edilmez (tek kural).
+  if (!media.file_type || !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type) || !isPublicListingImage(media)) {
     return NextResponse.json({ error: "Görsel bulunamadı." }, { status: 404 });
   }
 

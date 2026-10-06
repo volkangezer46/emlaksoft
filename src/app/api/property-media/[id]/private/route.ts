@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyShortLivedPropertyMediaClaim } from "@/lib/property-media-access";
-import { isPublicListingImage } from "@/lib/public-property-media";
+import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -53,12 +53,21 @@ export async function GET(
   if (!rate.allowed) return notFoundResponse();
 
   const admin = createAdminClient();
-  const { data: media, error: mediaError } = await admin
-    .from("property_media")
-    .select("kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))")
-    .eq("id", id)
-    .eq("kind", "image")
-    .maybeSingle();
+  type TenantRef = { status: string | null };
+  type PropertyRef = { deleted_at: string | null; tenant: TenantRef | TenantRef[] | null };
+  type MediaRow = {
+    kind: string;
+    storage_path: string | null;
+    file_type: string | null;
+    file_name: string | null;
+    is_document?: boolean | null;
+    property: PropertyRef | PropertyRef[] | null;
+  };
+  // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
+  const { data: media, error: mediaError } = await selectWithDocumentFlag<MediaRow>(
+    "kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))",
+    (columns) => admin.from("property_media").select(columns).eq("id", id).eq("kind", "image").maybeSingle(),
+  );
   const property = media && (Array.isArray(media.property) ? media.property[0] : media.property);
   const tenant = property && (Array.isArray(property.tenant) ? property.tenant[0] : property.tenant);
   if (
@@ -68,8 +77,9 @@ export async function GET(
     property.deleted_at ||
     !tenant ||
     !isPublicTenantActive(tenant.status) ||
-    !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "") ||
-    // KVKK P0-9: belge gibi görünen görsel imzalı public uçtan da servis edilmez (tek kural).
+    !media.file_type ||
+    !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type) ||
+    // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel imzalı public uçtan da servis edilmez (tek kural).
     !isPublicListingImage(media)
   ) {
     return notFoundResponse();

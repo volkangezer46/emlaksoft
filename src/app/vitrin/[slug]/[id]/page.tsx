@@ -38,7 +38,24 @@ import { getBaseUrl } from "@/lib/base-url";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { normalizeExternalHref } from "@/lib/external-href";
 import { provinceOptionsResult } from "@/lib/geo/reader";
-import { isPublicListingImage } from "@/lib/public-property-media";
+import {
+  PUBLIC_COVER_COLUMNS,
+  firstPublicImageByProperty,
+  isPublicListingImage,
+  selectWithDocumentFlag,
+  type PublicCoverCandidate,
+} from "@/lib/public-property-media";
+
+type VitrinMediaRow = {
+  id: string;
+  kind: string;
+  file_type: string | null;
+  file_name: string | null;
+  external_url: string | null;
+  is_cover: boolean;
+  sort_order: number | null;
+  is_document?: boolean | null;
+};
 
 // Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
 // alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
@@ -105,18 +122,22 @@ export async function generateMetadata({
   const { slug, id } = await params;
   const admin = createAdminClient();
 
-  const [{ data: tenant }, { data: cover }] = await Promise.all([
+  const [{ data: tenant }, { data: coverRows }] = await Promise.all([
     admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle(),
-    admin
-      .from("property_media")
-      .select("id")
-      .eq("property_id", id)
-      .eq("kind", "image")
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+    // KVKK P0-9: OG kapak görseli belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
+    selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", id)
+        .eq("kind", "image")
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .limit(50),
+    ),
   ]);
+  const coverId = firstPublicImageByProperty(coverRows).get(id);
+  const cover = coverId ? { id: coverId } : null;
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
   if (!(await isVitrinEnabled(admin, tenant.id))) return { title: "İlan bulunamadı" };
 
@@ -175,12 +196,15 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
       .select("id, name, status, phone, logo_url, license_no, address_line, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
-    admin
-      .from("property_media")
-      .select("id, kind, file_type, file_name, external_url, is_cover, sort_order")
-      .eq("property_id", id)
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true }),
+    // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
+    selectWithDocumentFlag<VitrinMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover, sort_order", (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", id)
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true }),
+    ),
     provinceOptionsResult(),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
@@ -308,22 +332,23 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
   const fxLine = fxApproxLine(price, fxRates);
 
-  const similarCoverMap = new Map<string, string>();
+  let similarCoverMap = new Map<string, string>();
   if (similar.length) {
-    const { data: similarMedia } = await admin
-      .from("property_media")
-      .select("id, property_id, is_cover, sort_order")
-      .eq("kind", "image")
-      .in("property_id", similar.map((p) => p.id))
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true });
-    for (const m of similarMedia ?? []) {
-      if (!similarCoverMap.has(m.property_id)) similarCoverMap.set(m.property_id, m.id);
-    }
+    // KVKK P0-9: benzer ilan kapağı belge olamaz -> ilk public görsel.
+    const { data: similarMedia } = await selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("kind", "image")
+        .in("property_id", similar.map((p) => p.id))
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true }),
+    );
+    similarCoverMap = firstPublicImageByProperty(similarMedia);
   }
 
   const media = mediaRows ?? [];
-  // KVKK P0-9: belge gibi görünen görsel vitrinde gösterilmez (tek kural, public-property-media).
+  // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel vitrinde gösterilmez (tek kural).
   const images = media.filter((m) => isPublicListingImage(m));
   const tours = media.flatMap((item) => {
     const externalUrl = normalizeExternalHref(item.external_url);

@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PortalListingLink } from "@/lib/social-card/core";
+import { PUBLIC_COVER_COLUMNS, isPublicListingImage, selectWithDocumentFlag, type PublicCoverCandidate } from "@/lib/public-property-media";
 
 /**
  * Sosyal kart verisi — oturumlu (RLS'li) istemciyle, açık tenant_id filtresiyle okunur. service_role YOK.
@@ -80,18 +81,26 @@ export async function loadSocialCardData(db: SupabaseClient, tenantId: string, p
 
 const MAX_COVER_BYTES = 4 * 1024 * 1024;
 
-/** Kapak görseli (yalnız JPEG/PNG: satori webp okumaz) → data URL; yoksa/okunamazsa null (kart fotoğrafsız çizilir). */
+/**
+ * Kapak görseli → data URL; yoksa/okunamazsa null (kart fotoğrafsız çizilir). Kart sosyal medyada paylaşıldığı için
+ * PUBLIC medya kuralından geçer (`src/lib/public-property-media.ts`, KVKK P0-9): belge (is_document / belge adlı dosya)
+ * ASLA karta girmez; ilk public görsel kullanılır. Satori yalnız JPEG/PNG okur (webp ise fotoğrafsız).
+ */
 export async function loadCoverDataUrl(db: SupabaseClient, tenantId: string, propertyId: string): Promise<string | null> {
-  const { data: media } = await db
-    .from("property_media")
-    .select("storage_path, file_type")
-    .eq("property_id", propertyId)
-    .eq("tenant_id", tenantId)
-    .eq("kind", "image")
-    .order("is_cover", { ascending: false })
-    .order("sort_order", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const { data: rows } = await selectWithDocumentFlag<(PublicCoverCandidate & { storage_path: string | null })[]>(
+    `${PUBLIC_COVER_COLUMNS}, storage_path`,
+    (columns) =>
+      db
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", propertyId)
+        .eq("tenant_id", tenantId)
+        .eq("kind", "image")
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .limit(20),
+  );
+  const media = (rows ?? []).find((m) => isPublicListingImage(m));
   const type = String(media?.file_type ?? "").toLowerCase();
   if (!media?.storage_path || !/^image\/(jpeg|png)$/.test(type)) return null;
   try {
