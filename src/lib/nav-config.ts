@@ -48,6 +48,12 @@ export type NavItem = {
   module: AppModule;
   /** Birden çok sayfayı tek menü öğesinde toplar; ilk sekme öğenin girişidir. */
   tabs?: readonly NavTab[];
+  /**
+   * Sekme şeridi ÇİZİLMEYEN ama öğeyi etkin yapan ek yollar: sayfa kendi alt gezinmesini taşır (ör. İlan Kontrol
+   * alt gezinmesindeki "Kapanış kayıpları" = /app/kayip-kacak) ya da sayfaya bir düğmeden gidilir (TV panosu).
+   * Menüde ayrı öğe olmaz (mükerrer giriş yok), yolu değişmez; yetim sayfa sözleşmesi bu yolları menüde sayar.
+   */
+  matchPaths?: readonly string[];
   /** true: sekmelerin kendi modülü yetse de öğenin kendi `module`ü yoksa öğe hiç görünmez. */
   needsItemModule?: boolean;
   /**
@@ -194,8 +200,10 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         icon: ICONS.ilanKontrol,
         module: "portals",
         tier: "core",
-        description: "Portal yayın takibi, kayıp ve kaçak uyarıları",
-        keywords: ["kayıp", "kaçak", "anomali", "sla", "yayın"],
+        description: "Portal yayın takibi, kayıp ve kaçak uyarıları, kapanış kayıpları",
+        keywords: ["kayıp", "kaçak", "anomali", "sla", "yayın", "kaçan komisyon", "kapanış kaybı", "kalkan", "rakip"],
+        // Kayıp-Kaçak Kalkanı İlan Kontrol alt gezinmesinin "Kapanış kayıpları" sekmesidir (tek menü girişi).
+        matchPaths: ["/app/kayip-kacak"],
       },
       {
         href: "/app/kiralama",
@@ -373,7 +381,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "performans",
     title: "Performans ve Raporlar",
     icon: ICONS.baslikPerformans,
-    description: "Kişisel karne, ofis raporları ve kaçak takibi.",
+    description: "Kişisel karne, ofis raporları ve ekip performansı.",
     items: [
       // Kişinin kendi karnesi, hedefi ve kazancı (danışman rolünde Ekip Merkezi yerine bu giriş vardır).
       {
@@ -405,23 +413,23 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["analiz", "istatistik", "rapor", "bölge", "grafik"],
       },
       {
-        href: "/app/kayip-kacak",
-        label: "Kaçan komisyonlar",
-        icon: ICONS.alarm,
-        module: "leak",
-        tier: "more",
-        description: "Portal ilanından rakibe kapanan satışlar ve kaçan komisyon",
-        keywords: ["kayıp kaçak", "kalkan", "rakip", "leak"],
-      },
-      {
-        href: "/app/pano-tv",
-        label: "Ofis Panosu (TV)",
-        icon: ICONS.panoTv,
-        module: "reports",
-        tier: "more",
-        advanced: true,
-        description: "Ofis ekranı için canlı skor panosu",
-        keywords: ["tv", "ekran", "pano", "lig"],
+        // Ekip performansı TEK öğe: Özet (danışman KPI), Lig, Kıyas sekmeleri (yollar sabit, her sayfa kendi kapısını korur).
+        // TV panosu menü öğesi değildir: ana ekranın ve Lig'in "TV modu" düğmesinden açılır.
+        href: "/app/danisman-kpi",
+        label: "Ekip performansı",
+        icon: ICONS.kpi,
+        // Ekip modülü olana görünür (eskiden Ekip Merkezi sekmesiydi; danışman/muhasebe görmez, kendi karnesi Performansım).
+        module: "team",
+        needsItemModule: true,
+        tabs: [
+          { href: "/app/danisman-kpi", label: "Özet", icon: ICONS.kpi, module: "reports", description: "Arama, randevu, teklif ve anlaşma performansı", keywords: ["kpi", "performans", "danışman"] },
+          { href: "/app/lig", label: "Lig", icon: ICONS.lig, module: "reports", description: "Sıralama, rozetler ve motivasyon panosu", keywords: ["lig", "sıralama", "rozet"] },
+          { href: "/app/ekip/kiyas", label: "Kıyas", icon: ICONS.kiyas, module: "reports", description: "Danışman karnesi: dönüşüm, iş yükü, hedef", keywords: ["kıyas", "karşılaştır", "karne"] },
+        ],
+        matchPaths: ["/app/pano-tv"],
+        tier: "core",
+        description: "Danışman KPI özeti, ekip ligi ve danışman kıyası",
+        keywords: ["kpi", "lig", "kıyas", "sıralama", "performans", "tv", "pano"],
       },
     ],
   },
@@ -500,10 +508,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "team",
         tabs: [
           { href: "/app/ekip", label: "Genel", icon: ICONS.ekip, module: "team" },
-          // Ekip performansı sekmeleri (eski Performans başlığındaki "Ekip performansı" girişi buraya birleşti).
-          { href: "/app/ekip/kiyas", label: "Kıyas", icon: ICONS.kiyas, module: "reports", description: "Danışman karnesi: dönüşüm, iş yükü, hedef", keywords: ["kıyas", "karşılaştır"] },
-          { href: "/app/danisman-kpi", label: "Danışman KPI", icon: ICONS.kpi, module: "reports", description: "Arama, randevu, teklif ve anlaşma performansı", keywords: ["kpi", "performans"] },
-          { href: "/app/lig", label: "Ekip Ligi", icon: ICONS.lig, module: "reports", description: "Sıralama, rozetler ve motivasyon panosu", keywords: ["lig", "sıralama", "rozet"] },
+          // Kıyas / Danışman KPI / Lig sekmeleri "Ekip performansı" öğesine taşındı (Performans ve Raporlar).
           { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets", description: "Aylık ciro ve anlaşma hedefleri", keywords: ["hedef", "kota", "target"] },
           { href: "/app/ekip/devir", label: "Devir / Atama", icon: ICONS.devir, module: "team", description: "Müşteri ve portföyleri danışmanlar arasında devret", keywords: ["devir", "atama", "transfer"] },
           { href: "/app/ekip/subeler", label: "Şubeler", icon: ICONS.ekip, module: "team", description: "Şube tanımları ve bölgeleri", keywords: ["şube", "branş"] },
@@ -512,7 +517,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         // Ekip Merkezi ekip modülü olanın girişidir; modülsüz rolde (danışman) yerine Performansım vardır.
         needsItemModule: true,
         tier: "core",
-        description: "Danışmanlar, kıyas, KPI, lig, hedefler, şube ve takımlar",
+        description: "Danışmanlar, hedefler, devir, şube ve takımlar",
         keywords: ["danışman", "çalışan", "personel", "ekip", "şube", "takım", "izin"],
       },
       {
@@ -743,7 +748,7 @@ export function moreSections(
 /** Menü öğeleri, sekmeleri ve eski (yönlendirmeli) yollar: hiçbir sayfa kaybolmaz. */
 export const ALL_NAV_HREFS: readonly string[] = [
   ...new Set([
-    ...NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? [])])),
+    ...NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? []), ...(i.matchPaths ?? [])])),
     ...Object.keys(NAV_ALIASES),
   ]),
 ];
@@ -763,6 +768,7 @@ export function resolveActiveNav(
   for (const item of sections.flatMap((s) => s.items)) {
     owner.set(item.href, item.href);
     for (const tab of item.tabs ?? []) owner.set(tab.href, item.href);
+    for (const extra of item.matchPaths ?? []) if (!owner.has(extra)) owner.set(extra, item.href);
   }
   const hit = findActiveNavigationHref(pathname, [...owner.keys()], "/app");
   const href = hit ? (owner.get(hit) ?? null) : null;
