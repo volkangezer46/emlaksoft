@@ -40,7 +40,6 @@ function glassSelectors(css: string): string[] {
 const CSS_ENVANTERI: Record<string, string[]> = {
   // .glass / .glass-dark / .glass-card / .mega-backdrop: eski yardımcılar; hiçbir bileşen kullanmıyor (aşağıda sabit).
   "src/app/globals.css": [".glass", ".glass-dark", ".mega-backdrop", ".glass-card", ".glass-bar"],
-  "src/app/premium.css": [".pm-glass"],
   "src/app/marketing.css": [".mk-nav::before", ".mk-portals"],
 };
 
@@ -49,7 +48,6 @@ const BILESEN_IZINLI = [
   "src/components/public/compare-table.tsx", // tam ekran karşılaştırma örtüsü
   "src/components/public/gallery-lightbox.tsx", // tam ekran galeri örtüsü
   "src/components/ui/dialog.tsx", // Radix diyalog örtüleri (.dialog-overlay)
-  "src/components/ui/premium/glass-kpi.tsx", // yalnız belge yorumu; cam .pm-glass sınıfından gelir
 ];
 
 /**
@@ -116,7 +114,7 @@ describe("cam yüzey bütçesi", () => {
     };
     const supportsBody = body(a11y, supports);
     const mediaBody = body(a11y, media);
-    for (const sel of [...CSS_ENVANTERI["src/app/globals.css"]!, ...CSS_ENVANTERI["src/app/premium.css"]!]) {
+    for (const sel of [...CSS_ENVANTERI["src/app/globals.css"]!, ...(CSS_ENVANTERI["src/app/premium.css"] ?? [])] /* .pm-glass GlassKpi ile silindi (2026-10-06) */) {
       expect(supportsBody, `@supports not: ${sel}`).toMatch(new RegExp(`:root \\${sel}[,\\s{]`));
       expect(mediaBody, `media: ${sel}`).toMatch(new RegExp(`:root \\${sel}[,\\s{]`));
     }

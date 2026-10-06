@@ -6,6 +6,7 @@ import { attachUsage, getAdminRow, listAdminRows } from "@/lib/geo/admin-store";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { GeoEntityList, type EntityRowData } from "../../entity-list";
 import { NewEntityForm } from "../../new-entity-form";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 const PAGE_SIZE = 300;
 
@@ -50,18 +51,12 @@ export default async function AdminGeoDistrictPage({
         <ArrowLeft className="h-3.5 w-3.5" /> {province.name} · ilçeler
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
-            <MapPinned className="h-3.5 w-3.5" /> {province.name}
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold">{district.name} · mahalleler</h1>
-          <p className="mt-2 max-w-xl text-sm text-white/60">
-            {total.toLocaleString("tr-TR")} mahalle{truncated ? ` (ilk ${PAGE_SIZE} gösteriliyor — daraltmak için arayın)` : ""}
-          </p>
-        </div>
-      </section>
+      <AdminPageHeader
+        eyebrow={province.name}
+        icon={MapPinned}
+        title={`${district.name} · mahalleler`}
+        description={`${total.toLocaleString("tr-TR")} mahalle${truncated ? ` (ilk ${PAGE_SIZE} gösteriliyor — daraltmak için arayın)` : ""}`}
+      />
 
       <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">

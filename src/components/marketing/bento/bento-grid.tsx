@@ -3,34 +3,41 @@ import { Check } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { gateBadge } from "@/lib/marketing-plan-badge";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
-import type { Heading } from "@/lib/site-content/schema";
+import type { BentoTile, Heading, SiteContent } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "../content-link";
 import { SectionHeading } from "../section-heading";
 import { AssistantArt, AutomationArt, LeakArt, PortalArt, ShowcaseArt, SignatureArt, TeamArt, ValuationArt } from "./bento-art";
-import { CRON_JOBS } from "@/lib/cron-jobs";
 
-type Tile = { id: string; cls: string; eyebrow: string; title: string; text: string; gate?: string; points?: string[]; art: ReactNode; dark?: boolean };
-
-/* Paket rozetleri plans.ts ile uyumludur: kayıp-kaçak, KPI/lig ve otomasyon kuralları Profesyonel; portal teyit ve
-   dijital imza Ofis ve üstü. Garanti/ispatsız üstünlük dili yok. */
-const TILES: Tile[] = [
-  {
-    id: "kayip-kacak", cls: "mk-b-leak", dark: true, eyebrow: "Kayıp-kaçak kalkanı", title: "Kaybettiğiniz komisyonu rakama dökün", gate: "/app/kayip-kacak",
-    text: "İlan yayından kalktığında sistem sebebini sorar: satıldı mı, rakip mi kapattı, yoksa ihmal mi edildi? Kaçan komisyon görünür olur.",
-    points: ["Zorunlu kapanış formu, boş geçilemez", "Rakip kapanışı ile kendi satışınız ayrı sayılır", "Danışman bazında kaçak karnesi"], art: <LeakArt />,
-  },
-  { id: "emsal-degerleme", cls: "mk-b-val", eyebrow: "Değerleme", title: "Emsal bazlı fiyat sinyali", text: "Emsal motoru benzer portföylerden bir fiyat aralığı çıkarır; pazarlığa veriyle girersiniz.", art: <ValuationArt /> },
-  { id: "otomasyon", cls: "mk-b-auto", eyebrow: "Otomasyonlar", title: `${CRON_JOBS.length} otomatik görev, arka planda`, gate: "/app/otomasyonlar", text: "Hatırlatma, teyit ve özet işleri siz uğraşmadan zamanında çalışır.", art: <AutomationArt /> },
-  { id: "ai-asistan", cls: "mk-b-ai", eyebrow: "AI asistan", title: "Sorun, listelesin", text: "Doğal dille sorun; asistan ofis kayıtlarınız üzerinden yanıtlar.", art: <AssistantArt /> },
-  { id: "portal-kontrol", cls: "mk-b-portal", eyebrow: "Portal kontrolü", title: "İlanlarınızı teyitle, kaçağı ölçün", gate: "/app/portallar", text: "İlan numarası veya bağlantısını ekleyin; periyodik teyit ve kapanış formu. Otomatik yayınlama yoktur.", art: <PortalArt /> },
-  { id: "imza", cls: "mk-b-sign", eyebrow: "Sözleşme", title: "SMS onaylı dijital imza", gate: "/app/sozlesmeler", text: "Teklif ve sözleşme aynı kayıtta; imza SMS doğrulamasıyla alınır.", art: <SignatureArt /> },
-  { id: "vitrin", cls: "mk-b-show", eyebrow: "Vitrin", title: "Kendi adresinizde ofis vitrini", text: "Portföyleriniz, favoriler ve değerleme formuyla herkese açık sayfa.", art: <ShowcaseArt /> },
-  { id: "performans", cls: "mk-b-team", eyebrow: "Ekip ve performans", title: "Karne, lig ve hedefler", gate: "/app/danisman-kpi", text: "Danışman KPI, ekip ligi ve hedefler tek yerde; ekibi sayılarla yönetin.", art: <TeamArt /> },
+/**
+ * Yapı koddadır (kimlik -> ızgara sınıfı, illüstrasyon, koyu zemin, paket rozeti yolu); metinler site içeriğinden
+ * (/admin/site-icerik). Paket rozetleri plans.ts / page-gates ile uyumludur. Garanti/ispatsız üstünlük dili yok.
+ */
+type TileMeta = { id: BentoTile["id"]; cls: string; art: () => ReactNode; gate?: string; dark?: boolean };
+/** Kimlik aynı zamanda sayfa içi bağlantı hedefidir (/#kayip-kacak, /#emsal-degerleme ...; site menüsü testi doğrular). */
+const TILE_LIST: TileMeta[] = [
+  { id: "kayip-kacak", cls: "mk-b-leak", dark: true, gate: "/app/kayip-kacak", art: () => <LeakArt /> },
+  { id: "emsal-degerleme", cls: "mk-b-val", art: () => <ValuationArt /> },
+  { id: "otomasyon", cls: "mk-b-auto", gate: "/app/otomasyonlar", art: () => <AutomationArt /> },
+  { id: "ai-asistan", cls: "mk-b-ai", art: () => <AssistantArt /> },
+  { id: "portal-kontrol", cls: "mk-b-portal", gate: "/app/portallar", art: () => <PortalArt /> },
+  { id: "imza", cls: "mk-b-sign", gate: "/app/sozlesmeler", art: () => <SignatureArt /> },
+  { id: "vitrin", cls: "mk-b-show", art: () => <ShowcaseArt /> },
+  { id: "performans", cls: "mk-b-team", gate: "/app/danisman-kpi", art: () => <TeamArt /> },
 ];
+const TILE_META = Object.fromEntries(TILE_LIST.map((t) => [t.id, t])) as Record<BentoTile["id"], TileMeta>;
 
-export async function BentoGrid({ heading = defaultSiteContent().sections.ozellikler }: { heading?: Heading } = {}) {
+export async function BentoGrid({ heading = defaultSiteContent().sections.ozellikler, content = defaultSiteContent().bento }: { heading?: Heading; content?: SiteContent["bento"] } = {}) {
   const plans = await getPublicPlanDefinitions();
+  const ctx = { plans: [] };
+  const TILES = content.tiles
+    .filter((t) => !t.hidden)
+    .map((t) => {
+      const m = TILE_META[t.id];
+      const points = t.points.filter((x) => !x.hidden).map((x) => tx(x.text, ctx)).filter(Boolean);
+      return { id: t.id, cls: m.cls, dark: m.dark, gate: m.gate, eyebrow: tx(t.eyebrow, ctx), title: tx(t.title, ctx), text: tx(t.text, ctx), points: points.length ? points : undefined, art: m.art() };
+    });
+  if (TILES.length === 0) return null;
   return (
     <section id="ozellikler" className="mk-section" aria-labelledby="ozellik-baslik">
       <div className="mk-wrap mk-wrap-wide">
@@ -53,9 +60,7 @@ export async function BentoGrid({ heading = defaultSiteContent().sections.ozelli
             </article>
           ))}
         </div>
-        <p className="mk-fine">
-          İllüstrasyonlardaki isim ve sayılar örnek veridir. Özelliklerin kapsamı pakete göre değişir; deneme boyunca hepsi açıktır.
-        </p>
+        {content.note ? <p className="mk-fine">{tx(content.note, ctx)}</p> : null}
       </div>
     </section>
   );

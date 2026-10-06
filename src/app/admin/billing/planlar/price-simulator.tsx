@@ -8,6 +8,7 @@ import type { PlanDef } from "@/lib/billing/plans";
 import { opFieldClass } from "../inline-op";
 import { useSeatDraft } from "./seat-draft";
 import { SeatTierEditor } from "./seat-tier-editor";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 const lbl = "block text-xs font-semibold text-text-muted";
 const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
@@ -175,43 +176,43 @@ function SimulatorBody({
       </fieldset>
 
       <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line">
-        <table className="w-full text-left text-sm">
+        <Table className="w-full text-left text-sm">
           <caption className="sr-only">Fiyat simülasyonu sonucu</caption>
-          <thead className="bg-canvas text-xs text-text-faint">
-            <tr>
-              <th className="px-3 py-2 font-semibold">Gösterge</th>
-              <th className="px-3 py-2 font-semibold">Şimdi</th>
-              <th className="px-3 py-2 font-semibold">Yeni fiyatla</th>
-              <th className="px-3 py-2 font-semibold">Fark</th>
-            </tr>
-          </thead>
-          <tbody className="text-ink-950">
-            <tr className="border-t border-line">
-              <td className="px-3 py-2">MRR (aylık)</td>
-              <td className="px-3 py-2 tabular-nums">{tl(result.before.mrrTry)}</td>
-              <td className="px-3 py-2 tabular-nums">{tl(result.after.mrrTry)}</td>
-              <td className="px-3 py-2 font-semibold tabular-nums">{signed(result.deltaMrrTry)}</td>
-            </tr>
-            <tr className="border-t border-line">
-              <td className="px-3 py-2">ARPA</td>
-              <td className="px-3 py-2 tabular-nums">{tl(result.before.arpaTry)}</td>
-              <td className="px-3 py-2 tabular-nums">{tl(result.after.arpaTry)}</td>
-              <td className="px-3 py-2 font-semibold tabular-nums">{signed(result.deltaArpaTry)}</td>
-            </tr>
-            <tr className="border-t border-line">
-              <td className="px-3 py-2">Yeni satıştan MRR</td>
-              <td className="px-3 py-2 tabular-nums">{tl(result.before.newSalesMrrTry)}</td>
-              <td className="px-3 py-2 tabular-nums">{tl(result.after.newSalesMrrTry)}</td>
-              <td className="px-3 py-2 font-semibold tabular-nums">{signed(result.after.newSalesMrrTry - result.before.newSalesMrrTry)}</td>
-            </tr>
-            <tr className="border-t border-line">
-              <td className="px-3 py-2">Abone sayısı (varsayım dahil)</td>
-              <td className="px-3 py-2 tabular-nums">{result.before.subscribers}</td>
-              <td className="px-3 py-2 tabular-nums">{result.after.subscribers}</td>
-              <td className="px-3 py-2 tabular-nums">-</td>
-            </tr>
-          </tbody>
-        </table>
+          <THead className="bg-canvas text-xs text-text-faint">
+            <TR>
+              <TH className="px-3 py-2 font-semibold">Gösterge</TH>
+              <TH className="px-3 py-2 font-semibold">Şimdi</TH>
+              <TH className="px-3 py-2 font-semibold">Yeni fiyatla</TH>
+              <TH className="px-3 py-2 font-semibold">Fark</TH>
+            </TR>
+          </THead>
+          <TBody className="text-ink-950">
+            <TR className="border-t border-line">
+              <TD className="px-3 py-2">MRR (aylık)</TD>
+              <TD className="px-3 py-2 tabular-nums">{tl(result.before.mrrTry)}</TD>
+              <TD className="px-3 py-2 tabular-nums">{tl(result.after.mrrTry)}</TD>
+              <TD className="px-3 py-2 font-semibold tabular-nums">{signed(result.deltaMrrTry)}</TD>
+            </TR>
+            <TR className="border-t border-line">
+              <TD className="px-3 py-2">ARPA</TD>
+              <TD className="px-3 py-2 tabular-nums">{tl(result.before.arpaTry)}</TD>
+              <TD className="px-3 py-2 tabular-nums">{tl(result.after.arpaTry)}</TD>
+              <TD className="px-3 py-2 font-semibold tabular-nums">{signed(result.deltaArpaTry)}</TD>
+            </TR>
+            <TR className="border-t border-line">
+              <TD className="px-3 py-2">Yeni satıştan MRR</TD>
+              <TD className="px-3 py-2 tabular-nums">{tl(result.before.newSalesMrrTry)}</TD>
+              <TD className="px-3 py-2 tabular-nums">{tl(result.after.newSalesMrrTry)}</TD>
+              <TD className="px-3 py-2 font-semibold tabular-nums">{signed(result.after.newSalesMrrTry - result.before.newSalesMrrTry)}</TD>
+            </TR>
+            <TR className="border-t border-line">
+              <TD className="px-3 py-2">Abone sayısı (varsayım dahil)</TD>
+              <TD className="px-3 py-2 tabular-nums">{result.before.subscribers}</TD>
+              <TD className="px-3 py-2 tabular-nums">{result.after.subscribers}</TD>
+              <TD className="px-3 py-2 tabular-nums">-</TD>
+            </TR>
+          </TBody>
+        </Table>
       </div>
       <p className="text-xs text-text-muted">
         Fiyatı değişmeyen mevcut abone: <strong className="text-ink-950">{result.unchangedSubscribers}</strong>

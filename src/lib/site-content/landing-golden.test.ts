@@ -26,8 +26,9 @@ import { TrustStrip } from "@/components/marketing/trust-strip";
 import { ValueCards } from "@/components/marketing/value-cards";
 import { Why } from "@/components/marketing/why";
 
-async function html(el: ReactElement | Promise<ReactElement>): Promise<string> {
-  return renderToStaticMarkup(await el);
+async function html(el: ReactElement | null | Promise<ReactElement | null>): Promise<string> {
+  const node = await el;
+  return node ? renderToStaticMarkup(node) : "";
 }
 
 describe("ana sayfa varsayılan çıktısı (bugünkü metin, birebir)", () => {

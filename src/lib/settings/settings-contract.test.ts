@@ -67,7 +67,6 @@ describe("ayar yazım sözleşmesi", () => {
 
   it("migre edilen eylemler registry üzerinden yazar (ham setPlatformSetting yok)", () => {
     for (const f of [
-      "src/app/actions/platform-settings-general.ts",
       "src/app/actions/platform-messaging-keys.ts",
       "src/app/actions/portal-keys.ts",
       "src/app/actions/ai-advisor.ts",

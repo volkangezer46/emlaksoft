@@ -138,7 +138,7 @@ export function PortfolioScreen() {
 export function DealsScreen() {
   const cols: [string, string, [string, string, string][]][] = [
     ["Teklif", C.blue, [["3+1 Daire", "Ahmet K. → Mehmet S.", "₺ 4,2 mn"], ["Villa", "Zeynep D.", "₺ 11 mn"], ["Dükkan", "Can B.", "₺ 6,5 mn"]]],
-    ["Sözleşme", "#7a3cf0", [["2+1 Daire", "Elif T.", "₺ 3,6 mn"], ["Arsa", "Selin A.", "₺ 2,4 mn"]]],
+    ["Sözleşme", "#163a78", [["2+1 Daire", "Elif T.", "₺ 3,6 mn"], ["Arsa", "Selin A.", "₺ 2,4 mn"]]],
     ["İmza", "#e5a23a", [["1+1 Daire", "Kiralama", "₺ 24 bin/ay"]]],
     ["Tamamlandı", C.green, [["3+1 Daire", "Tapu devri yapıldı", "₺ 4,8 mn"], ["Dükkan", "Komisyon kesildi", "₺ 5,1 mn"]]],
   ];

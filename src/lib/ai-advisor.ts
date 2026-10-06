@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSecret } from "@/lib/settings/secret-read";
 import { getPlan } from "@/lib/billing/plans";
+import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
 
@@ -14,10 +15,10 @@ export type AdvisorContext = {
   tenantsPastDue: number;
   mrr: number;
   arpa: number;
-  newDemos: number;
-  wonThisMonth: number;
-  demoTotal: number;
-  conversion: number;
+  /** Self-servis huni (demo talebi/aday takibi yok): son 30 günde açılan ofis, 7 gün içinde biten deneme, süresi geçmiş deneme. */
+  newTenants30: number;
+  trialsEndingSoon: number;
+  trialsExpired: number;
   openTickets: number;
   urgentTickets: number;
   members: number;
@@ -44,7 +45,6 @@ const money = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 /** Dashboard KPI'larını toplayıp danışman bağlamı üretir. */
 export async function buildAdvisorContext(): Promise<AdvisorContext> {
   const admin = createAdminClient();
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
   const [
     { count: tenantsTotal },
@@ -52,9 +52,9 @@ export async function buildAdvisorContext(): Promise<AdvisorContext> {
     { count: tenantsTrial },
     { count: tenantsPastDue },
     { data: subs },
-    { count: newDemos },
-    { count: wonThisMonth },
-    { count: demoTotal },
+    { count: newTenants30 },
+    { count: trialsEndingSoon },
+    { count: trialsExpired },
     { count: openTickets },
     { count: urgentTickets },
     { count: members },
@@ -64,9 +64,9 @@ export async function buildAdvisorContext(): Promise<AdvisorContext> {
     admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial"),
     admin.from("tenants").select("id", { count: "exact", head: true }).in("status", ["past_due", "suspended"]),
     admin.from("subscriptions").select("amount_try, status").in("status", ["active", "trialing"]),
-    admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "new"),
-    admin.from("demo_requests").select("id", { count: "exact", head: true }).eq("status", "won").gte("created_at", monthStart),
-    admin.from("demo_requests").select("id", { count: "exact", head: true }),
+    admin.from("tenants").select("id", { count: "exact", head: true }).gte("created_at", daysAgoIso(30)),
+    admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial").gte("trial_ends_at", daysAgoIso(0)).lte("trial_ends_at", daysFromNowIso(7)),
+    admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial").lt("trial_ends_at", daysAgoIso(0)),
     admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting"]),
     admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("priority", "urgent").in("status", ["open", "in_progress"]),
     admin.from("profiles").select("id", { count: "exact", head: true }),
@@ -77,8 +77,6 @@ export async function buildAdvisorContext(): Promise<AdvisorContext> {
     .reduce((sum, s) => sum + (Number(s.amount_try) || 0), 0);
   const activeCount = tenantsActive ?? 0;
   const arpa = activeCount > 0 ? mrr / activeCount : 0;
-  const total = demoTotal ?? 0;
-  const conversion = total > 0 ? Math.round(((wonThisMonth ?? 0) / total) * 100) : 0;
 
   return {
     tenantsTotal: tenantsTotal ?? 0,
@@ -87,10 +85,9 @@ export async function buildAdvisorContext(): Promise<AdvisorContext> {
     tenantsPastDue: tenantsPastDue ?? 0,
     mrr,
     arpa,
-    newDemos: newDemos ?? 0,
-    wonThisMonth: wonThisMonth ?? 0,
-    demoTotal: total,
-    conversion,
+    newTenants30: newTenants30 ?? 0,
+    trialsEndingSoon: trialsEndingSoon ?? 0,
+    trialsExpired: trialsExpired ?? 0,
     openTickets: openTickets ?? 0,
     urgentTickets: urgentTickets ?? 0,
     members: members ?? 0,
@@ -106,10 +103,9 @@ export function contextToText(c: AdvisorContext): string {
     `Aylık yinelenen gelir: ${money(c.mrr)}`,
     `Ofis başına ortalama gelir: ${money(c.arpa)}`,
     `Yıllık gelir tahmini: ${money(c.mrr * 12)}`,
-    `Yeni demo talebi (işlenmemiş): ${c.newDemos}`,
-    `Bu ay kazanılan aday: ${c.wonThisMonth}`,
-    `Toplam aday: ${c.demoTotal}`,
-    `Dönüşüm oranı (bu ay): %${c.conversion}`,
+    `Son 30 günde açılan ofis (self-servis kayıt): ${c.newTenants30}`,
+    `Denemesi 7 gün içinde bitecek ofis: ${c.trialsEndingSoon}`,
+    `Denemesi bitmiş, hâlâ ücretli pakete geçmemiş ofis: ${c.trialsExpired}`,
     `Açık destek talebi: ${c.openTickets}`,
     `Acil destek talebi: ${c.urgentTickets}`,
     `Toplam kullanıcı: ${c.members}`,
@@ -180,8 +176,8 @@ export function fallbackAdvisor(messages: AdvisorMessage[], c: AdvisorContext): 
   }
   if (topic.sales || !focused) {
     insights.push(
-      `**Satış:** ${c.newDemos} işlenmemiş demo talebi, bu ay ${c.wonThisMonth} kazanım, dönüşüm %${c.conversion}.` +
-        (c.newDemos > 0 ? ` İlk 1 saatte dönülen adaylarda dönüşüm ~7× artar — bekleyen ${c.newDemos} talebi hemen arayın.` : " Yeni aday akışını artırmak için tanıtım kampanyası düşünün."),
+      `**Self-servis huni:** son 30 günde ${c.newTenants30} yeni ofis; ${c.trialsEndingSoon} ofisin denemesi 7 gün içinde bitiyor, ${c.trialsExpired} ofisin denemesi bitti ama ücretli pakete geçmedi.` +
+        (c.trialsEndingSoon > 0 ? " Denemesi bitmek üzere olan ofislerin kurulum ve kullanım durumuna bakın." : " Deneme bitişleri şu an sakin."),
     );
   }
   if (topic.support || !focused) {
@@ -194,7 +190,7 @@ export function fallbackAdvisor(messages: AdvisorMessage[], c: AdvisorContext): 
   const priority: string[] = [];
   if (c.urgentTickets > 0) priority.push(`${c.urgentTickets} acil destek talebini çöz`);
   if (c.tenantsPastDue > 0) priority.push(`${c.tenantsPastDue} geciken ödemeyi tahsil et`);
-  if (c.newDemos > 0) priority.push(`${c.newDemos} yeni adayı ara`);
+  if (c.trialsEndingSoon > 0) priority.push(`denemesi bitmek üzere olan ${c.trialsEndingSoon} ofisi incele`);
   if (c.tenantsTrial > 0) priority.push(`${c.tenantsTrial} deneme ofisini dönüşüme hazırla`);
 
   return (

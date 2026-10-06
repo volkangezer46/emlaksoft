@@ -73,6 +73,7 @@ import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { exactArr, exactMrr, exactTrendMrr, monthlyPrice, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 /**
  * Kontrol paneli (tasarım sistemi v4 referans uygulaması). KPI'lar tam kapsamlı SQL aggregate
@@ -438,26 +439,26 @@ async function ChurnSection({ period }: { period: Period }) {
         <EmptyState variant="compact" illustration="basari" title="Risk sinyali olan ofis yok" description="Ödeme gecikmesi, askıya alma veya 14 gündür düşük kullanım olursa burada listelenir." />
       ) : (
         <div className="-mx-1.5 overflow-x-auto">
-          <table className="pm-tbl min-w-[34rem]">
+          <Table className="pm-tbl min-w-[34rem]">
             <caption className="sr-only">Riskli ofisler, sinyalleri, son hareket ve risk düzeyi</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="pm-l">Ofis</th>
-                <th scope="col" className="pm-l">Sinyaller</th>
-                <th scope="col">Son hareket</th>
-                <th scope="col">Risk</th>
-              </tr>
-            </thead>
-            <tbody>
+            <THead>
+              <TR>
+                <TH scope="col" className="pm-l">Ofis</TH>
+                <TH scope="col" className="pm-l">Sinyaller</TH>
+                <TH scope="col">Son hareket</TH>
+                <TH scope="col">Risk</TH>
+              </TR>
+            </THead>
+            <TBody>
               {rows.map((r) => (
-                <tr key={r.id}>
-                  <th scope="row">
+                <TR key={r.id}>
+                  <TH scope="row">
                     <Link href={r.href} className="focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)]">
                       <Building2 className="h-4 w-4 shrink-0 text-text-faint" aria-hidden />
                       <span className="truncate">{r.name}</span>
                     </Link>
-                  </th>
-                  <td className="pm-l pm-wrap">
+                  </TH>
+                  <TD className="pm-l pm-wrap">
                     <span className="flex flex-wrap gap-1.5">
                       {r.signals.map((s) => (
                         <span key={s.key} className={`ds-pill pm-t-${SIGNAL_TONE[s.key]}`}>
@@ -465,15 +466,15 @@ async function ChurnSection({ period }: { period: Period }) {
                         </span>
                       ))}
                     </span>
-                  </td>
-                  <td className="text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "14+ gün"}</td>
-                  <td>
+                  </TD>
+                  <TD className="text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "14+ gün"}</TD>
+                  <TD>
                     <span className={`ds-pill pm-t-${LEVEL_PILL[r.level].tone}`}>{LEVEL_PILL[r.level].label}</span>
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       )}
     </ChartCard>

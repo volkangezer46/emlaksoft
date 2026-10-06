@@ -4,6 +4,7 @@ import { quoteSeats } from "@/lib/billing/seat-pricing";
 import type { PlanDef, SeatRounding } from "@/lib/billing/plans";
 import { opFieldClass } from "../inline-op";
 import { rowFrom, type TierRow, type useSeatDraft } from "./seat-draft";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 const lbl = "block text-xs font-semibold text-text-muted";
 const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
@@ -151,27 +152,27 @@ export function SeatTierEditor({ plan, draft, readOnly = false }: { plan: PlanDe
 
       {previews.length > 0 ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <Table className="w-full text-left text-xs">
             <caption className="pb-1 text-left font-semibold text-text-muted">Önizleme (KDV hariç, aylık)</caption>
-            <thead>
-              <tr className="text-text-faint">
-                <th className="py-1 pr-3 font-semibold">Kullanıcı</th>
-                <th className="py-1 pr-3 font-semibold">Toplam</th>
-                <th className="py-1 pr-3 font-semibold">Kişi başı</th>
-                <th className="py-1 font-semibold">Üst paket önerisi</th>
-              </tr>
-            </thead>
-            <tbody>
+            <THead>
+              <TR className="text-text-faint">
+                <TH className="py-1 pr-3 font-semibold">Kullanıcı</TH>
+                <TH className="py-1 pr-3 font-semibold">Toplam</TH>
+                <TH className="py-1 pr-3 font-semibold">Kişi başı</TH>
+                <TH className="py-1 font-semibold">Üst paket önerisi</TH>
+              </TR>
+            </THead>
+            <TBody>
               {previews.map(({ s, q }) => (
-                <tr key={s} className="border-t border-line text-ink-950">
-                  <td className="py-1 pr-3 tabular-nums">{s}</td>
-                  <td className="py-1 pr-3 tabular-nums">{tl(q.totalMonthlyTry)}</td>
-                  <td className="py-1 pr-3 tabular-nums">{tl(q.perSeatEffectiveTry)}</td>
-                  <td className="py-1 text-text-muted">{q.recommendation ? q.recommendation.reason : "-"}</td>
-                </tr>
+                <TR key={s} className="border-t border-line text-ink-950">
+                  <TD className="py-1 pr-3 tabular-nums">{s}</TD>
+                  <TD className="py-1 pr-3 tabular-nums">{tl(q.totalMonthlyTry)}</TD>
+                  <TD className="py-1 pr-3 tabular-nums">{tl(q.perSeatEffectiveTry)}</TD>
+                  <TD className="py-1 text-text-muted">{q.recommendation ? q.recommendation.reason : "-"}</TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       ) : null}
     </fieldset>

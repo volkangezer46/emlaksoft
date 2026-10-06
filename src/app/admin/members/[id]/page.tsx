@@ -22,6 +22,7 @@ import { formatDateTimeTr } from "@/lib/format";
 import { PageTabs } from "@/components/app/page-tabs";
 import { MemberAccessPanel, MemberInfoForm } from "./member-forms";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 const roleLabel: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
 
@@ -123,45 +124,38 @@ export default async function AdminMemberDetailPage({
         <ArrowLeft className="h-4 w-4" /> Üye listesi
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-amber-400">
-              <UserRound className="h-4 w-4" /> Kullanıcı detayı
+      <AdminPageHeader
+        eyebrow="Kullanıcı detayı"
+        icon={UserRound}
+        title={profile.full_name}
+        description={
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-bold text-accent-text">{roleLabel[profile.role] ?? profile.role}</span>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${profile.is_active ? "bg-mint-500/15 text-mint-700" : "bg-ink-950/6 text-text-muted"}`}>
+              {profile.is_active ? "Aktif" : "Pasif"}
             </span>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">{profile.full_name}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/60">
-              <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-white">
-                {roleLabel[profile.role] ?? profile.role}
-              </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${profile.is_active ? "bg-mint-500/20 text-mint-300" : "bg-white/10 text-white/60"}`}>
-                {profile.is_active ? "Aktif" : "Pasif"}
-              </span>
-              {branchName ? <span>Şube: {branchName}</span> : null}
-            </p>
-          </div>
-          {profile.tenant_id ? (
-            <Link
-              href={`/admin/tenants/${profile.tenant_id}`}
-              className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-white/90"
-            >
-              <Building2 className="h-4 w-4" /> {tenantName ?? "Ofis"} <ArrowUpRight className="h-4 w-4" />
+            {branchName ? <span>Şube: {branchName}</span> : null}
+          </span>
+        }
+        actions={
+          profile.tenant_id ? (
+            <Link href={`/admin/tenants/${profile.tenant_id}`} className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
+              <Building2 className="h-4 w-4" aria-hidden /> {tenantName ?? "Ofis"} <ArrowUpRight className="h-4 w-4" aria-hidden />
             </Link>
-          ) : null}
-        </div>
-
-        <div className="relative mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          ) : null
+        }
+      >
+        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {facts.map((f) => (
-            <div key={f.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
-              <span className="flex items-center gap-1.5 text-xs text-white/45">
-                <f.icon className="h-3.5 w-3.5 text-mint-400" /> {f.label}
-              </span>
-              <p className="mt-1.5 truncate text-sm font-semibold text-white">{f.value}</p>
+            <div key={f.label} className="rounded-[var(--radius-card)] border border-line bg-surface p-3">
+              <dt className="flex items-center gap-1.5 text-xs text-text-muted">
+                <f.icon className="h-3.5 w-3.5 text-accent-text" aria-hidden /> {f.label}
+              </dt>
+              <dd className="mt-1.5 truncate text-sm font-semibold text-ink-950">{f.value}</dd>
             </div>
           ))}
-        </div>
-      </section>
+        </dl>
+      </AdminPageHeader>
 
       <PageTabs base={`/admin/members/${id}`} label="Üye sekmeleri" tabs={MEMBER_TABS} active={active} />
 

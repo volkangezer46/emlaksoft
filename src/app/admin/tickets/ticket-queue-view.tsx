@@ -27,6 +27,7 @@ import {
   type TicketSortDirection,
   type TicketSortKey,
 } from "./ticket-list-model";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 export type TicketQueueRow = {
   id: string;
@@ -263,11 +264,11 @@ export function TicketQueueView({
       <section aria-label="Destek kuyruğu" className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
       {/* Geniş ekran: hizalı operasyon tablosu. */}
       <div className="relative hidden max-w-full overflow-x-auto xl:block">
-        <table className="w-full min-w-[1120px] table-fixed text-left text-xs">
+        <Table className="w-full min-w-[1120px] table-fixed text-left text-xs">
           <caption className="sr-only">Seçilebilir destek talepleri; durum, SLA ve personel işlemleri</caption>
-          <thead className="border-b border-hairline bg-canvas/75 text-xs font-bold uppercase tracking-[0.06em] text-text-faint">
-            <tr>
-              <th scope="col" className="w-[4%] px-3 py-3 text-center">
+          <THead className="border-b border-hairline bg-canvas/75 text-xs font-bold uppercase tracking-[0.06em] text-text-faint">
+            <TR>
+              <TH scope="col" className="w-[4%] px-3 py-3 text-center">
                 <input
                   ref={(node) => {
                     if (node) node.indeterminate = partlySelected;
@@ -278,24 +279,24 @@ export function TicketQueueView({
                   aria-label={allSelected ? "Sayfadaki tüm taleplerin seçimini kaldır" : "Sayfadaki tüm talepleri seç"}
                   className="focus-ring h-4 w-4 cursor-pointer rounded border-line-strong accent-[var(--brand-600)]"
                 />
-              </th>
-              <th scope="col" className="w-[25%] px-4 py-3">
+              </TH>
+              <TH scope="col" className="w-[25%] px-4 py-3">
                 <SortHeader label="Talep" column="subject" filters={filters} hrefFor={hrefFor} />
-              </th>
-              <th scope="col" className="w-[13%] px-3 py-3">Ofis</th>
-              <th scope="col" className="w-[10%] px-3 py-3">Kategori</th>
-              <th scope="col" className="w-[11%] px-3 py-3">
+              </TH>
+              <TH scope="col" className="w-[13%] px-3 py-3">Ofis</TH>
+              <TH scope="col" className="w-[10%] px-3 py-3">Kategori</TH>
+              <TH scope="col" className="w-[11%] px-3 py-3">
                 <SortHeader label="Oluşturma" column="created_at" filters={filters} hrefFor={hrefFor} />
-              </th>
-              <th scope="col" className="w-[16%] px-3 py-3">
+              </TH>
+              <TH scope="col" className="w-[16%] px-3 py-3">
                 <SortHeader label="SLA / Durum" column="status" filters={filters} hrefFor={hrefFor} />
-              </th>
-              <th scope="col" className="w-[21%] px-3 py-3">Durum ve atama</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-hairline">
+              </TH>
+              <TH scope="col" className="w-[21%] px-3 py-3">Durum ve atama</TH>
+            </TR>
+          </THead>
+          <TBody className="divide-y divide-hairline">
             {rows.map((row) => (
-              <tr
+              <TR
                 key={row.id}
                 className={cn(
                   "group align-middle transition hover:bg-brand-600/[0.025]",
@@ -303,7 +304,7 @@ export function TicketQueueView({
                   row.priority === "urgent" && "shadow-[inset_3px_0_0_0_var(--danger-500)]",
                 )}
               >
-                <td className="px-3 py-3.5 text-center">
+                <TD className="px-3 py-3.5 text-center">
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(row.id)}
@@ -311,9 +312,9 @@ export function TicketQueueView({
                     aria-label={`${row.ticketNo || shortTicketId(row.id)} · ${row.subject} talebini seç`}
                     className="focus-ring h-4 w-4 cursor-pointer rounded border-line-strong accent-[var(--brand-600)]"
                   />
-                </td>
-                <td className="px-4 py-3.5"><TicketTitle row={row} /></td>
-                <td className="px-3 py-3.5">
+                </TD>
+                <TD className="px-4 py-3.5"><TicketTitle row={row} /></TD>
+                <TD className="px-3 py-3.5">
                   {row.tenantId ? (
                     <Link href={`/admin/tenants/${row.tenantId}`} className="focus-ring block rounded-[5px] transition hover:text-brand-700">
                       <span className="flex items-center gap-1.5 font-semibold text-ink-950">
@@ -324,21 +325,21 @@ export function TicketQueueView({
                   ) : (
                     <span className="text-text-muted">{row.tenantName}</span>
                   )}
-                </td>
-                <td className="px-3 py-3.5">
+                </TD>
+                <TD className="px-3 py-3.5">
                   <span className="inline-flex rounded-[7px] border border-line bg-canvas px-2 py-1 text-xs font-bold text-ink-950">
                     {categoryLabels[row.category] ?? row.category}
                   </span>
                   <div className="mt-1.5"><TicketPriorityBadge priority={row.priority} /></div>
-                </td>
-                <td className="px-3 py-3.5">
+                </TD>
+                <TD className="px-3 py-3.5">
                   <span className="flex items-start gap-1.5 text-xs font-semibold leading-relaxed text-ink-950">
                     <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-faint" aria-hidden />
                     {dt(row.createdAt)}
                   </span>
                   <p className="mt-1 text-xs text-text-faint">Son hareket {dt(row.updatedAt)}</p>
-                </td>
-                <td className="px-3 py-3.5">
+                </TD>
+                <TD className="px-3 py-3.5">
                   <div className="flex flex-col items-start gap-1.5">
                     <TicketStatusBadge status={row.status} />
                     <SlaBadge sla={row.sla} />
@@ -348,8 +349,8 @@ export function TicketQueueView({
                       </span>
                     ) : null}
                   </div>
-                </td>
-                <td className="px-3 py-3.5">
+                </TD>
+                <TD className="px-3 py-3.5">
                   <div className="flex flex-col items-stretch gap-2">
                     <TicketRowActions
                       id={row.id}
@@ -362,11 +363,11 @@ export function TicketQueueView({
                       Konuşmayı aç
                     </ButtonLink>
                   </div>
-                </td>
-              </tr>
+                </TD>
+              </TR>
             ))}
-          </tbody>
-        </table>
+          </TBody>
+        </Table>
       </div>
 
       {/* Mobil/tablet: semantik, dokunma hedefleri geniş kartlar. */}

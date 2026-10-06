@@ -70,7 +70,6 @@ describe("yeni platform formları sekme sözleşmesi dışındadır", () => {
     for (const rel of [
       "src/app/admin/members/[id]/member-forms.tsx",
       "src/app/admin/hesabim/account-forms.tsx",
-      "src/app/admin/ayarlar/general-settings-form.tsx",
       "src/app/admin/personel/[id]/staff-account-panel.tsx",
       "src/app/admin/sistem/messaging-keys-form.tsx",
     ]) {

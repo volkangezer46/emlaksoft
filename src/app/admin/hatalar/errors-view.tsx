@@ -10,6 +10,8 @@ import { ResolveErrorButton } from "./resolve-button";
 import { ErrorsBulkBar, ReopenErrorButton } from "./error-bulk";
 import { ERRORS_BULK_FORM_ID } from "./bulk-form-id";
 import { hrefWith, type Filters } from "./errors-href";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 
 export const metadata = { title: "Üretim hataları" };
 
@@ -130,56 +132,34 @@ export async function ErrorsView({
 
   return (
     <div className="space-y-6">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-danger-500/25 blur-[80px]" />
-        <div className="relative">
-          <span className="flex items-center gap-2 text-xs font-semibold text-danger-300">
-            <Bug className="h-3.5 w-3.5" /> Üretim izleme
-          </span>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Hatalar</h1>
-          <p className="mt-1 max-w-2xl text-sm text-white/60">
-            Aynı hata tekrar geldiğinde yeni satır açılmaz, sayaç artar — kaç <strong>farklı</strong>{" "}
-            sorun olduğu görünür.
-          </p>
-
-          <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[
-              { label: "Açık hata türü", value: String(acikSayi ?? 0), icon: AlertTriangle, href: "/admin/sistem?sekme=hatalar", active: false },
-              { label: "Eşleşen hata", value: String(count ?? 0), icon: Info, href: hrefWith(base), active: false },
-              { label: "Sayfadaki olay", value: String(toplamOlay), icon: Repeat, href: `${hrefWith(base)}#hata-listesi`, active: false },
-              {
-                label: "Son 1 saatte",
-                value: String(sonSaat),
-                icon: Clock3,
-                href: hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" }),
-                active: sonBirSaat,
-              },
-            ].map((k) =>
-              k.href ? (
-                <Link
-                  key={k.label}
-                  href={k.href}
-                  aria-current={k.active ? "page" : undefined}
-                  className={`focus-ring press group relative block rounded-[var(--radius-card)] border p-3 backdrop-blur transition ${
-                    k.active ? "border-danger-300/50 bg-white/12" : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
-                  }`}
-                >
-                  <k.icon className="h-4 w-4 text-danger-300" />
-                  <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-                </Link>
-              ) : (
-                <div key={k.label} className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 backdrop-blur">
-                  <k.icon className="h-4 w-4 text-danger-300" />
-                  <p className="numeric mt-2 font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-xs text-white/45 sm:text-xs">{k.label}</p>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      </section>
+      <AdminPageHeader
+        eyebrow="Üretim izleme"
+        icon={Bug}
+        title="Hatalar"
+        description="Aynı hata tekrar geldiğinde yeni satır açılmaz, sayaç artar: kaç farklı sorun olduğu görünür."
+      >
+        <KpiGrid label="Hata göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
+          {[
+            { label: "Açık hata türü", value: acikSayi ?? 0, icon: AlertTriangle, href: hrefWith({ ...base, durum: undefined }), active: false },
+            { label: "Eşleşen hata", value: count ?? 0, icon: Info, href: hrefWith(base), active: false },
+            { label: "Sayfadaki olay", value: toplamOlay, icon: Repeat, href: `${hrefWith(base)}#hata-listesi`, active: false },
+            { label: "Son 1 saatte", value: sonSaat, icon: Clock3, href: hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" }), active: sonBirSaat },
+          ].map((k) => (
+            <KpiCard
+              key={k.label}
+              layout="inline"
+              label={k.label}
+              value={k.value}
+              href={k.href}
+              icon={k.icon}
+              tone="danger"
+              tinted={k.active}
+              attention={k.value > 0 && k.label === "Son 1 saatte"}
+              hint={k.active ? "filtre aktif · kaldırmak için tıkla" : undefined}
+            />
+          ))}
+        </KpiGrid>
+      </AdminPageHeader>
 
       <nav aria-label="Durum filtresi" className="flex flex-wrap gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         {[

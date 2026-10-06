@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { intakeLead, type LeadInput } from "@/lib/lead-intake";
 import { buildLeadConsentVersion } from "@/lib/legal-copy";
+import { getLeadFormCopy } from "@/lib/legal-copy-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
@@ -17,7 +18,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Metin sürümü ve pazarlama tercihi legal-copy.ts'ten gelir (v2: amaç düzeltmesi + ayrı pazarlama kutusu). */
+/** Metin sürümü ve pazarlama tercihi legal-copy.ts'ten gelir (v2: amaç düzeltmesi + ayrı pazarlama kutusu). Varsayılan metnin sürümüdür;
+ *  yönetimden değiştirilen metinde kanıt sürümü metin izini taşır (POST içinde getLeadFormCopy). */
 export const PUBLIC_LEAD_CONSENT_VERSION = buildLeadConsentVersion(false);
 
 function allowedOrigins(req: NextRequest): string[] {
@@ -177,7 +179,7 @@ export async function POST(
     consent: {
       requestId,
       scope: "lead_intake",
-      version: buildLeadConsentVersion(isConsentAccepted(body.marketing_opt_in)),
+      version: buildLeadConsentVersion(isConsentAccepted(body.marketing_opt_in), await getLeadFormCopy()),
       acceptedAt,
       ipHash: publicEvidenceHash(ip),
       userAgentHash: publicEvidenceHash(req.headers.get("user-agent")),

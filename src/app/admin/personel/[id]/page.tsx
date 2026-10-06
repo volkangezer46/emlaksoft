@@ -11,6 +11,7 @@ import { deactivateStaff, reactivateStaff, updateStaffRole } from "@/app/actions
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { PLATFORM_ROLES, roleSummary } from "../staff-model";
 import { StaffAccountPanel } from "./staff-account-panel";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 type Member = {
   id: string;
@@ -104,23 +105,19 @@ export default function PersonelDetayPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Personel
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
-              <ShieldCheck className="h-3.5 w-3.5" /> {rs.label}
-            </p>
-            <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">{member.full_name}</h1>
-            <p className="mt-1 text-sm text-white/65">{member.email}</p>
-          </div>
-          <div className="flex items-center gap-2">
+      <AdminPageHeader
+        eyebrow={rs.label}
+        icon={ShieldCheck}
+        title={member.full_name}
+        description={member.email}
+        actions={
+          <>
             <Badge variant={member.is_active ? "success" : "outline"} size="sm">{member.is_active ? "Aktif" : "Pasif"}</Badge>
             {member.is_active ? (
               <ConfirmDialog
                 trigger={
-                  <button type="button" disabled={pending} className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-danger-500/40 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50">
-                    <UserMinus className="h-3.5 w-3.5" /> Pasif yap
+                  <button type="button" disabled={pending} className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] border border-danger-500/40 bg-surface px-3 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/8 disabled:opacity-50">
+                    <UserMinus className="h-3.5 w-3.5" aria-hidden /> Pasif yap
                   </button>
                 }
                 title={`${member.full_name} pasif yapılsın mı?`}
@@ -135,13 +132,13 @@ export default function PersonelDetayPage() {
                 }}
               />
             ) : (
-              <button type="button" onClick={() => run(reactivateStaff)} disabled={pending} className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-amber-400 px-3 py-2 text-xs font-bold text-ink-950 disabled:opacity-50">
-                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />} Aktif yap
+              <button type="button" onClick={() => run(reactivateStaff)} disabled={pending} className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] bg-accent px-3 text-xs font-semibold text-accent-fg disabled:opacity-50">
+                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <UserPlus className="h-3.5 w-3.5" aria-hidden />} Aktif yap
               </button>
             )}
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {err ? <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{err}</p> : null}
 

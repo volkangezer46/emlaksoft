@@ -20,8 +20,6 @@ export type ConvertResult = {
   accessLinkSent?: boolean;
 };
 
-const STATUSES = ["new", "contacted", "qualified", "won", "lost"] as const;
-
 function slugify(input: string) {
   return input
     .toLocaleLowerCase("tr-TR")
@@ -175,94 +173,8 @@ async function recoverCommittedConversion(
   };
 }
 
-export async function setDemoStatus(formData: FormData): Promise<SalesResult> {
-  const staff = await requirePlatformModule("sales");
-  const id = String(formData.get("id") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim();
-  if (!id) return { error: "Kay\u0131t bulunamad\u0131." };
-  if (!(STATUSES as readonly string[]).includes(status)) return { error: "Ge\u00e7ersiz durum." };
-
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("demo_requests")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("setDemoStatus", error);
-    return { error: "Durum g\u00fcncellenemedi." };
-  }
-
-  await admin.from("audit_logs").insert({
-    tenant_id: null,
-    actor_id: staff.id,
-    action: "sales.status",
-    entity_type: "demo",
-    entity_id: id,
-    new_value: { status },
-  });
-
-  revalidatePath("/admin/satis");
-  revalidatePath("/admin");
-  return { ok: true };
-}
-
-export async function assignDemo(formData: FormData): Promise<SalesResult> {
-  const staff = await requirePlatformModule("sales");
-  const id = String(formData.get("id") ?? "").trim();
-  const assignee = String(formData.get("assigned_to") ?? "").trim();
-  if (!id) return { error: "Kay\u0131t bulunamad\u0131." };
-
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("demo_requests")
-    .update({ assigned_to: assignee || null, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("assignDemo", error);
-    return { error: "Atama yap\u0131lamad\u0131." };
-  }
-
-  await admin.from("audit_logs").insert({
-    tenant_id: null,
-    actor_id: staff.id,
-    action: "sales.assign",
-    entity_type: "demo",
-    entity_id: id,
-    new_value: { assigned_to: assignee || null },
-  });
-
-  revalidatePath("/admin/satis");
-  return { ok: true };
-}
-
-export async function addDemoNote(formData: FormData): Promise<SalesResult> {
-  const staff = await requirePlatformModule("sales");
-  const id = String(formData.get("id") ?? "").trim();
-  const note = String(formData.get("note") ?? "").trim();
-  if (!id || !note) return { error: "Not bo\u015f olamaz." };
-
-  const admin = createAdminClient();
-  const { data: current } = await admin.from("demo_requests").select("notes").eq("id", id).maybeSingle();
-  const stamp = new Date().toLocaleString("tr-TR", {
-    timeZone: "Europe/Istanbul",
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-  const line = `[${stamp} \u2022 ${staff.full_name}] ${note}`;
-  const merged = current?.notes ? `${current.notes}\n${line}` : line;
-
-  const { error } = await admin
-    .from("demo_requests")
-    .update({ notes: merged, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) {
-    console.error("addDemoNote", error);
-    return { error: "Not eklenemedi." };
-  }
-
-  revalidatePath("/admin/satis");
-  return { ok: true };
-}
+// "Demo & aday" ekranı kaldırıldı (self-servis kayıt): demo durumu/atama/not eylemleri silindi. Ofis açma akışı
+// (platform-tenants.createOffice...) dönüşüm RPC'sini kullanmaya devam eder.
 
 /**
  * Converts a won lead to a tenant. Auth is created first; the tenant, owner
@@ -374,7 +286,6 @@ export async function convertDemoToTenant(formData: FormData): Promise<ConvertRe
     meta: { tenant_id: conversion.tenantId, demo_id: id },
   });
 
-  revalidatePath("/admin/satis");
   revalidatePath("/admin/tenants");
   revalidatePath("/admin");
 

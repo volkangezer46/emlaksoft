@@ -127,8 +127,9 @@ describe("SEO sözleşmesi: cron ve yetki", () => {
     for (const [role, mods] of Object.entries(PLATFORM_ROLE_MODULES)) {
       expect(mods.includes("seo"), role).toBe(role === "super_admin" || role === "ops");
     }
-    expect(read("src/components/admin/admin-sidebar.tsx")).toContain('module: "seo"');
-    expect(read("src/components/admin/command-palette.tsx")).toContain('module: "seo"');
+    // Menü ve komut paleti tek kaynaktan beslenir (src/lib/admin/nav.ts).
+    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/seo", "SEO", "Arama motoru, sitemap, robot", ["seo"])');
+    expect(read("src/components/admin/command-palette.tsx")).toContain("adminPaletteFor(modules)");
     expect(read("src/app/admin/seo/page.tsx")).toContain('requirePlatformModule("seo")');
   });
   it("her yazan action seo modülünü doğrular ve duyarlı olanlar süper admine kilitli", () => {

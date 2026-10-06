@@ -228,8 +228,6 @@ Hepsi sunucu bileşeni (istemci JS yok), saf SVG, yeni bağımlılık yok, token
 
 | Bileşen | Ne yapar | Önemli prop |
 |---|---|---|
-| `HeroBanner` | Lacivert gradient karşılama bandı + elle çizilmiş SVG gece şehri (`CityNight`) | `eyebrow`, `title`, `highlight` (altın ad), `summary` (ReactNode, Suspense ile akabilir), `actions`, `children` (GlassKpi ızgarası) |
-| `GlassKpi` | Hero içi cam (backdrop-blur) KPI: ikon, etiket, değer, alt satır, MiniBars | `href` ZORUNLU, `subTone` (`danger`/`warn`), `series` |
 | `KpiCard` | Beyaz kart: ikon rozeti, başlık, sağ ok, değer, `TrendPill`, önceki dönem metni, alt grafik | `href` ZORUNLU, `tone`, `trend`, `previousText`/`hint`, `series` + `chart` (`line`/`bars`) |
 | `Sparkline` / `MiniBars` | Saf SVG; `role="img"` + `aria-label` (özet otomatik) | `data` (en az 2 sonlu nokta, yoksa HİÇBİR ŞEY çizmez), `tone`, `unit`, `label` |
 | `TrendPill` | Yön oku + yüzde; iyi yeşil, kötü kırmızı, düz nötr, "yeni" altın; sr-only cümle | `trend` = `computeTrend(cari, önceki, invert?)` |
@@ -252,8 +250,8 @@ Kurallar:
 - **Hareket:** yıldız/pencere ışıltısı ve kart kalkması yalnız `prefers-reduced-motion: no-preference` içindedir.
 - **Yan menü (v4 ile güncellendi):** aktif öğe `.nav-pill` = dolgulu vurgu hapı + kayan altın `.nav-bar`; zemin
   `.sb-surface`. Admin menüsündeki arama kutusu kaldırıldı (üst çubuk Ctrl K); "Sistem durumu" kartı gerçek sağlık
-  verisiyle eklendi. `HeroBanner` / `GlassKpi` / `CityNight` artık importer'sız (admin panelleri `DashboardHero`'ya
-  geçti); sonraki temizlikte silinebilir.
+  verisiyle eklendi. `HeroBanner` / `GlassKpi` / `CityNight` ve `console/bar-chart` SİLİNDİ (2026-10-06); tüm /admin başlıkları
+  `AdminPageHeader` = `DashboardHero` (açık bant), KPI'lar `KpiCard` (`AdminStatCard` silindi), /admin menüsü tek kaynak `src/lib/admin/nav.ts`.
 - **Tema:** "Gece Altın" vurgusu (`data-accent="gold"`): `--brand-600 #9a6700` (beyaz yazı 4.87:1), metin `#7a5200`
   açıkta, `#f0c36a` koyuda; `ACCENTS` tablosu, `themes.css` ve boot script ile senkron.
 

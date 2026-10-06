@@ -10,7 +10,6 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
     "src/app/admin/billing/page.tsx",
     "src/app/admin/muhasebe/page.tsx",
     "src/app/admin/raporlar/page.tsx",
-    "src/app/admin/satis/page.tsx",
   ];
 
   it("flow-line / glow-halo / conic-spin / chart-draw / bar-live kullanılmaz", () => {
@@ -23,7 +22,7 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
   });
 
   it("yükleme iskeletleri animate-pulse yerine SkeletonCard kullanır", () => {
-    for (const p of ["src/app/admin/billing/loading.tsx", "src/app/admin/raporlar/loading.tsx", "src/app/admin/satis/loading.tsx", "src/app/admin/_dashboards/shared.tsx"]) {
+    for (const p of ["src/app/admin/billing/loading.tsx", "src/app/admin/raporlar/loading.tsx", "src/app/admin/_dashboards/shared.tsx"]) {
       const src = read(p);
       expect(src).not.toContain("animate-pulse");
       expect(src).toContain("SkeletonCard");

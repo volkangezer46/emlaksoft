@@ -12,13 +12,19 @@ import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, hasErrors, sameConten
 import { InlineConfirm, TargetDatalist, btn } from "../site-menu/editor-ui";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
 import { ContentPreview } from "./content-preview";
+import { BentoTab, EfTab, LayoutTab, TourTab, WhyTab, setValuationVisible, valuationVisible } from "./editor-landing-tabs";
 
-type Tab = "hero" | "sections" | "lists" | "valuation" | "faq" | "final" | "pages" | "versions";
+type Tab = "layout" | "hero" | "sections" | "lists" | "tour" | "bento" | "why" | "valuation" | "ef" | "faq" | "final" | "pages" | "versions";
 const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "layout", label: "Bölüm düzeni" },
   { id: "hero", label: "Ana başlık" },
   { id: "sections", label: "Bölüm başlıkları" },
   { id: "lists", label: "Kartlar ve listeler" },
+  { id: "tour", label: "Ürün turu" },
+  { id: "bento", label: "Özellik ızgarası" },
+  { id: "why", label: "Karşılaştırma" },
   { id: "valuation", label: "Değerleme" },
+  { id: "ef", label: "EmlakFiyati kontör" },
   { id: "faq", label: "SSS" },
   { id: "final", label: "Son çağrı" },
   { id: "pages", label: "Demo ve kayıt" },
@@ -45,7 +51,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
   const readOnly = !canWrite;
   const [cfg, setCfg] = useState<SiteContent>(initialDraft);
   const [saved, setSaved] = useState<SiteContent>(initialDraft);
-  const [tab, setTab] = useState<Tab>("hero");
+  const [tab, setTab] = useState<Tab>("layout");
   const [note, setNote] = useState("");
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
@@ -215,10 +221,15 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
       </div>
 
       <div role="tabpanel" id={`sc-panel-${tab}`} aria-labelledby={`sc-tab-${tab}`} tabIndex={0} className="focus-ring space-y-4 rounded-[var(--radius-card)]">
+        {tab === "layout" ? <LayoutTab {...props} /> : null}
         {tab === "hero" ? <HeroTab {...props} /> : null}
         {tab === "sections" ? <SectionsTab {...props} /> : null}
         {tab === "lists" ? <ListsTab {...props} /> : null}
+        {tab === "tour" ? <TourTab {...props} /> : null}
+        {tab === "bento" ? <BentoTab {...props} /> : null}
+        {tab === "why" ? <WhyTab {...props} /> : null}
         {tab === "valuation" ? <ValuationTab {...props} /> : null}
+        {tab === "ef" ? <EfTab {...props} /> : null}
         {tab === "faq" ? <FaqTab {...props} /> : null}
         {tab === "final" ? <FinalTab {...props} /> : null}
         {tab === "pages" ? <PagesTab {...props} /> : null}
@@ -436,7 +447,7 @@ function ValuationTab({ cfg, update, issues, readOnly }: TabProps) {
         title="Değerleme bölümü (EmlakFiyati entegrasyonu)"
         aside={
           <label className="flex items-center gap-2 text-xs font-semibold text-ink-950">
-            <input type="checkbox" disabled={readOnly} checked={!v.hidden} onChange={(e) => update((d) => void (d.valuation.hidden = !e.target.checked))} />
+            <input type="checkbox" disabled={readOnly} checked={valuationVisible(cfg)} onChange={(e) => update((d) => setValuationVisible(d, e.target.checked))} />
             Bölümü ana sayfada göster
           </label>
         }

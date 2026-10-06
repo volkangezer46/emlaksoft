@@ -16,6 +16,7 @@ import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { getBaseUrl } from "@/lib/base-url";
 import { parseMoneyInput } from "@/lib/money-input";
+import { paymentLinkDemoAllowed } from "@/lib/feature-flags/registry";
 
 export type PayLinkResult = { error?: string; ok?: boolean; url?: string; checkoutUrl?: string };
 
@@ -234,7 +235,7 @@ export async function startPaymentLinkCheckout(token: string, formData: FormData
 
 /** Demo: yalnızca iyzico yokken veya açıkça izinli ortamda */
 export async function markPaymentLinkPaid(token: string): Promise<PayLinkResult> {
-  const demoAllowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_PAYMENT_LINK_DEMO === "1";
+  const demoAllowed = paymentLinkDemoAllowed(); // tek tanım: lib/feature-flags/registry.ts (ALLOW_PAYMENT_LINK_DEMO)
   if (!demoAllowed || (isIyzicoConfigured() && process.env.ALLOW_PAYMENT_LINK_DEMO !== "1")) {
     return { error: "Canlı iyzico açık — demo tahsilat kapalı. Gerçek ödeme butonunu kullanın." };
   }

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { RegistrySettings } from "@/components/settings/registry-settings";
 import { geoRowCount } from "@/lib/geo/reader";
-import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { probeSchema } from "./schema-checks";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -191,45 +192,44 @@ export async function SystemView() {
         title="Altyapı & entegrasyon durumu"
         description="Geo kapsama, cron güvenliği, şema sürümü ve opsiyonel entegrasyonların (iyzico, EmlakFiyati, yapay zeka) canlı yapılandırma durumu."
       >
-        <AdminStatGrid className="mt-6">
-          <AdminStatCard
-            tone="dark"
+        <KpiGrid label="Sistem göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
+          <KpiCard
+            layout="inline"
             label="Sağlıklı cron"
             value={`${cronHealthy}/${CRON_JOBS.length}`}
+            href="/admin/sistem#cron"
             icon={HeartPulse}
-            accent={cronHealthy === CRON_JOBS.length ? "text-mint-400" : "text-amber-300"}
+            tone={cronHealthy === CRON_JOBS.length ? "success" : "warn"}
+            attention={cronHealthy !== CRON_JOBS.length}
             hint="iş zamanlamasına göre sağlıklı"
           />
-          <AdminStatCard
-            tone="dark"
+          <KpiCard
+            layout="inline"
             label="Şema durumu"
             value={schemaMissing.length === 0 ? "Güncel" : `${schemaMissing.length} eksik`}
+            href="/admin/sistem#sema"
             icon={Layers}
-            accent={schemaMissing.length === 0 ? "text-mint-400" : "text-danger-300"}
+            tone={schemaMissing.length === 0 ? "success" : "danger"}
+            attention={schemaMissing.length > 0}
             hint={`${schemaRows.length} kontrol noktası`}
           />
-          <AdminStatCard
-            tone="dark"
+          <KpiCard
+            layout="inline"
             label="Açık hata türü"
             value={openErrors ?? 0}
-            href="/admin/sistem?sekme=hatalar"
+            href="/admin/hatalar"
             icon={Bug}
-            accent={(openErrors ?? 0) > 0 ? "text-danger-300" : "text-mint-400"}
+            tone={(openErrors ?? 0) > 0 ? "danger" : "success"}
+            attention={(openErrors ?? 0) > 0}
             hint="tekilleştirilmiş üretim hatası"
           />
-          <AdminStatCard
-            tone="dark"
-            label="Geo kapsama"
-            value={`%${provinceCoverage}`}
-            href="/admin/geo"
-            icon={MapPin}
-            accent="text-cyan-300"
-            hint={`${provinces ?? 0}/${TOTAL_PROVINCES} il`}
-          />
-        </AdminStatGrid>
+          <KpiCard layout="inline" label="Geo kapsama" value={`%${provinceCoverage}`} href="/admin/geo" icon={MapPin} tone="brand" hint={`${provinces ?? 0}/${TOTAL_PROVINCES} il`} />
+        </KpiGrid>
       </AdminPageHeader>
 
-      <CronStatusStrip items={stripItems} />
+      <div id="cron" className="scroll-mt-24">
+        <CronStatusStrip items={stripItems} />
+      </div>
 
       {/* Geo + ortam değişkenleri */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -432,7 +432,7 @@ export async function SystemView() {
       </div>
 
       {/* Şema / migration durumu — salt okunur yoklama, hiçbir şey yazmaz */}
-      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+      <section id="sema" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
@@ -493,6 +493,14 @@ export async function SystemView() {
           <code className="rounded bg-canvas px-1">npx tsx scripts/check-schema.ts</code>.
         </p>
       </section>
+
+      {/* Kayıt ve bakım: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
+      <RegistrySettings
+        title="Kayıt ve bakım"
+        description="Yeni ofis kaydı ve bakım modu. Değişiklikler doğrulanır, gerekçesiyle geçmişe yazılır ve geri alınabilir."
+        keys={["platform.registration_open", "platform.maintenance_mode", "platform.maintenance_message"]}
+        canEdit={staff.role === "super_admin"}
+      />
 
       {/* Yapay zeka anahtarı */}
       <OpenAiKeyForm

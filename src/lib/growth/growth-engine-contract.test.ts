@@ -365,8 +365,8 @@ describe("arayüz sözleşmesi", () => {
     expect(office).toContain("EmlakSoft sizin adınıza e-posta veya SMS göndermez");
   });
   it("admin: ölçüm kartları tıklanabilir, hazırlık kontrolü ve kuyruk var", () => {
-    const cards = admin.match(/<AdminStatCard\b/g)?.length ?? 0;
-    const hrefs = admin.match(/<AdminStatCard\b[^>]*\bhref=/g)?.length ?? 0;
+    const cards = admin.match(/<KpiCard\b/g)?.length ?? 0;
+    const hrefs = admin.match(/<KpiCard\b[^>]*\bhref=/g)?.length ?? 0;
     // Tek huni yeniden tasarımı: üst şerit 4 kart, ölçüm hunisi/K-faktör/maliyet satırları <Link> ile süzgece gider
     // (eski 10 kartlık ızgara kaldırıldı). Her kart tıklanabilir kalır; her ölçüm satırı bir Link içindedir.
     expect(cards).toBeGreaterThanOrEqual(4);

@@ -35,6 +35,7 @@ import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
 import { getTryMaxShare } from "@/lib/try-credits/settings";
 import type { AppliedWalletCredit } from "@/lib/try-credits/checkout";
+import { billingDemoAllowed } from "@/lib/feature-flags/registry";
 
 export type CheckoutResult = {
   error?: string;
@@ -126,7 +127,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   const invoiceAmounts = invoiceAmountsTry(amountTry);
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
   const configured = isIyzicoConfigured();
-  const demoAllowed = process.env.NODE_ENV !== "production" || process.env.ALLOW_BILLING_DEMO === "true";
+  const demoAllowed = billingDemoAllowed(); // tek tanım: lib/feature-flags/registry.ts (ALLOW_BILLING_DEMO)
   let checkoutBuyer: ValidatedCheckoutBuyer | null = null;
 
   if (!configured && !demoAllowed) {

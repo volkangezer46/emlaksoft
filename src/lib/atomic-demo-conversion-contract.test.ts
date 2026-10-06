@@ -10,7 +10,6 @@ const migration = read(
 const identityMigration = read(
   "supabase/migrations/20260802000300_identity_session_authorization_hardening.sql",
 );
-const demoCard = read("src/app/admin/satis/demo-card.tsx");
 const conversionStart = action.indexOf("export async function convertDemoToTenant");
 const conversionAction = action.slice(conversionStart);
 
@@ -52,7 +51,6 @@ describe("atomic demo conversion contract", () => {
     );
     expect(publicResultStart).toBeGreaterThan(-1);
     expect(conversionAction.slice(publicResultStart, publicResultEnd)).not.toContain("tempPassword,");
-    expect(demoCard).not.toContain("tempPassword");
   });
 
   it("locks the demo and authorizes only active sales-capable platform staff", () => {

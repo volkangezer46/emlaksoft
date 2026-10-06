@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
 import { planLabel } from "@/lib/billing/plans";
 import type { SeatAnalytics, SeatSubscriberRow } from "@/lib/billing/seat-analytics";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
 const pct = (r: number | null) => (r === null ? "-" : `%${Math.round(r * 100)}`);
@@ -83,32 +84,32 @@ export function SeatAnalyticsPanel({
           <p className="px-4 py-6 text-sm text-text-muted">Henüz aktif abonelik yok.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs text-text-faint">
-                <tr>
-                  <th className="px-4 py-2 font-semibold">Plan</th>
-                  <th className="px-4 py-2 font-semibold">Ofis</th>
-                  <th className="px-4 py-2 font-semibold">MRR</th>
-                  <th className="px-4 py-2 font-semibold">Ek kullanıcı</th>
-                  <th className="px-4 py-2 font-semibold">Ort. doluluk</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="w-full text-left text-sm">
+              <THead className="text-xs text-text-faint">
+                <TR>
+                  <TH className="px-4 py-2 font-semibold">Plan</TH>
+                  <TH className="px-4 py-2 font-semibold">Ofis</TH>
+                  <TH className="px-4 py-2 font-semibold">MRR</TH>
+                  <TH className="px-4 py-2 font-semibold">Ek kullanıcı</TH>
+                  <TH className="px-4 py-2 font-semibold">Ort. doluluk</TH>
+                </TR>
+              </THead>
+              <TBody>
                 {data.planDistribution.map((p) => (
-                  <tr key={p.plan} className="border-t border-line text-ink-950">
-                    <td className="px-4 py-2 font-semibold">{planLabel(p.plan)}</td>
-                    <td className="px-4 py-2 tabular-nums">
+                  <TR key={p.plan} className="border-t border-line text-ink-950">
+                    <TD className="px-4 py-2 font-semibold">{planLabel(p.plan)}</TD>
+                    <TD className="px-4 py-2 tabular-nums">
                       <Link href={`/admin/tenants?plan=${p.plan}`} className="focus-ring underline decoration-line underline-offset-2 hover:text-brand-600">
                         {p.offices}
                       </Link>
-                    </td>
-                    <td className="px-4 py-2 tabular-nums">{tl(p.mrrTry)}</td>
-                    <td className="px-4 py-2 tabular-nums">{data.extraSeatsEnabled ? p.extraSeats : "-"}</td>
-                    <td className="px-4 py-2 tabular-nums">{pct(p.avgUtilization)}</td>
-                  </tr>
+                    </TD>
+                    <TD className="px-4 py-2 tabular-nums">{tl(p.mrrTry)}</TD>
+                    <TD className="px-4 py-2 tabular-nums">{data.extraSeatsEnabled ? p.extraSeats : "-"}</TD>
+                    <TD className="px-4 py-2 tabular-nums">{pct(p.avgUtilization)}</TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         )}
       </section>

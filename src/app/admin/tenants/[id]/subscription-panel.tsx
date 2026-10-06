@@ -64,7 +64,7 @@ export function SubscriptionPanel({
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+          className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
         >
           <CreditCard className="h-4 w-4" /> Abonelik değiştir
         </button>

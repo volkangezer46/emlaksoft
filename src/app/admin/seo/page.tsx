@@ -30,6 +30,7 @@ import {
   SitemapForm,
   type SitemapPreview,
 } from "./seo-settings-forms";
+import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 export const metadata = { title: "SEO merkezi" };
 // "Robotu şimdi çalıştır" sunucu action'ı bu segmentin süre sınırını kullanır.
@@ -163,52 +164,52 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
           </div>
         </CardHeader>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[44rem] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
-                <th scope="col" className="px-4 py-2 font-semibold">Sayfa</th>
-                <th scope="col" className="px-4 py-2 font-semibold">Başlık</th>
-                <th scope="col" className="px-4 py-2 font-semibold">İndeks</th>
-                <th scope="col" className="px-4 py-2 font-semibold">Sitemap</th>
-                <th scope="col" className="px-4 py-2 font-semibold">Kontrol</th>
-                <th scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
+          <Table className="w-full min-w-[44rem] text-left text-sm">
+            <THead>
+              <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
+                <TH scope="col" className="px-4 py-2 font-semibold">Sayfa</TH>
+                <TH scope="col" className="px-4 py-2 font-semibold">Başlık</TH>
+                <TH scope="col" className="px-4 py-2 font-semibold">İndeks</TH>
+                <TH scope="col" className="px-4 py-2 font-semibold">Sitemap</TH>
+                <TH scope="col" className="px-4 py-2 font-semibold">Kontrol</TH>
+                <TH scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></TH>
+              </TR>
+            </THead>
+            <TBody className="divide-y divide-line">
               {rows.map(({ def, view, checklist, ov }) => {
                 const failing = checklist.filter((c) => c.verdict !== "ok").length;
                 return (
-                  <tr key={def.path} className={selected === def.path ? "bg-canvas" : undefined}>
-                    <td className="px-4 py-2.5">
+                  <TR key={def.path} className={selected === def.path ? "bg-canvas" : undefined}>
+                    <TD className="px-4 py-2.5">
                       <p className="font-semibold text-ink-950">{def.label}</p>
                       <p className="font-mono text-xs text-text-muted">{def.path}</p>
-                    </td>
-                    <td className="max-w-xs px-4 py-2.5">
+                    </TD>
+                    <TD className="max-w-xs px-4 py-2.5">
                       <p className="truncate text-ink-950">{view.renderedTitle}</p>
                       <p className="text-xs text-text-muted">{view.renderedTitle.length} karakter{ov ? " · özelleştirilmiş" : ""}</p>
-                    </td>
-                    <td className="px-4 py-2.5">
+                    </TD>
+                    <TD className="px-4 py-2.5">
                       <StatusBadge tone={view.indexable ? "success" : "neutral"}>{view.indexable ? "index" : "noindex"}</StatusBadge>
-                    </td>
-                    <td className="px-4 py-2.5">
+                    </TD>
+                    <TD className="px-4 py-2.5">
                       <StatusBadge tone={view.inSitemap ? "success" : "neutral"}>{view.inSitemap ? "dahil" : "hariç"}</StatusBadge>
-                    </td>
-                    <td className="px-4 py-2.5">
+                    </TD>
+                    <TD className="px-4 py-2.5">
                       <StatusBadge tone={failing === 0 ? "success" : "attention"}>{failing === 0 ? "Tümü geçti" : `${failing} madde dikkat`}</StatusBadge>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
+                    </TD>
+                    <TD className="px-4 py-2.5 text-right">
                       <Link
                         href={`/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(def.path)}#editor`}
                         className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline"
                       >
                         Düzenle
                       </Link>
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 );
               })}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       </Card>
     </div>
@@ -337,32 +338,32 @@ async function RedirectsTab({ canBulk, prefill }: { canBulk: boolean; prefill?: 
           </CardContent>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[34rem] text-left text-sm">
-              <thead>
-                <tr className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
-                  <th scope="col" className="px-4 py-2 font-semibold">Yol</th>
-                  <th scope="col" className="px-4 py-2 font-semibold">İstek</th>
-                  <th scope="col" className="px-4 py-2 font-semibold">Son görülme</th>
-                  <th scope="col" className="px-4 py-2 font-semibold">Gönderen</th>
-                  <th scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
+            <Table className="w-full min-w-[34rem] text-left text-sm">
+              <THead>
+                <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
+                  <TH scope="col" className="px-4 py-2 font-semibold">Yol</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">İstek</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">Son görülme</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">Gönderen</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></TH>
+                </TR>
+              </THead>
+              <TBody className="divide-y divide-line">
                 {nf.rows.map((r) => (
-                  <tr key={r.path}>
-                    <td className="max-w-xs truncate px-4 py-2.5 font-mono text-xs text-ink-950">{r.path}</td>
-                    <td className="px-4 py-2.5 tabular-nums">{r.hits}</td>
-                    <td className="px-4 py-2.5 text-text-muted">{formatDateTimeTr(r.last_seen_at)}</td>
-                    <td className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "-"}</td>
-                    <td className="px-4 py-2.5 text-right">
+                  <TR key={r.path}>
+                    <TD className="max-w-xs truncate px-4 py-2.5 font-mono text-xs text-ink-950">{r.path}</TD>
+                    <TD className="px-4 py-2.5 tabular-nums">{r.hits}</TD>
+                    <TD className="px-4 py-2.5 text-text-muted">{formatDateTimeTr(r.last_seen_at)}</TD>
+                    <TD className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "-"}</TD>
+                    <TD className="px-4 py-2.5 text-right">
                       <Link href={`/admin/seo?sekme=yonlendirme&kaynak=${encodeURIComponent(r.path)}`} className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline">
                         Yönlendir
                       </Link>
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                 ))}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         )}
       </Card>

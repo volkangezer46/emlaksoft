@@ -27,6 +27,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { daysAgoIso } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { staffKpi } from "./staff-model";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -275,56 +276,45 @@ export default function PersonelPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-60 w-60 rounded-full bg-amber-400/20 blur-[90px]" />
-        <div className="relative">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="min-w-0">
-              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
-                <ShieldCheck className="h-3.5 w-3.5" /> Platform personeli
-              </p>
-              <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">Personel yönetimi</h1>
-              <p className="mt-1.5 max-w-2xl text-sm text-white/65">
-                EmlakSoft çalışanları · departman rolü, erişim ve durum yönetimi.
-              </p>
-            </div>
-            <Link
-              href="/admin/personel/yeni"
-              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-amber-400 px-4 py-2.5 text-sm font-bold text-ink-950"
-            >
-              <Plus className="h-4 w-4" /> Personel ekle
-            </Link>
-          </div>
-
-          {/* Rol dağılımı — her kart o rolü filtreler */}
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {roleCounts.map((r) => {
-              const isActive = roleFilter === r.role;
-              return (
-                <button
-                  key={r.role}
-                  type="button"
-                  onClick={() => setRoleFilter(isActive ? "all" : r.role)}
-                  aria-pressed={isActive}
-                  title={isActive ? "Rol filtresini kaldır" : `Yalnızca ${r.label} rolünü göster`}
-                  className={`focus-ring press group relative block rounded-[var(--radius-card)] border p-3.5 text-left transition ${
-                    isActive
-                      ? "border-amber-300/50 bg-white/15"
-                      : "border-white/12 bg-white/8 backdrop-blur hover:border-white/25 hover:bg-white/12"
-                  }`}
-                >
-                  <Users className="h-4 w-4 text-amber-300" />
-                  <p className="numeric mt-2 font-display text-xl font-extrabold tabular-nums text-white">
-                    {loading ? "—" : r.count}
-                  </p>
-                  <p className="text-xs text-white/70">{r.label}</p>
-                </button>
-              );
-            })}
-          </div>
+      <AdminPageHeader
+        eyebrow="Platform personeli"
+        icon={ShieldCheck}
+        title="Personel yönetimi"
+        description="EmlakSoft çalışanları · departman rolü, erişim ve durum yönetimi."
+        actions={
+          <Link
+            href="/admin/personel/yeni"
+            className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] bg-accent px-4 text-sm font-semibold text-accent-fg transition hover:bg-accent-hover"
+          >
+            <Plus className="h-4 w-4" aria-hidden /> Yeni personel
+          </Link>
+        }
+      >
+        {/* Rol dağılımı — her kart o rolü filtreler */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {roleCounts.map((r) => {
+            const isActive = roleFilter === r.role;
+            return (
+              <button
+                key={r.role}
+                type="button"
+                onClick={() => setRoleFilter(isActive ? "all" : r.role)}
+                aria-pressed={isActive}
+                title={isActive ? "Rol filtresini kaldır" : `Yalnızca ${r.label} rolünü göster`}
+                className={`pm-card pm-t-${isActive ? "gold" : "brand"} focus-ring text-left ${isActive ? "pm-card-tint" : ""}`}
+              >
+                <span className="pm-card-head">
+                  <span className="pm-ico" aria-hidden="true">
+                    <Users />
+                  </span>
+                  <span className="pm-card-title">{r.label}</span>
+                </span>
+                <span className="pm-value mt-2">{loading ? "—" : r.count}</span>
+              </button>
+            );
+          })}
         </div>
-      </section>
+      </AdminPageHeader>
 
       {/* KPI şeridi — her kart listeyi süzer */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

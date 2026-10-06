@@ -6,6 +6,7 @@ import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagina
 import { BroadcastForm } from "./broadcast-form";
 import { BroadcastRow } from "./broadcast-row";
 import { KIND_OPTIONS } from "./broadcast-options";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 const audienceLabel: Record<string, string> = {
   all: "Tüm ofisler",
@@ -89,21 +90,12 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
       {/* Satır içi düzenleme paneli burada açılır; popup yok. */}
       <div id="inline-panel-host" className="min-w-0 empty:hidden" />
       {/* Başlık */}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-amber-400/20 blur-[90px]" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300">
-            <Megaphone className="h-3.5 w-3.5" /> Toplu duyuru
-          </p>
-          <h1 className="mt-2 font-display text-2xl font-extrabold md:text-3xl">
-            Ofislere duyuru gönder
-          </h1>
-          <p className="mt-1.5 max-w-lg text-sm text-white/60">
-            Seçilen ofislerin bildirim kutusuna anlık mesaj iletir. Kullanıcılar ofis panelinden görür.
-          </p>
-        </div>
-      </section>
+      <AdminPageHeader
+        eyebrow="Toplu duyuru"
+        icon={Megaphone}
+        title="Ofislere duyuru gönder"
+        description="Seçilen ofislerin bildirim kutusuna anlık mesaj iletir. Kullanıcılar ofis panelinden görür."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="dashboard-panel flex flex-col items-start gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-6">

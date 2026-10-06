@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { checkHref } from "@/lib/site-menu/schema";
 import type { Issue } from "@/lib/site-menu/schema";
+import { HOME_ANCHORS } from "@/lib/site-menu/known-routes";
+import { defaultSiteContent } from "./defaults";
 
 /**
  * Site içeriği (ana sayfa ve genel pazarlama metinleri): tür, sınırlar ve doğrulama.
@@ -28,6 +30,8 @@ export const LIMITS = {
   maxFaq: 20,
   maxList: 8,
   maxChecks: 6,
+  maxTour: 7,
+  maxBento: 8,
   /** Serileştirilmiş yapılandırma üst sınırı (bayt). */
   jsonBytes: 60 * 1024,
 } as const;
@@ -52,6 +56,37 @@ const cardSchema = z.strictObject({ id, title: text(LIMITS.cardTitle, "Başlık"
 const trustSchema = z.strictObject({ id, label: text(LIMITS.cardTitle, "Etiket"), href, hidden: z.boolean() });
 const itemSchema = z.strictObject({ id, title: text(LIMITS.title, "Başlık"), text: text(LIMITS.text, "Açıklama"), hidden: z.boolean() });
 const faqSchema = z.strictObject({ id, q: text(LIMITS.question, "Soru"), a: text(LIMITS.answer, "Cevap"), hidden: z.boolean() });
+
+/** Paket rozeti yolu: boş (rozet yok) veya /app altındaki sayfa yolu (rozet sayfa kilidinden `gateBadge` ile üretilir). */
+const gate = z.string().trim().max(80).regex(/^$|^\/app(\/[a-z0-9-]+)*$/, "Paket rozeti yolu boş ya da /app/... biçiminde olmalı.");
+const pointSchema = z.strictObject({ id, text: text(LIMITS.cardText, "Madde"), gate, hidden: z.boolean() });
+
+/** Ürün turu ekranları: kimlik ekran çizimini seçer (sabit küme; eklenip silinmez, sıralanır/gizlenir). */
+export const TOUR_SCREEN_IDS = ["bugun", "musteriler", "portfoy", "anlasmalar", "komisyon", "raporlar", "otomasyon"] as const;
+/** Özellik ızgarası kartları: kimlik illüstrasyonu, ızgara yerleşimini ve paket rozetini seçer (sabit küme). */
+export const BENTO_TILE_IDS = ["kayip-kacak", "emsal-degerleme", "otomasyon", "ai-asistan", "portal-kontrol", "imza", "vitrin", "performans"] as const;
+
+/**
+ * Ana sayfa bölüm düzeni (hero her zaman ilk; sırası/görünürlüğü yönetilmez). Kimlik = bölüm. Eski yayınlarda eksik
+ * kalan kimlik `parseSiteContent` ile sona eklenir (yeni bölüm sessizce kaybolmaz).
+ */
+export const LANDING_SECTIONS = [
+  { id: "deger", label: "Değer kartları (hero altı)" },
+  { id: "guven", label: "Güven şeridi" },
+  { id: "tur", label: "Ürün turu" },
+  { id: "ozellikler", label: "Özellik ızgarası (bento)" },
+  { id: "degerleme", label: "Değerleme (EmlakFiyati)" },
+  { id: "emlakfiyati", label: "EmlakFiyati kontör bölümü" },
+  { id: "diger", label: "Ayrıntılar" },
+  { id: "neden", label: "Neden EmlakSoft (karşılaştırma)" },
+  { id: "nasil", label: "Nasıl çalışır" },
+  { id: "guvenlik", label: "Güvenlik ve KVKK" },
+  { id: "fiyat", label: "Fiyatlar" },
+  { id: "sss", label: "Sık sorulan sorular" },
+  { id: "son", label: "Son çağrı" },
+] as const;
+export type LandingSectionId = (typeof LANDING_SECTIONS)[number]["id"];
+const LANDING_IDS = LANDING_SECTIONS.map((s) => s.id) as [LandingSectionId, ...LandingSectionId[]];
 
 export const SECTION_KEYS = ["tur", "ozellikler", "diger", "neden", "nasil", "fiyat", "sss", "guvenlik"] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
@@ -117,6 +152,71 @@ export const siteContentSchema = z.strictObject({
     soonCta: ctaSchema,
     note: text(LIMITS.note, "Dipnot"),
   }),
+  /** Ürün turu sekmeleri (kimlik = ekran çizimi). */
+  tour: z
+    .array(
+      z.strictObject({
+        id: z.enum(TOUR_SCREEN_IDS),
+        label: text(30, "Sekme adı"),
+        text: text(LIMITS.cardText, "Açıklama"),
+        points: z.array(pointSchema).max(LIMITS.maxChecks),
+        hidden: z.boolean(),
+      }),
+    )
+    .max(LIMITS.maxTour),
+  /** Özellik ızgarası kartları (kimlik = illüstrasyon + yerleşim + paket rozeti). */
+  bento: z.strictObject({
+    tiles: z
+      .array(
+        z.strictObject({
+          id: z.enum(BENTO_TILE_IDS),
+          eyebrow: text(LIMITS.eyebrow, "Üst başlık"),
+          title: text(LIMITS.title, "Başlık"),
+          text: text(LIMITS.text, "Açıklama"),
+          points: z.array(checkSchema).max(LIMITS.maxChecks),
+          hidden: z.boolean(),
+        }),
+      )
+      .max(LIMITS.maxBento),
+    note: text(LIMITS.note, "Dipnot"),
+  }),
+  /** "Neden EmlakSoft" karşılaştırma tablosu (rakip adı yazılmaz). */
+  why: z.strictObject({
+    oldLabel: text(LIMITS.cardTitle, "Eski yöntem sütunu"),
+    newLabel: text(LIMITS.cardTitle, "EmlakSoft sütunu"),
+    rows: z
+      .array(
+        z.strictObject({
+          id,
+          topic: text(LIMITS.cardTitle, "Konu"),
+          old: text(LIMITS.cardText, "Eski yöntem"),
+          now: text(LIMITS.cardText, "EmlakSoft ile"),
+          gate,
+          hidden: z.boolean(),
+        }),
+      )
+      .max(LIMITS.maxList),
+    note: text(LIMITS.note, "Dipnot"),
+  }),
+  /** EmlakFiyati kontör bölümü metinleri (sayılar plan/tarife/paket kataloğundan gelir; burada sayı yazılmaz). */
+  efSection: z.strictObject({
+    eyebrow: text(LIMITS.eyebrow, "Üst başlık"),
+    title: text(LIMITS.title, "Başlık"),
+    em: text(LIMITS.em, "Vurgulu kısım"),
+    tail: text(LIMITS.tail, "Başlık sonu"),
+    liveText: text(LIMITS.lead, "Canlıyken açıklama"),
+    soonText: text(LIMITS.lead, "Canlı değilken açıklama"),
+    steps: z.array(itemSchema).max(LIMITS.maxChecks),
+    plansTitle: text(LIMITS.title, "Paket kontörü başlığı"),
+    plansNote: text(LIMITS.note, "Paket kontörü dipnotu"),
+    packsTitle: text(LIMITS.title, "Ek paket başlığı"),
+    packsText: text(LIMITS.text, "Ek paket açıklaması"),
+    packsEmpty: text(LIMITS.text, "Paket yokken metin"),
+    detailLink: ctaSchema,
+    note: text(LIMITS.note, "Dipnot"),
+  }),
+  /** Bölüm sırası ve görünürlüğü (hero sabit, ilk). */
+  layout: z.array(z.strictObject({ id: z.enum(LANDING_IDS), hidden: z.boolean() })).max(LANDING_SECTIONS.length),
   demo: z.strictObject({ title: text(LIMITS.title, "Başlık"), text: text(LIMITS.text, "Açıklama") }),
   register: z.strictObject({ title: text(LIMITS.title, "Başlık"), text: text(LIMITS.text, "Alt metin"), panelText: text(LIMITS.lead, "Yan panel metni") }),
 });
@@ -130,9 +230,56 @@ export type TrustItem = z.infer<typeof trustSchema>;
 export type TextItem = z.infer<typeof itemSchema>;
 export type FaqItem = z.infer<typeof faqSchema>;
 
+export type TourItem = SiteContent["tour"][number];
+export type BentoTile = SiteContent["bento"]["tiles"][number];
+export type WhyRow = SiteContent["why"]["rows"][number];
+export type LayoutItem = SiteContent["layout"][number];
+
+/** Sonradan eklenen üst düzey anahtarlar: eski yayında yoksa varsayılandan doldurulur (yayın kaybolmaz). */
+const LATER_KEYS = ["tour", "bento", "why", "efSection", "layout"] as const;
+
+/** Düzen listesi: bilinmeyen/yinelenen kimlik atılır, eksik bölüm sona (görünür) eklenir. Saf. */
+export function normalizeLayout(list: ReadonlyArray<{ id?: unknown; hidden?: unknown }>): LayoutItem[] {
+  const seen = new Set<string>();
+  const out: LayoutItem[] = [];
+  for (const it of list) {
+    const k = typeof it?.id === "string" ? it.id : "";
+    if (!(LANDING_IDS as readonly string[]).includes(k) || seen.has(k)) continue;
+    seen.add(k);
+    out.push({ id: k as LandingSectionId, hidden: it.hidden === true });
+  }
+  for (const k of LANDING_IDS) if (!seen.has(k)) out.push({ id: k, hidden: false });
+  return out;
+}
+
+/**
+ * Eski yayınları yükseltir: eksik yeni anahtarlar varsayılandan gelir, düzen listesi normalize edilir.
+ * Saf; girdiyi değiştirmez. Böylece şema genişlediğinde mevcut canlı içerik varsayılana düşmez.
+ */
+export function upgradeSiteContent(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const out: Record<string, unknown> = { ...(value as Record<string, unknown>) };
+  let defaults: SiteContent | null = null;
+  for (const k of LATER_KEYS) {
+    if (out[k] === undefined) {
+      defaults ??= defaultSiteContent();
+      out[k] = defaults[k];
+    }
+  }
+  if (Array.isArray(out.layout)) out.layout = normalizeLayout(out.layout as Array<{ id?: unknown; hidden?: unknown }>);
+  return out;
+}
+
 export function parseSiteContent(value: unknown): SiteContent | null {
-  const r = siteContentSchema.safeParse(value);
+  const r = siteContentSchema.safeParse(upgradeSiteContent(value));
   return r.success ? r.data : null;
+}
+
+/** Görünür bölümler, yayın sırasıyla. Değerleme için ayrıca `valuation.hidden` uygulanır (ikisi aynı anahtar gibi davranır). */
+export function visibleSections(cfg: Pick<SiteContent, "layout" | "valuation">): LandingSectionId[] {
+  return normalizeLayout(cfg.layout)
+    .filter((s) => !s.hidden && !(s.id === "degerleme" && cfg.valuation.hidden))
+    .map((s) => s.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,9 +287,10 @@ export function parseSiteContent(value: unknown): SiteContent | null {
 // ---------------------------------------------------------------------------
 
 /** Metin içinde kullanılabilen değişkenler ({deneme} gibi); değerleri sunucuda paket tanımlarından üretilir. */
-export const CONTENT_TOKENS = ["deneme", "deneme_dene", "deneme_gun", "deneme_uzun", "yillik", "yillik_cumle", "yillik_metin", "ef_hak"] as const;
+export const CONTENT_TOKENS = ["gorev", "deneme", "deneme_dene", "deneme_gun", "deneme_uzun", "yillik", "yillik_cumle", "yillik_metin", "ef_hak"] as const;
 
 export const TOKEN_HELP: Record<(typeof CONTENT_TOKENS)[number], string> = {
+  gorev: "Otomatik (zamanlanmış) görev sayısı; cron envanterinden gelir, elle yazılmaz",
   deneme: "“30 gün ücretsiz” (gün bilinmiyorsa “Ücretsiz”)",
   deneme_dene: "“30 gün ücretsiz dene”",
   deneme_gun: "“30 gün ” (gün bilinmiyorsa boş)",
@@ -180,6 +328,7 @@ export function collectStrings(cfg: SiteContent): Array<{ path: string; value: s
   const walk = (node: unknown, path: string) => {
     if (typeof node === "string") {
       const key = path.split(".").pop() ?? "";
+      if (key === "gate" || (key === "id" && /^\.?layout\./.test(path))) return; // yapısal alan: şemada doğrulanır, metin değil
       out.push({ path, value: node, link: key === "href", multiline: ["lead", "text", "a", "panelText", "note"].includes(key) });
     } else if (Array.isArray(node)) node.forEach((v, i) => walk(v, `${path}.${i}`));
     else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) if (k !== "v") walk(v, path ? `${path}.${k}` : k);
@@ -192,7 +341,7 @@ const CONTROL_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
 export function validateSiteContent(input: unknown): { config: SiteContent | null; issues: Issue[] } {
   const issues: Issue[] = [];
-  const parsed = siteContentSchema.safeParse(input);
+  const parsed = siteContentSchema.safeParse(upgradeSiteContent(input));
   if (!parsed.success) {
     for (const i of parsed.error.issues) issues.push({ level: "error", path: i.path.join("."), message: i.message });
     return { config: null, issues };
@@ -221,6 +370,13 @@ export function validateSiteContent(input: unknown): { config: SiteContent | nul
   dupCheck(cfg.valuation.points, "valuation.points");
   dupCheck(cfg.valuation.compare.before, "valuation.compare.before");
   dupCheck(cfg.valuation.compare.after, "valuation.compare.after");
+  dupCheck(cfg.tour, "tour");
+  cfg.tour.forEach((t, i) => dupCheck(t.points, `tour.${i}.points`));
+  dupCheck(cfg.bento.tiles, "bento.tiles");
+  cfg.bento.tiles.forEach((t, i) => dupCheck(t.points, `bento.tiles.${i}.points`));
+  dupCheck(cfg.why.rows, "why.rows");
+  dupCheck(cfg.efSection.steps, "efSection.steps");
+  dupCheck(cfg.layout, "layout");
 
   for (const s of collectStrings(cfg)) {
     if (s.link) {
@@ -262,6 +418,16 @@ export function validateSiteContent(input: unknown): { config: SiteContent | nul
     if (!f.q) issues.push({ level: "error", path: `faq.${i}.q`, message: "Soru boş olamaz." });
     if (!f.a) issues.push({ level: "error", path: `faq.${i}.a`, message: "Cevap boş olamaz." });
   });
+  cfg.tour.forEach((t, i) => {
+    if (!t.hidden && !t.label) issues.push({ level: "error", path: `tour.${i}.label`, message: "Sekme adı boş olamaz." });
+  });
+  cfg.bento.tiles.forEach((t, i) => {
+    if (t.hidden && (HOME_ANCHORS as readonly string[]).includes(t.id)) {
+      issues.push({ level: "warn", path: `bento.tiles.${i}`, message: `Bu kart gizliyken /#${t.id} bağlantısı (site menüsü) bölüme inmez.` });
+    }
+  });
+  if (cfg.tour.length > 0 && !cfg.tour.some((t) => !t.hidden)) issues.push({ level: "warn", path: "tour", message: "Hiç görünen ekran yok; ürün turu bölümü çizilmez." });
+  if (!visibleSections(cfg).length) issues.push({ level: "warn", path: "layout", message: "Tüm bölümler gizli; ana sayfada yalnız ana başlık kalır." });
   if (cfg.faq.length > 0 && !cfg.faq.some((f) => !f.hidden)) issues.push({ level: "warn", path: "faq", message: "Hiç görünen soru yok; SSS bölümü boş kalır." });
   return { config: cfg, issues };
 }

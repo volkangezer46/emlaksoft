@@ -5,27 +5,15 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useRouter } from "next/navigation";
 import {
   Building2,
-  CreditCard,
-  LayoutDashboard,
   LifeBuoy,
-  MapPin,
-  Radar,
-  Palette,
-  PanelTop,
-  Globe,
-  FileText,
   Search,
-  SearchCheck,
   Settings,
   User,
-  Users,
-  Activity,
-  BarChart3,
   CornerDownLeft,
-  Handshake,
   Loader2,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
+import { adminPaletteFor } from "@/lib/admin/nav";
 import { createRecentsStore, matchesQuery, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
 
 type Hit = {
@@ -35,28 +23,6 @@ type Hit = {
   subtitle: string;
   href: string;
 };
-
-type NavCmd = { label: string; href: string; icon: typeof LayoutDashboard; module: PlatformModule };
-
-const ALL_NAV: NavCmd[] = [
-  { label: "Kontrol paneli", href: "/admin", icon: LayoutDashboard, module: "dashboard" },
-  { label: "Demo & aday", href: "/admin/satis", icon: Handshake, module: "sales" },
-  { label: "Ofisler", href: "/admin/tenants", icon: Building2, module: "tenants" },
-  { label: "Yeni ofis", href: "/admin/tenants/yeni", icon: Building2, module: "sales" },
-  { label: "Üyeler", href: "/admin/members", icon: Users, module: "members" },
-  { label: "Abonelik & fatura", href: "/admin/billing", icon: CreditCard, module: "billing" },
-  { label: "Destek talepleri", href: "/admin/tickets", icon: LifeBuoy, module: "tickets" },
-  { label: "Aktivite kaydı", href: "/admin/aktivite", icon: Activity, module: "activity" },
-  { label: "Raporlar", href: "/admin/raporlar", icon: BarChart3, module: "reports" },
-  { label: "Coğrafya", href: "/admin/geo", icon: MapPin, module: "geo" },
-  { label: "Sistem sağlığı", href: "/admin/sistem", icon: Radar, module: "sistem" },
-  { label: "Sistem ayarları merkezi", href: "/admin/ayarlar/merkez", icon: Settings, module: "sistem" },
-  { label: "Marka (logo ve favicon)", href: "/admin/marka", icon: Palette, module: "marka" },
-  { label: "SEO merkezi (sitemap, robots, robot)", href: "/admin/seo", icon: SearchCheck, module: "seo" },
-  { label: "Site menüsü (menü, alt bilgi, duyuru)", href: "/admin/site-menu", icon: PanelTop, module: "sitemenu" },
-  { label: "Site yönetimi (tüm alanlar)", href: "/admin/site", icon: Globe, module: "dashboard" },
-  { label: "Site içeriği (ana sayfa metinleri, SSS)", href: "/admin/site-icerik", icon: FileText, module: "sitecontent" },
-];
 
 // Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).
 const recentsStore = createRecentsStore("admin_palette_recents");
@@ -73,8 +39,9 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const navCmds = ALL_NAV.filter((n) => modules.includes(n.module));
-  const filteredNav = q ? navCmds.filter((n) => matchesQuery(n.label, q)) : navCmds;
+  // Komutlar menü tek kaynağından (src/lib/admin/nav.ts): menü öğeleri, sekmeler ve eylemler (Yeni ofis vb.).
+  const navCmds = adminPaletteFor(modules);
+  const filteredNav = q ? navCmds.filter((n) => matchesQuery(n.label, q) || matchesQuery(n.description, q)) : navCmds;
   const recents = useSyncExternalStore(recentsStore.subscribe, recentsStore.read, recentsStore.getServerSnapshot);
   const recentNav = q.trim()
     ? []
@@ -151,12 +118,12 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
 
   const go = useCallback(
     (href: string) => {
-      const cmd = ALL_NAV.find((n) => n.href === href);
+      const cmd = navCmds.find((n) => n.href === href);
       if (cmd) recentsStore.push({ label: cmd.label, href: cmd.href, kind: "page" });
       close();
       router.push(href);
     },
-    [close, router],
+    [close, router, navCmds],
   );
 
   const onInputKey = (e: React.KeyboardEvent) => {
