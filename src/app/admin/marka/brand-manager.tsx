@@ -109,7 +109,7 @@ function SlotCard({ slot, meta }: { slot: BrandSlot; meta: BrandMeta }) {
       </div>
 
       <div
-        className={`mt-4 grid min-h-28 place-items-center rounded-[var(--radius-card)] border border-line p-4 ${dark ? "bg-[#0b1220]" : "bg-white"}`}
+        className={`mt-4 grid min-h-28 place-items-center rounded-[var(--radius-card)] border border-line p-4 ${dark ? "bg-[var(--sb-bg-mid)]" : "bg-white"}`}
       >
         <img
           src={localUrl ?? currentSrc}
@@ -228,7 +228,7 @@ export function BrandManager({ meta }: { meta: BrandMeta }) {
           <div className="grid place-items-center rounded-[var(--radius-card)] border border-line bg-white p-6">
             <img src={resolveBrandSrc(meta, "horizontal", "light")} alt="Açık zeminde logo" className="h-12 max-w-full object-contain" />
           </div>
-          <div className="grid place-items-center rounded-[var(--radius-card)] bg-[#0b1220] p-6">
+          <div className="grid place-items-center rounded-[var(--radius-card)] bg-[var(--sb-bg-mid)] p-6">
             <img src={resolveBrandSrc(meta, "horizontal", "dark")} alt="Koyu zeminde logo" className="h-12 max-w-full object-contain" />
           </div>
 

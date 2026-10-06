@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { ChevronRight, ShieldAlert } from "lucide-react";
 import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
@@ -72,25 +74,63 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} health={health} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} fontScale={fontScale} />
-        {mfaSyncIssue === "env_on_db_off" ? (
-          <p role="alert" className="border-b border-red-300/50 bg-red-50 px-4 py-1.5 text-center text-xs font-semibold text-red-800">
-            MFA tutarsız: PLATFORM_MFA_ENFORCEMENT açık ama platform_settings &quot;platform.mfa_enforced&quot; kapalı; veritabanı personel kapıları MFA istemiyor. Ayarı da açın.
-          </p>
-        ) : null}
-        {!isPlatformMfaRequired() ? (
-          <p role="status" className="border-b border-amber-300/50 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-800">
-            Geliştirme modu: platform iki adımlı doğrulaması (TOTP) kapalı. Yayın öncesi PLATFORM_MFA_ENFORCEMENT=on yapın.
-          </p>
-        ) : null}
         {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
         <main
           id="main-content"
-          className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start overflow-x-clip p-4 pb-24 md:p-6 md:pb-6"
+          className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1fr)] content-start gap-4 overflow-x-clip p-4 pb-24 md:p-6 md:pb-6"
         >
+          {mfaSyncIssue === "env_on_db_off" || !isPlatformMfaRequired() ? (
+            <div className="space-y-2">
+              {mfaSyncIssue === "env_on_db_off" ? (
+                <StatusStrip tone="danger" role="alert" href={modules.includes("sistem") ? "/admin/ayarlar/merkez" : undefined}>
+                  MFA tutarsız: PLATFORM_MFA_ENFORCEMENT açık ama platform_settings &quot;platform.mfa_enforced&quot; kapalı; veritabanı personel kapıları MFA istemiyor. Ayarı da açın.
+                </StatusStrip>
+              ) : null}
+              {!isPlatformMfaRequired() ? (
+                <StatusStrip tone="warning" role="status" href={modules.includes("sistem") ? "/admin/ayarlar/merkez" : undefined}>
+                  Geliştirme modu: platform iki adımlı doğrulaması (TOTP) kapalı. Yayın öncesi PLATFORM_MFA_ENFORCEMENT=on yapın.
+                </StatusStrip>
+              ) : null}
+            </div>
+          ) : null}
           {children}
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Kabuk bilgi şeridi (tam genişlik, yuvarlak kart): ton token'lı (`.tone-warning` / `.tone-danger`,
+ * açık + koyu temada AA). Bağlantı verilirse tüm şerit ilgili ayara gider (sağda ok).
+ */
+function StatusStrip({
+  tone,
+  role,
+  href,
+  children,
+}: {
+  tone: "warning" | "danger";
+  role: "status" | "alert";
+  href?: string;
+  children: React.ReactNode;
+}) {
+  const body = (
+    <>
+      <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1">{children}</span>
+      {href ? <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden /> : null}
+    </>
+  );
+  const cls = `tone-${tone} flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-2.5 text-sm font-semibold`;
+  return href ? (
+    <Link href={href} role={role} className={`${cls} focus-ring transition-[filter] hover:brightness-[0.98]`}>
+      {body}
+    </Link>
+  ) : (
+    <p role={role} className={cls}>
+      {body}
+    </p>
   );
 }

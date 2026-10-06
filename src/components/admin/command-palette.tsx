@@ -191,10 +191,10 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
         aria-haspopup="listbox"
         aria-controls="admin-command-results"
         aria-label="Platform genelinde ara"
-        className="focus-ring group flex h-10 w-full items-center gap-3 rounded-[var(--radius-card)] border border-hairline bg-canvas/80 px-4 text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300/70 hover:bg-surface hover:text-text-muted hover:shadow-[var(--elev-2)]"
+        className="focus-ring group flex h-11 w-full items-center gap-3 rounded-full border border-hairline bg-surface-raised px-4 text-sm text-text-muted shadow-[var(--elev-1)] transition hover:border-border-interactive hover:text-text hover:shadow-[var(--elev-2)]"
       >
-        <Search className="h-4 w-4 shrink-0 transition group-hover:text-brand-500" />
-        <span className="hidden flex-1 truncate text-left text-sm sm:block">Ara… ofis, üye, destek talebi</span>
+        <Search className="h-4 w-4 shrink-0 transition group-hover:text-accent-text" aria-hidden />
+        <span className="hidden flex-1 truncate text-left text-sm sm:block">Ara… ofis, üye, destek talebi, sayfa</span>
         <span className="ml-auto hidden shrink-0 lg:inline-flex">
           <KbdCombo keys={["mod", "K"]} />
         </span>

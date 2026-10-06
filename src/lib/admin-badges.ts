@@ -21,6 +21,8 @@ export type AdminHealth = {
   /** cron_heartbeats'te olup vercel.json'da tanımlı olmayan (eski/silinmiş) iş adları; sayıma katılmaz. */
   unknownJobs?: string[];
   lastCronAt: string | null;
+  /** Ölçümün yapıldığı an (ms; 30 sn önbellek turu). Kartta "Son kontrol" olarak gösterilir. */
+  checkedAt?: number;
 };
 
 /**
@@ -59,10 +61,11 @@ const cachedBadges = unstable_cache(
         failedJobs: cronRows ? cronRows.filter((r) => r.last_status === "error").map((r) => String(r.job)).slice(0, 3) : [],
         unknownJobs: unknownJobs.slice(0, 5),
         lastCronAt: cronRows && cronRows.length ? cronRows.map((r) => String(r.last_run_at)).sort().at(-1) ?? null : null,
+        checkedAt: now(),
       },
     };
   },
-  ["admin-sidebar-badges-v4"],
+  ["admin-sidebar-badges-v5"],
   { revalidate: 30, tags: ["admin-badges"] },
 );
 

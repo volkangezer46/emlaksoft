@@ -149,12 +149,17 @@ a.nav-flyout-title:hover { background: var(--surface-hover); }
 }
 @media (prefers-reduced-motion: reduce) { .topbar-search { transition: none; } }
 
-/* Seçili öğe: sade, yükseltilmiş koyu pill (altın gradyan/kenar YOK); solda kayan ince altın çubuk (.nav-bar) */
+/* Yan menü zemini (iki menü + çekmece ortak): lacivert degrade, token'dan (tokens.css --sb-bg-*).
+   Koyu temada bir ton derin (theme-dark.css). Üstündeki metin sabit beyaz/altın (kontrast testli). */
+.sb-surface { background: linear-gradient(180deg, var(--sb-bg-top) 0%, var(--sb-bg-mid) 46%, var(--sb-bg-bottom) 100%); }
+
+/* Seçili öğe: DOLGULU vurgu hapı (beyaz yazı --accent üstünde ≥4.5:1, tüm vurgu temalarında testli);
+   solda kayan ince altın çubuk (.nav-bar) kontrollü altın işarettir. */
 .nav-pill {
-  background: var(--surface-selected);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 16px -10px rgba(0, 0, 0, 0.7);
+  background: var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 22px -12px color-mix(in srgb, var(--accent) 90%, transparent);
 }
-.nav-pill:hover { background: rgba(255, 255, 255, 0.09); }
+.nav-pill:hover { background: var(--accent); }
 
 /* Genişletilmiş liste <-> ikon rayı (yalnız masaüstü .shell-aside daralınca) */
 .sb-rail { display: none; }

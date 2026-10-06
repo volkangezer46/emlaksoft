@@ -6,10 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Building2,
   ChevronDown,
   CreditCard,
+  Crown,
   ExternalLink,
   Globe,
   Handshake,
@@ -20,7 +22,6 @@ import {
   Menu,
   Radar,
   Receipt,
-  Search,
   SearchCheck,
   Palette,
   PanelTop,
@@ -39,10 +40,9 @@ import {
 } from "@/lib/platform-access";
 import type { AdminHealth } from "@/lib/admin-badges";
 import { getHrefStore } from "@/lib/nav-memory";
-import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { formatTrTime } from "@/lib/clock";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
-import { KbdCombo } from "@/components/ui/kbd";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 type Item = {
@@ -185,7 +185,7 @@ export function AdminSidebar({
             badge && badge > 0 ? "pr-12" : "pr-3"
           } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
         >
-          <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-[var(--gold-300)]" : "text-white/65 group-hover:text-white"}`} aria-hidden />
+          <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
         </Link>
         {badge && badge > 0 ? (
@@ -200,35 +200,23 @@ export function AdminSidebar({
     );
   };
 
-  const issues = health ? !health.ok || (health.cronErrors ?? 0) > 0 : false;
+  const cronIssues = health ? (health.cronErrors ?? 0) > 0 : false;
+  const dbDown = health ? !health.ok : false;
 
   const renderContent = (variant: "desktop" | "drawer") => (
-    <aside className="flex h-full w-full flex-col bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)]">
-      <div className="sb-head relative flex min-h-14 shrink-0 items-center gap-3 overflow-hidden border-b border-white/8 px-4">
-        <div className="pointer-events-none absolute -right-6 -top-8 h-24 w-24 rounded-full bg-amber-400/15 blur-2xl" />
-        <Brand variant="mark" tone="dark" height={36} alt="" className="relative rounded-[var(--radius-card)] shadow-[0_0_24px_-4px_rgba(251,191,36,0.65)]" />
-        <div className="sb-label relative min-w-0 flex-1">
-          <p className="truncate font-display text-sm font-extrabold leading-5 text-white">EmlakSoft Platform</p>
-          <p className="truncate text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{roleLabel}</p>
+    <aside className="sb-surface flex h-full w-full flex-col">
+      {/* Arama üst çubukta (Ctrl K); menüde ikinci arama kutusu yok. */}
+      <div className="sb-head relative flex min-h-16 shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3">
+        <Brand variant="mark" tone="dark" height={38} alt="" className="rounded-[var(--radius-card)]" />
+        <div className="sb-label min-w-0 flex-1">
+          <p className="truncate font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
+          <p className="truncate text-xs leading-4 text-white/75">Platform</p>
+          <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-bold uppercase tracking-[0.1em] text-[var(--gold-300)]">
+            <Crown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {roleLabel}
+          </p>
         </div>
-        <SidebarCollapseButton className="relative" />
-      </div>
-
-      <div className="sb-pad px-3 pt-3">
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            window.dispatchEvent(new Event(OPEN_PALETTE_EVENT));
-          }}
-          aria-label="Ara ve komut paletini aç (Ctrl K)"
-          title="Ara (Ctrl K)"
-          className="nav-search focus-ring w-full text-left transition-colors hover:bg-white/10"
-        >
-          <Search className="h-4 w-4 shrink-0" aria-hidden />
-          <span className="sb-label flex-1 truncate text-sm text-white/75">Ara…</span>
-          <KbdCombo keys={["mod", "K"]} className="sb-label !border-white/15 !bg-white/8 !text-white/80" />
-        </button>
+        <SidebarCollapseButton />
       </div>
 
       <NavScroller label="Platform menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
@@ -286,7 +274,7 @@ export function AdminSidebar({
                   aria-current={active ? "page" : undefined}
                   aria-label={item.label}
                   className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
-                    active ? "nav-pill text-[var(--gold-300)]" : "text-white/70 hover:bg-white/8 hover:text-white"
+                    active ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}
                 >
                   <item.icon className="h-[18px] w-[18px]" aria-hidden />
@@ -307,38 +295,48 @@ export function AdminSidebar({
           <Link
             href="/admin/sistem"
             onClick={() => setOpen(false)}
-            className="sb-label focus-ring block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition-colors hover:bg-white/8"
+            aria-label={`Sistem durumu: ${dbDown ? "veritabanı hatası" : "çevrimiçi"}${cronIssues ? `, ${health.cronErrors} hatalı zamanlanmış iş` : ""}. Sistemi görüntüle`}
+            className="sb-label focus-ring group block rounded-[var(--radius-card)] border border-white/12 bg-white/[0.06] p-3 transition-colors hover:bg-white/[0.09]"
           >
             <span className="flex items-center justify-between gap-2">
-              <span className="sb-eyebrow uppercase text-white/75">Sistem</span>
+              <span className="sb-eyebrow uppercase text-white/80">Sistem durumu</span>
               <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em] ${
-                  issues ? "border-amber-400/40 text-amber-300" : "border-mint-400/40 text-mint-300"
+                className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold ${
+                  dbDown ? "bg-danger-500/20 text-danger-300" : "bg-mint-500/15 text-mint-300"
                 }`}
               >
-                {issues ? "Dikkat" : "Canlı"}
+                <span className={`h-1.5 w-1.5 rounded-full ${dbDown ? "bg-danger-400" : "status-pulse bg-mint-400"}`} aria-hidden />
+                {dbDown ? "Sorunlu" : "Çevrimiçi"}
               </span>
             </span>
-            <span className="mt-2 flex items-center gap-2 text-sm font-semibold text-white">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${issues ? "bg-amber-400" : "bg-mint-400"}`} aria-hidden />
-              {health.ok ? "Veritabanı yanıt veriyor" : "Veritabanı sorgusu hata verdi"}
+            <span className="mt-2.5 flex items-center gap-2 text-sm font-semibold text-white">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dbDown ? "bg-danger-400" : "bg-mint-400"}`} aria-hidden />
+              {dbDown ? "Veritabanı sorgusu hata verdi" : "Veritabanı yanıt veriyor"}
             </span>
-            <span className="num mt-1 block text-xs text-white/70">
+            <span className="num mt-1 block text-xs font-medium text-white/75">
               {health.dbMs} ms
               {health.cronTotal != null
-                ? ` · ${health.cronTotal} cron işi${(health.cronErrors ?? 0) > 0 ? `, ${health.cronErrors} hatalı` : " hatasız"}`
+                ? ` · ${health.cronTotal} cron işi${cronIssues ? `, ${health.cronErrors} hatalı` : ", hatasız"}`
                 : ""}
             </span>
             {health.failedJobs && health.failedJobs.length > 0 ? (
-              <span className="mt-1 block line-clamp-2 break-words text-xs text-amber-300" title={health.failedJobs.join(", ")}>
-                Hatalı: {health.failedJobs.join(", ")}
+              <span className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-300" title={health.failedJobs.join(", ")}>
+                <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="line-clamp-2 break-words">Hatalı: {health.failedJobs.join(", ")}</span>
               </span>
             ) : null}
             {health.unknownJobs && health.unknownJobs.length > 0 ? (
-              <span className="mt-1 block line-clamp-2 break-words text-xs text-white/50" title={health.unknownJobs.join(", ")}>
+              <span className="mt-1 block line-clamp-2 break-words text-xs text-white/60" title={health.unknownJobs.join(", ")}>
                 Tanımsız iş (eski kayıt): {health.unknownJobs.join(", ")}
               </span>
             ) : null}
+            {health.checkedAt ? (
+              <span className="num mt-1.5 block text-xs text-white/65">Son kontrol: {formatTrTime(health.checkedAt)}</span>
+            ) : null}
+            <span className="mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-white/15 bg-white/[0.04] px-3 text-sm font-semibold text-white transition-colors group-hover:bg-white/10">
+              Sistemi görüntüle
+              <ExternalLink className="h-3.5 w-3.5 text-white/70" aria-hidden />
+            </span>
           </Link>
         ) : null}
 
@@ -364,14 +362,14 @@ export function AdminSidebar({
         <button
           type="button"
           aria-label="Admin menüsünü aç"
-          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-amber-400 text-ink-950 shadow-[0_0_24px_-6px_rgba(251,191,36,0.7)] md:hidden"
+          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-[var(--navy-800)] text-white shadow-[var(--elev-3)] md:hidden"
         >
           <Menu className="h-5 w-5" />
         </button>
       </DialogTrigger>
 
       {/* Masaüstü sabit sidebar */}
-      <div className="shell-aside sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden border-r border-white/6 md:block">{renderContent("desktop")}</div>
+      <div className="shell-aside sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden md:block">{renderContent("desktop")}</div>
 
       {/* Mobil çekmece — focus trap, Escape, scroll lock ve focus restore Radix'ten gelir. */}
       <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>
@@ -386,7 +384,7 @@ export function AdminSidebar({
       <nav
         aria-label="Admin hızlı gezinme"
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta).
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[#0a1224] pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/8 bg-[var(--sb-bg-bottom)] pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
@@ -397,9 +395,9 @@ export function AdminSidebar({
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold transition ${active ? "text-amber-300" : "text-white/70 hover:text-white"}`}
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold transition ${active ? "text-white" : "text-white/70 hover:text-white"}`}
               >
-                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-amber-400/15" : ""}`}>
+                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-[var(--accent)]" : ""}`}>
                   <tab.icon className="h-[18px] w-[18px]" />
                 </span>
                 <span className="max-w-full truncate px-0.5">{tab.label}</span>

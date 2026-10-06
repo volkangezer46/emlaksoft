@@ -161,7 +161,7 @@ export function AppSidebar({
             badge ? "pr-16" : "pr-9"
           } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
         >
-          <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-[var(--gold-300)]" : "text-white/65 group-hover:text-white"}`} aria-hidden />
+          <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
           {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
         </Link>
@@ -240,7 +240,7 @@ export function AppSidebar({
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
       <div className="sb-head flex min-h-11 shrink-0 items-center gap-3 border-b border-white/8 px-4">
-        <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)] shadow-[0_12px_28px_-12px_rgba(34,211,238,.75)]" />
+        <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">Ofis konsolu</p>
@@ -293,7 +293,7 @@ export function AppSidebar({
           })}
           {more.length > 0 ? (
             <>
-              <div className="sb-eyebrow sticky bottom-0 z-[1] bg-[#0a111e] px-3 pb-0.5 pt-1 text-white/70 shadow-[0_-8px_12px_-8px_rgba(0,0,0,.6)]">
+              <div className="sb-eyebrow sticky bottom-0 z-[1] bg-[var(--sb-bg-bottom)] px-3 pb-0.5 pt-1 text-white/70 shadow-[0_-8px_12px_-8px_rgba(0,0,0,.6)]">
                 <button
                   type="button"
                   onClick={toggleMore}
@@ -347,7 +347,7 @@ export function AppSidebar({
                   aria-current={active ? "true" : undefined}
                   aria-label={section.title}
                   className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
-                    active ? "nav-pill text-[var(--gold-300)]" : "text-white/70 hover:bg-white/8 hover:text-white"
+                    active ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}
                 >
                   <section.icon className="h-[18px] w-[18px]" aria-hidden />
@@ -475,12 +475,12 @@ export function AppSidebar({
           <Menu className="h-5 w-5" />
         </button>
       </DialogTrigger>
-      <aside className="shell-aside sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-hidden bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)] lg:flex">
+      <aside className="shell-aside sb-surface sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-hidden lg:flex">
         {renderContent("desktop")}
       </aside>
       <DialogDrawerContent id="app-mobile-navigation" aria-describedby={undefined} responsiveClassName="lg:hidden">
         <DialogTitleHidden>Panel menüsü</DialogTitleHidden>
-        <aside className="flex h-full flex-col bg-[linear-gradient(180deg,#0b1220_0%,#070d19_100%)]">
+        <aside className="sb-surface flex h-full flex-col">
           <DialogClose asChild>
             <button type="button" className="absolute right-3 top-2 z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
           </DialogClose>
