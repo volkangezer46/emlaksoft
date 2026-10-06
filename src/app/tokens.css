@@ -30,14 +30,14 @@
      burada tanımlanmayan her ton (ör. text-mint-700) sessizce hiçbir şey
      yapmaz. Kod tabanında kullanılan tüm tonlar aşağıda tam olarak tanımlı;
      yeni bir ton kullanmadan önce buraya eklenmesi gerekir. */
-  --mint-700: #0b8172;
+  --mint-700: #08705f;
   --mint-600: #0e9f8c;
   --mint-500: #10b9a3;
   --mint-400: #34d3bd;
   --mint-300: #6ee0cd;
   --mint-50: #ecfbf7;
 
-  --amber-700: #8f6a24;
+  --amber-700: #85621f;
   --amber-600: #b8862f;
   --amber-500: #e0a53a;
   --amber-400: #f2b84b;
