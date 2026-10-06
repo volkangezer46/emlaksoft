@@ -14,7 +14,7 @@ import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
 import { HBarList } from "./hbar-list";
 import { NetDiffChart } from "./net-diff-chart";
 import { hasNetData, netSeries, shareOfMax, shareOfTotal } from "./report-math";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
 import { SampleDataBadge } from "@/components/ui/sample-data-badge";

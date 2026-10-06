@@ -31,7 +31,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDealsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { relatedSearchClause } from "@/lib/list-search";
 import { buildHref } from "@/lib/ui/filter-params";
 import { PageHeader } from "@/components/ui/page-header";

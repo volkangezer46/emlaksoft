@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   importChunk,
   previewImportChunk,

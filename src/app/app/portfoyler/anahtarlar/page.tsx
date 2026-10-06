@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { returnPropertyKey } from "@/app/actions/property-keys";
 import { orIlike, inFilter } from "@/lib/pgrst";

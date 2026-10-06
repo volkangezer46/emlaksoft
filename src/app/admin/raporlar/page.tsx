@@ -9,7 +9,6 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
 import { formatTry } from "@/lib/format";
-import { moneyTRY } from "@/lib/admin-format";
 import { now as clockNow } from "@/lib/clock";
 import { AreaChart } from "@/components/ui/viz";
 import { StackedBar } from "@/components/admin/admin-bars";
@@ -199,7 +198,7 @@ export default async function AdminReportsPage({
         <div className="flex items-center justify-between gap-3">
           <p className="flex items-center gap-2 text-sm font-semibold text-text"><LineChart className="h-4 w-4 text-text-faint" aria-hidden /> Aktif abonelik kohortu · 12 ay</p>
           <span className="inline-flex items-center gap-2 text-sm tabular-nums">
-            <span className="font-semibold text-text">{moneyTRY(trendFallback[trendFallback.length - 1] ?? 0)}</span>
+            <span className="font-semibold text-text">{formatTry(trendFallback[trendFallback.length - 1] ?? 0)}</span>
             <TrendPill trend={cohortTrend} />
           </span>
         </div>
@@ -209,7 +208,7 @@ export default async function AdminReportsPage({
             <AreaChart
               series={[{ name: "Kümülatif MRR", values: trendFallback, tone: "gold" }]}
               pointLabels={months.map((m) => m.label)}
-              formatValue={moneyTRY}
+              formatValue={formatTry}
               ariaLabel="Son 12 ay aktif abonelik kohortu kümülatif MRR"
               href="/admin/billing"
             />
@@ -226,7 +225,7 @@ export default async function AdminReportsPage({
           <div className="mt-4">
             {planRevenue.some((p) => p.revenue > 0) ? (
               <StackedBar
-                format={moneyTRY}
+                format={formatTry}
                 ariaLabel="Plan bazında aylık yinelenen gelir payı"
                 rows={planRevenue.map((p) => ({ label: p.label, value: p.revenue, hint: `${p.count} ofis`, href: `/admin/tenants?plan=${p.key}` }))}
               />
@@ -272,7 +271,7 @@ export default async function AdminReportsPage({
                 <p className="truncate text-sm font-semibold text-ink-950 transition group-hover:text-brand-600">{t.name}</p>
                 <p className="text-xs text-text-faint">{catalogPlanLabel(t.plan)}</p>
               </div>
-              <span className="shrink-0 font-display text-sm font-extrabold tabular-nums text-ink-950">{moneyTRY(t.value)}<span className="text-xs font-normal text-text-faint">/ay</span></span>
+              <span className="shrink-0 font-display text-sm font-extrabold tabular-nums text-ink-950">{formatTry(t.value)}<span className="text-xs font-normal text-text-faint">/ay</span></span>
               <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
             </Link>
           ))}

@@ -327,7 +327,7 @@ const SETTING_GROUPS: { title: string; fields: SettingField[] }[] = [
       { key: "partner_tier2_pct", label: "2. kademe komisyon %" },
       { key: "partner_tier3_pct", label: "3. kademe komisyon %" },
       { key: "partner_duration_months", label: "Yinelenen komisyon süresi (ay)" },
-      { key: "partner_min_payout_try", label: "Minimum ödeme eşiği (TL)" },
+      { key: "partner_min_payout_try", label: "Minimum ödeme eşiği (₺)" },
     ],
   },
 ];

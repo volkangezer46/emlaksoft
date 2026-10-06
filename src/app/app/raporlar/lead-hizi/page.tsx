@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Progress } from "@/components/ui/progress";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";

@@ -16,7 +16,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { listOpenHouses } from "@/app/actions/targets-openhouse-sources";
 import { isPast, msUntil, DAY_MS } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 

@@ -1,11 +1,11 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Clock, Hand, Inbox, Layers, Settings2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Hand, Inbox, Layers, Settings2, UserX } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
@@ -16,6 +16,9 @@ import { formatTry } from "@/lib/utils";
 import { PoolEntryPanel, type PanelSuggestion } from "./pool-entry-panel";
 import { PoolSettingsForm } from "./pool-settings-form";
 import { getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/lib/geo/reader";
+import { assignHref, parseAssignView } from "@/lib/office-center/logic";
+import { loadUnassignedProperties } from "@/lib/office-center/store";
+import { AssignmentSection, assignBranchOf } from "./assignment-section";
 
 export const metadata = { title: "İlan havuzu" };
 
@@ -62,12 +65,21 @@ function slaTone(state: string): string {
   return "bg-mint-500/10 text-mint-700";
 }
 
-export default async function ListingPoolPage({ searchParams }: { searchParams?: Promise<{ durum?: string }> }) {
-  const { role, tenantId } = await requireModulePage("properties", PAGE);
-  const { durum: rawDurum = "" } = (await searchParams) ?? {};
+/**
+ * İLAN HAVUZU — TEK atama ekranı. Havuz kayıtları (kural/puan, sahiplenme, SLA) + Ofis Merkezi izni olana
+ * "Danışmansız ilanlar" (akıllı öneri `smart-assign` + elle atama) ve "Atama geçmişi" (iptal / yeniden ata) görünümleri
+ * (`?atama=`). Filtre kontratı: `?durum=` havuz, `?atama=` atama görünümü; sunucu sorgusu aynı değerleri okur.
+ */
+export default async function ListingPoolPage({ searchParams }: { searchParams?: Promise<{ durum?: string; atama?: string }> }) {
+  const { role, tenantId, userId, perms } = await requireModulePage("properties", PAGE);
+  const { durum: rawDurum = "", atama: rawAtama } = (await searchParams) ?? {};
   const durum = FILTERS.some((f) => f.value === rawDurum) ? rawDurum : "bekleyen";
   const canManage = hasOfficeWideDataScope(role);
   const canConfigure = role === "owner" || role === "gm";
+  // Atama görünümleri Ofis Merkezi iznine bağlı (atama eylemleri de office_center:edit ister).
+  const canSeeAssign = (perms.office_center ?? []).includes("view");
+  const canAssign = (perms.office_center ?? []).includes("edit");
+  const atama = canSeeAssign && rawAtama ? parseAssignView(rawAtama) : null;
 
   if (!tenantId) {
     return (
@@ -98,14 +110,17 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
     if (durum === "sahiplen") list = list.gte("claim_open_until", nowIso);
   }
 
-  const [listRes, pendingRes, lateRes, claimRes, assignedRes, enabled, rule] = await Promise.all([
-    list.limit(LIMIT),
+  const branchId = canSeeAssign ? await assignBranchOf({ supabase, tenantId, userId, role }) : null;
+  const [listRes, pendingRes, lateRes, claimRes, assignedRes, enabled, rule, unassignedRes] = await Promise.all([
+    // Atama görünümünde havuz listesi çizilmez (yalnız sayaçlar).
+    atama ? Promise.resolve({ data: [] as Row[], count: 0, error: null }) : list.limit(LIMIT),
     count((q) => q.eq("status", "pending")),
     count((q) => q.eq("status", "pending").lt("sla_due_at", nowIso)),
     count((q) => q.eq("status", "pending").gte("claim_open_until", nowIso)),
     count((q) => q.eq("status", "assigned").gte("assigned_at", week)),
     isPoolEnabled(supabase, tenantId),
     loadPoolRule(supabase, tenantId, null),
+    canSeeAssign ? loadUnassignedProperties(supabase, tenantId, { nowMs, slaHours: 24, limit: 1, branchId }) : Promise.resolve(null),
   ]);
 
   if (listRes.error && isMissingSchemaError(listRes.error)) {
@@ -198,6 +213,9 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
         <StatCard label="SLA'sı geçen" value={lateRes.count ?? 0} icon={AlertTriangle} tone={(lateRes.count ?? 0) > 0 ? "danger" : "warning"} href={href("gecikmis")} />
         <StatCard label="Sahiplenmeye açık" value={claimRes.count ?? 0} icon={Hand} tone="warning" href={href("sahiplen")} />
         <StatCard label="Son 7 gün atanan" value={assignedRes.count ?? 0} icon={CheckCircle2} tone="success" href={href("atanan")} />
+        {unassignedRes && !unassignedRes.failed ? (
+          <StatCard label="Danışmansız ilan" value={unassignedRes.total} icon={UserX} tone={unassignedRes.total > 0 ? "warning" : "neutral"} href={assignHref()} />
+        ) : null}
       </KpiGrid>
 
       {canConfigure ? (
@@ -212,20 +230,42 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
       ) : null}
 
       <nav aria-label="Havuz filtresi" className="flex flex-wrap items-center gap-1.5">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.value}
-            href={href(f.value)}
-            aria-current={durum === f.value ? "page" : undefined}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${durum === f.value ? "border-brand-400 bg-brand-50 text-brand-700" : "border-line bg-surface text-text-muted hover:bg-canvas"}`}
-          >
-            {f.label}
-          </Link>
-        ))}
-        <span className="ml-auto text-xs text-text-muted">{total} kayıt{total > LIMIT ? ` · ilk ${LIMIT}` : ""}</span>
+        {FILTERS.map((f) => {
+          const on = !atama && durum === f.value;
+          return (
+            <Link
+              key={f.value}
+              href={href(f.value)}
+              aria-current={on ? "page" : undefined}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${on ? "border-brand-400 bg-brand-50 text-brand-700" : "border-line bg-surface text-text-muted hover:bg-canvas"}`}
+            >
+              {f.label}
+            </Link>
+          );
+        })}
+        {canSeeAssign
+          ? (
+              [
+                { label: "Danışmansız ilanlar", href: assignHref(), on: atama === "bekleyen" || atama === "gecikmis" },
+                { label: "Atama geçmişi", href: assignHref("gecmis"), on: atama === "gecmis" || atama === "aktif" || atama === "iptal" || atama === "yeniden" },
+              ] as const
+            ).map((f) => (
+              <Link
+                key={f.label}
+                href={f.href}
+                aria-current={f.on ? "page" : undefined}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${f.on ? "border-brand-400 bg-brand-50 text-brand-700" : "border-line bg-surface text-text-muted hover:bg-canvas"}`}
+              >
+                {f.label}
+              </Link>
+            ))
+          : null}
+        {!atama ? <span className="ml-auto text-xs text-text-muted">{total} kayıt{total > LIMIT ? ` · ilk ${LIMIT}` : ""}</span> : null}
       </nav>
 
-      {entries.length === 0 ? (
+      {atama ? (
+        <AssignmentSection ctx={{ supabase, tenantId, userId, role, nowMs, canEdit: canAssign, view: atama }} />
+      ) : entries.length === 0 ? (
         <EmptyState
           illustration="portfoy"
           icon={Layers}

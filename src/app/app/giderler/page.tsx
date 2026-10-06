@@ -8,7 +8,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listExpenses } from "@/app/actions/expenses";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { requireReportingData } from "@/lib/reporting/result";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { CategoryDonut } from "./category-donut-lazy";

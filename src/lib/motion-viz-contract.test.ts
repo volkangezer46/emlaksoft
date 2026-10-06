@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -112,8 +112,9 @@ describe("viz kiti: eski dışa aktarımlar ve cam bütçesi", () => {
   });
 
   it("eski adlar yeni kite yönlenir", () => {
-    expect(read("src/components/admin/count-up.tsx")).toContain("@/components/ui/count-up");
-    expect(read("src/app/app/odometer-number.tsx")).toContain("@/components/ui/count-up");
+    // Tek sayaç ui/count-up: eski admin CountUp ve OdometerNumber sarmalayıcıları silindi (2026-10).
+    expect(existsSync(join(process.cwd(), "src/components/admin/count-up.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "src/app/app/odometer-number.tsx"))).toBe(false);
     expect(read("src/components/ui/console/ring.tsx")).toContain("RadialGauge");
     expect(read("src/components/ui/premium/charts.tsx")).toContain("RadialGauge");
     expect(read("src/components/ui/console/area-chart.tsx")).toContain("viz/area-chart");

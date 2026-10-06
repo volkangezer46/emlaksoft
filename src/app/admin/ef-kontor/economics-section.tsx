@@ -131,11 +131,11 @@ export function EconomicsSection({
                 hint="Denetim kaydına yazılır; geçmiş dönemler de bu tarifeyle yeniden hesaplanır."
               >
                 <label className="text-xs font-semibold text-text-muted">
-                  Değerleme (TL)
+                  Değerleme (₺)
                   <input name="valuation_tl" defaultValue={String(wholesale.valuationTl).replace(".", ",")} inputMode="decimal" className={`mt-1 block w-28 ${opFieldClass}`} />
                 </label>
                 <label className="text-xs font-semibold text-text-muted">
-                  İlk PDF (TL)
+                  İlk PDF (₺)
                   <input name="pdf_tl" defaultValue={String(wholesale.pdfTl).replace(".", ",")} inputMode="decimal" className={`mt-1 block w-28 ${opFieldClass}`} />
                 </label>
               </InlineOp>

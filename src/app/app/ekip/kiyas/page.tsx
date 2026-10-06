@@ -6,7 +6,7 @@ import { now } from "@/lib/clock";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { attentionReasons } from "@/lib/team/advisor-360";

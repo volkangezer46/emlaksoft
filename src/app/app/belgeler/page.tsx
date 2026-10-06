@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { now } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";

@@ -3,7 +3,7 @@ import { MessageCircle, Phone, Zap } from "lucide-react";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { Widget } from "../dashboard-widgets";
 import { loadActivityFeed, type HomeCtx } from "./data";
-import { timeFmt } from "./format";
+import { formatTrTime } from "@/lib/clock";
 import { PanelLink } from "./ortak";
 
 type FeedAction = { key: string; kind: "tel" | "wa" | "link"; href: string; label?: string };
@@ -122,7 +122,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
                     )}
                   </span>
                 ) : null}
-                <span className="shrink-0 text-xs text-text-faint">{timeFmt.format(new Date(item.time))}</span>
+                <span className="shrink-0 text-xs text-text-faint">{formatTrTime(item.time)}</span>
               </div>
             ))
           )}

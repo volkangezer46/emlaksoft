@@ -1,7 +1,8 @@
+import { formatTry } from "@/lib/format";
 import type { ReactNode } from "react";
 import { MapPinned, Sparkles } from "lucide-react";
 import type { createClient } from "@/lib/supabase/server";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { loadRegions, loadSpecialties, loadSpecialtyOptions } from "@/lib/advisor/advisor-store";
 import { SPECIALTY_LEVELS, type RegionView, type SpecialtyView } from "@/lib/advisor/advisor-profile";
@@ -23,14 +24,10 @@ function Section({ id, title, count, icon, children }: { id: string; title: stri
   );
 }
 
-function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
-}
-
 function priceBand(r: SpecialtyView): string | null {
   if (r.price_min === null && r.price_max === null) return null;
-  if (r.price_min !== null && r.price_max !== null) return `${money(r.price_min)} - ${money(r.price_max)} TL`;
-  return r.price_min !== null ? `${money(r.price_min)} TL ve üzeri` : `${money(r.price_max ?? 0)} TL'ye kadar`;
+  if (r.price_min !== null && r.price_max !== null) return `${formatTry(r.price_min)} - ${formatTry(r.price_max)}`;
+  return r.price_min !== null ? `${formatTry(r.price_min)} ve üzeri` : `${formatTry(r.price_max ?? 0)} ve altı`;
 }
 
 function SpecialtyList({ rows }: { rows: SpecialtyView[] }) {

@@ -6,7 +6,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { now, trDayKey } from "@/lib/clock";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatRow } from "@/components/ui/stat-row";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
 import { DOC_KIND_LABEL, formatDocCountdown, type DocKind } from "@/lib/advisor/advisor-profile";
 import { cn } from "@/lib/utils";

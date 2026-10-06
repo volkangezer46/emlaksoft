@@ -21,7 +21,7 @@ import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs, trMonthStartIso } from "@/lib/clock";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import {
   APPROVAL_KINDS,

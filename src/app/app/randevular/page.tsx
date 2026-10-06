@@ -35,7 +35,7 @@ import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { CalendarSubscribeCard } from "./calendar-subscribe-card";
 import { BookingLinkCard } from "./booking-link-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { TR_OFFSET_MIN } from "@/lib/booking-slots";
 import { isOnLeave, type LeaveLike } from "@/lib/leave-utils";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";

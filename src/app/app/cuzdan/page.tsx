@@ -15,7 +15,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { PrintButton } from "./print-button";

@@ -1,3 +1,4 @@
+import { formatTry } from "@/lib/format";
 import Link from "next/link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
@@ -37,7 +38,7 @@ import { PropertyMobileList, PropertyTable, type PropertyVM } from "./property-r
 import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
 import { PageHeader } from "@/components/ui/page-header";
@@ -600,8 +601,8 @@ export default async function PropertiesPage({
     { key: "eklenen", label: "Eklenme", format: (v) => `son ${v} gün` },
     { key: "islem", label: "İşlem" },
     { key: "oda", label: "Oda", format: (v) => v.split(",").join(" / ") },
-    { key: "fiyat_min", label: "Fiyat en az", format: (v) => `${Number(v).toLocaleString("tr-TR")} TL` },
-    { key: "fiyat_max", label: "Fiyat en çok", format: (v) => `${Number(v).toLocaleString("tr-TR")} TL` },
+    { key: "fiyat_min", label: "Fiyat en az", format: (v) => formatTry(Number(v)) },
+    { key: "fiyat_max", label: "Fiyat en çok", format: (v) => formatTry(Number(v)) },
     { key: "m2_min", label: "Alan en az", format: (v) => `${v} m²` },
     { key: "m2_max", label: "Alan en çok", format: (v) => `${v} m²` },
     { key: "kat_min", label: "Kat en az" },

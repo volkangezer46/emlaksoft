@@ -3,12 +3,15 @@
  * Rol etiketi `@/lib/role-labels`, metrik tanımı `@/lib/team/advisor-metrics`, puan `smart-assign.ts`.
  */
 
-export type OfficeCenterTab = "danismanlar" | "atamalar" | "ayarlar" | "tanimlamalar" | "istatistikler";
+/**
+ * Sekmeler: "Ayarlar" ve "Tanımlamalar" AYNI ayar anahtarlarına yazıyordu → tek "Tanımlar" sekmesi (tüm ayarlar,
+ * geçmiş ve geri alma Ayarlar > Tanımlar merkezinde). "Atamalar" yalnız özet + İlan Havuzu bağlantısıdır (atama tek ekranda).
+ */
+export type OfficeCenterTab = "danismanlar" | "atamalar" | "tanimlar" | "istatistikler";
 export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }[] = [
   { id: "danismanlar", label: "Danışmanlar" },
   { id: "atamalar", label: "Atamalar" },
-  { id: "ayarlar", label: "Ayarlar" },
-  { id: "tanimlamalar", label: "Tanımlamalar" },
+  { id: "tanimlar", label: "Tanımlar" },
   { id: "istatistikler", label: "İstatistikler" },
 ];
 export const OFFICE_CENTER_PATH = "/app/ofis-merkezi";

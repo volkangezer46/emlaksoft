@@ -68,7 +68,8 @@ import {
   type LedgerPoint,
 } from "@/lib/admin/platform-metrics";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
-import { auditActionLabel, moneyTRY, relativeTimeTR } from "@/lib/admin-format";
+import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
+import { formatTry } from "@/lib/format";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { exactArr, exactMrr, exactTrendMrr, monthlyPrice, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
@@ -367,7 +368,7 @@ async function MrrSection({ period }: { period: Period }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/admin/billing" className="focus-ring flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-control)]">
-            <span className="ds-num ds-money">{moneyTRY(d.mrr)}</span>
+            <span className="ds-num ds-money">{formatTry(d.mrr)}</span>
             {trend ? (
               <span className={`ds-pill pm-t-${trendTone}`}>
                 <span aria-hidden="true">{trend.label}</span>
@@ -376,14 +377,14 @@ async function MrrSection({ period }: { period: Period }) {
             ) : null}
           </Link>
           <p className="mt-1.5 text-sm tabular-nums text-text-muted">
-            Yıllık {moneyTRY(exactArr(d.mrr))}
-            {prev !== null ? ` · önceki ay sonu ${moneyTRY(prev)}` : ""}
+            Yıllık {formatTry(exactArr(d.mrr))}
+            {prev !== null ? ` · önceki ay sonu ${formatTry(prev)}` : ""}
           </p>
         </div>
         {arpa !== null ? (
           <Link href="/admin/tenants?durum=active" className="ds-tile ds-lift focus-ring pm-t-gold min-w-40">
             <span className="text-xs text-text-muted">Ofis başı gelir (ARPA)</span>
-            <span className="ds-num text-lg">{moneyTRY(arpa)}</span>
+            <span className="ds-num text-lg">{formatTry(arpa)}</span>
           </Link>
         ) : null}
       </div>
@@ -781,7 +782,7 @@ async function CompositionSection({ period }: { period: Period }) {
   return (
     <ChartCard as="h2" title="Gelir kompozisyonu" subtitle="Plan bazında aylık yinelenen gelir" icon={PieChart} tone="gold" href="/admin/billing" hrefLabel="Faturalama" height={0} className="h-full">
       {total > 0 ? (
-        <StackedBar rows={rows} format={moneyTRY} ariaLabel="Plan bazında aylık yinelenen gelir payı" />
+        <StackedBar rows={rows} format={formatTry} ariaLabel="Plan bazında aylık yinelenen gelir payı" />
       ) : (
         <EmptyState variant="compact" illustration="komisyon" title="Henüz gelir getiren plan yok" description="Aktif abonelikler oluştukça plan bazında dağılım burada görünür." />
       )}

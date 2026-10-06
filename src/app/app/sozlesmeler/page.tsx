@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportContractsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";

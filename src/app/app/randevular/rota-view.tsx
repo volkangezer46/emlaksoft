@@ -14,7 +14,7 @@ import {
   Route,
   UserRound,
 } from "lucide-react";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { RotaMap, type RotaMarker } from "./rota-map";
 
 /**

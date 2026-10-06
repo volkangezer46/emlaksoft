@@ -34,7 +34,7 @@ import {
   type NetworkContact,
 } from "@/app/actions/network";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ShareNetworkPanel, ShareNetworkTrigger } from "./share-network-panel";
 import { CollabRequestDialog } from "./collab-request-dialog";

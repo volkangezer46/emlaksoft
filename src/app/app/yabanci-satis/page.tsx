@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { now } from "@/lib/clock";
 import { FOREIGN_SALE_CHECKLIST, FOREIGN_SALE_GUIDE, guideCardVerification } from "@/lib/foreign-sale-checklist";

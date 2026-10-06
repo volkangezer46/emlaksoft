@@ -21,7 +21,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { daysAgoIso } from "@/lib/clock";
 import { compareTr } from "@/lib/tr-text";
 import {

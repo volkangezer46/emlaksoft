@@ -10,9 +10,34 @@ const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SORT_KEYS: readonly AdvisorSortKey[] = ["ad", "portfoy", "talep", "kapanis", "sla", "aktivite"];
 
+/** Eski sekme adları (yer imleri) birleşik sekmeye düşer. */
+const LEGACY_TABS: Readonly<Record<string, OfficeCenterTab>> = { ayarlar: "tanimlar", tanimlamalar: "tanimlar" };
+
 export function parseTab(raw: string | string[] | undefined): OfficeCenterTab {
   const v = first(raw);
+  if (Object.hasOwn(LEGACY_TABS, v)) return LEGACY_TABS[v]!;
   return OFFICE_CENTER_TABS.some((t) => t.id === v) ? (v as OfficeCenterTab) : "danismanlar";
+}
+
+/** TEK atama ekranı: İlan Havuzu (`?atama=`). Ofis Merkezi ve uyarılar buraya bağlanır. */
+export const LISTING_POOL_PATH = "/app/ilan-havuzu";
+export const ASSIGN_VIEWS = [
+  { id: "bekleyen", label: "Danışmansız ilanlar" },
+  { id: "gecikmis", label: "SLA'sı geçen" },
+  { id: "gecmis", label: "Atama geçmişi" },
+  { id: "aktif", label: "Aktif atamalar" },
+  { id: "iptal", label: "İptaller" },
+  { id: "yeniden", label: "Yeniden atananlar" },
+] as const;
+export type AssignView = (typeof ASSIGN_VIEWS)[number]["id"];
+
+export function parseAssignView(raw: string | string[] | undefined): AssignView {
+  const v = first(raw);
+  return ASSIGN_VIEWS.some((x) => x.id === v) ? (v as AssignView) : "bekleyen";
+}
+
+export function assignHref(view: AssignView = "bekleyen"): string {
+  return `${LISTING_POOL_PATH}?atama=${view}`;
 }
 
 /** Danışmanlar sekmesi URL -> filtre (bozuk değer varsayılana düşer). */
@@ -90,16 +115,16 @@ export function computeTeamHealth(input: {
 }): TeamHealth {
   const alerts: TeamHealth["alerts"] = [];
   if (input.stats.unassignedProperties >= input.unassignedThreshold) {
-    alerts.push({ text: `${input.stats.unassignedProperties} ilan danışmansız (eşik ${input.unassignedThreshold})`, href: tabHref("atamalar") });
+    alerts.push({ text: `${input.stats.unassignedProperties} ilan danışmansız (eşik ${input.unassignedThreshold})`, href: assignHref() });
   }
   if (input.breachedUnassigned > 0) {
-    alerts.push({ text: `${input.breachedUnassigned} ilan atama SLA'sını aştı`, href: tabHref("atamalar", { durum: "gecikmis" }) });
+    alerts.push({ text: `${input.breachedUnassigned} ilan atama SLA'sını aştı`, href: assignHref("gecikmis") });
   }
   if (input.advisorsWithoutActivity30d > 0) {
     alerts.push({ text: `${input.advisorsWithoutActivity30d} aktif danışmanın 30 gündür aktivitesi yok`, href: tabHref("danismanlar", { sirala: "aktivite", yon: "asc", durum: "aktif" }) });
   }
   if (input.stats.assignmentsThisMonth > 0 && input.stats.cancelledAssignmentsThisMonth / input.stats.assignmentsThisMonth >= 0.3) {
-    alerts.push({ text: `Bu ay atamaların %${Math.round((input.stats.cancelledAssignmentsThisMonth / input.stats.assignmentsThisMonth) * 100)}'i iptal edildi`, href: tabHref("atamalar", { durum: "iptal" }) });
+    alerts.push({ text: `Bu ay atamaların %${Math.round((input.stats.cancelledAssignmentsThisMonth / input.stats.assignmentsThisMonth) * 100)}'i iptal edildi`, href: assignHref("iptal") });
   }
   if (input.stats.failed) alerts.push({ text: "Bazı sayılar okunamadı; sağlık değerlendirmesi eksik olabilir", href: tabHref("istatistikler") });
   const level: TeamHealth["level"] = alerts.length === 0 ? "healthy" : alerts.length >= 3 || input.breachedUnassigned > 0 ? "critical" : "warning";

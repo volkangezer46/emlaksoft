@@ -324,7 +324,7 @@ export function AdvisorForm({
         <FormField label="Aylık anlaşma hedefi" htmlFor="adv-deals" hint="Adet; boş bırakırsanız hedef oluşturulmaz.">
           <FormInput name="target_deals" type="number" min={0} max={10000} step={1} inputMode="numeric" placeholder="Örn. 3" disabled={!canSetTargets} />
         </FormField>
-        <FormField label="Aylık ciro hedefi (TL)" htmlFor="adv-revenue" hint="Brüt komisyon cirosu.">
+        <FormField label="Aylık ciro hedefi (₺)" htmlFor="adv-revenue" hint="Brüt komisyon cirosu.">
           <FormInput name="target_revenue" type="number" min={0} step={1000} inputMode="decimal" placeholder="Örn. 250000" disabled={!canSetTargets} />
         </FormField>
         <p className="text-xs text-text-muted sm:col-span-2">
