@@ -18,7 +18,7 @@ describe("WhatsApp 24 saat penceresi", () => {
     expect(action).toContain('.eq("contact_address", msg.contact_address)');
     expect(action).toContain("templateRequired: true");
     const providers = readFileSync("src/lib/messaging/tenant-providers.ts", "utf8");
-    const fn = providers.slice(providers.indexOf("export async function sendTenantWhatsAppSessionText"), providers.indexOf("export async function prepareTenantWhatsAppSender"));
+    const fn = providers.slice(providers.indexOf("export async function sendTenantWhatsAppSessionText"));
     expect(fn).toContain("fetchExternal(");
     expect(fn).not.toContain("platformMessagingFallbackAllowed");
     expect(fn).toContain('type: "text"');
