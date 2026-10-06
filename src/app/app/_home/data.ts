@@ -16,6 +16,8 @@ import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from
 import type { Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import type { SampleKpiScope } from "@/lib/sample-scope";
+import type { EffectivePermissions } from "@/lib/permissions-effective";
+import { leadReasons } from "./home-brief";
 import {
   commissionSummaryFromAggregate,
   type CommissionAggregate,
@@ -30,6 +32,9 @@ export type HomeCtx = {
   /** Oturumdaki kullanıcı (görev/randevu/müşteri `assigned_to` süzgeci için). */
   userId: string;
   role: string;
+  /** Etkin izinler (ekip metrikleri kapsam/kazanç kuralları için). */
+  perms: EffectivePermissions;
+  canSeeExpenses: boolean;
   /** Yönetim rolü (owner/gm/branch_manager): "Bugün karar bekleyenler" + Ofis görünümü anahtarı. */
   isManagement: boolean;
   /** true → görev/randevu/müşteri/portföy sorguları `assigned_to = ben` ile daralır (varsayılan). */
@@ -190,7 +195,8 @@ export const loadTodayAppointments = cache(async (ctx: HomeCtx) => {
   return { rows: result.data ?? [], total: result.count ?? 0 };
 });
 
-export type HotLead = { id: string; fullName: string; phone: string | null; score: number };
+/** `reasons`: lead-skoru bileşenlerinden NEDEN etiketleri ("Bugün ara" tablosu skor yerine gerekçe gösterir). */
+export type HotLead = { id: string; fullName: string; phone: string | null; score: number; reasons: string[] };
 
 /**
  * Sıcak (hot) müşteriler, puana göre azalan. Danışman kapsamında yalnız bana atanan müşteriler.
@@ -229,7 +235,9 @@ export const loadHotLeads = cache(async (ctx: HomeCtx): Promise<HotLead[]> => {
       createdAt: c.created_at,
       blacklist: Boolean(c.blacklist),
     });
-    if (lead.tier === "hot") hot.push({ id: c.id, fullName: c.full_name ?? "Müşteri", phone: c.phone ?? null, score: lead.score });
+    if (lead.tier === "hot") {
+      hot.push({ id: c.id, fullName: c.full_name ?? "Müşteri", phone: c.phone ?? null, score: lead.score, reasons: leadReasons(lead.factors) });
+    }
   }
   return hot.sort((a, b) => b.score - a.score);
 });
@@ -436,6 +444,20 @@ export const loadOfficeTarget = cache(async (ctx: HomeCtx) => {
     .is("profile_id", null)
     .maybeSingle();
   assertQueryBatchSucceeded([result], ["office-target"], "Ana panel");
+  return result.data;
+});
+
+/** Kişisel aylık hedef (targets.profile_id = ben) — yoksa kişisel hedef kartı "hedef belirle" önerir. */
+export const loadMyTarget = cache(async (ctx: HomeCtx) => {
+  const supabase = await createClient();
+  const result = await supabase
+    .from("targets")
+    .select("target_deals, target_revenue")
+    .eq("period", "monthly")
+    .eq("period_start", ctx.monthStartKey)
+    .eq("profile_id", ctx.userId)
+    .maybeSingle();
+  assertQueryBatchSucceeded([result], ["my-target"], "Ana panel");
   return result.data;
 });
 

@@ -6,9 +6,13 @@ import { loadClosures, loadLiveListings, type HomeCtx } from "./data";
 import { overdueListingsOf } from "./helpers";
 import { PanelLink } from "./ortak";
 
-export async function KayipKacak({ ctx }: { ctx: HomeCtx }) {
+/**
+ * `showTeyit=false`: teyit sağlığı metrik şeridinde zaten gösteriliyorsa aynı sayı tekrar basılmaz
+ * (yalnız kaçan komisyon satırları kalır).
+ */
+export async function KayipKacak({ ctx, showTeyit = true }: { ctx: HomeCtx; showTeyit?: boolean }) {
   const [listings, closures] = await Promise.all([loadLiveListings(), loadClosures(ctx)]);
-  const overdueListings = overdueListingsOf(listings);
+  const overdueListings = showTeyit ? overdueListingsOf(listings) : [];
 
   return (
     <Widget id="kayip" className="h-full">
@@ -34,12 +38,12 @@ export async function KayipKacak({ ctx }: { ctx: HomeCtx }) {
               </p>
               <p className="mt-1 text-text-muted">Portal Kontrol’den teyit edin</p>
             </Link>
-          ) : (
+          ) : showTeyit ? (
             <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 px-3 py-3">
               <Bell className="h-4 w-4 text-mint-600" />
               <p className="font-semibold text-mint-600">Teyit kuyruğu temiz</p>
             </div>
-          )}
+          ) : null}
           {closures.recent
             .filter((c) => Number(c.estimated_lost_commission || 0) > 0)
             .slice(0, 2)
@@ -65,6 +69,12 @@ export async function KayipKacak({ ctx }: { ctx: HomeCtx }) {
                 </Link>
               );
             })}
+          {!showTeyit && closures.recent.every((c) => !(Number(c.estimated_lost_commission || 0) > 0)) ? (
+            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 px-3 py-3">
+              <Bell className="h-4 w-4 text-mint-600" />
+              <p className="font-semibold text-mint-600">Kaçan komisyon kaydı yok</p>
+            </div>
+          ) : null}
         </div>
       </section>
     </Widget>

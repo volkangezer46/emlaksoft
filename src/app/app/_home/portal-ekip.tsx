@@ -1,15 +1,17 @@
 import Link from "next/link";
-import { ArrowUpRight, Gauge, Trophy } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { moneyTry } from "@/lib/leak-shield";
+import { ArrowUpRight, Gauge } from "lucide-react";
 import { Widget } from "../dashboard-widgets";
-import { loadDeals, loadLiveListings, loadProfiles, type HomeCtx } from "./data";
-import { portalHealth, teamLeaders } from "./helpers";
-import { PanelLink } from "./ortak";
+import { loadLiveListings } from "./data";
+import { portalHealth } from "./helpers";
 
+/**
+ * Portal sağlığı ("Daha fazla" bölümü). Ekip liderliği tablosu `ekip-performans.tsx`'e taşındı
+ * (danışman, görüşme, randevu, teklif, anlaşma, hedef %, durum).
+ */
 export async function PortalSagligi() {
   const listings = await loadLiveListings();
-  const { portals, pct } = portalHealth(listings);
+  // Genel teyit yüzdesi metrik şeridindedir (teyit sağlığı); burada yalnız portal kırılımı.
+  const { portals } = portalHealth(listings);
 
   return (
     <Widget id="portal" className="h-full">
@@ -23,9 +25,9 @@ export async function PortalSagligi() {
           </div>
           <Link
             href="/app/portallar"
-            className="focus-ring rounded-[var(--radius-control)] font-display text-2xl font-extrabold text-mint-600 transition hover:text-mint-500"
+            className="focus-ring rounded-[var(--radius-control)] text-xs font-semibold text-brand-600"
           >
-            %{pct}
+            Portallar
           </Link>
         </div>
         <div className="mt-5 space-y-3">
@@ -57,74 +59,6 @@ export async function PortalSagligi() {
                   />
                 </div>
               </Link>
-            ))
-          )}
-        </div>
-      </section>
-    </Widget>
-  );
-}
-
-export async function Ekip({ ctx }: { ctx: HomeCtx }) {
-  const [deals, profiles] = await Promise.all([loadDeals(ctx), loadProfiles()]);
-  const team = teamLeaders(deals, profiles);
-
-  return (
-    <Widget id="ekip" className="h-full">
-      <section className="pm-bx h-full p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-amber-500">
-              <Trophy className="h-4 w-4" /> Ekip performansı
-            </p>
-            <h2 className="mt-1 font-display font-bold text-ink-950">Anlaşma değeri liderliği</h2>
-          </div>
-          <PanelLink href="/app/ekip">Ekip</PanelLink>
-        </div>
-        <div className="mt-5 space-y-3">
-          {team.length === 0 ? (
-            <EmptyState
-              variant="compact"
-              illustration="ekip"
-              title="Atanmış anlaşma yok"
-              description="Satış hattından anlaşma ekleyin."
-              action={{ href: "/app/anlasmalar", label: "Anlaşmalara git" }}
-            />
-          ) : (
-            team.map((member, index) => (
-              <div
-                key={member.id}
-                className="group relative flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3 transition hover:border-brand-300 hover:bg-surface"
-              >
-                <Link
-                  href={`/app/ekip/${member.id}`}
-                  className="focus-ring absolute inset-0 z-0 rounded-[var(--radius-card)]"
-                  aria-label={member.name}
-                />
-                <span
-                  className={`grid h-6 w-6 place-items-center rounded-full text-xs font-extrabold ${
-                    index === 0 ? "bg-amber-400 text-ink-950" : "bg-ink-950/5 text-text-muted"
-                  }`}
-                >
-                  {index + 1}
-                </span>
-                <span className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] text-xs font-bold text-white">
-                  {member.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-ink-950">{member.name}</p>
-                  <p className="truncate text-xs text-text-faint">{member.role}</p>
-                </div>
-                <p className="hover-action-hide text-xs font-bold text-ink-950 transition group-hover:opacity-0">{moneyTry(member.value)}</p>
-                {!ctx.tvMode && (
-                  <Link
-                    href="/app/danisman-kpi"
-                    className="hover-action focus-ring absolute right-3 z-10 rounded-[var(--radius-control)] bg-brand-600/10 px-2 py-1 text-xs font-bold text-brand-600 opacity-0 transition hover:bg-brand-600/20 group-hover:opacity-100"
-                  >
-                    KPI →
-                  </Link>
-                )}
-              </div>
             ))
           )}
         </div>
