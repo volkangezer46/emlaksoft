@@ -108,8 +108,8 @@ export default async function AdminSalesPage({
       <AdminPageHeader
         eyebrow="EmlakSoft · Satış hunisi"
         icon={Handshake}
-        title="Demo talepleri & aday yönetimi"
-        description="Tanıtım formundan gelen talepleri niteleyin, atayın ve aboneliğe dönüştürün."
+        title="Satış adayları (demo talepleri arşivi)"
+        description="Arşiv: public demo talebi formu kaldırıldı (kayıt artık self-servis sihirbazla). Eski talepleri ve elle eklenen adayları niteleyin, atayın, aboneliğe dönüştürün."
         glow="mint"
         actions={
           <div className="flex flex-wrap items-center gap-2">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ComponentType } from "react";
 import { PLANS, planAmountOf, yearlyOfferLabel, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { trialCtaShort } from "@/lib/marketing-copy";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -81,7 +82,7 @@ export function Pricing({
   const monthsLabels = new Set(plans.map((p) => yearlyOfferLabel(p)));
   const yearlyBadge = monthsLabels.size === 1 ? [...monthsLabels][0]! : "Yıllık avantaj";
   const cols = plans.length >= 4 ? "lg:grid-cols-4" : plans.length === 3 ? "lg:grid-cols-3" : plans.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-1";
-  const trialCta = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
+  const trialCta = trialCtaShort();
   const anyCredits = plans.some((p) => monthlyUnitsOf(p.efCreditsMonthly) > 0);
 
   return (

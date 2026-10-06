@@ -142,7 +142,8 @@ export function defaultSiteContent(): SiteContent {
       soonCta: { label: "{deneme_dene}", href: "/kayit" },
       note: "Sonuçlar bilgilendirme amaçlıdır, ilan fiyatlarına dayanır; resmi ekspertiz veya banka değerlemesi yerine geçmez.",
     },
-    demo: { title: "14 gün ücretsiz dene", text: "Kredi kartı gerekmez — CRM, portföy, kayıp-kaçak ve eşleştirme ofisinizin verisiyle çalışsın." },
+    // Geriye dönük anahtar: /demo sayfası kaldırıldı (kalıcı /kayit yönlendirmesi); şema uyumu için korunur, hiçbir sayfa okumaz.
+    demo: { title: "Ofisini ücretsiz kur", text: "Kredi kartı gerekmez — kurulum sihirbazı ofisini dakikalar içinde hazırlar." },
     register: {
       title: "Ücretsiz başlayın",
       text: "3 kısa adımda çalışma alanınız hazır.",

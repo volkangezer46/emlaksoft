@@ -38,10 +38,10 @@ describe("sayfa metadata'sı: ayar yokken eski metadata sabitleriyle uyum", () =
     expect(m.openGraph).toMatchObject({ title: "EmlakSoft Fiyatlar", url: "/fiyatlar", type: "website", locale: "tr_TR" });
     expect(m.robots).toBeUndefined();
   });
-  it("/demo ve /kayit OG başlıkları", () => {
-    expect(resolvePageMetadata("/demo", G, {}).openGraph).toMatchObject({ title: "EmlakSoft — 14 Gün Ücretsiz Dene", url: "/demo" });
-    expect(resolvePageMetadata("/kayit", G, {}).openGraph).toMatchObject({ title: "EmlakSoft — Ücretsiz Başla", url: "/kayit" });
-    expect(resolvePageMetadata("/kayit", G, {}).title).toBe("Ofisinizi Ücretsiz Oluşturun");
+  it("/kayit OG başlığı; /demo envanterde YOK (sayfa kaldırıldı, kalıcı yönlendirme)", () => {
+    expect(resolvePageMetadata("/kayit", G, {}).openGraph).toMatchObject({ title: "EmlakSoft — Ofisini Ücretsiz Kur", url: "/kayit" });
+    expect(resolvePageMetadata("/kayit", G, {}).title).toBe("Ofisinizi Ücretsiz Kurun");
+    expect(getSeoPage("/demo")).toBeUndefined();
   });
   it("/giris her zaman noindex+follow ve admin indekslenebilir yapamaz", () => {
     expect(resolvePageMetadata("/giris", G, {}).robots).toEqual({ index: false, follow: true });
@@ -91,8 +91,6 @@ describe("admin override'ları", () => {
   it("noindex/nofollow robots'a yansır", () => {
     expect(resolvePageMetadata("/kayit", G, { "/kayit": { robotsIndex: false } }).robots).toEqual({ index: false, follow: true });
     expect(resolvePageMetadata("/kayit", G, { "/kayit": { robotsFollow: false } }).robots).toEqual({ index: true, follow: false });
-    // /demo artık /kayit'a yönlenir: varsayılan noindex.
-    expect(resolvePageMetadata("/demo", G, {}).robots).toEqual({ index: false, follow: true });
   });
   it("ana sayfa başlığı override edilince şablon uygulanmaz (absolute)", () => {
     const m = resolvePageMetadata("/", G, { "/": { title: "Özel ana sayfa başlığı" } });
@@ -101,7 +99,7 @@ describe("admin override'ları", () => {
   });
   it("genel varsayılan OG görseli ayarlanınca sayfa kartları onu kullanır", () => {
     const g = mergeGlobal({ ogImage: "https://cdn.example.com/og.png" });
-    expect(resolvePageMetadata("/demo", g, {}).openGraph).toMatchObject({ images: [{ url: "https://cdn.example.com/og.png" }] });
+    expect(resolvePageMetadata("/kayit", g, {}).openGraph).toMatchObject({ images: [{ url: "https://cdn.example.com/og.png" }] });
   });
   it("dinamik sayfa (extra): kayıt yoksa extra değerleri ve noindex kullanılır", () => {
     const m = resolvePageMetadata("/vitrin/x", G, {}, { title: "Ofis | Vitrin", titleAbsolute: true, description: "d", noindex: true });
@@ -109,7 +107,7 @@ describe("admin override'ları", () => {
     expect(m.robots).toEqual({ index: false, follow: true });
   });
   it("effectivePageView: noindex sayfa sitemap'te sayılmaz", () => {
-    const view = effectivePageView(getSeoPage("/demo")!, { robotsIndex: false }, G);
+    const view = effectivePageView(getSeoPage("/kayit")!, { robotsIndex: false }, G);
     expect(view.indexable).toBe(false);
     expect(view.inSitemap).toBe(false);
   });

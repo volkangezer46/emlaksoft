@@ -66,7 +66,7 @@ describe("değişkenler", () => {
   it("deneme günü ve yıllık teklif çözülür; teklif yokken değişkenli madde 'missing' olur", () => {
     expect(tx("{deneme}", { trialDays: 30, plans: [] })).toBe("30 gün ücretsiz");
     expect(tx("{deneme}", { plans: [] })).toBe("Ücretsiz");
-    expect(tx("{deneme_dene}", { trialDays: 14, plans: [] })).toBe("14 gün ücretsiz dene");
+    expect(tx("{deneme_dene}", { trialDays: 14, plans: [] })).toBe("Ofisini ücretsiz kur — 14 gün, kart gerekmez");
     expect(tx("Kayıt {deneme_gun}ücretsiz", { trialDays: 14, plans: [] })).toBe("Kayıt 14 gün ücretsiz");
     expect(tx("Kayıt {deneme_gun}ücretsiz", { plans: [] })).toBe("Kayıt ücretsiz");
     expect(resolveTokens("Yıllık ödemede {yillik}", { plans: [] })).toMatchObject({ missing: true });
@@ -275,10 +275,9 @@ describe("yetkiler ve action kuralları", () => {
 });
 
 describe("public sayfa statik kalır", () => {
-  it("ana sayfa, demo ve içerik okuyucuları dinamik API çağırmaz", () => {
+  it("ana sayfa ve içerik okuyucuları dinamik API çağırmaz", () => {
     const files = [
       "src/app/page.tsx",
-      "src/app/demo/page.tsx",
       "src/lib/site-content/store.ts",
       "src/lib/site-content/ef-status.ts",
       "src/components/marketing/valuation-section.tsx",

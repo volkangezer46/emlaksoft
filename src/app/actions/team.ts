@@ -16,67 +16,14 @@ import {
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
-import { getPlanDefinition } from "@/lib/billing/plan-definitions";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
-import { getExtraSeats } from "@/lib/billing/seat-purchase";
 
 import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
+import { ensureBranchBelongsToTenant, ensureSeatAvailable, provisionTeamMember } from "@/lib/team/provision-member";
 
 export type TeamResult = { error?: string; ok?: boolean; id?: string };
 
 type Role = TeamRole;
-
-async function ensureBranchBelongsToTenant(
-  admin: ReturnType<typeof createAdminClient>,
-  branchId: string,
-  tenantId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!branchId) return { ok: true };
-  const { data: branch, error } = await admin
-    .from("branches")
-    .select("id")
-    .eq("id", branchId)
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true)
-    .maybeSingle();
-  if (error || !branch) {
-    return { ok: false, error: "Seçilen şube bu ofise ait değil veya aktif değil." };
-  }
-  return { ok: true };
-}
-
-async function ensureSeatAvailable(
-  admin: ReturnType<typeof createAdminClient>,
-  tenantId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const [{ data: tenant, error: tenantError }, { count, error: countError }] =
-    await Promise.all([
-      admin.from("tenants").select("plan, status").eq("id", tenantId).maybeSingle(),
-      admin
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("is_active", true),
-    ]);
-  if (tenantError || countError || !tenant) {
-    return { ok: false, error: "Paket ve ekip kapasitesi doğrulanamadı." };
-  }
-  if (tenant.status === "suspended" || tenant.status === "cancelled") {
-    return { ok: false, error: "Askıdaki veya iptal edilmiş ofise üye eklenemez." };
-  }
-
-  // Etkin limit = plan limiti + satın alınmış ek kullanıcı (sütun yoksa ek = 0, eski davranış).
-  const includedSeats = (await getPlanDefinition(String(tenant.plan))).limits.seats;
-  const extraSeats = await getExtraSeats(admin, tenantId);
-  const limit = includedSeats + extraSeats;
-  if ((count ?? 0) >= limit) {
-    return {
-      ok: false,
-      error: `Paketiniz en fazla ${limit} aktif kullanıcı destekliyor. Koltuk ekleyin (Abonelik > Kullanıcı ekle: /app/abonelik#koltuk), paketi yükseltin veya bir üyeyi pasife alın.`,
-    };
-  }
-  return { ok: true };
-}
 
 async function requireManager() {
   const gate = await requirePermission("team", "edit");
@@ -112,50 +59,23 @@ export async function createTeamMember(_prev: TeamResult, formData: FormData): P
   if (!isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
   const parsedPhone = phone ? parsePhoneStrict(phone) : null;
   if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
-  if (!ASSIGNABLE_ROLES.includes(role)) return { error: "Geçerli bir rol seçin." };
   if (password.length < 8) return { error: "Geçici şifre en az 8 karakter olmalı." };
 
-  const normalizedPhone = parsedPhone?.stored ?? "";
+  // Şube/koltuk doğrulaması + auth→profil atomik yazımı tek çekirdekte (kayıt sihirbazı da aynısını kullanır).
   const admin = createAdminClient();
-  const branch = await ensureBranchBelongsToTenant(admin, branchId, tenantId);
-  if (!branch.ok) return { error: branch.error };
-  const seat = await ensureSeatAvailable(admin, tenantId);
-  if (!seat.ok) return { error: seat.error };
-
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
+  const created = await provisionTeamMember(admin, {
+    tenantId,
+    fullName,
     email,
+    phone: parsedPhone?.stored ?? "",
     password,
-    email_confirm: true,
-    user_metadata: { full_name: fullName, phone: normalizedPhone },
-    app_metadata: { tenant_id: tenantId, role },
-  });
-
-  if (createError || !created.user) {
-    return {
-      error: createError?.message?.includes("already")
-        ? "Bu e-posta zaten kayıtlı."
-        : "Kullanıcı oluşturulamadı.",
-    };
-  }
-
-  const { error: profileError } = await admin.from("profiles").insert({
-    id: created.user.id,
-    tenant_id: tenantId,
-    full_name: fullName,
-    phone: normalizedPhone || null,
     role,
-    branch_id: branchId || null,
+    branchId,
   });
-
-  if (profileError) {
-    const planError = planLimitErrorMessage(profileError);
-    await admin.auth.admin.deleteUser(created.user.id);
-    if (planError) return { error: planError };
-    return { error: "Profil oluşturulamadı." };
-  }
+  if (!created.ok) return { error: created.error };
 
   revalidatePath("/app/ekip");
-  return { ok: true, id: created.user.id };
+  return { ok: true, id: created.id };
 }
 
 export async function updateTeamMember(formData: FormData): Promise<TeamResult> {
