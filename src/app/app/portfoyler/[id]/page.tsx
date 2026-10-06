@@ -72,6 +72,7 @@ import {
   TimelineSkeleton,
 } from "./sections";
 import { PropertyTimelineSection } from "./property-timeline-section";
+import { PropertyLifecyclePanel } from "@/components/listing-control/property-lifecycle-panel";
 import { PROPERTY_TIMELINE_CATEGORIES } from "./property-events";
 import { resolveCategory } from "@/lib/activity-timeline";
 import { getStageLabels } from "@/lib/definitions";
@@ -791,6 +792,11 @@ export default async function PropertyDetailPage({
               </div>
             )}
           </section>
+
+          {/* İlan kontrol: yaşam döngüsü, portal geçmişi, sağlık skoru (izole bileşen) */}
+          {(perms.portals ?? []).includes("view") ? (
+            <PropertyLifecyclePanel propertyId={id} tenantId={tenantId} canCreate={(perms.portals ?? []).includes("create")} />
+          ) : null}
 
           {/* Portale yayınla */}
           <Suspense fallback={<PublishSkeleton />}>

@@ -97,6 +97,7 @@ import {
   PiggyBank,
   RadioTower,
   Receipt,
+  ScanSearch,
   ScrollText,
   Search,
   Settings,
@@ -155,6 +156,8 @@ export const ICONS = {
   gelenKutusu: Inbox,
   /** İlan havuzu: atanmamış ilanların uzmanlığa göre dağıtımı. */
   ilanHavuzu: Waypoints,
+  /** İlan kontrol merkezi (portal ilanı doğrulama, kayıp/kaçak). */
+  ilanKontrol: ScanSearch,
 
   // --- Finans ---------------------------------------------------------------
   /** Komisyon / hakediş. */

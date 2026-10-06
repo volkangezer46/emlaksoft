@@ -231,9 +231,9 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 });
 
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
-  it("menü öğesi sayısı 37 (9 başlık; 36 + Davet et ve kazan)", () => {
+  it("menü öğesi sayısı 38 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(37);
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(38);
   });
 
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {

@@ -118,6 +118,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       { href: "/app/projeler", label: "Projeler", icon: ICONS.proje, module: "projects", tier: "more" },
       { href: "/app/acik-ev", label: "Açık Ev", icon: ICONS.acikEv, module: "open_house", tier: "more" },
+      // İlan Kontrol Merkezi: kayıp/kaçak ve portal doğrulama özeti (modül `portals`; yeni izin modülü yok).
+      { href: "/app/ilan-kontrol", label: "İlan Kontrol", icon: ICONS.ilanKontrol, module: "portals", tier: "core" },
       { href: "/app/portallar", label: "Portal Kontrol", icon: ICONS.portal, module: "portals", tier: "more" },
       { href: "/app/ag", label: "Ofisler Arası Ağ", icon: ICONS.ag, module: "network", tier: "more" },
     ],

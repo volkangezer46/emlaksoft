@@ -33,6 +33,7 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/kiralama", title: "Kiralama", minPlan: "office", pitch: "Kira sözleşmeleri, aylık tahakkuk, gecikme ve depozito takibi tek ekranda." },
   { href: "/app/acik-ev", title: "Açık Ev", minPlan: "office", pitch: "QR ile ziyaretçi kaydı alın, ziyaretçiyi otomatik talebe çevirin." },
   { href: "/app/portallar", title: "Portal Kontrol", minPlan: "office", pitch: "Portal ilanlarınızın teyit, yenileme ve kapanış durumunu takip edin." },
+  { href: "/app/ilan-kontrol", title: "İlan Kontrol Merkezi", minPlan: "office", pitch: "Hangi portföy portalda yayında, hangisi kayboldu, kimde açıklama eksik: kayıp ve kaçakları tek ekrandan yakalayın." },
   { href: "/app/kampanyalar", title: "Kampanyalar", minPlan: "office", pitch: "İYS izinlerine uygun toplu SMS ve mesaj kampanyaları gönderin." },
   { href: "/app/giderler", title: "Giderler", minPlan: "office", pitch: "Ofis giderlerini kaydedin, kâr-zarar tablosunda komisyonla karşılaştırın." },
   { href: "/app/aidat", title: "Aidat", minPlan: "office", pitch: "Portföy aidat ve vergi ödemelerini vade ve durumla takip edin." },
