@@ -1,4 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { getRequestProfile } from "@/lib/cache/request";
+import { getSetting } from "@/lib/settings/read";
 import { daysFromNowIso, toTrLocalInput } from "@/lib/clock";
 import { KapanisSihirbazi, type KapanisProps } from "./kapanis-sihirbazi";
 import { COLLECTION_TASK_PREFIX } from "./kapanis-model";
@@ -32,6 +35,12 @@ type Base = Pick<
  */
 export async function KapanisPanel(props: Base) {
   const supabase = await createClient();
+  // Ofis Tanımları Merkezi: önerilen danışman payı (ayar yoksa kod varsayılanı 50).
+  const user = await getRequestUser();
+  const profile = user ? await getRequestProfile(user.id) : null;
+  const defaultAdvisorShare = profile?.tenant_id
+    ? await getSetting<number>("office.commission.split_advisor_share", { tenantId: profile.tenant_id as string })
+    : 50;
   const [property, commission, checklist, collectionTask] = await Promise.all([
     props.propertyId
       ? supabase.from("properties").select("commission_rate").eq("id", props.propertyId).maybeSingle()
@@ -73,6 +82,7 @@ export async function KapanisPanel(props: Base) {
       key={props.requestedOutcome ?? "secim"}
       {...props}
       commissionRate={rateRaw != null ? Number(rateRaw) : null}
+      defaultAdvisorShare={defaultAdvisorShare}
       commission={
         c
           ? {

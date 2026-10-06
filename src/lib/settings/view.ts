@@ -65,6 +65,7 @@ export function buildView(
     description: def.description,
     impact: def.impact,
     category: def.category,
+    group: def.group,
     type: def.type,
     sensitivity: def.sensitivity,
     risk: def.risk,

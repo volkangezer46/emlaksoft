@@ -68,6 +68,8 @@ export type KapanisProps = {
   requestedOutcome?: ClosingOutcome | null;
   // Aşağıdakiler KapanisPanel (sunucu) tarafından doldurulur.
   commissionRate?: number | null;
+  /** Ofis Tanımları Merkezi: pay kaydedilmemiş anlaşmada önerilen danışman payı (varsayılan 50). */
+  defaultAdvisorShare?: number;
   commission?: { id: string; gross: number; vat: number; status: string; splits: { label: string; rate: number }[] } | null;
   checklist?: { done: number; total: number };
   hasCollectionTask?: boolean;
@@ -426,8 +428,8 @@ function SplitsStep(p: BodyProps) {
     p.commission && p.commission.splits.length > 0
       ? p.commission.splits.map((s) => ({ label: s.label, rate: String(s.rate) }))
       : [
-          { label: "Danışman", rate: "50" },
-          { label: "Ofis", rate: "50" },
+          { label: "Danışman", rate: String(p.defaultAdvisorShare ?? 50) },
+          { label: "Ofis", rate: String(Math.round((100 - (p.defaultAdvisorShare ?? 50)) * 100) / 100) },
         ];
   const [rows, setRows] = useState<SplitRow[]>(initial);
 

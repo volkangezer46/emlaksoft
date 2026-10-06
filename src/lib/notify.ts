@@ -1,5 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push";
+import { getSettingDef } from "@/lib/settings/registry";
+import { notifyKey } from "@/lib/settings/registry/tenant";
+import { coerceInput } from "@/lib/settings/view";
 
 /**
  * Kiracıya bildirim yaz.
@@ -43,6 +46,20 @@ export type NotifPrefKey =
   | "network"
   | "insight";
 
+/** Ofisin `office.notify.default_<tür>` kaydı "kapalı" mı? Kayıt yok/okunamıyor/tür tanımsız = false (davranış değişmez). */
+async function officeDefaultIsOff(admin: ReturnType<typeof createAdminClient>, tenantId: string, prefKey: string): Promise<boolean> {
+  const def = getSettingDef(notifyKey(prefKey));
+  if (!def) return false;
+  try {
+    const { data } = await admin.from("tenant_settings").select("value").eq("tenant_id", tenantId).eq("key", def.key).maybeSingle();
+    if (!data || data.value === null || data.value === undefined) return false;
+    const c = coerceInput(def, data.value);
+    return c.ok && c.value === false;
+  } catch {
+    return false;
+  }
+}
+
 export async function notifyTenant(input: {
   tenantId: string;
   userId?: string | null;
@@ -83,6 +100,11 @@ export async function notifyTenant(input: {
       && typeof prefs === "object"
       && prefs[input.prefKey] === false
     ) return;
+    // Ofis Tanımları Merkezi: kullanıcı bu türü hiç belirlememişse ofisin "kapalı" varsayılanı geçerlidir.
+    // Yalnız ofisin AÇIKÇA kaydettiği "kapalı" etkilidir; kayıt yoksa davranış değişmez (eksik anahtar = açık).
+    if (input.prefKey && !(prefs && typeof prefs === "object" && typeof prefs[input.prefKey] === "boolean")) {
+      if (await officeDefaultIsOff(admin, input.tenantId, input.prefKey)) return;
+    }
   }
 
   const { error: notificationError } = await admin.from("notifications").insert({

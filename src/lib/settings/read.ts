@@ -5,7 +5,7 @@ import { ALL_SETTING_DEFS, getSettingDef, isSecretDef, listSettingDefs, storageK
 import { revealSecret, isSealed } from "./secrets";
 export { getPlatformSecret, getPlatformSecretsMany } from "./secret-read";
 import type { AnySettingDef, SettingView } from "./types";
-import { buildView } from "./view";
+import { buildView, coerceInput } from "./view";
 
 /**
  * Ayar OKUMA (sunucu). Çözümleme: kullanıcı > şube > ofis > platform > varsayılan (şu an ofis ve platform katmanları).
@@ -45,8 +45,9 @@ async function readTenantRows(tenantId: string): Promise<Record<string, unknown>
 
 function resolveFrom(def: AnySettingDef, platformRaw: string | null, tenantRaw: unknown): unknown {
   if (def.scope !== "platform" && tenantRaw !== undefined && tenantRaw !== null) {
-    const parsed = def.schema.safeParse(tenantRaw);
-    if (parsed.success) return parsed.data;
+    // Ofis değeri RPC ile metin olarak (jsonb string) yazılır; coerceInput hem metni hem tipli değeri çözer, bozuk = düşer.
+    const parsed = coerceInput(def, tenantRaw);
+    if (parsed.ok) return parsed.value;
   }
   return def.codec.parse(platformRaw);
 }
@@ -98,5 +99,20 @@ export async function getPlatformSettingViews(): Promise<SettingView[]> {
   return defs.map((d) => {
     const r = raw[storageKeyOf(d)] ?? null;
     return buildView(d, r, isSecretDef(d) ? { configured: Boolean(r), plaintext: Boolean(r) && !isSealed(r) } : undefined);
+  });
+}
+
+/** Ofis Tanımları Merkezi: bir ofisin tüm ofis-kapsamlı ayar görünümleri (ofis değeri yoksa/bozuksa varsayılan). Oturumlu istemci (RLS). */
+export async function getTenantSettingViews(tenantId: string): Promise<SettingView[]> {
+  const defs = ALL_SETTING_DEFS.filter((d) => d.scope === "tenant" && !isSecretDef(d));
+  const rows = await readTenantRows(tenantId);
+  return defs.map((d) => {
+    const stored = rows[storageKeyOf(d)];
+    let raw: string | null = null;
+    if (stored !== undefined && stored !== null) {
+      const c = coerceInput(d, stored);
+      if (c.ok) raw = d.codec.format(c.value);
+    }
+    return buildView(d, raw);
   });
 }

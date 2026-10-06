@@ -51,11 +51,12 @@ import {
   type KpiItem,
   type ViewOption,
 } from "@/components/ui/list-kit";
+import { getSetting } from "@/lib/settings/read";
 import { DealMobileList, DealTable, type DealVM } from "./deal-rows";
 import {
   DEAL_STAGE_KEYS,
   OPEN_STAGES,
-  STALE_DAYS,
+  STALE_DAYS as DEFAULT_STALE_DAYS,
   dealStageTone,
   parseStageParam,
   sumDeals,
@@ -116,7 +117,9 @@ export default async function DealsPage({
 }) {
   const sp = (await searchParams) ?? {};
   if (sp.yeni === "1") redirect("/app/anlasmalar/yeni");
-  const { perms, role, userId } = await requireModulePage("commissions");
+  const { perms, role, userId, tenantId } = await requireModulePage("commissions");
+  // Ofis Tanımları Merkezi: hareketsiz anlaşma eşiği (ayar yoksa kod varsayılanı 14 gün).
+  const STALE_DAYS = tenantId ? await getSetting<number>("office.alert.deal_stale_days", { tenantId }) : DEFAULT_STALE_DAYS;
   const canCreate = (perms.commissions ?? []).includes("create");
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
+import { getSettings } from "@/lib/settings/read";
+import { notifyKey } from "@/lib/settings/registry/tenant";
 import type { NotifPrefs } from "@/components/app/notification-prefs";
 
 const DEFAULTS: NotifPrefs = {
@@ -21,14 +23,27 @@ const DEFAULTS: NotifPrefs = {
 };
 
 // Helper function (not exported, not a server action)
-function mergeNotifPrefs(raw: unknown): NotifPrefs {
-  if (!raw || typeof raw !== "object") return DEFAULTS;
-  return { ...DEFAULTS, ...(raw as Partial<NotifPrefs>) };
+function mergeNotifPrefs(raw: unknown, base: NotifPrefs): NotifPrefs {
+  if (!raw || typeof raw !== "object") return base;
+  return { ...base, ...(raw as Partial<NotifPrefs>) };
+}
+
+/** Ofis Tanımları Merkezi: ofisin bildirim varsayılanları (kayıt yoksa kod varsayılanı DEFAULTS). */
+async function officeDefaults(tenantId: string): Promise<NotifPrefs> {
+  const keys = Object.keys(DEFAULTS) as (keyof NotifPrefs)[];
+  const values = await getSettings(keys.map(notifyKey), { tenantId });
+  const out = { ...DEFAULTS };
+  for (const k of keys) {
+    const v = values[notifyKey(k)];
+    if (typeof v === "boolean") out[k] = v;
+  }
+  return out;
 }
 
 export async function getNotificationPrefs(): Promise<NotifPrefs> {
   const gate = await requireActiveTenant();
   if (!gate.ok) return DEFAULTS;
+  const base = await officeDefaults(gate.tenantId);
 
   const supabase = await createClient();
   const { data: profile } = await supabase
@@ -37,8 +52,8 @@ export async function getNotificationPrefs(): Promise<NotifPrefs> {
     .eq("id", gate.userId)
     .maybeSingle();
 
-  if (!profile?.notification_prefs) return DEFAULTS;
-  return mergeNotifPrefs(profile.notification_prefs);
+  if (!profile?.notification_prefs) return base;
+  return mergeNotifPrefs(profile.notification_prefs, base);
 }
 
 export async function saveNotificationPrefs(prefs: NotifPrefs): Promise<{ error?: string; ok?: boolean }> {

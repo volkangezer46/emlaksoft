@@ -32,7 +32,33 @@ function histValue(v: unknown): string {
   return typeof v === "string" ? (v === "" ? "(boş)" : v) : JSON.stringify(v);
 }
 
-export function SettingField({ view, canEdit }: { view: SettingView; canEdit: boolean }) {
+/** Ayar eylemleri: varsayılan platform merkezi; ofis merkezi kendi (ofis kapılı) eylemlerini verir. */
+type ActionResult = { ok?: boolean; error?: string; degraded?: boolean };
+export type SettingFieldActions = {
+  save: (key: string, value: string, reason: string) => Promise<ActionResult>;
+  reset: (key: string, reason: string) => Promise<ActionResult>;
+  revert: (key: string, version: number, reason: string) => Promise<ActionResult>;
+  history: (key: string) => Promise<{ entries: SettingHistoryEntry[]; error?: string }>;
+};
+
+const PLATFORM_ACTIONS: SettingFieldActions = {
+  save: saveSettingAction,
+  reset: resetSettingAction,
+  revert: revertSettingAction,
+  history: settingHistoryAction,
+};
+
+export function SettingField({
+  view,
+  canEdit,
+  actions = PLATFORM_ACTIONS,
+  readOnlyNote = "Bu ayar yalnız süper admin tarafından değiştirilir.",
+}: {
+  view: SettingView;
+  canEdit: boolean;
+  actions?: SettingFieldActions;
+  readOnlyNote?: string;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [tab, setTab] = useState<Tab>("value");
@@ -76,14 +102,14 @@ export function SettingField({ view, canEdit }: { view: SettingView; canEdit: bo
       return;
     }
     if (!reasonOk) return;
-    run(() => saveSettingAction(view.key, value, reason), "Kaydedildi.");
+    run(() => actions.save(view.key, value, reason), "Kaydedildi.");
   }
 
   function loadHistory() {
     setTab("history");
     if (history) return;
     start(async () => {
-      const res = await settingHistoryAction(view.key);
+      const res = await actions.history(view.key);
       setHistError(res.error ?? null);
       setHistory(res.entries);
     });
@@ -225,8 +251,8 @@ export function SettingField({ view, canEdit }: { view: SettingView; canEdit: bo
                       type="button"
                       disabled={pending || reason.trim().length < MIN_REASON}
                       onClick={() => {
-                        if (confirm === "save") run(() => saveSettingAction(view.key, value, reason), "Kaydedildi.");
-                        else run(() => resetSettingAction(view.key, reason), confirm === "clear" ? "Silindi." : "Varsayılana dönüldü.");
+                        if (confirm === "save") run(() => actions.save(view.key, value, reason), "Kaydedildi.");
+                        else run(() => actions.reset(view.key, reason), confirm === "clear" ? "Silindi." : "Varsayılana dönüldü.");
                       }}
                       className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-white disabled:opacity-60"
                     >
@@ -271,7 +297,7 @@ export function SettingField({ view, canEdit }: { view: SettingView; canEdit: bo
                   ) : null}
                 </div>
               ) : null}
-              {!canEdit ? <p className="text-xs text-text-faint">Bu ayar yalnız süper admin tarafından değiştirilir.</p> : null}
+              {!canEdit ? <p className="text-xs text-text-faint">{readOnlyNote}</p> : null}
             </>
           )}
         </div>
@@ -308,7 +334,7 @@ export function SettingField({ view, canEdit }: { view: SettingView; canEdit: bo
                   disabled={pending}
                   onClick={() => {
                     const why = `v${h.version} sürümüne dönüldü`;
-                    run(() => revertSettingAction(view.key, h.version, why), why + ".");
+                    run(() => actions.revert(view.key, h.version, why), why + ".");
                   }}
                   className="focus-ring press mt-1 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
                 >
