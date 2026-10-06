@@ -118,8 +118,10 @@ describe("viz kiti: eski dışa aktarımlar ve cam bütçesi", () => {
     expect(read("src/components/ui/premium/charts.tsx")).toContain("RadialGauge");
     expect(read("src/components/ui/console/area-chart.tsx")).toContain("viz/area-chart");
     expect(read("src/components/ui/premium/charts.tsx")).toContain("viz/area-chart");
-    expect(read("src/app/app/_ui/lazy-chart.tsx")).toContain("SkeletonCard");
-    expect(read("src/app/app/_ui/lazy-chart.tsx")).not.toContain("animate-pulse");
+    // Tembel grafik kapısı tek yerde (components/ui/lazy-charts); eski yol yalnız yeniden dışa aktarır.
+    expect(read("src/app/app/_ui/lazy-chart.tsx")).toContain("@/components/ui/lazy-charts");
+    expect(read("src/components/ui/lazy-charts.tsx")).toContain("SkeletonCard");
+    expect(read("src/components/ui/lazy-charts.tsx")).not.toContain("animate-pulse");
   });
 
   it("Recharts grafikleri reduced-motion'da animasyonu kapatır", () => {

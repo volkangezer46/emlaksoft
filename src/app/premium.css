@@ -51,9 +51,10 @@ html[data-theme="dark"] {
   color: var(--text);
   text-decoration: none;
 }
-/* Kartlar hareket etmez: hover'da yalnız gölge + kenar (spec: "kart hover'da hareket yok") */
+/* Hover: gölge + kenar her zaman; tıklanabilir kart yalnız hareket tercihi açıksa 2 px
+   yükselir (aşağıda "Tasarım sistemi v4" — mikro etkileşim). Taban :hover kuralı hareketsizdir. */
 @media (prefers-reduced-motion: no-preference) {
-  .pm-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out); }
+  .pm-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out); }
 }
 .pm-card:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--t, var(--accent)) 38%, var(--hairline)); }
 .pm-card-head { display: flex; align-items: center; gap: 0.7rem; }
@@ -375,7 +376,7 @@ html[data-theme="dark"] {
   .pm-glass-value { font-size: 1.35rem; }
 }
 /* ---- KpiCard inline (referans: ikon kapsülü + değer + trend + mini çubuk) ------- */
-.pm-card-inline { flex-direction: row; align-items: center; gap: 0.9rem; min-height: 6.5rem; }
+.pm-card-inline { flex-direction: row; align-items: flex-start; gap: 0.8rem; min-height: 6.25rem; }
 .pm-ico-lg { width: 3rem; height: 3rem; border-radius: 0.9rem; }
 .pm-ico-lg svg { width: 1.4rem; height: 1.4rem; }
 .pm-card-bars { align-self: flex-end; margin-bottom: 0.15rem; }
@@ -620,3 +621,168 @@ html[data-density="compact"] {
   --pm-r36-h: 1.875rem;
   --pm-card-pad: 0.75rem 0.9rem 0.7rem;
 }
+
+/* ==== Tasarım sistemi v4 (ds-*) — docs/DESIGN_SYSTEM.md "Kanonik bileşenler" ===============
+   Bileşenler: KpiCard (pm-card + .pm-card-tint), ChartCard, AttentionList, InsightCard,
+   DashboardHero, SegmentedControl, StatusTile. Ton/ikon karosu .pm-t-* + .pm-ico'dan gelir
+   (yeni ton sınıfı yazılmaz). Renkler yalnız token; açık + koyu + vurgu temalarında çalışır. */
+
+/* Mikro etkileşim: tıklanabilir kart 2 px yükselir + gölge bir kademe (140 ms); yalnız
+   hareket tercihi açık ve gerçek hover olan cihazda. Dokunmatikte ve reduce'ta yükselme yok. */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  a.pm-card:hover, a.ds-card:hover, .ds-lift:hover { translate: 0 -2px; }
+}
+
+/* Tonlu zemin (KpiCard `tinted`): tonun %8'i üstten yüzeye doğru söner; kenar tonlu. */
+.pm-card-tint {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--t) 8%, var(--surface-raised)) 0%, var(--surface-raised) 72%);
+  border-color: color-mix(in srgb, var(--t) 20%, var(--hairline));
+}
+
+/* Panel kartı (ChartCard, AttentionList, durum kartı) */
+.ds-card {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--pm-r);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--card-shadow);
+  color: var(--text);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ds-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out); }
+}
+.ds-card:hover { box-shadow: var(--card-shadow-hover); }
+.ds-pad { padding: var(--space-4); }
+@media (min-width: 640px) { .ds-pad { padding: var(--space-5); } }
+.ds-head { display: flex; align-items: flex-start; gap: var(--space-3); }
+.ds-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 1rem; line-height: 1.35; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); text-wrap: balance; }
+.ds-sub { font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
+.ds-eyebrow { font-size: var(--fs-eyebrow); line-height: 1rem; font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--text-muted); }
+.ds-link {
+  display: inline-flex; align-items: center; gap: 0.25rem; flex: none;
+  min-height: 2rem; padding: 0 0.35rem; border-radius: var(--radius-control);
+  font-size: 0.8125rem; font-weight: 600; color: var(--accent-text); text-decoration: none;
+}
+.ds-link:hover { background: var(--surface-hover); }
+.ds-link svg { width: 0.9rem; height: 0.9rem; }
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .ds-link svg { transition: translate var(--motion-fast) var(--ease-out); }
+  .ds-link:hover svg { translate: 1px -1px; }
+}
+
+/* Ton hapı (önem, sinyal, risk): metin her zaman var; renk tek başına anlam taşımaz. */
+.ds-pill {
+  display: inline-flex; align-items: center; gap: 0.3rem; flex: none;
+  min-height: 1.5rem; padding: 0 0.6rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: var(--t-soft); color: var(--t-text);
+}
+
+/* Dikkat listesi satırı */
+.ds-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 3.25rem; padding: 0.45rem 0.6rem; border-radius: var(--radius-control);
+  color: var(--text); text-decoration: none;
+}
+.ds-row:hover { background: var(--surface-hover); }
+.ds-row:active { background: var(--surface-pressed); }
+.ds-row-ico {
+  display: grid; place-items: center; flex: none; width: 2rem; height: 2rem; border-radius: 999px;
+  background: var(--t); color: var(--surface-raised);
+}
+.ds-row-ico svg { width: 1rem; height: 1rem; }
+.ds-row-chev { flex: none; color: var(--text-faint); }
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .ds-row-chev { transition: translate var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
+  .ds-row:hover .ds-row-chev { translate: 2px 0; color: var(--text); }
+}
+.ds-sep > li + li { border-top: 1px solid var(--hairline); }
+
+/* İçgörü kartı (öneri): hafif vurgu tonlu, kart içinde ikincil yüzey */
+.ds-insight {
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--hairline));
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface-raised));
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Durum karosu + ilerleme çubuğu */
+.ds-tile {
+  display: flex; flex-direction: column; gap: 0.4rem; min-width: 0;
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-card);
+  border: 1px solid var(--hairline); background: var(--surface-raised);
+  color: var(--text); text-decoration: none;
+}
+.ds-tile:hover { border-color: color-mix(in srgb, var(--t, var(--accent)) 38%, var(--hairline)); }
+.ds-bar { display: block; height: 0.375rem; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
+.ds-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--t); transform-origin: left center; }
+
+/* Gösterge sayısı (KPI / para) */
+.ds-num { font-family: var(--font-manrope), system-ui, sans-serif; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--heading); }
+.ds-money { font-size: var(--fs-money-hero); line-height: 1.05; }
+
+/* ---- DashboardHero: açık, havadar; sağda soluk mavi izometrik şehir; çok hafif hareketli
+   degrade YALNIZ burada (transform, 18 sn, ekran dışında durur, reduce'ta yok). ---- */
+.ds-hero {
+  position: relative; isolation: isolate; overflow: hidden;
+  border-radius: var(--radius-hero); border: 1px solid var(--hairline);
+  padding: clamp(1rem, 0.6rem + 1.6vw, 1.75rem);
+  background: linear-gradient(115deg, var(--surface-raised) 0%, color-mix(in srgb, var(--brand-50) 70%, var(--surface-raised)) 100%);
+  box-shadow: var(--card-shadow);
+}
+html[data-theme="dark"] .ds-hero {
+  background: linear-gradient(115deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 12%, var(--surface)) 100%);
+}
+.ds-hero-ambient {
+  position: absolute; inset: -30% -12%; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(38% 46% at 68% 28%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+    radial-gradient(28% 36% at 92% 82%, color-mix(in srgb, var(--gold-300) 16%, transparent), transparent 70%);
+}
+@keyframes ds-ambient { from { transform: translate3d(-3%, -2%, 0); } to { transform: translate3d(3%, 2%, 0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .ds-hero-ambient { animation: ds-ambient 18s ease-in-out infinite alternate; animation-play-state: paused; }
+  .ds-hero[data-play="1"] .ds-hero-ambient { animation-play-state: running; }
+}
+.ds-hero-art {
+  position: absolute; right: 0; bottom: 0; z-index: -1; pointer-events: none;
+  width: min(48%, 36rem); height: 100%; color: var(--hero-art);
+  -webkit-mask-image: linear-gradient(to left, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 55%, transparent 100%);
+}
+@media (max-width: 639px) { .ds-hero-art { width: 70%; opacity: 0.45; } }
+.ds-hero-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.ds-hero-body { min-width: 0; max-width: 46rem; }
+.ds-hero-title { margin-top: 0.35rem; font-family: var(--font-manrope), system-ui, sans-serif; font-size: clamp(1.5rem, 1.15rem + 1.3vw, 2.125rem); line-height: 1.15; font-weight: 800; letter-spacing: -0.025em; color: var(--heading); text-wrap: balance; }
+.ds-hero-summary { margin-top: 0.4rem; max-width: 40rem; min-height: 1.45em; font-size: 0.9375rem; line-height: 1.5; color: var(--text-muted); }
+
+/* ---- SegmentedControl: eşit genişlikli seçenekler, kayan dolgulu hap (transform). ---- */
+.ds-seg {
+  position: relative; isolation: isolate;
+  display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 3px; border-radius: 999px;
+  background: var(--surface-raised); border: 1px solid var(--hairline); box-shadow: var(--elev-1);
+}
+.ds-seg-thumb {
+  position: absolute; z-index: -1; top: 3px; bottom: 3px; left: 3px;
+  width: calc((100% - 6px) / var(--seg-n, 3)); border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+  transform: translateX(calc(var(--seg-i, 0) * 100%));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ds-seg-thumb { transition: transform var(--motion-base) var(--ease-spring); }
+}
+.ds-seg-opt {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 2.25rem; padding: 0 0.95rem; border-radius: 999px;
+  font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); text-decoration: none;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+.ds-seg-opt:hover { color: var(--text); }
+/* Hapın altındaki seçenek (tıklama anında da) beyaz yazı: --accent dolgu üstünde ≥4.5:1 (test). */
+.ds-seg-opt[data-on="1"] { color: var(--accent-fg); }
+.ds-seg-opt:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+@media (pointer: coarse) { .ds-seg-opt { min-height: 44px; } }

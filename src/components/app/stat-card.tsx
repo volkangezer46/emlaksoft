@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
 import type { PremiumTone, Trend } from "@/components/ui/premium/premium-math";
-import { Skeleton } from "@/components/ui/skeleton";
+import { KpiCardSkeleton } from "@/components/ui/kpi-card";
 
 /**
  * StatCard — dashboard KPI kartı (eski imza korunur). Görünüm artık TEK uygulama olan
@@ -82,14 +82,9 @@ export function StatCard({
 }) {
   if (loading) {
     return (
-      <div role="status" aria-busy="true" className="pm-card pm-t-neutral h-full">
+      <div role="status" aria-busy="true" className="h-full">
         <span className="sr-only">{label} yükleniyor</span>
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-10 w-10 rounded-[var(--radius-card)]" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-        <Skeleton className="mt-2 h-[1.875rem] w-20" />
-        {sparkline ? <Skeleton className="mt-3 h-10 w-full" /> : null}
+        <KpiCardSkeleton layout="stack" />
       </div>
     );
   }

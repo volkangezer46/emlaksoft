@@ -334,3 +334,34 @@ describe("token tek kaynak", () => {
     }
   });
 });
+
+// ---- Tasarım sistemi v4: mikro etkileşim ve hero hareketi bütçesi --------------------
+describe("tasarım sistemi v4 hareket bütçesi", () => {
+  const css = read("src/app/premium.css").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("kart yükselmesi en çok 2px ve yalnız no-preference + hover:hover içinde", () => {
+    const lifts = [...css.matchAll(/translate:\s*0\s+-(\d+)px/g)];
+    expect(lifts.length).toBeGreaterThan(0);
+    for (const m of lifts) {
+      expect(Number(m[1])).toBeLessThanOrEqual(2);
+      const before = css.slice(0, m.index);
+      const lastMedia = before.lastIndexOf("@media");
+      expect(before.slice(lastMedia, lastMedia + 80)).toContain("prefers-reduced-motion: no-preference) and (hover: hover)");
+    }
+  });
+
+  it("hero degradesi: sonsuz döngü yalnız no-preference içinde, varsayılan duraklatılmış", () => {
+    const at = css.indexOf(".ds-hero-ambient { animation:");
+    expect(at).toBeGreaterThan(0);
+    const media = css.lastIndexOf("@media", at);
+    expect(css.slice(media, media + 60)).toContain("prefers-reduced-motion: no-preference");
+    expect(css.slice(at, css.indexOf("}", at))).toContain("animation-play-state: paused");
+    expect(css).toMatch(/\.ds-hero\[data-play="1"\] \.ds-hero-ambient \{ animation-play-state: running; \}/);
+    expect(css).not.toMatch(/\.ds-hero[^{]*\{[^}]*(backdrop-filter|filter:\s*blur)/);
+  });
+
+  it("segment seçici: hap altındaki seçenek --accent-fg (dolgu üstünde AA)", () => {
+    expect(css).toMatch(/\.ds-seg-opt\[data-on="1"\] \{ color: var\(--accent-fg\); \}/);
+    expect(css).toMatch(/\.ds-seg-thumb \{[^}]*background: var\(--accent\)/);
+  });
+});

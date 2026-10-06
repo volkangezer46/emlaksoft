@@ -54,6 +54,8 @@
   --nav-badge-danger: #c8323a;
   --nav-badge-warn: #a35a00;
   --nav-badge-ok: #0f6b4a;
+  /* Hero illüstrasyonu (soluk mavi izometrik şehir; dekoratif, metin taşımaz) */
+  --hero-art: #8fb0ea;
 
   /* ---- Boşluk ölçeği (4 px tabanlı). Bileşen iç boşluğu ve ızgara aralığı buradan. */
   --space-1: 0.25rem;

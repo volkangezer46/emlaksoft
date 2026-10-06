@@ -49,6 +49,8 @@ export type KpiTileProps = {
   className?: string;
   /** "inline": ikon kapsülü solda, değer + trend ortada, mini çubuklar sağda (yoğun ana ekran düzeni). */
   layout?: "stack" | "inline";
+  /** Tonlu zemin: tonun hafif degradesi + tonlu kenar (öne çıkan / dikkat kartı). */
+  tinted?: boolean;
 };
 
 export function KpiTile({
@@ -70,12 +72,14 @@ export function KpiTile({
   title,
   className,
   layout = "stack",
+  tinted = false,
 }: KpiTileProps) {
   const drawChart = hasSeries(series);
   const ico = iconNode ?? (Icon ? <Icon /> : null);
   const cls = cn(
     `pm-card pm-t-${tone} h-full`,
     layout === "inline" && "pm-card-inline",
+    tinted && "pm-card-tint",
     href && "focus-ring group",
     dim && "opacity-70 hover:opacity-100",
     className,
@@ -91,7 +95,7 @@ export function KpiTile({
     layout === "inline" ? (
       <>
         {ico ? (
-          <span className="pm-ico pm-ico-lg" aria-hidden="true">
+          <span className="pm-ico" aria-hidden="true">
             {ico}
           </span>
         ) : null}
@@ -99,13 +103,13 @@ export function KpiTile({
           <span className="pm-card-title line-clamp-2" title={label}>
             {label}
           </span>
-          <span className={cn("pm-value mt-0.5 block", valueCls)} style={valueStyle}>
-            {rawValue}
-          </span>
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className={cn("pm-value", valueCls)} style={valueStyle}>
+              {rawValue}
+            </span>
             {trend ? <TrendPill trend={trend} /> : null}
-            {previousText || hint ? <span className="pm-sub">{previousText ?? hint}</span> : null}
           </span>
+          {previousText || hint ? <span className="pm-sub mt-0.5 block">{previousText ?? hint}</span> : null}
         </span>
         {drawChart ? (
           <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={64} height={44} className="pm-card-bars" />

@@ -44,6 +44,7 @@ html[data-theme="dark"] {
   --sb-bg-top: #0c2350;
   --sb-bg-mid: var(--navy-900);
   --sb-bg-bottom: var(--navy-950);
+  --hero-art: #3c5f9f;
 
   /* Yüzeyler */
   --canvas: #0a1020;
