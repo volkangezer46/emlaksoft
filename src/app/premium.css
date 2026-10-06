@@ -646,6 +646,11 @@ html[data-theme="dark"] .ds-hero {
 .ds-seg-opt[data-on="1"] { color: var(--accent-fg); }
 .ds-seg-opt:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 @media (pointer: coarse) { .ds-seg-opt { min-height: 44px; } }
+/* ScopeSwitch (ui/scope-switch): aynı .ds-seg ailesi, ikonlu iki parça; mobilde tam genişlik iki eşit parça. */
+.scope-opt { gap: 0.4rem; padding: 0 1rem; }
+.scope-opt svg { opacity: 0.85; }
+.scope-opt[data-on="1"] svg { opacity: 1; }
+.scope-hint { min-height: 1.25em; padding-inline: 0.5rem; }
 
 /* ---- Mobil (360 px) ana ekran ve KPI: dar ekranda 2 sütun KPI sığar, dokunma hedefi 44 px ---------------------- */
 @media (max-width: 767.98px) { .ds-seg-opt { min-height: 44px; } }
