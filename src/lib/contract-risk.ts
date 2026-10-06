@@ -6,7 +6,7 @@
  *
  * NE YAPMAZ — ÖNEMLİ: Hukuki görüş vermez. Bir maddenin varlığını arar, o
  * maddenin İÇERİĞİNİN doğru ya da yeterli olduğunu söyleyemez. Sonuçlar
- * "gönder tuşuna basmadan önce bak" listesidir, avukat onayı değildir.
+ * "gönder tuşuna basmadan önce bak" listesidir.
  * Arayüzde bu açıkça yazılı.
  *
  * NEDEN GEREKLİ: Sözleşme şablonları `___________` yer tutucularıyla geliyor

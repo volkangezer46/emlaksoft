@@ -6,7 +6,7 @@ import { loadTenantLicense, tenantLicenseStatus } from "@/lib/license-server";
  * Uygulama içi yetki belgesi uyarı kartı (sunucu bileşeni; kendi verisini yükler).
  * Yalnız dikkat gerektiren durumlarda görünür: eksik no, süresi dolmuş veya 60/30/7 gün içinde bitiyor.
  * Yayını ENGELLEMEZ; yeni cron/bildirim YOK (60/30/7 hatırlatması bu kart + Ayarlar rozetiyle).
- * Dayanak: Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i (AVUKAT TEYİDİ GEREKİR).
+ * Dayanak: Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i.
  */
 export async function LicenseStatusCard({ className }: { className?: string }) {
   let status;

@@ -23,7 +23,7 @@ Kısaltmalar: OS = ofis sahibi, DM = danışman/müşteri, ST = strateji, MH = m
 | U6 | Yetki bitişi verisi var ama gömülü: Karar Bekleyenler'e 5. kutu (`authorization_end`) | OS-R1 B4; MH-R2 B1/B4; ST-R2 OB4; DM-R2 OS-B4 | Sıfır çıkmaz metrik kuralı: portföy listesinde süzgeç yoksa önce süzgeç |
 | U7 | Kayıp-kaçak: tek "tahmin" etiketli özet kartı Ofis/denemeye açılsın, detay + otomatik yakalama Profesyonel'de kalsın; danışman bazlı suçlayıcı gösterim yok | ST-R1 B1; OS-R2 ST-B1; MH-R2 ST-B1; DM-R2 ST-B1 | `page-gates.ts:47` hâlâ yalnız Profesyonel (doğrulandı) |
 | U8 | Hızlı ilan (`/app/hizli` 4. sekme): değerli, ama TASLAK statü + onay kancası/yayın kapısı/havuz yolu atlanmayacak, komisyon boşsa ofis varsayılanı | DM-R1 B1; OS-R2 A-B1; ST-R2 DM1; MH-R2 B1 | Foto adımı K4 (`is_document`) dalına bağlı |
-| U9 | İlan detayında kısa talep formu + amaca uygun KVKK onay metni (mevcut: "tanıtım amacıyla", `lead-form.tsx:141`); metin avukat onaylı | DM-R1 B6; OS-R2 A-B6; ST-R2 DM6; MH-R2 B6 | Honeypot korunur; consent sürümü alanı varsa bump (MH-R2) |
+| U9 | İlan detayında kısa talep formu + amaca uygun KVKK onay metni (mevcut: "tanıtım amacıyla", `lead-form.tsx:141`); metin ofis/şirket sahibince belirlenir | DM-R1 B6; OS-R2 A-B6; ST-R2 DM6; MH-R2 B6 | Honeypot korunur; consent sürümü alanı varsa bump (MH-R2) |
 | U10 | Onay kancası dili: hata gibi değil durum ("Yöneticiye iletildi") + onay bildiriminde "Uygula" derin bağlantısı; tek kullanımlık tüketim bozulmaz; varsayılan KAPALI kalır | DM-R1 B4; OS-R2 A-B4; ST-R2 DM4; MH-R2 B4 | `approval-gate.ts:250` metni değişmemiş |
 | U11 | Kalıcı çevrimdışı kuyruk YOK; yalnız bellek içi "gönderilemedi, verin korunuyor, tekrar dene" kabul | DM-R1 B3 (kendisi riskli dedi); OS-R2 B3; ST-R2 DM3; MH-R2 B3 | KVKK + paylaşımlı telefon |
 | U12 | Ekip Merkezi 7 sekme birleştirmesi şimdilik YOK (kullanım verisi yok, URL/yetki kırılır) | OS-R1 B8 (kendisi "ölçmeden birleştirme" dedi); OS-R2; ST-R2 OB8; MH-R2 B8; DM-R2 OS-B8 | 30. gün karar noktası |
@@ -147,11 +147,11 @@ Canlıya alma iki kapıdır: (P) `git push` → Vercel deploy (kod), (M) sahibin
 - Bağımlılık: yok (P3 ile paralel).
 - Kabul: kalıp testi sıfır istisnasız veya gerekçeli listeyle yeşil; `properties` UPDATE sonucu `docs/design`'a tek paragraf notla kaydedilmiş.
 
-**P6 — KVKK talep formu metni + doğrulama ön işleri** · S (kod) + hukuki onay
+**P6 — KVKK talep formu metni + doğrulama ön işleri** · S (kod)
 - Kapsam: `lead-form.tsx` onay metni amaca uygun (talebe dönüş + iletişim; tanıtım ayrı kutu); kısa mod ilk 30 güne (K-§5). Aynı pakette doğrulamalar: yeni talep → danışman bildirim zinciri var mı (K6), `lead-intake` iletişim kanalsız talep kabul ediyor mu (DM-R1 B6 ŞÜPHE).
 - Dosya sahipliği: `src/app/lead/[token]/lead-form.tsx`, consent metin sabiti, doğrulama notu.
-- Bağımlılık: AVUKAT/SAHİP metin onayı (§7-3). Kod metni onay gelmeden değiştirilmez; mevcut metin zaten canlıda "tanıtım" diyor, push durumu kötüleştirmez (MH-R2), bu yüzden P6 push engeli DEĞİL ama "bu hafta" önerilir.
-- Kabul: onaylı metin sürüm bump'ıyla yayında; honeypot çalışıyor; doğrulama sonucu yazılı (var/yok).
+- Bağımlılık: SAHİP metin kararı (§7-3); avukat onayı aşaması kaldırıldı (2026-10-06). Mevcut metin zaten canlıda "tanıtım" diyor, push durumu kötüleştirmez (MH-R2), bu yüzden P6 push engeli DEĞİL ama "bu hafta" önerilir.
+- Kabul: metin sürüm bump'ıyla yayında; honeypot çalışıyor; doğrulama sonucu yazılı (var/yok).
 
 **P7 — Küçük terim/metin temizliği** · S
 - Kapsam: "Lead skoru" → "Öncelik puanı" + tıklayınca nedenler (`customer-rows.tsx:84`, `musteriler/page.tsx:777`, `terminology.ts` testi); onay mesajı durum dili + "Uygula" bağlantısı (`approval-gate.ts:250`, `actions/approvals.ts`); telefon "Kişi" sekmesi + müşteri listesi "Yeni" önce hızlı (`customer-tabs.ts`, `form-tabs-contract.test.ts`).
@@ -196,7 +196,7 @@ Not: P6 ve P7 push'u bloke etmez; P1, P3 bloke eder (kod bütünlüğü); P2, P4
 2. Fiyat bütünlüğü (P1+P2) bitmeden canlıda yeni fiyat, Founders, Business, plan değişimi, duraklatma/oransal açmak; ömür boyu Founders veya ücretsiz paket. (ST-Y5/9, MH-Y6, MH-R2 Y4)
 3. Onay kurallarını varsayılan AÇIK göndermek, her işleme zorunlu gerekçe/imza koymak, onay yetkisini/muafiyeti team_lead'e açmak, onaylanan işlemi "otomatik uygula" yapmak (tek kullanımlık tüketim ve denetim izi bozulur). (DM-Y2/3, MH-R2 D5)
 4. Kişisel veriyi cihazda kalıcı tutmak (IndexedDB kuyruğu), `/app` sayfalarını service worker'da önbelleğe almak: KVKK + paylaşımlı telefon. (DM-Y5, MH-R2 B3)
-5. Sahte/gerekçesiz skor, kaynağı olmayan müşteri metriği ("X kişi baktı", sahte kıtlık), doğrulanmamış hukuki sabit (kira tavanı, harç, MASAK), kanıtsız "ilk/tek" iddiası, avukat onaysız "KVKK uyumlu"/"veri ofiste kalır" iddiası. (ST-Y3/7/8, DM-R2 ST-B7)
+5. Sahte/gerekçesiz skor, kaynağı olmayan müşteri metriği ("X kişi baktı", sahte kıtlık), doğrulanmamış hukuki sabit (kira tavanı, harç, MASAK), kanıtsız "ilk/tek" iddiası, kanıtsız "KVKK uyumlu"/"veri ofiste kalır" iddiası. (ST-Y3/7/8, DM-R2 ST-B7)
 6. Danışman bazlı gözetim/skor/"AI danışman puanı"/gizli aktivite izleme, danışmana "kaçıran" diyen suçlayıcı ekran; ofis-agregat dışı çalışma izleme metriği. (OS-Y3/8, DM-R2 E3, ST-R2)
 7. Canlıya çıkmamış ~70 commit / ~40 migration varken yeni özellik katmanı eklemek; migration'ları tek dev pakette birleştirmek; güvenlik düzeltici migration'ı ana dosyadan ayrı uygulamak; uygulanmış migration'ı değiştirmek; `proposed` dosyasını numara değiştirmeden `migrations`'a kopyalamak. (OS-Y7, MH-Y1/8, ST-F2/3)
 8. Fiyat düzeltmesinde `pg_get_functiondef + replace` yamasını kullanmak (araya girmiş fonksiyon değişikliklerini ezer); açık gövdeli `CREATE OR REPLACE` kullanılır. (MH-R2 D2)
@@ -216,7 +216,7 @@ Not: P6 ve P7 push'u bloke etmez; P1, P3 bloke eder (kod bütünlüğü); P2, P4
 |---|---|---|---|
 | S1 | Fiyat/DB tutarı: onaylı katalog (749/2.490/4.990/8.990/özel) zaten HAFIZA §7'de onaylı. Karar: (a) DB fonksiyonlarının tutarı çağırandan alması (b) yıllık "10 öde 12" (%16,7) ile SQL `*0.8` hizalaması (c) mevcut abonelerin tutarı | Katalog tutarına otomatik geç / mevcut aboneliğin tutarını koru | (a) çağırandan/abonelikten al; (b) TS'e uy ("10 öde 12", "%20" ifadesi kaldır); (c) mevcut abonelik tutarı korunur (sürpriz fatura yok). Founders yalnız P2 sonrası |
 | S2 | `branch_manager` onay muafiyeti | owner/gm (HAFIZA) / owner/gm/branch_manager (kod) | owner/gm ile hizala; şube müdürü onaylayabilir, kendi işleminde muaf değil (K2) |
-| S3 | KVKK/hukuki metin onayı: lead formu amaç metni; aydınlatma (çalışan izleme/Ofis Kontrol); attribution çerezi; "veri ofiste kalır" satış dili | Avukat metni / mevcut metin | Avukata gönder; onaysız yayınlama; lead formu metni bu hafta |
+| S3 | KVKK/hukuki metin onayı: lead formu amaç metni; aydınlatma (çalışan izleme/Ofis Kontrol); attribution çerezi; "veri ofiste kalır" satış dili | Mevcut metin / sahip metni | Sahip kararıyla yayınla (avukat onayı aşaması kaldırıldı); lead formu metni bu hafta |
 | S4 | Kayıp-kaçak motorunun Ofis paketine açılması | (a) yalnız tahmin özet kartı Ofis + denemede, detay Profesyonel'de (b) tamamı Ofis'e (c) hiç | (a): ürün değerini gösterir, Profesyonel'e geçiş gerekçesini bozmaz; "tahmin" etiketi, danışman görmez |
 | S5 | Deneme süresi | 30 gün sabit (mevcut karar) / 14 + aktivasyonla +7 | 30 gün kalsın; M1 4-6 hafta ölçülsün, sonra yeniden bak (K1) |
 | S6 | Migration penceresi zamanı + yedek/PITR + `git push` | Hemen / P1-P5 sonrası | P1 (kod) ve P3 sonrası push; P2/P4 sonrası migration; kazanç gizliliği RLS ayrı gün. Push'u sahip kendisi yapar (HAFIZA §1) |

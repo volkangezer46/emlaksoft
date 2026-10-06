@@ -8,8 +8,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * AVUKAT ONAYI GEREKİR: Davet programı koşulları yayın öncesi hukuki incelemeye tabidir
- * (ticari ileti, kampanya mevzuatı, KDV/muhasebe muamelesi). Tutarlar bilerek yazılmaz;
+ * Davet programı koşulları (ticari ileti, kampanya mevzuatı, KDV/muhasebe muamelesi) ofis/şirket sahibinin
+ * sorumluluğundadır. Tutarlar bilerek yazılmaz;
  * güncel kurallar ofis admin panelindeki kural ve ayarlardan gelir (docs/design/REFERANS_PROGRAMI.md).
  */
 export default function DavetKosullariPage() {

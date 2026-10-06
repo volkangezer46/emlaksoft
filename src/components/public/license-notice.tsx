@@ -2,7 +2,7 @@ import { formatPhoneDisplay } from "@/lib/phone";
 
 /**
  * Public ilan/paylaşım/PDF yüzeylerinde işletme unvanı + yetki belgesi no + iletişim bilgisi (okunaklı, ayrı blok).
- * Dayanak: Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i (AVUKAT TEYİDİ GEREKİR; docs/MEVZUAT_SABITLERI.md).
+ * Dayanak: Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i (docs/MEVZUAT_SABITLERI.md).
  * Yetki belgesi no yoksa public yüzeyde "eksik" yazılmaz (ofise uygulama içinde uyarı gösterilir); unvan/iletişim yine görünür.
  * Sunucu bileşeni (hook yok) — yazdırma çıktısında da görünür.
  */

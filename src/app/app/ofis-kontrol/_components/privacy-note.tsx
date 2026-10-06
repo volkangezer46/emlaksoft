@@ -23,7 +23,7 @@ export function PrivacyNote({ audience }: { audience: "office" | "advisor" }) {
         )}
         <p className="rounded-[var(--radius-control)] border border-dashed border-line bg-surface px-3 py-2 text-xs">
           <span className="font-semibold text-ink-950">İzleme politikası aydınlatma metni (yer tutucu):</span> Bu alanda ofisinizin
-          KVKK aydınlatma metni yayımlanacaktır. Metin ofis sahibi ve hukuk danışmanı tarafından hazırlanır; bu sayfa hukuki bir
+          KVKK aydınlatma metni yayımlanacaktır. Metin ofis sahibi tarafından hazırlanır; bu sayfa hukuki bir
           taahhüt içermez.
         </p>
       </div>
