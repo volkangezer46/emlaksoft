@@ -3,9 +3,9 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { Brand } from "@/components/brand/brand";
-import { MobileSheetBody, SiteHeaderClient, type ClientGroup } from "@/components/site-menu/mega-menu";
+import { toClientGroups } from "@/components/site-menu/client-groups";
+import { MobileSheetBody, SiteHeaderClient } from "@/components/site-menu/mega-menu";
 import { now } from "@/lib/clock";
-import { renderMenuIcon } from "@/lib/site-menu/icon-node";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import type { SiteMenuConfig } from "@/lib/site-menu/schema";
 import { btn } from "./editor-ui";
@@ -19,15 +19,7 @@ import "@/app/marketing-sections.css";
 export function MenuPreview({ cfg }: { cfg: SiteMenuConfig }) {
   const [mode, setMode] = useState<"desktop" | "mobile">("desktop");
   const menu = useMemo(() => toPublicMenu(cfg, now()), [cfg]);
-  const groups: ClientGroup[] = useMemo(
-    () =>
-      menu.groups.map((g) => ({
-        ...g,
-        columns: g.columns.map((c) => ({ title: c.title, items: c.items.map(({ icon, ...it }) => ({ ...it, iconNode: renderMenuIcon(icon) })) })),
-        featured: g.featured ? { ...g.featured, iconNode: renderMenuIcon(g.featured.icon, 22) } : null,
-      })),
-    [menu],
-  );
+  const groups = useMemo(() => toClientGroups(menu), [menu]);
   const ann = menu.announcement;
 
   const block = (e: MouseEvent) => {

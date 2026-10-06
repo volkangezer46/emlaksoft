@@ -65,7 +65,7 @@ const itemSchema = z.strictObject({
 });
 
 /** Öne çıkan kartta medya yokken gösterilen animasyonlu mini ürün önizlemesi (isteğe bağlı; eski yapılandırmalarda yok). */
-export const FEATURED_PREVIEWS = ["leak", "valuation", "signature", "plans", "assistant"] as const;
+export const FEATURED_PREVIEWS = ["leak", "valuation", "signature", "plans", "assistant", "listing", "security", "automation", "dashboard"] as const;
 export type FeaturedPreviewKind = (typeof FEATURED_PREVIEWS)[number];
 
 const featuredSchema = z.strictObject({
