@@ -1,105 +1,86 @@
 import Link from "next/link";
-import { Bell, Radar } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Radar } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
 import { createClient } from "@/lib/supabase/server";
 import { getControlSummary } from "@/lib/listing-control/server/readers";
 import type { Db } from "@/lib/listing-control/server/db";
 import { kpiHref, sumSummaryRows } from "@/components/listing-control/helpers";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Widget } from "../dashboard-widgets";
-import { loadClosures, loadLiveListings, type HomeCtx } from "./data";
-import { overdueListingsOf } from "./helpers";
-import { PanelLink } from "./ortak";
+import { loadClosures, type HomeCtx } from "./data";
 
 /**
- * `showTeyit=false`: teyit sağlığı metrik şeridinde zaten gösteriliyorsa aynı sayı tekrar basılmaz
- * (yalnız kaçan komisyon satırları kalır).
+ * KAÇAN KOMİSYONLAR (yönetim alt satırı): portalda kaybolan ilan sayısı (İlan Kontrol özetiyle TEK KAYNAK) + son kapanışlarda
+ * tahmini kaçan komisyon. Teyitsiz ilan sayısı burada YOK: "Dikkat gerektirenler" listesindedir (aynı sayı iki yerde yok).
+ * Kapsam: İlan Kontrol özeti rol kapsamını kendisi uygular; kapanışlar RLS ile ofis kapsamındadır.
  */
-export async function KayipKacak({ ctx, showTeyit = true }: { ctx: HomeCtx; showTeyit?: boolean }) {
-  const [listings, closures, control] = await Promise.all([
-    loadLiveListings(),
+export async function KayipKacak({ ctx }: { ctx: HomeCtx }) {
+  const [closures, control] = await Promise.all([
     loadClosures(ctx),
     // İlan Kontrol ile TEK KAYNAK: "portalda kayıp" sayısı İlan Kontrol özetiyle (aynı RPC, aynı rol kapsamı) birebir aynıdır.
     createClient().then((c) => getControlSummary(c as unknown as Db, "tenant")),
   ]);
   const portalMissing = control.available ? sumSummaryRows(control.rows).portal_missing : 0;
-  const overdueListings = showTeyit ? overdueListingsOf(listings) : [];
+  const lost = closures.recent.filter((c) => Number(c.estimated_lost_commission || 0) > 0).slice(0, 3);
 
   return (
     <Widget id="kayip" className="h-full">
-      <section className="pm-bx h-full p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Radar className="h-4 w-4 text-danger-500" />
-            <h2 className="font-display font-bold text-ink-950">Kaçan komisyonlar</h2>
+      <section aria-labelledby="kayip-baslik" className="ds-card ds-pad h-full">
+        <header className="ds-head mb-3">
+          <span className="pm-ico pm-t-danger" aria-hidden="true">
+            <Radar />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="kayip-baslik" className="ds-title">
+              Kaçan komisyonlar
+            </h2>
+            <p className="ds-sub mt-0.5">Portal kayıpları ve kapanan ilanlar</p>
           </div>
-          <PanelLink href="/app/kayip-kacak">Detay</PanelLink>
-        </div>
-        <div className="mt-4 space-y-3 text-sm">
-          {overdueListings.length > 0 ? (
-            <Link
-              href="/app/portallar?durum=teyit"
-              className="focus-ring group block rounded-[var(--radius-card)] border border-warn-500/30 bg-warn-500/5 px-3 py-3 transition hover:border-warn-500/50 hover:bg-warn-500/10"
-            >
-              <p className="flex items-center justify-between gap-2 font-semibold text-ink-950">
-                {overdueListings.length} ilanda 7+ gün teyit yok
-                <span className="hover-action shrink-0 text-xs font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
-                  İncele →
-                </span>
-              </p>
-              <p className="mt-1 text-text-muted">Portal Kontrol’den teyit edin</p>
-            </Link>
-          ) : showTeyit ? (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 px-3 py-3">
-              <Bell className="h-4 w-4 text-mint-600" />
-              <p className="font-semibold text-mint-600">Teyit kuyruğu temiz</p>
-            </div>
-          ) : null}
-          {portalMissing > 0 ? (
-            <Link
-              href={kpiHref("portal_missing")}
-              className="focus-ring group block rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-3 transition hover:border-danger-500/50 hover:bg-danger-500/10"
-            >
-              <p className="flex items-center justify-between gap-2 font-semibold text-ink-950">
-                {portalMissing} portföyde portal ilanı kayıp
-                <span className="hover-action shrink-0 text-xs font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
-                  İncele →
-                </span>
-              </p>
-              <p className="mt-1 text-text-muted">İlan Kontrol Merkezi: doğrulanan kayıplar</p>
-            </Link>
-          ) : null}
-          {closures.recent
-            .filter((c) => Number(c.estimated_lost_commission || 0) > 0)
-            .slice(0, 2)
-            .map((c) => {
+          <Link href="/app/kayip-kacak" className="ds-link focus-ring">
+            Detay <ArrowUpRight aria-hidden="true" />
+          </Link>
+        </header>
+        {portalMissing === 0 && lost.length === 0 ? (
+          <EmptyState variant="compact" illustration="basari" title="Kaçan komisyon kaydı yok" description="Portal kaybı ya da tahmini kayıplı kapanış oluşunca burada görünür." />
+        ) : (
+          <ul className="ds-sep -mx-1.5">
+            {portalMissing > 0 ? (
+              <li>
+                <Link href={kpiHref("portal_missing")} className="ds-row focus-ring group">
+                  <span className="ds-row-ico pm-t-danger" aria-hidden="true">
+                    <Radar />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-text">{portalMissing} portföyde portal ilanı kayıp</span>
+                    <span className="block truncate text-xs text-text-muted">İlan Kontrol Merkezi: doğrulanan kayıplar</span>
+                  </span>
+                  <ChevronRight className="ds-row-chev h-4 w-4" aria-hidden="true" />
+                </Link>
+              </li>
+            ) : null}
+            {lost.map((c) => {
               const listing = Array.isArray(c.portal_listing) ? c.portal_listing[0] : c.portal_listing;
               return (
-                <Link
-                  key={c.id}
-                  href={`/app/kayip-kacak?neden=${encodeURIComponent(c.reason ?? "")}`}
-                  className="focus-ring group block rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-3 transition hover:border-danger-500/50 hover:bg-danger-500/10"
-                >
-                  <p className="flex items-center justify-between gap-2 font-semibold text-ink-950">
-                    {c.reason}
-                    <span className="hover-action shrink-0 text-xs font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
-                      İncele →
+                <li key={c.id}>
+                  <Link href={`/app/kayip-kacak?neden=${encodeURIComponent(c.reason ?? "")}`} className="ds-row focus-ring group">
+                    <span className="ds-row-ico pm-t-warn" aria-hidden="true">
+                      <Radar />
                     </span>
-                  </p>
-                  <p className="mt-1 text-text-muted">
-                    {listing?.portal_name ?? "Portal"}
-                    {listing?.portal_listing_id ? ` #${listing.portal_listing_id}` : ""} · −
-                    {moneyTry(Number(c.estimated_lost_commission || 0))}
-                  </p>
-                </Link>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-text">{c.reason}</span>
+                      <span className="block truncate text-xs text-text-muted">
+                        {listing?.portal_name ?? "Portal"}
+                        {listing?.portal_listing_id ? ` #${listing.portal_listing_id}` : ""}
+                      </span>
+                    </span>
+                    <span className="ds-num shrink-0 text-sm text-[var(--pm-danger-text)]">−{moneyTry(Number(c.estimated_lost_commission || 0))}</span>
+                    <ChevronRight className="ds-row-chev h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </li>
               );
             })}
-          {!showTeyit && closures.recent.every((c) => !(Number(c.estimated_lost_commission || 0) > 0)) ? (
-            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/5 px-3 py-3">
-              <Bell className="h-4 w-4 text-mint-600" />
-              <p className="font-semibold text-mint-600">Kaçan komisyon kaydı yok</p>
-            </div>
-          ) : null}
-        </div>
+          </ul>
+        )}
       </section>
     </Widget>
   );

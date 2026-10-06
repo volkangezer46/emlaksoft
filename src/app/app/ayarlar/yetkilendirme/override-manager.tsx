@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -205,35 +206,35 @@ export function OverrideManager({
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                <th scope="col" className="py-2 pr-3">Üye</th>
-                <th scope="col" className="px-2 py-2">Kaynak</th>
-                <th scope="col" className="px-2 py-2">Etki</th>
-                <th scope="col" className="px-2 py-2">Gerekçe</th>
-                <th scope="col" className="px-2 py-2">Bitiş</th>
-                <th scope="col" className="px-2 py-2">Tanımlayan</th>
-                <th scope="col" className="px-2 py-2 text-right">İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full min-w-[760px] border-collapse text-sm">
+            <THead>
+              <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                <TH scope="col" className="py-2 pr-3">Üye</TH>
+                <TH scope="col" className="px-2 py-2">Kaynak</TH>
+                <TH scope="col" className="px-2 py-2">Etki</TH>
+                <TH scope="col" className="px-2 py-2">Gerekçe</TH>
+                <TH scope="col" className="px-2 py-2">Bitiş</TH>
+                <TH scope="col" className="px-2 py-2">Tanımlayan</TH>
+                <TH scope="col" className="px-2 py-2 text-right">İşlem</TH>
+              </TR>
+            </THead>
+            <TBody>
               {[...active, ...expired].map((r) => (
-                <tr key={r.id} className={`border-b border-line/60 last:border-0 ${r.expired ? "opacity-50" : ""}`}>
-                  <td className="py-2.5 pr-3">
+                <TR key={r.id} className={`border-b border-line/60 last:border-0 ${r.expired ? "opacity-50" : ""}`}>
+                  <TD className="py-2.5 pr-3">
                     <Link href={`/app/ayarlar/yetkilendirme?sekme=kapsamlar`} className="font-semibold text-ink-950 hover:text-brand-600 hover:underline">{r.userName}</Link>
-                  </td>
-                  <td className="px-2 py-2.5">
+                  </TD>
+                  <TD className="px-2 py-2.5">
                     <span className="text-xs text-text-muted">{OVERRIDE_RESOURCE_LABELS[r.resourceType]} · </span>
                     {r.resourceHref ? <Link href={r.resourceHref} className="text-sm font-medium text-brand-600 hover:underline">{r.resourceLabel}</Link> : <span className="text-sm">{r.resourceLabel}</span>}
-                  </td>
-                  <td className="px-2 py-2.5">
+                  </TD>
+                  <TD className="px-2 py-2.5">
                     <Badge variant={r.allowed ? "success" : "danger"} size="sm">{r.allowed ? "İzin" : "Yasak"}</Badge>
-                  </td>
-                  <td className="max-w-64 px-2 py-2.5 text-xs text-text-muted" title={r.reason ?? undefined}>
+                  </TD>
+                  <TD className="max-w-64 px-2 py-2.5 text-xs text-text-muted" title={r.reason ?? undefined}>
                     <span className="line-clamp-2">{r.reason ?? "—"}</span>
-                  </td>
-                  <td className="px-2 py-2.5 text-xs">
+                  </TD>
+                  <TD className="px-2 py-2.5 text-xs">
                     {r.expiresAt ? (
                       <span className={r.expired ? "text-text-muted" : "font-semibold text-amber-600"}>
                         {r.expired ? "Doldu · " : ""}{formatDateTr(r.expiresAt)}
@@ -241,17 +242,17 @@ export function OverrideManager({
                     ) : (
                       <span className="text-text-muted">Süresiz</span>
                     )}
-                  </td>
-                  <td className="px-2 py-2.5 text-xs text-text-muted">{r.createdByName} · {formatDateTr(r.createdAt)}</td>
-                  <td className="px-2 py-2.5 text-right">
+                  </TD>
+                  <TD className="px-2 py-2.5 text-xs text-text-muted">{r.createdByName} · {formatDateTr(r.createdAt)}</TD>
+                  <TD className="px-2 py-2.5 text-right">
                     {canEdit && !r.expired ? (
                       <Button size="xs" variant="ghost" icon={Ban} onClick={() => cancel(r.id)} loading={busyId === r.id}>İptal</Button>
                     ) : null}
-                  </td>
-                </tr>
+                  </TD>
+                </TR>
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </Table>
         </div>
       )}
     </section>

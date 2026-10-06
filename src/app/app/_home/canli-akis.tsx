@@ -12,8 +12,8 @@ type FeedItem = { key: string; icon: string; text: string; time: string; tone: s
 const actionBtn =
   "focus-ring press grid h-6 w-6 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-mint-600 transition hover:border-mint-500/50 hover:bg-mint-500/10";
 
-/** Son 24s birleşik aktivite akışı — tip bazlı hızlı aksiyonlarla. */
-export async function CanliAkis({ ctx }: { ctx: HomeCtx }) {
+/** Son 24s birleşik aktivite akışı — tip bazlı hızlı aksiyonlarla. Denetim bağlantısı yalnız yönetimde (`layout.auditLink`). */
+export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; auditLink?: boolean }) {
   const feed = await loadActivityFeed(ctx);
   const items: FeedItem[] = [
     ...feed.customers.map((c) => ({
@@ -72,7 +72,7 @@ export async function CanliAkis({ ctx }: { ctx: HomeCtx }) {
             </p>
             <h2 className="mt-1 font-display font-bold text-ink-950">Son 24 saat</h2>
           </div>
-          <PanelLink href="/app/denetim">Denetim</PanelLink>
+          {auditLink ? <PanelLink href="/app/denetim">Denetim</PanelLink> : null}
         </div>
         <div className="relative mt-5 space-y-3 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-line">
           {items.length === 0 ? (

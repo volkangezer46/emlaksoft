@@ -64,7 +64,7 @@ export async function PersonalGoal({
   const behind = elapsed !== null && elapsed < 100 && pct < elapsed - 10;
 
   return (
-    <section aria-label="Kişisel hedef" className="surface-card rounded-[var(--radius-panel)] p-5" style={{ boxShadow: "var(--elev-3)" }}>
+    <section aria-label="Kişisel hedef" className="ds-card ds-pad h-full">
       <div className="flex flex-wrap items-center gap-6">
         <RadialGauge
           value={pct}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -450,39 +451,39 @@ export function PurchaseCalculator({
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                      <th className="py-2.5 pr-3">Kalem</th>
-                      <th className="py-2.5 text-right">Tutar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
+                <Table className="w-full min-w-[520px] text-sm">
+                  <THead>
+                    <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                      <TH className="py-2.5 pr-3">Kalem</TH>
+                      <TH className="py-2.5 text-right">Tutar</TH>
+                    </TR>
+                  </THead>
+                  <TBody className="divide-y divide-line">
                     {costs.lines.map((l) => (
-                      <tr key={l.key}>
-                        <td className="py-3 pr-3">
+                      <TR key={l.key}>
+                        <TD className="py-3 pr-3">
                           <p className="font-semibold text-ink-950">{l.label}</p>
                           <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{l.note}</p>
-                        </td>
-                        <td className="numeric whitespace-nowrap py-3 text-right align-top font-bold tabular-nums text-ink-950">
+                        </TD>
+                        <TD className="numeric whitespace-nowrap py-3 text-right align-top font-bold tabular-nums text-ink-950">
                           {formatTry(l.amount)}
-                        </td>
-                      </tr>
+                        </TD>
+                      </TR>
                     ))}
-                    <tr className="bg-canvas/60">
-                      <td className="py-3 pr-3 font-display font-extrabold text-ink-950">
+                    <TR className="bg-canvas/60">
+                      <TD className="py-3 pr-3 font-display font-extrabold text-ink-950">
                         Masraf toplamı
                         <span className="ml-2 text-xs font-semibold text-text-muted">
                           fiyatın ~%{costs.costsPctOfPrice}&apos;i
                         </span>
-                      </td>
+                      </TD>
                       {/* whitespace-nowrap: dar sütunda "170.000" ve "₺" alt alta düşüyordu */}
-                      <td className="numeric whitespace-nowrap py-3 text-right font-display font-extrabold tabular-nums text-brand-600">
+                      <TD className="numeric whitespace-nowrap py-3 text-right font-display font-extrabold tabular-nums text-brand-600">
                         {formatTry(costs.totalCosts)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                      </TD>
+                    </TR>
+                  </TBody>
+                </Table>
               </div>
             )}
             <ul className="mt-4 space-y-1 text-xs leading-relaxed text-text-faint">
@@ -521,32 +522,32 @@ export function PurchaseCalculator({
                   Başlangıçta taksidin büyük kısmı faize gider; anapara payı vade ilerledikçe artar.
                 </p>
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-sm">
-                    <thead>
-                      <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                        <th className="py-2.5 pr-3">Taksit</th>
-                        <th className="py-2.5 pr-3 text-right">Anapara</th>
-                        <th className="py-2.5 pr-3 text-right">Faiz</th>
-                        <th className="py-2.5 text-right">Kalan borç</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line">
+                  <Table className="w-full min-w-[520px] text-sm">
+                    <THead>
+                      <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                        <TH className="py-2.5 pr-3">Taksit</TH>
+                        <TH className="py-2.5 pr-3 text-right">Anapara</TH>
+                        <TH className="py-2.5 pr-3 text-right">Faiz</TH>
+                        <TH className="py-2.5 text-right">Kalan borç</TH>
+                      </TR>
+                    </THead>
+                    <TBody className="divide-y divide-line">
                       {loan.amortizationSchedule.map((row) => (
-                        <tr key={row.no} className={row.no <= 3 ? "bg-brand-600/[0.03]" : undefined}>
-                          <td className="py-2.5 pr-3 font-semibold text-ink-950">{row.no}. ay</td>
-                          <td className="numeric py-2.5 pr-3 text-right tabular-nums text-mint-600">
+                        <TR key={row.no} className={row.no <= 3 ? "bg-brand-600/[0.03]" : undefined}>
+                          <TD className="py-2.5 pr-3 font-semibold text-ink-950">{row.no}. ay</TD>
+                          <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-mint-600">
                             {formatTry(row.principal)}
-                          </td>
-                          <td className="numeric py-2.5 pr-3 text-right tabular-nums text-amber-600">
+                          </TD>
+                          <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-amber-600">
                             {formatTry(row.interest)}
-                          </td>
-                          <td className="numeric py-2.5 text-right tabular-nums text-text-muted">
+                          </TD>
+                          <TD className="numeric py-2.5 text-right tabular-nums text-text-muted">
                             {formatTry(row.balance)}
-                          </td>
-                        </tr>
+                          </TD>
+                        </TR>
                       ))}
-                    </tbody>
-                  </table>
+                    </TBody>
+                  </Table>
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-text-faint">{loan.note}</p>
               </>

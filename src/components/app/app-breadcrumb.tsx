@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { House } from "lucide-react";
 import { useMemo } from "react";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { useClosedModules } from "@/components/app/closed-modules-context";
@@ -43,5 +45,17 @@ export function AppBreadcrumb({ accessibleModules }: { accessibleModules: AppMod
   }
   const unique = items.filter((it, i) => i === 0 || it.label !== items[i - 1]!.label);
   const trimmed = unique.length > 3 ? unique.slice(-3) : unique;
-  return <Breadcrumb items={trimmed} className="hidden min-w-0 shrink-0 lg:block" />;
+  // v4 kabuk (/admin ile aynı): ev ikonlu konum şeridi.
+  return (
+    <div className="hidden min-w-0 shrink-0 items-center gap-2.5 lg:flex">
+      <Link
+        href="/app"
+        aria-label="Bugün (ana ekran)"
+        className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted transition-colors hover:text-text"
+      >
+        <House className="h-4 w-4" aria-hidden="true" />
+      </Link>
+      <Breadcrumb items={trimmed} className="min-w-0" />
+    </div>
+  );
 }

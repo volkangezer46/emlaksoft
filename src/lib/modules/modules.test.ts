@@ -231,9 +231,9 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 });
 
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
-  it("menü öğesi sayısı 42 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + yetim sayfalar: Bildirimler, İçe aktarma, Mahalle notları)", () => {
+  it("menü öğesi sayısı 40 (9 başlık; 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + Bildirimler + Mahalle notları; eylem sayfaları İçe aktarma ve Ofis kurulumu menüden çıktı)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(42);
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(40);
   });
 
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {
@@ -243,9 +243,9 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
       expect(topHrefs).not.toContain(gone);
     }
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/kayip-satis"]);
-    expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu"]);
+    expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu", "/app/ayarlar/filigran"]);
   });
 
   it("kapalı modül menüden, sekmelerden ve Daha fazla listesinden çıkar; çekirdek kalır", () => {

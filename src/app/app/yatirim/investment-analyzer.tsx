@@ -1,5 +1,6 @@
 "use client";
 
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -581,66 +582,66 @@ export function InvestmentAnalyzer({
             </p>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[460px] text-sm">
-                <tbody className="divide-y divide-line">
-                  <tr>
-                    <td className="py-2.5 pr-3 font-semibold text-ink-950">Brüt aylık kira</td>
-                    <td className="numeric whitespace-nowrap py-2.5 text-right font-bold tabular-nums text-mint-600">
+              <Table className="w-full min-w-[460px] text-sm">
+                <TBody className="divide-y divide-line">
+                  <TR>
+                    <TD className="py-2.5 pr-3 font-semibold text-ink-950">Brüt aylık kira</TD>
+                    <TD className="numeric whitespace-nowrap py-2.5 text-right font-bold tabular-nums text-mint-600">
                       +{formatTry(cashFlow.monthlyRent)}
-                    </td>
-                  </tr>
+                    </TD>
+                  </TR>
                   {cashFlow.expenseLines.map((l) => (
-                    <tr key={l.key}>
-                      <td className="py-2.5 pr-3">
+                    <TR key={l.key}>
+                      <TD className="py-2.5 pr-3">
                         <p className="text-ink-950">{l.label}</p>
                         <p className="mt-0.5 text-xs leading-relaxed text-text-muted">{l.note}</p>
-                      </td>
-                      <td className="numeric whitespace-nowrap py-2.5 text-right align-top tabular-nums text-text-muted">
+                      </TD>
+                      <TD className="numeric whitespace-nowrap py-2.5 text-right align-top tabular-nums text-text-muted">
                         −{formatTry(l.amount)}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ))}
                   {cashFlow.monthlyLoanPayment > 0 ? (
-                    <tr>
-                      <td className="py-2.5 pr-3">
+                    <TR>
+                      <TD className="py-2.5 pr-3">
                         <p className="text-ink-950">Kredi taksiti ({months} ay)</p>
                         <p className="mt-0.5 text-xs text-text-muted">
                           {formatTry(cashFlow.loanAmount)} kredi · aylık %{monthlyRatePct}
                         </p>
-                      </td>
-                      <td className="numeric whitespace-nowrap py-2.5 text-right align-top tabular-nums text-amber-600">
+                      </TD>
+                      <TD className="numeric whitespace-nowrap py-2.5 text-right align-top tabular-nums text-amber-600">
                         −{formatTry(cashFlow.monthlyLoanPayment)}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ) : null}
-                  <tr className="bg-canvas/60">
-                    <td className="py-3 pr-3 font-display font-extrabold text-ink-950">
+                  <TR className="bg-canvas/60">
+                    <TD className="py-3 pr-3 font-display font-extrabold text-ink-950">
                       Aylık net nakit akışı
                       <span className="ml-2 text-xs font-semibold text-text-muted">
                         peşinata göre nakit getirisi {formatPct(cashFlow.cashOnCashPct)}
                       </span>
-                    </td>
-                    <td
+                    </TD>
+                    <TD
                       className={`numeric whitespace-nowrap py-3 text-right font-display font-extrabold tabular-nums ${
                         positive ? "text-mint-600" : "text-amber-600"
                       }`}
                     >
                       {formatTry(cashFlow.monthlyCashFlow)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 pr-3 text-text-muted">
+                    </TD>
+                  </TR>
+                  <TR>
+                    <TD className="py-2.5 pr-3 text-text-muted">
                       Başabaş kira
                       <span className="ml-2 text-xs">
                         bu kiranın altında her ay cebinizden para koyarsınız
                       </span>
-                    </td>
-                    <td className="numeric whitespace-nowrap py-2.5 text-right font-semibold tabular-nums text-ink-950">
+                    </TD>
+                    <TD className="numeric whitespace-nowrap py-2.5 text-right font-semibold tabular-nums text-ink-950">
                       {cashFlow.breakEvenRent > 0 ? formatTry(cashFlow.breakEvenRent) : "—"}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    </TD>
+                  </TR>
+                </TBody>
+              </Table>
             </div>
           )}
         </section>
@@ -687,55 +688,55 @@ export function InvestmentAnalyzer({
               Kira yılda %{rentGrowthPct}, konut değeri yılda %{priceGrowthPct} artar varsayımıyla.
             </p>
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                    <th className="py-2.5 pr-3">Yıl</th>
-                    <th className="py-2.5 pr-3 text-right">Kira geliri</th>
-                    <th className="py-2.5 pr-3 text-right">Gider</th>
-                    <th className="py-2.5 pr-3 text-right">Taksit</th>
-                    <th className="py-2.5 pr-3 text-right">Net nakit</th>
-                    <th className="py-2.5 pr-3 text-right">Kalan borç</th>
-                    <th className="py-2.5 pr-3 text-right">Tahmini değer</th>
-                    <th className="py-2.5 text-right">Kümülatif</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
+              <Table className="w-full min-w-[760px] text-sm">
+                <THead>
+                  <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                    <TH className="py-2.5 pr-3">Yıl</TH>
+                    <TH className="py-2.5 pr-3 text-right">Kira geliri</TH>
+                    <TH className="py-2.5 pr-3 text-right">Gider</TH>
+                    <TH className="py-2.5 pr-3 text-right">Taksit</TH>
+                    <TH className="py-2.5 pr-3 text-right">Net nakit</TH>
+                    <TH className="py-2.5 pr-3 text-right">Kalan borç</TH>
+                    <TH className="py-2.5 pr-3 text-right">Tahmini değer</TH>
+                    <TH className="py-2.5 text-right">Kümülatif</TH>
+                  </TR>
+                </THead>
+                <TBody className="divide-y divide-line">
                   {projection.years.map((y) => (
-                    <tr
+                    <TR
                       key={y.year}
                       className={y.year === projection.cashPaybackYear ? "bg-mint-500/6" : undefined}
                     >
-                      <td className="py-2.5 pr-3 font-semibold text-ink-950">{y.year}. yıl</td>
-                      <td className="numeric py-2.5 pr-3 text-right tabular-nums text-ink-950">
+                      <TD className="py-2.5 pr-3 font-semibold text-ink-950">{y.year}. yıl</TD>
+                      <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-ink-950">
                         {formatTry(y.rentIncome)}
-                      </td>
-                      <td className="numeric py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                      </TD>
+                      <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-text-muted">
                         {formatTry(y.expenses)}
-                      </td>
-                      <td className="numeric py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                      </TD>
+                      <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-text-muted">
                         {y.debtService > 0 ? formatTry(y.debtService) : "—"}
-                      </td>
-                      <td
+                      </TD>
+                      <TD
                         className={`numeric py-2.5 pr-3 text-right font-bold tabular-nums ${
                           y.netCash >= 0 ? "text-mint-600" : "text-amber-600"
                         }`}
                       >
                         {formatTry(y.netCash)}
-                      </td>
-                      <td className="numeric py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                      </TD>
+                      <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-text-muted">
                         {y.remainingPrincipal > 0 ? formatTry(y.remainingPrincipal) : "Kapandı"}
-                      </td>
-                      <td className="numeric py-2.5 pr-3 text-right tabular-nums text-ink-950">
+                      </TD>
+                      <TD className="numeric py-2.5 pr-3 text-right tabular-nums text-ink-950">
                         {formatTry(y.estimatedValue)}
-                      </td>
-                      <td className="numeric py-2.5 text-right font-semibold tabular-nums text-ink-950">
+                      </TD>
+                      <TD className="numeric py-2.5 text-right font-semibold tabular-nums text-ink-950">
                         {formatTry(y.cumulativeCash)}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ))}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-text-faint">{IRR_METHOD_NOTE}</p>
           </section>

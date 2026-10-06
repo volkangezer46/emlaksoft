@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { ReferralNudge } from "@/components/app/referral-nudge";
 import {
@@ -404,41 +405,41 @@ export default async function ValuationPage({
           </div>
         ) : (
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
-                  <th className="py-2.5 pr-3">İlçe</th>
-                  <th className="py-2.5 pr-3 text-right">Satılık medyan ₺/m²</th>
-                  <th className="py-2.5 pr-3 text-right">Kira medyan ₺/m²/ay</th>
-                  <th className="py-2.5 pr-3 text-right">Brüt getiri</th>
-                  <th className="py-2.5 pr-3 text-right">Amortisman</th>
-                  <th className="py-2.5 pr-3 text-right">Örneklem</th>
-                  <th className="py-2.5 text-right">Ofis medyanına göre</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
+            <Table className="w-full min-w-[720px] text-sm">
+              <THead>
+                <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-faint">
+                  <TH className="py-2.5 pr-3">İlçe</TH>
+                  <TH className="py-2.5 pr-3 text-right">Satılık medyan ₺/m²</TH>
+                  <TH className="py-2.5 pr-3 text-right">Kira medyan ₺/m²/ay</TH>
+                  <TH className="py-2.5 pr-3 text-right">Brüt getiri</TH>
+                  <TH className="py-2.5 pr-3 text-right">Amortisman</TH>
+                  <TH className="py-2.5 pr-3 text-right">Örneklem</TH>
+                  <TH className="py-2.5 text-right">Ofis medyanına göre</TH>
+                </TR>
+              </THead>
+              <TBody className="divide-y divide-line">
                 {yieldRows.map((r) => {
                   const diff = districtYieldMedian != null ? r.grossYieldPct - districtYieldMedian : null;
                   return (
-                    <tr key={r.districtId} className="group transition hover:bg-brand-600/[0.03]">
-                      <td className="py-3 pr-3">
+                    <TR key={r.districtId} className="group transition hover:bg-brand-600/[0.03]">
+                      <TD className="py-3 pr-3">
                         <Link
                           href={`/app/bolge-analizi?district=${r.districtId}`}
                           className="focus-ring font-semibold text-ink-950 underline-offset-2 transition hover:text-brand-600 hover:underline"
                         >
                           {r.districtName}
                         </Link>
-                      </td>
-                      <td className="numeric py-3 pr-3 text-right tabular-nums">{money(Math.round(r.saleMedian))}</td>
-                      <td className="numeric py-3 pr-3 text-right tabular-nums">{money(Math.round(r.rentMedian))}</td>
-                      <td className="numeric py-3 pr-3 text-right font-bold tabular-nums text-mint-600">
+                      </TD>
+                      <TD className="numeric py-3 pr-3 text-right tabular-nums">{money(Math.round(r.saleMedian))}</TD>
+                      <TD className="numeric py-3 pr-3 text-right tabular-nums">{money(Math.round(r.rentMedian))}</TD>
+                      <TD className="numeric py-3 pr-3 text-right font-bold tabular-nums text-mint-600">
                         %{nf1.format(r.grossYieldPct)}
-                      </td>
-                      <td className="numeric py-3 pr-3 text-right tabular-nums">{nf1.format(r.amortYears)} yıl</td>
-                      <td className="py-3 pr-3 text-right text-xs text-text-muted">
+                      </TD>
+                      <TD className="numeric py-3 pr-3 text-right tabular-nums">{nf1.format(r.amortYears)} yıl</TD>
+                      <TD className="py-3 pr-3 text-right text-xs text-text-muted">
                         {r.sampleSale} satılık · {r.sampleRent} kiralık
-                      </td>
-                      <td className="py-3 text-right">
+                      </TD>
+                      <TD className="py-3 text-right">
                         {diff == null ? (
                           <span className="text-text-faint">—</span>
                         ) : (
@@ -451,12 +452,12 @@ export default async function ValuationPage({
                             {nf1.format(Math.abs(diff))} puan
                           </span>
                         )}
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   );
                 })}
-              </tbody>
-            </table>
+              </TBody>
+            </Table>
           </div>
         )}
         {yieldRows.some((r) => r.sampleSale < 3 || r.sampleRent < 3) ? (

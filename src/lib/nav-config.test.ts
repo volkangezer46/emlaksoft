@@ -81,7 +81,7 @@ describe("menü yapısı", () => {
     expect(resolveActiveNav("/app", sections).href).toBe("/app");
     expect(resolveActiveNav("/app/musteriler/abc", sections).section?.id).toBe("musteriler");
     expect(resolveActiveNav("/app/ekip/izinler", sections).href).toBe("/app/ekip");
-    expect(resolveActiveNav("/app/ayarlar/filigran", sections).href).toBe("/app/ayarlar");
+    expect(resolveActiveNav("/app/ayarlar/cop-kutusu", sections).href).toBe("/app/ayarlar");
     // Anahtar Takibi ve Sunumlar Portföyler öğesinin sekmesidir (yol aynı, menü öğesi Portföyler).
     expect(resolveActiveNav("/app/portfoyler/anahtarlar", sections).href).toBe("/app/portfoyler");
     expect(resolveActiveNav("/app/akilli-listeler", sections).href).toBe("/app/musteriler");
@@ -143,25 +143,51 @@ describe("bilgi mimarisi 2026-10 (docs/design/MENU_IA_2026_10.md)", () => {
   const sectionOf = (href: string) => NAV_SECTIONS.find((s) => s.items.some((i) => i.href === href))?.id;
   const sections = visibleSections(ALL_MODULES);
 
-  it("Bugün = günün işi: randevu ve görev; AI Asistan Araçlar'a, Ofis kurulumu Ofis'e taşındı", () => {
+  it("Bugün = günün işi: randevu ve görev; AI Asistan Araçlar'a; kurulum sihirbazı eylem akışı (menüde değil)", () => {
     expect(sectionOf("/app/randevular")).toBe("bugun");
     expect(sectionOf("/app/gorevler")).toBe("bugun");
     expect(sectionOf("/app/asistan")).toBe("araclar");
-    expect(sectionOf("/app/baslangic")).toBe("ofis");
+    expect(sectionOf("/app/baslangic")).toBeUndefined();
+    expect(HIDDEN_APP_PAGES["/app/baslangic"]).toBeTruthy();
     expect(sectionOf("/app/gelen-kutusu")).toBe("iletisim");
     expect(sectionOf("/app/kampanyalar")).toBe("iletisim");
   });
 
-  it("yetim sayfalar menüye bağlandı: Bildirimler, İçe aktarma, Mahalle notları, Ayarlar sekmeleri", () => {
+  it("yetim sayfalar menüye bağlandı: Bildirimler, Mahalle notları, Ayarlar sekmeleri; İçe aktarma eylem (başlık düğmesi)", () => {
     expect(sectionOf("/app/bildirimler")).toBe("bugun");
-    expect(sectionOf("/app/ice-aktarma")).toBe("musteriler");
+    expect(sectionOf("/app/ice-aktarma")).toBeUndefined();
+    expect(HIDDEN_APP_PAGES["/app/ice-aktarma"]).toBeTruthy();
     expect(sectionOf("/app/mahalle-notlari")).toBe("araclar");
     for (const h of ["/app/ayarlar/roller", "/app/ayarlar/yetkilendirme", "/app/ayarlar/moduller"]) {
       expect(ALL_NAV_HREFS, h).toContain(h);
       expect(resolveActiveNav(h, sections).href, h).toBe("/app/ayarlar");
     }
     // Ayarlar altındaki diğer sayfalar (sekme olmayan) yine Ayarlar öğesini etkin yapar.
-    expect(resolveActiveNav("/app/ayarlar/etiketler", sections).href).toBe("/app/ayarlar");
+    expect(resolveActiveNav("/app/ayarlar/cop-kutusu", sections).href).toBe("/app/ayarlar");
+  });
+
+  it("modüle ait ayar sayfası modülün 'Ayarlar' sekmesidir (yol sabit, tek sayfa); eylem sayfası menü öğesi olmaz", () => {
+    const owners: Record<string, string> = {
+      "/app/ayarlar/etiketler": "/app/musteriler",
+      "/app/ayarlar/filigran": "/app/portfoyler",
+      "/app/ayarlar/sozlesme-sablonlari": "/app/sozlesmeler",
+      "/app/ayarlar/mesaj-sablonlari": "/app/kampanyalar",
+      "/app/ayarlar/ai-kullanim": "/app/asistan",
+      "/app/ayarlar/is-akislari": "/app/otomasyonlar",
+    };
+    for (const [page, owner] of Object.entries(owners)) {
+      expect(resolveActiveNav(page, sections).href, page).toBe(owner);
+      const tab = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.href === owner)?.tabs?.find((t) => t.href === page);
+      expect(tab, page).toBeTruthy();
+    }
+    // Aynı ayar sayfası menüde iki öğenin sekmesi olamaz (tek giriş; ikinci yol Ayarlar dizini kartıdır).
+    const tabHrefs = NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => (i.tabs ?? []).filter((t) => t.href !== i.href).map((t) => t.href)));
+    expect(new Set(tabHrefs).size).toBe(tabHrefs.length);
+    // Eylem sayfaları (/yeni, içe aktarma, kurulum sihirbazı) menü öğesi değildir.
+    const itemHrefs = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
+    for (const h of itemHrefs) expect(h, h).not.toMatch(/\/yeni$/);
+    expect(itemHrefs).not.toContain("/app/ice-aktarma");
+    expect(itemHrefs).not.toContain("/app/baslangic");
   });
 
   it("her öğenin ve ikincil sekmenin Türkçe açıklaması var; ekranda 'lead' geçmez", () => {

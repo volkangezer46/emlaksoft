@@ -16,6 +16,7 @@ import {
   Map as MapIcon,
   MapPin,
   Plus,
+  Upload,
   Search,
   Sparkles,
 } from "lucide-react";
@@ -626,6 +627,11 @@ export default async function PropertiesPage({
               label="Dışa aktar"
               className="focus-ring press inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50"
             />
+            {canCreate && (perms.customers ?? []).includes("create") ? (
+              <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
+                İçe aktar
+              </ButtonLink>
+            ) : null}
             {canCreate ? <ButtonLink href="/app/portfoyler/yeni"><Plus className="h-4 w-4" /> Yeni portföy</ButtonLink> : null}
           </>
         }

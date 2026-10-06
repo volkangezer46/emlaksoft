@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { divergingBars, type NetPoint } from "./report-math";
@@ -56,27 +57,27 @@ export function NetDiffChart({ points, className }: { points: readonly NetPoint[
           );
         })}
       </div>
-      <table className="sr-only">
+      <Table className="sr-only">
         <caption>Aylık gelir, gider ve net fark</caption>
-        <thead>
-          <tr>
-            <th scope="col">Ay</th>
-            <th scope="col">Gelir</th>
-            <th scope="col">Gider</th>
-            <th scope="col">Net</th>
-          </tr>
-        </thead>
-        <tbody>
+        <THead>
+          <TR>
+            <TH scope="col">Ay</TH>
+            <TH scope="col">Gelir</TH>
+            <TH scope="col">Gider</TH>
+            <TH scope="col">Net</TH>
+          </TR>
+        </THead>
+        <TBody>
           {points.map((p) => (
-            <tr key={p.label}>
-              <th scope="row">{p.label}</th>
-              <td>{money(p.income)}</td>
-              <td>{money(p.expense)}</td>
-              <td>{money(p.net)}</td>
-            </tr>
+            <TR key={p.label}>
+              <TH scope="row">{p.label}</TH>
+              <TD>{money(p.income)}</TD>
+              <TD>{money(p.expense)}</TD>
+              <TD>{money(p.net)}</TD>
+            </TR>
           ))}
-        </tbody>
-      </table>
+        </TBody>
+      </Table>
     </figure>
   );
 }

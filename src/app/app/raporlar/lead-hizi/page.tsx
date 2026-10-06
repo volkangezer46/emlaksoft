@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -191,32 +192,32 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
             <p className="px-4 py-6 text-sm text-text-muted">Bu pencerede yeni müşteri kaydı yok.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-text-faint">
-                    <th scope="col" className="px-4 py-2 font-semibold">Danışman</th>
-                    <th scope="col" className="px-3 py-2 font-semibold">Yeni kayıt</th>
-                    <th scope="col" className="px-3 py-2 font-semibold">Ort. yanıt</th>
-                    <th scope="col" className="px-3 py-2 font-semibold">Süresinde</th>
-                    <th scope="col" className="px-3 py-2 font-semibold">Gecikmiş</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="w-full min-w-[560px] text-sm">
+                <THead>
+                  <TR className="text-left text-xs text-text-faint">
+                    <TH scope="col" className="px-4 py-2 font-semibold">Danışman</TH>
+                    <TH scope="col" className="px-3 py-2 font-semibold">Yeni kayıt</TH>
+                    <TH scope="col" className="px-3 py-2 font-semibold">Ort. yanıt</TH>
+                    <TH scope="col" className="px-3 py-2 font-semibold">Süresinde</TH>
+                    <TH scope="col" className="px-3 py-2 font-semibold">Gecikmiş</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {byAdvisor.map((a) => {
                     const key = a.advisorId ?? "atanmamis";
                     return (
-                      <tr key={key} className="border-t border-line">
-                        <td className="px-4 py-2 font-semibold text-text">
+                      <TR key={key} className="border-t border-line">
+                        <TD className="px-4 py-2 font-semibold text-text">
                           <Link
                             href={href({ ...base, danisman: key, durum: sp.durum })}
                             className="focus-ring rounded hover:text-accent-text"
                           >
                             {advisorName(a.advisorId)}
                           </Link>
-                        </td>
-                        <td className="px-3 py-2 tabular-nums text-text-muted">{a.summary.total}</td>
-                        <td className="px-3 py-2 tabular-nums text-text-muted">{formatMinutes(a.summary.avgMin)}</td>
-                        <td className="px-3 py-2 tabular-nums text-text-muted">
+                        </TD>
+                        <TD className="px-3 py-2 tabular-nums text-text-muted">{a.summary.total}</TD>
+                        <TD className="px-3 py-2 tabular-nums text-text-muted">{formatMinutes(a.summary.avgMin)}</TD>
+                        <TD className="px-3 py-2 tabular-nums text-text-muted">
                           {a.summary.withinSlaPct === null ? (
                             "Veri yok"
                           ) : (
@@ -229,8 +230,8 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
                               />
                             </span>
                           )}
-                        </td>
-                        <td className="px-3 py-2">
+                        </TD>
+                        <TD className="px-3 py-2">
                           {a.summary.overdueWaiting > 0 ? (
                             <Link
                               href={href({ ...base, danisman: key, durum: "gecikmis" })}
@@ -241,12 +242,12 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
                           ) : (
                             <span className="text-text-faint">0</span>
                           )}
-                        </td>
-                      </tr>
+                        </TD>
+                      </TR>
                     );
                   })}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
           )}
           {danismanFilter ? (

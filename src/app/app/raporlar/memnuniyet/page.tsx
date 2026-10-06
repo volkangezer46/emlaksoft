@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -262,26 +263,26 @@ export default async function SatisfactionReportPage() {
             </p>
           ) : (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
-                    <th className="py-2 pr-3">Danışman</th>
-                    <th className="py-2 pr-3 text-right">Yanıt</th>
-                    <th className="py-2 pr-3 text-right">NPS</th>
-                    <th className="py-2 text-right">Ort. puan</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="w-full text-sm">
+                <THead>
+                  <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                    <TH className="py-2 pr-3">Danışman</TH>
+                    <TH className="py-2 pr-3 text-right">Yanıt</TH>
+                    <TH className="py-2 pr-3 text-right">NPS</TH>
+                    <TH className="py-2 text-right">Ort. puan</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {agentRows.map((a) => {
                     const aNps = npsOf(a.scores);
                     const aAvg = avgOf(a.scores);
                     return (
-                      <tr key={a.name} className="border-b border-line/60 last:border-0">
-                        <td className="py-2.5 pr-3 font-semibold text-text">{a.name}</td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                      <TR key={a.name} className="border-b border-line/60 last:border-0">
+                        <TD className="py-2.5 pr-3 font-semibold text-text">{a.name}</TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {a.scores.length}/{a.total}
-                        </td>
-                        <td
+                        </TD>
+                        <TD
                           className={`py-2.5 pr-3 text-right font-bold tabular-nums ${
                             aNps === null
                               ? "text-text-faint"
@@ -293,15 +294,15 @@ export default async function SatisfactionReportPage() {
                           }`}
                         >
                           {aNps === null ? "—" : aNps}
-                        </td>
-                        <td className="py-2.5 text-right tabular-nums text-text">
+                        </TD>
+                        <TD className="py-2.5 text-right tabular-nums text-text">
                           {aAvg === null ? "—" : aAvg.toLocaleString("tr-TR")}
-                        </td>
-                      </tr>
+                        </TD>
+                      </TR>
                     );
                   })}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
           )}
         </section>

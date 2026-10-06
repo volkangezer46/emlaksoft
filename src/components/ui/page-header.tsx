@@ -22,6 +22,7 @@ export function PageHeader({
   icon,
   freshness,
   className,
+  as: Heading = "h1",
 }: {
   title: string;
   description?: ReactNode;
@@ -37,6 +38,8 @@ export function PageHeader({
   /** "Son güncelleme SS:DD · Taze" damgası: true = bu istekte okundu, değer = verinin gerçek zamanı. */
   freshness?: boolean | string | number | Date;
   className?: string;
+  /** Başlık düzeyi: sayfada üstte DashboardHero (tek h1) varsa "h2". */
+  as?: "h1" | "h2";
 }) {
   return (
     <header className={cn("mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}>
@@ -48,7 +51,7 @@ export function PageHeader({
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="font-display text-2xl font-bold tracking-tight text-text">{title}</h1>
+          <Heading className="font-display text-2xl font-bold tracking-tight text-text">{title}</Heading>
           {meta}
         </div>
         {description ? <div className="mt-1 max-w-2xl text-sm text-text-muted">{description}</div> : null}

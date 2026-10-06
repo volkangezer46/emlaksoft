@@ -2,9 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { completeTask } from "@/app/actions/tasks";
-import { updateAppointmentStatus } from "@/app/actions/appointments";
 
 /**
  * Görev satırı sarmalayıcı — hover'da "Tamamla" butonu belirir; tıklayınca
@@ -50,39 +49,5 @@ export function TaskQuickRow({
         </span>
       ) : null}
     </div>
-  );
-}
-
-/** Randevu hızlı onayı — pending durumdaki satırda hover'da görünür. */
-export function AppointmentConfirmButton({ id }: { id: string }) {
-  const router = useRouter();
-  const [, startTransition] = useTransition();
-  const [confirmed, setConfirmed] = useState(false);
-
-  if (confirmed) {
-    return (
-      <span className="rounded-[var(--radius-control)] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-600">
-        Onaylandı ✓
-      </span>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        setConfirmed(true);
-        startTransition(async () => {
-          const fd = new FormData();
-          fd.set("id", id);
-          fd.set("status", "confirmed");
-          await updateAppointmentStatus(fd);
-          router.refresh();
-        });
-      }}
-      className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-brand-600 px-2 py-1 text-xs font-bold text-white shadow-sm transition hover:bg-brand-700"
-    >
-      <CalendarCheck className="h-3.5 w-3.5" /> Onayla
-    </button>
   );
 }

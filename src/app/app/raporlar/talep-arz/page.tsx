@@ -1,3 +1,4 @@
+import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -345,38 +346,38 @@ export default async function TalepArzPage({
               </span>
             </div>
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
-                    <th className="py-2 pr-3">İlçe</th>
-                    <th className="py-2 pr-3 text-right">Açık talep</th>
-                    <th className="py-2 pr-3 text-right">Yayında portföy</th>
-                    <th className="py-2 pr-3 text-right">Arz/Talep</th>
-                    <th className="py-2 pr-3 text-right">Medyan bütçe</th>
-                    <th className="py-2 pr-3 text-right">Medyan liste fiyatı</th>
-                    <th className="py-2 text-right">Boşluk</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="w-full min-w-[760px] text-sm">
+                <THead>
+                  <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                    <TH className="py-2 pr-3">İlçe</TH>
+                    <TH className="py-2 pr-3 text-right">Açık talep</TH>
+                    <TH className="py-2 pr-3 text-right">Yayında portföy</TH>
+                    <TH className="py-2 pr-3 text-right">Arz/Talep</TH>
+                    <TH className="py-2 pr-3 text-right">Medyan bütçe</TH>
+                    <TH className="py-2 pr-3 text-right">Medyan liste fiyatı</TH>
+                    <TH className="py-2 text-right">Boşluk</TH>
+                  </TR>
+                </THead>
+                <TBody>
                   {rows.length === 0 ? (
                     // Talep var ama hiçbirinde il bilgisi yok — başlık şeridi boş
                     // gövdeyle asılı kalmasın (görsel QA bulgusu, Dalga M).
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-sm text-text-muted">
+                    <TR>
+                      <TD colSpan={7} className="py-8 text-center text-sm text-text-muted">
                         Bölge bilgisi (il/ilçe) girilmiş talep yok — talep kartlarına konum ekledikçe
                         denge tablosu burada oluşur.
-                      </td>
-                    </tr>
+                      </TD>
+                    </TR>
                   ) : null}
                   {rows.map((r) => {
                     const badge = GAP_BADGE[r.gap];
                     return (
-                      <tr key={r.key} className="border-b border-line/60 transition hover:bg-canvas">
-                        <td className="py-2.5 pr-3">
+                      <TR key={r.key} className="border-b border-line/60 transition hover:bg-canvas">
+                        <TD className="py-2.5 pr-3">
                           <p className="font-semibold text-text">{r.label}</p>
                           <p className="text-xs text-text-muted">{r.provinceName}</p>
-                        </td>
-                        <td className="py-2.5 pr-3 text-right">
+                        </TD>
+                        <TD className="py-2.5 pr-3 text-right">
                           <Link
                             href={r.demandHref}
                             className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-accent-text hover:bg-accent-subtle"
@@ -385,8 +386,8 @@ export default async function TalepArzPage({
                             {r.demandCount}
                             <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
                           </Link>
-                        </td>
-                        <td className="py-2.5 pr-3 text-right">
+                        </TD>
+                        <TD className="py-2.5 pr-3 text-right">
                           <Link
                             href={r.supplyHref}
                             className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-[color:var(--viz-pos)] hover:bg-mint-500/10"
@@ -395,26 +396,26 @@ export default async function TalepArzPage({
                             {r.supplyCount}
                             <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-[color:var(--viz-pos)] group-hover:opacity-100" />
                           </Link>
-                        </td>
-                        <td className={`py-2.5 pr-3 text-right font-semibold tabular-nums ${TONE_TEXT[r.tone]}`}>
+                        </TD>
+                        <TD className={`py-2.5 pr-3 text-right font-semibold tabular-nums ${TONE_TEXT[r.tone]}`}>
                           {ratioText(r.ratio)}
-                        </td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                        </TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {r.medianBudget !== null ? money(r.medianBudget) : "—"}
-                        </td>
-                        <td className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                        </TD>
+                        <TD className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {r.medianPrice !== null ? money(r.medianPrice) : "—"}
-                        </td>
-                        <td className="py-2.5 text-right">
+                        </TD>
+                        <TD className="py-2.5 text-right">
                           <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${badge.cls}`}>
                             {badge.label}
                           </span>
-                        </td>
-                      </tr>
+                        </TD>
+                      </TR>
                     );
                   })}
-                </tbody>
-              </table>
+                </TBody>
+              </Table>
             </div>
           </section>
 
