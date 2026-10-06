@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
-import { setPlatformSetting } from "@/lib/platform-settings";
+import { applyPlatformWrites } from "@/lib/settings/write";
 import { getGeneralSettings } from "@/lib/platform-flags";
 import {
   MAX_MAINTENANCE_MESSAGE,
@@ -11,7 +11,6 @@ import {
   MAX_TRIAL_GRACE_DAYS,
   MIN_TRIAL_DAYS,
   MIN_TRIAL_GRACE_DAYS,
-  PLATFORM_SETTING_KEYS,
 } from "@/lib/platform-setting-keys";
 
 export type GeneralSettingsResult = { ok?: boolean; error?: string; changed?: string[] };
@@ -48,18 +47,19 @@ export async function saveGeneralSettings(fd: FormData): Promise<GeneralSettings
   const graceDays = Number(graceRaw);
 
   const before = await getGeneralSettings();
-  const writes: [string, string][] = [
-    [PLATFORM_SETTING_KEYS.maintenanceMode, maintenance ? "on" : "off"],
-    [PLATFORM_SETTING_KEYS.maintenanceMessage, message],
-    [PLATFORM_SETTING_KEYS.registrationOpen, registrationOpen ? "on" : "off"],
-    [PLATFORM_SETTING_KEYS.defaultTrialDays, String(trialDays)],
-    [PLATFORM_SETTING_KEYS.trialGraceDays, String(graceDays)],
-  ];
-  for (const [key, value] of writes) {
-    const ok = await setPlatformSetting(key, value, gate.staff.id);
-    if (!ok) return { error: "Ayarlar kaydedilemedi. Lütfen tekrar deneyin." };
-  }
-
+  const res = await applyPlatformWrites(
+    gate.staff,
+    [
+      { key: "platform.maintenance_mode", value: maintenance },
+      { key: "platform.maintenance_message", value: message },
+      { key: "platform.registration_open", value: registrationOpen },
+      { key: "billing.default_trial_days", value: trialDays },
+      { key: "billing.trial_grace_days", value: graceDays },
+    ],
+    // Bu form gerekçe sormaz; yüksek riskli anahtarlar için sabit gerekçe (ayrıntılı denetim aşağıdaki kayıttadır).
+    { reason: "Genel ayarlar formu", audit: false },
+  );
+  if (!res.ok) return { error: "Ayarlar kaydedilemedi. Lütfen tekrar deneyin." };
   const changed: string[] = [];
   if (before.maintenanceMode !== maintenance) changed.push("Bakım modu");
   if (before.maintenanceMessage !== message) changed.push("Bakım mesajı");

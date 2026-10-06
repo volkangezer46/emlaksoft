@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePlatformModule, requirePlatformStaff } from "@/lib/platform";
-import { setPlatformSetting } from "@/lib/platform-settings";
+import { requirePlatformModule } from "@/lib/platform";
+import { guardPlatformAction } from "@/lib/platform-guards";
+import { applyPlatformWrites } from "@/lib/settings/write";
 import { runAdvisor, type AdvisorMessage, type AdvisorResult } from "@/lib/ai-advisor";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -190,9 +191,17 @@ export async function deleteAdvisorSession(sessionId: string): Promise<{ ok: boo
 
 export type KeyResult = { ok?: boolean; error?: string };
 
+function gateOpenAiKey() {
+  return guardPlatformAction({
+    module: "sistem",
+    roles: ["super_admin"],
+    rate: { key: "platform-openai-key", limit: 12, windowSec: 600 },
+  });
+}
+
 export async function saveOpenAiKey(formData: FormData): Promise<KeyResult> {
-  const staff = await requirePlatformStaff();
-  if (staff.role !== "super_admin") return { error: "Yalnızca süper admin anahtar tanımlayabilir." };
+  const gate = await gateOpenAiKey();
+  if ("error" in gate) return { error: gate.error };
 
   const key = String(formData.get("key") ?? "").trim();
   if (!key) return { error: "Anahtar boş olamaz." };
@@ -200,17 +209,23 @@ export async function saveOpenAiKey(formData: FormData): Promise<KeyResult> {
     return { error: "Geçersiz anahtar formatı (sk- ile başlamalı)." };
   }
 
-  await setPlatformSetting("openai_api_key", key, staff.id);
+  const res = await applyPlatformWrites(gate.staff, [{ key: "ai.openai_api_key", value: key }], {
+    reason: "OpenAI anahtarı kaydı",
+  });
+  if (!res.ok) return { error: res.error };
   revalidatePath("/admin/sistem");
   revalidatePath("/admin/danisman");
   return { ok: true };
 }
 
 export async function clearOpenAiKey(): Promise<KeyResult> {
-  const staff = await requirePlatformStaff();
-  if (staff.role !== "super_admin") return { error: "Yalnızca süper admin anahtar silebilir." };
+  const gate = await gateOpenAiKey();
+  if ("error" in gate) return { error: gate.error };
 
-  await setPlatformSetting("openai_api_key", null, staff.id);
+  const res = await applyPlatformWrites(gate.staff, [{ key: "ai.openai_api_key", value: null }], {
+    reason: "OpenAI anahtarı silindi",
+  });
+  if (!res.ok) return { error: res.error };
   revalidatePath("/admin/sistem");
   revalidatePath("/admin/danisman");
   return { ok: true };

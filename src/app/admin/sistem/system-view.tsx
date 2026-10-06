@@ -7,6 +7,7 @@ import { probeSchema } from "./schema-checks";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { getPlatformSecret } from "@/lib/settings/secret-read";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { msSince } from "@/lib/clock";
 import { CRON_JOBS } from "@/lib/cron-jobs";
@@ -87,13 +88,13 @@ export async function SystemView() {
     { count: openErrors },
     { data: manualRunRows },
   ] = await Promise.all([
-    getPlatformSetting("openai_api_key"),
+    getPlatformSecret("openai_api_key"),
     getEmlakFiyatiAdminStatus(),
     getPlatformSetting("netgsm_usercode"),
-    getPlatformSetting("netgsm_password"),
+    getPlatformSecret("netgsm_password"),
     getPlatformSetting("netgsm_msgheader"),
     getPlatformSetting("whatsapp_api_url"),
-    getPlatformSetting("whatsapp_api_token"),
+    getPlatformSecret("whatsapp_api_token"),
     getPortalConfig("sahibinden"),
     getPortalConfig("hepsiemlak"),
     getPortalConfig("zingat"),

@@ -1,6 +1,7 @@
 import type { PlanId } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan, type RegistrationTeamSize } from "@/lib/billing/registration-plan";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { DEFAULT_TRIAL_DAYS } from "@/lib/platform-setting-keys";
 
 /**
  * Platform yönetiminden ofis açma kuralları (saf; form ve sunucu action'ı ortak kullanır, zod içermez).
@@ -8,7 +9,8 @@ import { ROLE_LABELS } from "@/lib/role-labels";
  * Deneme süresi varsayılanı kayıt akışındaki mevcut kuraldır (14 gün; provizyon RPC'leri de 14 gün yazar).
  * Farklı bir süre seçilirse provizyondan SONRA deneme bitişi güncellenir.
  */
-export const OFFICE_TRIAL_DEFAULT_DAYS = 14;
+/** Tek kaynak: Ayar Kayit Defteri varsayilani (platform-setting-keys DEFAULT_TRIAL_DAYS = 14). SQL platform_default_trial_days() ayri kalir. */
+export const OFFICE_TRIAL_DEFAULT_DAYS: number = DEFAULT_TRIAL_DAYS;
 export const OFFICE_TRIAL_MIN_DAYS = 1;
 export const OFFICE_TRIAL_MAX_DAYS = 90;
 export const OFFICE_TRIAL_PRESETS = [7, 14, 30, 60] as const;

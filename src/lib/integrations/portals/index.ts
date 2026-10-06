@@ -13,6 +13,7 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import { getPlatformSecret } from "@/lib/settings/secret-read";
 import {
   normalizeProviderBaseUrl,
   providerAllowedHosts,
@@ -72,8 +73,8 @@ export type PortalPublishResult = {
 
 export async function getPortalConfig(portal: PortalName): Promise<PortalPublishConfig | null> {
   const [apiKey, apiSecret, agencyId, baseUrl] = await Promise.all([
-    getPlatformSetting(`${portal}_api_key`),
-    getPlatformSetting(`${portal}_api_secret`),
+    getPlatformSecret(`${portal}_api_key`),
+    getPlatformSecret(`${portal}_api_secret`),
     getPlatformSetting(`${portal}_agency_id`),
     getPlatformSetting(`${portal}_base_url`),
   ]);

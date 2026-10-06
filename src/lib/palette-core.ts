@@ -13,6 +13,9 @@ import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
  * veri ve davranış burada tek yerdedir.
  */
 
+/** Komut paleti "Ayarlar" grubu: ayar arama sonuçlarının grup adı (sonuçlar sunucudan, registry indeksinden ve rol filtreli gelir). */
+export const PALETTE_SETTINGS_GROUP = "Ayarlar";
+
 /** Yan menüdeki arama düğmesi komut paletini bu olayla açar (ikinci bir arama kutusu YOK). */
 export const OPEN_PALETTE_EVENT = "es-open-palette";
 

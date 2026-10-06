@@ -36,6 +36,9 @@ export default async function AdminSettingsPage() {
         </p>
       ) : null}
       <GeneralSettingsForm initial={settings} canEdit={staff.role === "super_admin"} />
+      <Link href="/admin/ayarlar/merkez" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+        Sistem ayarları merkezi (tüm ayarlar, geçmiş, gizli anahtarlar) <ArrowUpRight className="h-3 w-3" />
+      </Link>
       <Link href="/admin/ayarlar/tufe" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
         TÜFE tablosu (kira artışı oranları) <ArrowUpRight className="h-3 w-3" />
       </Link>
