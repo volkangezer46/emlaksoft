@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import Link from "next/link";
-import { Check, ChevronsUpDown, Loader2, TriangleAlert } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, LocateFixed, TriangleAlert } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { MorphTabs, type MorphTabItem } from "@/components/ui/morph-tabs";
@@ -11,16 +11,24 @@ import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/
 import { PhoneInput } from "@/components/ui/phone-input";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { CALL_DISPOSITIONS } from "@/app/app/arama/call-console";
-import { quickCreateAppointment, quickCreateCustomer, quickLogCall } from "./actions";
-import { QUICK_INTENTS } from "./quick-intents";
+import { quickCreateAppointment, quickCreateCustomer, quickCreateProperty, quickLogCall } from "./actions";
+import { QUICK_INTENTS, QUICK_ROOM_OPTIONS } from "./quick-intents";
+import dynamic from "next/dynamic";
+import type { WatermarkSettings } from "@/lib/watermark";
 
-export type QuickTabId = "musteri" | "gorusme" | "randevu";
+export type QuickTabId = "musteri" | "gorusme" | "randevu" | "portfoy";
 
 const TAB_META: Record<QuickTabId, { label: string; icon: MorphTabItem["icon"] }> = {
   musteri: { label: "Müşteri", icon: ICONS.musteri },
   gorusme: { label: "Görüşme notu", icon: ICONS.telefon },
   randevu: { label: "Randevu", icon: ICONS.randevu },
+  portfoy: { label: "Portföy", icon: ICONS.portfoy },
 };
+
+// Medya yükleyicisi (filigran tuvali dahil) yalnız taslak kaydedildikten sonra yüklenir: /app/hizli ilk yükü büyümez.
+const PropertyMediaManager = dynamic(() => import("@/app/app/portfoyler/[id]/property-media-manager").then((m) => m.PropertyMediaManager), {
+  loading: () => <p className="text-sm text-text-muted">Fotoğraf yükleyici açılıyor…</p>,
+});
 
 const SUBMIT =
   "focus-ring press inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60 sm:w-auto";
@@ -28,7 +36,7 @@ const GHOST =
   "focus-ring press inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-300";
 const BIG = "min-h-11";
 
-type Result = { error?: string; ok?: boolean; id?: string; conflictWarning?: string };
+type Result = { error?: string; ok?: boolean; id?: string; conflictWarning?: string; duplicate?: boolean };
 
 /** Ortak gönderim akışı: pending + hata + başarı; Ctrl/Cmd+Enter formu gönderir. */
 function useQuick(action: (fd: FormData) => Promise<Result>) {
@@ -282,6 +290,121 @@ function AppointmentTab({
   );
 }
 
+
+/* -------------------------------- Portföy -------------------------------- */
+
+export type QuickPropertyBrand = { watermark: WatermarkSettings; officeName: string; logoUrl: string | null };
+
+/**
+ * Sahadan hızlı portföy (mal sahibinin evinde): 1) tür, işlem, fiyat, oda, m², "konumumu kullan" → TASLAK kaydedilir;
+ * 2) aynı ekranda fotoğraf çek/yükle (portföy detayındaki yükleyicinin AYNISI: filigran, küçültme, belge türü).
+ * Başlık ve komisyon oranı sunucuda üretilir/ofis varsayılanından gelir; kalan alanlar "Sonra tamamla" ile tam formda.
+ */
+function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: string; label: string }[]; txOptions: { value: string; label: string }[]; brand: QuickPropertyBrand }) {
+  const q = useQuick(quickCreateProperty);
+  const [tx, setTx] = useState(txOptions[0]?.value ?? "Satılık");
+  const [rooms, setRooms] = useState("");
+  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoState, setGeoState] = useState<"idle" | "busy" | "error">("idle");
+
+  function locate() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoState("error");
+      return;
+    }
+    setGeoState("busy");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeo({ lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 });
+        setGeoState("idle");
+      },
+      () => setGeoState("error"),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
+
+  if (q.done?.id) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p role="status" className="flex items-center gap-2 text-base font-bold text-mint-600">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-mint-500/15"><Check className="h-4 w-4" aria-hidden /></span>
+          Taslak portföy kaydedildi — şimdi fotoğrafları ekleyin
+        </p>
+        <PropertyMediaManager propertyId={q.done.id} media={[]} canEdit watermark={brand.watermark} officeName={brand.officeName} logoUrl={brand.logoUrl} />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Link href={`/app/portfoyler/${q.done.id}`} className={SUBMIT}>Sonra tamamla (kaydı aç)</Link>
+          <button type="button" onClick={() => { setGeo(null); setRooms(""); q.again(); }} className={GHOST}>Bir portföy daha</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <form
+      key={q.round}
+      onSubmit={(e) => q.onSubmit(e, q.result.duplicate ? { allow_duplicate: "1" } : undefined)}
+      onKeyDown={q.onKeyDown}
+      className="flex flex-col gap-4"
+    >
+      <fieldset>
+        <legend className="mb-1.5 text-sm font-medium text-ink-950">İşlem *</legend>
+        <div className="grid grid-cols-2 gap-2">
+          {txOptions.map((o) => (
+            <label key={o.value} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border text-sm font-semibold transition ${tx === o.value ? "border-brand-400 bg-brand-600/8 text-brand-600" : "border-line text-text-muted hover:border-brand-300"}`}>
+              <input type="radio" name="transaction_type" value={o.value} checked={tx === o.value} onChange={() => setTx(o.value)} className="sr-only" />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Portföy türü" htmlFor="hq-prop-type" required inject={false}>
+          <div className="relative">
+            <FormSelect id="hq-prop-type" name="property_type" required defaultValue={typeOptions[0]?.value ?? "Daire"} className={`${BIG} cursor-pointer appearance-none pr-9`}>
+              {typeOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </FormSelect>
+            <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" aria-hidden />
+          </div>
+        </FormField>
+        <FormField label={tx === "Kiralık" ? "Aylık kira (₺)" : "Fiyat (₺)"} htmlFor="hq-prop-price" required>
+          <FormInput id="hq-prop-price" name="list_price" inputMode="numeric" required placeholder="Örn. 4.500.000" className={BIG} />
+        </FormField>
+      </div>
+      <fieldset>
+        <legend className="mb-1.5 text-sm font-medium text-ink-950">Oda</legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {QUICK_ROOM_OPTIONS.map((r) => (
+            <label key={r} className={`flex min-h-11 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border text-sm font-semibold transition ${rooms === r ? "border-brand-400 bg-brand-600/8 text-brand-600" : "border-line text-text-muted hover:border-brand-300"}`}>
+              <input type="radio" name="rooms" value={r} checked={rooms === r} onChange={() => setRooms(r)} className="sr-only" />
+              {r}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <FormField label="m² (brüt)" htmlFor="hq-prop-sqm">
+        <FormInput id="hq-prop-sqm" name="sqm" inputMode="decimal" placeholder="Örn. 120" className={BIG} />
+      </FormField>
+      <FormField label="Adres / semt (isteğe bağlı)" htmlFor="hq-prop-address">
+        <FormInput id="hq-prop-address" name="address_line" maxLength={200} placeholder="Mahalle, sokak…" className={BIG} />
+      </FormField>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={locate} disabled={geoState === "busy"} className={GHOST}>
+          {geoState === "busy" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden /> : <LocateFixed className="mr-1.5 h-4 w-4" aria-hidden />}
+          {geo ? "Konum alındı — yenile" : "Konumumu kullan"}
+        </button>
+        {geo ? <span className="text-xs text-text-muted tabular-nums">{geo.lat}, {geo.lng}</span> : null}
+        {geoState === "error" ? <span className="text-xs text-danger-600">Konum alınamadı (izin verin ya da adres yazın).</span> : null}
+        <input type="hidden" name="lat" value={geo ? String(geo.lat) : ""} />
+        <input type="hidden" name="lng" value={geo ? String(geo.lng) : ""} />
+      </div>
+      <p className="text-xs text-text-faint">Başlık otomatik oluşur, komisyon oranı ofis varsayılanıdır; kaydettikten sonra fotoğrafları bu ekranda eklersiniz.</p>
+      <ErrorBand error={q.result.error} />
+      <SubmitRow pending={q.pending} label={q.result.duplicate ? "Yine de yeni taslak aç" : "Taslak olarak kaydet"} />
+    </form>
+  );
+}
+
 /* --------------------------------- Kabuk --------------------------------- */
 
 export function QuickCapture({
@@ -291,6 +414,9 @@ export function QuickCapture({
   properties,
   typeOptions,
   defaultWhen,
+  propertyTypeOptions = [],
+  transactionOptions = [],
+  brand,
 }: {
   tabs: QuickTabId[];
   initial: QuickTabId;
@@ -298,6 +424,9 @@ export function QuickCapture({
   properties: ComboboxOption[];
   typeOptions: { value: string; label: string }[];
   defaultWhen: string;
+  propertyTypeOptions?: { value: string; label: string }[];
+  transactionOptions?: { value: string; label: string }[];
+  brand?: QuickPropertyBrand;
 }) {
   const [active, setActive] = useState<QuickTabId>(initial);
   const items: MorphTabItem[] = tabs.map((t) => ({ id: t, label: TAB_META[t].label, icon: TAB_META[t].icon }));
@@ -316,6 +445,7 @@ export function QuickCapture({
     musteri: <CustomerTab />,
     gorusme: <CallTab customers={customers} />,
     randevu: <AppointmentTab customers={customers} properties={properties} typeOptions={typeOptions} defaultWhen={defaultWhen} />,
+    portfoy: brand ? <PropertyTab typeOptions={propertyTypeOptions} txOptions={transactionOptions} brand={brand} /> : null,
   };
 
   return (

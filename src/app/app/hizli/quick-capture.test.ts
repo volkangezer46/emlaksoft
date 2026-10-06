@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_ACTIONS } from "@/lib/palette-core";
-import { QUICK_INTENTS, QUICK_INTENT_TYPES } from "./quick-intents";
+import { QUICK_INTENTS, QUICK_INTENT_TYPES, buildQuickPropertyTitle } from "./quick-intents";
 
 /**
  * Hızlı kayıt sözleşmesi: sekmeli tek sayfa (popup yok), mevcut server action'lar sarılır,
@@ -50,5 +50,20 @@ describe("hızlı kayıt", () => {
 
   it("komut paleti / Yeni menüsü tek kaynağında kayıtlı", () => {
     expect(APP_ACTIONS.some((a) => a.href === "/app/hizli" && a.label === "Hızlı kayıt")).toBe(true);
+  });
+
+  it("hızlı portföy: createProperty sarılır (taslak), başlık otomatik, komisyon ofis varsayılanı, fotoğraf mevcut yükleyiciyle", () => {
+    expect(actions).toContain("createProperty(out)");
+    expect(actions).toContain('"office.commission.default_rate"');
+    expect(actions).not.toMatch(/\.from\("properties"\)\s*\.insert/);
+    expect(ui).toContain('"portfoy"');
+    expect(ui).toContain("<PropertyMediaManager");
+    expect(ui).toContain("navigator.geolocation");
+    expect(page).toMatch(/can\("properties"\) && \(perms\.properties \?\? \[\]\)\.includes\("edit"\)/);
+  });
+
+  it("otomatik başlık: oda + işlem + tür + m²; boşsa taslak adı", () => {
+    expect(buildQuickPropertyTitle({ rooms: "3+1", transactionType: "Satılık", propertyType: "Daire", sqm: 120 })).toBe("3+1 Satılık Daire, 120 m²");
+    expect(buildQuickPropertyTitle({})).toBe("Yeni portföy (taslak)");
   });
 });

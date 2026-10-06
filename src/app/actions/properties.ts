@@ -44,6 +44,10 @@ export type PropertyResult = {
   pooled?: boolean;
   /** Yetki süresi EİDS kuralına (en az 3 ay) uymuyorsa uyarı; kayıt yapılmıştır. */
   authorityWarning?: string;
+  /** Oluşan portföyün kimliği (hızlı kayıt fotoğrafı aynı ekranda bağlar). */
+  id?: string;
+  /** Giriş anı mükerrer kontrolü takıldı: aynı form `allow_duplicate=1` ile yeniden gönderilebilir. */
+  duplicate?: boolean;
 };
 
 /** Havuza yönlendirmede "kendi adına ekleyen" sayılan roller; diğer roller (ör. çağrı merkezi) ilanı atanmamış açar. */
@@ -281,6 +285,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     );
     if (dups.length > 0) {
       return {
+        duplicate: true,
         error:
           "Benzer bir portföy zaten var. Formdaki uyarıyı inceleyin; yine de yeni kayıt açmak için \"Yine de yeni kayıt\" seçin.",
       };
@@ -509,7 +514,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   const authorityWarning = ownerInfo
     ? (shortAuthorityWarning(ownerInfo.authorizationStart, ownerInfo.authorizationEnd, clockNow()) ?? undefined)
     : undefined;
-  return { ok: true, matchedDemands, ownerInfoScore, ownerMissing, pooled, authorityWarning };
+  return { ok: true, id: data.id, matchedDemands, ownerInfoScore, ownerMissing, pooled, authorityWarning };
 }
 
 export async function updateProperty(formData: FormData): Promise<PropertyResult> {
