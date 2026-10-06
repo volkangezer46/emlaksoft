@@ -1,5 +1,6 @@
 import { CalendarCheck, FileSignature, LayoutGrid, Scale, Workflow, type LucideIcon } from "lucide-react";
 import { CountUp } from "@/components/ui/count-up";
+import { CRON_JOBS } from "@/lib/cron-jobs";
 import { NAV_SECTIONS } from "@/lib/nav-config";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import type { TrustItem } from "@/lib/site-content/schema";
@@ -7,11 +8,12 @@ import { homeHref } from "./content-link";
 
 /**
  * Sahte rakam yerine doğrulanabilir gerçekler. Kaynaklar: getEffectiveTrialDays (deneme günü, sunucuda okunur),
- * vercel.json (27 cron, `npm run check:cron`), nav-config (iş başlığı sayısı), SMS onaylı dijital imza.
+ * cron envanteri (CRON_JOBS.length = vercel.json, `npm run check:cron` doğrular), nav-config (iş başlığı sayısı), SMS onaylı dijital imza.
  * DEĞERLER koddan gelir (içerik editöründe değiştirilemez, sahte sayaç yok); yalnız etiket/bağlantı/sıra/gizleme düzenlenir.
  * Sunucu çıktısı SONUÇ değerini basar (JS kapalıyken de doğru); sayılar ilk görünümde bir kez yukarı sayar (CountUp, ek paket yok).
  */
-const CRON_COUNT = 27;
+// Sabit sayı yazılmaz: envanterden türetilir (eskiden 27 sabitti ve gerçek sayıyla uyuşmuyordu).
+const CRON_COUNT = CRON_JOBS.length;
 
 export function TrustStrip({ trialDays, content = defaultSiteContent().trust }: { trialDays?: number; content?: readonly TrustItem[] }) {
   const base: Record<string, { icon: LucideIcon; value: string } | null> = {

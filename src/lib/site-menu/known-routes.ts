@@ -47,7 +47,7 @@ export const HOME_ANCHORS = [
 ] as const;
 
 /** /fiyatlar sayfasındaki bölüm kimlikleri. */
-export const PRICING_ANCHORS = ["karsilastirma", "kacan-komisyon", "sss"] as const;
+export const PRICING_ANCHORS = ["karsilastirma", "kacan-komisyon", "kontor", "sss"] as const;
 
 export function knownPublicPaths(): string[] {
   return [...STATIC_PUBLIC_PATHS, ...publishedTools().map((t) => `/araclar/${t.slug}`)];

@@ -8,6 +8,9 @@ import { CRON_JOBS } from "@/lib/cron-jobs";
  * burada okur; `landing-golden.test.ts` çıktıyı eski sabit metinlerden alınmış altın dosyayla birebir karşılaştırır.
  * Değişkenler ({deneme}, {yillik} ...) tokens.ts'te çözülür. Bölüm kimlikleri (id) ikon/yapı eşlemesi içindir; değiştirilmez.
  */
+const p = (id: string, text: string, gate = "") => ({ id, text, gate, hidden: false });
+const c = (id: string, text: string) => ({ id, text, hidden: false });
+
 export function defaultSiteContent(): SiteContent {
   return {
     v: 1,
@@ -144,6 +147,66 @@ export function defaultSiteContent(): SiteContent {
       soonCta: { label: "{deneme_dene}", href: "/kayit" },
       note: "Sonuçlar bilgilendirme amaçlıdır, ilan fiyatlarına dayanır; resmi ekspertiz veya banka değerlemesi yerine geçmez.",
     },
+    // Ürün turu: kimlik = ekran çizimi. `gate` dolu maddeye paket rozeti sayfa kilidinden eklenir (metin elle yazılmaz).
+    tour: [
+      { id: "bugun", label: "Bugün", text: "Günün işi açılışta tek bakışta: görevler, randevular ve yeni talepler.", points: [p("p1", "Günlük brifing ve AI asistan aynı başlıkta"), p("p2", "Görev ve randevular tek akışta"), p("p3", "Yeni talepler eşleşmeleriyle gelir")], hidden: false },
+      { id: "musteriler", label: "Müşteriler", text: "Müşteri kartı, talep ve eşleşmeler yan yana; hiçbir talep kaybolmaz.", points: [p("p1", "Müşteri, talep ve eşleştirme bir arada"), p("p2", "Akıllı listeler ve tavsiyeler"), p("p3", "Gelen kutusu ve görüşme notları")], hidden: false },
+      { id: "portfoy", label: "Portföy", text: "Portföyleriniz durumlarıyla kart görünümünde; yayın teyidi bekleyenler ayrışır.", points: [p("p1", "Kiralama, proje ve açık ev yönetimi"), p("p2", "Portal kontrolü ve anahtar takibi"), p("p3", "Sunumlar ve ofisler arası ağ")], hidden: false },
+      { id: "anlasmalar", label: "Anlaşmalar", text: "Tekliften tamamlanmaya anlaşmalar aşamalarına göre sütunlarda ilerler.", points: [p("p1", "Teklif ve sözleşme aynı kayıtta"), p("p2", "SMS onaylı dijital imza", "/app/sozlesmeler"), p("p3", "Aşama bazlı takip")], hidden: false },
+      { id: "komisyon", label: "Komisyon", text: "Komisyon kayıtları, bölüşüm ve hakediş durumu aylık dağılımla birlikte.", points: [p("p1", "Bölüşüm ve hakediş kayıt altında"), p("p2", "Onay akışı"), p("p3", "Cüzdan, gider ve aidat takibi")], hidden: false },
+      { id: "raporlar", label: "Raporlar", text: "Satış hunisi, danışman karnesi ve kaçan komisyon özeti.", points: [p("p1", "Satış hunisi ve trendler"), p("p2", "Danışman KPI ve ekip ligi"), p("p3", "Kayıp-kaçak karnesi", "/app/kayip-kacak")], hidden: false },
+      { id: "otomasyon", label: "Otomasyon", text: "Hatırlatma, teyit ve özet işleri arka planda zamanlanmış görevlerle çalışır.", points: [p("p1", "{gorev} otomatik görev"), p("p2", "İş akışı ve onay akışları", "/app/onaylar"), p("p3", "Çalışmalar kayıt altına alınır")], hidden: false },
+    ],
+    // Özellik ızgarası: kimlik = illüstrasyon + ızgara yerleşimi + paket rozeti yolu (bento-grid.tsx TILE_META).
+    bento: {
+      tiles: [
+        { id: "kayip-kacak", eyebrow: "Kayıp-kaçak kalkanı", title: "Kaybettiğiniz komisyonu rakama dökün", text: "İlan yayından kalktığında sistem sebebini sorar: satıldı mı, rakip mi kapattı, yoksa ihmal mi edildi? Kaçan komisyon görünür olur.", points: [c("b1", "Zorunlu kapanış formu, boş geçilemez"), c("b2", "Rakip kapanışı ile kendi satışınız ayrı sayılır"), c("b3", "Danışman bazında kaçak karnesi")], hidden: false },
+        { id: "emsal-degerleme", eyebrow: "Değerleme", title: "Emsal bazlı fiyat sinyali", text: "Emsal motoru benzer portföylerden bir fiyat aralığı çıkarır; pazarlığa veriyle girersiniz.", points: [], hidden: false },
+        { id: "otomasyon", eyebrow: "Otomasyonlar", title: "{gorev} otomatik görev, arka planda", text: "Hatırlatma, teyit ve özet işleri siz uğraşmadan zamanında çalışır.", points: [], hidden: false },
+        { id: "ai-asistan", eyebrow: "AI asistan", title: "Sorun, listelesin", text: "Doğal dille sorun; asistan ofis kayıtlarınız üzerinden yanıtlar.", points: [], hidden: false },
+        { id: "portal-kontrol", eyebrow: "Portal kontrolü", title: "İlanlarınızı teyitle, kaçağı ölçün", text: "İlan numarası veya bağlantısını ekleyin; periyodik teyit ve kapanış formu. Otomatik yayınlama yoktur.", points: [], hidden: false },
+        { id: "imza", eyebrow: "Sözleşme", title: "SMS onaylı dijital imza", text: "Teklif ve sözleşme aynı kayıtta; imza SMS doğrulamasıyla alınır.", points: [], hidden: false },
+        { id: "vitrin", eyebrow: "Vitrin", title: "Kendi adresinizde ofis vitrini", text: "Portföyleriniz, favoriler ve değerleme formuyla herkese açık sayfa.", points: [], hidden: false },
+        { id: "performans", eyebrow: "Ekip ve performans", title: "Karne, lig ve hedefler", text: "Danışman KPI, ekip ligi ve hedefler tek yerde; ekibi sayılarla yönetin.", points: [], hidden: false },
+      ],
+      note: "İllüstrasyonlardaki isim ve sayılar örnek veridir. Özelliklerin kapsamı pakete göre değişir; deneme boyunca hepsi açıktır.",
+    },
+    why: {
+      oldLabel: "Excel + WhatsApp + defter",
+      newLabel: "EmlakSoft",
+      rows: [
+        { id: "musteri", topic: "Müşteri ve talep", old: "Dosyalara ve sohbetlere dağılmış kayıtlar; talep unutulabilir.", now: "Tek müşteri kartı; talep ve portföy eşleşmesi aynı akışta.", gate: "", hidden: false },
+        { id: "takip", topic: "Takip ve hatırlatma", old: "Hatırlatma sizin hafızanızda ve not defterinizde.", now: "Görev ve randevu hatırlatmaları otomatik görevlerle gelir.", gate: "", hidden: false },
+        { id: "kacak", topic: "Kaçan fırsat", old: "Bir ilanın neden kaybedildiği çoğu zaman bilinmez.", now: "Zorunlu kapanış formu ve kaçak karnesi.", gate: "/app/kayip-kacak", hidden: false },
+        { id: "komisyon", topic: "Komisyon", old: "Elle hesap; bölüşümde ve hakedişte tartışma çıkar.", now: "Bölüşüm, hakediş ve onay durumu kayıt altında.", gate: "", hidden: false },
+        { id: "erisim", topic: "Ekip erişimi", old: "Dosyaya ulaşan herkes her şeyi görür.", now: "Rol ve izin matrisi; ofis verisi ayrı tutulur.", gate: "", hidden: false },
+        { id: "imza", topic: "Sözleşme ve imza", old: "Kâğıt, fotoğraf ve mesajlaşma ile onay.", now: "SMS onaylı dijital imza akışı.", gate: "/app/sozlesmeler", hidden: false },
+      ],
+      note: "Karşılaştırma genel çalışma alışkanlıklarını anlatır; belirli bir ürün veya firma ile kıyas değildir.",
+    },
+    efSection: {
+      eyebrow: "EmlakFiyati",
+      title: "Nasıl çalışır,",
+      em: "kaç kontör",
+      tail: "düşer?",
+      liveText: "Değerleme ve PDF rapor sorguları kontörle çalışır; paketinizdeki aylık kontör her ay otomatik yüklenir.",
+      soonText: "Değerleme henüz herkese açık değil. Aşağıdaki kontör hakları planlanan değerlerdir ve değerleme açılınca paketinizle yüklenecektir.",
+      // "onay" adımına tarifedeki değerleme bedeli koddan eklenir (sayı burada yazılmaz).
+      steps: [
+        { id: "sec", title: "Mahalle ve ada/parsel seçin", text: "Müşteri kaydının yanından mahalleyi seçin, ada ve parseli girin.", hidden: false },
+        { id: "onay", title: "Onaylayın, kontör görünsün", text: "Sorgu çalışmadan önce kaç kontör düşeceği ekranda görünür; onaylarsanız çalışır.", hidden: false },
+        { id: "rapor", title: "Rapor ve PDF", text: "Değer aralığı, emsal sayısı ve güven düzeyiyle rapor gelir; PDF olarak indirirsiniz.", hidden: false },
+      ],
+      plansTitle: "Pakete dahil aylık kontör",
+      plansNote: "Yaklaşık değerleme sayısı, aylık kontörün değerleme bedeline bölünmesiyle bulunur. Plan kontörü en çok 3 aylık birikir.",
+      packsTitle: "Ek kontör paketleri",
+      packsText: "Satın alınan paketin kontörü süresiz geçerlidir. Büyük pakette kontör başı fiyat düşer.",
+      packsEmpty: "Ek paket fiyatları ofis panelinde, giriş yaptıktan sonra görünür.",
+      detailLink: { label: "Kontör ayrıntıları ve fiyatlar", href: "/fiyatlar#kontor" },
+      note: "Tutarlar KDV hariçtir. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.",
+    },
+    // Bölüm sırası = bugünkü ana sayfa sırası; hepsi görünür.
+    layout: ["deger", "guven", "tur", "ozellikler", "degerleme", "emlakfiyati", "diger", "neden", "nasil", "guvenlik", "fiyat", "sss", "son"].map((id) => ({ id: id as SiteContent["layout"][number]["id"], hidden: false })),
     // Geriye dönük anahtar: /demo sayfası kaldırıldı (kalıcı /kayit yönlendirmesi); şema uyumu için korunur, hiçbir sayfa okumaz.
     demo: { title: "Ofisini ücretsiz kur", text: "Kredi kartı gerekmez — kurulum sihirbazı ofisini dakikalar içinde hazırlar." },
     register: {

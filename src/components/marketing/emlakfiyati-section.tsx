@@ -7,16 +7,14 @@ import { monthlyUnitsOf } from "@/lib/ef-credits/plan-credits";
 import { efPlannedLine, type EfPublicState } from "@/lib/ef-credits/public-state-core";
 import { trialCtaLabel } from "@/lib/marketing-copy";
 import { formatNumberTr } from "@/lib/format";
-import { Em, SectionHeading } from "./section-heading";
+import { SectionHeading } from "./section-heading";
+import { ContentLink, RichTitle } from "./content-link";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import type { SiteContent } from "@/lib/site-content/schema";
+import { tx } from "@/lib/site-content/tokens";
 
 /** Ofis panelindeki Kontör sekmesi; yalnız durum "live" iken bağlantı verilir. Hesabı olmayan /kayit'tan başlar. */
 export const EF_PACKS_APP_HREF = "/app/abonelik?sekme=kontor#paketler";
-
-const STEPS = [
-  { title: "Mahalle ve ada/parsel seçin", text: "Müşteri kaydının yanından mahalleyi seçin, ada ve parseli girin." },
-  { title: "Onaylayın, kontör görünsün", text: "Sorgu çalışmadan önce kaç kontör düşeceği ekranda görünür; onaylarsanız çalışır." },
-  { title: "Rapor ve PDF", text: "Değer aralığı, emsal sayısı ve güven düzeyiyle rapor gelir; PDF olarak indirirsiniz." },
-] as const;
 
 const TH = "px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.06em] text-text-muted";
 const TD = "px-3 py-2.5 text-sm tabular-nums text-ink-950";
@@ -106,18 +104,22 @@ export function EfPackTiersTable({ packs, tariff, live }: { packs: EfPack[]; tar
 /**
  * Ana sayfa EmlakFiyati bölümü (#emlakfiyati), değerleme bölümünün hemen ardından gelir: nasıl çalışır, paket kontörleri,
  * ek paketler. Her sayı tek kaynaktan (plan kataloğu, kontör tarifesi, ek paket kataloğu); sabit sayı yoktur.
- * DÜRÜST DURUM: yalnız `state === "live"` iken "Canlı" ve satın alma bağlantısı; diğer durumlarda "Yakında"/"Bakımda".
+ * Metinler site içeriğinden (efSection); sayılar ve durum koddan. DÜRÜST DURUM: yalnız `state === "live"` iken "Canlı" ve satın alma bağlantısı; diğer durumlarda "Yakında"/"Bakımda".
  */
 export function EmlakFiyatiSection({
   pricing,
   tariff,
   packs,
+  content = defaultSiteContent().efSection,
 }: {
   pricing: PublicPricing;
   tariff: EfTariff;
   packs: EfPack[];
+  content?: SiteContent["efSection"];
 }) {
   const { plans, trialDays, efState } = pricing;
+  const ctx = { trialDays, plans, efLive: efState === "live" };
+  const steps = content.steps.filter((s) => !s.hidden);
   const state: EfPublicState = efState;
   const live = state === "live";
   if (!plans.some((p) => monthlyUnitsOf(p.efCreditsMonthly) > 0)) return null;
@@ -130,50 +132,44 @@ export function EmlakFiyatiSection({
       <div className="mk-wrap">
         <SectionHeading
           center
-          eyebrow="EmlakFiyati"
-          title={<span id="emlakfiyati-baslik">Nasıl çalışır, <Em>kaç kontör</Em> düşer?</span>}
-          text={
-            live
-              ? "Değerleme ve PDF rapor sorguları kontörle çalışır; paketinizdeki aylık kontör her ay otomatik yüklenir."
-              : "Değerleme henüz herkese açık değil. Aşağıdaki kontör hakları planlanan değerlerdir ve değerleme açılınca paketinizle yüklenecektir."
-          }
+          eyebrow={content.eyebrow}
+          title={<span id="emlakfiyati-baslik"><RichTitle title={content.title} em={content.em} tail={content.tail} /></span>}
+          text={tx(live ? content.liveText : content.soonText, ctx) || undefined}
         />
         <p className="mt-4 flex justify-center">
           <span className={`mk-tag ${live ? "mk-tag-plan" : "mk-example"}`} data-ef-status={state}>{badge}</span>
         </p>
 
+        {steps.length ? (
         <ol className="mt-9 grid gap-4 md:grid-cols-3" aria-label="Nasıl çalışır">
-          {STEPS.map((s, i) => (
-            <li key={s.title} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+          {steps.map((s, i) => (
+            <li key={s.id} className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-600/10 text-sm font-bold text-brand-700">{i + 1}</span>
-              <h3 className="mt-3 font-display text-base font-bold text-ink-950">{s.title}</h3>
+              <h3 className="mt-3 font-display text-base font-bold text-ink-950">{tx(s.title, ctx)}</h3>
               <p className="mt-1 text-sm text-text-muted">
-                {s.text}
-                {i === 1 && valuation > 0 ? ` Ada/parsel değerleme ${formatNumberTr(valuation)} kontördür.` : ""}
+                {tx(s.text, ctx)}
+                {s.id === "onay" && valuation > 0 ? ` Ada/parsel değerleme ${formatNumberTr(valuation)} kontördür.` : ""}
               </p>
             </li>
           ))}
         </ol>
+        ) : null}
 
-        <h3 className="mt-10 font-display text-lg font-bold text-ink-950">Pakete dahil aylık kontör</h3>
+        <h3 className="mt-10 font-display text-lg font-bold text-ink-950">{content.plansTitle}</h3>
         <div className="mt-3">
           <EfPlanCreditsTable plans={plans} tariff={tariff} live={live} />
         </div>
-        <p className="mt-2 text-xs text-text-muted">
-          Yaklaşık değerleme sayısı, aylık kontörün değerleme bedeline bölünmesiyle bulunur. Plan kontörü en çok 3 aylık birikir.
-        </p>
+        {content.plansNote ? <p className="mt-2 text-xs text-text-muted">{tx(content.plansNote, ctx)}</p> : null}
 
         <h3 className="mt-10 flex items-center gap-2 font-display text-lg font-bold text-ink-950">
-          <Coins aria-hidden className="h-5 w-5 text-brand-700" /> Ek kontör paketleri
+          <Coins aria-hidden className="h-5 w-5 text-brand-700" /> {content.packsTitle}
         </h3>
-        <p className="mt-1 text-sm text-text-muted">
-          Satın alınan paketin kontörü süresiz geçerlidir. Büyük pakette kontör başı fiyat düşer.
-        </p>
+        {content.packsText ? <p className="mt-1 text-sm text-text-muted">{tx(content.packsText, ctx)}</p> : null}
         <div className="mt-3">
           {hasPacks ? (
             <EfPackTiersTable packs={packs} tariff={tariff} live={live} />
           ) : (
-            <p className="text-sm text-text-muted">Ek paket fiyatları ofis panelinde, giriş yaptıktan sonra görünür.</p>
+            <p className="text-sm text-text-muted">{tx(content.packsEmpty, ctx)}</p>
           )}
         </div>
         {live ? (
@@ -192,13 +188,9 @@ export function EmlakFiyatiSection({
           >
             <FileText aria-hidden className="h-4 w-4" /> {trialCtaLabel(trialDays)}
           </Link>
-          <Link href="/fiyatlar#kontor" className="text-sm font-semibold text-brand-700 hover:underline">
-            Kontör ayrıntıları ve fiyatlar
-          </Link>
+          {content.detailLink.label ? <ContentLink href={content.detailLink.href} className="text-sm font-semibold text-brand-700 hover:underline">{tx(content.detailLink.label, ctx)}</ContentLink> : null}
         </div>
-        <p className="mk-fine">
-          Tutarlar KDV hariçtir. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.
-        </p>
+        {content.note ? <p className="mk-fine">{tx(content.note, ctx)}</p> : null}
       </div>
     </section>
   );

@@ -19,7 +19,9 @@ import { ValuationSection } from "@/components/marketing/valuation-section";
 import { FinalCta } from "@/components/marketing/final-cta";
 import { LandingJsonLd } from "@/components/marketing/landing-jsonld";
 import { MotionRoot } from "@/components/marketing/motion-root";
+import { Fragment, type ReactNode } from "react";
 import type { Metadata } from "next";
+import { visibleSections, type LandingSectionId } from "@/lib/site-content/schema";
 import { buildMetadata } from "@/lib/seo/store";
 import "./marketing.css";
 import "./marketing-sections.css";
@@ -40,26 +42,32 @@ export default async function HomePage() {
   const efCatalog = await getEfCatalog();
   const { trialDays, plans } = pricing;
   const faqs = buildHomeFaqs({ trialDays, plans, content: content.faq });
+  // Bölüm sırası ve görünürlüğü site içeriğinden (Yönetim > Site içeriği > Bölüm düzeni); hero her zaman ilk.
+  const sections: Record<LandingSectionId, ReactNode> = {
+    deger: <ValueCards trialDays={trialDays} plans={plans} content={content.valueCards} />,
+    guven: <TrustStrip trialDays={trialDays} content={content.trust} />,
+    tur: <ProductTour heading={content.sections.tur} items={content.tour} />,
+    ozellikler: <BentoGrid heading={content.sections.ozellikler} content={content.bento} />,
+    degerleme: <ValuationSection status={pricing.efLive ? "live" : "soon"} state={pricing.efState} trialDays={trialDays} plans={plans} content={content.valuation} />,
+    emlakfiyati: <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} content={content.efSection} />,
+    diger: <Highlights heading={content.sections.diger} content={content.highlights} />,
+    neden: <Why heading={content.sections.neden} content={content.why} />,
+    nasil: <HowItWorks trialDays={trialDays} plans={plans} steps={content.steps} heading={content.sections.nasil} />,
+    guvenlik: <SecurityBand trialDays={trialDays} plans={plans} content={content.security} heading={content.sections.guvenlik} />,
+    fiyat: <PricingSection pricing={pricing} heading={content.sections.fiyat} />,
+    sss: <Faq items={faqs} heading={content.sections.sss} />,
+    son: <FinalCta trialDays={trialDays} plans={plans} content={content.finalCta} />,
+  };
+  const shown = visibleSections(content);
   return (
     <div className="mk">
-      <LandingJsonLd faq={faqForJsonLd(faqs)} />
+      {/* FAQPage verisi yalnız SSS bölümü görünürken (görünen içerikle aynı liste). */}
+      <LandingJsonLd faq={shown.includes("sss") ? faqForJsonLd(faqs) : []} />
       <MotionRoot />
       <SiteHeader />
       <main id="main-content">
         <HeroSection trialDays={trialDays} plans={plans} content={content.hero} />
-        <ValueCards trialDays={trialDays} plans={plans} content={content.valueCards} />
-        <TrustStrip trialDays={trialDays} content={content.trust} />
-        <ProductTour heading={content.sections.tur} />
-        <BentoGrid heading={content.sections.ozellikler} />
-        <ValuationSection status={pricing.efLive ? "live" : "soon"} state={pricing.efState} trialDays={trialDays} plans={plans} content={content.valuation} />
-        <EmlakFiyatiSection pricing={pricing} tariff={efCatalog.tariff} packs={efCatalog.packs} />
-        <Highlights heading={content.sections.diger} content={content.highlights} />
-        <Why heading={content.sections.neden} />
-        <HowItWorks trialDays={trialDays} plans={plans} steps={content.steps} heading={content.sections.nasil} />
-        <SecurityBand trialDays={trialDays} plans={plans} content={content.security} heading={content.sections.guvenlik} />
-        <PricingSection pricing={pricing} heading={content.sections.fiyat} />
-        <Faq items={faqs} heading={content.sections.sss} />
-        <FinalCta trialDays={trialDays} plans={plans} content={content.finalCta} />
+        {shown.map((id) => <Fragment key={id}>{sections[id]}</Fragment>)}
       </main>
       <SiteFooter />
     </div>

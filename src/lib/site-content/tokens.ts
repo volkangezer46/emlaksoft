@@ -1,6 +1,7 @@
 import { EF_PLANNED_SUFFIX } from "@/lib/ef-credits/public-state-core";
 import type { PlanDef } from "@/lib/billing/plans";
 import { trialCtaLabel, trialShort, yearlyOffer } from "@/lib/marketing-copy";
+import { CRON_JOBS } from "@/lib/cron-jobs";
 
 /**
  * Metin değişkenleri ({deneme}, {yillik} ...): deneme günü ve yıllık teklif tek kaynaktan (admin paket tanımları) gelir;
@@ -31,6 +32,8 @@ export function efMonthlyAllowanceText(plans: readonly PlanDef[]): string | null
 function tokenValue(name: string, ctx: TokenContext): string | null | undefined {
   const offer = yearlyOffer(ctx.plans);
   switch (name) {
+    case "gorev":
+      return String(CRON_JOBS.length);
     case "deneme":
       return trialShort(ctx.trialDays);
     case "deneme_dene":
