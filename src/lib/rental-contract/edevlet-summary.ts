@@ -5,6 +5,7 @@
  * doldururken kira kaydından kopyalayacağı alanları tek blokta toplar. TC kimlik no EmlakSoft'ta TUTULMAZ:
  * özet bunu açıkça "taraflardan alın" diye belirtir. Alan adları e-Devlet ekranından doğrulanmadı ("sıkça istenen").
  */
+import { formatTryDecimal } from "@/lib/format";
 
 export const EDEVLET_GUIDE_URL = "https://www.turkiye.gov.tr/";
 export const EDEVLET_GUIDE_LABEL = "e-Devlet Kapısı (\"Dijital Kontrat\" hizmetini arayın)";
@@ -23,9 +24,7 @@ export type EdevletRentalInput = {
   deposit: number | null;
 };
 
-function tl(n: number): string {
-  return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n)} TL`;
-}
+const tl = (n: number): string => formatTryDecimal(n, 2);
 
 function trDate(dayKey: string): string {
   const [y, m, d] = dayKey.slice(0, 10).split("-");

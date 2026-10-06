@@ -5,6 +5,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { SOCIAL_LINK_REQUIRED_MESSAGE, isSocialCardFormat, pickListingLink } from "@/lib/social-card/core";
 import { loadCoverDataUrl, loadSocialCardData } from "@/lib/social-card/load";
 import { renderSocialCard } from "@/lib/social-card/render";
+import { formatTryAmount } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const rent = tx === "rent" || tx.includes("kira");
   const price =
     p.listPrice != null && p.listPrice > 0
-      ? `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(p.listPrice)} ₺${rent ? "/ay" : ""}`
+      ? `${formatTryAmount(p.listPrice)}${rent ? "/ay" : ""}`
       : null;
 
   const image = await renderSocialCard({

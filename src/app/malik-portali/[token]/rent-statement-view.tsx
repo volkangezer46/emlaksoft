@@ -4,12 +4,11 @@ import { loadRentStatementData } from "@/lib/owner-report/load";
 import { RENT_DECLARATION_NOTE, buildRentStatement, statementYears } from "@/lib/owner-report/rent-statement";
 import { now, trDayKey } from "@/lib/clock";
 import { PrintButton } from "./print-button";
+import { formatTryDecimal } from "@/lib/format";
 
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 
-function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(n);
-}
+const money = (n: number) => formatTryDecimal(n, 2);
 
 /**
  * Malik kira ekstresi (yazdırılabilir): `/malik-portali/<token>?ekstre=<yıl>`. Seçilen yılın aylık tahakkuk / tahsilat /

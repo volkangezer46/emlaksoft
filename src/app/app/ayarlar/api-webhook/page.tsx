@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyState } from "@/components/ui/empty-state";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { createClient } from "@/lib/supabase/server";
@@ -66,7 +66,7 @@ export default async function ApiWebhookPage() {
             </p>
             <ApiKeyCreateForm />
             {keys.length === 0 ? (
-              <EmptyStateV3 variant="compact" title="Henüz anahtar yok." description="Anahtar oluşturunca tam değer yalnız bir kez gösterilir; güvenli bir yerde saklayın." />
+              <EmptyState variant="compact" title="Henüz anahtar yok." description="Anahtar oluşturunca tam değer yalnız bir kez gösterilir; güvenli bir yerde saklayın." />
             ) : (
               <ul className="mt-3 divide-y divide-line rounded-[var(--radius-card)] border border-line">
                 {keys.map((k) => (
@@ -103,7 +103,7 @@ export default async function ApiWebhookPage() {
               </>
             )}
             {endpoints.length === 0 ? (
-              <EmptyStateV3 variant="compact" title="Henüz webhook adresi yok." description="Yalnız https ve herkese açık alan adları kabul edilir." />
+              <EmptyState variant="compact" title="Henüz webhook adresi yok." description="Yalnız https ve herkese açık alan adları kabul edilir." />
             ) : (
               <ul className="mt-3 divide-y divide-line rounded-[var(--radius-card)] border border-line">
                 {endpoints.map((e) => (

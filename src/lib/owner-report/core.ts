@@ -6,6 +6,7 @@
  * nedeniyle yaklaşıktır ("yaklaşık" etiketi). Veri olmayan satır "kayıt yok" yazılır, sıfır gibi sunulmaz.
  * Kişisel veri yok: alıcı adı/telefonu, teklif sahibi raporda yer almaz.
  */
+import { formatNumberTr } from "@/lib/format";
 
 export type OwnerReportFacts = {
   showings: { total: number; completed: number };
@@ -24,7 +25,7 @@ export type OwnerWeeklyReport = {
   empty: boolean;
 };
 
-const fmtInt = (n: number) => new Intl.NumberFormat("tr-TR").format(n);
+const fmtInt = formatNumberTr;
 
 /** "29 Eyl – 5 Eki 2026" (TR, gün anahtarlarından; saf). */
 export function periodLabel(startKey: string, endKeyInclusive: string): string {

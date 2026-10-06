@@ -40,6 +40,8 @@ import { Illustration } from "@/components/ui/illustrations";
 import { shareOfMax } from "@/app/app/raporlar/report-math";
 import { statusShares } from "./commission-math";
 import { StatusStackBar } from "./status-stack-bar";
+import { PipelineForecastCard } from "./pipeline-forecast";
+import { Suspense } from "react";
 
 export const metadata = { title: "Komisyon" };
 type CommissionRow = {
@@ -341,6 +343,11 @@ export default async function CommissionPage({
           </Link>
         }
       />
+      {seeAllEarnings && tenantId ? (
+        <Suspense fallback={null}>
+          <PipelineForecastCard tenantId={tenantId} />
+        </Suspense>
+      ) : null}
 <p className="text-xs font-semibold text-text-muted">{kpiScopeLabel}</p>
       {kpiEmpty ? (
         <p className="rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm text-text-muted">

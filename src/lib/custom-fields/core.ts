@@ -4,6 +4,7 @@
  * Değer tek sütunda saklanır (value_text | value_num | value_date | value_bool). Kimlik no gibi hassas veri için
  * özel alan önerilmez (formda uyarı); ürün bunu engelleyemez.
  */
+import { formatNumberTr } from "@/lib/format";
 
 export const CUSTOM_FIELD_ENTITIES = ["customer", "property", "demand", "deal"] as const;
 export type CustomFieldEntity = (typeof CUSTOM_FIELD_ENTITIES)[number];
@@ -153,7 +154,7 @@ export function formatValue(def: Pick<CustomFieldDef, "fieldType">, row: Pick<Cu
     case "boolean":
       return row.value_bool === true ? "Evet" : row.value_bool === false ? "Hayır" : "";
     case "number":
-      return row.value_num != null && Number.isFinite(Number(row.value_num)) ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 4 }).format(Number(row.value_num)) : "";
+      return row.value_num != null && Number.isFinite(Number(row.value_num)) ? formatNumberTr(Number(row.value_num)) : "";
     case "date":
       return row.value_date ? row.value_date.slice(0, 10).split("-").reverse().join(".") : "";
     default:

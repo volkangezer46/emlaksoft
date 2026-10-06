@@ -6,10 +6,9 @@ import { buildOwnerWeeklyReport, lastFullWeek, periodLabel, trDayStartIsoOf } fr
 import { loadOwnerReportFacts, loadRentStatementData } from "@/lib/owner-report/load";
 import { RENT_DECLARATION_NOTE, buildRentStatement, showRentDeclarationReminder } from "@/lib/owner-report/rent-statement";
 import { now, trDayKey } from "@/lib/clock";
+import { formatTry } from "@/lib/format";
 
-function money(n: number) {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
-}
+const money = formatTry;
 
 /** Malik paneli "Haftalık rapor" bölümü (ofis ayarı açıksa çizilir). İstemci sayfanın mevcut istemcisidir. */
 export async function OwnerWeeklyReportSection({ db, tenantId, propertyId }: { db: SupabaseClient; tenantId: string; propertyId: string }) {

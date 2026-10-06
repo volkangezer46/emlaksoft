@@ -28,6 +28,8 @@ import { now as clockNow } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
 import { requireReportingData } from "@/lib/reporting/result";
 import { getTenantReportingAggregates } from "@/lib/reporting/cache";
+import { getSettings } from "@/lib/settings/read";
+import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 
 export const metadata = { title: "Raporlar" };
 
@@ -241,12 +243,15 @@ export default async function ReportsPage() {
     sub: `${r.customers} müşteri · ${r.wonCount} kazanılan`,
     highlight: r.source === bestSource,
   }));
+  // Tahmini kaçan komisyon: kaybedilen anlaşma tutarı × ofis varsayılan komisyon oranı (Ofis Tanımları; yoksa %3). TAHMİN.
+  const lossRate = Number((await getSettings(["office.commission.default_rate"], { tenantId: tenantId ?? undefined }))["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
+  const lostCommission = (v: number) => Math.round(v * (lossRate / 100));
   const lossItems = lossRows.map((r) => ({
     key: r.reason,
     label: r.reason,
-    href: "/app/anlasmalar",
+    href: "/app/anlasmalar?gorunum=liste&asama=lost",
     pct: shareOfMax(r.count, lossMax),
-    valueText: `${r.count} · %${shareOfTotal(r.count, lostCount)} · ${money(r.value)}`,
+    valueText: `${r.count} · %${shareOfTotal(r.count, lostCount)} · ${money(r.value)}${r.value > 0 ? ` · ≈ ${money(lostCommission(r.value))} komisyon` : ""}`,
   }));
 
   return (
@@ -478,7 +483,7 @@ export default async function ReportsPage() {
           <h2 className={H2}>Kaybedilen anlaşmalar: kayıp nedeni analizi</h2>
           {lostCount > 0 ? (
             <span className="ml-auto text-xs tabular-nums text-text-muted">
-              {lostCount} kaybedilen anlaşma · {money(lostValue)} kaybedilen değer · en yüksek 8 neden
+              {lostCount} kaybedilen anlaşma · {money(lostValue)} kaybedilen değer · tahmini kaçan komisyon ≈ {money(lostCommission(lostValue))} (%{lossRate}) · en yüksek 8 neden
             </span>
           ) : null}
         </div>

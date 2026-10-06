@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
-import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
+import { EmptyState } from "@/components/ui/empty-state";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { createClient } from "@/lib/supabase/server";
@@ -60,7 +60,7 @@ export default async function CustomFieldsPage() {
                   </span>
                 </div>
                 {list.length === 0 ? (
-                  <EmptyStateV3 variant="compact" title="Henüz alan yok." description="Yukarıdaki formdan bu kayıt türü için alan ekleyebilirsiniz." />
+                  <EmptyState variant="compact" title="Henüz alan yok." description="Yukarıdaki formdan bu kayıt türü için alan ekleyebilirsiniz." />
                 ) : (
                   <ul className="mt-3 divide-y divide-line rounded-[var(--radius-card)] border border-line">
                     {list.map((d) => (
