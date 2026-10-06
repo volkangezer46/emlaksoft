@@ -15,7 +15,9 @@ import {
   type SamplePack,
   type SampleSeedReport,
 } from "@/lib/sample-data-seed";
-import { deleteSampleRecords, type SampleClearReport } from "@/lib/sample-clear";
+import type { SampleClearReport } from "@/lib/sample-clear";
+import { purgeSampleData } from "@/lib/sample-data/purge";
+import { canSwitchToRealUse, REAL_USE_HREF } from "@/lib/sample-data/real-use";
 
 export type SampleDataResult = {
   error?: string;
@@ -119,70 +121,53 @@ export async function seedSampleData(input?: { pack?: string }): Promise<SampleD
     },
   });
 
-  revalidatePath("/app");
+  revalidatePath("/app", "layout");
   revalidatePath("/app/ayarlar");
   revalidatePath("/app/baslangic");
   return { ok: true, seed };
 }
 
 /**
- * "Gerçek kullanıma başla" — örnek verileri KALICI siler (soft delete değil, GERİ ALINAMAZ).
- * Yalnız is_sample=true kayıtlar; ofisin gerçek kayıtlarına asla dokunulmaz. Silme sırası ve kısmi hata
- * davranışı `src/lib/sample-clear.ts`'tedir: bir tablo takılırsa diğerleri denenir, `clear.complete=false`
- * döner ve işlem tekrar denenebilir (idempotent). `sample_seeded_at` yalnız TAM temizlikte sıfırlanır.
+ * "Gerçek kullanıma geç" — örnek verileri KALICI siler (soft delete değil, GERİ ALINAMAZ).
+ * Yalnız is_sample=true kayıtlar; ofisin gerçek kayıtlarına asla dokunulmaz. Kapı: settings:edit + ofis sahibi/genel
+ * müdür (RPC aynı kuralı içeride tekrar doğrular). Yol: `purge_tenant_sample_data` RPC (tek transaction, oturum
+ * istemcisiyle); migration yoksa eski tablo-tablo silme (service_role, kısmi hatayı raporlar, idempotent).
  */
 export async function clearSampleData(): Promise<SampleDataResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!canSwitchToRealUse(gate.role)) {
+    return { error: "Gerçek kullanıma geçiş yalnız ofis sahibi veya genel müdür tarafından yapılabilir." };
+  }
   if (!(await canMutateEverySampleModule({ ...gate, action: "delete" }))) {
-    return {
-      error: "Örnek verileri temizlemek için ilgili tüm modüllerde silme yetkisi gerekir.",
-    };
+    return { error: "Örnek verinin dokunduğu modüllerden birinde silme yetkiniz yok." };
   }
   const tenantId = gate.tenantId;
 
-  let report: SampleClearReport;
-  try {
-    // Kazanılmış anlaşma/komisyon/kira silmesi çekirdek iş akışı tetikleyicilerince yalnız service_role'e
-    // açıktır; her sorgu açık tenant_id + is_sample=true süzgeciyle sınırlıdır.
-    const admin = createAdminClient();
-    report = await deleteSampleRecords(admin, tenantId);
-    if (report.complete) {
-      const { error: markErr } = await admin
-        .from("tenants")
-        .update({ sample_seeded_at: null })
-        .eq("id", tenantId);
-      if (markErr) throw markErr;
-      // Genişletme migration'ı uygulanmamışsa bu sütunlar yoktur — sessizce atla.
-      await admin
-        .from("tenants")
-        .update({ sample_pack: null, sample_cleared_at: new Date(now()).toISOString() })
-        .eq("id", tenantId);
-    }
-  } catch (e) {
-    console.error("clearSampleData", e);
-    return { error: "Örnek veriler temizlenemedi. Lütfen tekrar deneyin." };
-  }
+  // Eski yol için service_role (RPC varsa kullanılmaz); her sorgu açık tenant_id + is_sample=true süzgeciyle sınırlıdır.
+  const result = await purgeSampleData({ session: await createClient(), tenantId, fallbackAdmin: createAdminClient() });
+  const report = result.ok ? result.report : result.report;
 
   await logActivity({
     tenantId,
     actorId: gate.userId,
-    action: report.complete ? "sample_data.clear" : "sample_data.clear_partial",
+    action: result.ok ? "sample_data.clear" : "sample_data.clear_partial",
     entityType: "tenant",
     entityId: tenantId,
-    newValue: { deleted: report.deleted, total: report.totalDeleted, failed: report.failed.map((f) => f.table) },
+    newValue: {
+      via: result.ok ? result.via : "failed",
+      deleted: report?.deleted ?? {},
+      total: report?.totalDeleted ?? 0,
+      failed: report?.failed.map((f) => f.table) ?? [],
+    },
   });
 
-  revalidatePath("/app");
+  revalidatePath("/app", "layout");
   revalidatePath("/app/ayarlar");
+  revalidatePath(REAL_USE_HREF);
   revalidatePath("/app/baslangic");
-  if (!report.complete) {
-    return {
-      error: `Temizlik yarım kaldı (${report.failed.map((f) => f.label).join(", ")}). Silinenler geri gelmez; tekrar deneyebilirsiniz.`,
-      clear: report,
-    };
-  }
-  return { ok: true, clear: report };
+  if (!result.ok) return { error: result.error, clear: result.report };
+  return { ok: true, clear: result.report };
 }
 
 /** ConfirmDialog `formAction` uyumu için void sarmalayıcı (hata logda kalır). */

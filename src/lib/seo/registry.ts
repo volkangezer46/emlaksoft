@@ -57,30 +57,17 @@ const BASE_PAGES: SeoPageDef[] = [
     sitemap: { include: true, priority: 0.8, freq: "monthly" },
     jsonLd: ["SoftwareApplication", "FAQPage", "BreadcrumbList"],
   },
-  {
-    path: "/demo",
-    label: "Ücretsiz deneme / görüşme",
-    group: "ana",
-    title: "14 Gün Ücretsiz Deneyin",
-    description:
-      "EmlakSoft'u 14 gün ücretsiz deneyin; kredi kartı gerekmez. Portföy, müşteri, komisyon ve portal yönetimini kendi verinizle görün. Sorunuz varsa görüşme talep edebilirsiniz.",
-    ogTitle: "EmlakSoft — 14 Gün Ücretsiz Dene",
-    ogDescription: "Emlak ofisinizi tek platformda yönetin. 14 gün ücretsiz deneyin.",
-    // /demo artık /kayit'a 308 yönlendirilir (next.config.ts); sayfa dosyası yalnız geriye dönük kalır. İndekslenmez, sitemap'e girmez.
-    index: false,
-    canIndex: false,
-    sitemap: { include: false, priority: 0.8, freq: "monthly" },
-    jsonLd: [],
-  },
+  // /demo (satış demosu talebi) KALDIRILDI: tek yol self-servis kurulum sihirbazı. Eski adres kalıcı olarak /kayit'a
+  // yönlenir (LEGACY_REDIRECTS, redirects.ts + next.config.ts); envanterde sayfa yoktur, sitemap'e girmez.
   {
     path: "/kayit",
-    label: "Kayıt",
+    label: "Kayıt (kurulum sihirbazı)",
     group: "hesap",
-    title: "Ofisinizi Ücretsiz Oluşturun",
+    title: "Ofisinizi Ücretsiz Kurun",
     description:
-      "Ücretsiz deneme ile EmlakSoft'a başlayın. Kredi kartı gerekmez. Deneme boyunca tüm paketlerin özellikleri açıktır. Portföy, müşteri ve komisyon yönetimi tek platformda.",
-    ogTitle: "EmlakSoft — Ücretsiz Başla",
-    ogDescription: "Ücretsiz deneme. Emlak ofisinizi bugün dijitalleştirin.",
+      "Ofisinizi birkaç dakikada kurun, 14 gün ücretsiz deneyin; kredi kartı gerekmez. İsterseniz örnek müşteri, portföy ve anlaşmalarla dolu başlayın, tek tuşla gerçek kullanıma geçin.",
+    ogTitle: "EmlakSoft — Ofisini Ücretsiz Kur",
+    ogDescription: "Kurulum sihirbazı, 14 gün ücretsiz deneme, kart gerekmez.",
     index: true,
     canIndex: true,
     sitemap: { include: true, priority: 0.9, freq: "monthly" },

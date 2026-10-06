@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   cookieDelete: vi.fn(),
   wantsDemo: false,
   demoSeed: vi.fn(),
+  applyProfile: vi.fn(),
 }));
 
 class RedirectSignal extends Error {
@@ -61,6 +62,8 @@ vi.mock("@/lib/sample-registration-seed", () => ({
   wantsDemoData: () => h.wantsDemo,
   seedDemoDataForNewTenant: h.demoSeed,
 }));
+// Sihirbaz profili (konum/marka/odak/davet): provizyondan SONRA, best-effort; burada yalnız çağrı sırası doğrulanır.
+vi.mock("@/lib/sample-data/apply-office-profile", () => ({ applyWizardOfficeProfile: h.applyProfile }));
 vi.mock("@/lib/two-factor", () => ({
   generateLoginCode: () => "000000",
   LOGIN_CODE_TTL_MS: 300_000,
@@ -98,6 +101,7 @@ beforeEach(() => {
   h.signInWithPassword.mockResolvedValue({ error: null });
   h.attribution.mockResolvedValue(undefined);
   h.demoSeed.mockResolvedValue({ ok: true });
+  h.applyProfile.mockResolvedValue({ warnings: [], invited: 0 });
 });
 
 describe("signUp — ön kapılar (hiçbir kaynak oluşmaz)", () => {
@@ -145,6 +149,8 @@ describe("signUp — provision_registration başarısızsa TELAFİ (auth kullan�
     expect(h.deleteUser).toHaveBeenCalledWith("user-1");
     expect(r.error).toMatch(/güvenli şekilde oluşturulamadı/);
     expect(h.attribution).not.toHaveBeenCalled();
+    expect(h.applyProfile).not.toHaveBeenCalled();
+    expect(h.demoSeed).not.toHaveBeenCalled();
     expect(h.signInWithPassword).not.toHaveBeenCalled();
     expect(h.loginEvent).not.toHaveBeenCalled();
   });
@@ -202,6 +208,25 @@ describe("signUp — başarılı akış", () => {
     h.demoSeed.mockResolvedValue({ ok: false });
     await expect(signUp({}, form())).rejects.toMatchObject({ to: "/app" });
     expect(h.cookieSet).toHaveBeenCalledWith("demo_seed_failed", "1", expect.objectContaining({ httpOnly: true }));
+    expect(h.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("sihirbaz profili provizyondan sonra uygulanır; odak seçimi demo paketini belirler; profil hatası kaydı kesmez", async () => {
+    h.wantsDemo = true;
+    h.applyProfile.mockRejectedValue(new Error("storage down"));
+    const f = form({ office_type: "franchise", brand_color: "#0F7B6C" });
+    f.append("focus", "ticari");
+    await expect(signUp({}, f)).rejects.toMatchObject({ to: "/app" });
+    expect(h.applyProfile).toHaveBeenCalledTimes(1);
+    const [, , payload] = h.applyProfile.mock.calls[0]!;
+    expect(payload).toMatchObject({
+      tenantId: "tenant-1",
+      ownerId: "user-1",
+      profile: expect.objectContaining({ officeType: "franchise", brandColor: "#0f7b6c", focus: ["ticari"], pack: "ticari" }),
+    });
+    // Demo seti odaktan türeyen paketle ve profil uygulamasından SONRA yüklenir.
+    expect(h.demoSeed).toHaveBeenCalledWith(expect.anything(), "tenant-1", "user-1", "ticari");
+    expect(h.applyProfile.mock.invocationCallOrder[0]!).toBeLessThan(h.demoSeed.mock.invocationCallOrder[0]!);
     expect(h.deleteUser).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { memo, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,8 +15,10 @@ import type { PremiumTone } from "@/components/ui/premium/premium-math";
  * Gövde: `loading` → sabit yükseklikli iskelet (CLS yok); `empty` → anlamlı boş durum (gövde
  * çizilmez, sahte grafik yok). Eski kullanım (title, subtitle, action, children, className,
  * height) aynen çalışır; `height={0}` gövdeyi serbest yükseklikte bırakır.
+ * `memo`: istemci kapısından (`lazy-charts`, `ui/chart`) çizildiğinde grafik veri/filtre state'i değişip
+ * çerçeve prop'ları aynı kalınca başlık/çerçeve yeniden üretilmez (davranış değişmez; sunucudan da çizilir).
  */
-export function ChartFrame({
+export const ChartFrame = memo(function ChartFrame({
   title,
   subtitle,
   action,
@@ -99,6 +101,6 @@ export function ChartFrame({
       </div>
     </section>
   );
-}
+});
 
 export { ChartFrame as ChartCard };

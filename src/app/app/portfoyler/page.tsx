@@ -233,11 +233,14 @@ export default async function PropertiesPage({
   const offset = (page - 1) * PAGE_SIZE;
   const supabase = await createClient();
   const nlFilters = normalizePropertyNlParams(params);
-  // "Foto eksik" (F3): sayı + kapak kuralıyla eksik portföy id'leri (en çok PHOTO_GAP_ID_CAP).
-  const photoGap = nlFilters.fotoEksik ? await fetchPhotoGapIds(supabase) : null;
   // EİDS / yetki süzgeci: sayaçlarla AYNI saf mantıktan (src/lib/eids/status.ts) kimlik listesi; sorguya `id in (...)` iner.
   const eidsFilter = isEidsFilter(params.yetki) ? params.yetki : null;
-  const eidsLoad = eidsFilter ? await loadEidsStatus(supabase) : null;
+  // "Foto eksik" (F3): sayı + kapak kuralıyla eksik portföy id'leri (en çok PHOTO_GAP_ID_CAP). İki ön sorgu
+  // birbirinden bağımsız: aynı turda (eskiden ardışıktı).
+  const [photoGap, eidsLoad] = await Promise.all([
+    nlFilters.fotoEksik ? fetchPhotoGapIds(supabase) : Promise.resolve(null),
+    eidsFilter ? loadEidsStatus(supabase) : Promise.resolve(null),
+  ]);
   const eidsIds = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.ids[eidsFilter] : null;
   const eidsTotal = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.counts[eidsFilter] : 0;
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).

@@ -1,14 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { logActivity } from "@/lib/activity";
-import { now } from "@/lib/clock";
-import { insertSampleRecords, SAMPLE_DATA_COUNTS } from "@/lib/sample-data-seed";
+import { ensureSampleData } from "@/lib/sample-data/seed";
+import type { SamplePack } from "@/lib/sample-data-seed";
 
 /**
  * Kayıtta "demo verileriyle başla" (sunucu; istemci import ETMEZ).
  *
- * Yeni kurulan ofise, "Dolu demo ile başla" yolundaki AYNI kayıt setini (`insertSampleRecords`) yükler;
- * tüm kayıtlar `is_sample=true` taşır, bu yüzden Ayarlar / ana ekran bandındaki "Gerçek kullanıma başla"
- * ile (`clearSampleData`) tek adımda silinir. Kayıt akışını ASLA bozmaz: hata yutulur, sonuç döner.
+ * Yeni kurulan ofise, "Örnek veriyle başla" yolundaki AYNI kayıt setini yükler (tek kaynak `sample-data-seed.ts`,
+ * idempotent çekirdek `sample-data/seed.ts`). Tüm kayıtlar `is_sample=true` taşır; Ayarlar > Gerçek kullanıma geç
+ * (`purge_tenant_sample_data`) ile tek adımda silinir. Kayıt akışını ASLA bozmaz: hata yutulur, sonuç döner.
  * `db` çağıranın (signUp) zaten elindeki service_role client'ıdır; yeni createAdminClient çağrısı yoktur.
  */
 
@@ -29,32 +28,8 @@ export async function seedDemoDataForNewTenant(
   db: SupabaseClient,
   tenantId: string,
   ownerId: string,
+  pack: SamplePack = "konut",
 ): Promise<RegistrationSeedResult> {
-  try {
-    const seed = await insertSampleRecords(db, tenantId, ownerId, { extrasDb: db, pack: "konut" });
-    const stamp = new Date(now()).toISOString();
-    const { error: markError } = await db.from("tenants").update({ sample_seeded_at: stamp }).eq("id", tenantId);
-    if (markError) throw markError;
-    // Genişletme migration'ı uygulanmamışsa sütun yoktur; sessizce atla.
-    await db.from("tenants").update({ sample_pack: "konut", sample_cleared_at: null }).eq("id", tenantId);
-    await logActivity({
-      tenantId,
-      actorId: ownerId,
-      action: "sample_data.seed",
-      entityType: "tenant",
-      entityId: tenantId,
-      newValue: {
-        ...SAMPLE_DATA_COUNTS,
-        by: "registration",
-        pack: "konut",
-        loaded: seed.counts,
-        skipped: seed.skipped.map((x) => x.group),
-        failed: seed.failed.map((x) => x.group),
-      },
-    });
-    return { ok: true };
-  } catch (e) {
-    console.error("seedDemoDataForNewTenant", e);
-    return { ok: false };
-  }
+  const res = await ensureSampleData(db, tenantId, ownerId, { pack, by: "registration" });
+  return { ok: res.ok };
 }

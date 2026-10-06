@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useMemo,
@@ -242,7 +243,7 @@ function usePersistedRaw(key: string | undefined): [string | null, (value: strin
 
 /* ── Hücre içeriği (tablo + kart ortak) ───────────────────────────────── */
 
-function CellContent({
+const CellContent = memo(function CellContent({
   col,
   row,
   hideSubtitle,
@@ -285,7 +286,130 @@ function CellContent({
       ) : null}
     </>
   );
-}
+});
+
+/* ── Tablo satırı (memo) ────────────────────────────────────────────────── */
+
+type RowViewProps = {
+  row: DataTableRow;
+  index: number;
+  id: string | null;
+  href: string | null;
+  isSelected: boolean;
+  keyboardNav: boolean;
+  /** Roving tabindex: bu satır klavye odağının giriş noktası mı? */
+  roving: boolean;
+  density: Density;
+  densityMeta: { rowClass: string; cellClass: string };
+  revealRowActions: boolean;
+  showSelect: boolean;
+  hasActions: boolean;
+  visibleColumns: DataTableColumn[];
+  action: ReactNode;
+  onToggle: (id: string) => void;
+  onFocusRow: (index: number) => void;
+};
+
+/**
+ * Satır bileşeni `memo` ile: arama yazarken, sıralarken, sayfa değiştirirken ya da bir satır seçilirken yalnız
+ * prop'u değişen satırlar yeniden çizilir (seçim/odak diğer 24 satırı tekrar üretmez). Davranış aynıdır;
+ * `onToggle`/`onFocusRow` kararlı referanslardır (useCallback / state setter).
+ */
+const DataTableRowView = memo(function DataTableRowView({
+  row,
+  index,
+  id,
+  href,
+  isSelected,
+  keyboardNav,
+  roving,
+  density,
+  densityMeta,
+  revealRowActions,
+  showSelect,
+  hasActions,
+  visibleColumns,
+  action,
+  onToggle,
+  onFocusRow,
+}: RowViewProps) {
+  return (
+    <TR
+      interactive={Boolean(href)}
+      data-row-index={keyboardNav ? index : undefined}
+      data-row-id={keyboardNav && id ? id : undefined}
+      data-selected={isSelected || undefined}
+      tabIndex={keyboardNav ? (roving ? 0 : -1) : undefined}
+      onFocus={
+        keyboardNav
+          ? (e) => {
+              if (e.target === e.currentTarget) onFocusRow(index);
+            }
+          : undefined
+      }
+      className={cn(
+        densityMeta.rowClass,
+        (revealRowActions || keyboardNav) && "group",
+        isSelected && "bg-surface-selected",
+        keyboardNav &&
+          "outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]",
+      )}
+    >
+      {showSelect ? (
+        <TD className={cn("w-px pr-0", densityMeta.cellClass)}>
+          {/* relative + z-10: satır bağlantısı katmanının üstünde kalsın */}
+          <Checkbox
+            aria-label="Satırı seç"
+            className="relative z-10"
+            checked={isSelected}
+            disabled={id === null}
+            tabIndex={keyboardNav ? -1 : undefined}
+            onChange={() => id !== null && onToggle(id)}
+          />
+        </TD>
+      ) : null}
+      {visibleColumns.map((col, colIndex) => (
+        <TD
+          key={col.key}
+          align={col.align}
+          className={cn(
+            densityMeta.cellClass,
+            col.hideBelow ? hideClass[col.hideBelow] : undefined,
+            colIndex === 0 && "font-semibold text-ink-950",
+          )}
+        >
+          {/* Satır linki: ilk hücrede tüm satırı kaplayan görünmez bağlantı —
+              panelde zaten kullanılan desen, iç içe <a> üretmez. */}
+          {href && colIndex === 0 ? (
+            <Link
+              href={href}
+              data-row-link=""
+              tabIndex={keyboardNav ? -1 : undefined}
+              className="absolute inset-0"
+              aria-label={`${String(row[col.key] ?? "Kayıt")} detayları`}
+            />
+          ) : null}
+          <CellContent col={col} row={row} hideSubtitle={density === "compact"} />
+        </TD>
+      ))}
+      {hasActions ? (
+        <TD align="right" className={cn("whitespace-nowrap", densityMeta.cellClass)}>
+          {/* relative + z-10: satırı kaplayan görünmez bağlantının
+              üstünde kalsın, tıklama aksiyona gelsin */}
+          <span
+            className={cn(
+              "relative z-10 inline-flex items-center gap-1 transition-opacity",
+              revealRowActions &&
+                "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100",
+            )}
+          >
+            {action}
+          </span>
+        </TD>
+      ) : null}
+    </TR>
+  );
+});
 
 const pagerButton =
   "focus-ring press surface-interactive inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 touch:min-h-11 font-medium text-ink-950 shadow-[var(--elev-1)] transition disabled:pointer-events-none disabled:opacity-40";
@@ -476,14 +600,14 @@ export function DataTable({
   const pageSelectedCount = pageIds.filter((id) => effectiveSelected.has(id)).length;
   const headCheck = checkState(pageSelectedCount, pageIds.length);
 
-  function toggleOne(id: string) {
+  const toggleOne = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
+  }, []);
   function togglePage() {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -830,83 +954,26 @@ export function DataTable({
                   visible.map((row, index) => {
                     const href = typeof row[ROW_HREF] === "string" ? (row[ROW_HREF] as string) : null;
                     const id = rowId(row);
-                    const isSelected = id !== null && effectiveSelected.has(id);
                     return (
-                      <TR
+                      <DataTableRowView
                         key={String(row.id ?? index)}
-                        interactive={Boolean(href)}
-                        data-row-index={keyboardNav ? index : undefined}
-                        data-row-id={keyboardNav && id ? id : undefined}
-                        data-selected={isSelected || undefined}
-                        tabIndex={keyboardNav ? (index === rovingIndex ? 0 : -1) : undefined}
-                        onFocus={
-                          keyboardNav
-                            ? (e) => {
-                                if (e.target === e.currentTarget) setActiveIndex(index);
-                              }
-                            : undefined
-                        }
-                        className={cn(
-                          densityMeta.rowClass,
-                          (revealRowActions || keyboardNav) && "group",
-                          isSelected && "bg-surface-selected",
-                          keyboardNav &&
-                            "outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--accent)]",
-                        )}
-                      >
-                        {showSelect ? (
-                          <TD className={cn("w-px pr-0", densityMeta.cellClass)}>
-                            {/* relative + z-10: satır bağlantısı katmanının üstünde kalsın */}
-                            <Checkbox
-                              aria-label="Satırı seç"
-                              className="relative z-10"
-                              checked={isSelected}
-                              disabled={id === null}
-                              tabIndex={keyboardNav ? -1 : undefined}
-                              onChange={() => id !== null && toggleOne(id)}
-                            />
-                          </TD>
-                        ) : null}
-                        {visibleColumns.map((col, colIndex) => (
-                          <TD
-                            key={col.key}
-                            align={col.align}
-                            className={cn(
-                              densityMeta.cellClass,
-                              col.hideBelow ? hideClass[col.hideBelow] : undefined,
-                              colIndex === 0 && "font-semibold text-ink-950",
-                            )}
-                          >
-                            {/* Satır linki: ilk hücrede tüm satırı kaplayan görünmez bağlantı —
-                                panelde zaten kullanılan desen, iç içe <a> üretmez. */}
-                            {href && colIndex === 0 ? (
-                              <Link
-                                href={href}
-                                data-row-link=""
-                                tabIndex={keyboardNav ? -1 : undefined}
-                                className="absolute inset-0"
-                                aria-label={`${String(row[col.key] ?? "Kayıt")} detayları`}
-                              />
-                            ) : null}
-                            <CellContent col={col} row={row} hideSubtitle={density === "compact"} />
-                          </TD>
-                        ))}
-                        {hasActions ? (
-                          <TD align="right" className={cn("whitespace-nowrap", densityMeta.cellClass)}>
-                            {/* relative + z-10: satırı kaplayan görünmez bağlantının
-                                üstünde kalsın, tıklama aksiyona gelsin */}
-                            <span
-                              className={cn(
-                                "relative z-10 inline-flex items-center gap-1 transition-opacity",
-                                revealRowActions &&
-                                  "opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100",
-                              )}
-                            >
-                              {rowActions?.[String(row.id ?? "")] ?? null}
-                            </span>
-                          </TD>
-                        ) : null}
-                      </TR>
+                        row={row}
+                        index={index}
+                        id={id}
+                        href={href}
+                        isSelected={id !== null && effectiveSelected.has(id)}
+                        keyboardNav={keyboardNav}
+                        roving={index === rovingIndex}
+                        density={density}
+                        densityMeta={densityMeta}
+                        revealRowActions={revealRowActions}
+                        showSelect={showSelect}
+                        hasActions={hasActions}
+                        visibleColumns={visibleColumns}
+                        action={rowActions?.[String(row.id ?? "")] ?? null}
+                        onToggle={toggleOne}
+                        onFocusRow={setActiveIndex}
+                      />
                     );
                   })
                 )}

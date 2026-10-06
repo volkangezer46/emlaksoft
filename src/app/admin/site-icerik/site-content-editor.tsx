@@ -556,10 +556,7 @@ function PagesTab({ cfg, update, issues, readOnly }: TabProps) {
   const f = { issues, readOnly };
   return (
     <>
-      <Card title="Demo talebi sayfası (/demo) üst metni">
-        <Txt label="Başlık" value={cfg.demo.title} max={LIMITS.title} onChange={(v) => update((d) => void (d.demo.title = v))} path="demo.title" {...f} />
-        <Txt label="Alt metin" value={cfg.demo.text} max={LIMITS.text} onChange={(v) => update((d) => void (d.demo.text = v))} path="demo.text" {...f} />
-      </Card>
+      {/* `demo` içerik anahtarı şemada geriye dönük durur; /demo sayfası kaldırıldı (kalıcı olarak /kayit'a yönlenir), bu yüzden düzenleyici kartı yok. */}
       <Card title="Kayıt sayfası (/kayit) üst metni">
         <Txt label="Başlık" value={cfg.register.title} max={LIMITS.title} onChange={(v) => update((d) => void (d.register.title = v))} path="register.title" {...f} />
         <Txt label="Alt metin" value={cfg.register.text} max={LIMITS.text} onChange={(v) => update((d) => void (d.register.text = v))} path="register.text" {...f} />

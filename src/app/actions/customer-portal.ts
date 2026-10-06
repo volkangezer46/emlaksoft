@@ -29,15 +29,17 @@ export async function createCustomerPortalToken(
   const supabase = await createClient();
 
   // Müşteri bu tenanta ait mi?
+  // Örnek (is_sample) müşteriye portal bağlantısı ÜRETİLMEZ: token'lı yüzeyler demo kaydı hiç göstermez.
   const { data: customer } = await supabase
     .from("customers")
     .select("id, full_name")
     .eq("id", customerId)
     .eq("tenant_id", gate.tenantId)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (!customer) return { error: "Müşteri bulunamadı." };
+  if (!customer) return { error: "Müşteri bulunamadı (örnek kayıtlar için portal bağlantısı üretilmez)." };
 
   // Aktif token var mı?
   const { data: existing } = await supabase
@@ -193,6 +195,7 @@ export async function getCustomerPortalData(
       .select("id, full_name, email, phone")
       .eq("id", customerId)
       .eq("tenant_id", tenantId)
+      .eq("is_sample", false)
       .is("deleted_at", null)
       .single(),
     admin.from("tenants")
@@ -216,6 +219,7 @@ export async function getCustomerPortalData(
     admin.from("properties")
       .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features, province:geo_provinces(name)")
       .eq("tenant_id", tenantId)
+      .eq("is_sample", false)
       .is("deleted_at", null)
       .in("status", ["live", "reserved", "Yayında"])
       .order("created_at", { ascending: false })

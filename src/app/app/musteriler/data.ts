@@ -253,6 +253,8 @@ export async function loadCustomersData(input: CustomersDataInput) {
     savedViewsPromise,
     heatP,
     intentP,
+    // Ofis tanımı: uykuda eşiği (varsayılan 90 gün = DORMANT_DAYS) — ana sorgularla aynı turda (eskiden ardışıktı).
+    tenantId ? getSetting<number>("office.insight.dormant_days", { tenantId }) : Promise.resolve(undefined),
   ]);
   const [
     listRes,
@@ -271,6 +273,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
     savedViews,
     heatRes,
     intentRes,
+    dormantDays,
   ] = batch;
   // Hata sessizce "kayıt yok"a dönüşmesin: error.tsx sınırına düşer (sahte sıfır yok).
   assertQueryBatchSucceeded(
@@ -318,8 +321,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const heatSignalMap = new Map<string, HeatSignalRow>();
   for (const s of (heatSignals ?? []) as HeatSignalRow[]) heatSignalMap.set(s.customer_id, s);
   const nowMs = now();
-  // Ofis tanımı: uykuda eşiği (varsayılan 90 gün = DORMANT_DAYS).
-  const dormantDays = tenantId ? await getSetting<number>("office.insight.dormant_days", { tenantId }) : undefined;
   const heatOf = (id: string, createdAt: string, blacklist: boolean | null): CustomerHeat => {
     const s = heatSignalMap.get(id);
     return scoreCustomerHeat(

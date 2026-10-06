@@ -64,7 +64,8 @@ export type AttentionInput = {
   openTickets: number | null;
   risk: number | null;
   trialsEnding: number | null;
-  demoRequests: number | null;
+  /** Dönemde açılan yeni ofisler (self-servis kurulum; hepsi denemeyle başlar). Demo talebi formu kaldırıldı. */
+  newTrials: number | null;
 };
 
 export type AttentionTone = "danger" | "warn" | "brand";
@@ -101,7 +102,7 @@ export function buildAttentionQueue(input: AttentionInput, role: PlatformRole): 
     { id: "ef-drift", label: "EmlakFiyati mutabakat sapması", hint: input.efReconciliation === "error" ? "Son mutabakat yapılamadı" : "Son mutabakatta fark var", count: efCount, href: "/admin/ef-kontor", tone: "warn", severity: 65, module: "billing" },
     { id: "open-ticket", label: "Açık destek talebi", hint: "Acil olmayanlar", count: nonUrgentOpen, href: "/admin/tickets?durum=acik", tone: "warn", severity: 50, module: "tickets" },
     { id: "trial-ending", label: "Deneme 7 gün içinde bitiyor", hint: "Dönüşüm fırsatı", count: input.trialsEnding, href: "/admin/tenants?deneme=bitiyor", tone: "brand", severity: 45, module: "tenants" },
-    { id: "demo", label: "Yeni demo talebi", hint: "Satış fırsatı, yanıt bekliyor", count: input.demoRequests, href: "/admin/satis", tone: "brand", severity: 40, module: "sales" },
+    { id: "new-trial", label: "Yeni deneme başlatan ofis", hint: "Kurulum sihirbazından geldi; ilk hafta karşılayın", count: input.newTrials, href: "/admin/tenants?durum=trial", tone: "brand", severity: 40, module: "tenants" },
   ];
   return candidates
     .filter((c): c is AttentionRow => typeof c.count === "number" && Number.isFinite(c.count) && c.count > 0)

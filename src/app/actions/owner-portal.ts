@@ -24,15 +24,17 @@ export async function createOwnerPortalToken(
   const supabase = await createClient();
 
   // Portföy bu tenanta ait mi?
+  // Örnek (is_sample) portföye malik portalı bağlantısı ÜRETİLMEZ: token'lı yüzeyler demo kaydı hiç göstermez.
   const { data: property } = await supabase
     .from("properties")
     .select("id, property_code")
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)
+    .eq("is_sample", false)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (!property) return { error: "Portföy bulunamadı." };
+  if (!property) return { error: "Portföy bulunamadı (örnek kayıtlar için portal bağlantısı üretilmez)." };
   if (!ownerName.trim()) return { error: "Malik adı zorunludur." };
 
   // Aktif token var mı?
@@ -182,6 +184,7 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       .select("id, property_code, title, list_price, status, address_line, province:geo_provinces(name), district:geo_districts(name)")
       .eq("id", propertyId)
       .eq("tenant_id", tenantId)
+      .eq("is_sample", false)
       .is("deleted_at", null)
       .single(),
     admin.from("tenants")

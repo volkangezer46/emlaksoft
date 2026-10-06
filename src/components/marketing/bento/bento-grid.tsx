@@ -8,6 +8,7 @@ import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "../content-link";
 import { SectionHeading } from "../section-heading";
 import { AssistantArt, AutomationArt, LeakArt, PortalArt, ShowcaseArt, SignatureArt, TeamArt, ValuationArt } from "./bento-art";
+import { CRON_JOBS } from "@/lib/cron-jobs";
 
 type Tile = { id: string; cls: string; eyebrow: string; title: string; text: string; gate?: string; points?: string[]; art: ReactNode; dark?: boolean };
 
@@ -20,7 +21,7 @@ const TILES: Tile[] = [
     points: ["Zorunlu kapanış formu, boş geçilemez", "Rakip kapanışı ile kendi satışınız ayrı sayılır", "Danışman bazında kaçak karnesi"], art: <LeakArt />,
   },
   { id: "emsal-degerleme", cls: "mk-b-val", eyebrow: "Değerleme", title: "Emsal bazlı fiyat sinyali", text: "Emsal motoru benzer portföylerden bir fiyat aralığı çıkarır; pazarlığa veriyle girersiniz.", art: <ValuationArt /> },
-  { id: "otomasyon", cls: "mk-b-auto", eyebrow: "Otomasyonlar", title: "27 otomatik görev, arka planda", gate: "/app/otomasyonlar", text: "Hatırlatma, teyit ve özet işleri siz uğraşmadan zamanında çalışır.", art: <AutomationArt /> },
+  { id: "otomasyon", cls: "mk-b-auto", eyebrow: "Otomasyonlar", title: `${CRON_JOBS.length} otomatik görev, arka planda`, gate: "/app/otomasyonlar", text: "Hatırlatma, teyit ve özet işleri siz uğraşmadan zamanında çalışır.", art: <AutomationArt /> },
   { id: "ai-asistan", cls: "mk-b-ai", eyebrow: "AI asistan", title: "Sorun, listelesin", text: "Doğal dille sorun; asistan ofis kayıtlarınız üzerinden yanıtlar.", art: <AssistantArt /> },
   { id: "portal-kontrol", cls: "mk-b-portal", eyebrow: "Portal kontrolü", title: "İlanlarınızı teyitle, kaçağı ölçün", gate: "/app/portallar", text: "İlan numarası veya bağlantısını ekleyin; periyodik teyit ve kapanış formu. Otomatik yayınlama yoktur.", art: <PortalArt /> },
   { id: "imza", cls: "mk-b-sign", eyebrow: "Sözleşme", title: "SMS onaylı dijital imza", gate: "/app/sozlesmeler", text: "Teklif ve sözleşme aynı kayıtta; imza SMS doğrulamasıyla alınır.", art: <SignatureArt /> },
