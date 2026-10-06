@@ -83,11 +83,11 @@ function FocusCard({ insight, eyebrow, canTask }: { insight: Insight; eyebrow: s
             return (
               <li key={`${c.label}-${c.value}`}>
                 {c.href ? (
-                  <Link href={c.href} className="focus-ring inline-flex items-center rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs hover:bg-surface-hover">
+                  <Link href={c.href} className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs hover:bg-surface-hover">
                     {body}
                   </Link>
                 ) : (
-                  <span className="inline-flex items-center rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs">{body}</span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs">{body}</span>
                 )}
               </li>
             );

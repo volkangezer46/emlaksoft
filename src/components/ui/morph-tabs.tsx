@@ -132,7 +132,7 @@ export function MorphTabs({
     >
       {items.map((t) => {
         const active = t.id === activeId;
-        const density = tabDensity({ active, orientation, railCollapsed: collapsed, peek: peeking, inactive });
+        const density = tabDensity({ active, orientation, railCollapsed: collapsed, peek: peeking, inactive: t.icon ? inactive : "label" });
         return (
           <button
             key={t.id}

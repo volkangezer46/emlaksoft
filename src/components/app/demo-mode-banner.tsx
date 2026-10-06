@@ -90,7 +90,7 @@ export function DemoModeBanner({
       data-tour="demo-bandi"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+        <div className="flex min-w-0 flex-1 basis-[16rem] items-start gap-2.5">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-bold text-amber-800">{copy.title}</p>

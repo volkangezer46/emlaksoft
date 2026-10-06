@@ -16,7 +16,7 @@ export function OrnekVeriYenile() {
       aria-label="Örnek veri yüklenemedi"
       className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.08] px-4 py-3"
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[16rem]">
         <p className="text-sm font-bold text-amber-800">Örnek veri yüklenemedi, buradan yeniden dene</p>
         <p className="mt-0.5 text-xs leading-relaxed text-amber-800/80">
           Kaydınız tamamlandı ancak seçtiğiniz örnek veriler yüklenemedi. Yeniden deneyebilir ya da boş ofisle devam edebilirsiniz.
