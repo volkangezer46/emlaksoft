@@ -150,6 +150,7 @@ const LIGHT_PARSE_ALLOWED: Record<string, string> = {
   "src/lib/duplicate-match.ts": "mükerrer eşleştirme anahtarı üretir; kayıt/doğrulama değil",
   "src/components/ui/phone-input.tsx": "istemci anlık geri bildirim; sunucu sıkı doğrular",
   "src/app/app/musteriler/yeni/customer-form.tsx": "istemci ön kontrol; sunucu action'ı sıkı doğrular",
+  "src/lib/signup-errors.ts": "kayıt sihirbazı istemci adım ön kontrolü; signUp sunucuda parsePhoneStrict ile doğrular",
 };
 
 const USE_CLIENT = /^\s*(?:\/\*[\s\S]*?\*\/\s*)?["']use client["']/;

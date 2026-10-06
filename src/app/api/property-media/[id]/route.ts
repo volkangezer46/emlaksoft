@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isPublicListingImage, PUBLIC_IMAGE_MIME_RE } from "@/lib/public-property-media";
+import { isPublicListingImage } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -32,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   // KVKK P0-9: belge gibi görünen görsel (tapu, yetki belgesi...) public uçtan servis edilmez (tek kural).
-  if (!PUBLIC_IMAGE_MIME_RE.test(media.file_type ?? "") || !isPublicListingImage(media)) {
+  if (!/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "") || !isPublicListingImage(media)) {
     return NextResponse.json({ error: "Görsel bulunamadı." }, { status: 404 });
   }
 

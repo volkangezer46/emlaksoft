@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyShortLivedPropertyMediaClaim } from "@/lib/property-media-access";
-import { isPublicListingImage, PUBLIC_IMAGE_MIME_RE } from "@/lib/public-property-media";
+import { isPublicListingImage } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -68,7 +68,7 @@ export async function GET(
     property.deleted_at ||
     !tenant ||
     !isPublicTenantActive(tenant.status) ||
-    !PUBLIC_IMAGE_MIME_RE.test(media.file_type ?? "") ||
+    !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "") ||
     // KVKK P0-9: belge gibi görünen görsel imzalı public uçtan da servis edilmez (tek kural).
     !isPublicListingImage(media)
   ) {
