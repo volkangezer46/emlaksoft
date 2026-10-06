@@ -9,6 +9,7 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminStatCard, AdminStatGrid } from "@/components/admin/admin-stat-card";
 import { AdminEmpty } from "@/components/admin/admin-table";
 import { Input } from "@/components/ui/input";
+import { FunnelChart } from "@/components/ui/viz";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { exportDemoRequestsCsv } from "@/app/actions/platform-export";
 import { DemoCard, type DemoRow } from "./demo-card";
@@ -87,12 +88,11 @@ export default async function AdminSalesPage({
 
   // pipeline funnel
   const funnel = [
-    { label: "Yeni", href: "/admin/satis?durum=new", value: newCount, tone: "bg-brand-500" },
-    { label: "İletişim", href: "/admin/satis?durum=contacted", value: contacted, tone: "bg-cyan-400" },
-    { label: "Nitelikli", href: "/admin/satis?durum=qualified", value: qualified, tone: "bg-amber-400" },
-    { label: "Kazanıldı", href: "/admin/satis?durum=won", value: wonTotal, tone: "bg-mint-500" },
+    { label: "Yeni", href: "/admin/satis?durum=new", value: newCount },
+    { label: "İletişim", href: "/admin/satis?durum=contacted", value: contacted },
+    { label: "Nitelikli", href: "/admin/satis?durum=qualified", value: qualified },
+    { label: "Kazanıldı", href: "/admin/satis?durum=won", value: wonTotal },
   ];
-  const funnelMax = Math.max(1, ...funnel.map((f) => f.value));
 
   const kpis: { label: string; href: string; value: number | null; suffix?: string; icon: typeof Sparkles; accent: string; hint?: string }[] = [
     { label: "Yeni talep", href: salesHref({ durum: "new" }), value: hasData ? newCount : null, icon: Sparkles, accent: "text-brand-300", hint: "yanıt bekliyor" },
@@ -137,21 +137,14 @@ export default async function AdminSalesPage({
       </AdminPageHeader>
 
       {/* pipeline */}
-      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-        <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><TrendingUp className="h-4 w-4" /> Satış hunisi</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-4">
-          {funnel.map((f, i) => (
-            <Link key={f.label} href={f.href} className="focus-ring group block rounded-[var(--radius-control)]">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-ink-950 transition group-hover:text-brand-600">{f.label}</span>
-                <span className="tabular-nums text-text-muted">{f.value}</span>
-              </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-950/5">
-                <div className={`bar-live h-full rounded-full transition group-hover:brightness-110 ${f.tone}`} style={{ width: `${Math.max((f.value / funnelMax) * 100, 4)}%`, animationDelay: `${i * 0.08}s` }} />
-              </div>
-            </Link>
-          ))}
-        </div>
+      <section className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-1)" }}>
+        <p className="bx-eyebrow flex items-center gap-1.5"><TrendingUp className="h-4 w-4 text-text-faint" aria-hidden /> Satış hunisi</p>
+        <FunnelChart
+          className="mt-3"
+          ariaLabel="Talep durumlarına göre satış hunisi"
+          emptyText="Henüz demo talebi yok"
+          stages={funnel.map((f) => ({ label: f.label, value: f.value, href: f.href }))}
+        />
       </section>
 
       {/* filters + search */}

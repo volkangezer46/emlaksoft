@@ -28,6 +28,8 @@ import { saveEfWholesale } from "@/app/actions/accounting";
 import { InlineOp, opFieldClass } from "@/app/admin/billing/inline-op";
 import { BillingNav } from "@/app/admin/billing/billing-nav";
 import { PeriodBar } from "./period-bar";
+import { RankedBars } from "@/components/admin/admin-bars";
+import { TrendPill, computeTrend } from "@/components/ui/premium";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,23 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
   const summary = summarizeLedger(ledger.rows, openRes ?? [], period, nowMs);
   const planTenantIds = ledger.rows.filter((r) => isCollectedIn(r, period) && r.kind === "plan").map((r) => r.tenantId);
   const movement = await loadSubscriptionMovement(admin, period, planTenantIds).catch(() => null);
+
+  // Dönem karşılaştırması: aynı uzunlukta bir önceki dönem (yalnız iki ucu belli dönemlerde; "tüm zamanlar" karşılaştırılmaz).
+  let prevSummary: ReturnType<typeof summarizeLedger> | null = null;
+  if (period.fromIso && period.toIso) {
+    const fromMs = Date.parse(period.fromIso);
+    const toMs = Date.parse(period.toIso);
+    const prevPeriod = { ...period, fromIso: new Date(fromMs - (toMs - fromMs)).toISOString(), toIso: period.fromIso, fromDay: null, toDay: null };
+    const prevLedger = await loadLedger(admin, prevPeriod, { withRefunds: true }).catch(() => null);
+    if (prevLedger && !prevLedger.truncated) prevSummary = summarizeLedger(prevLedger.rows, openRes ?? [], prevPeriod, nowMs);
+  }
+  const comparison = prevSummary
+    ? [
+        { label: "Tahsilat (brüt)", cur: summary.collected.gross, prev: prevSummary.collected.gross, invert: false, href: defterHref(period, { durum: "paid" }) },
+        { label: "Tahsilat net (KDV hariç)", cur: summary.collected.net, prev: prevSummary.collected.net, invert: false, href: defterHref(period, { durum: "paid" }) },
+        { label: "İade", cur: summary.refunds.gross, prev: prevSummary.refunds.gross, invert: true, href: defterHref(period, { durum: "iade" }) },
+      ]
+    : [];
 
   const wholesale = parseEfWholesale(wholesaleRaw);
   const econ = computeEfEconomics(efUsage.rows, wholesale, summary.byKind.credit_pack.net);
@@ -212,6 +231,26 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
         </p>
       </section>
 
+      {comparison.length > 0 ? (
+        <section aria-labelledby="karsilastirma-baslik" className="space-y-1">
+          <h2 id="karsilastirma-baslik" className="font-display font-bold text-ink-950">Önceki dönemle karşılaştırma</h2>
+          <ul>
+            {comparison.map((c) => (
+              <li key={c.label}>
+                <Link href={c.href} className="focus-ring grid min-h-10 grid-cols-[1fr_auto_auto] items-center gap-4 rounded-[var(--radius-control)] px-1.5 text-sm tabular-nums transition-colors hover:bg-[var(--surface-sunken)]">
+                  <span className="text-text">{c.label}</span>
+                  <span className="text-xs text-text-faint">önceki {formatKurusShort(c.prev)}</span>
+                  <span className="flex items-center justify-end gap-2">
+                    <span className="font-semibold text-text">{formatKurusShort(c.cur)}</span>
+                    <TrendPill trend={computeTrend(c.cur, c.prev, c.invert)} />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section aria-labelledby="abonelik-baslik" className="space-y-3">
         <h2 id="abonelik-baslik" className="font-display font-bold text-ink-950">Abonelik hareketi</h2>
         <StatRow items={subItems} label="Abonelik hareketi" />
@@ -220,6 +259,17 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
           <h2 className="border-b border-line px-5 py-4 font-display font-bold text-ink-950">Gelir türü kırılımı</h2>
+          <RankedBars
+            className="px-4 pt-3"
+            format={formatKurusShort}
+            emptyText="Bu dönemde gelir yok"
+            rows={INVOICE_KINDS.map((k) => ({
+              label: INVOICE_KIND_LABELS[k],
+              value: summary.byKind[k].net,
+              hint: `${summary.byKind[k].count} fatura`,
+              href: defterHref(period, { durum: "paid", tur: k }),
+            }))}
+          />
           <BreakdownTable
             rows={INVOICE_KINDS.map((k) => ({
               key: k,
@@ -233,6 +283,17 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
         </section>
         <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
           <h2 className="border-b border-line px-5 py-4 font-display font-bold text-ink-950">Ödeme yöntemi kırılımı</h2>
+          <RankedBars
+            className="px-4 pt-3"
+            format={formatKurusShort}
+            emptyText="Bu dönemde tahsilat yok"
+            rows={PAYMENT_METHOD_CODES.map((m) => ({
+              label: PAYMENT_METHOD_LABELS[m],
+              value: summary.byMethod[m].net,
+              hint: `${summary.byMethod[m].count} fatura`,
+              href: defterHref(period, { durum: "paid", yontem: m }),
+            }))}
+          />
           <BreakdownTable
             rows={PAYMENT_METHOD_CODES.map((m) => ({
               key: m,

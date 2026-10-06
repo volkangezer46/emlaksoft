@@ -1,4 +1,5 @@
 import { trParts } from "@/lib/clock";
+import { SkeletonCard } from "@/components/ui/viz/skeleton-card";
 
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 const WEEKDAYS = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
@@ -28,7 +29,7 @@ export function GlassSkeleton() {
   return (
     <>
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="pm-glass h-[4.9rem] animate-pulse" aria-hidden="true" />
+        <SkeletonCard key={i} height={78} label="Yükleniyor" />
       ))}
     </>
   );
@@ -38,7 +39,7 @@ export function KpiGridSkeleton({ count = 8 }: { count?: number }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="pm-card h-36 animate-pulse" />
+        <SkeletonCard key={i} height={144} label="Yükleniyor" />
       ))}
     </div>
   );

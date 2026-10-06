@@ -196,7 +196,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-950/5">
                   <div
-                    className="bar-live h-full rounded-full bg-[image:var(--grad-brand)] transition group-hover:brightness-110"
+                    className="h-full rounded-full bg-[image:var(--grad-brand)] transition group-hover:brightness-110"
                     style={{ width: `${Math.max((p.value / maxPlan) * 100, 3)}%`, animationDelay: `${i * 0.08}s` }}
                   />
                 </div>
