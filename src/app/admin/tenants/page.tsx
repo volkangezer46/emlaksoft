@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { Activity, ArrowUpRight, Building2, Plus, Search, Settings2, ShieldAlert, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowUpRight, Building2, CheckCircle2, Database, Hourglass, Plus, Search, Settings2, ShieldAlert, X } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { startImpersonation } from "@/app/actions/platform";
 import { exportTenantsCsv } from "@/app/actions/platform-export";
@@ -186,54 +188,45 @@ export default async function AdminTenantsPage({
           </Link>
         </div>
       ) : null}
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[90px]" />
-        <div className="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-amber-400">
-              <Building2 className="h-4 w-4" /> Ofis envanteri
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white">Tüm ofisler</h1>
-            <p className="mt-1 text-sm text-white/75">
-              {filtered ? `${tenantCount ?? rows.length} / ${stats.length} ofis · filtre aktif` : `${stats.length} ofis`} · paket ve durum
-              burada yönetilir
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {canCreate ? (
-                <Link
-                  href="/admin/tenants/yeni"
-                  className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-amber-400 px-4 py-2 text-sm font-bold text-ink-950 transition hover:bg-amber-300"
-                >
-                  <Plus className="h-4 w-4" /> Ofis ekle
-                </Link>
-              ) : null}
-              <ExportButton action={exportTenantsCsv} label="Excel'e aktar" />
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {[
-                { label: "Toplam ofis", value: stats.length, href: buildHref({}) },
-                { label: "Aktif", value: statusCounts[0].count, href: href({ q: query, plan, veri, durum: "active" }) },
-                { label: "Denemede", value: statusCounts[1].count, href: href({ q: query, plan, veri, durum: "trial" }) },
-                { label: "Demo veri var", value: demoCount, href: href({ q: query, plan, durum, veri: veri === "demo" ? undefined : "demo" }) },
-                {
-                  label: "Askıda / gecikmiş",
-                  value: statusCounts[2].count + statusCounts[3].count,
-                  href: href({ q: query, plan, veri, durum: "risk" }),
-                },
-              ].map((k) => (
-                <Link
-                  key={k.label}
-                  href={k.href}
-                  className="focus-ring press rounded-[var(--radius-control)] border border-white/10 bg-white/5 px-3 py-2 transition hover:bg-white/10"
-                >
-                  <p className="font-display text-lg font-extrabold text-white">{k.value}</p>
-                  <p className="text-xs text-white/70">{k.label}</p>
-                </Link>
-              ))}
-            </div>
-            <div className="mt-5 flex h-24 items-end gap-2.5">
-              {planCounts.map((p, i) => {
+      <AdminPageHeader
+        eyebrow="Ofis envanteri"
+        icon={Building2}
+        title="Tüm ofisler"
+        description={`${filtered ? `${tenantCount ?? rows.length} / ${stats.length} ofis · filtre aktif` : `${stats.length} ofis`} · paket ve durum burada yönetilir`}
+        actions={
+          <>
+            {canCreate ? (
+              <Link
+                href="/admin/tenants/yeni"
+                className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-4 text-sm font-semibold text-accent-fg transition hover:bg-accent-hover"
+              >
+                <Plus className="h-4 w-4" aria-hidden /> Yeni ofis
+              </Link>
+            ) : null}
+            <ExportButton action={exportTenantsCsv} label="Excel'e aktar" variant="light" />
+          </>
+        }
+      >
+        <KpiGrid label="Ofis göstergeleri" className="lg:grid-cols-5 2xl:grid-cols-5">
+          <KpiCard layout="inline" label="Toplam ofis" value={stats.length} href={buildHref({})} icon={Building2} tone="brand" />
+          <KpiCard layout="inline" label="Aktif" value={statusCounts[0].count} href={href({ q: query, plan, veri, durum: "active" })} icon={CheckCircle2} tone="success" />
+          <KpiCard layout="inline" label="Denemede" value={statusCounts[1].count} href={href({ q: query, plan, veri, durum: "trial" })} icon={Hourglass} tone="gold" />
+          <KpiCard layout="inline" label="Demo veri var" value={demoCount} href={href({ q: query, plan, durum, veri: veri === "demo" ? undefined : "demo" })} icon={Database} tone="neutral" />
+          <KpiCard
+            layout="inline"
+            label="Askıda / gecikmiş"
+            value={statusCounts[2].count + statusCounts[3].count}
+            href={href({ q: query, plan, veri, durum: "risk" })}
+            icon={AlertTriangle}
+            tone="danger"
+            attention={statusCounts[2].count + statusCounts[3].count > 0}
+          />
+        </KpiGrid>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_1fr]">
+          <section aria-label="Pakete göre ofis dağılımı" className="rounded-[var(--radius-panel)] border border-line bg-surface p-4">
+            <p className="text-xs font-semibold text-text-muted">Paket dağılımı</p>
+            <div className="mt-2 flex h-24 items-end gap-2.5">
+              {planCounts.map((p) => {
                 const active = plan === p.key;
                 return (
                   <Link
@@ -242,25 +235,25 @@ export default async function AdminTenantsPage({
                     aria-current={active ? "page" : undefined}
                     title={active ? "Paket filtresini kaldır" : `Yalnızca ${p.label} paketini göster`}
                     className={`focus-ring press flex h-full flex-1 flex-col items-center justify-end gap-1 rounded-[var(--radius-control)] pb-1 transition ${
-                      active ? "bg-white/12" : "hover:bg-white/6"
+                      active ? "bg-accent/10" : "hover:bg-canvas"
                     }`}
                   >
-                    <span className="text-xs font-bold text-white/80">{p.count}</span>
+                    <span className="text-xs font-bold text-ink-950">{p.count}</span>
                     <div
-                      className="bar-live w-full max-w-[26px] rounded-t-[5px] bg-gradient-to-t from-amber-500 to-amber-300"
-                      style={{ height: `${Math.max((p.count / maxPlan) * 70, 8)}%`, animationDelay: `${i * 0.08}s` }}
+                      className="w-full max-w-[26px] rounded-t-[5px] bg-gradient-to-t from-[var(--gold-500)] to-[var(--gold-300)]"
+                      style={{ height: `${Math.max((p.count / maxPlan) * 70, 8)}%` }}
                     />
-                    <span className={`text-xs ${active ? "font-bold text-amber-300" : "text-white/65"}`}>{p.label}</span>
+                    <span className={`text-xs ${active ? "font-bold text-accent-text" : "text-text-muted"}`}>{p.label}</span>
                   </Link>
                 );
               })}
             </div>
-          </div>
+          </section>
 
-          <div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
-            <div className="relative grid h-28 w-28 place-items-center">
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
+          <section aria-label="Duruma göre ofis dağılımı" className="flex items-center gap-5 rounded-[var(--radius-panel)] border border-line bg-surface p-4">
+            <div className="relative grid h-28 w-28 shrink-0 place-items-center">
+              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden="true">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--surface-sunken)" strokeWidth="10" />
                 {arcs.filter((a) => a.count > 0).map((a) => (
                   <circle
                     key={a.key}
@@ -278,11 +271,11 @@ export default async function AdminTenantsPage({
                 ))}
               </svg>
               <div className="absolute text-center">
-                <p className="font-display text-xl font-extrabold text-white">%{Math.round(activeRate * 100)}</p>
-                <p className="text-xs text-white/70">aktif</p>
+                <p className="font-display text-xl font-extrabold text-ink-950">%{Math.round(activeRate * 100)}</p>
+                <p className="text-xs text-text-muted">aktif</p>
               </div>
             </div>
-            <div className="space-y-1 text-xs">
+            <div className="min-w-0 flex-1 space-y-1 text-xs">
               {statusCounts.map((s) => {
                 const active = durum === s.key;
                 return (
@@ -292,19 +285,19 @@ export default async function AdminTenantsPage({
                     aria-current={active ? "page" : undefined}
                     title={active ? "Durum filtresini kaldır" : `Yalnızca "${s.label}" ofisleri göster`}
                     className={`focus-ring flex items-center gap-2 rounded-[7px] px-1.5 py-0.5 transition ${
-                      active ? "bg-white/12 text-white" : "text-white/70 hover:bg-white/6 hover:text-white"
+                      active ? "bg-accent/10 text-ink-950" : "text-text-muted hover:bg-canvas hover:text-ink-950"
                     }`}
                   >
                     <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
                     <span className={`flex-1 ${active ? "font-bold" : ""}`}>{s.label}</span>
-                    <span className="font-bold text-white">{s.count}</span>
+                    <span className="font-bold text-ink-950">{s.count}</span>
                   </Link>
                 );
               })}
             </div>
-          </div>
+          </section>
         </div>
-      </section>
+      </AdminPageHeader>
 
       <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3">

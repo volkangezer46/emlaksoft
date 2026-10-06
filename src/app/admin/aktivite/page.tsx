@@ -14,6 +14,8 @@ import {
   type ActivityFilters,
 } from "@/lib/admin/activity-query";
 import { ActivityExportButton } from "./activity-export-button";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 
 
 function pretty(v: unknown): string {
@@ -284,38 +286,28 @@ export default async function AdminActivityPage({
 
   return (
     <div className="space-y-5">
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
-        <div className="pointer-events-none absolute -right-14 -top-14 h-52 w-52 rounded-full bg-brand-500/25 blur-[90px]" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <span className="flex items-center gap-2 text-xs font-semibold text-brand-300">
-              <ShieldCheck className="h-4 w-4" /> Denetim izi
-            </span>
-            <h1 className="mt-2 font-display text-2xl font-extrabold text-white md:text-3xl">Platform aktivite kaydı</h1>
-            <p className="mt-1 max-w-lg text-sm text-white/75">
-              Tüm kritik işlemler, personel hareketleri ve operasyon kayıtları kronolojik sırayla.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-stretch gap-3">
-            {counters.map((c) => (
-              <Link
-                key={c.label}
-                href={c.href}
-                aria-current={c.active ? "page" : undefined}
-                className={`focus-ring press block rounded-[var(--radius-card)] border p-3 text-center transition ${
-                  c.active
-                    ? "border-brand-400/60 bg-white/15"
-                    : "border-white/12 bg-white/8 hover:border-white/25 hover:bg-white/12"
-                }`}
-              >
-                <p className="font-display text-2xl font-extrabold text-white">{c.value}</p>
-                <p className="text-xs text-white/70">{c.label}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <AdminPageHeader
+        eyebrow="Denetim izi"
+        icon={ShieldCheck}
+        title="Platform aktivite kaydı"
+        description="Tüm kritik işlemler, personel hareketleri ve operasyon kayıtları kronolojik sırayla."
+      >
+        <KpiGrid label="Aktivite sayaçları" className="lg:grid-cols-4 2xl:grid-cols-4">
+          {counters.map((c) => (
+            <KpiCard
+              key={c.label}
+              layout="inline"
+              label={c.label}
+              value={c.value}
+              href={c.href}
+              icon={Activity}
+              tone={c.active ? "gold" : "brand"}
+              tinted={c.active}
+              hint={c.active ? "filtre aktif · kaldırmak için tıkla" : undefined}
+            />
+          ))}
+        </KpiGrid>
+      </AdminPageHeader>
 
       <ActivityFilterBar filters={filters} total={totalFiltered} />
 

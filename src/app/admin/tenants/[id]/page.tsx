@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
-  ArrowUpRight,
   Building2,
   CreditCard,
   Gauge,
@@ -58,6 +57,8 @@ import {
   SupportTab,
   TeamTab,
 } from "./office-360-panels";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 
 const tenantStatusLabel: Record<string, string> = {
   trial: "Deneme",
@@ -404,17 +405,12 @@ export default async function AdminTenantDetailPage({
         <ArrowLeft className="h-4 w-4" /> Ofis listesi
       </Link>
 
-      <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
-        <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
-        <div className="relative flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-300">Ofis 360</p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold">{tenant.name}</h1>
-            <p className="mt-1 text-sm text-white/60">
-              {planLabel(tenant.plan)} · {tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici erişimiyle güvenli okuma
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <AdminPageHeader
+        eyebrow="Ofis 360"
+        title={tenant.name}
+        description={`${planLabel(tenant.plan)} · ${tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici erişimiyle güvenli okuma`}
+        actions={
+          <>
             <SubscriptionPanel
               tenantId={tenant.id}
               currentPlan={tenant.plan ?? "office"}
@@ -422,28 +418,19 @@ export default async function AdminTenantDetailPage({
               plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
             />
             <form action={stopImpersonation}>
-              <button type="submit" className="rounded-[var(--radius-control)] bg-white px-4 py-2.5 text-sm font-semibold text-ink-950">
+              <button type="submit" className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
                 Önizlemeyi bitir
               </button>
             </form>
-          </div>
-        </div>
-        <div className="relative mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          </>
+        }
+      >
+        <KpiGrid label="Ofis göstergeleri">
           {kpis.map((k) => (
-            <Link
-              key={k.label}
-              href={k.href}
-              className="focus-ring press group relative block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-4 transition hover:border-white/25 hover:bg-white/8"
-            >
-              <ArrowUpRight className="hover-action absolute right-3 top-3 h-4 w-4 text-white/40 opacity-0 transition group-hover:text-amber-300 group-hover:opacity-100" />
-              <k.icon className="h-4 w-4 text-mint-400" />
-              <p className="mt-2 font-display text-lg font-extrabold">{k.value}</p>
-              <p className="text-xs text-white/45">{k.label}</p>
-              {k.hint ? <p className="mt-0.5 text-xs text-white/60">{k.hint}</p> : null}
-            </Link>
+            <KpiCard key={k.label} layout="inline" label={k.label} value={k.value} href={k.href} icon={k.icon} tone="brand" hint={k.hint} />
           ))}
-        </div>
-      </section>
+        </KpiGrid>
+      </AdminPageHeader>
 
       <MorphNav
         variant="underline"
