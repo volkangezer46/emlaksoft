@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
@@ -162,7 +163,7 @@ export default async function OnaylarPage({
     { count: redAy },
     { data: kararRows },
     { data: turRows },
-  ] = await Promise.all([
+  ] = await batchAll("Onaylar", [], [
     listQuery,
     // Gecikme vurgusu için bekleyenlerin yaş+türü (sayfa dışı da dahil).
     supabase.from("approval_requests").select("id, kind, created_at").eq("status", "bekliyor").limit(500),

@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -140,7 +141,7 @@ export default async function ReferralsPage({
     { data: linkCountRows },
     { data: staffRows },
     { data: promoterRows },
-  ] = await Promise.all([
+  ] = await batchAll("Tavsiyeler", [], [
     listQuery.order("created_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1),
     // KPI sayıları — liste sayfalı olduğundan head-count ile gerçek toplamlar.
     supabase.from("referrals").select("id", { count: "exact", head: true }),

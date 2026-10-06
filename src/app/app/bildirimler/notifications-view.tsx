@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { ArrowUpRight, Bell, BellRing, CheckCheck, Gauge, Inbox, Sparkles } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -74,7 +75,7 @@ export async function NotificationsView({
 
   const kindKeys = Object.keys(kindLabel);
   const [{ data, count }, { count: unreadCount }, { count: allCount }, { count: weekCount }, ...kindCountRes] =
-    await Promise.all([
+    await batchAll("Bildirimler", [], [
       listQuery.order("created_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1),
       countBase().is("read_at", null),
       countBase(),

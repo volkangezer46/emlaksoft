@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import { ArrowLeft, FileUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -145,7 +146,7 @@ export default async function EvrakLinkleriPage({
   if (musteri) list = list.eq("customer_id", musteri);
   if (portfoy) list = list.eq("property_id", portfoy);
 
-  const [listRes, totalRes, acikRes, bekleyenRes, tamamRes, kapaliRes, prefillCustomerRes, prefillPropertyRes] = await Promise.all([
+  const [listRes, totalRes, acikRes, bekleyenRes, tamamRes, kapaliRes, prefillCustomerRes, prefillPropertyRes] = await batchAll("Evrak linkleri", [], [
     list,
     base(),
     filters.acik(base()),

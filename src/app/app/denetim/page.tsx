@@ -1,3 +1,4 @@
+import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
 import {
   Activity,
@@ -93,7 +94,7 @@ export default async function AuditPage({
     .order("created_at", { ascending: false });
   // Tarih, aktör, risk, işlem türü ve metin araması sunucu tarafında (CSV aynı süzgeci kullanır).
   logQuery = applyAuditFilters(logQuery, filters);
-  const [{ data: logs, count: logTotal }, { count: highCount }, { count: last24Count }] = await Promise.all([
+  const [{ data: logs, count: logTotal }, { count: highCount }, { count: last24Count }] = await batchAll("Denetim günlüğü", [], [
     logQuery.range(offset, offset + PAGE_SIZE - 1),
     // KPI'lar gerçek sayım: sayfadaki 60 kayıt değil, tüm günlük.
     supabase.from("audit_logs").select("id", { count: "exact", head: true }).in("action", [...HIGH_RISK_ACTIONS]),
