@@ -442,7 +442,7 @@ export async function SystemView() {
           </div>
           {schemaG ? (
             <RadialGauge value={schemaG.ok} max={schemaG.total} size={56} stroke={7} tone={schemaMissing.length === 0 ? "success" : "danger"} ariaLabel="Uygulanmış şema kontrolleri">
-              <span className="text-[11px] font-bold tabular-nums text-ink-950">{schemaG.ok}/{schemaG.total}</span>
+              <span className="text-xs font-bold tabular-nums text-ink-950">{schemaG.ok}/{schemaG.total}</span>
             </RadialGauge>
           ) : null}
           <span

@@ -209,6 +209,12 @@ export default async function AdminGrowthPage({
                 </div>
                 <ul className="divide-y divide-line text-sm">
                   <li>
+                    <Link href={hrefFor({ kaynak: "odeyen" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                      <span className="text-text-muted">Deneme → ödeme dönüşümü</span>
+                      <span className="font-semibold tabular-nums text-ink-950">{formatPercent(m.signupToPaid)}</span>
+                    </Link>
+                  </li>
+                  <li>
                     <Link href={hrefFor({ kaynak: "referral" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
                       <span className="text-text-muted">Davetçi başına ödeyen</span>
                       <span className="font-semibold tabular-nums text-ink-950">{formatDecimal(m.payersPerReferrer)}</span>

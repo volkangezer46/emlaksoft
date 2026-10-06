@@ -37,6 +37,7 @@ const LEGACY_WRITERS: Record<string, string> = {
   "src/app/actions/accounting.ts": "muhasebe ayarları",
   "src/app/admin/ef-kontor/actions.ts": "EF tarife/paket JSON (kendi ekranı)",
   "src/app/admin/ai-kullanim/actions.ts": "AI kredi maliyet tablosu (kendi ekranı)",
+  "src/lib/insights/engine.ts": "içgörü motoru tur imleci (ayar değil, cron durum işaretçisi; tek anahtar, ofis kimliği)",
 };
 
 describe("ayar yazım sözleşmesi", () => {

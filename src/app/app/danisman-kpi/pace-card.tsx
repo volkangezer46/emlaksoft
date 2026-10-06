@@ -41,7 +41,7 @@ export function PaceCard({
       <div className="mt-4 flex flex-wrap items-center gap-6">
         <RadialGauge value={g.value} max={g.max} target={g.target} size={112} stroke={10} tone="accent" ariaLabel={`${monthLabel} ekip skoru ${g.value}, ${prevLabel} ${g.target}`}>
           <span className="font-display text-xl font-extrabold tabular-nums text-text">%{g.ratioPct}</span>
-          <span className="block text-[11px] text-text-faint">geçen ayın</span>
+          <span className="block text-xs text-text-faint">geçen ayın</span>
         </RadialGauge>
         <dl className="min-w-48 flex-1 space-y-2 text-sm">
           <div className="flex items-baseline justify-between gap-3">

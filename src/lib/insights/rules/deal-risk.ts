@@ -1,4 +1,5 @@
 import { computeDealScore } from "@/lib/deal-score";
+import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import { buildDedupeKey, weekPeriod } from "@/lib/insights/dedupe";
 import type { InsightDraft } from "@/lib/insights/types";
 import { capPerUser, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from "@/lib/insights/rules/common";
@@ -32,7 +33,8 @@ export type StalledDealFact = {
   propertyCode: string | null;
 };
 
-const STAGE_TR: Record<string, string> = { new: "Yeni", qualified: "Nitelikli", negotiation: "Müzakere" };
+// Aşama adları tek kaynaktan (definition-defaults / deal-stage-labels); sabit metin yazılmaz.
+const STAGE_TR = stageLabelMap(defaultStageLabels());
 
 export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: number): InsightDraft[] {
   const week = weekPeriod(nowMs);

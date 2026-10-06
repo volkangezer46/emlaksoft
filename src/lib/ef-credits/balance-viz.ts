@@ -54,7 +54,7 @@ export function forecastDepletion(rows: readonly LedgerPoint[], available: numbe
   const from = nowMs - FORECAST_WINDOW_DAYS * DAY_MS;
   const spends = rows
     .map((r) => ({ t: r.at ? Date.parse(r.at) : Number.NaN, u: r.units }))
-    .filter((r) => Number.isFinite(r.t) && r.t >= from && r.t <= nowMs && r.units !== 0 && r.u < 0);
+    .filter((r) => Number.isFinite(r.t) && r.t >= from && r.t <= nowMs && r.u !== 0 && r.u < 0);
   if (spends.length < FORECAST_MIN_SPEND_ROWS) return null;
   const first = Math.min(...spends.map((s) => s.t));
   const last = Math.max(...spends.map((s) => s.t));

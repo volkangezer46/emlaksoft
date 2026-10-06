@@ -367,10 +367,13 @@ describe("arayüz sözleşmesi", () => {
   it("admin: ölçüm kartları tıklanabilir, hazırlık kontrolü ve kuyruk var", () => {
     const cards = admin.match(/<AdminStatCard\b/g)?.length ?? 0;
     const hrefs = admin.match(/<AdminStatCard\b[^>]*\bhref=/g)?.length ?? 0;
-    expect(cards).toBeGreaterThanOrEqual(10);
+    // Tek huni yeniden tasarımı: üst şerit 4 kart, ölçüm hunisi/K-faktör/maliyet satırları <Link> ile süzgece gider
+    // (eski 10 kartlık ızgara kaldırıldı). Her kart tıklanabilir kalır; her ölçüm satırı bir Link içindedir.
+    expect(cards).toBeGreaterThanOrEqual(4);
     expect(hrefs).toBe(cards);
+    expect(admin.match(/<Link\b[^>]*\bhref=\{(?:hrefFor|queueHref)\(/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
     for (const k of ["K-faktör", "CAC geri dönüşü", "Kötüye kullanım oranı", "Ödül maliyeti", "Deneme → ödeme dönüşümü", "Bağlantı tıklaması"]) {
-      expect(admin).toContain(k);
+      expect(admin + read("src/app/admin/growth/funnel-model.ts")).toContain(k);
     }
     expect(admin).toContain("ReadinessPanel");
     expect(admin).toContain('id="kuyruk"');

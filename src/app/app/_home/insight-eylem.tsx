@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { ArrowRight, BellOff, ChevronDown, ListPlus, X } from "lucide-react";
 import { acceptInsightAsTask, setInsightState } from "@/app/actions/insights";
 import type { InsightDismissReason } from "@/lib/insights/types";
@@ -23,11 +23,12 @@ const btn =
 
 /** Küçük, bağımlılıksız açılır menü (details). Seçimde kapanır; Esc ile kapanır. */
 function Menu({ label, icon, children, disabled }: { label: string; icon: React.ReactNode; children: (close: () => void) => React.ReactNode; disabled?: boolean }) {
-  const ref = useRef<HTMLDetailsElement>(null);
-  const close = () => ref.current?.removeAttribute("open");
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
   return (
     <details
-      ref={ref}
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
       className="relative"
       onKeyDown={(e) => {
         if (e.key === "Escape") close();

@@ -13,7 +13,7 @@ import type { InsightDraft } from "@/lib/insights/types";
  * günlük `digest` içgörüsünün üstüne eklenen kısa, motive edici bir paragraftır.
  *
  * GÜVENLİK/DÜRÜSTLÜK SÖZLEŞMESİ (insight-llm-boundary-contract.test.ts):
- *  - Yalnız `openai-client.ts` üzerinden gider (doğrudan api.openai.com yok); istem + kullanıcı verisi Redactor'dan geçer.
+ *  - Yalnız `openai-client.ts` üzerinden gider (doğrudan OpenAI uç noktası çağrısı yok); istem + kullanıcı verisi Redactor'dan geçer.
  *  - Girdi YALNIZ özet sayılar/etiketlerdir (içgörü türü adları + adetler). Kişisel veri (ad, iletişim, adres) yoktur.
  *  - Her çağrıda `audit: { tenantId, actorId }` (kredi defteri + ai.openai_call denetim izi).
  *  - Otomatik çağrı: KOTA KAPISI (kota doluysa çağrı yok) + önbellek (aynı özet iki kez çağrılmaz).

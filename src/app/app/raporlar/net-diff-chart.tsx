@@ -44,9 +44,9 @@ export function NetDiffChart({ points, className }: { points: readonly NetPoint[
                   <span className="w-full max-w-8 rounded-b-[4px]" style={{ height: h, background: "var(--viz-neg)" }} />
                 ) : null}
               </span>
-              <span className="pt-1 text-center text-[11px] font-medium text-text-faint">{b.label}</span>
+              <span className="pt-1 text-center text-xs font-medium text-text-faint">{b.label}</span>
               <span
-                className="pb-1 text-center text-[11px] font-semibold tabular-nums"
+                className="pb-1 text-center text-xs font-semibold tabular-nums"
                 style={{ color: pos ? "var(--viz-pos)" : "var(--viz-neg)" }}
               >
                 {pos ? "+" : "−"}
