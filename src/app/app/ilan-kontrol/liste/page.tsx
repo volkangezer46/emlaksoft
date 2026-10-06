@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/viz";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableFrame, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatDateTimeTr, formatTry } from "@/lib/format";
 import { listControlProperties } from "@/lib/listing-control/server/readers";
@@ -31,7 +32,7 @@ const HEALTH_VISUAL = { green: "healthy", yellow: "pending", orange: "mismatch",
 const HEALTH_LABEL = { green: "Sağlıklı", yellow: "Kontrol bekliyor", orange: "Uyuşmazlık", red: "Kritik", gray: "Kontrol edilemiyor" } as const;
 
 export default async function IlanKontrolListePage({ searchParams }: { searchParams: SearchParams }) {
-  await requireModulePage("portals", "/app/ilan-kontrol");
+  const { perms } = await requireModulePage("portals", "/app/ilan-kontrol");
   const sp = await searchParams;
   const kpiRaw = Array.isArray(sp.kpi) ? sp.kpi[0] : sp.kpi;
   const kpi: KpiKey = isKpiKey(kpiRaw) ? kpiRaw : "active";
@@ -46,7 +47,7 @@ export default async function IlanKontrolListePage({ searchParams }: { searchPar
         description="Bu liste, ana ekrandaki sayıyla aynı kaynaktan gelir; risk puanı en yüksek portföy en üstte."
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: KPI_LABELS[kpi] }]}
       />
-      <ControlSubNav active="liste" />
+      <ControlSubNav active="liste" closures={effectiveCanAccessModule(perms, "leak")} />
       <nav aria-label="Gösterge filtresi" className="mb-4 flex flex-wrap gap-1.5">
         {KPI_KEYS.map((k) => (
           <Link

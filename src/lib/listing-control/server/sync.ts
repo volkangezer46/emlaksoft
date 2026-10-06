@@ -96,7 +96,7 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
   );
   if (props.failed) return { ...out, skipped: ids.length, schemaMissing: props.missing };
 
-  const [listingsQ, poolQ, dealsQ, anomaliesQ, ownerQ, prevQ] = await Promise.all([
+  const [listingsQ, poolQ, dealsQ, anomaliesQ, ownerQ, prevQ, closuresQ] = await Promise.all([
     rows<ListingRow>(
       db
         .from("portal_listings")
@@ -119,13 +119,22 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
     rows<{ property_id: string; assigned_at: string | null; advisor_id: string | null }>(
       db.from("property_control_state").select("property_id, assigned_at, advisor_id").eq("tenant_id", tenantId).in("property_id", ids),
     ),
+    // Kayıp-Kaçak Kalkanı kapanış kayıtları (listing_closures): "CRM'de kapanış var" TEK kavramdır; kapanış formu girilmiş
+    // portföy için 'potansiyel kayıp işlem' anomalisi açılmaz/kapanır (aynı olay iki yerde iki farklı sonuç vermesin).
+    rows<{ id: string; portal_listing: { property_id: string } | { property_id: string }[] | null }>(
+      db
+        .from("listing_closures")
+        .select("id, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey!inner(property_id)")
+        .eq("tenant_id", tenantId)
+        .in("portal_listing.property_id", ids),
+    ),
   ]);
   if (prevQ.missing) return { ...out, skipped: ids.length, schemaMissing: true };
   const prevState = new Map(prevQ.data.map((r) => [r.property_id, r]));
   const nowIso = new Date(nowMs).toISOString();
   // Kontrol tabloları yoksa (migration uygulanmamış) hiçbir şey yazılmaz.
   if (anomaliesQ.missing) return { ...out, skipped: ids.length, schemaMissing: true };
-  if (listingsQ.failed || dealsQ.failed || anomaliesQ.failed) return { ...out, skipped: ids.length };
+  if (listingsQ.failed || dealsQ.failed || anomaliesQ.failed || closuresQ.failed) return { ...out, skipped: ids.length };
 
   const listings = listingsQ.data;
   const healthQ = listings.length
@@ -149,6 +158,11 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
 
   const poolPending = new Set(poolQ.data.map((r) => r.property_id));
   const ownerInfo = ownerQ.failed ? null : new Set(ownerQ.data.map((r) => r.property_id));
+  const closedProps = new Set<string>();
+  for (const c of closuresQ.data) {
+    const pl = Array.isArray(c.portal_listing) ? c.portal_listing[0] : c.portal_listing;
+    if (pl?.property_id) closedProps.add(pl.property_id);
+  }
   const dealsByProp = new Map<string, string[]>();
   for (const d of dealsQ.data) dealsByProp.set(d.property_id, [...(dealsByProp.get(d.property_id) ?? []), d.stage]);
   const anomaliesByProp = new Map<string, AnomalyRow[]>();
@@ -205,7 +219,7 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
       assignedAt: assignedAtIso,
       publishable: ["ready", "live", "active", "yayında", "yayinda", "hazır", "hazir"].includes((p.status ?? "").toLocaleLowerCase("tr-TR")),
       authorizationEnd: p.authorization_end,
-      hasCrmClosure: !life.active || stages.includes("won") || stages.includes("lost"),
+      hasCrmClosure: !life.active || stages.includes("won") || stages.includes("lost") || closedProps.has(p.id),
       closure: null,
       explainedKeys,
     };

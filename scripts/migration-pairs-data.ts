@@ -127,6 +127,8 @@ const F = {
   lcQueueRpcs: "20260826002050_lc_queue_and_check_rpcs.sql",
   lcAnomalyRpcs: "20260826002060_lc_anomaly_rpcs.sql",
   lcSummaryMarket: "20260826002070_lc_summary_rpcs_market_view.sql",
+  // Ilan kontrol: tarayici destekli dogrulama RPC'leri (kullanici JWT'si) + olay gunlugu + Realtime yayini.
+  lcWorkerEvents: "20260826002800_lc_worker_events_realtime.sql",
   // Zeka katmani (Insight Engine): icgoru kuyrugu (yeni tablo + set_state RPC), platform ikizi, olgu RPC/gorunum/temizlik.
   insights: "20260826002500_insights.sql",
   platformInsights: "20260826002600_platform_insights.sql",
@@ -228,6 +230,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcQueueRpcs]: "ek", // kuyruk talep/hasat + supheli->onayli kayip durum makinesi RPC'leri (portal_listings'e YAZMAZ)
     [F.lcAnomalyRpcs]: "ek", // anomali esitleme/SLA yukseltme (service_role) + acikla/kapat (authenticated, JWT'den)
     [F.lcSummaryMarket]: "ek", // KPI/liste/dunden-beri RPC'leri (invoker) + property_status_history'ye 2 nullable kolon + anonim agregat gorunum (service_role)
+    [F.lcWorkerEvents]: "ek", // listing_control_events (yeni tablo, Realtime) + 3 tetikleyici (yalniz ilan kontrol tablolari) + 4 authenticated worker RPC
   },
 
   // Pencereler yayin sirasidir (order artan). Her pencere --only ile dosya dosya uygulanir.
@@ -323,6 +326,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB30-ilan-kontrol-tablolar", order: 29.81, title: "Ilan kontrol: saglik/sonuc/kuyruk/cihaz + anomali/SLA/eslestirme + portfoy kontrol ozeti tablolari", files: [F.lcVerificationTables, F.lcAnomalyTables, F.lcControlState] },
     { id: "PB31-ilan-kontrol-rpc", order: 29.82, title: "Ilan kontrol: kuyruk/durum makinesi + anomali RPC'leri + KPI/liste RPC'leri + anonim agregat gorunum", files: [F.lcQueueRpcs, F.lcAnomalyRpcs, F.lcSummaryMarket] },
     { id: "PB32-icgoru-temeli", order: 29.83, title: "Zeka katmani: icgoru kuyrugu (insights) + platform ikizi + set-tabanli olgu RPC'leri/kalite gorunumu/temizlik (cron insight-engine bunlari kullanir)", files: [F.insights, F.platformInsights, F.insightSupport] },
+    { id: "PB33-ilan-kontrol-worker", order: 29.84, title: "Ilan kontrol: tarayici destekli dogrulama RPC'leri + olay gunlugu + Realtime (ana ekran sayaclari)", files: [F.lcWorkerEvents] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -432,6 +436,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcSummaryMarket, F.lcControlState],
     [F.lcSummaryMarket, F.lcAnomalyTables],
     [F.lcSummaryMarket, F.lcVerificationTables],
+    [F.lcWorkerEvents, F.lcQueueRpcs],
+    [F.lcWorkerEvents, F.lcControlState],
+    [F.lcWorkerEvents, F.lcAnomalyTables],
     // Icgoru destek RPC/gorunum/temizlik insights tablosuna baglidir (platform ikizi bagimsiz).
     [F.insightSupport, F.insights],
   ],

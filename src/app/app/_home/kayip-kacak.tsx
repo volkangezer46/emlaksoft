@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Bell, Radar } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
+import { createClient } from "@/lib/supabase/server";
+import { getControlSummary } from "@/lib/listing-control/server/readers";
+import type { Db } from "@/lib/listing-control/server/db";
+import { kpiHref, sumSummaryRows } from "@/components/listing-control/helpers";
 import { Widget } from "../dashboard-widgets";
 import { loadClosures, loadLiveListings, type HomeCtx } from "./data";
 import { overdueListingsOf } from "./helpers";
@@ -11,7 +15,13 @@ import { PanelLink } from "./ortak";
  * (yalnız kaçan komisyon satırları kalır).
  */
 export async function KayipKacak({ ctx, showTeyit = true }: { ctx: HomeCtx; showTeyit?: boolean }) {
-  const [listings, closures] = await Promise.all([loadLiveListings(), loadClosures(ctx)]);
+  const [listings, closures, control] = await Promise.all([
+    loadLiveListings(),
+    loadClosures(ctx),
+    // İlan Kontrol ile TEK KAYNAK: "portalda kayıp" sayısı İlan Kontrol özetiyle (aynı RPC, aynı rol kapsamı) birebir aynıdır.
+    createClient().then((c) => getControlSummary(c as unknown as Db, "tenant")),
+  ]);
+  const portalMissing = control.available ? sumSummaryRows(control.rows).portal_missing : 0;
   const overdueListings = showTeyit ? overdueListingsOf(listings) : [];
 
   return (
@@ -43,6 +53,20 @@ export async function KayipKacak({ ctx, showTeyit = true }: { ctx: HomeCtx; show
               <Bell className="h-4 w-4 text-mint-600" />
               <p className="font-semibold text-mint-600">Teyit kuyruğu temiz</p>
             </div>
+          ) : null}
+          {portalMissing > 0 ? (
+            <Link
+              href={kpiHref("portal_missing")}
+              className="focus-ring group block rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-3 transition hover:border-danger-500/50 hover:bg-danger-500/10"
+            >
+              <p className="flex items-center justify-between gap-2 font-semibold text-ink-950">
+                {portalMissing} portföyde portal ilanı kayıp
+                <span className="hover-action shrink-0 text-xs font-bold text-brand-600 opacity-0 transition group-hover:opacity-100">
+                  İncele →
+                </span>
+              </p>
+              <p className="mt-1 text-text-muted">İlan Kontrol Merkezi: doğrulanan kayıplar</p>
+            </Link>
           ) : null}
           {closures.recent
             .filter((c) => Number(c.estimated_lost_commission || 0) > 0)

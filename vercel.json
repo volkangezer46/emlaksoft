@@ -24,7 +24,7 @@
     },
     {
       "path": "/api/cron/leak-sla",
-      "schedule": "0 */12 * * *"
+      "schedule": "11 * * * *"
     },
     {
       "path": "/api/cron/dogum-gunu",

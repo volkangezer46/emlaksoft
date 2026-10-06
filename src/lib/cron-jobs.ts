@@ -21,7 +21,7 @@ export const CRON_JOBS = [
   { job: "gorev-hatirlat", label: "Görev hatırlatma", path: "/api/cron/gorev-hatirlat", schedule: "0 */2 * * *", cadenceLabel: "2 saatte bir", staleAfterMinutes: 300 },
   { job: "portal-teyit", label: "Portal teyit takibi", path: "/api/cron/portal-teyit", schedule: "0 */6 * * *", cadenceLabel: "6 saatte bir", staleAfterMinutes: 840 },
   { job: "abonelik-kontrol", label: "Abonelik kontrolü", path: "/api/cron/abonelik-kontrol", schedule: "0 0 * * *", cadenceLabel: "her gün 00:00 UTC (03:00 TR)", staleAfterMinutes: 2_160 },
-  { job: "leak-sla", label: "Kayıp-kaçak SLA", path: "/api/cron/leak-sla", schedule: "0 */12 * * *", cadenceLabel: "12 saatte bir", staleAfterMinutes: 1_560 },
+  { job: "leak-sla", label: "Kayıp-kaçak SLA ve ilan kontrol yükseltme", path: "/api/cron/leak-sla", schedule: "11 * * * *", cadenceLabel: "saatte bir", staleAfterMinutes: 180 },
   { job: "dogum-gunu", label: "Doğum günü / yıldönümü", path: "/api/cron/dogum-gunu", schedule: "0 8 * * *", cadenceLabel: "her gün 08:00 UTC (11:00 TR)", staleAfterMinutes: 2_160 },
   { job: "tcmb-kur", label: "TCMB kur çekimi", path: "/api/cron/tcmb-kur", schedule: "30 13 * * 1-5", cadenceLabel: "hafta içi 13:30 UTC (16:30 TR)", staleAfterMinutes: 4_800 },
   { job: "otomasyon", label: "Otomasyon motoru", path: "/api/cron/otomasyon", schedule: "0 6,14 * * *", cadenceLabel: "her gün 06:00 ve 14:00 UTC (09:00 ve 17:00 TR)", staleAfterMinutes: 900 },

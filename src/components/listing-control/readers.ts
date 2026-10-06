@@ -4,6 +4,7 @@ import { getControlSummary, type ControlSummaryRow } from "@/lib/listing-control
 import { computeHealthScore, type HealthResult } from "@/lib/listing-control/health-score";
 import { normalizeListingControlConfig, type ListingControlConfig } from "@/lib/listing-control/config";
 import { daysAgoIso } from "@/lib/clock";
+import type { MissingEvent } from "@/lib/listing-control/advisor-patterns";
 import type { ScopeKind } from "@/lib/listing-control/types";
 import { ANOMALY_TYPE_LABELS, type TypeCounts } from "./helpers";
 import { averageLeadHours, averageResolveHours, buildHealthInputs, buildLifecycleTimeline, type TimelineEvent } from "./lifecycle-model";
@@ -64,15 +65,15 @@ export async function resolveGroupNames(db: Db, scope: ScopeKind, ids: readonly 
   return out;
 }
 
-export type PropertyBrief = { id: string; code: string; title: string; price: number | null; advisorId: string | null };
+export type PropertyBrief = { id: string; code: string; title: string; price: number | null; advisorId: string | null; commissionRate: number | null };
 
 export async function loadPropertyBriefs(db: Db, ids: readonly string[]): Promise<Map<string, PropertyBrief>> {
   const out = new Map<string, PropertyBrief>();
   const uniq = [...new Set(ids)];
   if (uniq.length === 0) return out;
-  const { data } = await db.from("properties").select("id, property_code, title, list_price, assigned_to").in("id", uniq);
-  for (const r of (data ?? []) as { id: string; property_code: string; title: string | null; list_price: number | null; assigned_to: string | null }[]) {
-    out.set(r.id, { id: r.id, code: r.property_code, title: r.title?.trim() || "İsimsiz portföy", price: r.list_price === null ? null : Number(r.list_price), advisorId: r.assigned_to });
+  const { data } = await db.from("properties").select("id, property_code, title, list_price, assigned_to, commission_rate").in("id", uniq);
+  for (const r of (data ?? []) as { id: string; property_code: string; title: string | null; list_price: number | null; assigned_to: string | null; commission_rate: number | null }[]) {
+    out.set(r.id, { id: r.id, code: r.property_code, title: r.title?.trim() || "İsimsiz portföy", price: r.list_price === null ? null : Number(r.list_price), advisorId: r.assigned_to, commissionRate: r.commission_rate === null || r.commission_rate === undefined ? null : Number(r.commission_rate) });
   }
   return out;
 }
@@ -259,4 +260,25 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
     openAnomalies: anRows.filter((a) => OPEN_STATUSES.includes(a.status) || a.status === "explained").map((a) => ({ id: a.id, type: a.type, status: a.status, riskScore: a.risk_score })),
     config,
   };
+}
+
+/** Son dönemde açılan portal kaybı uyarıları (danışman örüntüsü için). RLS rol kapsamlı; en çok 1000 satır. */
+export async function loadMissingEvents(db: Db, sinceIso: string): Promise<{ available: boolean; events: MissingEvent[] }> {
+  const { data, error } = await db
+    .from("listing_anomalies")
+    .select("advisor_id, property_id, first_seen_at")
+    .eq("type", "portal_missing")
+    .gte("first_seen_at", sinceIso)
+    .order("first_seen_at", { ascending: false })
+    .limit(1000);
+  if (error) {
+    if (!isMissingSchema(error)) console.error("loadMissingEvents", { code: error.code });
+    return { available: false, events: [] };
+  }
+  const events = ((data ?? []) as { advisor_id: string | null; property_id: string; first_seen_at: string }[]).map((r) => ({
+    advisorId: r.advisor_id,
+    propertyId: r.property_id,
+    atMs: Date.parse(r.first_seen_at),
+  }));
+  return { available: true, events };
 }
