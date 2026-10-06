@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyShortLivedPropertyMediaClaim } from "@/lib/property-media-access";
+import { isPublicListingImage, PUBLIC_IMAGE_MIME_RE } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -54,7 +55,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: media, error: mediaError } = await admin
     .from("property_media")
-    .select("storage_path, file_type, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))")
+    .select("kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(deleted_at, tenant:tenants(status))")
     .eq("id", id)
     .eq("kind", "image")
     .maybeSingle();
@@ -67,7 +68,9 @@ export async function GET(
     property.deleted_at ||
     !tenant ||
     !isPublicTenantActive(tenant.status) ||
-    !/^image\/(?:avif|gif|jpeg|png|webp)$/i.test(media.file_type ?? "")
+    !PUBLIC_IMAGE_MIME_RE.test(media.file_type ?? "") ||
+    // KVKK P0-9: belge gibi görünen görsel imzalı public uçtan da servis edilmez (tek kural).
+    !isPublicListingImage(media)
   ) {
     return notFoundResponse();
   }

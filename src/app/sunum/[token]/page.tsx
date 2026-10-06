@@ -23,6 +23,7 @@ import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { PrintButton } from "./print-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
+import { isPublicListingImage } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { LicenseNotice } from "@/components/public/license-notice";
 
@@ -117,13 +118,14 @@ export default async function PublicPresentationPage({
   // Tüm portföylerin görselleri tek sorguda: kapak önde, sonra sort_order.
   const { data: mediaRows } = await admin
     .from("property_media")
-    .select("id, property_id, is_cover, sort_order")
+    .select("id, property_id, is_cover, sort_order, kind, file_type, file_name")
     .in("property_id", properties.map((p) => p.id as string))
     .eq("kind", "image")
     .order("is_cover", { ascending: false })
     .order("sort_order", { ascending: true });
   const mediaByProperty = new Map<string, { id: string; src: string }[]>();
-  for (const m of mediaRows ?? []) {
+  // KVKK P0-9: belge gibi görünen görsel sunum linkinde gösterilmez (tek kural, public-property-media).
+  for (const m of (mediaRows ?? []).filter((r) => isPublicListingImage(r))) {
     const list = mediaByProperty.get(m.property_id) ?? [];
     list.push({ id: m.id, src: createShortLivedPropertyMediaUrl(m.id, "presentation") });
     mediaByProperty.set(m.property_id, list);
