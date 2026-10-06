@@ -506,6 +506,8 @@ Yalnız `CREATE OR REPLACE` (md5 korumalı ön-koşul: taban VEYA kendi sürüm�
 - **Doğrulama (bu dal):** type-check 0 · lint 0 · vitest 480 dosya / 5256 test geçti · check:migrations 0 (286 dosya, son 20261007000100) · check:migration-pairs 0 hata
   (2 eski proposed/ ad uyarısı; K4 uyarısı kalktı) · check:links 0 · check:cron 0 · audit:actions 0 · admin-client envanteri yenilendi (yeni `createAdminClient` YOK) ·
   build (sahte env) BUILD_EXIT=0. `direct-file-upload-contract.test.ts` finalize çağrısında 3. argümana (belge bayrağı) izin verecek şekilde güncellendi.
+  **main (2ed77fff) birleşimi sonrası yeniden:** type-check 0 · lint 0 · vitest 493 dosya / 5339 test · check:links/cron/audit:actions 0 · check:migrations 0 (289 dosya) ·
+  check:migration-pairs 0 hata · build BUILD_EXIT=0. Not: PB48 (000100) numarası canlıdaki PB46'dan (000200..220) küçük; runner `--only` ile sırasız uygulamayı destekler (P12 emsali).
 
 ## 25. İlan Kontrol VERİ YOLLARI: tarayıcı eklentisi, envanter içe aktarma, eşleşme kuyruğu, kopya kuralı, SLA görevi, yaşam döngüsü kaydı, ana ekran kartı — 2026-10-07, KODDA (dal `worktree-agent-aca052c1061ec4725`); migration'lar CANLIYA UYGULANMADI (PB46)
 
