@@ -1,1 +1,18 @@
-export default function Loading() { return ( <div className="space-y-6 animate-pulse"><div className="h-52 rounded-[var(--radius-panel)] bg-ink-950/8" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" /><div className="h-32 rounded-[var(--radius-panel)] bg-ink-950/8" /></div><div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" /></div> ); } 
+import { SkeletonCard } from "@/components/ui/viz";
+
+/** Danışman KPI: başlık → özet KPI → podyum → tempo kartı → ekip metrikleri → grafik/tablo (içerik yükseklikleriyle). */
+export default function Loading() {
+  return (
+    <div className="space-y-6" role="status" aria-label="Danışman performansı yükleniyor">
+      <SkeletonCard height={104} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <SkeletonCard key={i} height={112} />
+        ))}
+      </div>
+      <SkeletonCard height={256} />
+      <SkeletonCard height={176} />
+      <SkeletonCard height={320} />
+    </div>
+  );
+}

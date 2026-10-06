@@ -32,7 +32,7 @@ const MAX_ZOOM = 12;
 const MAP_HEIGHT = 460;
 
 const TONE_CLS: Record<TalepArzTone, { fill: string; ring: string; text: string; label: string }> = {
-  mint: { fill: "bg-mint-500/60", ring: "ring-mint-600", text: "text-mint-600", label: "Arz talebi karşılıyor" },
+  mint: { fill: "bg-mint-500/60", ring: "ring-mint-600", text: "text-[color:var(--viz-pos)]", label: "Arz talebi karşılıyor" },
   amber: { fill: "bg-amber-400/65", ring: "ring-amber-500", text: "text-amber-600", label: "Kısmi karşılama" },
   red: { fill: "bg-danger-500/60", ring: "ring-danger-500", text: "text-danger-500", label: "Talep aç" },
 };
@@ -213,7 +213,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
               top: Math.max(activePoint.wy * scale - originY - markerSize(activePoint.demand) / 2 - 8, 96),
             }}
           >
-            <p className="text-sm font-bold text-ink-950">{activePoint.name}</p>
+            <p className="text-sm font-bold text-text">{activePoint.name}</p>
             <p className="mt-1 text-xs tabular-nums text-text-muted">
               {activePoint.demand} açık talep · {activePoint.supply} yayında portföy
             </p>
@@ -222,7 +222,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
             </p>
             <Link
               href={activePoint.href}
-              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
+              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-accent-text hover:underline"
             >
               İlçe dökümünü gör <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
@@ -234,7 +234,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 1))}
-            className="grid h-8 w-8 place-items-center text-ink-950 transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center text-text transition hover:bg-canvas"
             aria-label="Yakınlaştır"
           >
             <Plus className="h-4 w-4" />
@@ -243,7 +243,7 @@ export function TalepArzMap({ markers }: { markers: TalepArzMarker[] }) {
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 1))}
-            className="grid h-8 w-8 place-items-center border-t border-line text-ink-950 transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center border-t border-line text-text transition hover:bg-canvas"
             aria-label="Uzaklaştır"
           >
             <Minus className="h-4 w-4" />

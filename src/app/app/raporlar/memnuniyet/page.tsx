@@ -57,7 +57,7 @@ function ScoreBadge({ score }: { score: number }) {
       ? "bg-danger-500/10 text-danger-500"
       : score <= 8
         ? "bg-amber-500/12 text-amber-600"
-        : "bg-mint-500/12 text-mint-600";
+        : "bg-mint-500/12 text-[color:var(--viz-pos)]";
   return (
     <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-sm font-extrabold tabular-nums ${cls}`}>
       {score}
@@ -130,7 +130,7 @@ export default async function SatisfactionReportPage() {
     .slice(0, 25);
 
   const base = appUrl();
-  const npsTone = nps === null ? "text-text-muted" : nps >= 30 ? "text-mint-700" : nps >= 0 ? "text-amber-700" : "text-danger-500";
+  const npsTone = nps === null ? "text-text-muted" : nps >= 30 ? "text-[color:var(--viz-pos)]" : nps >= 0 ? "text-amber-700" : "text-danger-500";
 
   return (
     <div className="space-y-6">
@@ -143,7 +143,7 @@ export default async function SatisfactionReportPage() {
       {effectiveCanAccessModule(ctx.perms, "surveys") ? (
         <p className="-mt-3 mb-4 text-xs text-text-muted">
           Yayından kalkan, uzayan ve kaybedilen işlemler için anketör aramaları ayrı izlenir:{" "}
-          <Link href="/app/anketler" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
+          <Link href="/app/anketler" className="focus-ring rounded-[var(--radius-control)] font-semibold text-accent-text underline-offset-2 hover:underline">
             Anketler ve anketör kuyruğu
           </Link>
           . Anketörün telefonla aldığı kapanış cevapları bu NPS raporuna da yansır.
@@ -164,7 +164,7 @@ export default async function SatisfactionReportPage() {
             value: responseRate === null ? "—" : `%${responseRate}`,
             sub: `${answered.length} yanıt / ${rows.length} anket`,
             icon: Send,
-            tone: "text-brand-700",
+            tone: "text-accent-text",
             href: "#bekleyen",
           },
           {
@@ -180,18 +180,18 @@ export default async function SatisfactionReportPage() {
             value: String(pending.length),
             sub: "Linki iletilmeyi bekliyor",
             icon: Hourglass,
-            tone: "text-mint-700",
+            tone: "text-[color:var(--viz-pos)]",
             href: "#bekleyen",
           },
         ].map((k) => (
           <a
             key={k.label}
             href={k.href}
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-400"
+            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-border-interactive"
           >
             <span className="flex items-start justify-between">
               <k.icon className={`h-4 w-4 ${k.tone}`} />
-              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
             </span>
             <p className={`numeric mt-2 font-display text-xl font-extrabold ${k.label === "NPS skoru" ? k.tone : "text-text"}`}>{k.value}</p>
             <p className="text-xs font-medium text-text-muted">{k.label}</p>
@@ -203,8 +203,8 @@ export default async function SatisfactionReportPage() {
       {/* Anket oluştur — kapanan ve anketi olmayan anlaşmalar */}
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-2">
-          <Send className="h-4 w-4 text-brand-600" />
-          <h2 className="font-display font-bold text-ink-950">Anket oluştur</h2>
+          <Send className="h-4 w-4 text-accent-text" />
+          <h2 className="font-display font-bold text-text">Anket oluştur</h2>
           <span className="ml-auto text-xs text-text-muted">
             {openForSurvey.length} kapanan anlaşma anket bekliyor
           </span>
@@ -231,7 +231,7 @@ export default async function SatisfactionReportPage() {
                   <div className="min-w-0 flex-1">
                     <Link
                       href={cust?.id ? `/app/musteriler/${cust.id}` : "/app/musteriler"}
-                      className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-ink-950 underline-offset-2 hover:underline"
+                      className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-text underline-offset-2 hover:underline"
                     >
                       {cust?.full_name ?? "Müşteri"}
                     </Link>
@@ -253,8 +253,8 @@ export default async function SatisfactionReportPage() {
         {/* Danışman bazlı NPS */}
         <section id="danisman" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-brand-600" />
-            <h2 className="font-display font-bold text-ink-950">Danışman bazlı</h2>
+            <Users className="h-4 w-4 text-accent-text" />
+            <h2 className="font-display font-bold text-text">Danışman bazlı</h2>
           </div>
           {agentRows.length === 0 ? (
             <p className="py-10 text-center text-sm text-text-muted">
@@ -277,7 +277,7 @@ export default async function SatisfactionReportPage() {
                     const aAvg = avgOf(a.scores);
                     return (
                       <tr key={a.name} className="border-b border-line/60 last:border-0">
-                        <td className="py-2.5 pr-3 font-semibold text-ink-950">{a.name}</td>
+                        <td className="py-2.5 pr-3 font-semibold text-text">{a.name}</td>
                         <td className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {a.scores.length}/{a.total}
                         </td>
@@ -286,7 +286,7 @@ export default async function SatisfactionReportPage() {
                             aNps === null
                               ? "text-text-faint"
                               : aNps >= 30
-                                ? "text-mint-600"
+                                ? "text-[color:var(--viz-pos)]"
                                 : aNps >= 0
                                   ? "text-amber-600"
                                   : "text-danger-500"
@@ -294,7 +294,7 @@ export default async function SatisfactionReportPage() {
                         >
                           {aNps === null ? "—" : aNps}
                         </td>
-                        <td className="py-2.5 text-right tabular-nums text-ink-950">
+                        <td className="py-2.5 text-right tabular-nums text-text">
                           {aAvg === null ? "—" : aAvg.toLocaleString("tr-TR")}
                         </td>
                       </tr>
@@ -310,7 +310,7 @@ export default async function SatisfactionReportPage() {
         <section id="bekleyen" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center gap-2">
             <Hourglass className="h-4 w-4 text-amber-500" />
-            <h2 className="font-display font-bold text-ink-950">Bekleyen anketler</h2>
+            <h2 className="font-display font-bold text-text">Bekleyen anketler</h2>
             <span className="ml-auto text-xs text-text-muted">{pending.length} adet</span>
           </div>
           {pending.length === 0 ? (
@@ -326,7 +326,7 @@ export default async function SatisfactionReportPage() {
                     <div className="min-w-0 flex-1">
                       <Link
                         href={cust?.id ? `/app/musteriler/${cust.id}` : "/app/musteriler"}
-                        className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-ink-950 underline-offset-2 hover:underline"
+                        className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-text underline-offset-2 hover:underline"
                       >
                         {cust?.full_name ?? "Müşteri"}
                       </Link>
@@ -347,8 +347,8 @@ export default async function SatisfactionReportPage() {
       {/* Son yorumlar */}
       <section id="yorumlar" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <div className="flex items-center gap-2">
-          <MessageSquareQuote className="h-4 w-4 text-brand-600" />
-          <h2 className="font-display font-bold text-ink-950">Son yorumlar</h2>
+          <MessageSquareQuote className="h-4 w-4 text-accent-text" />
+          <h2 className="font-display font-bold text-text">Son yorumlar</h2>
           <span className="ml-auto text-xs text-text-muted">{comments.length} yorum</span>
         </div>
         {comments.length === 0 ? (
@@ -366,7 +366,7 @@ export default async function SatisfactionReportPage() {
                     <div className="min-w-0">
                       <Link
                         href={cust?.id ? `/app/musteriler/${cust.id}` : "/app/musteriler"}
-                        className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 underline-offset-2 hover:underline"
+                        className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-text underline-offset-2 hover:underline"
                       >
                         {cust?.full_name ?? "Müşteri"}
                       </Link>

@@ -1,17 +1,18 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import {
-  ArrowRight,
   ArrowUpRight,
   BarChart3,
   Gauge,
   Map as MapIcon,
   PieChart,
   Smile,
-  TrendingDown,
-  TrendingUp,
   Trophy,
 } from "lucide-react";
+import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
+import { HBarList } from "./hbar-list";
+import { NetDiffChart } from "./net-diff-chart";
+import { hasNetData, netSeries, shareOfMax, shareOfTotal } from "./report-math";
 import { EmptyStateV3 } from "@/components/ui/empty-state-v3";
 import { createClient } from "@/lib/supabase/server";
 import { SAMPLE_DATA_LABEL, loadSampleKpiScope } from "@/lib/sample-scope";
@@ -67,43 +68,6 @@ function istanbulYearMonth(iso: string) {
   }).formatToParts(new Date(iso));
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
   return { year: get("year"), month: get("month") - 1 };
-}
-
-type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
-
-/**
- * Dönem karşılaştırma rozeti — "%+12" / "%-8" / "%0"; önceki dönem 0 ise
- * oran anlamsız olduğundan "yeni" döner. `invert` kayıp gibi "artışı kötü"
- * metriklerde iyi/kötü rengini çevirir (dashboard'daki desenin kopyası).
- */
-function calcTrend(current: number, previous: number, invert = false): TrendInfo {
-  if (previous <= 0) {
-    return current > 0 ? { label: "yeni", dir: "new" } : { label: "%0", dir: "flat" };
-  }
-  const pct = Math.round(((current - previous) / previous) * 100);
-  if (pct === 0) return { label: "%0", dir: "flat" };
-  const up = pct > 0;
-  return {
-    label: `%${up ? "+" : "-"}${Math.abs(pct)}`,
-    dir: up ? "up" : "down",
-    good: invert ? !up : up,
-  };
-}
-
-/** Rozetin karanlık hero üzerindeki varyantı (dashboard TrendBadge deseni). */
-function TrendBadge({ trend }: { trend: TrendInfo }) {
-  const Icon = trend.dir === "down" ? TrendingDown : trend.dir === "flat" ? ArrowRight : TrendingUp;
-  const cls =
-    trend.dir === "new" || trend.dir === "flat"
-      ? "text-text-muted"
-      : trend.good
-        ? "text-mint-700"
-        : "text-danger-500";
-  return (
-    <span className={`flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold tabular-nums ${cls}`}>
-      <Icon className="h-3 w-3" /> {trend.label}
-    </span>
-  );
 }
 
 export default async function ReportsPage() {
@@ -235,9 +199,52 @@ export default async function ReportsPage() {
 
   // Hero KPI dönem rozetleri aynı tam-kapsamlı aggregate snapshot'tan gelir.
   const prevLost = Number(summary.prev_month_lost);
-  const commissionMoM = calcTrend(trendMonths[5]?.income ?? 0, trendMonths[4]?.income ?? 0);
-  const lostMoM = calcTrend(lost, prevLost, true);
-  const demandFlowMoM = calcTrend(Number(summary.month_new_demands), Number(summary.prev_month_new_demands));
+  const commissionMoM = computeTrend(trendMonths[5]?.income ?? 0, trendMonths[4]?.income ?? 0);
+  const lostMoM = computeTrend(lost, prevLost, true);
+  const demandFlowMoM = computeTrend(Number(summary.month_new_demands), Number(summary.prev_month_new_demands));
+
+  const netPoints = netSeries(trendMonths);
+  const showNet = hasNetData(netPoints);
+  const incomeSeries = trendMonths.map((m) => m.income);
+  const prevCommission = trendMonths[4]?.income ?? 0;
+  const incomeVsPrevPeriod = hasPrevPeriodData ? computeTrend(trendIncomeTotal, prevIncomeTotal) : undefined;
+
+  const SECTION = "surface-card rounded-[var(--radius-panel)] p-5";
+  const H2 = "font-display text-base font-bold tracking-[-0.015em] text-text";
+  const ICON_ACCENT = "h-4 w-4 text-accent-text";
+  const POS = "text-[color:var(--viz-pos)]";
+  const NEG = "text-[color:var(--viz-neg)]";
+
+  const volumeItems = bars.map((b) => ({
+    key: b.label,
+    label: b.label,
+    href: b.href,
+    pct: shareOfMax(b.value, b.max),
+    valueText: String(b.value),
+  }));
+  const sourceItems = sourceBars.map((b) => ({
+    key: b.label,
+    label: b.label,
+    href: b.value ? `/app/musteriler?source=${encodeURIComponent(b.value)}` : "/app/musteriler",
+    pct: shareOfMax(b.count, sourceMax),
+    valueText: `${b.count} · %${shareOfTotal(b.count, sourceTotal)}`,
+  }));
+  const roiItems = roiRows.map((r) => ({
+    key: r.source,
+    label: sourceLabel(r.source),
+    href: `/app/musteriler?source=${encodeURIComponent(r.source)}`,
+    pct: shareOfMax(r.wonValue, roiValueMax),
+    valueText: money(r.wonValue),
+    sub: `${r.customers} müşteri · ${r.wonCount} kazanılan`,
+    highlight: r.source === bestSource,
+  }));
+  const lossItems = lossRows.map((r) => ({
+    key: r.reason,
+    label: r.reason,
+    href: "/app/anlasmalar",
+    pct: shareOfMax(r.count, lossMax),
+    valueText: `${r.count} · %${shareOfTotal(r.count, lostCount)} · ${money(r.value)}`,
+  }));
 
   return (
     <div className="space-y-6">
@@ -247,9 +254,9 @@ export default async function ReportsPage() {
         meta={<SampleDataBadge label={sampleLabel} />}
         description="Gerçek toplulaştırma · sahte satış hattı yok."
         actions={
-          <details className="rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-            <summary className="focus-ring cursor-pointer list-none rounded-[var(--radius-card)] px-5 py-3 text-center transition hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
-              <p className="font-display text-2xl font-extrabold text-mint-700">{office.score}</p>
+          <details className="surface-card rounded-[var(--radius-card)]">
+            <summary className="focus-ring cursor-pointer list-none rounded-[var(--radius-card)] px-5 py-3 text-center transition hover:bg-surface-hover [&::-webkit-details-marker]:hidden">
+              <p className={`font-display text-2xl font-extrabold tabular-nums ${POS}`}>{office.score}</p>
               <p className="text-xs text-text-muted">{office.label} ofis skoru · bileşenler ▾</p>
             </summary>
             <div className="border-t border-line px-5 py-4 text-left">
@@ -262,7 +269,7 @@ export default async function ReportsPage() {
                     <span className="text-text">
                       {f.label} <span className="text-text-muted">({f.input} · {f.note})</span>
                     </span>
-                    <span className={`numeric font-bold ${f.points >= 0 ? "text-mint-700" : "text-danger-500"}`}>
+                    <span className={`numeric font-bold tabular-nums ${f.points >= 0 ? POS : NEG}`}>
                       {f.points >= 0 ? "+" : ""}{f.points}
                     </span>
                   </li>
@@ -272,119 +279,123 @@ export default async function ReportsPage() {
           </details>
         }
       />
-      <div className="list-stagger mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Aylık komisyon", value: money(commissionTotal), icon: ICONS.komisyon, tone: "text-amber-700", href: "/app/komisyon", trend: commissionMoM, trendTitle: "Geçen aya göre" },
-          { label: "Kaçan komisyon (tahmini)", value: money(lost), icon: ICONS.alarm, tone: "text-danger-500", href: "/app/kayip-kacak", trend: lostMoM, trendTitle: "Geçen aya göre" },
-          // Gecikmiş teyit anlık (stok) bir metrik; geçmiş anlık görüntüsü
-          // tutulmadığından dürüst bir dönem kıyası üretilemiyor — rozetsiz.
-          // "Gecikmiş teyit" /app/portallar'a gidiyor; portal kavramı ICONS.portal.
-          { label: "Gecikmiş teyit", value: String(overdue), icon: ICONS.portal, tone: "text-amber-700", href: "/app/portallar?durum=teyit", trend: undefined as TrendInfo | undefined, trendTitle: "" },
-          { label: "Açık talep", value: String(demands), icon: ICONS.talep, tone: "text-mint-700", href: "/app/talepler", trend: demandFlowMoM, trendTitle: "Yeni talep akışı, geçen aya göre" },
-        ].map((k) => (
-          <Link
-            key={k.label}
-            href={k.href}
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-brand-400"
-          >
-            <span className="flex items-start justify-between">
-              <k.icon className={`h-4 w-4 ${k.tone}`} />
-              <span className="flex items-center gap-1.5">
-                {k.trend ? (
-                  <span title={k.trendTitle}>
-                    <TrendBadge trend={k.trend} />
-                  </span>
-                ) : null}
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </span>
-            </span>
-            <p className="numeric mt-2 font-display text-xl font-extrabold text-text">{k.value}</p>
-            <p className="text-xs font-medium text-text-muted">{k.label}</p>
-          </Link>
-        ))}
-      </div>
 
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-        <h2 className="font-display font-bold text-ink-950">Hacim dağılımı</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-4">
-          {bars.map((b, i) => (
-            <Link key={b.label} href={b.href} className="focus-ring press group block rounded-[var(--radius-card)] p-1 -m-1">
-              <div className="flex h-36 items-end rounded-[var(--radius-card)] bg-canvas px-3 pb-2 pt-4 transition group-hover:ring-1 group-hover:ring-brand-300">
-                <div
-                  className="bar-live w-full rounded-t-[var(--radius-control)] bg-[image:var(--grad-brand)]"
-                  style={{ height: `${Math.max(8, (b.value / b.max) * 100)}%`, animationDelay: `${i * 80}ms` }}
-                />
-              </div>
-              <p className="mt-2 flex items-center justify-center gap-1 text-center text-xs font-semibold text-ink-950">
-                {b.label}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-              <p className="text-center font-display text-lg font-extrabold text-brand-600">{b.value}</p>
-            </Link>
-          ))}
-        </div>
+      <section aria-label="Öne çıkan göstergeler" className="list-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="Aylık komisyon"
+          value={money(commissionTotal)}
+          icon={ICONS.komisyon}
+          tone="gold"
+          href="/app/komisyon"
+          trend={commissionMoM}
+          previousText={`Önceki ay ${money(prevCommission)}`}
+          series={incomeSeries}
+          chart="bars"
+          seriesUnit="ay"
+          seriesLabel="Son 6 ay gelir"
+        />
+        <KpiCard
+          label="Kaçan komisyon (tahmini)"
+          value={money(lost)}
+          icon={ICONS.alarm}
+          tone="danger"
+          href="/app/kayip-kacak"
+          trend={lostMoM}
+          previousText={`Önceki ay ${money(prevLost)}`}
+        />
+        {/* Gecikmiş teyit anlık (stok) bir metrik; geçmiş anlık görüntüsü tutulmadığından
+            dürüst bir dönem kıyası yok: trend/seri çizilmez. */}
+        <KpiCard
+          label="Gecikmiş teyit"
+          value={String(overdue)}
+          icon={ICONS.portal}
+          tone="warn"
+          href="/app/portallar?durum=teyit"
+          attention={overdue > 0}
+          hint="Anlık durum · dönem kıyası yok"
+        />
+        <KpiCard
+          label="Açık talep"
+          value={String(demands)}
+          icon={ICONS.talep}
+          tone="success"
+          href="/app/talepler"
+          trend={demandFlowMoM}
+          previousText={`Bu ay yeni ${summary.month_new_demands} · önceki ay ${summary.prev_month_new_demands}`}
+        />
       </section>
 
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className={SECTION} style={{ boxShadow: "var(--elev-3)" }}>
         <div className="flex flex-wrap items-center gap-2">
-          <ICONS.komisyon className="h-4 w-4 text-brand-600" />
-          <h2 className="font-display font-bold text-ink-950">Gelir & gider · son 6 ay</h2>
-          <div className="ml-auto flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] bg-mint-500" /> Gelir</span>
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px] bg-danger-500" /> Gider</span>
+          <ICONS.komisyon className={ICON_ACCENT} aria-hidden="true" />
+          <h2 className={H2}>Gelir &amp; gider · son 6 ay</h2>
+          <div className="ml-auto flex items-center gap-4 text-xs text-text-muted">
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-pos)" }} /> Gelir</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-neg)" }} /> Gider</span>
           </div>
         </div>
 
         {hasTrendData ? (
           <>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas p-3 hover:border-brand-300">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  <TrendingUp className="h-3.5 w-3.5 text-mint-600" /> Toplam gelir
-                  <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </p>
-                <p className="mt-1 font-display text-lg font-extrabold text-mint-600">{money(trendIncomeTotal)}</p>
+            <dl className="mt-3 grid divide-y divide-line/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover">
+                <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
+                  Toplam gelir
+                  <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                </dt>
+                <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${POS}`}>
+                  {money(trendIncomeTotal)}
+                  {incomeVsPrevPeriod ? <TrendPill trend={incomeVsPrevPeriod} className="ml-2 align-middle" /> : null}
+                </dd>
+                {hasPrevPeriodData ? <p className="text-xs tabular-nums text-text-faint">Önceki 6 ay {money(prevIncomeTotal)}</p> : null}
               </Link>
-              <Link href="/app/giderler" className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas p-3 hover:border-brand-300">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  <TrendingDown className="h-3.5 w-3.5 text-danger-500" /> Toplam gider
-                  <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </p>
-                <p className="mt-1 font-display text-lg font-extrabold text-danger-500">{money(trendExpenseTotal)}</p>
+              <Link href="/app/giderler" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover">
+                <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
+                  Toplam gider
+                  <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                </dt>
+                <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${NEG}`}>{money(trendExpenseTotal)}</dd>
               </Link>
-              <Link href="/app/komisyon" className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas p-3 hover:border-brand-300">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  <ICONS.komisyon className="h-3.5 w-3.5 text-brand-600" /> Net
-                  <ArrowUpRight className="hover-action ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </p>
-                <p className={`mt-1 font-display text-lg font-extrabold ${trendNet >= 0 ? "text-mint-600" : "text-danger-500"}`}>{money(trendNet)}</p>
+              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover">
+                <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
+                  Net
+                  <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                </dt>
+                <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${trendNet >= 0 ? POS : NEG}`}>{money(trendNet)}</dd>
               </Link>
-            </div>
+            </dl>
 
-            {/* Etkileşimli çizgi trend — crosshair + tooltip'te gelir/gider/net */}
+            {/* Etkileşimli çizgi trend — crosshair + tooltip'te gelir/gider/net (a11y tablo + klavye bileşende) */}
             <InteractiveChart
               className="mt-5"
               data={trendMonths.map((m) => ({ label: m.label, value: m.income, value2: m.expense }))}
               name="Gelir"
               name2="Gider"
-              color="var(--mint-500)"
-              color2="var(--danger-500)"
+              color="var(--viz-pos)"
+              color2="var(--viz-neg)"
               format="money"
               height={200}
               diffLabel="Net"
               showLegend={false}
             />
 
-            {/* Önceki dönem "hayaleti" — gelir serisinin 6 ay önceki karşılığı
-                aynı eksende soluk ikinci seri olarak (InteractiveChart'ın
-                mevcut çift seri desteği; üstteki grafikte iki slot da
-                gelir/gider tarafından dolu olduğundan kıyas ayrı çizgide). */}
+            {showNet ? (
+              <div className="mt-6 border-t border-line pt-4">
+                <h3 className="text-xs font-semibold text-text-muted">
+                  Net fark · gelir eksi gider
+                  <span className="ml-1 font-normal text-text-faint">(sıfır çizgisinin üstü kâr, altı zarar)</span>
+                </h3>
+                <NetDiffChart className="mt-3" points={netPoints} />
+              </div>
+            ) : null}
+
+            {/* Önceki dönem "hayaleti" — gelir serisinin 6 ay önceki karşılığı (aynı sıradaki ay) */}
             {hasPrevPeriodData ? (
               <div className="mt-6 border-t border-line pt-4">
-                <p className="text-xs font-semibold text-text-muted">
+                <h3 className="text-xs font-semibold text-text-muted">
                   Gelir · önceki dönemle karşılaştırma
                   <span className="ml-1 font-normal text-text-faint">(aynı sıradaki ay, 6 ay öncesi)</span>
-                </p>
+                </h3>
                 <InteractiveChart
                   className="mt-3"
                   data={trendMonths.map((m, i) => ({
@@ -394,7 +405,7 @@ export default async function ReportsPage() {
                   }))}
                   name="Gelir"
                   name2="Önceki dönem"
-                  color="var(--mint-500)"
+                  color="var(--viz-pos)"
                   color2="var(--text-faint)"
                   format="money"
                   height={160}
@@ -405,196 +416,101 @@ export default async function ReportsPage() {
             ) : null}
           </>
         ) : (
-          <p className="py-10 text-center text-sm text-text-muted">
-            Henüz komisyon veya gider kaydı yok. Anlaşma kapatıp gider ekledikçe bu grafik dolacak.
-          </p>
+          <EmptyStateV3
+            illustration="rapor"
+            icon={<BarChart3 />}
+            title="Henüz komisyon veya gider kaydı yok"
+            description="Anlaşma kapatıp gider ekledikçe bu grafik dolacak."
+            action={<Link href="/app/giderler" className="text-sm font-semibold text-accent-text hover:underline">Giderlere git</Link>}
+          />
         )}
       </section>
 
-      {sourceBars.length > 0 ? (
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className={SECTION}>
+        <h2 className={H2}>Hacim dağılımı</h2>
+        <p className="mt-0.5 text-xs text-text-faint">Dört sayı ortak ölçekte; satıra tıklayınca liste açılır.</p>
+        <HBarList className="mt-3" items={volumeItems} ariaLabel="Hacim dağılımı" />
+      </section>
+
+      {sourceItems.length > 0 ? (
+        <section className={SECTION}>
           <div className="flex items-center gap-2">
-            <PieChart className="h-4 w-4 text-brand-600" />
-            <h2 className="font-display font-bold text-ink-950">Müşteri kaynak dağılımı</h2>
-            <span className="ml-auto text-xs text-text-muted">{sourceTotal} müşteri · en yüksek 8 kaynak</span>
+            <PieChart className={ICON_ACCENT} aria-hidden="true" />
+            <h2 className={H2}>Müşteri kaynak dağılımı</h2>
+            <span className="ml-auto text-xs tabular-nums text-text-muted">{sourceTotal} müşteri · en yüksek 8 kaynak</span>
           </div>
-          <div className="mt-5 space-y-3">
-            {sourceBars.map((b, i) => (
-              <Link
-                key={b.label}
-                href={b.value ? `/app/musteriler?source=${encodeURIComponent(b.value)}` : "/app/musteriler"}
-                className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1"
-              >
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1 font-semibold text-ink-950">
-                    {b.label}
-                    <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                  </span>
-                  <span className="tabular-nums text-text-muted">
-                    {b.count} · %{Math.round((b.count / sourceTotal) * 100)}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                  <div
-                    className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
-                    style={{
-                      width: `${Math.max((b.count / sourceMax) * 100, 4)}%`,
-                      animationDelay: `${i * 60}ms`,
-                    }}
-                  />
-                </div>
-              </Link>
-            ))}
-          </div>
+          <HBarList className="mt-3" items={sourceItems} ariaLabel="Müşteri kaynak dağılımı" />
         </section>
       ) : null}
 
       {/* Kaynak ROI — hangi kaynak gerçekten kazandırıyor? */}
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className={SECTION}>
         <div className="flex flex-wrap items-center gap-2">
-          <Trophy className="h-4 w-4 text-brand-600" />
-          <h2 className="font-display font-bold text-ink-950">Kaynak ROI · kazanılan anlaşmalar</h2>
+          <Trophy className={ICON_ACCENT} aria-hidden="true" />
+          <h2 className={H2}>Kaynak ROI · kazanılan anlaşmalar</h2>
           {roiRows.length > 0 ? (
-            <span className="ml-auto text-xs text-text-muted">
+            <span className="ml-auto text-xs tabular-nums text-text-muted">
               {roiWonCount} kazanılan · {money(roiWonValue)} · en yüksek 8 kaynak
             </span>
           ) : null}
         </div>
         {roiRows.length === 0 ? (
           <EmptyStateV3
+            illustration="rapor"
             icon={<BarChart3 />}
             title="Henüz kaynak verisi yok"
             description="Müşterilere kaynak girip anlaşma kazandıkça kaynakların getirisi burada karşılaştırılır."
-            action={<Link href="/app/musteriler" className="text-sm font-semibold text-brand-600 hover:underline">Müşterilere git</Link>}
+            action={<Link href="/app/musteriler" className="text-sm font-semibold text-accent-text hover:underline">Müşterilere git</Link>}
           />
         ) : (
-          <div className="mt-5 space-y-3">
-            {roiRows.map((r, i) => {
-              const best = r.source === bestSource;
-              return (
-                <div
-                  key={r.source}
-                  className={`rounded-[var(--radius-card)] p-2 ${best ? "bg-brand-600/[0.05] ring-1 ring-brand-400/40" : ""}`}
-                >
-                  <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-xs">
-                    <span className="flex items-center gap-1.5 font-semibold text-ink-950">
-                      {sourceLabel(r.source)}
-                      {best ? (
-                        <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">
-                          En değerli kaynak
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="tabular-nums text-text-muted">
-                      {r.customers} müşteri · {r.wonCount} kazanılan ·{" "}
-                      <span className="font-semibold text-ink-950">{money(r.wonValue)}</span>
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                    <div
-                      className={`bar-live h-full rounded-full ${best ? "bg-[image:var(--grad-brand)]" : "bg-mint-500"}`}
-                      style={{
-                        width: `${Math.max((r.wonValue / roiValueMax) * 100, 4)}%`,
-                        animationDelay: `${i * 60}ms`,
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <HBarList className="mt-3" items={roiItems} tone="success" ariaLabel="Kaynak bazında kazanılan değer" />
         )}
       </section>
 
       {/* Kayıp nedeni raporu — kaybedilen anlaşmaların neden dağılımı */}
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <section className={SECTION}>
         <div className="flex flex-wrap items-center gap-2">
-          <TrendingDown className="h-4 w-4 text-danger-500" />
-          <h2 className="font-display font-bold text-ink-950">Kaybedilen anlaşmalar: kayıp nedeni analizi</h2>
+          <ICONS.alarm className={`h-4 w-4 ${NEG}`} aria-hidden="true" />
+          <h2 className={H2}>Kaybedilen anlaşmalar: kayıp nedeni analizi</h2>
           {lostCount > 0 ? (
-            <span className="ml-auto text-xs text-text-muted">
+            <span className="ml-auto text-xs tabular-nums text-text-muted">
               {lostCount} kaybedilen anlaşma · {money(lostValue)} kaybedilen değer · en yüksek 8 neden
             </span>
           ) : null}
         </div>
         {lossRows.length === 0 ? (
           <EmptyStateV3
+            illustration="rapor"
             icon={<BarChart3 />}
             title="Henüz kaybedilen anlaşma yok"
             description="Anlaşma tahtasında “Kaybedildi”ye taşınan kartlar nedenleriyle burada toplanır."
-            action={<Link href="/app/anlasmalar" className="text-sm font-semibold text-brand-600 hover:underline">Anlaşma tahtasına git</Link>}
+            action={<Link href="/app/anlasmalar" className="text-sm font-semibold text-accent-text hover:underline">Anlaşma tahtasına git</Link>}
           />
         ) : (
-          <div className="mt-5 space-y-3">
-            {lossRows.map((r, i) => (
-              <Link
-                key={r.reason}
-                href="/app/anlasmalar"
-                className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1"
-              >
-                <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                  <span className="flex min-w-0 items-center gap-1 font-semibold text-ink-950">
-                    <span className="truncate">{r.reason}</span>
-                    <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-danger-500 group-hover:opacity-100" />
-                  </span>
-                  <span className="shrink-0 tabular-nums text-text-muted">
-                    {r.count} · %{Math.round((r.count / Math.max(1, lostCount)) * 100)} · {money(r.value)}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                  <div
-                    className="bar-live h-full rounded-full bg-danger-500"
-                    style={{
-                      width: `${Math.max((r.count / lossMax) * 100, 4)}%`,
-                      animationDelay: `${i * 60}ms`,
-                    }}
-                  />
-                </div>
-              </Link>
-            ))}
-          </div>
+          <HBarList className="mt-3" items={lossItems} tone="danger" ariaLabel="Kayıp nedenleri" />
         )}
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Link href="/app/raporlar/talep-arz" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          <MapIcon className="h-4 w-4 text-brand-600" />
-          <p className="mt-2 font-display font-bold">Talep-Arz Haritası</p>
-          <p className="text-xs text-text-muted">İlçe bazlı talep-arz dengesi</p>
-        </Link>
-        <Link href="/app/raporlar/memnuniyet" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          <Smile className="h-4 w-4 text-mint-600" />
-          <p className="mt-2 font-display font-bold">Memnuniyet (NPS)</p>
-          <p className="text-xs text-text-muted">Kapanış sonrası anket skoru</p>
-        </Link>
-        <Link href="/app/kayip-kacak" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          <ICONS.alarm className="h-4 w-4 text-danger-500" />
-          <p className="mt-2 font-display font-bold">Kaçan komisyonlar</p>
-          <p className="text-xs text-text-muted">Teyit ve kapanış analizi</p>
-        </Link>
-        <Link href="/app/eslestirme" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          <ICONS.eslestirme className="h-4 w-4 text-brand-600" />
-          <p className="mt-2 font-display font-bold">Eşleştirme</p>
-          <p className="text-xs text-text-muted">Talep × portföy skorları</p>
-        </Link>
-        <Link href="/app/degerleme" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          <Gauge className="h-4 w-4 text-cyan-600" />
-          <p className="mt-2 font-display font-bold">Değerleme</p>
-          <p className="text-xs text-text-muted">Emsal · EmlakFiyati endeksi</p>
-        </Link>
-        <Link href="/app/musteriler" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          <ICONS.musteri className="h-4 w-4 text-mint-600" />
-          <p className="mt-2 font-display font-bold">Müşteri merkezi</p>
-          <p className="text-xs text-text-muted">360 görünüm</p>
-        </Link>
-        <Link href="/app/franchise" className="lift rounded-[var(--radius-card)] border border-line bg-surface p-4 hover:border-brand-400">
-          {/* İkonografi: şube/franchise, portföy binası (Building2) ile aynı
-              ikonu paylaşıyordu; ayrı kavram → ICONS.sube. */}
-          <ICONS.sube className="h-4 w-4 text-amber-500" />
-          <p className="mt-2 font-display font-bold">Şube analitiği</p>
-          <p className="text-xs text-text-muted">Şube bazlı konsolide</p>
-        </Link>
-      </div>
+      <nav aria-label="İlgili raporlar" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[
+          { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-Arz Haritası", sub: "İlçe bazlı talep-arz dengesi" },
+          { href: "/app/raporlar/memnuniyet", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
+          { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Aday Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
+          { href: "/app/kayip-kacak", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
+          { href: "/app/eslestirme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
+          { href: "/app/degerleme", icon: Gauge, title: "Değerleme", sub: "Emsal · EmlakFiyati endeksi" },
+          { href: "/app/musteriler", icon: ICONS.musteri, title: "Müşteri merkezi", sub: "360 görünüm" },
+          { href: "/app/franchise", icon: ICONS.sube, title: "Şube analitiği", sub: "Şube bazlı konsolide" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="focus-ring lift surface-card flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] p-3 transition hover:bg-surface-hover">
+            <l.icon className={ICON_ACCENT} aria-hidden="true" />
+            <span className="min-w-0">
+              <span className="block font-display text-sm font-bold text-text">{l.title}</span>
+              <span className="block text-xs text-text-muted">{l.sub}</span>
+            </span>
+          </Link>
+        ))}
+      </nav>
     </div>
   );
 }

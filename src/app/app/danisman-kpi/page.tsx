@@ -17,6 +17,10 @@ import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import { RevenueChart } from "./revenue-chart-lazy";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
 import { PrintButton } from "./print-button";
+import { PaceCard } from "./pace-card";
+import { CoachInsightSlot } from "./coach-insight-slot";
+import { monthElapsedPct } from "./month-progress";
+import { Progress } from "@/components/ui/progress";
 
 export const metadata = { title: "Danışman performansı" };
 
@@ -250,6 +254,12 @@ export default async function DanismanKpiPage({
   for (const r of rozetler) rozetByUid.set(r.sahip.id, [...(rozetByUid.get(r.sahip.id) ?? []), r]);
   const yeniLider = Boolean(prevLeader && lider && prevLeader.id !== lider.id);
 
+  // Bu ay vs geçen ay: ekip skoru toplamları + ay ilerlemesi (yalnız içinde bulunulan ayda).
+  const scoreNowTotal = advisors.reduce((s, a) => s + a.score, 0);
+  const scorePrevTotal = advisors.reduce((s, a) => s + (prevScoreByUid.get(a.id) ?? 0), 0);
+  const elapsedPct = isCurrentMonth ? monthElapsedPct(nowMs, monthStart.getTime(), nextMonth.getTime()) : null;
+  const prevMonthLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", timeZone: "Europe/Istanbul" }).format(prevMonth);
+
   // ── Liderlik podyumu: skor > 0 olan ilk üç danışman ───────────────────────
   const podium = advisors.filter((a) => a.score > 0).slice(0, 3);
 
@@ -370,12 +380,12 @@ export default async function DanismanKpiPage({
       {/* ── Liderlik podyumu: skoru olan ilk üç danışman (ekran, çıktı dışı) ── */}
       {podium.length > 0 ? (
         <section className={`no-print dashboard-panel relative overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface p-6 ${podium.length === 1 ? "mx-auto w-full max-w-md text-center" : ""}`}>
-          <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-amber-400/15 blur-[70px]" />
+          <div className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-[color-mix(in_srgb,var(--viz-gold)_18%,transparent)] blur-[70px]" />
           <div className="relative">
-            <p className={`flex items-center gap-2 text-xs font-semibold text-amber-600 ${podium.length === 1 ? "justify-center" : ""}`}>
+            <p className={`flex items-center gap-2 text-xs font-semibold text-[color:var(--pm-gold-text)] ${podium.length === 1 ? "justify-center" : ""}`}>
               <Crown className="h-4 w-4" /> Liderlik podyumu
             </p>
-            <h2 className="mt-1 font-display text-lg font-bold text-ink-950">
+            <h2 className="mt-1 font-display text-lg font-bold text-text">
               {isCurrentMonth ? "Bu ayın" : `${donem} döneminin`} ilk üçü
             </h2>
             <div className={`mt-6 grid gap-3 sm:items-end ${podiumColumns(podium.length)}`}>
@@ -383,25 +393,25 @@ export default async function DanismanKpiPage({
                 const sira = i + 1;
                 const stil = [
                   { order: "sm:order-2", bar: "h-24 bg-[image:var(--grad-brand)]", ring: "bg-amber-400 text-ink-950", medal: "🥇" },
-                  { order: "sm:order-1", bar: "h-16 bg-brand-600/25", ring: "bg-canvas text-text-muted border border-line", medal: "🥈" },
-                  { order: "sm:order-3", bar: "h-12 bg-amber-700/25", ring: "bg-amber-700/15 text-amber-700", medal: "🥉" },
+                  { order: "sm:order-1", bar: "h-16 bg-accent-subtle", ring: "bg-canvas text-text-muted border border-line", medal: "🥈" },
+                  { order: "sm:order-3", bar: "h-12 bg-[color-mix(in_srgb,var(--viz-gold)_16%,transparent)]", ring: "bg-[color-mix(in_srgb,var(--viz-gold)_16%,transparent)] text-[color:var(--pm-gold-text)]", medal: "🥉" },
                 ][i];
                 const initials = a.full_name.split(" ").map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase();
                 return (
                   <Link
                     key={a.id}
                     href={`/app/ekip/${a.id}`}
-                    className={`focus-ring press lift group flex flex-col rounded-[var(--radius-panel)] border border-line bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${stil.order}`}
+                    className={`focus-ring press lift group flex flex-col rounded-[var(--radius-panel)] border border-line bg-canvas/40 p-4 text-center transition hover:border-border-interactive ${stil.order}`}
                     aria-label={`${sira}. sıra: ${a.full_name} — skor ${a.score}`}
                   >
                     <span className={`mx-auto grid h-12 w-12 place-items-center rounded-full font-display text-sm font-extrabold ${stil.ring}`}>
                       {initials}
                     </span>
-                    <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-ink-950 group-hover:text-brand-600">
+                    <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-text group-hover:text-accent-text">
                       <span aria-hidden="true">{stil.medal}</span> {a.full_name}
                     </p>
                     <p className="text-xs text-text-muted">
-                      Skor <span className="numeric font-bold text-ink-950">{a.score}</span>
+                      Skor <span className="numeric font-bold text-text">{a.score}</span>
                       {a.revenue > 0 && showRevenue(a.id) ? ` · ${money(a.revenue)}` : ""} · {a.dealCount} satış
                     </p>
                     <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${stil.bar}`} aria-hidden="true" />
@@ -412,6 +422,17 @@ export default async function DanismanKpiPage({
           </div>
         </section>
       ) : null}
+
+      <div className="no-print">
+        <PaceCard
+          scoreNow={scoreNowTotal}
+          scorePrev={scorePrevTotal}
+          elapsedPct={elapsedPct}
+          prevHref={prevHref}
+          monthLabel={isCurrentMonth ? "Bu ay" : donem}
+          prevLabel={prevMonthLabel}
+        />
+      </div>
 
       {/* ── Ekip metrik kartları — önceki döneme kıyasla (ekran, çıktı dışı) ── */}
       <KpiGrid count={4} className="no-print" label="Ekip aktivitesi">
@@ -463,12 +484,12 @@ export default async function DanismanKpiPage({
                 className="focus-ring press lift surface-card flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-3"
                 aria-label={`${r.ad}: ${r.sahip.full_name}`}
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber-400/15 text-base" aria-hidden="true">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--viz-gold)_18%,transparent)] text-base" aria-hidden="true">
                   {r.emoji}
                 </span>
                 <span className="min-w-0">
                   <span className="block text-xs font-bold uppercase tracking-[0.1em] text-text-faint">{r.ad}</span>
-                  <span className="block truncate text-sm font-bold text-ink-950">{r.sahip.full_name}</span>
+                  <span className="block truncate text-sm font-bold text-text">{r.sahip.full_name}</span>
                   <span className="block text-xs text-text-muted">{r.aciklama}</span>
                 </span>
               </Link>
@@ -476,9 +497,9 @@ export default async function DanismanKpiPage({
           </div>
           {prevLeader ? (
             <p className="flex flex-wrap items-center gap-2 px-1 text-xs text-text-muted">
-              Geçen ayın lideri: <span className="font-semibold text-ink-950">{prevLeader.full_name}</span>
+              Geçen ayın lideri: <span className="font-semibold text-text">{prevLeader.full_name}</span>
               {yeniLider ? (
-                <span className="rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-700">
+                <span className="rounded-full bg-accent-subtle px-2 py-0.5 text-xs font-bold text-accent-text">
                   Yeni lider!
                 </span>
               ) : null}
@@ -491,6 +512,8 @@ export default async function DanismanKpiPage({
           yapmaliyim" sorusunu cevaplamak danismanin isi olarak kaliyordu.
           Koc kisisel bir arac; resmi karne cikisina girmez (no-print sarici —
           CoachPanel paylasilan bir bilesen, kendisine dokunulmuyor). */}
+      {/* Koçluk içgörüsü için yer: içgörü okuyucusu bağlanana dek hiçbir şey çizilmez (sahte içgörü yok). */}
+      <CoachInsightSlot />
       {isCurrentMonth ? (
         <div className="no-print">
           <CoachPanel actions={coachActions} adSoyad={ben?.full_name ?? null} />
@@ -504,19 +527,19 @@ export default async function DanismanKpiPage({
       {/* Karne başlığı — yalnızca çıktıda: ofis adı + dönem (değerleme
           raporundaki başlık bandı deseni). */}
       <header className="print-only hairline-b pb-5">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-brand-600">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent-text">
           {office?.name ?? "Emlak ofisi"}
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
-          <h1 className="font-display text-2xl font-extrabold tracking-[-0.02em] text-ink-950">Danışman karnesi</h1>
+          <h1 className="font-display text-2xl font-extrabold tracking-[-0.02em] text-text">Danışman karnesi</h1>
           <dl className="text-right text-xs text-text-muted">
             <div className="flex justify-end gap-2">
               <dt>Dönem</dt>
-              <dd className="font-semibold text-ink-950">{donem}</dd>
+              <dd className="font-semibold text-text">{donem}</dd>
             </div>
             <div className="mt-1 flex justify-end gap-2">
               <dt>Danışman sayısı</dt>
-              <dd className="numeric font-semibold text-ink-950">{advisors.length}</dd>
+              <dd className="numeric font-semibold text-text">{advisors.length}</dd>
             </div>
           </dl>
         </div>
@@ -534,6 +557,25 @@ export default async function DanismanKpiPage({
           >
             <RevenueChart data={revenueChart} />
           </ChartFrame>
+          <table className="sr-only">
+            <caption>Danışman bazlı gelir (komisyon payı)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Danışman</th>
+                <th scope="col">Gelir</th>
+              </tr>
+            </thead>
+            <tbody>
+              {revenueChart.map((r) => (
+                <tr key={r.id}>
+                  <th scope="row">
+                    <Link href={`/app/ekip/${r.id}`}>{r.name}</Link>
+                  </th>
+                  <td>{money(r.revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : null}
 
@@ -568,11 +610,11 @@ export default async function DanismanKpiPage({
                     <span
                       className={`numeric font-display font-bold ${
                         i === 0
-                          ? "text-amber-500"
+                          ? "text-[color:var(--pm-gold-text)]"
                           : i === 1
                             ? "text-text-muted"
                             : i === 2
-                              ? "text-amber-700"
+                              ? "text-[color:var(--pm-gold-text)]"
                               : "text-text-faint"
                       }`}
                     >
@@ -581,7 +623,7 @@ export default async function DanismanKpiPage({
                   </TD>
                   <TD>
                     <Link href={`/app/ekip/${a.id}`} className="absolute inset-0" aria-label={`${a.full_name} danışman detayı`} />
-                    <p className="font-semibold text-ink-950 group-hover:text-brand-600">
+                    <p className="font-semibold text-text group-hover:text-accent-text">
                       {a.full_name}
                       {(rozetByUid.get(a.id) ?? []).map((r) => (
                         <span key={r.ad} className="no-print ml-1 text-xs" title={r.ad} aria-label={r.ad}>
@@ -595,7 +637,7 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="text-text-muted">
                     <Link
                       href={`/app/musteriler?assigned=${a.id}`}
-                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
                       aria-label={`${a.full_name} müşterileri`}
                     >
                       {a.customerCount}
@@ -604,7 +646,7 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="text-text-muted">
                     <Link
                       href={`/app/arama?danisman=${a.id}`}
-                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
                       aria-label={`${a.full_name} çağrıları`}
                     >
                       {a.callCount}
@@ -613,29 +655,24 @@ export default async function DanismanKpiPage({
                   <TD align="right" className="text-text-muted">
                     <Link
                       href="/app/randevular"
-                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline"
+                      className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
                       aria-label={`${a.full_name} randevuları`}
                     >
                       {a.appointCount}
                     </Link>
                   </TD>
                   <TD align="right" className="text-text-muted">{a.offerCount}</TD>
-                  <TD align="right" className="font-semibold text-ink-950">{a.dealCount}</TD>
+                  <TD align="right" className="font-semibold text-text">{a.dealCount}</TD>
                   <TD align="right" className="text-text-muted">{a.conversionRate}</TD>
-                  {/* mint-700 bu turda tanımlandı; öncesinde sınıf sessizce düşüyordu */}
-                  <TD align="right" className="font-bold text-mint-700">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
+                  {/* gelir: başarı tonu (viz-pos) */}
+                  <TD align="right" className="font-bold text-[color:var(--viz-pos)]">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
                   <TD>
                     <div className="flex items-center gap-2">
-                      <div className="surface-sunken h-1.5 w-16 overflow-hidden rounded-full">
-                        <div
-                          className="h-full rounded-full bg-[image:var(--grad-brand)]"
-                          style={{ width: `${(a.score / topScore) * 100}%` }}
-                        />
-                      </div>
-                      <span className="numeric text-xs font-bold text-ink-950">{a.score}</span>
+                      <Progress className="w-16" value={(a.score / topScore) * 100} label={`${a.full_name} skoru`} />
+                      <span className="numeric text-xs font-bold text-text">{a.score}</span>
                       {/* Önceki aya göre ilerleme — ayrıntı title'da (ekran okuyucu için aria-label) */}
                       <span
-                        className={`text-xs font-bold ${fark > 0 ? "text-mint-700" : fark < 0 ? "text-danger-600" : "text-text-faint"}`}
+                        className={`text-xs font-bold ${fark > 0 ? "text-[color:var(--viz-pos)]" : fark < 0 ? "text-[color:var(--viz-neg)]" : "text-text-faint"}`}
                         title={`Önceki ay: ${oncekiSkor} · fark: ${fark > 0 ? `+${fark}` : fark}`}
                         aria-label={`Önceki ay skoru ${oncekiSkor}, fark ${fark > 0 ? `+${fark}` : fark}`}
                       >

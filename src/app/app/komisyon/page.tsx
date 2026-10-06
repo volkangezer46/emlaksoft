@@ -33,6 +33,11 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { MoneyValue } from "@/components/ui/money-value";
 import { DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
+import { Progress } from "@/components/ui/progress";
+import { Illustration } from "@/components/ui/illustrations";
+import { shareOfMax } from "@/app/app/raporlar/report-math";
+import { statusShares } from "./commission-math";
+import { StatusStackBar } from "./status-stack-bar";
 
 export const metadata = { title: "Komisyon" };
 type CommissionRow = {
@@ -278,6 +283,10 @@ export default async function CommissionPage({
     aylikSeri[idx].value2 = Number(r.paid);
   }
   const hasAylikSeri = aylikSeri.some((m) => m.value > 0);
+  // Durum yığını (para = altın, durum tonları) ve bağlamlı KPI ipuçları — saf hesap: commission-math.ts
+  const allShares = statusShares(paid, pending);
+  const donemShares = statusShares(donemTahsil, donemBekleyen);
+  const prevMonthAccrued = aylikSeri[4]?.value ?? 0;
 
   const totalCount = commissionTotal;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -317,7 +326,7 @@ export default async function CommissionPage({
             className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-line-strong hover:text-text"
           >
             Onaylar
-            {bekleyenOnay > 0 ? <span className="numeric rounded-full bg-amber-400/90 px-1.5 py-0.5 text-xs font-bold text-ink-950">{bekleyenOnay}</span> : null}
+            {bekleyenOnay > 0 ? <span className="numeric rounded-full bg-[color-mix(in_srgb,var(--viz-5)_18%,transparent)] px-1.5 py-0.5 text-xs font-bold text-[color:var(--pm-warn-text)]">{bekleyenOnay}</span> : null}
             <ArrowUpRight className="h-3.5 w-3.5 opacity-60" aria-hidden />
           </Link>
         }
@@ -329,15 +338,15 @@ export default async function CommissionPage({
         </p>
       ) : null}
       {ownTruncated ? (
-        <p className="text-xs text-amber-700">Son {OWN_ROWS_LIMIT} kayıt üzerinden hesaplandı; daha eski kayıtlar toplamda yoktur.</p>
+        <p className="text-xs text-[color:var(--pm-warn-text)]">Son {OWN_ROWS_LIMIT} kayıt üzerinden hesaplandı; daha eski kayıtlar toplamda yoktur.</p>
       ) : null}
       <div className={kpiEmpty ? "hidden" : undefined}>
       <KpiGrid count={3} label="Toplam komisyon göstergeleri">
         {/* KPI kartları defter filtresine bağlı: tıklayınca ?durum= uygulanır (tarih aralığı korunur) */}
         {[
-          { label: seeAllEarnings ? "Toplam komisyon" : "Payım (toplam)", value: <MoneyValue amount={total} />, icon: Wallet, tone: "brand" as const, href: filterHref({ durum: null }), active: durum === null },
-          { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "success" as const, href: filterHref({ durum: "tahsil" }), active: durum === "tahsil" },
-          { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "warn" as const, href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen" },
+          { label: seeAllEarnings ? "Toplam komisyon" : "Payım (toplam)", value: <MoneyValue amount={total} />, icon: Wallet, tone: "gold" as const, href: filterHref({ durum: null }), active: durum === null, hint: `${Number(aggregate.record_count).toLocaleString("tr-TR")} kayıt`, series: undefined },
+          { label: "Tahsil edilen", value: <MoneyValue amount={paid} />, icon: CheckCircle2, tone: "success" as const, href: filterHref({ durum: "tahsil" }), active: durum === "tahsil", hint: allShares.collectionRate === null ? undefined : `Toplamın %${allShares.collectionRate}'i tahsil edildi`, series: hasAylikSeri ? aylikSeri.map((m) => m.value2) : undefined },
+          { label: "Bekleyen", value: <MoneyValue amount={pending} />, icon: Clock3, tone: "warn" as const, href: filterHref({ durum: "bekleyen" }), active: durum === "bekleyen", hint: allShares.collectionRate === null ? undefined : `Toplamın %${100 - allShares.collectionRate}'i bekliyor`, series: undefined },
         ].map((item) => (
           <KpiTile
             key={item.label}
@@ -346,6 +355,12 @@ export default async function CommissionPage({
             icon={item.icon}
             tone={item.tone}
             href={item.href}
+            hint={item.hint}
+            series={item.series}
+            chart="bars"
+            seriesUnit="ay"
+            seriesLabel="Son 6 ay tahsilat"
+            attention={item.active}
             className={item.active ? "!border-[var(--accent)]" : undefined}
           />
         ))}
@@ -354,30 +369,39 @@ export default async function CommissionPage({
 
       {/* Dönem KPI şeridi — bu ayın tahakkuk/tahsilat özeti; kartlar defteri
           ilgili tarih aralığı + durumla süzer (?from/?to/?durum). */}
-      <DashCard>
+      <DashCard style={{ boxShadow: "var(--elev-3)" }}>
         <SectionHeader as="h2" title={`Dönem özeti · ${donemLabel} · ${kpiScopeLabel}`} icon={<CalendarRange />} />
         <div className={kpiEmpty ? "hidden" : undefined}>
         <KpiGrid count={4} label="Dönem özeti göstergeleri">
           {[
-            { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "brand" as const },
-            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "success" as const },
-            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "warn" as const },
-            { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "neutral" as const },
+            { label: "Dönem komisyonu", value: <MoneyValue amount={donemToplam} />, href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "gold" as const, hint: seeAllEarnings ? `Geçen ay tamamı ${money(prevMonthAccrued)}` : undefined },
+            { label: "Tahsil edilen", value: <MoneyValue amount={donemTahsil} />, href: filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to }), tone: "success" as const, hint: donemShares.collectionRate === null ? undefined : `Dönemin %${donemShares.collectionRate}'i` },
+            { label: "Bekleyen", value: <MoneyValue amount={donemBekleyen} />, href: filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to }), tone: "warn" as const, hint: donemShares.collectionRate === null ? undefined : `Dönemin %${100 - donemShares.collectionRate}'i` },
+            { label: "Kayıt", value: Number(aggregate.month_record_count).toLocaleString("tr-TR"), href: filterHref({ durum: null, from: presets[0].from, to: presets[0].to }), tone: "neutral" as const, hint: "Bu ay oluşan kayıtlar" },
           ].map((k) => (
-            <KpiTile key={k.label} label={k.label} value={k.value} href={k.href} tone={k.tone} className="!shadow-none" />
+            <KpiTile key={k.label} label={k.label} value={k.value} href={k.href} tone={k.tone} hint={k.hint} className="!shadow-none" />
           ))}
         </KpiGrid>
         </div>
+        {!kpiEmpty && allShares.total > 0 ? (
+          <StatusStackBar
+            className="mt-4"
+            title="Tüm zamanlar · tahsilat durumu"
+            paid={paid}
+            pending={pending}
+            paidHref={filterHref({ durum: "tahsil", from: null, to: null })}
+            pendingHref={filterHref({ durum: "bekleyen", from: null, to: null })}
+          />
+        ) : null}
         {donemToplam > 0 ? (
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-text-muted">
-              <span>Dönem tahsilat oranı</span>
-              <span className="numeric text-mint-600">%{Math.round((donemTahsil / donemToplam) * 100)}</span>
-            </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-canvas">
-              <div className="h-full rounded-full bg-mint-500" style={{ width: `${Math.round((donemTahsil / donemToplam) * 100)}%` }} />
-            </div>
-          </div>
+          <StatusStackBar
+            className="mt-4"
+            title="Dönem tahsilat durumu"
+            paid={donemTahsil}
+            pending={donemBekleyen}
+            paidHref={filterHref({ durum: "tahsil", from: presets[0].from, to: presets[0].to })}
+            pendingHref={filterHref({ durum: "bekleyen", from: presets[0].from, to: presets[0].to })}
+          />
         ) : null}
       </DashCard>
 
@@ -386,8 +410,8 @@ export default async function CommissionPage({
         <div className="grid items-stretch gap-4 lg:grid-cols-2">
           {advisorDist.length > 0 ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>
-              <h2 className="mt-1 font-display font-bold text-ink-950">Danışman bazlı dağılım</h2>
+              <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>
+              <h2 className="mt-1 font-display font-bold text-text">Danışman bazlı dağılım</h2>
               <p className="mt-0.5 text-xs text-text-muted">Tüm defterden hesaplanan en yüksek 8 danışman payı</p>
               <ul className="mt-4 space-y-3">
                 {advisorDist.map((a) => {
@@ -396,22 +420,17 @@ export default async function CommissionPage({
                     <li key={a.label}>
                       <div className="flex items-center justify-between gap-2 text-sm">
                         {memberId ? (
-                          <Link href={`/app/ekip/${memberId}`} className="focus-ring rounded-[4px] font-semibold text-brand-600 hover:underline">
+                          <Link href={`/app/ekip/${memberId}`} className="focus-ring rounded-[4px] font-semibold text-accent-text hover:underline">
                             {a.label}
                           </Link>
                         ) : (
-                          <span className="font-semibold text-ink-950">{a.label}</span>
+                          <span className="font-semibold text-text">{a.label}</span>
                         )}
-                        <span className="numeric font-display text-sm font-bold text-ink-950">{money(a.pay)}</span>
+                        <span className="numeric font-display text-sm font-bold text-text">{money(a.pay)}</span>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-canvas">
-                          <div
-                            className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
-                            style={{ width: `${Math.max(3, Math.round((a.pay / advisorMax) * 100))}%` }}
-                          />
-                        </div>
-                        <span className="numeric w-14 shrink-0 text-right text-xs font-semibold text-text-muted">{a.adet} kayıt</span>
+                        <Progress className="flex-1" value={shareOfMax(a.pay, advisorMax)} label={`${a.label} payı`} />
+                        <span className="numeric w-14 shrink-0 text-right text-xs font-semibold tabular-nums text-text-muted">{a.adet} kayıt</span>
                       </div>
                     </li>
                   );
@@ -429,8 +448,8 @@ export default async function CommissionPage({
                 data={aylikSeri.map((m) => ({ label: m.label, value: Math.round(m.value), value2: Math.round(m.value2) }))}
                 name="Tahakkuk"
                 name2="Tahsil edilen"
-                color="var(--brand-600)"
-                color2="var(--mint-500)"
+                color="var(--viz-gold)"
+                color2="var(--viz-pos)"
                 diffLabel="Bekleyen"
                 format="money"
                 height={210}
@@ -444,10 +463,10 @@ export default async function CommissionPage({
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <div><p className="flex items-center gap-2 text-xs font-semibold text-brand-600"><ReceiptText className="h-4 w-4" /> Gerçek kayıtlar</p><h2 className="mt-1 font-display font-bold text-ink-950">Komisyon defteri</h2></div>
+          <div><p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><ReceiptText className="h-4 w-4" /> Gerçek kayıtlar</p><h2 className="mt-1 font-display font-bold text-text">Komisyon defteri</h2></div>
           <div className="flex items-center gap-2">
             <ExportCsvButton action={exportCommissionsCsv} label="Dışa aktar" hint="Hızlı dışa aktarma en çok 2.000 satır içerir; daha fazlası varsa indirmeden sonra çıkan Tümünü indir bağlantısını kullanın." />
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">{totalCount} kayıt</span>
+            <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-xs font-bold text-accent-text">{totalCount} kayıt</span>
           </div>
         </div>
         {/* Durum filtre çipleri — sunucu filtresi (?durum=), tarih aralığı korunur */}
@@ -462,8 +481,8 @@ export default async function CommissionPage({
               href={filterHref({ durum: f.value })}
               className={`rounded-[var(--radius-control)] border px-3.5 py-1.5 text-xs font-semibold transition ${
                 durum === f.value
-                  ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
-                  : "border-line bg-surface text-ink-950 hover:border-brand-300"
+                  ? "border-accent bg-accent-subtle text-accent-text"
+                  : "border-line bg-surface text-text hover:border-border-interactive"
               }`}
             >
               {f.label}
@@ -482,8 +501,8 @@ export default async function CommissionPage({
                 aria-current={active ? "page" : undefined}
                 className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
                   active
-                    ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
-                    : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
+                    ? "border-accent bg-accent-subtle text-accent-text"
+                    : "border-line bg-surface text-text-muted hover:border-border-interactive hover:text-accent-text"
                 }`}
               >
                 {p.label}
@@ -497,7 +516,7 @@ export default async function CommissionPage({
               type="date"
               defaultValue={from ?? ""}
               aria-label="Başlangıç tarihi"
-              className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+              className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-accent"
             />
             <span className="text-xs text-text-faint">—</span>
             <input
@@ -505,13 +524,13 @@ export default async function CommissionPage({
               type="date"
               defaultValue={to ?? ""}
               aria-label="Bitiş tarihi"
-              className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+              className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs outline-none focus:border-accent"
             />
-            <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700">
+            <button type="submit" className="rounded-[var(--radius-control)] bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg transition hover:bg-accent-hover">
               Filtrele
             </button>
             {from || to ? (
-              <Link href={filterHref({ from: null, to: null })} className="text-xs font-semibold text-text-muted hover:text-danger-500">
+              <Link href={filterHref({ from: null, to: null })} className="text-xs font-semibold text-text-muted hover:text-[color:var(--viz-neg)]">
                 Tarihi temizle
               </Link>
             ) : null}
@@ -530,8 +549,8 @@ export default async function CommissionPage({
           {canEdit ? <BulkCollectBar allIds={pendingIds} /> : null}
           {rows.length === 0 ? (
             <div className="grid place-items-center px-6 py-14 text-center">
-              <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-amber-400/12 text-amber-500"><Wallet className="h-7 w-7" /></span>
-              <h3 className="mt-4 font-display text-lg font-bold text-ink-950">
+              <Illustration kind="komisyon" tone="amber" size={96} />
+              <h3 className="mt-4 font-display text-lg font-bold text-text">
                 {durum || from || to || sayfa > 1
                   ? "Bu filtrelerle eşleşen komisyon kaydı yok"
                   : "Henüz komisyon kaydı yok"}
@@ -539,7 +558,7 @@ export default async function CommissionPage({
               {durum || from || to || sayfa > 1 ? (
                 <>
                   <p className="mt-1 max-w-md text-sm text-text-muted">Kapanan anlaşmalardan oluşan komisyon ve hakediş kayıtları burada izlenir.</p>
-                  <Link href="/app/komisyon" className="mt-3 text-sm font-semibold text-brand-600 hover:underline">
+                  <Link href="/app/komisyon" className="mt-3 text-sm font-semibold text-accent-text hover:underline">
                     Filtreleri temizle
                   </Link>
                 </>
@@ -552,7 +571,7 @@ export default async function CommissionPage({
                   </p>
                   <Link
                     href="/app/anlasmalar/yeni"
-                    className="focus-ring btn-shine mt-4 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="focus-ring btn-shine mt-4 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-accent px-4 py-2.5 text-sm font-semibold text-accent-fg transition hover:bg-accent-hover"
                   >
                     Anlaşma ekle
                   </Link>
@@ -568,7 +587,7 @@ export default async function CommissionPage({
                 return (
                   <article
                     key={row.id}
-                    className={`group relative grid gap-3 px-5 py-4 transition hover:bg-brand-600/[0.02] md:items-center ${
+                    className={`group relative grid min-h-10 gap-3 px-5 py-3 transition hover:bg-surface-hover md:items-center ${
                       canEdit ? "md:grid-cols-[auto_1.4fr_.7fr_.7fr_auto]" : "md:grid-cols-[1.4fr_.7fr_.7fr_auto]"
                     }`}
                   >
@@ -588,10 +607,10 @@ export default async function CommissionPage({
                         )}
                       </div>
                     ) : null}
-                    <div><p className="text-sm font-semibold text-ink-950">{property?.title ?? "Komisyon kaydı"}</p><p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? (row.deal_id ? "Portföysüz anlaşma" : "Genel işlem")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p></div>
+                    <div><p className="text-sm font-semibold text-text">{property?.title ?? "Komisyon kaydı"}</p><p className="mt-0.5 text-xs text-text-muted">{property?.property_code ?? (row.deal_id ? "Portföysüz anlaşma" : "Genel işlem")} · {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(row.created_at))}</p></div>
                     <div>
                       <p className="text-xs text-text-faint">Brüt komisyon</p>
-                      <p className="font-display text-sm font-bold text-ink-950">{money(Number(row.gross_amount))}</p>
+                      <p className="font-display text-sm font-bold text-text">{money(Number(row.gross_amount))}</p>
                       {seeAllEarnings && Array.isArray(row.splits) && row.splits.length > 0 ? (
                         <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-text-muted">
                           {row.splits.map((s, i) => {
@@ -601,7 +620,7 @@ export default async function CommissionPage({
                                 {memberId ? (
                                   <Link
                                     href={`/app/ekip/${memberId}`}
-                                    className="focus-ring relative z-10 rounded-[4px] font-semibold text-brand-600 hover:underline"
+                                    className="focus-ring relative z-10 rounded-[4px] font-semibold text-accent-text hover:underline"
                                   >
                                     {s.label}
                                   </Link>
@@ -615,7 +634,7 @@ export default async function CommissionPage({
                         </p>
                       ) : null}
                     </div>
-                    <div><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${rowPaid ? "bg-mint-500/10 text-mint-600" : "bg-amber-400/15 text-amber-500"}`}>{rowPaid ? "Tahsil edildi" : "Hesaplandı"}</span></div>
+                    <div><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${rowPaid ? "bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] text-[color:var(--viz-pos)]" : "bg-[color-mix(in_srgb,var(--viz-5)_16%,transparent)] text-[color:var(--pm-warn-text)]"}`}>{rowPaid ? "Tahsil edildi" : "Hesaplandı"}</span></div>
                     {canEdit ? (
                       <div className="relative z-10 flex flex-col items-end gap-1.5">
                         {seeAllEarnings ? (
@@ -638,7 +657,7 @@ export default async function CommissionPage({
             </span>
             <div className="flex items-center gap-2">
               {sayfa > 1 ? (
-                <Link href={pageHref(sayfa - 1)} className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300">
+                <Link href={pageHref(sayfa - 1)} className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text transition hover:border-border-interactive">
                   <ChevronLeft className="h-3.5 w-3.5" /> Önceki
                 </Link>
               ) : (
@@ -647,7 +666,7 @@ export default async function CommissionPage({
                 </span>
               )}
               {sayfa < totalPages ? (
-                <Link href={pageHref(sayfa + 1)} className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300">
+                <Link href={pageHref(sayfa + 1)} className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text transition hover:border-border-interactive">
                   Sonraki <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               ) : (
@@ -658,7 +677,7 @@ export default async function CommissionPage({
             </div>
           </nav>
         ) : null}
-        <div className="flex items-center gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-xs font-semibold text-mint-600"><TrendingUp className="h-3.5 w-3.5" /> Tüm hesaplamalar denetim iziyle saklanır</div>
+        <div className="flex items-center gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-xs font-semibold text-[color:var(--viz-pos)]"><TrendingUp className="h-3.5 w-3.5" /> Tüm hesaplamalar denetim iziyle saklanır</div>
       </section>
     </div>
   );

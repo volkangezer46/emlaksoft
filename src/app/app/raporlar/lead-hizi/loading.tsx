@@ -1,15 +1,17 @@
+import { SkeletonCard } from "@/components/ui/viz";
+
+/** Aday hızı: başlık → süzgeç satırı → 4 KPI → danışman tablosu (içerik yükseklikleriyle eşleşir, CLS yok). */
 export default function Loading() {
   return (
-    <div className="space-y-6 animate-pulse">
-      <div className="h-24 rounded-[var(--radius-panel)] bg-ink-950/8" />
-      <div className="h-10 rounded-[var(--radius-card)] bg-ink-950/8" />
+    <div className="space-y-6" role="status" aria-label="Aday hızı yükleniyor">
+      <SkeletonCard height={96} />
+      <SkeletonCard height={40} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="h-28 rounded-[var(--radius-card)] bg-ink-950/8" />
-        <div className="h-28 rounded-[var(--radius-card)] bg-ink-950/8" />
-        <div className="h-28 rounded-[var(--radius-card)] bg-ink-950/8" />
-        <div className="h-28 rounded-[var(--radius-card)] bg-ink-950/8" />
+        {Array.from({ length: 4 }, (_, i) => (
+          <SkeletonCard key={i} height={112} />
+        ))}
       </div>
-      <div className="h-64 rounded-[var(--radius-panel)] bg-ink-950/8" />
+      <SkeletonCard height={256} />
     </div>
   );
 }

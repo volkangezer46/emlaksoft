@@ -1,5 +1,8 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { SkeletonCard } from "@/components/ui/viz";
+import { shareOfMax } from "../report-math";
 import { getDistrictNameMap, getProvinces } from "@/lib/geo/reader";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -33,7 +36,7 @@ import type { TalepArzMarker } from "./talep-arz-map";
 // Harita ağır bir client komponenti — dynamic import ile ayrı chunk
 // (portfoyler sayfasındaki MapView deseniyle aynı).
 const TalepArzMap = dynamic(() => import("./talep-arz-map").then((m) => m.TalepArzMap), {
-  loading: () => <div className="h-[460px] animate-pulse rounded-[var(--radius-card)] border border-line bg-ink-950/8" />,
+  loading: () => <SkeletonCard height={460} label="Harita yükleniyor" />,
 });
 
 function money(n: number) {
@@ -61,12 +64,12 @@ const OPEN_DEMAND_STATUSES = ["new", "active", "matched"];
 const LIVE_PROPERTY_STATUSES = ["live", "Yayında"];
 
 const GAP_BADGE = {
-  collect: { label: "Fırsat: portföy topla", cls: "bg-mint-500/12 text-mint-600" },
+  collect: { label: "Fırsat: portföy topla", cls: "bg-mint-500/12 text-[color:var(--viz-pos)]" },
   generate: { label: "Talep üret", cls: "bg-amber-400/15 text-amber-600" },
   balanced: { label: "Dengede", cls: "bg-canvas text-text-muted" },
 } as const;
 
-const TONE_TEXT = { mint: "text-mint-600", amber: "text-amber-600", red: "text-danger-500" } as const;
+const TONE_TEXT = { mint: "text-[color:var(--viz-pos)]", amber: "text-amber-600", red: "text-danger-500" } as const;
 
 export default async function TalepArzPage({
   searchParams,
@@ -228,8 +231,8 @@ export default async function TalepArzPage({
               href={talepArzHref({ islem: f.key })}
               className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                 active
-                  ? "bg-brand-600 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
+                  ? "bg-accent text-white"
+                  : "border border-line bg-surface text-text-muted hover:border-border-interactive hover:text-accent-text"
               }`}
             >
               {f.label}
@@ -245,8 +248,8 @@ export default async function TalepArzPage({
               href={talepArzHref({ donem: f.key })}
               className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                 active
-                  ? "bg-ink-950 text-white"
-                  : "border border-line bg-surface text-text-muted hover:border-brand-400 hover:text-brand-600"
+                  ? "bg-accent text-accent-fg"
+                  : "border border-line bg-surface text-text-muted hover:border-border-interactive hover:text-accent-text"
               }`}
             >
               {f.label}
@@ -260,7 +263,7 @@ export default async function TalepArzPage({
             name="il"
             defaultValue={ilFilter ?? ""}
             aria-label="İl filtresi"
-            className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 outline-none transition focus:border-brand-400"
+            className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text outline-none transition focus:border-accent"
           >
             <option value="">Tüm iller</option>
             {provinces.map((p) => (
@@ -271,14 +274,14 @@ export default async function TalepArzPage({
           </select>
           <button
             type="submit"
-            className="rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-ink-950/85"
+            className="rounded-[var(--radius-control)] bg-ink-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-ink-800"
           >
             Uygula
           </button>
           {selectedProvince ? (
             <Link
               href={talepArzHref({ il: null })}
-              className="text-xs font-semibold text-brand-600 hover:underline"
+              className="text-xs font-semibold text-accent-text hover:underline"
               title="İl filtresini kaldır"
             >
               {selectedProvince.name} ✕
@@ -335,8 +338,8 @@ export default async function TalepArzPage({
           {/* İlçe bazlı denge tablosu */}
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <div className="flex flex-wrap items-center gap-2">
-              <Scale className="h-4 w-4 text-brand-600" />
-              <h2 className="font-display font-bold text-ink-950">İlçe bazlı talep-arz dengesi</h2>
+              <Scale className="h-4 w-4 text-accent-text" />
+              <h2 className="font-display font-bold text-text">İlçe bazlı talep-arz dengesi</h2>
               <span className="ml-auto text-xs text-text-muted">
                 {rows.length} bölge · talep {donem.label.toLowerCase()} · arz güncel stok
               </span>
@@ -370,27 +373,27 @@ export default async function TalepArzPage({
                     return (
                       <tr key={r.key} className="border-b border-line/60 transition hover:bg-canvas">
                         <td className="py-2.5 pr-3">
-                          <p className="font-semibold text-ink-950">{r.label}</p>
+                          <p className="font-semibold text-text">{r.label}</p>
                           <p className="text-xs text-text-muted">{r.provinceName}</p>
                         </td>
                         <td className="py-2.5 pr-3 text-right">
                           <Link
                             href={r.demandHref}
-                            className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-brand-600 hover:bg-brand-600/10"
+                            className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-accent-text hover:bg-accent-subtle"
                             title="Açık talepler (talep merkezi)"
                           >
                             {r.demandCount}
-                            <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                            <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
                           </Link>
                         </td>
                         <td className="py-2.5 pr-3 text-right">
                           <Link
                             href={r.supplyHref}
-                            className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-mint-600 hover:bg-mint-500/10"
+                            className="focus-ring group inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 font-display font-extrabold tabular-nums text-[color:var(--viz-pos)] hover:bg-mint-500/10"
                             title={`Yayındaki portföyler — ${r.districtName ?? r.provinceName}`}
                           >
                             {r.supplyCount}
-                            <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-mint-600 group-hover:opacity-100" />
+                            <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-[color:var(--viz-pos)] group-hover:opacity-100" />
                           </Link>
                         </td>
                         <td className={`py-2.5 pr-3 text-right font-semibold tabular-nums ${TONE_TEXT[r.tone]}`}>
@@ -420,11 +423,11 @@ export default async function TalepArzPage({
           {barRows.length > 0 ? (
             <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <div className="flex flex-wrap items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-brand-600" />
-                <h2 className="font-display font-bold text-ink-950">Talep vs arz · ilçe sıralaması</h2>
+                <BarChart3 className="h-4 w-4 text-accent-text" />
+                <h2 className="font-display font-bold text-text">Talep vs arz · ilçe sıralaması</h2>
                 <span className="ml-auto flex items-center gap-4 text-xs text-text-muted">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-[3px] bg-brand-600" /> Talep
+                    <span className="h-2.5 w-2.5 rounded-[3px] bg-accent" /> Talep
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-[3px] bg-mint-500" /> Arz
@@ -432,31 +435,21 @@ export default async function TalepArzPage({
                 </span>
               </div>
               <div className="mt-5 space-y-3">
-                {barRows.map((r, i) => (
+                {barRows.map((r) => (
                   <Link key={r.key} href={r.supplyHref} className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
                     <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1 font-semibold text-ink-950">
+                      <span className="flex items-center gap-1 font-semibold text-text">
                         {r.label}
                         <span className="font-normal text-text-faint">· {r.provinceName}</span>
-                        <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                        <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
                       </span>
                       <span className="tabular-nums text-text-muted">
                         {r.demandCount} talep · {r.supplyCount} arz
                       </span>
                     </div>
                     <div className="space-y-1">
-                      <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                        <div
-                          className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
-                          style={{ width: `${Math.max((r.demandCount / barMax) * 100, r.demandCount > 0 ? 4 : 0)}%`, animationDelay: `${i * 60}ms` }}
-                        />
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                        <div
-                          className="bar-live h-full rounded-full bg-mint-500"
-                          style={{ width: `${Math.max((r.supplyCount / barMax) * 100, r.supplyCount > 0 ? 4 : 0)}%`, animationDelay: `${i * 60 + 30}ms` }}
-                        />
-                      </div>
+                      <Progress value={shareOfMax(r.demandCount, barMax, 4)} label={`${r.label} talep`} />
+                      <Progress value={shareOfMax(r.supplyCount, barMax, 4)} label={`${r.label} arz`} tone="success" />
                     </div>
                   </Link>
                 ))}
@@ -471,8 +464,8 @@ export default async function TalepArzPage({
           {markers.length > 0 ? (
             <section className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <MapIcon className="h-4 w-4 text-brand-600" />
-                <h2 className="font-display font-bold text-ink-950">Denge haritası · il görünümü</h2>
+                <MapIcon className="h-4 w-4 text-accent-text" />
+                <h2 className="font-display font-bold text-text">Denge haritası · il görünümü</h2>
                 <span className="ml-auto text-xs text-text-muted">
                   Daireye tıklayın → o ilin ilçe dökümü açılır
                 </span>
