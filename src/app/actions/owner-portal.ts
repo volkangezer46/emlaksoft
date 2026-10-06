@@ -196,10 +196,12 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
       .eq("property_id", propertyId)
       .eq("tenant_id", tenantId)
       .order("published_at", { ascending: false }),
+    // Taslak teklif (danışman incelemesi bekleyen; müşteri portalından gelenler dahil) malike GÖSTERİLMEZ.
     admin.from("offers")
       .select("id, amount, status, submitted_at, notes")
       .eq("property_id", propertyId)
       .eq("tenant_id", tenantId)
+      .neq("status", "draft")
       .order("created_at", { ascending: false })
       .limit(20),
     admin.from("appointments")
