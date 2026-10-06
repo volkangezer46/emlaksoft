@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
 import { StatRow } from "@/components/ui/stat-row";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "next/link";
 import {
@@ -129,7 +130,7 @@ export default async function OtomasyonlarPage({
       />
 
       {/* Hazır şablonlar */}
-      <section className="rounded-[var(--radius-panel)] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
+      <section id="sablonlar" className="scroll-mt-6 rounded-[var(--radius-panel)] border border-dashed border-brand-300/40 bg-brand-600/[0.02] p-5">
         <h2 className="mb-3 flex flex-wrap items-center gap-2 font-display font-bold text-ink-950">
           <Zap className="h-4 w-4 text-brand-600" /> Hızlı başlangıç şablonları
           <Link href="/app/ayarlar/is-akislari" className="focus-ring ml-auto rounded-[var(--radius-control)] text-xs font-semibold text-brand-600 hover:underline">
@@ -207,20 +208,26 @@ export default async function OtomasyonlarPage({
         </div>
 
         {visible.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Zap className="h-10 w-10 text-text-faint" />
+          <div className="px-6 py-10">
             {rows.length === 0 ? (
-              <>
-                <p className="mt-3 font-semibold text-ink-950">Henüz otomasyon yok</p>
-                <p className="mt-1 text-sm text-text-muted">Yukarıdaki şablonlardan birini uygulayarak başlayın.</p>
-              </>
+              <EmptyState
+                variant="compact"
+                bare
+                illustration="otomasyon"
+                title="Henüz otomasyon yok"
+                description="Tekrar eden işleri kurala bağlayın: önce yukarıdaki hazır şablonlardan birini tek tıkla uygulayın, sonra koşullarını ofisinize göre düzenleyin."
+                action={{ href: "#sablonlar", label: "Şablonlardan başla" }}
+                secondary={canEdit ? { href: "/app/otomasyonlar/yeni", label: "Sıfırdan kural yaz" } : undefined}
+              />
             ) : (
-              <>
-                <p className="mt-3 font-semibold text-ink-950">Bu filtreyle eşleşen otomasyon yok</p>
-                <Link href="/app/otomasyonlar" className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
-                  Filtreyi temizle
-                </Link>
-              </>
+              <EmptyState
+                variant="compact"
+                bare
+                icon={Zap}
+                title="Bu süzgeçle eşleşen otomasyon yok"
+                description={durum === "aktif" ? "Hiç aktif kural yok; pasif kuralları açarak başlatabilirsiniz." : "Tüm kurallar aktif."}
+                action={{ href: "/app/otomasyonlar", label: "Filtreyi temizle" }}
+              />
             )}
           </div>
         ) : (
@@ -301,12 +308,19 @@ export default async function OtomasyonlarPage({
           </span>
         </div>
         {recentLogs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <History className="h-9 w-9 text-text-faint" />
-            <p className="mt-3 font-semibold text-ink-950">Son 7 günde çalışma kaydı yok</p>
-            <p className="mt-1 max-w-sm text-sm text-text-muted">
-              Aktif bir kural tetiklendiğinde her çalışma burada sonuç rozetiyle listelenir.
-            </p>
+          <div className="px-6 py-8">
+            <EmptyState
+              variant="compact"
+              bare
+              icon={History}
+              title="Son 7 günde çalışma kaydı yok"
+              description={
+                active === 0
+                  ? "Aktif kural olmadığı için motor tetiklenmedi; bir kuralı aktifleştirin."
+                  : "Aktif kurallar tetiklendiğinde her çalışma burada sonuç rozetiyle listelenir."
+              }
+              action={active === 0 ? { href: "/app/otomasyonlar?durum=pasif", label: "Pasif kuralları gör" } : undefined}
+            />
           </div>
         ) : (
           <div className="divide-y divide-line">

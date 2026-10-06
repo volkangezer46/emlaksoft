@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/app/toast-provider";
 import { deleteCustomerTagEverywhere, renameCustomerTag } from "@/app/actions/customer-tags";
 
@@ -19,9 +20,13 @@ export function TagManager({ tags, canEdit }: { tags: { tag: string; count: numb
 
   if (tags.length === 0) {
     return (
-      <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
-        Henüz etiket yok. Müşteri kartından ya da toplu işlemle etiket eklediğinizde burada listelenir.
-      </p>
+      <EmptyState
+        illustration="musteri"
+        title="Henüz etiket yok"
+        description="Etiketler müşteri kartından ya da müşteri listesindeki toplu işlemle eklenir; burada yeniden adlandırır, birleştirir veya kaldırırsınız."
+        action={{ href: "/app/musteriler", label: "Müşteri listesine git" }}
+        secondary={{ href: "/app/ayarlar/tanimlar", label: "Tanımlar ve seçim listeleri" }}
+      />
     );
   }
 
