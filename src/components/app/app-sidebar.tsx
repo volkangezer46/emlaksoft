@@ -128,6 +128,12 @@ export function AppSidebar({
   // "Son kullanılanlar" ve "Kullanım" kartı da varsayılan KAPALI; kimlik depoda varsa AÇIK (aynı desen).
   const recentOpen = closed.includes("son-acik");
   const usageOpen = closed.includes("kullanim-acik");
+  // Ofis durumu kartı: en dolu kullanım kalemi (gerçek plan kullanımı) ve genel ton.
+  const ratioOf = (u: PlanUsageRow) => (u.limit > 0 ? Math.min(1, u.used / u.limit) : 0);
+  const topUsage = usage.reduce<PlanUsageRow | null>((best, u) => (best === null || ratioOf(u) > ratioOf(best) ? u : best), null);
+  const topRatio = topUsage ? ratioOf(topUsage) : 0;
+  const officeTone =
+    (trial && trialDaysLeft != null && trialDaysLeft <= 0) || topRatio >= 0.9 ? "bg-danger-400" : topRatio >= 0.75 || trial ? "bg-amber-400" : "bg-mint-400";
   const toggleMore = () => {
     const cur = closedStore.read();
     closedStore.write(cur.includes("daha-fazla-acik") ? cur.filter((x) => x !== "daha-fazla-acik") : [...cur, "daha-fazla-acik"]);
@@ -369,36 +375,53 @@ export function AppSidebar({
           {officeName.trim().charAt(0).toLocaleUpperCase("tr-TR") || "E"}
         </div>
 
-        <div className="sb-label rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-0.5">
-          <button
-            type="button"
-            onClick={() => toggleSection("kullanim-acik")}
-            aria-expanded={usageOpen}
-            aria-controls="sb-kullanim"
-            title={`${officeName} · kullanım ayrıntısı`}
-            className="focus-ring flex min-h-8 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] text-left"
-          >
-            <span className="sb-eyebrow min-w-0 flex-1 truncate uppercase text-white/75">Kullanım</span>
-            <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.06em] text-[var(--gold-300)]">
-              {trial ? (trialDaysLeft != null ? `Deneme · ${trialDaysLeft} gün` : "Deneme") : plan}
+        {/* OFİS DURUMU (admin "Sistem durumu" kartının /app karşılığı): paket/deneme günü + en dolu kullanım kalemi,
+            hepsi mevcut veriden (tenant planı, trial_ends_at, plan kullanımı). Ayrıntı açılır; sahte sayı yok. */}
+        <div className="sb-label rounded-[var(--radius-card)] border border-white/12 bg-white/[0.06] p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="sb-eyebrow uppercase text-white/80">Ofis durumu</span>
+            <span
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-bold ${
+                trial ? "bg-amber-400/15 text-amber-300" : "bg-mint-500/15 text-mint-300"
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${trial ? "bg-amber-300" : "bg-mint-400"}`} aria-hidden />
+              {trial ? (trialDaysLeft != null ? `Deneme · ${Math.max(0, trialDaysLeft)} gün` : "Deneme") : plan}
             </span>
-            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-white/70 transition-transform ${usageOpen ? "" : "-rotate-90"}`} aria-hidden />
-          </button>
+          </div>
+          <p className="mt-2.5 flex items-center gap-2 text-sm font-semibold text-white" title={officeName}>
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${officeTone}`} aria-hidden />
+            <span className="truncate">{officeName}</span>
+          </p>
+          <p className="num mt-1 truncate text-xs font-medium text-white/75">
+            {topUsage
+              ? `${topUsage.label}: ${topUsage.used.toLocaleString("tr-TR")} / ${topUsage.limit.toLocaleString("tr-TR")} · %${Math.round(topRatio * 100)}`
+              : "Paketinizde sayılı kullanım sınırı yok"}
+          </p>
           {trial ? (
             <Link
               href="/app/abonelik"
               onClick={() => setOpen(false)}
-              className="focus-ring mb-1 flex min-h-8 items-center justify-between gap-2 rounded-[var(--radius-control)] bg-[var(--gold-300)]/15 px-2 text-xs font-semibold text-[var(--gold-300)] transition-colors hover:bg-[var(--gold-300)]/25"
+              className="focus-ring mt-2 flex min-h-8 touch:min-h-11 items-center justify-between gap-2 rounded-[var(--radius-control)] bg-[var(--gold-300)]/15 px-2 text-xs font-semibold text-[var(--gold-300)] transition-colors hover:bg-[var(--gold-300)]/25"
             >
               <span>{trialDaysLeft != null ? (trialDaysLeft > 0 ? `Denemenin bitmesine ${trialDaysLeft} gün` : "Deneme süren doldu") : "Deneme sürümü"}</span>
               <span>Plan seç</span>
             </Link>
           ) : null}
-          {usageOpen ? (
-          <div id="sb-kullanim" className="pb-1.5">
-          <p className="mt-1 truncate text-sm font-semibold text-white">{officeName}</p>
           {usage.length > 0 ? (
-            <ul className="mt-2 space-y-2">
+            <button
+              type="button"
+              onClick={() => toggleSection("kullanim-acik")}
+              aria-expanded={usageOpen}
+              aria-controls="sb-kullanim"
+              className="focus-ring mt-2 flex min-h-8 touch:min-h-11 w-full items-center justify-between gap-2 rounded-[var(--radius-control)] text-left text-xs font-semibold text-white/80 hover:text-white"
+            >
+              Kullanım ayrıntısı
+              <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-white/70 transition-transform ${usageOpen ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          ) : null}
+          {usageOpen && usage.length > 0 ? (
+            <ul id="sb-kullanim" className="mt-1 space-y-2 pb-1">
               {usage.map((u) => {
                 const ratio = u.limit > 0 ? Math.min(1, u.used / u.limit) : 0;
                 const tone = ratio >= 0.9 ? "bg-danger-400" : ratio >= 0.75 ? "bg-amber-400" : "bg-mint-400";
@@ -426,20 +449,15 @@ export function AppSidebar({
                 );
               })}
             </ul>
-          ) : (
-            <p className="mt-1 text-xs text-white/70">Paketinizde sayılı kullanım sınırı yok.</p>
-          )}
-          {canUpgrade ? (
-            <Link
-              href="/app/abonelik"
-              onClick={() => setOpen(false)}
-              className="focus-ring mt-3 flex min-h-9 items-center justify-center rounded-[var(--radius-control)] bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/16"
-            >
-              Paketi yükselt
-            </Link>
           ) : null}
-          </div>
-          ) : null}
+          <Link
+            href="/app/abonelik"
+            onClick={() => setOpen(false)}
+            className="focus-ring mt-2.5 flex min-h-9 touch:min-h-11 items-center justify-between rounded-[var(--radius-control)] border border-white/15 bg-white/[0.04] px-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+          >
+            {canUpgrade ? "Paketi yükselt" : "Abonelik ve kullanım"}
+            <ExternalLink className="h-3.5 w-3.5 text-white/70" aria-hidden />
+          </Link>
         </div>
 
         {vitrinHref ? (
