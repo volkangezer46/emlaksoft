@@ -12,8 +12,9 @@ test.describe("Landing", () => {
     await page.goto("/");
     await expect(page).toHaveTitle(/EmlakSoft/i);
     await expect(page.locator("h1").first()).toBeVisible();
-    // Hero CTA: /kayit'e giden ilk buton
-    await expect(page.locator('main a[href="/kayit"], a[href="/kayit"]').first()).toBeVisible();
+    // Hero CTA: /kayit'e giden ilk GORUNUR bag. DOM'daki ilk /kayit baglari
+    // mobil menu/mega menu icindedir (masaustunde kasitli gizli); hero CTA main icindedir.
+    await expect(page.locator('main a[href="/kayit"]:visible').first()).toBeVisible();
   });
 });
 

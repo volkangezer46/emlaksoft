@@ -1245,8 +1245,8 @@ p {
      KURAL: `-strong` tonlari BEYAZ uzerinde WCAG AA (>=4.5:1) saglar; olculen
      kontrast oranlari (sRGB relative luminance, WCAG 2.1 formulu):
 
-       --success-strong  #0b8172 (mint-700)   -> 4.84:1  AA
-       --warning-strong  #8f6a24 (amber-700)  -> 4.98:1  AA
+       --success-strong  #08705f (mint-700)   -> 5.65:1  AA (mint-500/15 zeminde 5.22)
+       --warning-strong  #85621f (amber-700)  -> 5.58:1  AA
        --danger-strong   #a92a2e (danger-700) -> 6.83:1  AA
        --info-strong     #0b4fd6 (brand-700)  -> 6.77:1  AA
        --neutral-strong  #172033 (text)       -> 14.8:1  AAA

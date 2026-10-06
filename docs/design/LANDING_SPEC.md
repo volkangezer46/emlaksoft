@@ -36,7 +36,7 @@ Kimlik: ofis/mimari plan hassasiyeti. İnce çizgi ızgarası (kroki kâğıdı)
 - Zemin `#fbfaf7`, alt zemin `#f4f2ec`, kart `#ffffff`, çizgi `#e7e3da`, ızgara `rgba(10,34,71,.06)`.
 - Mürekkep `#071a38`, gövde `#334155`, soluk `#5b6577` (AA).
 - Vurgu mavi `#1463ff` (düğme zemini ve büyük metin); küçük metin bağlantısı `#0b4fd6`.
-- Mint `#0e9f8c` (metin için `#0b8172`), amber `#e0a53a`, kayıp kırmızısı `#cf3438`.
+- Mint `#0e9f8c` (metin için `#08705f`), amber `#e0a53a`, kayıp kırmızısı `#cf3438`.
 - Koyu bant (güvenlik, son CTA, kayıp-kaçak): `#071a38 -> #0a2247` gradyan; mevcut `theme-dark` yerel sınıfıyla, sayfa teması açık kalır.
 
 **Derinlik:** 3 katman: zemin (ızgara + radyal ışık), orta (kart/cihaz, `--elev-3`), ön (süzülen rozet/kart, `--elev-5` + `--inner-top`). Cam (backdrop-blur) yalnız başlıkta ve süzülen rozetlerde; kart gövdesi opak. Gölgeler lacivert tonlu, asla saf siyah.
