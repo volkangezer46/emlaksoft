@@ -33,6 +33,11 @@ html[data-theme="dark"] {
   --viz-neg: #f87171;
   --viz-neutral: #94a3b8;
   --viz-gold: #f0c36a;
+  /* Grafik derinliği (viz.css): koyuda ışık daha sönük, gölge daha derin, çizgi parlaması daha görünür */
+  --viz-sheen: rgba(255, 255, 255, 0.2);
+  --viz-shade: rgba(0, 0, 0, 0.34);
+  --viz-shadow: rgba(0, 0, 0, 0.55);
+  --viz-glow: 0.3;
 
   /* Durum metin tonları (kendi yumuşak zemininde AA; açık değerler tokens.css) */
   --pm-success-text: #6ee7c8;

@@ -9,13 +9,12 @@ import { PageHeader } from "@/components/ui/page-header";
 import { KpiGrid, kpiColumns, podiumColumns } from "@/components/ui/dashboard-grid";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { ChartFrame } from "@/app/app/_ui/lazy-chart";
+import { BarCompare, ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { TBody, TD, TH, THead, TR, Table, TableFrame } from "@/components/ui/table";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
 import { now, TR_OFFSET_MS, trParts } from "@/lib/clock";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
-import { RevenueChart } from "./revenue-chart-lazy";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
 import { PrintButton } from "./print-button";
 import { PaceCard } from "./pace-card";
@@ -25,7 +24,7 @@ import { Progress } from "@/components/ui/progress";
 
 export const metadata = { title: "Danışman performansı" };
 
-// Recharts (~400 KB) revenue-chart-lazy (istemci kapısı) ile ayrı parçaya taşınır.
+// Recharts (~400 KB) tembel grafik kapısıyla (lazy-chart → ui/lazy-charts) ayrı parçaya taşınır.
 
 /**
  * Koç önerisini ilgili ekrana bağlar. `advisor-coach` paylaşılan bir lib
@@ -320,12 +319,12 @@ export default async function DanismanKpiPage({
   ).map((a) => ({ ...a, ...coachLink(a) }));
 
   // Grafik verisi: geliri olan ilk 8 danışman (düz, serileştirilebilir dizi;
-  // id → çubuğa tıklayınca /app/ekip/{id})
+  // href → çubuğa tıklayınca /app/ekip/{id}; kanonik BarCompare `hrefKey`)
   const revenueChart = advisors
     .filter((a) => seeAllEarnings && a.revenue > 0)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 8)
-    .map((a) => ({ id: a.id, name: a.full_name, revenue: a.revenue }));
+    .map((a) => ({ id: a.id, name: a.full_name, revenue: a.revenue, href: `/app/ekip/${a.id}` }));
 
   return (
     <div className="space-y-6">
@@ -558,7 +557,15 @@ export default async function DanismanKpiPage({
             subtitle={`${isCurrentMonth ? "Bu ay" : donem} · en yüksek 8 danışman · çubuğa tıklayın`}
             height={Math.max(200, revenueChart.length * 38)}
           >
-            <RevenueChart data={revenueChart} />
+            <BarCompare
+              data={revenueChart}
+              xKey="name"
+              series={[{ key: "revenue", label: "Gelir" }]}
+              format="money"
+              layout="horizontal"
+              hrefKey="href"
+              hint="Danışman detayı için tıklayın"
+            />
           </ChartFrame>
           <Table className="sr-only">
             <caption>Danışman bazlı gelir (komisyon payı)</caption>

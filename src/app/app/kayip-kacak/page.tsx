@@ -19,13 +19,11 @@ import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { RISK_BAND_LABEL } from "@/lib/listing-control/risk-language";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import type { CSSProperties } from "react";
+import { RadialGauge } from "@/components/ui/viz/radial-gauge";
 import { now, trMonthStartMs } from "@/lib/clock";
 import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton";
 
 export const metadata = { title: "Kayıp-kaçak kalkanı" };
-
-const RING_C = 2 * Math.PI * 42;
 
 type Closure = {
   id: string;
@@ -482,26 +480,19 @@ async function RateReasons({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Kapanış kalitesi</h2>
           <div className="mt-5 flex items-center gap-4">
-            <div className="relative grid h-28 w-28 place-items-center">
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--line)" strokeWidth="10" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--danger-500)"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  className="ring-sweep"
-                  style={{ "--circ": RING_C, "--dash": RING_C * (1 - leakShare) } as CSSProperties}
-                />
-              </svg>
-              <div className="absolute text-center">
-                <p className="font-display text-lg font-extrabold text-ink-950">%{Math.round(leakShare * 100)}</p>
-                <p className="text-xs text-text-faint">kaçak</p>
+            {/* Kaçak oranı: tek grafik setinden RadialGauge (kayıt yoksa oran yok; sahte %0 gösterilmez). */}
+            {rows.length > 0 ? (
+              <RadialGauge value={leakRows.length} max={rows.length} size={112} stroke={10} tone="danger" ariaLabel="Kaçak oranı (kaçan komisyonlu kapanış / toplam kapanış)">
+                <div>
+                  <p className="font-display text-lg font-extrabold text-ink-950">%{Math.round(leakShare * 100)}</p>
+                  <p className="text-xs text-text-faint">kaçak</p>
+                </div>
+              </RadialGauge>
+            ) : (
+              <div className="grid h-28 w-28 shrink-0 place-items-center rounded-full border-[10px] border-[color:var(--surface-sunken)] text-center">
+                <p className="text-xs text-text-faint">Kayıt yok</p>
               </div>
-            </div>
+            )}
             <div className="space-y-2 text-xs text-text-muted">
               <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-mint-500" /> {ours} bizim kapanış</div>
               <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-danger-500" /> {competitor} rakip</div>
@@ -538,7 +529,7 @@ async function RateReasons({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-canvas">
                       <div
-                        className="bar-live h-full rounded-full bg-[image:var(--grad-brand)]"
+                        className="bar-live viz-bar-fill h-full rounded-full bg-[color:var(--viz-1)]"
                         style={{ width: `${(r.count / maxReason) * 100}%`, animationDelay: `${i * 0.08}s` }}
                       />
                     </div>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { Illustration } from "@/components/ui/illustrations";
-import { formatViz, type VizFormat } from "./colors";
+import { formatViz, vizToneColor, type VizFormat, type VizTone } from "./colors";
 
 /**
  * FunnelChart (viz) — yatay hunidir: tüm aşamalar ORTAK ölçekte (en büyük aşama = %100),
@@ -13,6 +13,8 @@ import { formatViz, type VizFormat } from "./colors";
  * öncekinin alt kümesi olduğu doğrulanmış gerçek bir hunide. Aksi halde (bağımsız sayımlar)
  * oran yanıltıcı olur, gösterilmez.
  * Hareket: çubuklar ilk görünümde soldan bir kez dolar (motion.css `.viz-grow-x`).
+ * Derinlik: çubukta üstten ışık + alt gölge hattı, bağlantılı satırın üzerine gelince hafif gölge (viz.css `.viz-bar-fill`).
+ * Renk: `tone` (varsayılan marka mavisi `--viz-1`).
  */
 export type FunnelStage = { label: string; value: number; href?: string; sub?: string };
 
@@ -20,6 +22,7 @@ export function FunnelChart({
   stages,
   format = "number",
   ardisik = false,
+  tone,
   ariaLabel = "Dönüşüm hunisi",
   emptyText = "Henüz veri yok",
   className,
@@ -28,6 +31,8 @@ export function FunnelChart({
   format?: VizFormat;
   /** Her aşama bir öncekinin alt kümesi mi? true ise aşamalar arası dönüşüm oku gösterilir. */
   ardisik?: boolean;
+  /** Çubuk tonu (verilmezse `--viz-1`). */
+  tone?: VizTone;
   ariaLabel?: string;
   emptyText?: string;
   className?: string;
@@ -41,6 +46,7 @@ export function FunnelChart({
       </div>
     );
   }
+  const barColor = tone ? vizToneColor(tone, 0) : "var(--viz-1)";
   return (
     <ol className={cn("m-0 flex list-none flex-col p-0", className)} aria-label={ariaLabel}>
       {stages.map((s, i) => {
@@ -58,8 +64,8 @@ export function FunnelChart({
             </span>
             <span className="relative block h-3 overflow-hidden rounded-full bg-[var(--surface-sunken)]" aria-hidden="true">
               <span
-                className="viz-grow-x absolute inset-y-0 left-0 block rounded-full"
-                style={{ width: `${pct}%`, background: "var(--viz-1)", "--viz-delay": `${i * 60}ms` } as CSSProperties}
+                className="viz-grow-x viz-bar-fill absolute inset-y-0 left-0 block rounded-full"
+                style={{ width: `${pct}%`, backgroundColor: barColor, "--viz-delay": `${i * 60}ms` } as CSSProperties}
               />
             </span>
             <span className="text-sm font-semibold tabular-nums text-[color:var(--viz-tooltip-text)]">{formatViz(v, format)}</span>
@@ -74,7 +80,7 @@ export function FunnelChart({
               </p>
             ) : null}
             {s.href ? (
-              <Link href={s.href} className="block rounded-[var(--radius-control)] hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
+              <Link href={s.href} className="viz-row block rounded-[var(--radius-control)] hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]">
                 {row}
               </Link>
             ) : (
