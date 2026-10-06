@@ -46,10 +46,10 @@ function money(value: number) {
  * Stopaj varsayilani SIFIR ve kullanici girdisi — danismanin vergi statusune
  * gore degistigi icin uygulamanin karar vermesi dogru olmaz.
  */
-export function CommissionSimulator() {
+export function CommissionSimulator({ defaultRate = 3, defaultAdvisorShare = 60 }: { defaultRate?: number; defaultAdvisorShare?: number } = {}) {
   const [dealValue, setDealValue] = useState("6.750.000");
-  const [rate, setRate] = useState("3");
-  const [advisorShare, setAdvisorShare] = useState("60");
+  const [rate, setRate] = useState(String(defaultRate));
+  const [advisorShare, setAdvisorShare] = useState(String(defaultAdvisorShare));
   const [vatIncluded, setVatIncluded] = useState(false);
   const [withholdingRate, setWithholdingRate] = useState("0");
   const [otherDeductions, setOtherDeductions] = useState("");

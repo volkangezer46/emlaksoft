@@ -8,8 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso, now } from "@/lib/clock";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
+import { getSetting } from "@/lib/settings/read";
 import {
-  DEFAULT_SLA_MIN,
   formatMinutes,
   SLA_OPTIONS_MIN,
   summarizeByAdvisor,
@@ -53,7 +53,8 @@ type Sp = { donem?: string; esik?: string; durum?: string; danisman?: string };
 function href(sp: { donem: string; esik: number; durum?: string; danisman?: string }): string {
   const q = new URLSearchParams();
   if (sp.donem !== "30") q.set("donem", sp.donem);
-  if (sp.esik !== DEFAULT_SLA_MIN) q.set("esik", String(sp.esik));
+  // Ofis varsayılanı değişebildiği için eşik URL'de her zaman taşınır (paylaşılan bağlantı aynı sonucu verir).
+  q.set("esik", String(sp.esik));
   if (sp.durum) q.set("durum", sp.durum);
   if (sp.danisman) q.set("danisman", sp.danisman);
   const s = q.toString();
@@ -66,8 +67,10 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
   const supabase = await createClient();
 
   const donem = DONEM_FILTERS.find((f) => f.key === sp.donem) ?? DONEM_FILTERS[1];
+  // Ofis Tanımları Merkezi: ilk yanıt SLA varsayılanı (ayar yoksa kod varsayılanı 60 dk).
+  const officeSla = Number(await getSetting<string>("office.sla.lead_first_response_min", { tenantId }));
   const esikParsed = Number(sp.esik);
-  const esik = (SLA_OPTIONS_MIN as readonly number[]).includes(esikParsed) ? esikParsed : DEFAULT_SLA_MIN;
+  const esik = (SLA_OPTIONS_MIN as readonly number[]).includes(esikParsed) ? esikParsed : officeSla;
   const durum = DURUM_FILTERS.find((f) => f.key === sp.durum) ?? DURUM_FILTERS[0];
   const officeWide = hasOfficeWideDataScope(role);
   const danismanFilter = officeWide ? (sp.danisman ?? "").trim() || null : null;

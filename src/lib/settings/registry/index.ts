@@ -1,8 +1,9 @@
 import { SETTING_CATEGORIES, type AnySettingDef, type SettingCategoryId } from "../types";
 import { PLATFORM_SETTING_DEFS } from "./platform";
+import { TENANT_SETTING_DEFS } from "./tenant";
 
-/** Tum ayar tanimlari (TEK kaynak). Ofis/sube/kullanici tanimlari sonraki pakette buraya eklenir. */
-export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS];
+/** Tum ayar tanimlari (TEK kaynak). Ofis tanimlari tenant.ts; sube/kullanici sonraki pakette. */
+export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...TENANT_SETTING_DEFS];
 
 const BY_KEY = new Map<string, AnySettingDef>();
 const BY_STORAGE = new Map<string, AnySettingDef>();

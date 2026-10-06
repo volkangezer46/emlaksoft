@@ -150,7 +150,14 @@ export async function revertSettingToVersion(key: string, version: number, reaso
   const def = getSettingDef(key);
   if (!def) return { ok: false, error: `Bilinmeyen ayar: ${key}` };
   if (isSecretDef(def)) return { ok: false, error: "Gizli ayarlar geri alınamaz; yeni değeri girin." };
-  const history = await getSettingHistory(key, { limit: 100 });
+  let tenantId: string | undefined;
+  if (def.scope === "tenant") {
+    if (!def.permission.appModule) return { ok: false, error: "Bu ayar için ofis yetkisi tanımlı değil." };
+    const gate = await requirePermission(def.permission.appModule, "edit");
+    if (!gate.ok) return { ok: false, error: gate.error };
+    tenantId = gate.tenantId;
+  }
+  const history = await getSettingHistory(key, { limit: 100, tenantId });
   const row = history.find((h) => h.version === version);
   if (!row) return { ok: false, error: "Sürüm bulunamadı." };
   if (row.actorType === "direct" && row.newValue == null) {

@@ -38,10 +38,11 @@ import {
   type Density,
   type KpiItem,
 } from "@/components/ui/list-kit";
+import { getSetting } from "@/lib/settings/read";
 import { DemandMobileList, DemandTable, type DemandVM } from "./demand-rows";
 import { DemandBulkBar, DemandBulkProvider } from "./demand-bulk";
 import {
-  AGING_DAYS,
+  AGING_DAYS as DEFAULT_AGING_DAYS,
   BUDGET_BANDS,
   DEMAND_STATUS_LABELS,
   URGENCY_LABELS,
@@ -117,7 +118,9 @@ export async function DemandsView({
     yogunluk?: string;
   }>;
 }) {
-  const { perms } = await requireModulePage("demands");
+  const { perms, tenantId } = await requireModulePage("demands");
+  // Ofis Tanımları Merkezi: bekleyen talep eşiği (ayar yoksa kod varsayılanı 30 gün).
+  const AGING_DAYS = tenantId ? await getSetting<number>("office.alert.demand_aging_days", { tenantId }) : DEFAULT_AGING_DAYS;
   const canCreate = (perms.demands ?? []).includes("create");
   const canEdit = (perms.demands ?? []).includes("edit");
   const canDelete = (perms.demands ?? []).includes("delete");

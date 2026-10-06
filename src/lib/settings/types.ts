@@ -31,6 +31,15 @@ export const SETTING_CATEGORIES = [
 ] as const;
 export type SettingCategoryId = (typeof SETTING_CATEGORIES)[number]["id"];
 
+/** Ofis Tanimlari Merkezi gruplari (yalniz scope=tenant ayarlarda; ekran sirasidir). */
+export const OFFICE_SETTING_GROUPS = [
+  { id: "sla", label: "SLA süreleri", description: "Müşteriye ne kadar sürede dönüş yapılması gerektiği." },
+  { id: "esik", label: "Uyarı eşikleri", description: "Hareketsiz anlaşma ve bekleyen talep gibi uyarıların kaç günde başlayacağı." },
+  { id: "komisyon", label: "Komisyon varsayılanları", description: "Komisyon hesaplayıcı ve bölüşüm ekranlarının başlangıç oran ve payları." },
+  { id: "bildirim", label: "Bildirim varsayılanları", description: "Kendi tercihini kaydetmemiş kullanıcıların bildirim tercihleri." },
+] as const;
+export type OfficeSettingGroupId = (typeof OFFICE_SETTING_GROUPS)[number]["id"];
+
 /** Merkezde duzenleme modu: center = ayar merkezinde duzenlenir; bridge = mevcut ekranda (merkez koprudur); locked = degistirilemez. */
 export type SettingEditMode = "center" | "bridge" | "locked";
 
@@ -62,6 +71,8 @@ export type SettingDef<T = unknown> = {
   storage: SettingStorage;
   permission: SettingPermission;
   category: SettingCategoryId;
+  /** Ofis merkezi grubu (scope=tenant icin zorunlu). */
+  group?: OfficeSettingGroupId;
   label: string;
   description: string;
   /** "ETKISI" satiri: bu ayari degistirirsen ne olur. */
@@ -127,6 +138,7 @@ export type SettingView = {
   description: string;
   impact: string;
   category: SettingCategoryId;
+  group?: OfficeSettingGroupId;
   type: SettingValueType;
   sensitivity: SettingSensitivity;
   risk: SettingRisk;

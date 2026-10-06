@@ -13,6 +13,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
+import { getSettings } from "@/lib/settings/read";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { summarizeAdvisorEarning, type ShareRow } from "@/lib/team/advisor-share";
 import { trMonthContext } from "@/lib/team/scorecard";
@@ -139,7 +140,13 @@ export default async function CommissionPage({
 }: {
   searchParams?: Promise<{ durum?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
-  const { perms, userId } = await requireModulePage("commissions");
+  const { perms, userId, tenantId } = await requireModulePage("commissions");
+  // Ofis Tanımları Merkezi: simülatör başlangıç oranı/payı (ayar yoksa kod varsayılanları 3 / 60).
+  const simDefaults = tenantId
+    ? await getSettings(["office.commission.simulator_rate", "office.commission.simulator_advisor_share"], { tenantId })
+    : {};
+  const simRate = Number(simDefaults["office.commission.simulator_rate"] ?? 3);
+  const simShare = Number(simDefaults["office.commission.simulator_advisor_share"] ?? 60);
   const canEdit = (perms.commissions ?? []).includes("edit");
   // Kazanç gizliliği: danışman bazlı pay dağılımı ve split etiketleri başkasının kazancını gösterir.
   const seeAllEarnings = canSeeAllEarnings(perms);
@@ -459,7 +466,7 @@ export default async function CommissionPage({
         </div>
       ) : null}
 
-      <CommissionSimulator />
+      <CommissionSimulator defaultRate={simRate} defaultAdvisorShare={simShare} />
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
