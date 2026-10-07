@@ -41,26 +41,20 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
             </Link>
           </div>
           {columns.map((col) => (
-            <nav key={col.id} aria-label={col.title}>
+            <nav key={col.id} aria-label={col.title} className="mk-foot-col">
               <h2>{col.title}</h2>
-              <ul>
-                {col.links.map((l) => (
-                  <li key={l.id}>
-                    {l.external ? (
-                      <a href={l.href} target="_blank" rel="noopener noreferrer">
-                        {l.label}
-                        <span className="sr-only"> (yeni sekmede açılır)</span>
-                      </a>
-                    ) : l.href.startsWith("mailto:") || l.href.startsWith("tel:") ? (
-                      <a href={l.href}>{l.label}</a>
-                    ) : (
-                      <Link href={l.href}>{l.label}</Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <FootLinks links={col.links} />
             </nav>
           ))}
+          {/* Mobil (< 768 px): aynı gruplar JS'siz akordeon; masaüstünde gizli (display:none => yinelenen bağlantı erişilebilirlik ağacına girmez). */}
+          <div className="mk-foot-acc">
+            {columns.map((col) => (
+              <details key={col.id} className="mk-foot-acc-item">
+                <summary>{col.title}<i aria-hidden="true" /></summary>
+                <FootLinks links={col.links} />
+              </details>
+            ))}
+          </div>
         </div>
         <div className="mk-foot-bottom">
           <p style={{ margin: 0 }}>© {trParts().year} EmlakSoft. Tüm hakları saklıdır.</p>
@@ -73,5 +67,26 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
         <Link href="/kayit" className="mk-btn mk-btn-grad">{trialCtaMobileLabel(trialDays)}</Link>
       </div>
     </footer>
+  );
+}
+
+function FootLinks({ links }: { links: readonly { id: string; label: string; href: string; external?: boolean }[] }) {
+  return (
+    <ul>
+      {links.map((l) => (
+        <li key={l.id}>
+          {l.external ? (
+            <a href={l.href} target="_blank" rel="noopener noreferrer">
+              {l.label}
+              <span className="sr-only"> (yeni sekmede açılır)</span>
+            </a>
+          ) : l.href.startsWith("mailto:") || l.href.startsWith("tel:") ? (
+            <a href={l.href}>{l.label}</a>
+          ) : (
+            <Link href={l.href}>{l.label}</Link>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

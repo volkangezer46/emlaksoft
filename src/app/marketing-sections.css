@@ -475,3 +475,21 @@ html[data-mk-ann-off] .mk-preview .mk-ann { display: flex; }
 .mk-rep-conf i { width: 1.25rem; height: 0.5rem; border-radius: 999px; background: #dfe6f5; }
 .mk-rep-conf i:nth-child(-n + 2) { background: var(--mk-gain); }
 .mk-rep-note { margin: var(--mk-s-3) 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--mk-muted); }
+
+/* ---- footer mobil akordeon (< 768 px; JS'siz <details>). Masaüstünde akordeon gizli, sütunlar görünür. ---- */
+.mk-foot-acc { display: none; }
+@media (max-width: 767px) {
+  .mk-foot-col { display: none; }
+  .mk-foot-acc { display: block; grid-column: 1 / -1; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  .mk-foot-acc-item { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+  .mk-foot-acc-item summary { display: flex; align-items: center; justify-content: space-between; min-height: 3rem; cursor: pointer; list-style: none; font-size: 0.9375rem; font-weight: 800; color: #fff; }
+  .mk-foot-acc-item summary::-webkit-details-marker { display: none; }
+  .mk-foot-acc-item summary i { position: relative; flex: none; width: 0.75rem; height: 0.75rem; transition: transform var(--motion-base) var(--mk-ease); }
+  .mk-foot-acc-item summary i::before, .mk-foot-acc-item summary i::after { content: ""; position: absolute; left: 0; top: 50%; width: 100%; height: 2px; margin-top: -1px; background: rgba(255, 255, 255, 0.7); border-radius: 1px; }
+  .mk-foot-acc-item summary i::after { transform: rotate(90deg); }
+  .mk-foot-acc-item[open] summary i { transform: rotate(45deg); }
+  .mk-foot-acc-item ul { list-style: none; margin: 0; padding: 0 0 0.75rem; display: grid; }
+  .mk-foot-acc-item li a { display: flex; align-items: center; min-height: 2.75rem; font-size: 0.9375rem; }
+  .mk-foot-grid { gap: var(--mk-s-5); }
+  .mk-foot { padding-top: 3rem; }
+}
