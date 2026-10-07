@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { ChevronRight, LoaderCircle, Pencil, RefreshCw, X } from "lucide-react";
+import { ChevronRight, LoaderCircle, MoreVertical, Pencil, RefreshCw, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   enqueueProvinceGeoSync,
   updateProvince,
@@ -126,7 +127,7 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
     ?? syncString(province.sync, "created_at");
 
   return (
-    <div className={`grid gap-3 border-b border-line px-5 py-3.5 transition hover:bg-canvas/60 lg:grid-cols-[auto_minmax(0,1fr)_minmax(190px,auto)_auto_auto_auto_auto] lg:items-center ${province.plate_code === 46 ? "bg-amber-500/[0.025]" : ""}`}>
+    <div className={`grid gap-3 border-b border-line px-5 py-3.5 transition hover:bg-canvas/60 lg:grid-cols-[auto_minmax(0,1fr)_minmax(190px,auto)_auto_auto_auto] lg:items-center ${province.plate_code === 46 ? "bg-amber-500/[0.025]" : ""}`}>
       <span className="rounded-full bg-brand-600/8 px-2.5 py-1 text-center text-xs font-bold text-brand-600">
         {province.plate_code}
       </span>
@@ -137,6 +138,9 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
         >
           {province.name}
         </Link>
+        {!province.is_active ? (
+          <span className="ml-2 rounded-full bg-danger-500/10 px-2 py-0.5 align-middle text-xs font-bold text-danger-500">Pasif</span>
+        ) : null}
         <p className="mt-0.5 text-xs text-text-muted">
           <Link href={`/admin/geo/${province.id}`} className="transition hover:text-brand-600 hover:underline">
             {province.districtCount} ilçe · {province.neighborhoodCount} mahalle
@@ -178,14 +182,6 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
         {syncState.error ? <p className="mt-1 text-xs text-danger-500">{syncState.error}</p> : null}
         {syncState.message ? <p className="mt-1 text-xs text-emerald-700">{syncState.message}</p> : null}
       </div>
-      {!province.is_active ? (
-        <span className="rounded-full bg-danger-500/10 px-2 py-1 text-xs font-bold text-danger-500">Pasif</span>
-      ) : (
-        <span />
-      )}
-      <button type="button" aria-label={`${province.name} ilini düzenle`} onClick={() => setEditing(true)} className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas">
-        <Pencil className="h-3.5 w-3.5" />
-      </button>
       <form action={syncAction}>
         <input type="hidden" name="province_id" value={province.id} />
         <button
@@ -204,6 +200,23 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
       >
         İlçeler <ChevronRight className="h-3.5 w-3.5" />
       </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Diğer işlemler: ${province.name}`}
+            title="Diğer işlemler"
+            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700"
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onSelect={() => setEditing(true)}>
+            <Pencil aria-hidden="true" /> İli düzenle
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

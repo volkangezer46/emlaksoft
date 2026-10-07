@@ -150,11 +150,21 @@ function NewPortalForm({
 export function ClosePortalDialog({
   listingId,
   label,
+  open: openProp,
+  onOpenChange,
 }: {
   listingId: string;
   label: string;
+  /** Denetimli kullanım (⋮ menüsünden açılış): verilirse kendi "Kapat" düğmesi çizilmez. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenState(next);
+    onOpenChange?.(next);
+  };
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -174,7 +184,9 @@ export function ClosePortalDialog({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="rounded-[var(--radius-control)] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8">Kapat</button>
+      {openProp === undefined ? (
+        <button type="button" onClick={() => setOpen(true)} className="rounded-[var(--radius-control)] border border-danger-500/20 px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-500/8">Kapat</button>
+      ) : null}
       <DialogShell open={open} onOpenChange={setOpen} title="İlan kapanış formu" description={label} icon={Siren} danger>
           <form action={submit} className="grid gap-4 p-4 md:p-6">
             <input type="hidden" name="portal_listing_id" value={listingId} />

@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Check, Globe, Loader2, Lock, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Globe, Loader2, Lock, MoreVertical, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { addDefinition, toggleDefinition, deleteDefinition, renameDefinition, moveDefinition, setDefinitionColor, type DefinitionResult } from "@/app/actions/definitions";
@@ -70,6 +72,79 @@ export function DefinitionsManager({ categories, tenantId }: { categories: Categ
         <CategoryPanel category={current} tenantId={tenantId} />
       ) : null}
     </div>
+  );
+}
+
+/** Tanım satırının ikincil eylemleri (⋮): sırala, rengi kaldır, sil. Silme onayı menü kapansa da açık kalır. */
+function DefinitionRowMore({
+  label,
+  disabled,
+  canUp,
+  canDown,
+  hasColor,
+  canDelete,
+  onMove,
+  onClearColor,
+  onDelete,
+}: {
+  label: string;
+  disabled: boolean;
+  canUp: boolean;
+  canDown: boolean;
+  hasColor: boolean;
+  canDelete: boolean;
+  onMove: (direction: "up" | "down") => void;
+  onClearColor: () => void;
+  onDelete: () => Promise<void>;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={`Diğer işlemler: ${label}`}
+            title="Diğer işlemler"
+            className="focus-ring press grid h-8 w-8 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 disabled:opacity-50"
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem disabled={!canUp} onSelect={() => onMove("up")}>
+            <ArrowUp aria-hidden="true" /> Yukarı taşı
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={!canDown} onSelect={() => onMove("down")}>
+            <ArrowDown aria-hidden="true" /> Aşağı taşı
+          </DropdownMenuItem>
+          {hasColor ? (
+            <DropdownMenuItem onSelect={onClearColor}>
+              <X aria-hidden="true" /> Rengi kaldır
+            </DropdownMenuItem>
+          ) : null}
+          {canDelete ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem danger onSelect={() => setConfirmOpen(true)}>
+                <Trash2 aria-hidden="true" /> Tanımı sil…
+              </DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {canDelete ? (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          title="Tanımı sil"
+          description={`"${label}" seçeneği kalıcı olarak silinecek. Kayıtlarda kullanılan bir değer silinemez; bu durumda gizleyin.`}
+          confirmLabel="Sil"
+          onConfirm={onDelete}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -250,12 +325,6 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                   <span className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-muted">Sistem</span>
                 ) : isOwn ? (
                   <div className="flex items-center gap-1.5">
-                    <button type="button" onClick={() => onMove(d.id, "up")} disabled={busy === d.id || ownIndex <= 0} aria-label="Yukarı taşı" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-30">
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button type="button" onClick={() => onMove(d.id, "down")} disabled={busy === d.id || ownIndex < 0 || ownIndex >= ownItems.length - 1} aria-label="Aşağı taşı" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-30">
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </button>
                     <input
                       type="color"
                       aria-label={`${d.label} rengi`}
@@ -264,36 +333,29 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                       onBlur={(e) => { if (e.target.value.toLowerCase() !== (d.color ?? "").toLowerCase()) onColor(d.id, e.target.value); }}
                       className="h-7 w-7 min-h-9 min-w-9 shrink-0 cursor-pointer rounded-[var(--radius-control)] border border-line bg-canvas p-1 disabled:opacity-50"
                     />
-                    {d.color ? (
-                      <button type="button" onClick={() => onColor(d.id, null)} disabled={busy === d.id} aria-label="Rengi kaldır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 disabled:opacity-50">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                    {editingId !== d.id ? (
-                      <button type="button" onClick={() => startEdit(d)} disabled={busy === d.id} aria-label="Yeniden adlandır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-50">
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => onToggle(d.id, !d.is_active)}
-                      disabled={busy === d.id || (isSystem && d.is_active)}
-                      title={isSystem && d.is_active ? "Sistem anahtarı gizlenemez" : undefined}
-                      className={`rounded-[var(--radius-control)] border px-2.5 py-1 text-xs font-semibold transition disabled:opacity-50 ${d.is_active ? "border-line text-text-muted hover:border-amber-400 hover:text-amber-600" : "border-mint-500/30 text-mint-600"}`}
-                    >
-                      {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : d.is_active ? "Gizle" : "Göster"}
+                    <button type="button" onClick={() => startEdit(d)} disabled={busy === d.id} aria-label="Yeniden adlandır" title="Yeniden adlandır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-50">
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    {isSystem ? null : <ConfirmDialog
-                      title="Tanımı sil"
-                      description={`"${d.label}" seçeneği kalıcı olarak silinecek. Kayıtlarda kullanılan bir değer silinemez; bu durumda "Gizle" seçeneğini kullanın.`}
-                      confirmLabel="Sil"
-                      onConfirm={() => onDelete(d.id)}
-                      trigger={
-                        <button type="button" disabled={busy === d.id} aria-label="Sil" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-500 disabled:opacity-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      }
-                    />}
+                    <span className="inline-flex items-center gap-1.5" title={isSystem && d.is_active ? "Sistem anahtarı gizlenemez" : undefined}>
+                      <Switch
+                        checked={d.is_active}
+                        onCheckedChange={(next) => onToggle(d.id, next)}
+                        disabled={busy === d.id || (isSystem && d.is_active)}
+                        aria-label={`${d.label} listede gösterilsin`}
+                      />
+                      <span className="w-14 text-xs font-semibold text-text-muted">{d.is_active ? "Görünür" : "Gizli"}</span>
+                    </span>
+                    <DefinitionRowMore
+                      label={d.label}
+                      disabled={busy === d.id}
+                      canUp={ownIndex > 0}
+                      canDown={ownIndex >= 0 && ownIndex < ownItems.length - 1}
+                      hasColor={Boolean(d.color)}
+                      canDelete={!isSystem}
+                      onMove={(dir) => onMove(d.id, dir)}
+                      onClearColor={() => onColor(d.id, null)}
+                      onDelete={() => onDelete(d.id)}
+                    />
                   </div>
                 ) : null}
               </div>

@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock3,
-  ExternalLink,
   FileCheck2,
   RadioTower,
   ShieldCheck,
@@ -20,7 +19,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getExpiringAuthorizations } from "@/app/actions/property-management";
 import { exportPortalListingsCsv } from "@/app/actions/export";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { ClosePortalDialog, NewPortalPanel, NewPortalTrigger } from "./portal-dialogs";
+import { NewPortalPanel, NewPortalTrigger } from "./portal-dialogs";
+import { PortalRowMore } from "./portal-row-more";
 import { ConfirmListingButton } from "./confirm-listing-button";
 import { BulkConfirmForm } from "./bulk-confirm-form";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -473,13 +473,8 @@ export default async function PortalsPage({
                     <p className="flex items-center gap-1.5">{isOverdue ? <AlertTriangle className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />}{relativeConfirm(row.last_confirmed_at)}</p>
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    {row.portal_url ? <a href={row.portal_url} target="_blank" rel="noreferrer" className="grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-brand-300 hover:text-brand-600" aria-label="İlanı aç"><ExternalLink className="h-4 w-4" /></a> : null}
-                    {isLive ? (
-                      <>
-                        <ConfirmListingButton listingId={row.id} />
-                        <ClosePortalDialog listingId={row.id} label={`${property?.property_code ?? ""} · ${row.portal_name}`} />
-                      </>
-                    ) : null}
+                    {isLive ? <ConfirmListingButton listingId={row.id} /> : null}
+                    <PortalRowMore listingId={row.id} label={`${property?.property_code ?? ""} · ${row.portal_name}`} portalUrl={row.portal_url} isLive={isLive} />
                   </div>
                 </article>
               );

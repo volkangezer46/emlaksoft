@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Info, Loader2, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { Info, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { RowSaveActions, rowDraftProps } from "@/components/ui/row-save-actions";
+import { useRowDraft } from "@/lib/ui/use-row-draft";
 import { useToast } from "@/components/app/toast-provider";
 import { resetStageLabel, setStageLabel } from "@/app/actions/definitions";
 import { defaultStageLabels } from "@/lib/deal-stage-labels";
@@ -65,28 +67,29 @@ function StageRow({
 }) {
   const router = useRouter();
   const { push } = useToast();
-  const [label, setLabel] = useState(initialLabel);
-  const [color, setColor] = useState<string | null>(initialColor);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const locked = isSystemDefinitionValue("deal_stage_label", stage);
-  const dirty = label.trim() !== initialLabel || (color ?? "").toLowerCase() !== (initialColor ?? "").toLowerCase();
-
-  function save() {
-    setError(null);
-    startTransition(async () => {
+  // Satır içi kaydetme standardı: Kaydet/Vazgeç yalnız değişen satırda belirir.
+  const rowDraft = useRowDraft<{ label: string; color: string }>({
+    id: `stage-${stage}`,
+    label: defaultLabel,
+    saved: { label: initialLabel, color: (initialColor ?? "").toLowerCase() },
+    validate: (d) => (d.label.trim() ? { ok: true } : { ok: false, reason: "Aşama adı boş olamaz." }),
+    save: async (d) => {
       try {
-        const res = await setStageLabel(stage, label, color);
-        if (res.error) setError(res.error);
-        else {
-          push("Aşama adı güncellendi", "ok");
-          router.refresh();
-        }
+        const res = await setStageLabel(stage, d.label, d.color || null);
+        if (res.error) return { error: res.error };
+        push("Aşama adı güncellendi", "ok");
+        router.refresh();
+        return { ok: true };
       } catch {
-        setError("Aşama adı güncellenemedi. Lütfen tekrar deneyin.");
+        return { error: "Aşama adı güncellenemedi. Lütfen tekrar deneyin." };
       }
-    });
-  }
+    },
+  });
+  const label = rowDraft.draft.label;
+  const color = rowDraft.draft.color || null;
   function reset() {
     setError(null);
     startTransition(async () => {
@@ -104,7 +107,7 @@ function StageRow({
   }
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-line px-4 py-2.5">
+    <div className="rs-row rounded-[var(--radius-card)] border border-line px-4 py-2.5" {...rowDraftProps(rowDraft)}>
       <div className="flex flex-wrap items-center gap-3">
         <span aria-hidden className="inline-block h-3 w-3 shrink-0 rounded-full border border-line" style={color ? { backgroundColor: color } : undefined} />
         <div className="min-w-[10rem] flex-1">
@@ -112,7 +115,8 @@ function StageRow({
           <input
             id={`stage-${stage}`}
             value={label}
-            onChange={(e) => setLabel(e.target.value)}
+            onChange={(e) => rowDraft.set("label", e.target.value)}
+            disabled={rowDraft.locked}
             maxLength={40}
             className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-brand-400"
           />
@@ -125,22 +129,16 @@ function StageRow({
           type="color"
           aria-label={`${label} rengi`}
           value={color ?? "#6366f1"}
-          onChange={(e) => setColor(e.target.value)}
+          onChange={(e) => rowDraft.set("color", e.target.value.toLowerCase())}
+          disabled={rowDraft.locked}
           className="h-7 w-7 min-h-9 min-w-9 shrink-0 cursor-pointer rounded-[var(--radius-control)] border border-line bg-canvas p-1"
         />
         {color ? (
-          <button type="button" onClick={() => setColor(null)} aria-label="Rengi kaldır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950">
+          <button type="button" onClick={() => rowDraft.set("color", "")} disabled={rowDraft.locked} aria-label="Rengi kaldır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950">
             <X className="h-3.5 w-3.5" />
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending || !dirty || !label.trim()}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
-        >
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Kaydet
-        </button>
+        <RowSaveActions draft={rowDraft}>
         {own ? (
           <button
             type="button"
@@ -151,6 +149,7 @@ function StageRow({
             <RotateCcw className="h-3.5 w-3.5" /> Sıfırla
           </button>
         ) : null}
+        </RowSaveActions>
       </div>
       {error ? <p role="alert" className="mt-2 text-sm text-danger-500">{error}</p> : null}
     </div>
