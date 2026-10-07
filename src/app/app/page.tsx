@@ -26,6 +26,7 @@ import { preloadDashboardSnapshot } from "./_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
 import { OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
 import { AnaHero } from "./_home/ana-hero";
+import { BostaOnyukle } from "./_home/bosta-onyukle";
 import { DurumCubugu } from "./_home/durum-cubugu";
 import { KontorBandi } from "./_home/kontor-bandi";
 import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
@@ -133,7 +134,18 @@ export default async function AppHomePage({
     icgoru: icgoru === "tum" ? "tum" : undefined,
   };
   const moreOpen = daha === "1";
-  const swapKey = `${ctx.period}-${officeView ? "ofis" : "ben"}`;
+  // En olası sonraki hedefler (yalnız görme yetkisi olunanlar; kapalı modül atlanır). Boşta ısıtılır, en çok 4.
+  const prefetchTargets = (
+    [
+      ["customers", "/app/musteriler"],
+      ["properties", "/app/portfoyler"],
+      ["tasks", "/app/gorevler"],
+      ["appointments", "/app/randevular"],
+    ] as const
+  )
+    .filter(([mod]) => (perms[mod] ?? []).includes("view"))
+    .map(([, href]) => href);
+  const swapKey =`${ctx.period}-${officeView ? "ofis" : "ben"}`;
 
   /** Izgara hücresi; `widget` verilirse "Düzenle" modunda gizlenebilir. */
   const cell = (xl: 3 | 4 | 5 | 6 | 7 | 8 | 12, node: ReactNode, key: string, opts?: { widget?: string; className?: string }) => (
@@ -413,6 +425,7 @@ export default async function AppHomePage({
             </div>
           </BosOfisKapisi>
         </Suspense>
+        <BostaOnyukle hrefs={prefetchTargets} />
         <ShortcutBar
           items={[
             { keys: ["mod", "K"], label: "Ara ve komut" },
