@@ -9,6 +9,7 @@ import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type
 import { insertPropertyShareLink } from "@/lib/share-links";
 import { buildMatchShareMessage, toSmsHref } from "@/lib/match-share-message";
 import { toWhatsAppLink } from "@/lib/phone";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type MatchActionResult = { error?: string; ok?: boolean; score?: number };
 
@@ -83,7 +84,7 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     .eq("tenant_id", gate.tenantId);
   if (updateError) {
     console.error("saveMatch update", updateError);
-    return { error: "Eşleştirme kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(updateError, "Eşleştirme kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   const cust = demand.customer as { full_name?: string } | { full_name?: string }[] | null;
@@ -170,7 +171,7 @@ export async function sendMatchToCustomer(formData: FormData): Promise<SendMatch
     propertyId,
     label: `Eşleşme · ${customer?.full_name ?? "müşteri"}`,
   });
-  if (!link.ok) return { error: "Paylaşım bağlantısı oluşturulamadı." };
+  if (!link.ok) return { error: actionErrorMessage(null, "Paylaşım bağlantısı oluşturulamadı.") };
 
   const message = buildMatchShareMessage({
     customerName: customer?.full_name ?? null,

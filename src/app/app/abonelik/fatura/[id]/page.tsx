@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 
 export const metadata = { title: "Fatura" };
 
@@ -52,7 +52,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         <Link href="/app/abonelik?sekme=faturalar" className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600">
           <ArrowLeft className="h-4 w-4" /> Faturalar
         </Link>
-        <PrintButton />
+        <PrintButton tone="outline" label="Yazdır / PDF kaydet" />
       </div>
 
       <article className="rounded-[var(--radius-panel)] border border-line bg-surface p-6 shadow-[var(--shadow-xs)] print:border-0 print:shadow-none">

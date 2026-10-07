@@ -172,6 +172,82 @@ Hepsi `src/components/ui`; ton/ikon karosu mevcut `.pm-t-*` + `.pm-ico` (yeni to
   gizliyken `animation-play-state: paused`, reduce'ta hiç yok). Sonsuz döngünün diğer tek istisnası canlı göstergeler
   (canlı saat, "Çevrimiçi" noktası).
 
+## Premium etkileşim kiti (2026-10-07): düğmeler, satır içi seçici, satır içi kaydetme, admin liste deseni
+
+CSS tek dosya `src/app/kit.css` (globals.css'ten yüklenir, kurallar `@layer components` içinde → `className`
+yardımcıları her zaman ezer). Renk yalnız token; hareket yalnız `prefers-reduced-motion: no-preference` içinde.
+Referans uygulama: `/admin/tenants`.
+
+### Premium düğme sistemi (`ui/button.tsx`, geriye uyumlu)
+
+| Varyant | Görünüm | Ne zaman |
+|---|---|---|
+| `primary` | mavi degrade (taban `--accent`, renksiz ışık/gölge katmanı) + üst iç parlama + renkli taban gölgesi | sayfanın TEK birincil eylemi ("+ Yeni ofis") |
+| `navy` | lacivert degrade (`--navy-*`, iki temada aynı) | satır içi kalıcı onay ("✓ Kaydet") |
+| `gold` | yumuşak altın, metin `--pm-gold-text` (AA) | premium an / içeri girme ("→ Ofise gir") |
+| `outline` | beyaz yüzey + ince kenar + yumuşak gölge | ikincil ("⚙ Yönet", "Excel'e aktar") |
+| `secondary` / `ghost` | eski ikincil / saydam | mevcut ekranlar; ikon düğmeleri (⋮, ↺) |
+| `danger` | kırmızı degrade | geri dönüşü zor eylem, satır içi risk onayı |
+
+Boylar `xs/sm/md/lg` + `icon` (kare; `aria-label` zorunlu). `loading`: sol ikon spinner'a döner, METİN KORUNUR
+(genişlik zıplamaz), `aria-busy`. Hover 1 px yükselme + gölge (yalnız no-preference + hover:hover), basılı iç gölge,
+odak halkası `--focus-ring`. Pasif: opaklık yerine sönük yüzey (`--surface-sunken`, `--text-muted`) → düşük kontrast
+ama okunur. Düğme olmayan öğeye aynı görünüm: `buttonClass({ variant, size })`. Taban renk `background-color`
+olduğundan `<Button className="bg-mint-600">` gibi ton ezmeleri çalışır.
+
+### InlineSelect (`ui/inline-select.tsx`)
+
+Tablo hücresi seçicisi: rozet/ikon görünümlü tetik (`pm-t-*` tonu, ikon, etiket, ok) + portal liste (tablo
+`overflow` kabı kırpmaz). Radix Select: ok tuşları, Home/End, harfle arama, Esc, odak dönüşü, combobox/listbox rolleri.
+`changed` → tetiğin köşesinde amber "değişti" noktası (+ aria-label'a "değişti, kaydedilmedi"). `name` verilirse gizli
+native select üretir (FormData). Seçenek ikonları istemcide tanımlanır (fonksiyon sunucudan geçemez). Native `<select>`
+yalnız form sayfalarında kalır; tablo satırında InlineSelect kullanılır.
+
+### Satır içi kaydetme standardı (tüm satır içi düzenlemeli tablolar; /app dahil)
+
+Parçalar: saf durum makinesi `src/lib/ui/row-draft.ts` (+ test), hook `src/lib/ui/use-row-draft.ts`
+(`useRowDraft`), görünüm `ui/row-save-actions.tsx` (`RowSaveActions`, `rowDraftProps`), tablo sarmalayıcı
+`ui/draft-table.tsx` (`DraftTable`), kirli satır deposu `src/lib/ui/row-draft-store.ts`.
+
+1. Kaydet başlangıçta PASİF. Yalnız gerçek değişiklikte AKTİF: "kirli" = taslak ≠ kayıtlı DEĞER (aynı değere dönülürse
+   yeniden pasif; tıklama sayılmaz).
+2. Geçersiz seçimde PASİF + neden satır altında (`validate` saf fonksiyon, ör. `lib/admin/tenant-row-rules.ts`
+   "Askıdaki ofise paket atanamaz"). Sunucu kendi kurallarını yine uygular.
+3. Kaydederken: spinner + "Kaydediliyor…", satırın seçicileri kilitli (`draft.locked`), çift gönderim yok.
+4. Başarı: ≈1,5 sn "✓ Kaydedildi" (ikon girişi reduce'ta animasyonsuz) → yeniden pasif; kayıtlı değer taslağa eşitlenir.
+   Hata: mesaj satırda (`role="alert"`), taslak korunur, Kaydet aktif kalır.
+5. Kaydedilmemiş ipucu: satır solunda 3 px amber şerit (`tr[data-dirty="1"]`), değişen hücrede amber nokta, düğme
+   yanında "Kaydedilmemiş" etiketi, `aria-live` duyurusu.
+6. Gelişmiş: ↺ Vazgeç (kirli satırda); 2+ kirli satırda tablonun üstünde yapışkan çubuk "N satırda kaydedilmemiş
+   değişiklik · Tümünü kaydet · Tümünü geri al" (sıralı kayıt; riskli satırlar kendi onayında bekler); kirli satır varken
+   `beforeunload` + iç bağlantı tıklamasında onay; riskli değişiklik (`risk`: askıya alma, iptal, paket düşürme,
+   pasifleştirme) kaydederken satır içi onay adımı (ConfirmDialog YOK); klavye: satırda Enter = kaydet (kapalı seçicide
+   Enter listeyi açmaz, kaydeder), Esc = vazgeç / onayı kapat; açık listede tuşlar listeye aittir.
+7. Eşzamanlılık: `version` (ör. `updated_at`) verilirse ve satır kirliyken sunucu değeri değişirse satır "bayat" olur:
+   kayıt engellenir, "Bu satır başkası tarafından güncellendi — Yenile". Sunucu tarafı isteğe bağlı denetim:
+   `updateTenantPlanStatus` `expected_updated_at` alırsa yazmadan önce karşılaştırır (`code: "stale"`).
+
+```tsx
+const draft = useRowDraft({ id, label: name, saved: { status, plan }, version: updatedAt, validate, risk, save });
+<tr {...rowDraftProps(draft)}>
+  <td><InlineSelect value={draft.draft.status} onValueChange={(v) => draft.set("status", v)} changed={draft.changed.has("status")} disabled={draft.locked} … /></td>
+  <td><RowSaveActions draft={draft}>{/* Yönet, Ofise gir, ⋮ */}</RowSaveActions></td>
+</tr>
+```
+Uygulananlar: `/admin/tenants` (durum + paket), `/admin/members` (rol + aktif/pasif), `/admin/personel` (rol + durum).
+
+### Admin liste deseni (`components/admin/admin-list.tsx`, kit.css `.adm-*`)
+
+Hero bandı (`AdminPageHeader` + `art` = `HeroArt` konu figürü + isteğe bağlı `note` gerçek veriden kısa not) →
+`KpiGrid` (boşluksuz; seçili süzgecin kartı `tinted`) → 1-2 `ChartCard` (sunucu-güvenli `viz/BarColumns`,
+`viz/DonutBreakdown`; her sütun/dilim/lejant satırı filtreli listeye bağlantı) → `AdminListCard` (arama + hızlı
+süzgeç çipleri gerçek sayılarla + bilgi satırı; etkin süzgeç çipleri × ile) → `.adm-tbl` (yapışkan başlık, satır
+hover vurgusu, tutarlı satır yüksekliği, satır sonu eylem grubu + ⋮ menü). Dar kapta (`.adm-cq` container, 76 rem
+altı) eylem metinleri gizlenir (ikon + erişilebilir ad kalır), 70 rem altı ikincil sütun (`data-col`) kimlik hücresine
+geçer → 1366 px'te yatay kaydırma yok. 768 px altında satırlar karta dönüşür (`data-label` hücre etiketi; ikinci liste
+çizilmez). `HeroArt` türleri: office, users, invoice, support, shield, rocket, coins, ai, megaphone, pulse, layers, coupon
+(`ui/illustrations/hero-art.tsx`, token renkli, ≤4 KB gz, test).
+
 ## Tema sistemi (mod + vurgu)
 
 Dosyalar: `src/app/tokens.css` (ham skala + semantik takma adlar + `@theme`), `theme-dark.css` (yalnız koyu değerler),
@@ -367,6 +443,26 @@ ve `title` kalır). Tek sistem; ikinci sekme bileşeni yazma.
 - **İkonlar:** form sekmeleri `lib/icons.ts` `TAB_ICONS` sözlüğünden (aynı kavram = aynı ikon, formda çakışma yok; sözleşme testi).
 - **Dokunma hedefi** >=44px (`min-h-11`, ikon-only `2.75rem`); renkler yalnız token (Gece Altın dahil, açık/koyu).
 
+
+## Liste sayfası iskeleti (`src/components/ui/list-page.tsx`, 2026-10-07)
+
+/app LİSTE ekranlarının (19 sayfa: Müşteriler … Projeler) TEK yerleşimi; referans /admin "Tüm ofisler". Sıra:
+**hero → KPI şeridi → grafik satırı (0-2 kart) → bilgi kartları → araç çubuğu + çipler → tablo/kart/boş durum → sayfalama**.
+Hepsi sunucu bileşeni (istemci JS yok); stil `src/app/list-page.css` (`lp-*`), derinlik `viz.css`.
+
+- **`ListHero`** (`<ListPage hero={…}>` ya da ilk çocuk): eyebrow (vurgu rengi) + büyük başlık (tek h1) + tek cümle özet +
+  konu sahnesi `art` (`illustrations/hero-scenes.tsx`, 19 sahne: musteri, talep, portfoy, havuz, randevu, gorev, anlasma,
+  teklif, sozlesme, komisyon, onay, kiralama, aidat, gider, kampanya, otomasyon, ekip, belge, proje; token renkli, her biri
+  < 6 KB, `.ill-float` hareketi) + eylemler (sağda; < 1024 px alta sarar, < 640 px sahne gizlenir). Eski `PageHeader`
+  liste sayfalarında KULLANILMAZ (sözleşme `list-page.test.ts`).
+- **Grafik kartları** (~220 px, `ListCharts` satırı 1 kart = tam genişlik, 2 kart = yan yana): `DistributionCard` (DonutRing +
+  lejant: ad/sayı/yüzde; 6'dan çok dilim "Diğer"), `ColumnChartCard` (kategori ya da hafta/gün sütunu, `highlight` altın),
+  `FunnelCard` (FunnelChart). Kural: toplam 0 → kart `null` (sahte grafik yok); HER dilim/sütun/lejant satırı filtreli listeye
+  gider (`href` zorunlu; dilim bağlantısı fare kısayoludur, klavye yolu lejanttır). Sayımlar ya head-count ya kesilmemiş tarama:
+  tarama PostgREST 1000 tavanına dayandıysa grafik çizilmez. Haftalık kovalar `lib/ui/list-charts.ts` `weekBuckets` (UTC gün
+  sınırı = liste `from`/`to` filtresiyle aynı kural → sütun sayısı = açılan listenin sayısı).
+- **Tablo → kart (360 px):** kendi mobil listesi olmayan tablolar `TableFrame stack` + `TD primary` (kart başlığı) /
+  `TD label="…"` (hücre önü etiket) / `TD actions` (tam satır eylem) kullanır; başlık satırı gizlenir.
 
 ## Liste kiti (`src/components/ui/list-kit`)
 

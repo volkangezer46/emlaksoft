@@ -1,68 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { reportClientError } from "@/app/actions/report-error";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { RouteError, type RouteErrorBoundaryProps } from "@/components/ui/route-error";
 
-export default function AppError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
-  const headingRef = useRef<HTMLHeadingElement>(null);
-
-  useEffect(() => {
-    console.error("App route error:", error);
-    // Vercel loguna ek olarak DB'ye de yaz: log satirlari toplanmiyor ve
-    // aranamiyordu. Ayni hata tekrar gelirse yeni satir degil sayac artiyor.
-    void reportClientError({
-      message: error.message || "Bilinmeyen hata",
-      digest: error.digest,
-      stack: error.stack,
-      path: typeof window !== "undefined" ? window.location.pathname : undefined,
-    });
-  }, [error]);
-
-  useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
-
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto grid h-16 w-16 place-items-center rounded-[var(--radius-card)] bg-danger-500/10">
-          <AlertTriangle className="h-8 w-8 text-danger-500" />
-        </div>
-        <h2
-          ref={headingRef}
-          tabIndex={-1}
-          className="mt-4 font-display text-lg font-bold text-ink-950 outline-none"
-        >
-          Bu sayfa yüklenemedi
-        </h2>
-        <p className="mt-2 text-sm text-text-muted">
-          Beklenmeyen bir hata oluştu. Tekrar deneyebilir veya panele geri dönebilirsiniz.
-        </p>
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={reset}
-            className="inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            <RotateCcw className="h-4 w-4" /> Tekrar dene
-          </button>
-          {/* Hata sonrası sert gezinme bilerek (durum sıfırlanır); kök [...slug] rotası kuralı tetikler. */}
-          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-          <a
-            href="/app"
-            className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-300"
-          >
-            Panele dön
-          </a>
-        </div>
-      </div>
-    </div>
-  );
+/** /app genel hata sınırı: modülün kendi error.tsx'i yoksa burası çizer (kanonik görünüm `ui/route-error`). */
+export default function AppError(props: RouteErrorBoundaryProps) {
+  return <RouteError {...props} moduleName="Bu sayfa" title="Bu sayfa yüklenemedi" />;
 }

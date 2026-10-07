@@ -7,6 +7,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TICKET_LIMITS, isUuid } from "@/lib/support/ticket-contract";
 import type { ComboboxOption } from "@/components/ui/combobox";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type MacroEditResult = { ok?: boolean; error?: string };
 
@@ -44,7 +45,7 @@ export async function updateTicketMacro(formData: FormData): Promise<MacroEditRe
   const { data, error } = await admin.from("ticket_macros").update({ title, body }).eq("id", id).select("id").maybeSingle();
   if (error) {
     console.error("updateTicketMacro", error.message);
-    return { error: "Makro güncellenemedi." };
+    return { error: actionErrorMessage(error, "Makro güncellenemedi.") };
   }
   if (!data) return { error: "Makro bulunamadı." };
   await logPlatformActivity({ actorId: staff.id, action: "ticket.macro.update", entityType: "ticket_macro", entityId: id });

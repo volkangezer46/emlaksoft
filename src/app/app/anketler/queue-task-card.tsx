@@ -205,7 +205,7 @@ export function QueueTaskCard({
           <p className="text-xs font-semibold text-text-muted">Bu muhatabın telefonu kayıtlı değil. Öğrendiğiniz numarayı ekleyin.</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
             <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Ad soyad" aria-label="Muhatap adı" className={FIELD} maxLength={120} />
-            <PhoneInput value={contactPhone} onValueChange={setContactPhone} />
+            <PhoneInput aria-label="Ulaşılan telefon" value={contactPhone} onValueChange={setContactPhone} />
             <Button size="md" loading={pending} onClick={() => run(() => updateSurveyTaskContact(task.id, contactName, contactPhone))}>
               Kaydet
             </Button>

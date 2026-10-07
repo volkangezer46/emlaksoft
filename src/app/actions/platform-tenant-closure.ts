@@ -11,6 +11,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ClosureResult = { ok?: boolean; error?: string; message?: string };
 
@@ -104,7 +105,7 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
     return {
       error: plan.archive
         ? "Ofis arşivlendi ancak talep güncellenemedi. Aynı işlemi tekrarlayın."
-        : "Talep güncellenemedi.",
+        : actionErrorMessage(null, "Talep güncellenemedi."),
     };
   }
 

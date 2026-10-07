@@ -253,7 +253,7 @@ export function Customer360Tabs({
             <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink>
           </div>
           {demands.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={{ href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" }} />
           ) : (
             <div className="mt-4 space-y-3">
               {demands.map((d) => (
@@ -298,7 +298,7 @@ export function Customer360Tabs({
             </Link>
           </div>
           {deals.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={{ href: "/app/anlasmalar/yeni", label: "Anlaşma başlat" }} />
           ) : (
             <div className="mt-4 space-y-2">
               {deals.map((d) => (
@@ -332,7 +332,7 @@ export function Customer360Tabs({
             <Link href="/app/teklifler" className="text-xs font-semibold text-brand-600 hover:underline">Teklifler →</Link>
           </div>
           {offers.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." action={{ href: `/app/teklifler/yeni?musteri=${customerId}`, label: "Teklif oluştur" }} />
           ) : (
             <div className="mt-4 space-y-2">
               {offers.map((o) => (
@@ -370,7 +370,7 @@ export function Customer360Tabs({
             <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link>
           </div>
           {contracts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={{ href: `/app/sozlesmeler/yeni?customer=${customerId}`, label: "Sözleşme hazırla" }} />
           ) : (
             <div className="mt-4 space-y-2">
               {contracts.map((c) => (
@@ -405,7 +405,7 @@ export function Customer360Tabs({
             </Link>
           </div>
           {consents.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Kayıtlı ticari ileti izni yok." />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Kayıtlı ticari ileti izni yok." description="SMS veya e-posta kampanyası göndermeden önce İYS izni kaydedin." action={{ href: "/app/uyum", label: "İzin kaydet" }} />
           ) : (
             <div className="mt-4 space-y-2">
               {consents.map((c) => (
@@ -442,7 +442,7 @@ export function Customer360Tabs({
             <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink>
           </div>
           {appts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={{ href: `/app/randevular/yeni?customer=${customerId}`, label: "Randevu ver" }} />
           ) : (
             <div className="mt-4 space-y-2">
               {appts.map((a) => (

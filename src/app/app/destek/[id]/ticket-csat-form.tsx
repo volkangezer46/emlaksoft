@@ -48,7 +48,7 @@ export function TicketCsatForm({
             ))}
           </div>
         </fieldset>
-        <textarea name="comment" maxLength={1000} rows={3} placeholder="İsterseniz kısa bir yorum ekleyin…" className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs leading-relaxed outline-none focus:border-brand-400" />
+        <textarea aria-label="Değerlendirme yorumu" name="comment" maxLength={1000} rows={3} placeholder="İsterseniz kısa bir yorum ekleyin…" className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs leading-relaxed outline-none focus:border-brand-400" />
         <button type="submit" disabled={pending} className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-bold text-white disabled:opacity-60">{pending ? "Kaydediliyor…" : "Değerlendirmeyi gönder"}</button>
         {state.error ? <p className="text-xs font-semibold text-danger-600" role="alert">{state.error}</p> : null}
         {state.ok ? <p className="text-xs font-semibold text-mint-700" role="status">Teşekkürler, değerlendirmeniz kaydedildi.</p> : null}

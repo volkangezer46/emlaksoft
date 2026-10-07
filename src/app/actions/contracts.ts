@@ -20,6 +20,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { parseFixedPct, parseIncreaseBasis } from "@/lib/rental-contract/build";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
 function tenantStatusOf(rel: TenantStatusRel): string | null | undefined {
@@ -119,7 +120,7 @@ export async function createContract(
     if (rentalId && isMissingSchemaError(error)) {
       return { error: "Kiralamadan sözleşme için veritabanı güncellemesi henüz uygulanmamış." };
     }
-    return { error: "Sözleşme oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Sözleşme oluşturulamadı.") };
   }
 
   revalidatePath("/app/sozlesmeler");
@@ -148,13 +149,13 @@ async function updateContractDraftAtomic(input: {
   });
   if (error) {
     console.error("updateContractDraftAtomic", error);
-    return { error: "Sözleşme güncellenemedi." };
+    return { error: actionErrorMessage(error, "Sözleşme güncellenemedi.") };
   }
   const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
   if (outcome === "not_found") return { error: "Sözleşme bulunamadı." };
   if (outcome === "invalid_state") return { error: "Sadece taslak sözleşmeler düzenlenebilir." };
   if (outcome === "invalid_input") return { error: "Sözleşme içeriği veya başlığı geçersiz." };
-  if (outcome !== "applied" && outcome !== "replay") return { error: "Sözleşme güncellenemedi." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Sözleşme güncellenemedi.") };
   return { ok: true };
 }
 
@@ -274,7 +275,7 @@ export async function sendContractForSigning(
   if (outcome === "not_found") return { error: "Sözleşme bulunamadı." };
   if (outcome === "invalid_state") return { error: "Sadece taslak sözleşmeler imzaya gönderilebilir." };
   if (outcome === "expired") return { error: "Sözleşmenin son geçerlilik tarihi geçmiş; önce taslağı güncelleyin." };
-  if (outcome !== "applied") return { error: "Sözleşme imzaya gönderilemedi." };
+  if (outcome !== "applied") return { error: actionErrorMessage(null, "Sözleşme imzaya gönderilemedi.") };
   const insertedSigners = Array.isArray(transition?.signers)
     ? transition.signers.filter((value): value is { token: string; phone?: string; full_name: string } => {
         if (!value || typeof value !== "object") return false;
@@ -372,7 +373,7 @@ export async function signContractByToken(
   );
   if (transitionError) {
     console.error("signContractByToken atomic", { code: transitionError.code });
-    return { error: "İmza kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(transitionError, "İmza kaydedilemedi. Lütfen tekrar deneyin.") };
   }
   const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
     ? transitionData as Record<string, unknown>
@@ -495,7 +496,7 @@ export async function requestSignatureOtp(
   });
   if (upError) {
     console.error("requestSignatureOtp atomic", { code: upError.code });
-    return { error: "Doğrulama kodu oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(upError, "Doğrulama kodu oluşturulamadı. Lütfen tekrar deneyin.") };
   }
   const otpOutcome = String((otpData as { outcome?: string } | null)?.outcome ?? "");
   if (otpOutcome === "expired") return { error: "Bu imza linkinin geçerlilik süresi dolmuştur." };
@@ -510,7 +511,7 @@ export async function requestSignatureOtp(
   );
   if (!res.ok) {
     console.error("requestSignatureOtp sms", res.error);
-    return { error: "Doğrulama SMS'i gönderilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(null, "Doğrulama SMS'i gönderilemedi. Lütfen tekrar deneyin.") };
   }
 
   return { ok: true };
@@ -593,7 +594,7 @@ export async function verifySignatureOtp(
       .maybeSingle();
     if (consumeError) {
       console.error("verifySignatureOtp attempt consume", { code: consumeError.code });
-      return { error: "Doğrulama kaydedilemedi. Lütfen tekrar deneyin." };
+      return { error: actionErrorMessage(consumeError, "Doğrulama kaydedilemedi. Lütfen tekrar deneyin.") };
     }
     if (!consumed) {
       return { error: "Kod durumu değişti. Lütfen yeniden deneyin veya yeni kod isteyin." };
@@ -623,7 +624,7 @@ export async function verifySignatureOtp(
     .select("id")
     .maybeSingle();
 
-  if (upError) return { error: "Doğrulama kaydedilemedi. Lütfen tekrar deneyin." };
+  if (upError) return { error: actionErrorMessage(upError, "Doğrulama kaydedilemedi. Lütfen tekrar deneyin.") };
   if (!verified) {
     return { error: "Kod durumu değişti. Lütfen yeniden deneyin veya yeni kod isteyin." };
   }
@@ -648,7 +649,7 @@ export async function cancelContract(id: string): Promise<ContractResult> {
   });
   if (error) {
     console.error("cancelContract atomic", { code: error.code });
-    return { error: "Sözleşme iptal edilemedi." };
+    return { error: actionErrorMessage(error, "Sözleşme iptal edilemedi.") };
   }
   const result = data && typeof data === "object" && !Array.isArray(data)
     ? data as Record<string, unknown>
@@ -659,7 +660,7 @@ export async function cancelContract(id: string): Promise<ContractResult> {
     return { error: "İmzalanmış veya reddedilmiş sözleşme iptal edilemez." };
   }
   if (outcome !== "applied" && outcome !== "replay") {
-    return { error: "Sözleşme iptal edilemedi." };
+    return { error: actionErrorMessage(null, "Sözleşme iptal edilemedi.") };
   }
 
   revalidatePath("/app/sozlesmeler");
@@ -731,7 +732,7 @@ export async function saveContractTemplate(
     .select("id")
     .single();
 
-  if (error || !data) return { error: "Şablon kaydedilemedi." };
+  if (error || !data) return { error: actionErrorMessage(error, "Şablon kaydedilemedi.") };
 
   revalidatePath("/app/sozlesmeler");
   return { ok: true, id: data.id };

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarRange, Receipt, X } from "lucide-react";
+import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
@@ -17,7 +17,9 @@ import { ExpensesTable } from "./expenses-table";
 import { ExpenseCreateForm } from "./expense-create-form";
 import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-receipts";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
+import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
+import { ButtonLink } from "@/components/ui/button";
 // Inline server action wrappers — void return için form action uyumlu
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -181,38 +183,33 @@ export default async function GiderlerPage({
     : null;
   const portfoyLabel = pickedProperty ? (pickedProperty.property_code ?? pickedProperty.title ?? "Portföy") : null;
 
+  // KPI şeridi: kayıt + seçili aralık toplamı (RPC) + bu ay; her kart filtreli listeye gider.
+  const kpis: KpiItem[] = [
+    { label: "Gider kaydı", value: aggregate.record_count, icon: <Receipt />, tone: "info", href: "/app/giderler", hint: fromF || toF ? "seçili aralık" : "tüm kayıtlar" },
+    { label: "Toplam gider", value: money(total), icon: <Wallet />, tone: "warning", href: href({ kategori: null }), hint: fromF || toF ? "seçili aralık" : "tüm zamanlar" },
+    { label: "Bu ay", value: money(buAyTutar), icon: <CalendarRange />, tone: "neutral", href: href({ from: presets[0]!.from, to: presets[0]!.to }), hint: buAyLabel },
+  ];
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="Masraf & Giderler" eyebrow="Gider takibi" description="Ofis giderlerini kategorilere göre takip edin." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
-            <ExportCsvButton
-              action={exportExpensesCsv}
-              label="Dışa aktar"
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/12 bg-white/8 px-3.5 py-2.5 text-sm font-semibold text-white/80 backdrop-blur transition hover:border-white/30 hover:text-white disabled:opacity-50"
-            />
-            {/* KPI kartları tüm filtreleri temizleyip tam listeye döner */}
-            <Link
-              href="/app/giderler"
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
-            >
-              <p className="flex items-center justify-center gap-1 font-display text-2xl font-extrabold text-white">
-                {aggregate.record_count}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/70">Kayıt</p>
-            </Link>
-            <Link
-              href="/app/giderler"
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
-            >
-              <p className="flex items-center justify-center gap-1 font-display text-xl font-extrabold text-white">
-                {money(total)}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/70">Toplam gider</p>
-            </Link>
-          </div></div>
-} />
+    <ListPage>
+      <ListHero
+        eyebrow="Gider takibi"
+        art="gider"
+        title="Masraf & Giderler"
+        description="Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
+        actions={
+          <>
+            <ExportCsvButton action={exportExpensesCsv} label="Dışa aktar" />
+            {canCreate ? (
+              <ButtonLink href="#gider-ekle" icon={Plus}>
+                Yeni gider
+              </ButtonLink>
+            ) : null}
+          </>
+        }
+      />
+
+      <KpiStrip items={kpis} />
 
       {/* Tarih aralığı filtresi — GET formu (?from=&to=) + hızlı çipler; ?kategori= korunur */}
       <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
@@ -373,8 +370,8 @@ export default async function GiderlerPage({
 
       {/* Yeni gider formu */}
       {canCreate && (
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-          <h2 className="mb-4 font-display font-bold text-text">Yeni Gider Ekle</h2>
+        <section id="gider-ekle" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+          <h2 className="mb-4 font-display font-bold text-text">Yeni gider ekle</h2>
           <ExpenseCreateForm
             categories={categories}
             defaultDate={new Date(nowMs()).toISOString().slice(0, 10)}
@@ -434,6 +431,7 @@ export default async function GiderlerPage({
             title="Henüz gider kaydı yok"
             description="Ofis giderlerinizi kategorilere göre ekleyin. Kayıtlar burada listelenir."
             tone="amber"
+            action={canCreate ? { href: "#gider-ekle", label: "İlk gideri ekle" } : { href: "/app/raporlar", label: "Raporlara git" }}
           />
         )
       ) : (
@@ -455,6 +453,6 @@ export default async function GiderlerPage({
           </Link>
         </div>
       ) : null}
-    </div>
+    </ListPage>
   );
 }

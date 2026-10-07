@@ -13,6 +13,7 @@ import {
   validateWebhookUrl,
 } from "@/lib/integrations-api/core";
 import { postWebhook, webhookSigningSecret } from "@/lib/integrations-api/webhooks";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const PATH = "/app/ayarlar/api-webhook";
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -40,13 +41,13 @@ export async function createApiKey(_prev: IntegrationResult, formData: FormData)
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", gate.tenantId)
     .is("revoked_at", null);
-  if (countError) return { error: missing(countError) ? NOT_READY : "Anahtarlar okunamadı." };
+  if (countError) return { error: missing(countError) ? NOT_READY : actionErrorMessage(countError, "Anahtarlar okunamadı.") };
   if ((count ?? 0) >= MAX_KEYS) return { error: `En çok ${MAX_KEYS} etkin anahtar olabilir; kullanılmayanı iptal edin.` };
   const { key, prefix } = generateApiKey();
   const { error } = await supabase
     .from("api_keys")
     .insert({ tenant_id: gate.tenantId, name, key_prefix: prefix, key_hash: hashApiKey(key), scopes, created_by: gate.userId });
-  if (error) return { error: missing(error) ? NOT_READY : "Anahtar oluşturulamadı." };
+  if (error) return { error: missing(error) ? NOT_READY : actionErrorMessage(error, "Anahtar oluşturulamadı.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "api_key.create", entityType: "api_key", newValue: { prefix, scopes } });
   revalidatePath(PATH);
   return { ok: true, key };
@@ -64,7 +65,7 @@ export async function revokeApiKey(formData: FormData): Promise<IntegrationResul
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .is("revoked_at", null);
-  if (error) return { error: "Anahtar iptal edilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Anahtar iptal edilemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "api_key.revoke", entityType: "api_key", entityId: id });
   revalidatePath(PATH);
   return { ok: true };
@@ -83,10 +84,10 @@ export async function createWebhookEndpoint(_prev: IntegrationResult, formData: 
     .from("webhook_endpoints")
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", gate.tenantId);
-  if (countError) return { error: missing(countError) ? NOT_READY : "Uçlar okunamadı." };
+  if (countError) return { error: missing(countError) ? NOT_READY : actionErrorMessage(countError, "Uçlar okunamadı.") };
   if ((count ?? 0) >= MAX_ENDPOINTS) return { error: `En çok ${MAX_ENDPOINTS} webhook adresi tanımlanabilir.` };
   const { error } = await supabase.from("webhook_endpoints").insert({ tenant_id: gate.tenantId, url: url.url, events, created_by: gate.userId });
-  if (error) return { error: missing(error) ? NOT_READY : "Webhook eklenemedi." };
+  if (error) return { error: missing(error) ? NOT_READY : actionErrorMessage(error, "Webhook eklenemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "webhook.create", entityType: "webhook_endpoint", newValue: { host: new URL(url.url).host, events } });
   revalidatePath(PATH);
   return { ok: true };
@@ -104,7 +105,7 @@ export async function setWebhookActive(formData: FormData): Promise<IntegrationR
     .update({ active, failure_count: 0, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Webhook güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Webhook güncellenemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: active ? "webhook.activate" : "webhook.deactivate", entityType: "webhook_endpoint", entityId: id });
   revalidatePath(PATH);
   return { ok: true };
@@ -117,7 +118,7 @@ export async function deleteWebhookEndpoint(formData: FormData): Promise<Integra
   if (!UUID.test(id)) return { error: "Webhook bulunamadı." };
   const supabase = await createClient();
   const { error } = await supabase.from("webhook_endpoints").delete().eq("id", id).eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Webhook silinemedi." };
+  if (error) return { error: actionErrorMessage(error, "Webhook silinemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "webhook.delete", entityType: "webhook_endpoint", entityId: id });
   revalidatePath(PATH);
   return { ok: true };
@@ -143,7 +144,7 @@ export async function revealWebhookSecret(formData: FormData): Promise<Integrati
       .update({ secret_version: version, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("tenant_id", gate.tenantId);
-    if (error) return { error: "İmza anahtarı yenilenemedi." };
+    if (error) return { error: actionErrorMessage(error, "İmza anahtarı yenilenemedi.") };
   }
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: rotate ? "webhook.secret_rotate" : "webhook.secret_reveal", entityType: "webhook_endpoint", entityId: id });
   if (rotate) revalidatePath(PATH);

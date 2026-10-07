@@ -16,8 +16,9 @@ import {
 } from "@/lib/impersonation";
 import { logActivity } from "@/lib/activity";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
+import { actionErrorMessage } from "@/lib/action-errors";
 
-export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string };
+export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string; code?: "stale" };
 
 const PLANS = ["advisor", "office", "professional", "business", "enterprise"] as const;
 const STATUSES = ["trial", "active", "past_due", "suspended", "cancelled"] as const;
@@ -35,6 +36,17 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
   if (!plan && !status) return { ok: true };
 
   const admin = createAdminClient();
+  // İsteğe bağlı iyimser eşzamanlılık (satır içi kaydetme standardı): satır, okunduğu sürümden (`updated_at`)
+  // sonra başkası tarafından değiştiyse yazmadan "bayat" döner. Alan gönderilmezse eski davranış aynen sürer.
+  const expectedUpdatedAt = String(formData.get("expected_updated_at") ?? "").trim();
+  if (expectedUpdatedAt) {
+    const { data: current, error: readError } = await admin.from("tenants").select("updated_at").eq("id", id).maybeSingle();
+    if (readError || !current) return { error: "Tenant bulunamadı." };
+    const currentMs = Date.parse(String(current.updated_at ?? ""));
+    if (Number.isFinite(currentMs) && currentMs !== Date.parse(expectedUpdatedAt)) {
+      return { error: "Bu satır başkası tarafından güncellendi. Yenileyip tekrar deneyin.", code: "stale" };
+    }
+  }
   const { data, error } = await admin.rpc("update_tenant_plan_subscription", {
     p_tenant_id: id,
     p_actor_id: staff.id,
@@ -48,7 +60,7 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
         planLimitErrorMessage(error) ??
         (error.code === "PGRST202"
           ? "Abonelik güncelleme servisi henüz hazır değil. Veritabanı migration'ını uygulayın."
-          : "Tenant ve abonelik güncellenemedi."),
+          : actionErrorMessage(null, "Tenant ve abonelik güncellenemedi.")),
     };
   }
 

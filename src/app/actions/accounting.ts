@@ -10,6 +10,7 @@ import {
   parseWholesaleTl,
   serializeEfWholesale,
 } from "@/lib/accounting/ef-economics";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AccountingOpResult = { ok?: boolean; error?: string; notice?: string };
 
@@ -38,7 +39,7 @@ export async function saveEfWholesale(formData: FormData): Promise<AccountingOpR
   }
 
   const ok = await setPlatformSetting(EF_WHOLESALE_SETTING_KEY, serializeEfWholesale(next), g.staff.id);
-  if (!ok) return { error: "Maliyet kaydedilemedi." };
+  if (!ok) return { error: actionErrorMessage(null, "Maliyet kaydedilemedi.") };
 
   await logPlatformActivity({
     actorId: g.staff.id,

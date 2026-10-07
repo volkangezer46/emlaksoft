@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { publishBlockReason } from "@/lib/property-owner/server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const MANUAL_STATUSES = ["draft", "live", "reserved", "passive", "withdrawn", "archived"] as const;
 
@@ -74,13 +75,13 @@ export async function bulkUpdatePropertyStatus(
     p_status: newStatus,
     p_reason: "Toplu güncelleme",
   });
-  if (error) return { error: "Güncelleme başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Güncelleme başarısız.") };
   const result = data as { outcome?: string; updated_count?: number } | null;
   if (result?.outcome === "not_found") return { error: "Seçilen portföylerden biri bulunamadı." };
   if (result?.outcome === "terminal_requires_workflow") {
     return { error: "Satılmış veya kiralanmış portföy yalnız ilgili anlaşma/kiralama iş akışından yeniden açılabilir." };
   }
-  if (result?.outcome !== "applied" && result?.outcome !== "replay") return { error: "Güncelleme başarısız." };
+  if (result?.outcome !== "applied" && result?.outcome !== "replay") return { error: actionErrorMessage(null, "Güncelleme başarısız.") };
 
   revalidatePath("/app/portfoyler");
   revalidateTenantData(gate.tenantId);

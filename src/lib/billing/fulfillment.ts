@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import { ActionUserError } from "@/lib/action-errors";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
 import { TRY_RPC } from "@/lib/try-credits/config";
@@ -367,7 +368,7 @@ export async function createCheckoutInvoice(input: {
       .eq("id", invoiceId)
       .eq("tenant_id", input.tenantId)
       .eq("status", "draft");
-    throw new Error(applied.error);
+    throw new ActionUserError(applied.error);
   }
   return { invoiceId, totalTry: amounts.totalTry, credit: applied.applied };
 }
@@ -440,7 +441,7 @@ export async function assertBillingPlanPreflight(tenantId: string, plan: PlanId)
       branches: "aktif şube",
     };
     const detail = labels.map((label) => labelMap[label] ?? label).join(", ");
-    throw new Error(
+    throw new ActionUserError(
       detail
         ? `Bu pakete geçmeden önce kapasite aşımını giderin: ${detail}.`
         : "Seçilen paket mevcut kullanımı karşılamıyor.",

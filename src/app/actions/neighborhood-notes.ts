@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { isMissingTableError, isUuid, validateNoteInput } from "@/lib/neighborhood-notes/notes";
 import { getNeighborhood } from "@/lib/geo/reader";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Mahalle notu (F5) yazma eylemleri. Notlar ofis içidir: kiracı kimliği oturumdan gelir, RLS ikinci kapıdır.
@@ -39,7 +40,7 @@ export async function createNeighborhoodNote(input: {
   if (error) {
     return {
       ok: false,
-      error: isMissingTableError(error) ? "Mahalle notları bu ortamda henüz etkin değil." : "Not kaydedilemedi. Lütfen tekrar deneyin.",
+      error: isMissingTableError(error) ? "Mahalle notları bu ortamda henüz etkin değil." : actionErrorMessage(null, "Not kaydedilemedi. Lütfen tekrar deneyin."),
     };
   }
   revalidatePath("/app/mahalle-notlari");
@@ -58,7 +59,7 @@ export async function deleteNeighborhoodNote(id: string): Promise<NoteActionResu
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null);
-  if (error) return { ok: false, error: "Not silinemedi. Lütfen tekrar deneyin." };
+  if (error) return { ok: false, error: actionErrorMessage(error, "Not silinemedi. Lütfen tekrar deneyin.") };
   revalidatePath("/app/mahalle-notlari");
   return { ok: true };
 }

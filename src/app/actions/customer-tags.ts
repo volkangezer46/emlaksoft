@@ -14,6 +14,7 @@ import {
   rewriteTagList,
   tagKey,
 } from "@/lib/customer-tags-logic";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Etiket yönetimi (ayarlar/etiketler): ofis genelinde listele, yeniden adlandır (mevcutsa birleştir), kaldır.
@@ -70,7 +71,7 @@ async function rewriteTag(from: string, to: string | null): Promise<TagManageRes
     .limit(TAG_MANAGE_LIMIT);
   if (error) {
     console.error("rewriteTag load", error);
-    return { error: "Etiketler yüklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Etiketler yüklenemedi. Lütfen tekrar deneyin.") };
   }
   // Parçalı toplu güncelleme: değişecek müşteriler hesaplanır, TAG_UPDATE_CHUNK'lık dilimlerle paralel yazılır.
   // Bir dilimdeki hata diğerlerini durdurmaz; sonda kaç müşterinin güncellendiği/başarısız olduğu raporlanır.

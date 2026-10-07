@@ -8,6 +8,7 @@ import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { parseEidsPropertyNo } from "@/lib/eids/property-no";
 import { shortAuthorityWarning } from "@/lib/eids/authority-term";
 import { now } from "@/lib/clock";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PropertyActionResult = { ok?: boolean; error?: string; warning?: string };
 
@@ -86,7 +87,7 @@ export async function updatePropertyAuthorization(
       .eq("tenant_id", gate.tenantId));
   }
 
-  if (error) return { error: "Yetki belgesi güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Yetki belgesi güncellenemedi.") };
 
   // Yalnız tarih gerçekten uzatıldıysa (önceki bitiş vardı ve yenisi daha ileri). Hata asıl işlemi etkilemez.
   await queueAuthorityExtensionSurvey(supabase, gate.tenantId, propertyId, (before?.authorization_end as string | null) ?? null, data.authEnd || null);

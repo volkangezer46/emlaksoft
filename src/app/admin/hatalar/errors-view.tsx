@@ -133,6 +133,7 @@ export async function ErrorsView({
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="pulse"
         eyebrow="Üretim izleme"
         icon={Bug}
         title="Hatalar"

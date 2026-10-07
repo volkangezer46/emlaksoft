@@ -11,6 +11,7 @@ import { isPoolMode } from "@/lib/pool/modes";
 import { notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
 import { computeSuggestions, loadPoolRule, toPoolProperty } from "@/lib/pool/server";
 import { toStoredSuggestions } from "@/lib/pool/score";
+import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
 
 export type PoolActionResult = { ok?: boolean; error?: string };
 
@@ -37,8 +38,8 @@ function revalidatePool(tenantId: string, propertyId?: string) {
 
 /** RPC'nin kendi (Türkçe, kullanıcıya dönük) hata iletilerini geçirir; diğerlerini genelleştirir. */
 function rpcMessage(error: { code?: string; message?: string }): string {
-  if (["22023", "42501", "P0002"].includes(String(error.code)) && error.message) return error.message;
-  return "Atama yapılamadı. Lütfen tekrar deneyin.";
+  return sqlRaiseMessage(error, ["22023", "42501", "P0002"]) ??
+    actionErrorMessage(error, "Atama yapılamadı. Lütfen tekrar deneyin.");
 }
 
 async function loadEntry(entryId: string, tenantId: string): Promise<EntryRow | null> {
@@ -152,7 +153,7 @@ export async function skipPoolEntry(entryId: string, reason: string): Promise<Po
     .eq("tenant_id", gate.tenantId)
     .eq("status", "pending")
     .select("id");
-  if (error || !data?.length) return { error: "Kayıt güncellenemedi." };
+  if (error || !data?.length) return { error: actionErrorMessage(error, "Kayıt güncellenemedi.") };
   await supabase.from("listing_pool_events").insert({
     tenant_id: gate.tenantId,
     entry_id: entryId,
@@ -185,7 +186,7 @@ export async function refreshPoolSuggestions(entryId: string): Promise<PoolActio
     .eq("id", entryId)
     .eq("tenant_id", gate.tenantId)
     .eq("status", "pending");
-  if (error) return { error: "Öneriler güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Öneriler güncellenemedi.") };
   await supabase.from("listing_pool_events").insert({
     tenant_id: gate.tenantId,
     entry_id: entryId,
@@ -219,7 +220,7 @@ export async function openPoolClaimWindow(entryId: string): Promise<PoolActionRe
     .eq("tenant_id", gate.tenantId)
     .eq("status", "pending")
     .select("id");
-  if (error || !data?.length) return { error: "Sahiplenme açılamadı." };
+  if (error || !data?.length) return { error: actionErrorMessage(error, "Sahiplenme açılamadı.") };
   await supabase.from("listing_pool_events").insert({
     tenant_id: gate.tenantId,
     entry_id: entryId,
@@ -287,7 +288,7 @@ export async function saveListingPoolSettings(formData: FormData): Promise<PoolA
       ).error;
   if (ruleError) {
     console.error("saveListingPoolSettings", { code: ruleError.code });
-    return { error: "Atama kuralı kaydedilemedi." };
+    return { error: actionErrorMessage(ruleError, "Atama kuralı kaydedilemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,

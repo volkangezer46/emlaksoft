@@ -151,7 +151,7 @@ export function AppSidebar({
           aria-current={active ? "page" : undefined}
           title={item.description ? `${item.label} — ${item.description}` : item.label}
           onClick={() => setOpen(false)}
-          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 ${
+          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 touch:min-h-11 ${
             badge ? "pr-16" : "pr-9"
           } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
         >
@@ -177,7 +177,7 @@ export function AppSidebar({
             aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
             title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
             onClick={() => pinStore.write(togglePin(pinStore.read(), item.href))}
-            className={`nav-pin focus-ring absolute top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white ${
+            className={`nav-pin focus-ring absolute top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white ${
               badge ? "right-9" : "right-1"
             }`}
           >
@@ -215,7 +215,7 @@ export function AppSidebar({
           aria-expanded={opts.expanded}
           aria-controls={`sb-${id}`}
           title={title}
-          className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
+          className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
         >
           <span className="min-w-0 truncate">{title}</span>
           <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Referans (tavsiye) programı — panel action'ları (/app/tavsiyeler).
@@ -115,7 +116,7 @@ export async function createReferralLink(fd: FormData): Promise<ReferralLinkResu
 
   if (error) {
     console.error("createReferralLink", error);
-    return { error: "Tavsiye linki oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Tavsiye linki oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -153,7 +154,7 @@ export async function toggleReferralLink(fd: FormData): Promise<ReferralResult> 
       return { error: "Bu müşterinin başka bir aktif linki var. Önce onu kapatın." };
     }
     console.error("toggleReferralLink", error);
-    return { error: "Link durumu güncellenemedi." };
+    return { error: actionErrorMessage(error, "Link durumu güncellenemedi.") };
   }
 
   await logActivity({
@@ -189,7 +190,7 @@ export async function setReferralStatus(fd: FormData): Promise<ReferralResult> {
 
   if (error) {
     console.error("setReferralStatus", error);
-    return { error: "Durum güncellenemedi." };
+    return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   }
   if (!data) return { error: "Tavsiye bulunamadı." };
 
@@ -242,7 +243,7 @@ export async function addReferralNote(fd: FormData): Promise<ReferralResult> {
 
   if (error) {
     console.error("addReferralNote", error);
-    return { error: "Not eklenemedi." };
+    return { error: actionErrorMessage(error, "Not eklenemedi.") };
   }
 
   await logActivity({
@@ -345,7 +346,7 @@ export async function convertReferralToCustomer(fd: FormData): Promise<ReferralC
 
     if (error) {
       console.error("convertReferralToCustomer insert", error);
-      return { error: "Müşteri kaydı oluşturulamadı. Lütfen tekrar deneyin." };
+      return { error: actionErrorMessage(error, "Müşteri kaydı oluşturulamadı. Lütfen tekrar deneyin.") };
     }
     customerId = String(created.id);
   }

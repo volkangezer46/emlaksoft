@@ -14,6 +14,7 @@ import { validateNewPassword } from "@/lib/account/password-rules";
 import { emailSchema } from "@/lib/validation/contact";
 import { getBaseUrl } from "@/lib/base-url";
 import { maskEmail } from "@/lib/account/email-change";
+import { SESSION_EXPIRED_MESSAGE, actionErrorMessage } from "@/lib/action-errors";
 
 export type AccountResult = { ok?: boolean; error?: string; message?: string };
 
@@ -68,7 +69,7 @@ export async function updateMyProfile(_prev: AccountResult, formData: FormData):
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("updateMyProfile", error.message);
-    return { error: "Profil güncellenemedi." };
+    return { error: actionErrorMessage(error, "Profil güncellenemedi.") };
   }
   const { error: metaError } = await admin.auth.admin.updateUserById(gate.userId, {
     user_metadata: { full_name: fullName, phone: phone ?? "" },
@@ -115,7 +116,7 @@ export async function changeMyPassword(_prev: AccountResult, formData: FormData)
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email || user.id !== gate.userId) return { error: "Oturum doğrulanamadı." };
+  if (!user?.email || user.id !== gate.userId) return { error: SESSION_EXPIRED_MESSAGE };
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = resolveSupabasePublicKey();
@@ -161,7 +162,7 @@ export async function signOutOtherDevices(_prev: AccountResult, _formData: FormD
   const { error } = await supabase.auth.signOut({ scope: "others" });
   if (error) {
     console.error("signOutOtherDevices", error.message);
-    return { error: "Diğer oturumlar kapatılamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Diğer oturumlar kapatılamadı. Lütfen tekrar deneyin.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -200,7 +201,7 @@ export async function requestMyEmailChange(_prev: AccountResult, formData: FormD
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email || user.id !== gate.userId) return { error: "Oturum doğrulanamadı." };
+  if (!user?.email || user.id !== gate.userId) return { error: SESSION_EXPIRED_MESSAGE };
   if (user.email.toLowerCase() === newEmail) return { error: "Bu zaten mevcut e-posta adresiniz." };
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

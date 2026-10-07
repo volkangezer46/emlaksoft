@@ -11,12 +11,12 @@ import {
   Copy,
   Percent,
   PiggyBank,
-  Printer,
   Sparkles,
   TrendingUp,
   Wallet,
 } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";
+import { PrintButton } from "@/components/ui/print-button";
 import { AreaTrend, BarCompare, ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { useToast } from "@/components/app/toast-provider";
 import { convertTry, formatFx } from "@/lib/fx";
@@ -810,13 +810,7 @@ export function InvestmentAnalyzer({
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied ? "Kopyalandı" : "Müşteriye gönder"}
             </button>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="focus-ring press inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-4 py-3 text-sm font-bold text-ink-950 transition hover:border-line-strong"
-            >
-              <Printer className="h-4 w-4" /> Yazdır
-            </button>
+            <PrintButton tone="outline" label="Yazdır" className="justify-center bg-canvas py-3 font-bold text-ink-950 hover:border-line-strong hover:text-ink-950" />
           </div>
           <p className="no-print mt-2 text-center text-xs text-text-faint">
             Link bu analizin tüm parametrelerini taşır — müşteri açtığında aynı sonucu görür.

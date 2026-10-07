@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ContractTemplateResult = { ok?: boolean; error?: string; id?: string };
 
@@ -40,7 +41,7 @@ export async function createContractTemplate(
     .single();
   if (error || !data) {
     if (error) console.error("createContractTemplate", error);
-    return { error: "Şablon kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Şablon kaydedilemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -83,7 +84,7 @@ export async function updateContractTemplate(
     .maybeSingle();
   if (error) {
     console.error("updateContractTemplate", error);
-    return { error: "Şablon güncellenemedi." };
+    return { error: actionErrorMessage(error, "Şablon güncellenemedi.") };
   }
   if (!data) return { error: "Şablon bulunamadı (hazır şablonlar değiştirilemez)." };
 
@@ -115,7 +116,7 @@ export async function setContractTemplateActive(id: string, active: boolean): Pr
     .maybeSingle();
   if (error) {
     console.error("setContractTemplateActive", error);
-    return { error: "Şablon durumu güncellenemedi." };
+    return { error: actionErrorMessage(error, "Şablon durumu güncellenemedi.") };
   }
   if (!data) return { error: "Şablon bulunamadı." };
 
@@ -146,7 +147,7 @@ export async function deleteContractTemplate(id: string): Promise<ContractTempla
     .maybeSingle();
   if (error) {
     console.error("deleteContractTemplate", error);
-    return { error: "Şablon silinemedi." };
+    return { error: actionErrorMessage(error, "Şablon silinemedi.") };
   }
   if (!data) return { error: "Şablon bulunamadı." };
 

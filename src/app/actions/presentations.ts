@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PresentationResult = { error?: string; ok?: boolean; id?: string; url?: string };
 
@@ -97,7 +98,7 @@ export async function createPresentation(formData: FormData): Promise<Presentati
 
   if (error || !data) {
     console.error("createPresentation", error);
-    return { error: "Sunum oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Sunum oluşturulamadı.") };
   }
 
   await logActivity({
@@ -131,7 +132,7 @@ export async function deletePresentation(formData: FormData): Promise<Presentati
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deletePresentation", error);
-    return { error: "Sunum silinemedi." };
+    return { error: actionErrorMessage(error, "Sunum silinemedi.") };
   }
 
   await logActivity({

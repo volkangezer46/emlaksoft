@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlarmClock, CalendarX2, FileSignature, PenLine, Plus, Search, Send } from "lucide-react";
+import { AlarmClock, BarChart3, CalendarX2, FileSignature, PenLine, PieChart, Plus, Search, Send } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { ButtonLink } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportContractsCsv } from "@/app/actions/export";
@@ -47,6 +47,15 @@ import {
 export const metadata = { title: "Sözleşmeler" };
 
 const PATH = "/app/sozlesmeler";
+
+/** İmza durumu dilim rengi (viz token). */
+const CONTRACT_SLICE_COLOR: Record<string, string> = {
+  draft: "var(--viz-neutral)",
+  sent: "var(--viz-5)",
+  signed: "var(--viz-pos)",
+  rejected: "var(--viz-neg)",
+  cancelled: "var(--viz-8)",
+};
 
 function relativeDate(iso: string) {
   const d = Math.floor(msSince(iso) / DAY_MS);
@@ -259,8 +268,9 @@ export default async function SozlesmelerPage({
   ]);
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="sozlesme"
         eyebrow="Sözleşmeler"
         title="Sözleşme & E-İmza"
         description="Kira, satış ve diğer sözleşme taslakları oluşturun. İmza linki ile dijital onay alın."
@@ -283,6 +293,33 @@ export default async function SozlesmelerPage({
       ) : (
         <>
           <KpiStrip items={kpis} />
+
+          {/* İmza durumu + sözleşme türü (gerçek sayımlar; tür taraması PostgREST 1000 tavanına dayandıysa çizilmez) */}
+          <ListCharts>
+            <DistributionCard
+              title="İmza durumu"
+              subtitle="Tüm sözleşmelerin durumu"
+              icon={PieChart}
+              tone="success"
+              href={PATH}
+              centerLabel="sözleşme"
+              slices={statusKeys.map((k) => ({
+                label: CONTRACT_STATUS_LABELS[k] ?? k,
+                value: statusCounts[k] ?? 0,
+                color: CONTRACT_SLICE_COLOR[k],
+                href: `${PATH}?durum=${k}`,
+              }))}
+            />
+            {typeCounts && scanRows.length < 1000 ? (
+              <ColumnChartCard
+                title="Sözleşme türü"
+                subtitle="Kira, satış ve diğer türler"
+                icon={BarChart3}
+                href={PATH}
+                bars={Object.entries(CONTRACT_TYPE_LABELS).map(([value, label]) => ({ label, value: typeCounts[value] ?? 0, href: `${PATH}?tip=${value}` }))}
+              />
+            ) : null}
+          </ListCharts>
 
           <ListToolbar
             pathname={PATH}
@@ -377,6 +414,6 @@ export default async function SozlesmelerPage({
           Tüm imzalayanlar onayladığında sözleşme tamamlanır.
         </p>
       </section>
-    </div>
+    </ListPage>
   );
 }

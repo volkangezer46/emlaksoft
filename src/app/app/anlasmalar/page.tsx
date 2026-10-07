@@ -8,6 +8,7 @@ import {
   KanbanSquare,
   List,
   Percent,
+  PieChart,
   Plus,
   Search,
   Target,
@@ -36,7 +37,7 @@ import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { relatedSearchClause } from "@/lib/list-search";
 import { buildHref } from "@/lib/ui/filter-params";
-import { PageHeader } from "@/components/ui/page-header";
+import { DistributionCard, FunnelCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { MoneyValue } from "@/components/ui/money-value";
 import {
@@ -434,13 +435,16 @@ export default async function DealsPage({
   const wonTrendTotal = wonByMonth.reduce((s, m) => s + m.value, 0);
 
   const chipParams = { ...urlParams, gorunum: "liste" };
+  // Grafik bağlantıları danışman süzgecini taşır (yalnız ofis geneli kapsamda anlamlı; diğerinde kapsam zaten kişinin kendisi).
+  const dq = officeWide && danismanF ? `&danisman=${danismanF}` : "";
 
   return (
-    <div className="space-y-5">
+    <ListPage>
       <ReferralNudge moment="first_deal" show={(realWonRes.count ?? 0) >= 1} />
-      <PageHeader
+      <ListHero
         title="Anlaşma tahtası"
         eyebrow="Anlaşma hattı"
+        art="anlasma"
         meta={<ScopeBadge text={listScope.badge} />}
         description={`${stageLabels.new.label} → ${stageLabels.qualified.label} → ${stageLabels.negotiation.label} → ${stageLabels.won.label}/${stageLabels.lost.label}. Kazanıldığında komisyon otomatik üretilir.`}
         actions={
@@ -468,6 +472,36 @@ export default async function DealsPage({
       ) : (
         <>
           <KpiStrip items={kpis} />
+
+          {/* Liste görünümünde aşama hunisi + sonuç dağılımı (gerçek sayımlar). Pano görünümünün kendi hunisi var (#huni). */}
+          {gorunum === "liste" ? (
+            <ListCharts>
+              <FunnelCard
+                title="Aşama hunisi"
+                subtitle="Her aşamadaki anlaşma sayısı"
+                icon={Filter}
+                href={hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" })}
+                stages={FUNNEL_STAGES.map((s) => ({
+                  label: stageLabels[s.key].label,
+                  value: stageCounts[s.key] ?? 0,
+                  href: `${PATH}?gorunum=liste&asama=${s.key}${dq}`,
+                }))}
+              />
+              <DistributionCard
+                title="Sonuç dağılımı"
+                subtitle="Açık, kazanılan ve kaybedilen"
+                icon={PieChart}
+                tone="success"
+                href={`${PATH}?gorunum=liste${dq}`}
+                centerLabel="anlaşma"
+                slices={[
+                  { label: "Açık", value: openCount, color: "var(--viz-1)", href: `${PATH}?gorunum=liste&asama=acik${dq}` },
+                  { label: stageLabels.won.label, value: stageCounts.won ?? 0, tone: "success", href: `${PATH}?gorunum=liste&asama=won${dq}` },
+                  { label: stageLabels.lost.label, value: stageCounts.lost ?? 0, tone: "danger", href: `${PATH}?gorunum=liste&asama=lost${dq}` },
+                ]}
+              />
+            </ListCharts>
+          ) : null}
 
           <ListToolbar
             pathname={PATH}
@@ -699,6 +733,6 @@ export default async function DealsPage({
           )}
         </>
       )}
-    </div>
+    </ListPage>
   );
 }

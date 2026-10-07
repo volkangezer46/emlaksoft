@@ -7,6 +7,7 @@ import { exportSubscriptionsCsv } from "@/app/actions/platform-export";
 import { ACCOUNTING_EXPORT_PATH } from "@/lib/accounting/csv";
 import { loadPlatformMrr } from "@/lib/accounting/loaders";
 import { ExportButton } from "@/components/admin/export-button";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now as clockNow } from "@/lib/clock";
@@ -180,19 +181,17 @@ export default async function AdminBillingPage({
 
   return (
     <div className="space-y-6">
+      <AdminPageHeader
+        eyebrow="Abonelik & fatura"
+        icon={CreditCard}
+        title="Gelir operasyonu"
+        art="invoice"
+        description="Abonelik, fatura ve tahsilat tek ekranda · iyzico bağlanınca tahsilat otomatikleşir"
+        actions={<ExportButton action={exportSubscriptionsCsv} label="Abonelikleri indir" />}
+      />
       <BillingNav active="genel" />
-      <section aria-label="Gelir operasyonu" className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="bx-eyebrow flex items-center gap-1.5">
-              <CreditCard className="h-4 w-4 text-text-faint" aria-hidden /> Abonelik & fatura
-            </p>
-            <h1 className="mt-0.5 font-display text-2xl font-extrabold text-text">Gelir operasyonu</h1>
-            <p className="mt-1 text-sm text-text-muted">Altyapı hazır · iyzico bağlanınca tahsilat otomatikleşecek</p>
-          </div>
-          <ExportButton action={exportSubscriptionsCsv} label="Abonelikleri indir" />
-        </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start">
+      <section aria-label="Gelir özeti" className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
             {[
               { key: "active", value: money(mrr), label: "Aktif aylık gelir", tone: "text-text" },

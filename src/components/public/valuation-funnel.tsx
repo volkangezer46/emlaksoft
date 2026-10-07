@@ -190,6 +190,7 @@ export function ValuationFunnel({
               <PhoneCall className="h-4 w-4 text-mint-400" /> Net değerleme için danışmanımız arasın
             </p>
             <input
+              aria-label="Ad soyad"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
@@ -197,6 +198,7 @@ export function ValuationFunnel({
               className={inputCls}
             />
             <PhoneInput
+              aria-label="Cep telefonu"
               value={phone}
               onValueChange={setPhone}
               required

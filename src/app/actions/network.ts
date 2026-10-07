@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { now } from "@/lib/clock";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /*
  * Ofisler Arası Ağ (MLS temeli) — TEMKİNLİ mimari.
@@ -232,7 +233,7 @@ async function setListingStatus(id: string, status: "active" | "paused"): Promis
 
   if (error) {
     console.error("setListingStatus", error);
-    return { error: "Ağ kaydı güncellenemedi." };
+    return { error: actionErrorMessage(error, "Ağ kaydı güncellenemedi.") };
   }
 
   await logActivity({
@@ -268,7 +269,7 @@ export async function removeFromNetwork(id: string): Promise<NetworkResult> {
 
   if (error) {
     console.error("removeFromNetwork", error);
-    return { error: "Ağ kaydı kaldırılamadı." };
+    return { error: actionErrorMessage(error, "Ağ kaydı kaldırılamadı.") };
   }
 
   await logActivity({
@@ -447,7 +448,7 @@ export async function sendCollabRequest(_prev: NetworkResult, fd: FormData): Pro
 
   if (error) {
     console.error("sendCollabRequest", error);
-    return { error: "Talep gönderilemedi." };
+    return { error: actionErrorMessage(error, "Talep gönderilemedi.") };
   }
 
   const { data: myOffice } = await admin.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle();
@@ -1016,7 +1017,7 @@ async function setDemandStatus(id: string, status: "active" | "paused"): Promise
 
   if (error) {
     console.error("setDemandStatus", error);
-    return { error: "Ağ talep kaydı güncellenemedi." };
+    return { error: actionErrorMessage(error, "Ağ talep kaydı güncellenemedi.") };
   }
 
   await logActivity({
@@ -1052,7 +1053,7 @@ export async function removeDemandFromNetwork(id: string): Promise<NetworkResult
 
   if (error) {
     console.error("removeDemandFromNetwork", error);
-    return { error: "Ağ talep kaydı kaldırılamadı." };
+    return { error: actionErrorMessage(error, "Ağ talep kaydı kaldırılamadı.") };
   }
 
   await logActivity({
@@ -1226,7 +1227,7 @@ export async function respondToNetworkDemand(_prev: NetworkResult, fd: FormData)
 
   if (error) {
     console.error("respondToNetworkDemand", error);
-    return { error: "Yanıt gönderilemedi." };
+    return { error: actionErrorMessage(error, "Yanıt gönderilemedi.") };
   }
 
   const { data: myOffice } = await admin.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle();
@@ -1278,7 +1279,7 @@ async function decideDemandResponse(id: string, decision: "accept" | "reject"): 
 
   if (error) {
     console.error("decideDemandResponse", error);
-    return { error: "Yanıt karara bağlanamadı." };
+    return { error: actionErrorMessage(error, "Yanıt karara bağlanamadı.") };
   }
 
   const { data: offices } = await admin

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { AlarmClock, Crosshair, Flame, Plus, Search, Sparkles, Target } from "lucide-react";
+import { AlarmClock, Crosshair, Flame, PieChart, Plus, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { getProvince } from "@/lib/geo/reader";
@@ -13,7 +13,8 @@ import {
 } from "@/lib/matching";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
-import { PageHeader } from "@/components/ui/page-header";
+import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { weekBucketsOf } from "@/lib/ui/list-charts";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
@@ -35,6 +36,7 @@ import {
   mergeResetPage,
   pageWindow,
   parsePage,
+  isoDateParam,
   uuidParam,
   weeklySeriesOf,
   type Density,
@@ -119,6 +121,8 @@ export async function DemandsView({
     aciliyet?: string;
     yas?: string;
     eklenen?: string;
+    from?: string;
+    to?: string;
     il?: string;
     butce?: string;
     danisman?: string;
@@ -149,6 +153,9 @@ export async function DemandsView({
   const eklenenF = ADDED_WINDOWS.find((d) => String(d) === sp.eklenen) ?? null;
   // Talepte danışman sütunu yok: danışman = talep sahibi müşterinin atandığı kişi (customers.assigned_to).
   const danismanF = uuidParam(sp.danisman);
+  // ?from=&to= (YYYY-MM-DD, UTC gün sınırı): "Yeni talep" haftalık grafiğinin sütunları buraya iner (sayımla aynı koşul).
+  const fromF = isoDateParam(sp.from);
+  const toF = isoDateParam(sp.to);
   const q = (sp.q ?? "").trim().slice(0, 80);
   const statusF = sp.status === "all" || (sp.status && DEMAND_STATUS_LABELS[sp.status]) ? sp.status : "";
   const density = densityOf(sp.yogunluk);
@@ -165,6 +172,8 @@ export async function DemandsView({
   if (yasF) urlParams.yas = String(AGING_DAYS);
   if (eklenenF) urlParams.eklenen = String(eklenenF);
   if (danismanF) urlParams.danisman = danismanF;
+  if (fromF) urlParams.from = fromF;
+  if (toF) urlParams.to = toF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   // Özel alan filtresi (?ozel=anahtar:değer): liste sorgusuna eşleşen kimliklerle iner.
   const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "demand", customFilterRaw(sp as Record<string, string | undefined>));
@@ -209,6 +218,8 @@ export async function DemandsView({
     // Yaşlanan: 30+ gündür açık; kapalılar sayılmaz.
     if (yasF) query = query.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
     if (eklenenF) query = query.gte("created_at", daysAgoIso(eklenenF));
+    if (fromF) query = query.gte("created_at", fromF);
+    if (toF) query = query.lte("created_at", `${toF}T23:59:59.999`);
     if (search.clause) query = query.or(search.clause);
     query = applyCustomFieldIds(query, customFilter.ids);
     return query;
@@ -321,7 +332,11 @@ export async function DemandsView({
   const urgentCounts: Record<string, number> = { urgent: urgentRes.count ?? 0, high: highRes.count ?? 0 };
   const urgentTotal = urgentCounts.urgent! + urgentCounts.high!;
   const agingCount = agingRes.count ?? 0;
-  const weekly = weeklySeriesOf(((seriesRes.data ?? []) as unknown as Array<{ created_at: string }>).map((r) => r.created_at), nowMs, SERIES_SCAN_LIMIT);
+  const seriesIsos = ((seriesRes.data ?? []) as unknown as Array<{ created_at: string }>).map((r) => r.created_at);
+  const weekly = weeklySeriesOf(seriesIsos, nowMs, SERIES_SCAN_LIMIT);
+  // Grafik kovaları: PostgREST tavanı (1000) ile SERIES_SCAN_LIMIT'ten küçüğüne göre kesilme denetlenir (kesildiyse grafik yok).
+  const weekBars = weekBucketsOf(seriesIsos, nowMs, Math.min(1000, SERIES_SCAN_LIMIT));
+  const danismanQ = danismanF ? `&danisman=${danismanF}` : "";
   const ilName = (ilRes.data as { name?: string } | null)?.name ?? null;
 
   const kpis: KpiItem[] = [
@@ -384,6 +399,8 @@ export async function DemandsView({
     { key: "butce", label: "Bütçe", format: (v) => BUDGET_BANDS.find((b) => b.key === v)?.label ?? v },
     { key: "yas", label: "Açık süre", format: (v) => `${v}+ gün` },
     { key: "eklenen", label: "Eklenme", format: (v) => addedLabel(v) },
+    { key: "from", label: "Başlangıç" },
+    { key: "to", label: "Bitiş" },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
   ]);
 
@@ -393,8 +410,10 @@ export async function DemandsView({
   ];
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        eyebrow="Talep yönetimi"
+        art="talep"
         title="Talepler"
         description="Açık talepleri yönetin, bütçe ve konum kriterlerini eşleştirme motoruna bağlayın."
         meta={<ScopeBadge text={listScope.badge} />}
@@ -430,6 +449,35 @@ export async function DemandsView({
       ) : (
         <>
           <KpiStrip items={kpis} />
+
+          {/* Durum dağılımı + haftalık yeni talep (gerçek sayımlar; dilim/sütun = filtreli liste) */}
+          <ListCharts>
+            <DistributionCard
+              title="Talep durumu"
+              subtitle="Açık ve kapalı talepler"
+              icon={PieChart}
+              href={`${PATH}?status=all${danismanQ}`}
+              centerLabel="talep"
+              slices={[
+                { label: DEMAND_STATUS_LABELS.new ?? "Yeni", value: statusCounts.new!, color: "var(--viz-1)", href: `${PATH}?status=new${danismanQ}` },
+                { label: DEMAND_STATUS_LABELS.active ?? "Aktif", value: statusCounts.active!, tone: "warn", href: `${PATH}?status=active${danismanQ}` },
+                { label: DEMAND_STATUS_LABELS.matched ?? "Eşleşti", value: statusCounts.matched!, tone: "success", href: `${PATH}?status=matched${danismanQ}` },
+                { label: DEMAND_STATUS_LABELS.closed ?? "Kapalı", value: statusCounts.closed!, tone: "neutral", href: `${PATH}?status=closed${danismanQ}` },
+              ]}
+            />
+            {weekBars ? (
+              <ColumnChartCard
+                title="Yeni talep"
+                subtitle="Son 8 hafta · haftalık açılan talep"
+                icon={TrendingUp}
+                tone="success"
+                barTone="success"
+                highlight={weekBars.length - 1}
+                href={`${PATH}?status=all&eklenen=90${danismanQ}`}
+                bars={weekBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `${PATH}?status=all&from=${w.from}&to=${w.to}${danismanQ}` }))}
+              />
+            ) : null}
+          </ListCharts>
 
           <ListToolbar
             pathname={PATH}
@@ -511,7 +559,7 @@ export async function DemandsView({
           </Suspense>
         </>
       )}
-    </div>
+    </ListPage>
   );
 }
 

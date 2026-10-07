@@ -14,6 +14,7 @@ import {
   UNIT_EDIT_FIELDS,
   unitEditSchema,
 } from "@/lib/projects/edit-schemas";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ProjectResult = { ok?: boolean; error?: string; id?: string };
 
@@ -147,7 +148,7 @@ export async function createProject(_prev: ProjectResult, fd: FormData): Promise
 
   if (error || !data) {
     console.error("createProject", error);
-    return { error: "Proje kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Proje kaydedilemedi.") };
   }
 
   await logActivity({
@@ -194,7 +195,7 @@ export async function updateProject(_prev: ProjectResult, fd: FormData): Promise
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("updateProject", { code: error.code });
-    return { error: "Proje güncellenemedi." };
+    return { error: actionErrorMessage(error, "Proje güncellenemedi.") };
   }
 
   await logActivity({
@@ -270,7 +271,7 @@ export async function updateUnit(_prev: ProjectResult, fd: FormData): Promise<Pr
   if (error) {
     if (error.code === "23505") return { error: "Bu blokta aynı daire numarası zaten kayıtlı." };
     console.error("updateUnit", { code: error.code });
-    return { error: "Daire güncellenemedi." };
+    return { error: actionErrorMessage(error, "Daire güncellenemedi.") };
   }
 
   await logActivity({
@@ -331,7 +332,7 @@ export async function addUnit(_prev: ProjectResult, fd: FormData): Promise<Proje
   if (error || !data) {
     if (error?.code === "23505") return { error: "Bu blokta aynı daire numarası zaten kayıtlı." };
     console.error("addUnit", error);
-    return { error: "Daire kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Daire kaydedilemedi.") };
   }
 
   revalidatePath(`/app/projeler/${projectId}`);
@@ -386,7 +387,7 @@ export async function bulkAddUnits(_prev: ProjectResult, fd: FormData): Promise<
   if (error) {
     if (error.code === "23505") return { error: "Bu blokta çakışan daire numaraları var — önce mevcut daireleri kontrol edin." };
     console.error("bulkAddUnits", error);
-    return { error: "Daireler kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Daireler kaydedilemedi.") };
   }
 
   await logActivity({
@@ -484,7 +485,7 @@ export async function reserveUnit(unitId: string, customerId: string, optionDays
     .update({ status: "reserved", customer_id: customerId, reserved_until: reservedUntil, sold_at: null })
     .eq("id", unitId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Rezervasyon kaydedilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Rezervasyon kaydedilemedi.") };
 
   await auditStatusChange(gate.tenantId, gate.userId, unit, {
     status: "reserved",
@@ -516,7 +517,7 @@ export async function markUnitDeposit(unitId: string, customerId?: string): Prom
     .update({ status: "deposit", customer_id: customer })
     .eq("id", unitId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Kapora kaydedilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Kapora kaydedilemedi.") };
 
   await auditStatusChange(gate.tenantId, gate.userId, unit, { status: "deposit", customer_id: customer });
   revalidateUnit(unit.project_id);
@@ -550,14 +551,14 @@ export async function sellUnit(unitId: string, customerId?: string): Promise<Pro
   });
   if (error) {
     console.error("sellUnit atomic", { code: error.code });
-    return { error: "Daire satışı, anlaşma ve komisyon birlikte kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Daire satışı, anlaşma ve komisyon birlikte kaydedilemedi.") };
   }
   const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
   if (outcome === "not_found") return { error: "Daire bulunamadı." };
   if (outcome === "customer_not_found") return { error: "Müşteri bulunamadı." };
   if (outcome === "price_required") return { error: "Satıştan önce daire için geçerli bir liste fiyatı girin." };
   if (outcome === "already_sold") return { error: "Daire zaten satılmış." };
-  if (outcome !== "applied" && outcome !== "replay") return { error: "Daire satışı tamamlanamadı." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Daire satışı tamamlanamadı.") };
 
   revalidateUnit(unit.project_id);
   return { ok: true };
@@ -716,7 +717,7 @@ export async function createPaymentPlan(
   const { error } = await supabase.from("unit_payments").insert(rows);
   if (error) {
     console.error("createPaymentPlan", error);
-    return { error: "Ödeme planı kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Ödeme planı kaydedilemedi.") };
   }
 
   await logActivity({
@@ -808,7 +809,7 @@ export async function togglePaymentPaid(paymentId: string): Promise<ProjectResul
     .update(toPaid ? { status: "paid", paid_at: new Date().toISOString() } : { status: "pending", paid_at: null })
     .eq("id", paymentId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Ödeme durumu güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Ödeme durumu güncellenemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,

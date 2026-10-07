@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OwnerOfferResponseResult = { ok?: boolean; error?: string };
 
@@ -45,7 +46,7 @@ export async function respondToOfferByToken(
   );
   if (transitionError) {
     console.error("respondToOfferByToken atomic transition", { code: transitionError.code });
-    return { error: "İşlem kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(transitionError, "İşlem kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
@@ -60,7 +61,7 @@ export async function respondToOfferByToken(
   }
   if (outcome === "offer_not_found") return { error: "Teklif bulunamadı." };
   if (outcome !== "applied" && outcome !== "replay") {
-    return { error: "İşlem kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(null, "İşlem kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   revalidatePath(`/malik-portali/${token}`);

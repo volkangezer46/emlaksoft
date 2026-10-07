@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CallResult = { error?: string; ok?: boolean };
 
@@ -51,7 +52,7 @@ export async function createCall(formData: FormData): Promise<CallResult> {
 
   if (error) {
     console.error("createCall", error);
-    return { error: "Çağrı kaydı oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Çağrı kaydı oluşturulamadı.") };
   }
 
   await logActivity({

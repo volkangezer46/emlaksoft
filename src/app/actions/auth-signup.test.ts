@@ -137,7 +137,8 @@ describe("signUp — auth kullanıcısı oluşturma hatası", () => {
   it("diğer hatalar: genel mesaj (iç hata sızmaz)", async () => {
     h.createUser.mockResolvedValue({ data: { user: null }, error: { message: "db exploded: secret detail" } });
     const r = await signUp({}, form());
-    expect(r.error).toBe("Hesap oluşturulamadı.");
+    expect(r.error).toMatch(/^Hesap oluşturulamadı: /);
+    expect(r.error).not.toContain("secret detail");
   });
 });
 

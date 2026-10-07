@@ -47,6 +47,8 @@ export function Switch({
         }}
         className={cn(
           "focus-ring relative inline-flex h-6 w-10 shrink-0 items-center rounded-full border border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+          // Dokunmatikte görünüm aynı, basma alanı 44px: görünmez genişletme katmanı.
+          "touch:before:absolute touch:before:-inset-y-2.5 touch:before:inset-x-0",
           on ? "bg-accent" : "bg-line-strong",
           className,
         )}

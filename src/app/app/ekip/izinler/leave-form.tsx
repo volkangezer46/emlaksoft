@@ -25,12 +25,11 @@ type PanelProps = {
 };
 
 /** Hero'daki "İzin ekle" düğmesi: sayfa içi paneli açar/kapatır. */
-export function AddLeaveTrigger() {
+export function AddLeaveTrigger({
+  className = "btn-shine bg-white px-4 py-2.5 font-semibold text-ink-950 hover:bg-white/90",
+}: { className?: string } = {}) {
   return (
-    <InlinePanelTrigger
-      panelId={LEAVE_PANEL_ID}
-      className="btn-shine bg-white px-4 py-2.5 font-semibold text-ink-950 hover:bg-white/90"
-    >
+    <InlinePanelTrigger panelId={LEAVE_PANEL_ID} className={className}>
       <CalendarPlus className="h-4 w-4" /> İzin ekle
     </InlinePanelTrigger>
   );

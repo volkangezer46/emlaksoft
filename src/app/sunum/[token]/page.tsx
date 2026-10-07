@@ -21,7 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
@@ -184,7 +184,7 @@ export default async function PublicPresentationPage({
             <ShieldCheck className="h-3.5 w-3.5 text-mint-600" />
             Bu sunum {officeName} tarafından hazırlanmıştır
           </span>
-          <PrintButton />
+          <PrintButton tone="dark" label="Yazdır / PDF kaydet" />
         </div>
 
         {/* ============ KAPAK ============ */}

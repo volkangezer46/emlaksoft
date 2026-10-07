@@ -121,6 +121,7 @@ export function SettingField({
     if (secret) {
       return (
         <FormInput
+          aria-labelledby={`${view.key}-title`}
           id={id}
           type="password"
           autoComplete="new-password"
@@ -148,7 +149,7 @@ export function SettingField({
     }
     if (view.type === "enum") {
       return (
-        <FormSelect id={id} value={value} onChange={(e) => setValue(e.target.value)} disabled={!editable || pending}>
+        <FormSelect aria-labelledby={`${view.key}-title`} id={id} value={value} onChange={(e) => setValue(e.target.value)} disabled={!editable || pending}>
           {(view.options ?? []).map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -158,10 +159,11 @@ export function SettingField({
       );
     }
     if (view.multiline) {
-      return <FormTextarea id={id} rows={3} maxLength={view.max} value={value} onChange={(e) => setValue(e.target.value)} disabled={!editable || pending} />;
+      return <FormTextarea aria-labelledby={`${view.key}-title`} id={id} rows={3} maxLength={view.max} value={value} onChange={(e) => setValue(e.target.value)} disabled={!editable || pending} />;
     }
     return (
       <FormInput
+        aria-labelledby={`${view.key}-title`}
         id={id}
         type={view.type === "int" || view.type === "number" ? "number" : "text"}
         inputMode={view.type === "int" ? "numeric" : view.type === "number" ? "decimal" : undefined}

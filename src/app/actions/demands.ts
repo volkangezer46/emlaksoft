@@ -19,6 +19,7 @@ import {
 import { pruneRequiredKeys } from "@/lib/demand-geo";
 import { validateGeoChain } from "@/lib/geo/reader";
 import { findSimilarOpenDemands } from "@/lib/duplicate-finders";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -101,7 +102,7 @@ export async function createDemand(
 
   if (error) {
     console.error("createDemand", error);
-    return { error: "Talep kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Talep kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -263,7 +264,7 @@ export async function updateDemand(
 
   if (error) {
     console.error("updateDemand", error);
-    return { error: "Talep güncellenemedi." };
+    return { error: actionErrorMessage(error, "Talep güncellenemedi.") };
   }
   if (!updated) return { error: "Talep bulunamadı veya başka bir ofise ait." };
 
@@ -300,7 +301,7 @@ export async function bulkSetDemandStatus(ids: string[], status: string): Promis
     .select("id, customer_id");
   if (error) {
     console.error("bulkSetDemandStatus", error);
-    return { error: "Talepler güncellenemedi." };
+    return { error: actionErrorMessage(error, "Talepler güncellenemedi.") };
   }
   const rows = data ?? [];
   if (rows.length === 0) return { error: "Güncellenecek talep bulunamadı." };
@@ -364,7 +365,7 @@ export async function bulkDeleteDemands(ids: string[]): Promise<DemandResult & {
     .select("id, customer_id");
   if (error) {
     console.error("bulkDeleteDemands", error);
-    return { error: "Talepler silinemedi." };
+    return { error: actionErrorMessage(error, "Talepler silinemedi.") };
   }
   const rows = data ?? [];
   if (rows.length === 0) return { error: "Silinecek talep bulunamadı." };
@@ -403,7 +404,7 @@ export async function setDemandStatus(formData: FormData): Promise<DemandResult>
 
   if (error) {
     console.error("setDemandStatus", error);
-    return { error: "Durum güncellenemedi." };
+    return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   }
   if (!updated) return { error: "Talep bulunamadı veya başka bir ofise ait." };
 

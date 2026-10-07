@@ -91,6 +91,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
       <div id="inline-panel-host" className="min-w-0 empty:hidden" />
       {/* Başlık */}
       <AdminPageHeader
+        art="megaphone"
         eyebrow="Toplu duyuru"
         icon={Megaphone}
         title="Ofislere duyuru gönder"

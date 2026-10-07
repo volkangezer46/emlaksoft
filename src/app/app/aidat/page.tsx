@@ -1,14 +1,15 @@
 import { batchAll } from "@/lib/supabase/query-batch";
 import Link from "next/link";
-import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, X } from "lucide-react";
+import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, PieChart, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { msSince, now, DAY_MS } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDuesCsv } from "@/app/actions/export";
+import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 
-import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Aidat & Ortak Gider" };
 
 function money(n: number) {
@@ -168,72 +169,57 @@ export default async function AidatPage({
     ? new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${donemF}-01T00:00:00`))
     : "";
 
+  // KPI şeridi (tüm kayıtlar, RPC toplamı; her kart ?durum= filtresine iner, dönem korunur).
+  const kpis: KpiItem[] = [
+    {
+      label: "Tahsilat oranı",
+      value: `%${collectionRate}`,
+      icon: <Gauge />,
+      tone: "success",
+      href: href({ durum: "paid" }),
+      hint: total > 0 ? `${money(paidAmount)} tahsil edildi` : "tahakkuk yok",
+    },
+    { label: "Toplam tahakkuk", value: money(total), icon: <TrendingUp />, tone: "info", href: href({ durum: null }), hint: "tüm aidat kayıtları" },
+    { label: "Bekleyen", value: money(unpaid), icon: <Coins />, tone: "warning", href: href({ durum: "unpaid" }), hint: "ödenmemiş tutar" },
+    {
+      label: "Gecikmiş",
+      value: overdue,
+      icon: <AlertTriangle />,
+      tone: "danger",
+      attention: true,
+      href: href({ durum: "overdue" }),
+      hint: overdue > 0 ? money(overdueTotal) : "vadesi geçen yok",
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <PageHeader title="Aidat takibi" eyebrow="Aidat & ortak gider" description="Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* KPI kartları ?durum= filtresine bağlı: tıklayınca liste süzülür (dönem korunur) */}
-          <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4">
-            <Link
-              href={href({ durum: "paid" })}
-              aria-current={durumF === "paid" ? "page" : undefined}
-              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
-                durumF === "paid" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
-              }`}
-            >
-              <Gauge className="mx-auto h-4 w-4 text-mint-400" />
-              <p className="mt-1 flex items-center justify-center gap-1 font-display text-lg font-extrabold text-white">
-                %{collectionRate}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/60">Tahsilat oranı</p>
-              {/* Mini ilerleme çubuğu — tutar bazlı tahsilat */}
-              <div className="mx-auto mt-1.5 h-1 w-full max-w-[72px] overflow-hidden rounded-full bg-white/15">
-                <div className="h-full rounded-full bg-mint-400" style={{ width: `${collectionRate}%` }} />
-              </div>
-            </Link>
-            <Link
-              href={href({ durum: null })}
-              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
-                durumF === "" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
-              }`}
-            >
-              <TrendingUp className="mx-auto h-4 w-4 text-cyan-400" />
-              <p className="mt-1 flex items-center justify-center gap-1 font-display text-lg font-extrabold text-white">
-                {money(total)}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/60">Toplam</p>
-            </Link>
-            <Link
-              href={href({ durum: "unpaid" })}
-              aria-current={durumF === "unpaid" ? "page" : undefined}
-              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
-                durumF === "unpaid" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
-              }`}
-            >
-              <Coins className="mx-auto h-4 w-4 text-amber-300" />
-              <p className="mt-1 flex items-center justify-center gap-1 font-display text-lg font-extrabold text-white">
-                {money(unpaid)}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/60">Bekleyen</p>
-            </Link>
-            <Link
-              href={href({ durum: "overdue" })}
-              aria-current={durumF === "overdue" ? "page" : undefined}
-              className={`focus-ring press lift group block rounded-[var(--radius-card)] border p-3 text-center transition hover:border-white/30 ${
-                durumF === "overdue" ? "border-white/35 bg-white/12" : "border-white/12 bg-white/8"
-              }`}
-            >
-              <AlertTriangle className="mx-auto h-4 w-4 text-danger-400" />
-              <p className="mt-1 flex items-center justify-center gap-1 font-display text-lg font-extrabold text-white">
-                {overdue}
-                <ArrowUpRight className="hover-action h-3.5 w-3.5 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-              </p>
-              <p className="text-xs text-white/60">Gecikmiş</p>
-            </Link>
-          </div></div>
-} />
+    <ListPage>
+      <ListHero
+        eyebrow="Aidat & ortak gider"
+        art="aidat"
+        title="Aidat takibi"
+        description="Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde."
+        actions={filteredDues.length > 0 ? <ExportCsvButton action={exportDuesCsv} label="Dışa aktar" /> : undefined}
+      />
+
+      <KpiStrip items={kpis} />
+
+      {/* Tahsilat dağılımı (tutar bazlı, RPC toplamı): dilim = filtreli liste */}
+      <ListCharts>
+        <DistributionCard
+          title="Tahsilat durumu"
+          subtitle="Tahakkukun ödenen ve bekleyen tutarı"
+          icon={PieChart}
+          tone="success"
+          format="money"
+          centerLabel="toplam"
+          href={href({ durum: null })}
+          slices={[
+            { label: "Tahsil edildi", value: paidAmount, tone: "success", href: href({ durum: "paid" }) },
+            { label: "Bekleyen", value: unpaid, tone: "warn", href: href({ durum: "unpaid" }) },
+          ]}
+        />
+      </ListCharts>
 
       {/* Geciken ödemeler şeridi — vadesi geçmiş kayıtlar, en eski vade önce.
           Kart portföye (varsa) gider; başlık linki listeyi ?durum=overdue süzer. */}
@@ -329,11 +315,6 @@ export default async function AidatPage({
         </div>
       ) : null}
 
-      {filteredDues.length > 0 ? (
-        <div className="flex items-center justify-end">
-          <ExportCsvButton action={exportDuesCsv} label="Dışa aktar" />
-        </div>
-      ) : null}
       <DuesClient dues={filteredDues as Parameters<typeof DuesClient>[0]["dues"]} properties={properties} canCreate={canCreate} canBulk={canEdit} />
 
       {/* Sayfalama — filtre parametreleri linklerde korunur */}
@@ -368,6 +349,6 @@ export default async function AidatPage({
           </div>
         </div>
       ) : null}
-    </div>
+    </ListPage>
   );
 }

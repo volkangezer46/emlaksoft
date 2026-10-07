@@ -11,6 +11,7 @@ import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
 import { checkRentalExtension } from "@/lib/workflow-rules";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Mülk Yönetimi (kiralama) server action'ları.
@@ -70,7 +71,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   });
   if (error) {
     console.error("createRental atomic", { code: error.code });
-    return { error: "Kira, portföy ve kiracı kaydı birlikte oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Kira, portföy ve kiracı kaydı birlikte oluşturulamadı.") };
   }
   const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
     ? transitionData as Record<string, unknown>
@@ -82,7 +83,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
     return { error: "Kiralama kapanışından önce portföyde 0'dan büyük, en çok iki ondalık haneli geçerli bir komisyon oranı tanımlayın." };
   }
   if (transition?.outcome !== "created" || typeof transition.rental_id !== "string") {
-    return { error: "Kira kaydı oluşturulamadı." };
+    return { error: actionErrorMessage(null, "Kira kaydı oluşturulamadı.") };
   }
   const rentalId = transition.rental_id;
 
@@ -184,7 +185,7 @@ export async function updateRental(_prev: RentalResult, fd: FormData): Promise<R
     .maybeSingle();
   if (error) {
     console.error("updateRental", error);
-    return { error: "Kira kaydı güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kira kaydı güncellenemedi.") };
   }
   if (!updated) return { error: "Kira kaydı bu sırada değişti; sayfayı yenileyin." };
 
@@ -291,7 +292,7 @@ export async function markDepositReturned(id: string, returned = true): Promise<
     .maybeSingle();
   if (error) {
     console.error("markDepositReturned", error);
-    return { error: "Depozito durumu güncellenemedi." };
+    return { error: actionErrorMessage(error, "Depozito durumu güncellenemedi.") };
   }
   if (!data) return { error: "Depozito durumu bu sırada değişti; sayfayı yenileyin." };
 
@@ -344,7 +345,7 @@ export async function createRentCharge(rentalId: string, month: string): Promise
   if (error) {
     if (error.code === "23505") return { error: "Bu dönem için tahakkuk zaten var." };
     console.error("createRentCharge", error);
-    return { error: "Tahakkuk oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Tahakkuk oluşturulamadı.") };
   }
 
   revalidatePath("/app/kiralama");
@@ -367,7 +368,7 @@ export async function toggleChargePaid(id: string, rentalId: string, paid: boole
     .neq("status", paid ? "paid" : "pending")
     .select("id")
     .maybeSingle();
-  if (error) return { error: "Tahakkuk durumu güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Tahakkuk durumu güncellenemedi.") };
   if (!data) return { error: "Tahakkuk bulunamadı veya durum zaten güncel." };
 
   revalidatePath("/app/kiralama");
@@ -445,7 +446,7 @@ export async function applyRentIncrease(
   const { data: updated, error } = await updateQuery.select("id").maybeSingle();
   if (error) {
     console.error("applyRentIncrease", error);
-    return { error: "Kira artışı uygulanamadı." };
+    return { error: actionErrorMessage(error, "Kira artışı uygulanamadı.") };
   }
   if (!updated) return { error: "Kira kaydı bu sırada değişti; sayfayı yenileyip tekrar deneyin." };
 
@@ -501,7 +502,7 @@ export async function createMaintenanceRequest(_prev: RentalResult, fd: FormData
 
   if (error || !data) {
     console.error("createMaintenanceRequest", error);
-    return { error: "Bakım talebi kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Bakım talebi kaydedilemedi.") };
   }
 
   revalidatePath("/app/kiralama");
@@ -538,7 +539,7 @@ export async function updateMaintenanceRequest(
     .update(update)
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Bakım talebi güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Bakım talebi güncellenemedi.") };
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/kiralama/${rentalId}`);

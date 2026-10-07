@@ -609,7 +609,7 @@ export function ImportWizard({
                     })
                   }
                 >
-                  <SelectTrigger placeholder="Eşleme yok" />
+                  <SelectTrigger aria-label={`${f.label} için dosya kolonu`} placeholder="Eşleme yok" />
                   <SelectContent>
                     <SelectItem value={NONE}>— Eşleme yok —</SelectItem>
                     {parsed.headers.map((h, i) => (
@@ -670,7 +670,7 @@ export function ImportWizard({
             {!NO_ASSIGNEE_TARGETS.includes(target) ? (
               <FormField label="Danışman ataması" hint="Yeni oluşan kayıtların sorumlusu.">
                 <Select value={assignee} onValueChange={setAssignee}>
-                  <SelectTrigger placeholder="Danışman seçin" />
+                  <SelectTrigger aria-label="Danışman ataması" placeholder="Danışman seçin" />
                   <SelectContent>
                     <SelectItem value={ME}>Ben (içe aktaran kullanıcı)</SelectItem>
                     <SelectItem value={UNASSIGNED}>Danışmansız bırak</SelectItem>

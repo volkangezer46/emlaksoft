@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
+import { ColumnChartCard, ListPage } from "@/components/ui/list-page";
 import { HelpTip } from "@/components/ui/help-tip";
 import {
   ArrowDown,
@@ -171,6 +171,7 @@ export default async function CustomersPage({
     savedViews,
     segmentCounts,
     poolLimited,
+  weeklyBars,
   } = await loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter, customIds: customFilter.ids });
 
   // ---- Link kurucu: filtreler sayfa/sıralama linklerinde korunur ----------
@@ -269,13 +270,52 @@ export default async function CustomersPage({
     { key: "uykuda" as const, icon: Moon },
   ];
 
+  // ---- Grafikler: yalnız güvenilir sayım varsa (tarama kesilmediyse); her sütun filtreli listeye gider ----
+  const typeBars = typeCounts
+    ? customerTypes.map((t) => ({
+        label: t.label,
+        value: typeCounts[t.value] ?? 0,
+        href: `/app/musteriler?type=${encodeURIComponent(t.value)}`,
+      }))
+    : [];
+  const charts = (
+    <>
+      <ColumnChartCard
+        title="Müşteri tipleri"
+        subtitle="Bir müşteri birden çok tipte olabilir"
+        icon={ICONS.musteri}
+        bars={typeBars}
+        href="/app/musteriler"
+      />
+      {weeklyBars ? (
+        <ColumnChartCard
+          title="Yeni müşteri"
+          subtitle="Son 8 hafta · haftalık kayıt"
+          icon={TrendingUp}
+          tone="success"
+          barTone="success"
+          highlight={weeklyBars.length - 1}
+          bars={weeklyBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `/app/musteriler?from=${w.from}&to=${w.to}` }))}
+          href={`/app/musteriler?from=${growthFromDate}`}
+        />
+      ) : null}
+    </>
+  );
+
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Müşteriler"
-        description={<>Talep, iletişim ve müşteri durumu tek ekranda. <HelpTip topic="sicaklik" label="Müşteri sıcaklığı" /></>}
-        meta={<ScopeBadge text={listScope.badge} />}
-        actions={
+    <ListPage
+      hero={{
+        eyebrow: "Müşteri yönetimi",
+        title: "Müşteriler",
+        art: "musteri",
+        description: (
+          <>
+            Alıcı, mülk sahibi ve yatırımcılar; talep, iletişim ve sıcaklık tek ekranda.{" "}
+            <HelpTip topic="sicaklik" label="Müşteri sıcaklığı" />
+          </>
+        ),
+        meta: <ScopeBadge text={listScope.badge} />,
+        actions: (
           <>
             <ButtonLink href="/app/musteriler/cift-kayit" variant="secondary" size="sm" icon={Copy}>
               Çift kayıt kontrolü
@@ -292,11 +332,12 @@ export default async function CustomersPage({
             />
             {canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null}
           </>
-        }
-      />
-
-      {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden */}
-      <KpiStrip items={kpis} />
+        ),
+      }}
+      // KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden
+      kpis={<KpiStrip items={kpis} />}
+      charts={charts}
+    >
 
       {/* Yaklaşan doğum günü / yıldönümü hatırlatma */}
       {occasions.length > 0 ? (
@@ -542,6 +583,6 @@ export default async function CustomersPage({
           </div>
         </div>
       ) : null}
-    </div>
+    </ListPage>
   );
 }

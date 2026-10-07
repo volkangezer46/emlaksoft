@@ -5,6 +5,7 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CommissionSplitInput = { label: string; rate: number };
 export type CommissionResult = { ok?: boolean; error?: string };
@@ -53,7 +54,7 @@ export async function updateCommissionSplits(
 
   if (error) {
     console.error("updateCommissionSplits", error);
-    return { error: "Paylaşım güncellenemedi." };
+    return { error: actionErrorMessage(error, "Paylaşım güncellenemedi.") };
   }
 
   revalidatePath("/app/komisyon");
@@ -88,7 +89,7 @@ export async function markCommissionsPaidBulk(
 
   if (error) {
     console.error("markCommissionsPaidBulk", error);
-    return { error: "Kayıtlar güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kayıtlar güncellenemedi.") };
   }
 
   const updatedIds = (data ?? []).map((r) => r.id as string);
@@ -153,7 +154,7 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
 
   if (error) {
     console.error("revertCommissionPayment", error);
-    return { error: "Tahsilat geri alınamadı." };
+    return { error: actionErrorMessage(error, "Tahsilat geri alınamadı.") };
   }
   if (!updated || updated.length === 0) {
     return { error: "Kayıt bu sırada değişti. Sayfayı yenileyip tekrar deneyin." };

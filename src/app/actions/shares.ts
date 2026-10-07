@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { insertPropertyShareLink } from "@/lib/share-links";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ShareResult = { error?: string; ok?: boolean; url?: string };
 
@@ -27,7 +28,7 @@ export async function createPropertyShareLink(formData: FormData): Promise<Share
   if (!property) return { error: "Portföy bulunamadı." };
 
   const link = await insertPropertyShareLink(supabase, { tenantId: gate.tenantId, userId: gate.userId, propertyId, label: "Portföy paylaşımı" });
-  if (!link.ok) return { error: "Paylaşım linki oluşturulamadı." };
+  if (!link.ok) return { error: actionErrorMessage(null, "Paylaşım linki oluşturulamadı.") };
   const token = link.token;
   await logActivity({
     tenantId: gate.tenantId,

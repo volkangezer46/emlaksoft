@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { MANAGER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { parseTeamInput } from "@/lib/team/team-input";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TeamsResult = { error?: string; ok?: boolean };
 
@@ -68,7 +69,7 @@ export async function updateTeam(formData: FormData): Promise<TeamsResult> {
   const patch: Record<string, unknown> = { name: v.name, branch_id: v.branchId, lead_user_id: v.leadUserId };
   if (v.isActive !== null) patch.is_active = v.isActive;
   const { error } = await ctx.supabase.from("teams").update(patch).eq("id", id).eq("tenant_id", ctx.tenantId);
-  if (error) return { error: error.code === "23505" ? "Bu adla bir takım zaten var." : "Takım güncellenemedi." };
+  if (error) return { error: error.code === "23505" ? "Bu adla bir takım zaten var." : actionErrorMessage(error, "Takım güncellenemedi.") };
   return done();
 }
 
@@ -80,7 +81,7 @@ export async function deleteTeam(formData: FormData): Promise<TeamsResult> {
   const { count } = await ctx.supabase.from("profiles").select("id", { count: "exact", head: true }).eq("team_id", id).eq("tenant_id", ctx.tenantId);
   if ((count ?? 0) > 0) return { error: `Bu takımda ${count} üye var; önce üyeleri başka takıma taşıyın.` };
   const { error } = await ctx.supabase.from("teams").delete().eq("id", id).eq("tenant_id", ctx.tenantId);
-  if (error) return { error: "Takım silinemedi." };
+  if (error) return { error: actionErrorMessage(error, "Takım silinemedi.") };
   return done();
 }
 
@@ -96,6 +97,6 @@ export async function setMemberTeam(formData: FormData): Promise<TeamsResult> {
     if (!data) return { error: "Takım bulunamadı veya pasif." };
   }
   const { error } = await ctx.supabase.from("profiles").update({ team_id: teamId || null }).eq("id", memberId).eq("tenant_id", ctx.tenantId);
-  if (error) return { error: "Üyenin takımı güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Üyenin takımı güncellenemedi.") };
   return done();
 }

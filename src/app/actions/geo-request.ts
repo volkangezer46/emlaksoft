@@ -6,6 +6,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/activity";
 import { validateGeoChain } from "@/lib/geo/reader";
 import { cleanGeoName } from "@/lib/geo/normalize";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type GeoRequestResult = { error?: string; ok?: boolean };
 
@@ -50,7 +51,7 @@ export async function submitGeoChangeRequest(formData: FormData): Promise<GeoReq
       return { error: "Bölge bildirimi bu ortamda henüz etkin değil." };
     }
     console.error("submitGeoChangeRequest", error.code);
-    return { error: "Bildirim kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Bildirim kaydedilemedi.") };
   }
 
   await logActivity({

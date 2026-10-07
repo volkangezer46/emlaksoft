@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type NotificationRow = {
   id: string;
@@ -96,7 +97,7 @@ export async function subscribeToPush(sub: { endpoint: string; p256dh: string; a
     },
     { onConflict: "endpoint" },
   );
-  if (error) return { error: error.message };
+  if (error) return { error: actionErrorMessage(error, "Anlık bildirim aboneliği kaydedilemedi") };
   return { ok: true };
 }
 

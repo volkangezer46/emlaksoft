@@ -11,7 +11,7 @@ import {
   type ComparableDetail,
 } from "@/lib/comparables";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { ShareButton } from "./share-button";
 
 export const metadata = { title: "Değerleme raporu" };
@@ -44,7 +44,7 @@ function rel<T>(value: T | T[] | null): T | null {
  *
  * ÇIKTI: Tarayıcının "PDF olarak kaydet" akışı (`globals.css` içindeki
  * `@media print` katmanı). Ayrı bir PDF kütüphanesi bilinçli olarak
- * eklenmedi — gerekçesi print-button.tsx içinde.
+ * eklenmedi — gerekçesi components/ui/print-button.tsx içinde.
  *
  * DÜRÜSTLÜK: Rapor, hangi kaynağın sonuca ne ağırlıkla girdiğini açıkça
  * gösteriyor ve altında bunun bir eksper raporu OLMADIĞI yazıyor. Değerleme
@@ -182,7 +182,7 @@ export default async function ValuationReportPage({
               </span>
             )}
             <ShareButton valuationId={valuation.id} title={valuation.title} />
-            <PrintButton />
+            <PrintButton tone="light" />
           </>
         }
       />

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { verifyImageFile } from "@/lib/file-validation";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type LogoResult = { ok?: boolean; error?: string; url?: string };
 
@@ -58,7 +59,7 @@ export async function uploadTenantLogo(formData: FormData): Promise<LogoResult> 
 
   if (dbErr) {
     console.error("uploadTenantLogo db", dbErr);
-    return { error: "Logo URL kaydedilemedi." };
+    return { error: actionErrorMessage(dbErr, "Logo URL kaydedilemedi.") };
   }
 
   revalidatePath("/app/ayarlar");

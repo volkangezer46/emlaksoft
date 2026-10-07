@@ -21,6 +21,7 @@ import type {
   DirectFileUploadFinalizeResult,
   DirectFileUploadPrepareResult,
 } from "@/lib/direct-file-uploads";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type { PropertyDocFields } from "@/lib/ai/document-ocr";
 
@@ -170,7 +171,7 @@ export async function addPropertyMediaUrl(_prev: MediaResult, formData: FormData
 
   if (error) {
     console.error("addPropertyMediaUrl", error);
-    return { error: "Bağlantı eklenemedi." };
+    return { error: actionErrorMessage(error, "Bağlantı eklenemedi.") };
   }
 
   revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -327,7 +328,7 @@ export async function setPropertyMediaDocument(
   if (res.unavailable) {
     return { error: "Belge işareti bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor)." };
   }
-  if (!res.ok) return { error: "İşaret kaydedilemedi." };
+  if (!res.ok) return { error: actionErrorMessage(null, "İşaret kaydedilemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -400,7 +401,7 @@ export async function reorderPropertyMedia(
   const failed = results.find((r) => r.error);
   if (failed?.error) {
     console.error("reorderPropertyMedia", failed.error);
-    return { error: "Sıralama kaydedilemedi." };
+    return { error: actionErrorMessage(null, "Sıralama kaydedilemedi.") };
   }
 
   await logActivity({
@@ -455,7 +456,7 @@ export async function bulkDeletePropertyMedia(
     .in("id", owned);
   if (error) {
     console.error("bulkDeletePropertyMedia", error);
-    return { error: "Görseller silinemedi." };
+    return { error: actionErrorMessage(error, "Görseller silinemedi.") };
   }
 
   // Kapak silindiyse kalan ilk İLAN görselini kapak yap (belge kapak olamaz, KVKK P0-9)
@@ -649,7 +650,7 @@ export async function applyDocFieldsToProperty(
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("applyDocFieldsToProperty", error);
-    return { error: "Portföy güncellenemedi." };
+    return { error: actionErrorMessage(error, "Portföy güncellenemedi.") };
   }
 
   await logActivity({

@@ -32,6 +32,7 @@ import { notifyNewListing, notifyPoolAssigned, notifyPoolEntry } from "@/lib/poo
 import { shortAuthorityWarning } from "@/lib/eids/authority-term";
 import { now as clockNow, trDayKey } from "@/lib/clock";
 import { notifyAssignment } from "@/lib/assignment-notify";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PropertyResult = {
   error?: string;
@@ -359,7 +360,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
 
   if (error || !data) {
     console.error("createProperty", error);
-    return { error: planLimitErrorMessage(error) ?? "Portföy eklenemedi. Lütfen tekrar deneyin." };
+    return { error: planLimitErrorMessage(error) ?? actionErrorMessage(error, "Portföy eklenemedi. Lütfen tekrar deneyin.") };
   }
 
   // İlan sahibi: müşteri kaydına bağla + ayrıntıları yaz (şema yoksa notlara düşer; ilan her durumda oluşur).
@@ -660,7 +661,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
 
   if (error) {
     console.error("updateProperty", error);
-    return { error: "Portföy güncellenemedi." };
+    return { error: actionErrorMessage(error, "Portföy güncellenemedi.") };
   }
 
   await logActivity({

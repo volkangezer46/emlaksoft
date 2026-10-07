@@ -41,6 +41,9 @@ type PhoneInputProps = (UncontrolledProps | ControlledProps) & {
   /** Başlangıç/boşken seçili ülke (ISO, varsayılan TR). */
   defaultCountry?: string;
   "aria-describedby"?: string;
+  /** Görünür etiket yoksa (satır içi alanlar) erişilebilir ad. */
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
   "aria-invalid"?: boolean;
 };
 
@@ -109,6 +112,8 @@ export function PhoneInput(props: PhoneInputProps) {
     defaultCountry = DEFAULT_PHONE_COUNTRY,
     "aria-describedby": ariaDescribedBy,
     "aria-invalid": ariaInvalid,
+    "aria-label": ariaLabel,
+    "aria-labelledby": ariaLabelledBy,
   } = props;
   const isControlled = props.value !== undefined;
 
@@ -225,6 +230,8 @@ export function PhoneInput(props: PhoneInputProps) {
         type="tel"
         inputMode="tel"
         autoComplete={autoComplete}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
         aria-describedby={describedByIds}
         aria-invalid={ariaInvalid || (touched && invalid) || undefined}
         required={required}

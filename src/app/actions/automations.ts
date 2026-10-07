@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AutomationResult = { ok?: boolean; error?: string; id?: string };
 
@@ -145,7 +146,7 @@ export async function applyAutomationTemplate(
 
   if (error || !data) {
     console.error("applyAutomationTemplate", error);
-    return { error: "Otomasyon kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Otomasyon kaydedilemedi.") };
   }
 
   revalidatePath("/app/otomasyonlar");
@@ -246,7 +247,7 @@ async function parseWizardForm(
       }))
       .filter((c) => c.field && (CONDITION_OPS as readonly string[]).includes(c.op));
   } catch {
-    return { error: "Koşullar okunamadı." };
+    return { error: actionErrorMessage(null, "Koşullar okunamadı.") };
   }
   if (conditions.length > 3) return { error: "En fazla 3 koşul eklenebilir." };
 
@@ -257,7 +258,7 @@ async function parseWizardForm(
     if (!Array.isArray(raw)) throw new Error("bad");
     rawActions = raw.filter((a): a is Record<string, unknown> => !!a && typeof a === "object");
   } catch {
-    return { error: "Aksiyon okunamadı." };
+    return { error: actionErrorMessage(null, "Aksiyon okunamadı.") };
   }
   if (rawActions.length === 0) return { error: "En az bir aksiyon seçin." };
 
@@ -375,7 +376,7 @@ export async function createAutomation(formData: FormData): Promise<AutomationRe
 
   if (error || !data) {
     console.error("createAutomation", error);
-    return { error: "Otomasyon kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Otomasyon kaydedilemedi.") };
   }
 
   revalidatePath("/app/otomasyonlar");
@@ -413,7 +414,7 @@ export async function updateAutomation(formData: FormData): Promise<AutomationRe
 
   if (error) {
     console.error("updateAutomation", error);
-    return { error: "Otomasyon güncellenemedi." };
+    return { error: actionErrorMessage(error, "Otomasyon güncellenemedi.") };
   }
 
   revalidatePath("/app/otomasyonlar");
@@ -438,7 +439,7 @@ export async function toggleAutomation(
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
 
-  if (error) return { error: "Durum güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
 
   revalidatePath("/app/otomasyonlar");
   return { ok: true };

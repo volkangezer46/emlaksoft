@@ -78,6 +78,7 @@ export function ContractSignPanel({
               )}
             </div>
             <input
+              aria-label="İmzalayan ad soyad"
               type="text"
               placeholder="Ad Soyad *"
               value={s.full_name}
@@ -87,12 +88,14 @@ export function ContractSignPanel({
             />
             <div className="grid grid-cols-2 gap-2">
               <EmailInput
+                aria-label="İmzalayan e-postası"
                 placeholder="E-posta (opsiyonel)"
                 value={s.email}
                 onChange={(e) => updateSigner(i, "email", e.target.value)}
                 className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400 aria-[invalid=true]:border-danger-400"
               />
               <PhoneInput
+                aria-label="İmzalayan telefonu"
                 value={s.phone}
                 onValueChange={(v) => updateSigner(i, "phone", v)}
                 className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400 aria-[invalid=true]:border-danger-400"

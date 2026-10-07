@@ -18,6 +18,7 @@ import {
   isAppointmentStatus,
   isAppointmentTransitionAllowed,
 } from "@/lib/workflow-state";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AppointmentResult = {
   error?: string;
@@ -182,7 +183,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
 
   if (error) {
     console.error("createAppointment", error);
-    return { error: "Randevu oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Randevu oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   // Başkası adına açılan randevu: atanan danışmana bildirim (tercih "Randevu", tek seferlik anahtar).
@@ -232,7 +233,7 @@ export async function regenerateCalendarToken(): Promise<AppointmentResult> {
 
   if (error) {
     console.error("regenerateCalendarToken", error);
-    return { error: "Link yenilenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Link yenilenemedi. Lütfen tekrar deneyin.") };
   }
 
   revalidatePath("/app/randevular");
@@ -301,7 +302,7 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
     .maybeSingle();
   if (error) {
     console.error("updateAppointmentStatus", error);
-    return { error: "Durum güncellenemedi." };
+    return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   }
   if (!updated) return { error: "Randevu bu sırada değişti; sayfayı yenileyin." };
 
@@ -412,7 +413,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
 
   if (error) {
     console.error("updateAppointment", error);
-    return { error: "Randevu güncellenemedi." };
+    return { error: actionErrorMessage(error, "Randevu güncellenemedi.") };
   }
 
   await logActivity({

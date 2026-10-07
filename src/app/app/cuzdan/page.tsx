@@ -18,7 +18,7 @@ import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { advisorShare, dealOf, isPaid, type SplitEntry } from "@/lib/team/advisor-share";
 import { redirect } from "next/navigation";
 import { lockedGate } from "@/lib/billing/page-gates";
@@ -198,7 +198,7 @@ export default async function CuzdanPage({
         eyebrow="Kişisel hakediş"
         title={`Kazanç${fullName ? ` · ${fullName}` : ""}`}
         description="Kapanan anlaşmalardan payına düşen hakediş, tahsilat ve bekleyen tutarlar tek ekranda."
-        actions={<PrintButton />}
+        actions={<PrintButton tone="light" label="Dönem bordrosu yazdır" />}
       />
 
       {/* Dönem bordrosu — yalnızca çıktıda: değerleme raporundaki print deseni

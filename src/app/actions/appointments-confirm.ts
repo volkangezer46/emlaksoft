@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ConfirmResponse = "coming" | "cancelled";
 export type ConfirmResult = { ok?: boolean; error?: string; response?: ConfirmResponse };
@@ -41,7 +42,7 @@ export async function respondToAppointmentByToken(fd: FormData): Promise<Confirm
   );
   if (transitionError) {
     console.error("respondToAppointmentByToken atomic transition", { code: transitionError.code });
-    return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(transitionError, "Yanıt kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
@@ -59,7 +60,7 @@ export async function respondToAppointmentByToken(fd: FormData): Promise<Confirm
     return { error: "Bağlantı geçersiz veya randevu bulunamadı." };
   }
   if (outcome !== "applied" && outcome !== "replay") {
-    return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(null, "Yanıt kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   revalidatePath("/app/randevular");

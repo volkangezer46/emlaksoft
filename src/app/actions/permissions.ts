@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { canEditPermissionOverride } from "@/lib/access-control/admin-rules";
 import { recordAccessAudit } from "@/lib/access-control/audit";
 import type { AppAction, AppModule, AppRole } from "@/lib/permissions";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PermissionActionResult = { error?: string; ok?: boolean };
 
@@ -57,7 +58,7 @@ export async function updateTenantPermission(
 
   if (error) {
     console.error("updateTenantPermission", error);
-    return { error: "İzin güncellenemedi." };
+    return { error: actionErrorMessage(error, "İzin güncellenemedi.") };
   }
 
   await logActivity({
@@ -175,7 +176,7 @@ export async function setUserPermissionOverride(
 
   if (error) {
     console.error("setUserPermissionOverride", error);
-    return { error: "İstisna kaydedilemedi." };
+    return { error: actionErrorMessage(error, "İstisna kaydedilemedi.") };
   }
 
   await auditPermissionChange(
@@ -204,7 +205,7 @@ export async function removeUserPermissionOverride(userId: string, mod: AppModul
 
   if (error) {
     console.error("removeUserPermissionOverride", error);
-    return { error: "İstisna kaldırılamadı." };
+    return { error: actionErrorMessage(error, "İstisna kaldırılamadı.") };
   }
 
   if (before) await auditPermissionChange(ctx, "permission_revoked", { actions: before.actions, expires_at: before.expires_at }, null, { module: mod });

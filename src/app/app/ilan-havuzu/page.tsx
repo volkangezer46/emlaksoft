@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Hand, Inbox, Layers, Settings2, UserX } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
@@ -84,7 +84,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (!tenantId) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Portföy" title="İlan havuzu" description="Havuz ofis hesabıyla çalışır." />
+        <ListHero eyebrow="Portföy" art="havuz" title="İlan havuzu" description="Havuz ofis hesabıyla çalışır." />
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (listRes.error && isMissingSchemaError(listRes.error)) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Portföy" title="İlan havuzu" description="Atanmamış ilanları uzmanlığa göre danışmanlara dağıtın." />
+        <ListHero eyebrow="Portföy" art="havuz" title="İlan havuzu" description="Atanmamış ilanları uzmanlığa göre danışmanlara dağıtın." />
         <EmptyState
           illustration="portfoy"
           icon={Layers}
@@ -196,8 +196,9 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   const modeMeta = POOL_MODES.find((m) => m.value === rule.mode);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="havuz"
         eyebrow="Portföy"
         title="İlan havuzu"
         description="Atanmamış, içe aktarılmış, portal ve ağ kaynaklı ilanlar uzmanlığa göre açıklanabilir puanla danışmanlara dağıtılır."
@@ -380,6 +381,6 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
           })}
         </ul>
       )}
-    </div>
+    </ListPage>
   );
 }

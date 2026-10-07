@@ -16,7 +16,8 @@ import { requirePlatformModule } from "@/lib/platform";
 import { PAGE_SIZE, Pagination, pageRange } from "@/app/admin/_components/pagination";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { ExportButton } from "@/components/admin/export-button";
-import { Button } from "@/components/ui/button";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { exportTicketsCsv } from "@/app/actions/platform-export";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { cn } from "@/lib/utils";
@@ -474,39 +475,32 @@ export default async function AdminTicketsPage({
 
   return (
     <div className="space-y-4">
-      <header className="surface-card relative overflow-hidden rounded-[var(--radius-panel)] p-5">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-amber-400/12 blur-[70px]" aria-hidden />
-        <div className="relative flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 items-start gap-3.5">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-card)] bg-[linear-gradient(145deg,var(--amber-300),var(--amber-500))] text-ink-950 shadow-[var(--inner-top),var(--elev-2)]">
-              <LifeBuoy className="h-6 w-6" aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-amber-700">Müşteri operasyon merkezi</p>
-              <h1 className="mt-1 font-display text-xl font-extrabold text-ink-950 sm:text-2xl">Destek talepleri</h1>
-              <p className="mt-1 text-sm text-text-muted">
-                SLA, durum ve sorumlu atamalarını tek kuyruktan yönetin.
-                {filtered ? ` ${listTotal} filtrelenmiş sonuç gösteriliyor.` : ` ${open} aktif talep izleniyor.`}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-            <ExportButton action={exportTicketsCsv} label="CSV dışa aktar" variant="light" />
-            <Link
-              href={filters.tenant ? `/admin/tickets/yeni?tenant=${filters.tenant}` : "/admin/tickets/yeni"}
-              className="btn-shine focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-sm font-bold text-white"
-            >
-              <LifeBuoy className="h-4 w-4" aria-hidden /> Yeni talep oluştur
-            </Link>
-            <Link
-              href="/admin/tickets/makrolar"
-              className="focus-ring press inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink-950"
-            >
+      <AdminPageHeader
+        eyebrow="Müşteri operasyon merkezi"
+        icon={LifeBuoy}
+        title="Destek talepleri"
+        art="support"
+        description={`SLA, durum ve sorumlu atamalarını tek kuyruktan yönetin.${filtered ? ` ${listTotal} süzülmüş sonuç gösteriliyor.` : ` ${open} aktif talep izleniyor.`}`}
+        note={
+          metrics.firstResponseBreached > 0 ? (
+            <>
+              <strong>{metrics.firstResponseBreached} talepte</strong> ilk yanıt SLA süresi aşıldı.{" "}
+              <Link href={metricHrefFor({ durum: "acik" })}>Kuyruğu aç</Link>
+            </>
+          ) : undefined
+        }
+        actions={
+          <>
+            <ButtonLink href={filters.tenant ? `/admin/tickets/yeni?tenant=${filters.tenant}` : "/admin/tickets/yeni"} size="lg" variant="primary" icon={LifeBuoy}>
+              Yeni talep
+            </ButtonLink>
+            <ExportButton action={exportTicketsCsv} label="CSV dışa aktar" />
+            <ButtonLink href="/admin/tickets/makrolar" size="lg" variant="outline">
               Hazır yanıtlar
-            </Link>
-          </div>
-        </div>
-      </header>
+            </ButtonLink>
+          </>
+        }
+      />
 
       <KpiGrid label="Destek özeti">
         <MetricCard label="Toplam talep" value={total} hint="Tüm zamanlar" icon={Inbox} tone="brand" href={metricHrefFor()} />

@@ -29,6 +29,7 @@ import type { CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
 import { applyCustomFieldIds } from "@/lib/custom-fields/filter";
+import { weekBucketsOf } from "@/lib/ui/list-charts";
 
 /** Sayfa başına kayıt — gerçek sayfalama, 500'lük dilim yerine. */
 export const PAGE_SIZE = 50;
@@ -457,7 +458,9 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const typeCounts = (typeScanRows ?? []).length >= TYPE_SCAN_LIMIT
     ? null
     : countCustomerTypes((typeScanRows ?? []) as { customer_types: string[] | null }[]);
-  const weeklySeries = ((growthRows ?? []) as unknown[]).length >= 2000 ? undefined : buckets;
+  // PostgREST tavanı 1000 satır olabilir (limit 2000 istense de): 1000 ve üstü kesilmiş sayılır, seri çizilmez.
+  const weeklySeries = ((growthRows ?? []) as unknown[]).length >= 1000 ? undefined : buckets;
+  const weeklyBars = weekBucketsOf(((growthRows ?? []) as { created_at: string }[]).map((r) => r.created_at), nowMs, 1000);
   const advisorName = new Map(advisorList.map((a) => [a.id, a.full_name]));
   const sourceLabel = new Map<string, string>(sourceEntries);
 
@@ -517,6 +520,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
     growthTotal,
     growthFromDate,
     weeklySeries,
+    weeklyBars,
     typeCounts,
     tenantTags,
     customerTypes,

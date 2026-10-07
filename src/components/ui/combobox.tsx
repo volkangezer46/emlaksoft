@@ -271,6 +271,7 @@ export function Combobox({
             <div className="hairline-b flex items-center gap-2 px-3">
               <Search className="h-4 w-4 shrink-0 text-text-faint" />
               <input
+                aria-label={searchPlaceholder || "Seçeneklerde ara"}
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);

@@ -106,6 +106,7 @@ function ChipInput({
       {values.length < max ? (
         <div className="mt-2 flex gap-2">
           <input
+            aria-label="Uzmanlık etiketi ekle"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -243,6 +244,7 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
             <p className="text-xs text-text-muted">{view.officeName}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <input
+                aria-label="Profil fotoğrafı seç"
                 ref={fileRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"

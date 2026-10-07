@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OpenHouseActionResult = { ok?: boolean; error?: string; id?: string };
 
@@ -39,7 +40,7 @@ export async function updateOpenHouseStatus(
     .eq("id", openHouseId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  if (readError) return { error: "Etkinlik durumu okunamadı." };
+  if (readError) return { error: actionErrorMessage(readError, "Etkinlik durumu okunamadı.") };
   if (!current || !isOpenHouseStatus(current.status)) return { error: "Açık ev etkinliği bulunamadı." };
   if (current.status === status) return { ok: true };
   if (!OPEN_HOUSE_TRANSITIONS[current.status].includes(status)) {
@@ -54,7 +55,7 @@ export async function updateOpenHouseStatus(
     .eq("status", current.status)
     .select("id")
     .maybeSingle();
-  if (error) return { error: "Durum güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   if (!updated) return { error: "Etkinlik durumu başka bir işlemde değişti. Sayfayı yenileyip tekrar deneyin." };
 
   revalidatePath("/app/acik-ev");

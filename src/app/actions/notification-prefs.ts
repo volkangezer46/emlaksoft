@@ -6,6 +6,7 @@ import { requireActiveTenant } from "@/lib/tenant-guard";
 import { getSettings } from "@/lib/settings/read";
 import { notifyKey } from "@/lib/settings/registry/tenant";
 import type { NotifPrefs } from "@/components/app/notification-prefs";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const DEFAULTS: NotifPrefs = {
   portal: true,
@@ -92,7 +93,7 @@ export async function saveNotificationPrefs(prefs: NotifPrefs): Promise<{ error?
     .eq("id", gate.userId)
     .eq("tenant_id", gate.tenantId);
 
-  if (error) return { error: error.message };
+  if (error) return { error: actionErrorMessage(error, "Bildirim tercihleri kaydedilemedi") };
   revalidatePath("/app/ayarlar");
   revalidatePath("/app", "layout");
   return { ok: true };

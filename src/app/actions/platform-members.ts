@@ -9,6 +9,7 @@ import { readEffectiveSeatLimit } from "@/lib/billing/seat-purchase";
 import { getBaseUrl } from "@/lib/base-url";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type MemberActionResult = { ok?: boolean; error?: string; link?: string };
 
@@ -60,7 +61,7 @@ export async function updateMemberProfile(fd: FormData): Promise<MemberActionRes
     .update({ full_name: fullName, phone })
     .eq("id", id)
     .eq("tenant_id", target.tenant_id);
-  if (error) return { error: "Üye bilgileri güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Üye bilgileri güncellenemedi.") };
 
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -95,14 +96,14 @@ export async function setMemberRoleAsStaff(fd: FormData): Promise<MemberActionRe
   if (target.role === role) return { ok: true };
 
   const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
-  if (authReadError || !authRecord.user) return { error: "Üyenin kimlik kaydı doğrulanamadı." };
+  if (authReadError || !authRecord.user) return { error: actionErrorMessage(authReadError, "Üyenin kimlik kaydı doğrulanamadı.") };
 
   const { error } = await admin
     .from("profiles")
     .update({ role })
     .eq("id", id)
     .eq("tenant_id", target.tenant_id);
-  if (error) return { error: "Rol güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Rol güncellenemedi.") };
 
   const currentMeta = (authRecord.user.app_metadata ?? {}) as Record<string, unknown>;
   const { error: claimError } = await admin.auth.admin.updateUserById(id, {
@@ -159,7 +160,7 @@ export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberAction
         .eq("tenant_id", target.tenant_id)
         .eq("is_active", true),
     ]);
-    if (!tenant) return { error: "Ofis doğrulanamadı." };
+    if (!tenant) return { error: actionErrorMessage(null, "Ofis doğrulanamadı.") };
     if (tenant.status === "suspended" || tenant.status === "cancelled") {
       return { error: "Askıdaki veya iptal edilmiş ofiste üye aktifleştirilemez." };
     }
@@ -170,14 +171,14 @@ export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberAction
   }
 
   const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
-  if (authReadError || !authRecord.user) return { error: "Üyenin kimlik kaydı doğrulanamadı." };
+  if (authReadError || !authRecord.user) return { error: actionErrorMessage(authReadError, "Üyenin kimlik kaydı doğrulanamadı.") };
 
   const { error } = await admin
     .from("profiles")
     .update({ is_active: active })
     .eq("id", id)
     .eq("tenant_id", target.tenant_id);
-  if (error) return { error: "Üye durumu güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Üye durumu güncellenemedi.") };
 
   const currentMeta = (authRecord.user.app_metadata ?? {}) as Record<string, unknown>;
   const { error: claimError } = await admin.auth.admin.updateUserById(id, {
@@ -232,7 +233,7 @@ export async function signOutMemberSessions(fd: FormData): Promise<MemberActionR
     return {
       error: /could not find|schema cache|PGRST202/i.test(error.message + (error.code ?? ""))
         ? "Oturum kapatma veritabanı fonksiyonu henüz uygulanmamış (migration 20260816010200)."
-        : "Oturumlar kapatılamadı.",
+        : actionErrorMessage(null, "Oturumlar kapatılamadı."),
     };
   }
 

@@ -16,7 +16,7 @@ import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
 import { now, TR_OFFSET_MS, trParts } from "@/lib/clock";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { PaceCard } from "./pace-card";
 import { CoachInsightSlot } from "./coach-insight-slot";
 import { monthElapsedPct } from "./month-progress";
@@ -357,7 +357,7 @@ export default async function DanismanKpiPage({
                 </Link>
               ) : null}
             </div>
-            <PrintButton />
+            <PrintButton tone="light" label="Karneyi yazdır" />
             {/* Karne parayı ölçer, lig davranışı — puan/rozet/seri için /app/lig */}
             <Link href={`/app/lig?donem=${ayParam(monthStart)}`} className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><Trophy className="h-4 w-4" /> Lig tablosu</Link>
           </>

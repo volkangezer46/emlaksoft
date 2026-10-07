@@ -14,6 +14,7 @@ import {
   type ThresholdNumField,
 } from "@/lib/oversight/settings";
 import { isMissingTable } from "@/lib/oversight/store";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OversightResult = { ok?: boolean; error?: string };
 
@@ -44,7 +45,7 @@ export async function reviewAlert(_prev: OversightResult, fd: FormData): Promise
     return {
       error: isMissingTable(error)
         ? "İnceleme kaydı henüz etkin değil (veritabanı güncellemesi bekleniyor)."
-        : "İnceleme kaydedilemedi.",
+        : actionErrorMessage(null, "İnceleme kaydedilemedi."),
     };
   }
 
@@ -101,7 +102,7 @@ export async function saveOversightSettings(_prev: OversightResult, fd: FormData
     return {
       error: isMissingTable(error)
         ? "Ayar kaydı henüz etkin değil (veritabanı güncellemesi bekleniyor). Varsayılan eşikler kullanılıyor."
-        : "Ayarlar kaydedilemedi.",
+        : actionErrorMessage(null, "Ayarlar kaydedilemedi."),
     };
   }
 

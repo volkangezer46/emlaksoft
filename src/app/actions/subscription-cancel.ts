@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CancelResult = { ok?: boolean; error?: string; message?: string };
 
@@ -57,7 +58,7 @@ export async function requestSubscriptionCancel(
     return {
       error: MISSING_COLUMN.test(error.message)
         ? "İptal talebi bu ortamda henüz etkin değil. Lütfen destek ile iletişime geçin."
-        : "İptal talebi kaydedilemedi.",
+        : actionErrorMessage(null, "İptal talebi kaydedilemedi."),
     };
   }
 
@@ -99,7 +100,7 @@ export async function undoSubscriptionCancel(
     .eq("tenant_id", g.tenantId);
   if (error) {
     console.error("undoSubscriptionCancel", error.message);
-    return { error: "İptal talebi geri alınamadı." };
+    return { error: actionErrorMessage(error, "İptal talebi geri alınamadı.") };
   }
   await logActivity({
     tenantId: g.tenantId,

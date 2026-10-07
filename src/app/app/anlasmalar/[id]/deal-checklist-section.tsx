@@ -277,6 +277,7 @@ export function DealChecklistSection({
                     <input type="hidden" name="item_id" value={item.id} />
                     <input type="hidden" name="deal_id" value={dealId} />
                     <input
+                      aria-label="Madde notu"
                       name="note"
                       type="text"
                       maxLength={500}

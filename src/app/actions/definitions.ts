@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { defaultLabelMap, isDefinitionCategory, isSystemDefinitionValue, type DefinitionCategory } from "@/lib/definition-defaults";
 import { countDefinitionUsage } from "@/lib/definition-usage";
 import { DEAL_STAGES } from "@/lib/workflow-state";
-
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type DefinitionResult = { ok?: boolean; error?: string; id?: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -208,7 +208,7 @@ export async function moveDefinition(id: string, direction: "up" | "down"): Prom
     .eq("category", row.category)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
-  if (error || !own) return { error: "Sıralama okunamadı." };
+  if (error || !own) return { error: actionErrorMessage(error, "Sıralama okunamadı.") };
 
   const { data: globals } = await supabase
     .from("definitions")
@@ -236,7 +236,7 @@ export async function moveDefinition(id: string, direction: "up" | "down"): Prom
       .update({ sort_order: target })
       .eq("id", list[i].id)
       .eq("tenant_id", gate.tenantId);
-    if (upErr) return { error: "Sıralama güncellenemedi." };
+    if (upErr) return { error: actionErrorMessage(upErr, "Sıralama güncellenemedi.") };
   }
   await audit(gate, "definition.reorder", id, null, { category: row.category, value: row.value, direction });
   invalidate(gate.tenantId);
@@ -269,7 +269,7 @@ export async function deleteDefinition(id: string): Promise<DefinitionResult> {
     .eq("tenant_id", gate.tenantId)
     .select("id")
     .maybeSingle();
-  if (error) return { error: "Tanım silinemedi." };
+  if (error) return { error: actionErrorMessage(error, "Tanım silinemedi.") };
   if (!data) return { error: "Tanım bulunamadı veya sistem tanımı silinemez." };
   await audit(gate, "definition.delete", id, { category: row.category, value: row.value, label: row.label }, null);
   invalidate(gate.tenantId);

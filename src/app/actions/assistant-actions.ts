@@ -9,6 +9,7 @@ import { daysFromNowIso } from "@/lib/clock";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
 import { canAutoCallAi } from "@/lib/ai/auto-call-gate";
 import { ASSISTANT_ACTION_SYSTEM_PROMPT, AssistantProposalSchema, parseAssistantProposal, type AssistantProposal } from "@/lib/ai/assistant-actions";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ProposeResult = { ok?: boolean; error?: string; proposal?: AssistantProposal };
 export type ApproveResult = { ok?: boolean; error?: string; createdTasks?: number; draft?: string };
@@ -88,7 +89,7 @@ export async function approveAssistantAction(input: unknown): Promise<ApproveRes
       })),
     )
     .select("id");
-  if (error) return { error: "Görevler oluşturulamadı." };
+  if (error) return { error: actionErrorMessage(error, "Görevler oluşturulamadı.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "assistant.action_approved", entityType: "assistant", newValue: { type: p.type, tasks: data?.length ?? 0 } });
   revalidatePath("/app/gorevler");
   return { ok: true, createdTasks: data?.length ?? 0 };

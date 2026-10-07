@@ -48,6 +48,7 @@ import {
   validateTaskRow,
   type NormalizedRental,
 } from "@/lib/import-rows-activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * İçe aktarma (müşteri / portföy / talep) — /app/ice-aktarma sihirbazı.
@@ -456,7 +457,7 @@ async function runChunk(
 
   const seen = new Set(options.seen ?? []);
   const plans = await planChunk(supabase, gate.tenantId, target, rows, policy, seen);
-  if (!plans) return { error: "Mükerrer kontrolü yapılamadı. Lütfen tekrar deneyin." };
+  if (!plans) return { error: actionErrorMessage(null, "Mükerrer kontrolü yapılamadı. Lütfen tekrar deneyin.") };
   for (const p of plans) {
     if (flaggedRows.has(p.row)) {
       p.issues = [
@@ -569,7 +570,7 @@ async function runChunk(
     const res = await supabase.from(table).insert(part.map(buildInsert)).select("id");
     if (res?.error) {
       console.error("import insert chunk", target, res.error);
-      for (const p of part) fail(p, "Veritabanına yazılamadı.");
+      for (const p of part) fail(p, actionErrorMessage(null, "Veritabanına yazılamadı."));
     } else {
       for (const d of (res?.data ?? []) as { id: string }[]) createdIds.push(d.id);
     }
@@ -586,7 +587,7 @@ async function runChunk(
           .eq("tenant_id", gate.tenantId);
         if (error) {
           console.error("import update", target, error);
-          fail(p, "Mevcut kayıt güncellenemedi.");
+          fail(p, actionErrorMessage(error, "Mevcut kayıt güncellenemedi."));
         } else {
           updatedPrev.push({ id: p.existingId, prev: p.prev ?? {} });
         }

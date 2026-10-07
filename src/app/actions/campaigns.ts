@@ -11,6 +11,7 @@ import {
   listApprovedTenantWhatsAppTemplates,
   type ApprovedWhatsAppTemplate,
 } from "@/lib/messaging/whatsapp-cloud";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CampaignResult = { ok?: boolean; error?: string; id?: string };
 export type WhatsAppTemplateListResult =
@@ -106,7 +107,7 @@ export async function createCampaign(
     ? createResult as Record<string, unknown>
     : null;
   const campaignId = typeof created?.id === "string" ? created.id : null;
-  if (!campaignId) return { error: "Kampanya oluşturma sonucu doğrulanamadı." };
+  if (!campaignId) return { error: actionErrorMessage(null, "Kampanya oluşturma sonucu doğrulanamadı.") };
 
   revalidatePath("/app/kampanyalar");
   return { ok: true, id: campaignId };
@@ -165,7 +166,7 @@ export async function updateCampaign(_prev: CampaignResult, fd: FormData): Promi
     .select("id");
   if (error) {
     console.error("updateCampaign", error);
-    return { error: "Kampanya güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kampanya güncellenemedi.") };
   }
   if (!updated || updated.length === 0) return { error: "Kampanya artık taslak değil; düzenlenemedi." };
 
@@ -203,7 +204,7 @@ export async function sendCampaign(campaignId: string): Promise<CampaignResult> 
     },
   );
   if (enqueueError || !enqueueResult) {
-    return { error: "Kampanya gönderim kuyruğuna alınamadı." };
+    return { error: actionErrorMessage(enqueueError, "Kampanya gönderim kuyruğuna alınamadı.") };
   }
 
   revalidatePath("/app/kampanyalar");
@@ -270,7 +271,7 @@ export async function unscheduleCampaign(campaignId: string): Promise<CampaignRe
     .select("id");
   if (error) {
     console.error("unscheduleCampaign", error);
-    return { error: "Zamanlama kaldırılamadı." };
+    return { error: actionErrorMessage(error, "Zamanlama kaldırılamadı.") };
   }
   if (!data || data.length === 0) return { error: "Kampanya artık zamanlanmış durumda değil (gönderim başlamış olabilir)." };
   await logActivity({
@@ -350,7 +351,7 @@ export async function deleteCampaign(id: string): Promise<CampaignResult> {
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
 
-  if (error) return { error: "Kampanya silinemedi." };
+  if (error) return { error: actionErrorMessage(error, "Kampanya silinemedi.") };
   revalidatePath("/app/kampanyalar");
   return { ok: true };
 }
