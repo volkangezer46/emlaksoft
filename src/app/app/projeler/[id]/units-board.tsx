@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { EmptyState } from "@/components/app/empty-state";
 import { searchCustomers } from "@/app/actions/lookup";
 import { UnitPaymentPlan } from "./unit-payment-plan";
+import { AddUnitsTrigger } from "./add-units-panel";
 import {
   markUnitDeposit,
   releaseUnit,
@@ -68,7 +69,7 @@ export function UnitsBoard({
   projectId: _projectId,
   units,
   canEdit,
-  canCreate: _canCreate,
+  canCreate,
 }: {
   projectId: string;
   units: UnitRow[];
@@ -487,7 +488,8 @@ export function UnitsBoard({
         <EmptyState illustration="portfoy"
           icon={LayoutGrid}
           title="Henüz daire eklenmedi"
-          description={'Sağ üstteki "Daire ekle" ile tekil daire girin ya da "Çoğalt" sekmesiyle kat kat üretin.'}
+          description={'"Daire ekle" ile tekil daire girin ya da "Çoğalt" sekmesiyle kat kat üretin.'}
+          action={canCreate ? <AddUnitsTrigger /> : undefined}
         />
       ) : filtered.length === 0 ? (
         <EmptyState illustration="portfoy"
@@ -495,6 +497,18 @@ export function UnitsBoard({
           title="Filtreye uyan daire yok"
           description="Durum ya da blok filtresini değiştirip tekrar deneyin."
           tone="amber"
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setDurum("all");
+                setBlok("all");
+              }}
+              className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:border-brand-300 touch:min-h-11"
+            >
+              Filtreleri temizle
+            </button>
+          }
         />
       ) : (
         <div className="space-y-5">

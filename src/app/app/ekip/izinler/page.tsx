@@ -410,6 +410,11 @@ export default async function LeavesPage({
                     ? "Bitmiş izin bulunmuyor. Yaklaşan izinlere dönebilirsiniz."
                     : "Ekipte planlanmış izin yok. İzin ekleyerek takvimi ve randevu linkini birlikte güncel tutun."
                 }
+                action={
+                  gecmis
+                    ? { href: monthHref({ gecmis: "" }), label: "Yaklaşan izinlere dön" }
+                    : <AddLeaveTrigger className="btn-shine bg-brand-600 px-5 py-2.5 font-semibold text-white hover:bg-brand-700" />
+                }
               />
             </div>
           ) : (

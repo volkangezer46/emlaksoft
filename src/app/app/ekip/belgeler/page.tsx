@@ -133,6 +133,7 @@ export default async function BelgeTakibiPage({ searchParams }: { searchParams?:
           icon={BadgeCheck}
           title={all.length === 0 ? "Yaklaşan belge bitişi yok" : "Bu süzgece uyan belge yok"}
           description={all.length === 0 ? "Önümüzdeki 30 gün içinde biten veya süresi dolmuş belge bulunmuyor." : "Süzgeci değiştirerek diğer belgeleri görebilirsiniz."}
+          action={all.length === 0 ? undefined : { href: "/app/ekip/belgeler", label: "Süzgeci temizle" }}
         />
       ) : (
         <ul className="space-y-2">

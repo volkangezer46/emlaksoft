@@ -353,7 +353,7 @@ export async function PipelineTab({ ctx }: { ctx: Ctx }) {
   ]);
   const deals = (dealsRes.data ?? []) as unknown as { id: string; stage: string; deal_value: number | null; updated_at: string; property: Rel; customer: Rel }[];
   if (deals.length === 0) {
-    return <EmptyStateV3 title="Açık anlaşma yok" description="Bu danışmana atanmış açık anlaşma bulunmuyor." />;
+    return <EmptyStateV3 title="Açık anlaşma yok" description="Bu danışmana atanmış açık anlaşma bulunmuyor." action={{ href: "/app/anlasmalar/yeni", label: "Anlaşma başlat" }} secondary={{ href: `/app/anlasmalar?danisman=${id}&gorunum=liste`, label: "Tüm anlaşmaları gör" }} />;
   }
   const stages = openPipeline(deals);
   const items: StatRowItem[] = stages.map((s) => ({

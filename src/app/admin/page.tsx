@@ -799,7 +799,7 @@ async function ActivitySection({ period }: { period: Period }) {
     <section aria-label="Son hareketler" className="grid gap-4 md:grid-cols-2">
       <ChartCard as="h2" title="Son ofisler" icon={Building2} tone="brand" href="/admin/tenants" hrefLabel="Tümü" height={0}>
         {list.length === 0 ? (
-          <EmptyState variant="compact" illustration="ev" title="Henüz ofis yok" description="Yeni kayıtlar burada listelenir." />
+          <EmptyState variant="compact" illustration="ev" title="Henüz ofis yok" description="Yeni kayıtlar burada listelenir." action={{ href: "/admin/tenants/yeni", label: "Ofis aç" }} />
         ) : (
           <ul className="ds-sep -mx-1.5">
             {list.slice(0, 5).map((t) => (
