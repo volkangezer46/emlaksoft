@@ -259,14 +259,14 @@ const weekLabel = (iso: string) => {
 async function HeroSummary({ period, role }: { period: Period; role: PlatformRole }) {
   const queue = await loadAttention(period, role);
   const top = queue[0];
-  if (!top) return <p>Platform sakin: önceliklendirilmiş bekleyen iş yok. Yeni bir durum oluşunca burada söylenir.</p>;
+  if (!top) return <p>Platform sakin: bekleyen öncelikli iş yok.</p>;
   return (
     <p>
-      Dikkat bekleyen konular var; en önceliklisi{" "}
+      En öncelikli iş:{" "}
       <Link href={top.href} className="focus-ring rounded-sm font-semibold text-accent-text underline-offset-2 hover:underline">
         {top.label.toLocaleLowerCase("tr-TR")}
       </Link>
-      . Ayrıntılar aşağıda önem sırasıyla.
+      .
     </p>
   );
 }
@@ -428,7 +428,7 @@ async function ChurnSection({ period }: { period: Period }) {
     <ChartCard
       as="h2"
       title="Riskli ofisler ve churn"
-      subtitle="Gecikmiş/askıda veya az kullanan ofisler; erken aksiyon alın."
+      subtitle="Gecikmiş, askıda veya az kullanan ofisler"
       icon={ShieldAlert}
       tone="danger"
       href="/admin/tenants?durum=risk"
@@ -598,7 +598,7 @@ async function ModulesSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const rows = moduleAdoption(data.aggregate.adoption, Number(data.aggregate.all_tenant_count)).filter((r) => r.offices > 0).slice(0, 8);
   return (
-    <ChartCard as="h2" title="Modül kullanımı" subtitle="Son 30 gün · en az bir işlem yapan ofis oranı" icon={LayoutGrid} tone="brand" href="/admin/raporlar" hrefLabel="Raporlar" height={0} className="h-full">
+    <ChartCard as="h2" title="Modül kullanımı" subtitle="Son 30 gün · işlem yapan ofis oranı" icon={LayoutGrid} tone="brand" href="/admin/raporlar" hrefLabel="Raporlar" height={0} className="h-full">
       {rows.length === 0 ? (
         <EmptyState variant="compact" illustration="rapor" title="Henüz modül kullanımı yok" description="Ofisler müşteri, portföy, anlaşma gibi işlemler yaptıkça dağılım burada görünür." />
       ) : (
@@ -637,7 +637,7 @@ async function UnitEconomicsSection({ period }: { period: Period }) {
   );
   const real = points.filter((p) => p.arpa !== null);
   return (
-    <ChartCard as="h2" title="Birim ekonomisi" subtitle="ARPA: aktif ofis başına aylık gelir · 12 ay" icon={TrendingUp} tone="brand" href="/admin/raporlar" hrefLabel="Raporlar" height={0} className="h-full">
+    <ChartCard as="h2" title="Birim ekonomisi" subtitle="Ofis başına aylık gelir · 12 ay" icon={TrendingUp} tone="brand" href="/admin/raporlar" hrefLabel="Raporlar" height={0} className="h-full">
       <div className="h-48">
         {real.length >= 2 ? (
           <AreaTrendChart data={points.map((p) => ({ label: p.label, value: p.arpa }))} tone="brand" format="money" name="ARPA" ariaLabel="Son 12 ay aktif ofis başına aylık gelir" />
@@ -737,7 +737,7 @@ async function GrowthSection({ period }: { period: Period }) {
     <ChartCard
       as="h2"
       title="Büyüme"
-      subtitle="Haftalık yeni ofis ve yeni aktif abonelik · son 8 hafta"
+      subtitle="Yeni ofis ve abonelik · son 8 hafta"
       icon={Gauge}
       tone="success"
       href="/admin/tenants?yeni=90"

@@ -31,7 +31,7 @@ export async function GelirEgrisi({ ctx }: { ctx: HomeCtx }) {
     <ChartCard
       as="h2"
       title="Komisyon geliri"
-      subtitle="Son 6 ay aylık tahakkuk ve tahsilat durumu"
+      subtitle="Son 6 ay tahakkuk ve tahsilat"
       icon={Wallet}
       tone="gold"
       href="/app/komisyon"

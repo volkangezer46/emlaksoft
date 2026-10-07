@@ -41,10 +41,10 @@ export function InsightCard({
               {forecast ? <span className="ds-pill pm-t-gold">{forecast}</span> : null}
             </p>
           ) : null}
-          <Link href={href} className="focus-ring rounded-[var(--radius-control)] text-sm font-semibold text-text hover:text-accent-text">
+          <Link href={href} className="focus-ring line-clamp-2 rounded-[var(--radius-control)] text-sm font-semibold text-text hover:text-accent-text" title={title}>
             {title}
           </Link>
-          {why ? <p className="mt-0.5 text-xs leading-5 text-text-muted">{why}</p> : null}
+          {why ? <p className="mt-0.5 line-clamp-3 text-xs leading-5 text-text-muted" title={why}>{why}</p> : null}
           {evidence.length > 0 ? (
             <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-muted">
               {evidence.slice(0, 4).map((e, i) => (

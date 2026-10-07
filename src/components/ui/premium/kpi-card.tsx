@@ -109,7 +109,7 @@ export function KpiTile({
             </span>
             {trend ? <TrendPill trend={trend} /> : null}
           </span>
-          {previousText || hint ? <span className="pm-sub mt-0.5 block">{previousText ?? hint}</span> : null}
+          {previousText || hint ? <span className="pm-sub mt-0.5" title={typeof (previousText ?? hint) === "string" ? ((previousText ?? hint) as string) : undefined}>{previousText ?? hint}</span> : null}
         </span>
         {drawChart ? (
           <MiniBars data={series} tone={tone} unit={seriesUnit} label={seriesLabel} width={64} height={44} className="pm-card-bars" />

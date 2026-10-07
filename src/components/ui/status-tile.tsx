@@ -30,11 +30,11 @@ export function StatusTile({
   const ratio = progress && progress.max > 0 ? Math.min(1, Math.max(0, progress.value / progress.max)) : null;
   return (
     <Link href={href} className={cn(`ds-tile pm-t-${tone} focus-ring`, className)}>
-      <span className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
-        <span className="pm-dot" aria-hidden="true" />
-        {label}
+      <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-text-muted" title={label}>
+        <span className="pm-dot shrink-0" aria-hidden="true" />
+        <span className="min-w-0 truncate">{label}</span>
       </span>
-      <span className="text-sm font-bold tabular-nums text-text">{value}</span>
+      <span className="min-w-0 truncate text-sm font-bold tabular-nums text-text" title={value}>{value}</span>
       {hint ? <span className="truncate text-xs text-text-muted" title={hint}>{hint}</span> : null}
       {ratio !== null && progress ? (
         <span

@@ -36,7 +36,7 @@ export async function Son30Gun({ userId }: { userId: string }) {
     <ChartCard
       as="h2"
       title="Son 30 gün aktivite"
-      subtitle="Günlük çağrı + randevu + teklif toplamı"
+      subtitle="Günlük arama, randevu ve teklif"
       icon={Activity}
       tone="brand"
       href="/app/performansim?sekme=aktivite"

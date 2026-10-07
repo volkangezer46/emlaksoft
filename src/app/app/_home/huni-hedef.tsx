@@ -149,7 +149,7 @@ export async function HuniHedef({ ctx }: { ctx: HomeCtx }) {
     <ChartCard
       as="h2"
       title="Satış hunisi"
-      subtitle="Talep aşamaları ve son 90 gün kazanılan anlaşma"
+      subtitle="Talep aşamaları · son 90 gün"
       icon={Funnel}
       tone="brand"
       href="/app/talepler"
