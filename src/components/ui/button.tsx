@@ -13,27 +13,33 @@ import { cn } from "@/lib/utils";
  *
  * `href` verilirse Link olarak render edilir (aynı görünüm, gezinme için).
  */
-/* Hover/basılı zeminler rol token'larından gelir (tokens.css "rol adlı etkileşim
-   token'ları"): hayalet saydam zeminde `surface-hover/pressed`, ikincil opak zeminde
-   `surface-interactive` (ton zeminin üstüne biner). Birincil hover `accent-hover`:
-   açıkta --brand-700, koyuda --brand-500 (koyuda --brand-700 açık METİN tonudur;
-   üstünde beyaz yazı okunmaz). */
+/* Premium düğme sistemi (2026-10-07; CSS `src/app/kit.css` .btn-*): degrade dolgu + üst iç parlama +
+   basılı iç gölge, hover'da 1px yükselme (yalnız no-preference + hover:hover), pasif durumda sönük AMA
+   okunur yüzey. API geriye uyumlu: eski varyant adları (primary/secondary/ghost/danger) ve boylar aynı.
+   - primary: mavi degrade (sayfanın TEK birincil eylemi)   - navy: lacivert (satır içi kalıcı onay "Kaydet")
+   - gold: yumuşak altın (premium an / "Ofise gir")          - outline: beyaz + ince kenar + gölge ("Yönet", dışa aktar)
+   - secondary: eski ikincil (opak zemin, rol token'ları)    - ghost: saydam; danger: kırmızı degrade
+   Dolgu --accent'tir (koyuda da beyaz yazı AA); hayalet/ikincil hover rol token'larından (tokens.css). */
 const VARIANTS = {
-  primary:
-    "bg-brand-600 text-white shadow-[var(--inner-top-dark)] hover:bg-accent-hover",
+  primary: "btn btn-primary",
+  navy: "btn btn-navy",
+  gold: "btn btn-gold",
+  outline: "btn btn-outline",
   secondary:
-    "surface-interactive border border-border-interactive bg-surface text-ink-950 hover:border-border-strong",
-  ghost: "text-text-muted hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed",
-  danger: "bg-danger-600 text-white hover:bg-danger-700",
+    "surface-interactive border border-border-interactive bg-surface text-ink-950 hover:border-border-strong disabled:opacity-55",
+  ghost: "text-text-muted hover:bg-surface-hover hover:text-ink-950 active:bg-surface-pressed disabled:opacity-55",
+  danger: "btn btn-danger",
 } as const;
 
 /** Boy ölçeği. `xs` v2'de eklendi: tablo satırı içi aksiyonlar 32px'de bile iri
- *  duruyordu ve her ekran kendi `h-7 text-xs` reçetesini yazıyordu. */
+ *  duruyordu ve her ekran kendi `h-7 text-xs` reçetesini yazıyordu. `icon`: kare ikon düğmesi
+ *  (⋮ menü, ↺ vazgeç) — erişilebilir ad `aria-label` ile ZORUNLU. */
 const SIZES = {
   xs: "h-7 touch:h-11 gap-1 rounded-[var(--radius-control)] px-2.5 text-xs",
   sm: "h-8 touch:h-11 gap-1.5 rounded-[var(--radius-control)] px-3 text-xs",
   md: "h-9 touch:h-11 gap-2 rounded-[var(--radius-control)] px-4 text-sm",
   lg: "h-10 touch:h-11 gap-2 rounded-[var(--radius-control)] px-5 text-sm",
+  icon: "h-8 w-8 touch:h-11 touch:w-11 rounded-[var(--radius-control)] p-0",
 } as const;
 
 /** İkon boyu boy ölçeğiyle birlikte büyür — elle `h-4 w-4` yazmaya gerek yok. */
@@ -42,10 +48,20 @@ const ICON_SIZES = {
   sm: "h-3.5 w-3.5",
   md: "h-4 w-4",
   lg: "h-4 w-4",
+  icon: "h-4 w-4",
 } as const;
 
 const BASE =
-  "focus-ring press inline-flex items-center justify-center font-semibold transition disabled:pointer-events-none disabled:opacity-55";
+  // Pasif görünüm: .btn-* varyantlarında kit.css (sönük ama okunur yüzey), diğerlerinde opaklık.
+  "focus-ring press inline-flex items-center justify-center font-semibold transition disabled:pointer-events-none";
+
+export type ButtonVariant = keyof typeof VARIANTS;
+export type ButtonSize = keyof typeof SIZES;
+
+/** Aynı görünüm düğme olmayan öğeye (ör. `<a>`, `<summary>`): `className={buttonClass({ variant: "outline" })}`. */
+export function buttonClass({ variant = "primary", size = "md", className }: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}) {
+  return cn(BASE, VARIANTS[variant], SIZES[size], className);
+}
 
 type CommonProps = {
   variant?: keyof typeof VARIANTS;
