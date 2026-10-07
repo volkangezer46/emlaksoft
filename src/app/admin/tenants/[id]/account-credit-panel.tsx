@@ -100,7 +100,7 @@ export function AccountCreditPanel({
             ["Toplam yüklenen", formatTry(balance.granted_total)],
           ].map(([k, v]) => (
             <div key={k} className="rounded-[var(--radius-control)] border border-line bg-surface-sunken px-3 py-2">
-              <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">{k}</dt>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">{k}</dt>
               <dd className="font-display text-base font-bold text-ink-950">
                 <Link href="/admin/billing" className="focus-ring hover:underline">
                   {v}
