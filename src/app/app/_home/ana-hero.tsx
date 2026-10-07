@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { ArrowRight, Phone, Plus, Receipt, Tv } from "lucide-react";
 import { DashboardHero } from "@/components/ui/dashboard-hero";

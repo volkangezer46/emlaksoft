@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { deleteBroadcast, updateBroadcast } from "@/app/actions/platform-notifications";

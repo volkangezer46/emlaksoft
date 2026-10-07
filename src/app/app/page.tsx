@@ -1,6 +1,6 @@
 import { ShortcutBar } from "@/components/ui/shortcut-bar";
 import { Suspense, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { resolveScope, SCOPE_COOKIE } from "@/lib/ui/scope";

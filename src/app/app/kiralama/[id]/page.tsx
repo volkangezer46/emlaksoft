@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, StickyNote, TrendingUp, User, Wrench } from "lucide-react";

@@ -2,7 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Check, CircleCheck, Copy, Eye, EyeOff, Loader2, Plus, RotateCcw, TriangleAlert } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { checkOfficeSlugAvailability, createTenantByAdmin, type CreateOfficeResult, type SlugCheckResult } from "@/app/actions/platform-tenants";

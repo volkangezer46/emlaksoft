@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Loader2, Minus, Plus, ShieldAlert, Users2 } from "lucide-react";
 import { startSeatPurchase } from "@/app/actions/billing";
 import { BILLING_VAT_RATE, type PlanDef, type SeatTier } from "@/lib/billing/plans";

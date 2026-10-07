@@ -27,6 +27,7 @@ import {
   type DealStage,
 } from "@/lib/workflow-state";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string };
 
@@ -88,6 +89,9 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
+  // Özel alanlar: kayıttan ÖNCE doğrulanır (zorunlu/tür hatası anlaşmayı yazdırmaz).
+  const customFields = await prepareCustomFieldInputs(supabase, gate.tenantId, "deal", formData);
+  if (!customFields.ok) return { error: customFields.error };
   const { data: deal, error } = await supabase
     .from("deals")
     .insert({
@@ -107,6 +111,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
     console.error("createPipelineDeal", error);
     return { error: actionErrorMessage(error, "Anlaşma oluşturulamadı.") };
   }
+  await writeCustomFieldInputs(supabase, { tenantId: gate.tenantId, userId: gate.userId, recordId: deal.id }, customFields.value);
 
   await logActivity({
     tenantId: gate.tenantId,

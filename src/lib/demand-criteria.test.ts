@@ -10,6 +10,7 @@ import {
   isOwnerSideCustomerType,
   parseDemandCriteria,
   parseDemandValues,
+  validateDemandCriteria,
 } from "./demand-criteria";
 
 describe("parseDemandValues", () => {
@@ -113,5 +114,39 @@ describe("form yardımcıları", () => {
   it("alan adları tek ve benzersiz", () => {
     expect(new Set(DEMAND_FIELD_NAMES).size).toBe(DEMAND_FIELD_NAMES.length);
     expect(Object.values(DEMAND_FIELD_GROUPS).flat().length).toBe(DEMAND_FIELD_NAMES.length);
+  });
+});
+
+describe("validateDemandCriteria (eski zod şemasıyla aynı kurallar)", () => {
+  it("varsayılanlar, kırpma ve bilinmeyen anahtar atma", () => {
+    expect(validateDemandCriteria({ heating: "  Kombi  ", extra: 1 })).toEqual({
+      required: [], max_sqm: null, floor_min: null, floor_max: null, heating: "Kombi", facade: null,
+      features: [], uses_loan: false, swap_ok: false, extra_locations: [],
+    });
+    expect(validateDemandCriteria({ heating: "   " })!.heating).toBeNull();
+  });
+
+  it("yanlış tür / sınır dışı değer tüm nesneyi geçersiz kılar", () => {
+    for (const bad of [
+      { required: ["yok"] },
+      { max_sqm: 0 },
+      { floor_min: 1.5 },
+      { floor_max: 201 },
+      { heating: "x".repeat(61) },
+      { features: ["a", ""] },
+      { features: Array.from({ length: 13 }, (_, i) => `f${i}`) },
+      { uses_loan: "true" },
+      { extra_locations: [{ province_id: "kısa" }] },
+      { extra_locations: Array.from({ length: 5 }, () => ({})) },
+    ]) {
+      expect(validateDemandCriteria(bad), JSON.stringify(bad)).toBeNull();
+      expect(parseDemandCriteria(bad)).toEqual(parseDemandCriteria({}));
+    }
+  });
+
+  it("geçerli ek bölge ve özellikler korunur", () => {
+    const id = "0123abcd-0000-4000-8000-000000000001";
+    const v = validateDemandCriteria({ required: ["budget"], features: [" Asansör "], extra_locations: [{ province_id: id }] });
+    expect(v).toMatchObject({ required: ["budget"], features: ["Asansör"], extra_locations: [{ province_id: id, district_id: null, neighborhood_id: null }] });
   });
 });

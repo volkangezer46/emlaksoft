@@ -1,10 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CheckCircle2, Clock3, Eye, FileSignature, MapPin, Undo2, XCircle } from "lucide-react";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EntityThumb, MobileCard, MobileCardList, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
+import { EntityThumb, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import type { CalendarEvent } from "@/lib/calendar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
@@ -170,8 +170,8 @@ function LeaveFlag({ a }: { a: AppointmentVM }) {
 /** md+ tablo görünümü. */
 export function AppointmentTable({ rows, density, typeOptions, advisors }: { rows: AppointmentVM[]; density: Density; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={1040} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={1040} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -193,7 +193,7 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
                   <p className="numeric font-display text-base font-extrabold text-ink-950">{a.timeLabel}</p>
                   <p className="text-xs uppercase tracking-[0.06em] text-text-faint">{a.dateLabel}</p>
                 </TD>
-                <TD>
+                <TD primary>
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" name={a.customerName} size="sm" />
                     <div className="min-w-0">
@@ -235,7 +235,7 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
                 <TD>
                   <Pills a={a} />
                 </TD>
-                <TD>
+                <TD actions>
                   <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar={false} />
                 </TD>
               </TR>
@@ -247,37 +247,3 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
   );
 }
 
-/** <md: tablo yerine kart listesi. */
-export function AppointmentMobileList({ rows, typeOptions, advisors }: { rows: AppointmentVM[]; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[] }) {
-  return (
-    <MobileCardList>
-      {rows.map((a) => (
-        <MobileCard key={a.id} id={`randevu-m-${a.id}`} className="scroll-mt-24">
-          <div className="flex items-start gap-3">
-            <EntityThumb alt="" name={a.customerName} size="sm" />
-            <div className="min-w-0 flex-1">
-              {a.cardHref ? (
-                <Link href={a.cardHref} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                  {a.customerName}
-                </Link>
-              ) : (
-                <p className="truncate font-semibold text-text">{a.customerName}</p>
-              )}
-              <p className="numeric mt-0.5 text-xs text-text-muted">
-                {a.dateLabel} · {a.timeLabel} · {a.typeLabel}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-text-muted">{a.propertyName}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <Pills a={a} />
-                <LeaveFlag a={a} />
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 border-t border-line pt-2">
-            <Actions a={a} typeOptions={typeOptions} advisors={advisors} withCalendar />
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

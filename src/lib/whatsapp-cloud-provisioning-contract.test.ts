@@ -14,7 +14,8 @@ import {
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const actions = read("src/app/actions/tenant-integrations.ts");
 const campaignActions = read("src/app/actions/campaigns.ts");
-const settingsPage = read("src/app/app/ayarlar/page.tsx");
+// Entegrasyon verisi ayarlar sayfasının sekme dosyasında (sekme bölme, PB52 turu).
+const settingsPage = read("src/app/app/ayarlar/_sekmeler/entegrasyon-tab.tsx");
 const integrationsForm = read("src/app/app/ayarlar/integrations-form.tsx");
 const campaignDialog = read("src/app/app/kampanyalar/yeni/new-campaign-form.tsx");
 const templateClient = read("src/lib/messaging/whatsapp-cloud.ts");

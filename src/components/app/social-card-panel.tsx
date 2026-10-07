@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { eligibleListingLinks, SOCIAL_LINK_REQUIRED_MESSAGE } from "@/lib/social-card/core";

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   AlarmClock,
   ArrowUpRight,
@@ -32,6 +32,8 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDealsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
+import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
+import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { relatedSearchClause } from "@/lib/list-search";
 import { buildHref } from "@/lib/ui/filter-params";
@@ -55,7 +57,7 @@ import {
   type ViewOption,
 } from "@/components/ui/list-kit";
 import { getSetting } from "@/lib/settings/read";
-import { DealMobileList, DealTable, type DealVM } from "./deal-rows";
+import { DealTable, type DealVM } from "./deal-rows";
 import { DealBulkBar } from "./deal-bulk-bar";
 import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
@@ -153,6 +155,9 @@ export default async function DealsPage({
   if (officeWide && danismanF) urlParams.danisman = danismanF;
   if (bayatF) urlParams.bayat = "1";
   if (density === "kompakt" && gorunum === "liste") urlParams.yogunluk = "kompakt";
+  // Özel alan filtresi (?ozel=anahtar:değer): liste ve pano aynı kimlik kümesiyle daralır.
+  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "deal", customFilterRaw(sp as Record<string, string | undefined>));
+  if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
@@ -169,6 +174,7 @@ export default async function DealsPage({
   // Liste/pano ortak filtreleri (danışman kapsamı, arama, bayat); aşama yalnız liste görünümünde.
   let listQuery = scoped(supabase.from("deals").select(SELECT_COLS, { count: "exact" }).match(scope));
   if (search.clause) listQuery = listQuery.or(search.clause);
+  listQuery = applyCustomFieldIds(listQuery, customFilter.ids);
   if (bayatF) listQuery = listQuery.not("stage", "in", "(won,lost)").lt("updated_at", staleIso);
   if (gorunum === "liste") {
     if (asamaF === "acik") listQuery = listQuery.not("stage", "in", "(won,lost)");
@@ -531,6 +537,7 @@ export default async function DealsPage({
             resultCount={chips.length > 0 ? (dealCount ?? rawRows.length) : undefined}
             savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
           />
+          <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
 
           {/* Aşama çipleri: pano görünümünde tıklayınca liste görünümüne iner (sunucu filtresi ?asama=) */}
           <CategoryChips
@@ -564,7 +571,6 @@ export default async function DealsPage({
                     />
                   ) : null}
                   <DealTable rows={viewModels} density={density} selectable={canEdit} />
-                  <DealMobileList rows={viewModels} />
                 </BulkSelectionProvider>
               )}
               <ListPager pathname={PATH} params={urlParams} window={win} total={dealCount ?? rawRows.length} />

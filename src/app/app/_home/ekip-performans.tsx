@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";

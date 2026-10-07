@@ -1,6 +1,6 @@
 import { Children, cloneElement, isValidElement } from "react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { cn } from "@/lib/utils";
 import { errorNextStep, fieldAriaProps, type NextStep } from "@/lib/form-logic";
 

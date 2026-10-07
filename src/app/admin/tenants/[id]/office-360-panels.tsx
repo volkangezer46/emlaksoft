@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { ArrowUpRight, Download, ShieldAlert } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state";

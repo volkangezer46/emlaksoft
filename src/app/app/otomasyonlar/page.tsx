@@ -3,7 +3,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { StatRow } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   Zap,
   Play,

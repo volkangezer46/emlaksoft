@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { cn } from "@/lib/utils";
 import { VIZ_SERIES } from "@/components/ui/viz/colors";
 

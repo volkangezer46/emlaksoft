@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { MapPinned } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { listNeighborhoodNotes } from "@/lib/neighborhood-notes/load";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Layers, Lock, PowerOff, Sparkles } from "lucide-react";
 import { applyModulePreset, setModuleEnabled } from "@/app/actions/modules";

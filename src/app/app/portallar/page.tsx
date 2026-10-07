@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { daysAgoIso, msSince, msUntil, DAY_MS } from "@/lib/clock";
 import {
   AlertTriangle,

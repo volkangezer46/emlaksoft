@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { AlarmClock, BarChart3, CalendarX2, FileSignature, PenLine, PieChart, Plus, Search, Send } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
@@ -31,7 +31,7 @@ import {
   weeklySeriesOf,
   type KpiItem,
 } from "@/components/ui/list-kit";
-import { ContractMobileList, ContractTable, type ContractVM } from "./contract-rows";
+import { ContractTable, type ContractVM } from "./contract-rows";
 import { ContractBulkBar } from "./contract-bulk-bar";
 import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
@@ -397,7 +397,6 @@ export default async function SozlesmelerPage({
             <BulkSelectionProvider>
               {canEditContracts ? <ContractBulkBar /> : null}
               <ContractTable rows={viewModels} density={density} selectable={canEditContracts} />
-              <ContractMobileList rows={viewModels} />
             </BulkSelectionProvider>
           )}
 

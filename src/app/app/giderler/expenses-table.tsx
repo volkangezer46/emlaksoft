@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Building2, Receipt, SearchX, Trash2 } from "lucide-react";
+import Link from "@/components/ui/smart-link";
+import { Building2, Paperclip, Receipt, SearchX, Trash2 } from "lucide-react";
+import { expenseReceiptHref } from "@/lib/expense-receipts";
 import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";
 import { ExpenseBulkBar } from "./expense-bulk-bar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -48,11 +49,14 @@ export function ExpensesTable({
   categories,
   canEdit,
   canDelete,
+  receiptUploads = false,
 }: {
   expenses: Expense[];
   categories: readonly Category[];
   canEdit: boolean;
   canDelete: boolean;
+  /** Fiş dosyası yükleme etkin mi (düzenleme panelinde). */
+  receiptUploads?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -161,7 +165,7 @@ export function ExpensesTable({
                     {e.notes ? (
                       <span className="mt-0.5 block text-xs font-normal text-text-faint">{e.notes}</span>
                     ) : null}
-                    {e.property_id || e.receipt_url ? (
+                    {e.property_id || e.receipt_url || e.receipt_file ? (
                       <span className="relative z-10 mt-1 flex flex-wrap items-center gap-3 text-xs font-normal">
                         {e.property_id ? (
                           <Link href={`/app/portfoyler/${e.property_id}`} className="inline-flex items-center gap-1 text-brand-600 hover:underline">
@@ -171,6 +175,11 @@ export function ExpensesTable({
                         {e.receipt_url ? (
                           <a href={e.receipt_url} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-brand-600 hover:underline">
                             <Receipt className="h-3 w-3" /> Fiş
+                          </a>
+                        ) : null}
+                        {e.receipt_file ? (
+                          <a href={expenseReceiptHref(e.receipt_file.id, "preview")} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand-600 hover:underline" title={e.receipt_file.name}>
+                            <Paperclip className="h-3 w-3" /> Fiş dosyası
                           </a>
                         ) : null}
                       </span>
@@ -232,6 +241,7 @@ export function ExpensesTable({
           key={editing.id}
           expense={editing}
           categories={categories}
+          receiptUploads={receiptUploads}
           open
           onOpenChange={(open) => {
             if (!open) setEditing(null);

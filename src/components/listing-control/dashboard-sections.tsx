@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowRight, Building2, CheckCircle2, Clock3, EyeOff, Gauge, RadioTower, Siren, AlertTriangle, Sparkles } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { RadialGauge } from "@/components/ui/viz";

@@ -1,7 +1,7 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
   CheckCircle2,

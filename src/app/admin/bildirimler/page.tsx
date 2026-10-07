@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Bell, BellRing, CheckCheck, Inbox, MailOpen } from "lucide-react";
 import { requirePlatformStaff } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";

@@ -8,7 +8,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs, trParts } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";

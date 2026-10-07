@@ -1,6 +1,6 @@
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { HelpTip } from "@/components/ui/help-tip";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import {
   AlertTriangle,

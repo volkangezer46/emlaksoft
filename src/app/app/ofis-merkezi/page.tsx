@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { parseTab, tabHref } from "@/lib/office-center/logic";

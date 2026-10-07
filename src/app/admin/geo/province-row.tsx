@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronRight, LoaderCircle, Pencil, RefreshCw, X } from "lucide-react";
 import {
   enqueueProvinceGeoSync,

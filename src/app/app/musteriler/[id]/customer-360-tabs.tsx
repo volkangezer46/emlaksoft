@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import {

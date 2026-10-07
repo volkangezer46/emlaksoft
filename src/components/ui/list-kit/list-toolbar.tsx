@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { Rows3, Rows4, Search, SlidersHorizontal, X } from "lucide-react";
 import { buildHref, formatCount, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";

@@ -1,5 +1,5 @@
 import { formatTry } from "@/lib/format";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { cookies } from "next/headers";
 import { AlertTriangle, Gift } from "lucide-react";
 import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";

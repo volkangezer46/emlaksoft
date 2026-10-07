@@ -1,11 +1,9 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Eye, KeyRound, User } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
-  MobileCard,
-  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -61,8 +59,8 @@ function Flags({ r }: { r: RentalVM }) {
 /** md+ tablo görünümü. */
 export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Density }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={920} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={920} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -80,7 +78,7 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
           <TBody>
             {rows.map((r) => (
               <TR key={r.id} interactive>
-                <TD>
+                <TD primary>
                   <IntentLink href={r.href} className="absolute inset-0" aria-label={`${r.propertyLabel ?? "Kira kaydı"} kira detayını aç`} />
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" icon={KeyRound} size="sm" />
@@ -114,7 +112,7 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
                     {r.evreLabel}
                   </StatusPill>
                 </TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={r.href} label={`${r.propertyLabel ?? "Kira"} detayını aç`} icon={Eye} />
                     {r.propertyId ? <RowActionLink href={`/app/portfoyler/${r.propertyId}`} label={`${r.propertyLabel ?? "Portföy"} kaydını aç`} icon={Building2} /> : null}
@@ -130,30 +128,3 @@ export function RentalTable({ rows, density }: { rows: RentalVM[]; density: Dens
   );
 }
 
-/** <md: tablo yerine kart listesi. */
-export function RentalMobileList({ rows }: { rows: RentalVM[] }) {
-  return (
-    <MobileCardList>
-      {rows.map((r) => (
-        <MobileCard key={r.id}>
-          <div className="flex items-start gap-3">
-            <EntityThumb alt="" icon={KeyRound} size="sm" />
-            <div className="min-w-0 flex-1">
-              <Link href={r.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                {r.propertyLabel ?? "Kira kaydı"}
-              </Link>
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {r.renterName ?? "Kiracı yok"}
-                {r.nextDue ? ` · vade ${r.nextDue}` : ""}
-              </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <Flags r={r} />
-                <span className="numeric text-sm font-semibold text-text">{r.rent}</span>
-              </div>
-            </div>
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

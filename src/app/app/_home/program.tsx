@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, ChevronRight, Navigation, Route } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { loadTodayAppointments, type HomeCtx } from "./data";

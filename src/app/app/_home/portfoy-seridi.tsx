@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, MapPin, TrendingDown } from "lucide-react";
 import { trParts } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";

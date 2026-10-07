@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Lock, Plus, ThumbsDown, Trophy, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";

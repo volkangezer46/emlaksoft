@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { CONTROL_BASE } from "./helpers";
 
 /** Kayıp-Kaçak Kalkanı sayfası (yol DEĞİŞMEZ; nav-config kuralı). İlan Kontrol alt gezinmesinin "Kapanış kayıpları" sekmesi. */

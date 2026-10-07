@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Tag } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createOffer } from "@/app/actions/offers";

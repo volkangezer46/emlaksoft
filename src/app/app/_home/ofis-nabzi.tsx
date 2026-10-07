@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, BellRing, History } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";

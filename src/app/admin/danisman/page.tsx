@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, CreditCard, Hourglass, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { buildAdvisorContext, isAiConfigured } from "@/lib/ai-advisor";

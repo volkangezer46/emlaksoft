@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { Building2, Gauge, Info, Scale, Share2, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";

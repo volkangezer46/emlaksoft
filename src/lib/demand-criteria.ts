@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { parseMoneyInput } from "@/lib/money-input";
 
 /**
@@ -41,40 +40,117 @@ export const DEMAND_FIELD_NAMES: readonly string[] = [
 import { CRITERIA_REQUIRED_KEYS, CRITERIA_LABELS, type CriteriaKey } from "@/lib/demand-criteria-labels";
 export { CRITERIA_REQUIRED_KEYS, CRITERIA_LABELS, type CriteriaKey };
 
+/*
+ * jsonb doğrulaması el yazımı (zod YOK): bu modül müşteri/talep/portföy formları ve içe aktarma sihirbazı üzerinden
+ * istemci paketine girer; zod ~280 KB ham taşıyordu (HIZ_OLCUM_RAPORU_5 §3, P3). Kurallar eski zod şemasıyla birebir:
+ * tanımsız → varsayılan, yanlış tür / sınır dışı → TÜM nesne geçersiz; bilinmeyen anahtarlar atılır.
+ */
 const ID_RE = /^[0-9a-fA-F-]{8,40}$/;
-const idOrNull = z
-  .string()
-  .regex(ID_RE)
-  .nullable()
-  .optional()
-  .transform((v) => v ?? null);
+const INVALID = Symbol("invalid");
+type Invalid = typeof INVALID;
 
-export const extraLocationSchema = z.object({
-  province_id: idOrNull,
-  district_id: idOrNull,
-  neighborhood_id: idOrNull,
-});
-export type DemandLocation = z.infer<typeof extraLocationSchema>;
+export type DemandLocation = { province_id: string | null; district_id: string | null; neighborhood_id: string | null };
 
 export const MAX_EXTRA_LOCATIONS = 4;
 export const MAX_FEATURE_TAGS = 12;
 
-const intOrNull = z.number().int().min(-5).max(200).nullable().optional().transform((v) => v ?? null);
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
-export const demandCriteriaSchema = z.object({
-  required: z.array(z.enum(CRITERIA_REQUIRED_KEYS)).max(CRITERIA_REQUIRED_KEYS.length).default([]),
-  max_sqm: z.number().positive().max(1_000_000).nullable().optional().transform((v) => v ?? null),
-  floor_min: intOrNull,
-  floor_max: intOrNull,
-  heating: z.string().trim().max(60).nullable().optional().transform((v) => v || null),
-  facade: z.string().trim().max(60).nullable().optional().transform((v) => v || null),
-  features: z.array(z.string().trim().min(1).max(40)).max(MAX_FEATURE_TAGS).default([]),
-  uses_loan: z.boolean().default(false),
-  swap_ok: z.boolean().default(false),
-  extra_locations: z.array(extraLocationSchema).max(MAX_EXTRA_LOCATIONS).default([]),
-});
+function idOrNull(v: unknown): string | null | Invalid {
+  if (v === undefined || v === null) return null;
+  return typeof v === "string" && ID_RE.test(v) ? v : INVALID;
+}
 
-export type DemandCriteria = z.infer<typeof demandCriteriaSchema>;
+function parseLocation(v: unknown): DemandLocation | Invalid {
+  if (!isObj(v)) return INVALID;
+  const province_id = idOrNull(v.province_id);
+  const district_id = idOrNull(v.district_id);
+  const neighborhood_id = idOrNull(v.neighborhood_id);
+  if (province_id === INVALID || district_id === INVALID || neighborhood_id === INVALID) return INVALID;
+  return { province_id, district_id, neighborhood_id };
+}
+
+function parseLocations(v: unknown): DemandLocation[] | Invalid {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || v.length > MAX_EXTRA_LOCATIONS) return INVALID;
+  const out: DemandLocation[] = [];
+  for (const item of v) {
+    const loc = parseLocation(item);
+    if (loc === INVALID) return INVALID;
+    out.push(loc);
+  }
+  return out;
+}
+
+function intOrNull(v: unknown): number | null | Invalid {
+  if (v === undefined || v === null) return null;
+  return typeof v === "number" && Number.isInteger(v) && v >= -5 && v <= 200 ? v : INVALID;
+}
+
+function shortText(v: unknown): string | null | Invalid {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== "string") return INVALID;
+  const t = v.trim();
+  return t.length > 60 ? INVALID : t || null;
+}
+
+function bool(v: unknown): boolean | Invalid {
+  if (v === undefined) return false;
+  return typeof v === "boolean" ? v : INVALID;
+}
+
+export type DemandCriteria = {
+  required: CriteriaKey[];
+  max_sqm: number | null;
+  floor_min: number | null;
+  floor_max: number | null;
+  heating: string | null;
+  facade: string | null;
+  features: string[];
+  uses_loan: boolean;
+  swap_ok: boolean;
+  extra_locations: DemandLocation[];
+};
+
+/** Eski `demandCriteriaSchema.safeParse` eşi: geçerliyse normalize nesne, değilse null. */
+export function validateDemandCriteria(raw: unknown): DemandCriteria | null {
+  if (!isObj(raw)) return null;
+  let required: CriteriaKey[] = [];
+  if (raw.required !== undefined) {
+    if (!Array.isArray(raw.required) || raw.required.length > CRITERIA_REQUIRED_KEYS.length) return null;
+    if (!raw.required.every((k) => typeof k === "string" && (CRITERIA_REQUIRED_KEYS as readonly string[]).includes(k))) return null;
+    required = raw.required as CriteriaKey[];
+  }
+  let max_sqm: number | null = null;
+  if (raw.max_sqm !== undefined && raw.max_sqm !== null) {
+    if (typeof raw.max_sqm !== "number" || !Number.isFinite(raw.max_sqm) || raw.max_sqm <= 0 || raw.max_sqm > 1_000_000) return null;
+    max_sqm = raw.max_sqm;
+  }
+  const floor_min = intOrNull(raw.floor_min);
+  const floor_max = intOrNull(raw.floor_max);
+  const heating = shortText(raw.heating);
+  const facade = shortText(raw.facade);
+  const uses_loan = bool(raw.uses_loan);
+  const swap_ok = bool(raw.swap_ok);
+  const extra_locations = parseLocations(raw.extra_locations);
+  const features: string[] = [];
+  if (raw.features !== undefined) {
+    if (!Array.isArray(raw.features) || raw.features.length > MAX_FEATURE_TAGS) return null;
+    for (const f of raw.features) {
+      if (typeof f !== "string") return null;
+      const t = f.trim();
+      if (t.length < 1 || t.length > 40) return null;
+      features.push(t);
+    }
+  }
+  if (
+    floor_min === INVALID || floor_max === INVALID || heating === INVALID || facade === INVALID ||
+    uses_loan === INVALID || swap_ok === INVALID || extra_locations === INVALID
+  ) {
+    return null;
+  }
+  return { required, max_sqm, floor_min, floor_max, heating, facade, features, uses_loan, swap_ok, extra_locations };
+}
 
 export const EMPTY_CRITERIA: DemandCriteria = {
   required: [],
@@ -95,8 +171,7 @@ export const EMPTY_CRITERIA: DemandCriteria = {
  */
 export function parseDemandCriteria(raw: unknown): DemandCriteria {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ...EMPTY_CRITERIA };
-  const r = demandCriteriaSchema.safeParse(raw);
-  return r.success ? r.data : { ...EMPTY_CRITERIA };
+  return validateDemandCriteria(raw) ?? { ...EMPTY_CRITERIA };
 }
 
 /** Kriter nesnesinde hiçbir ek kriter yok mu (jsonb'ye `{}` yazılsın diye). */
@@ -167,10 +242,10 @@ function parseExtraLocations(raw: string): DemandLocation[] | null {
   if (!raw) return [];
   try {
     const json: unknown = JSON.parse(raw);
-    const r = z.array(extraLocationSchema).max(MAX_EXTRA_LOCATIONS).safeParse(json);
-    if (!r.success) return null;
+    const r = parseLocations(json);
+    if (r === INVALID) return null;
     // Boş satırı ele; il yoksa ilçe/mahalle anlamsız.
-    return r.data.filter((l) => l.province_id || l.district_id || l.neighborhood_id);
+    return r.filter((l) => l.province_id || l.district_id || l.neighborhood_id);
   } catch {
     return null;
   }
@@ -260,7 +335,7 @@ export function parseDemandValues(values: DemandFormValues): ParsedDemand {
   const required = CRITERIA_REQUIRED_KEYS.filter((k) => requested.has(k) && present[k]);
 
   const truthy = (v: string | undefined) => v === "1" || v === "on" || v === "true";
-  const criteria = demandCriteriaSchema.parse({
+  const criteria = validateDemandCriteria({
     required,
     max_sqm: maxSqm.value,
     floor_min: floorMin.value,
@@ -272,6 +347,7 @@ export function parseDemandValues(values: DemandFormValues): ParsedDemand {
     swap_ok: truthy(values.swap_ok),
     extra_locations: extra,
   });
+  if (!criteria) return { ok: false, error: "Talep kriterleri geçersiz (ısınma/cephe en fazla 60 karakter)." };
 
   return { ok: true, columns, criteria };
 }

@@ -313,6 +313,11 @@ const access: AnySettingDef[] = [
 export const OWNER_WEEKLY_REPORT_KEY = "office.owner_report.weekly_enabled";
 export const HOME_VALUE_SUMMARY_KEY = "office.customer_portal.home_value_enabled";
 export const VITRIN_AI_CHAT_KEY = "office.vitrin.ai_chat_enabled";
+/**
+ * Anonim piyasa verisi paylaşım izni (ofis bazlı opt-in, varsayılan KAPALI). Okuyucu: platform dışa aktarımı
+ * `/admin/ef-kontor/piyasa-verisi` (`src/lib/listing-control/market-export.ts`) yalnız açık ofislerin ilanlarını k≥5 hücrelerde toplar.
+ */
+export const MARKET_DATA_SHARE_KEY = "office.market_data.share_enabled";
 /** Yetki belgesi yıllık harç kontrolü hatırlatma ayı ("0" = kapalı). Okuyucu: abonelik-kontrol cron'u (`license-reminders.ts`). */
 export const LICENSE_FEE_MONTH_KEY = "office.license.annual_fee_month";
 
@@ -358,6 +363,15 @@ const compliance: AnySettingDef[] = [
     label: "Yetki belgesi yıllık harç hatırlatma ayı",
     description: "Seçilen ayın ilk günü ofis sahibi ve genel müdüre yetki belgesi yıllık harç/ödeme ve belge geçerlilik kontrolü hatırlatması düşer (yılda bir kez).",
     impact: "Tutar veya son gün yazılmaz; belgenizden ve güncel mevzuattan doğrulayın. Kapalıyken hatırlatma üretilmez.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: MARKET_DATA_SHARE_KEY,
+    group: "uyum",
+    default: false,
+    label: "Anonim piyasa verisi paylaşımı (EmlakFiyati)",
+    description: "Açılırsa ofisinizin yayındaki ilanlarından yalnız TOPLULAŞTIRILMIŞ ve anonim istatistikler (ilçe × portföy türü × ay: yayında kalma süresi, fiyat değişim bandı, kapanış süresi) bölgesel piyasa endeksine katkı olarak paylaşılabilir.",
+    impact: "Kişisel veri, ilan kodu, adres, malik, danışman veya ofis adı paylaşılmaz; en az 5 ilanlık hücreler dışarı çıkar. Kapalıyken (varsayılan) ofisinizin verisi hiçbir dışa aktarıma girmez.",
   }),
 ];
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { HandCoins } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso, now, trParts } from "@/lib/clock";

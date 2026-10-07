@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowRight, Rocket } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { ButtonLink } from "@/components/ui/button";

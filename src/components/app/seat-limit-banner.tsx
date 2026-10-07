@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Users2 } from "lucide-react";
 import type { SeatUsageSummary } from "@/lib/billing/seat-purchase";
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, ChevronRight, Radar } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
 import { createClient } from "@/lib/supabase/server";

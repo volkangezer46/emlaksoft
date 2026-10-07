@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { RadialGauge } from "@/components/ui/viz";
 import { Progress } from "@/components/ui/progress";
 import { paceGauge, paceVerdict } from "./month-progress";

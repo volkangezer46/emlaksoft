@@ -2,7 +2,7 @@
  * Ana ekran ortak küçük parçaları: panel bağlantısı ve Suspense iskeletleri. Elle çizilmiş mini grafikler (Sparkline,
  * TrendBadge) kaldırıldı (importer yoktu); grafikler tek setten gelir: `@/components/ui/viz` ve `ui/lazy-charts`.
  */
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
 
 /** Panel kartı başlığının sağındaki bağlantı ("Tümü ↗" vb.). */

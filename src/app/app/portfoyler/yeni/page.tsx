@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireModulePage } from "@/lib/require-module-page";
+import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { createClient } from "@/lib/supabase/server";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
@@ -24,6 +25,7 @@ export default async function NewPropertyPage() {
 
   return (
     <PropertyForm
+      customFields={await loadCustomFieldInputDefs(supabase, tenantId, "property")}
       provinces={provinces}
       branches={branches ?? []}
       propertyTypes={propertyTypes.map((d) => d.value)}

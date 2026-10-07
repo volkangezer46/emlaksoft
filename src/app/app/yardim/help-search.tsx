@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useState } from "react";
 import { ArrowRight, Bot, Search } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";

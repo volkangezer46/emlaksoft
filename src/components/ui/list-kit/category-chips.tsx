@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { formatCount, type ParamRecord } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { buildCategoryChips, type CategoryOption } from "./list-logic";

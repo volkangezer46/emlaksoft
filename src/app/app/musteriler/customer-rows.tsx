@@ -1,11 +1,9 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { CalendarPlus, Eye, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
-  MobileCard,
-  MobileCardList,
   RowActionAnchor,
   RowActionLink,
   RowActions,
@@ -113,8 +111,8 @@ export function CustomerTable({
   sortHeader: { name: React.ReactNode; created: React.ReactNode; nameSort?: "ascending" | "descending"; createdSort?: "ascending" | "descending" };
 }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={canBulk ? 980 : 940} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={canBulk ? 980 : 940} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -145,7 +143,7 @@ export function CustomerTable({
                     <CustomerRowCheckbox id={c.id} name={c.name} />
                   </TD>
                 ) : null}
-                <TD>
+                <TD primary>
                   <IntentLink href={c.href} className="absolute inset-0" aria-label={`${c.name} detayları`} />
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" name={c.name} size="sm" />
@@ -193,7 +191,7 @@ export function CustomerTable({
                   {c.lastContact ?? <span className="text-text-faint">Temas yok</span>}
                 </TD>
                 <TD className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} />
                     {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
@@ -212,55 +210,3 @@ export function CustomerTable({
   );
 }
 
-/** <md: tablo yerine dokunmatik dostu kart listesi; hızlı ara / WhatsApp / randevu eylemleri. */
-export function CustomerMobileList({
-  rows,
-  canBulk = false,
-  canEdit = false,
-  canDelete = false,
-}: {
-  rows: CustomerVM[];
-  canBulk?: boolean;
-  canEdit?: boolean;
-  canDelete?: boolean;
-}) {
-  return (
-    <MobileCardList>
-      {rows.map((c) => (
-        <MobileCard key={c.id}>
-          <div className="flex items-start gap-3">
-            {canBulk ? (
-              <span className="mt-1 grid min-h-9 min-w-6 place-items-center">
-                <CustomerRowCheckbox id={c.id} name={c.name} />
-              </span>
-            ) : null}
-            <EntityThumb alt="" name={c.name} size="sm" />
-            <div className="min-w-0 flex-1">
-              <Link href={c.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                {c.name}
-              </Link>
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {c.province}
-                {c.types[0] ? ` · ${c.types[0]}` : ""}
-                {c.lastContact ? ` · Son temas: ${c.lastContact}` : ""}
-              </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <HeatCell c={c} />
-              </div>
-            </div>
-          </div>
-          {c.telHref || c.waHref || canEdit || canDelete ? (
-            <div className="relative z-10 mt-2 flex flex-wrap items-center gap-1 border-t border-line pt-2">
-              {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
-              {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
-              <RowActionLink href={`/app/randevular/yeni?customer=${c.id}`} label={`${c.name} için randevu oluştur`} icon={CalendarPlus} />
-              {canEdit ? <CustomerPortalLinkButton customerId={c.id} customerName={c.name} phone={c.phone} /> : null}
-              {canDelete ? <CustomerRowDelete customerId={c.id} name={c.name} /> : null}
-              <span className="numeric ml-auto text-xs text-text-muted">{c.phoneDisplay}</span>
-            </div>
-          ) : null}
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

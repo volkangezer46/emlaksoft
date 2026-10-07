@@ -95,7 +95,25 @@ export const EXPENSE_FIELDS: FieldDef[] = [
   { key: "notes", label: "Not", hints: ["notlar", "not", "detay", "notes"], sample: "Kasım dönemi" },
 ];
 
+/** Aktif kira: kiralama anlaşması (kazanıldı) + komisyon + kira tek transaction'da kurulur (20261007000710). */
+export const RENTAL_FIELDS: FieldDef[] = [
+  { key: "property_code", label: "Portföy kodu", required: true, hints: ["portfoy kodu", "ilan kodu", "ilan no", "portfoy no", "kod", "code"], sample: "ES-2611-AB12CD" },
+  { key: "renter_name", label: "Kiracı adı", hints: ["kiraci adi", "kiraci ad soyad", "kiraci", "tenant"], sample: "Mehmet Kaya" },
+  { key: "renter_phone", label: "Kiracı telefonu", required: true, hints: ["kiraci telefonu", "kiraci tel", "kiraci cep", "kiraci gsm"], sample: "0533 222 33 44" },
+  { key: "renter_email", label: "Kiracı e-postası", hints: ["kiraci e posta", "kiraci eposta", "kiraci mail"], sample: "mehmet@example.com" },
+  { key: "owner_name", label: "Malik adı", hints: ["malik adi", "ev sahibi adi", "mal sahibi", "malik", "ev sahibi"], sample: "Ayşe Yılmaz" },
+  { key: "owner_phone", label: "Malik telefonu", hints: ["malik telefonu", "ev sahibi telefonu", "malik tel", "ev sahibi tel"], sample: "0532 123 45 67" },
+  { key: "monthly_rent", label: "Aylık kira", required: true, hints: ["aylik kira", "kira bedeli", "kira tutari", "kira", "rent"], sample: "25.000" },
+  { key: "due_day", label: "Vade günü", hints: ["vade gunu", "odeme gunu", "vade", "gun"], sample: "5" },
+  { key: "start_date", label: "Başlangıç tarihi", required: true, hints: ["baslangic tarihi", "sozlesme baslangic", "baslangic", "giris tarihi"], sample: "01.09.2026" },
+  { key: "end_date", label: "Bitiş tarihi", hints: ["bitis tarihi", "sozlesme bitis", "bitis", "cikis tarihi"], sample: "31.08.2027" },
+  { key: "deposit", label: "Depozito", hints: ["depozito", "teminat", "deposit"], sample: "50.000" },
+  { key: "commission", label: "Komisyon tutarı", hints: ["komisyon tutari", "komisyon", "hizmet bedeli"], sample: "25.000" },
+  { key: "notes", label: "Not", hints: ["notlar", "not", "aciklama", "notes"], sample: "Aidat kiracıda" },
+];
+
 export function fieldsFor(target: ImportTarget): FieldDef[] {
+  if (target === "rentals") return RENTAL_FIELDS;
   if (target === "customers") return CUSTOMER_FIELDS;
   if (target === "properties") return PROPERTY_FIELDS;
   if (target === "tasks") return TASK_FIELDS;
@@ -111,6 +129,7 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
   tasks: "Görevler",
   appointments: "Randevular",
   expenses: "Giderler",
+  rentals: "Kiralama",
 };
 
 // ---------------------------------------------------------------------------

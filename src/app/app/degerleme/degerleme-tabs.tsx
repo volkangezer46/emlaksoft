@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 
 const TABS = [
   { key: "motor", href: "/app/degerleme", label: "Değerleme motoru" },

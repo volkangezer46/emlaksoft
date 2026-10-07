@@ -1,5 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
@@ -21,10 +21,9 @@ import { DAY_MS, daysAgoIso, msSince } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { ButtonLink } from "@/components/ui/button";
-import type { CSSProperties } from "react";
+import { DonutRing, RadialGauge } from "@/components/ui/viz";
 
 import { PageHeader } from "@/components/ui/page-header";
-const RING_C = 2 * Math.PI * 42;
 
 /** Sayfa başına kayıt — gerçek sayfalama, 100'lük dilim + bellek filtresi yerine. */
 const PAGE_SIZE = 50;
@@ -240,20 +239,12 @@ export default async function SupportPage({
     return qs ? `/app/destek?${qs}` : "/app/destek";
   };
 
-  const ringTotal = Math.max(1, grandTotal);
   const statusCounts = statusKeys.map((k) => ({
     key: k,
     label: statusLabel[k],
     count: countOf(k),
     color: statusColor[k],
   }));
-  let arcOffset = 0;
-  const arcs = statusCounts.map((s) => {
-    const len = (s.count / ringTotal) * RING_C;
-    const item = { ...s, dash: len, offset: arcOffset };
-    arcOffset += len;
-    return item;
-  });
   const resolveRate = grandTotal ? resolved / grandTotal : 0;
 
   // Kategori dağılımı — çipler ?kategori= ile listeyi süzer (gerçek sayımlar).
@@ -308,38 +299,27 @@ canCreateTicket ? <ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
                 style={{ background: "conic-gradient(from 0deg, var(--mint-400), var(--brand-500), var(--mint-400))" }}
               />
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="10" />
-                {grandTotal === 0 ? (
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="42"
-                    fill="none"
-                    stroke="var(--mint-400)"
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    className="ring-sweep"
-                    style={{ "--circ": RING_C, "--dash": RING_C * 0.85 } as CSSProperties}
-                  />
-                ) : (
-                  arcs.filter((a) => a.count > 0).map((a) => (
-                    /* SVG içi <a>: segment tıklanınca liste o duruma süzülür */
-                    <a key={a.key} href={buildHref({ durum: a.key })} aria-label={`${a.label} taleplerini listele`} className="cursor-pointer">
-                      <circle
-                        cx="50"
-                        cy="50"
-                        r="42"
-                        fill="none"
-                        stroke={a.color}
-                        strokeWidth="10"
-                        strokeDasharray={`${a.dash} ${RING_C - a.dash}`}
-                        strokeDashoffset={-a.offset}
-                      />
-                    </a>
-                  ))
-                )}
-              </svg>
+              {/* Kanonik halka; dilim → liste süzgeci yandaki lejant bağlantılarındadır (sıfır çıkmaz). Talep yoksa boş yatak. */}
+              {grandTotal > 0 ? (
+                <DonutRing
+                  segments={statusCounts.map((s) => ({ label: s.label, value: s.count, color: s.color }))}
+                  size={112}
+                  stroke={11}
+                  trackColor="var(--viz-track-inverse)"
+                  ariaLabel="Destek talepleri durum dağılımı"
+                  className="absolute inset-0"
+                />
+              ) : (
+                <RadialGauge
+                  value={0}
+                  max={1}
+                  size={112}
+                  stroke={11}
+                  trackColor="var(--viz-track-inverse)"
+                  ariaLabel="Destek talebi yok"
+                  className="absolute inset-0"
+                />
+              )}
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold text-white">%{Math.round(resolveRate * 100)}</p>
                 <p className="text-xs text-white/45">çözüm</p>

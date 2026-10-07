@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin, Search } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";

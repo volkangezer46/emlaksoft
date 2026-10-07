@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Bolt, Check, ChevronLeft, ChevronRight, Filter, Loader2, Plus, Trash2, Wand2, Zap } from "lucide-react";
 import { createPortal } from "react-dom";

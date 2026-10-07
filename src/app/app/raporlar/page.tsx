@@ -1,7 +1,7 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReportExportBar } from "@/components/app/report-export-bar";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
   BarChart3,

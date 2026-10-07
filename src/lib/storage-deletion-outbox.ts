@@ -101,8 +101,12 @@ async function currentMetadataReference(
   admin: ReturnType<typeof createAdminClient>,
   job: StorageDeletionJob,
 ): Promise<{ referenced: boolean; error: string | null }> {
-  if (job.bucket === "customer-files" || job.bucket === "property-media") {
-    const table = job.bucket === "customer-files" ? "customer_files" : "property_media";
+  if (job.bucket === "customer-files" || job.bucket === "property-media" || job.bucket === "expense-receipts") {
+    const table = job.bucket === "customer-files"
+      ? "customer_files"
+      : job.bucket === "expense-receipts"
+        ? "expense_receipt_files"
+        : "property_media";
     const { data, error } = await admin
       .from(table)
       .select("id")

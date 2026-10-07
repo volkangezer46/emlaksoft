@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { REAL_USE_HREF, demoStripText } from "@/lib/sample-data/real-use";
 import { trialLabel, trialUrgency } from "@/lib/sample-data/trial";

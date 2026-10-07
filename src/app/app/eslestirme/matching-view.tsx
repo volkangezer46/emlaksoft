@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
   Building2,
@@ -31,11 +31,10 @@ import { decodeDemandPreviewParam, parseDemandValues } from "@/lib/demand-criter
 import { fetchMatchCandidateProperties, MATCH_CANDIDATE_LIMIT } from "@/lib/match-candidates";
 import { SaveMatchButton } from "./save-match-button";
 import { SendMatchButton } from "./send-match-button";
-import type { CSSProperties } from "react";
+import { RadialGauge } from "@/components/ui/viz";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
-const RING_C = 2 * Math.PI * 42;
 /** ?kriter= önizleme bağlantısının sanal talep kimliği (kayıtlı talep değildir). */
 const PREVIEW_DEMAND_ID = "onizleme";
 
@@ -242,20 +241,17 @@ export async function MatchingView({
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
                 style={{ background: "conic-gradient(from 0deg, var(--cyan-400), var(--mint-400), var(--cyan-400))" }}
               />
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="8" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--cyan-400)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  className="ring-sweep"
-                  style={{ "--circ": RING_C, "--dash": RING_C * (1 - hitRate) } as CSSProperties}
-                />
-              </svg>
+              <RadialGauge
+                value={Math.round(hitRate * 100)}
+                max={100}
+                size={112}
+                stroke={9}
+                color="var(--cyan-400)"
+                trackColor="var(--viz-track-inverse)"
+                format="percent"
+                ariaLabel="Eşleşme oranı"
+                className="absolute inset-0"
+              />
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold">{avg || 0}</p>
                 <p className="text-xs text-white/45">ort. skor</p>
@@ -325,7 +321,7 @@ export async function MatchingView({
           {tenantWeights ? "ofise özel" : "varsayılan"}
         </span>
         <Link
-          href="/app/ayarlar#eslestirme-agirliklari"
+          href="/app/ayarlar?sekme=eslestirme#eslestirme-agirliklari"
           className="ml-auto inline-flex items-center gap-1 font-semibold text-brand-600"
         >
           Ayarlar <ArrowUpRight className="h-3.5 w-3.5" />

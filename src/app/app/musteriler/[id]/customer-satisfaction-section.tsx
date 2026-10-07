@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ExternalLink, Eye, HeartHandshake, MessageSquareQuote, Presentation } from "lucide-react";
 // Kopyalama davranışı tek yerde yaşasın diye memnuniyet raporundaki client
 // bileşeni AYNEN yeniden kullanılıyor (o dosya değiştirilmedi, yalnız import).

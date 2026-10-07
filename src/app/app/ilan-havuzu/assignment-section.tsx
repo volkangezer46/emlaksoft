@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CheckCircle2, Clock, Layers } from "lucide-react";
 import { AssignPanel } from "@/components/app/office-center/assign-panel";

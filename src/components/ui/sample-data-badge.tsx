@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { sampleDataHint } from "@/lib/sample-scope";

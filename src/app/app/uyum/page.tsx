@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, CircleCheck, CircleX, Clock3, Eraser, FileCheck2, History, ShieldAlert } from "lucide-react";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";

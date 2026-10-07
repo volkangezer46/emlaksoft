@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -47,11 +47,14 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { CustomerPortalPanel } from "./customer-portal-panel";
-import { CustomerMobileList, CustomerTable } from "./customer-rows";
+import { CustomerTable } from "./customer-rows";
 import { heatTone } from "./customer-list-logic";
 import { HEAT_SEGMENT_KEYS, PAGE_SIZE, WINDOW_DAYS, loadCustomersData } from "./data";
 import { getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
+import { createClient } from "@/lib/supabase/server";
+import { customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
+import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 
 export const metadata = { title: "Müşteriler" };
 
@@ -138,6 +141,8 @@ export default async function CustomersPage({
 
   const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
+  // Özel alan filtresi (?ozel=anahtar:değer): eşleşen kimlikler liste + havuz sorgusuna uygulanır.
+  const customFilter = await resolveCustomFieldFilter(await createClient(), tenantId, "customer", customFilterRaw(sp as Record<string, string | undefined>));
 
   // Tüm sorgular + skorlama data.ts'te (T1); burada yalnız görünüm.
   const {
@@ -167,7 +172,7 @@ export default async function CustomersPage({
     segmentCounts,
     poolLimited,
   weeklyBars,
-  } = await loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter });
+  } = await loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter, customIds: customFilter.ids });
 
   // ---- Link kurucu: filtreler sayfa/sıralama linklerinde korunur ----------
   const baseParams: Record<string, string> = {};
@@ -184,6 +189,7 @@ export default async function CustomersPage({
   if (siralaF)   baseParams.sirala = siralaF;
   if (yonF)      baseParams.yon = yonF;
   if (density === "kompakt") baseParams.yogunluk = "kompakt";
+  if (customFilter.active) baseParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
 
   const hrefWith = (overrides: Record<string, string | undefined>) => {
     const merged: Record<string, string | undefined> = { ...baseParams, ...overrides };
@@ -447,6 +453,7 @@ export default async function CustomersPage({
         resultCount={chips.length > 0 ? totalFiltered : undefined}
         savedViews={<SavedViews route="/app/musteriler" views={savedViews} currentParams={savedViewParams} />}
       />
+      <CustomFieldFilterBar path="/app/musteriler" params={baseParams} state={customFilter} />
 
       {totalAll > 0 ? (
         <div className="space-y-2">
@@ -537,7 +544,6 @@ export default async function CustomersPage({
               createdSort: columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined,
             }}
           />
-          <CustomerMobileList rows={viewModels} canBulk={canBulk} canEdit={canEdit} canDelete={canDelete} />
         </CustomerBulkProvider>
       )}
 

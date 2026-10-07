@@ -1,5 +1,5 @@
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { cn } from "@/lib/utils";
 import { divergingBars, type NetPoint } from "./report-math";
 

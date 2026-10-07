@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Eye, EyeOff, Mail, Phone, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatTurkishPhone } from "@/lib/phone";

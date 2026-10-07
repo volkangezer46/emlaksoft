@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowLeft, ArrowRight, Check, ExternalLink, FileUp, Sparkles } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";

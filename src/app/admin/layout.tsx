@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronRight, ShieldAlert } from "lucide-react";
 import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";

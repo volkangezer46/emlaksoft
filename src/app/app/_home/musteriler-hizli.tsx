@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Bell, PhoneIncoming } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { Widget } from "../dashboard-widgets";

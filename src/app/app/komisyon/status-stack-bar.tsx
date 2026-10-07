@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { statusShares, visibleWidths } from "./commission-math";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });

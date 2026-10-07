@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export const PAGE_SIZE = 50;

@@ -1,6 +1,6 @@
 import { formatTry } from "@/lib/format";
 import { PageHeader } from "@/components/ui/page-header";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import { SignerEditPanel } from "./signer-edit-panel";
 import { CancelContractButton } from "./cancel-contract-button";
 import { CopySignLink } from "./copy-sign-link";
 import { RemindSigner } from "./remind-signer";
+import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
@@ -68,8 +69,10 @@ export default async function ContractDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
+  const { perms, tenantId } = await requireModulePage("contracts", "/app/sozlesmeler");
   const canEdit = perms.contracts?.includes("edit") ?? false;
+  // Sunucudan SMS hatırlatması yalnız ofiste SMS sağlayıcısı hazırsa (yoksa WhatsApp/kopyala).
+  const smsReminder = canEdit && tenantId ? await isTenantSmsAvailable(tenantId) : false;
   const canCreate = perms.contracts?.includes("create") ?? false;
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; sürüm geçmişi yalnız o sekmede sorgulanır
@@ -426,6 +429,9 @@ export default async function ContractDetailPage({
                                     fullName={String(s.full_name)}
                                     phone={(s.phone as string | null) ?? null}
                                     contractTitle={contract.title}
+                                    contractId={String(contract.id)}
+                                    signerId={String(s.id)}
+                                    smsAvailable={smsReminder && contract.status === "sent"}
                                   />
                                   <CopySignLink token={String(s.token)} />
                                 </>

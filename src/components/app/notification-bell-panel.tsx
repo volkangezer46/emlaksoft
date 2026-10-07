@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, startTransition, type Dispatch, type SetStateAction } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   AlertOctagon,
   AlertTriangle,

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { requirePlatformModule } from "@/lib/platform";
 import { getGeoHealth } from "@/lib/geo/admin-store";
 import { GeoHealthCard } from "../health-card";

@@ -32,7 +32,7 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { buildHref } from "@/lib/ui/filter-params";
-import { OfferMobileList, OfferTable, type OfferVM } from "./offer-rows";
+import { OfferTable, type OfferVM } from "./offer-rows";
 import { OfferBulkBar } from "./offer-bulk-bar";
 import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import { daysUntilOfferExpiry } from "@/lib/offer-expiry";
@@ -347,7 +347,6 @@ export default async function TekliflerPage({
             <BulkSelectionProvider>
               {canEditOffers ? <OfferBulkBar /> : null}
               <OfferTable rows={viewModels} density={density} selectable={canEditOffers} />
-              <OfferMobileList rows={viewModels} />
             </BulkSelectionProvider>
           )}
 

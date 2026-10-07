@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
 import { effectiveCanAccessModule, type EffectivePermissions } from "@/lib/permissions-effective";

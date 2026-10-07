@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, ClipboardList, Link2, Phone, PhoneOff, UserRound, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

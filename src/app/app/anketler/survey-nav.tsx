@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { BarChart3, Headphones, HeartPulse, Settings2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";

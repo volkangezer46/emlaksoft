@@ -1,5 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
 import {
   CheckCircle2,

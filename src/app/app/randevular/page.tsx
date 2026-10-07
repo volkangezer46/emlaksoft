@@ -57,7 +57,7 @@ import {
   type ViewOption,
 } from "@/components/ui/list-kit";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
-import { AppointmentMobileList, AppointmentTable, type AppointmentVM } from "./appointment-rows";
+import { AppointmentTable, type AppointmentVM } from "./appointment-rows";
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_TYPE_LABELS,
@@ -890,7 +890,6 @@ export default async function AppointmentsPage({
           </div>
           <ListLimitNotice shown={rows.length} total={apptTotal} hint="Geçmiş randevular için takvimi kullanın." />
           <AppointmentTable rows={viewModels} density={density} typeOptions={appointmentTypeOptions} advisors={editAdvisors} />
-          <AppointmentMobileList rows={viewModels} typeOptions={appointmentTypeOptions} advisors={editAdvisors} />
           <ListPager pathname={PATH} params={urlParams} window={win} total={rows.length} />
         </section>
       )}

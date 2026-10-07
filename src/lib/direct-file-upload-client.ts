@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  DIRECT_FILE_UPLOAD_CONFIG,
+  directUploadConfigForBucket,
   type DirectFileUploadTarget,
 } from "@/lib/direct-file-uploads";
 
@@ -14,9 +14,7 @@ export async function uploadToDirectFileTarget(
     return { ok: false, error: "Dosya bilgileri güvenli yükleme oturumuyla eşleşmiyor." };
   }
 
-  const config = target.bucket === "customer-files"
-    ? DIRECT_FILE_UPLOAD_CONFIG.customer_file
-    : DIRECT_FILE_UPLOAD_CONFIG.property_media;
+  const config = directUploadConfigForBucket(target.bucket);
   if (file.size > config.maxBytes) {
     return { ok: false, error: "Dosya yükleme sınırını aşıyor." };
   }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 
 export type OversightTab = "akis" | "uyarilar" | "karne" | "kurallar" | "benim";
 

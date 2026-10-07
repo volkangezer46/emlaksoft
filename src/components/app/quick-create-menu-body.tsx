@@ -1,7 +1,7 @@
 "use client";
 
 import { KbdCombo } from "@/components/ui/kbd";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Plus } from "lucide-react";
 import {
   DropdownMenu,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowUpRight, BadgeCheck, Building2, Clock3, KeyRound, LayoutGrid, Pencil, Save, Undo2, X } from "lucide-react";
 import { FormField, Input, Textarea } from "@/components/ui/input";

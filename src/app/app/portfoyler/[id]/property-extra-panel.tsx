@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Globe2, Receipt, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatTry } from "@/lib/format";

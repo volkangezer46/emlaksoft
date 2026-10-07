@@ -1,5 +1,5 @@
 import { Table, TBody, TR, TD } from "@/components/ui/table";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Flag } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";

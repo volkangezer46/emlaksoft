@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, Camera, CheckCircle2, CircleDashed } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadPhotoQuality } from "@/lib/photo-quality/load";

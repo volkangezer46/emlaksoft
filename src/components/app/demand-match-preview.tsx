@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Crosshair, Loader2 } from "lucide-react";
 import { previewDemandMatches, type MatchPreviewResult } from "@/app/actions/match-preview";
 import { hasDemandContent, encodeDemandPreviewParam, type DemandFormValues } from "@/lib/demand-criteria";

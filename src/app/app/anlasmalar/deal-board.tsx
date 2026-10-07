@@ -13,7 +13,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   DndContext,
   DragOverlay,

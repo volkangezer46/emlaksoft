@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useEffect, useRef, useState } from "react";
 import { RadioTower } from "lucide-react";
 import { daysAgoIso, now } from "@/lib/clock";

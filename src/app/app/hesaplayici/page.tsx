@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Banknote, Calculator, LineChart } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { cn } from "@/lib/utils";

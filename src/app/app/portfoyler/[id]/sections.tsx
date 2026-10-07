@@ -14,7 +14,7 @@
  * Görünüm ve davranış değişmedi: bu dosyadaki JSX, eski `page.tsx` içindeki
  * ilgili blokların birebir taşınmış hâlidir.
  */
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Landmark, Percent, Siren, Timer, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { moneyTry } from "@/lib/leak-shield";

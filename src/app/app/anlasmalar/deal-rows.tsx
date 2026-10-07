@@ -1,12 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Eye, FileCheck2, Handshake, Layers, MessageSquare, User } from "lucide-react";
 import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
-  MobileCard,
-  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -62,8 +60,8 @@ function Badges({ d }: { d: DealVM }) {
 /** md+ tablo görünümü. */
 export function DealTable({ rows, density, selectable = false }: { rows: DealVM[]; density: Density; selectable?: boolean }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={940} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={940} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -91,7 +89,7 @@ export function DealTable({ rows, density, selectable = false }: { rows: DealVM[
                     <BulkRowCheckbox id={d.id} label={`${d.propertyLabel ?? d.customerName ?? "Anlaşma"} anlaşmasını`} />
                   </TD>
                 ) : null}
-                <TD>
+                <TD primary>
                   <IntentLink href={d.href} className="absolute inset-0" aria-label={`${d.propertyLabel ?? d.customerName ?? "Anlaşma"} detayını aç`} />
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" icon={Handshake} size="sm" />
@@ -132,7 +130,7 @@ export function DealTable({ rows, density, selectable = false }: { rows: DealVM[
                     {d.updatedLabel}
                   </span>
                 </TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={d.href} label="Anlaşma detayını aç" icon={Eye} />
                     {d.propertyId ? <RowActionLink href={`/app/portfoyler/${d.propertyId}`} label={`${d.propertyLabel ?? "Portföy"} kaydını aç`} icon={Building2} /> : null}
@@ -148,31 +146,3 @@ export function DealTable({ rows, density, selectable = false }: { rows: DealVM[
   );
 }
 
-/** <md: tablo yerine kart listesi. */
-export function DealMobileList({ rows }: { rows: DealVM[] }) {
-  return (
-    <MobileCardList>
-      {rows.map((d) => (
-        <MobileCard key={d.id}>
-          <div className="flex items-start gap-3">
-            <EntityThumb alt="" icon={Handshake} size="sm" />
-            <div className="min-w-0 flex-1">
-              <Link href={d.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                {d.propertyLabel ?? d.customerName ?? "Anlaşma"}
-              </Link>
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {d.customerName ?? "Müşteri yok"} · {d.updatedLabel}
-              </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <StatusPill tone={d.stageTone}>{d.stageLabel}</StatusPill>
-                {d.value ? <span className="numeric text-sm font-semibold text-text">{d.value}</span> : null}
-                {d.probability != null ? <span className="numeric text-xs text-text-muted">%{d.probability}</span> : null}
-                <Badges d={d} />
-              </div>
-            </div>
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

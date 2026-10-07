@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { CheckCircle2, ClipboardCheck, Clock3, Gauge, SearchCheck, ShieldAlert, Siren, Timer, TrendingDown, TrendingUp, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";

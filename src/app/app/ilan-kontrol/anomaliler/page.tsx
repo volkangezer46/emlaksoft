@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { Clock3, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";

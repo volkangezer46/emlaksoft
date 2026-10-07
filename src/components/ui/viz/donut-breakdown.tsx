@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { DonutRing } from "./donut-ring";

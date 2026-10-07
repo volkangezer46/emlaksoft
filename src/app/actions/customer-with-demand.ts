@@ -17,6 +17,7 @@ import { createDemand } from "@/app/actions/demands";
 import { linkRecordToCustomer } from "@/app/actions/communications";
 import { findCustomerDuplicates } from "@/lib/duplicate-finders";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 
 export type CustomerWithDemandResult = {
   error?: string;
@@ -109,8 +110,17 @@ export async function createCustomerWithDemand(
     }
   }
 
+  // Özel alanlar (müşteri): kayıttan ÖNCE doğrulanır; müşteri yazılınca eklenir (talebe taşınmaz).
+  const cfGate = await requirePermission("customers", "create");
+  const cfDb = cfGate.ok ? await createClient() : null;
+  const customFields = cfGate.ok && cfDb ? await prepareCustomFieldInputs(cfDb, cfGate.tenantId, "customer", formData) : null;
+  if (customFields && !customFields.ok) return { error: customFields.error };
+
   const customer = await createCustomer({}, formData);
   if (!customer.ok || !customer.id) return { error: customer.error ?? actionErrorMessage(null, "Müşteri eklenemedi.") };
+  if (cfGate.ok && cfDb && customFields?.ok) {
+    await writeCustomFieldInputs(cfDb, { tenantId: cfGate.tenantId, userId: cfGate.userId, recordId: customer.id }, customFields.value);
+  }
   // Gelen kutusu / çağrı kaydından açıldıysa kaynak kayıt yeni müşteriye bağlanır (hata müşteri kaydını bozmaz).
   const linkRef = String(formData.get("link_ref") ?? "").trim();
   const linkMatch = /^([ac])-([0-9a-f-]{36})$/i.exec(linkRef);

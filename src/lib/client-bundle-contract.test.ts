@@ -80,6 +80,17 @@ const CLIENT_ENTRIES = [
   "src/app/app/ayarlar/integrations-form.tsx",
   "src/app/app/ayarlar/logo-upload-form.tsx",
   "src/components/app/notification-prefs.tsx",
+  // P3 (PB52 turu): talep ölçütü doğrulaması el yazımı (demand-criteria zod'suz), parsel ön doğrulaması tıklamada yüklenir.
+  "src/app/app/ice-aktarma/import-wizard.tsx",
+  "src/app/app/musteriler/yeni/customer-form.tsx",
+  "src/app/app/portfoyler/yeni/property-form.tsx",
+  "src/app/app/talepler/yeni/demand-form.tsx",
+  "src/app/app/degerleme/parsel/parsel-client.tsx",
+  "src/components/app/structured-demand-fields.tsx",
+  "src/components/app/demand-summary.tsx",
+  "src/components/app/duplicate-hint.tsx",
+  "src/app/app/giderler/expense-create-form.tsx",
+  "src/app/app/sozlesmeler/[id]/remind-signer.tsx",
 ];
 
 describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
@@ -104,7 +115,18 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
   });
 
   it("zincir izleyici gerçek zinciri bulur (öz-sınama)", () => {
-    expect(chainTo("src/lib/demand-criteria.ts", "zod")).toBe("src/lib/demand-criteria.ts -> zod");
+    expect(chainTo("src/lib/validation/contact.ts", "zod")).toBe("src/lib/validation/contact.ts -> zod");
+  });
+
+  it(".xlsx kütüphanesi yalnız dinamik içe aktarılır (statik zincir yok)", () => {
+    for (const entry of ["src/app/app/ice-aktarma/import-wizard.tsx", "src/components/listing-control/inventory-import-form.tsx", ...CLIENT_ENTRIES]) {
+      expect(chainTo(entry, "read-excel-file"), entry).toBeNull();
+    }
+    expect(read("src/lib/xlsx-import.ts")).toContain('await import("read-excel-file/browser")');
+  });
+
+  it("demand-criteria zod'suz kalır (istemci formlarının ortak modülü)", () => {
+    expect(chainTo("src/lib/demand-criteria.ts", "zod")).toBeNull();
   });
 });
 

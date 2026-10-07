@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { HeartHandshake, X } from "lucide-react";
 import { NUDGE_COPY, nudgeStorageKey, type NudgeMoment } from "@/lib/growth/program";
 

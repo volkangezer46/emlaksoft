@@ -1,7 +1,8 @@
 "use client";
 
+import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createCustomerWithDemand } from "@/app/actions/customer-with-demand";
@@ -52,7 +53,10 @@ export function CustomerForm({
   transactionTypes,
   propertyTypes,
   urgencyOptions,
+  customFields = [],
 }: {
+  /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
+  customFields?: CustomFieldInputDef[];
   /** Gelen kutusundan gelen telefon (saklama biçiminde); boşsa alan boş açılır. */
   initialPhone?: string;
   /** Müşteri oluşunca bağlanacak çağrı / iletişim kaydı (`a-<id>` | `c-<id>`). */
@@ -290,7 +294,7 @@ export function CustomerForm({
       }
       onSubmit={onSubmit}
       tabs={tabs}
-      tabPanels={tabPanels}
+      tabPanels={{ ...tabPanels, kisi: <>{tabPanels.kisi}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       saveAndNew
       fieldLabels={FIELD_LABELS}

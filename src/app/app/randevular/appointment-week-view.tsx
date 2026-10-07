@@ -1,5 +1,5 @@
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { formatTrTime, trParts, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 

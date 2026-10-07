@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
 import { planLabel } from "@/lib/billing/plans";
 import type { SeatAnalytics, SeatSubscriberRow } from "@/lib/billing/seat-analytics";

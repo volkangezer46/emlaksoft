@@ -1,5 +1,5 @@
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { ArrowLeftRight, ArrowUpRight, Building2, CalendarDays, FileText, PhoneCall, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

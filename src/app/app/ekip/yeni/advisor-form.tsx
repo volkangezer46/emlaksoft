@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import type { FormEvent } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, Copy, Info, KeyRound, Mail, UserCheck } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createAdvisor, type CreateAdvisorResult } from "../invite-actions";

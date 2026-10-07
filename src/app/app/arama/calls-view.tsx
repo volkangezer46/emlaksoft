@@ -1,5 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   Activity,
   Clock3,

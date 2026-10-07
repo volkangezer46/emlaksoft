@@ -1,10 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Eye, MapPin, Radio } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import type { CompareItem } from "@/components/public/compare-table";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EntityThumb, MobileCard, MobileCardList, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
+import { EntityThumb, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import { PropertyRowCheckbox, PropertySelectAllCheckbox } from "./property-bulk-actions";
 import { PropertyRowCompare } from "./property-row-compare";
 
@@ -57,8 +57,8 @@ export function PropertyTable({
   density: Density;
 }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={canBulk ? 1040 : 1000} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={canBulk ? 1040 : 1000} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -88,7 +88,7 @@ export function PropertyTable({
                     <PropertyRowCheckbox id={p.id} name={p.title} />
                   </TD>
                 ) : null}
-                <TD>
+                <TD primary>
                   <IntentLink href={p.href} className="absolute inset-0" aria-label={`${p.title} detayları`} />
                   <div className="flex items-center gap-3">
                     <EntityThumb src={p.coverSrc} alt="" icon={Building2} />
@@ -127,7 +127,7 @@ export function PropertyTable({
                   <PortalCell live={p.portalsLive} total={p.portalsTotal} />
                 </TD>
                 <TD className="numeric hidden text-text-muted 2xl:table-cell">{p.createdLabel}</TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={p.href} label={`${p.title} detayını aç`} icon={Eye} />
                     <PropertyRowCompare item={p.compareItem} />
@@ -143,28 +143,3 @@ export function PropertyTable({
   );
 }
 
-/** <md: tablo yerine dokunmatik dostu kart listesi (yatay kaydırma yok). */
-export function PropertyMobileList({ rows }: { rows: PropertyVM[] }) {
-  return (
-    <MobileCardList>
-      {rows.map((p) => (
-        <MobileCard key={p.id} className="flex gap-3">
-          <EntityThumb src={p.coverSrc} alt="" icon={Building2} className="h-16 w-20" />
-          <div className="min-w-0 flex-1">
-            <Link href={p.href} prefetch={false} className="focus-ring line-clamp-2 font-semibold text-text after:absolute after:inset-0">
-              {p.title}
-            </Link>
-            <p className="mt-0.5 truncate text-xs text-text-muted">
-              {p.type} · {p.tx} · {p.location}
-            </p>
-            <p className="mt-1 font-display text-base font-bold text-text">{p.price}</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <StatusPill tone={p.statusTone}>{p.statusLabel}</StatusPill>
-              {p.health ? <StatusPill tone={p.health.tone}>Fiyat: {p.health.label}</StatusPill> : null}
-            </div>
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

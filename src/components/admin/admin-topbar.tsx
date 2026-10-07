@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { CommandPalette } from "@/components/admin/command-palette";
 import { NotificationBell } from "@/components/admin/notification-bell";

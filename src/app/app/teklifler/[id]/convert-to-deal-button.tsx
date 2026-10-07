@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Handshake } from "lucide-react";
 import { convertOfferToDeal } from "@/app/actions/offers";
 

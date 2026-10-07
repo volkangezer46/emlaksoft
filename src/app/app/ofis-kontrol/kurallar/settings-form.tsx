@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useActionState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { saveOversightSettings, type OversightResult } from "@/app/actions/oversight";

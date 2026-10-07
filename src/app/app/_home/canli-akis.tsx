@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { MessageCircle, Phone, Zap } from "lucide-react";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { Widget } from "../dashboard-widgets";

@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 
 /**
  * "Bu listede her şey yok" uyarısı.

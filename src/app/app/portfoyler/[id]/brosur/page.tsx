@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, Flame, Layers, Phone, QrCode, Ruler, BedDouble, CalendarClock, UserRound } from "lucide-react";

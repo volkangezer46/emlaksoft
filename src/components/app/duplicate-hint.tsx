@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, ExternalLink, Lock } from "lucide-react";
 import { useDuplicateCheck, type DuplicateKind } from "@/components/app/use-duplicate-check";
 import type { DuplicateHit } from "@/lib/duplicate-match";

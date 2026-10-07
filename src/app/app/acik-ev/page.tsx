@@ -1,6 +1,6 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
   CalendarDays,

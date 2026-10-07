@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Clock, Loader2, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

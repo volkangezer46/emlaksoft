@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Copy, Send, ShieldAlert, Sparkles } from "lucide-react";
 import { InlinePanel, useInlinePanel } from "@/components/ui/inline-panel";
 import { suggestReplyDraft } from "@/app/actions/reply-draft";

@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Paperclip, Plus } from "lucide-react";
+import { LocalReceiptPreview, RECEIPT_ACCEPT, receiptClientError, uploadExpenseReceipt } from "./expense-receipt-file";
 import { createExpense, type ExpenseResult } from "@/app/actions/expenses";
 import { useToast } from "@/components/app/toast-provider";
 import { Combobox } from "@/components/ui/combobox";
@@ -17,21 +18,54 @@ export function ExpenseCreateForm({
   categories,
   defaultDate,
   defaultProperty = null,
+  receiptUploads = false,
 }: {
   categories: readonly Category[];
   defaultDate: string;
   /** Portföy detayından gelen ön seçim (?portfoy=). */
   defaultProperty?: { value: string; label: string } | null;
+  /** Fiş DOSYASI yükleme etkin mi (20261007000700 uygulanmış + yetki). Kapalıysa yalnız https bağlantı alanı. */
+  receiptUploads?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { push } = useToast();
+  const [receipt, setReceipt] = useState<{ file: File; url: string | null } | null>(null);
+
+  function clearReceipt() {
+    if (receipt?.url) URL.revokeObjectURL(receipt.url);
+    setReceipt(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function onReceiptPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (receipt?.url) URL.revokeObjectURL(receipt.url);
+    if (!file) return setReceipt(null);
+    const problem = receiptClientError(file);
+    if (problem) {
+      push(problem, "err");
+      e.target.value = "";
+      return setReceipt(null);
+    }
+    setReceipt({ file, url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null });
+  }
+
   const [state, action, pending] = useActionState<ExpenseResult, FormData>(
     async (previous, formData) => {
       const result = await createExpense(previous, formData);
       if (result.ok) {
+        // Gider kaydı önce yazılır; fiş dosyası ardından güvenli hattan bu gidere yüklenir.
+        if (receipt && result.id) {
+          const uploaded = await uploadExpenseReceipt(result.id, receipt.file);
+          if (uploaded.ok) push("Gider ve fiş dosyası kaydedildi", "ok");
+          else push(`Gider kaydedildi; fiş yüklenemedi: ${uploaded.error}`, "err");
+        } else {
+          push("Gider kaydedildi", "ok");
+        }
         formRef.current?.reset();
-        push("Gider kaydedildi", "ok");
+        clearReceipt();
         router.refresh();
       }
       return result;
@@ -78,6 +112,25 @@ export function ExpenseCreateForm({
         placeholder="Fiş / e-Arşiv bağlantısı (https://…)"
         className={inputClass}
       />
+      {receiptUploads ? (
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+          <input
+            ref={fileRef}
+            id="expense-receipt-file"
+            type="file"
+            accept={RECEIPT_ACCEPT}
+            className="hidden"
+            onChange={onReceiptPick}
+          />
+          <label
+            htmlFor="expense-receipt-file"
+            className="focus-ring press inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-sm font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+          >
+            <Paperclip className="h-4 w-4" aria-hidden="true" /> Fiş dosyası ekle (görsel / PDF, en fazla 10 MB)
+          </label>
+          {receipt ? <LocalReceiptPreview file={receipt.file} url={receipt.url} onClear={clearReceipt} /> : null}
+        </div>
+      ) : null}
       <button
         type="submit"
         disabled={pending}

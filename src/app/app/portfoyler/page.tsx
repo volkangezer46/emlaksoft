@@ -1,5 +1,5 @@
 import { formatTry } from "@/lib/format";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
 import Image from "next/image";
@@ -36,7 +36,7 @@ import type { CompareItem } from "@/components/public/compare-table";
 import { PropertyCompareShell } from "./compare-shell";
 import { PropertyBulkBar, PropertyBulkProvider } from "./property-bulk-actions";
 import { PropertySortSelect } from "./property-sort-select";
-import { PropertyMobileList, PropertyTable, type PropertyVM } from "./property-rows";
+import { PropertyTable, type PropertyVM } from "./property-rows";
 import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
@@ -74,6 +74,8 @@ import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { formatListingPrice } from "@/lib/format";
 import { formatDateTr } from "@/lib/format";
 import { searchGeoIds } from "@/lib/geo/reader";
+import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
+import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 
 export const metadata = { title: "Portföyler" };
 
@@ -248,6 +250,8 @@ export default async function PropertiesPage({
   ]);
   const eidsIds = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.ids[eidsFilter] : null;
   const eidsTotal = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.counts[eidsFilter] : 0;
+  // Özel alan filtresi (?ozel=anahtar:değer): eşleşen kimlikler ortak filtre kurucusuna iner.
+  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "property", customFilterRaw(params as Record<string, string | undefined>));
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews(PATH);
 
@@ -261,6 +265,7 @@ export default async function PropertiesPage({
   if (danismanF) urlParams.danisman = danismanF;
   if (eklenenDays) urlParams.eklenen = String(eklenenDays);
   if (eidsFilter) urlParams.yetki = eidsFilter;
+  if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   Object.assign(urlParams, propertyNlUrlParams(nlFilters));
   if (siralaF) urlParams.sirala = siralaF;
   if (view !== "liste") urlParams.gorunum = view;
@@ -319,6 +324,7 @@ export default async function PropertiesPage({
     query = applyPropertyNlFilters(query, nlFilters);
     if (photoGap) query = query.in("id", photoGap.ids.length > 0 ? photoGap.ids : ["00000000-0000-0000-0000-000000000000"]);
     if (eidsIds) query = query.in("id", eidsIds.length > 0 ? eidsIds.slice(0, EIDS_ID_CAP) : ["00000000-0000-0000-0000-000000000000"]);
+    query = applyCustomFieldIds(query, customFilter.ids);
     return query;
   };
   const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
@@ -327,7 +333,7 @@ export default async function PropertiesPage({
     return query;
   };
 
-  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters);
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customFilter.active;
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
@@ -763,6 +769,7 @@ export default async function PropertiesPage({
         resultNoun="sonuç"
         savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
       />
+      <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
 
       {/* Tip çipleri (sunucu filtresi, ?kategori=) + fiyat sağlığı dağılımı */}
       {total > 0 ? (
@@ -843,7 +850,6 @@ export default async function PropertiesPage({
             <PropertyBulkProvider key={`${page}|${Object.values(urlParams).join("|")}`}>
               {canEditProperty ? <PropertyBulkBar /> : null}
               <PropertyTable rows={viewModels} ids={pageIds} canBulk={canEditProperty} canEdit={canEditProperty} density={density} />
-              <PropertyMobileList rows={viewModels} />
             </PropertyBulkProvider>
           ) : (
             <div className="list-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">

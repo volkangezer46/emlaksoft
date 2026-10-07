@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Check, Pencil, Phone, Plus, Power, Trash2, UserRound, X } from "lucide-react";
 import { createBranch, deleteBranch, updateBranch } from "@/app/actions/team";
 import { Alert } from "@/components/ui/alert";

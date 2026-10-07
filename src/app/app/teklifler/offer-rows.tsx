@@ -1,12 +1,10 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Eye, User } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
 import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
-  MobileCard,
-  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -38,8 +36,8 @@ const LINK = "focus-ring relative z-10 rounded-[var(--radius-control)] transitio
 /** md+ tablo görünümü. */
 export function OfferTable({ rows, density, selectable = false }: { rows: OfferVM[]; density: Density; selectable?: boolean }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={880} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={880} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -68,7 +66,7 @@ export function OfferTable({ rows, density, selectable = false }: { rows: OfferV
                     <BulkRowCheckbox id={o.id} label={`${o.propertyLabel ?? "Teklif"} teklifini`} />
                   </TD>
                 ) : null}
-                <TD>
+                <TD primary>
                   <IntentLink href={o.href} className="absolute inset-0" aria-label={`${o.propertyLabel ?? "Teklif"} teklif detayı`} />
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" icon={Building2} size="sm" />
@@ -100,7 +98,7 @@ export function OfferTable({ rows, density, selectable = false }: { rows: OfferV
                 </TD>
                 <TD className="hidden text-text-muted xl:table-cell">{o.advisor ?? <span className="text-text-faint">—</span>}</TD>
                 <TD align="right" className="hidden text-text-muted lg:table-cell">{o.dateLabel}</TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={o.href} label={`${o.propertyLabel ?? "Teklif"} teklif detayını aç`} icon={Eye} />
                     {o.customerId ? <RowActionLink href={`/app/musteriler/${o.customerId}`} label={`${o.customerName ?? "Müşteri"} kartını aç`} icon={User} /> : null}
@@ -115,30 +113,3 @@ export function OfferTable({ rows, density, selectable = false }: { rows: OfferV
   );
 }
 
-/** <md: tablo yerine kart listesi. */
-export function OfferMobileList({ rows }: { rows: OfferVM[] }) {
-  return (
-    <MobileCardList>
-      {rows.map((o) => (
-        <MobileCard key={o.id}>
-          <div className="flex items-start gap-3">
-            <EntityThumb alt="" icon={Building2} size="sm" />
-            <div className="min-w-0 flex-1">
-              <Link href={o.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                {o.propertyLabel ?? "Teklif"}
-              </Link>
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {o.customerName ?? "Müşteri yok"} · {o.dateLabel}
-              </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <StatusPill tone={o.statusTone}>{o.statusLabel}</StatusPill>
-                <span className="numeric text-sm font-semibold text-text">{o.amount}</span>
-                {o.counter ? <span className="numeric text-xs text-text-muted">karşı: {o.counter}</span> : null}
-              </div>
-            </div>
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

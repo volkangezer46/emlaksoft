@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+﻿import Link from "@/components/ui/smart-link";
 import { Activity, AlertTriangle, ArrowUpRight, CreditCard, Download, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";

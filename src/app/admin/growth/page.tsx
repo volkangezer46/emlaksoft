@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Handshake, Hourglass, Megaphone, ShieldAlert, Sprout, Users, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";

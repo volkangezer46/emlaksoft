@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CreditCard, FileText, TrendingUp, Wallet, Receipt, Clock } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/ui/empty-state";

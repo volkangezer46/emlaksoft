@@ -1,7 +1,7 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { PageHeader } from "@/components/ui/page-header";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
   ArrowLeft,

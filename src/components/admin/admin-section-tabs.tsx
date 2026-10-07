@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import type { PlatformModule } from "@/lib/platform-access";
 import { activeAdminItem, activeTabHref, adminNavFor } from "@/lib/admin/nav";

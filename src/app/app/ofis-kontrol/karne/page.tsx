@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { Info, UsersRound } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/role-labels";
