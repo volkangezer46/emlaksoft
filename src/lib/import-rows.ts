@@ -16,7 +16,7 @@ import { DEFAULT_DEFINITIONS, defaultLabelMap } from "@/lib/definition-defaults"
 import { parseDemandValues, type DemandColumns, type DemandCriteria } from "@/lib/demand-criteria";
 
 /** Faaliyet türleri (görev / randevu / gider) `import-rows-activity.ts`te doğrulanır; yalnız "atla"/"yeni oluştur". */
-export type ImportTarget = "customers" | "properties" | "demands" | "tasks" | "appointments" | "expenses";
+export type ImportTarget = "customers" | "properties" | "demands" | "tasks" | "appointments" | "expenses" | "rentals";
 export type DuplicatePolicy = "skip" | "update" | "create";
 export type RowStatus = "new" | "update" | "skip" | "error";
 

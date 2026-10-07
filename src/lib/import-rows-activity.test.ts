@@ -5,9 +5,11 @@ import {
   expenseKey,
   parseTrDateTime,
   planActivityRows,
+  rentalKey,
   taskKey,
   validateAppointmentRow,
   validateExpenseRow,
+  validateRentalRow,
   validateTaskRow,
 } from "./import-rows-activity";
 
@@ -67,5 +69,34 @@ describe("planActivityRows", () => {
   it("anahtarlar kararlı", () => {
     expect(taskKey({ title: "Geri Ara", due_at: null, customer_id: null })).toBe(taskKey({ title: "geri ara", due_at: null, customer_id: null }));
     expect(appointmentKey({ scheduled_at: "x", appointment_type: "showing", customer_id: null })).toBe("x|showing|");
+  });
+});
+
+describe("validateRentalRow (kira içe aktarma)", () => {
+  const base = { row: 1, property_code: "ES-1", renter_name: "Mehmet Kaya", renter_phone: "0533 222 33 44", monthly_rent: "25.000", start_date: "15.09.2026" };
+
+  it("zorunlu alanlar: portföy kodu, kiracı telefonu, kira, başlangıç", () => {
+    expect(validateRentalRow({ ...base, property_code: "" }).data).toBeUndefined();
+    expect(validateRentalRow({ ...base, renter_phone: "" }).issues[0]!.message).toMatch(/Kiracı telefonu zorunlu/);
+    expect(validateRentalRow({ ...base, monthly_rent: "" }).data).toBeUndefined();
+    expect(validateRentalRow({ ...base, start_date: "dün" }).data).toBeUndefined();
+  });
+
+  it("telefon parsePhoneStrict ile saklama biçimine; vade günü boşsa başlangıç günü (en çok 28)", () => {
+    const v = validateRentalRow(base);
+    expect(v.data).toMatchObject({ property_code: "ES-1", monthly_rent: 25000, due_day: 15, start_date: "2026-09-15", commission: null });
+    expect(v.data!.renter.phone).toBe("05332223344");
+    expect(validateRentalRow({ ...base, start_date: "30.09.2026" }).data!.due_day).toBe(28);
+    expect(validateRentalRow({ ...base, renter_phone: "12" }).data).toBeUndefined();
+  });
+
+  it("komisyon 0 kabul; bozuk komisyon hatalı; bitiş başlangıçtan önce olamaz; malik = kiracı olamaz", () => {
+    expect(validateRentalRow({ ...base, commission: "0" }).data!.commission).toBe(0);
+    expect(validateRentalRow({ ...base, commission: "abc" }).data).toBeUndefined();
+    expect(validateRentalRow({ ...base, end_date: "01.09.2026" }).data).toBeUndefined();
+    expect(validateRentalRow({ ...base, owner_name: "X", owner_phone: "0533 222 33 44" }).data).toBeUndefined();
+    const withOwner = validateRentalRow({ ...base, owner_name: "Ayşe", owner_phone: "0532 123 45 67" });
+    expect(withOwner.data!.owner).toMatchObject({ name: "Ayşe", phone: "05321234567" });
+    expect(rentalKey({ property_code: "es-1" })).toBe(rentalKey({ property_code: "ES-1" }));
   });
 });

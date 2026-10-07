@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   FileWarning,
   History,
+  KeyRound,
   ListChecks,
   Receipt,
   RefreshCw,
@@ -80,10 +81,15 @@ const TARGETS: { key: ImportTarget; desc: string; icon: typeof Users2 }[] = [
   { key: "tasks", desc: "Görev, son tarih, tür, öncelik; müşteri telefonu ile isteğe bağlı bağ", icon: ListChecks },
   { key: "appointments", desc: "Tarih-saat, randevu türü, konum; müşteri telefonu ile isteğe bağlı bağ", icon: CalendarDays },
   { key: "expenses", desc: "Gider başlığı, tutar, kategori, tarih", icon: Receipt },
+  {
+    key: "rentals",
+    desc: "Aktif kira: portföy kodu, kiracı/malik (telefonla eşleşir, yoksa oluşturulur), kira, başlangıç. Kiralama anlaşması + komisyon birlikte kurulur; geri alınamaz.",
+    icon: KeyRound,
+  },
 ];
 
 /** Bu türlerde "güncelle" politikası yoktur (kimlik anahtarı yok): yalnız atla / yeni oluştur. */
-const NO_UPDATE_TARGETS: readonly ImportTarget[] = ["demands", "tasks", "appointments", "expenses"];
+const NO_UPDATE_TARGETS: readonly ImportTarget[] = ["demands", "tasks", "appointments", "expenses", "rentals"];
 /** Danışman ataması anlamsız olan türler. */
 const NO_ASSIGNEE_TARGETS: readonly ImportTarget[] = ["demands", "expenses"];
 const TARGET_LIST_HREF: Record<ImportTarget, string> = {
@@ -93,8 +99,10 @@ const TARGET_LIST_HREF: Record<ImportTarget, string> = {
   tasks: "/app/gorevler",
   appointments: "/app/randevular",
   expenses: "/app/giderler",
+  rentals: "/app/kiralama",
 };
 const DUPLICATE_RULE: Record<ImportTarget, string> = {
+  rentals: "Portföy kodu ile eşleşir; portföyde aktif kira varsa satır atlanır. Kiracı/malik telefonla aranır, yoksa oluşturulur.",
   customers: "Telefon, yoksa e-posta ile mevcut müşteri aranır.",
   properties: "Aynı başlık + adres mevcut portföy sayılır.",
   demands: "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep mükerrer sayılır.",
@@ -169,7 +177,7 @@ export type ImportWizardProps = {
   canImportProperties: boolean;
   canImportDemands: boolean;
   /** Görev / randevu / gider aktarımı: ilgili modülde oluşturma yetkisi. */
-  canImportActivity?: { tasks: boolean; appointments: boolean; expenses: boolean };
+  canImportActivity?: { tasks: boolean; appointments: boolean; expenses: boolean; rentals?: boolean };
   /** Hedef bazında: mevcut kaydı güncelleme (edit) yetkisi. */
   updateAllowed: Record<ImportTarget, boolean>;
   /** Hedef bazında: geri alma (delete) yetkisi. */
@@ -440,7 +448,9 @@ export function ImportWizard({
                       ? canImportDemands
                       : t.key === "tasks" || t.key === "appointments" || t.key === "expenses"
                         ? canImportActivity[t.key]
-                        : true;
+                        : t.key === "rentals"
+                          ? canImportActivity.rentals === true
+                          : true;
                 return (
                   <button
                     key={t.key}
