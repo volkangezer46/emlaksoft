@@ -16,7 +16,25 @@ export const FIELD = {
   focus: "focus",
   workDistricts: "work_district_ids",
   inviteEmails: "invite_emails",
+  officePhone: "office_phone",
+  addressLine: "address_line",
+  licenseNo: "license_no",
 } as const;
+
+/** Açık adres üst sınırı (admin ofis formu ile aynı). */
+export const ADDRESS_LINE_MAX = 300;
+/** Taşınmaz Ticareti Yetki Belgesi no: harf, rakam, boşluk, nokta, tire, eğik çizgi; en çok 40 (admin formu ile aynı kural). */
+export const LICENSE_NO_RE = /^[\p{L}\p{N} ./-]{1,40}$/u;
+
+export function parseAddressLine(v: unknown): string | null {
+  const s = String(v ?? "").trim().replace(/\s+/g, " ");
+  return s ? s.slice(0, ADDRESS_LINE_MAX) : null;
+}
+
+export function parseLicenseNo(v: unknown): string | null {
+  const s = String(v ?? "").trim().replace(/\s+/g, " ");
+  return s && LICENSE_NO_RE.test(s) ? s : null;
+}
 
 export type OfficeType = "bagimsiz" | "franchise" | "kurumsal";
 export const OFFICE_TYPES: readonly { key: OfficeType; label: string; description: string }[] = [
@@ -121,6 +139,10 @@ export type WizardOfficeProfile = {
   workDistrictIds: string[];
   inviteEmails: string[];
   pack: SamplePack;
+  /** Ham ofis telefonu (PhoneInput saklama değeri); SUNUCUDA parsePhoneStrict ile doğrulanır (apply-office-profile). */
+  officePhoneRaw: string | null;
+  addressLine: string | null;
+  licenseNo: string | null;
 };
 
 /** FormData → doğrulanmış profil. Hiçbir alan zorunlu değildir; eksik alan null/boş kalır (kayıt akışını kesmez). */
@@ -135,5 +157,8 @@ export function readWizardOfficeProfile(formData: FormData, ownerEmail: string):
     workDistrictIds: parseWorkDistrictIds(formData.getAll(FIELD.workDistricts)),
     inviteEmails: parseInviteEmails(formData.getAll(FIELD.inviteEmails), ownerEmail),
     pack: packForFocus(focus),
+    officePhoneRaw: String(formData.get(FIELD.officePhone) ?? "").trim() || null,
+    addressLine: parseAddressLine(formData.get(FIELD.addressLine)),
+    licenseNo: parseLicenseNo(formData.get(FIELD.licenseNo)),
   };
 }

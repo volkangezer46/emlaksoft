@@ -5,6 +5,7 @@ import { now } from "@/lib/clock";
 import { verifyImageFile } from "@/lib/file-validation";
 import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvince } from "@/lib/geo/reader";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { provisionTeamMember } from "@/lib/team/provision-member";
 import type { WizardOfficeProfile } from "./office-profile";
 
@@ -74,6 +75,14 @@ export async function applyWizardOfficeProfile(
     }
   }
   if (profile.brandColor) base.brand_color = profile.brandColor;
+  // İletişim ve yasal kimlik (isteğe bağlı): telefon yalnız katı doğrulamadan geçerse saklama biçimiyle yazılır.
+  if (profile.officePhoneRaw) {
+    const phone = parsePhoneStrict(profile.officePhoneRaw);
+    if (phone.ok) base.phone = phone.stored;
+    else warnings.push("Ofis telefonu geçersiz olduğu için kaydedilmedi; Ayarlar > Ofis bilgileri'nden ekleyin.");
+  }
+  if (profile.addressLine) base.address_line = profile.addressLine;
+  if (profile.licenseNo) base.license_no = profile.licenseNo;
   if (Object.keys(base).length > 0) {
     const { error } = await admin.from("tenants").update({ ...base, updated_at: new Date(now()).toISOString() }).eq("id", tenantId);
     if (error) {

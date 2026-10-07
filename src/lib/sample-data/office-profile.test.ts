@@ -49,6 +49,16 @@ describe("sihirbaz ofis profili ayrıştırıcıları", () => {
     f.append(FIELD.inviteEmails, "d@x.com");
     expect(readWizardOfficeProfile(f, "o@x.com")).toMatchObject({ provinceId: U1, officeType: "kurumsal", focus: ["kiralik"], workDistrictIds: [U2], inviteEmails: ["d@x.com"] });
   });
+  it("iletişim ve yetki belgesi: isteğe bağlı, kurala uymayan değer yazılmaz", () => {
+    const f = new FormData();
+    f.set(FIELD.officePhone, "05321234567");
+    f.set(FIELD.addressLine, "  Atatürk Cd.   No: 5  ");
+    f.set(FIELD.licenseNo, "3400123");
+    expect(readWizardOfficeProfile(f, "o@x.com")).toMatchObject({ officePhoneRaw: "05321234567", addressLine: "Atatürk Cd. No: 5", licenseNo: "3400123" });
+    const bad = new FormData();
+    bad.set(FIELD.licenseNo, "<script>");
+    expect(readWizardOfficeProfile(bad, "o@x.com")).toMatchObject({ officePhoneRaw: null, addressLine: null, licenseNo: null });
+  });
 });
 
 describe("deneme ve gerçek kullanım görünümü", () => {

@@ -6,19 +6,24 @@ import { startTransition, useActionState, useEffect, useRef, useState, useTransi
 import {
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   Building2,
   Check,
   Eye,
   EyeOff,
   Loader2,
+  House,
   Lock,
   Mail,
+  MapPin,
   Palette,
+  Pencil,
   Rocket,
   Sparkles,
   Target,
   Upload,
   User,
+  UserRound,
   Users,
 } from "lucide-react";
 import { signOut, signUp, type AuthResult } from "@/app/actions/auth";
@@ -31,6 +36,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { Progress } from "@/components/ui/progress";
 import { formatNumberTr } from "@/lib/format";
+import { formatPhoneDisplay } from "@/lib/phone";
 import {
   SIGNUP_FIELD_STEP,
   signupErrorTarget,
@@ -43,6 +49,7 @@ import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { registrationQuote, registrationSelection, seatBounds } from "@/lib/billing/seat-calculator-model";
 import {
+  ADDRESS_LINE_MAX,
   BRAND_COLOR_PRESETS,
   FIELD,
   FOCUS_SEGMENTS,
@@ -153,6 +160,11 @@ export function RegisterForm({
   const [loadingDistricts, startDistricts] = useTransition();
   const [workDistricts, setWorkDistricts] = useState<string[]>([]);
   const [demo, setDemo] = useState(true);
+  const [officePhone, setOfficePhone] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [licenseNo, setLicenseNo] = useState("");
+  // Son adım özeti için adım geçişlerinde alınan form görüntüsü (alanlar kontrolsüz; render'da DOM okunmaz).
+  const [snap, setSnap] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
   // Sunucu yanıtı işlendi mi (hata dönünce ilgili adıma geçiş, render sırasında durum ayarı; efekt yok).
   const [handledState, setHandledState] = useState(state);
@@ -274,7 +286,16 @@ export function RegisterForm({
       document.getElementById(signupFieldInputId(pending))?.focus();
       return;
     }
+    takeSnapshot();
     setStep((s) => Math.min(s + 1, LAST));
+  }
+  function takeSnapshot() {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const out: Record<string, string> = {};
+    for (const [k, v] of fd.entries()) if (typeof v === "string" && !(k in out)) out[k] = v;
+    out.__invites = String(fd.getAll(FIELD.inviteEmails).filter((v) => typeof v === "string" && v.trim()).length);
+    setSnap(out);
   }
   function back() {
     setStep((s) => Math.max(1, s - 1));
@@ -505,6 +526,51 @@ export function RegisterForm({
                 }}
               />
             </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="address_line">
+                Açık adres <span className="font-normal text-text-faint">(opsiyonel)</span>
+              </label>
+              <div className="relative">
+                <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                <input
+                  id="address_line"
+                  name={FIELD.addressLine}
+                  value={addressLine}
+                  onChange={(e) => setAddressLine(e.target.value)}
+                  maxLength={ADDRESS_LINE_MAX}
+                  autoComplete="street-address"
+                  placeholder="Mahalle, cadde/sokak, bina no"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="office_phone">
+                  Ofis telefonu <span className="font-normal text-text-faint">(opsiyonel)</span>
+                </label>
+                <PhoneInput id="office_phone" name={FIELD.officePhone} value={officePhone} onValueChange={setOfficePhone} className={plainInputCls} />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="license_no">
+                  Yetki belgesi no <span className="font-normal text-text-faint">(opsiyonel)</span>
+                </label>
+                <div className="relative">
+                  <BadgeCheck className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                  <input
+                    id="license_no"
+                    name={FIELD.licenseNo}
+                    value={licenseNo}
+                    onChange={(e) => setLicenseNo(e.target.value.replace(/[^\p{L}\p{N} ./-]/gu, "").slice(0, 40))}
+                    inputMode="text"
+                    autoComplete="off"
+                    placeholder="Taşınmaz Ticareti Yetki Belgesi"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="-mt-2 text-xs text-text-faint">İletişim ve belge bilgileri vitrinde ve belgelerde kullanılır; sonradan Ayarlar&apos;dan değiştirilebilir.</p>
             <fieldset>
               <legend className="mb-2 text-sm font-semibold text-ink-900">Ofis türü</legend>
               <div className="grid gap-2 sm:grid-cols-3">
@@ -550,23 +616,22 @@ export function RegisterForm({
                 </button>
                 <span className="text-sm text-text-muted">kullanıcı</span>
               </div>
-              <p className="mt-3 min-h-10 rounded-[var(--radius-card)] bg-brand-600/[0.06] px-3.5 py-2.5 text-sm text-ink-950" aria-live="polite">
+              <div className="mt-3" aria-live="polite">
                 {selection.calc.status === "over_max" ? (
-                  <>{selection.calc.limitNote}</>
+                  <p className="rounded-[var(--radius-card)] bg-brand-600/[0.06] px-3.5 py-2.5 text-sm text-ink-950">{selection.calc.limitNote}</p>
                 ) : (
-                  <>
-                    Deneme sonrası önerilen paket: <strong>{selectedPlan.name}</strong>
-                    {quote ? ` · aylık ödemede ${formatNumberTr(quote.totalMonthlyTry)} ₺ / ay + KDV` : ""}
-                  </>
+                  <RecommendedPlanCard plan={selectedPlan} seats={seats} monthlyTry={quote?.totalMonthlyTry ?? null} />
                 )}
-              </p>
+              </div>
               {efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive) ? (
                 <p className="mt-1.5 text-xs font-semibold text-mint-700">
                   {efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive)}
                   {efLive ? "; kontör ile ek sorgu satın alınabilir." : "."}
                 </p>
               ) : null}
-              <p className="mt-2 text-xs text-text-faint">Deneme boyunca tüm özellikler açık; paket sonradan değiştirilebilir.</p>
+              <p className="mt-2 text-xs text-text-faint">
+                Deneme boyunca tüm özellikler açık · paket ve aylık/yıllık seçimi ödeme sırasında yapılır.
+              </p>
             </fieldset>
             <div className="flex gap-2.5">
               <button type="button" onClick={back} className={ghostBtn}>
@@ -768,7 +833,14 @@ export function RegisterForm({
                 Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </button>
             </div>
-            <button type="button" onClick={() => setStep(LAST)} className="w-full text-center text-xs font-semibold text-text-muted hover:text-ink-950">
+            <button
+              type="button"
+              onClick={() => {
+                takeSnapshot();
+                setStep(LAST);
+              }}
+              className="w-full text-center text-xs font-semibold text-text-muted hover:text-ink-950"
+            >
               Şimdilik atla
             </button>
           </div>
@@ -792,18 +864,35 @@ export function RegisterForm({
               </p>
             ) : null}
 
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3 text-xs">
-              <dt className="text-text-faint">Paket (deneme sonrası)</dt>
-              <dd className="font-semibold text-ink-950">
-                {selectedPlan.name} · {formatNumberTr(seats)} kullanıcı
-              </dd>
-              <dt className="text-text-faint">Ofis türü</dt>
-              <dd className="font-semibold text-ink-950">{OFFICE_TYPES.find((t) => t.key === officeType)?.label}</dd>
-              <dt className="text-text-faint">Odak</dt>
-              <dd className="font-semibold text-ink-950">{focus.length ? FOCUS_SEGMENTS.filter((f) => focus.includes(f.key)).map((f) => f.label).join(", ") : "Seçilmedi"}</dd>
-              <dt className="text-text-faint">Deneme</dt>
-              <dd className="font-semibold text-ink-950">{trialText} · kart gerekmez</dd>
-            </dl>
+            <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas">
+              <SummarySection title="Hesap" onEdit={() => setStep(1)}>
+                <SummaryItem label="Ad soyad" value={snap.name || googleAccount?.name} />
+                <SummaryItem label="E-posta" value={googleAccount?.email ?? snap.email} />
+              </SummarySection>
+              <SummarySection title="Ofis" onEdit={() => setStep(2)}>
+                <SummaryItem label="Ofis adı" value={snap.company} />
+                <SummaryItem
+                  label="Konum"
+                  value={[districts.find((d) => d.id === snap[FIELD.districtId])?.name, provinces.find((p) => p.id === snap[FIELD.provinceId])?.name]
+                    .filter(Boolean)
+                    .join(", ")}
+                />
+                <SummaryItem label="Telefon" value={officePhone ? formatPhoneDisplay(officePhone) : ""} />
+                <SummaryItem label="Yetki belgesi" value={licenseNo} />
+                <SummaryItem label="Ofis türü" value={OFFICE_TYPES.find((t) => t.key === officeType)?.label} />
+              </SummarySection>
+              <SummarySection title="Paket" onEdit={() => setStep(2)}>
+                <SummaryItem label="Önerilen" value={`${selectedPlan.name} · ${formatNumberTr(seats)} kullanıcı`} />
+                <SummaryItem label="Tahmini tutar" value={quote ? `${formatNumberTr(quote.totalMonthlyTry)} ₺/ay + KDV` : ""} />
+                <SummaryItem label="Deneme" value={`${trialText} · kart gerekmez`} />
+              </SummarySection>
+              <SummarySection title="Kurulum" onEdit={() => setStep(4)}>
+                <SummaryItem label="Odak" value={FOCUS_SEGMENTS.filter((f) => focus.includes(f.key)).map((f) => f.label).join(", ")} />
+                <SummaryItem label="Çalışılan ilçe" value={workDistricts.length ? `${workDistricts.length} ilçe` : ""} />
+                <SummaryItem label="Davet" value={Number(snap.__invites ?? 0) > 0 ? `${snap.__invites} danışman` : ""} />
+                <SummaryItem label="Marka rengi" value={effectiveHex} swatch={effectiveHex} />
+              </SummarySection>
+            </div>
 
             <div data-field="legal_consent">
             <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
@@ -863,5 +952,88 @@ export function RegisterForm({
         )}
       </div>
     </AuthShell>
+  );
+}
+
+const nfTr = new Intl.NumberFormat("tr-TR");
+const limitTr = (n: number | null) => (n == null ? "Sınırsız" : nfTr.format(n));
+
+/** Danışman sayısından motorun önerdiği paket: fiyat, sınırlar ve öne çıkanlar (deneme sonrası; şimdi ödeme yok). */
+function RecommendedPlanCard({ plan, seats, monthlyTry }: { plan: PlanDef; seats: number; monthlyTry: number | null }) {
+  const tiles = [
+    { label: "Kullanıcı", value: limitTr(plan.limits.seats), Icon: Users },
+    { label: "Şube", value: limitTr(plan.limits.branches), Icon: Building2 },
+    { label: "Müşteri", value: limitTr(plan.limits.customers), Icon: UserRound },
+    { label: "Aktif portföy", value: limitTr(plan.limits.activeProperties), Icon: House },
+  ];
+  return (
+    <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-brand-300/70 bg-gradient-to-b from-brand-600/[0.07] to-surface p-4 shadow-[var(--elev-2)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-text-muted">Deneme sonrası önerilen paket</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            <span className="font-display text-lg font-bold tracking-tight text-ink-950">{plan.name}</span>
+            {plan.popular ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+                <Sparkles className="h-3 w-3" aria-hidden="true" /> En çok tercih
+              </span>
+            ) : null}
+          </p>
+          <p className="text-xs text-text-muted">{plan.blurb}</p>
+        </div>
+        {monthlyTry != null ? (
+          <div className="shrink-0 text-right">
+            <p className="font-display text-xl font-bold tabular-nums tracking-tight text-ink-950">{nfTr.format(monthlyTry)} ₺</p>
+            <p className="text-xs text-text-muted">/ay + KDV · {nfTr.format(seats)} kullanıcı</p>
+          </div>
+        ) : null}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-1.5">
+        {tiles.map(({ label, value, Icon }) => (
+          <div key={label} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line/70 bg-surface/80 px-2 py-1.5">
+            <Icon className="h-3.5 w-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+            <div className="min-w-0 leading-tight">
+              <p className="text-xs font-bold tabular-nums text-ink-950">{value}</p>
+              <p className="truncate text-xs text-text-muted">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <ul className="mt-3 grid gap-1 border-t border-line/70 pt-2.5 sm:grid-cols-2">
+        {plan.features.slice(2, 6).map((f) => (
+          <li key={f} className="flex items-start gap-1.5 text-xs text-text-muted">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" aria-hidden="true" />
+            <span className="min-w-0">{f}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function SummarySection({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
+  return (
+    <section className="border-b border-line px-3.5 py-2.5 last:border-b-0">
+      <div className="mb-1 flex items-center justify-between">
+        <h3 className="text-xs font-bold text-ink-950">{title}</h3>
+        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs font-semibold text-brand-600 hover:bg-brand-600/[0.06]">
+          <Pencil className="h-3 w-3" aria-hidden="true" /> Düzenle
+        </button>
+      </div>
+      <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">{children}</dl>
+    </section>
+  );
+}
+
+function SummaryItem({ label, value, swatch }: { label: string; value?: string | null; swatch?: string }) {
+  const v = (value ?? "").trim();
+  return (
+    <>
+      <dt className="text-text-faint">{label}</dt>
+      <dd className={`flex min-w-0 items-center gap-1.5 truncate ${v ? "font-semibold text-ink-950" : "font-normal text-text-faint"}`}>
+        {swatch ? <span className="h-3 w-3 shrink-0 rounded-full border border-line" style={{ background: swatch }} aria-hidden="true" /> : null}
+        <span className="truncate">{v || "—"}</span>
+      </dd>
+    </>
   );
 }
