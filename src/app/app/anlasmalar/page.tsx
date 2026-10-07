@@ -141,8 +141,8 @@ export default async function DealsPage({
   const officeWide = hasOfficeWideDataScope(role);
   const danismanF = officeWide ? uuidParam(sp.danisman) : userId;
   // Kullanıcı kapsamı (ofis bayrağı açıksa) eski rol kuralını yalnız DARALTIR (takım/şube lideri ofis geneli yerine üyelerini görür).
-  const listScope = await getListScope({ userId, tenantId, role, mineOnly: !officeWide });
-  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
+  // Kapsam, özel alan süzgeci ve arama ön sorgusu birbirinden bağımsız: aşağıda TEK turda beklenir (eskiden 3 ardışık tur).
+  const listScopeP = getListScope({ userId, tenantId, role, mineOnly: !officeWide });
   const bayatF = sp.bayat === "1";
   const density = densityOf(sp.yogunluk);
   const page = parsePage(sp.sayfa);
@@ -156,15 +156,14 @@ export default async function DealsPage({
   if (bayatF) urlParams.bayat = "1";
   if (density === "kompakt" && gorunum === "liste") urlParams.yogunluk = "kompakt";
   // Özel alan filtresi (?ozel=anahtar:değer): liste ve pano aynı kimlik kümesiyle daralır.
-  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "deal", customFilterRaw(sp as Record<string, string | undefined>));
+  const customFilterP = resolveCustomFieldFilter(supabase, tenantId, "deal", customFilterRaw(sp as Record<string, string | undefined>));
+  const searchP = relatedSearchClause(supabase, q, { customerColumn: "customer_id", propertyColumn: "property_id" });
+  const [listScope, customFilter, STALE_DAYS, search] = await Promise.all([listScopeP, customFilterP, staleDaysPromise, searchP]);
+  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
-  const [STALE_DAYS, search] = await Promise.all([
-    staleDaysPromise,
-    relatedSearchClause(supabase, q, { customerColumn: "customer_id", propertyColumn: "property_id" }),
-  ]);
   const staleIso = daysAgoIso(STALE_DAYS);
   const scope: Record<string, string> = danismanF ? { assigned_to: danismanF } : {};
 

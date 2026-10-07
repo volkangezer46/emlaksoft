@@ -129,6 +129,7 @@ export default async function AdminBillingPage({
     { data: captureQueue, count: captureQueueCount, error: captureQueueError },
     { count: manualReviewCount },
     { count: refundRequiredCount },
+    platformMrr,
   ] = await Promise.all([
     subsQuery,
     admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
@@ -141,6 +142,8 @@ export default async function AdminBillingPage({
       .limit(20),
     admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "manual_review"),
     admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "refund_required"),
+    // MRR hesabı liste sorgularından bağımsız: aynı turda (eskiden ardışık). RPC okunamazsa null → eski yaklaşık toplam.
+    loadPlatformMrr(admin, clockNow()).catch(() => null),
   ]);
 
   const listRows = subs ?? [];
@@ -150,7 +153,6 @@ export default async function AdminBillingPage({
   const reconciliationRows = captureQueue ?? [];
   const reconciliationCount = captureQueueCount ?? reconciliationRows.length;
   // MRR: tek hesap (reporting/platform exactMrr; panel ve raporlarla aynı). RPC okunamazsa eski yaklaşık toplam.
-  const platformMrr = await loadPlatformMrr(admin, clockNow()).catch(() => null);
   const mrr = platformMrr?.mrr ?? subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;

@@ -9,6 +9,7 @@ import type { CalendarEvent } from "@/lib/calendar";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
 import { AppointmentRowMore } from "./appointment-row-more";
+import { OptimisticConfirmButton } from "./optimistic-confirm-button";
 
 /** Sunuma hazır randevu satır modeli (tablo + mobil liste ortak). */
 export type AppointmentVM = {
@@ -47,21 +48,6 @@ export type AppointmentVM = {
 type TypeOption = { value: string; label: string };
 type AdvisorOption = { id: string; label: string };
 
-const FORM_ICON_BTN =
-  "focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent transition hover:border-line hover:bg-canvas";
-
-function StatusForm({ id, status, label, className, children }: { id: string; status: "confirmed" | "cancelled" | "signature"; label: string; className: string; children: React.ReactNode }) {
-  return (
-    <form action={setAppointmentStatus}>
-      <input type="hidden" name="id" value={id} />
-      <input type="hidden" name="status" value={status} />
-      <button type="submit" aria-label={label} title={label} className={`${FORM_ICON_BTN} ${className}`}>
-        {children}
-      </button>
-    </form>
-  );
-}
-
 /** Satır eylemleri: birincil tamamla (sonuç diyaloğu) / onayla / düzenle; kalanı ⋮ (`AppointmentRowMore`). */
 function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[]; withCalendar: boolean }) {
   const completed = a.status === "completed";
@@ -86,9 +72,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
       {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} /> : null}
       <RowActions>
         {a.status === "pending" ? (
-          <StatusForm id={a.id} status="confirmed" label="Randevuyu onayla" className="text-[var(--success-strong)] hover:text-[var(--success-strong)]">
-            <SpriteIcon name="check-circle-2" className="h-4 w-4" />
-          </StatusForm>
+          <OptimisticConfirmButton id={a.id} className="text-[var(--success-strong)] hover:text-[var(--success-strong)]" />
         ) : null}
         {/* İkincil eylemler ⋮: detay, imzaya al, tutanak, teyit linki, iptal (her satırda dağınık ikon yok). */}
         <AppointmentRowMore

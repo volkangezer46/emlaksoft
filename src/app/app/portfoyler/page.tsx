@@ -219,11 +219,11 @@ export default async function PropertiesPage({
 }) {
   const { perms, tenantId, userId, role } = await requireModulePage("properties");
   // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
-  const listScope = await getListScope({ userId, tenantId, role });
+  const [listScope, sp0] = await Promise.all([getListScope({ userId, tenantId, role }), searchParams]);
   const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   const canCreate = (perms.properties ?? []).includes("create");
   const canEditProperty = (perms.properties ?? []).includes("edit");
-  const params = (await searchParams) ?? {};
+  const params = sp0 ?? {};
   if (params.yeni === "1") redirect("/app/portfoyler/yeni");
   const q = (params.q ?? "").trim();
   const statusFilter = STATUS_FILTERS.some((f) => f.value === params.status) ? params.status! : "all";
@@ -244,14 +244,14 @@ export default async function PropertiesPage({
   const eidsFilter = isEidsFilter(params.yetki) ? params.yetki : null;
   // "Foto eksik" (F3): sayı + kapak kuralıyla eksik portföy id'leri (en çok PHOTO_GAP_ID_CAP). İki ön sorgu
   // birbirinden bağımsız: aynı turda (eskiden ardışıktı).
-  const [photoGap, eidsLoad] = await Promise.all([
+  // Özel alan filtresi (?ozel=anahtar:değer) de aynı turda çözülür: eşleşen kimlikler ortak filtre kurucusuna iner.
+  const [photoGap, eidsLoad, customFilter] = await Promise.all([
     nlFilters.fotoEksik ? fetchPhotoGapIds(supabase) : Promise.resolve(null),
     eidsFilter ? loadEidsStatus(supabase) : Promise.resolve(null),
+    resolveCustomFieldFilter(supabase, tenantId, "property", customFilterRaw(params as Record<string, string | undefined>)),
   ]);
   const eidsIds = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.ids[eidsFilter] : null;
   const eidsTotal = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.counts[eidsFilter] : 0;
-  // Özel alan filtresi (?ozel=anahtar:değer): eşleşen kimlikler ortak filtre kurucusuna iner.
-  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "property", customFilterRaw(params as Record<string, string | undefined>));
   // Bağımsız: sorgularla aynı turda beklenir (aşağıdaki Promise.all).
   const savedViewsPromise = listSavedViews(PATH);
 

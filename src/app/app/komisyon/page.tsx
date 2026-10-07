@@ -172,9 +172,8 @@ export default async function CommissionPage({
   ];
 
   const supabase = await createClient();
-  const [simDefaults, savedViews] = await Promise.all([simDefaultsPromise, listSavedViews("/app/komisyon")]);
-  const simRate = Number(simDefaults["office.commission.simulator_rate"] ?? 3);
-  const simShare = Number(simDefaults["office.commission.simulator_advisor_share"] ?? 60);
+  // Ayar + kayıtlı görünümler defter sorgularıyla AYNI turda beklenir (eskiden ardışık tur).
+  const defaultsP = Promise.all([simDefaultsPromise, listSavedViews("/app/komisyon")]);
   // Onay merkezi rozeti — tek head-count sorgusu (bkz. /app/onaylar).
   // Kayıtlı görünümler için aktif filtre paramları (sayfa hariç)
   const savedViewParams: Record<string, string> = {};
@@ -207,7 +206,7 @@ export default async function CommissionPage({
         .eq("deal.assigned_to", userId)
         .order("created_at", { ascending: false })
         .limit(OWN_ROWS_LIMIT);
-  const [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult] = await batchAll("Komisyon", [], [
+  const [[simDefaults, savedViews], [ledgerResult, aggregateResult, memberResult, approvalResult, ownRowsResult]] = await Promise.all([defaultsP, batchAll("Komisyon", [], [
     ledgerQuery,
     // Sayfalama dışı KPI, dağılım ve aylık seri tam kapsamlı SQL aggregate'tir.
     seeAllEarnings ? supabase.rpc("tenant_commission_aggregates", { p_as_of: now.toISOString() }) : Promise.resolve(null),
@@ -215,7 +214,9 @@ export default async function CommissionPage({
     supabase.from("profiles").select("id, full_name").eq("is_active", true),
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("status", "bekliyor"),
     ownRowsQuery ?? Promise.resolve(null),
-  ]);
+  ])]);
+  const simRate = Number(simDefaults["office.commission.simulator_rate"] ?? 3);
+  const simShare = Number(simDefaults["office.commission.simulator_advisor_share"] ?? 60);
 
   const rows = requireReportingData("commission-ledger", ledgerResult) as CommissionRow[];
   const commissionTotal = requireReportingCount("commission-ledger-count", ledgerResult);
