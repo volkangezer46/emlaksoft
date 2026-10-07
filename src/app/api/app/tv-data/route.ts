@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "session" }, { status: 401, headers: NO_STORE });
 
   const gate = await requirePermission("reports", "view");
-  if (!gate.ok) return NextResponse.json({ error: "forbidden" }, { status: 403, headers: NO_STORE });
+  if (!gate.ok) return NextResponse.json({ error: "forbidden", reason: gate.error }, { status: 403, headers: NO_STORE });
   if (!canViewTv(gate.role)) return NextResponse.json({ error: "scope" }, { status: 403, headers: NO_STORE });
 
   const perms = gate.impersonating ? immutableReadonlyPermissions() : await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
