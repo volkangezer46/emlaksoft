@@ -46,6 +46,8 @@ import type { ActivityHealth } from "./tenants-model";
  * Ofisler tablosu (istemci): satır içi kaydetme standardı (docs/DESIGN_SYSTEM.md). Durum + paket aynı satırda
  * düzenlenir, Kaydet TEK satırı `updateTenantPlanStatus` ile yazar (iyimser eşzamanlılık: `expected_updated_at`).
  * Mevcut veri ve yetkili durumu düzenlenmez (karşılık gelen admin eylemi yok): filtre/ayrıntı bağlantısıdır.
+ * Yetkili ve veri durumu ayrı sütun değil: kimlik hücresinde rozet ("Sahip aktif", "Demo veri") + ⋮ menüde "Ekip ve yetkili" / "Sahibe erişim bağlantısı gönder".
+ * Satırda birincil eylemler `Yönet` + `Ofise gir`; kalanı ⋮ (Ofis 360 sekmeleri, vitrin, askıya al).
  */
 
 export type TenantRowData = {
@@ -98,7 +100,7 @@ export function TenantTable({ rows, plans, perms }: { rows: TenantRowData[]; pla
   const planName = (id: string) => plans.find((p) => p.id === id)?.name ?? id;
   return (
     <DraftTable>
-      <div className="adm-cq">
+      <div className="adm-cq" data-roomy="">
         <div className="adm-scroll">
           <table className="adm-tbl">
             <caption className="sr-only">Ofisler; durum ve paket satır içinde düzenlenir, her satır kendi Kaydet düğmesiyle kaydedilir.</caption>
@@ -107,8 +109,6 @@ export function TenantTable({ rows, plans, perms }: { rows: TenantRowData[]; pla
                 <th scope="col">Ofis bilgileri</th>
                 <th scope="col">Durum</th>
                 <th scope="col">Paket</th>
-                <th scope="col">Mevcut veri</th>
-                <th scope="col" data-col="owner">Yetkili</th>
                 <th scope="col" className="text-right">
                   İşlemler
                 </th>
@@ -126,16 +126,18 @@ export function TenantTable({ rows, plans, perms }: { rows: TenantRowData[]; pla
   );
 }
 
-function OwnerPill({ owner, href }: { owner: TenantRowData["owner"]; href: string }) {
-  if (owner === null) return <span className="text-xs text-text-faint">—</span>;
-  const m =
-    owner === "active"
-      ? { label: "Sahip aktif", tone: "success", Icon: UserCheck }
-      : owner === "inactive"
-        ? { label: "Sahip pasif", tone: "danger", Icon: UserX }
-        : { label: "Sahip yok", tone: "danger", Icon: UserX };
+const OWNER_META = {
+  active: { label: "Sahip aktif", tone: "success", Icon: UserCheck },
+  inactive: { label: "Sahip pasif", tone: "danger", Icon: UserX },
+  none: { label: "Sahip yok", tone: "danger", Icon: UserX },
+} as const;
+
+/** Yetkili durumu: ayrı sütun değil, kimlik hücresinin meta satırında küçük rozet (Ofis 360 > Ekip'e gider). */
+function OwnerBadge({ owner, href }: { owner: TenantRowData["owner"]; href: string }) {
+  if (owner === null) return null;
+  const m = OWNER_META[owner];
   return (
-    <Link href={href} className={`adm-pill pm-t-${m.tone} focus-ring`} title="Ofis ekibini aç">
+    <Link href={href} className={`adm-badge pm-t-${m.tone} focus-ring`} title="Ofis ekibini ve yetkiliyi aç">
       <m.Icon aria-hidden="true" />
       {m.label}
     </Link>
@@ -186,6 +188,8 @@ function TenantRow({
     .map((p) => ({ value: p.id, label: p.name, ...(PLAN_META[p.id] ?? { icon: Building2, tone: "brand" as const }) }));
   const detail = `/admin/tenants/${row.id}`;
   const disabled = !perms.canEdit || draft.locked;
+  // Askıya alma ⋮'den taslağa yazılır: satırda Kaydet grubu belirir, kaydederken satır içi risk onayı istenir.
+  const canSuspend = perms.canEdit && !draft.locked && draft.draft.status !== "suspended" && draft.draft.status !== "cancelled";
   const healthTitle = row.health.n === null ? "Son 14 günün işlem sayısı alınamadı" : `Son 14 günde ${row.health.n} işlem (denetim kaydı)`;
 
   function resend() {
@@ -215,15 +219,24 @@ function TenantRow({
               <Link href={`/admin/members?tenant=${row.id}`} className="font-semibold text-accent-text hover:underline" title="Ofisin kullanıcılarını listele">
                 <Users aria-hidden="true" /> {row.members === null ? "—" : `${row.members} üye`}
               </Link>
-              <span title="Kayıt tarihi" className="adm-meta-opt">
+              <span title="Kayıt tarihi">
                 <CalendarDays aria-hidden="true" /> {row.createdLabel}
               </span>
               <span className={HEALTH_TEXT[row.health.tone]} title={healthTitle}>
                 ● {row.health.label}
               </span>
-              <span className="adm-owner-inline">
-                <OwnerPill owner={row.owner} href={`${detail}?sekme=ekip`} />
-              </span>
+              <OwnerBadge owner={row.owner} href={`${detail}?sekme=ekip`} />
+              {/* Veri durumu: sütun değil rozet; yalnız örnek (demo) veri varken (gerçek veri varsayılan, sakin). */}
+              {row.sample ? (
+                <Link
+                  href={row.dataHref}
+                  className="adm-badge pm-t-warn focus-ring"
+                  title="Ofiste örnek (demo) veri yüklü; gerçek kullanıma geçmedi. Tıklayınca aynı durumdaki ofisleri süzer."
+                >
+                  <Database aria-hidden="true" />
+                  Demo veri
+                </Link>
+              ) : null}
             </div>
             {row.trialLabel ? (
               <p className={cn("mt-0.5 flex items-center gap-1 text-xs", row.trialOver ? "text-[var(--pm-danger-text)]" : "text-[var(--pm-warn-text)]")}>
@@ -262,19 +275,6 @@ function TenantRow({
           className="w-[9.25rem]"
         />
       </td>
-      <td data-label="Mevcut veri">
-        <Link
-          href={row.dataHref}
-          className={`adm-pill focus-ring pm-t-${row.sample ? "warn" : "success"}`}
-          title={row.sample ? "Ofiste örnek (demo) veri yüklü; gerçek kullanıma geçmedi. Tıklayınca aynı durumdaki ofisleri süzer." : "Örnek veri yok: ofis gerçek verisiyle çalışıyor. Tıklayınca süzer."}
-        >
-          <Database aria-hidden="true" />
-          {row.sample ? "Demo veri var" : "Gerçek veri"}
-        </Link>
-      </td>
-      <td data-label="Yetkili" data-col="owner">
-        <OwnerPill owner={row.owner} href={`${detail}?sekme=ekip`} />
-      </td>
       <td>
         <div className="adm-acts">
           <RowSaveActions draft={draft}>
@@ -301,7 +301,7 @@ function TenantRow({
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href={`${detail}?sekme=ekip`}>
-                    <Users aria-hidden="true" /> Ekip ve yetkili
+                    <Users aria-hidden="true" /> Ekip ve yetkili{row.owner ? ` · ${OWNER_META[row.owner].label}` : ""}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
@@ -324,13 +324,16 @@ function TenantRow({
                     <ExternalLink aria-hidden="true" /> Vitrini aç
                   </a>
                 </DropdownMenuItem>
+                {perms.canResend || canSuspend ? <DropdownMenuSeparator /> : null}
                 {perms.canResend ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem disabled={resending} onSelect={resend}>
-                      <Mail aria-hidden="true" /> {resending ? "Gönderiliyor…" : "Sahibe erişim bağlantısı gönder"}
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem disabled={resending} onSelect={resend}>
+                    <Mail aria-hidden="true" /> {resending ? "Gönderiliyor…" : "Sahibe erişim bağlantısı gönder"}
+                  </DropdownMenuItem>
+                ) : null}
+                {canSuspend ? (
+                  <DropdownMenuItem danger onSelect={() => draft.set("status", "suspended")}>
+                    <PauseCircle aria-hidden="true" /> Askıya al…
+                  </DropdownMenuItem>
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>

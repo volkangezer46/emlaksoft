@@ -6,6 +6,7 @@ import Link from "@/components/ui/smart-link";
 import {
   Clock,
   Crown,
+  Eye,
   Headphones,
   Plus,
   Receipt,
@@ -161,7 +162,11 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => Promise<
         {new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(member.created_at))}
       </TD>
       <TD align="right">
-        <RowSaveActions draft={draft} confirmLabel="Onayla" />
+        <RowSaveActions draft={draft} confirmLabel="Onayla">
+          <ButtonLink href={`/admin/personel/${member.id}`} size="sm" variant="outline" icon={Eye} aria-label={`Ayrıntı: ${member.full_name}`}>
+            Ayrıntı
+          </ButtonLink>
+        </RowSaveActions>
       </TD>
     </TR>
   );

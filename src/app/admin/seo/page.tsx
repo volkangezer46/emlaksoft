@@ -164,13 +164,11 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
           </div>
         </CardHeader>
         <div className="overflow-x-auto">
-          <Table className="w-full min-w-[44rem] text-left text-sm">
+          <Table className="w-full min-w-[36rem] text-left text-sm">
             <THead>
               <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
                 <TH scope="col" className="px-4 py-2 font-semibold">Sayfa</TH>
                 <TH scope="col" className="px-4 py-2 font-semibold">Başlık</TH>
-                <TH scope="col" className="px-4 py-2 font-semibold">İndeks</TH>
-                <TH scope="col" className="px-4 py-2 font-semibold">Sitemap</TH>
                 <TH scope="col" className="px-4 py-2 font-semibold">Kontrol</TH>
                 <TH scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></TH>
               </TR>
@@ -182,17 +180,16 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
                   <TR key={def.path} className={selected === def.path ? "bg-canvas" : undefined}>
                     <TD className="px-4 py-2.5">
                       <p className="font-semibold text-ink-950">{def.label}</p>
-                      <p className="font-mono text-xs text-text-muted">{def.path}</p>
+                      <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-text-muted">
+                        {def.path}
+                        {/* İndeks/sitemap: sütun değil rozet; yalnız varsayılandan sapınca (noindex / sitemap dışı). */}
+                        {!view.indexable ? <StatusBadge tone="neutral">noindex</StatusBadge> : null}
+                        {!view.inSitemap ? <StatusBadge tone="neutral">sitemap dışı</StatusBadge> : null}
+                      </p>
                     </TD>
                     <TD className="max-w-xs px-4 py-2.5">
                       <p className="truncate text-ink-950">{view.renderedTitle}</p>
                       <p className="text-xs text-text-muted">{view.renderedTitle.length} karakter{ov ? " · özelleştirilmiş" : ""}</p>
-                    </TD>
-                    <TD className="px-4 py-2.5">
-                      <StatusBadge tone={view.indexable ? "success" : "neutral"}>{view.indexable ? "index" : "noindex"}</StatusBadge>
-                    </TD>
-                    <TD className="px-4 py-2.5">
-                      <StatusBadge tone={view.inSitemap ? "success" : "neutral"}>{view.inSitemap ? "dahil" : "hariç"}</StatusBadge>
                     </TD>
                     <TD className="px-4 py-2.5">
                       <StatusBadge tone={failing === 0 ? "success" : "attention"}>{failing === 0 ? "Tümü geçti" : `${failing} madde dikkat`}</StatusBadge>

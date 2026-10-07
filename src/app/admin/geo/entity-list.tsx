@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, GitMerge, Lightbulb, MoveRight, Pencil, Power, Tag, X } from "lucide-react";
+import { ChevronRight, GitMerge, Lightbulb, MoreVertical, MoveRight, Pencil, Power, Tag, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   addGeoAlias,
   loadGeoAliases,
@@ -175,16 +176,27 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
           {canWrite ? (
             <>
               <button type="button" className={ghostBtn} onClick={() => open("edit")} aria-label={`${row.name} düzenle`}><Pencil className="h-3.5 w-3.5" /> Düzenle</button>
-              <button type="button" className={ghostBtn} onClick={() => open("alias")} aria-label={`${row.name} takma adları`}><Tag className="h-3.5 w-3.5" /> Takma ad</button>
-              {level !== "province" ? (
-                <>
-                  <button type="button" className={ghostBtn} onClick={() => open("move")} aria-label={`${row.name} taşı`}><MoveRight className="h-3.5 w-3.5" /> Taşı</button>
-                  <button type="button" className={ghostBtn} onClick={() => open("merge")} aria-label={`${row.name} birleştir`}><GitMerge className="h-3.5 w-3.5" /> Birleştir</button>
-                </>
-              ) : null}
-              <button type="button" className={ghostBtn} onClick={() => open("deactivate")} aria-label={`${row.name} ${row.isActive ? "pasife al" : "etkinleştir"}`}>
-                <Power className="h-3.5 w-3.5" /> {row.isActive ? "Pasife al" : "Etkinleştir"}
-              </button>
+              {/* İkincil eylemler ⋮ (satırda tek birincil eylem; panel yine satırın altında açılır). */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className={ghostBtn} aria-label={`Diğer işlemler: ${row.name}`} title="Diğer işlemler">
+                    <MoreVertical className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onSelect={() => open("alias")}><Tag aria-hidden="true" /> Takma adlar</DropdownMenuItem>
+                  {level !== "province" ? (
+                    <>
+                      <DropdownMenuItem onSelect={() => open("move")}><MoveRight aria-hidden="true" /> Taşı</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => open("merge")}><GitMerge aria-hidden="true" /> Birleştir</DropdownMenuItem>
+                    </>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem danger={row.isActive} onSelect={() => open("deactivate")}>
+                    <Power aria-hidden="true" /> {row.isActive ? "Pasife al…" : "Etkinleştir…"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : (
             <button type="button" className={ghostBtn} onClick={() => open("suggest")}><Lightbulb className="h-3.5 w-3.5" /> Düzeltme öner</button>

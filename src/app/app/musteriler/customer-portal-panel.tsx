@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore, useTransition } from "react";
-import { Link2, Share2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { createCustomerPortalToken } from "@/app/actions/customer-portal";
 import { ResultPanel, WA_CUSTOMER } from "@/components/app/portal-link-dialog";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { toWhatsAppLink } from "@/lib/phone";
 
 /**
  * Müşteri portalı linki — sayfa içi panel (popup değil).
- * Satırlardaki paylaş düğmesi seçili müşteriyi küçük bir store'a yazar ve paneli açar;
+ * Satır ⋮ menüsündeki "Müşteri portalı linki" (customer-row-delete.tsx) seçili müşteriyi küçük bir store'a yazar ve paneli açar;
  * liste üstündeki tek `CustomerPortalPanel` seçili müşteri için link üretir.
  */
 export const CUSTOMER_PORTAL_PANEL_ID = "musteri-portali-linki";
@@ -26,36 +26,9 @@ const subscribe = (l: () => void) => {
   };
 };
 const getTarget = () => target;
-function setTarget(next: Target | null) {
+export function setPortalTarget(next: Target | null) {
   target = next;
   listeners.forEach((l) => l());
-}
-
-export function CustomerPortalLinkButton({
-  customerId,
-  customerName,
-  phone,
-}: {
-  customerId: string;
-  customerName: string;
-  phone: string | null;
-}) {
-  const { openPanel } = useInlinePanel(CUSTOMER_PORTAL_PANEL_ID);
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        setTarget({ id: customerId, name: customerName, phone });
-        openPanel(e.currentTarget);
-      }}
-      className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
-      aria-label={`${customerName} için müşteri portalı linki üret`}
-      aria-controls={CUSTOMER_PORTAL_PANEL_ID}
-      title="Müşteri portalı linki"
-    >
-      <Share2 className="h-4 w-4" />
-    </button>
-  );
 }
 
 function PanelBody({ customer }: { customer: Target }) {

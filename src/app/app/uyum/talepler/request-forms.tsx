@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { Plus, Save } from "lucide-react";
+import { Plus, RotateCcw, Save } from "lucide-react";
 import {
   createKvkkRequest,
   updateKvkkRequestStatus,
@@ -113,7 +113,15 @@ export function StatusForm({ id, status, canEdit }: { id: string; status: string
             <option key={s} value={s}>{KVKK_STATUS_LABELS[s]}</option>
           ))}
         </FormSelect>
-        <Button type="submit" size="sm" variant="secondary" icon={Save} loading={pending} disabled={next === status}>Kaydet</Button>
+        {/* Satır içi kaydetme standardı: Kaydet yalnız değişiklik varken (her satırda pasif düğme yok). */}
+        {next !== status || pending ? (
+          <span className="rs-group">
+            <Button type="button" size="icon" variant="ghost" onClick={() => setNext(status)} disabled={pending} aria-label="Değişikliği geri al" title="Vazgeç">
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button type="submit" size="sm" variant="navy" icon={Save} loading={pending}>Kaydet</Button>
+          </span>
+        ) : null}
       </div>
       {finishing ? <FormInput aria-label="Çözüm notu" name="resolution_note" placeholder="Çözüm notu (zorunlu)" maxLength={1000} required /> : null}
       <Result state={state} />

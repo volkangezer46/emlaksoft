@@ -72,6 +72,14 @@ export function canSave<T extends DraftValues>(s: RowDraftState<T>, validation: 
   return isDirty(s) && validation.ok && !isStale(s) && s.status !== "saving" && s.status !== "saved";
 }
 
+/**
+ * Kaydet grubu (↺ Vazgeç + Kaydet) görünür mü? Temiz satırda HİÇ çizilmez (yer kaplamaz); yalnız değişiklik varken,
+ * kaydederken, kısa "Kaydedildi" onayında ve hata/onay adımında görünür.
+ */
+export function showSaveGroup<T extends DraftValues>(s: RowDraftState<T>): boolean {
+  return isDirty(s) || s.status !== "idle";
+}
+
 /** Seçiciler kilitli mi? (kaydederken çift gönderim/değişiklik yok) */
 export function isLocked<T extends DraftValues>(s: RowDraftState<T>): boolean {
   return s.status === "saving";

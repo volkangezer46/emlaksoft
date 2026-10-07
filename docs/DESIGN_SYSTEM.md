@@ -198,10 +198,20 @@ olduğundan `<Button className="bg-mint-600">` gibi ton ezmeleri çalışır.
 ### InlineSelect (`ui/inline-select.tsx`)
 
 Tablo hücresi seçicisi: rozet/ikon görünümlü tetik (`pm-t-*` tonu, ikon, etiket, ok) + portal liste (tablo
-`overflow` kabı kırpmaz). Radix Select: ok tuşları, Home/End, harfle arama, Esc, odak dönüşü, combobox/listbox rolleri.
+`overflow` kabı kırpmaz). **Kaydırmayı kilitlemez:** Radix Popover `modal={false}` + kendi listbox'ı (Radix Select
+DEĞİL — o her açılışta body'yi kilitler; html `overflow-x: clip` olduğundan kilit body'yi kaydırma kabına çevirip
+yapışkan yan menüyü sayfanın tepesine kaydırıyordu). Klavye: kapalı tetikte ↓/↑/Boşluk açar (Enter satır kısayoluna
+bırakılır: kirli satırda kaydeder, temizde açar); açık listede ↑/↓, Home/End, harfle arama, Enter/Boşluk seçer, Esc/Tab
+kapatır, odak tetiğe döner. Roller: tetik `combobox` (`aria-haspopup="listbox"`, `aria-expanded`), liste `listbox`,
+seçenek `option` + `aria-selected`, vurgu `aria-activedescendant`.
 `changed` → tetiğin köşesinde amber "değişti" noktası (+ aria-label'a "değişti, kaydedilmedi"). `name` verilirse gizli
-native select üretir (FormData). Seçenek ikonları istemcide tanımlanır (fonksiyon sunucudan geçemez). Native `<select>`
-yalnız form sayfalarında kalır; tablo satırında InlineSelect kullanılır.
+input üretir (FormData). Seçenek ikonları istemcide tanımlanır (fonksiyon sunucudan geçemez). Native `<select>` /
+`ui/select.tsx` (Radix Select, kilitli) yalnız form sayfalarında kalır; tablo satırında ve sayfa içi hızlı seçimde
+InlineSelect kullanılır (ör. `/admin/tickets` satır durum/atama).
+
+**Kabuk güvencesi (yapışkan yan menü):** `console.css` → kabukta (`html:has(.shell-aside)`) kilit body'yi kaydırma
+kabı yapamaz (`overflow: visible; overflow-x: clip !important`), kilit html'e (viewport) taşınır; `.shell-aside`
+`position: sticky; top: 0; align-self: flex-start; height: 100dvh`. Dialog / Radix Select açıkken de menü tam boy kalır.
 
 ### Satır içi kaydetme standardı (tüm satır içi düzenlemeli tablolar; /app dahil)
 
@@ -209,15 +219,17 @@ Parçalar: saf durum makinesi `src/lib/ui/row-draft.ts` (+ test), hook `src/lib/
 (`useRowDraft`), görünüm `ui/row-save-actions.tsx` (`RowSaveActions`, `rowDraftProps`), tablo sarmalayıcı
 `ui/draft-table.tsx` (`DraftTable`), kirli satır deposu `src/lib/ui/row-draft-store.ts`.
 
-1. Kaydet başlangıçta PASİF. Yalnız gerçek değişiklikte AKTİF: "kirli" = taslak ≠ kayıtlı DEĞER (aynı değere dönülürse
-   yeniden pasif; tıklama sayılmaz).
+1. **Kaydet yalnız değişen satırda.** Temiz satırda Kaydet HİÇ çizilmez (yer kaplamaz; her satırda pasif düğme yok,
+   tablo sakin). Gerçek değişiklikte işlemler alanının BAŞINDA `↺ Vazgeç + Kaydet` grubu yumuşak belirir (`.rs-group`,
+   fade + 6 px kayma; reduce'ta anında). "Kirli" = taslak ≠ kayıtlı DEĞER (aynı değere dönülürse grup kaybolur; tıklama
+   sayılmaz). Görünürlük saf kuralı `showSaveGroup` (`row-draft.ts`, test) → hook'ta `draft.showSave`.
 2. Geçersiz seçimde PASİF + neden satır altında (`validate` saf fonksiyon, ör. `lib/admin/tenant-row-rules.ts`
    "Askıdaki ofise paket atanamaz"). Sunucu kendi kurallarını yine uygular.
 3. Kaydederken: spinner + "Kaydediliyor…", satırın seçicileri kilitli (`draft.locked`), çift gönderim yok.
-4. Başarı: ≈1,5 sn "✓ Kaydedildi" (ikon girişi reduce'ta animasyonsuz) → yeniden pasif; kayıtlı değer taslağa eşitlenir.
+4. Başarı: ≈1,5 sn "✓ Kaydedildi" (ikon girişi reduce'ta animasyonsuz) → grup kaybolur; kayıtlı değer taslağa eşitlenir.
    Hata: mesaj satırda (`role="alert"`), taslak korunur, Kaydet aktif kalır.
-5. Kaydedilmemiş ipucu: satır solunda 3 px amber şerit (`tr[data-dirty="1"]`), değişen hücrede amber nokta, düğme
-   yanında "Kaydedilmemiş" etiketi, `aria-live` duyurusu.
+5. Kaydedilmemiş ipucu düğmede DEĞİL satırda: satır solunda 3 px amber şerit (`tr[data-dirty="1"]`) + değişen hücrede
+   amber nokta (`InlineSelect changed`) + `aria-live` duyurusu. Düğme üstü "Kaydedilmemiş" rozeti yok.
 6. Gelişmiş: ↺ Vazgeç (kirli satırda); 2+ kirli satırda tablonun üstünde yapışkan çubuk "N satırda kaydedilmemiş
    değişiklik · Tümünü kaydet · Tümünü geri al" (sıralı kayıt; riskli satırlar kendi onayında bekler); kirli satır varken
    `beforeunload` + iç bağlantı tıklamasında onay; riskli değişiklik (`risk`: askıya alma, iptal, paket düşürme,
@@ -235,6 +247,18 @@ const draft = useRowDraft({ id, label: name, saved: { status, plan }, version: u
 </tr>
 ```
 Uygulananlar: `/admin/tenants` (durum + paket), `/admin/members` (rol + aktif/pasif), `/admin/personel` (rol + durum).
+`RowSaveActions` kullanan her tablo bu davranışı otomatik alır; satırın kalıcı eylemleri `children` olarak verilir
+(temiz satırda işlemler alanı boş kalmasın: en az `Ayrıntı`/`Yönet`).
+
+### Satır eylemleri ve durum bilgisi (liste tabloları; admin + /app)
+
+- Satırda en çok 1-2 BİRİNCİL eylem görünür (ör. `Yönet` + `Ofise gir`, `Ayrıntı`); kalan tüm eylemler ⋮
+  (`DropdownMenu`, modal değil): sekme kısayolları, vitrin, bağlantı gönder, askıya al… Riskli eylem ⋮'de `danger`.
+- Durum/boolean bilgisi ayrı SÜTUN değil: kimlik hücresinin meta satırında küçük tonlu rozet (`.adm-badge`, tıklanınca
+  ilgili sekmeye gider). Örn. `/admin/tenants` "Sahip aktif" (eski "Yetkili" sütunu kaldırıldı; ⋮ "Ekip ve yetkili ·
+  Sahip aktif", "Sahibe erişim bağlantısı gönder", "Askıya al…" → taslağa yazar, satır içi risk onayıyla kaydedilir).
+- Her satırda pasif düğme yok: koşullu eylem (Kaydet, Onayla) yalnız anlamlı olduğunda çizilir.
+- Sütun sayısı azaltılır; 1366 px'te yatay kaydırma olmamalı (dar kapta eylem metinleri ikon + erişilebilir ada iner).
 
 ### Admin liste deseni (`components/admin/admin-list.tsx`, kit.css `.adm-*`)
 
@@ -243,8 +267,8 @@ Hero bandı (`AdminPageHeader` + `art` = `HeroArt` konu figürü + isteğe bağl
 `viz/DonutBreakdown`; her sütun/dilim/lejant satırı filtreli listeye bağlantı) → `AdminListCard` (arama + hızlı
 süzgeç çipleri gerçek sayılarla + bilgi satırı; etkin süzgeç çipleri × ile) → `.adm-tbl` (yapışkan başlık, satır
 hover vurgusu, tutarlı satır yüksekliği, satır sonu eylem grubu + ⋮ menü). Dar kapta (`.adm-cq` container, 76 rem
-altı) eylem metinleri gizlenir (ikon + erişilebilir ad kalır), 70 rem altı ikincil sütun (`data-col`) kimlik hücresine
-geçer → 1366 px'te yatay kaydırma yok. 768 px altında satırlar karta dönüşür (`data-label` hücre etiketi; ikinci liste
+altı) eylem metinleri gizlenir (ikon + erişilebilir ad kalır); durum bilgisi sütun yerine kimlik hücresinde `.adm-badge`
+rozeti → 1366 px'te yatay kaydırma yok. 768 px altında satırlar karta dönüşür (`data-label` hücre etiketi; ikinci liste
 çizilmez). `HeroArt` türleri: office, users, invoice, support, shield, rocket, coins, ai, megaphone, pulse, layers, coupon
 (`ui/illustrations/hero-art.tsx`, token renkli, ≤4 KB gz, test).
 
