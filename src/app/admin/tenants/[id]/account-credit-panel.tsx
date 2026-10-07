@@ -4,10 +4,18 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, Coins, Loader2, Undo2 } from "lucide-react";
 import { grantAccountCredit, reverseAccountCredit, type AdminCreditResult } from "@/app/actions/admin-account-credit";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import Link from "@/components/ui/smart-link";
+import { formatTry } from "@/lib/format";
+import type { TryBalance } from "@/lib/try-credits/config";
 import { ADMIN_CREDIT_MAX_TRY, ADMIN_CREDIT_REASON_MAX, ADMIN_CREDIT_REASON_MIN, ADMIN_GRANT_KINDS } from "@/lib/try-credits/admin-credit-input";
 
 /** Defterdeki yükleme kaydı (geri alma seçimi için; tutar yalnız seçim etiketinde, bakiye gösterilmez). */
 export type CreditGrantOption = { idem: string; label: string };
+
+/** Son hareket satırı (sunucuda biçimlenir; grantIdem doluysa satırdan "Geri al" açılır). */
+export type CreditMovementRow = { entryType: string; amount: number; dateLabel: string; grantIdem: string | null };
+
+const ENTRY_LABEL: Record<string, string> = { grant: "Yükleme", spend: "Harcama", reverse: "Geri alma", expire: "Vade dolumu", adjust: "Düzeltme" };
 
 const KIND_LABEL: Record<(typeof ADMIN_GRANT_KINDS)[number], string> = { manual: "Manuel düzeltme", bonus: "Hediye (bonus)", campaign: "Kampanya" };
 
@@ -15,10 +23,21 @@ type Mode = "grant" | "reverse";
 
 /**
  * Hesap kredisi (₺) — yalnız süper admin. Yükleme ve geri alma `admin-account-credit` eylemleriyle; denetim önce yazılır,
- * çift gönderim `request_id` ile engellenir (ilk gönderimde istemcide crypto.randomUUID ile üretilir, başarıdan sonra yenilenir). Bakiye burada okunmaz;
- * işlem sonucu mesajı eylemden gelir. Gönderimden önce satır içi onay (geri alma geri döndürülemez uyarısı).
+ * çift gönderim `request_id` ile engellenir (ilk gönderimde istemcide crypto.randomUUID ile üretilir, başarıdan sonra yenilenir). Bakiye ve son hareketler
+ * sunucudan (page.tsx) gelir; işlem sonucu mesajı eylemden gelir. Gönderimden önce satır içi onay (geri alma geri döndürülemez uyarısı).
  */
-export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; grants: CreditGrantOption[] }) {
+export function AccountCreditPanel({
+  tenantId,
+  grants,
+  movements,
+  balance,
+}: {
+  tenantId: string;
+  grants: CreditGrantOption[];
+  movements: CreditMovementRow[];
+  balance: TryBalance | null;
+}) {
+  const [original, setOriginal] = useState("");
   const [mode, setMode] = useState<Mode>("grant");
   // İstek kimliği ilk gönderimde üretilir ve başarıya kadar korunur (yeniden deneme aynı kimlikle: çift kayıt olmaz).
   const [requestId, setRequestId] = useState<string | null>(null);
@@ -36,6 +55,7 @@ export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; gra
       setResult(res);
       setConfirming(false);
       if (res.ok) {
+        setOriginal("");
         form.reset();
         setRequestId(null);
       }
@@ -71,6 +91,28 @@ export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; gra
         </div>
       </div>
 
+      <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {balance ? (
+          [
+            ["Kullanılabilir", formatTry(balance.available)],
+            ["Bakiye", formatTry(balance.balance)],
+            ["Rezerve", formatTry(balance.reserved)],
+            ["Toplam yüklenen", formatTry(balance.granted_total)],
+          ].map(([k, v]) => (
+            <div key={k} className="rounded-[var(--radius-control)] border border-line bg-surface-sunken px-3 py-2">
+              <dt className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">{k}</dt>
+              <dd className="font-display text-base font-bold text-ink-950">
+                <Link href="/admin/billing" className="focus-ring hover:underline">
+                  {v}
+                </Link>
+              </dd>
+            </div>
+          ))
+        ) : (
+          <p className="col-span-full text-xs text-text-muted">Bakiye okunamadı (cüzdan hazır değil). İşlemler yine de denenebilir.</p>
+        )}
+      </dl>
+
       <form
         key={mode}
         className="mt-4 grid gap-3 sm:grid-cols-2"
@@ -104,7 +146,7 @@ export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; gra
           </>
         ) : (
           <FormField label="Geri alınacak yükleme" htmlFor="kredi-asil" hint="Seçilirse geri alma o yüklemenin kalanını aşamaz. Boşsa genel geri alma.">
-            <FormSelect id="kredi-asil" name="original_idem" defaultValue="">
+            <FormSelect id="kredi-asil" name="original_idem" value={original} onChange={(e) => setOriginal(e.target.value)}>
               <option value="">Belirli bir yükleme yok</option>
               {grants.map((g) => (
                 <option key={g.idem} value={g.idem}>
@@ -146,6 +188,40 @@ export function AccountCreditPanel({ tenantId, grants }: { tenantId: string; gra
           ) : null}
         </div>
       </form>
+
+      <div className="mt-5">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-text-muted">Son hareketler</h3>
+        {movements.length === 0 ? (
+          <p className="mt-2 text-sm text-text-muted">Bu ofis için henüz TL kredi hareketi yok. Yukarıdan ilk krediyi yükleyebilirsiniz.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-line rounded-[var(--radius-control)] border border-line">
+            {movements.map((m, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                <span className="text-ink-950">
+                  {ENTRY_LABEL[m.entryType] ?? m.entryType} <span className="text-text-muted">· {m.dateLabel}</span>
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className={`font-semibold ${m.amount < 0 ? "text-danger-600" : "text-mint-700"}`}>{formatTry(m.amount)}</span>
+                  {m.grantIdem ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("reverse");
+                        setOriginal(m.grantIdem ?? "");
+                        setConfirming(false);
+                        setResult(null);
+                      }}
+                      className="focus-ring text-xs font-semibold text-accent hover:underline"
+                    >
+                      Geri al
+                    </button>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {result ? (
         <p

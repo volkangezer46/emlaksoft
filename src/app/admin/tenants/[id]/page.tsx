@@ -18,7 +18,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AccountCreditPanel, type CreditGrantOption } from "./account-credit-panel";
+import { AccountCreditPanel, type CreditGrantOption, type CreditMovementRow } from "./account-credit-panel";
+import { tryBalance } from "@/lib/try-credits/wallet";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
 import { getPlan, planLabel, PLANS } from "@/lib/billing/plans";
@@ -257,8 +258,8 @@ export default async function AdminTenantDetailPage({
         .limit(60),
     ]);
     const seatInfo = await loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats);
-    // Hesap kredisi yalnız süper admin: geri alma seçimi için son yüklemeler (aynı admin istemcisi; bakiye gösterilmez).
-    const creditGrants = staff.role === "super_admin" ? await loadCreditGrantOptions(admin, id) : null;
+    // Hesap kredisi yalnız süper admin: bakiye (RPC), son hareketler ve geri alma seçimi (aynı admin istemcisi).
+    const creditData = staff.role === "super_admin" ? await loadCreditData(admin, id) : null;
     content = (
       <div className="space-y-6">
         {access.billing ? (
@@ -272,7 +273,7 @@ export default async function AdminTenantDetailPage({
           captures={captures ?? []}
           billingHref={billingHref}
         />
-        {creditGrants ? <AccountCreditPanel tenantId={id} grants={creditGrants} /> : null}
+        {creditData ? <AccountCreditPanel tenantId={id} grants={creditData.grants} movements={creditData.movements} balance={creditData.balance} /> : null}
       </div>
     );
   } else if (active === "destek") {
@@ -451,25 +452,35 @@ export default async function AdminTenantDetailPage({
 }
 
 /**
- * Geri alma seçimi: ofisin son TL kredi yüklemeleri (account_credit_ledger, unit=try, feature try_grant:*). Defter anahtarı
- * `try:grant:<ofis>:<idem>`; geri alma eylemi `original_idem` olarak <idem> bekler. Hata/tablo yoksa boş liste (form genel
- * geri almayla çalışır). Bakiye hesaplanmaz/gösterilmez.
+ * Hesap kredisi verisi: bakiye (try_credit_balance), son 20 TL hareketi (account_credit_ledger, unit=try) ve geri alma
+ * seçimi. Defter anahtarı `try:grant:<ofis>:<idem>`; geri alma eylemi `original_idem` olarak <idem> bekler.
+ * Hata/tablo yoksa boş (form genel geri almayla çalışır).
  */
-async function loadCreditGrantOptions(admin: ReturnType<typeof createAdminClient>, tenantId: string): Promise<CreditGrantOption[]> {
-  const { data, error } = await admin
-    .from("account_credit_ledger")
-    .select("idempotency_key, amount, feature, created_at")
-    .eq("tenant_id", tenantId)
-    .eq("unit", "try")
-    .like("feature", "try_grant:%")
-    .order("created_at", { ascending: false })
-    .limit(20);
-  if (error || !data) return [];
+async function loadCreditData(admin: ReturnType<typeof createAdminClient>, tenantId: string) {
+  const [balance, { data, error }] = await Promise.all([
+    tryBalance(admin, tenantId),
+    admin
+      .from("account_credit_ledger")
+      .select("idempotency_key, amount, entry_type, feature, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("unit", "try")
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+  const rows = error || !data ? [] : (data as { idempotency_key: string; amount: number | string; entry_type: string; feature: string | null; created_at: string }[]);
   const prefix = `try:grant:${tenantId}:`;
-  return (data as { idempotency_key: string; amount: number | string; feature: string | null; created_at: string }[])
-    .filter((r) => r.idempotency_key.startsWith(prefix))
+  const fmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" });
+  const movements: CreditMovementRow[] = rows.map((r) => ({
+    entryType: r.entry_type,
+    amount: Number(r.amount),
+    dateLabel: fmt.format(new Date(r.created_at)),
+    grantIdem: r.entry_type === "grant" && r.idempotency_key.startsWith(prefix) ? r.idempotency_key.slice(prefix.length) : null,
+  }));
+  const grants: CreditGrantOption[] = rows
+    .filter((r) => r.feature?.startsWith("try_grant:") && r.idempotency_key.startsWith(prefix))
     .map((r) => ({
       idem: r.idempotency_key.slice(prefix.length),
-      label: `${new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(r.created_at))} · ${formatTry(Number(r.amount))} · ${(r.feature ?? "").replace("try_grant:", "")}`,
+      label: `${fmt.format(new Date(r.created_at))} · ${formatTry(Number(r.amount))} · ${(r.feature ?? "").replace("try_grant:", "")}`,
     }));
+  return { balance, movements, grants };
 }
