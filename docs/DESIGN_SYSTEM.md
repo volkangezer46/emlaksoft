@@ -645,6 +645,16 @@ Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--
   yüzeylerinde degrade dolgu yok (`pm-card-tint` yalnız %8 ton sönmesi). Bulanık (blur) büyük katman yok.
 - **motion:** kuruldu ama yalnız `LazyMotion` + `domAnimation` + `m.*` (bkz. "Hareket katmanı"); `domMax`/layoutId yok.
 
+## Mobil ana sayfa (< 768 px, aşama 1, 2026-10-07)
+
+- Başlık 56 px; mobilde başlıkta birincil CTA yok ("Giriş" + menü). Ekranda aynı anda TEK birincil "Ücretsiz dene":
+  hero düğmesi görünürken alt çubuk gizli; alt çubuk (`.mk-sticky-cta[data-smart]`) yalnız hiçbir deneme düğmesi, kapanış
+  bölümü ya da alt bilgi görünmezken belirir (IntersectionObserver; kaydırma dinleyicisi yazılmaz; gizliyken `visibility:hidden`).
+- Masaüstü/mobil metin çifti `.mk-dl` / `.mk-ml` (HeroSection `Pair`); kısa metin yalnız yönetimdeki metin varsayılanken.
+- Mobil ürün görseli telefon sahnesidir (`hero-phone.tsx`, SVG + CSS, sabit oran); masaüstü sahnesi mobilde gizli.
+  Süzülme tek sonsuz döngü istisnasıdır: `.mk-demo` kapsamında, ekran dışında duraklar, duraklat düğmesi var, reduce'ta sabit.
+- Ritim: gövde 15/22, kenar 16 px (sonraki aşamalarda bölüm başlığı 24 px).
+
 ## Marka
 
 **Seçilen sembol:** lacivert karo üzerinde altın çatı + beyaz "E" (omurga + 3 kol; orta kol marka mavisi). Üç alternatif

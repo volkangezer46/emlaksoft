@@ -3,6 +3,7 @@ import { Brand } from "@/components/brand/brand";
 import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { now, trParts } from "@/lib/clock";
+import { trialCtaMobileLabel } from "@/lib/marketing-copy";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
 
@@ -11,7 +12,7 @@ import { getLiveSiteMenu } from "@/lib/site-menu/store";
  * (src/lib/site-menu/defaults.ts). Sunucu bileşeni: istemciye JS göndermez. `autoPlans` sütununa (varsayılan: "Paketler")
  * paket bağlantıları etkin plan tanımlarından (fiyat okuyucu) eklenir.
  */
-export async function SiteFooter() {
+export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: boolean; trialDays?: number } = {}) {
   const menuColumns = toPublicMenu(await getLiveSiteMenu(), now()).footer;
   const plans = menuColumns.some((c) => c.autoPlans) ? await getPublicPlanDefinitions() : [];
   const columns = menuColumns.map((c) =>
@@ -66,8 +67,10 @@ export async function SiteFooter() {
           <p style={{ margin: 0 }}>Ekran görüntüleri ve sayılar örnek veridir. Anılan portal adları yalnız takip içindir; resmi ortaklık iddiası yoktur.</p>
         </div>
       </div>
-      <div className="mk-sticky-cta">
-        <Link href="/kayit" className="mk-btn mk-btn-grad">Ücretsiz dene</Link>
+      {/* Mobil alt çubuk (< 768 px). smartCta: ana sayfada yalnız hero CTA'sı görünüm dışındayken belirir (MotionRoot). */}
+      <div className="mk-sticky-cta" data-smart={smartCta ? "" : undefined}>
+        <Link href="/giris" className="mk-sticky-login">Giriş</Link>
+        <Link href="/kayit" className="mk-btn mk-btn-grad">{trialCtaMobileLabel(trialDays)}</Link>
       </div>
     </footer>
   );

@@ -14,6 +14,37 @@ import { useEffect } from "react";
  * Fare/imleç konumu izlenmez.
  */
 export function MotionRoot() {
+  /*
+   * Akıllı alt çubuk (hareket değil, görünürlük: reduce / otomasyon tarayıcısında da çalışır). Kaydırma dinleyicisi YOK.
+   * Çubuk yalnız şu öğelerin HİÇBİRİ görünmüyorken belirir: hero birincil düğmesi, sayfadaki diğer deneme düğmeleri,
+   * kapanış bölümü, alt bilgi => ekranda aynı anda tek birincil "Ücretsiz dene". Üst/alt 56 px (başlık + çubuk) sayılmaz.
+   */
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>(".mk");
+    const bar = root?.querySelector<HTMLElement>(".mk-sticky-cta[data-smart]");
+    if (!root || !bar) return;
+    if (typeof IntersectionObserver === "undefined") {
+      bar.dataset.show = "true";
+      return;
+    }
+    const seen = new Set<Element>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) seen.add(e.target);
+          else seen.delete(e.target);
+        }
+        bar.dataset.show = String(seen.size === 0);
+      },
+      { rootMargin: "-56px 0px -56px 0px" },
+    );
+    root.querySelectorAll(".mk-hero-primary, main a.mk-btn[href^='/kayit'], .mk-final, .mk-foot").forEach((el) => io.observe(el));
+    return () => {
+      io.disconnect();
+      delete bar.dataset.show;
+    };
+  }, []);
+
   useEffect(() => {
     const root = document.querySelector<HTMLElement>(".mk");
     if (!root || typeof IntersectionObserver === "undefined") return;
@@ -80,22 +111,28 @@ export function MotionRoot() {
       demos.forEach((d) => demoIo.observe(d));
       document.addEventListener("visibilitychange", apply);
 
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "mk-pause";
-      btn.setAttribute("aria-pressed", "false");
-      btn.textContent = "Animasyonu duraklat";
-      btn.addEventListener("click", () => {
-        userPaused = !userPaused;
-        btn.setAttribute("aria-pressed", String(userPaused));
-        btn.textContent = userPaused ? "Animasyonu oynat" : "Animasyonu duraklat";
-        apply();
+      // Her sahneye bir düğme (masaüstü ve mobil sahneden yalnız biri görünür); durum ortak.
+      const btns = demos.map((d) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mk-pause";
+        btn.setAttribute("aria-pressed", "false");
+        btn.textContent = "Animasyonu duraklat";
+        btn.addEventListener("click", () => {
+          userPaused = !userPaused;
+          for (const b of btns) {
+            b.setAttribute("aria-pressed", String(userPaused));
+            b.textContent = userPaused ? "Animasyonu oynat" : "Animasyonu duraklat";
+          }
+          apply();
+        });
+        d.appendChild(btn);
+        return btn;
       });
-      demos[0]!.appendChild(btn);
       cleanups.push(() => {
         demoIo.disconnect();
         document.removeEventListener("visibilitychange", apply);
-        btn.remove();
+        btns.forEach((b) => b.remove());
         for (const d of demos) delete d.dataset.paused;
       });
     }
