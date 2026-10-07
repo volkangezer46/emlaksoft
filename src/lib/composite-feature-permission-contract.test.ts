@@ -25,7 +25,12 @@ describe("composite feature permission truthfulness", () => {
     expect(page).toContain('effectiveHasPermission(perms, "properties", "create")');
     expect(page).toContain("canImportProperties={canImportProperties}");
     expect(page).toContain('effectiveHasPermission(perms, "demands", "create")');
-    expect(wizard).toContain('t.key === "properties" ? canImportProperties : t.key === "demands" ? canImportDemands : true');
+    // Hedef başına yetki: portföy/talep ve faaliyet türleri (görev/randevu/gider) kendi "create" iznine bağlı.
+    expect(wizard).toMatch(/t\.key === "properties"\s*\?\s*canImportProperties\s*:\s*t\.key === "demands"\s*\?\s*canImportDemands/);
+    expect(wizard).toContain("canImportActivity[t.key]");
+    for (const mod of ["tasks", "appointments", "expenses"]) {
+      expect(page).toContain(`effectiveHasPermission(perms, "${mod}", "create")`);
+    }
     expect(wizard).toContain("disabled={!allowed}");
     expect(wizard).toContain("aria-describedby={!allowed ? `${t.key}-import-permission-note` : undefined}");
   });
