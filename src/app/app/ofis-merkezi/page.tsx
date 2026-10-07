@@ -35,10 +35,9 @@ type Sp = {
 export default async function OfficeCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { userId, role, tenantId, perms } = await requireModulePage("office_center", OFFICE_CENTER_PATH);
   // Etkin izinler URL'den bağımsız: searchParams ile aynı turda (eskiden ardışık).
-  const [sp, effective] = await Promise.all([
-    searchParams,
-    tenantId ? getEffectivePermissions(tenantId, role, userId) : Promise.resolve(null),
-  ]);
+  const effectiveP = tenantId ? getEffectivePermissions(tenantId, role, userId) : Promise.resolve(null);
+  const sp = await searchParams;
+  const effective = await effectiveP;
   const tab = parseTab(sp.sekme);
 
   if (!tenantId || !effective) {
