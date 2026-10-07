@@ -138,7 +138,8 @@ const MAP_LIMIT = 1000;
 const SCAN_LIMIT = 2000;
 const TREND_WEEKS = 8;
 /** ?eklenen= — son N günde eklenenler (KPI "Son 4 hafta" buraya iner). */
-const ADDED_WINDOWS = [7, 28, 90] as const;
+const ADDED_WINDOWS = [1, 7, 28, 90] as const;
+const addedLabel = (d: number | string) => (String(d) === "1" ? "son 24 saat" : `son ${d} gün`);
 
 /** ?status= kontratı — değerler properties.status kolonuyla (İngilizce + Türkçe eşleri) eşlenir. */
 const STATUS_FILTERS = [
@@ -598,7 +599,7 @@ export default async function PropertiesPage({
     { key: "status", label: "Durum", format: (v) => STATUS_FILTERS.find((f) => f.value === v)?.label ?? v },
     { key: "saglik", label: "Fiyat sağlığı", format: (v) => SAGLIK_FILTERS.find((f) => f.value === v)?.label ?? v },
     { key: "kategori", label: "Tip" },
-    { key: "eklenen", label: "Eklenme", format: (v) => `son ${v} gün` },
+    { key: "eklenen", label: "Eklenme", format: (v) => addedLabel(v) },
     { key: "islem", label: "İşlem" },
     { key: "oda", label: "Oda", format: (v) => v.split(",").join(" / ") },
     { key: "fiyat_min", label: "Fiyat en az", format: (v) => formatTry(Number(v)) },
@@ -705,7 +706,7 @@ export default async function PropertiesPage({
               name="eklenen"
               label="Eklenme"
               value={eklenenDays ? String(eklenenDays) : ""}
-              options={[{ value: "", label: "Tümü" }, ...ADDED_WINDOWS.map((d) => ({ value: String(d), label: `Son ${d} gün` }))]}
+              options={[{ value: "", label: "Tümü" }, ...ADDED_WINDOWS.map((d) => ({ value: String(d), label: addedLabel(d).replace(/^s/, "S") }))]}
             />
           </FilterGrid>
         }

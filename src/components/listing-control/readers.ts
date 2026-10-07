@@ -180,7 +180,6 @@ export type LifecycleData = {
   controlAvailable: boolean;
   listings: { id: string; portal: string; externalId: string | null; url: string | null; status: string; publishedAt: string | null; removedAt: string | null; supersedesId: string | null }[];
   health: Map<string, PortalHealthRow>;
-  timeline: TimelineEvent[];
   score: HealthResult | null;
   storedScore: number | null;
   stage: string | null;
@@ -190,17 +189,15 @@ export type LifecycleData = {
   config: ListingControlConfig | null;
 };
 
-/** Portföy detayı verisi: portal ilanları + sağlık satırları + zaman çizelgesi + sağlık skoru bileşenleri. */
+/** Portföy detayı verisi: portal ilanları + sağlık satırları + sağlık skoru bileşenleri (olaylar: `loadLifecycleEvents`). */
 export async function loadLifecycle(db: Db, tenantId: string | null, propertyId: string, nowMs: number): Promise<LifecycleData> {
-  const empty: LifecycleData = { available: false, controlAvailable: false, listings: [], health: new Map(), timeline: [], score: null, storedScore: null, stage: null, exitKind: null, listPrice: null, openAnomalies: [], config: null };
-  const [prop, listings, health, verifs, anomalies, prices, state] = await Promise.all([
+  const empty: LifecycleData = { available: false, controlAvailable: false, listings: [], health: new Map(), score: null, storedScore: null, stage: null, exitKind: null, listPrice: null, openAnomalies: [], config: null };
+  const [prop, listings, health, anomalies, state] = await Promise.all([
     db.from("properties").select("created_at, updated_at, list_price, assigned_to, authorization_start, authorization_end").eq("id", propertyId).maybeSingle(),
     db.from("portal_listings").select("id, portal_name, portal_listing_id, portal_url, status, published_at, removed_at, supersedes_id").eq("property_id", propertyId).order("published_at", { ascending: true }),
     db.from("portal_listing_health").select("portal_listing_id, check_state, confidence, last_check_at, last_success_at, last_seen_at, last_check_result, portal_price").eq("property_id", propertyId),
-    db.from("listing_verifications").select("checked_at, result, state_after, portal_listing_id").eq("property_id", propertyId).order("checked_at", { ascending: false }).limit(40),
-    db.from("listing_anomalies").select("id, type, status, risk_score, first_seen_at, explained_at, explained_reason_code, resolved_at").eq("property_id", propertyId).order("first_seen_at", { ascending: false }).limit(40),
-    db.from("property_price_history").select("created_at, old_price, new_price, price_field").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(30),
-    db.from("property_control_state").select("health_score, lifecycle_stage, stage_since, assigned_at, exit_kind").eq("property_id", propertyId).maybeSingle(),
+    db.from("listing_anomalies").select("id, type, status, risk_score").eq("property_id", propertyId).order("first_seen_at", { ascending: false }).limit(40),
+    db.from("property_control_state").select("health_score, lifecycle_stage, exit_kind").eq("property_id", propertyId).maybeSingle(),
   ]);
   // Portal ilanları okunamıyorsa (yetki/şema) ekran dürüstçe "etkin değil" der; diğerleri eksik olabilir (en iyi çaba).
   if (listings.error || prop.error) {
@@ -215,63 +212,8 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
   }));
   const healthMap = new Map<string, PortalHealthRow>();
   for (const h of (health.data ?? []) as PortalHealthRow[]) healthMap.set(h.portal_listing_id, { ...h, portal_price: h.portal_price === null ? null : Number(h.portal_price) });
-  const portalById = new Map(ls.map((l) => [l.id, l.portal]));
-  const st = (state.data ?? null) as { health_score: number | null; lifecycle_stage: string; stage_since: string | null; assigned_at: string | null; exit_kind: string | null } | null;
-  const anRows = (anomalies.data ?? []) as { id: string; type: string; status: string; risk_score: number | null; first_seen_at: string; explained_at: string | null; explained_reason_code: string | null; resolved_at: string | null }[];
-
-  // Aşama geçişleri (20261007000200) ve portal ilanı kapanış kayıtları: ayrı, hataya dayanıklı okumalar (tablo yoksa atlanır).
-  const [stageRes, closureRes, extraRes] = await Promise.all([
-    db.from("lc_lifecycle_events").select("created_at, from_stage, to_stage, actor_id, actor_source, reason").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(40),
-    ls.length
-      ? db.from("listing_closures").select("portal_listing_id, reason, created_by, created_at").in("portal_listing_id", ls.map((l) => l.id)).order("created_at", { ascending: false }).limit(40)
-      : Promise.resolve({ data: [], error: null }),
-    ls.length
-      ? db.from("portal_listings").select("id, ended_reason, removal_reason, published_by").in("id", ls.map((l) => l.id))
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  const stageRows = stageRes.error ? [] : ((stageRes.data ?? []) as { created_at: string; from_stage: string | null; to_stage: string; actor_id: string | null; actor_source: "user" | "inferred" | "system"; reason: string | null }[]);
-  const closureRows = closureRes.error ? [] : ((closureRes.data ?? []) as { portal_listing_id: string; reason: string | null; created_by: string | null; created_at: string }[]);
-  const extraRows = extraRes.error ? [] : ((extraRes.data ?? []) as { id: string; ended_reason: string | null; removal_reason: string | null; published_by: string | null }[]);
-  const closureByListing = new Map<string, { reason: string | null; created_by: string | null }>();
-  for (const c of closureRows) if (!closureByListing.has(c.portal_listing_id)) closureByListing.set(c.portal_listing_id, c);
-  const extraById = new Map(extraRows.map((r) => [r.id, r]));
-  const actorNames = await loadProfileNames(db, [
-    ...stageRows.map((s) => s.actor_id),
-    ...closureRows.map((c) => c.created_by),
-    ...extraRows.map((r) => r.published_by),
-  ]);
-
-  const timeline = buildLifecycleTimeline({
-    createdAt: p?.created_at ?? null,
-    assignedAt: st?.assigned_at ?? null,
-    stage: st ? { stage: st.lifecycle_stage, since: st.stage_since } : null,
-    stageEvents: stageRows.map((s) => ({
-      at: s.created_at,
-      from: s.from_stage,
-      to: s.to_stage,
-      actorName: s.actor_id ? (actorNames.get(s.actor_id) ?? null) : null,
-      actorSource: s.actor_source,
-      reason: s.reason,
-    })),
-    listings: ls.map((l) => {
-      const x = extraById.get(l.id);
-      const c = closureByListing.get(l.id);
-      return {
-        ...l,
-        endedReason: x?.ended_reason ?? null,
-        removalReason: c?.reason ?? x?.removal_reason ?? null,
-        removedByName: c?.created_by ? (actorNames.get(c.created_by) ?? null) : null,
-        publishedByName: x?.published_by ? (actorNames.get(x.published_by) ?? null) : null,
-      };
-    }),
-    verifications: ((verifs.data ?? []) as { checked_at: string; result: string; state_after: string | null; portal_listing_id: string }[]).map((v) => ({
-      checkedAt: v.checked_at, portal: portalById.get(v.portal_listing_id) ?? "Portal", result: v.result, stateAfter: v.state_after,
-    })),
-    prices: ((prices.data ?? []) as { created_at: string; old_price: number | null; new_price: number | null; price_field?: string | null }[])
-      .filter((r) => !r.price_field || r.price_field === "list_price")
-      .map((r) => ({ at: r.created_at, oldPrice: r.old_price === null ? null : Number(r.old_price), newPrice: r.new_price === null ? null : Number(r.new_price) })),
-    anomalies: anRows.map((a) => ({ type: a.type, firstSeenAt: a.first_seen_at, explainedAt: a.explained_at, explainedReason: a.explained_reason_code, resolvedAt: a.resolved_at })),
-  });
+  const st = (state.data ?? null) as { health_score: number | null; lifecycle_stage: string; exit_kind: string | null } | null;
+  const anRows = (anomalies.data ?? []) as { id: string; type: string; status: string; risk_score: number | null }[];
 
   const config = tenantId ? await loadListingControlConfig(db, tenantId) : normalizeListingControlConfig(null);
   // EİDS taşınmaz no ayrı, hataya dayanıklı okunur (sütun yoksa ölçülemedi).
@@ -298,7 +240,6 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
     controlAvailable: schemaOk,
     listings: ls,
     health: healthMap,
-    timeline,
     score: computeHealthScore(inputs, config.healthWeights, config.healthColors),
     storedScore: st?.health_score ?? null,
     stage: st?.lifecycle_stage ?? null,
@@ -310,6 +251,80 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
 }
 
 /** Son dönemde açılan portal kaybı uyarıları (danışman örüntüsü için). RLS rol kapsamlı; en çok 1000 satır. */
+
+/**
+ * Portföyün İLAN KONTROL olayları (aşama geçişi, danışmana atama, portal yayın/kaldırma [neden + kim], ilan no değişimi,
+ * portal teyidi/kayboluş, uyarı/açıklama/çözüm). Portföy "Zaman çizelgesi" sekmesi (TEK tünel) bunları CRM olaylarıyla
+ * birleştirir; fiyat ve oluşturma CRM tarafında olduğundan burada üretilmez (mükerrer yok). Tablolar yoksa boş döner.
+ */
+export async function loadLifecycleEvents(db: Db, propertyId: string): Promise<{ available: boolean; events: TimelineEvent[] }> {
+  const [listings, verifs, anomalies, state] = await Promise.all([
+    db.from("portal_listings").select("id, portal_name, portal_listing_id, portal_url, status, published_at, removed_at, supersedes_id").eq("property_id", propertyId).order("published_at", { ascending: true }),
+    db.from("listing_verifications").select("checked_at, result, state_after, portal_listing_id").eq("property_id", propertyId).order("checked_at", { ascending: false }).limit(40),
+    db.from("listing_anomalies").select("type, first_seen_at, explained_at, explained_reason_code, resolved_at").eq("property_id", propertyId).order("first_seen_at", { ascending: false }).limit(40),
+    db.from("property_control_state").select("lifecycle_stage, stage_since, assigned_at").eq("property_id", propertyId).maybeSingle(),
+  ]);
+  if (listings.error) {
+    if (!isMissingSchema(listings.error)) console.error("loadLifecycleEvents", { code: listings.error.code });
+    return { available: false, events: [] };
+  }
+  const ls = ((listings.data ?? []) as Record<string, string | null>[]).map((r) => ({
+    id: String(r.id), portal: String(r.portal_name), externalId: r.portal_listing_id, url: r.portal_url, status: String(r.status),
+    publishedAt: r.published_at, removedAt: r.removed_at, supersedesId: r.supersedes_id ?? null,
+  }));
+  const portalById = new Map(ls.map((l) => [l.id, l.portal]));
+  const st = state.error ? null : ((state.data ?? null) as { lifecycle_stage: string; stage_since: string | null; assigned_at: string | null } | null);
+  const [stageRes, closureRes, extraRes] = await Promise.all([
+    db.from("lc_lifecycle_events").select("created_at, from_stage, to_stage, actor_id, actor_source, reason").eq("property_id", propertyId).order("created_at", { ascending: false }).limit(40),
+    ls.length
+      ? db.from("listing_closures").select("portal_listing_id, reason, created_by, created_at").in("portal_listing_id", ls.map((l) => l.id)).order("created_at", { ascending: false }).limit(40)
+      : Promise.resolve({ data: [], error: null }),
+    ls.length
+      ? db.from("portal_listings").select("id, ended_reason, removal_reason, published_by").in("id", ls.map((l) => l.id))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  const stageRows = stageRes.error ? [] : ((stageRes.data ?? []) as { created_at: string; from_stage: string | null; to_stage: string; actor_id: string | null; actor_source: "user" | "inferred" | "system"; reason: string | null }[]);
+  const closureRows = closureRes.error ? [] : ((closureRes.data ?? []) as { portal_listing_id: string; reason: string | null; created_by: string | null; created_at: string }[]);
+  const extraRows = extraRes.error ? [] : ((extraRes.data ?? []) as { id: string; ended_reason: string | null; removal_reason: string | null; published_by: string | null }[]);
+  const closureByListing = new Map<string, { reason: string | null; created_by: string | null }>();
+  for (const c of closureRows) if (!closureByListing.has(c.portal_listing_id)) closureByListing.set(c.portal_listing_id, c);
+  const extraById = new Map(extraRows.map((r) => [r.id, r]));
+  const actorNames = await loadProfileNames(db, [...stageRows.map((x) => x.actor_id), ...closureRows.map((c) => c.created_by), ...extraRows.map((r) => r.published_by)]);
+  const anRows = anomalies.error ? [] : ((anomalies.data ?? []) as { type: string; first_seen_at: string; explained_at: string | null; explained_reason_code: string | null; resolved_at: string | null }[]);
+  const events = buildLifecycleTimeline({
+    createdAt: null,
+    assignedAt: st?.assigned_at ?? null,
+    stage: st ? { stage: st.lifecycle_stage, since: st.stage_since } : null,
+    stageEvents: stageRows.map((x) => ({
+      at: x.created_at,
+      from: x.from_stage,
+      to: x.to_stage,
+      actorName: x.actor_id ? (actorNames.get(x.actor_id) ?? null) : null,
+      actorSource: x.actor_source,
+      reason: x.reason,
+    })),
+    listings: ls.map((l) => {
+      const x = extraById.get(l.id);
+      const c = closureByListing.get(l.id);
+      return {
+        ...l,
+        endedReason: x?.ended_reason ?? null,
+        removalReason: c?.reason ?? x?.removal_reason ?? null,
+        removedByName: c?.created_by ? (actorNames.get(c.created_by) ?? null) : null,
+        publishedByName: x?.published_by ? (actorNames.get(x.published_by) ?? null) : null,
+      };
+    }),
+    verifications: verifs.error
+      ? []
+      : ((verifs.data ?? []) as { checked_at: string; result: string; state_after: string | null; portal_listing_id: string }[]).map((v) => ({
+          checkedAt: v.checked_at, portal: portalById.get(v.portal_listing_id) ?? "Portal", result: v.result, stateAfter: v.state_after,
+        })),
+    prices: [],
+    anomalies: anRows.map((a) => ({ type: a.type, firstSeenAt: a.first_seen_at, explainedAt: a.explained_at, explainedReason: a.explained_reason_code, resolvedAt: a.resolved_at })),
+  });
+  return { available: true, events };
+}
+
 export async function loadMissingEvents(db: Db, sinceIso: string): Promise<{ available: boolean; events: MissingEvent[] }> {
   const { data, error } = await db
     .from("listing_anomalies")

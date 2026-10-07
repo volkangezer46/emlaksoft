@@ -52,7 +52,10 @@ async function propertiesWithOpenLostDealAnomaly(admin: ReturnType<typeof create
 }
 
 /**
- * Proaktif kayıp-kaçak: deal olmadan kapanmış + uyarısı gitmemiş + SLA aşımı → bildir.
+ * Proaktif kayıp-kaçak: deal olmadan kapanmış + uyarısı gitmemiş + SLA aşımı → bildir ("sonuçsuz kapanış" takibi).
+ * "Potansiyel kayıp" TUTARI tek kaynaktır: listing_anomalies (`closure_loss` kapanış tetikleyicisiyle, `potential_lost_deal`
+ * motorla; 20261007000610). Kayıplı kapanış (deal_happened=true) bu döngüye zaten girmez; açık `potential_lost_deal`
+ * uyarısı olan portföy için de bu cron ek bildirim üretmez (aşağıdaki `covered`).
  * TEK SLA ZİNCİRİ: aynı çalıştırmada İlan Kontrol anomalilerinin yükseltmesi de yürür (danışman 0-4 saat → takım lideri
  * → 8. saat şube müdürü → 24. saat ofis sahibi; süreler ofis ayarlı). Yeni cron YOK: bu cron saatlik çalışır ki 4/8/24
  * saatlik kademeler en çok ~1 saat gecikmeyle tetiklensin. Aşama kaydı (anomali, aşama) tekildir; tekrar çalışma

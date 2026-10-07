@@ -60,8 +60,9 @@ import {
 } from "./demand-list-logic";
 
 const PATH = "/app/talepler";
-/** ?eklenen= pencereleri (gün) — ana ekran dönem seçiciyle aynı (7|30|90). */
-const ADDED_WINDOWS = [7, 30, 90] as const;
+/** ?eklenen= pencereleri (gün) — ana ekran dönem seçiciyle aynı (7|30|90); 1 = ana ekran "Dünden beri" (son 24 saat). */
+const ADDED_WINDOWS = [1, 7, 30, 90] as const;
+const addedLabel = (d: number | string) => (String(d) === "1" ? "son 24 saat" : `son ${d} gün`);
 
 type Rel = { id?: string; full_name?: string; name?: string; assigned_to?: string | null } | { id?: string; full_name?: string; name?: string; assigned_to?: string | null }[] | null;
 
@@ -376,7 +377,7 @@ export async function DemandsView({
     { key: "il", label: "İl", format: () => ilName ?? "Seçili il" },
     { key: "butce", label: "Bütçe", format: (v) => BUDGET_BANDS.find((b) => b.key === v)?.label ?? v },
     { key: "yas", label: "Açık süre", format: (v) => `${v}+ gün` },
-    { key: "eklenen", label: "Eklenme", format: (v) => `son ${v} gün` },
+    { key: "eklenen", label: "Eklenme", format: (v) => addedLabel(v) },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
   ]);
 
@@ -453,7 +454,7 @@ export async function DemandsView({
                   name="eklenen"
                   label="Eklenme"
                   value={eklenenF ? String(eklenenF) : ""}
-                  options={[{ value: "", label: "Tümü" }, ...ADDED_WINDOWS.map((d) => ({ value: String(d), label: `Son ${d} gün` }))]}
+                  options={[{ value: "", label: "Tümü" }, ...ADDED_WINDOWS.map((d) => ({ value: String(d), label: addedLabel(d).replace(/^s/, "S") }))]}
                 />
               </FilterGrid>
             }

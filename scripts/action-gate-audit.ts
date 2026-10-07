@@ -79,6 +79,7 @@ const MUAF: Record<string, string> = {
   "open-house-public.ts::registerOpenHouseVisitorByToken": "Acik ev QR self check-in; token etkinlige sabit.",
   "owner-portal-offers.ts::respondToOfferByToken": "Malik portalinda teklif onay/ret; token ile.",
   "customer-portal-feedback.ts::submitMatchFeedbackByToken": "Musteri portali begen/gec geri bildirimi; token ile.",
+  "customer-portal-requests.ts::submitPortalRequest": "Musteri portali teklif/erteleme/bakim istegi; token ve sahiplik SQL RPC icinde (20261007000620), service_role yok.",
   "survey-public.ts::submitSurveyByToken": "NPS memnuniyet anketi; token ankete sabit.",
   "survey-public.ts::submitSurveyTaskByToken": "Anketör görevi bağlı linki; UUID token tek göreve sabit, IP hız sınırı (deny), honeypot, modül ve ofis aktiflik denetimi, tenant filtreli yazım.",
   "referral-public.ts::submitReferralByToken": "Tavsiye formu; token referral_links kaydina sabit.",

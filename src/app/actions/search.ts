@@ -6,6 +6,7 @@ import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { formatTurkishPhone } from "@/lib/phone";
+import { phoneSearchNeedle } from "@/lib/caller-lookup";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
 import {
   canSearchKind,
@@ -66,13 +67,16 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   const per = (n: number) => n * factor;
   const DEAL_STAGE_LABEL = stageLabelMap(await getStageLabels());
 
-  let customerQuery = supabase
+  // Arayan tanıma: numara her biçimde yazılabilir ("0532 123 45 67", "+90 532…"); saklama biçimine göre rakam araması.
+  const phoneNeedle = phoneSearchNeedle(q);
+  const customerBase = supabase
     .from("customers")
     .select("id, full_name, phone")
     .eq("tenant_id", gate.tenantId)
-    .is("deleted_at", null)
-    .or(orIlike(["full_name", "phone", "email"], q))
-    .limit(per(8));
+    .is("deleted_at", null);
+  let customerQuery = (phoneNeedle ? customerBase.ilike("phone", `%${phoneNeedle.needle}%`) : customerBase.or(orIlike(["full_name", "phone", "email"], q))).limit(
+    per(8),
+  );
   let propertyQuery = supabase
     .from("properties")
     .select("id, property_code, title, parcel_block, parcel_lot")
@@ -151,12 +155,31 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
     canSearch("task") ? taskQuery : empty,
   ]);
 
+  // Numara aramasında kişinin rolü (malik / kiracı) da gösterilir: ikisi de customers kaydıdır (owner_customer_id, renter_customer_id).
+  const roleOf = new Map<string, string[]>();
+  if (phoneNeedle && (customers ?? []).length > 0) {
+    const ids = (customers ?? []).map((c) => c.id as string);
+    const [owned, rented] = await Promise.all([
+      supabase.from("properties").select("owner_customer_id").eq("tenant_id", gate.tenantId).is("deleted_at", null).in("owner_customer_id", ids).limit(200),
+      supabase.from("rentals").select("renter_customer_id").eq("tenant_id", gate.tenantId).in("renter_customer_id", ids).limit(200),
+    ]);
+    const add = (id: unknown, label: string) => {
+      if (typeof id !== "string") return;
+      const list = roleOf.get(id) ?? [];
+      if (!list.includes(label)) list.push(label);
+      roleOf.set(id, list);
+    };
+    if (!owned.error) for (const r of owned.data ?? []) add(r.owner_customer_id, "Malik");
+    if (!rented.error) for (const r of rented.data ?? []) add(r.renter_customer_id, "Kiracı");
+  }
+
   for (const c of customers ?? []) {
+    const roles = roleOf.get(c.id as string) ?? [];
     hits.push({
       id: c.id,
       kind: "customer",
       title: c.full_name,
-      subtitle: c.phone ? formatTurkishPhone(c.phone) : "Müşteri",
+      subtitle: [c.phone ? formatTurkishPhone(c.phone) : "Müşteri", ...roles].join(" · "),
       href: `/app/musteriler/${c.id}`,
     });
   }

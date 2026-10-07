@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { PoolProperty } from "@/lib/pool/score";
 import { getSettingDef } from "@/lib/settings/registry";
@@ -169,5 +170,25 @@ describe("kısıt ve adil dağıtım", () => {
     const stored = toStoredScore(rankAdvisorsForProperty(prop, [cand()], ctx)[0]);
     expect(Object.keys(stored)).toEqual(["total", "reasons"]);
     expect(Object.keys(stored.reasons[0])).toEqual(["key", "label", "points", "max"]);
+  });
+});
+
+describe("tek motor (havuz ile ortak alt hesaplar)", () => {
+  it("fiyat bandı tanımlıysa uzmanlığa girer: bant dışı danışman bant içindekinden düşük uzmanlık puanı alır", () => {
+    const spec = (priceMin: number | null, priceMax: number | null) => [
+      { kind: "property_type" as const, value: "Daire", transactionType: "Satılık", priceMin, priceMax, level: 3 },
+    ];
+    const inside = scoreSmartCandidate(cand({ specialties: spec(4_000_000, 6_000_000) }), prop, ctx).reasons.find((r) => r.key === "specialty")!;
+    const outside = scoreSmartCandidate(cand({ specialties: spec(10_000_000, 20_000_000) }), prop, ctx).reasons.find((r) => r.key === "specialty")!;
+    expect(inside.points).toBe(DEFAULT_WEIGHTS.specialty);
+    expect(outside.points).toBeLessThan(inside.points);
+    expect(outside.detail).toMatch(/Fiyat bandının dışında/);
+  });
+
+  it("akıllı atama kendi iş yükü/performans/müsaitlik/sıralama kopyasını taşımaz; motor çarpanlarını kullanır", () => {
+    const src = readFileSync("src/lib/office-center/smart-assign.ts", "utf8");
+    for (const fn of ["workloadFactor(", "performanceFactor(", "availabilityFactor(", "rankScored(", "explainReasons("]) expect(src).toContain(fn);
+    expect(src).not.toMatch(/function (workloadReason|performanceReason|availabilityReason)\(/);
+    expect(src).not.toContain("TIE_WINDOW");
   });
 });

@@ -30,6 +30,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { decodeDemandPreviewParam, parseDemandValues } from "@/lib/demand-criteria";
 import { fetchMatchCandidateProperties, MATCH_CANDIDATE_LIMIT } from "@/lib/match-candidates";
 import { SaveMatchButton } from "./save-match-button";
+import { SendMatchButton } from "./send-match-button";
 import type { CSSProperties } from "react";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -522,7 +523,10 @@ export async function MatchingView({
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                       {pair.demand.id === PREVIEW_DEMAND_ID ? null : (
-                        <SaveMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
+                        <>
+                          <SendMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
+                          <SaveMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
+                        </>
                       )}
                       <Link
                         href={`/app/portfoyler/${pair.property.id}`}

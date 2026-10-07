@@ -91,7 +91,9 @@ describe("TS sabitleri ↔ SQL CHECK listeleri", () => {
   });
   it("anomali türleri, önem, durumlar, açıklama nedenleri", () => {
     const t = sql("20260826002030_lc_anomaly_tables.sql");
-    expect(checkList(t, "type")).toEqual([...ANOMALY_TYPES]);
+    // Tür listesi 20261007000610'da 'closure_loss' ile genişledi (TS sabiti en son tanımla eşleşir).
+    expect([...checkList(t, "type"), "closure_loss"]).toEqual([...ANOMALY_TYPES]);
+    expect(checkList(readFileSync("supabase/migrations/20261007000610_closure_loss_anomalies.sql", "utf8"), "type")).toEqual([...ANOMALY_TYPES]);
     expect(checkList(t, "severity")).toEqual([...ANOMALY_SEVERITIES]);
     expect(checkList(t, "status")).toEqual([...ANOMALY_STATUSES]);
     expect(checkList(t, "explained_reason_code")).toEqual([...REASON_CODES]);

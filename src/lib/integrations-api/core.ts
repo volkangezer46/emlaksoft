@@ -6,7 +6,8 @@
  *  - Webhook imza sırrı SAKLANMAZ: `WEBHOOK_SIGNING_SECRET` (sunucu) + uç kimliği + sürümden HMAC ile türetilir;
  *    sürüm artırılınca (yenile) eski sır geçersiz olur. Ortam değişkeni yoksa webhook kanalı KAPALI.
  *  - İmza: `X-EmlakSoft-Signature: t=<unix>,v1=<hex(HMAC_SHA256(sır, t + "." + gövde))>` (zaman damgası tekrar saldırısına karşı).
- *  - Hedef URL yalnız https, IP literal / localhost / iç alan adı YOK (DNS yeniden bağlama ayrıca engellenmez — bilinen sınır).
+ *  - Hedef URL yalnız https, IP literal / localhost / iç alan adı YOK; DNS yeniden bağlama teslim anında `safe-delivery.ts`
+ *    ile engellenir (çözülen her adres denetlenir, soket yalnız denetlenen adrese açılır).
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 

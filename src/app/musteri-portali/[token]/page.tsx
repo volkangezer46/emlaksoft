@@ -5,6 +5,9 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  FileSignature,
+  Home,
+  KeyRound,
   MapPin,
   MessageCircle,
   Phone,
@@ -18,6 +21,14 @@ import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
+import { PortalRequestForm } from "@/components/public/portal-request-form";
+import {
+  MAINTENANCE_LABELS,
+  OWNER_OFFER_LABELS,
+  PORTAL_TAB_LABELS,
+  RENT_CHARGE_LABELS,
+  resolvePortalTab,
+} from "@/lib/customer-portal/portal-model";
 import { MatchFeedback } from "./match-feedback";
 import { CompareBar, CompareToggle } from "@/components/public/compare-select";
 import {
@@ -78,10 +89,12 @@ type TenantRel = { slug?: string | null } | { slug?: string | null }[] | null;
 
 export default async function CustomerPortalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { token } = await params;
+  const [{ token }, sp] = await Promise.all([params, searchParams]);
   const data = await getCustomerPortalData(token);
 
   if (!data) {
@@ -93,7 +106,9 @@ export default async function CustomerPortalPage({
     );
   }
 
-  const { customer, tenant, demands, appointments, matches } = data;
+  const { customer, tenant, demands, appointments, matches, tabs, owner, renter, documents, requestsEnabled } = data;
+  // TEK PORTAL: rolüne göre sekme (alıcı / malik / kiracı / belgeler); yalnız veri olan sekme görünür.
+  const active = resolvePortalTab(sp?.sekme, tabs);
 
   // Sayfaya özel ek veriler — paylaşılan portal aksiyonuna dokunmadan burada:
   // atanmış danışman iletişimi, vitrin slug'ı, eşleşen portföylerin kapak
@@ -253,6 +268,23 @@ export default async function CustomerPortalPage({
           </div>
         </section>
 
+        {tabs.length > 1 ? (
+          <nav aria-label="Panel bölümleri" className="flex gap-1.5 overflow-x-auto">
+            {tabs.map((t) => (
+              <Link
+                key={t}
+                href={`/musteri-portali/${token}?sekme=${t}`}
+                aria-current={active === t ? "page" : undefined}
+                className={`focus-ring inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm font-semibold transition ${active === t ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-ink-950 hover:border-brand-300"}`}
+              >
+                {PORTAL_TAB_LABELS[t]}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
+
+        {active === "alici" ? (
+        <>
         {/* Eşleşen portföyler */}
         {matches.length > 0 && (
           <PortalSection id="portfoyler" icon={Star} iconClassName="text-amber-500" title="Size Özel Portföyler">
@@ -355,6 +387,7 @@ export default async function CustomerPortalPage({
                     {/* ✓ seçim (2-3 portföy) → alt çubukta Karşılaştır; beğen/geç aynen kalır */}
                     <CompareToggle item={compareItem} variant="row" />
                     <MatchFeedback token={token} propertyId={m.id} initialVerdict={verdict} />
+                    {requestsEnabled && statusMap.get(m.id) ? <PortalRequestForm token={token} refId={m.id} variant="offer" /> : null}
                   </div>
                 );
               })}
@@ -418,6 +451,11 @@ export default async function CustomerPortalPage({
                       {a.status === "confirmed" ? "Onaylandı" : "Teyit Bekliyor"}
                     </span>
                   </div>
+                  {requestsEnabled ? (
+                    <div className="-mx-4 mt-2">
+                      <PortalRequestForm token={token} refId={a.id} variant="appointment" />
+                    </div>
+                  ) : null}
                   <div className="mt-2 flex justify-end border-t border-line pt-2">
                     <AddToCalendarButton
                       event={{
@@ -462,6 +500,110 @@ export default async function CustomerPortalPage({
             hint="Danışmanınız arayışınızı, size özel portföyleri ve randevularınızı buraya ekledikçe bu sayfa dolacak."
           />
         )}
+        </>
+        ) : null}
+
+        {active === "malik" ? (
+          <PortalSection id="mulkum" icon={Home} title="Mülküm">
+            <div className="space-y-3">
+              {owner.map((o) => (
+                <div key={o.id} className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink-950">{o.label}</p>
+                      <p className="mt-0.5 text-xs text-text-muted">Liste fiyatı {money(o.listPrice)} · {o.livePortals} portalda yayında</p>
+                    </div>
+                  </div>
+                  {o.offers.length > 0 ? (
+                    <ul className="mt-2 divide-y divide-line text-sm">
+                      {o.offers.map((x, i) => (
+                        <li key={i} className="flex items-center justify-between gap-2 py-1.5">
+                          <span className="font-semibold tabular-nums text-ink-950">{money(x.amount)}</span>
+                          <span className="text-xs text-text-muted">{OWNER_OFFER_LABELS[x.status] ?? x.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-xs text-text-muted">Henüz değerlendirmedeki teklif yok.</p>
+                  )}
+                  {o.ownerPortalHref ? (
+                    <Link href={o.ownerPortalHref} className="focus-ring mt-2 inline-flex min-h-10 items-center text-xs font-bold text-brand-600">
+                      Haftalık rapor, teklif kararı ve kira ekstresi →
+                    </Link>
+                  ) : (
+                    <p className="mt-2 text-xs text-text-faint">Ayrıntılı malik raporu için danışmanınızdan malik bağlantısı isteyin.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </PortalSection>
+        ) : null}
+
+        {active === "kiraci" ? (
+          <PortalSection id="kiram" icon={KeyRound} title="Kiram">
+            <div className="space-y-3">
+              {renter.map((r) => (
+                <div key={r.id} className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+                  <div className="px-4 py-3">
+                    <p className="text-sm font-semibold text-ink-950">{r.label}</p>
+                    <p className="mt-0.5 text-xs text-text-muted">Aylık kira {money(r.monthlyRent)} · her ayın {r.dueDay}. günü</p>
+                    {r.charges.length > 0 ? (
+                      <ul className="mt-2 divide-y divide-line text-sm">
+                        {r.charges.map((c) => (
+                          <li key={c.period} className="flex items-center justify-between gap-2 py-1.5">
+                            <span className="text-text-muted">{formatDateTimeTr(c.period, { month: "long", year: "numeric" })}</span>
+                            <span className="flex items-center gap-2">
+                              <span className="tabular-nums text-ink-950">{money(c.amount)}</span>
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${c.status === "paid" ? "bg-mint-500/12 text-mint-700" : c.status === "overdue" ? "bg-danger-500/10 text-danger-600" : "bg-amber-400/15 text-amber-700"}`}>
+                                {RENT_CHARGE_LABELS[c.status] ?? c.status}
+                              </span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-xs text-text-muted">Henüz kira tahakkuku yok.</p>
+                    )}
+                    {r.maintenance.length > 0 ? (
+                      <div className="mt-3">
+                        <p className="text-xs font-semibold text-ink-950">Bakım talepleriniz</p>
+                        <ul className="mt-1 space-y-1 text-xs text-text-muted">
+                          {r.maintenance.map((m, i) => (
+                            <li key={i} className="flex items-center justify-between gap-2">
+                              <span className="truncate">{m.title}</span>
+                              <span className="shrink-0 font-semibold">{MAINTENANCE_LABELS[m.status] ?? m.status}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                  {requestsEnabled ? <PortalRequestForm token={token} refId={r.id} variant="maintenance" /> : null}
+                </div>
+              ))}
+            </div>
+          </PortalSection>
+        ) : null}
+
+        {active === "belgeler" ? (
+          <PortalSection id="belgeler" icon={FileSignature} title="Belgeler">
+            <div className="space-y-2">
+              {documents.pendingSign.map((d) => (
+                <Link key={d.id} href={d.href} className="focus-ring flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/8 px-4 py-3 text-sm font-semibold text-ink-950">
+                  <span className="truncate">{d.title}</span>
+                  <span className="shrink-0 text-xs font-bold text-amber-700">İmzanızı bekliyor →</span>
+                </Link>
+              ))}
+              {documents.signed.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-sm">
+                  <span className="truncate text-ink-950">{d.title}</span>
+                  <span className="shrink-0 text-xs text-text-muted">İmzalandı{d.signedAt ? ` · ${formatDateTimeTr(d.signedAt, { day: "2-digit", month: "long", year: "numeric" })}` : ""}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-text-faint">Belgelerin kendisi bu sayfada gösterilmez; imza bağlantısı yalnız size özeldir.</p>
+          </PortalSection>
+        ) : null}
 
         <PortalFooterNote office={tenant.name} />
         <PortalStickySpacer active={Boolean(advisorTel || advisorWhatsApp)} />

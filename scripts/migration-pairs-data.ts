@@ -174,6 +174,12 @@ const F = {
   vitrinChatContext: "20261007000330_vitrin_chat_context.sql",
   // PB49 anket sistemi (2026-10-07): kitle x tetik matrisi, otomatik gonderim izi, dusuk puan zinciri, ekip nabzi.
   surveyMatrix: "20261007000400_survey_matrix_channels.sql",
+  // PB51 persona turu (2026-10-07): webhook kuyrugu izin kapisi (dogrudan RPC acigi).
+  webhookEnqueueGate: "20261007000600_webhook_enqueue_gate.sql",
+  // PB51: potansiyel kayip tek kaynak (kayipli kapanis -> closure_loss anomalisi; tetikleyici + uzlastirma).
+  closureLossAnomalies: "20261007000610_closure_loss_anomalies.sql",
+  // PB51: musteri tek portali yazma kapisi (token'li teklif / randevu erteleme / bakim talebi; anon DEFINER RPC).
+  customerPortalRequests: "20261007000620_customer_portal_requests.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -293,6 +299,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcInventoryMatching]: "ek", // yeni tablo listing_inventory_imports + 2 authenticated RPC (lc_inventory_import, lc_match_decide) mevcut service_role cekirdeklerini sarar
     [F.lcDistrictSlaReset]: "davranis", // 2 yeni invoker RPC (ilce kirilimi) + listing_anomalies tetikleyicisi: yeniden acilan uyarinin eski SLA asama kayitlarini siler (yukseltme bastan isler)
     [F.vitrinChatContext]: "ek", // yeni anon DEFINER RPC vitrin_chat_context (ofis ayari acik + ilan yayinda ise yalniz public ilan alanlari)
+    [F.customerPortalRequests]: "ek", // yeni portal_customer_requests (iz) + anon/authenticated DEFINER RPC portal_customer_request (token icerde dogrulanir; yalniz taslak teklif/gorev/bakim yazar) + portal_customer_request_ready
+    [F.closureLossAnomalies]: "davranis", // listing_anomalies.type CHECK'ine closure_loss; listing_closures AFTER tetikleyicisi + tek seferlik uzlastirma (yalniz 'explained' satir, SLA yok); lc_closure_loss_ready yoklamasi
+    [F.webhookEnqueueGate]: "siki", // webhook_enqueue modul izni + 30 sn tekrar freni; webhook_mark_delivery yalniz kuyruga yazan + ilk deneme; webhook_deliveries.enqueued_by
     [F.webhooksApiKeys]: "ek", // yeni api_keys/webhook_endpoints/webhook_deliveries + RLS (ayarlar:edit) + 3 DEFINER RPC (api_v1_list anon'a acik, yalniz anahtar ozetiyle okur)
     [F.customFields]: "ek", // yeni custom_field_defs/values + RLS (okuma ust kayit gorunurlugu, yazma modul edit) + 2 INVOKER yardimci fonksiyon
     [F.dealGosFields]: "ek", // deals'a 2 nullable kolon (gos_reference_no + CHECK, title_deed_appointment_at) + kismi indeks; politika degismez
@@ -405,6 +414,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB47-crm-ozellikleri", order: 29.98, title: "CRM ozellik turu: GOS anlasma alanlari -> ozel alanlar -> API anahtari + giden webhook -> vitrin AI sohbet baglami", files: [F.dealGosFields, F.customFields, F.webhooksApiKeys, F.vitrinChatContext] },
     { id: "PB49-anket-sistemi", order: 29.99, title: "Anket sistemi: kitle x tetik matrisi (rent_renewal/tenant_annual/advisor_pulse + advisor kitlesi) + otomatik gonderim izi + dusuk puan zinciri RPC + ekip nabzi RPC; kod yokken eski davranis", files: [F.surveyMatrix] },
     { id: "PB48-medya-belge-isareti", order: 29.985, title: "KVKK P0-9: property_media.is_document (belge public'e cikmaz) + ad kurali fonksiyonu + INSERT tetikleyicisi; kod sutun yokken ad kuralina duser (sira serbest)", files: [F.mediaIsDocument] },
+    { id: "PB51-persona-turu", order: 29.997, title: "Persona turu: webhook kuyrugu izin kapisi (dogrudan RPC acigi kapanir) -> potansiyel kayip tek kaynak (kapanis kaybi anomaliye) -> musteri tek portali yazma kapisi", files: [F.webhookEnqueueGate, F.closureLossAnomalies, F.customerPortalRequests] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
@@ -532,6 +542,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcDistrictSlaReset, F.lcAnomalyTables],
     // PB49: anket genisletmesi anket modulu tablolarina ve survey_is_manager'a dayanir.
     [F.surveyMatrix, F.survey],
+    // PB51: webhook izin kapisi 000320 govdelerini yeniden yazar.
+    [F.webhookEnqueueGate, F.webhooksApiKeys],
+    // PB51: closure_loss tetikleyicisi anomali tablolarina dayanir.
+    [F.closureLossAnomalies, F.lcAnomalyTables],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

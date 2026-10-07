@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TimelineEvent } from "@/lib/activity-timeline";
 import { getPropertyTimeline, type TimelineKind } from "@/app/actions/property-timeline";
 import { dealAuditEvents, fetchActorNames, fetchDealAudit, tl } from "@/lib/activity-timeline-sources";
+import { loadLifecycleEvents } from "@/components/listing-control/readers";
+import type { TimelineEvent as LifecycleEvent } from "@/components/listing-control/lifecycle-model";
 
 /** Portföy zaman çizelgesi kategorileri (URL ?kategori=). */
 export const PROPERTY_TIMELINE_CATEGORIES = [
@@ -12,6 +14,7 @@ export const PROPERTY_TIMELINE_CATEGORIES = [
   { key: "teklif", label: "Teklif" },
   { key: "anlasma", label: "Anlaşma" },
   { key: "portal", label: "Portal" },
+  { key: "ilan-kontrol", label: "İlan kontrol" },
   { key: "anahtar", label: "Anahtar" },
   { key: "medya", label: "Medya" },
 ] as const;
@@ -35,6 +38,31 @@ const KIND_ICON: Record<TimelineKind, string> = {
   media: "file",
 };
 const TONE = { ok: "success", warn: "warn", danger: "danger", neutral: "neutral" } as const;
+
+/** İlan Kontrol olayı → tek tünel kategorisi/ikon/ton. Yayın/kaldırma "Portal" altında (neden + kim ile), kalanı "İlan kontrol". */
+const LC_MAP: Record<LifecycleEvent["kind"], { category: string; icon: string; tone: TimelineEvent["tone"] } | null> = {
+  created: null,
+  price: null,
+  assigned: { category: "ilan-kontrol", icon: "history", tone: "neutral" },
+  stage: { category: "ilan-kontrol", icon: "history", tone: "info" },
+  published: { category: "portal", icon: "portal", tone: "success" },
+  removed: { category: "portal", icon: "portal", tone: "warn" },
+  id_changed: { category: "portal", icon: "portal", tone: "info" },
+  verified: { category: "ilan-kontrol", icon: "portal", tone: "success" },
+  missing: { category: "ilan-kontrol", icon: "portal", tone: "danger" },
+  anomaly: { category: "ilan-kontrol", icon: "history", tone: "warn" },
+  explained: { category: "ilan-kontrol", icon: "history", tone: "neutral" },
+  resolved: { category: "ilan-kontrol", icon: "history", tone: "success" },
+};
+
+/** İlan Kontrol olaylarını tek tünel biçimine çevirir (saf; testli). Fiyat/oluşturma CRM kaynağında olduğundan atlanır. */
+export function lifecycleToTimeline(events: readonly LifecycleEvent[]): TimelineEvent[] {
+  return events.flatMap((e, i) => {
+    const m = LC_MAP[e.kind];
+    if (!m) return [];
+    return [{ id: `lc-${e.kind}-${e.at}-${i}`, at: e.at, category: m.category, title: e.title, detail: e.detail, icon: m.icon, tone: m.tone }];
+  });
+}
 
 const KEY_ACTION: Record<string, { title: string; tone: TimelineEvent["tone"] }> = {
   olusturma: { title: "Anahtar kaydı açıldı", tone: "neutral" },
@@ -62,13 +90,18 @@ export async function buildPropertyEvents(
   propertyId: string,
   stageNames: Record<string, string>,
 ): Promise<TimelineEvent[]> {
-  const [base, { data: views }, { data: keys }, { data: deals }, { data: audit }] = await Promise.all([
+  const [base, { data: views }, { data: keys }, { data: deals }, { data: audit }, lifecycle] = await Promise.all([
     getPropertyTimeline(propertyId),
     supabase.from("listing_views").select("id, day, count").eq("property_id", propertyId).gt("count", 0).order("day", { ascending: false }).limit(30),
     supabase.from("property_keys").select("id, label").eq("property_id", propertyId),
     supabase.from("deals").select("id, stage, deal_type, deal_value, updated_at").eq("property_id", propertyId).order("updated_at", { ascending: false }).limit(20),
     supabase.from("audit_logs").select("id, action, actor_id, ip, created_at").eq("entity_id", propertyId).order("created_at", { ascending: false }).limit(40),
+    // İlan Kontrol olayları (tek tünel). RLS'li oturum istemcisi; tablolar yoksa boş.
+    loadLifecycleEvents(supabase, propertyId).catch(() => ({ available: false, events: [] as LifecycleEvent[] })),
   ]);
+  const lcEvents = lifecycleToTimeline(lifecycle.events);
+  // İlan Kontrol portal yayın/kaldırma olayı (neden + kim) varsa CRM'in sade portal olayı tekrar yazılmaz.
+  const lcHasPortal = lcEvents.some((e) => e.category === "portal");
 
   const keyRows = (keys ?? []) as { id: string; label: string | null }[];
   const dealRows = (deals ?? []) as { id: string; stage: string; deal_type: string; deal_value: number | null; updated_at: string }[];
@@ -96,6 +129,7 @@ export async function buildPropertyEvents(
   const ev: TimelineEvent[] = [];
 
   for (const e of base) {
+    if (lcHasPortal && e.kind === "portal") continue;
     ev.push({
       id: `pt-${e.id}`,
       at: e.at,
@@ -166,5 +200,6 @@ export async function buildPropertyEvents(
     });
   }
 
+  ev.push(...lcEvents);
   return ev;
 }

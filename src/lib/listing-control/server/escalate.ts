@@ -304,6 +304,7 @@ function anomalyLabel(type: string): string {
     unregistered_listing: "Portalda CRM'e kayıtsız ilan",
     advisor_mismatch: "Danışman uyuşmazlığı",
     duplicate: "Olası kopya portföy",
+    closure_loss: "Kapanışta kaçan komisyon",
   };
   return map[type] ?? "İlan uyarısı";
 }

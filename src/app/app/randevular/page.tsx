@@ -27,7 +27,7 @@ import { AppointmentCalendar } from "./appointment-calendar";
 import { AppointmentWeekView, type WeekViewAppointment } from "./appointment-week-view";
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
-import { buildRoutePlan, type RoutePlanStop } from "@/lib/route-plan";
+import { buildRoutePlan, type RoutePlanStop, directionsHref as directionsHrefFor } from "@/lib/route-plan";
 import { ExportIcsButton } from "./export-ics-button";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportAppointmentsCsv } from "@/app/actions/export";
@@ -515,12 +515,7 @@ export default async function AppointmentsPage({
       if (!r) return [];
       const c = rel(r.customer);
       const p = rel(r.property);
-      const directionsHref =
-        s.lat != null && s.lng != null
-          ? `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`
-          : r.location
-            ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.location)}`
-            : null;
+      const directionsHref = directionsHrefFor({ lat: s.lat, lng: s.lng, location: r.location });
       return [{
         id: r.id,
         order: i + 1,

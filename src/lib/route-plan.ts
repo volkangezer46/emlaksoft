@@ -104,3 +104,26 @@ export function buildRoutePlan(input: RoutePlanStop[]): RoutePlan {
 
   return { stops, legs, totalKm, tightCount };
 }
+
+/* ------------------------------ Harita bağlantıları (tek kaynak) ------------------------------ */
+
+export type DirectionsTarget = { lat: number | null; lng: number | null; location?: string | null };
+
+/** Tek durak için Google Maps yol tarifi: koordinat > konum metni; ikisi de yoksa null. */
+export function directionsHref(t: DirectionsTarget): string | null {
+  if (t.lat != null && t.lng != null) return `https://www.google.com/maps/dir/?api=1&destination=${t.lat},${t.lng}`;
+  const loc = t.location?.trim();
+  return loc ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(loc)}` : null;
+}
+
+/**
+ * Günün tüm rotası tek bağlantıda (saat sırası korunur; son durak varış, öncekiler ara durak). Yalnız koordinatlı duraklar;
+ * 2'den az koordinatlı durak varsa null (tek durakta `directionsHref` yeterli). Google'ın ara durak sınırı nedeniyle en çok 10 durak.
+ */
+export function routeDirectionsHref(stops: readonly DirectionsTarget[]): string | null {
+  const pts = stops.filter((s) => s.lat != null && s.lng != null).slice(0, 10);
+  if (pts.length < 2) return null;
+  const last = pts[pts.length - 1]!;
+  const mid = pts.slice(0, -1).map((s) => `${s.lat},${s.lng}`).join("|");
+  return `https://www.google.com/maps/dir/?api=1&destination=${last.lat},${last.lng}&waypoints=${encodeURIComponent(mid)}`;
+}

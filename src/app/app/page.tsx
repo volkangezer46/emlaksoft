@@ -49,6 +49,7 @@ import { Program } from "./_home/program";
 import { DanismanAra, DanismanAraIskelet } from "./_home/danisman-ara";
 import { Tahsilat, TahsilatIskelet } from "./_home/tahsilat";
 import { GiderOzeti } from "./_home/gider-ozeti";
+import { OfisNabzi } from "./_home/ofis-nabzi";
 import { homeHref, type HomeParams } from "./_home/kapsam-anahtari";
 import { homeLayoutFor, type MoreBlock } from "./_home/home-layout";
 
@@ -279,6 +280,7 @@ export default async function AppHomePage({
     case "management":
       rows.push(
         grid("r1", gelir ? [cell(7, dikkat, "dikkat"), cell(5, gelir, "gelir", { widget: "gelir" })] : [cell(12, dikkat, "dikkat")]),
+        <Suspense key="nabiz" fallback={null}><OfisNabzi ctx={ctx} /></Suspense>,
         deferredGrid("r2", [
           ...(layout.team && !off("team_perf") ? [{ span: 7 as const, node: widgetWrap("ekip-perf", ekip) }] : []),
           ...(layout.funnelTarget && !off("team_perf") ? [{ span: 5 as const, node: widgetWrap("huni-hedef", huniHedef) }] : []),

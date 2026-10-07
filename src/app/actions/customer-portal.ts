@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { getBaseUrl } from "@/lib/base-url";
+import { buildPortalTabs, signerMatchesCustomer, type PortalOwnerProperty, type PortalRental, type PortalDocuments, type PortalTab } from "@/lib/customer-portal/portal-model";
 
 function relName(v: unknown): string | null {
   if (!v) return null;
@@ -154,6 +155,15 @@ export type CustomerPortalData = {
       province: string | null;
     };
   }[];
+  /** TEK PORTAL: kişinin rolleri (alıcı / malik / kiracı / belgeler) — yalnız veri olan sekme döner. */
+  tabs: PortalTab[];
+  /** Malik: `properties.owner_customer_id` bu kişi olan portföyler (en çok 5). */
+  owner: PortalOwnerProperty[];
+  /** Kiracı: `rentals.renter_customer_id` bu kişi olan aktif kira kayıtları. */
+  renter: PortalRental[];
+  documents: PortalDocuments;
+  /** İstek RPC'si (20261007000620) var mı: yoksa teklif/erteleme/bakım formları çizilmez. */
+  requestsEnabled: boolean;
 };
 
 export async function getCustomerPortalData(
@@ -255,6 +265,9 @@ export async function getCustomerPortalData(
   scored.sort((a, b) => b.score - a.score);
   const topMatches = scored.slice(0, 6);
 
+  // TEK PORTAL ekleri (aynı service_role istemcisi; her sorgu token'ın müşteri + ofis kimliğine bağlı, örnek kayıt süzülür).
+  const extras = await loadPortalRoles(admin, tenantId, customerId, customer.phone ?? null);
+
   return {
     customer: {
       id:       customer.id,
@@ -289,5 +302,121 @@ export async function getCustomerPortalData(
         province: m.province,
       },
     })),
+    tabs: buildPortalTabs({
+      buyer: topMatches.length + demandRows.length + (appointments ?? []).length,
+      owner: extras.owner.length,
+      renter: extras.renter.length,
+      documents: extras.documents.pendingSign.length + extras.documents.signed.length,
+    }),
+    owner: extras.owner,
+    renter: extras.renter,
+    documents: extras.documents,
+    requestsEnabled: extras.requestsEnabled,
   };
+}
+
+type AdminDb = ReturnType<typeof createAdminClient>;
+
+/**
+ * Kişinin malik / kiracı / belge verisi. KVKK: yalnız bu müşterinin kayıtları — malik portföyleri `owner_customer_id`,
+ * kira kayıtları `renter_customer_id`, sözleşmeler `customer_id` + imzacı telefonu eşleşmesi. Malik tarafında alıcı adı/notu
+ * gösterilmez (yalnız tutar/durum), taslak teklif gösterilmez. Belge DOSYASI gösterilmez (yalnız imza bağlantısı/durum).
+ * Tablo/sütun yoksa ilgili bölüm boş döner (hata sayfası yok).
+ */
+async function loadPortalRoles(admin: AdminDb, tenantId: string, customerId: string, customerPhone: string | null) {
+  const nowIso = new Date().toISOString();
+  const [ownedRes, rentalsRes, contractsRes, readyRes] = await Promise.all([
+    admin
+      .from("properties")
+      .select("id, property_code, title, list_price, status")
+      .eq("tenant_id", tenantId)
+      .eq("owner_customer_id", customerId)
+      .eq("is_sample", false)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    admin
+      .from("rentals")
+      .select("id, monthly_rent, due_day, start_date, end_date, property:properties!rentals_property_id_fkey(title, property_code)")
+      .eq("tenant_id", tenantId)
+      .eq("renter_customer_id", customerId)
+      .eq("is_sample", false)
+      .eq("status", "active")
+      .limit(3),
+    admin
+      .from("contracts")
+      .select("id, title, status, expires_at, signers:contract_signers(token, status, phone, signed_at)")
+      .eq("tenant_id", tenantId)
+      .eq("customer_id", customerId)
+      .eq("is_sample", false)
+      .in("status", ["sent", "signed"])
+      .order("created_at", { ascending: false })
+      .limit(10),
+    admin.rpc("portal_customer_request_ready"),
+  ]);
+
+  const owned = ownedRes.error ? [] : ((ownedRes.data ?? []) as { id: string; property_code: string; title: string | null; list_price: number | null; status: string }[]);
+  const ownedIds = owned.map((o) => o.id);
+  const [offersRes, listingsRes, ownerTokensRes] = ownedIds.length
+    ? await Promise.all([
+        admin.from("offers").select("property_id, amount, status, submitted_at").eq("tenant_id", tenantId).in("property_id", ownedIds).neq("status", "draft").order("created_at", { ascending: false }).limit(50),
+        admin.from("portal_listings").select("property_id, status").eq("tenant_id", tenantId).in("property_id", ownedIds).eq("status", "live"),
+        admin.from("owner_portal_tokens").select("property_id, token, expires_at").eq("tenant_id", tenantId).in("property_id", ownedIds).gt("expires_at", nowIso).order("created_at", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }];
+  const offerRows = (offersRes.data ?? []) as { property_id: string; amount: number; status: string; submitted_at: string | null }[];
+  const liveRows = (listingsRes.data ?? []) as { property_id: string }[];
+  const tokenRows = (ownerTokensRes.data ?? []) as { property_id: string; token: string }[];
+  const owner: PortalOwnerProperty[] = owned.map((o) => ({
+    id: o.id,
+    label: o.title || o.property_code,
+    listPrice: o.list_price != null ? Number(o.list_price) : null,
+    status: o.status,
+    livePortals: liveRows.filter((l) => l.property_id === o.id).length,
+    offers: offerRows.filter((x) => x.property_id === o.id).slice(0, 5).map((x) => ({ amount: Number(x.amount), status: x.status, at: x.submitted_at })),
+    ownerPortalHref: (() => {
+      const t = tokenRows.find((r) => r.property_id === o.id);
+      return t ? `/malik-portali/${t.token}` : null;
+    })(),
+  }));
+
+  type RentalRaw = { id: string; monthly_rent: number; due_day: number; start_date: string; end_date: string | null; property: { title: string | null; property_code: string } | { title: string | null; property_code: string }[] | null };
+  const rentals = rentalsRes.error ? [] : ((rentalsRes.data ?? []) as RentalRaw[]);
+  const rentalIds = rentals.map((r) => r.id);
+  const [chargesRes, maintRes] = rentalIds.length
+    ? await Promise.all([
+        admin.from("rent_charges").select("rental_id, period, amount, status").eq("tenant_id", tenantId).in("rental_id", rentalIds).order("period", { ascending: false }).limit(24),
+        admin.from("maintenance_requests").select("rental_id, title, status, created_at").eq("tenant_id", tenantId).in("rental_id", rentalIds).order("created_at", { ascending: false }).limit(20),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const charges = (chargesRes.data ?? []) as { rental_id: string; period: string; amount: number; status: string }[];
+  const maint = (maintRes.data ?? []) as { rental_id: string; title: string; status: string; created_at: string }[];
+  const renter: PortalRental[] = rentals.map((r) => {
+    const p = Array.isArray(r.property) ? r.property[0] : r.property;
+    return {
+      id: r.id,
+      label: p?.title || p?.property_code || "Kiralık mülk",
+      monthlyRent: Number(r.monthly_rent),
+      dueDay: r.due_day,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      charges: charges.filter((c) => c.rental_id === r.id).slice(0, 6).map((c) => ({ period: c.period, amount: Number(c.amount), status: c.status })),
+      maintenance: maint.filter((m) => m.rental_id === r.id).slice(0, 5).map((m) => ({ title: m.title, status: m.status, at: m.created_at })),
+    };
+  });
+
+  type ContractRaw = { id: string; title: string | null; status: string; expires_at: string | null; signers: { token: string; status: string; phone: string | null; signed_at: string | null }[] | null };
+  const contracts = contractsRes.error ? [] : ((contractsRes.data ?? []) as ContractRaw[]);
+  const documents: PortalDocuments = { pendingSign: [], signed: [] };
+  for (const c of contracts) {
+    const mine = (c.signers ?? []).filter((sg) => signerMatchesCustomer(sg.phone, customerPhone));
+    const pending = mine.find((sg) => sg.status === "pending");
+    if (c.status === "sent" && pending && !(c.expires_at && c.expires_at < nowIso)) {
+      documents.pendingSign.push({ id: c.id, title: c.title || "Sözleşme", href: `/imza/${pending.token}` });
+    } else if (mine.some((sg) => sg.status === "signed")) {
+      documents.signed.push({ id: c.id, title: c.title || "Sözleşme", signedAt: mine.find((sg) => sg.signed_at)?.signed_at ?? null });
+    }
+  }
+
+  return { owner, renter, documents, requestsEnabled: !readyRes.error && readyRes.data === true };
 }
