@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileCheck2, Info } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { buildAuditDossier } from "@/app/actions/audit-dossier";
-import { PrintButton } from "@/app/app/degerleme/[id]/print-button";
+import { PrintButton } from "@/components/ui/print-button";
 
 export const metadata = { title: "Denetim dosyası" };
 
@@ -49,7 +49,7 @@ export default async function AuditDossierPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Uyum merkezine dön
         </Link>
-        <PrintButton />
+        <PrintButton tone="light" />
       </div>
 
       <article className="print-sheet surface-card rounded-[var(--radius-panel)] p-6 sm:p-8">

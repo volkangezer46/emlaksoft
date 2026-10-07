@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadRentStatementData } from "@/lib/owner-report/load";
 import { RENT_DECLARATION_NOTE, buildRentStatement, statementYears } from "@/lib/owner-report/rent-statement";
 import { now, trDayKey } from "@/lib/clock";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { formatTryDecimal } from "@/lib/format";
 
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -59,7 +59,7 @@ export async function OwnerRentStatementView({
               </Link>
             ))}
           </nav>
-          <PrintButton />
+          <PrintButton tone="brand" size="sm" />
         </div>
       </div>
 
