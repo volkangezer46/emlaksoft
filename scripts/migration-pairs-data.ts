@@ -186,6 +186,8 @@ const F = {
   importRentalWithDeal: "20261007000710_import_rental_with_deal.sql",
   // PB52: imza hatirlatmasi kisa baglanti + token acmayan RPC'ler.
   contractSignerReminder: "20261007000720_contract_signer_reminder.sql",
+  // PB53 perf turu 3 (2026-10-07): RLS yardimci fonksiyonlari SQL -> plpgsql (govde birebir, plan onbellegi) + customer_demands indeksi.
+  perfIndexesRpc: "20261007001100_perf_indexes_rpc.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -308,6 +310,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.expenseReceiptUploads]: "davranis", // direct_file_uploads kisitlari + claim/finalize/enqueue tam govde (3. tur expense_receipt), yeni expense_receipt_files + ozel kova expense-receipts, outbox kova izin listesi genisler
     [F.importRentalWithDeal]: "ek", // yeni authenticated DEFINER RPC import_rental_with_deal (yetki icerde; guard'lar yalniz kendi transaction'inda service_role kimligiyle gecilir)
     [F.contractSignerReminder]: "ek", // contract_signers'a short_code/reminder_count/last_reminded_at + 2 DEFINER RPC (hatirlatma yuku: tam token donmez; kisa kod cozumu anon)
+    [F.perfIndexesRpc]: "davranis", // current_session_two_factor_satisfied/is_platform_staff/support_is_ticket_staff dili sql->plpgsql (govde+ACL birebir; sorgu basi ~360us ayristirma biter) + idx_customer_demands_tenant_created
     [F.customerPortalRequests]: "ek", // yeni portal_customer_requests (iz) + anon/authenticated DEFINER RPC portal_customer_request (token icerde dogrulanir; yalniz taslak teklif/gorev/bakim yazar) + portal_customer_request_ready
     [F.closureLossAnomalies]: "davranis", // listing_anomalies.type CHECK'ine closure_loss; listing_closures AFTER tetikleyicisi + tek seferlik uzlastirma (yalniz 'explained' satir, SLA yok); lc_closure_loss_ready yoklamasi
     [F.webhookEnqueueGate]: "siki", // webhook_enqueue modul izni + 30 sn tekrar freni; webhook_mark_delivery yalniz kuyruga yazan + ilk deneme; webhook_deliveries.enqueued_by
@@ -425,6 +428,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB48-medya-belge-isareti", order: 29.985, title: "KVKK P0-9: property_media.is_document (belge public'e cikmaz) + ad kurali fonksiyonu + INSERT tetikleyicisi; kod sutun yokken ad kuralina duser (sira serbest)", files: [F.mediaIsDocument] },
     { id: "PB51-persona-turu", order: 29.997, title: "Persona turu: webhook kuyrugu izin kapisi (dogrudan RPC acigi kapanir) -> potansiyel kayip tek kaynak (kapanis kaybi anomaliye) -> musteri tek portali yazma kapisi", files: [F.webhookEnqueueGate, F.closureLossAnomalies, F.customerPortalRequests] },
     { id: "PB52-kalan-isler", order: 29.998, title: "Kalan isler turu: gider fisi dosya yukleme (yukleme hatti RPC'leri) -> kira ice aktarma atomik RPC -> imza hatirlatmasi kisa baglanti", files: [F.expenseReceiptUploads, F.importRentalWithDeal, F.contractSignerReminder] },
+    { id: "PB53-perf-rls-yardimcilari", order: 29.999, title: "Perf turu 3: RLS yardimci fonksiyonlari plpgsql (tenant cozumu ~420->~60us/cagri) + customer_demands tenant/created_at indeksi", files: [F.perfIndexesRpc] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
