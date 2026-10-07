@@ -13,6 +13,8 @@ export type ChartTooltipItem = {
   value?: number | string | null;
   color?: string;
   dataKey?: string | number;
+  /** Recharts `tooltipType="none"` verilen dekoratif seriler (ör. parlama katmanı) ipucunda listelenmez. */
+  type?: string;
   payload?: { fill?: string } & Record<string, unknown>;
 };
 
@@ -35,7 +37,15 @@ export function ChartTooltip({
   hint?: ReactNode;
   hideLabel?: boolean;
 }) {
-  const items = (payload ?? []).filter((p) => p.value !== null && p.value !== undefined && p.value !== "");
+  const seen = new Set<string>();
+  const items = (payload ?? []).filter((p) => {
+    if (p.type === "none" || p.value === null || p.value === undefined || p.value === "") return false;
+    // Aynı veri anahtarını çizen ikinci katman (parlama/gölge) yalnız bir kez gösterilir.
+    const k = String(p.dataKey ?? p.name ?? "");
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   if (!active || items.length === 0) return null;
   const fmt = (n: number) => (formatValue ? formatValue(n) : formatChartValue(n, format));
   return (

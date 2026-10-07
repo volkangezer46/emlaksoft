@@ -394,7 +394,7 @@ const TREND_TONE = {
   violet: "var(--viz-4)",
 } as const;
 
-type DotProps = { cx?: number; cy?: number; index?: number; value?: number | null };
+type DotProps = { cx?: number; cy?: number; index?: number; payload?: { value?: number | null } };
 
 /**
  * AreaTrendChart — tek seri premium alan grafiği: altın (para) veya mavi çizgi, katmanlı degrade dolgu, çizgi
@@ -435,11 +435,13 @@ export function AreaTrendChart({
   const rows = data.map((d) => ({ label: d.label, value: d.value, forecast: d.forecast ?? null }));
 
   const renderDot = (props: DotProps) => {
-    const { cx, cy, index, value } = props;
-    if (index !== lastIdx || cx === undefined || cy === undefined || value === null || value === undefined) {
+    // Recharts 3 Area noktasında `value` [taban, değer] dizisidir (Number(dizi) = NaN); değer satırdan okunur.
+    const { cx, cy, index } = props;
+    const value = props.payload?.value;
+    if (index !== lastIdx || cx === undefined || cy === undefined || typeof value !== "number" || !Number.isFinite(value)) {
       return <g key={`d-${index}`} />;
     }
-    const text = fmt(Number(value));
+    const text = fmt(value);
     const w = Math.max(48, text.length * 7.4 + 18);
     return (
       <g key={`d-${index}`}>

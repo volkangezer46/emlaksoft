@@ -106,5 +106,15 @@ export function selectPlatformReadable(rows: readonly PlatformInsightDbRow[], no
     const m = mapRow(r);
     if (m && platformCanAccess(role, platformInsightModule(m.kind))) out.push(m);
   }
-  return out.sort((a, b) => b.priority - a.priority || b.createdAt.localeCompare(a.createdAt)).slice(0, Math.max(0, limit));
+  // Aynı kural + aynı başlık birden çok kez üretildiyse (motor turları arası) tek öneri gösterilir: en yüksek öncelikli/en yeni.
+  const seen = new Set<string>();
+  return out
+    .sort((a, b) => b.priority - a.priority || b.createdAt.localeCompare(a.createdAt))
+    .filter((m) => {
+      const k = `${m.kind}|${m.title}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .slice(0, Math.max(0, limit));
 }

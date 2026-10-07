@@ -8,7 +8,8 @@ const row = (o: Partial<PlatformInsightDbRow> = {}): PlatformInsightDbRow => ({
   rule_id: "system_health@1",
   severity: "yuksek",
   priority: 50,
-  title: "Başlık",
+  // Ayrı içgörüler ayrı başlık taşır (aynı tür + başlık tekilleştirilir).
+  title: `Başlık ${o.id ?? "id-1"}`,
   why: "Neden",
   evidence: [{ label: "Hata", value: "3", href: "/admin/hatalar" }],
   href: "/admin/sistem",
@@ -63,5 +64,13 @@ describe("platform içgörü okuyucu (saf)", () => {
 
   it("veri yoksa boş dizi", () => {
     expect(selectPlatformReadable([], NOW, "super_admin", 5)).toEqual([]);
+  });
+
+  it("aynı tür ve başlıkla tekrar üretilen içgörü tek kez listelenir (yüksek öncelikli/yeni kalır)", () => {
+    const rows = [
+      row({ id: "eski", title: "1 zamanlanmış iş hata verdi", created_at: "2026-10-04T00:00:00Z" }),
+      row({ id: "yeni", title: "1 zamanlanmış iş hata verdi", created_at: "2026-10-06T00:00:00Z" }),
+    ];
+    expect(selectPlatformReadable(rows, NOW, "super_admin", 10).map((i) => i.id)).toEqual(["yeni"]);
   });
 });
