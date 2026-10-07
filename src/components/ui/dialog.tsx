@@ -194,7 +194,7 @@ export function DialogHeader({
           </div>
         </div>
         <DialogPrimitive.Close
-          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/70 transition hover:bg-white/15 hover:text-white touch:h-11 touch:w-11"
           aria-label="Kapat"
         >
           <X className="h-5 w-5" />

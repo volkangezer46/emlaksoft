@@ -53,7 +53,7 @@ export function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       {...props}
       className={cn(
-        "flex cursor-pointer select-none items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 text-sm outline-none transition [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
+        "flex cursor-pointer select-none items-center gap-2.5 rounded-[var(--radius-control)] px-3 py-2 text-sm outline-none transition touch:min-h-11 [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0",
         danger
           ? "text-danger-500 data-[highlighted]:bg-danger-500/[0.08]"
           : "text-ink-950 data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700",
@@ -73,7 +73,7 @@ export function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       {...props}
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-8 pr-3 text-sm text-ink-950 outline-none transition",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-8 pr-3 text-sm text-ink-950 outline-none transition touch:min-h-11",
         "data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
