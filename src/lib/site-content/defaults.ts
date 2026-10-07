@@ -20,6 +20,8 @@ export function defaultSiteContent(): SiteContent {
       em: "tek platformda",
       tail: "yönetin",
       lead: `Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve ${CRON_JOBS.length} otomatik görev ofisinizle birlikte çalışır.`,
+      // Boş = uzun açıklamanın ilk cümlesi ("Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde.").
+      mobileLead: "",
       primary: { label: "{deneme_dene}", href: "/kayit" },
       secondary: { label: "Paketleri ve fiyatları gör", href: "/fiyatlar" },
       checks: [

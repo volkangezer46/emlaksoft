@@ -18,6 +18,14 @@ export function trialCtaLabel(trialDays?: number): string {
   return trialDays ? `Ofisini ücretsiz kur — ${trialDays} gün, kart gerekmez` : "Ofisini ücretsiz kur — kart gerekmez";
 }
 
+/**
+ * Mobil (< 768 px) birincil CTA: "Ücretsiz dene — 14 gün" (gün bilinmiyorsa "Ücretsiz dene"). Tam genişlik düğmede tek satır
+ * kalır; "kart gerekmez" bilgisi hemen altındaki güven rozetlerinde yazar. Hero ve akıllı alt çubuk bunu kullanır.
+ */
+export function trialCtaMobileLabel(trialDays?: number): string {
+  return trialDays ? `Ücretsiz dene — ${trialDays} gün` : "Ücretsiz dene";
+}
+
 /** Paket kartı gibi dar yerler için kısa CTA (gün/kart cümlesi kartın altında ayrıca yazılır). */
 export function trialCtaShort(): string {
   return "Ofisini ücretsiz kur";

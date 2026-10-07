@@ -1,13 +1,30 @@
 import { ArrowRight, CalendarCheck, Check, Zap } from "lucide-react";
 import { HeroScene } from "./hero-scene";
+import { HeroPhoneScene } from "./hero-phone";
 import { PortalStrip } from "../portal-strip";
 import { ContentLink, Lines } from "../content-link";
 import type { PlanDef } from "@/lib/billing/plans";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
+import { heroMobileCopy } from "@/lib/site-content/hero-mobile";
 import type { SiteContent } from "@/lib/site-content/schema";
-import { resolveTokens, tx } from "@/lib/site-content/tokens";
+import { tx } from "@/lib/site-content/tokens";
 
-/** Hero: sol metin bloğu + sağ ürün sahnesi. Sunucu bileşeni, istemci JS yok. Metinler site içeriğinden (varsayılan = bugünkü metin). */
+/** Masaüstü/mobil metin çifti: aynıysa tek metin; farklıysa CSS kırılımı (768 px) hangisinin görüneceğini seçer. */
+function Pair({ desk, mobile }: { desk: string; mobile: string }) {
+  if (desk === mobile) return <>{desk}</>;
+  return (
+    <>
+      <span className="mk-dl">{desk}</span>
+      <span className="mk-ml">{mobile}</span>
+    </>
+  );
+}
+
+/**
+ * Hero: sol metin bloğu + sağ ürün sahnesi. Sunucu bileşeni, istemci JS yok. Metinler site içeriğinden (varsayılan = bugünkü metin).
+ * Mobil (< 768 px): tek cümle açıklama (`hero.mobileLead`), kısa düğme etiketi, metin bağlantısı, sıkı güven çipleri ve
+ * telefon sahnesi (HeroPhoneScene); EmlakFiyati satırı mobilde gizlidir (kendi bölümünde durur). Masaüstü çıktı değişmez.
+ */
 export function HeroSection({
   trialDays,
   plans = [],
@@ -18,7 +35,7 @@ export function HeroSection({
   content?: SiteContent["hero"];
 }) {
   const ctx = { trialDays, plans };
-  const checks = content.checks.filter((c) => !c.hidden).map((c) => ({ id: c.id, ...resolveTokens(c.text, ctx) })).filter((c) => !c.missing);
+  const m = heroMobileCopy(content, ctx);
   return (
     <>
     <section className="mk-hero" aria-labelledby="hero-baslik">
@@ -32,6 +49,7 @@ export function HeroSection({
             {content.tail ? ` ${content.tail}` : null}
           </h1>
           <p className="mk-hero-lead"><Lines text={tx(content.lead, ctx)} /></p>
+          {m.lead ? <p className="mk-hero-lead-m">{m.lead}</p> : null}
           {content.integrationBadge || content.integrationLine ? (
             <p className="mk-hero-int" data-hero-integration="">
               {content.integrationBadge ? <a href="#degerleme" className="mk-tag mk-tag-plan">{tx(content.integrationBadge, ctx)}</a> : null}
@@ -40,13 +58,14 @@ export function HeroSection({
             </p>
           ) : null}
           <div className="mk-cta-row">
-            <ContentLink href={content.primary.href} className="mk-btn mk-btn-grad btn-shine">{tx(content.primary.label, ctx)} <ArrowRight size={18} aria-hidden="true" /></ContentLink>
-            <ContentLink href={content.secondary.href} className="mk-btn mk-btn-ghost"><CalendarCheck size={18} aria-hidden="true" />{tx(content.secondary.label, ctx)}</ContentLink>
+            <ContentLink href={content.primary.href} className="mk-btn mk-btn-grad btn-shine mk-hero-primary"><Pair desk={tx(content.primary.label, ctx)} mobile={m.primary} /> <ArrowRight size={18} aria-hidden="true" /></ContentLink>
+            <ContentLink href={content.secondary.href} className="mk-btn mk-btn-ghost mk-hero-secondary"><CalendarCheck size={18} aria-hidden="true" /><Pair desk={tx(content.secondary.label, ctx)} mobile={m.secondary} /><ArrowRight className="mk-ml" size={16} aria-hidden="true" /></ContentLink>
           </div>
           <ul className="mk-checks">
-            {checks.map((c) => <li key={c.id}><Check size={16} aria-hidden="true" />{c.text}</li>)}
+            {m.checks.map((c) => <li key={c.id}><Check size={16} aria-hidden="true" /><Pair desk={c.text} mobile={c.short} /></li>)}
           </ul>
         </div>
+        <HeroPhoneScene />
         <HeroScene />
       </div>
     </section>
