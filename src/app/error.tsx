@@ -11,10 +11,10 @@ import { reportClientError } from "@/app/actions/report-error";
  */
 export default function RootError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -69,7 +69,7 @@ export default function RootError({
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
-            onClick={() => unstable_retry()}
+            onClick={() => retry()}
             className="btn-shine inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:bg-brand-700"
           >
             <RotateCcw className="h-4 w-4" /> Tekrar dene

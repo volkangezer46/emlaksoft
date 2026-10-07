@@ -19,10 +19,10 @@ const fontStack =
 
 export default function GlobalError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -170,7 +170,7 @@ export default function GlobalError({
             >
               <button
                 type="button"
-                onClick={() => unstable_retry()}
+                onClick={() => retry()}
                 style={{
                   padding: "12px 26px",
                   borderRadius: 11,
