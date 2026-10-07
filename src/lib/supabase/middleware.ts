@@ -9,6 +9,7 @@ import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
 import { AUTH_VERIFIED_HEADER, claimsMatchLiveUser } from "@/lib/supabase/verified-request";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform-flags-cache";
+import { readProxyGateData } from "@/lib/supabase/proxy-gates";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
 
@@ -100,31 +101,16 @@ export async function updateSession(request: NextRequest) {
       ? user.app_metadata.role
       : "";
     const impersonating = user.app_metadata?.impersonating === true;
-    // Dördü de birbirinden bağımsız (tenantId JWT'den, DB'den değil) → tek
-    // Promise.all'da paralel; her navigasyonda 2 seri round-trip yerine 1.
+    // profil + personel + ofis durumu tek RPC'de (yoksa eski üç sorgu; bkz. proxy-gates.ts);
+    // getClaims yerel JWKS doğrulaması olduğundan onunla paralel.
     const tGates0 = timing ? performance.now() : 0;
-    const [
-      { data: profile, error: profileError },
-      { data: staff },
-      { data: claimsData, error: claimsError },
-      { data: tenant },
-    ] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("tenant_id, role, is_active, two_factor_sms, phone, two_factor_version")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("platform_staff")
-        .select("id")
-        .eq("id", user.id)
-        .eq("is_active", true)
-        .maybeSingle(),
+    const [gate, { data: claimsData, error: claimsError }] = await Promise.all([
+      readProxyGateData(supabase, user.id, tenantId),
       supabase.auth.getClaims(),
-      tenantId
-        ? supabase.from("tenants").select("status").eq("id", tenantId).maybeSingle()
-        : Promise.resolve({ data: null }),
     ]);
+    const { profile, profileError } = gate;
+    const staff = gate.staff ? { id: user.id } : null;
+    const tenant = gate.tenantStatus === null ? null : { status: gate.tenantStatus };
     if (timing) tGates = performance.now() - tGates0;
     const sessionId = claimsData?.claims?.session_id;
 
