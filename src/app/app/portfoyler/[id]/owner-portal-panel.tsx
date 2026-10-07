@@ -204,7 +204,7 @@ export function OwnerPortalPanel({
                 Telefon <span className="font-medium text-text-faint">(WhatsApp ile göndermek için)</span>
               </span>
               <div className="mt-1">
-                <PhoneInput value={ownerPhone} onValueChange={setOwnerPhone} />
+                <PhoneInput aria-label="Malik telefonu" value={ownerPhone} onValueChange={setOwnerPhone} />
               </div>
             </div>
           </div>

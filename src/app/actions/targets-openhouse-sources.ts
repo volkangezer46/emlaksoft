@@ -351,7 +351,7 @@ export async function updateOpenHouse(
     })
     .eq("id", openHouseId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Açık ev güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Açık ev güncellenemedi.") };
 
   revalidatePath("/app/acik-ev");
   revalidatePath(`/app/acik-ev/${openHouseId}`);

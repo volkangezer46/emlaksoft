@@ -89,7 +89,7 @@ export async function updateValuation(id: string, formData: FormData): Promise<V
     .maybeSingle();
   if (error) {
     console.error("updateValuation", error);
-    return { error: "Değerleme güncellenemedi." };
+    return { error: actionErrorMessage(error, "Değerleme güncellenemedi.") };
   }
   if (!data) return { error: "Değerleme bulunamadı." };
 
@@ -123,7 +123,7 @@ export async function revokeValuationShare(id: string): Promise<ValuationResult>
     .maybeSingle();
   if (error) {
     console.error("revokeValuationShare", error);
-    return { error: "Paylaşım kapatılamadı." };
+    return { error: actionErrorMessage(error, "Paylaşım kapatılamadı.") };
   }
   if (!data) return { error: "Değerleme bulunamadı." };
 
@@ -155,7 +155,7 @@ export async function deleteValuation(id: string): Promise<ValuationResult> {
     .maybeSingle();
   if (error) {
     console.error("deleteValuation", error);
-    return { error: "Değerleme silinemedi." };
+    return { error: actionErrorMessage(error, "Değerleme silinemedi.") };
   }
   if (!data) return { error: "Değerleme bulunamadı." };
 
