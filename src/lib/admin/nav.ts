@@ -60,7 +60,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       { href: "/admin", label: "Kontrol paneli", description: "Canlı metrikler, dikkat kuyruğu, öneriler", icon: LayoutDashboard, modules: ["dashboard"] },
       { href: "/admin/raporlar", label: "Raporlar", description: "Platform analizi: gelir, aktivasyon, modül kullanımı", icon: BarChart3, modules: ["reports"] },
-      { href: "/admin/danisman", label: "Yapay zeka danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
+      { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
     ],
   },
   {

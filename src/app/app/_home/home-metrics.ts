@@ -327,7 +327,7 @@ export function funnelRows(i: FunnelInput): FunnelRow[] {
   const max = Math.max(0, ...stages.map((s) => s.value));
   return stages.map((s) => ({
     ...s,
-    sub: max > 0 && s.value !== max ? `En büyük aşamanın %${Math.round((s.value / max) * 100)}'i` : max > 0 ? "En büyük aşama" : "",
+    sub: max > 0 && s.value !== max ? `%${Math.round((s.value / max) * 100)} · en yükseğe göre` : max > 0 ? "En yüksek aşama" : "",
   }));
 }
 

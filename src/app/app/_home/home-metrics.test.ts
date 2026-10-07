@@ -92,8 +92,8 @@ describe("huni", () => {
     expect(FUNNEL_SEQUENTIAL).toBe(false);
     const rows = funnelRows({ newDemand: 10, activeDemand: 20, matchedDemand: 5, won: 2 });
     expect(rows.map((r) => r.value)).toEqual([10, 20, 5, 2]);
-    expect(rows[1]!.sub).toBe("En büyük aşama");
-    expect(rows[0]!.sub).toBe("En büyük aşamanın %50'i");
+    expect(rows[1]!.sub).toBe("En yüksek aşama");
+    expect(rows[0]!.sub).toBe("%50 · en yükseğe göre");
     expect(rows.every((r) => r.href.startsWith("/app/"))).toBe(true);
   });
   it("tüm aşamalar 0 ise alt yazı boş", () => {
