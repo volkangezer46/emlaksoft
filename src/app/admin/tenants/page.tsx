@@ -46,7 +46,6 @@ import {
   tenantsHref,
   toggleFilter,
   type InventoryRow,
-  type RawTenantSearch,
 } from "./tenants-model";
 import { TenantTable, type TenantRowData } from "./tenant-table";
 
@@ -68,7 +67,12 @@ const QUICK = [
   { key: "gercek", label: "Gerçek veride", param: "veri" as const, value: "gercek" as const },
 ];
 
-export default async function AdminTenantsPage({ searchParams }: { searchParams?: Promise<RawTenantSearch & { audit?: string }> }) {
+export default async function AdminTenantsPage({
+  searchParams,
+}: {
+  // Açık tip: link kontratı denetimi (check:links) okunan parametreleri buradan görür.
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; sayfa?: string; audit?: string }>;
+}) {
   const staff = await requirePlatformModule("tenants");
   const canCreate = officeAdminCan(staff.role, "create");
   const perms = {
