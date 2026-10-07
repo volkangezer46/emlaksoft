@@ -1,0 +1,105 @@
+/* ============================================================================
+   Liste sayfası iskeleti (lp-*) — src/components/ui/list-page.tsx.
+   Referans: /admin "Tüm ofisler". Hero zemini `.ds-hero` (premium.css), kart `.ds-card`,
+   grafik derinliği `viz.css` (.viz-bar-fill). Yalnız token; ham renk yok. Hareket yalnız transform/opacity,
+   reduced-motion'da yok. Hedef: 1366×768'de hero + KPI + grafik satırı ilk ekranda kompakt.
+   ========================================================================== */
+
+/* ---- Hero: sol metin, ortada konu sahnesi, sağda eylemler; yüksekliği sınırlı ---- */
+.lp-hero { padding: 0.875rem clamp(1rem, 0.6rem + 1.2vw, 1.5rem); }
+.lp-hero-row { display: flex; align-items: center; gap: var(--space-4); }
+.lp-hero-body { flex: 1 1 18rem; min-width: 0; }
+.lp-eyebrow { color: var(--accent-text, var(--accent)); }
+.lp-hero-title {
+  margin-top: 0.2rem;
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  font-size: clamp(1.375rem, 1.05rem + 0.9vw, 1.875rem); line-height: 1.12;
+  font-weight: 800; letter-spacing: -0.025em; color: var(--heading); text-wrap: balance;
+}
+.lp-hero-summary { margin-top: 0.3rem; max-width: 46rem; font-size: var(--text-sm, 0.8125rem); line-height: 1.5; color: var(--text-muted); }
+.lp-hero-art { flex: 0 0 auto; width: clamp(10rem, 15vw, 14rem); aspect-ratio: 2 / 1; height: auto; max-height: 7rem; }
+.lp-hero-actions { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; max-width: 30rem; }
+@media (max-width: 1023.98px) {
+  .lp-hero-row { flex-wrap: wrap; }
+  .lp-hero-art { width: 9rem; order: 0; }
+  .lp-hero-actions { flex-basis: 100%; justify-content: flex-start; max-width: none; }
+}
+@media (max-width: 639.98px) {
+  .lp-hero-art { display: none; }
+  .lp-hero-title { font-size: 1.375rem; }
+}
+
+/* ---- Grafik satırı: 1 kart tam genişlik, 2 kart yan yana; boşsa yok ---- */
+.lp-charts { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); }
+.lp-charts:empty { display: none; }
+.lp-chart { padding: var(--space-4); display: flex; flex-direction: column; min-height: 13.75rem; }
+.lp-chart-head { margin-bottom: var(--space-3); align-items: center; }
+.lp-chart-head .pm-ico { width: 2rem; height: 2rem; }
+.lp-chart-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+
+/* Dağılım: halka + lejant */
+.lp-dist { display: flex; align-items: center; gap: var(--space-5); }
+.lp-dist-total { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 1.375rem; font-weight: 800; line-height: 1.1; color: var(--heading); font-variant-numeric: tabular-nums; }
+.lp-dist-cap { font-size: 0.75rem; color: var(--text-muted); }
+.lp-legend { flex: 1; min-width: 0; display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.lp-legend-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto 3rem; align-items: center; gap: 0.6rem;
+  padding: 0.3rem 0.5rem; border-radius: var(--radius-control); font-size: 0.8125rem; color: var(--text); text-decoration: none;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.lp-legend-row:hover { background: var(--surface-hover); }
+.lp-dot { width: 0.625rem; height: 0.625rem; border-radius: 999px; box-shadow: inset 0 -1px 0 var(--viz-shade); }
+.lp-legend-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-legend-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+.lp-legend-pct { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Dilim bağlantısı: üzerine gelinen dilim kalınlaşır, diğerleri söner (viz dili). */
+.viz-ring-link { cursor: pointer; }
+.viz-ring-link circle { transition: stroke-width var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out); }
+.lp-dist-ring svg:has(.viz-ring-link:hover) .viz-ring-link:not(:hover) circle { opacity: 0.55; }
+.viz-ring-link:hover circle { stroke-width: 22px; }
+.lp-dist:has(.lp-legend-row:hover) .lp-dist-ring { filter: drop-shadow(0 4px 8px var(--viz-shadow)); }
+@media (max-width: 479.98px) {
+  .lp-dist { flex-direction: column; align-items: stretch; gap: var(--space-3); }
+  .lp-dist-ring { align-self: center; }
+}
+
+/* Sütun grafiği: eşit sütunlar, değer üstte, etiket altta; her sütun bağlantı */
+.lp-cols {
+  display: grid; grid-template-columns: repeat(var(--lp-n, 6), minmax(0, 1fr)); gap: 0.375rem;
+  height: 9.5rem; margin: 0; padding: 0; list-style: none;
+  background-image: repeating-linear-gradient(to top, var(--hairline) 0 1px, transparent 1px 25%);
+  background-size: 100% calc(100% - 2.6rem); background-position: 0 1.2rem; background-repeat: no-repeat;
+}
+.lp-cols > li { min-width: 0; }
+.lp-col {
+  height: 100%; display: grid; grid-template-rows: 1.2rem minmax(0, 1fr) auto; justify-items: center; gap: 0;
+  border-radius: var(--radius-control); text-decoration: none; color: var(--text);
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+.lp-col:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.lp-col-val { font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; align-self: end; }
+.lp-col-track { position: relative; width: min(100%, 2.75rem); height: 100%; }
+.lp-col-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0.5rem 0.5rem 0.2rem 0.2rem; transform-origin: bottom; }
+.lp-col:hover .lp-col-bar { box-shadow: inset 0 -2px 0 var(--viz-shade), 0 4px 10px -3px var(--viz-shadow); }
+.lp-cols:has(.lp-col:hover) .lp-col:not(:hover) .lp-col-bar { opacity: 0.6; }
+.lp-col-label { padding-top: 0.25rem; font-size: 0.75rem; line-height: 1.15; color: var(--text-muted); max-width: 100%; text-align: center; overflow-wrap: anywhere; align-self: start; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes lp-grow-y { from { transform: scaleY(0); } to { transform: none; } }
+  .lp-col-bar { animation: lp-grow-y var(--motion-draw) var(--ease-out-expo) both; animation-delay: var(--viz-delay, 0ms); transition: opacity var(--motion-fast) var(--ease-out); }
+}
+
+.lp-funnel { gap: 0; }
+
+/* ---- Tablo → kart (360 px): `TableFrame stack` + `TD label` ---- */
+@media (max-width: 479.98px) {
+  .tbl-stack > div, .tbl-stack > div > div { width: 100% !important; min-width: 0 !important; overflow: visible; }
+  .tbl-stack table, .tbl-stack tbody, .tbl-stack tfoot { display: block; width: 100%; }
+  .tbl-stack thead { display: none; }
+  .tbl-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; padding: 0.75rem 0.875rem; }
+  .tbl-stack td { display: block; padding: 0 !important; border: 0; text-align: left !important; max-width: 100%; }
+  .tbl-stack td[data-primary] { flex: 1 1 70%; font-weight: 600; }
+  .tbl-stack tr:not(:has(td[data-primary])) td:first-child { flex-basis: 100%; font-weight: 600; }
+  .tbl-stack td[data-label]::before { content: attr(data-label) " · "; color: var(--text-faint); font-size: 0.75rem; font-weight: 500; }
+  .tbl-stack td[data-actions] { flex-basis: 100%; }
+  .tbl-stack td[data-actions] > * { justify-content: flex-start; }
+}

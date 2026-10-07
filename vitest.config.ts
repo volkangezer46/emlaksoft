@@ -20,6 +20,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // pglite'lı SQL testlerinin beforeAll kurulumu tam koşu yükünde 10 sn varsayılanı aşıyor.
+    hookTimeout: 60_000,
     // Testler .env.local'a bağımlı olmamalı; DB'ye giden hiçbir test yok.
     env: {},
     // Yalnız tanım (eşik YOK); @vitest/coverage-v8 devDependency; `npm run test:coverage` (CI birim test adımı bunu koşar).

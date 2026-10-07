@@ -1,6 +1,6 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { PageHeader } from "@/components/ui/page-header";
+import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -10,6 +10,7 @@ import {
   KeyRound,
   MessageSquare,
   Percent,
+  PieChart,
   Plus,
   Receipt,
   ShieldCheck,
@@ -261,11 +262,11 @@ export default async function OnaylarPage({
   const statuses: ApprovalStatus[] = ["bekliyor", "onaylandi", "reddedildi", "iptal"];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="onay"
         eyebrow="Onay merkezi"
         title="Onaylar"
-        icon={<span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-700"><ShieldCheck className="h-5 w-5" /></span>}
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -305,6 +306,21 @@ export default async function OnaylarPage({
           href="/app/onaylar?durum=onaylandi"
         />
       </KpiGrid>
+
+      {/* Seçili sekmedeki taleplerin tür dağılımı (tarama 1000'e dayandıysa güvenilmez → çizilmez) */}
+      {(turRows ?? []).length < 1000 ? (
+        <ListCharts>
+          <DistributionCard
+            title={`${APPROVAL_STATUS_LABEL[durum]} talepler · tür`}
+            subtitle="Komisyon, gider, fiyat ve diğer onay türleri"
+            icon={PieChart}
+            tone="success"
+            href={`/app/onaylar?durum=${durum}`}
+            centerLabel="talep"
+            slices={APPROVAL_KINDS.map((k) => ({ label: kindMeta(k).label, value: turSayac.get(k) ?? 0, href: `/app/onaylar?durum=${durum}&tur=${k}` }))}
+          />
+        </ListCharts>
+      ) : null}
 
       {/* Sekmeler + filtreler */}
       <div className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
@@ -426,6 +442,8 @@ export default async function OnaylarPage({
             title="Bekleyen onay yok — her şey yolunda"
             description="Komisyon indirimi, olağandışı gider ya da fiyat değişikliği talebi açıldığında burada belirir ve yöneticilere bildirim gider."
             tone="mint"
+            action={{ href: "/app/onaylar?durum=onaylandi", label: "Onaylanan talepleri gör" }}
+            secondary={{ href: "/app/onaylar/yeni", label: "Onay talebi aç" }}
           />
         ) : (
           <EmptyState illustration="gorev"
@@ -593,6 +611,6 @@ export default async function OnaylarPage({
         </section>
         </BulkSelectionProvider>
       )}
-    </div>
+    </ListPage>
   );
 }

@@ -30,7 +30,7 @@ import { CommissionSplitEditor } from "./commission-split-editor";
 import { BulkCollectBar, BulkCollectCheckbox, BulkCollectProvider } from "./bulk-collect";
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
 import { HelpTip } from "@/components/ui/help-tip";
 import { MoneyValue } from "@/components/ui/money-value";
 import { DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
@@ -326,8 +326,9 @@ export default async function CommissionPage({
   );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="komisyon"
         title="Komisyon & hakediş"
         eyebrow="Finans merkezi"
         freshness
@@ -703,6 +704,6 @@ export default async function CommissionPage({
         ) : null}
         <div className="flex items-center gap-2 border-t border-line bg-canvas/60 px-5 py-3 text-xs font-semibold text-[color:var(--viz-pos)]"><TrendingUp className="h-3.5 w-3.5" /> Tüm hesaplamalar denetim iziyle saklanır</div>
       </section>
-    </div>
+    </ListPage>
   );
 }

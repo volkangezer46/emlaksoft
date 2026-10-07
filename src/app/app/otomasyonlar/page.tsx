@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
 import { HelpTip } from "@/components/ui/help-tip";
 import { StatRow } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -110,9 +110,9 @@ export default async function OtomasyonlarPage({
   const recentLogs = logs.slice(0, 6);
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="otomasyon"
         eyebrow="Otomatik işler"
         title="Otomasyonlar"
         description={<>&quot;... olunca ... yap&quot; kurallarıyla tekrar eden işleri kendiliğinden yaptırın. <HelpTip topic="otomasyon" /></>}
@@ -351,6 +351,6 @@ export default async function OtomasyonlarPage({
           </div>
         )}
       </section>
-    </div>
+    </ListPage>
   );
 }

@@ -22,7 +22,8 @@ import { now, trDayKey } from "@/lib/clock";
 import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
 import type { CSSProperties } from "react";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ButtonLink } from "@/components/ui/button";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
 import { provinceOptionsResult } from "@/lib/geo/reader";
@@ -245,23 +246,32 @@ export default async function TeamPage() {
         : "Tüm yetki ve SPK belgeleri güncel";
 
   return (
-    <div className="space-y-6">
-      {/* premium header */}
-      <PageHeader title="Çalışan yönetimi" eyebrow="Ekip & yetkiler" description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür." actions={
-<div className="flex flex-wrap items-center gap-2">
-                <Link href="/app/ayarlar/roller" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2">
-                  <Fingerprint className="h-4 w-4" /> İzin matrisi
-                </Link>
-                <Link href="/app/ekip/izinler" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><CalendarRange className="h-4 w-4" /> Tatil ve izin takvimi</Link>
-                <Link href="/app/ekip/kartvizitim" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-sm font-semibold text-text transition hover:bg-surface-2"><IdCard className="h-4 w-4" /> Kartvizitim</Link>
-                {canManage ? (
-                  <Link href="/app/ekip/yeni" className="focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-4 py-2 text-sm font-semibold text-accent-fg transition hover:opacity-90">
-                    <UserPlus className="h-4 w-4" /> Danışman ekle
-                  </Link>
-                ) : null}
-              </div>
-} />
-<SeatLimitBanner summary={seatSummary} />
+    <ListPage>
+      <ListHero
+        eyebrow="Ekip & yetkiler"
+        art="ekip"
+        title="Çalışan yönetimi"
+        description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür."
+        actions={
+          <>
+            <ButtonLink href="/app/ayarlar/roller" variant="secondary" size="sm" icon={Fingerprint}>
+              İzin matrisi
+            </ButtonLink>
+            <ButtonLink href="/app/ekip/izinler" variant="secondary" size="sm" icon={CalendarRange}>
+              Tatil ve izin takvimi
+            </ButtonLink>
+            <ButtonLink href="/app/ekip/kartvizitim" variant="secondary" size="sm" icon={IdCard}>
+              Kartvizitim
+            </ButtonLink>
+            {canManage ? (
+              <ButtonLink href="/app/ekip/yeni" icon={UserPlus}>
+                Danışman ekle
+              </ButtonLink>
+            ) : null}
+          </>
+        }
+      />
+      <SeatLimitBanner summary={seatSummary} />
       <ReferralNudge moment="team_grew" show={activeCount >= 3} />
 <KpiGrid count={kpis.length}>
         {kpis.map((k) => (
@@ -426,6 +436,6 @@ export default async function TeamPage() {
           </div>
         )}
       </section>
-    </div>
+    </ListPage>
   );
 }
