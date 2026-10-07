@@ -180,6 +180,21 @@ html:has(.shell-aside) {
 html:has(.shell-aside) body[data-scroll-locked] {
   margin-right: 0 !important;
   padding-right: 0 !important;
+  /* Yapışkan yan menü güvencesi: kilit body'ye `overflow:hidden` yazınca (html clip olduğundan viewport'a
+     taşınmaz) body kaydırma kabı olur → `position: sticky` menü body'nin tepesine (scrollTop 0) yapışır ve
+     sayfa aşağıdayken yarıda biter. Body kaydırma kabı yapılmaz; kilit html'e (viewport) taşınır. Tekerlek/dokunma
+     engeli react-remove-scroll'un olay dinleyicilerinde kalır (Dialog arkası yine kaymaz). */
+  overflow: visible !important;
+  overflow-x: clip !important;
+}
+html:has(.shell-aside):has(body[data-scroll-locked]) { overflow-y: hidden; }
+/* Yan menü her durumda görünür pencerenin tam yüksekliği (dinamik araç çubuklu mobil tarayıcılar: dvh). */
+.shell-aside {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* ---- Yazı boyutu (Küçük / Normal / Büyük): html[data-font-size] ----

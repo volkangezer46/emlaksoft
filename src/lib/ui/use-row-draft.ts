@@ -8,6 +8,7 @@ import {
   isLocked,
   isStale,
   rowDraftReducer,
+  showSaveGroup,
   type DraftValues,
   type RowDraftState,
   type RowValidation,
@@ -142,6 +143,8 @@ export function useRowDraft<T extends DraftValues>({ id, label, saved, version =
     validation,
     risk: riskText,
     canSave: canSaveState(state, validation),
+    /** Kaydet grubu görünür mü (temiz satırda false → hiç çizilmez). */
+    showSave: showSaveGroup(state),
     changed: new Set(changedKeys(state.saved, state.draft)),
     set: <K extends keyof T>(key: K, value: T[K]) => dispatch({ type: "set", key, value }),
     reset,

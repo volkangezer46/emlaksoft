@@ -7,6 +7,7 @@ import {
   isDirty,
   isLocked,
   rowDraftReducer,
+  showSaveGroup,
   type RowDraftAction,
   type RowDraftState,
 } from "./row-draft";
@@ -36,6 +37,22 @@ describe("satır taslağı: kirli = değer karşılaştırması", () => {
   it("geçersiz seçimde Kaydet pasif", () => {
     const a = run(initRowDraft(base), { type: "set", key: "status", value: "suspended" });
     expect(canSave(a, { ok: false, reason: "Askıdaki ofise paket atanamaz" })).toBe(false);
+  });
+});
+
+describe("Kaydet grubu yalnız değişen satırda", () => {
+  it("temiz satırda gizli; kirlenince, kaydederken ve kısa onayda görünür; yerleşince yine gizli", () => {
+    const clean = initRowDraft(base, "v1");
+    expect(showSaveGroup(clean)).toBe(false);
+    const dirty = run(clean, { type: "set", key: "plan", value: "professional" });
+    expect(showSaveGroup(dirty)).toBe(true);
+    const saving = run(dirty, { type: "submit" });
+    expect(showSaveGroup(saving)).toBe(true);
+    const saved = run(saving, { type: "success", version: "v2" });
+    expect(isDirty(saved)).toBe(false);
+    expect(showSaveGroup(saved)).toBe(true);
+    expect(showSaveGroup(run(saved, { type: "settle" }))).toBe(false);
+    expect(showSaveGroup(run(dirty, { type: "set", key: "plan", value: "office" }))).toBe(false);
   });
 });
 

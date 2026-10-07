@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils";
  * `<select>` render eder, yani mevcut `<form action={submit}>` + `FormData`
  * desenimiz aynen çalışır. Ek bir state yönetimine gerek yok.
  *
+ * KAYDIRMA KİLİDİ: Radix Select açıkken body'yi kilitler (react-remove-scroll; kapatılamaz). Form sayfalarında
+ * bu beklenen davranış; kabuktaki yapışkan yan menü `console.css` "Yapışkan yan menü güvencesi" ile korunur.
+ * Tablo satırı / sayfa içi hızlı seçimde bunun yerine kilitlemeyen `InlineSelect` kullanılır.
+ *
  *   <Select name="kind" defaultValue="followup">
  *     <SelectTrigger placeholder="Seçiniz" />
  *     <SelectContent>

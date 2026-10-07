@@ -20,6 +20,9 @@ import { Button } from "./button";
  * 1) `onConfirm` — client callback (async olabilir; bitince kapanır)
  * 2) `formAction` — server action; `hiddenFields` gizli input olarak eklenir
  *    (mevcut <form action={...}> silme desenleri sarmalamadan taşınabilsin diye)
+ *
+ * Denetimli kullanım: `open` + `onOpenChange` verilirse `trigger` isteğe bağlıdır (ör. ⋮ menü öğesinden açılış;
+ * menü kapanınca tetik DOM'dan kalksa da diyalog açık kalır).
  */
 export function ConfirmDialog({
   trigger,
@@ -31,8 +34,10 @@ export function ConfirmDialog({
   onConfirm,
   formAction,
   hiddenFields,
+  open: openProp,
+  onOpenChange,
 }: {
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
   title: string;
   description?: string;
   confirmLabel?: string;
@@ -41,15 +46,22 @@ export function ConfirmDialog({
   onConfirm?: () => void | Promise<void>;
   formAction?: (formData: FormData) => void | Promise<void>;
   hiddenFields?: Record<string, string>;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenState(next);
+    onOpenChange?.(next);
+  };
   const [pending, startTransition] = useTransition();
 
   const confirmVariant = tone === "danger" ? "danger" : "primary";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       <DialogContent size="sm">
         <DialogHeader
           icon={<AlertTriangle />}

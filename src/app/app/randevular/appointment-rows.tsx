@@ -1,16 +1,14 @@
 import Link from "@/components/ui/smart-link";
-import { Eye, FileSignature } from "lucide-react";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { EntityThumb, RowActionLink, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
+import { EntityThumb, RowActions, StatusPill, type Density, type PillTone } from "@/components/ui/list-kit";
 import type { CalendarEvent } from "@/lib/calendar";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CompleteAppointmentDialog } from "./complete-appointment-dialog";
 import { AppointmentEditDialog } from "./appointment-edit-dialog";
-import { CopyConfirmLink } from "./copy-confirm-link";
+import { AppointmentRowMore } from "./appointment-row-more";
 
 /** Sunuma hazır randevu satır modeli (tablo + mobil liste ortak). */
 export type AppointmentVM = {
@@ -64,7 +62,7 @@ function StatusForm({ id, status, label, className, children }: { id: string; st
   );
 }
 
-/** Satır eylemleri: onayla / tamamla (sonuç diyaloğu) / düzenle / iptal / teyit linki / tutanak. */
+/** Satır eylemleri: birincil tamamla (sonuç diyaloğu) / onayla / düzenle; kalanı ⋮ (`AppointmentRowMore`). */
 function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM; typeOptions: TypeOption[] | undefined; advisors?: AdvisorOption[]; withCalendar: boolean }) {
   const completed = a.status === "completed";
   return (
@@ -87,39 +85,23 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
       )}
       {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} /> : null}
       <RowActions>
-        {a.cardHref ? <RowActionLink href={a.cardHref} label={`${a.customerName} randevusu detayı`} icon={Eye} /> : null}
         {a.status === "pending" ? (
           <StatusForm id={a.id} status="confirmed" label="Randevuyu onayla" className="text-[var(--success-strong)] hover:text-[var(--success-strong)]">
             <SpriteIcon name="check-circle-2" className="h-4 w-4" />
           </StatusForm>
         ) : null}
-        {a.status === "confirmed" ? (
-          <StatusForm id={a.id} status="signature" label="İmzaya al (imza bekleniyor olarak işaretle)" className="text-brand-600 hover:text-brand-600">
-            <SpriteIcon name="file-signature" className="h-4 w-4" />
-          </StatusForm>
-        ) : null}
-        {!completed ? (
-          <ConfirmDialog
-            trigger={
-              <button
-                type="button"
-                aria-label="Randevuyu iptal et"
-                title="Randevuyu iptal et"
-                className={`${FORM_ICON_BTN} text-[var(--danger-strong)] hover:text-[var(--danger-strong)]`}
-              >
-                <SpriteIcon name="x-circle" className="h-4 w-4" />
-              </button>
-            }
-            title="Randevuyu iptal et"
-            description={`${a.customerName} ile ${a.dateLabel} ${a.timeLabel} randevusu iptal edilecek ve takvimden kalkacak.`}
-            confirmLabel="İptal et"
-            formAction={setAppointmentStatus}
-            hiddenFields={{ id: a.id, status: "cancelled" }}
-          />
-        ) : null}
-        {a.isShowing ? <RowActionLink href={a.tutanakHref} label="Yer gösterme tutanağı oluştur" icon={FileSignature} /> : null}
+        {/* İkincil eylemler ⋮: detay, imzaya al, tutanak, teyit linki, iptal (her satırda dağınık ikon yok). */}
+        <AppointmentRowMore
+          id={a.id}
+          status={a.status}
+          customerName={a.customerName}
+          whenLabel={`${a.dateLabel} ${a.timeLabel}`}
+          cardHref={a.cardHref}
+          tutanakHref={a.tutanakHref}
+          isShowing={a.isShowing}
+          confirmToken={a.confirmToken}
+        />
       </RowActions>
-      {!completed && a.confirmToken ? <CopyConfirmLink token={a.confirmToken} /> : null}
       {withCalendar ? <AddToCalendarButton event={a.calendarEvent} /> : null}
     </div>
   );

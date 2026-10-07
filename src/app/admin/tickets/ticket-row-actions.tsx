@@ -2,41 +2,27 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, UserRound } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { CheckCircle2, CircleDot, Clock3, Hourglass, Lock, UserRound, UserX } from "lucide-react";
+import { InlineSelect, type InlineSelectOption } from "@/components/ui/inline-select";
 import { updateTicketStatus } from "@/app/actions/tickets";
 import { assignTicketStaff } from "@/app/actions/admin-ticket-ops";
 import { isTicketTransitionAllowed } from "@/lib/support/ticket-contract";
-import { cn } from "@/lib/utils";
 
 /**
- * Ticket satırı aksiyonları — Radix `Select` tabanlı (bkz. `components/ui/select`):
- * animasyonlu popover, klavye ile harf-arama, seçili öğede tik işareti. Değişince
- * `startTransition` içinde server action doğrudan çağrılır (form/native-select
- * gerekmez) — durum/atama ayrı bir "Güncelle/Ata" butonu olmadan anında uygulanır.
+ * Ticket satırı aksiyonları — `InlineSelect` (satır içi seçici; sayfa kaydırmasını kilitlemez, yapışkan yan
+ * menüyü bozmaz). Değişince `startTransition` içinde server action doğrudan çağrılır: durum/atama ayrı bir
+ * "Güncelle/Ata" düğmesi olmadan anında uygulanır (tek alanlı, geri alınabilir değişiklik → taslak gerekmez).
  */
 
 const UNASSIGNED = "__unassigned";
 
-const STATUS_DOT: Record<string, string> = {
-  open: "bg-brand-500",
-  in_progress: "bg-cyan-400",
-  waiting: "bg-amber-400",
-  resolved: "bg-mint-500",
-  closed: "bg-ink-950/30",
+const STATUS_META: Record<string, Pick<InlineSelectOption, "icon" | "tone">> = {
+  open: { icon: CircleDot, tone: "brand" },
+  in_progress: { icon: Clock3, tone: "brand" },
+  waiting: { icon: Hourglass, tone: "warn" },
+  resolved: { icon: CheckCircle2, tone: "success" },
+  closed: { icon: Lock, tone: "neutral" },
 };
-
-const STATUS_TONE: Record<string, string> = {
-  open: "border-brand-500/40 bg-brand-600/10 text-brand-700 hover:border-brand-500/70 data-[state=open]:border-brand-500",
-  in_progress: "border-cyan-400/40 bg-cyan-400/10 text-ink-800 hover:border-cyan-400/70 data-[state=open]:border-cyan-400",
-  waiting: "border-amber-400/40 bg-amber-400/10 text-amber-700 hover:border-amber-400/70 data-[state=open]:border-amber-500",
-  resolved: "border-mint-500/40 bg-mint-500/10 text-mint-700 hover:border-mint-500/70 data-[state=open]:border-mint-500",
-  closed: "border-line bg-canvas text-text-muted hover:border-line-strong data-[state=open]:border-brand-400",
-};
-
-/** Kompakt satır-içi tetikleyici — form select bileşenlerinden ayrı, dar dolgu. */
-const TRIGGER_BASE =
-  "h-auto min-h-0 w-auto min-w-[8rem] gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-none transition data-[state=open]:shadow-[var(--shadow-xs)]";
 
 export function TicketRowActions({
   id,
@@ -57,16 +43,21 @@ export function TicketRowActions({
   const [statusError, setStatusError] = useState<string>();
   const [assignError, setAssignError] = useState<string>();
 
-  const statusLabelOf = useMemo(() => new Map(statusOptions.map((o) => [o.value, o.label])), [statusOptions]);
-  const staffNameOf = useMemo(() => new Map(staff.map((s) => [s.id, s.full_name])), [staff]);
-  const allowedStatusOptions = useMemo(
-    () => statusOptions.filter(
+  const statusChoices = useMemo<InlineSelectOption[]>(() => {
+    const allowed = statusOptions.filter(
       (option) =>
-        option.value !== "resolved" &&
-        option.value !== "closed" &&
-        isTicketTransitionAllowed(status, option.value, "staff"),
-    ),
-    [status, statusOptions],
+        option.value === status ||
+        (option.value !== "resolved" && option.value !== "closed" && isTicketTransitionAllowed(status, option.value, "staff")),
+    );
+    const list = allowed.some((o) => o.value === status) ? allowed : [{ value: status, label: status }, ...allowed];
+    return list.map((o) => ({ value: o.value, label: o.label, ...(STATUS_META[o.value] ?? STATUS_META.closed) }));
+  }, [status, statusOptions]);
+  const staffChoices = useMemo<InlineSelectOption[]>(
+    () => [
+      { value: UNASSIGNED, label: "Atanmadı", icon: UserX, tone: "neutral" },
+      ...staff.map((s) => ({ value: s.id, label: s.full_name, icon: UserRound, tone: "brand" as const })),
+    ],
+    [staff],
   );
   const assignValue = assignedId ?? UNASSIGNED;
 
@@ -97,61 +88,24 @@ export function TicketRowActions({
   }
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto lg:justify-end">
-      <Select value={status} onValueChange={onStatusChange}>
-        <SelectTrigger
-          aria-label="Durum değiştir"
-          disabled={statusPending}
-          className={cn(TRIGGER_BASE, STATUS_TONE[status] ?? STATUS_TONE.closed, statusPending && "opacity-70")}
-        >
-          <span className="flex min-w-0 items-center gap-1.5">
-            {statusPending ? (
-              <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-            ) : (
-              <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", STATUS_DOT[status] ?? STATUS_DOT.closed)} aria-hidden />
-            )}
-            <span className="truncate">{statusLabelOf.get(status) ?? status}</span>
-          </span>
-        </SelectTrigger>
-        <SelectContent align="end">
-          {allowedStatusOptions.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              <span className="flex items-center gap-2">
-                <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[o.value] ?? STATUS_DOT.closed)} aria-hidden />
-                {o.label}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={assignValue} onValueChange={onAssignChange}>
-        <SelectTrigger
-          aria-label="Personel ata"
-          disabled={assignPending}
-          className={cn(
-            TRIGGER_BASE,
-            assignedId
-              ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-700 hover:border-cyan-400/70 data-[state=open]:border-cyan-500"
-              : "border-line bg-canvas text-text-muted hover:border-line-strong data-[state=open]:border-brand-400",
-            assignPending && "opacity-70",
-          )}
-        >
-          <span className="flex min-w-0 items-center gap-1.5">
-            {assignPending ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden />}
-            <span className="truncate">{assignedId ? (staffNameOf.get(assignedId) ?? "Personel") : "Atanmadı"}</span>
-          </span>
-        </SelectTrigger>
-        <SelectContent align="end">
-          <SelectItem value={UNASSIGNED}>Atanmadı</SelectItem>
-          {staff.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.full_name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto lg:justify-end" aria-busy={statusPending || assignPending || undefined}>
+      <InlineSelect
+        value={status}
+        onValueChange={onStatusChange}
+        options={statusChoices}
+        label="Durum değiştir"
+        disabled={statusPending}
+        className="min-w-[8rem]"
+      />
+      <InlineSelect
+        value={assignValue}
+        onValueChange={onAssignChange}
+        options={staffChoices}
+        label="Personel ata"
+        disabled={assignPending}
+        plain={!assignedId}
+        className="min-w-[8rem] max-w-[12rem]"
+      />
       {statusError || assignError ? (
         <p role="alert" aria-live="polite" className="basis-full text-right text-xs font-semibold text-danger-600">
           {statusError ?? assignError}

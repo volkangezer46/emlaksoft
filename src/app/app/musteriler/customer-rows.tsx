@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { CalendarPlus, Eye, MessageCircle, Phone } from "lucide-react";
+import { Eye, MessageCircle, Phone } from "lucide-react";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -13,8 +13,7 @@ import {
   type PillTone,
 } from "@/components/ui/list-kit";
 import { CustomerRowCheckbox, CustomerSelectAllCheckbox } from "./customer-bulk-actions";
-import { CustomerPortalLinkButton } from "./customer-portal-panel";
-import { CustomerRowDelete } from "./customer-row-delete";
+import { CustomerRowMore } from "./customer-row-delete";
 import { customerTypeTone } from "./customer-list-logic";
 
 /** Sayfanın hazırladığı, sunuma hazır müşteri satır modeli. */
@@ -197,9 +196,7 @@ export function CustomerTable({
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} />
                     {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
                     {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
-                    <RowActionLink href={`/app/randevular/yeni?customer=${c.id}`} label={`${c.name} için randevu oluştur`} icon={CalendarPlus} />
-                    {canEdit ? <CustomerPortalLinkButton customerId={c.id} customerName={c.name} phone={c.phone} /> : null}
-                    {canDelete ? <CustomerRowDelete customerId={c.id} name={c.name} /> : null}
+                    <CustomerRowMore customerId={c.id} name={c.name} phone={c.phone} canEdit={canEdit} canDelete={canDelete} />
                   </RowActions>
                 </TD>
               </TR>
