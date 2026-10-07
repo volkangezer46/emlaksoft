@@ -29,6 +29,7 @@ export const ChartFrame = memo(function ChartFrame({
   children,
   className,
   height = 260,
+  bodyClassName,
   period,
   href,
   hrefLabel = "Ayrıntı",
@@ -50,6 +51,8 @@ export const ChartFrame = memo(function ChartFrame({
   className?: string;
   /** Gövde yüksekliği (px); 0 = içerik kadar. */
   height?: number;
+  /** Gövde kabı için ek sınıf (ör. kartı dolduran grafik: "flex flex-1 flex-col"). */
+  bodyClassName?: string;
   /** Dönem etiketi (ör. "Son 30 gün"). */
   period?: string;
   /** Grafiğin ayrıntı/filtrelenmiş hedefi. */
@@ -85,7 +88,7 @@ export const ChartFrame = memo(function ChartFrame({
           </div>
         ) : null}
       </header>
-      <div style={height ? { height } : undefined}>
+      <div className={bodyClassName} style={height ? { height } : undefined}>
         {loading ? (
           <SkeletonCard height={height || 160} label={`${title} yükleniyor`} />
         ) : empty ? (
