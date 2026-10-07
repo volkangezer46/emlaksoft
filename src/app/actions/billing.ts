@@ -36,6 +36,7 @@ import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/p
 import { getTryMaxShare } from "@/lib/try-credits/settings";
 import type { AppliedWalletCredit } from "@/lib/try-credits/checkout";
 import { billingDemoAllowed } from "@/lib/feature-flags/registry";
+import { ActionUserError, actionErrorMessage } from "@/lib/action-errors";
 
 export type CheckoutResult = {
   error?: string;
@@ -105,7 +106,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   try {
     await assertBillingPlanPreflight(gate.tenantId, plan);
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Paket kapasitesi doğrulanamadı." };
+    return { error: actionErrorMessage(error, "Paket kapasitesi doğrulanamadı.") };
   }
 
   const planDef = await getPlanDefinition(plan);
@@ -151,9 +152,9 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       });
     } catch (error) {
       return {
-        error: error instanceof Error
+        error: error instanceof ActionUserError
           ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
-          : "Ödeme sahibi bilgileri doğrulanamadı.",
+          : actionErrorMessage(error, "Ödeme sahibi bilgileri doğrulanamadı."),
       };
     }
   }
@@ -174,7 +175,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     invoiceId = created.invoiceId;
     credit = created.credit;
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Fatura taslağı oluşturulamadı.") };
   }
 
   if (couponNormalized) {
@@ -207,7 +208,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       });
     } catch (error) {
       await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
-      return { error: error instanceof Error ? error.message : "Demo tahsilat tamamlanamadı." };
+      return { error: actionErrorMessage(error, "Demo tahsilat tamamlanamadı.") };
     }
     revalidatePath("/app/abonelik");
     revalidatePath("/app/ayarlar");
@@ -224,7 +225,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       await fulfillInvoiceWithWalletCredit({ tenantId: gate.tenantId, plan, cycle, conversationId });
     } catch (error) {
       await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
-      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+      return { error: actionErrorMessage(error, "Kredi ile ödeme tamamlanamadı.") };
     }
     revalidatePath("/app/abonelik");
     revalidatePath("/app/ayarlar");
@@ -261,7 +262,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
 
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
-      return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
+      return { error: init.errorMessage || actionErrorMessage(null, "Ödeme oturumu açılamadı.") };
     }
 
     await markCheckoutInvoiceInitialized({ invoiceId, tenantId: gate.tenantId });
@@ -269,7 +270,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   } catch (e) {
     await markCheckoutInvoiceFailed({ invoiceId, tenantId: gate.tenantId });
     console.error("startPlanCheckout", e);
-    return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
+    return { error: actionErrorMessage(e, "Ödeme sayfası açılamadı") };
   }
 }
 
@@ -314,7 +315,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   if (!user) return { error: "Oturum bulunamadı." };
 
   const state = await loadSeatState(supabase, gate.tenantId, support);
-  if (!state) return { error: "Abonelik bilgisi okunamadı." };
+  if (!state) return { error: actionErrorMessage(null, "Abonelik bilgisi okunamadı.") };
   if (state.status !== "active") {
     return { error: "Koltuk eklemek için önce ücretli bir paket aktif olmalı (deneme veya gecikmiş abonelikte kapalı)." };
   }
@@ -371,9 +372,9 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
     });
   } catch (error) {
     return {
-      error: error instanceof Error
+      error: error instanceof ActionUserError
         ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
-        : "Ödeme sahibi bilgileri doğrulanamadı.",
+        : actionErrorMessage(error, "Ödeme sahibi bilgileri doğrulanamadı."),
     };
   }
 
@@ -394,7 +395,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       quotedPeriodTry: evalResult.toQuote.totalForCycleTry,
     });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Fatura taslağı oluşturulamadı.") };
   }
 
   await logActivity({
@@ -423,7 +424,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       });
     } catch (error) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
-      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+      return { error: actionErrorMessage(error, "Kredi ile ödeme tamamlanamadı.") };
     }
     revalidatePath("/app/abonelik");
     return { checkoutUrl: `${appUrl()}/app/abonelik?paid=1`, quotedChargeTry: chargeNet };
@@ -444,7 +445,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
     });
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
-      return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
+      return { error: init.errorMessage || actionErrorMessage(null, "Ödeme oturumu açılamadı.") };
     }
     await markCheckoutInvoiceInitialized({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
     revalidatePath("/app/abonelik");
@@ -452,7 +453,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   } catch (e) {
     await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
     console.error("startSeatPurchase", e);
-    return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
+    return { error: actionErrorMessage(e, "Ödeme sayfası açılamadı") };
   }
 }
 
@@ -524,9 +525,9 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
     });
   } catch (error) {
     return {
-      error: error instanceof Error
+      error: error instanceof ActionUserError
         ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
-        : "Ödeme sahibi bilgileri doğrulanamadı.",
+        : actionErrorMessage(error, "Ödeme sahibi bilgileri doğrulanamadı."),
     };
   }
 
@@ -540,7 +541,7 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
       walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
     });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Fatura taslağı oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Fatura taslağı oluşturulamadı.") };
   }
 
   await logActivity({
@@ -569,7 +570,7 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
       });
     } catch (error) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
-      return { error: error instanceof Error ? error.message : "Kredi ile ödeme tamamlanamadı." };
+      return { error: actionErrorMessage(error, "Kredi ile ödeme tamamlanamadı.") };
     }
     revalidatePath("/app/abonelik");
     return { checkoutUrl: `${appUrl()}/app/abonelik?sekme=kontor&paid=1`, quotedTotalTry: invoice.totalTry };
@@ -589,7 +590,7 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
     });
     if (init.status !== "success" || !init.paymentPageUrl) {
       await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
-      return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
+      return { error: init.errorMessage || actionErrorMessage(null, "Ödeme oturumu açılamadı.") };
     }
     await markCheckoutInvoiceInitialized({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
     revalidatePath("/app/abonelik");
@@ -597,6 +598,6 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
   } catch (e) {
     await markCheckoutInvoiceFailed({ invoiceId: invoice.invoiceId, tenantId: gate.tenantId });
     console.error("startCreditPackPurchase", e);
-    return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
+    return { error: actionErrorMessage(e, "Ödeme sayfası açılamadı") };
   }
 }

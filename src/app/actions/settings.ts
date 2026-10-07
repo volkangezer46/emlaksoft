@@ -18,6 +18,7 @@ import {
 } from "@/lib/license";
 import { daysFromNowIso } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type SettingsResult = { error?: string; ok?: boolean };
 
@@ -56,7 +57,7 @@ export async function updateMatchingWeights(formData: FormData): Promise<Setting
 
   if (error) {
     console.error("updateMatchingWeights", error);
-    return { error: "Eşleştirme ağırlıkları kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Eşleştirme ağırlıkları kaydedilemedi.") };
   }
 
   await logActivity({
@@ -145,7 +146,7 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
 
   if (error) {
     console.error("updateTenantInfo", error);
-    return { error: "Ofis bilgileri güncellenemedi." };
+    return { error: actionErrorMessage(error, "Ofis bilgileri güncellenemedi.") };
   }
 
   // Unvan + geçerlilik tarihi: migration 20260826001800 uygulanmadıysa sütunlar yoktur; ana kayıt zaten yapıldı,

@@ -11,6 +11,7 @@ import {
   isTemplateCategory,
   type TemplateCategory,
 } from "@/lib/message-templates";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TemplateResult = { ok?: boolean; error?: string };
 
@@ -79,7 +80,7 @@ export async function createMessageTemplate(_prev: TemplateResult, fd: FormData)
 
   if (error) {
     console.error("createMessageTemplate", error);
-    return { error: "Şablon kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Şablon kaydedilemedi.") };
   }
 
   await logActivity({
@@ -121,7 +122,7 @@ export async function updateMessageTemplate(_prev: TemplateResult, fd: FormData)
 
   if (error) {
     console.error("updateMessageTemplate", error);
-    return { error: "Şablon güncellenemedi." };
+    return { error: actionErrorMessage(error, "Şablon güncellenemedi.") };
   }
 
   await logActivity({
@@ -174,7 +175,7 @@ export async function toggleMessageTemplate(id: string, isActive: boolean): Prom
 
   if (error) {
     console.error("toggleMessageTemplate", error);
-    return { error: "Durum değiştirilemedi." };
+    return { error: actionErrorMessage(error, "Durum değiştirilemedi.") };
   }
 
   revalidateTemplates();
@@ -210,7 +211,7 @@ export async function seedDefaultTemplates(): Promise<TemplateResult> {
   const { error } = await supabase.from("message_templates").insert(rows);
   if (error) {
     console.error("seedDefaultTemplates", error);
-    return { error: "Varsayılan şablonlar eklenemedi." };
+    return { error: actionErrorMessage(error, "Varsayılan şablonlar eklenemedi.") };
   }
 
   await logActivity({
@@ -245,7 +246,7 @@ export async function listMessageTemplates(): Promise<{ templates: MessageTempla
 
   if (error) {
     console.error("listMessageTemplates", error);
-    return { templates: [], error: "Şablonlar yüklenemedi." };
+    return { templates: [], error: actionErrorMessage(error, "Şablonlar yüklenemedi.") };
   }
 
   return { templates: (data ?? []) as MessageTemplateRow[] };

@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { getBaseUrl } from "@/lib/base-url";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OwnerPortalResult = { ok?: boolean; error?: string; token?: string; url?: string };
 
@@ -66,7 +67,7 @@ export async function createOwnerPortalToken(
     .select("token")
     .single();
 
-  if (error || !newToken) return { error: "Token oluşturulamadı." };
+  if (error || !newToken) return { error: actionErrorMessage(error, "Token oluşturulamadı.") };
 
   const url = buildOwnerPortalUrl(newToken.token);
   revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -101,7 +102,7 @@ export async function revokeOwnerPortalToken(formData: FormData): Promise<OwnerP
 
   if (error) {
     console.error("revokeOwnerPortalToken", error);
-    return { error: "Link iptal edilemedi." };
+    return { error: actionErrorMessage(error, "Link iptal edilemedi.") };
   }
 
   revalidatePath("/app/portfoyler/sunumlar");

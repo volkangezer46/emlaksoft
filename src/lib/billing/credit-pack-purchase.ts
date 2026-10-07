@@ -4,6 +4,7 @@ import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { buildCreditPackMeta } from "@/lib/billing/credit-pack-purchase-core";
 import { now } from "@/lib/clock";
+import { ActionUserError } from "@/lib/action-errors";
 import type { EfPack } from "@/lib/ef-credits/config";
 import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
 
@@ -67,7 +68,7 @@ export async function createCreditPackInvoice(input: {
       .eq("id", invoiceId)
       .eq("tenant_id", input.tenantId)
       .eq("status", "draft");
-    throw new Error(applied.error);
+    throw new ActionUserError(applied.error);
   }
   return { invoiceId, totalTry: amounts.totalTry, credit: applied.applied };
 }

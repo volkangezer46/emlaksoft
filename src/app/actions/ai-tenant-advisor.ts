@@ -14,6 +14,7 @@ import { buildAdvisorScope, gated, type AdvisorScope } from "@/lib/ai/advisor-sc
 import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
 import { faqContextForMessages, selectFaqForQuestion } from "@/lib/ai/faq-context";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 // ---------------------------------------------------------------------------
 // Ofis (tenant) yapay zeka asistanı — admin danışman deseninin tenant uyarlaması.
@@ -93,7 +94,6 @@ type TenantAdvisorContext = {
   overpricedCount: number;
   overpriced: OverpricedProperty[];
 };
-
 
 async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promise<TenantAdvisorContext> {
   const supabase = await createClient();
@@ -356,7 +356,6 @@ ${contextToText(context)}` },
   if (!content) throw new Error("OpenAI boş yanıt döndü.");
   return content.trim();
 }
-
 
 // ---------------------------------------------------------------------------
 // Kural tabanlı yedek yanıtlar — anahtar yoksa / hata olursa
@@ -829,7 +828,7 @@ export async function confirmSuggestedTask(input: {
 
   const res = await createTask({}, fd);
   if (res.error || !res.id) {
-    return { ok: false, error: res.error ?? "Görev oluşturulamadı. Lütfen tekrar deneyin." };
+    return { ok: false, error: res.error ?? actionErrorMessage(res.error, "Görev oluşturulamadı. Lütfen tekrar deneyin.") };
   }
   return { ok: true, taskId: res.id, customerMatched: Boolean(customer) };
 }

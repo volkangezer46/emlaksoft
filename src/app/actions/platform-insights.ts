@@ -6,6 +6,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingSchemaError } from "@/lib/insights/facts";
 import { INSIGHT_DISMISS_REASONS, type InsightDismissReason } from "@/lib/insights/types";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PlatformInsightActionResult = { ok?: boolean; error?: string };
 
@@ -41,7 +42,7 @@ export async function setPlatformInsightState(
     return {
       error: isMissingSchemaError(error)
         ? "Platform önerileri henüz etkin değil (veritabanı güncellemesi bekleniyor)."
-        : "Öneri güncellenemedi. Lütfen tekrar deneyin.",
+        : actionErrorMessage(null, "Öneri güncellenemedi. Lütfen tekrar deneyin."),
     };
   }
   if (data !== true) return { error: "Öneri bulunamadı ya da zaten kapatılmış." };

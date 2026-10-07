@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ComplianceResult = { error?: string; ok?: boolean };
 
@@ -36,7 +37,7 @@ export async function upsertIysConsent(formData: FormData): Promise<ComplianceRe
 
   if (error) {
     console.error("upsertIysConsent", error);
-    return { error: "İYS kaydı güncellenemedi." };
+    return { error: actionErrorMessage(error, "İYS kaydı güncellenemedi.") };
   }
 
   await logActivity({

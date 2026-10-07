@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ErrorLogResult = { ok?: boolean; error?: string; count?: number };
 
@@ -53,7 +54,7 @@ export async function reopenErrorLog(id: string): Promise<ErrorLogResult> {
 
   const admin = createAdminClient();
   const { error } = await admin.from("error_logs").update({ resolved_at: null }).eq("id", id);
-  if (error) return { error: "Yeniden açılamadı." };
+  if (error) return { error: actionErrorMessage(error, "Yeniden açılamadı.") };
 
   await logPlatformActivity({
     actorId: staff.id,
@@ -79,7 +80,7 @@ export async function resolveErrorLogs(ids: string[]): Promise<ErrorLogResult> {
     .in("id", clean)
     .is("resolved_at", null)
     .select("id");
-  if (error) return { error: "Toplu işlem başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Toplu işlem başarısız.") };
 
   const count = data?.length ?? 0;
   await logPlatformActivity({

@@ -15,6 +15,7 @@ import {
   toDef,
   type CustomFieldEntity,
 } from "@/lib/custom-fields/core";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CustomFieldResult = { ok?: boolean; error?: string };
 
@@ -56,7 +57,7 @@ export async function createCustomFieldDef(_prev: CustomFieldResult, formData: F
     .eq("tenant_id", gate.tenantId)
     .eq("entity", entity)
     .limit(200);
-  if (listError) return { error: isMissingCustomFieldSchema(listError) ? NOT_READY : "Alanlar okunamadı." };
+  if (listError) return { error: isMissingCustomFieldSchema(listError) ? NOT_READY : actionErrorMessage(listError, "Alanlar okunamadı.") };
   const rows = (existing ?? []) as { key: string; position: number }[];
   if (rows.length >= MAX_DEFS_PER_ENTITY) return { error: `Bu kayıt türü için en çok ${MAX_DEFS_PER_ENTITY} alan tanımlanabilir.` };
   const taken = new Set(rows.map((r) => r.key));
@@ -79,7 +80,7 @@ export async function createCustomFieldDef(_prev: CustomFieldResult, formData: F
   if (error) {
     if (isMissingCustomFieldSchema(error)) return { error: NOT_READY };
     console.error("createCustomFieldDef", error.code);
-    return { error: "Alan eklenemedi." };
+    return { error: actionErrorMessage(error, "Alan eklenemedi.") };
   }
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "custom_field.create", entityType: "custom_field_def", newValue: { entity, key, type: parsed.value.fieldType } });
   revalidatePath(SETTINGS_PATH);
@@ -121,7 +122,7 @@ export async function updateCustomFieldDef(_prev: CustomFieldResult, formData: F
     .update({ label: parsed.value.label, options: parsed.value.options, required: parsed.value.required, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Alan güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Alan güncellenemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "custom_field.update", entityType: "custom_field_def", entityId: id });
   revalidatePath(SETTINGS_PATH);
   return { ok: true };
@@ -140,7 +141,7 @@ export async function setCustomFieldActive(formData: FormData): Promise<CustomFi
     .update({ active, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Alan güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Alan güncellenemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: active ? "custom_field.activate" : "custom_field.deactivate", entityType: "custom_field_def", entityId: id });
   revalidatePath(SETTINGS_PATH);
   return { ok: true };
@@ -155,7 +156,7 @@ export async function deleteCustomFieldDef(formData: FormData): Promise<CustomFi
   if (String(formData.get("confirm") ?? "") !== "sil") return { error: "Silmeyi onaylamak için kutuya \"sil\" yazın." };
   const supabase = await createClient();
   const { error } = await supabase.from("custom_field_defs").delete().eq("id", id).eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Alan silinemedi." };
+  if (error) return { error: actionErrorMessage(error, "Alan silinemedi.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "custom_field.delete", entityType: "custom_field_def", entityId: id });
   revalidatePath(SETTINGS_PATH);
   return { ok: true };
@@ -184,7 +185,7 @@ export async function saveCustomFieldValues(_prev: CustomFieldResult, formData: 
     .eq("entity", entity)
     .eq("active", true)
     .limit(200);
-  if (defError) return { error: isMissingCustomFieldSchema(defError) ? NOT_READY : "Alanlar okunamadı." };
+  if (defError) return { error: isMissingCustomFieldSchema(defError) ? NOT_READY : actionErrorMessage(defError, "Alanlar okunamadı.") };
   const defs = ((defRows ?? []) as Record<string, unknown>[]).map(toDef).filter((d) => d !== null);
 
   const upserts: Record<string, unknown>[] = [];
@@ -201,12 +202,12 @@ export async function saveCustomFieldValues(_prev: CustomFieldResult, formData: 
     const { error } = await supabase.from("custom_field_values").upsert(upserts, { onConflict: "def_id,record_id" });
     if (error) {
       console.error("saveCustomFieldValues", error.code);
-      return { error: "Özel alanlar kaydedilemedi." };
+      return { error: actionErrorMessage(error, "Özel alanlar kaydedilemedi.") };
     }
   }
   if (clears.length > 0) {
     const { error } = await supabase.from("custom_field_values").delete().eq("tenant_id", gate.tenantId).eq("record_id", recordId).in("def_id", clears);
-    if (error) return { error: "Özel alanlar kaydedilemedi." };
+    if (error) return { error: actionErrorMessage(error, "Özel alanlar kaydedilemedi.") };
   }
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "custom_field.values_update", entityType: entity, entityId: recordId, newValue: { set: upserts.length, cleared: clears.length } });
   revalidatePath(RECORD_PATH[entity](recordId));

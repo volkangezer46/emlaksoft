@@ -20,6 +20,7 @@ import {
   validateTicketResolution,
   validateTicketSubject,
 } from "@/lib/support/ticket-contract";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TicketResult = {
   error?: string;
@@ -86,7 +87,7 @@ function rpcFailure(label: string, error: { code?: string; message?: string } | 
   if (error?.message?.includes("Invalid ticket transition")) return "Bu durum geçişi yapılamaz.";
   if (error?.message?.includes("Invalid category")) return "Seçilen destek kategorisi artık kullanılamıyor.";
   if (error?.message?.includes("Ticket not found")) return "Destek talebi bulunamadı.";
-  return fallback;
+  return actionErrorMessage(error, fallback);
 }
 
 /** `version` alanı formda varsa optimistic-concurrency kontrolü için RPC'ye iletilir. */

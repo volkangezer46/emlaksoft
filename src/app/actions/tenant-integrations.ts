@@ -17,6 +17,7 @@ import {
   verifyTenantWhatsAppBinding,
   type WhatsAppBindingVerificationFailure,
 } from "@/lib/messaging/whatsapp-cloud";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TenantIntegrationResult = { ok?: boolean; error?: string };
 
@@ -66,7 +67,7 @@ export async function saveNetgsmCredentials(
     .maybeSingle();
   if (existingError) {
     console.error("saveNetgsmCredentials integration read", { code: existingError.code });
-    return { error: "Entegrasyon kaydı okunamadı." };
+    return { error: actionErrorMessage(existingError, "Entegrasyon kaydı okunamadı.") };
   }
 
   let previousCredentials: NetgsmCredentials = {};
@@ -78,7 +79,7 @@ export async function saveNetgsmCredentials(
       .maybeSingle();
     if (secretError) {
       console.error("saveNetgsmCredentials secret read", { code: secretError.code });
-      return { error: "Kayıtlı entegrasyon sırrı okunamadı." };
+      return { error: actionErrorMessage(secretError, "Kayıtlı entegrasyon sırrı okunamadı.") };
     }
     previousCredentials = (secret?.credentials ?? {}) as NetgsmCredentials;
   }
@@ -105,7 +106,7 @@ export async function saveNetgsmCredentials(
     console.error("saveNetgsmCredentials", { code: error.code });
     return error.code === "23505"
       ? { error: "Bu gelen SMS abone numarası başka bir aktif ofise bağlı." }
-      : { error: "Netgsm entegrasyonu kaydedilemedi." };
+      : { error: actionErrorMessage(error, "Netgsm entegrasyonu kaydedilemedi.") };
   }
 
   revalidatePath("/app/ayarlar");
@@ -125,7 +126,7 @@ export async function clearNetgsmCredentials(): Promise<TenantIntegrationResult>
   });
   if (error) {
     console.error("clearNetgsmCredentials", { code: error.code });
-    return { error: "Netgsm hesabı kaldırılamadı." };
+    return { error: actionErrorMessage(error, "Netgsm hesabı kaldırılamadı.") };
   }
 
   revalidatePath("/app/ayarlar");
@@ -223,7 +224,7 @@ export async function saveWhatsAppCredentials(
     if (error.code === "22023") {
       return { error: "WhatsApp ayarları geçersiz veya erişim anahtarı eksik." };
     }
-    return { error: "WhatsApp Cloud API bağlantısı kaydedilemedi." };
+    return { error: actionErrorMessage(null, "WhatsApp Cloud API bağlantısı kaydedilemedi.") };
   }
 
   revalidatePath("/app/ayarlar");
@@ -285,7 +286,7 @@ export async function clearWhatsAppCredentials(): Promise<TenantIntegrationResul
   });
   if (error) {
     console.error("clearWhatsAppCredentials", { code: error.code });
-    return { error: "WhatsApp Cloud API bağlantısı kaldırılamadı." };
+    return { error: actionErrorMessage(error, "WhatsApp Cloud API bağlantısı kaldırılamadı.") };
   }
 
   revalidatePath("/app/ayarlar");

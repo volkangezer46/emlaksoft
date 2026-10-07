@@ -27,6 +27,7 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { requirePermission } from "@/lib/require-permission";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ModuleActionResult = { ok?: boolean; error?: string; message?: string };
 
@@ -172,7 +173,7 @@ export async function setTenantModuleByAdmin(officeId: string, moduleKey: string
     .eq("tenant_id", tenantId)
     .eq("module_key", moduleKey)
     .maybeSingle();
-  if (readError) return { error: isMissingTableError(readError) ? UNAVAILABLE : "Modül durumu okunamadı." };
+  if (readError) return { error: isMissingTableError(readError) ? UNAVAILABLE : actionErrorMessage(readError, "Modül durumu okunamadı.") };
   const before = (existing as ModuleRow | null) ?? null;
   const beforeEnabled = before ? before.enabled : true;
   const beforeLocked = before?.locked_by_platform === true;
@@ -211,7 +212,7 @@ export async function setTenantModuleByAdmin(officeId: string, moduleKey: string
   if (error) {
     if (isMissingTableError(error)) return { error: UNAVAILABLE };
     console.error("setTenantModuleByAdmin", error);
-    return { error: "Modül durumu kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Modül durumu kaydedilemedi.") };
   }
 
   await logPlatformActivity({

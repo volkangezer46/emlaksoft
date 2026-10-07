@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { SOCIAL_LINK_REQUIRED_MESSAGE, ensureSocialCompliance, pickListingLink, type SocialCompliance } from "@/lib/social-card/core";
 import { loadSocialCardData } from "@/lib/social-card/load";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AiContentResult = { text?: string; source?: "ai" | "template"; error?: string };
 
@@ -131,7 +132,7 @@ export async function savePropertyDescription(propertyId: string, text: string):
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("savePropertyDescription", error);
-    return { error: "Açıklama kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Açıklama kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({

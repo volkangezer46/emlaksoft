@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { templateForDealType } from "@/lib/deal-checklist-templates";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Anlaşma kapanış dosyası — evrak kontrol listesi action'ları.
@@ -80,7 +81,7 @@ export async function createFromTemplate(_prev: ChecklistResult, fd: FormData): 
   );
   if (error) {
     console.error("createFromTemplate", error);
-    return { error: "Evrak listesi oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Evrak listesi oluşturulamadı.") };
   }
 
   await logActivity({
@@ -131,7 +132,7 @@ export async function addItem(_prev: ChecklistResult, fd: FormData): Promise<Che
   });
   if (error) {
     console.error("addItem", error);
-    return { error: "Madde eklenemedi." };
+    return { error: actionErrorMessage(error, "Madde eklenemedi.") };
   }
 
   await logActivity({
@@ -172,7 +173,7 @@ export async function toggleItem(itemId: string, dealId: string): Promise<Checkl
     })
     .eq("id", itemId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Durum güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -213,7 +214,7 @@ export async function updateItemNote(_prev: ChecklistResult, fd: FormData): Prom
     .update({ note: note || null })
     .eq("id", itemId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Not kaydedilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Not kaydedilemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -305,7 +306,7 @@ export async function attachChecklistFile(itemId: string, dealId: string, fileId
     })
     .eq("id", itemId)
     .eq("tenant_id", gate.tenantId);
-  if (error) return { error: "Dosya maddeye bağlanamadı." };
+  if (error) return { error: actionErrorMessage(error, "Dosya maddeye bağlanamadı.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -334,7 +335,7 @@ export async function detachChecklistFile(itemId: string, dealId: string): Promi
     .eq("tenant_id", gate.tenantId)
     .select("id, label")
     .maybeSingle();
-  if (error || !data) return { error: "Dosya bağı kaldırılamadı." };
+  if (error || !data) return { error: actionErrorMessage(error, "Dosya bağı kaldırılamadı.") };
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,

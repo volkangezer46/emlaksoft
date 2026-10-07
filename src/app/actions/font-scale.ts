@@ -12,6 +12,7 @@ import {
   serializeFontCookie,
   type FontScale,
 } from "@/lib/font-scale";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type FontScaleResult = { ok: true; scale: FontScale } | { ok: false; error: string };
 
@@ -32,7 +33,7 @@ export async function saveFontScale(value: unknown): Promise<FontScaleResult> {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({ data: { [FONT_SCALE_META_KEY]: value } });
-  if (error) return { ok: false, error: "Yazı boyutu kaydedilemedi. Lütfen tekrar deneyin." };
+  if (error) return { ok: false, error: actionErrorMessage(error, "Yazı boyutu kaydedilemedi. Lütfen tekrar deneyin.") };
 
   const jar = await cookies();
   jar.set(FONT_SCALE_COOKIE, serializeFontCookie(user.id, value), {

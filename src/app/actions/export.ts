@@ -20,6 +20,7 @@ import { filterCustomersByHeatSegment } from "@/lib/customer-heat-export";
 import { applyCustomerFilters, normalizeCustomerFilters, type CustomerListFilters } from "@/lib/customer-list-filters";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { customFieldCsvColumns } from "@/lib/custom-fields/load";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Liste CSV'leri ekranla AYNI kapsamı uygular: eski rol kuralı (`hasOfficeWideDataScope`) taban, ofis bayrağı
@@ -111,7 +112,7 @@ export async function exportCustomersCsv(filters: Partial<CustomerListFilters> =
   }
   if (error) {
     console.error("exportCustomersCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const custom = await customFieldCsvColumns(supabase, gate.tenantId, "customer", (data ?? []).map((r) => String((r as { id?: string }).id ?? "")));
   const rows = (data ?? []).map((r) => ({ ...mapCustomer(r), ...custom.forRecord(String((r as { id?: string }).id ?? "")) }));
@@ -135,7 +136,7 @@ export async function exportCommissionsCsv(): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportCommissionsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   // Danışman adı: ilk sorguya gömülü profil (ek sorgu yok; deals_assigned_to_fkey). Yalnız bu ofisin profili
   // kabul edilir (tenant_id kontrolü); çözülemeyen kimlik boş kalır.
@@ -166,7 +167,7 @@ export async function exportAuditCsv(): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportAuditCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
 
   const actorIds = [...new Set((data ?? []).map((r) => r.actor_id).filter(Boolean))] as string[];
@@ -202,7 +203,7 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportPropertiesCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
 
   const advisorIds = [...new Set((data ?? []).map((p) => p.assigned_to).filter(Boolean))] as string[];
@@ -238,7 +239,7 @@ export async function exportExpensesCsv(ids?: string[]): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportExpensesCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapExpense(r));
   return exportResult(gate, "giderler", rows, `giderler-${trDayKey()}.csv`);
@@ -265,7 +266,7 @@ export async function exportOffersCsv(ids?: string[]): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportOffersCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapOffer(r));
   return exportResult(gate, "teklifler", rows, `teklifler-${trDayKey()}.csv`);
@@ -288,7 +289,7 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportPortalListingsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapPortalListing(r));
   return exportResult(gate, "portal-ilanlari", rows, `portal-ilanlari-${trDayKey()}.csv`);
@@ -356,7 +357,7 @@ export async function exportDemandsCsv(filters: DemandExportFilters = {}): Promi
   const { data, error } = await q.order("created_at", { ascending: false }).limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportDemandsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const custom = await customFieldCsvColumns(supabase, gate.tenantId, "demand", (data ?? []).map((r) => String(r.id)));
   const rows = (data ?? []).map((r) => ({ ...mapDemand(r), ...custom.forRecord(String(r.id)) }));
@@ -391,7 +392,7 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
   const { data, error } = await q.order("scheduled_at", { ascending: false }).limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportAppointmentsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapAppointment(r));
   return exportResult(gate, "randevular", rows, `randevular-${today10()}.csv`);
@@ -421,7 +422,7 @@ export async function exportDealsCsv(ids?: string[]): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportDealsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const stageNames = stageLabelMap(await getStageLabels());
   const custom = await customFieldCsvColumns(supabase, gate.tenantId, "deal", (data ?? []).map((r) => String(r.id)));
@@ -450,7 +451,7 @@ export async function exportProjectsCsv(filters: { durum?: string } = {}): Promi
   const { data, error } = await q.order("created_at", { ascending: false }).limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportProjectsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapProject(r));
   return exportResult(gate, "projeler", rows, `projeler-${today10()}.csv`);
@@ -513,7 +514,7 @@ export async function exportRentalsCsv(filters: RentalExportFilters = {}): Promi
   const exportError = rentalError ?? chargeError ?? maintError;
   if (exportError) {
     console.error("exportRentalsCsv", exportError);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(exportError, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
 
   const rentals = rentalData ?? [];
@@ -598,7 +599,7 @@ export async function exportDuesCsv(): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportDuesCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapDue(r));
   return exportResult(gate, "aidatlar", rows, `aidatlar-${today10()}.csv`);
@@ -625,7 +626,7 @@ export async function exportContractsCsv(ids?: string[]): Promise<ExportResult> 
   const { data, error } = await q;
   if (error) {
     console.error("exportContractsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapContract(r));
   return exportResult(gate, "sozlesmeler", rows, `sozlesmeler-${today10()}.csv`);
@@ -648,7 +649,7 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
   const { data, error } = await q;
   if (error) {
     console.error("exportReferralsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => mapReferral(r));
   return exportResult(gate, "tavsiyeler", rows, `tavsiyeler-${today10()}.csv`);
@@ -677,7 +678,7 @@ export async function exportCampaignRecipientsCsv(campaignId: string, durum = ""
   const { data, error } = await q;
   if (error) {
     console.error("exportCampaignRecipientsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((r) => ({
     ad_soyad: r.full_name ?? "",
@@ -718,7 +719,7 @@ export async function exportApprovalsCsv(filters: ApprovalExportFilters = {}): P
   const { data, error } = await q;
   if (error) {
     console.error("exportApprovalsCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const ids = [...new Set((data ?? []).flatMap((r) => [r.requested_by, r.decided_by]).filter(Boolean) as string[])];
   const names = new Map<string, string>();
@@ -788,7 +789,7 @@ export async function exportTasksCsv(filters: TaskExportFilters = {}): Promise<E
   const { data, error } = await q;
   if (error) {
     console.error("exportTasksCsv", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []).map((t) => ({
     baslik: t.title,

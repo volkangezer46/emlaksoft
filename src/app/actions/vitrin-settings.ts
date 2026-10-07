@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { validateVitrinInput, isMissingColumnError, type VitrinSettings } from "@/lib/vitrin-settings-logic";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type VitrinSettingsResult = { ok?: boolean; error?: string; settings?: VitrinSettings };
 
@@ -46,7 +47,7 @@ export async function saveVitrinSettings(_prev: VitrinSettingsResult, formData: 
   if (error) {
     if (isMissingColumnError(error)) return { error: UNAVAILABLE };
     console.error("saveVitrinSettings", error);
-    return { error: "Vitrin ayarları kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Vitrin ayarları kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({

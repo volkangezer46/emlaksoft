@@ -5,6 +5,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { escapeCsvCell } from "@/lib/csv";
 import { planLabel } from "@/lib/billing/plans";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ExportResult = { error?: string; csv?: string; filename?: string };
 
@@ -28,7 +29,7 @@ export async function exportTenantsCsv(): Promise<ExportResult> {
     .select("name, plan, status, created_at, trial_ends_at")
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const rows = (data ?? []).map((t) => ({
     ofis: t.name,
     paket: planLabel(t.plan),
@@ -47,7 +48,7 @@ export async function exportSubscriptionsCsv(): Promise<ExportResult> {
     .select("plan, status, amount_try, billing_cycle, current_period_end, created_at, tenant:tenants(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const rows = (data ?? []).map((s) => {
     const t = s.tenant as { name?: string } | { name?: string }[] | null;
     const name = Array.isArray(t) ? t[0]?.name : t?.name;
@@ -72,7 +73,7 @@ export async function exportDemoRequestsCsv(): Promise<ExportResult> {
     .select("full_name, phone, email, company, city, team_size, status, source, created_at")
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const rows = (data ?? []).map((d) => ({
     ad_soyad: d.full_name,
     telefon: d.phone ?? "",
@@ -116,7 +117,7 @@ export async function exportInvoicesCsv(): Promise<ExportResult> {
     .select("invoice_no, status, total_try, due_at, paid_at, reminder_count, created_at, tenant:tenants(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const rows = (data ?? []).map((i) => ({
     fatura_no: i.invoice_no ?? "",
     ofis: relName(i.tenant),
@@ -138,7 +139,7 @@ export async function exportMembersCsv(): Promise<ExportResult> {
     .select("full_name, phone, role, is_active, created_at, tenant:tenants(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const rows = (data ?? []).map((m) => ({
     ad_soyad: m.full_name,
     telefon: m.phone ?? "",
@@ -158,7 +159,7 @@ export async function exportTicketsCsv(): Promise<ExportResult> {
     .select("subject, category, status, priority, created_at, tenant:tenants(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const rows = (data ?? []).map((t) => ({
     konu: t.subject,
     ofis: relName(t.tenant),
@@ -181,7 +182,7 @@ export async function exportPlatformReportCsv(): Promise<ExportResult> {
     admin.from("tenants").select("id, name, plan, status, created_at").order("created_at", { ascending: false }).limit(5000),
     admin.from("subscriptions").select("tenant_id, status, amount_try, billing_cycle").limit(5000),
   ]);
-  if (error) return { error: "Dışa aktarma başarısız." };
+  if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
   const subByTenant = new Map((subs ?? []).map((s) => [s.tenant_id as string, s]));
   const rows = (tenants ?? []).map((t) => {
     const s = subByTenant.get(t.id);

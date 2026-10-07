@@ -10,6 +10,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { logActivity } from "@/lib/activity";
 import { applyAuditFilters, normalizeAuditFilters, type AuditFilters } from "@/lib/audit-filters";
 import type { ExportResult } from "@/app/actions/export";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const EXPORT_LIMIT = 2000;
 
@@ -37,7 +38,7 @@ export async function exportAuditCsvFiltered(filters: Partial<AuditFilters> = {}
   const { data, error } = await q;
   if (error) {
     console.error("exportAuditCsvFiltered", error);
-    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
 
   const actorIds = [...new Set((data ?? []).map((r) => r.actor_id).filter(Boolean))] as string[];

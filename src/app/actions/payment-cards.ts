@@ -7,6 +7,7 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { removeStoredCard, setDefaultStoredCard, writeAutoRenewConsent } from "@/lib/billing/card-store";
 import { createClient } from "@/lib/supabase/server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Kayıtlı kart yönetimi. Kart verisi bu action'lara GELMEZ: yalnız kartın kendi kimliği (uuid) gelir; ekleme zaten
@@ -54,7 +55,7 @@ export async function setDefaultPaymentCard(cardId: string): Promise<CardActionR
   if (!UUID_RE.test(cardId)) return { ok: false, error: "Geçersiz kart." };
 
   const done = await setDefaultStoredCard(await createClient(), { cardId });
-  if (!done) return { ok: false, error: "Varsayılan kart değiştirilemedi." };
+  if (!done) return { ok: false, error: actionErrorMessage(null, "Varsayılan kart değiştirilemedi.") };
   await logActivity({
     tenantId: g.gate.tenantId,
     actorId: g.gate.userId,

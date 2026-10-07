@@ -5,6 +5,7 @@ import { guardPlatformAction } from "@/lib/platform-guards";
 import { applyPlatformWrites } from "@/lib/settings/write";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { normalizeAllowedWhatsAppApiUrl } from "@/lib/messaging/netgsm";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type MessagingKeyResult = { ok?: boolean; error?: string };
 
@@ -40,7 +41,7 @@ export async function saveNetgsmKeys(fd: FormData): Promise<MessagingKeyResult> 
     ],
     { reason: "Netgsm bilgileri kaydı", fromBridge: true },
   );
-  if (!res.ok) return { error: res.error || "Netgsm bilgileri kaydedilemedi." };
+  if (!res.ok) return { error: res.error || actionErrorMessage(null, "Netgsm bilgileri kaydedilemedi.") };
 
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -94,7 +95,7 @@ export async function saveWhatsappKeys(fd: FormData): Promise<MessagingKeyResult
     ],
     { reason: "WhatsApp bilgileri kaydı", fromBridge: true },
   );
-  if (!res.ok) return { error: res.error || "WhatsApp bilgileri kaydedilemedi." };
+  if (!res.ok) return { error: res.error || actionErrorMessage(null, "WhatsApp bilgileri kaydedilemedi.") };
 
   await logPlatformActivity({
     actorId: gate.staff.id,

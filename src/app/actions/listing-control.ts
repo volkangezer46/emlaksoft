@@ -7,6 +7,7 @@ import { parseMoneyInput } from "@/lib/money-input";
 import { suggestCrmClosure, validateExplanation } from "@/lib/listing-control/closure-checklist";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { sanitizeObserved } from "@/lib/listing-control/server/process-check";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * İlan kontrol KULLANICI eylemleri. Hepsi `requirePermission("portals", ...)` kapısından geçer ve KULLANICI OTURUMU
@@ -36,9 +37,9 @@ const OUTCOME_ERRORS: Record<string, string> = {
 function failure(error: { code?: string | null } | null, outcome?: string): ControlActionResult {
   if (error) {
     console.error("listing-control action", { code: error.code });
-    return { error: isMissingSchema(error) ? "İlan kontrol sistemi henüz etkin değil." : "İşlem tamamlanamadı." };
+    return { error: isMissingSchema(error) ? "İlan kontrol sistemi henüz etkin değil." : actionErrorMessage(error, "İşlem tamamlanamadı.") };
   }
-  return { error: OUTCOME_ERRORS[outcome ?? ""] ?? "İşlem tamamlanamadı." };
+  return { error: OUTCOME_ERRORS[outcome ?? ""] ?? actionErrorMessage(null, "İşlem tamamlanamadı.") };
 }
 
 function refresh() {

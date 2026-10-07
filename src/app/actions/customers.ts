@@ -16,6 +16,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { daysFromNowIso, trDayKey } from "@/lib/clock";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CustomerResult = { error?: string; ok?: boolean; id?: string };
 
@@ -83,7 +84,7 @@ export async function createCustomer(
 
   if (error) {
     console.error("createCustomer", error);
-    return { error: planLimitErrorMessage(error) ?? "Müşteri eklenemedi. Lütfen tekrar deneyin." };
+    return { error: planLimitErrorMessage(error) ?? actionErrorMessage(error, "Müşteri eklenemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -187,7 +188,7 @@ export async function updateCustomer(
 
   if (error) {
     console.error("updateCustomer", error);
-    return { error: "Müşteri güncellenemedi." };
+    return { error: actionErrorMessage(error, "Müşteri güncellenemedi.") };
   }
 
   await logActivity({
@@ -273,7 +274,7 @@ export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deleteCustomer", error);
-    return { error: "Müşteri silinemedi." };
+    return { error: actionErrorMessage(error, "Müşteri silinemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -346,7 +347,7 @@ export async function bulkAssignCustomers(
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("bulkAssignCustomers", error);
-    return { error: "Danışman ataması yapılamadı." };
+    return { error: actionErrorMessage(error, "Danışman ataması yapılamadı.") };
   }
   if (assignedTo && assignedTo !== gate.userId && movedCount > 0) {
     await notifyAssignment({
@@ -392,7 +393,7 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkCustomerRe
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("bulkDeleteCustomers", error);
-    return { error: "Müşteriler silinemedi." };
+    return { error: actionErrorMessage(error, "Müşteriler silinemedi.") };
   }
 
   await logActivity({
@@ -444,7 +445,7 @@ export async function bulkReheatCustomers(ids: string[]): Promise<BulkCustomerRe
     .is("deleted_at", null);
   if (loadError) {
     console.error("bulkReheatCustomers load", loadError);
-    return { error: "Müşteriler yüklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(loadError, "Müşteriler yüklenemedi. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []) as Array<{ id: string; full_name: string; assigned_to: string | null }>;
   if (!rows.length) return { error: "Görev açılacak müşteri bulunamadı." };
@@ -459,7 +460,7 @@ export async function bulkReheatCustomers(ids: string[]): Promise<BulkCustomerRe
     .like("title", `%${REHEAT_MARK}%`);
   if (taskErr) {
     console.error("bulkReheatCustomers tasks", taskErr);
-    return { error: "Mevcut görevler kontrol edilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(taskErr, "Mevcut görevler kontrol edilemedi. Lütfen tekrar deneyin.") };
   }
   const alreadyOpen = new Set((existing ?? []).map((t) => t.customer_id as string));
   const fresh = rows.filter((r) => !alreadyOpen.has(r.id));
@@ -484,7 +485,7 @@ export async function bulkReheatCustomers(ids: string[]): Promise<BulkCustomerRe
   );
   if (error) {
     console.error("bulkReheatCustomers insert", error);
-    return { error: "Görevler oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Görevler oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -542,7 +543,7 @@ async function loadCustomerTags(
     .maybeSingle();
   if (error) {
     console.error("loadCustomerTags", error);
-    return { error: "Etiketler yüklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Etiketler yüklenemedi. Lütfen tekrar deneyin.") };
   }
   if (!data) return { error: "Müşteri bulunamadı." };
   return { tags: (data.tags ?? []) as string[] };
@@ -581,7 +582,7 @@ export async function addCustomerTag(
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("addCustomerTag", error);
-    return { error: "Etiket eklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Etiket eklenemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -625,7 +626,7 @@ export async function removeCustomerTag(
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("removeCustomerTag", error);
-    return { error: "Etiket kaldırılamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Etiket kaldırılamadı. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -665,7 +666,7 @@ export async function bulkAddTag(ids: string[], tag: string): Promise<BulkCustom
     .is("deleted_at", null);
   if (loadError) {
     console.error("bulkAddTag load", loadError);
-    return { error: "Müşteriler yüklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(loadError, "Müşteriler yüklenemedi. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []) as Array<{ id: string; tags: string[] | null }>;
   if (!rows.length) return { error: "Güncellenecek müşteri bulunamadı." };
@@ -829,7 +830,7 @@ async function loadMergeParties(
     .order("created_at", { ascending: true });
   if (error) {
     console.error("loadMergeParties", error);
-    return { error: "Kayıtlar yüklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Kayıtlar yüklenemedi. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []) as CustomerMergeRow[];
   const primary = rows.find((r) => r.id === primaryId);
@@ -1062,7 +1063,7 @@ export async function appendCustomerNote(customerId: string, text: string): Prom
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("appendCustomerNote", error);
-    return { error: "Not eklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Not eklenemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({

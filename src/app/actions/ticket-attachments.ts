@@ -9,6 +9,7 @@ import {
   isUuid,
   TICKET_ATTACHMENT_BUCKET,
 } from "@/lib/ticket-attachments";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TicketAttachmentActionResult = {
   ok?: boolean;
@@ -35,7 +36,7 @@ export async function deleteTicketAttachment(
   if (!access.ok) return { error: access.error };
   const { attachment, actor, ticket } = access;
   if (!isSafeTicketAttachmentPath(attachment.storage_path, ticket.tenant_id, ticket.id)) {
-    return { error: "Dosya yolu doğrulanamadı." };
+    return { error: actionErrorMessage(null, "Dosya yolu doğrulanamadı.") };
   }
 
   const admin = createAdminClient();
@@ -51,7 +52,7 @@ export async function deleteTicketAttachment(
     .remove([attachment.storage_path]);
   if (storageError) {
     console.error("ticket attachment storage delete failed", { statusCode: storageError.statusCode });
-    return { error: "Dosya silinemedi." };
+    return { error: actionErrorMessage(storageError, "Dosya silinemedi.") };
   }
 
   const deletedAt = new Date().toISOString();
@@ -95,7 +96,7 @@ export async function deleteTicketAttachment(
     if (restoreError) {
       console.error("ticket attachment delete rollback failed", { statusCode: restoreError.statusCode });
     }
-    return { error: "Dosya kaydı silinemedi." };
+    return { error: actionErrorMessage(null, "Dosya kaydı silinemedi.") };
   }
 
   revalidatePath(`/admin/tickets/${ticket.id}`);

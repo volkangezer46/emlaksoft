@@ -21,6 +21,7 @@ import {
   type InventoryRow,
   type PropertyForMatch,
 } from "@/lib/listing-control/inventory-import";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Portal ENVANTERİ içe aktarma ve EŞLEŞME KUYRUĞU kararları. Hepsi `requirePermission("portals","edit")` kapısından geçer
@@ -206,7 +207,7 @@ export async function importPortalInventory(input: {
 
   const db = (await createClient()) as unknown as Db;
   const crm = await loadCrm(db, portal, scope, gate.userId);
-  if (!crm) return { ok: false, error: "CRM ilanları okunamadı." };
+  if (!crm) return { ok: false, error: actionErrorMessage(null, "CRM ilanları okunamadı.") };
   const summaryRes = await getControlSummary(db, scope === "mine" ? "advisor" : "tenant");
   const neverPublished = summaryRes.available
     ? scope === "mine"
@@ -237,11 +238,11 @@ export async function importPortalInventory(input: {
     });
     if (error) {
       console.error("lc_inventory_import", { code: error.code });
-      return { ok: false, error: isMissingSchema(error) ? "Envanter içe aktarma için sistem güncellemesi bekleniyor." : "Karşılaştırma kaydedilemedi." };
+      return { ok: false, error: isMissingSchema(error) ? "Envanter içe aktarma için sistem güncellemesi bekleniyor." : actionErrorMessage(error, "Karşılaştırma kaydedilemedi.") };
     }
     const r = (data ?? {}) as { outcome?: string; observations_applied?: number; candidates_registered?: number; anomalies_opened?: number };
     if (r.outcome === "forbidden") return { ok: false, error: "Bu işlem için yetkiniz yok." };
-    if (r.outcome !== "ok") return { ok: false, error: "Karşılaştırma kaydedilemedi." };
+    if (r.outcome !== "ok") return { ok: false, error: actionErrorMessage(null, "Karşılaştırma kaydedilemedi.") };
     applied += Number(r.observations_applied ?? 0);
     registered += Number(r.candidates_registered ?? 0);
     opened += Number(r.anomalies_opened ?? 0);
@@ -290,10 +291,10 @@ export async function decidePortalMatch(formData: FormData): Promise<MatchDecisi
   });
   if (error) {
     console.error("lc_match_decide", { code: error.code });
-    return { error: isMissingSchema(error) ? "Eşleşme kuyruğu için sistem güncellemesi bekleniyor." : "Karar kaydedilemedi." };
+    return { error: isMissingSchema(error) ? "Eşleşme kuyruğu için sistem güncellemesi bekleniyor." : actionErrorMessage(error, "Karar kaydedilemedi.") };
   }
   const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
-  if (outcome !== "ok") return { error: MATCH_ERRORS[outcome] ?? "Karar kaydedilemedi." };
+  if (outcome !== "ok") return { error: MATCH_ERRORS[outcome] ?? actionErrorMessage(null, "Karar kaydedilemedi.") };
   revalidatePath("/app/ilan-kontrol/eslesme");
   revalidatePath("/app/ilan-kontrol/anomaliler");
   revalidatePath("/app/portallar");

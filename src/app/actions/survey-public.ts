@@ -10,6 +10,7 @@ import { validateAnswers } from "@/lib/surveys/logic";
 import { isSurveyTaskLinkExpired } from "@/lib/surveys/task-expiry";
 import { now } from "@/lib/clock";
 import { completeSurveyTask, loadSurveySettings, loadTemplateQuestions } from "@/lib/surveys/server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PublicSurveyResult = {
   ok?: boolean;
@@ -111,7 +112,7 @@ export async function submitSurveyByToken(fd: FormData): Promise<PublicSurveyRes
 
   if (error) {
     console.error("submitSurveyByToken", error);
-    return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Yanıt kaydedilemedi. Lütfen tekrar deneyin.") };
   }
   if (!updated) return { ok: true, alreadyAnswered: true };
 
@@ -169,7 +170,7 @@ export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurve
     const parsed: unknown = JSON.parse(String(fd.get("answers") ?? "{}"));
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
   } catch {
-    return { error: "Cevaplar okunamadı." };
+    return { error: actionErrorMessage(null, "Cevaplar okunamadı.") };
   }
 
   const ip = await clientIp();
@@ -244,6 +245,6 @@ export async function submitSurveyTaskByToken(fd: FormData): Promise<PublicSurve
     // Destekleyen (9-10): teşekkür ekranında müşteriye özel tavsiye bağlantısı (ofis ayarı + modül açıksa).
     return result.referralUrl ? { ok: true, referralUrl: result.referralUrl } : { ok: true };
   } catch {
-    return { error: "Yanıt kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(null, "Yanıt kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 }

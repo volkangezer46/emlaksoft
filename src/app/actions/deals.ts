@@ -26,6 +26,7 @@ import {
   isDealTransitionAllowed,
   type DealStage,
 } from "@/lib/workflow-state";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string };
 
@@ -104,7 +105,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
 
   if (error || !deal) {
     console.error("createPipelineDeal", error);
-    return { error: "Anlaşma oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Anlaşma oluşturulamadı.") };
   }
 
   await logActivity({
@@ -171,7 +172,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
 
-  if (loadError) return { error: "Anlaşma durumu okunamadı." };
+  if (loadError) return { error: actionErrorMessage(loadError, "Anlaşma durumu okunamadı.") };
   if (!existing) return { error: "Anlaşma bulunamadı." };
   if (!isDealStage(existing.stage) || !isDealTransitionAllowed(existing.stage, stage)) {
     return { error: "Bu aşama geçişi desteklenmiyor." };
@@ -359,7 +360,7 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
 
   if (error) {
     console.error("updateDeal", error);
-    return { error: "Anlaşma güncellenemedi." };
+    return { error: actionErrorMessage(error, "Anlaşma güncellenemedi.") };
   }
   if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
@@ -437,7 +438,7 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
     .maybeSingle();
   if (error) {
     console.error("updateDealLinks", error);
-    return { error: "Bağlantılar güncellenemedi." };
+    return { error: actionErrorMessage(error, "Bağlantılar güncellenemedi.") };
   }
   if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
@@ -516,7 +517,7 @@ export async function addDealCost(_prev: DealResult, fd: FormData): Promise<Deal
 
   if (error) {
     console.error("addDealCost", error);
-    return { error: "Kalem kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Kalem kaydedilemedi.") };
   }
 
   // Kapora anlaşmanın kilit anıdır — zaman çizgisine/aktiviteye düşsün
@@ -556,7 +557,7 @@ export async function toggleDealCostPaid(costId: string, dealId: string): Promis
     .eq("id", costId)
     .eq("tenant_id", gate.tenantId);
 
-  if (error) return { error: "Durum güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
 
   revalidatePath(`/app/anlasmalar/${dealId}`);
   return { ok: true, dealId };
@@ -623,7 +624,7 @@ export async function addDealNote(_prev: DealResult, fd: FormData): Promise<Deal
 
   if (error) {
     console.error("addDealNote", error);
-    return { error: "Not kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Not kaydedilemedi.") };
   }
 
   revalidatePath(`/app/anlasmalar/${dealId}`);
@@ -740,7 +741,7 @@ export async function bulkAssignDeals(ids: string[], assignedTo: string): Promis
     .select("id");
   if (error) {
     console.error("bulkAssignDeals", error);
-    return { error: "Atama yapılamadı." };
+    return { error: actionErrorMessage(error, "Atama yapılamadı.") };
   }
   const changed = (data ?? []).map((r) => r.id as string);
   await logActivity({

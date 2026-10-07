@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type MatchFeedbackVerdict = "liked" | "disliked";
 
@@ -114,7 +115,7 @@ export async function submitMatchFeedbackByToken(
 
   if (error) {
     console.error("submitMatchFeedbackByToken upsert", error);
-    return { error: "Geri bildirim kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Geri bildirim kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   // Danışmana bildirim — müşterinin danışmanı öncelikli, yoksa portföyünki

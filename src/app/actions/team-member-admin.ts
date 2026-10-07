@@ -13,6 +13,7 @@ import { notifyTenant } from "@/lib/notify";
 import { emailSchema } from "@/lib/validation/contact";
 import { maskEmail } from "@/lib/account/email-change";
 import { authorizeMemberManagement } from "@/lib/team/member-admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type MemberAdminResult = { ok?: boolean; error?: string; message?: string };
 
@@ -61,7 +62,7 @@ export async function updateMemberProfile(
     .eq("tenant_id", ctx.tenantId);
   if (error) {
     console.error("updateMemberProfile", error.message);
-    return { error: "Üye bilgileri güncellenemedi." };
+    return { error: actionErrorMessage(error, "Üye bilgileri güncellenemedi.") };
   }
 
   // Auth meta yalnız görünüm içindir (yetki profilden okunur); hata ana işlemi bozmaz.

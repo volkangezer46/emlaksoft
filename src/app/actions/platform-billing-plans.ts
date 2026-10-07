@@ -31,6 +31,7 @@ import {
   SEAT_WARN_PERCENT_MIN,
   serializeSeatSettings,
 } from "@/lib/billing/seat-settings";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PlanOpResult = { ok?: boolean; error?: string; notice?: string };
 
@@ -131,7 +132,7 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
     notice = "Limitler kota tablosuyla senkronlandı. Mevcut aboneliklerin tutarı değişmez.";
   }
 
-  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.plan.save",
@@ -162,7 +163,7 @@ export async function resetPlanDefinition(formData: FormData): Promise<PlanOpRes
   }
   const next = { ...settings.overrides };
   delete next[id];
-  if (!(await persist({ ...settings, overrides: next }, g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  if (!(await persist({ ...settings, overrides: next }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   await logPlatformActivity({ actorId: g.staff.id, action: "billing.plan.reset", entityType: "plan", entityId: id });
   return { ok: true, notice: "Varsayılana dönüldü." };
 }
@@ -184,7 +185,7 @@ export async function applyRecommendedCatalog(): Promise<PlanOpResult> {
     }
   }
   // business önerisi (fiyat/limit) kayda girer ama gizli kalır
-  if (!(await persist({ ...settings, overrides: next }, g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  if (!(await persist({ ...settings, overrides: next }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   await logPlatformActivity({ actorId: g.staff.id, action: "billing.plan.apply_recommended", entityType: "plan" });
   return { ok: true, notice: "Önerilen katalog uygulandı. Mevcut abonelikler kendi tutarını korur." };
 }
@@ -215,8 +216,8 @@ export async function saveCampaignSettings(formData: FormData): Promise<PlanOpRe
     campaign: { name, quota: Number(quotaRaw), active, lockPrice },
   };
   // Deneme süresi: plan başına değil, TEK platform ayarı (K1: default_trial_days).
-  if (!(await setPlatformSetting("default_trial_days", trialRaw, g.staff.id))) return { error: "Deneme süresi kaydedilemedi." };
-  if (!(await persist(next, g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  if (!(await setPlatformSetting("default_trial_days", trialRaw, g.staff.id))) return { error: actionErrorMessage(null, "Deneme süresi kaydedilemedi.") };
+  if (!(await persist(next, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   updateTag(PLAN_SUPPORT_TAG);
   await logPlatformActivity({
     actorId: g.staff.id,
@@ -251,7 +252,7 @@ export async function applySimulatedSeatPricing(formData: FormData): Promise<Pla
   try {
     tiersJson = JSON.parse(String(formData.get("seat_tiers_json") ?? "null"));
   } catch {
-    return { error: "Kademe verisi okunamadı." };
+    return { error: actionErrorMessage(null, "Kademe verisi okunamadı.") };
   }
   const tiers = sanitizeSeatTiers(tiersJson);
   if (tiers === undefined) return { error: "Kademeler geçersiz (tam sayı, en fazla 12 kademe)." };
@@ -282,7 +283,7 @@ export async function applySimulatedSeatPricing(formData: FormData): Promise<Pla
   const report = validateSeatCatalog(effective);
   if (report.errors.length > 0) return { error: `Uygulanamadı: ${report.errors[0]}` };
 
-  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.seat_pricing.apply",
@@ -304,7 +305,7 @@ export async function saveSeatSettings(formData: FormData): Promise<PlanOpResult
     return { error: `Uyarı eşiği ${SEAT_WARN_PERCENT_MIN}-${SEAT_WARN_PERCENT_MAX} arasında tam sayı (yüzde) olmalı.` };
   }
   if (!(await setPlatformSetting(SEAT_SETTINGS_KEY, serializeSeatSettings({ warnPercent: n }), g.staff.id))) {
-    return { error: "Ayar kaydedilemedi." };
+    return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   }
   updateTag(PLAN_DEFINITIONS_TAG);
   revalidatePath("/admin/billing/planlar");
@@ -320,7 +321,7 @@ export async function saveEfWelcomeUnits(formData: FormData): Promise<PlanOpResu
   if (!/^\d+$/.test(raw) || Number(raw) > 1000) return { error: "Hoş geldin kontörü 0-1000 arasında tam sayı olmalı (0 = kapalı)." };
   const units = Number(raw);
   const before = await getPlatformSetting(EF_WELCOME_SETTING_KEY);
-  if (!(await setPlatformSetting(EF_WELCOME_SETTING_KEY, String(units), g.staff.id))) return { error: "Ayar kaydedilemedi." };
+  if (!(await setPlatformSetting(EF_WELCOME_SETTING_KEY, String(units), g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   updateTag(PLAN_DEFINITIONS_TAG);
   revalidatePath("/admin/billing/planlar");
   await logPlatformActivity({

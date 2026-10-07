@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { copyTitle } from "@/lib/record-copy";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Genel kayıt işlemleri: "Silindi · Geri al" (çöp kutusu altyapısı: deleted_at) ve "Kaydı çoğalt".
@@ -32,7 +33,7 @@ export async function restoreDeletedRecord(entity: "customer" | "property", id: 
     .not("deleted_at", "is", null)
     .select("id")
     .maybeSingle();
-  if (error || !data) return { error: "Kayıt geri alınamadı." };
+  if (error || !data) return { error: actionErrorMessage(error, "Kayıt geri alınamadı.") };
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: `${entity}.restore`, entityType: entity, entityId: id });
   revalidatePath("/app/ayarlar/cop-kutusu");
   revalidatePath(entity === "customer" ? "/app/musteriler" : "/app/portfoyler");

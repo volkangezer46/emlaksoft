@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,7 +67,7 @@ export async function suggestAlternativeTimesByToken(fd: FormData): Promise<Sugg
     .eq("tenant_id", appt.tenant_id);
   if (upErr) {
     console.error("suggestAlternativeTimesByToken update", { code: upErr.code });
-    return { error: "Öneri kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(upErr, "Öneri kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   const cust = Array.isArray(appt.customer) ? appt.customer[0] : appt.customer;

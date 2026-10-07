@@ -7,6 +7,7 @@ import { getPlatformStaffUnrestricted } from "@/lib/platform";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logPlatformActivity } from "@/lib/platform-activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AccountResult = { ok?: boolean; error?: string };
 
@@ -40,7 +41,7 @@ export async function updateOwnProfile(fd: FormData): Promise<AccountResult> {
     .from("platform_staff")
     .update({ full_name: fullName, updated_at: new Date().toISOString() })
     .eq("id", me.staff.id);
-  if (error) return { error: "Ad güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Ad güncellenemedi.") };
 
   const supabase = await createClient();
   await supabase.auth.updateUser({ data: { full_name: fullName } });
@@ -92,7 +93,7 @@ export async function changeOwnPassword(fd: FormData): Promise<AccountResult> {
     password: next,
     data: { must_change_password: false },
   });
-  if (error) return { error: error.message || "Parola değiştirilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Parola değiştirilemedi.") };
 
   await logPlatformActivity({
     actorId: me.staff.id,

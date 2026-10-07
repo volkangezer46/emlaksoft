@@ -8,6 +8,7 @@ import { validateTenantReferences } from "@/lib/tenant-references";
 import { isExpenseId, parseExpenseForm } from "@/lib/expense-input";
 import { logActivity } from "@/lib/activity";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ExpenseResult = { ok?: boolean; error?: string; id?: string };
 
@@ -42,7 +43,7 @@ export async function createExpense(
     .select("id")
     .single();
 
-  if (error || !data) return { error: "Gider kaydedilemedi." };
+  if (error || !data) return { error: actionErrorMessage(error, "Gider kaydedilemedi.") };
 
   revalidatePath("/app/giderler");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -85,7 +86,7 @@ export async function updateExpense(
     .select("id")
     .maybeSingle();
 
-  if (error) return { error: "Gider güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Gider güncellenemedi.") };
   if (!data) return { error: "Gider kaydı bulunamadı." };
 
   revalidatePath("/app/giderler");
@@ -121,7 +122,7 @@ export async function bulkSetExpenseCategory(ids: string[], category: string): P
     .select("id");
   if (error) {
     console.error("bulkSetExpenseCategory", error);
-    return { error: "Kategori güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kategori güncellenemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -150,7 +151,7 @@ export async function bulkDeleteExpenses(ids: string[]): Promise<BulkExpenseResu
     .select("id");
   if (error) {
     console.error("bulkDeleteExpenses", error);
-    return { error: "Giderler silinemedi." };
+    return { error: actionErrorMessage(error, "Giderler silinemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -182,7 +183,7 @@ export async function deleteExpense(id: string): Promise<ExpenseResult> {
 
   if (error) {
     console.error("deleteExpense", error);
-    return { error: "Gider silinemedi." };
+    return { error: actionErrorMessage(error, "Gider silinemedi.") };
   }
   if (!data) return { error: "Gider kaydı bulunamadı." };
 

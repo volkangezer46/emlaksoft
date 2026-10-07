@@ -14,6 +14,7 @@ import {
   restoreUpdated,
   type RestoreEntry,
 } from "@/lib/import-undo";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * İçe aktarma günlüğü + "son içe aktarmayı geri al".
@@ -95,7 +96,7 @@ export async function listRecentImports(): Promise<{ batches: ImportBatch[]; err
     .limit(500);
   if (error) {
     console.error("listRecentImports", error);
-    return { batches: [], error: "İçe aktarma günlüğü okunamadı." };
+    return { batches: [], error: actionErrorMessage(error, "İçe aktarma günlüğü okunamadı.") };
   }
 
   const rolled = new Map<string, string>();
@@ -203,7 +204,7 @@ export async function rollbackImport(batchId: string): Promise<RollbackResult> {
   const { data, error } = await readLogs();
   if (error) {
     console.error("rollbackImport read", error);
-    return { error: "İçe aktarma kaydı okunamadı." };
+    return { error: actionErrorMessage(error, "İçe aktarma kaydı okunamadı.") };
   }
   const logs = (data ?? []) as LogRow[];
   if (activeRollbackClaims(logs, batchId).length > 0) return { error: "Bu içe aktarma zaten geri alınmış veya geri alınıyor." };

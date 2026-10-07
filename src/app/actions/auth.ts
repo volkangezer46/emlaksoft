@@ -34,6 +34,7 @@ import {
 } from "@/lib/two-factor";
 import { hashOtpForStorage } from "@/lib/otp-hmac";
 import type { SignupField } from "@/lib/signup-errors";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const REGISTRATION_TERMS_VERSION = "kullanim-sartlari-2026-07-31";
 const REGISTRATION_KVKK_VERSION = "kvkk-aydinlatma-2026-07-31";
@@ -121,7 +122,7 @@ export async function signIn(
     if (profileError || staffError) {
       console.error("signIn identity", profileError ?? staffError);
       await supabase.auth.signOut();
-      return { error: "Giriş doğrulanamadı. Lütfen tekrar deneyin." };
+      return { error: actionErrorMessage(profileError, "Giriş doğrulanamadı. Lütfen tekrar deneyin.") };
     }
 
     const bootstrappedStaff = !staff && signInData.user?.email
@@ -148,7 +149,7 @@ export async function signIn(
       if (claimsError || snapshotError) {
         console.error("signIn impersonation recovery read", claimsError ?? snapshotError);
         await supabase.auth.signOut();
-        return { error: "Destek oturumu güvenli şekilde doğrulanamadı." };
+        return { error: actionErrorMessage(claimsError, "Destek oturumu güvenli şekilde doğrulanamadı.") };
       }
 
       if (
@@ -226,7 +227,7 @@ export async function signIn(
         .maybeSingle();
       if (tenantError || !tenant) {
         await supabase.auth.signOut();
-        return { error: "Ofis durumu doğrulanamadı." };
+        return { error: actionErrorMessage(tenantError, "Ofis durumu doğrulanamadı.") };
       }
     }
 
@@ -249,7 +250,7 @@ export async function signIn(
         if (proofClearError) {
           console.error("signIn clear 2FA session proof", proofClearError);
           await supabase.auth.signOut();
-          return { error: "İki adımlı doğrulama oturumu hazırlanamadı." };
+          return { error: actionErrorMessage(proofClearError, "İki adımlı doğrulama oturumu hazırlanamadı.") };
         }
       }
 
@@ -283,7 +284,7 @@ export async function signIn(
       if (challengeError) {
         console.error("signIn 2fa challenge", challengeError);
         await supabase.auth.signOut();
-        return { error: "Doğrulama başlatılamadı. Lütfen tekrar deneyin." };
+        return { error: actionErrorMessage(challengeError, "Doğrulama başlatılamadı. Lütfen tekrar deneyin.") };
       }
 
       const message = `EmlakSoft giriş kodunuz: ${code}`;
@@ -294,7 +295,7 @@ export async function signIn(
         console.error("signIn 2fa sms", sms.error);
         await admin.from("login_challenges").delete().eq("user_id", userId);
         await supabase.auth.signOut();
-        return { error: "Doğrulama SMS'i gönderilemedi. Lütfen tekrar deneyin." };
+        return { error: actionErrorMessage(null, "Doğrulama SMS'i gönderilemedi. Lütfen tekrar deneyin.") };
       }
 
       await logLoginEvent({ userId, tenantId, ip, userAgent, result: "2fa_pending" });
@@ -389,7 +390,7 @@ export async function signUp(
     console.error("signUp auth", createError);
     return createError?.message?.includes("already")
       ? { error: "Bu e-posta zaten kayıtlı.", field: "email" }
-      : { error: "Hesap oluşturulamadı." };
+      : { error: actionErrorMessage(createError, "Hesap oluşturulamadı.") };
   }
 
   const { data: provisioned, error: provisionError } = await admin.rpc(
@@ -421,7 +422,7 @@ export async function signUp(
     console.error("signUp provision_registration", provisionError);
     const { error: cleanupError } = await admin.auth.admin.deleteUser(created.user.id);
     if (cleanupError) console.error("signUp auth compensation", cleanupError);
-    return { error: "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(provisionError, "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   await recordSignupAttributionFromRequest(tenantId, formData); // büyüme atfı: en iyi çaba, asla fırlatmaz

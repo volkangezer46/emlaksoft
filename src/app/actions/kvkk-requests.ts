@@ -12,6 +12,7 @@ import {
   isKvkkType,
   parseDueDays,
 } from "@/lib/compliance/kvkk-requests";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type KvkkRequestResult = { ok?: boolean; error?: string; message?: string };
 
@@ -77,7 +78,7 @@ export async function createKvkkRequest(
     return {
       error: error && MISSING_TABLE.test(error.message)
         ? "KVKK talep kaydı bu ortamda henüz etkin değil."
-        : "Talep kaydedilemedi.",
+        : actionErrorMessage(null, "Talep kaydedilemedi."),
     };
   }
 
@@ -124,7 +125,7 @@ export async function updateKvkkRequestStatus(
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("updateKvkkRequestStatus", error.message);
-    return { error: "Talep güncellenemedi." };
+    return { error: actionErrorMessage(error, "Talep güncellenemedi.") };
   }
 
   await logActivity({

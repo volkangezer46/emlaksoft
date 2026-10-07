@@ -7,6 +7,7 @@ import { notifyTenant } from "@/lib/notify";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PublicReferralResult = {
   ok?: boolean;
@@ -107,7 +108,7 @@ export async function submitReferralByToken(fd: FormData): Promise<PublicReferra
     // Yarışta ikinci yazımı DB unique index keser (idx_referrals_link_phone_unique).
     if (error.code === "23505") return { ok: true, alreadySent: true };
     console.error("submitReferralByToken", error);
-    return { error: "Tavsiyeniz kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Tavsiyeniz kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   // Danışmana bildirim — hata teşekkür ekranını düşürmesin.

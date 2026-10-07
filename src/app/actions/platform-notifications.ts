@@ -7,6 +7,7 @@ import { notifyTenant } from "@/lib/notify";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { ComboboxOption } from "@/components/ui/combobox";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export async function markPlatformNotificationRead(id: string): Promise<{ ok: boolean }> {
   const staff = await requirePlatformStaff();
@@ -98,7 +99,7 @@ export async function sendBroadcast(fd: FormData): Promise<BroadcastResult> {
   }
 
   const { data: tenants, error: qErr } = await query;
-  if (qErr) return { error: qErr.message };
+  if (qErr) return { error: actionErrorMessage(qErr, "Hedef ofisler okunamadı") };
   if (!tenants || tenants.length === 0) return { error: "Eşleşen ofis bulunamadı." };
 
   const validKind = ["info", "success", "warning", "danger", "system"].includes(kind)
@@ -248,7 +249,7 @@ export async function updateBroadcast(fd: FormData): Promise<BroadcastEditResult
   const { error } = await admin.from("platform_announcements").update({ title, body, kind }).eq("id", id);
   if (error) {
     console.error("updateBroadcast", error.message);
-    return { error: "Duyuru güncellenemedi." };
+    return { error: actionErrorMessage(error, "Duyuru güncellenemedi.") };
   }
   await logPlatformActivity({
     actorId: staff.id,
@@ -290,7 +291,7 @@ export async function deleteBroadcast(fd: FormData): Promise<BroadcastEditResult
   const { error } = await admin.from("platform_announcements").delete().eq("id", id);
   if (error) {
     console.error("deleteBroadcast", error.message);
-    return { error: "Duyuru silinemedi." };
+    return { error: actionErrorMessage(error, "Duyuru silinemedi.") };
   }
   await logPlatformActivity({
     actorId: staff.id,

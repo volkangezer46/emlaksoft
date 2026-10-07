@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { parseCouponForm } from "@/lib/billing/coupon";
 import { ALL_PLAN_IDS } from "@/lib/billing/plan-overrides";
 import { getPlanSupport } from "@/lib/billing/plan-support";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CouponOpResult = { ok?: boolean; error?: string; notice?: string };
 
@@ -54,7 +55,7 @@ export async function createCoupon(formData: FormData): Promise<CouponOpResult> 
   if (error) {
     if (error.code === "23505") return { error: "Bu kod zaten var." };
     console.error("createCoupon", error.message);
-    return { error: "Kupon oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Kupon oluşturulamadı.") };
   }
   await logPlatformActivity({ actorId: g.staff.id, action: "billing.coupon.create", entityType: "coupon", entityId: data.id, meta: { code: c.code, kind: c.kind, value: c.value } });
   revalidatePath("/admin/billing/kuponlar");
@@ -90,7 +91,7 @@ export async function updateCoupon(formData: FormData): Promise<CouponOpResult> 
     .eq("id", id);
   if (error) {
     console.error("updateCoupon", error.message);
-    return { error: "Kupon güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kupon güncellenemedi.") };
   }
   await logPlatformActivity({ actorId: g.staff.id, action: "billing.coupon.update", entityType: "coupon", entityId: id, meta: { code: cur.code } });
   revalidatePath("/admin/billing/kuponlar");
@@ -105,7 +106,7 @@ export async function setCouponActive(formData: FormData): Promise<CouponOpResul
   const active = String(formData.get("active") ?? "") === "1";
   const admin = createAdminClient();
   const { data, error } = await admin.from("coupons").update({ is_active: active, updated_at: new Date().toISOString() }).eq("id", id).select("code").maybeSingle();
-  if (error || !data) return { error: "Kupon güncellenemedi." };
+  if (error || !data) return { error: actionErrorMessage(error, "Kupon güncellenemedi.") };
   await logPlatformActivity({ actorId: g.staff.id, action: active ? "billing.coupon.activate" : "billing.coupon.deactivate", entityType: "coupon", entityId: id, meta: { code: data.code } });
   revalidatePath("/admin/billing/kuponlar");
   return { ok: true, notice: active ? "Kupon etkin." : "Kupon devre dışı." };
@@ -119,7 +120,7 @@ export async function deleteCoupon(formData: FormData): Promise<CouponOpResult> 
   if (!UUID.test(id)) return { error: "Geçersiz kupon." };
   const admin = createAdminClient();
   const { data, error } = await admin.from("coupons").delete().eq("id", id).eq("redeemed_count", 0).select("code").maybeSingle();
-  if (error) return { error: "Kupon silinemedi." };
+  if (error) return { error: actionErrorMessage(error, "Kupon silinemedi.") };
   if (!data) return { error: "Kullanılmış kupon silinemez; devre dışı bırakın." };
   await logPlatformActivity({ actorId: g.staff.id, action: "billing.coupon.delete", entityType: "coupon", entityId: id, meta: { code: data.code } });
   revalidatePath("/admin/billing/kuponlar");

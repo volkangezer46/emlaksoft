@@ -8,6 +8,7 @@ import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { getBaseUrl } from "@/lib/base-url";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const VALID_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];
 
@@ -101,7 +102,7 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
       });
 
   if (invErr || !invited.user) {
-    return { error: invErr?.message ?? "Davet gönderilemedi." };
+    return { error: actionErrorMessage(invErr, "Davet gönderilemedi.") };
   }
 
   await admin.from("platform_staff").insert({
@@ -283,14 +284,14 @@ export async function updateStaffProfile(fd: FormData): Promise<StaffActionResul
     const { data: clash } = await admin.from("platform_staff").select("id").eq("email", email).neq("id", id).maybeSingle();
     if (clash) return { error: "Bu e-posta başka bir personelde kayıtlı." };
     const { error: authError } = await admin.auth.admin.updateUserById(id, { email, email_confirm: true });
-    if (authError) return { error: authError.message || "Giriş e-postası güncellenemedi." };
+    if (authError) return { error: actionErrorMessage(authError, "Giriş e-postası güncellenemedi.") };
   }
 
   const { error } = await admin
     .from("platform_staff")
     .update({ full_name: fullName, email, updated_at: new Date().toISOString() })
     .eq("id", id);
-  if (error) return { error: "Personel bilgileri güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Personel bilgileri güncellenemedi.") };
 
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -363,7 +364,7 @@ export async function resetStaffPassword(fd: FormData): Promise<StaffActionResul
     password: tempPassword,
     user_metadata: { ...(authRecord.user.user_metadata ?? {}), must_change_password: true },
   });
-  if (error) return { error: error.message || "Parola sıfırlanamadı." };
+  if (error) return { error: actionErrorMessage(error, "Parola sıfırlanamadı.") };
 
   // Eski oturumlar eski parolayla sürmesin (fonksiyon henüz uygulanmamışsa sessizce atlanır).
   await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
@@ -397,7 +398,7 @@ export async function signOutStaffSessions(fd: FormData): Promise<StaffActionRes
     return {
       error: /could not find|schema cache|PGRST202/i.test(error.message + (error.code ?? ""))
         ? "Oturum kapatma veritabanı fonksiyonu henüz uygulanmamış (migration 20260816010200)."
-        : "Oturumlar kapatılamadı.",
+        : actionErrorMessage(null, "Oturumlar kapatılamadı."),
     };
   }
 

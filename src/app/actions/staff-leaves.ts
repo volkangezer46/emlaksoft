@@ -11,6 +11,7 @@ import {
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { asLeaveKind, leaveDaysCount, LEAVE_KIND_LABELS } from "@/lib/leave-utils";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type LeaveResult = { ok?: boolean; error?: string };
 
@@ -108,7 +109,7 @@ export async function createLeave(fd: FormData): Promise<LeaveResult> {
 
   if (error || !created) {
     console.error("createLeave", error);
-    return { error: "İzin kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "İzin kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -163,7 +164,7 @@ async function setLeaveStatus(fd: FormData, next: "onayli" | "reddedildi"): Prom
   const { error } = await supabase.from("staff_leaves").update({ status: next }).eq("id", id);
   if (error) {
     console.error("setLeaveStatus", error);
-    return { error: "İşlem tamamlanamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "İşlem tamamlanamadı. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -256,7 +257,7 @@ export async function deleteLeave(fd: FormData): Promise<LeaveResult> {
   const { error } = await supabase.from("staff_leaves").delete().eq("id", id);
   if (error) {
     console.error("deleteLeave", error);
-    return { error: "İzin silinemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "İzin silinemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({

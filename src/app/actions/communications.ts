@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { normalizeTurkishPhone, isValidTurkishMobile } from "@/lib/phone";
 import { logActivity } from "@/lib/activity";
 import { isSignerSmsAvailable, sendSignerSms } from "@/app/imza/_lib/sms";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CommResult = { ok?: boolean; error?: string; id?: string };
 
@@ -53,7 +54,7 @@ export async function createCommunication(
     .select("id")
     .single();
 
-  if (error || !data) return { error: "İletişim kaydı oluşturulamadı." };
+  if (error || !data) return { error: actionErrorMessage(error, "İletişim kaydı oluşturulamadı.") };
 
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -121,7 +122,7 @@ export async function linkRecordToCustomer(
     .select("id");
   if (error) {
     console.error("linkRecordToCustomer", error);
-    return { error: "Kayıt müşteriye bağlanamadı." };
+    return { error: actionErrorMessage(error, "Kayıt müşteriye bağlanamadı.") };
   }
   if (!data || data.length === 0) return { error: "Kayıt zaten bir müşteriye bağlı ya da bulunamadı." };
 
@@ -201,7 +202,7 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
     if (result.code === "50" || result.code === "51") {
       return { error: "SMS kredisi yetersiz — Netgsm bakiyenizi kontrol edin." };
     }
-    return { error: result.error ?? "SMS gönderilemedi." };
+    return { error: result.error ?? actionErrorMessage(null, "SMS gönderilemedi.") };
   }
 
   // Başarılı gönderim → iletişim kaydı (zaman tüneli + gelen kutusu akışı)
