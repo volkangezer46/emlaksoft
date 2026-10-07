@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PageHeader } from "@/components/ui/page-header";
+import { TicketPercent } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { getPlanSupport } from "@/lib/billing/plan-support";
 import { BillingNav } from "../billing-nav";
@@ -29,11 +30,12 @@ export default async function CouponsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Faturalama"
+      <AdminPageHeader
+        art="coupon"
+        icon={TicketPercent}
+        eyebrow="Faturalama · indirim"
         title="Kuponlar"
         description="Kupon ve indirim kodları. Kod ödeme sırasında tek seferlik, kota ve geçerlilik tek kilitle doğrulanarak uygulanır."
-        breadcrumbs={[{ label: "Faturalama", href: "/admin/billing" }, { label: "Kuponlar" }]}
       />
       <BillingNav active="kuponlar" />
       <NewCoupon plans={plans} />

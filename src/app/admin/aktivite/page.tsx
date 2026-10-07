@@ -287,6 +287,7 @@ export default async function AdminActivityPage({
   return (
     <div className="space-y-5">
       <AdminPageHeader
+        art="shield"
         eyebrow="Denetim izi"
         icon={ShieldCheck}
         title="Platform aktivite kaydı"

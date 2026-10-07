@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PageHeader } from "@/components/ui/page-header";
+import { Layers } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { getEfTariff, getPlanCatalog, getPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { EF_WELCOME_SETTING_KEY, efUnitsFor, parseEfWelcomeUnits } from "@/lib/ef-credits/config";
 import { getPlatformSetting } from "@/lib/platform-settings";
@@ -57,11 +58,12 @@ export default async function PlansAdminPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Faturalama"
+      <AdminPageHeader
+        art="layers"
+        icon={Layers}
+        eyebrow="Faturalama · katalog"
         title="Plan tanımları"
         description="Fiyat, limit, kota ve özellik listesi buradan düzenlenir; kayıt, fiyat sayfası ve yeni ödemeler bu tanımlardan beslenir. Mevcut abonelikler kendi tutarını korur."
-        breadcrumbs={[{ label: "Faturalama", href: "/admin/billing" }, { label: "Planlar" }]}
         actions={isSuper ? <ApplyRecommended /> : undefined}
       />
       <BillingNav active="planlar" />

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
+import { Sparkles } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Progress } from "@/components/ui/progress";
 import { StatRow } from "@/components/ui/stat-row";
 import { requirePlatformModule } from "@/lib/platform";
@@ -27,11 +28,12 @@ export default async function AdminAiUsagePage({ searchParams }: { searchParams:
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Faturalama"
+      <AdminPageHeader
+        art="ai"
+        icon={Sparkles}
+        eyebrow="Faturalama · yapay zeka"
         title="AI kullanımı"
         description={`${usage.monthKey} dönemi (Türkiye saati): ofis bazlı AI kredisi ve değerleme raporu kullanımı.`}
-        breadcrumbs={[{ label: "Yönetim", href: "/admin" }, { label: "AI kullanımı" }]}
       />
 
       {!usage.enabled ? (
