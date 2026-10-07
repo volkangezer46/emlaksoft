@@ -14,7 +14,8 @@ html.tv-active body {
   --tv-line: rgb(15 23 42 / 0.1);
   --tv-ink: #0b1220;
   --tv-muted: #4b5870;
-  --tv-accent: #2f5bea;
+  --tv-accent: #1e3a8a;
+  --tv-gold: #b8892b;
   --tv-good: #0f9d6b;
   --tv-warn: #b7791f;
   --tv-bad: #d23b3b;
@@ -35,7 +36,8 @@ html.tv-active body {
   --tv-line: rgb(255 255 255 / 0.1);
   --tv-ink: #f3f6fc;
   --tv-muted: #9aa8c4;
-  --tv-accent: #7aa2ff;
+  --tv-accent: #8fb0ff;
+  --tv-gold: #e5b95c;
   --tv-good: #3ddc9b;
   --tv-warn: #f5b942;
   --tv-bad: #ff7a7a;
@@ -51,7 +53,10 @@ html.tv-active body {
   flex-direction: column;
   gap: calc(var(--u) * 1.1);
   padding: calc(var(--u) * 1.6) calc(var(--u) * 2);
-  transition: transform 30s linear;
+  transition: transform 30s linear, padding-bottom 0.6s ease;
+}
+.tv-shift[data-hint="true"] {
+  padding-bottom: calc(var(--u) * 4.6);
 }
 
 /* ---- Üst şerit ---- */
@@ -72,6 +77,10 @@ html.tv-active body {
   white-space: nowrap;
 }
 .tv-head-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: calc(var(--u) * 0.3);
   font-size: calc(var(--u) * 1.2);
   color: var(--tv-muted);
   font-weight: 600;
@@ -87,6 +96,8 @@ html.tv-active body {
   text-align: right;
 }
 .tv-date {
+  margin-top: calc(var(--u) * 0.4);
+  white-space: nowrap;
   font-size: calc(var(--u) * 1.4);
   color: var(--tv-muted);
   font-weight: 600;
@@ -140,7 +151,7 @@ html.tv-active body {
   background: var(--tv-card);
   border: 1px solid var(--tv-line);
   border-radius: calc(var(--u) * 1.2);
-  padding: calc(var(--u) * 1.3) calc(var(--u) * 1.5);
+  padding: calc(var(--u) * 1.1) calc(var(--u) * 1.4);
   min-height: 0;
   min-width: 0;
   display: flex;
@@ -150,13 +161,34 @@ html.tv-active body {
 .tv-card-title {
   display: flex;
   align-items: center;
-  gap: calc(var(--u) * 0.6);
-  font-size: calc(var(--u) * 1.35);
+  gap: calc(var(--u) * 0.8);
+  min-width: 0;
+  font-size: calc(var(--u) * 1.5);
   font-weight: 800;
-  color: var(--tv-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: calc(var(--u) * 0.9);
+  color: var(--tv-ink);
+  letter-spacing: -0.005em;
+  line-height: 1.15;
+  margin: 0 0 calc(var(--u) * 0.7);
+}
+.tv-card-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 2.5);
+  height: calc(var(--u) * 2.5);
+  border-radius: calc(var(--u) * 0.7);
+  background: color-mix(in srgb, var(--tv-accent) 12%, transparent);
+  color: var(--tv-accent);
+}
+.tv-card-ico > svg {
+  width: 58%;
+  height: 58%;
+}
+.tv-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tv-card-title > .tv-pager {
   margin-left: auto;
@@ -175,26 +207,60 @@ html.tv-active body {
   background: var(--tv-accent);
 }
 
+.tv-list-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tv-probe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--u);
+  height: 0;
+  visibility: hidden;
+}
 .tv-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--u) * 0.6);
+  gap: calc(var(--u) * 0.5);
   flex: 1;
   min-height: 0;
+  align-content: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  animation: tv-fade 0.6s ease-out both;
 }
 .tv-row {
   display: flex;
   align-items: center;
   gap: calc(var(--u) * 1);
-  padding: calc(var(--u) * 0.6) calc(var(--u) * 0.8);
+  padding: 0 calc(var(--u) * 0.9);
   border-radius: calc(var(--u) * 0.8);
   background: color-mix(in srgb, var(--tv-ink) 4%, transparent);
-  font-size: calc(var(--u) * 1.6);
+  font-size: calc(var(--u) * 1.4);
   min-width: 0;
-  animation: tv-rise 0.5s ease-out both;
+  height: calc(var(--u) * 3.6);
+  flex: none;
+  overflow: hidden;
+}
+.tv-row-end {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.tv-row-end > .tv-num {
+  font-size: calc(var(--u) * 1.6);
+}
+.tv-row-end > .tv-row-sub {
+  line-height: 1.15;
 }
 .tv-row {
   position: relative;
@@ -222,26 +288,36 @@ html.tv-active body {
 }
 .tv-row-main > b {
   font-weight: 700;
+  line-height: 1.2;
+}
+.tv-row-main > .tv-row-sub {
+  line-height: 1.25;
 }
 .tv-row-sub {
-  font-size: calc(var(--u) * 1.15);
+  font-size: calc(var(--u) * 1.1);
   color: var(--tv-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.tv-row > .tv-row-sub {
+  flex: none;
 }
 .tv-time {
-  font-size: calc(var(--u) * 2);
+  flex: none;
+  font-size: calc(var(--u) * 1.8);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--tv-accent);
-  min-width: calc(var(--u) * 5);
+  min-width: calc(var(--u) * 5.5);
 }
 .tv-rank {
-  width: calc(var(--u) * 2.8);
-  height: calc(var(--u) * 2.8);
+  width: calc(var(--u) * 2.4);
+  height: calc(var(--u) * 2.4);
   display: grid;
   place-items: center;
-  border-radius: calc(var(--u) * 0.8);
+  border-radius: calc(var(--u) * 0.7);
   font-weight: 800;
-  font-size: calc(var(--u) * 1.6);
+  font-size: calc(var(--u) * 1.4);
   background: color-mix(in srgb, var(--tv-ink) 10%, transparent);
   flex: none;
 }
@@ -265,11 +341,48 @@ html.tv-active body {
 }
 .tv-empty {
   flex: 1;
-  display: grid;
-  place-items: center;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 0.7);
   text-align: center;
   color: var(--tv-muted);
-  font-size: calc(var(--u) * 1.5);
+  padding: 0 calc(var(--u) * 1);
+}
+.tv-empty-icon {
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 5.6);
+  height: calc(var(--u) * 5.6);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tv-accent) 9%, transparent);
+  color: var(--tv-accent);
+}
+.tv-empty-icon > svg {
+  width: 52%;
+  height: 52%;
+}
+.tv-empty p {
+  margin: 0;
+  font-size: calc(var(--u) * 1.7);
+  font-weight: 700;
+  color: var(--tv-ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.tv-empty small {
+  font-size: calc(var(--u) * 1.2);
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 /* ---- Hedef halkası ---- */
@@ -297,14 +410,27 @@ html.tv-active body {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+.tv-goal .tv-cap {
+  font-size: calc(var(--u) * 1.15);
+}
+.tv-big .tv-cap {
+  display: inline;
+}
 .tv-big {
-  font-size: calc(var(--u) * 5.2);
+  font-size: calc(var(--u) * 4.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .tv-cap {
   font-size: calc(var(--u) * 1.3);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--tv-muted);
   font-weight: 600;
 }
@@ -320,24 +446,70 @@ html.tv-active body {
   gap: calc(var(--u) * 0.8);
 }
 .tv-stat {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: calc(var(--u) * 0.5) calc(var(--u) * 0.9);
+  flex-direction: row;
+  align-items: center;
+  gap: calc(var(--u) * 0.8);
+  padding: calc(var(--u) * 0.3) calc(var(--u) * 1.1);
   border-radius: calc(var(--u) * 0.9);
   background: color-mix(in srgb, var(--tv-ink) 4%, transparent);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
+.tv-stat::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: calc(var(--u) * 0.3);
+  border-radius: 0 999px 999px 0;
+  background: var(--tv-accent);
+  opacity: 0.55;
+}
 /* Tek kalan kutu satırı boş bırakmaz. */
 .tv-stat:last-child:nth-child(odd) {
   grid-column: span 2;
 }
-.tv-stat > :not(.tv-num) {
+.tv-stat > .tv-num {
+  flex: none;
+  font-size: calc(var(--u) * 2.7);
   white-space: nowrap;
+}
+.tv-stat > .tv-cap {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(var(--u) * 1.1);
+  line-height: 1.15;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+.tv-stat[data-tone="warn"]::before {
+  background: var(--tv-warn);
+  opacity: 1;
+}
+.tv-stat[data-tone="bad"]::before {
+  background: var(--tv-bad);
+  opacity: 1;
+}
+.tv-stat[data-tone="good"]::before {
+  background: var(--tv-good);
+  opacity: 1;
+}
+.tv-stat[data-tone="warn"] {
+  background: color-mix(in srgb, var(--tv-warn) 10%, transparent);
+}
+.tv-stat[data-tone="bad"] {
+  background: color-mix(in srgb, var(--tv-bad) 11%, transparent);
+}
+.tv-stat[data-tone="good"] {
+  background: color-mix(in srgb, var(--tv-good) 9%, transparent);
 }
 .tv-stat[data-tone="warn"] .tv-num {
   color: var(--tv-warn);
@@ -393,30 +565,74 @@ html.tv-active body {
   white-space: nowrap;
 }
 
-/* ---- Duyuru şeridi ---- */
+/* ---- Duyuru şeridi (kayan yazı yok: sabit, çoklu duyuruda yumuşak geçiş) ---- */
 .tv-ticker {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: calc(var(--u) * 1.2);
+  gap: calc(var(--u) * 1.4);
   overflow: hidden;
-  padding: calc(var(--u) * 0.8) calc(var(--u) * 1.5);
+  padding: calc(var(--u) * 0.7) calc(var(--u) * 1.5);
+  min-height: calc(var(--u) * 4.4);
   border-radius: calc(var(--u) * 1.2);
-  background: var(--tv-accent);
+  background: linear-gradient(105deg, #14275f, var(--tv-accent));
   color: #fff;
-  font-size: calc(var(--u) * 1.8);
-  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
-.tv-ticker-track {
+.tv-root[data-tv-dark="true"] .tv-ticker {
+  background: linear-gradient(105deg, #12234f, #1c3a86);
+}
+.tv-ticker[data-tall="true"] {
+  min-height: calc(var(--u) * 6);
+}
+.tv-ticker-tag {
+  flex: none;
   display: inline-flex;
-  gap: calc(var(--u) * 6);
-  white-space: nowrap;
-  animation: tv-marquee var(--tv-marquee, 40s) linear infinite;
-  padding-left: 100%;
+  align-items: center;
+  gap: calc(var(--u) * 0.6);
+  padding: calc(var(--u) * 0.45) calc(var(--u) * 1);
+  border-radius: 999px;
+  background: var(--tv-gold);
+  color: #1a1203;
+  font-size: calc(var(--u) * 1.15);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-.tv-ticker-static {
-  white-space: nowrap;
+.tv-ticker-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.tv-ticker-text {
+  margin: 0;
+  min-width: 0;
+  font-weight: 700;
+  line-height: 1.22;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  animation: tv-ticker-in 0.7s ease-out both;
+}
+.tv-ticker-text[data-size="md"] {
+  font-size: calc(var(--u) * 1.9);
+}
+.tv-ticker-text[data-size="sm"] {
+  font-size: calc(var(--u) * 1.6);
+}
+.tv-ticker-text[data-size="xs"] {
+  font-size: calc(var(--u) * 1.35);
+}
+.tv-ticker-count {
+  flex: none;
+  font-size: calc(var(--u) * 1.15);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
 }
 
 /* ---- Kutlama ---- */
@@ -529,16 +745,22 @@ html.tv-active body {
 .tv-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--u) * 5);
+  bottom: calc(var(--u) * 0.9);
   transform: translateX(-50%);
   z-index: 7;
-  font-size: calc(var(--u) * 1.3);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.6);
+  max-width: 90cqw;
+  white-space: nowrap;
+  font-size: calc(var(--u) * 1.15);
   font-weight: 700;
-  padding: calc(var(--u) * 0.6) calc(var(--u) * 1.4);
+  padding: calc(var(--u) * 0.5) calc(var(--u) * 1.3);
   border-radius: 999px;
   background: var(--tv-ink);
   color: var(--tv-bg);
-  opacity: 0.9;
+  opacity: 0.88;
+  animation: tv-toast-in 0.5s ease-out both;
 }
 
 /* ---- Ayar paneli ---- */
@@ -618,9 +840,10 @@ html.tv-active body {
     opacity: 0;
   }
 }
-@keyframes tv-marquee {
-  to {
-    transform: translateX(-100%);
+@keyframes tv-ticker-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--u) * 0.8));
   }
 }
 @keyframes tv-fall {
@@ -653,8 +876,12 @@ html.tv-active body {
 .tv-toast {
   position: absolute;
   left: calc(var(--u) * 2);
-  bottom: calc(var(--u) * 6);
+  bottom: calc(var(--u) * 7);
   z-index: 4;
+  max-width: 60cqw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: calc(var(--u) * 0.7);
@@ -683,4 +910,12 @@ html.tv-active body {
   color: var(--tv-ink);
   font-size: calc(var(--u) * 1.5);
   font-weight: 700;
+}
+
+/* Marka işareti ekranla ölçeklenir (4K de küçük kalmaz) */
+.tv-head > :first-child {
+  flex: none;
+  height: calc(var(--u) * 4.6) !important;
+  width: calc(var(--u) * 4.6) !important;
+  object-fit: contain;
 }
