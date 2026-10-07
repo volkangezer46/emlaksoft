@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useCallback, useId, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Area,
@@ -9,7 +9,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Legend,
+  LabelList,
   Pie,
   PieChart,
   Rectangle,
@@ -22,6 +22,9 @@ import {
 import { ChartFrame } from "@/components/ui/chart-frame";
 import { CHART_COLORS } from "@/components/ui/chart-colors";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
+import { ChartLegend, type ChartLegendItem } from "@/components/ui/chart-legend";
+import { ChartRangePanel, useChartRange } from "@/components/ui/chart-range";
+import type { Granularity, RangeSummaryMode } from "@/components/ui/chart-range-math";
 import { formatChartAxis, formatChartValue, type ChartValueFormat } from "@/components/ui/chart-format";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 import { TubeGradient } from "@/components/ui/viz/tube-gradient";
@@ -39,6 +42,7 @@ import { TubeGradient } from "@/components/ui/viz/tube-gradient";
  *  - Halka: dilim başına iç kenarda koyu ton (kalınlık), dış kenarda ince ışık; etkin dilim dışarı taşar + gölge.
  *  - Alan: katmanlı (3 duraklı) degrade + çizginin altında kalın/yarı saydam parlama eğrisi; etkin nokta gölgeli.
  *  - Eksen/ızgara sade: yalnız yatay kesikli ızgara, en çok 4-5 değer etiketi, eksen çizgisi yok.
+ *  - Zaman aralığı (chart-range.tsx): sürüklenebilir mini harita + hazır aralık hapları + canlı özet; lejant tıklanınca seri/dilim gizlenir.
  *  - Dönem değişimi: aynı bileşen yeni veriyle çizilince Recharts eski değerden yeniye canlandırır (reduce'ta yok).
  *
  * Tıklanabilir grafik (sıfır çıkmaz metrik): `hrefKey` verilirse satırdaki o alan (ör. "href") hedef adrestir;
@@ -136,9 +140,11 @@ type SectorShapeLike = {
 };
 
 /** Kalınlık hissi veren dilim: ana dilim + üstünde tüp degradesi (iç kenar gölge → dış kenar ışık); etkin dilim 4 px dışarı. */
-function depthSector(idPrefix: string) {
-  return function renderDepthSector(props: SectorShapeLike & { index?: number }) {
-    const { cx = 0, cy = 0, innerRadius = 0, outerRadius = 0, startAngle = 0, endAngle = 0, fill, isActive } = props;
+function depthSector(idPrefix: string, focusKey: string | null = null, nameKey = "name") {
+  return function renderDepthSector(props: SectorShapeLike & { index?: number; name?: unknown; payload?: Record<string, unknown> }) {
+    const { cx = 0, cy = 0, innerRadius = 0, outerRadius = 0, startAngle = 0, endAngle = 0, fill } = props;
+    // Lejant üzerine gelince ilgili dilim de öne çıkar (etkin dilim dışarı taşar, diğerleri söner — viz.css).
+    const isActive = props.isActive || (focusKey !== null && String(props.payload?.[nameKey] ?? props.name ?? "") === focusKey);
     const out = isActive ? outerRadius + 4 : outerRadius;
     const common = { cx, cy, startAngle, endAngle, innerRadius, outerRadius: out, cornerRadius: 3 };
     const gid = `${idPrefix}-${props.index ?? 0}`;
@@ -165,28 +171,115 @@ function hrefOf(entry: unknown, hrefKey: string | undefined): string | null {
   return typeof v === "string" && v.startsWith("/") ? v : null;
 }
 
-/** Zaman serisi / trend — katmanlı degrade dolgulu alan grafiği (+ çizgi parlaması). */
+type SeriesDef = { key: string; label: string; color?: string };
+
+/** Grafik alanı: üst kap akışta yüksekliği belirler, Recharts kabı mutlak konumla tam doldurur (taşma/0 px yok). */
+function PlotBox({ children }: { children: ReactNode }) {
+  return <div className="absolute inset-0">{children}</div>;
+}
+
+type DotProps = { cx?: number; cy?: number; index?: number; payload?: { value?: number | null } };
+
+/**
+ * Son gerçek noktada nabız noktası (halka + yayılan parıltı; reduced-motion'da durağan, viz.css) ve isteğe bağlı değer balonu.
+ * Recharts 3 Area noktasında `value` [taban, değer] dizisidir; balon değeri satırdan (`payload.value`) okunur.
+ */
+function lastPointDot(color: string, lastIdx: number, fmt: (n: number) => string, withLabel: boolean, valueOf?: (p: DotProps) => number | null | undefined) {
+  return function renderDot(props: DotProps) {
+    const { cx, cy, index } = props;
+    const value = valueOf ? valueOf(props) : props.payload?.value;
+    if (index !== lastIdx || cx === undefined || cy === undefined || typeof value !== "number" || !Number.isFinite(value)) {
+      return <g key={`d-${index}`} />;
+    }
+    const text = fmt(value);
+    const w = Math.max(48, text.length * 7.4 + 18);
+    return (
+      <g key={`d-${index}`}>
+        <circle cx={cx} cy={cy} r={10} fill={color} opacity={0.18} className="viz-pulse" />
+        <circle cx={cx} cy={cy} r={5} fill="var(--surface-raised)" stroke={color} strokeWidth={3} className="viz-dot" />
+        {withLabel ? (
+          <g transform={`translate(${Math.max(4, cx - w + 8)}, ${Math.max(2, cy - 38)})`}>
+            <rect width={w} height={24} rx={8} fill="var(--surface-raised)" stroke="var(--hairline-strong)" />
+            <text x={w / 2} y={16} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--viz-tooltip-text)" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {text}
+            </text>
+          </g>
+        ) : null}
+      </g>
+    );
+  };
+}
+
+const crosshair = (color: string) => ({ stroke: color, strokeWidth: 1.5, strokeDasharray: "3 3", strokeOpacity: 0.85 });
+
+/** Seri gösterme/gizleme durumu (en az bir seri açık kalır — ChartLegend). */
+function useHiddenSet() {
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const toggle = useCallback((key: string) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+  return [hidden, toggle] as const;
+}
+
+const finite = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/**
+ * Zaman serisi / trend — katmanlı degrade dolgulu alan grafiği (+ çizgi parlaması).
+ * Zaman aralığı: yeterli nokta varsa (varsayılan >= 8) altta sürüklenebilir mini harita + hazır aralık hapları +
+ * canlı özet (son değer ve değişim %) çıkar; çoklu seride lejanttan seri açılıp kapanır, son noktada nabız noktası vardır.
+ */
 export function AreaTrend({
   data,
   xKey,
   series,
   format = "number",
   compactAxis = true,
+  rangeable,
+  granularity = "month",
+  summary = "last",
 }: {
   data: Row[];
   xKey: string;
-  series: Array<{ key: string; label: string; color?: string }>;
+  series: SeriesDef[];
   format?: ChartValueFormat;
   compactAxis?: boolean;
+  /** Aralık seçici (varsayılan: >= 8 noktada açık). */
+  rangeable?: boolean;
+  granularity?: Granularity;
+  /** Canlı özet: "last" son değer + değişim, "total" aralık toplamı, "none" yok. */
+  summary?: RangeSummaryMode;
 }) {
-  const reduce = useReducedMotion();
+  const reducedMotion = useReducedMotion();
   const gid = useId().replace(/:/g, "");
-  return (
+  const [hidden, toggle] = useHiddenSet();
+  const [focus, setFocus] = useState<string | null>(null);
+  const n = data.length;
+  const canRange = (rangeable ?? n >= 8) && n >= 4;
+  const { range, setRange, reset, touched } = useChartRange(n);
+  // Sürüklerken/aralık değişince yeniden çizim animasyonu yok (canlı his, 60 fps); ilk çizimde var.
+  const reduce = reducedMotion || touched;
+  const rows = useMemo(() => (canRange ? data.slice(range[0], range[1] + 1) : data), [canRange, data, range]);
+  const colorOf = (s: SeriesDef, index: number) => s.color ?? CHART_COLORS[index % CHART_COLORS.length]!;
+  const items: ChartLegendItem[] = series.map((s, index) => ({ key: s.key, label: s.label, color: colorOf(s, index) }));
+  const firstVisibleIdx = Math.max(0, series.findIndex((s) => !hidden.has(s.key)));
+  const lead = series[firstVisibleIdx] ?? series[0];
+  const leadColor = lead ? colorOf(lead, firstVisibleIdx) : CHART_COLORS[0]!;
+  const labels = useMemo(() => data.map((d) => String(d[xKey] ?? "")), [data, xKey]);
+  const leadValues = useMemo(() => data.map((d) => (lead ? finite(d[lead.key]) : null)), [data, lead]);
+  const fmt = (v: number) => formatChartValue(v, format);
+  const lastIdx = rows.length - 1;
+
+  const chart = (
     <ResponsiveContainer width="100%" height="100%" className="viz-depth">
-      <AreaChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+      <AreaChart data={rows} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
         <defs>
           {series.map((s, index) => {
-            const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
+            const color = colorOf(s, index);
             return (
               <linearGradient key={s.key} id={`area-${gid}-${index}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity={0.42} />
@@ -199,54 +292,48 @@ export function AreaTrend({
         <CartesianGrid {...gridProps} vertical={false} />
         <XAxis dataKey={xKey} {...axisProps} minTickGap={12} />
         <YAxis {...axisProps} width={48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, compactAxis)} />
-        <Tooltip content={<ChartTooltip format={format} />} cursor={{ stroke: "var(--brand-300)", strokeWidth: 1, strokeDasharray: "3 3" }} />
-        {series.length > 1 ? (
-          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
-        ) : null}
+        <Tooltip content={<ChartTooltip format={format} deltaRows={data} />} cursor={crosshair("var(--brand-300)")} />
+        {series.map((s, index) => (
+          <Area
+            key={`sh-${s.key}`}
+            className="viz-shadow-line"
+            type="monotone"
+            dataKey={s.key}
+            stroke={colorOf(s, index)}
+            strokeWidth={4}
+            fill="none"
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            tooltipType="none"
+            hide={hidden.has(s.key)}
+            isAnimationActive={!reduce}
+            animationDuration={DRAW_MS}
+            animationEasing="ease-out"
+          />
+        ))}
+        {series.map((s, index) => (
+          <Area
+            key={`g-${s.key}`}
+            className="viz-glow"
+            type="monotone"
+            dataKey={s.key}
+            stroke={colorOf(s, index)}
+            strokeWidth={7}
+            fill="none"
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            tooltipType="none"
+            hide={hidden.has(s.key)}
+            isAnimationActive={!reduce}
+            animationDuration={DRAW_MS}
+            animationEasing="ease-out"
+          />
+        ))}
         {series.map((s, index) => {
-          const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
-          return (
-            <Area
-              key={`sh-${s.key}`}
-              className="viz-shadow-line"
-              type="monotone"
-              dataKey={s.key}
-              stroke={color}
-              strokeWidth={4}
-              fill="none"
-              dot={false}
-              activeDot={false}
-              legendType="none"
-              tooltipType="none"
-              isAnimationActive={!reduce}
-              animationDuration={DRAW_MS}
-              animationEasing="ease-out"
-            />
-          );
-        })}
-        {series.map((s, index) => {
-          const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
-          return (
-            <Area
-              key={`g-${s.key}`}
-              className="viz-glow"
-              type="monotone"
-              dataKey={s.key}
-              stroke={color}
-              strokeWidth={7}
-              fill="none"
-              dot={false}
-              activeDot={false}
-              legendType="none"
-              tooltipType="none"
-              isAnimationActive={!reduce}
-              animationDuration={DRAW_MS}
-              animationEasing="ease-out"
-            />
-          );
-        })}
-        {series.map((s, index) => {
-          const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
+          const color = colorOf(s, index);
+          const dim = focus !== null && focus !== s.key;
           return (
             <Area
               key={s.key}
@@ -255,8 +342,11 @@ export function AreaTrend({
               name={s.label}
               stroke={color}
               strokeWidth={2.2}
+              strokeOpacity={dim ? 0.25 : 1}
               fill={`url(#area-${gid}-${index})`}
-              dot={false}
+              fillOpacity={dim ? 0.3 : 1}
+              dot={lastPointDot(color, lastIdx, fmt, false, (p) => finite((p.payload as Row | undefined)?.[s.key]))}
+              hide={hidden.has(s.key)}
               isAnimationActive={!reduce}
               animationDuration={DRAW_MS}
               animationEasing="ease-out"
@@ -267,6 +357,44 @@ export function AreaTrend({
       </AreaChart>
     </ResponsiveContainer>
   );
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-1">
+      <div className="min-h-0 flex-1">
+        {canRange ? (
+          <ChartRangePanel
+            labels={labels}
+            values={leadValues}
+            range={range}
+            onRangeChange={setRange}
+            onReset={reset}
+            summaryMode={summary}
+            formatValue={fmt}
+            color={leadColor}
+            granularity={granularity}
+            summaryLabel={series.length > 1 ? lead?.label : undefined}
+          >
+            <PlotBox>{chart}</PlotBox>
+          </ChartRangePanel>
+        ) : (
+          <div className="relative h-full">
+            <PlotBox>{chart}</PlotBox>
+          </div>
+        )}
+      </div>
+      {series.length > 1 ? <ChartLegend items={items} hidden={hidden} onToggle={toggle} onHover={setFocus} /> : null}
+    </div>
+  );
+}
+
+/** Değer etiketi (çubuk ucu): kısa Türkçe biçim. */
+function barLabel(format: ChartValueFormat) {
+  return (v: unknown) => {
+    const x = Number(v);
+    if (!Number.isFinite(x) || x === 0) return "";
+    if (format === "percent") return `%${formatChartAxis(x, false)}`;
+    return formatChartAxis(x, true, format === "money" ? "₺" : "");
+  };
 }
 
 /** Kategori karşılaştırma — danışman performansı, gider kırılımı vb. `hrefKey` ile çubuk tıklanabilir. */
@@ -278,10 +406,11 @@ export function BarCompare({
   layout = "vertical",
   hrefKey,
   hint,
+  showValues,
 }: {
   data: Row[];
   xKey: string;
-  series: Array<{ key: string; label: string; color?: string }>;
+  series: SeriesDef[];
   format?: ChartValueFormat;
   /** "vertical" = klasik dikey çubuk; "horizontal" = uzun etiketler için yatay. */
   layout?: "vertical" | "horizontal";
@@ -289,66 +418,91 @@ export function BarCompare({
   hrefKey?: string;
   /** İpucunun alt satırı (ör. "Ayrıntı için tıklayın"). */
   hint?: string;
+  /** Çubuk ucunda değer etiketi (varsayılan: tek seri ve <= 10 kategori). */
+  showValues?: boolean;
 }) {
   const horizontal = layout === "horizontal";
   const reduce = useReducedMotion();
   const router = useRouter();
   const sheenId = `sheen-${useId().replace(/:/g, "")}`;
   const shape = depthBar(horizontal, sheenId);
+  const [hidden, toggle] = useHiddenSet();
+  const [focus, setFocus] = useState<string | null>(null);
+  const values = showValues ?? (series.length === 1 && data.length <= 10);
+  const colorOf = (s: SeriesDef, index: number) => s.color ?? CHART_COLORS[index % CHART_COLORS.length]!;
+  const items: ChartLegendItem[] = series.map((s, index) => ({ key: s.key, label: s.label, color: colorOf(s, index) }));
+  const labelFmt = barLabel(format);
   return (
-    <ResponsiveContainer width="100%" height="100%" className="viz-depth">
-      <BarChart
-        data={data}
-        layout={horizontal ? "vertical" : "horizontal"}
-        margin={{ top: 6, right: 12, left: horizontal ? 8 : 0, bottom: 0 }}
-        barGap={4}
-      >
-        <SheenDefs id={sheenId} />
-        <CartesianGrid {...gridProps} vertical={horizontal} horizontal={!horizontal} />
-        {horizontal ? (
-          <>
-            <XAxis type="number" {...axisProps} tickCount={5} tickFormatter={(v: number) => formatChartAxis(v)} />
-            <YAxis type="category" dataKey={xKey} {...axisProps} width={110} />
-          </>
-        ) : (
-          <>
-            <XAxis dataKey={xKey} {...axisProps} minTickGap={8} />
-            <YAxis {...axisProps} width={format === "money" ? 68 : 48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
-          </>
-        )}
-        <Tooltip content={<ChartTooltip format={format} hint={hint} />} cursor={{ fill: "var(--accent)", fillOpacity: 0.05 }} />
-        {series.length > 1 ? (
-          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
-        ) : null}
-        {series.map((s, index) => (
-          <Bar
-            key={s.key}
-            dataKey={s.key}
-            name={s.label}
-            fill={s.color ?? CHART_COLORS[index % CHART_COLORS.length]}
-            maxBarSize={horizontal ? 18 : 34}
-            shape={shape}
-            activeBar
-            isAnimationActive={!reduce}
-            animationDuration={DRAW_MS}
-            animationEasing="ease-out"
-            cursor={hrefKey ? "pointer" : undefined}
-            onClick={
-              hrefKey
-                ? (entry: unknown) => {
-                    const href = hrefOf(entry, hrefKey);
-                    if (href) router.push(href);
+    <div className="flex h-full min-h-0 flex-col gap-1">
+      <div className="relative min-h-0 flex-1">
+        <PlotBox>
+          <ResponsiveContainer width="100%" height="100%" className="viz-depth">
+            <BarChart
+              data={data}
+              layout={horizontal ? "vertical" : "horizontal"}
+              margin={{ top: values && !horizontal ? 18 : 6, right: values && horizontal ? 44 : 12, left: horizontal ? 8 : 0, bottom: 0 }}
+              barGap={4}
+            >
+              <SheenDefs id={sheenId} />
+              <CartesianGrid {...gridProps} vertical={horizontal} horizontal={!horizontal} />
+              {horizontal ? (
+                <>
+                  <XAxis type="number" {...axisProps} tickCount={5} tickFormatter={(v: number) => formatChartAxis(v)} />
+                  <YAxis type="category" dataKey={xKey} {...axisProps} width={110} />
+                </>
+              ) : (
+                <>
+                  <XAxis dataKey={xKey} {...axisProps} minTickGap={8} />
+                  <YAxis {...axisProps} width={format === "money" ? 68 : 48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
+                </>
+              )}
+              <Tooltip content={<ChartTooltip format={format} hint={hint} />} cursor={{ fill: "var(--accent)", fillOpacity: 0.06 }} />
+              {series.map((s, index) => (
+                <Bar
+                  key={s.key}
+                  dataKey={s.key}
+                  name={s.label}
+                  fill={colorOf(s, index)}
+                  fillOpacity={focus !== null && focus !== s.key ? 0.3 : 1}
+                  maxBarSize={horizontal ? 18 : 34}
+                  shape={shape}
+                  activeBar
+                  hide={hidden.has(s.key)}
+                  isAnimationActive={!reduce}
+                  animationDuration={DRAW_MS}
+                  animationEasing="ease-out"
+                  cursor={hrefKey ? "pointer" : undefined}
+                  onClick={
+                    hrefKey
+                      ? (entry: unknown) => {
+                          const href = hrefOf(entry, hrefKey);
+                          if (href) router.push(href);
+                        }
+                      : undefined
                   }
-                : undefined
-            }
-          />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
+                >
+                  {values ? (
+                    <LabelList
+                      dataKey={s.key}
+                      position={horizontal ? "right" : "top"}
+                      formatter={labelFmt}
+                      fontSize={12}
+                      fontWeight={700}
+                      fill="var(--viz-tooltip-text)"
+                    />
+                  ) : null}
+                </Bar>
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </PlotBox>
+      </div>
+      {series.length > 1 ? <ChartLegend items={items} hidden={hidden} onToggle={toggle} onHover={setFocus} /> : null}
+    </div>
   );
 }
 
-/** Dağılım — portföy tipi kırılımı, kaynak dağılımı vb. `hrefKey` ile dilim tıklanabilir. */
+/** Dağılım — portföy tipi kırılımı, kaynak dağılımı vb. `hrefKey` ile dilim tıklanabilir; üzerine gelince ortada dilim değeri. */
 export function DonutSplit({
   data,
   nameKey = "name",
@@ -370,49 +524,77 @@ export function DonutSplit({
   const reduce = useReducedMotion();
   const router = useRouter();
   const tubeId = `tube-${useId().replace(/:/g, "")}`;
-  const total = data.reduce((sum, row) => sum + Number(row[valueKey] ?? 0), 0);
+  const [hidden, toggle] = useHiddenSet();
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const all = useMemo(
+    () =>
+      data.map((row, index) => ({
+        row,
+        key: String(row[nameKey] ?? index),
+        color: CHART_COLORS[index % CHART_COLORS.length]!,
+        value: Number(row[valueKey] ?? 0),
+      })),
+    [data, nameKey, valueKey],
+  );
+  const visible = all.filter((d) => !hidden.has(d.key));
+  const grand = all.reduce((sum, d) => sum + (Number.isFinite(d.value) ? d.value : 0), 0);
+  const total = visible.reduce((sum, d) => sum + (Number.isFinite(d.value) ? d.value : 0), 0);
+  const focused = hoverKey !== null ? (visible.find((d) => d.key === hoverKey) ?? null) : null;
+  const share = (v: number) => (grand > 0 ? `%${Math.round((v / grand) * 100)}` : "");
+  const items: ChartLegendItem[] = all.map((d) => ({ key: d.key, label: d.key, color: d.color, suffix: share(d.value) }));
   return (
-    <div className="relative h-full">
-      <ResponsiveContainer width="100%" height="100%" className="viz-depth">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey={valueKey}
-            nameKey={nameKey}
-            innerRadius="58%"
-            outerRadius="82%"
-            paddingAngle={2}
-            strokeWidth={0}
-            shape={depthSector(tubeId)}
-            isAnimationActive={!reduce}
-            animationDuration={DRAW_MS}
-            animationEasing="ease-out"
-            cursor={hrefKey ? "pointer" : undefined}
-            onClick={
-              hrefKey
-                ? (entry: unknown) => {
-                    const href = hrefOf(entry, hrefKey);
-                    if (href) router.push(href);
-                  }
-                : undefined
-            }
-          >
-            {data.map((_, index) => (
-              <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip content={<ChartTooltip format={format} hint={hint} />} />
-          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="pointer-events-none absolute inset-x-0 top-[38%] -translate-y-1/2 text-center">
-        <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-[color:var(--viz-tooltip-text)]">
-          {formatChartValue(total, format)}
-        </p>
-        {centerLabel ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">{centerLabel}</p>
-        ) : null}
+    <div className="flex h-full min-h-0 flex-col gap-1">
+      <div className="relative min-h-0 flex-1">
+        <PlotBox>
+          <ResponsiveContainer width="100%" height="100%" className="viz-depth">
+            <PieChart>
+              <Pie
+                data={visible.map((d) => d.row)}
+                dataKey={valueKey}
+                nameKey={nameKey}
+                innerRadius="58%"
+                outerRadius="82%"
+                paddingAngle={2}
+                strokeWidth={0}
+                shape={depthSector(tubeId, hoverKey, nameKey)}
+                isAnimationActive={!reduce}
+                animationDuration={DRAW_MS}
+                animationEasing="ease-out"
+                cursor={hrefKey ? "pointer" : undefined}
+                onMouseEnter={(entry: unknown) => {
+                  const e = entry as { name?: unknown; payload?: Row };
+                  setHoverKey(String(e?.payload?.[nameKey] ?? e?.name ?? ""));
+                }}
+                onMouseLeave={() => setHoverKey(null)}
+                onClick={
+                  hrefKey
+                    ? (entry: unknown) => {
+                        const href = hrefOf(entry, hrefKey);
+                        if (href) router.push(href);
+                      }
+                    : undefined
+                }
+              >
+                {visible.map((d) => (
+                  <Cell key={d.key} fill={d.color} />
+                ))}
+              </Pie>
+              <Tooltip content={<ChartTooltip format={format} hint={hint} />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 grid place-items-center">
+            <div className="max-w-[40%] text-center">
+              <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-[color:var(--viz-tooltip-text)]">
+                {formatChartValue(focused ? focused.value : total, format)}
+              </p>
+              <p className="truncate text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
+                {focused ? `${focused.key} · ${share(focused.value)}` : centerLabel}
+              </p>
+            </div>
+          </div>
+        </PlotBox>
       </div>
+      <ChartLegend items={items} hidden={hidden} onToggle={toggle} onHover={setHoverKey} />
     </div>
   );
 }
@@ -425,6 +607,8 @@ export type TrendPoint = {
   value: number | null;
   /** Tahmin değeri (kesikli çizgi); son gerçek noktada değerle aynı verilir ki çizgi kopmasın. */
   forecast?: number | null;
+  /** Nokta tıklanınca gidilecek uygulama içi filtreli adres (sıfır çıkmaz metrik). */
+  href?: string;
 };
 
 const TREND_TONE = {
@@ -434,13 +618,13 @@ const TREND_TONE = {
   violet: "var(--viz-4)",
 } as const;
 
-type DotProps = { cx?: number; cy?: number; index?: number; payload?: { value?: number | null } };
-
 /**
  * AreaTrendChart — tek seri premium alan grafiği: altın (para) veya mavi çizgi, katmanlı degrade dolgu, çizgi
- * parlaması, SON gerçek noktada halka + değer etiketi, isteğe bağlı kesikli TAHMİN uzantısı.
- * Dönem/filtre değişince `animationKey` ile yeniden çizilir (500 ms ease-out; reduce'ta yok).
- * Ekran okuyucu için sr-only veri tablosu; ipucu ortak `ChartTooltip`.
+ * parlaması, SON gerçek noktada nabız noktası + değer etiketi, isteğe bağlı kesikli TAHMİN uzantısı (lejanttan gizlenir).
+ * Zaman aralığı: >= 6 gerçek noktada altta sürüklenebilir mini harita, hazır aralık hapları ve canlı özet
+ * (`summary`: "last" son değer + değişim, "total" aralık toplamı) çıkar; çift tık sıfırlar.
+ * Dönem/filtre değişince `animationKey` ile yeniden çizilir (reduce'ta yok). `href` taşıyan noktaya tıklayınca oraya gidilir.
+ * Ekran okuyucu için sr-only veri tablosu; ipucu ortak `ChartTooltip` (önceki döneme göre fark).
  */
 export function AreaTrendChart({
   data,
@@ -452,6 +636,9 @@ export function AreaTrendChart({
   showLastLabel = true,
   animationKey,
   ariaLabel,
+  rangeable,
+  granularity = "month",
+  summary = "last",
 }: {
   data: readonly TrendPoint[];
   tone?: keyof typeof TREND_TONE;
@@ -462,146 +649,193 @@ export function AreaTrendChart({
   showLastLabel?: boolean;
   animationKey?: string | number;
   ariaLabel?: string;
+  /** Aralık seçici (varsayılan: >= 6 gerçek noktada açık). */
+  rangeable?: boolean;
+  granularity?: Granularity;
+  summary?: RangeSummaryMode;
 }) {
-  const reduce = useReducedMotion();
+  const reducedMotion = useReducedMotion();
+  const router = useRouter();
   const gid = useId().replace(/:/g, "");
   const color = TREND_TONE[tone];
   const fmt = (n: number) => (formatValue ? formatValue(n) : formatChartValue(n, format));
+  const [hidden, toggle] = useHiddenSet();
+  const allRows = useMemo(
+    () => data.map((d) => ({ label: d.label, value: d.value, forecast: d.forecast ?? null, href: d.href })),
+    [data],
+  );
+  const n = allRows.length;
+  const realCount = useMemo(() => {
+    let last = -1;
+    allRows.forEach((d, i) => {
+      if (d.value !== null && Number.isFinite(d.value)) last = i;
+    });
+    return last;
+  }, [allRows]);
+  const canRange = (rangeable ?? realCount + 1 >= 6) && n >= 4;
+  const { range, setRange, reset, touched } = useChartRange(n);
+  const reduce = reducedMotion || touched;
+  const rows = useMemo(() => (canRange ? allRows.slice(range[0], range[1] + 1) : allRows), [canRange, allRows, range]);
   let lastIdx = -1;
-  data.forEach((d, i) => {
+  rows.forEach((d, i) => {
     if (d.value !== null && Number.isFinite(d.value)) lastIdx = i;
   });
-  const hasForecast = data.some((d) => d.forecast !== null && d.forecast !== undefined);
-  const rows = data.map((d) => ({ label: d.label, value: d.value, forecast: d.forecast ?? null }));
+  const hasForecast = allRows.some((d) => d.forecast !== null && d.forecast !== undefined);
+  const showForecast = hasForecast && !hidden.has("forecast");
+  const hasHref = allRows.some((d) => typeof d.href === "string");
+  const labels = useMemo(() => allRows.map((r) => r.label), [allRows]);
+  const allValues = useMemo(() => allRows.map((r) => r.value), [allRows]);
 
-  const renderDot = (props: DotProps) => {
-    // Recharts 3 Area noktasında `value` [taban, değer] dizisidir (Number(dizi) = NaN); değer satırdan okunur.
-    const { cx, cy, index } = props;
-    const value = props.payload?.value;
-    if (index !== lastIdx || cx === undefined || cy === undefined || typeof value !== "number" || !Number.isFinite(value)) {
-      return <g key={`d-${index}`} />;
-    }
-    const text = fmt(value);
-    const w = Math.max(48, text.length * 7.4 + 18);
-    return (
-      <g key={`d-${index}`}>
-        <circle cx={cx} cy={cy} r={10} fill={color} opacity={0.18} className="viz-pulse" />
-        <circle cx={cx} cy={cy} r={5} fill="var(--surface-raised)" stroke={color} strokeWidth={3} className="viz-dot" />
-        {showLastLabel ? (
-          <g transform={`translate(${Math.max(4, cx - w + 8)}, ${Math.max(2, cy - 38)})`}>
-            <rect width={w} height={24} rx={8} fill="var(--surface-raised)" stroke="var(--hairline-strong)" />
-            <text x={w / 2} y={16} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--viz-tooltip-text)" style={{ fontVariantNumeric: "tabular-nums" }}>
-              {text}
-            </text>
-          </g>
+  const chart = (
+    <ResponsiveContainer width="100%" height="100%" className="viz-depth">
+      <AreaChart
+        key={animationKey}
+        data={rows}
+        margin={{ top: showLastLabel ? 38 : 12, right: 14, left: 0, bottom: 0 }}
+        style={hasHref ? { cursor: "pointer" } : undefined}
+        onClick={
+          hasHref
+            ? (state: unknown) => {
+                const idx = Number((state as { activeIndex?: unknown } | undefined)?.activeIndex);
+                const href = Number.isInteger(idx) ? rows[idx]?.href : undefined;
+                if (typeof href === "string" && href.startsWith("/")) router.push(href);
+              }
+            : undefined
+        }
+      >
+        <defs>
+          <linearGradient id={`atc-${gid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.44} />
+            <stop offset="48%" stopColor={color} stopOpacity={0.15} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid {...gridProps} vertical={false} />
+        <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
+        <YAxis {...axisProps} width={format === "money" ? 68 : 44} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
+        <Tooltip content={<ChartTooltip formatValue={fmt} deltaRows={allRows} hint={hasHref ? "Ayrıntı için tıklayın" : undefined} />} cursor={crosshair(color)} />
+        <Area
+          className="viz-shadow-line"
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={4}
+          fill="none"
+          connectNulls={false}
+          dot={false}
+          activeDot={false}
+          legendType="none"
+          tooltipType="none"
+          isAnimationActive={!reduce}
+          animationDuration={500}
+          animationEasing="ease-out"
+        />
+        <Area
+          className="viz-glow"
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={7}
+          fill="none"
+          connectNulls={false}
+          dot={false}
+          activeDot={false}
+          legendType="none"
+          tooltipType="none"
+          isAnimationActive={!reduce}
+          animationDuration={500}
+          animationEasing="ease-out"
+        />
+        <Area
+          type="monotone"
+          dataKey="value"
+          name={name}
+          stroke={color}
+          strokeWidth={2.4}
+          fill={`url(#atc-${gid})`}
+          connectNulls={false}
+          dot={lastPointDot(color, lastIdx, fmt, showLastLabel)}
+          activeDot={{ r: 6, strokeWidth: 2.5, stroke: "var(--surface-raised)", fill: color, className: "viz-dot" }}
+          isAnimationActive={!reduce}
+          animationDuration={500}
+          animationEasing="ease-out"
+        />
+        <Area
+          className="viz-edge"
+          type="monotone"
+          dataKey="value"
+          stroke="var(--viz-sheen)"
+          strokeWidth={1}
+          fill="none"
+          connectNulls={false}
+          dot={false}
+          activeDot={false}
+          legendType="none"
+          tooltipType="none"
+          isAnimationActive={!reduce}
+          animationDuration={500}
+          animationEasing="ease-out"
+        />
+        {showForecast ? (
+          <Area
+            type="monotone"
+            dataKey="forecast"
+            name={forecastName}
+            stroke={color}
+            strokeWidth={2}
+            strokeDasharray="5 4"
+            fill="none"
+            connectNulls={false}
+            dot={false}
+            activeDot={{ r: 3, strokeWidth: 2, stroke: "var(--surface-raised)" }}
+            isAnimationActive={!reduce}
+            animationDuration={500}
+            animationEasing="ease-out"
+          />
         ) : null}
-      </g>
-    );
-  };
+      </AreaChart>
+    </ResponsiveContainer>
+  );
 
   return (
-    <figure className="relative h-full" aria-label={ariaLabel}>
-      <ResponsiveContainer width="100%" height="100%" className="viz-depth">
-        <AreaChart key={animationKey} data={rows} margin={{ top: 40, right: 14, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`atc-${gid}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.44} />
-              <stop offset="48%" stopColor={color} stopOpacity={0.15} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid {...gridProps} vertical={false} />
-          <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
-          <YAxis {...axisProps} width={format === "money" ? 68 : 44} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
-          <Tooltip
-            content={<ChartTooltip formatValue={fmt} />}
-            cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: "3 3" }}
-          />
-          <Area
-            className="viz-shadow-line"
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={4}
-            fill="none"
-            connectNulls={false}
-            dot={false}
-            activeDot={false}
-            legendType="none"
-            tooltipType="none"
-            isAnimationActive={!reduce}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-          <Area
-            className="viz-glow"
-            type="monotone"
-            dataKey="value"
-            stroke={color}
-            strokeWidth={7}
-            fill="none"
-            connectNulls={false}
-            dot={false}
-            activeDot={false}
-            legendType="none"
-            tooltipType="none"
-            isAnimationActive={!reduce}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-          <Area
-            type="monotone"
-            dataKey="value"
-            name={name}
-            stroke={color}
-            strokeWidth={2.4}
-            fill={`url(#atc-${gid})`}
-            connectNulls={false}
-            dot={renderDot}
-            activeDot={{ r: 5, strokeWidth: 2.5, stroke: "var(--surface-raised)", fill: color, className: "viz-dot" }}
-            isAnimationActive={!reduce}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-          <Area
-            className="viz-edge"
-            type="monotone"
-            dataKey="value"
-            stroke="var(--viz-sheen)"
-            strokeWidth={1}
-            fill="none"
-            connectNulls={false}
-            dot={false}
-            activeDot={false}
-            legendType="none"
-            tooltipType="none"
-            isAnimationActive={!reduce}
-            animationDuration={500}
-            animationEasing="ease-out"
-          />
-          {hasForecast ? (
-            <Area
-              type="monotone"
-              dataKey="forecast"
-              name={forecastName}
-              stroke={color}
-              strokeWidth={2}
-              strokeDasharray="5 4"
-              fill="none"
-              connectNulls={false}
-              dot={false}
-              activeDot={{ r: 3, strokeWidth: 2, stroke: "var(--surface-raised)" }}
-              isAnimationActive={!reduce}
-              animationDuration={500}
-              animationEasing="ease-out"
-            />
-          ) : null}
-        </AreaChart>
-      </ResponsiveContainer>
+    <figure className="m-0 flex h-full min-h-0 flex-col gap-1" aria-label={ariaLabel}>
+      <div className="min-h-0 flex-1">
+        {canRange ? (
+          <ChartRangePanel
+            labels={labels}
+            values={allValues}
+            range={range}
+            onRangeChange={setRange}
+            onReset={reset}
+            summaryMode={summary}
+            formatValue={fmt}
+            color={color}
+            granularity={granularity}
+            anchor={realCount}
+            summaryLabel={name}
+          >
+            <PlotBox>{chart}</PlotBox>
+          </ChartRangePanel>
+        ) : (
+          <div className="relative h-full">
+            <PlotBox>{chart}</PlotBox>
+          </div>
+        )}
+      </div>
+      {hasForecast ? (
+        <ChartLegend
+          items={[
+            { key: "value", label: name, color },
+            { key: "forecast", label: forecastName, color, dashed: true },
+          ]}
+          hidden={hidden}
+          onToggle={toggle}
+        />
+      ) : null}
       <table className="sr-only">
         <caption>{ariaLabel ?? name}</caption>
         <tbody>
-          {rows.map((r, i) => (
+          {allRows.map((r, i) => (
             <tr key={`${r.label}-${i}`}>
               <th scope="row">{r.label}</th>
               <td>{r.value !== null ? fmt(r.value) : r.forecast !== null ? `${forecastName}: ${fmt(r.forecast)}` : "—"}</td>
