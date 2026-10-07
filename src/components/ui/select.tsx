@@ -37,7 +37,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       {...props}
       className={cn(
-        "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-left text-sm text-ink-950 outline-none transition",
+        "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-left text-sm text-ink-950 outline-none transition touch:min-h-11",
         "focus:border-brand-400 focus:bg-surface data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
         "disabled:cursor-not-allowed disabled:opacity-60",
         "data-[placeholder]:text-text-faint",
@@ -90,7 +90,7 @@ export function SelectItem({
     <SelectPrimitive.Item
       {...props}
       className={cn(
-        "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-3 pr-8 text-sm text-ink-950 outline-none transition",
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-3 pr-8 text-sm text-ink-950 outline-none transition touch:min-h-11",
         "data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,

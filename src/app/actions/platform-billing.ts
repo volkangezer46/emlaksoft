@@ -11,6 +11,7 @@ import { efCommit, efReserve } from "@/lib/ef-credits/wallet";
 import { EF_PACK_REFUND_ITEM, efPackClawbackUnits, efPackRefundIdem } from "@/lib/billing/credit-pack-refund";
 import { reverseClaimsForInvoiceSafe } from "@/lib/growth/engine";
 import { parseMoneyTry, validateRefundAmount, MANUAL_PAYMENT_METHODS, type ManualPaymentMethod } from "@/lib/billing/invoice-ops";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type BillingOpResult = { ok?: boolean; error?: string; notice?: string };
 
@@ -106,7 +107,7 @@ export async function markInvoicePaid(formData: FormData): Promise<BillingOpResu
     .maybeSingle();
   if (error) {
     console.error("markInvoicePaid", error.message);
-    return { error: "Fatura güncellenemedi." };
+    return { error: actionErrorMessage(error, "Fatura güncellenemedi.") };
   }
   if (!updated) return { ok: true, notice: "Fatura başka bir işlemle zaten güncellenmiş." };
 
@@ -144,7 +145,7 @@ export async function voidInvoice(formData: FormData): Promise<BillingOpResult> 
     .maybeSingle();
   if (error) {
     console.error("voidInvoice", error.message);
-    return { error: "Fatura iptal edilemedi." };
+    return { error: actionErrorMessage(error, "Fatura iptal edilemedi.") };
   }
   if (!updated) return { error: "Fatura iptal edilemez: ödenmiş ya da zaten iptal." };
   // TL hesap kredisi: iptal edilen faturaya ayrılmış kredi rezervi serbest kalır (rezerv yoksa/şema eskiyse etkisiz).
@@ -195,7 +196,7 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
       .maybeSingle();
     if (cbError) {
       console.error("recordInvoiceChargeback", cbError.message);
-      return { error: "Ters ibraz kaydı yazılamadı." };
+      return { error: actionErrorMessage(cbError, "Ters ibraz kaydı yazılamadı.") };
     }
     if (!marked) return { ok: true, notice: "Bu faturaya ters ibraz zaten kaydedilmiş." };
     await reverseClaimsForInvoiceSafe(admin, invoiceId, "chargeback");
@@ -293,7 +294,7 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
     .maybeSingle();
   if (error) {
     console.error("recordInvoiceRefund", error.message);
-    return { error: "İade kaydı yazılamadı." };
+    return { error: actionErrorMessage(error, "İade kaydı yazılamadı.") };
   }
   if (!updated) return { ok: true, notice: "Bu faturaya iade zaten kaydedilmiş." };
   // Referans/ortak programı: iade = bu faturaya bağlı ödül/komisyon talepleri geri alınır, verilmiş kredi clawback edilir.

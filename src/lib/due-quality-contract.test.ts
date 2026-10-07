@@ -16,7 +16,7 @@ describe("due feature quality contract", () => {
   it("never reports a missing update or delete as successful", () => {
     expect(action.match(/\.select\("id"\)\s*\.maybeSingle\(\)/g)).toHaveLength(3);
     expect(action.match(/if \(!data\) return \{ error: "Aidat kaydı bulunamadı\." \};/g)).toHaveLength(3);
-    expect(action).toContain('return { error: "Aidat silinemedi." };');
+    expect(action).toContain('return { error: actionErrorMessage(error, "Aidat silinemedi.") };');
   });
 
   it("fails the page instead of presenting database errors as empty financial data", () => {

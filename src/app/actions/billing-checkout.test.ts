@@ -96,6 +96,7 @@ vi.mock("@/lib/ef-credits/public-state", () => ({
 }));
 vi.mock("@/lib/try-credits/settings", () => ({ getTryMaxShare: async () => 0.5 }));
 
+import { ActionUserError } from "@/lib/action-errors";
 import { startCreditPackPurchase, startPlanCheckout } from "./billing";
 
 function form(over: Record<string, string> = {}) {
@@ -159,7 +160,7 @@ describe("startPlanCheckout — ön kapılar", () => {
     h.tenant = null;
     expect((await startPlanCheckout(form())).error).toBe("Ofis bulunamadı.");
     h.tenant = { id: "t1", name: "Ofis", plan: "office" };
-    h.preflight.mockRejectedValue(new Error("Aktif kullanıcı sayınız bu paketin sınırını aşıyor."));
+    h.preflight.mockRejectedValue(new ActionUserError("Aktif kullanıcı sayınız bu paketin sınırını aşıyor."));
     expect((await startPlanCheckout(form())).error).toMatch(/sınırını aşıyor/);
     h.preflight.mockResolvedValue(undefined);
     h.planHidden = true;
@@ -212,7 +213,7 @@ describe("startPlanCheckout — ödeme altyapısı ve alıcı doğrulama", () =>
 
   it("alıcı bilgisi eksikse ayarlara yönlendiren mesaj; fatura oluşmaz", async () => {
     h.buyer.mockImplementation(() => {
-      throw new Error("Vergi numarası eksik.");
+      throw new ActionUserError("Vergi numarası eksik.");
     });
     const r = await startPlanCheckout(form());
     expect(r.error).toMatch(/Vergi numarası eksik\..*Ayarlar bölümünden/);
@@ -220,7 +221,7 @@ describe("startPlanCheckout — ödeme altyapısı ve alıcı doğrulama", () =>
   });
 
   it("fatura taslağı oluşmazsa (ör. kredi yetersiz) hata aynen döner; iyzico çağrılmaz", async () => {
-    h.createInvoice.mockRejectedValue(new Error("Hesap kredisi bakiyesi yetersiz."));
+    h.createInvoice.mockRejectedValue(new ActionUserError("Hesap kredisi bakiyesi yetersiz."));
     expect((await startPlanCheckout(form({ use_credit: "1" }))).error).toBe("Hesap kredisi bakiyesi yetersiz.");
     expect(h.initCheckout).not.toHaveBeenCalled();
     expect(h.markFailed).not.toHaveBeenCalled(); // taslak hiç oluşmadı
@@ -235,7 +236,7 @@ describe("startPlanCheckout — demo / kredi / iyzico yolları", () => {
     expect(h.fulfillDemo).toHaveBeenCalledWith(expect.objectContaining({ source: "demo", plan: "office", expectedCurrency: "TRY" }));
     expect(h.initCheckout).not.toHaveBeenCalled();
     h.fulfillDemo.mockRejectedValue(new Error("Tutar uyuşmuyor."));
-    expect((await startPlanCheckout(form())).error).toBe("Tutar uyuşmuyor.");
+    expect((await startPlanCheckout(form())).error).toMatch(/^Demo tahsilat tamamlanamadı: /); // iç hata metni sızmaz
     expect(h.markFailed).toHaveBeenCalledTimes(1);
   });
 
@@ -246,7 +247,7 @@ describe("startPlanCheckout — demo / kredi / iyzico yolları", () => {
     expect(h.fulfillCredit).toHaveBeenCalledTimes(1);
     expect(h.initCheckout).not.toHaveBeenCalled();
     h.fulfillCredit.mockRejectedValue(new Error("Kredi düşülemedi."));
-    expect((await startPlanCheckout(form({ use_credit: "1" }))).error).toBe("Kredi düşülemedi.");
+    expect((await startPlanCheckout(form({ use_credit: "1" }))).error).toMatch(/^Kredi ile ödeme tamamlanamadı: /);
     expect(h.markFailed).toHaveBeenCalledTimes(1);
   });
 
@@ -261,9 +262,9 @@ describe("startPlanCheckout — demo / kredi / iyzico yolları", () => {
     expect((await startPlanCheckout(form())).error).toBe("Kart reddedildi.");
     expect(h.markFailed).toHaveBeenCalledTimes(1);
     h.initCheckout.mockResolvedValue({ status: "success", paymentPageUrl: "" });
-    expect((await startPlanCheckout(form())).error).toBe("Ödeme oturumu açılamadı.");
+    expect((await startPlanCheckout(form())).error).toMatch(/^Ödeme oturumu açılamadı: /);
     h.initCheckout.mockRejectedValue(new Error("ağ hatası"));
-    expect((await startPlanCheckout(form())).error).toBe("ağ hatası");
+    expect((await startPlanCheckout(form())).error).toMatch(/^Ödeme sayfası açılamadı: /); // ham "ağ hatası" gösterilmez
     expect(h.markFailed).toHaveBeenCalledTimes(3);
     expect(h.markInitialized).not.toHaveBeenCalled();
     h.initCheckout.mockResolvedValue({ status: "success", paymentPageUrl: "https://iyzico.test/pay" });
@@ -326,7 +327,7 @@ describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
   });
 
   it("fatura hatası aynen döner; iyzico başarısızsa fatura failed; tam kredide iyzico çağrılmaz", async () => {
-    h.packInvoice.mockRejectedValue(new Error("Hesap kredisi bakiyesi yetersiz."));
+    h.packInvoice.mockRejectedValue(new ActionUserError("Hesap kredisi bakiyesi yetersiz."));
     expect((await startCreditPackPurchase(pform({ use_credit: "1" }))).error).toBe("Hesap kredisi bakiyesi yetersiz.");
     h.packInvoice.mockResolvedValue({ invoiceId: "inv-pack", totalTry: 1188, credit: null });
     h.initCheckout.mockResolvedValue({ status: "failure", errorMessage: "Banka hatası." });
@@ -340,7 +341,7 @@ describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
     expect(h.fulfillCredit).toHaveBeenCalledTimes(1);
     expect(h.initCheckout).not.toHaveBeenCalled();
     h.fulfillCredit.mockRejectedValue(new Error("Kredi düşülemedi."));
-    expect((await startCreditPackPurchase(pform({ use_credit: "1" }))).error).toBe("Kredi düşülemedi.");
+    expect((await startCreditPackPurchase(pform({ use_credit: "1" }))).error).toMatch(/^Kredi ile ödeme tamamlanamadı: /);
     expect(h.markFailed).toHaveBeenCalledTimes(1);
   });
 

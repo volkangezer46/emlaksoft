@@ -15,6 +15,7 @@ import {
   uniqueValidTicketIds,
   validateTicketCategory,
 } from "@/lib/support/ticket-contract";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AdminTicketOpsResult = {
   error?: string;
@@ -83,7 +84,7 @@ export async function getTicketCategoriesForTenant(
     console.error("ticket category lookup", {
       message: error instanceof Error ? error.message : "unknown",
     });
-    return { error: "Ofise ait kategoriler yüklenemedi." };
+    return { error: actionErrorMessage(error, "Ofise ait kategoriler yüklenemedi.") };
   }
 }
 
@@ -116,7 +117,7 @@ async function updateAdminField(
     if (error?.message?.includes("VERSION_CONFLICT")) {
       return { error: "Bu talep az önce başka biri tarafından güncellendi. Sayfayı yenileyip tekrar deneyin." };
     }
-    return { error: field === "assigned_staff_id" ? "Atama kaydedilemedi." : "Destek talebi güncellenemedi." };
+    return { error: field === "assigned_staff_id" ? actionErrorMessage(error, "Atama kaydedilemedi.") : actionErrorMessage(error, "Destek talebi güncellenemedi.") };
   }
   revalidateTicketPages(ticketId);
   return { ok: true, ticketId };
@@ -221,7 +222,7 @@ export async function createTicketMacro(formData: FormData): Promise<AdminTicket
 
   const admin = createAdminClient();
   const { data, error } = await admin.from("ticket_macros").insert({ title, body, created_by: staff.id }).select("id").single();
-  if (error || !data) return { error: "Makro eklenemedi." };
+  if (error || !data) return { error: actionErrorMessage(error, "Makro eklenemedi.") };
   await logPlatformActivity({ actorId: staff.id, action: "ticket.macro.create", entityType: "ticket_macro", entityId: data.id });
   revalidateTicketPages();
   return { ok: true };
@@ -236,7 +237,7 @@ export async function deleteTicketMacro(formData: FormData): Promise<AdminTicket
 
   const admin = createAdminClient();
   const { error, count } = await admin.from("ticket_macros").delete({ count: "exact" }).eq("id", id);
-  if (error || count !== 1) return { error: "Makro silinemedi." };
+  if (error || count !== 1) return { error: actionErrorMessage(error, "Makro silinemedi.") };
   await logPlatformActivity({ actorId: staff.id, action: "ticket.macro.delete", entityType: "ticket_macro", entityId: id });
   revalidateTicketPages();
   return { ok: true };

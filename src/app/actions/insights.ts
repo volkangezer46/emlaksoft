@@ -8,6 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { isMissingSchemaError } from "@/lib/insights/facts";
 import { normalizeInsightSettings } from "@/lib/insights/settings";
 import { INSIGHT_DISMISS_REASONS, type InsightDismissReason, type InsightSettings } from "@/lib/insights/types";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type InsightActionResult = { ok?: boolean; error?: string; taskId?: string };
 
@@ -46,7 +47,7 @@ export async function setInsightState(
   });
   if (error) {
     console.error("setInsightState", error.code);
-    return { error: isMissingSchemaError(error) ? NOT_READY : "Öneri güncellenemedi. Lütfen tekrar deneyin." };
+    return { error: isMissingSchemaError(error) ? NOT_READY : actionErrorMessage(error, "Öneri güncellenemedi. Lütfen tekrar deneyin.") };
   }
   if (data !== true) return { error: "Öneri bulunamadı ya da zaten kapatılmış." };
 
@@ -77,7 +78,7 @@ export async function acceptInsightAsTask(insightId: string): Promise<InsightAct
     .eq("tenant_id", gate.tenantId)
     .eq("recipient_user_id", gate.userId)
     .maybeSingle();
-  if (readError) return { error: isMissingSchemaError(readError) ? NOT_READY : "Öneri okunamadı." };
+  if (readError) return { error: isMissingSchemaError(readError) ? NOT_READY : actionErrorMessage(readError, "Öneri okunamadı.") };
   if (!insight) return { error: "Öneri bulunamadı." };
   if (insight.state === "dismissed" || insight.state === "accepted") return { error: "Bu öneri zaten kapatılmış." };
 
@@ -117,7 +118,7 @@ export async function acceptInsightAsTask(insightId: string): Promise<InsightAct
       .single();
     if (insertError || !created) {
       console.error("acceptInsightAsTask", insertError?.code);
-      return { error: "Görev oluşturulamadı. Lütfen tekrar deneyin." };
+      return { error: actionErrorMessage(insertError, "Görev oluşturulamadı. Lütfen tekrar deneyin.") };
     }
     taskId = created.id as string;
     await logActivity({
@@ -165,7 +166,7 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
     .select("thresholds, approval_rules")
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  if (readError) return { error: isMissingSchemaError(readError) ? NOT_READY : "Ayarlar okunamadı." };
+  if (readError) return { error: isMissingSchemaError(readError) ? NOT_READY : actionErrorMessage(readError, "Ayarlar okunamadı.") };
 
   const prev = row?.thresholds && typeof row.thresholds === "object" ? (row.thresholds as Record<string, unknown>) : {};
   const { error } = await supabase.from("oversight_settings").upsert(
@@ -178,7 +179,7 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
     },
     { onConflict: "tenant_id" },
   );
-  if (error) return { error: "Ayarlar kaydedilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Ayarlar kaydedilemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,

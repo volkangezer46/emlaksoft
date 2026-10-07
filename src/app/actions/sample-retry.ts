@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/require-permission";
 import { seedSampleData } from "@/app/actions/sample-data";
 import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Kayıtta yüklenemeyen örnek veriyi yeniden dener. Yetki/kapı denetimleri `seedSampleData` içindedir
@@ -23,7 +24,7 @@ export async function retryRegistrationDemoSeed(): Promise<{ ok?: boolean; error
   }
   const settled = res.error?.includes("zaten yüklü") || res.error?.includes("yalnız boş ofislere");
   if (settled) jar.delete(DEMO_SEED_FAILED_COOKIE);
-  return { error: res.error ?? "Örnek veriler yüklenemedi. Lütfen tekrar deneyin." };
+  return { error: res.error ?? actionErrorMessage(null, "Örnek veriler yüklenemedi. Lütfen tekrar deneyin.") };
 }
 
 /** Bandı kapatır (örnek veri istemiyorum). */

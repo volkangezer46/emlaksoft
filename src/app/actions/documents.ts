@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { isDocSource, SOURCE_GATE } from "@/lib/documents";
 import { isSafeTenantObjectPath } from "@/lib/file-validation";
 import { cancelContract } from "@/app/actions/contracts";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Belge Merkezi (/app/belgeler) yazma işlemleri.
@@ -78,7 +79,7 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
       .eq("tenant_id", gate.tenantId);
     if (error) {
       console.error("deleteDocument customer_files", error);
-      return { error: "Dosya silinemedi." };
+      return { error: actionErrorMessage(error, "Dosya silinemedi.") };
     }
 
     await logActivity({
@@ -117,7 +118,7 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
       .eq("tenant_id", gate.tenantId);
     if (error) {
       console.error("deleteDocument property_media", error);
-      return { error: "Medya silinemedi." };
+      return { error: actionErrorMessage(error, "Medya silinemedi.") };
     }
 
     await logActivity({
@@ -150,7 +151,7 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
       .eq("tenant_id", gate.tenantId);
     if (error) {
       console.error("deleteDocument deal_checklist_items", error);
-      return { error: "Evrak bağlantısı kaldırılamadı." };
+      return { error: actionErrorMessage(error, "Evrak bağlantısı kaldırılamadı.") };
     }
 
     await logActivity({
@@ -180,7 +181,7 @@ export async function deleteDocument(kaynak: string, id: string): Promise<Docume
   if (contract.status === "cancelled") return { error: "Sözleşme zaten iptal edilmiş." };
 
   const cancellation = await cancelContract(cleanId);
-  if (!cancellation.ok) return { error: cancellation.error ?? "Sözleşme iptal edilemedi." };
+  if (!cancellation.ok) return { error: cancellation.error ?? actionErrorMessage(null, "Sözleşme iptal edilemedi.") };
   revalidatePath("/app/belgeler");
   revalidatePath("/app/sozlesmeler");
   return { ok: true, deleted: 1 };
@@ -222,7 +223,7 @@ export async function bulkDeleteDocuments(keys: string[]): Promise<DocumentResul
   revalidatePath("/app/belgeler");
 
   if (deleted === 0) {
-    return { error: failures[0] ?? "Hiçbir belge kaldırılamadı." };
+    return { error: failures[0] ?? actionErrorMessage(null, "Hiçbir belge kaldırılamadı.") };
   }
   if (failures.length > 0) {
     // Kısmi başarı da bir sonuçtur; sessizce "tamam" demek yanıltıcı olurdu.

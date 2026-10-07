@@ -115,7 +115,7 @@ export function StatusForm({ id, status, canEdit }: { id: string; status: string
         </FormSelect>
         <Button type="submit" size="sm" variant="secondary" icon={Save} loading={pending} disabled={next === status}>Kaydet</Button>
       </div>
-      {finishing ? <FormInput name="resolution_note" placeholder="Çözüm notu (zorunlu)" maxLength={1000} required /> : null}
+      {finishing ? <FormInput aria-label="Çözüm notu" name="resolution_note" placeholder="Çözüm notu (zorunlu)" maxLength={1000} required /> : null}
       <Result state={state} />
     </form>
   );

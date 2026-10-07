@@ -18,6 +18,7 @@ import {
 import type { SampleClearReport } from "@/lib/sample-clear";
 import { purgeSampleData } from "@/lib/sample-data/purge";
 import { canSwitchToRealUse, REAL_USE_HREF } from "@/lib/sample-data/real-use";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type SampleDataResult = {
   error?: string;
@@ -103,7 +104,7 @@ export async function seedSampleData(input?: { pack?: string }): Promise<SampleD
     await admin.from("tenants").update({ sample_pack: pack, sample_cleared_at: null }).eq("id", tenantId);
   } catch (e) {
     console.error("seedSampleData", e);
-    return { error: "Örnek veriler yüklenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(e, "Örnek veriler yüklenemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({

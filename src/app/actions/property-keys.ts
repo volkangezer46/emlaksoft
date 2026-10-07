@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { isKeyOut } from "@/lib/key-overdue";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Anahtar & emanet takibi action'ları.
@@ -165,7 +166,7 @@ export async function addPropertyKey(_prev: KeyResult, fd: FormData): Promise<Ke
 
   if (error || !inserted) {
     console.error("addPropertyKey", error);
-    return { error: "Anahtar eklenemedi." };
+    return { error: actionErrorMessage(error, "Anahtar eklenemedi.") };
   }
 
   await supabase.from("property_key_events").insert({
@@ -276,7 +277,7 @@ export async function checkoutPropertyKey(_prev: KeyResult, fd: FormData): Promi
 
   if (error) {
     console.error("checkoutPropertyKey", error);
-    return { error: "Çıkış kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Çıkış kaydedilemedi.") };
   }
 
   await supabase.from("property_key_events").insert({

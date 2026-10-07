@@ -97,6 +97,7 @@ export function OfferStatusActions({ offerId, status }: { offerId: string; statu
       {counterMode ? (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
           <input
+            aria-label="Karşı teklif tutarı (₺)"
             type="number"
             min="0"
             step="1000"

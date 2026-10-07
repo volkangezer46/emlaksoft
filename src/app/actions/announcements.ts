@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { notifyTenant } from "@/lib/notify";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AnnouncementResult = { ok?: boolean; error?: string };
 
@@ -121,7 +122,7 @@ export async function updateAnnouncement(_prev: AnnouncementResult, fd: FormData
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("updateAnnouncement", error);
-    return { error: "Duyuru güncellenemedi." };
+    return { error: actionErrorMessage(error, "Duyuru güncellenemedi.") };
   }
 
   revalidateAnnouncements();

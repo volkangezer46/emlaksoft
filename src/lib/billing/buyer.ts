@@ -1,5 +1,6 @@
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { ActionUserError } from "@/lib/action-errors";
 
 export type CheckoutBuyerDraft = {
   id: string;
@@ -70,13 +71,13 @@ export function validateCheckoutBuyer(input: CheckoutBuyerDraft): ValidatedCheck
   const address = clean(input.address, 250);
   const city = clean(input.city, 80);
 
-  if (!id) throw new Error("Ödeme sahibi kimliği bulunamadı.");
-  if (nameParts.length < 2) throw new Error("Ödeme için ad ve soyad eksiksiz girilmelidir.");
-  if (!isValidEmail(email)) throw new Error("Ödeme için geçerli bir e-posta adresi girilmelidir.");
-  if (!gsmNumber) throw new Error("Ödeme için geçerli bir telefon numarası girilmelidir.");
-  if (!identityNumber) throw new Error("Geçerli T.C. kimlik veya vergi numarası girilmelidir.");
-  if (address.length < 10) throw new Error("Ödeme için açık adres en az 10 karakter olmalıdır.");
-  if (city.length < 2) throw new Error("Ödeme için şehir bilgisi girilmelidir.");
+  if (!id) throw new ActionUserError("Ödeme sahibi kimliği bulunamadı.");
+  if (nameParts.length < 2) throw new ActionUserError("Ödeme için ad ve soyad eksiksiz girilmelidir.");
+  if (!isValidEmail(email)) throw new ActionUserError("Ödeme için geçerli bir e-posta adresi girilmelidir.");
+  if (!gsmNumber) throw new ActionUserError("Ödeme için geçerli bir telefon numarası girilmelidir.");
+  if (!identityNumber) throw new ActionUserError("Geçerli T.C. kimlik veya vergi numarası girilmelidir.");
+  if (address.length < 10) throw new ActionUserError("Ödeme için açık adres en az 10 karakter olmalıdır.");
+  if (city.length < 2) throw new ActionUserError("Ödeme için şehir bilgisi girilmelidir.");
 
   const name = nameParts[0]!;
   const surname = nameParts.slice(1).join(" ");

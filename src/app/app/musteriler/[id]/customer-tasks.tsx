@@ -106,11 +106,11 @@ export function CustomerTasks({
 
       {adding ? (
         <form action={submit} className="mt-4 grid gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3 sm:grid-cols-[1fr_auto_auto_auto]">
-          <input name="title" required placeholder="Görev başlığı" className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400" />
-          <select name="kind" defaultValue="followup" className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400">
+          <input aria-label="Görev başlığı" name="title" required placeholder="Görev başlığı" className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-400" />
+          <select aria-label="Görev türü" name="kind" defaultValue="followup" className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400">
             {Object.entries(KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input name="due_at" type="datetime-local" className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400" />
+          <input aria-label="Son tarih" name="due_at" type="datetime-local" className="rounded-[var(--radius-control)] border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-brand-400" />
           <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Ekle</button>
           {error ? <p className="text-sm text-danger-500 sm:col-span-4">{error}</p> : null}
         </form>

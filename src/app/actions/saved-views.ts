@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Kayıtlı görünümler — kullanıcının liste sayfası filtre kombinasyonlarını
@@ -122,7 +123,7 @@ export async function createSavedView(
   if (error) {
     if (error.code === "23505") return { error: "Bu adla kayıtlı bir görünüm zaten var." };
     console.error("createSavedView", error);
-    return { error: "Görünüm kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Görünüm kaydedilemedi.") };
   }
 
   revalidatePath(route);
@@ -154,7 +155,7 @@ export async function deleteSavedView(id: string): Promise<{ error?: string; ok?
 
   if (error) {
     console.error("deleteSavedView", error);
-    return { error: "Görünüm silinemedi." };
+    return { error: actionErrorMessage(error, "Görünüm silinemedi.") };
   }
   if (!data || data.length === 0) return { error: "Görünüm bulunamadı." };
 

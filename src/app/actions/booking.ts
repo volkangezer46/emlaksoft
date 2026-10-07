@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { normalizeWeekdayHours, WEEKDAY_LABELS, type WeekdayHours } from "@/lib/booking-slots";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type BookingSettingsResult = { ok?: boolean; error?: string };
 
@@ -76,7 +77,7 @@ export async function upsertBookingSettings(fd: FormData): Promise<BookingSettin
 
   if (error) {
     console.error("upsertBookingSettings", error);
-    return { error: "Ayar kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Ayar kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -115,7 +116,7 @@ export async function regenerateBookingToken(): Promise<BookingSettingsResult> {
 
   if (error) {
     console.error("regenerateBookingToken", error);
-    return { error: "Link yenilenemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Link yenilenemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({

@@ -6,6 +6,7 @@ import { resolveGeo } from "@/lib/geo";
 import { getEfIlceler, getEfIller, getEfMahalleler } from "@/lib/integrations/emlakfiyati/ortak-client";
 import { type OrtakValuationInput } from "@/lib/integrations/emlakfiyati/ortak-contract";
 import { getReportDetail, runParcelValuation, type ReportDetailResult, type RunValuationResult } from "@/lib/ef-credits/service";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Ada/parsel değerleme (EmlakFiyati Ortak API) — kullanıcı eylemleri. Her action requirePermission("valuation", ...) + hız sınırı.
@@ -29,7 +30,7 @@ async function geoGate(): Promise<{ ok: false; error: string } | { ok: true }> {
 }
 
 function toList(out: Awaited<ReturnType<typeof getEfIller>>): EfGeoListResult {
-  if (!out.ok) return { ok: false, error: "Konum listesi şu an alınamadı. Lütfen tekrar deneyin." };
+  if (!out.ok) return { ok: false, error: actionErrorMessage(null, "Konum listesi şu an alınamadı. Lütfen tekrar deneyin.") };
   return { ok: true, items: out.data.map((i) => ({ id: i.id, ad: i.ad })) };
 }
 

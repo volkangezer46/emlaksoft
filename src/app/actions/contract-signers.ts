@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { isSignerSmsAvailable, sendSignerSms } from "@/app/imza/_lib/sms";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type SignerResult = { ok?: boolean; error?: string; sms?: "sent" | "unavailable" | "failed" };
 
@@ -57,7 +58,7 @@ export async function updateContractSigner(_prev: SignerResult, fd: FormData): P
     .eq("status", "pending");
   if (error) {
     console.error("updateContractSigner", { code: error.code || "unknown" });
-    return { error: "İmzalayan güncellenemedi." };
+    return { error: actionErrorMessage(error, "İmzalayan güncellenemedi.") };
   }
 
   await logActivity({

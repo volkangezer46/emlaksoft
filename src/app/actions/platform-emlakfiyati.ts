@@ -18,6 +18,7 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { guardPlatformAction } from "@/lib/platform-guards";
 import { PLATFORM_SECRETS_DISABLED_MESSAGE, platformSecretsEnabled } from "@/lib/platform-secrets";
 import { setPlatformSetting } from "@/lib/platform-settings";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * EmlakFiyati API anahtarı yönetimi (Admin > Sistem > EmlakFiyati). YALNIZ süper admin yazar; ops salt okur (sayfada).
@@ -51,7 +52,7 @@ export async function saveEmlakFiyatiKey(fd: FormData): Promise<EmlakFiyatiActio
   if (!res.ok) {
     if (res.error === "secrets_disabled") return { error: PLATFORM_SECRETS_DISABLED_MESSAGE };
     if (res.error === "same_key") return { error: "Bu anahtar zaten tanımlı." };
-    return { error: "Anahtar kaydedilemedi." };
+    return { error: actionErrorMessage(null, "Anahtar kaydedilemedi.") };
   }
 
   await logPlatformActivity({
@@ -67,7 +68,7 @@ export async function saveEmlakFiyatiKey(fd: FormData): Promise<EmlakFiyatiActio
 export async function deletePreviousEmlakFiyatiKey(): Promise<EmlakFiyatiActionResult> {
   const g = await gate("platform-emlakfiyati-key");
   if ("error" in g) return { error: g.error };
-  if (!(await dropPreviousEmlakFiyatiKey(g.staff.id))) return { error: "Eski anahtar silinemedi." };
+  if (!(await dropPreviousEmlakFiyatiKey(g.staff.id))) return { error: actionErrorMessage(null, "Eski anahtar silinemedi.") };
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "integration.emlakfiyati.previous_delete",
@@ -81,7 +82,7 @@ export async function deletePreviousEmlakFiyatiKey(): Promise<EmlakFiyatiActionR
 export async function clearEmlakFiyatiKey(): Promise<EmlakFiyatiActionResult> {
   const g = await gate("platform-emlakfiyati-key");
   if ("error" in g) return { error: g.error };
-  if (!(await clearStoredEmlakFiyatiKeys(g.staff.id))) return { error: "Anahtar silinemedi." };
+  if (!(await clearStoredEmlakFiyatiKeys(g.staff.id))) return { error: actionErrorMessage(null, "Anahtar silinemedi.") };
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "integration.emlakfiyati.key_clear",
@@ -135,7 +136,7 @@ export async function setEmlakFiyatiOrtakFlag(enabled: boolean): Promise<EmlakFi
     return { error: "Önce 'Ortak bağlantıyı dene' başarılı olmalı: ortak uçlar canlıda doğrulanmadan etkinleştirilemez." };
   }
   const ok = await setPlatformSetting(EF_SETTING.ortakEnabled, enabled === true ? "1" : "0", g.staff.id);
-  if (!ok) return { error: "Ayar kaydedilemedi." };
+  if (!ok) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "integration.emlakfiyati.ortak_flag",

@@ -10,6 +10,7 @@ import { checkAuthorityShield } from "@/lib/authority-shield";
 import { notifyTenant } from "@/lib/notify";
 import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string };
 
@@ -78,7 +79,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     });
     if (closeError) {
       console.error("convertWorkflow atomic close", { code: closeError.code });
-      return { error: "Anlaşma, komisyon ve portföy durumu birlikte oluşturulamadı." };
+      return { error: actionErrorMessage(closeError, "Anlaşma, komisyon ve portföy durumu birlikte oluşturulamadı.") };
     }
     const close = closeData && typeof closeData === "object" && !Array.isArray(closeData)
       ? closeData as Record<string, unknown>
@@ -90,7 +91,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       return { error: "Kapanıştan önce portföyde 0'dan büyük, en çok iki ondalık haneli geçerli bir komisyon oranı tanımlayın." };
     }
     if (close?.outcome !== "created" || typeof close.deal_id !== "string" || typeof close.commission_id !== "string") {
-      return { error: "Kapanış kaydı oluşturulamadı." };
+      return { error: actionErrorMessage(null, "Kapanış kaydı oluşturulamadı.") };
     }
     const dealId = close.deal_id;
     const commissionId = close.commission_id;
@@ -129,7 +130,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       .not("status", "in", "(paid,collected)")
       .select("id")
       .maybeSingle();
-    if (error) return { error: "Durum güncellenemedi." };
+    if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
     if (!updated) return { error: "Komisyon bulunamadı veya zaten tahsil edilmiş." };
     await logActivity({
       tenantId: gate.tenantId,

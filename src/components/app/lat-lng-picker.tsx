@@ -48,6 +48,7 @@ export function LatLngPicker({
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <input
+          aria-label="Enlem"
           name="lat"
           value={lat}
           onChange={(e) => setLat(e.target.value)}
@@ -56,6 +57,7 @@ export function LatLngPicker({
           className={`min-w-0 flex-1 ${cls}`}
         />
         <input
+          aria-label="Boylam"
           name="lng"
           value={lng}
           onChange={(e) => setLng(e.target.value)}

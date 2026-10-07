@@ -22,6 +22,7 @@ import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
 import { syncScopeForRoleChange } from "@/lib/access-control/scope-sync";
 import { ensureBranchBelongsToTenant, ensureSeatAvailable, provisionTeamMember } from "@/lib/team/provision-member";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TeamResult = { error?: string; ok?: boolean; id?: string };
 
@@ -142,13 +143,13 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
     : { data: { user: null }, error: null };
   if (requiresIdentitySync && (authReadError || !authRecord.user)) {
     console.error("team identity read", authReadError);
-    return { error: "Üyenin kimlik kaydı doğrulanamadı." };
+    return { error: actionErrorMessage(null, "Üyenin kimlik kaydı doğrulanamadı.") };
   }
 
   const { error } = await admin.from("profiles").update(patch).eq("id", id);
   const planError = planLimitErrorMessage(error);
   if (planError) return { error: planError };
-  if (error) return { error: "Üye güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Üye güncellenemedi.") };
 
   // Claims, ban state and canonical profile move as one compensated operation.
   if (requiresIdentitySync) {
@@ -240,7 +241,7 @@ export async function createBranch(_prev: TeamResult, formData: FormData): Promi
   });
   const planError = planLimitErrorMessage(error);
   if (planError) return { error: planError };
-  if (error) return { error: "Şube oluşturulamadı." };
+  if (error) return { error: actionErrorMessage(error, "Şube oluşturulamadı.") };
 
   revalidatePath("/app/ekip");
   revalidatePath("/app/ekip/subeler");
@@ -307,7 +308,7 @@ export async function updateBranch(formData: FormData): Promise<TeamResult> {
   const { error } = await supabase.from("branches").update(patch).eq("id", id).eq("tenant_id", tenantId);
   const planError = planLimitErrorMessage(error);
   if (planError) return { error: planError };
-  if (error) return { error: "Şube güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Şube güncellenemedi.") };
 
   revalidatePath("/app/ekip");
   revalidatePath("/app/ekip/subeler");
@@ -564,7 +565,7 @@ export async function getHandoffCounts(fromId: string): Promise<{ counts?: Recor
       .in("status", ["pending", "confirmed", "signature"])
       .gte("scheduled_at", nowIso),
   ]);
-  if (c.error || p.error || d.error || t.error || a.error) return { error: "Sayımlar okunamadı." };
+  if (c.error || p.error || d.error || t.error || a.error) return { error: actionErrorMessage(c.error, "Sayımlar okunamadı.") };
   return {
     counts: {
       customers: c.count ?? 0,

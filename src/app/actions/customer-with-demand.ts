@@ -16,6 +16,7 @@ import { createCustomer } from "@/app/actions/customers";
 import { createDemand } from "@/app/actions/demands";
 import { linkRecordToCustomer } from "@/app/actions/communications";
 import { findCustomerDuplicates } from "@/lib/duplicate-finders";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CustomerWithDemandResult = {
   error?: string;
@@ -109,7 +110,7 @@ export async function createCustomerWithDemand(
   }
 
   const customer = await createCustomer({}, formData);
-  if (!customer.ok || !customer.id) return { error: customer.error ?? "Müşteri eklenemedi." };
+  if (!customer.ok || !customer.id) return { error: customer.error ?? actionErrorMessage(null, "Müşteri eklenemedi.") };
   // Gelen kutusu / çağrı kaydından açıldıysa kaynak kayıt yeni müşteriye bağlanır (hata müşteri kaydını bozmaz).
   const linkRef = String(formData.get("link_ref") ?? "").trim();
   const linkMatch = /^([ac])-([0-9a-f-]{36})$/i.exec(linkRef);
@@ -124,7 +125,7 @@ export async function createCustomerWithDemand(
   for (const [k, v] of Object.entries(values)) demandForm.set(k, v);
   const demand = await createDemand({}, demandForm);
   if (!demand.ok) {
-    const reason = demand.error ?? "Talep kaydedilemedi.";
+    const reason = demand.error ?? actionErrorMessage(null, "Talep kaydedilemedi.");
     return {
       id: customer.id,
       demandError: reason,

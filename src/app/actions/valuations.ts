@@ -10,6 +10,7 @@ import { estimateMultiSourceValue } from "@/lib/valuation";
 import { comparablesSourceEntry, listComparableDetails } from "@/lib/comparables";
 import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvinceName } from "@/lib/geo/reader";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ValuationResult = { error?: string; ok?: boolean; id?: string };
 export type ValuationShareResult = { error?: string; ok?: boolean; url?: string };
@@ -50,7 +51,7 @@ export async function generateValuationShareLink(id: string): Promise<ValuationS
       .eq("tenant_id", gate.tenantId);
     if (error) {
       console.error("generateValuationShareLink", error);
-      return { error: "Paylaşım linki oluşturulamadı." };
+      return { error: actionErrorMessage(error, "Paylaşım linki oluşturulamadı.") };
     }
     await logActivity({
       tenantId: gate.tenantId,
@@ -213,7 +214,7 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
 
   if (error) {
     console.error("createValuation", error);
-    return { error: "Değerleme kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Değerleme kaydedilemedi.") };
   }
 
   await logActivity({

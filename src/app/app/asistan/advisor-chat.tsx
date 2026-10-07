@@ -596,6 +596,7 @@ export function TenantAdvisorChat({
         <div className="border-t border-line p-3">
           <div className="flex items-end gap-2">
             <textarea
+              aria-label="Asistana mesajınız"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {

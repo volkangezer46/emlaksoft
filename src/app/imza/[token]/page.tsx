@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { SignPanel } from "./sign-panel";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { isPast } from "@/lib/clock";
 import { isSignerSmsAvailable, maskPhone } from "../_lib/sms";
 import { isPublicTenantActive } from "@/lib/public-tenant";
@@ -68,7 +68,7 @@ export default async function PublicContractSignPage({ params }: { params: Promi
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-400">
               <ShieldCheck className="h-3.5 w-3.5" /> {office}
             </p>
-            <PrintButton />
+            <PrintButton tone="glass" size="sm" label="Yazdır / PDF kaydet" />
           </div>
           <h1 className="mt-2 font-display text-2xl font-extrabold sm:text-3xl">{contract.title}</h1>
           <p className="mt-2 flex items-center gap-2 text-sm text-white/60">

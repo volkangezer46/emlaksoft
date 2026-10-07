@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { moneyTry } from "@/lib/leak-shield";
 import { getBaseUrl } from "@/lib/base-url";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/ui/print-button";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { buildQrListingUrl, qrImageSrc } from "@/lib/qr-source";
 import {

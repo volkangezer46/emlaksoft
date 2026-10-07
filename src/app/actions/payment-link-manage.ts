@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
 import { normalizeExtendDays, paymentLinkCancelDecision } from "@/lib/workflow-rules";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PaymentLinkManageResult = { error?: string; ok?: boolean };
 
@@ -40,7 +41,7 @@ export async function listCommissionPaymentLinks(
     .limit(20);
   if (error) {
     console.error("listCommissionPaymentLinks", error);
-    return { error: "Ödeme linkleri okunamadı." };
+    return { error: actionErrorMessage(error, "Ödeme linkleri okunamadı.") };
   }
   const base = getBaseUrl();
   return {
@@ -98,7 +99,7 @@ export async function cancelPaymentLink(linkId: string): Promise<PaymentLinkMana
     .maybeSingle();
   if (error) {
     console.error("cancelPaymentLink", error);
-    return { error: "Ödeme linki iptal edilemedi." };
+    return { error: actionErrorMessage(error, "Ödeme linki iptal edilemedi.") };
   }
   if (!updated) return { error: "Link durumu bu sırada değişti; yenileyin." };
 

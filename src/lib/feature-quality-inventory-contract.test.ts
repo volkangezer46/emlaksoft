@@ -45,15 +45,18 @@ describe("product feature quality inventory", () => {
   });
 
   it("keeps accessible recovery focus in root, product and admin error boundaries", () => {
+    // /app ve /admin sınırları kanonik `ui/route-error` görünümünü çizer (odak + kayıt orada).
     for (const file of [
       "src/app/error.tsx",
-      "src/app/app/error.tsx",
-      "src/app/admin/error.tsx",
+      "src/components/ui/route-error.tsx",
     ]) {
       const source = readFileSync(resolve(process.cwd(), file), "utf8");
       expect(source, file).toContain("headingRef.current?.focus()");
       expect(source, file).toContain("tabIndex={-1}");
       expect(source, file).toContain("reportClientError(");
+    }
+    for (const file of ["src/app/app/error.tsx", "src/app/admin/error.tsx"]) {
+      expect(readFileSync(resolve(process.cwd(), file), "utf8"), file).toContain("<RouteError");
     }
   });
 
@@ -72,7 +75,7 @@ describe("product feature quality inventory", () => {
     expect(source).toContain('.eq("tenant_id", gate.tenantId)');
     expect(source.match(/\.select\("id"\)\s*\.maybeSingle\(\)/g)).toHaveLength(2);
     expect(source).toContain('if (!data) return { error: "Gider kaydı bulunamadı." };');
-    expect(source).toContain('return { error: "Gider silinemedi." };');
+    expect(source).toContain('return { error: actionErrorMessage(error, "Gider silinemedi.") };');
     expect(source).toContain('throw new Error("Gider kayıtları güvenli şekilde yüklenemedi.")');
     expect(createForm).toContain("useActionState<ExpenseResult, FormData>");
     expect(createForm).toContain('role="alert"');

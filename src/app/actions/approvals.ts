@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { canDecide, isApprovalKind, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ApprovalResult = { ok?: boolean; error?: string; id?: string };
 
@@ -73,7 +74,7 @@ export async function createApprovalRequest(
     .select("id")
     .single();
 
-  if (error || !data) return { error: "Talep kaydedilemedi." };
+  if (error || !data) return { error: actionErrorMessage(error, "Talep kaydedilemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -175,7 +176,7 @@ export async function decideApproval(
     .eq("tenant_id", gate.tenantId)
     .eq("status", "bekliyor"); // yarış koşulu: iki yönetici aynı anda karar veremez
 
-  if (error) return { error: "Karar kaydedilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Karar kaydedilemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -268,7 +269,7 @@ export async function cancelApprovalRequest(
     .eq("requested_by", gate.userId)
     .eq("status", "bekliyor");
 
-  if (error) return { error: "Talep iptal edilemedi." };
+  if (error) return { error: actionErrorMessage(error, "Talep iptal edilemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -313,7 +314,7 @@ export async function addApprovalComment(
     author_id: gate.userId,
     body,
   });
-  if (error) return { error: "Not eklenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Not eklenemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,

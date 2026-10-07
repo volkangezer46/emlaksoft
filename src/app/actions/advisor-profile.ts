@@ -32,6 +32,7 @@ import {
   piiAad,
   type PiiField,
 } from "@/lib/advisor/pii-crypto";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AdvisorProfileResult = { ok?: boolean; error?: string; message?: string; warnings?: string[] };
 export type RevealResult = { ok: true; value: string } | { ok: false; error: string };
@@ -46,8 +47,8 @@ const isManagerRole = (role: string) => role === "owner" || role === "gm";
 
 function dbError(scope: string, error: { message?: string; code?: string }, fallback: string): string {
   if (isAdvisorSchemaMissing(error)) return NOT_READY;
-  console.error(scope, error.message);
-  return fallback;
+  void scope;
+  return actionErrorMessage(error, fallback);
 }
 
 async function targetInTenant(supabase: Supabase, tenantId: string, profileId: string): Promise<boolean> {
@@ -364,7 +365,7 @@ export async function saveAdvisorSpecialties(profileId: string, specialtiesJson:
   const supabase = await createClient();
   if (!(await targetInTenant(supabase, gate.tenantId, profileId))) return { error: "Danışman bu ofise ait değil." };
   const raw = parseJson(specialtiesJson);
-  if (raw === null) return { error: "Uzmanlık listesi okunamadı." };
+  if (raw === null) return { error: actionErrorMessage(null, "Uzmanlık listesi okunamadı.") };
   const res = await writeSpecialties(supabase, { tenantId: gate.tenantId, actorId: gate.userId }, profileId, raw);
   if (res.ok) revalidatePath(`/app/ekip/${profileId}`);
   return res.ok ? { ok: true, message: "Uzmanlıklar kaydedildi." } : res;
@@ -379,7 +380,7 @@ export async function saveAdvisorRegions(profileId: string, regionsJson: string)
   const supabase = await createClient();
   if (!(await targetInTenant(supabase, gate.tenantId, profileId))) return { error: "Danışman bu ofise ait değil." };
   const raw = parseJson(regionsJson);
-  if (raw === null) return { error: "Bölge listesi okunamadı." };
+  if (raw === null) return { error: actionErrorMessage(null, "Bölge listesi okunamadı.") };
   const res = await writeRegions(supabase, { tenantId: gate.tenantId, actorId: gate.userId }, profileId, raw);
   if (res.ok) revalidatePath(`/app/ekip/${profileId}`);
   return res.ok ? { ok: true, message: "Bölgeler kaydedildi." } : res;

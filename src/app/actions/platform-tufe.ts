@@ -6,6 +6,7 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { setPlatformSetting } from "@/lib/platform-settings";
 import { TUFE_SETTING_KEY, serializeTufeTable, validateTufeTable } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TufeSaveResult = { ok?: boolean; error?: string };
 
@@ -33,7 +34,7 @@ export async function saveTufeTable(fd: FormData): Promise<TufeSaveResult> {
 
   const before = await loadTufeTable();
   const ok = await setPlatformSetting(TUFE_SETTING_KEY, serializeTufeTable(v.table), gate.staff.id);
-  if (!ok) return { error: "TÜFE tablosu kaydedilemedi. Lütfen tekrar deneyin." };
+  if (!ok) return { error: actionErrorMessage(null, "TÜFE tablosu kaydedilemedi. Lütfen tekrar deneyin.") };
 
   await logPlatformActivity({
     actorId: gate.staff.id,

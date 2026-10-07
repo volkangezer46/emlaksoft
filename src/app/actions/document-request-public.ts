@@ -18,6 +18,7 @@ import {
   hashRequestToken,
   lookupPublicRequest,
 } from "@/lib/doc-request/server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PublicUploadFinalizeResult = { ok?: boolean; error?: string; fileCount?: number };
 export type PublicCompleteResult = { ok?: boolean; error?: string };
@@ -110,7 +111,7 @@ export async function prepareDocRequestUpload(
   });
   if (insertError) {
     console.error("prepareDocRequestUpload insert", { code: insertError.code });
-    return { error: "Yükleme oturumu oluşturulamadı." };
+    return { error: actionErrorMessage(insertError, "Yükleme oturumu oluşturulamadı.") };
   }
   const { data: signed, error: signError } = await admin.storage
     .from(DOC_REQUEST_BUCKET)
@@ -118,7 +119,7 @@ export async function prepareDocRequestUpload(
   if (signError || !signed?.token || signed.path !== path) {
     console.error("prepareDocRequestUpload sign", { code: signError?.name ?? null });
     await admin.from("document_request_files").update({ status: "blocked" }).eq("id", fileId).eq("status", "pending");
-    return { error: "Güvenli yükleme bağlantısı oluşturulamadı." };
+    return { error: actionErrorMessage(signError, "Güvenli yükleme bağlantısı oluşturulamadı.") };
   }
   return {
     ok: true,
@@ -231,7 +232,7 @@ export async function completeDocRequest(token: string): Promise<PublicCompleteR
     .eq("id", request.id)
     .eq("tenant_id", request.tenant_id)
     .eq("status", "active");
-  if (error) return { error: "Gönderim tamamlanamadı. Lütfen tekrar deneyin." };
+  if (error) return { error: actionErrorMessage(error, "Gönderim tamamlanamadı. Lütfen tekrar deneyin.") };
   await logActivity({
     tenantId: request.tenant_id,
     actorId: null,

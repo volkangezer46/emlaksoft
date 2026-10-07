@@ -11,7 +11,7 @@ import { compareTr } from "@/lib/tr-text";
 import { now } from "@/lib/clock";
 import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
 import { EMLAKFIYATI_TIPS, type EmlakFiyatiTip } from "@/lib/integrations/emlakfiyati/contract";
-import { PrintReportButton } from "./print-report-button";
+import { PrintButton } from "@/components/ui/print-button";
 
 export const metadata = { title: "Bölge Analizi" };
 
@@ -446,7 +446,7 @@ export default async function RegionAnalysisPage({
                 subtitle={`Son 12 ay · ${tx || "Tümü"} · aylık snapshot`}
                 action={
                   <div className="no-print flex items-center gap-2">
-                    <PrintReportButton />
+                    <PrintButton tone="dark" size="sm" label="Cep raporu yazdır" />
                     <Link
                       href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${months}`}
                       className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted hover:text-ink-950"

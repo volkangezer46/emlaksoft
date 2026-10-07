@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { now } from "@/lib/clock";
 import { evaluateOwnerInfo, isMissingSchemaError, parseOwnerInfoForm } from "@/lib/property-owner/info";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OwnerInfoResult = { ok?: boolean; error?: string; score?: number; missing?: string[] };
 
@@ -66,7 +67,7 @@ export async function updatePropertyOwnerInfo(propertyId: string, formData: Form
     return {
       error: isMissingSchemaError(readError)
         ? "İlan sahibi ayrıntı kaydı henüz etkin değil (veritabanı güncellemesi bekleniyor)."
-        : "İlan sahibi bilgisi okunamadı.",
+        : actionErrorMessage(null, "İlan sahibi bilgisi okunamadı."),
     };
   }
   const prev = existing as { id: string; customer_id: string | null; kvkk_consent: boolean } | null;
@@ -120,7 +121,7 @@ export async function updatePropertyOwnerInfo(propertyId: string, formData: Form
     .eq("tenant_id", gate.tenantId);
   if (propError) {
     console.error("updatePropertyOwnerInfo property", { code: propError.code });
-    return { error: "Yetki bilgileri kaydedilemedi." };
+    return { error: actionErrorMessage(propError, "Yetki bilgileri kaydedilemedi.") };
   }
 
   await logActivity({

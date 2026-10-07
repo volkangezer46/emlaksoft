@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import type { PlaybookTriggerEvent } from "@/lib/playbook-engine";
 import { PLAYBOOK_TRIGGER_EVENTS } from "@/lib/playbook-labels";
 import { findPlaybookTemplate } from "@/lib/playbook-templates";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * İş akışı (playbook) yönetimi — /app/ayarlar/is-akislari.
@@ -49,7 +50,7 @@ function parseSteps(raw: unknown): { ok: true; steps: ParsedStep[] } | { ok: fal
   try {
     parsed = typeof raw === "string" && raw.trim() ? JSON.parse(raw) : [];
   } catch {
-    return { ok: false, error: "Adım listesi okunamadı." };
+    return { ok: false, error: actionErrorMessage(null, "Adım listesi okunamadı.") };
   }
   if (!Array.isArray(parsed)) return { ok: false, error: "Adım listesi geçersiz." };
   if (parsed.length === 0) return { ok: false, error: "En az bir adım eklemelisiniz." };
@@ -158,7 +159,7 @@ export async function createPlaybook(_prev: PlaybookResult, fd: FormData): Promi
 
   if (error || !data) {
     console.error("createPlaybook", error);
-    return { error: "İş akışı kaydedilemedi." };
+    return { error: actionErrorMessage(error, "İş akışı kaydedilemedi.") };
   }
 
   const { error: stepError } = await supabase.from("playbook_steps").insert(
@@ -168,7 +169,7 @@ export async function createPlaybook(_prev: PlaybookResult, fd: FormData): Promi
     // Adımsız playbook işe yaramaz — başlığı da geri al (yarım kayıt bırakma).
     await supabase.from("playbooks").delete().eq("id", data.id).eq("tenant_id", gate.tenantId);
     console.error("createPlaybook steps", stepError);
-    return { error: "İş akışı adımları kaydedilemedi." };
+    return { error: actionErrorMessage(stepError, "İş akışı adımları kaydedilemedi.") };
   }
 
   await logActivity({
@@ -221,7 +222,7 @@ export async function updatePlaybook(_prev: PlaybookResult, fd: FormData): Promi
 
   if (error) {
     console.error("updatePlaybook", error);
-    return { error: "İş akışı güncellenemedi." };
+    return { error: actionErrorMessage(error, "İş akışı güncellenemedi.") };
   }
 
   await supabase.from("playbook_steps").delete().eq("playbook_id", id).eq("tenant_id", gate.tenantId);
@@ -230,7 +231,7 @@ export async function updatePlaybook(_prev: PlaybookResult, fd: FormData): Promi
   );
   if (stepError) {
     console.error("updatePlaybook steps", stepError);
-    return { error: "İş akışı adımları kaydedilemedi." };
+    return { error: actionErrorMessage(stepError, "İş akışı adımları kaydedilemedi.") };
   }
 
   await logActivity({
@@ -272,7 +273,7 @@ export async function togglePlaybookActive(id: string, isActive: boolean): Promi
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("togglePlaybookActive", error);
-    return { error: "Durum güncellenemedi." };
+    return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   }
 
   await logActivity({
@@ -314,7 +315,7 @@ export async function applyPlaybookTemplate(fd: FormData): Promise<PlaybookResul
 
   if (error || !data) {
     console.error("applyPlaybookTemplate", error);
-    return { error: "Şablon kopyalanamadı." };
+    return { error: actionErrorMessage(error, "Şablon kopyalanamadı.") };
   }
 
   const { error: stepError } = await supabase.from("playbook_steps").insert(
@@ -334,7 +335,7 @@ export async function applyPlaybookTemplate(fd: FormData): Promise<PlaybookResul
   if (stepError) {
     await supabase.from("playbooks").delete().eq("id", data.id).eq("tenant_id", gate.tenantId);
     console.error("applyPlaybookTemplate steps", stepError);
-    return { error: "Şablon adımları kopyalanamadı." };
+    return { error: actionErrorMessage(stepError, "Şablon adımları kopyalanamadı.") };
   }
 
   await logActivity({

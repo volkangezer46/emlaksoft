@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
 
 export type KvkkResult = { ok?: boolean; error?: string; ref?: string };
 
@@ -51,7 +52,7 @@ export async function requestCustomerErasure(formData: FormData): Promise<KvkkRe
   if (error) {
     // Fonksiyon `raise exception` ile anlamlı mesaj döndürüyor ("bu ofise ait
     // değil", "daha önce anonimleştirilmiş"); kullanıcıya onu gösteriyoruz.
-    return { error: error.message || "Anonimleştirme yapılamadı." };
+    return { error: sqlRaiseMessage(error) ?? actionErrorMessage(error, "Anonimleştirme yapılamadı.") };
   }
 
   const sonuc = (data ?? {}) as { ok?: boolean; ref?: string };
@@ -96,7 +97,7 @@ export async function purgeStaleCustomers(formData: FormData): Promise<KvkkResul
     p_days: Math.round(gun),
     p_actor_id: gate.userId,
   });
-  if (error) return { error: error.message || "Temizlik çalıştırılamadı." };
+  if (error) return { error: sqlRaiseMessage(error) ?? actionErrorMessage(error, "Temizlik çalıştırılamadı.") };
 
   const adet = Number(data ?? 0);
   if (adet > 0) {

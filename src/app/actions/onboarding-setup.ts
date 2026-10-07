@@ -21,6 +21,7 @@ import {
   toggleSkipped,
   welcomeDoneCookieName,
 } from "@/lib/setup-skip";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OnboardingSetupResult = { error?: string; ok?: boolean };
 
@@ -72,7 +73,7 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
   const { error } = await supabase.from("tenants").update(patch).eq("id", gate.tenantId);
   if (error) {
     console.error("saveOfficeProfile", error);
-    return { error: "Ofis profili kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Ofis profili kaydedilemedi.") };
   }
 
   await logActivity({
@@ -149,7 +150,7 @@ export async function saveOwnPhone(formData: FormData): Promise<OnboardingSetupR
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("saveOwnPhone", error);
-    return { error: "Telefon kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Telefon kaydedilemedi.") };
   }
   revalidatePath("/app/hos-geldin");
   revalidatePath("/app/ekip");
@@ -174,7 +175,7 @@ export async function applyOfficeTemplate(kind: string): Promise<OnboardingSetup
     .in("category", ["loss_reason", "customer_source"]);
   if (readError) {
     console.error("applyOfficeTemplate:read", readError);
-    return { error: "Mevcut tanımlar okunamadı." };
+    return { error: actionErrorMessage(readError, "Mevcut tanımlar okunamadı.") };
   }
   const have = new Set((existing ?? []).map((r) => `${r.category}\u0000${String(r.value).toLocaleLowerCase("tr-TR")}`));
   const maxSort = (category: string) =>
@@ -197,7 +198,7 @@ export async function applyOfficeTemplate(kind: string): Promise<OnboardingSetup
     const { error } = await supabase.from("definitions").insert(rows);
     if (error) {
       console.error("applyOfficeTemplate:insert", error);
-      return { error: "Ofis tipi şablonu uygulanamadı." };
+      return { error: actionErrorMessage(error, "Ofis tipi şablonu uygulanamadı.") };
     }
     added = rows.length;
     updateTag(`definitions:${gate.tenantId}`);

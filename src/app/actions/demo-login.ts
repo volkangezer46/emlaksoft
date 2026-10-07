@@ -10,6 +10,7 @@ import { getDemoPersona, type DemoPersona } from "@/lib/demo-personas";
 import { planAmountTry } from "@/lib/billing/plans";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { deriveDemoPassword } from "@/lib/demo-credentials";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 const DEMO_TENANT_SLUG = "demo-ofis";
 const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
@@ -23,12 +24,6 @@ function passwordForDemoIdentity(email: string): string {
     resolveSupabaseAdminKey() ||
     "";
   return deriveDemoPassword(secret, email);
-}
-
-function errMsg(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  if (typeof e === "string") return e;
-  return "Bilinmeyen hata";
 }
 
 async function findAuthUserIdByEmail(
@@ -204,7 +199,7 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
     await ensurePersona(persona);
   } catch (e) {
     console.error("quickDemoLogin:ensure", e);
-    return { error: `Demo hesap hazırlanamadı: ${errMsg(e)}` };
+    return { error: actionErrorMessage(e, "Demo hesap hazırlanamadı") };
   }
 
   const supabase = await createClient();
@@ -215,7 +210,7 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
 
   if (error) {
     console.error("quickDemoLogin:signIn", error);
-    return { error: `Demo giriş başarısız: ${error.message}` };
+    return { error: actionErrorMessage(error, "Demo giriş başarısız") };
   }
 
   // Platform kişilikleri zorunlu iki adımlı doğrulamadan (TOTP) geçer. Sunucu işleminin içinden

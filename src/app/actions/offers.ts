@@ -10,6 +10,7 @@ import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type OfferResult = { ok?: boolean; error?: string; id?: string };
 
@@ -53,13 +54,13 @@ export async function createOffer(
   });
   if (error) {
     console.error("createOffer atomic", { code: error.code });
-    return { error: "Teklif ve pazarlık kaydı oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Teklif ve pazarlık kaydı oluşturulamadı.") };
   }
   const transition = transitionData && typeof transitionData === "object" && !Array.isArray(transitionData)
     ? transitionData as Record<string, unknown>
     : null;
   if (transition?.outcome !== "created" || typeof transition.offer_id !== "string") {
-    return { error: "Teklif kaydedilemedi." };
+    return { error: actionErrorMessage(null, "Teklif kaydedilemedi.") };
   }
   const offerId = transition.offer_id;
 
@@ -106,7 +107,7 @@ export async function updateOfferStatus(
   });
   if (error) {
     console.error("updateOfferStatus atomic", { code: error.code });
-    return { error: "Teklif durumu güncellenemedi." };
+    return { error: actionErrorMessage(error, "Teklif durumu güncellenemedi.") };
   }
   const result = data && typeof data === "object" && !Array.isArray(data)
     ? data as Record<string, unknown>
@@ -115,7 +116,7 @@ export async function updateOfferStatus(
   if (outcome === "not_found") return { error: "Teklif bulunamadı." };
   if (outcome === "invalid_transition") return { error: "Kapanmış bir teklif yeniden açılamaz." };
   if (outcome === "expired") return { error: "Süresi dolmuş teklif kabul edilemez veya karşılanamaz." };
-  if (outcome !== "applied" && outcome !== "replay") return { error: "Teklif durumu güncellenemedi." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Teklif durumu güncellenemedi.") };
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/teklifler/${offerId}`);
@@ -151,7 +152,7 @@ export async function addOfferRound(
   });
   if (error) {
     console.error("addOfferRound atomic", { code: error.code });
-    return { error: "Tur kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Tur kaydedilemedi.") };
   }
   const result = data && typeof data === "object" && !Array.isArray(data)
     ? data as Record<string, unknown>
@@ -159,7 +160,7 @@ export async function addOfferRound(
   if (result?.outcome === "not_found") return { error: "Teklif bulunamadı." };
   if (result?.outcome === "invalid_state") return { error: "Kapanmış teklife tur eklenemez." };
   if (result?.outcome === "expired") return { error: "Süresi dolmuş teklife yeni pazarlık turu eklenemez." };
-  if (result?.outcome !== "created") return { error: "Tur kaydedilemedi." };
+  if (result?.outcome !== "created") return { error: actionErrorMessage(null, "Tur kaydedilemedi.") };
 
   revalidatePath(`/app/teklifler/${offerId}`);
   return { ok: true, id: offerId };
@@ -221,7 +222,7 @@ export async function updateOffer(
     p_valid_until: validUntil,
     p_notes: notes,
   });
-  if (error) return { error: "Teklif güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Teklif güncellenemedi.") };
   const outcome = String((data as { outcome?: string } | null)?.outcome ?? "");
   if (outcome === "not_found") return { error: "Teklif bulunamadı." };
   if (outcome === "amount_immutable") {
@@ -229,7 +230,7 @@ export async function updateOffer(
   }
   if (outcome === "expired") return { error: "Teklif son tarihi geçmişte olamaz." };
   if (outcome === "invalid_state") return { error: "Kapanmış teklifin koşulları değiştirilemez." };
-  if (outcome !== "applied" && outcome !== "replay") return { error: "Teklif güncellenemedi." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Teklif güncellenemedi.") };
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/teklifler/${id}`);

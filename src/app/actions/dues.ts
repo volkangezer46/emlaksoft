@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { parseDueInput } from "@/lib/due-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type DueResult = { ok?: boolean; error?: string; id?: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,7 +39,7 @@ export async function createDue(_prev: DueResult, fd: FormData): Promise<DueResu
 
   if (error || !data) {
     console.error("createDue", error);
-    return { error: "Aidat kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Aidat kaydedilemedi.") };
   }
   revalidatePath("/app/aidat");
   return { ok: true, id: data.id };
@@ -76,7 +77,7 @@ export async function updateDue(_prev: DueResult, fd: FormData): Promise<DueResu
     .maybeSingle();
   if (error) {
     console.error("updateDue", { code: error.code || "unknown" });
-    return { error: "Aidat güncellenemedi." };
+    return { error: actionErrorMessage(error, "Aidat güncellenemedi.") };
   }
   if (!data) return { error: "Aidat kaydı bulunamadı." };
   revalidatePath("/app/aidat");
@@ -96,7 +97,7 @@ export async function toggleDuePaid(id: string, paid: boolean): Promise<DueResul
     .eq("tenant_id", gate.tenantId)
     .select("id")
     .maybeSingle();
-  if (error) return { error: "Durum güncellenemedi." };
+  if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
   if (!data) return { error: "Aidat kaydı bulunamadı." };
   revalidatePath("/app/aidat");
   return { ok: true };
@@ -129,7 +130,7 @@ export async function markDuesPaidBulk(
 
   if (error) {
     console.error("markDuesPaidBulk", error);
-    return { error: "Kayıtlar güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kayıtlar güncellenemedi.") };
   }
 
   revalidatePath("/app/aidat");
@@ -150,7 +151,7 @@ export async function deleteDue(id: string): Promise<DueResult> {
     .maybeSingle();
   if (error) {
     console.error("deleteDue", { code: error.code || "unknown" });
-    return { error: "Aidat silinemedi." };
+    return { error: actionErrorMessage(error, "Aidat silinemedi.") };
   }
   if (!data) return { error: "Aidat kaydı bulunamadı." };
   revalidatePath("/app/aidat");

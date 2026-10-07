@@ -6,6 +6,7 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PublicBookingResult = {
   ok?: boolean;
@@ -75,7 +76,7 @@ export async function createPublicBooking(fd: FormData): Promise<PublicBookingRe
   );
   if (bookingError) {
     console.error("createPublicBooking atomic reservation", { code: bookingError.code });
-    return { error: "Randevu oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(bookingError, "Randevu oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   const booking = bookingData && typeof bookingData === "object" && !Array.isArray(bookingData)
@@ -92,7 +93,7 @@ export async function createPublicBooking(fd: FormData): Promise<PublicBookingRe
     return { error: "Bağlantı geçersiz veya süresi dolmuş." };
   }
   if (outcome !== "created" && outcome !== "replay") {
-    return { error: "Randevu oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(null, "Randevu oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   const appointmentId = typeof booking?.appointment_id === "string" ? booking.appointment_id : "";

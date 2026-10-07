@@ -41,6 +41,7 @@ import { createClient } from "@/lib/supabase/server";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { HANDOFF_SCOPES } from "@/lib/team/handoff";
+import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
 
 /**
  * Ofis Merkezi sunucu eylemleri. Her eylem `requirePermission("office_center", ...)` kapısından geçer ve zod ile doğrular.
@@ -263,7 +264,7 @@ async function assignCore(gate: OkGate, v: AssignCore): Promise<OfficeCenterResu
       p_score: "total" in stored ? stored.total : null,
       p_detail: { source: "office_center" },
     });
-    if (error) return { error: ["22023", "42501", "P0002"].includes(String(error.code)) && error.message ? error.message : "Atama yapılamadı." };
+    if (error) return { error: sqlRaiseMessage(error, ["22023", "42501", "P0002"]) ?? actionErrorMessage(error, "Atama yapılamadı.") };
   } else {
     const { data, error } = await supabase.from("properties").update({ assigned_to: v.advisorId }).eq("id", v.propertyId).eq("tenant_id", gate.tenantId).is("deleted_at", null).select("id");
     if (error || !data?.length) return { error: "İlan güncellenemedi (yetki veya kayıt sorunu)." };
@@ -345,7 +346,7 @@ export async function cancelAssignment(input: unknown): Promise<OfficeCenterResu
   const v = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase.from("pool_assignments").select("id, property_id, assigned_to, status").eq("id", v.assignmentId).eq("tenant_id", gate.tenantId).maybeSingle();
-  if (error) return { error: isMissingSchemaError(error) ? "Atama geçmişi henüz etkin değil." : "Atama okunamadı." };
+  if (error) return { error: isMissingSchemaError(error) ? "Atama geçmişi henüz etkin değil." : actionErrorMessage(error, "Atama okunamadı.") };
   const row = data as { property_id: string; assigned_to: string; status: string } | null;
   if (!row) return { error: "Atama kaydı bulunamadı." };
   if (row.status !== "active") return { error: "Yalnız aktif atama iptal edilir." };
@@ -364,7 +365,7 @@ export async function cancelAssignment(input: unknown): Promise<OfficeCenterResu
     .eq("tenant_id", gate.tenantId)
     .eq("status", "active")
     .select("id");
-  if (upd.error || !upd.data?.length) return { error: "Atama iptal edilemedi." };
+  if (upd.error || !upd.data?.length) return { error: actionErrorMessage(upd.error, "Atama iptal edilemedi.") };
   // İlan hâlâ bu danışmandaysa danışmansız bırak (başkasına geçmişse dokunma).
   const { data: prop } = await supabase.from("properties").update({ assigned_to: null }).eq("id", row.property_id).eq("tenant_id", gate.tenantId).eq("assigned_to", row.assigned_to).select("id, title, property_code");
   const title = (prop?.[0] as { title?: string | null; property_code?: string | null } | undefined)?.title ?? (prop?.[0] as { property_code?: string | null } | undefined)?.property_code ?? "İlan";
@@ -385,7 +386,7 @@ export async function reassignAssignment(input: unknown): Promise<OfficeCenterRe
   const v = parsed.data;
   const supabase = await createClient();
   const { data, error } = await supabase.from("pool_assignments").select("id, property_id, assigned_to, status").eq("id", v.assignmentId).eq("tenant_id", gate.tenantId).maybeSingle();
-  if (error) return { error: isMissingSchemaError(error) ? "Atama geçmişi henüz etkin değil." : "Atama okunamadı." };
+  if (error) return { error: isMissingSchemaError(error) ? "Atama geçmişi henüz etkin değil." : actionErrorMessage(error, "Atama okunamadı.") };
   const row = data as { property_id: string; assigned_to: string; status: string } | null;
   if (!row) return { error: "Atama kaydı bulunamadı." };
   if (row.status !== "active") return { error: "Yalnız aktif atama yeniden atanır." };

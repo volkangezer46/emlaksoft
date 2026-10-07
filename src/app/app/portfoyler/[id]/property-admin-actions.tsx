@@ -76,6 +76,7 @@ export function ReassignProperty({
       <input type="hidden" name="id" value={propertyId} />
       <UserRoundCog className="h-3.5 w-3.5 text-white/50" />
       <select
+        aria-label="Sorumlu danışman"
         name="assigned_to"
         defaultValue={currentAssignee ?? ""}
         className="rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white outline-none [color-scheme:dark]"

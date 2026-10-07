@@ -16,6 +16,7 @@ import {
   parseChips,
   slugifyAgentName,
 } from "@/lib/agent-profile";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type AgentProfileResult = { ok?: boolean; error?: string; slug?: string; url?: string };
 
@@ -131,7 +132,7 @@ export async function saveAgentProfile(fd: FormData): Promise<AgentProfileResult
     if (error.code === "23505") {
       return { error: `"${slug}" adresi az önce başkası tarafından alındı. Farklı bir adres deneyin.` };
     }
-    return { error: "Kartvizit kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Kartvizit kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
   await logActivity({
@@ -180,7 +181,7 @@ export async function uploadAgentPhoto(fd: FormData): Promise<AgentProfileResult
 
   if (upErr) {
     console.error("uploadAgentPhoto storage", upErr);
-    return { error: "Yükleme başarısız. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(upErr, "Yükleme başarısız. Lütfen tekrar deneyin.") };
   }
 
   const { data: pub } = admin.storage.from(PHOTO_BUCKET).getPublicUrl(path);
@@ -191,7 +192,7 @@ export async function uploadAgentPhoto(fd: FormData): Promise<AgentProfileResult
   const { error: dbErr } = await supabase.from("profiles").update({ photo_url: url }).eq("id", gate.targetId);
   if (dbErr) {
     console.error("uploadAgentPhoto db", dbErr);
-    return { error: "Fotoğraf adresi kaydedilemedi." };
+    return { error: actionErrorMessage(dbErr, "Fotoğraf adresi kaydedilemedi.") };
   }
 
   revalidatePath("/app/ekip/kartvizitim");
@@ -212,7 +213,7 @@ export async function removeAgentPhoto(fd: FormData): Promise<AgentProfileResult
   const { error } = await supabase.from("profiles").update({ photo_url: null }).eq("id", gate.targetId);
   if (error) {
     console.error("removeAgentPhoto", error);
-    return { error: "Fotoğraf kaldırılamadı." };
+    return { error: actionErrorMessage(error, "Fotoğraf kaldırılamadı.") };
   }
 
   revalidatePath("/app/ekip/kartvizitim");

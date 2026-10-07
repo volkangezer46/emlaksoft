@@ -38,6 +38,7 @@ import {
   type SurveyAssignmentMode,
   type SurveyOutcome,
 } from "@/lib/surveys/types";
+import { SESSION_EXPIRED_MESSAGE, actionErrorMessage } from "@/lib/action-errors";
 
 export type SurveyResult = { error?: string; ok?: boolean; id?: string; url?: string };
 
@@ -117,7 +118,7 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
     // unique(deal_id) ihlali — bir anlaşmaya bir anket.
     if (error?.code === "23505") return { error: "Bu anlaşma için zaten bir anket oluşturulmuş." };
     console.error("createSurveyForDeal", error);
-    return { error: "Anket oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Anket oluşturulamadı.") };
   }
 
   const url = `${appUrl()}/anket/${data.public_token}`;
@@ -171,8 +172,7 @@ function revalidateSurveys() {
 
 function schemaError(error: { code?: string | null; message?: string | null } | null, fallback: string): string {
   if (isSurveySchemaMissing(error)) return "Anket modülü bu ortamda henüz etkin değil (veritabanı güncellemesi bekleniyor).";
-  console.error("surveys action", error);
-  return fallback;
+  return actionErrorMessage(error, fallback);
 }
 
 /** Tetikleyiciyi aç/kapat; bekleme günü ve en çok deneme sayısı. Açılış anı kaydedilir (geriye dönük anket yok). */
@@ -368,9 +368,9 @@ export async function closeLowScoreFollowUp(taskId: string, note: string): Promi
       already: "Bu takip zaten kapatılmış.",
       not_found: "Anket görevi bulunamadı.",
       invalid: "Bu anket için düşük puan takibi yok.",
-      unauthorized: "Oturum doğrulanamadı.",
+      unauthorized: SESSION_EXPIRED_MESSAGE,
     };
-    return { error: messages[res.code ?? ""] ?? "Takip kapatılamadı." };
+    return { error: messages[res.code ?? ""] ?? actionErrorMessage(null, "Takip kapatılamadı.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -414,7 +414,7 @@ export async function submitAdvisorPulse(answers: Record<string, string>): Promi
       period: "Dönem değişti; sayfayı yenileyip tekrar deneyin.",
       required: "Zorunlu soruları cevaplayın.",
     };
-    return { error: messages[res.code ?? ""] ?? "Cevap kaydedilemedi." };
+    return { error: messages[res.code ?? ""] ?? actionErrorMessage(null, "Cevap kaydedilemedi.") };
   }
   revalidatePath(`${SURVEYS_HREF}/ic-anket`);
   return { ok: true, message: "Teşekkürler! Cevabınız anonim olarak kaydedildi." };
@@ -715,7 +715,7 @@ export async function completeSurveyByPhone(taskId: string, answers: Record<stri
     });
     if (!result.done) return { error: "Görev az önce başka biri tarafından kapatıldı." };
   } catch {
-    return { error: "Cevaplar kaydedilemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(null, "Cevaplar kaydedilemedi. Lütfen tekrar deneyin.") };
   }
   await logActivity({
     tenantId: gate.tenantId,

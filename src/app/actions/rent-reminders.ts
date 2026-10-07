@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { now } from "@/lib/clock";
 import { normalizeReminderSettings } from "@/lib/rent-reminders/logic";
 import { logActivity } from "@/lib/activity";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Kiracı hatırlatma ayarları ve kiracı opt-out (H3). Tümü oturumlu istemciyle (RLS) çalışır; service_role YOK.
@@ -62,7 +63,7 @@ export async function saveRentReminderSettings(input: {
   if (error) {
     if (isMissingSchema(error)) return { error: MISSING_MSG };
     console.error("saveRentReminderSettings", { code: error.code });
-    return { error: "Hatırlatma ayarları kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Hatırlatma ayarları kaydedilemedi.") };
   }
   revalidatePath("/app/kiralama");
   return { ok: true };
@@ -89,7 +90,7 @@ export async function setRenterReminderOptOut(rentalId: string, optOut: boolean)
   if (error) {
     if (isMissingSchema(error)) return { error: MISSING_MSG };
     console.error("setRenterReminderOptOut", { code: error.code });
-    return { error: "Tercih kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Tercih kaydedilemedi.") };
   }
   revalidatePath(`/app/kiralama/${rentalId}`);
   return { ok: true };
@@ -114,7 +115,7 @@ export async function setCustomerRentReminderOptOut(customerId: string, optOut: 
   if (error) {
     if (isMissingSchema(error)) return { error: MISSING_MSG };
     console.error("setCustomerRentReminderOptOut", { code: error.code });
-    return { error: "Tercih kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Tercih kaydedilemedi.") };
   }
   if (!data) return { error: "Müşteri bulunamadı." };
   await logActivity({
@@ -143,7 +144,7 @@ export async function markReminderSent(reminderId: string, rentalId: string): Pr
     .eq("channel", "office");
   if (error) {
     if (isMissingSchema(error)) return { error: MISSING_MSG };
-    return { error: "Kayıt güncellenemedi." };
+    return { error: actionErrorMessage(error, "Kayıt güncellenemedi.") };
   }
   revalidatePath(`/app/kiralama/${rentalId}`);
   return { ok: true };

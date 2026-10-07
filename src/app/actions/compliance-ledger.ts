@@ -18,6 +18,7 @@ import {
   type LedgerCsvRow,
   type LedgerThresholds,
 } from "@/lib/compliance/ledger";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type LedgerActionResult = { ok?: boolean; error?: string; message?: string };
 
@@ -68,7 +69,7 @@ export async function addLedgerEntry(
     .maybeSingle();
   if (settingsError) {
     console.error("addLedgerEntry settings", settingsError.message);
-    return { error: MISSING_TABLE.test(settingsError.message) ? MISSING_MSG : "Ayarlar okunamadı." };
+    return { error: MISSING_TABLE.test(settingsError.message) ? MISSING_MSG : actionErrorMessage(settingsError, "Ayarlar okunamadı.") };
   }
   const thresholds = toThresholds(settings as SettingsRow);
 
@@ -137,7 +138,7 @@ export async function addLedgerEntry(
     .single();
   if (error || !data) {
     console.error("addLedgerEntry", error?.message);
-    return { error: error && MISSING_TABLE.test(error.message) ? MISSING_MSG : "Kayıt eklenemedi." };
+    return { error: error && MISSING_TABLE.test(error.message) ? MISSING_MSG : actionErrorMessage(error, "Kayıt eklenemedi.") };
   }
 
   await logActivity({
@@ -182,7 +183,7 @@ export async function saveLedgerSettings(
   );
   if (error) {
     console.error("saveLedgerSettings", error.message);
-    return { error: MISSING_TABLE.test(error.message) ? MISSING_MSG : "Ayarlar kaydedilemedi." };
+    return { error: MISSING_TABLE.test(error.message) ? MISSING_MSG : actionErrorMessage(error, "Ayarlar kaydedilemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -214,7 +215,7 @@ export async function exportLedgerCsv(): Promise<ExportResult> {
     .limit(EXPORT_LIMIT);
   if (error) {
     console.error("exportLedgerCsv", error.message);
-    return { error: MISSING_TABLE.test(error.message) ? MISSING_MSG : "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: MISSING_TABLE.test(error.message) ? MISSING_MSG : actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
 
   const creatorIds = [...new Set((data ?? []).map((r) => r.created_by as string).filter((id) => UUID_RE.test(id)))];

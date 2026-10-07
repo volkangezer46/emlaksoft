@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { validateTenantReferences } from "@/lib/tenant-references";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TaskResult = { error?: string; ok?: boolean; id?: string };
 
@@ -162,7 +163,7 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
 
   if (error) {
     console.error("createTask", error);
-    return { error: "Görev oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Görev oluşturulamadı.") };
   }
 
   await logActivity({
@@ -247,7 +248,7 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
 
   if (error) {
     console.error("updateTask", error);
-    return { error: "Görev güncellenemedi." };
+    return { error: actionErrorMessage(error, "Görev güncellenemedi.") };
   }
 
   await logActivity({
@@ -312,7 +313,7 @@ export async function createFollowupReminder(input: {
     .single();
   if (error) {
     console.error("createFollowupReminder", error);
-    return { error: "Hatırlatma oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Hatırlatma oluşturulamadı.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -449,7 +450,7 @@ export async function deleteTask(formData: FormData): Promise<TaskResult> {
 
   if (error) {
     console.error("deleteTask", error);
-    return { error: "Görev silinemedi. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Görev silinemedi. Lütfen tekrar deneyin.") };
   }
   if (!data) return { error: "Görev bulunamadı veya silme yetkiniz yok." };
 

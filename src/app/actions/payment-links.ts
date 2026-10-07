@@ -17,6 +17,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { getBaseUrl } from "@/lib/base-url";
 import { parseMoneyInput } from "@/lib/money-input";
 import { paymentLinkDemoAllowed } from "@/lib/feature-flags/registry";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PayLinkResult = { error?: string; ok?: boolean; url?: string; checkoutUrl?: string };
 
@@ -94,7 +95,7 @@ export async function createPaymentLink(formData: FormData): Promise<PayLinkResu
   });
   if (error) {
     console.error("createPaymentLink", error);
-    return { error: "Ödeme linki oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Ödeme linki oluşturulamadı.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -177,7 +178,7 @@ export async function startPaymentLinkCheckout(token: string, formData: FormData
       ip,
     });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Ödeme sahibi bilgileri doğrulanamadı." };
+    return { error: actionErrorMessage(error, "Ödeme sahibi bilgileri doğrulanamadı.") };
   }
 
   const conversationId = paymentLinkConversationId(normalizedToken);
@@ -201,7 +202,7 @@ export async function startPaymentLinkCheckout(token: string, formData: FormData
     });
 
     if (init.status !== "success" || !init.paymentPageUrl) {
-      return { error: init.errorMessage || "Ödeme oturumu açılamadı." };
+      return { error: init.errorMessage || actionErrorMessage(null, "Ödeme oturumu açılamadı.") };
     }
 
     const { data: initialized, error: initializeError } = await admin
@@ -229,7 +230,7 @@ export async function startPaymentLinkCheckout(token: string, formData: FormData
     return { ok: true, checkoutUrl: init.paymentPageUrl };
   } catch (e) {
     console.error("startPaymentLinkCheckout", e);
-    return { error: e instanceof Error ? e.message : "iyzico bağlantı hatası." };
+    return { error: actionErrorMessage(e, "Ödeme sayfası açılamadı") };
   }
 }
 

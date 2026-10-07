@@ -139,6 +139,7 @@ export function StaffReplyForm({
 
       <div className="relative">
         <textarea
+          aria-label="Yanıt metni"
           ref={textareaRef}
           name="body"
           required

@@ -10,6 +10,7 @@ import { daysFromNowIso } from "@/lib/clock";
 import { extractPropertyDocFields, isDocOcrConfigured, type PropertyDocFields } from "@/lib/ai/document-ocr";
 import { isOcrEligible, parseCreateRequestForm } from "@/lib/doc-request/doc-request";
 import { DOC_REQUEST_BUCKET, generateRequestToken, hashRequestToken } from "@/lib/doc-request/server";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type DocRequestResult = { ok?: boolean; error?: string; message?: string; url?: string };
 export type DocRequestFileUrlResult = { error?: string; url?: string };
@@ -87,7 +88,7 @@ export async function createDocumentRequest(
     return {
       error: error && MISSING_TABLE.test(error.message)
         ? "Evrak linki bu ortamda henüz etkin değil."
-        : "Evrak linki oluşturulamadı.",
+        : actionErrorMessage(null, "Evrak linki oluşturulamadı."),
     };
   }
   await logActivity({
@@ -125,7 +126,7 @@ export async function revokeDocumentRequest(id: string): Promise<DocRequestResul
     .maybeSingle();
   if (error) {
     console.error("revokeDocumentRequest", error.message);
-    return { error: "Link iptal edilemedi." };
+    return { error: actionErrorMessage(error, "Link iptal edilemedi.") };
   }
   if (!data) return { error: "Link bulunamadı veya zaten kapalı." };
   await logActivity({
@@ -167,7 +168,7 @@ export async function getDocumentRequestFileUrl(fileId: string): Promise<DocRequ
   const { data, error } = await admin.storage.from(DOC_REQUEST_BUCKET).createSignedUrl(file.storage_path, 60, {
     download: file.file_name,
   });
-  if (error || !data?.signedUrl) return { error: "Dosya bağlantısı oluşturulamadı." };
+  if (error || !data?.signedUrl) return { error: actionErrorMessage(error, "Dosya bağlantısı oluşturulamadı.") };
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -199,7 +200,7 @@ export async function suggestDocumentFields(fileId: string): Promise<DocRequestO
   }
   const admin = createAdminClient();
   const { data: blob, error } = await admin.storage.from(DOC_REQUEST_BUCKET).download(file.storage_path);
-  if (error || !blob) return { error: "Dosya okunamadı." };
+  if (error || !blob) return { error: actionErrorMessage(error, "Dosya okunamadı.") };
   const result = await extractPropertyDocFields(
     { imageBase64: Buffer.from(await blob.arrayBuffer()).toString("base64"), mimeType: file.mime_type },
     { tenantId: gate.tenantId, actorId: gate.userId },

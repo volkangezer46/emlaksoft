@@ -16,6 +16,7 @@ import {
 } from "@/lib/impersonation";
 import { logActivity } from "@/lib/activity";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string };
 
@@ -48,7 +49,7 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
         planLimitErrorMessage(error) ??
         (error.code === "PGRST202"
           ? "Abonelik güncelleme servisi henüz hazır değil. Veritabanı migration'ını uygulayın."
-          : "Tenant ve abonelik güncellenemedi."),
+          : actionErrorMessage(null, "Tenant ve abonelik güncellenemedi.")),
     };
   }
 

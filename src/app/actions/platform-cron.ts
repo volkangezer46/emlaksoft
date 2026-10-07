@@ -7,6 +7,7 @@ import { CRON_JOBS } from "@/lib/cron-jobs";
 import { getBaseUrl } from "@/lib/base-url";
 import { now } from "@/lib/clock";
 import { fetchExternal, readExternalText } from "@/lib/external-fetch";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type CronRunResult = {
   ok?: boolean;
@@ -75,7 +76,7 @@ export async function runCronJobNow(fd: FormData): Promise<CronRunResult> {
   revalidatePath("/admin/sistem");
   if (!ok) {
     return {
-      error: status === 401 ? "İş yetkilendirmeyi reddetti (CRON_SECRET uyuşmuyor)." : "İş başarısız oldu.",
+      error: status === 401 ? "İş yetkilendirmeyi reddetti (CRON_SECRET uyuşmuyor)." : actionErrorMessage(null, "İş başarısız oldu."),
       job: job.job,
       status,
       durationMs,

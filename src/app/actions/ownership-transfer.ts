@@ -16,6 +16,7 @@ import {
   ownershipTransferMessage,
   parseOwnershipRpc,
 } from "@/lib/ownership-transfer";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/action-errors";
 
 /**
  * Ofis sahipliği devri (sahibin kendisi başlatır, hedef onaylar). Durum değişimi + rol takası + JWT claim + denetim
@@ -51,7 +52,7 @@ async function verifyPassword(userId: string, password: string): Promise<string 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email || user.id !== userId) return "Oturum doğrulanamadı.";
+  if (!user?.email || user.id !== userId) return SESSION_EXPIRED_MESSAGE;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = resolveSupabasePublicKey();
   if (!url || !key) return "Kimlik servisi yapılandırılmamış.";

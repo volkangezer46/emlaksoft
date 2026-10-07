@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { sanitizeWatermarkSettings, type WatermarkSettings } from "@/lib/watermark";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type WatermarkSettingsResult = {
   ok?: boolean;
@@ -44,7 +45,7 @@ export async function saveWatermarkSettings(
 
   if (error) {
     console.error("saveWatermarkSettings", error);
-    return { error: "Filigran ayarı kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Filigran ayarı kaydedilemedi.") };
   }
 
   await logActivity({

@@ -9,6 +9,7 @@ import { normalizeCloseFlags } from "@/lib/leak-shield";
 import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PortalResult = { error?: string; ok?: boolean };
 
@@ -52,13 +53,13 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
     });
     if (rotError) {
       console.error("createPortalListing rotate", { code: rotError.code });
-      return { error: isMissingSchema(rotError) ? "İlan numarası değişimi için sistem güncellemesi bekleniyor." : "İlan numarası değiştirilemedi." };
+      return { error: isMissingSchema(rotError) ? "İlan numarası değişimi için sistem güncellemesi bekleniyor." : actionErrorMessage(rotError, "İlan numarası değiştirilemedi.") };
     }
     const rotOutcome = String((rot as { outcome?: string } | null)?.outcome ?? "");
     if (rotOutcome === "external_id_in_use") return { error: "Bu ilan numarası bu portalda zaten başka bir ilana bağlı." };
     if (rotOutcome === "unchanged") return { error: "İlan numarası aynı; değişiklik yok." };
     if (rotOutcome === "not_live") return { error: "Yalnız yayındaki ilanın numarası değiştirilebilir." };
-    if (rotOutcome !== "applied") return { error: "İlan numarası değiştirilemedi." };
+    if (rotOutcome !== "applied") return { error: actionErrorMessage(null, "İlan numarası değiştirilemedi.") };
   } else {
     // Bağlama: aynı (ofis, portal, ilan no) açıkken tekrar = replay; başka portföye bağlıysa reddedilir.
     const { data: bound, error: bindError } = await admin.rpc("lc_bind_portal_listing", {
@@ -73,7 +74,7 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
     });
     if (bindError && !isMissingSchema(bindError)) {
       console.error("createPortalListing bind", { code: bindError.code });
-      return { error: "Portal ilanı eklenemedi." };
+      return { error: actionErrorMessage(bindError, "Portal ilanı eklenemedi.") };
     }
     if (bindError) {
       // Migration uygulanmamış: eski doğrudan ekleme yolu (davranış değişmez).
@@ -91,12 +92,12 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
       });
       if (error) {
         console.error("createPortalListing", error);
-        return { error: "Portal ilanı eklenemedi." };
+        return { error: actionErrorMessage(error, "Portal ilanı eklenemedi.") };
       }
     } else {
       const outcome = String((bound as { outcome?: string } | null)?.outcome ?? "");
       if (outcome === "bound_to_other_property") return { error: "Bu ilan numarası bu portalda başka bir portföye bağlı." };
-      if (outcome !== "applied" && outcome !== "replay") return { error: "Portal ilanı eklenemedi." };
+      if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Portal ilanı eklenemedi.") };
       if (candidateId) {
         // Kayıtsız ilan eşleştirme adayını bağlandı olarak işaretle (en iyi çaba).
         await admin.rpc("lc_decide_matching_candidate", {
@@ -241,7 +242,7 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
   });
   if (error) {
     console.error("closePortalListing atomic", { code: error.code });
-    return { error: "İlan kapanışı ve finans kayıtları birlikte tamamlanamadı." };
+    return { error: actionErrorMessage(error, "İlan kapanışı ve finans kayıtları birlikte tamamlanamadı.") };
   }
   const result = data && typeof data === "object" && !Array.isArray(data)
     ? data as Record<string, unknown>
@@ -250,7 +251,7 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
   if (outcome === "not_found") return { error: "Portal ilanı bulunamadı." };
   if (outcome === "closing_evidence_required") return { error: "Müşteri ve yazılı yetki belgesi onayı zorunludur." };
   if (outcome === "commission_rate_required") return { error: "Kapanıştan önce portföyde 0'dan büyük geçerli bir komisyon oranı tanımlayın." };
-  if (outcome !== "applied" && outcome !== "replay") return { error: "Kapanış kaydı oluşturulamadı." };
+  if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Kapanış kaydı oluşturulamadı.") };
 
   revalidatePath("/app/portallar");
   revalidatePath("/app/kayip-kacak");

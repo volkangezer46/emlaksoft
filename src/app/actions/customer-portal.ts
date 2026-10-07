@@ -8,6 +8,7 @@ import { isPublicTenantActive } from "@/lib/public-tenant";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { getBaseUrl } from "@/lib/base-url";
 import { buildPortalTabs, signerMatchesCustomer, type PortalOwnerProperty, type PortalRental, type PortalDocuments, type PortalTab } from "@/lib/customer-portal/portal-model";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 function relName(v: unknown): string | null {
   if (!v) return null;
@@ -69,7 +70,7 @@ export async function createCustomerPortalToken(
     .select("token")
     .single();
 
-  if (error || !newToken) return { error: "Token oluşturulamadı." };
+  if (error || !newToken) return { error: actionErrorMessage(error, "Token oluşturulamadı.") };
 
   const url = buildPortalUrl(newToken.token);
   revalidatePath(`/app/musteriler/${customerId}`);
@@ -106,7 +107,7 @@ export async function revokeCustomerPortalToken(formData: FormData): Promise<Por
 
   if (error) {
     console.error("revokeCustomerPortalToken", error);
-    return { error: "Link iptal edilemedi." };
+    return { error: actionErrorMessage(error, "Link iptal edilemedi.") };
   }
 
   revalidatePath("/app/portfoyler/sunumlar");

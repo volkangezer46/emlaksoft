@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { FOREIGN_SALE_CHECKLIST } from "@/lib/foreign-sale-checklist";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Yabancıya satış — evrak listesi uygulama ve müşteri işaretleme action'ları.
@@ -72,7 +73,7 @@ export async function applyForeignChecklist(
   );
   if (error) {
     console.error("applyForeignChecklist", error);
-    return { error: "Evrak listesi eklenemedi." };
+    return { error: actionErrorMessage(error, "Evrak listesi eklenemedi.") };
   }
 
   await logActivity({
@@ -135,7 +136,7 @@ export async function markCustomerForeign(
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("markCustomerForeign", error);
-    return { error: "Müşteri güncellenemedi." };
+    return { error: actionErrorMessage(error, "Müşteri güncellenemedi.") };
   }
 
   await logActivity({

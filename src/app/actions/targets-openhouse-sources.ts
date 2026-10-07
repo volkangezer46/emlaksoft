@@ -8,6 +8,7 @@ import { validateTenantReferences } from "@/lib/tenant-references";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type TargetResult = { ok?: boolean; error?: string; id?: string };
 
@@ -77,7 +78,7 @@ export async function createTarget(
 
   if (error || !data) {
     if (error?.code === "23505") return { error: "Bu dönem için zaten bir hedef tanımlı." };
-    return { error: "Hedef oluşturulamadı." };
+    return { error: actionErrorMessage(error, "Hedef oluşturulamadı.") };
   }
 
   revalidatePath("/app/hedefler");
@@ -119,7 +120,7 @@ export async function updateTarget(
 
   if (error) {
     if (error.code === "23505") return { error: "Bu dönem için zaten bir hedef tanımlı." };
-    return { error: "Hedef güncellenemedi." };
+    return { error: actionErrorMessage(error, "Hedef güncellenemedi.") };
   }
 
   revalidatePath("/app/hedefler");
@@ -216,7 +217,7 @@ export async function createOpenHouse(
     .select("id")
     .single();
 
-  if (error || !data) return { error: "Açık ev oluşturulamadı." };
+  if (error || !data) return { error: actionErrorMessage(error, "Açık ev oluşturulamadı.") };
 
   revalidatePath("/app/acik-ev");
   return { ok: true, id: data.id };
@@ -259,7 +260,7 @@ export async function registerOpenHouseVisitor(
     email,
     notes,
   });
-  if (visitorError) return { error: "Ziyaretçi kaydedilemedi." };
+  if (visitorError) return { error: actionErrorMessage(visitorError, "Ziyaretçi kaydedilemedi.") };
 
   revalidatePath("/app/acik-ev");
   revalidatePath(`/app/acik-ev/${openHouseId}`);

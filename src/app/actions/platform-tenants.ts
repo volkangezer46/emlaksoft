@@ -30,6 +30,7 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { insertSampleRecords, SAMPLE_DATA_COUNTS } from "@/lib/sample-data-seed";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Platform yönetimi: ofis (tenant) açma ve ofis yönetimi action'ları.
@@ -254,7 +255,7 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
     admin.from("platform_staff").select("id").eq("email", input.ownerEmail).maybeSingle(),
     resolveGeo(input.provinceId, input.districtId),
   ]);
-  if (slugRow.error || staffRow.error) return { error: "Benzersizlik denetimi yapılamadı. Lütfen tekrar deneyin." };
+  if (slugRow.error || staffRow.error) return { error: actionErrorMessage(slugRow.error, "Benzersizlik denetimi yapılamadı. Lütfen tekrar deneyin.") };
   if (slugRow.data) {
     return { error: `"${input.slug}" vitrin adresi başka bir ofiste kullanılıyor.`, field: "slug" };
   }
@@ -290,7 +291,7 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
     .single();
   if (demoError || !demo) {
     console.error("createTenantByAdmin:sales-record", demoError);
-    return { error: "Ofis açma kaydı oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(demoError, "Ofis açma kaydı oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   const conversionForm = new FormData();
@@ -305,7 +306,7 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
       .eq("id", demo.id)
       .is("converted_tenant_id", null);
     if (cleanupError) console.error("createTenantByAdmin:sales-record-cleanup", cleanupError);
-    const message = conversion.error ?? "Ofis açılamadı. Lütfen tekrar deneyin.";
+    const message = conversion.error ?? actionErrorMessage(null, "Ofis açılamadı. Lütfen tekrar deneyin.");
     return {
       error: message,
       field: /e-posta/i.test(message) ? "owner_email" : null,
@@ -524,7 +525,7 @@ export async function updateTenantProfileByAdmin(formData: FormData): Promise<Of
     .eq("id", tenantId);
   if (error) {
     console.error("updateTenantProfileByAdmin", error);
-    return { error: "Ofis bilgileri kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Ofis bilgileri kaydedilemedi.") };
   }
 
   await logPlatformActivity({
@@ -577,7 +578,7 @@ export async function changeTenantSlugByAdmin(formData: FormData): Promise<Offic
   if (error) {
     console.error("changeTenantSlugByAdmin", error);
     return {
-      error: error.code === "23505" ? `"${check.slug}" vitrin adresi başka bir ofiste kullanılıyor.` : "Vitrin adresi değiştirilemedi.",
+      error: error.code === "23505" ? `"${check.slug}" vitrin adresi başka bir ofiste kullanılıyor.` : actionErrorMessage(null, "Vitrin adresi değiştirilemedi."),
     };
   }
 
@@ -631,7 +632,7 @@ export async function extendTenantTrialByAdmin(formData: FormData): Promise<Offi
     statusForm.set("id", tenantId);
     statusForm.set("status", "trial");
     const statusResult = await updateTenantPlanStatus(statusForm);
-    if (!statusResult.ok) return { error: statusResult.error ?? "Ofis deneme durumuna alınamadı." };
+    if (!statusResult.ok) return { error: statusResult.error ?? actionErrorMessage(null, "Ofis deneme durumuna alınamadı.") };
   }
 
   const endsAt = new Date(endMs).toISOString();
@@ -717,7 +718,7 @@ export async function setTenantLifecycleByAdmin(formData: FormData): Promise<Off
   statusForm.set("id", tenantId);
   statusForm.set("status", nextStatus);
   const result = await updateTenantPlanStatus(statusForm);
-  if (!result.ok) return { error: result.error ?? "Ofis durumu değiştirilemedi." };
+  if (!result.ok) return { error: result.error ?? actionErrorMessage(null, "Ofis durumu değiştirilemedi.") };
 
   await logPlatformActivity({
     actorId: staff.id,
@@ -806,7 +807,7 @@ export async function changeTenantOwnerEmailByAdmin(formData: FormData): Promise
     admin.from("platform_staff").select("id").eq("email", newEmail).maybeSingle(),
   ]);
   const oldEmail = normalizeEmail(authUser.user?.email ?? "");
-  if (authError || !authUser.user) return { error: "Ofis sahibinin kimlik kaydı okunamadı." };
+  if (authError || !authUser.user) return { error: actionErrorMessage(authError, "Ofis sahibinin kimlik kaydı okunamadı.") };
   if (oldEmail === newEmail) return { error: "Yeni e-posta mevcut e-postayla aynı." };
   if (staffClash) return { error: "Bu e-posta platform personeline ait; farklı bir e-posta kullanın." };
 
@@ -820,7 +821,7 @@ export async function changeTenantOwnerEmailByAdmin(formData: FormData): Promise
     return {
       error: /already|registered|exists/i.test(updateError.message ?? "")
         ? "Bu e-posta başka bir hesapta kayıtlı."
-        : "Sahip e-postası değiştirilemedi.",
+        : actionErrorMessage(null, "Sahip e-postası değiştirilemedi."),
     };
   }
 
@@ -877,7 +878,7 @@ export async function transferTenantOwnershipByAdmin(formData: FormData): Promis
       .limit(20),
   ]);
   if (readError || !tenant) return { error: NOT_FOUND };
-  if (rowsError) return { error: "Ofis kullanıcıları okunamadı." };
+  if (rowsError) return { error: actionErrorMessage(rowsError, "Ofis kullanıcıları okunamadı.") };
   if (!confirmationMatches(field(formData, "confirm_name"), String(tenant.name))) {
     return { error: "Onay için ofis adını aynen yazın." };
   }
@@ -964,7 +965,7 @@ async function seatAvailable(admin: Admin, tenantId: string): Promise<{ ok: true
     admin.from("tenants").select("plan, status").eq("id", tenantId).maybeSingle(),
     admin.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_active", true),
   ]);
-  if (tenantError || countError || !tenant) return { ok: false, error: "Paket ve kullanıcı kapasitesi doğrulanamadı." };
+  if (tenantError || countError || !tenant) return { ok: false, error: actionErrorMessage(tenantError, "Paket ve kullanıcı kapasitesi doğrulanamadı.") };
   if (tenant.status === "suspended" || tenant.status === "cancelled") {
     return { ok: false, error: "Askıdaki ya da arşivdeki ofise kullanıcı eklenemez." };
   }
@@ -1005,7 +1006,7 @@ export async function addTenantUserByAdmin(formData: FormData): Promise<OfficeUs
     return {
       error: /already|registered|exists/i.test(createError?.message ?? "")
         ? "Bu e-posta zaten kayıtlı."
-        : "Kullanıcı oluşturulamadı.",
+        : actionErrorMessage(null, "Kullanıcı oluşturulamadı."),
     };
   }
 
@@ -1021,7 +1022,7 @@ export async function addTenantUserByAdmin(formData: FormData): Promise<OfficeUs
     // Yarım kayıt bırakma: profil oluşmadıysa Auth kullanıcısını sil.
     const { error: cleanupError } = await admin.auth.admin.deleteUser(userId);
     if (cleanupError) console.error("addTenantUserByAdmin:auth-cleanup", { userId, cleanupError });
-    return { error: planLimitErrorMessage(profileError) ?? "Kullanıcı profili oluşturulamadı." };
+    return { error: planLimitErrorMessage(profileError) ?? actionErrorMessage(profileError, "Kullanıcı profili oluşturulamadı.") };
   }
 
   const accessLinkSent = await sendAccessLink(admin, input.email);
@@ -1084,14 +1085,14 @@ export async function setTenantUserActiveByAdmin(formData: FormData): Promise<Of
   }
 
   const { data: authRecord, error: authError } = await admin.auth.admin.getUserById(memberId);
-  if (authError || !authRecord.user) return { error: "Kullanıcının kimlik kaydı doğrulanamadı." };
+  if (authError || !authRecord.user) return { error: actionErrorMessage(authError, "Kullanıcının kimlik kaydı doğrulanamadı.") };
 
   const { error: updateError } = await admin
     .from("profiles")
     .update({ is_active: next })
     .eq("id", memberId)
     .eq("tenant_id", tenantId);
-  if (updateError) return { error: planLimitErrorMessage(updateError) ?? "Kullanıcı güncellenemedi." };
+  if (updateError) return { error: planLimitErrorMessage(updateError) ?? actionErrorMessage(updateError, "Kullanıcı güncellenemedi.") };
 
   const meta = (authRecord.user.app_metadata ?? {}) as Record<string, unknown>;
   const { error: claimError } = await admin.auth.admin.updateUserById(memberId, {
@@ -1173,7 +1174,7 @@ export async function addTenantPlatformNote(formData: FormData): Promise<OfficeA
   });
   if (error) {
     console.error("addTenantPlatformNote", error);
-    return { error: "Not kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Not kaydedilemedi.") };
   }
 
   revalidatePath(`/admin/tenants/${tenantId}`);

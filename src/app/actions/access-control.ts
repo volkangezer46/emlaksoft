@@ -24,6 +24,7 @@ import { ASSIGNABLE_SCOPES, SCOPE_LABELS, defaultUserScopeForRole } from "@/lib/
 import { applyAccessAuditFilters, normalizeAccessAuditFilters, type AccessAuditFilters } from "@/lib/access-control/audit-filters";
 import type { ScopeOverride } from "@/lib/access-control/types";
 import type { ExportResult } from "@/app/actions/export";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Yetkilendirme yönetimi (/app/ayarlar/yetkilendirme) sunucu eylemleri.
@@ -64,13 +65,13 @@ async function loadTarget(ctx: Editor, userId: string) {
     .select("id, tenant_id, role, full_name, is_active, branch_id")
     .eq("id", userId)
     .maybeSingle();
-  if (error) return { error: "Üye okunamadı." } as const;
+  if (error) return { error: actionErrorMessage(error, "Üye okunamadı.") } as const;
   if (!data || data.tenant_id !== ctx.tenantId) return { error: "Üye bu ofise ait değil." } as const;
   return { target: data as { id: string; tenant_id: string; role: string; full_name: string; is_active: boolean; branch_id: string | null } } as const;
 }
 
 function schemaOrGeneric(error: { code?: string } | null, generic: string): string {
-  return error && MISSING_SCHEMA.has(String(error.code)) ? SCHEMA_ERROR : generic;
+  return error && MISSING_SCHEMA.has(String(error.code)) ? SCHEMA_ERROR : actionErrorMessage(error, generic);
 }
 
 // ───────────────────────── Kapsam (user_scopes) ─────────────────────────
@@ -187,7 +188,7 @@ export async function resetUserScope(userId: string, reason?: string): Promise<A
   const prev = before.data as Record<string, unknown>;
 
   const { error } = await ctx.supabase.from("user_scopes").delete().eq("tenant_id", ctx.tenantId).eq("user_id", target.id);
-  if (error) return { error: "Kapsam kaldırılamadı." };
+  if (error) return { error: actionErrorMessage(error, "Kapsam kaldırılamadı.") };
   const audit = await recordAccessAudit(ctx.supabase, {
     tenantId: ctx.tenantId,
     subjectUserId: target.id,
@@ -300,7 +301,7 @@ export async function cancelScopeOverride(id: string, reason?: string): Promise<
   if (prev.expires_at && new Date(prev.expires_at).getTime() <= now()) return { ok: true }; // zaten süresi dolmuş
 
   const { error } = await ctx.supabase.from("scope_overrides").update({ expires_at: nowIso }).eq("id", prev.id).eq("tenant_id", ctx.tenantId);
-  if (error) return { error: "İstisna iptal edilemedi." };
+  if (error) return { error: actionErrorMessage(error, "İstisna iptal edilemedi.") };
   const audit = await recordAccessAudit(ctx.supabase, {
     tenantId: ctx.tenantId,
     subjectUserId: prev.user_id,
@@ -398,7 +399,7 @@ export async function listAccessAudit(filters: Partial<AccessAuditFilters>, page
   if (error) {
     const missing = MISSING_SCHEMA.has(String(error.code));
     if (!missing) console.error("listAccessAudit", error);
-    return { rows: [], total: 0, schemaMissing: missing, error: missing ? undefined : "Denetim günlüğü okunamadı." };
+    return { rows: [], total: 0, schemaMissing: missing, error: missing ? undefined : actionErrorMessage(error, "Denetim günlüğü okunamadı.") };
   }
   return { rows: (data ?? []) as AccessAuditRow[], total: count ?? 0, schemaMissing: false };
 }
@@ -419,7 +420,7 @@ export async function exportAccessAuditCsv(filters: Partial<AccessAuditFilters> 
     .order("created_at", { ascending: false })
     .limit(AUDIT_EXPORT_LIMIT);
   if (error) {
-    return { error: MISSING_SCHEMA.has(String(error.code)) ? SCHEMA_ERROR : "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+    return { error: MISSING_SCHEMA.has(String(error.code)) ? SCHEMA_ERROR : actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
   }
   const rows = (data ?? []) as Omit<AccessAuditRow, "id">[];
   const ids = [...new Set(rows.flatMap((r) => [r.user_id, r.created_by]).filter(Boolean))];

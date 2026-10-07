@@ -12,6 +12,7 @@ import { GROWTH_RPC, SETTINGS_KEYS, decisionErrorText, staffRpc } from "@/lib/gr
 import { readinessBlockers } from "@/lib/growth/program";
 import { GROWTH_SETTING_KEYS, isMissingTableError } from "@/lib/growth/settings";
 import { isPartnerCode } from "@/lib/growth/attribution";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type GrowthResult = { ok?: boolean; error?: string };
 
@@ -74,7 +75,7 @@ export async function saveGrowthFlags(fd: FormData): Promise<GrowthResult> {
   const a = await setPlatformSetting(GROWTH_SETTING_KEYS.referralEnabled, referral ? "on" : "off", gate.staff.id);
   const b = await setPlatformSetting(GROWTH_SETTING_KEYS.partnerEnabled, partner ? "on" : "off", gate.staff.id);
   const c = await setPlatformSetting(GROWTH_SETTING_KEYS.cashPayoutEnabled, cash ? "on" : "off", gate.staff.id);
-  if (!a || !b || !c) return { error: "Ayarlar kaydedilemedi." };
+  if (!a || !b || !c) return { error: actionErrorMessage(null, "Ayarlar kaydedilemedi.") };
   await logPlatformActivity({
     actorId: gate.staff.id,
     action: "growth.flags_update",
@@ -145,7 +146,7 @@ export async function createRewardRule(fd: FormData): Promise<GrowthResult> {
     .single();
   if (error) {
     console.error("createRewardRule", error.message);
-    return { error: isMissingTableError(error) ? TABLES_OFF : "Kural kaydedilemedi." };
+    return { error: isMissingTableError(error) ? TABLES_OFF : actionErrorMessage(error, "Kural kaydedilemedi.") };
   }
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -165,7 +166,7 @@ export async function setRewardRuleActive(id: string, active: boolean): Promise<
   if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Geçersiz kural." };
   const admin = createAdminClient();
   const { error } = await admin.from("growth_reward_rules").update({ is_active: active }).eq("id", id);
-  if (error) return { error: isMissingTableError(error) ? TABLES_OFF : "Kural güncellenemedi." };
+  if (error) return { error: isMissingTableError(error) ? TABLES_OFF : actionErrorMessage(error, "Kural güncellenemedi.") };
   await logPlatformActivity({
     actorId: gate.staff.id,
     action: "growth.rule_toggle",
@@ -196,7 +197,7 @@ export async function createPartner(fd: FormData): Promise<GrowthResult> {
   if (error) {
     if (error.code === "23505") return { error: "Bu kod zaten kullanılıyor." };
     console.error("createPartner", error.message);
-    return { error: isMissingTableError(error) ? TABLES_OFF : "Ortak kaydedilemedi." };
+    return { error: isMissingTableError(error) ? TABLES_OFF : actionErrorMessage(error, "Ortak kaydedilemedi.") };
   }
   await logPlatformActivity({
     actorId: gate.staff.id,
@@ -216,7 +217,7 @@ export async function setPartnerStatus(id: string, status: string): Promise<Grow
   if (!(PARTNER_STATUSES as readonly string[]).includes(status)) return { error: "Geçersiz durum." };
   const admin = createAdminClient();
   const { error } = await admin.from("growth_partners").update({ status }).eq("id", id);
-  if (error) return { error: isMissingTableError(error) ? TABLES_OFF : "Durum güncellenemedi." };
+  if (error) return { error: isMissingTableError(error) ? TABLES_OFF : actionErrorMessage(error, "Durum güncellenemedi.") };
   await logPlatformActivity({
     actorId: gate.staff.id,
     action: "growth.partner_status",

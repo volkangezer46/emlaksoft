@@ -8,6 +8,7 @@ import { notifyTenant } from "@/lib/notify";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PublicCheckinResult = {
   ok?: boolean;
@@ -117,7 +118,7 @@ export async function registerOpenHouseVisitorByToken(fd: FormData): Promise<Pub
   });
   if (error) {
     console.error("registerOpenHouseVisitorByToken", error);
-    return { error: "Kayıt oluşturulamadı. Lütfen tekrar deneyin." };
+    return { error: actionErrorMessage(error, "Kayıt oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
   // Danışmana (etkinliği oluşturana) bildirim — hata teşekkür ekranını düşürmesin.
