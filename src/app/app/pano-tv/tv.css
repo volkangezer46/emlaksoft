@@ -315,16 +315,29 @@ html.tv-active body {
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* Kutular kart yüksekliğini eşit paylaşır; içerik kadar uzayıp kartın altından kesilmez. */
+  grid-auto-rows: minmax(0, 1fr);
   gap: calc(var(--u) * 0.8);
 }
 .tv-stat {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: calc(var(--u) * 0.6) calc(var(--u) * 0.9);
+  padding: calc(var(--u) * 0.5) calc(var(--u) * 0.9);
   border-radius: calc(var(--u) * 0.9);
   background: color-mix(in srgb, var(--tv-ink) 4%, transparent);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Tek kalan kutu satırı boş bırakmaz. */
+.tv-stat:last-child:nth-child(odd) {
+  grid-column: span 2;
+}
+.tv-stat > :not(.tv-num) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tv-stat[data-tone="warn"] .tv-num {
   color: var(--tv-warn);
