@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { SmartIcon } from "@/components/ui/icon-sprite";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,7 +32,7 @@ export function RowActionLink({
   tone?: "default" | "success";
 }) {
   const cls = cn(ACTION, tone === "success" && "text-[var(--success-strong)] hover:bg-[var(--success-soft)]");
-  const icon = <Icon aria-hidden="true" className="h-4 w-4" />;
+  const icon = <SmartIcon icon={Icon} className="h-4 w-4" />;
   if (external) {
     return (
       <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} className={cls}>
@@ -50,7 +51,7 @@ export function RowActionLink({
 export function RowActionAnchor({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   return (
     <a href={href} aria-label={label} title={label} className={ACTION}>
-      <Icon aria-hidden="true" className="h-4 w-4" />
+      <SmartIcon icon={Icon} className="h-4 w-4" />
     </a>
   );
 }

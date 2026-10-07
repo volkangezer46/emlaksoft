@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { SmartIcon } from "@/components/ui/icon-sprite";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,7 +45,7 @@ export function EntityThumb({
       {src ? (
         <Image src={src} alt={alt} fill sizes="72px" className="object-cover" unoptimized />
       ) : Icon ? (
-        <Icon aria-hidden="true" className="h-5 w-5 text-brand-600/45" />
+        <SmartIcon icon={Icon} className="h-5 w-5 text-brand-600/45" />
       ) : null}
     </span>
   );

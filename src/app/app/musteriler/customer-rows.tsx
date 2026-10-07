@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { CalendarPlus, Eye, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { CalendarPlus, Eye, MessageCircle, Phone } from "lucide-react";
+import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
@@ -151,7 +152,7 @@ export function CustomerTable({
                       <p className="max-w-[14rem] truncate font-semibold text-text">{c.name}</p>
                       <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-text-muted">
                         <span className="inline-flex items-center gap-1">
-                          <MapPin aria-hidden="true" className="h-3 w-3 text-text-faint" />
+                          <SpriteIcon name="map-pin" className="h-3 w-3 text-text-faint" />
                           {c.province}
                         </span>
                         {c.sourceLabel ? <span>· {c.sourceLabel}</span> : null}
@@ -173,7 +174,7 @@ export function CustomerTable({
                 <TD>
                   {c.phoneDisplay ? (
                     <p className="numeric flex items-center gap-1.5 text-text-muted">
-                      <Phone aria-hidden="true" className="h-3.5 w-3.5 text-brand-600" />
+                      <SpriteIcon name="phone" className="h-3.5 w-3.5 text-brand-600" />
                       {c.phoneDisplay}
                     </p>
                   ) : (
@@ -181,7 +182,7 @@ export function CustomerTable({
                   )}
                   {c.email ? (
                     <p className="mt-0.5 flex max-w-[14rem] items-center gap-1.5 truncate text-xs text-text-faint">
-                      <Mail aria-hidden="true" className="h-3 w-3 shrink-0" />
+                      <SpriteIcon name="mail" className="h-3 w-3 shrink-0" />
                       <span className="truncate">{c.email}</span>
                     </p>
                   ) : null}

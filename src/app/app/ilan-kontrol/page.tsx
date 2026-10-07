@@ -73,17 +73,42 @@ async function DashboardBody({ group, management }: { group: GroupParam; managem
   const db = await getDb();
 
   const nowIso = daysAgoIso(0);
-  const [tenantRes, anomalies, changes, today, publishStats, districts, overdue, advisorRes] = await Promise.all([
+  // Kırılım zinciri (özet -> adlar) ana turun İÇİNDE başlar: ana sorgularla paralel, sona kuyruklanmaz.
+  const groupRowsPromise: Promise<GroupRowView[]> =
+    group === "ofis"
+      ? Promise.resolve([])
+      : (async () => {
+          const grouped = await getControlSummary(db, scopeOfGroup(group));
+          const names = await resolveGroupNames(db, scopeOfGroup(group), grouped.rows.map((r) => r.group_id));
+          return grouped.rows
+            .map((r) => ({
+              ...r,
+              id: r.group_id,
+              name: r.group_id ? (names.get(r.group_id) ?? "Bilinmeyen") : "Atanmamış",
+              ratio: healthyPercent(r),
+            }))
+            .sort((a, b) => b.total_active - a.total_active);
+        })();
+  // Bugünün künyeleri listTodayChecks biter bitmez, kalan sorgulardan BAĞIMSIZ çekilir.
+  const todayPromise = (async () => {
+    const t = await listTodayChecks(db, nowIso, 8);
+    const rows = t.available ? t.rows : [];
+    const briefs = await loadPropertyBriefs(db, rows.map((r) => r.property_id));
+    return { rows, briefs };
+  })();
+  const [tenantRes, anomalies, changes, publishStats, districts, overdue, advisorRes, groupRows, todayData] = await Promise.all([
     getControlSummary(db, "tenant"),
     countOpenAnomalies(db, nowIso),
     getChangesSince(db, daysAgoIso(1)),
-    listTodayChecks(db, nowIso, 8),
     loadPublishLeadTimes(db, daysAgoIso(90)),
     getDistrictSummary(db),
     management ? loadOverdueAdvisors(db, nowIso) : Promise.resolve({ available: false, rows: [] as { advisorId: string; count: number }[] }),
     management ? getControlSummary(db, "advisor") : Promise.resolve({ available: false, rows: [] as ControlSummaryRow[] }),
+    groupRowsPromise,
+    todayPromise,
   ]);
   if (!tenantRes.available) return <ControlUnavailable />;
+  const { rows: todayRows, briefs } = todayData;
 
   const summary = sumSummaryRows(tenantRes.rows);
   const sentences = buildExecutiveSummary(summary, { overdueSla: anomalies.overdue });
@@ -110,25 +135,6 @@ async function DashboardBody({ group, management }: { group: GroupParam; managem
     });
   }
 
-  // Gruplu tablo (ofis dışı kırılım): rol kapsamı RLS'te; grup adları sayfa-yerel çözülür.
-  // Grup zinciri (özet → adlar) ile bugünün portföy künyeleri birbirinden bağımsız: aynı turda beklenir.
-  const todayRows = today.available ? today.rows : [];
-  const groupRowsPromise: Promise<GroupRowView[]> =
-    group === "ofis"
-      ? Promise.resolve([])
-      : (async () => {
-          const grouped = await getControlSummary(db, scopeOfGroup(group));
-          const names = await resolveGroupNames(db, scopeOfGroup(group), grouped.rows.map((r) => r.group_id));
-          return grouped.rows
-            .map((r) => ({
-              ...r,
-              id: r.group_id,
-              name: r.group_id ? (names.get(r.group_id) ?? "Bilinmeyen") : "Atanmamış",
-              ratio: healthyPercent(r),
-            }))
-            .sort((a, b) => b.total_active - a.total_active);
-        })();
-  const [groupRows, briefs] = await Promise.all([groupRowsPromise, loadPropertyBriefs(db, todayRows.map((r) => r.property_id))]);
   const todayView: TodayCheckView[] = todayRows.map((r) => ({
     ...r,
     code: briefs.get(r.property_id)?.code ?? "-",

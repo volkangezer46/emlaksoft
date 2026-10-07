@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { Clock3, Crosshair, Eye, MapPin, Sparkles, User } from "lucide-react";
+import { Crosshair, Eye, User } from "lucide-react";
+import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { DemandRowCheckbox, DemandSelectAllCheckbox } from "./demand-bulk";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -47,7 +48,7 @@ function MatchPill({ d }: { d: DemandVM }) {
         title={`En iyi skor ${m.best} · eşleştirmede aç`}
         className={`focus-ring relative z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition hover:opacity-80 ${m.strong > 0 ? "tone-success" : "tone-neutral"}`}
       >
-        <Sparkles aria-hidden="true" className="h-3 w-3" />
+        <SpriteIcon name="sparkles" className="h-3 w-3" />
         {m.strong > 0 ? `${m.strong} güçlü eşleşme` : `${m.good} iyi eşleşme`}
       </Link>
     );
@@ -134,7 +135,7 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                   <div className="flex flex-wrap items-center gap-1.5">
                     {d.province ? (
                       <span className="inline-flex items-center gap-1 text-text-muted">
-                        <MapPin aria-hidden="true" className="h-3 w-3 text-text-faint" />
+                        <SpriteIcon name="map-pin" className="h-3 w-3 text-text-faint" />
                         {d.province}
                       </span>
                     ) : null}
@@ -158,7 +159,7 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                 <TD className="hidden text-text-muted 2xl:table-cell">{d.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
                 <TD className="hidden xl:table-cell">
                   <span className={`inline-flex items-center gap-1 text-xs ${d.ageUrgent ? "font-semibold text-[var(--warning-strong)]" : "text-text-muted"}`}>
-                    <Clock3 aria-hidden="true" className="h-3 w-3" /> {d.ageLabel}
+                    <SpriteIcon name="clock-3" className="h-3 w-3" /> {d.ageLabel}
                   </span>
                 </TD>
                 <TD actions>

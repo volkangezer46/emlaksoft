@@ -16,6 +16,7 @@ import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { EfCreditBadge } from "@/components/app/ef-credit-badge";
 import { ThemeController } from "@/components/theme-controller";
+import { IconSprite } from "@/components/ui/icon-sprite";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
 import { ProductTourLazy } from "./product-tour-lazy";
@@ -340,6 +341,7 @@ async function buildShellModel() {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
+      <IconSprite />
       <ThemeController />
       <SidebarBoot />
       <ErrorBoundary>

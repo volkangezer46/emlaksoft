@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { Building2, Eye, MapPin, Radio } from "lucide-react";
+import { Building2, Eye } from "lucide-react";
+import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import type { CompareItem } from "@/components/public/compare-table";
@@ -34,7 +35,7 @@ function PortalCell({ live, total }: { live: number; total: number }) {
   if (total === 0) return <span className="text-text-faint">—</span>;
   return (
     <span className="inline-flex items-center gap-1.5 text-text-muted" title={`${total} portalda kayıtlı, ${live} canlı`}>
-      <Radio aria-hidden="true" className={`h-3.5 w-3.5 ${live > 0 ? "text-[var(--success-strong)]" : "text-text-faint"}`} />
+      <SpriteIcon name="radio" className={`h-3.5 w-3.5 ${live > 0 ? "text-[var(--success-strong)]" : "text-text-faint"}`} />
       <span className="numeric">
         {live}/{total}
       </span>
@@ -110,7 +111,7 @@ export function PropertyTable({
                 </TD>
                 <TD className="hidden text-text-muted xl:table-cell">
                   <span className="flex items-center gap-1.5">
-                    <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-text-faint" />
+                    <SpriteIcon name="map-pin" className="h-3.5 w-3.5 shrink-0 text-text-faint" />
                     <span className="max-w-[12rem] truncate">{p.location}</span>
                   </span>
                 </TD>
