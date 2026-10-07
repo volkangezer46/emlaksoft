@@ -16,6 +16,7 @@ import {
   buildCustomerLookup,
   collectCustomerKeys,
   countPlanned,
+  foldText,
   planCustomerRows,
   planDemandRows,
   planPropertyRows,
@@ -39,10 +40,13 @@ import {
   isActivityTarget,
   parseTrDateTime,
   planActivityRows,
+  rentalKey,
   taskKey,
   validateAppointmentRow,
   validateExpenseRow,
+  validateRentalRow,
   validateTaskRow,
+  type NormalizedRental,
 } from "@/lib/import-rows-activity";
 import { actionErrorMessage } from "@/lib/action-errors";
 
@@ -139,8 +143,10 @@ export type ChunkResult = {
 
 const ENTITY: Record<
   ImportTarget,
-  { action: string; entityType: string; path: string; module: "customers" | "properties" | "demands" | "tasks" | "appointments" | "expenses" }
+  { action: string; entityType: string; path: string; module: "customers" | "properties" | "demands" | "tasks" | "appointments" | "expenses" | "rentals" }
 > = {
+  // Kiralama: satır başına audit RPC içinde (`rental.import`); toplu özet `rental.import_batch`. Geri alma YOK.
+  rentals: { action: "rental.import_batch", entityType: "rental", path: "/app/kiralama", module: "rentals" },
   customers: { action: "customer.import", entityType: "customer", path: "/app/musteriler", module: "customers" },
   properties: { action: "property.import", entityType: "property", path: "/app/portfoyler", module: "properties" },
   demands: { action: "demand.import", entityType: "customer_demand", path: "/app/talepler", module: "demands" },
@@ -156,6 +162,7 @@ const TABLE: Record<ImportTarget, string> = {
   tasks: "tasks",
   appointments: "appointments",
   expenses: "expenses",
+  rentals: "rentals",
 };
 
 type Db = Awaited<ReturnType<typeof createClient>>;
@@ -416,6 +423,7 @@ async function runChunk(
   dryRun: boolean,
   maxRows: number = IMPORT_ROW_LIMIT,
 ): Promise<ChunkResult> {
+  if (target === "rentals") return runRentalChunk(rawRows, options, dryRun, maxRows);
   const meta = ENTITY[target];
   const policy: DuplicatePolicy = options.duplicatePolicy ?? "skip";
   if (!["skip", "update", "create"].includes(policy)) return { error: "Mükerrer politikası geçersiz." };
@@ -662,6 +670,247 @@ async function runChunk(
   revalidatePath(meta.path);
   revalidateTenantData(gate.tenantId);
   return { ok: true, rows: toView(target, rows, plans, false), counters, created, updated, ...(pooled ? { pooled } : {}) };
+}
+
+// ---------------------------------------------------------------------------
+// Kiralama (aktif kira) — satır başına atomik RPC `import_rental_with_deal` (20261007000710)
+// ---------------------------------------------------------------------------
+
+const RENTAL_RPC_PARALLEL = 4;
+
+const RENTAL_OUTCOME_MESSAGE: Record<string, string> = {
+  property_not_found: "Portföy bulunamadı.",
+  property_unavailable: "Portföy satılmış görünüyor; kira bağlanamaz.",
+  property_active_rental: "Portföyde zaten aktif kira var.",
+  property_already_closed: "Portföyün kapanmış (kazanılmış) bir anlaşması var; önce anlaşmayı inceleyin.",
+  renter_not_found: "Kiracı müşteri kaydı bulunamadı.",
+  owner_not_found: "Malik müşteri kaydı bulunamadı.",
+  assignee_not_found: "Seçilen danışman bu ofiste aktif değil.",
+  invalid_input: "Kira bilgileri geçersiz.",
+  forbidden: "Kira ve komisyon ekleme yetkisi gerekir.",
+  unauthorized: "Oturumunuz doğrulanamadı; sayfayı yenileyip yeniden giriş yapın.",
+};
+
+type RentalPlanData = NormalizedRental & {
+  property_id: string;
+  renter_id: string | null;
+  owner_id: string | null;
+};
+
+async function runRentalChunk(
+  rawRows: ImportRow[],
+  options: ImportOptions,
+  dryRun: boolean,
+  maxRows: number,
+): Promise<ChunkResult> {
+  const policy: DuplicatePolicy = options.duplicatePolicy ?? "skip";
+  if (policy === "update") return { error: "Kiralama aktarımında güncelleme politikası yoktur (atla veya yeni oluştur)." };
+  if (!["skip", "create"].includes(policy)) return { error: "Mükerrer politikası geçersiz." };
+  const gate = await requirePermission("rentals", "create");
+  if (!gate.ok) return { error: gate.error };
+  const financial = await requirePermission("commissions", "create");
+  if (!financial.ok) return { error: "Kiralama aktarımı komisyon kaydı da açar; komisyon ekleme yetkisi gerekir." };
+  const canCreateCustomers = (await requirePermission("customers", "create")).ok;
+  const limitError = limitCheck(rawRows, maxRows);
+  if (limitError) return { error: limitError };
+  if (!dryRun && !(options.batchId && UUID_RE.test(options.batchId))) {
+    return { error: "İçe aktarma kimliği geçersiz. Sayfayı yenileyip tekrar deneyin." };
+  }
+  const rate = await checkRateLimit(`${dryRun ? "import-preview" : "import-write"}:${gate.userId}`, {
+    limit: dryRun ? PREVIEW_CHUNKS_PER_WINDOW : WRITE_CHUNKS_PER_WINDOW,
+    windowSec: RATE_WINDOW_SEC,
+    failurePolicy: "deny",
+  });
+  if (!rate.allowed) return { error: "Çok fazla içe aktarma isteği gönderildi. Birkaç dakika sonra tekrar deneyin." };
+  const { rows, flaggedRows } = neutralizeFormulaCells(rawRows);
+
+  const supabase = await createClient();
+  const assignee = await resolveAssignee(supabase, gate.tenantId, gate.userId, options.assignTo);
+  if (!assignee.ok) return { error: assignee.error };
+
+  const validated = rows.map((r) => ({ r, v: validateRentalRow(r) }));
+  const codes = [...new Set(validated.map((x) => x.v.data?.property_code).filter((c): c is string => Boolean(c)))];
+  const phones = [
+    ...new Set(
+      validated.flatMap((x) => [x.v.data?.renter.phone, x.v.data?.owner?.phone]).filter((p): p is string => Boolean(p)),
+    ),
+  ];
+
+  const propertyByCode = new Map<string, { id: string; status: string | null }>();
+  for (const part of chunked(codes, LOOKUP_CHUNK)) {
+    const { data, error } = await supabase
+      .from("properties")
+      .select("id, property_code, status")
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      .in("property_code", part);
+    if (error) return { error: "Portföyler şu an eşleştirilemiyor; birkaç dakika sonra aynı dosyayla yeniden deneyin." };
+    for (const p of data ?? []) propertyByCode.set(foldText(String(p.property_code)), { id: String(p.id), status: (p.status as string | null) ?? null });
+  }
+  const activeRentalProps = new Set<string>();
+  const propertyIds = [...propertyByCode.values()].map((p) => p.id);
+  for (const part of chunked(propertyIds, LOOKUP_CHUNK)) {
+    const { data, error } = await supabase.from("rentals").select("property_id").eq("tenant_id", gate.tenantId).eq("status", "active").in("property_id", part);
+    if (error) return { error: "Aktif kira kontrolü şu an yapılamıyor; birkaç dakika sonra aynı dosyayla yeniden deneyin." };
+    for (const r of data ?? []) activeRentalProps.add(String(r.property_id));
+  }
+  const customerByPhone = new Map<string, { id: string; name: string | null }>();
+  for (const part of chunked(phones, LOOKUP_CHUNK)) {
+    const { data, error } = await supabase.from("customers").select("id, full_name, phone").eq("tenant_id", gate.tenantId).is("deleted_at", null).in("phone", part);
+    if (error) return { error: "Kiracı/malik eşleşmesi şu an yapılamıyor; birkaç dakika sonra aynı dosyayla yeniden deneyin." };
+    for (const c of data ?? []) if (c.phone && !customerByPhone.has(String(c.phone))) customerByPhone.set(String(c.phone), { id: String(c.id), name: (c.full_name as string | null) ?? null });
+  }
+
+  const seen = new Set(options.seen ?? []);
+  const plans: PlannedRow<RentalPlanData>[] = validated.map(({ r, v }) => {
+    const issues = [...v.issues];
+    if (flaggedRows.has(r.row)) {
+      issues.push({ level: "warning", message: "Metin =, +, - veya @ ile başlıyordu; formül sayılmaması için başına ' eklenerek kaydedilir." });
+    }
+    if (!v.data) return { row: r.row, status: "error", issues };
+    const d = v.data;
+    const key = rentalKey(d);
+    const dupInFile = seen.has(key);
+    seen.add(key);
+    const property = propertyByCode.get(key);
+    if (!property) return { row: r.row, status: "error", issues: [...issues, { level: "error", message: `Portföy bulunamadı: "${d.property_code}" (önce portföyleri aktarın).` }] };
+    if (property.status === "sold") return { row: r.row, status: "error", issues: [...issues, { level: "error", message: "Portföy satılmış; kira bağlanamaz." }] };
+    if (dupInFile) return { row: r.row, status: "skip", issues: [...issues, { level: "warning", message: "Aynı portföy dosyada daha önce geçiyor." }] };
+    if (activeRentalProps.has(property.id)) return { row: r.row, status: "skip", issues: [...issues, { level: "warning", message: "Atlandı (mevcut): portföyde aktif kira var." }] };
+    const renter = customerByPhone.get(d.renter.phone!) ?? null;
+    if (!renter) {
+      if (!d.renter.name) return { row: r.row, status: "error", issues: [...issues, { level: "error", message: "Kiracı telefonla bulunamadı; yeni müşteri için kiracı adı gerekir." }] };
+      if (!canCreateCustomers) return { row: r.row, status: "error", issues: [...issues, { level: "error", message: "Kiracı yeni müşteri olarak oluşturulmalı; müşteri ekleme yetkisi gerekir." }] };
+      issues.push({ level: "warning", message: `Kiracı yeni müşteri olarak oluşturulur: ${d.renter.name}.` });
+    }
+    const owner = d.owner?.phone ? customerByPhone.get(d.owner.phone) ?? null : null;
+    if (d.owner && !owner) {
+      if (!d.owner.name || !canCreateCustomers) issues.push({ level: "warning", message: "Malik bulunamadı ve oluşturulamıyor (ad veya müşteri ekleme yetkisi yok); malik bağı kurulmaz." });
+      else issues.push({ level: "warning", message: `Malik yeni müşteri olarak oluşturulur: ${d.owner.name}.` });
+    }
+    return {
+      row: r.row,
+      status: "new",
+      issues,
+      existingName: renter?.name ?? d.renter.name ?? undefined,
+      data: { ...d, property_id: property.id, renter_id: renter?.id ?? null, owner_id: owner?.id ?? null },
+    };
+  });
+
+  const view = (withLabel: boolean): PlannedRowView[] =>
+    plans.map((p, i) => ({
+      row: p.row,
+      status: p.status,
+      issues: p.issues,
+      existingName: p.existingName,
+      label: withLabel ? String(rows[i]?.property_code ?? "").trim() : undefined,
+    }));
+  if (dryRun) return { ok: true, rows: view(true), counters: countPlanned(plans), seen: [...seen] };
+
+  // ---- yazma ----
+  const fail = (p: PlannedRow<RentalPlanData>, reason: string) => {
+    p.status = "error";
+    p.issues = [...p.issues, { level: "error", message: reason }];
+  };
+  const toCreate = plans.filter((p) => p.status === "new" && p.data);
+
+  // 1) Eksik kiracı/malik müşterileri (telefon başına bir kez) oluştur.
+  const needed = new Map<string, { name: string; email: string | null; type: string }>();
+  for (const p of toCreate) {
+    const d = p.data!;
+    if (!d.renter_id && d.renter.phone && d.renter.name && !needed.has(d.renter.phone)) needed.set(d.renter.phone, { name: d.renter.name, email: d.renter.email, type: "Kiracı" });
+    if (d.owner && !d.owner_id && d.owner.phone && d.owner.name && canCreateCustomers && !needed.has(d.owner.phone)) {
+      needed.set(d.owner.phone, { name: d.owner.name, email: d.owner.email, type: "Mülk sahibi" });
+    }
+  }
+  const createdCustomerIds: string[] = [];
+  if (needed.size > 0) {
+    const inserts = [...needed.entries()].map(([phone, c]) => ({
+      tenant_id: gate.tenantId,
+      full_name: c.name,
+      phone,
+      email: c.email,
+      customer_types: [c.type],
+      source: "İçe aktarma",
+      assigned_to: assignee.id,
+      created_by: gate.userId,
+    }));
+    for (const part of chunked(inserts, INSERT_CHUNK)) {
+      const { data, error } = await supabase.from("customers").insert(part).select("id, phone, full_name");
+      if (error) {
+        console.error("rental import customer insert", error.code);
+        continue;
+      }
+      for (const c of data ?? []) {
+        createdCustomerIds.push(String(c.id));
+        customerByPhone.set(String(c.phone), { id: String(c.id), name: (c.full_name as string | null) ?? null });
+      }
+    }
+  }
+
+  // 2) Satır başına atomik RPC (küçük eşzamanlılık; her satır kendi portföyünü kilitler).
+  const createdRentalIds: string[] = [];
+  let rpcMissing = false;
+  for (const part of chunked(toCreate, RENTAL_RPC_PARALLEL)) {
+    await Promise.all(
+      part.map(async (p) => {
+        if (rpcMissing) return fail(p, "Kiralama içe aktarma henüz etkin değil.");
+        const d = p.data!;
+        const renterId = d.renter_id ?? (d.renter.phone ? customerByPhone.get(d.renter.phone)?.id : undefined);
+        if (!renterId) return fail(p, "Kiracı müşteri olarak eklenemedi; telefon ve adı kontrol edip satırı yeniden aktarın.");
+        const ownerId = d.owner_id ?? (d.owner?.phone ? customerByPhone.get(d.owner.phone)?.id ?? null : null);
+        const { data, error } = await supabase.rpc("import_rental_with_deal", {
+          p_property_id: d.property_id,
+          p_renter_id: renterId,
+          p_monthly_rent: d.monthly_rent,
+          p_due_day: d.due_day,
+          p_start_date: d.start_date,
+          p_end_date: d.end_date,
+          p_deposit: d.deposit,
+          p_commission: d.commission,
+          p_owner_id: ownerId && ownerId !== renterId ? ownerId : null,
+          p_assigned_to: assignee.id,
+          p_notes: d.notes,
+          p_batch_id: options.batchId ?? null,
+        });
+        if (error) {
+          if (error.code === "PGRST202" || error.code === "42883") rpcMissing = true;
+          console.error("import_rental_with_deal", error.code);
+          return fail(p, rpcMissing ? "Kiralama içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Kiralama ekranından ekleyin.");
+        }
+        const res = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+        if (res?.outcome !== "created" || typeof res.rental_id !== "string") {
+          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Kiralama ekranından ekleyin.");
+        }
+        createdRentalIds.push(res.rental_id);
+      }),
+    );
+  }
+
+  const counters = countPlanned(plans);
+  const created = plans.filter((p) => p.status === "new").length;
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "rental.import_batch",
+    entityType: "rental",
+    newValue: {
+      batch_id: options.batchId,
+      file_name: (options.fileName ?? "").slice(0, 200),
+      target: "rentals",
+      total: rows.length,
+      inserted: created,
+      skipped: counters.skip,
+      failed: counters.error,
+      created_ids: createdRentalIds,
+      created_customer_ids: createdCustomerIds,
+    },
+  });
+  revalidatePath("/app/kiralama");
+  revalidatePath("/app/portfoyler");
+  if (createdCustomerIds.length) revalidatePath("/app/musteriler");
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, rows: view(false), counters, created, updated: 0 };
 }
 
 /** Önizleme: yazmaz; satır bazlı durum + sayaçlar döner. Parça parça çağrılır. */

@@ -13,6 +13,7 @@ import { ADMIN_BALANCE_PAGE_SIZE, listTenantEfBalances, readTenantName } from "@
 import { filterAndPage } from "@/lib/ef-credits/credit-view";
 import { GrantForm, PacksEditor, TariffForm } from "./editors";
 import { EconomicsSection, loadEfEconomicsData } from "./economics-section";
+import { MarketExportCard } from "./market-export-card";
 import { LastReconciliationCard } from "./last-reconciliation-card";
 import { now as clockNow } from "@/lib/clock";
 import { getPlatformSetting } from "@/lib/platform-settings";
@@ -79,6 +80,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       />
 
       <EconomicsSection data={list?.extra ?? null} period={period} wholesale={wholesale} canWrite={canWrite} />
+      {canWrite ? <MarketExportCard /> : null}
 
       <LastReconciliationCard />
 

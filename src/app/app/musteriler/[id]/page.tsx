@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { RadialGauge } from "@/components/ui/viz";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -52,7 +53,6 @@ import { provinceOptionsResult } from "@/lib/geo/reader";
 import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
-const RING_C = 2 * Math.PI * 42;
 
 type Rel = { name?: string } | { name?: string }[] | null;
 
@@ -590,20 +590,16 @@ export default async function CustomerDetailPage({
           <div className="flex items-center gap-5 lg:justify-end">
             <div className="relative grid h-28 w-28 shrink-0 place-items-center">
               <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="8" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--mint-400)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  className="ring-sweep"
-                  style={{ "--circ": RING_C, "--dash": RING_C * (1 - score / 100) } as React.CSSProperties}
-                />
-              </svg>
+              <RadialGauge
+                value={score}
+                max={100}
+                size={112}
+                stroke={9}
+                color="var(--mint-400)"
+                trackColor="var(--viz-track-inverse)"
+                ariaLabel="Müşteri skoru"
+                className="absolute inset-0"
+              />
               <div className="absolute text-center">
                 <p className="font-display text-2xl font-extrabold text-white">{score}</p>
                 <p className="text-xs text-white/55">Müşteri skoru</p>

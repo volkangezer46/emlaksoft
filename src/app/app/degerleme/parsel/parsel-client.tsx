@@ -8,9 +8,8 @@ import { efCheckGeoMatch, efLoadIlceler, efLoadMahalleler, submitParcelValuation
 import {
   freeTextHasPersonalData,
   ORTAK_FREE_TEXT_WARNING,
-  ortakValuationInputSchema,
-  type OrtakValuationInput,
-} from "@/lib/integrations/emlakfiyati/ortak-contract";
+} from "@/lib/integrations/emlakfiyati/ortak-text";
+import type { OrtakValuationInput } from "@/lib/integrations/emlakfiyati/ortak-contract";
 import type { RunValuationResult } from "@/lib/ef-credits/types";
 import { EfResultView } from "./result-view";
 
@@ -123,7 +122,7 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
     });
   }
 
-  function buildInput(): OrtakValuationInput | null {
+  async function buildInput(): Promise<OrtakValuationInput | null> {
     const base = {
       mahalleId: Number(mahalleId),
       ada: ada.trim(),
@@ -156,6 +155,8 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
       setError("Konut değerlemesi için alan (m²) bilgisi zorunludur.");
       return null;
     }
+    // Ön doğrulama şeması (zod) yalnız tıklamada yüklenir: sayfa ilk yükünde zod (~280 KB ham) inmez. Sunucu yeniden doğrular.
+    const { ortakValuationInputSchema } = await import("@/lib/integrations/emlakfiyati/ortak-contract");
     const parsed = ortakValuationInputSchema.safeParse(base);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Girdiler geçersiz.");
@@ -164,10 +165,10 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
     return base;
   }
 
-  function onPrepare() {
+  async function onPrepare() {
     setError(null);
     setRun(null);
-    setConfirming(buildInput());
+    setConfirming(await buildInput());
   }
 
   function onConfirm() {

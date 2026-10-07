@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { DemandForm } from "./demand-form";
 import { provinceOptionsResult } from "@/lib/geo/reader";
@@ -12,7 +13,7 @@ export default async function NewDemandPage({
 }: {
   searchParams: Promise<{ musteri?: string }>;
 }) {
-  const { perms, userId } = await requireModulePage("demands");
+  const { perms, userId, tenantId } = await requireModulePage("demands");
   if (!(perms.demands ?? []).includes("create")) redirect("/app/talepler");
 
   const { musteri } = await searchParams;
@@ -34,6 +35,7 @@ export default async function NewDemandPage({
 
   return (
     <DemandForm
+      customFields={await loadCustomFieldInputDefs(supabase, tenantId, "demand")}
       userId={userId}
       customers={options}
       defaultCustomerId={pre?.id}

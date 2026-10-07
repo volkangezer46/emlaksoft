@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -78,7 +79,10 @@ export function PropertyForm({
   transactionTypes,
   userId,
   poolEnabled = false,
+  customFields = [],
 }: {
+  /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
+  customFields?: CustomFieldInputDef[];
   provinces: Province[];
   branches: Branch[];
   propertyTypes: string[];
@@ -275,7 +279,7 @@ export function PropertyForm({
       notice={<DuplicateHint kind="property" />}
       onSubmit={onSubmit}
       tabs={tabs}
-      tabPanels={tabPanels}
+      tabPanels={{ ...tabPanels, temel: <>{tabPanels.temel}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       saveAndNew
       fieldLabels={FIELD_LABELS}

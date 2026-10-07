@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   FileWarning,
   History,
+  KeyRound,
   ListChecks,
   Receipt,
   RefreshCw,
@@ -57,6 +58,7 @@ import {
   type ImportTarget,
   type ParsedCsv,
 } from "./import-config";
+import { isLegacyXls, isXlsxFile, readXlsxTable } from "@/lib/xlsx-import";
 
 /**
  * Dört adımlı içe aktarma sihirbazı (müşteri / portföy / talep ortak altyapı).
@@ -65,8 +67,8 @@ import {
  *  3. ÖNİZLEME: sunucuda yazmadan doğrulama (parça parça), sayaçlar, ilk 20 satır, sorunlu satırlar.
  *  4. Sonuç özeti, hatalı satırları CSV indirme, "bu içe aktarmayı geri al".
  *
- * .xlsx bilinçli olarak DESTEKLENMEZ (bağımlılık istemiyoruz) — kullanıcı
- * Excel'den "CSV olarak kaydet" ile geçirir; hata mesajı bunu söyler.
+ * .xlsx: `src/lib/xlsx-import.ts` (read-excel-file, yalnız dosya seçilince dinamik yüklenir; ilk sayfa, CSV ile aynı
+ * çıktı biçimi). Eski .xls (BIFF) desteklenmez; hata mesajı .xlsx/CSV'ye yönlendirir.
  */
 
 const NONE = "__none__";
@@ -80,10 +82,15 @@ const TARGETS: { key: ImportTarget; desc: string; icon: typeof Users2 }[] = [
   { key: "tasks", desc: "Görev, son tarih, tür, öncelik; müşteri telefonu ile isteğe bağlı bağ", icon: ListChecks },
   { key: "appointments", desc: "Tarih-saat, randevu türü, konum; müşteri telefonu ile isteğe bağlı bağ", icon: CalendarDays },
   { key: "expenses", desc: "Gider başlığı, tutar, kategori, tarih", icon: Receipt },
+  {
+    key: "rentals",
+    desc: "Aktif kira: portföy kodu, kiracı/malik (telefonla eşleşir, yoksa oluşturulur), kira, başlangıç. Kiralama anlaşması + komisyon birlikte kurulur; geri alınamaz.",
+    icon: KeyRound,
+  },
 ];
 
 /** Bu türlerde "güncelle" politikası yoktur (kimlik anahtarı yok): yalnız atla / yeni oluştur. */
-const NO_UPDATE_TARGETS: readonly ImportTarget[] = ["demands", "tasks", "appointments", "expenses"];
+const NO_UPDATE_TARGETS: readonly ImportTarget[] = ["demands", "tasks", "appointments", "expenses", "rentals"];
 /** Danışman ataması anlamsız olan türler. */
 const NO_ASSIGNEE_TARGETS: readonly ImportTarget[] = ["demands", "expenses"];
 const TARGET_LIST_HREF: Record<ImportTarget, string> = {
@@ -93,8 +100,10 @@ const TARGET_LIST_HREF: Record<ImportTarget, string> = {
   tasks: "/app/gorevler",
   appointments: "/app/randevular",
   expenses: "/app/giderler",
+  rentals: "/app/kiralama",
 };
 const DUPLICATE_RULE: Record<ImportTarget, string> = {
+  rentals: "Portföy kodu ile eşleşir; portföyde aktif kira varsa satır atlanır. Kiracı/malik telefonla aranır, yoksa oluşturulur.",
   customers: "Telefon, yoksa e-posta ile mevcut müşteri aranır.",
   properties: "Aynı başlık + adres mevcut portföy sayılır.",
   demands: "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep mükerrer sayılır.",
@@ -169,7 +178,7 @@ export type ImportWizardProps = {
   canImportProperties: boolean;
   canImportDemands: boolean;
   /** Görev / randevu / gider aktarımı: ilgili modülde oluşturma yetkisi. */
-  canImportActivity?: { tasks: boolean; appointments: boolean; expenses: boolean };
+  canImportActivity?: { tasks: boolean; appointments: boolean; expenses: boolean; rentals?: boolean };
   /** Hedef bazında: mevcut kaydı güncelleme (edit) yetkisi. */
   updateAllowed: Record<ImportTarget, boolean>;
   /** Hedef bazında: geri alma (delete) yetkisi. */
@@ -230,9 +239,9 @@ export function ImportWizard({
     setFileError("");
     setParsed(null);
     setFileName(file.name);
-    if (/\.xlsx?$/i.test(file.name)) {
+    if (isLegacyXls(file)) {
       setFileError(
-        "Excel dosyaları (.xlsx/.xls) doğrudan desteklenmiyor. Excel'de \"Dosya → Farklı Kaydet → CSV (Virgülle ayrılmış)\" ile kaydedip CSV'yi yükleyin.",
+        "Eski Excel biçimi (.xls) desteklenmiyor. Excel'de \"Farklı Kaydet → Excel Çalışma Kitabı (.xlsx)\" ya da CSV olarak kaydedip yükleyin.",
       );
       return;
     }
@@ -240,11 +249,14 @@ export function ImportWizard({
       setFileError(`Dosya çok büyük (en fazla ${Math.round(IMPORT_MAX_FILE_BYTES / 1024 / 1024)} MB). Dosyayı bölüp ayrı ayrı yükleyin.`);
       return;
     }
+    const excel = isXlsxFile(file);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
-        const text = decodeCsvBuffer(reader.result as ArrayBuffer);
-        const p = parseCsv(text);
+        // .xlsx yalnız burada, dinamik olarak okunur (kütüphane sayfa paketine girmez); çıktı CSV ile aynı biçim.
+        const p: ParsedCsv = excel
+          ? await readXlsxTable(reader.result as ArrayBuffer)
+          : parseCsv(decodeCsvBuffer(reader.result as ArrayBuffer));
         if (!p.headers.length || !p.rows.length) {
           setFileError("Dosyada başlık satırı veya veri satırı bulunamadı.");
           return;
@@ -257,7 +269,7 @@ export function ImportWizard({
         }
         setParsed(p);
       } catch {
-        setFileError("Dosya okunamadı. Geçerli bir CSV dosyası yükleyin.");
+        setFileError("Dosya okunamadı. Geçerli bir CSV veya Excel (.xlsx) dosyası yükleyin.");
       }
     };
     reader.onerror = () => setFileError("Dosya okunamadı. Lütfen tekrar deneyin.");
@@ -440,7 +452,9 @@ export function ImportWizard({
                       ? canImportDemands
                       : t.key === "tasks" || t.key === "appointments" || t.key === "expenses"
                         ? canImportActivity[t.key]
-                        : true;
+                        : t.key === "rentals"
+                          ? canImportActivity.rentals === true
+                          : true;
                 return (
                   <button
                     key={t.key}
@@ -509,7 +523,7 @@ export function ImportWizard({
               <ol className="mt-1 list-decimal space-y-0.5 pl-4">
                 <li>Excel&apos;de dosyanızı açın: Dosya, Farklı Kaydet.</li>
                 <li>Türü &quot;CSV UTF-8 (virgülle ayrılmış)&quot; seçip kaydedin.</li>
-                <li>Oluşan .csv dosyasını aşağıdan yükleyin. .xlsx / .xls doğrudan yüklenemez.</li>
+                <li>Oluşan .csv dosyasını aşağıdan yükleyin. Excel çalışma kitabı (.xlsx) doğrudan da yüklenebilir (ilk sayfa okunur); eski .xls yüklenemez.</li>
               </ol>
               <p className="mt-1.5">Kolonları nasıl düzenleyeceğinizi görmek için aşağıdaki örnek şablonlardan birini indirin.</p>
             </div>
@@ -517,7 +531,7 @@ export function ImportWizard({
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className="sr-only"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -525,8 +539,8 @@ export function ImportWizard({
                 }}
               />
               <UploadCloud className="mx-auto h-8 w-8 text-brand-600" />
-              <p className="mt-2 text-sm font-semibold text-ink-950">{fileName || "CSV dosyası seçmek için tıklayın"}</p>
-              <p className="mt-1 text-xs text-text-faint">.csv — Excel dosyanızı önce &quot;CSV olarak kaydedin&quot;</p>
+              <p className="mt-2 text-sm font-semibold text-ink-950">{fileName || "CSV veya Excel (.xlsx) dosyası seçmek için tıklayın"}</p>
+              <p className="mt-1 text-xs text-text-faint">.csv veya .xlsx (ilk sayfa; ilk satır başlık)</p>
             </label>
             {fileError ? (
               <p className="mt-2 flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs text-danger-600" role="alert">

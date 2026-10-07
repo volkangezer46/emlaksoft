@@ -10,9 +10,10 @@ import { FileInput } from "@/components/ui/file-input";
 import { bridgeInstalled, bridgePaused, requestInventoryPage } from "@/lib/listing-control/worker/bridge";
 import { importPortalInventory, type InventoryImportResult } from "@/app/actions/listing-control-inventory";
 import { CONTROL_BASE, kpiHref } from "./helpers";
+import { isLegacyXls, isXlsxFile } from "@/lib/xlsx-import";
 
 /**
- * Portal envanteri karşılaştırma formu. Kaynak: portal hesabından indirilen CSV (Excel: "CSV UTF-8" olarak kaydedin ya da
+ * Portal envanteri karşılaştırma formu. Kaynak: portal hesabından indirilen CSV veya .xlsx (dinamik okunur, CSV metnine çevrilir) ya da
  * başlıklı tabloyu kopyalayıp yapıştırın), yapıştırılan ilan no/URL listesi, ya da tarayıcı eklentisiyle portal mağaza
  * sayfasından okuma (kullanıcının kendi tarayıcısında, en çok 10 sayfa, sayfa arası ≥ 20 sn). Liste TAM değilse
  * "listede yok" kayıp sayılmaz.
@@ -56,9 +57,19 @@ export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
       setFileText("");
       return setError("Dosya çok büyük (en fazla ~3,5 MB / 5000 ilan).");
     }
-    if (/\.xlsx?$/i.test(f.name)) {
+    if (isLegacyXls(f)) {
       setFileText("");
-      return setError("Excel dosyasını \"CSV UTF-8\" olarak kaydedip yükleyin ya da tabloyu kopyalayıp \"Yapıştır\" sekmesine yapıştırın.");
+      return setError("Eski Excel biçimi (.xls) desteklenmiyor: .xlsx ya da \"CSV UTF-8\" olarak kaydedip yükleyin veya tabloyu \"Yapıştır\" sekmesine yapıştırın.");
+    }
+    if (isXlsxFile(f)) {
+      // Kütüphane yalnız burada dinamik yüklenir; ilk sayfa CSV metnine çevrilip aynı sunucu ayrıştırıcısına gider.
+      try {
+        const { readXlsxTable, tableToCsvText } = await import("@/lib/xlsx-import");
+        return setFileText(tableToCsvText(await readXlsxTable(await f.arrayBuffer())));
+      } catch {
+        setFileText("");
+        return setError("Excel dosyası okunamadı. Dosyayı .xlsx ya da CSV olarak yeniden kaydedip deneyin.");
+      }
     }
     setFileText(await f.text());
   }
@@ -176,9 +187,9 @@ export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
 
       {source === "csv" ? (
         <div className="space-y-2">
-          <FileInput accept=".csv,text/csv" onChange={onFile} buttonLabel="CSV dosyası seç" />
+          <FileInput accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onFile} buttonLabel="CSV / Excel dosyası seç" />
           <p className="text-xs text-text-muted">
-            Portal ofis panelinden ilan listenizi dışa aktarın. İlan No sütunu zorunlu; Fiyat, Durum, Danışman sütunları varsa fiyat ve danışman uyuşmazlığı da bulunur. Excel için &quot;CSV UTF-8&quot; olarak kaydedin.
+            Portal ofis panelinden ilan listenizi dışa aktarın. İlan No sütunu zorunlu; Fiyat, Durum, Danışman sütunları varsa fiyat ve danışman uyuşmazlığı da bulunur. Excel çalışma kitabı (.xlsx, ilk sayfa) doğrudan yüklenebilir.
           </p>
         </div>
       ) : null}

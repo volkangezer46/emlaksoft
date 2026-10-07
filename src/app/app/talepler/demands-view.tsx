@@ -20,6 +20,8 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
+import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
+import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 import { relatedSearchClause } from "@/lib/list-search";
 import { buildHref } from "@/lib/ui/filter-params";
 import {
@@ -173,6 +175,9 @@ export async function DemandsView({
   if (fromF) urlParams.from = fromF;
   if (toF) urlParams.to = toF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
+  // Özel alan filtresi (?ozel=anahtar:değer): liste sorgusuna eşleşen kimliklerle iner.
+  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "demand", customFilterRaw(sp as Record<string, string | undefined>));
+  if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
@@ -216,6 +221,7 @@ export async function DemandsView({
     if (fromF) query = query.gte("created_at", fromF);
     if (toF) query = query.lte("created_at", `${toF}T23:59:59.999`);
     if (search.clause) query = query.or(search.clause);
+    query = applyCustomFieldIds(query, customFilter.ids);
     return query;
   };
 
@@ -510,6 +516,7 @@ export async function DemandsView({
             chips={chips}
             savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
           />
+          <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
 
           <div className="space-y-2">
             <CategoryChips

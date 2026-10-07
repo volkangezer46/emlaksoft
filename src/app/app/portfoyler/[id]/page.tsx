@@ -84,14 +84,13 @@ import { PROPERTY_TIMELINE_CATEGORIES } from "./property-events";
 import { resolveCategory } from "@/lib/activity-timeline";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
-import type { CSSProperties } from "react";
+import { RadialGauge } from "@/components/ui/viz";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
 import { mapPropertyTypeToTip } from "@/lib/integrations/emlakfiyati/contract";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
-const RING_C = 2 * Math.PI * 42;
 
 type Rel = { name?: string; full_name?: string } | { name?: string; full_name?: string }[] | null;
 
@@ -509,20 +508,17 @@ export default async function PropertyDetailPage({
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
                 style={{ background: "conic-gradient(from 0deg, var(--mint-400), var(--brand-500), var(--mint-400))" }}
               />
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="8" />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  fill="none"
-                  stroke="var(--mint-400)"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  className="ring-sweep"
-                  style={{ "--circ": RING_C, "--dash": RING_C * (1 - portalHealth) } as CSSProperties}
-                />
-              </svg>
+              <RadialGauge
+                value={Math.round(portalHealth * 100)}
+                max={100}
+                size={112}
+                stroke={9}
+                color="var(--mint-400)"
+                trackColor="var(--viz-track-inverse)"
+                format="percent"
+                ariaLabel="Portal ilanı teyit oranı"
+                className="absolute inset-0"
+              />
               <div className="absolute text-center">
                 <p className="font-display text-xl font-extrabold">%{Math.round(portalHealth * 100)}</p>
                 <p className="text-xs text-white/45">teyit</p>

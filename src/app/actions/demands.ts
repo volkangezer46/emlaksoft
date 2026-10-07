@@ -20,6 +20,7 @@ import { pruneRequiredKeys } from "@/lib/demand-geo";
 import { validateGeoChain } from "@/lib/geo/reader";
 import { findSimilarOpenDemands } from "@/lib/duplicate-finders";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -88,6 +89,10 @@ export async function createDemand(
     }
   }
 
+  // Özel alanlar: kayıttan ÖNCE doğrulanır (zorunlu/tür hatası talebi yazdırmaz).
+  const customFields = await prepareCustomFieldInputs(supabase, gate.tenantId, "demand", formData);
+  if (!customFields.ok) return { error: customFields.error };
+
   const { data, error } = await supabase
     .from("customer_demands")
     .insert({
@@ -104,6 +109,7 @@ export async function createDemand(
     console.error("createDemand", error);
     return { error: actionErrorMessage(error, "Talep kaydedilemedi. Lütfen tekrar deneyin.") };
   }
+  if (data?.id) await writeCustomFieldInputs(supabase, { tenantId: gate.tenantId, userId: gate.userId, recordId: data.id }, customFields.value);
 
   await logActivity({
     tenantId: gate.tenantId,

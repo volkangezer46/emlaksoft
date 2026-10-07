@@ -32,7 +32,8 @@ import { actionErrorMessage } from "@/lib/action-errors";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IMPORT_ACTIONS = ["customer.import", "property.import", "demand.import", "task.import", "appointment.import", "expense.import"] as const;
 
-const TARGET_BY_ACTION: Record<string, ImportTarget> = {
+// Kiralama aktarması (rental.import_batch) geri alınamaz: kira/anlaşma/komisyon atomik zincirdir; listede yer almaz.
+const TARGET_BY_ACTION: Record<string, Exclude<ImportTarget, "rentals">> = {
   "customer.import": "customers",
   "property.import": "properties",
   "demand.import": "demands",

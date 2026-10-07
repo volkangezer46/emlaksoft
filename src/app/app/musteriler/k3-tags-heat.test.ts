@@ -94,13 +94,14 @@ describe("sıcaklık segmenti: ekran ve CSV aynı havuz sınırı", () => {
   });
 });
 
-describe("içe aktarma: yalnız CSV, Excel için açık yönerge + şablon", () => {
-  it("sihirbaz Excel'den CSV yönergesini ve örnek şablon indirmeyi içerir", () => {
+describe("içe aktarma: CSV + .xlsx (yalnız dinamik okuyucu), eski .xls için açık yönerge + şablon", () => {
+  it("sihirbaz .xlsx'i dinamik okuyucuyla, CSV'yi kendi ayrıştırıcısıyla alır; .xls reddedilir; şablon indirilir", () => {
     const wiz = read("src/app/app/ice-aktarma/import-wizard.tsx");
-    expect(wiz).toContain("Excel&apos;den CSV olarak kaydedip yükleyin");
+    expect(wiz).toContain("readXlsxTable(");
+    expect(wiz).toContain("isLegacyXls(file)");
     expect(wiz).toContain("buildTemplateCsv");
-    expect(wiz).toContain('accept=".csv,text/csv"');
-    expect(wiz).toContain("doğrudan desteklenmiyor");
+    expect(wiz).toMatch(/accept="\.csv,text\/csv,\.xlsx/);
+    expect(wiz).toContain("Eski Excel biçimi (.xls) desteklenmiyor");
   });
 
   it("xlsx bağımlılığı eklenmemiştir", () => {

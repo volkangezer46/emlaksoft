@@ -33,6 +33,7 @@ import { shortAuthorityWarning } from "@/lib/eids/authority-term";
 import { now as clockNow, trDayKey } from "@/lib/clock";
 import { notifyAssignment } from "@/lib/assignment-notify";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 
 export type PropertyResult = {
   error?: string;
@@ -319,6 +320,10 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     targetFacade: features.facade as string | null,
   });
 
+  // Özel alanlar: kayıttan ÖNCE doğrulanır (zorunlu/tür hatası portföyü yazdırmaz).
+  const customFields = await prepareCustomFieldInputs(supabase, gate.tenantId, "property", formData);
+  if (!customFields.ok) return { error: customFields.error };
+
   const { data, error } = await supabase
     .from("properties")
     .insert({
@@ -362,6 +367,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     console.error("createProperty", error);
     return { error: planLimitErrorMessage(error) ?? actionErrorMessage(error, "Portföy eklenemedi. Lütfen tekrar deneyin.") };
   }
+  await writeCustomFieldInputs(supabase, { tenantId: gate.tenantId, userId: gate.userId, recordId: data.id }, customFields.value);
 
   // İlan sahibi: müşteri kaydına bağla + ayrıntıları yaz (şema yoksa notlara düşer; ilan her durumda oluşur).
   let ownerInfoScore: number | undefined;

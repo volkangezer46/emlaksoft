@@ -11,6 +11,7 @@ import {
   isSafeDirectFileUploadPath,
   isUuid,
   validateDirectFileUploadMetadata,
+  type DirectFileUploadBucket,
   type DirectFileUploadFinalizeResult,
   type DirectFileUploadKind,
   type DirectFileUploadMetadata,
@@ -31,8 +32,10 @@ type DirectFileUploadSession = {
   kind: DirectFileUploadKind;
   customer_id: string | null;
   property_id: string | null;
+  /** 20261007000700 öncesi şemada sütun yoktur (yalnız gider fişi oturumunda dolu). */
+  expense_id?: string | null;
   requested_by: string;
-  bucket: "customer-files" | "property-media";
+  bucket: DirectFileUploadBucket;
   storage_path: string;
   file_name: string;
   file_size: number;
@@ -47,8 +50,18 @@ function contextIsValid(context: AuthorizedDirectFileUpload) {
   return isUuid(context.tenantId) && isUuid(context.parentId) && isUuid(context.userId);
 }
 
+/** Oturumun üst kaydı (tür → sütun; tek eşleme). */
+export function sessionParentId(
+  kind: DirectFileUploadKind,
+  session: { customer_id: string | null; property_id: string | null; expense_id?: string | null },
+): string | null {
+  if (kind === "customer_file") return session.customer_id;
+  if (kind === "expense_receipt") return session.expense_id ?? null;
+  return session.property_id;
+}
+
 function sessionMatchesContext(session: DirectFileUploadSession, context: AuthorizedDirectFileUpload) {
-  const parentId = context.kind === "customer_file" ? session.customer_id : session.property_id;
+  const parentId = sessionParentId(context.kind, session);
   return (
     session.id &&
     session.kind === context.kind &&
@@ -109,6 +122,8 @@ export async function prepareDirectFileUpload(
     kind: context.kind,
     customer_id: context.kind === "customer_file" ? context.parentId : null,
     property_id: context.kind === "property_media" ? context.parentId : null,
+    // Sütun yalnız gider fişinde yazılır: 20261007000700 öncesi şemada diğer türler bozulmasın.
+    ...(context.kind === "expense_receipt" ? { expense_id: context.parentId } : {}),
     requested_by: context.userId,
     bucket: config.bucket,
     storage_path: storagePath,
@@ -295,6 +310,7 @@ export async function finalizeDirectFileUpload(
   }
 
   const file = new File([blob], session.file_name, { type: session.claimed_mime });
+  // Gider fişi görsel VEYA PDF olabildiği için belge doğrulayıcısı (imza + izinli tür listesi) kullanılır.
   const verified = context.kind === "property_media"
     ? await verifyImageFile(file, config.allowedMime)
     : await verifyDocumentFile(file, config.allowedMime);

@@ -1,191 +1,51 @@
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  CheckCircle2,
-  Crosshair,
-  Droplets,
-  MapPin,
-  Globe,
-  Fingerprint,
-  Layers,
-  FileText,
-  Megaphone,
-  MessageSquareText,
-  Plug,
-  Radio,
-  Rocket,
-  ShieldCheck,
-  Sliders,
-  Sparkles,
-  Square,
-  Trash2,
-  Tags,
-  Users2,
-} from "lucide-react";
+import { CheckCircle2, Square } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { REAL_USE_HREF, canSwitchToRealUse } from "@/lib/sample-data/real-use";
-import { loadSampleStatus } from "@/lib/sample-status";
-import { getNotificationPrefs } from "@/app/actions/notification-prefs";
-import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
-import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
-import { sanitizeMatchingWeights, type MatchingWeights } from "@/lib/matching-weights";
-import { CompanyForm } from "./company-form";
-import { LicenseStatusCard } from "@/components/app/license-status-card";
-import { loadTenantLicense, tenantLicenseStatus } from "@/lib/license-server";
-import { getProvinceOptions } from "@/lib/geo/reader";
-import { MatchingWeightsForm } from "./matching-weights-form";
-import { LogoUploadForm } from "./logo-upload-form";
-import { IntegrationsForm } from "./integrations-form";
-import { ReadOnlyGate } from "./read-only-gate";
-import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
-import { loadNotificationChannels } from "@/lib/notification-channels";
 import { planLabel } from "@/lib/billing/plans";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
-import { canManageModules } from "@/lib/modules/permissions";
-
 import { PageHeader } from "@/components/ui/page-header";
+import { RadialGauge } from "@/components/ui/viz";
+import { SETTINGS_TABS, parseSettingsTab, settingsTabHref } from "./_sekmeler/tabs";
+import { HashTabRedirect } from "./_sekmeler/hash-tab-redirect";
+import { EMPTY_SETTINGS_TENANT, SETTINGS_TENANT_COLUMNS, type SettingsTenant } from "./_sekmeler/types";
+import { KimlikTab } from "./_sekmeler/kimlik-tab";
+import { EslestirmeTab } from "./_sekmeler/eslestirme-tab";
+import { EntegrasyonTab } from "./_sekmeler/entegrasyon-tab";
+import { BildirimTab } from "./_sekmeler/bildirim-tab";
+import { TumAyarlarTab } from "./_sekmeler/tum-tab";
 
-export const metadata = { title: "Ayarlar" };
-type SettingCard = {
-  title: string;
-  desc: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tone: string;
-  badge?: string;
-  badgeCls?: string;
-  href?: string;
-};
-
-const SETUP_RING_C = 2 * Math.PI * 42;
-
-const cards: SettingCard[] = [
-  { title: "Ofis kurulumu", desc: "Adım adım kurulum sihirbazı: ofis bilgileri, ekip, ilk kayıtlar ve örnek veri.", icon: Rocket, tone: "bg-brand-600/10 text-brand-600", href: "/app/baslangic" },
-  { title: "Şube / ekip", desc: "Şubeler, ekipler ve bölge yetkilendirmeleri.", icon: Users2, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ekip" },
-  { title: "Kullanıcı & roller", desc: "Danışman, yönetici ve broker rol izinleri.", icon: Fingerprint, tone: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/roller" },
-  { title: "Yetkilendirme", desc: "Kim hangi kayıtları görür: kullanıcı kapsamları, geçici istisnalar, kişiye özel izinler ve denetim günlüğü.", icon: ShieldCheck, tone: "bg-amber-400/12 text-amber-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/yetkilendirme" },
-  { title: "Entegrasyonlar", desc: "Hazır, yapılandırma bekleyen ve planlanan dış servis bağlantıları.", icon: Plug, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/entegrasyonlar" },
-  { title: "Duyuru panosu", desc: "Ekibe duyuru yayınlayın, kim okudu takip edin.", icon: Megaphone, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/bildirimler?sekme=duyurular" },
-  { title: "Mesaj şablonları", desc: "WhatsApp için hazır metinler — değişkenler tek tıkla dolar.", icon: MessageSquareText, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/mesaj-sablonlari" },
-  { title: "Sözleşme şablonları", desc: "Hazır sözleşme metinlerini ekleyin, düzenleyin, pasife alın.", icon: FileText, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/sozlesme-sablonlari" },
-  { title: "Güvenlik", desc: "SMS ile iki adımlı doğrulama ve giriş geçmişi.", icon: ShieldCheck, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/guvenlik" },
-  { title: "Müşteri etiketleri", desc: "Etiketleri yeniden adlandırın, birleştirin ya da kaldırın.", icon: Tags, tone: "bg-brand-600/10 text-brand-600", href: "/app/ayarlar/etiketler" },
-  { title: "Çöp kutusu", desc: "Silinen müşteri ve portföyleri 90 gün içinde geri alın.", icon: Trash2, tone: "bg-danger-500/10 text-danger-500", href: "/app/ayarlar/cop-kutusu" },
-  { title: "Tanımlar & seçim listeleri", desc: "Müşteri tipi, kaynak, portföy tipi gibi tüm dropdown seçeneklerini yönetin.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/tanimlar" },
-  { title: "Tanımlar merkezi", desc: "SLA süreleri, uyarı eşikleri, komisyon ve bildirim varsayılanları; geçmiş ve varsayılana dön.", icon: Sliders, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/merkez" },
-  { title: "Aday yakalama", desc: "Web formu/bağlantı, sırayla atama ve hızlı yanıt.", icon: Radio, tone: "bg-mint-500/12 text-mint-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/lead" },
-  { title: "Modüller", desc: "Kullanmadığınız alanları kapatın, menü sadeleşsin. Verileriniz silinmez.", icon: Layers, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/moduller" },
-  { title: "Ofis vitrini", desc: "Vitrinde görünecek bölümler, tanıtım metni ve arama motorlarında görünme onayı.", icon: Globe, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/vitrin" },
-  { title: "AI kullanımı", desc: "Aylık AI kredisi, kalan hak ve kimin ne kadar kullandığı.", icon: Sparkles, tone: "bg-brand-600/10 text-brand-600", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/ai-kullanim" },
-  { title: "Fotoğraf filigranı", desc: "İlan fotoğraflarına ofis logosu/adı otomatik basılsın — ilan çalınmasına karşı.", icon: Droplets, tone: "bg-cyan-400/12 text-cyan-500", badge: "Yeni", badgeCls: "bg-mint-500/12 text-mint-600", href: "/app/ayarlar/filigran" },
-  { title: "Bölge bildirimi", desc: "Eksik ya da yanlış mahalleyi platform ekibine bildirin.", icon: MapPin, tone: "bg-cyan-400/12 text-cyan-500", href: "/app/ayarlar/cografya-bildir" },
-];
-
-export default async function SettingsPage() {
+/**
+ * /app/ayarlar — sekme bazlı (`?sekme=kimlik|eslestirme|entegrasyon|bildirim|tum`, varsayılan kimlik). Başlık (kurulum
+ * halkası) her sekmede; sekme gövdesi YALNIZ kendi verisini okur ve kendi istemci adasını çizer (önceden tek sayfada
+ * 13 okuma + tüm formlar). Eski çapalar (`#marka-kimlik`, `#eslestirme-agirliklari`) `HashTabRedirect` ile sekmeye çevrilir.
+ */
+export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
   const { tenantId, role, perms } = await requireModulePage("settings");
+  const sp = (await searchParams) ?? {};
+  const tab = parseSettingsTab(sp.sekme);
   const canEditSettings = (perms.settings ?? []).includes("edit");
-  // Modüller kartı yalnız ofis sahibi ve genel müdür içindir.
-  const visibleCards = cards.filter((c) => (c.href !== "/app/ayarlar/moduller" && c.href !== "/app/ayarlar/ai-kullanim") || canManageModules(role));
   const supabase = await createClient();
-  // Tek tur: tüm bağımsız okumalar paralel (eskiden il listesi önce, lisans/örnek veri/kurulum durumu sonra sırayla bekleniyordu).
-  // Ofis satırı bir kez çalıştırılır (PostgREST sorgusu her `then`de yeniden gider): örnek veri durumu ona zincirlenir.
-  const tenantPromise = Promise.resolve(
-    supabase
-      .from("tenants")
-      .select("name, plan, tax_office, tax_number, license_no, brand_color, iban, phone, address_line, city, province_id, district_id, logo_url, website, sample_seeded_at, matching_weights")
-      .limit(1)
-      .maybeSingle(),
-  );
-  const sampleStatusPromise = tenantId
-    ? tenantPromise
-        .then(({ data }) => loadSampleStatus(supabase, tenantId, (data as { sample_seeded_at?: string | null } | null)?.sample_seeded_at ?? null))
-        .catch(() => null)
-    : Promise.resolve(null);
-
-  const [provinces, tenantLicense, snap, sampleStatus, user, { data: tenantRow }, notifPrefs, { count: consentCount }, { count: activeConsentCount }, { count: auditCount }, { data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
-    getProvinceOptions(),
-    loadTenantLicense(),
+  const [snap, user, { data: tenantRow }] = await Promise.all([
     tenantId ? loadOnboardingSnapshot(tenantId) : Promise.resolve(null),
-    sampleStatusPromise,
     getRequestUser(),
-    tenantPromise,
-    getNotificationPrefs(),
-    supabase.from("iys_consents").select("id", { count: "exact", head: true }),
-    supabase.from("iys_consents").select("id", { count: "exact", head: true }).eq("status", "granted"),
-    supabase.from("audit_logs").select("id", { count: "exact", head: true }),
-    // Tablo henüz oluşmadıysa error döner, data null kalır — form boş başlar
-    supabase.from("tenant_integrations").select("credentials, external_account_id").eq("provider", "netgsm").limit(1).maybeSingle(),
-    supabase
-      .from("tenant_integrations")
-      .select("credentials, external_account_id, whatsapp_business_account_id, graph_api_version, connection_status")
-      .eq("provider", "whatsapp")
-      .limit(1)
-      .maybeSingle(),
-    isNetgsmConfigured(),
+    supabase.from("tenants").select(SETTINGS_TENANT_COLUMNS).limit(1).maybeSingle(),
   ]);
-
-  const tenant = tenantRow ?? { name: "", plan: "office", tax_office: null, tax_number: null, license_no: null, brand_color: null, iban: null, phone: null, address_line: null, city: null, province_id: null, district_id: null, logo_url: null, website: null, sample_seeded_at: null };
-  const licenseStatus = tenantLicenseStatus(tenantLicense);
-  const sampleSeededAt = (tenant as { sample_seeded_at?: string | null }).sample_seeded_at ?? null;
-  // matching_weights null = varsayılan set kullanılıyor; form başlangıcı için güvenli ayrıştır.
-  const rawMatchingWeights = (tenant as { matching_weights?: unknown }).matching_weights ?? null;
-  const matchingWeights: MatchingWeights | null = rawMatchingWeights
-    ? sanitizeMatchingWeights(rawMatchingWeights)
-    : null;
-
-  const complianceStrip = [
-    {
-      label: "İYS izinleri",
-      value: (consentCount ?? 0) > 0 ? `${activeConsentCount ?? 0}/${consentCount} onaylı` : "Kayıt yok",
-      ok: (consentCount ?? 0) > 0,
-      href: "/app/uyum",
-    },
-    { label: "Yetki belgesi kalkanı", value: "Manuel", ok: false, href: "/app/uyum" },
-    {
-      label: "Denetim kaydı",
-      value: (auditCount ?? 0) > 0 ? `${auditCount} olay` : "Boş",
-      ok: (auditCount ?? 0) > 0,
-      href: "/app/denetim",
-    },
-  ];
-
-  const netgsmCreds = (netgsmRow?.credentials ?? null) as { usercode?: string; password?: string; msgheader?: string } | null;
-  // Şifre client'a asla gitmez — yalnızca var/yok bilgisi
-  const netgsm = netgsmCreds && (netgsmCreds.usercode || netgsmCreds.msgheader)
-    ? {
-        usercode: netgsmCreds.usercode ?? "",
-        msgheader: netgsmCreds.msgheader ?? "",
-        inboundReceiver: String(netgsmRow?.external_account_id ?? ""),
-        hasPassword: Boolean(netgsmCreds.password),
-      }
-    : null;
-  const platformFallbackConfigured =
-    netgsmPlatformConfigured && platformMessagingFallbackAllowed();
-  const whatsappCreds = (whatsappRow?.credentials ?? null) as { configured?: boolean } | null;
-  // Erişim anahtarı hiçbir zaman sayfa verisine girmez; yalnız maskeli var/yok bilgisi aktarılır.
-  const whatsapp = whatsappRow
-    ? {
-        phoneNumberId: String(whatsappRow.external_account_id ?? ""),
-        wabaId: String(whatsappRow.whatsapp_business_account_id ?? ""),
-        graphVersion: String(whatsappRow.graph_api_version ?? ""),
-        hasAccessToken: whatsappCreds?.configured === true,
-        status: String(whatsappRow.connection_status ?? "configured"),
-      }
-    : null;
+  const tenant: SettingsTenant = { ...EMPTY_SETTINGS_TENANT, ...((tenantRow as Partial<SettingsTenant> | null) ?? {}) };
 
   // Kurulum kontrol listesi — ilk madde her zaman tamam (hesap zaten açık),
   // diğerleri tenant/hesap verisinden hesaplanır; eksikler ilgili forma bağlanır.
   const checklist: { label: string; done: boolean; href?: string }[] = [
     { label: "Hesap oluşturuldu", done: true },
-    { label: "Ofis adı", done: !!tenant.name, href: "#marka-kimlik" },
-    { label: "Vergi dairesi", done: !!tenant.tax_office, href: "#marka-kimlik" },
-    { label: "Vergi / TC no", done: !!tenant.tax_number, href: "#marka-kimlik" },
-    { label: "Yetki belgesi no", done: !!tenant.license_no, href: "#marka-kimlik" },
-    { label: "Marka rengi", done: !!tenant.brand_color, href: "#marka-kimlik" },
-    { label: "IBAN", done: !!tenant.iban, href: "#marka-kimlik" },
-    { label: "Telefon", done: !!tenant.phone, href: "#marka-kimlik" },
-    { label: "Adres", done: !!tenant.address_line, href: "#marka-kimlik" },
+    { label: "Ofis adı", done: !!tenant.name, href: "/app/ayarlar#marka-kimlik" },
+    { label: "Vergi dairesi", done: !!tenant.tax_office, href: "/app/ayarlar#marka-kimlik" },
+    { label: "Vergi / TC no", done: !!tenant.tax_number, href: "/app/ayarlar#marka-kimlik" },
+    { label: "Yetki belgesi no", done: !!tenant.license_no, href: "/app/ayarlar#marka-kimlik" },
+    { label: "Marka rengi", done: !!tenant.brand_color, href: "/app/ayarlar#marka-kimlik" },
+    { label: "IBAN", done: !!tenant.iban, href: "/app/ayarlar#marka-kimlik" },
+    { label: "Telefon", done: !!tenant.phone, href: "/app/ayarlar#marka-kimlik" },
+    { label: "Adres", done: !!tenant.address_line, href: "/app/ayarlar#marka-kimlik" },
     { label: "Hesap e-postası", done: !!user?.email },
   ];
   // Kurulum yüzdesi: ana ekran şeridi ve /app/baslangic sihirbazıyla AYNI kaynak (onboarding-state).
@@ -206,20 +66,17 @@ export default async function SettingsPage() {
             >
               <div className="relative grid h-28 w-28 place-items-center">
                 <div className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-30 blur-md" style={{ background: "conic-gradient(from 0deg, var(--mint-500), var(--brand-500), var(--mint-500))" }} />
-                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--viz-track-inverse)" strokeWidth="8" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="42"
-                    fill="none"
-                    stroke="var(--mint-400)"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    className="ring-sweep"
-                    style={{ "--circ": SETUP_RING_C, "--dash": SETUP_RING_C * (1 - completion / 100) } as React.CSSProperties}
-                  />
-                </svg>
+                <RadialGauge
+                  value={completion}
+                  max={100}
+                  size={112}
+                  stroke={9}
+                  color="var(--mint-400)"
+                  trackColor="var(--viz-track-inverse)"
+                  format="percent"
+                  ariaLabel="Ofis kurulumu tamamlanma"
+                  className="absolute inset-0"
+                />
                 <div className="absolute text-center">
                   <p className="font-display text-xl font-extrabold text-white">%{completion}</p>
                   <p className="text-xs text-white/55">Kurulum</p>
@@ -257,176 +114,25 @@ export default async function SettingsPage() {
           </details></div>
 } />
 
-      <LicenseStatusCard />
-
-      {/* Logo + company form */}
-      <section id="marka-kimlik" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
-        <div className="flex items-center gap-3 border-b border-line pb-4">
-          <div>
-            <h2 className="font-display font-bold text-ink-950">Marka & kimlik</h2>
-            <p className="text-xs text-text-muted">Logo, ofis adı ve iletişim bilgileri</p>
-          </div>
-        </div>
-        <ReadOnlyGate canEdit={canEditSettings}>
-        <div className="mt-5 border-b border-line pb-5">
-          <LogoUploadForm currentUrl={tenant.logo_url ?? null} officeName={tenant.name || "Ofis"} />
-        </div>
-        <CompanyForm tenant={{ ...tenant, license_title: tenantLicense.licenseTitle, license_valid_until: tenantLicense.validUntil }} provinces={provinces} licenseBadge={{ label: licenseStatus.label, tone: licenseStatus.tone }} licenseColumnsReady={tenantLicense.extendedColumns} />
-        </ReadOnlyGate>
-      </section>
-
-      {/* Eşleştirme ağırlıkları */}
-      <section id="eslestirme-agirliklari" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
-          <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Crosshair className="h-5 w-5" /></span>
-            <div>
-              <h2 className="font-display font-bold text-ink-950">Eşleştirme ağırlıkları</h2>
-              <p className="text-xs text-text-muted">
-                Talep × portföy skorunda hangi kriterin ne kadar önemli olduğunu ofisinize göre ayarlayın.
-                {matchingWeights ? " Özel ağırlık seti aktif." : " Varsayılan set kullanılıyor."}
-              </p>
-            </div>
-          </div>
-          <Link href="/app/talepler?sekme=eslesme" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600">
-            Eşleştirme sayfası <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <ReadOnlyGate canEdit={canEditSettings}>
-          <MatchingWeightsForm initial={matchingWeights} />
-        </ReadOnlyGate>
-      </section>
-
-      {/* Entegrasyonlar */}
-      <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
-        <div className="flex items-center gap-3 border-b border-line pb-4">
-          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
-          <div>
-            <h2 className="font-display font-bold text-ink-950">Entegrasyonlar</h2>
-            <p className="text-xs text-text-muted">Ofise özel Netgsm SMS ve WhatsApp Cloud API bağlantıları</p>
-          </div>
-        </div>
-        <div className="mt-5">
-          <ReadOnlyGate canEdit={canEditSettings}>
-          <IntegrationsForm
-            netgsm={netgsm}
-            platformConfigured={platformFallbackConfigured}
-            whatsapp={whatsapp}
-          />
-          </ReadOnlyGate>
-        </div>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
-        <NotificationPrefsPanel initial={notifPrefs} channels={await loadNotificationChannels(tenantId)} />
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <h2 className="font-display font-bold text-ink-950">Hızlı bağlantılar</h2>
-          <p className="mt-1 text-xs text-text-muted">Operasyon ve uyum kısayolları</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {[
-              { href: "/app/anlasmalar", label: "Anlaşma tahtası" },
-              { href: "/app/denetim", label: "Denetim" },
-              { href: "/app/uyum", label: "İYS / yetki kalkanı" },
-              { href: "/app/degerleme", label: "Değerleme" },
-            ].map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {/* settings grid */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {visibleCards.map((card) => {
-          const inner = (
-            <>
-              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] ${card.tone}`}>
-                <card.icon className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-display font-bold text-ink-950">{card.title}</h2>
-                  {card.badge ? (
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${card.badgeCls}`}>{card.badge}</span>
-                  ) : (
-                    <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
-                  )}
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-text-muted">{card.desc}</p>
-              </div>
-            </>
-          );
-          const cls = "lift group flex items-start gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5 text-left transition hover:border-brand-300";
-          return card.href ? (
-            <Link key={card.title} href={card.href} className={cls}>{inner}</Link>
-          ) : (
-            <button key={card.title} className={cls}>{inner}</button>
-          );
-        })}
-      </div>
-
-      {/* Örnek veriler — durum + tek tuş geçiş sayfasına bağlantı (silme işlemi o sayfada, onaylı) */}
-      <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-        <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-amber-400/15 text-amber-500">
-            <Sparkles className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="font-display font-bold text-ink-950">Örnek veriler ve gerçek kullanım</h2>
-            <p className="text-xs text-text-muted">
-              {sampleStatus && sampleStatus.total > 0
-                ? `${sampleStatus.total} örnek kayıt yüklü${sampleSeededAt ? ` (${new Date(sampleSeededAt).toLocaleDateString("tr-TR")})` : ""}. Tek tuşla temizle; gerçek kayıtlarına dokunulmaz.`
-                : "Ofis gerçek kullanımda: yüklü örnek kayıt yok."}
-            </p>
-          </div>
-        </div>
-        {sampleStatus && sampleStatus.total > 0 ? (
+      <HashTabRedirect active={tab} />
+      <nav aria-label="Ayarlar sekmeleri" className="flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">
+        {SETTINGS_TABS.map((t) => (
           <Link
-            href={REAL_USE_HREF}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-ink-800"
-            title={canSwitchToRealUse(role) ? undefined : "Yalnız ofis sahibi veya genel müdür geçiş yapabilir"}
+            key={t.id}
+            href={settingsTabHref(t.id)}
+            aria-current={tab === t.id ? "page" : undefined}
+            className={`focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"}`}
           >
-            Gerçek kullanıma geç <ArrowUpRight className="h-3.5 w-3.5" />
+            {t.label}
           </Link>
-        ) : (
-          <span className="rounded-full bg-mint-500/12 px-2.5 py-1 text-xs font-bold text-mint-600">Gerçek kullanım</span>
-        )}
-      </section>
+        ))}
+      </nav>
 
-      {/* compliance strip */}
-      <section className="dashboard-panel flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
-        <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-mint-500/12 text-mint-600"><ShieldCheck className="h-5 w-5" /></span>
-          <div>
-            <h2 className="font-display font-bold text-ink-950">KVKK & uyum durumu</h2>
-            <p className="text-xs text-text-muted">İYS izinleri ve denetim kayıtları canlı verilerden hesaplanır.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {complianceStrip.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 text-center transition hover:border-brand-300"
-            >
-              <p className="flex items-center justify-center gap-1 text-xs text-text-faint">
-                {item.label}
-                <ArrowUpRight className="hover-action h-3 w-3 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-              <p className={`text-sm font-bold ${item.ok ? "text-mint-600" : "text-amber-600"}`}>{item.value}</p>
-            </Link>
-          ))}
-          <Link href="/app/uyum" className="rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-xs font-semibold text-white hover:bg-ink-800">
-            Uyum merkezine git
-          </Link>
-        </div>
-      </section>
+      {tab === "kimlik" ? <KimlikTab tenant={tenant} canEdit={canEditSettings} /> : null}
+      {tab === "eslestirme" ? <EslestirmeTab canEdit={canEditSettings} /> : null}
+      {tab === "entegrasyon" ? <EntegrasyonTab canEdit={canEditSettings} /> : null}
+      {tab === "bildirim" ? <BildirimTab tenantId={tenantId} /> : null}
+      {tab === "tum" ? <TumAyarlarTab tenantId={tenantId} role={role} sampleSeededAt={tenant.sample_seeded_at} /> : null}
     </div>
   );
 }

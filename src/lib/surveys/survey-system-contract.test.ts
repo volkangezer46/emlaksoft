@@ -72,7 +72,7 @@ describe("bildirim tercih anahtarları 4 yerde eş", () => {
 
   it("kanal kapalı uyarısı ayarlar ve hesabım ekranına bağlı", () => {
     expect(panel).toContain("kanalı kapalı");
-    expect(read("src/app/app/ayarlar/page.tsx")).toContain("loadNotificationChannels(tenantId)");
+    expect(read("src/app/app/ayarlar/_sekmeler/bildirim-tab.tsx")).toContain("loadNotificationChannels(tenantId)");
     expect(read("src/app/app/hesabim/page.tsx")).toContain("loadNotificationChannels(auth.tenantId)");
   });
 });

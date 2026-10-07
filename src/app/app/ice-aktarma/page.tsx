@@ -43,8 +43,11 @@ export default async function ImportPage() {
     tasks: effectiveHasPermission(perms, "tasks", "create"),
     appointments: effectiveHasPermission(perms, "appointments", "create"),
     expenses: effectiveHasPermission(perms, "expenses", "create"),
+    // Kira aktarımı kiralama anlaşması + komisyon da açar (createRental ile aynı iki kapı).
+    rentals: effectiveHasPermission(perms, "rentals", "create") && effectiveHasPermission(perms, "commissions", "create"),
   };
   const updateAllowed = {
+    rentals: false,
     customers: effectiveHasPermission(perms, "customers", "edit"),
     properties: effectiveHasPermission(perms, "properties", "edit"),
     demands: false,
@@ -53,6 +56,8 @@ export default async function ImportPage() {
     expenses: false,
   };
   const rollbackAllowed = {
+    // Kira aktarması geri alınamaz (atomik kira/anlaşma/komisyon zinciri; kira Kiralama ekranından sonlandırılır).
+    rentals: false,
     customers: effectiveHasPermission(perms, "customers", "delete"),
     properties: effectiveHasPermission(perms, "properties", "delete"),
     demands: effectiveHasPermission(perms, "demands", "delete"),

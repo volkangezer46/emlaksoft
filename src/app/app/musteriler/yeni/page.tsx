@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { CustomerForm } from "./customer-form";
@@ -25,7 +26,7 @@ export default async function NewCustomerPage({
   })();
   const linkRaw = one(sp.bagla).trim();
   const linkRef = LINK_REF.test(linkRaw) ? linkRaw : "";
-  const { perms, userId } = await requireModulePage("customers");
+  const { perms, userId, tenantId } = await requireModulePage("customers");
   if (!(perms.customers ?? []).includes("create")) redirect("/app/musteriler");
 
   const supabase = await createClient();
@@ -40,6 +41,7 @@ export default async function NewCustomerPage({
 
   return (
     <CustomerForm
+      customFields={await loadCustomFieldInputDefs(supabase, tenantId, "customer")}
       provinces={provinces ?? []}
       branches={branches ?? []}
       types={typeDefs.map((t) => t.value)}

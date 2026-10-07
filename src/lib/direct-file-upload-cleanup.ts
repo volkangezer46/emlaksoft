@@ -3,8 +3,23 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isSafeDirectFileUploadPath,
+  type DirectFileUploadBucket,
   type DirectFileUploadKind,
 } from "@/lib/direct-file-uploads";
+
+const METADATA_TABLE: Record<DirectFileUploadKind, { table: string; parentColumn: string }> = {
+  customer_file: { table: "customer_files", parentColumn: "customer_id" },
+  property_media: { table: "property_media", parentColumn: "property_id" },
+  expense_receipt: { table: "expense_receipt_files", parentColumn: "expense_id" },
+};
+
+function cleanupParentId(session: CleanupSession): string | null {
+  if (session.kind === "expense_receipt") return session.expense_id ?? null;
+  return session.customer_id ?? session.property_id;
+}
+
+// Sütun listesi yerine "*": expense_id sütunu 20261007000700 öncesi şemada yoktur.
+const SESSION_COLUMNS = "*";
 import { enqueueStorageDeletion } from "@/lib/storage-deletion-outbox";
 
 type CleanupSession = {
@@ -13,7 +28,9 @@ type CleanupSession = {
   kind: DirectFileUploadKind;
   customer_id: string | null;
   property_id: string | null;
-  bucket: "customer-files" | "property-media";
+  /** 20261007000700 sonrası; öncesinde sütun yoktur (select "*" ile güvenle okunur). */
+  expense_id?: string | null;
+  bucket: DirectFileUploadBucket;
   storage_path: string;
   canonical_extension: string;
   status: "pending" | "finalizing" | "blocked" | "expired" | "cleanup_queued";
@@ -33,9 +50,8 @@ export type DirectFileUploadCleanupSummary = {
 
 async function metadataExists(session: CleanupSession) {
   const admin = createAdminClient();
-  const table = session.kind === "customer_file" ? "customer_files" : "property_media";
-  const parentColumn = session.kind === "customer_file" ? "customer_id" : "property_id";
-  const parentId = session.customer_id ?? session.property_id;
+  const { table, parentColumn } = METADATA_TABLE[session.kind] ?? METADATA_TABLE.property_media;
+  const parentId = cleanupParentId(session);
   if (!parentId) return false;
 
   const { data, error } = await admin
@@ -73,7 +89,7 @@ export async function cleanupDirectFileUploads(
   const { data, error } = await admin
     .from("direct_file_uploads")
     .select(
-      "id, tenant_id, kind, customer_id, property_id, bucket, storage_path, canonical_extension, status, lease_id, lease_expires_at, cleanup_queued_at",
+      SESSION_COLUMNS,
     )
     .or(
       "status.in.(pending,finalizing,blocked,expired),and(status.eq.cleanup_queued,cleanup_queued_at.is.null)",
@@ -111,7 +127,7 @@ export async function cleanupDirectFileUploads(
       if (candidate.status === "finalizing") claim = claim.lte("lease_expires_at", nowIso);
       const { data: claimed, error: claimError } = await claim
         .select(
-          "id, tenant_id, kind, customer_id, property_id, bucket, storage_path, canonical_extension, status, lease_id, lease_expires_at, cleanup_queued_at",
+          SESSION_COLUMNS,
         )
         .maybeSingle();
       if (claimError) throw new Error(`direct upload cleanup claim failed: ${claimError.code}`);
@@ -138,7 +154,7 @@ export async function cleanupDirectFileUploads(
         continue;
       }
 
-      const parentId = session.customer_id ?? session.property_id;
+      const parentId = cleanupParentId(session);
       if (
         !parentId ||
         !isSafeDirectFileUploadPath({

@@ -15,6 +15,7 @@ import { CategoryBars } from "./category-bars";
 import { categoryChartMode } from "@/lib/expense-category-chart";
 import { ExpensesTable } from "./expenses-table";
 import { ExpenseCreateForm } from "./expense-create-form";
+import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-receipts";
 
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
@@ -66,7 +67,7 @@ export default async function GiderlerPage({
 }: {
   searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string }>;
 }) {
-  const { perms } = await requireModulePage("expenses", "/app/giderler");
+  const { perms, tenantId } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
@@ -156,8 +157,14 @@ export default async function GiderlerPage({
   const aylikDegisim = gecenAyTutar > 0 ? Math.round((aylikFark / gecenAyTutar) * 100) : null;
   const kiyasMax = Math.max(1, buAyTutar, gecenAyTutar);
 
+  // Fiş DOSYALARI (20261007000700); tablo yoksa receiptUploads=false → yalnız https bağlantı alanı.
+  const receipts = tenantId
+    ? await loadExpenseReceipts(supabase, tenantId, filteredExpenses.map((e) => e.id as string))
+    : { available: false, byExpense: new Map<string, ExpenseReceiptFile>() };
+  const receiptUploads = receipts.available && (canCreate || canEdit);
   const tableExpenses = filteredExpenses.map((e) => {
     const prop = Array.isArray(e.property) ? e.property[0] : e.property;
+    const receiptFile = receipts.byExpense.get(e.id as string) ?? null;
     return {
       id:             e.id,
       title:          e.title,
@@ -168,6 +175,7 @@ export default async function GiderlerPage({
       property_id:    (e.property_id as string | null) ?? null,
       property_label: prop ? (prop.property_code ?? prop.title ?? null) : null,
       receipt_url:    (e.receipt_url as string | null) ?? null,
+      receipt_file:   receiptFile ? { id: receiptFile.id, name: receiptFile.fileName, type: receiptFile.fileType } : null,
     };
   });
   const pickedProperty = portfoyF
@@ -368,6 +376,7 @@ export default async function GiderlerPage({
             categories={categories}
             defaultDate={new Date(nowMs()).toISOString().slice(0, 10)}
             defaultProperty={pickedProperty && portfoyLabel ? { value: pickedProperty.id as string, label: portfoyLabel } : null}
+            receiptUploads={receiptUploads}
           />
         </section>
       )}
@@ -431,6 +440,7 @@ export default async function GiderlerPage({
           categories={categories}
           canEdit={canEdit}
           canDelete={canDelete}
+          receiptUploads={receiptUploads && canEdit}
         />
       )}
       {expenses.length >= adet && adet < 1000 ? (

@@ -4,8 +4,9 @@
  * "güncelle" politikası YOKTUR (kimlik anahtarı yok); mükerrer = dosya içi ya da mevcut kayıtla
  * aynı anahtar. Telefon `parsePhoneStrict`, e-posta `normalizeEmail` ile doğrulanır (iletişim sözleşmesi).
  *
- * Kiralama içe aktarma bilinçli olarak YOK: aktif kira kaydı kazanılmış kiralama anlaşması + komisyon
- * zinciri ister (`rentals_guard_atomic_lifecycle`); toplu yazım bu değişmezi delmeden yapılamaz.
+ * Kiralama (aktif kira) bu dosyada YALNIZ doğrulanır (`validateRentalRow`); yazım tek tek atomik RPC
+ * `import_rental_with_deal` (20261007000710) ile yapılır: kazanılmış kiralama anlaşması + komisyon (0 olabilir) +
+ * aktif kira tek transaction'dadır (`rentals_guard_atomic_lifecycle` değişmezi delinmez). Geri alma YOKTUR.
  */
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
@@ -242,6 +243,131 @@ export function validateExpenseRow(r: ImportRow, todayKey: string): { data?: Nor
       amount: Math.round(amount * 100) / 100,
       category: category || "diger",
       expense_date: date?.day ?? todayKey,
+      notes: clean(r.notes).slice(0, 2000) || null,
+    },
+  };
+}
+
+// ── Kiralama (aktif kira) ───────────────────────────────────────────────────
+export type RentalParty = { name: string | null; phone: string | null; email: string | null };
+
+export type NormalizedRental = {
+  property_code: string;
+  renter: RentalParty;
+  owner: RentalParty | null;
+  monthly_rent: number;
+  due_day: number;
+  start_date: string;
+  end_date: string | null;
+  deposit: number | null;
+  /** null = portföy oranından hesaplanır (oran yoksa 0). */
+  commission: number | null;
+  notes: string | null;
+};
+
+/** Dosya içi mükerrer anahtarı: aynı portföy iki kez aktif kiraya bağlanamaz. */
+export const rentalKey = (x: { property_code: string }) => foldText(x.property_code);
+
+function rentalParty(
+  r: ImportRow,
+  prefix: "renter" | "owner",
+  label: string,
+  issues: RowIssue[],
+): RentalParty | null | "error" {
+  const name = clean(r[`${prefix}_name`]).slice(0, 160) || null;
+  const phoneRaw = clean(r[`${prefix}_phone`]);
+  const email = normalizeEmail(clean(r[`${prefix}_email`])) || null;
+  if (!name && !phoneRaw && !email) return null;
+  let phone: string | null = null;
+  if (phoneRaw) {
+    const parsed = parsePhoneStrict(phoneRaw);
+    if (!parsed.ok) {
+      issues.push({ level: "error", message: `${label} telefonu geçersiz: "${phoneRaw}".` });
+      return "error";
+    }
+    phone = parsed.stored;
+  }
+  if (email && !isValidEmail(email)) {
+    issues.push({ level: "error", message: `${label} e-postası geçersiz: "${email}".` });
+    return "error";
+  }
+  return { name, phone, email };
+}
+
+function money(raw: string, max: number): number | null | "error" {
+  const v = clean(raw);
+  if (!v) return null;
+  const n = parseTurkishNumber(v);
+  if (n == null || n < 0 || n > max) return "error";
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Kira satırı doğrulaması (SAF). Portföy kodu + kiracı telefonu zorunlu (kiracı telefonla eşleşir; yoksa adıyla
+ * oluşturulur — ad yoksa satır hatalı sayılır, karar sunucuda). Vade günü boşsa başlangıç günü (en çok 28).
+ */
+export function validateRentalRow(r: ImportRow): { data?: NormalizedRental; issues: RowIssue[] } {
+  const issues: RowIssue[] = [];
+  const code = clean(r.property_code).slice(0, 60);
+  if (!code) return { issues: [{ level: "error", message: "Portföy kodu zorunlu (kira mevcut bir portföye bağlanır)." }] };
+
+  const renter = rentalParty(r, "renter", "Kiracı", issues);
+  if (renter === "error") return { issues };
+  if (!renter?.phone) return { issues: [...issues, { level: "error", message: "Kiracı telefonu zorunlu (müşteri eşleşmesi telefonla yapılır)." }] };
+  const owner = rentalParty(r, "owner", "Malik", issues);
+  if (owner === "error") return { issues };
+  if (owner && !owner.phone) {
+    issues.push({ level: "warning", message: "Malik telefonu yok; malik bağı kurulmaz." });
+  }
+  if (owner?.phone && owner.phone === renter.phone) {
+    return { issues: [...issues, { level: "error", message: "Kiracı ve malik aynı telefon olamaz." }] };
+  }
+
+  const rent = money(String(r.monthly_rent ?? ""), 1_000_000_000);
+  if (rent === "error" || rent == null || rent < 0.01) {
+    return { issues: [...issues, { level: "error", message: clean(r.monthly_rent) ? `Aylık kira geçersiz: "${clean(r.monthly_rent)}".` : "Aylık kira zorunlu." }] };
+  }
+  const start = parseTrDateTime(String(r.start_date ?? ""));
+  if (!start) {
+    return { issues: [...issues, { level: "error", message: clean(r.start_date) ? `Başlangıç tarihi tanınmadı: "${clean(r.start_date)}" (GG.AA.YYYY).` : "Başlangıç tarihi zorunlu." }] };
+  }
+  const endRaw = clean(r.end_date);
+  const end = endRaw ? parseTrDateTime(endRaw) : null;
+  if (endRaw && !end) issues.push({ level: "warning", message: `Bitiş tarihi tanınmadı, süresiz eklenir: "${endRaw}".` });
+  if (end && end.day <= start.day) {
+    return { issues: [...issues, { level: "error", message: "Bitiş tarihi başlangıçtan sonra olmalı." }] };
+  }
+  const dueRaw = clean(r.due_day);
+  const dueNum = dueRaw ? parseTurkishNumber(dueRaw) : null;
+  let due = Math.min(Number(start.day.slice(8, 10)), 28);
+  if (dueRaw) {
+    if (dueNum == null || !Number.isInteger(dueNum) || dueNum < 1 || dueNum > 28) {
+      issues.push({ level: "warning", message: `Vade günü 1-28 olmalı ("${dueRaw}"); başlangıç günü kullanıldı.` });
+    } else {
+      due = dueNum;
+    }
+  }
+  const deposit = money(String(r.deposit ?? ""), 1_000_000_000);
+  if (deposit === "error") issues.push({ level: "warning", message: `Depozito tanınmadı, yok sayıldı: "${clean(r.deposit)}".` });
+  const commission = money(String(r.commission ?? ""), 100_000_000_000);
+  if (commission === "error") {
+    return { issues: [...issues, { level: "error", message: `Komisyon tutarı geçersiz: "${clean(r.commission)}".` }] };
+  }
+  if (commission == null) {
+    issues.push({ level: "warning", message: "Komisyon boş: portföy oranı × kira (oran yoksa 0) yazılır." });
+  }
+  return {
+    issues,
+    data: {
+      property_code: code,
+      renter,
+      owner: owner && owner.phone ? owner : null,
+      monthly_rent: rent,
+      due_day: due,
+      start_date: start.day,
+      end_date: end?.day ?? null,
+      deposit: deposit === "error" ? null : deposit,
+      commission,
       notes: clean(r.notes).slice(0, 2000) || null,
     },
   };

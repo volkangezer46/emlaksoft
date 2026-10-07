@@ -24,6 +24,7 @@ export function DonutRing({
   stroke = 16,
   gap = 0.008,
   format = "number",
+  trackColor = "var(--surface-sunken)",
   ariaLabel,
   children,
   className,
@@ -33,6 +34,8 @@ export function DonutRing({
   stroke?: number;
   /** Dilimler arası boşluk (çevre oranı). */
   gap?: number;
+  /** Yatak (boş halka) rengi; koyu hero yüzeyinde `--viz-track-inverse`. */
+  trackColor?: string;
   format?: VizFormat;
   ariaLabel: string;
   children?: ReactNode;
@@ -62,7 +65,7 @@ export function DonutRing({
         <defs>
           <TubeGradient id={tubeId} cx={cx} cy={cx} inner={r - stroke / 2} outer={r + stroke / 2} />
         </defs>
-        <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--surface-sunken)" strokeWidth={stroke} />
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={trackColor} strokeWidth={stroke} />
         {arcs.map((a, i) => {
           if (!(a.len > 0)) return null;
           const seg = (
