@@ -133,7 +133,7 @@ export function DuesClient({
   return (
     <div className="space-y-6">
       {canCreate ? (
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+        <section id="aidat-ekle" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-950"><Plus className="h-4 w-4 text-brand-600" /> Yeni aidat kaydı</h2>
           <form ref={formRef} action={action} aria-busy={pending} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block text-xs font-semibold text-text-muted">
@@ -185,6 +185,7 @@ export function DuesClient({
           title="Henüz aidat kaydı yok"
           description="Portföy bazlı aidat ve ortak gider kayıtlarınız burada listelenecek. Yukarıdan ilk kaydı ekleyin."
           tone="amber"
+          action={canCreate ? { href: "#aidat-ekle", label: "İlk aidatı ekle" } : { href: "/app/portfoyler", label: "Portföylere git" }}
         />
       ) : (
         <>
@@ -229,7 +230,7 @@ export function DuesClient({
             )}
           </div>
         ) : null}
-        <TableFrame minWidth={720}>
+        <TableFrame minWidth={720} stack>
           <Table>
             <THead>
               <TR>
@@ -268,7 +269,7 @@ export function DuesClient({
                           )}
                         </TD>
                       ) : null}
-                      <TD className="font-semibold text-ink-950">
+                      <TD primary className="font-semibold text-ink-950">
                         {/* Overlay yalnız sm+ (mobilde abs katman iOS'ta tabloyu belge
                             scroll'una promote edip sayfayı yana kaydırıyor). Mobilde
                             tıklama için başlık Link. */}
@@ -287,17 +288,17 @@ export function DuesClient({
                           d.title
                         )}
                       </TD>
-                      <TD className="hidden text-text-muted sm:table-cell">
+                      <TD label="Portföy" className="hidden text-text-muted sm:table-cell">
                         {prop ? (prop.title ?? prop.property_code) : "—"}
                       </TD>
-                      <TD className="hidden text-text-muted sm:table-cell">{monthLabel(d.period)}</TD>
-                      <TD align="right" className="font-bold text-ink-950">{money(Number(d.amount))}</TD>
+                      <TD label="Dönem" className="hidden text-text-muted sm:table-cell">{monthLabel(d.period)}</TD>
+                      <TD label="Tutar" align="right" className="font-bold text-ink-950">{money(Number(d.amount))}</TD>
                       <TD>
                         <Badge variant={paid ? "success" : overdue ? "danger" : "warning"} size="sm">
                           {paid ? "Ödendi" : overdue ? "Gecikti" : "Bekliyor"}
                         </Badge>
                       </TD>
-                      <TD align="right">
+                      <TD actions align="right">
                         {/* relative + z-10: satır linkinin üstünde kalsın; mobilde de görünür */}
                         <div className="relative z-10 flex items-center justify-end gap-1.5">
                           {canBulk ? (

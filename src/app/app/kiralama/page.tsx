@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { AlertTriangle, CalendarClock, Hourglass, KeyRound, Plus, Search, Wallet, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -16,7 +16,7 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportRentalsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
-import { PageHeader } from "@/components/ui/page-header";
+import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { buildHref } from "@/lib/ui/filter-params";
 import {
   CategoryChips,
@@ -53,6 +53,15 @@ import {
 export const metadata = { title: "Kiralama" };
 
 const PATH = "/app/kiralama";
+
+/** Yaşam döngüsü dilim rengi (viz token; EVRE_META tonlarıyla aynı anlam). */
+const EVRE_COLOR: Record<string, string> = {
+  yeni: "var(--viz-1)",
+  devam: "var(--viz-pos)",
+  yenileme: "var(--viz-5)",
+  bitiyor: "var(--viz-neg)",
+  bitti: "var(--viz-neutral)",
+};
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -268,8 +277,9 @@ export default async function KiralamaPage({
   ]);
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="kiralama"
         title="Kiralama"
         eyebrow="Mülk yönetimi"
         description="Kira sözleşmeleri, aylık tahakkuklar ve bakım talepleri tek yerde."
@@ -297,6 +307,40 @@ export default async function KiralamaPage({
       ) : (
         <>
           <KpiStrip items={kpis} />
+
+          {/* Yaşam döngüsü + bu ayın tahsilatı (gerçek veri; kesilmiş taramada/güvenilmez toplamda kart yok) */}
+          <ListCharts>
+            {truncated ? null : (
+              <DistributionCard
+                title="Sözleşme yaşam döngüsü"
+                subtitle="Yeni, devam eden, yenileme ve biten kiralar"
+                icon={PieChart}
+                href={PATH}
+                centerLabel="kira"
+                slices={(Object.keys(EVRE_META) as (keyof typeof EVRE_META)[]).map((k) => ({
+                  label: EVRE_META[k].label,
+                  value: evreCounts[k] ?? 0,
+                  color: EVRE_COLOR[k],
+                  href: `${PATH}?evre=${k}`,
+                }))}
+              />
+            )}
+            {sumsReliable ? (
+              <DistributionCard
+                title="Bu ayın tahsilatı"
+                subtitle="Ödenen ve bekleyen tahakkuk tutarı"
+                icon={Wallet}
+                tone="success"
+                format="money"
+                href={`${PATH}?durum=pending`}
+                centerLabel="bu ay"
+                slices={[
+                  { label: "Tahsil edildi", value: paidSum, tone: "success", href: `${PATH}?durum=paid` },
+                  { label: "Bekleyen", value: pendingSum, tone: "warn", href: `${PATH}?durum=pending` },
+                ]}
+              />
+            ) : null}
+          </ListCharts>
 
           {/* Yenileme radarı — yıldönümü/bitişi 60 gün içindeki aktif kiralar */}
           {renewalRadar.length > 0 ? (
@@ -437,6 +481,6 @@ export default async function KiralamaPage({
           <ListPager pathname={PATH} params={urlParams} window={win} total={filtered.length} />
         </>
       )}
-    </div>
+    </ListPage>
   );
 }

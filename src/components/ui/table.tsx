@@ -27,6 +27,7 @@ export function TableFrame({
   maxHeight,
   density = "rahat",
   stickyFirst = false,
+  stack = false,
 }: {
   children: ReactNode;
   /** Yatay kaydırmada ilk sütun (kimlik) sabit kalır — dar ekranda bağlam kaybolmaz. */
@@ -38,6 +39,8 @@ export function TableFrame({
   minWidth?: number;
   /** Verilirse kap dikey kayar ve `THead sticky` başlık bu kapta yapışır (ör. "70vh"). */
   maxHeight?: string;
+  /** 360 px'te satırlar karta döner (başlık gizlenir, `TD label` hücre önünde yazılır; list-page.css `.tbl-stack`). */
+  stack?: boolean;
 }) {
   return (
     <div
@@ -51,6 +54,7 @@ export function TableFrame({
         "surface-card w-full min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
         density === "kompakt" && "[&_td]:py-1.5 [&_th]:py-1.5",
         stickyFirst && "tbl-sticky-first",
+        stack && "tbl-stack",
         className,
       )}
     >
@@ -173,17 +177,29 @@ export function TD({
   className,
   align = "left",
   truncate = false,
+  label,
+  actions = false,
+  primary = false,
   ...props
 }: Omit<ComponentProps<"td">, "align"> & {
   align?: keyof typeof alignClass;
   /** Uzun metni tek satırda kırpar; metin çocuksa tam değer `title` olarak eklenir. */
   truncate?: boolean;
+  /** Kart görünümünde (TableFrame `stack`) hücre önündeki sütun adı. */
+  label?: string;
+  /** Kart görünümünde eylem hücresi tam satır. */
+  actions?: boolean;
+  /** Kart görünümünde kartın başlığı (kalın, satırın geri kalanını kaplar). */
+  primary?: boolean;
 }) {
   const title =
     truncate && props.title === undefined && typeof props.children === "string" ? props.children : props.title;
   return (
     <td
       {...props}
+      data-label={label}
+      data-actions={actions ? "" : undefined}
+      data-primary={primary ? "" : undefined}
       title={title}
       className={cn(
         "px-4 py-3",

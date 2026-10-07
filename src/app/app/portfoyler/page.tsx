@@ -20,6 +20,8 @@ import {
   Upload,
   Search,
   Sparkles,
+  ArrowLeftRight,
+  PieChart,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
@@ -41,7 +43,7 @@ import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/ui/empty-state";
 import { propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
-import { PageHeader } from "@/components/ui/page-header";
+import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -388,10 +390,14 @@ export default async function PropertiesPage({
     typeDefs,
     savedViews,
     coverRows,
+    { count: pendingCount },
+    { count: draftCount },
+    { count: saleCount },
+    { count: rentCount },
   ] = await batchAll("Portföyler", [
     "properties", "properties-map", "properties-filtered-total", "fx-rates", "properties-total", "properties-live",
     "portal-live", "health-green", "health-yellow", "health-red", "properties-recent", "properties-scan",
-    "property-types", "saved-views", "covers",
+    "property-types", "saved-views", "covers", "properties-pending", "properties-draft", "properties-sale", "properties-rent",
   ], [
     listP,
     mapQuery,
@@ -424,6 +430,11 @@ export default async function PropertiesPage({
     getDefinitionsOrDefault("property_type"),
     savedViewsPromise,
     coversP,
+    // Grafik: durum dağılımı (yayında + toplam zaten yukarıda) ve işlem türü — kapsamlı gerçek sayımlar.
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).in("status", STATUS_DB_VALUES.pending),
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).in("status", STATUS_DB_VALUES.draft),
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).eq("transaction_type", "Satılık"),
+    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).eq("transaction_type", "Kiralık"),
   ]);
 
   const rows = (data ?? []) as unknown as PropertyRow[];
@@ -617,8 +628,10 @@ export default async function PropertiesPage({
   const anyFilter = chips.length > 0;
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        eyebrow="Portföy yönetimi"
+        art="portfoy"
         title="Portföyler"
         description={<>Fiyat sağlığı, portal teyidi ve yetki durumu tek merkezde. <HelpTip topic="fiyat-sagligi" /></>}
         meta={<ScopeBadge text={listScope.badge} />}
@@ -679,6 +692,39 @@ export default async function PropertiesPage({
 
       {/* KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden */}
       <KpiStrip items={kpis} />
+
+      {/* Karar grafikleri: durum dağılımı + işlem türü (kapsamlı gerçek sayımlar; her dilim/çubuk filtreli liste) */}
+      <ListCharts>
+        <DistributionCard
+          title="Portföy durumu"
+          subtitle="Tüm portföylerin yayın durumu"
+          icon={PieChart}
+          href={PATH}
+          centerLabel="portföy"
+          slices={[
+            { label: "Yayında", value: liveCount ?? 0, tone: "success", href: `${PATH}?status=live` },
+            { label: "Teyit bekliyor", value: pendingCount ?? 0, tone: "warn", href: `${PATH}?status=pending` },
+            { label: "Taslak", value: draftCount ?? 0, color: "var(--viz-1)", href: `${PATH}?status=draft` },
+            {
+              label: "Diğer (satıldı, pasif…)",
+              value: Math.max(0, total - (liveCount ?? 0) - (pendingCount ?? 0) - (draftCount ?? 0)),
+              tone: "neutral",
+              href: PATH,
+            },
+          ]}
+        />
+        <ColumnChartCard
+          title="İşlem türü"
+          subtitle="Satılık ve kiralık portföy sayısı"
+          icon={ArrowLeftRight}
+          tone="gold"
+          href={PATH}
+          bars={[
+            { label: "Satılık", value: saleCount ?? 0, href: `${PATH}?islem=${encodeURIComponent("Satılık")}` },
+            { label: "Kiralık", value: rentCount ?? 0, href: `${PATH}?islem=${encodeURIComponent("Kiralık")}` },
+          ]}
+        />
+      </ListCharts>
 
       <ListToolbar
         pathname={PATH}
@@ -913,6 +959,6 @@ export default async function PropertiesPage({
           <CompareBar />
         </>
       )}
-    </div>
+    </ListPage>
   );
 }

@@ -11,6 +11,7 @@ import {
   Search,
   UserX,
   ImageOff,
+  Link2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -38,7 +39,8 @@ import {
 } from "@/lib/documents";
 import { DocumentList } from "./document-list";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ButtonLink } from "@/components/ui/button";
 /**
  * Belge Merkezi — ofisin dört ayrı yerde duran dosyaları tek listede.
  *
@@ -644,9 +646,18 @@ export default async function DocumentsPage({
   const chipOff = "border-line text-text-muted hover:border-brand-300 hover:text-brand-600";
 
   return (
-    <div className="space-y-6">
-      {/* ---------------------------------------------------------------- */}
-      <PageHeader title="Ofisin tüm dosyaları" eyebrow="Belge merkezi" description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada." actions={<Link href="/app/belgeler/evrak-linkleri" className="focus-ring inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700">Evrak linkleri</Link>} />
+    <ListPage>
+      <ListHero
+        eyebrow="Belge merkezi"
+        art="belge"
+        title="Ofisin tüm dosyaları"
+        description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada."
+        actions={
+          <ButtonLink href="/app/belgeler/evrak-linkleri" icon={Link2}>
+            Evrak linkleri
+          </ButtonLink>
+        }
+      />
 
       {/* --- 4 href'li StatCard ------------------------------------------- */}
       <KpiGrid>
@@ -999,6 +1010,6 @@ export default async function DocumentsPage({
           </div>
         </div>
       </section>
-    </div>
+    </ListPage>
   );
 }

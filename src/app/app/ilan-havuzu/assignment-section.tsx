@@ -140,7 +140,7 @@ export async function AssignmentSection({ ctx }: { ctx: AssignCtx }) {
       ) : history.rows.length === 0 ? (
         <EmptyState icon={Layers} title="Kayıt yok" description={historyAvailable ? "Bu süzgeçte atama kaydı bulunmuyor. İlk atamayı danışmansız ilanlardan yapın." : "Geçmiş tablosu uygulanınca kayıtlar burada birikir."} action={{ href: assignHref(), label: "Danışmansız ilanlar" }} />
       ) : (
-        <TableFrame minWidth={900}>
+        <TableFrame minWidth={900} stack>
           <Table>
             <THead>
               <TR>
@@ -156,35 +156,35 @@ export async function AssignmentSection({ ctx }: { ctx: AssignCtx }) {
             <TBody>
               {history.rows.map((r) => (
                 <TR key={r.id}>
-                  <TD>
+                  <TD primary>
                     <Link href={`/app/portfoyler/${r.propertyId}`} className="font-semibold text-ink-950 hover:text-brand-600">
                       {r.propertyTitle}
                     </Link>
                   </TD>
-                  <TD>
+                  <TD label="Danışman">
                     <Link href={`/app/ekip/${r.assignedTo}`} className="font-semibold text-ink-950 hover:text-brand-600">
                       {r.assignedToName}
                     </Link>
                     {r.previousAssigneeName ? <p className="text-xs text-text-muted">önceki: {r.previousAssigneeName}</p> : null}
                     <p className="text-xs text-text-faint">{r.assignedByName ? `atayan: ${r.assignedByName}` : "sistem"}</p>
                   </TD>
-                  <TD>
+                  <TD label="Yöntem">
                     <span className="text-xs font-semibold text-ink-950">{METHOD_LABEL[r.method]}</span>
                     {r.scoreTotal != null ? <span className="numeric ml-1 rounded-full bg-ink-950 px-1.5 text-xs font-bold text-white">{r.scoreTotal}</span> : null}
                     {r.reasonSummary ? <p className="max-w-xs truncate text-xs text-text-muted" title={r.reasonSummary}>{r.reasonSummary}</p> : null}
                   </TD>
-                  <TD>
+                  <TD label="Gerekçe">
                     <span className="text-xs text-text-muted">{r.reason ?? "—"}</span>
                     {r.cancelReason ? <p className="text-xs text-danger-600">İptal: {r.cancelReason}</p> : null}
                   </TD>
                   <TD>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === "active" ? "bg-mint-500/10 text-mint-700" : r.status === "cancelled" ? "bg-danger-500/10 text-danger-600" : "bg-canvas text-text-muted"}`}>{STATUS_LABEL[r.status]}</span>
                   </TD>
-                  <TD>
+                  <TD label="Tarih">
                     <span className="text-xs text-text-muted">{dtf.format(Date.parse(r.createdAt))}</span>
                     {r.cancelledAt ? <p className="text-xs text-text-faint">iptal {dtf.format(Date.parse(r.cancelledAt))}</p> : null}
                   </TD>
-                  {ctx.canEdit ? <TD>{r.status === "active" ? <AssignmentRowActions assignmentId={r.id} currentAdvisorId={r.assignedTo} advisors={advisors} /> : <span className="text-xs text-text-faint">—</span>}</TD> : null}
+                  {ctx.canEdit ? <TD actions>{r.status === "active" ? <AssignmentRowActions assignmentId={r.id} currentAdvisorId={r.assignedTo} advisors={advisors} /> : <span className="text-xs text-text-faint">—</span>}</TD> : null}
                 </TR>
               ))}
             </TBody>

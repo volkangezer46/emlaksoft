@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/ui/page-header";
+import { ListHero, ListPage } from "@/components/ui/list-page";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -78,8 +78,9 @@ export default async function ProjelerPage({
   });
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="proje"
         eyebrow="İnşaat proje satışı"
         title="Projeler"
         description="Müteahhit projelerinin daire stoğunu, rezervasyon ve satışlarını tek ekrandan yönetin."
@@ -307,6 +308,6 @@ export default async function ProjelerPage({
           })}
         </div>
       )}
-    </div>
+    </ListPage>
   );
 }

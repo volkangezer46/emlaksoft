@@ -368,6 +368,26 @@ ve `title` kalır). Tek sistem; ikinci sekme bileşeni yazma.
 - **Dokunma hedefi** >=44px (`min-h-11`, ikon-only `2.75rem`); renkler yalnız token (Gece Altın dahil, açık/koyu).
 
 
+## Liste sayfası iskeleti (`src/components/ui/list-page.tsx`, 2026-10-07)
+
+/app LİSTE ekranlarının (19 sayfa: Müşteriler … Projeler) TEK yerleşimi; referans /admin "Tüm ofisler". Sıra:
+**hero → KPI şeridi → grafik satırı (0-2 kart) → bilgi kartları → araç çubuğu + çipler → tablo/kart/boş durum → sayfalama**.
+Hepsi sunucu bileşeni (istemci JS yok); stil `src/app/list-page.css` (`lp-*`), derinlik `viz.css`.
+
+- **`ListHero`** (`<ListPage hero={…}>` ya da ilk çocuk): eyebrow (vurgu rengi) + büyük başlık (tek h1) + tek cümle özet +
+  konu sahnesi `art` (`illustrations/hero-scenes.tsx`, 19 sahne: musteri, talep, portfoy, havuz, randevu, gorev, anlasma,
+  teklif, sozlesme, komisyon, onay, kiralama, aidat, gider, kampanya, otomasyon, ekip, belge, proje; token renkli, her biri
+  < 6 KB, `.ill-float` hareketi) + eylemler (sağda; < 1024 px alta sarar, < 640 px sahne gizlenir). Eski `PageHeader`
+  liste sayfalarında KULLANILMAZ (sözleşme `list-page.test.ts`).
+- **Grafik kartları** (~220 px, `ListCharts` satırı 1 kart = tam genişlik, 2 kart = yan yana): `DistributionCard` (DonutRing +
+  lejant: ad/sayı/yüzde; 6'dan çok dilim "Diğer"), `ColumnChartCard` (kategori ya da hafta/gün sütunu, `highlight` altın),
+  `FunnelCard` (FunnelChart). Kural: toplam 0 → kart `null` (sahte grafik yok); HER dilim/sütun/lejant satırı filtreli listeye
+  gider (`href` zorunlu; dilim bağlantısı fare kısayoludur, klavye yolu lejanttır). Sayımlar ya head-count ya kesilmemiş tarama:
+  tarama PostgREST 1000 tavanına dayandıysa grafik çizilmez. Haftalık kovalar `lib/ui/list-charts.ts` `weekBuckets` (UTC gün
+  sınırı = liste `from`/`to` filtresiyle aynı kural → sütun sayısı = açılan listenin sayısı).
+- **Tablo → kart (360 px):** kendi mobil listesi olmayan tablolar `TableFrame stack` + `TD primary` (kart başlığı) /
+  `TD label="…"` (hücre önü etiket) / `TD actions` (tam satır eylem) kullanır; başlık satırı gizlenir.
+
 ## Liste kiti (`src/components/ui/list-kit`)
 
 Liste sayfalarının ortak dili: sayaçlı kategori çipleri, ikon kapsüllü KPI kartları, kapak önizlemeli tablo, renkli

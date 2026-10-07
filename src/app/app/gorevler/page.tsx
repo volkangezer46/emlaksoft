@@ -1,7 +1,7 @@
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlarmClock, CalendarClock, CalendarDays, CheckCircle2, Columns3, List, Plus, Sunrise } from "lucide-react";
+import { AlarmClock, CalendarClock, CalendarDays, CheckCircle2, Columns3, List, PieChart, Plus, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -16,7 +16,7 @@ import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICONS } from "@/lib/icons";
-import { PageHeader } from "@/components/ui/page-header";
+import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
@@ -369,8 +369,10 @@ export default async function TasksPage({
   const emptyAll = counts.all === 0;
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        eyebrow="İş takibi"
+        art="gorev"
         title="Görevler"
         description="Arama, ziyaret, evrak ve takip görevlerini planlayın; ekibe atayın, gecikmeleri anında görün."
         meta={<ScopeBadge text={listScope.badge} />}
@@ -391,6 +393,33 @@ export default async function TasksPage({
       {canCreate ? <QuickTask /> : null}
 
       {emptyAll ? null : <KpiStrip items={kpis} />}
+
+      {/* Açık görevlerin zamanı + türü (kapsamlı gerçek sayımlar; sütun/dilim = filtreli liste) */}
+      {emptyAll || gorunum !== "liste" ? null : (
+        <ListCharts>
+          <ColumnChartCard
+            title="Açık görevlerin zamanı"
+            subtitle="Gecikmiş, bugün ve önümüzdeki 7 gün"
+            icon={CalendarClock}
+            tone="warn"
+            href={`${PATH}?filter=open`}
+            bars={[
+              { label: "Gecikmiş", value: counts.overdue, href: `${PATH}?filter=overdue` },
+              { label: "Bugün", value: counts.today, href: `${PATH}?filter=today` },
+              { label: "7 gün", value: counts.upcoming, href: `${PATH}?filter=yaklasan` },
+            ]}
+            highlight={0}
+          />
+          <DistributionCard
+            title="Görev türü"
+            subtitle="Açık görevlerin türe göre dağılımı"
+            icon={PieChart}
+            href={`${PATH}?filter=open`}
+            centerLabel="açık görev"
+            slices={KIND_FILTERS.map((k) => ({ label: k.label, value: kindCounts[k.key] ?? 0, href: `${PATH}?tur=${k.key}` }))}
+          />
+        </ListCharts>
+      )}
 
       {emptyAll ? null : (
         <>
@@ -509,6 +538,13 @@ export default async function TasksPage({
               : "Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin."
           }
           tone="brand"
+          action={
+            emptyAll
+              ? canCreate
+                ? { href: "/app/gorevler/yeni", label: "Yeni görev" }
+                : { href: "/app/musteriler", label: "Müşterilere git" }
+              : { href: PATH, label: "Filtreleri temizle" }
+          }
           secondary={emptyAll ? undefined : { href: `${PATH}?filter=all`, label: "Tüm görevleri göster" }}
         />
       ) : (
@@ -521,6 +557,6 @@ export default async function TasksPage({
       )}
 
       {gorunum === "liste" ? <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} /> : null}
-    </div>
+    </ListPage>
   );
 }

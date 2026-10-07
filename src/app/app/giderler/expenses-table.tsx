@@ -96,7 +96,7 @@ export function ExpensesTable({
         </span>
       </div>
 
-      <TableFrame minWidth={600}>
+      <TableFrame minWidth={600} stack>
         <Table>
           <THead>
             <TR>
@@ -135,7 +135,7 @@ export function ExpensesTable({
                       <BulkRowCheckbox id={e.id} label={`${e.title} giderini`} />
                     </TD>
                   ) : null}
-                  <TD className="font-semibold text-text">
+                  <TD primary className="font-semibold text-text">
                     {canEdit ? (
                       // Satırı kaplayan görünmez buton — YALNIZ sm+. Mobilde abs katman
                       // iOS Safari'de yatay-kaydırılabilir tabloyu belge scroll'una
@@ -176,11 +176,11 @@ export function ExpensesTable({
                       </span>
                     ) : null}
                   </TD>
-                  <TD className="hidden sm:table-cell">{catLabel(e.category)}</TD>
-                  <TD align="right">{tryFormatter.format(Number(e.amount))}</TD>
-                  <TD align="right" className="hidden sm:table-cell">{formatDate(e.expense_date)}</TD>
+                  <TD label="Kategori" className="hidden sm:table-cell">{catLabel(e.category)}</TD>
+                  <TD label="Tutar" align="right">{tryFormatter.format(Number(e.amount))}</TD>
+                  <TD label="Tarih" align="right" className="hidden sm:table-cell">{formatDate(e.expense_date)}</TD>
                   {hasActions ? (
-                    <TD align="right" className="whitespace-nowrap">
+                    <TD actions align="right" className="whitespace-nowrap">
                       <span className="relative z-10 inline-flex items-center gap-1">
                         <ConfirmDialog
                           title="Gideri sil"

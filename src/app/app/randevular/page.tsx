@@ -7,6 +7,7 @@ import {
   Clock3,
   FileSignature,
   MapPinned,
+  PieChart,
   Plus,
   Route as RouteIcon,
   Search,
@@ -14,8 +15,7 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
+import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { resolveLazyTotal } from "@/lib/lazy-total";
@@ -448,7 +448,6 @@ export default async function AppointmentsPage({
     const count = ((weekBarRows ?? []) as { scheduled_at: string }[]).filter((r) => trDayKey(r.scheduled_at) === dKey).length;
     return { label: d.toLocaleDateString("tr-TR", { weekday: "short" }), day: d.getDate(), count, isToday: i === 0, key: dKey };
   });
-  const maxWeek = Math.max(1, ...week.map((w) => w.count));
   const weekTotal = week.reduce((n, w) => n + w.count, 0);
   const weekReliable = (weekBarRows ?? []).length < 1000;
 
@@ -678,9 +677,10 @@ export default async function AppointmentsPage({
   ]);
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
         eyebrow="Saha planı"
+        art="randevu"
         title="Randevular & yer gösterme"
         description="Yer gösterme, görüşme ve tur planını tek akışta yönetin."
         actions={
@@ -712,41 +712,37 @@ export default async function AppointmentsPage({
 
       <KpiStrip items={kpis} />
 
-      {/* Haftalık yoğunluk — önümüzdeki 7 gün, gerçek randevu sayıları; her gün gün görünümüne iner */}
-      {weekReliable ? (
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-              <CalendarClock aria-hidden="true" className="h-3.5 w-3.5 text-brand-600" /> Haftalık yoğunluk
-            </p>
-            <span className="text-xs text-text-faint">önümüzdeki 7 gün</span>
-          </div>
-          {weekTotal === 0 ? (
-            <p className="mt-3 text-xs text-text-muted">
-              Önümüzdeki 7 günde planlı randevu yok. Takvimden bir gün seçerek randevu ekleyebilirsiniz.
-            </p>
-          ) : null}
-          <div className="mt-3 flex h-20 items-stretch gap-2">
-            {week.map((w) => (
-              <a
-                key={w.key}
-                href={apptHref({ gorunum: "gun", tarih: w.key })}
-                aria-label={`${w.label} ${w.day}: ${w.count} randevu`}
-                className="focus-ring group flex h-full flex-1 flex-col items-center gap-1 rounded-[var(--radius-control)]"
-              >
-                <span className="numeric text-xs font-bold text-text-muted">{w.count || ""}</span>
-                <div className="flex min-h-0 w-full flex-1 items-end justify-center">
-                  <div
-                    className={`w-full max-w-4 rounded-t-sm transition group-hover:opacity-80 ${w.isToday ? "bg-[image:var(--grad-brand)]" : "bg-line-strong"}`}
-                    style={{ height: `${w.count === 0 ? 4 : Math.max((w.count / maxWeek) * 100, 12)}%` }}
-                  />
-                </div>
-                <span className={`text-xs ${w.isToday ? "font-bold text-brand-700" : "text-text-faint"}`}>{w.label}</span>
-              </a>
-            ))}
-          </div>
-        </Card>
-      ) : null}
+      {/* Haftalık yük (önümüzdeki 7 gün, gerçek sayım; her gün gün görünümüne iner) + randevu türü dağılımı */}
+      <ListCharts>
+        {weekReliable ? (
+          <ColumnChartCard
+            title="Haftalık yük"
+            subtitle="Önümüzdeki 7 gün · planlı randevu"
+            icon={CalendarClock}
+            href={apptHref({ gorunum: "hafta", tarih: todayKey })}
+            highlight={0}
+            bars={week.map((w) => ({
+              label: w.isToday ? "Bugün" : `${w.label} ${w.day}`,
+              value: w.count,
+              title: `${w.label} ${w.day}: ${w.count} randevu`,
+              href: apptHref({ gorunum: "gun", tarih: w.key }),
+            }))}
+          />
+        ) : null}
+        <DistributionCard
+          title="Randevu türü"
+          subtitle="Tüm randevuların türe göre dağılımı"
+          icon={PieChart}
+          tone="success"
+          href={apptHref({ tip: "", gorunum: "ay" })}
+          centerLabel="randevu"
+          slices={Object.entries(typeCounts).map(([value, count]) => ({
+            label: typeLabel[value] ?? value,
+            value: count,
+            href: apptHref({ tip: value, gorunum: "ay" }),
+          }))}
+        />
+      </ListCharts>
 
       <ListToolbar
         pathname={PATH}
@@ -906,6 +902,6 @@ export default async function AppointmentsPage({
         {/* Müşterinin kendi randevusunu aldığı public link (/randevu-al/[token]) */}
         <BookingLinkCard userId={gate.userId} />
       </div>
-    </div>
+    </ListPage>
   );
 }

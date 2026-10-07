@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Banknote, CheckCircle2, Plus, Search, Tag, Timer, Undo2 } from "lucide-react";
+import { Banknote, CheckCircle2, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
@@ -10,7 +10,8 @@ import { SavedViews } from "@/components/app/saved-views";
 import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
+import { weekBucketsOf } from "@/lib/ui/list-charts";
 import { relatedSearchClause } from "@/lib/list-search";
 import {
   CategoryChips,
@@ -40,6 +41,16 @@ import { OFFER_STATUS_LABELS, offerStatusTone, offerVolume } from "./offer-list-
 export const metadata = { title: "Teklifler" };
 
 const PATH = "/app/teklifler";
+
+/** Durum dilimi rengi (viz token; anlam: kabul yeşil, red kırmızı, pazarlık amber). */
+const OFFER_SLICE_COLOR: Record<string, string> = {
+  draft: "var(--viz-neutral)",
+  submitted: "var(--viz-1)",
+  countered: "var(--viz-5)",
+  accepted: "var(--viz-pos)",
+  rejected: "var(--viz-neg)",
+  withdrawn: "var(--viz-8)",
+};
 
 function money(n: number | null) {
   if (n == null) return "—";
@@ -195,7 +206,10 @@ export default async function TekliflerPage({
     counter: r.counter_amount != null ? Number(r.counter_amount) : null,
   }));
   const openVolume = offerVolume(openRows, SCAN_LIMIT);
-  const weekly = weeklySeriesOf(((seriesRes.data ?? []) as Array<{ created_at: string }>).map((r) => r.created_at), now(), SERIES_SCAN_LIMIT);
+  const seriesIsos = ((seriesRes.data ?? []) as Array<{ created_at: string }>).map((r) => r.created_at);
+  const weekly = weeklySeriesOf(seriesIsos, now(), SERIES_SCAN_LIMIT);
+  // Grafik kovaları: PostgREST tavanı 1000 satır olabilir → 1000'de kesilmiş sayılır, grafik çizilmez.
+  const weekBars = weekBucketsOf(seriesIsos, now(), 1000);
 
   const kpis: KpiItem[] = [
     {
@@ -226,8 +240,9 @@ export default async function TekliflerPage({
   ]);
 
   return (
-    <div className="space-y-5">
-      <PageHeader
+    <ListPage>
+      <ListHero
+        art="teklif"
         eyebrow="Teklif takibi"
         title="Teklifler"
         description="Portföylere gelen teklifleri ve durumlarını izleyin."
@@ -249,6 +264,35 @@ export default async function TekliflerPage({
       ) : (
         <>
           <KpiStrip items={kpis} />
+
+          {/* Durum dağılımı + haftalık yeni teklif (gerçek sayımlar; dilim/sütun = filtreli liste) */}
+          <ListCharts>
+            <DistributionCard
+              title="Teklif durumu"
+              subtitle="Tüm tekliflerin durumu"
+              icon={PieChart}
+              href={PATH}
+              centerLabel="teklif"
+              slices={statusKeys.map((k) => ({
+                label: OFFER_STATUS_LABELS[k] ?? k,
+                value: statusCounts[k] ?? 0,
+                color: OFFER_SLICE_COLOR[k],
+                href: `${PATH}?durum=${k}`,
+              }))}
+            />
+            {weekBars ? (
+              <ColumnChartCard
+                title="Yeni teklif"
+                subtitle="Son 8 hafta · haftalık"
+                icon={TrendingUp}
+                tone="success"
+                barTone="success"
+                highlight={weekBars.length - 1}
+                href={`${PATH}?from=${weekBars[0]!.from}`}
+                bars={weekBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `${PATH}?from=${w.from}&to=${w.to}` }))}
+              />
+            ) : null}
+          </ListCharts>
 
           <ListToolbar
             pathname={PATH}
@@ -310,6 +354,6 @@ export default async function TekliflerPage({
           <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} />
         </>
       )}
-    </div>
+    </ListPage>
   );
 }
