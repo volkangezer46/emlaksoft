@@ -34,10 +34,14 @@ type Sp = {
  */
 export default async function OfficeCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { userId, role, tenantId, perms } = await requireModulePage("office_center", OFFICE_CENTER_PATH);
-  const sp = await searchParams;
+  // Etkin izinler URL'den bağımsız: searchParams ile aynı turda (eskiden ardışık).
+  const [sp, effective] = await Promise.all([
+    searchParams,
+    tenantId ? getEffectivePermissions(tenantId, role, userId) : Promise.resolve(null),
+  ]);
   const tab = parseTab(sp.sekme);
 
-  if (!tenantId) {
+  if (!tenantId || !effective) {
     return (
       <div className="space-y-6">
         <PageHeader eyebrow="Ekip ve yetkiler" title="Ofis Merkezi" description="Ofis Merkezi yalnız ofis hesabıyla çalışır." />
@@ -46,7 +50,6 @@ export default async function OfficeCenterPage({ searchParams }: { searchParams:
   }
 
   const supabase = await createClient();
-  const effective = await getEffectivePermissions(tenantId, role, userId);
   const ctx: TabContext = {
     tenantId,
     userId,

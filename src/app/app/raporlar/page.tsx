@@ -82,11 +82,13 @@ export default async function ReportsPage() {
   // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
   const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
   // Ağır toplulaştırma: kısa TTL tenant-tag cache (src/lib/reporting/cache.ts).
-  const [aggregateResult, sourceDefs, lossOptions, sample] = await Promise.all([
+  // Varsayılan komisyon oranı (kaçan komisyon tahmini) da aynı turda: eskiden sayfa ortasında ardışık bekleniyordu.
+  const [aggregateResult, sourceDefs, lossOptions, sample, lossRateSettings] = await Promise.all([
     getTenantReportingAggregates(supabase, tenantId, clockNow()),
     sourceDefsPromise,
     getLossReasonOptions(),
     loadSampleKpiScope(supabase, tenantId),
+    getSettings(["office.commission.default_rate"], { tenantId: tenantId ?? undefined }),
   ]);
   const aggregate = requireReportingData(
     "tenant-reporting-aggregates",
@@ -245,7 +247,7 @@ export default async function ReportsPage() {
     highlight: r.source === bestSource,
   }));
   // Tahmini kaçan komisyon: kaybedilen anlaşma tutarı × ofis varsayılan komisyon oranı (Ofis Tanımları; yoksa %3). TAHMİN.
-  const lossRate = Number((await getSettings(["office.commission.default_rate"], { tenantId: tenantId ?? undefined }))["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
+  const lossRate = Number(lossRateSettings["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
   const lostCommission = (v: number) => Math.round(v * (lossRate / 100));
   const lossItems = lossRows.map((r) => ({
     key: r.reason,

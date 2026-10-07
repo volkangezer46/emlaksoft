@@ -43,11 +43,15 @@ export default async function AdminReportsPage({
   // Tarih aralığı verilirse metrikler o aralıkta OLUŞMUŞ kayıtlardan hesaplanır;
   // parametre yoksa mevcut davranış (tüm veri) korunur.
   const now = new Date(clockNow());
-  const aggregateResult = await admin.rpc("platform_reporting_aggregates", {
-    p_from: from ?? null,
-    p_to: to ?? null,
-    p_as_of: now.toISOString(),
-  });
+  // Plan tanımları RPC'den bağımsız: aynı turda (eskiden RPC'den sonra ardışık).
+  const [aggregateResult, planDefs] = await Promise.all([
+    admin.rpc("platform_reporting_aggregates", {
+      p_from: from ?? null,
+      p_to: to ?? null,
+      p_as_of: now.toISOString(),
+    }),
+    getPlanDefinitions(),
+  ]);
   const aggregate = requireReportingData(
     "platform-reporting-aggregates",
     aggregateResult,
@@ -58,7 +62,6 @@ export default async function AdminReportsPage({
 
   const active = Number(summary.active_count);
   const cancelled = Number(summary.cancelled_count);
-  const planDefs = await getPlanDefinitions();
   const prices = priceMapOf(planDefs);
   const mrr = exactMrr(aggregate.plan_stats, prices);
   const arpa = active ? Math.round(mrr / active) : 0;

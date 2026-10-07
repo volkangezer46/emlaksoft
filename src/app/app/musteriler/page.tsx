@@ -115,7 +115,7 @@ export default async function CustomersPage({
 }) {
   const { perms, tenantId, userId, role } = await requireModulePage("customers");
   // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
-  const listScope = await getListScope({ userId, tenantId, role });
+  const listScopeP = getListScope({ userId, tenantId, role });
   const canCreate = (perms.customers ?? []).includes("create");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -142,7 +142,11 @@ export default async function CustomersPage({
   const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
   // Özel alan filtresi (?ozel=anahtar:değer): eşleşen kimlikler liste + havuz sorgusuna uygulanır.
-  const customFilter = await resolveCustomFieldFilter(await createClient(), tenantId, "customer", customFilterRaw(sp as Record<string, string | undefined>));
+  // Kapsam ve özel alan süzgeci birbirinden bağımsız: TEK turda (eskiden ardışık).
+  const [listScope, customFilter] = await Promise.all([
+    listScopeP,
+    createClient().then((c) => resolveCustomFieldFilter(c, tenantId, "customer", customFilterRaw(sp as Record<string, string | undefined>))),
+  ]);
 
   // Tüm sorgular + skorlama data.ts'te (T1); burada yalnız görünüm.
   const {
