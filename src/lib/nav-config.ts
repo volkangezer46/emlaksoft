@@ -132,7 +132,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   {
     id: "musteriler",
-    title: "Müşteriler ve Talepler",
+    title: "Müşteriler",
     icon: ICONS.baslikMusteri,
     description: "Müşteri kartları, talepler, eşleşme ve toplu veri girişi.",
     items: [
@@ -171,7 +171,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   {
     id: "portfoy",
-    title: "Portföy ve İlanlar",
+    title: "Portföy",
     icon: ICONS.baslikPortfoy,
     description: "Portföy kayıtları, yayın takibi, kiralama, proje ve ağ.",
     items: [
@@ -249,7 +249,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/ag",
-        label: "Ofisler Arası Ağ",
+        label: "Ofis Ağı",
         icon: ICONS.ag,
         module: "network",
         tier: "more",
@@ -261,7 +261,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   {
     id: "anlasmalar",
-    title: "Anlaşmalar ve Sözleşmeler",
+    title: "Satış",
     icon: ICONS.baslikAnlasma,
     description: "Teklif, anlaşma hattı ve imzalı sözleşme.",
     items: [
@@ -273,7 +273,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "commissions",
         tabs: [
           { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
-          { href: "/app/kayip-satis", label: "Risk altındaki müşteriler", icon: ICONS.dusus, module: "customers", description: "Kaybedilme riski taşıyan müşteriler ve kayıp nedenleri", keywords: ["kayıp", "risk", "churn", "neden"] },
+          { href: "/app/kayip-satis", label: "Riskli müşteriler", icon: ICONS.dusus, module: "customers", description: "Kaybedilme riski taşıyan müşteriler ve kayıp nedenleri", keywords: ["kayıp", "risk", "churn", "neden"] },
         ],
         needsItemModule: true,
         tier: "core",
@@ -307,7 +307,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   {
     id: "iletisim",
-    title: "İletişim ve Pazarlama",
+    title: "Pazarlama",
     icon: ICONS.baslikIletisim,
     description: "Gelen mesajlar, çağrı kaydı ve toplu kampanyalar.",
     items: [
@@ -379,7 +379,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   {
     id: "performans",
-    title: "Performans ve Raporlar",
+    title: "Raporlar",
     icon: ICONS.baslikPerformans,
     description: "Kişisel karne, ofis raporları ve ekip performansı.",
     items: [
@@ -417,7 +417,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         // Ekip performansı TEK öğe: Özet (danışman KPI), Lig, Kıyas sekmeleri (yollar sabit, her sayfa kendi kapısını korur).
         // TV panosu menü öğesi değildir: ana ekranın ve Lig'in "TV modu" düğmesinden açılır.
         href: "/app/danisman-kpi",
-        label: "Ekip performansı",
+        label: "Ekip karnesi",
         icon: ICONS.kpi,
         // Ekip modülü olana görünür (eskiden Ekip Merkezi sekmesiydi; danışman/muhasebe görmez, kendi karnesi Performansım).
         module: "team",
@@ -496,7 +496,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   },
   {
     id: "ofis",
-    title: "Ofis ve Ayarlar",
+    title: "Ofis",
     icon: ICONS.baslikOfis,
     description: "Ekip, ofis yönetimi, abonelik, yardım, uyum ve yapılandırma.",
     items: [
@@ -552,7 +552,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/abonelik",
-        label: "Abonelik ve paket",
+        label: "Abonelik",
         icon: ICONS.abonelik,
         module: "billing",
         tier: "core",
@@ -562,7 +562,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       {
         // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.
         href: "/app/yardim",
-        label: "Yardım ve Destek",
+        label: "Yardım",
         icon: ICONS.destek,
         module: "support",
         tier: "core",
@@ -625,7 +625,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/buyume",
-        label: "Davet et ve kazan",
+        label: "Davet et",
         icon: ICONS.davet,
         module: "settings",
         tier: "more",

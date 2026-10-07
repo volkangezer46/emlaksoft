@@ -252,7 +252,7 @@ export function AppSidebar({
           ) : null}
           {recentItems.length > 0 ? (
             <div>
-              {groupHeader("son-acik", "Son kullanılanlar", { collapsible: true, expanded: recentOpen })}
+              {groupHeader("son-acik", "Son açılanlar", { collapsible: true, expanded: recentOpen })}
               {recentOpen ? (
                 <div id="sb-son-acik" className="space-y-0.5">{recentItems.map((i) => renderItem(i, { group: "recent", pinnable: true }))}</div>
               ) : null}

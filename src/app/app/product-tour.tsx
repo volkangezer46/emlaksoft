@@ -218,7 +218,7 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
           <DialogDescription asChild>
             <p className="mt-1 text-sm text-text-muted">
               {tour ? `${tour.label} bitti. ` : "Tur bitti. "}
-              Takıldığınızda soldaki menüden Yardım ve Destek sayfasını açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz.
+              Takıldığınızda soldaki menüden Yardım sayfasını açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz.
             </p>
           </DialogDescription>
           {others.length > 0 ? (
