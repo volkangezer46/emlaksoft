@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Save, TriangleAlert } from "lucide-react";
@@ -36,7 +37,7 @@ const addLink = "mt-1 inline-block text-xs font-semibold text-brand-600 underlin
 
 const TAB_ICONS = { taraflar: TI.taraflar, detay: TI.detay } as const;
 
-export function NewDealForm({ properties, customers, userId, stageNames = stageLabelMap(defaultStageLabels()) }: { properties: Prop[]; customers: Cust[]; userId: string; stageNames?: Record<string, string> }) {
+export function NewDealForm({ properties, customers, userId, stageNames = stageLabelMap(defaultStageLabels()), customFields = [] }: { properties: Prop[]; customers: Cust[]; userId: string; stageNames?: Record<string, string>; customFields?: CustomFieldInputDef[] }) {
   const nameOf = (v: string) => stageNames[v] ?? v;
   const [stage, setStage] = useState<string>("new");
   const [hasAuthority, setHasAuthority] = useState(false);
@@ -198,7 +199,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
       error={error}
       onSubmit={onSubmit}
       tabs={tabs}
-      tabPanels={tabPanels}
+      tabPanels={{ ...tabPanels, detay: <>{tabPanels.detay}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       draft={{ userId, formId: DEAL_FORM_ID, fields: [...DEAL_DRAFT_FIELDS] }}
       notice={

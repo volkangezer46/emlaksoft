@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { NewDealForm } from "./new-deal-form";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
@@ -8,7 +9,7 @@ import { stageLabelMap } from "@/lib/deal-stage-labels";
 export const metadata = { title: "Yeni anlaşma" };
 
 export default async function NewDealPage() {
-  const { perms, userId } = await requireModulePage("commissions");
+  const { perms, userId, tenantId } = await requireModulePage("commissions");
   if (!(perms.commissions ?? []).includes("create")) redirect("/app/anlasmalar");
   const supabase = await createClient();
 
@@ -28,5 +29,6 @@ export default async function NewDealPage() {
       .limit(200),
   ]);
 
-  return <NewDealForm properties={properties ?? []} customers={customers ?? []} userId={userId} stageNames={stageNames} />;
+  const customFields = await loadCustomFieldInputDefs(supabase, tenantId, "deal");
+  return <NewDealForm properties={properties ?? []} customers={customers ?? []} userId={userId} stageNames={stageNames} customFields={customFields} />;
 }

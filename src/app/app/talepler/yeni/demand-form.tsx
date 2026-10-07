@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Save, UserRound } from "lucide-react";
@@ -53,7 +54,10 @@ export function DemandForm({
   breadcrumbs,
   description,
   userId,
+  customFields = [],
 }: {
+  /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
+  customFields?: CustomFieldInputDef[];
   customers?: CustomerOption[];
   fixedCustomer?: CustomerOption;
   defaultCustomerId?: string;
@@ -195,7 +199,7 @@ export function DemandForm({
       notice={<DuplicateHint kind="demand" />}
       onSubmit={onSubmit}
       tabs={tabs}
-      tabPanels={tabPanels}
+      tabPanels={{ ...tabPanels, musteri: <>{tabPanels.musteri}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       saveAndNew
       fieldLabels={FIELD_LABELS}
