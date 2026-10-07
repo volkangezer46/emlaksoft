@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- portföy kapakları oturumlu indirme ucundan gelir; next/image optimizasyonu gerekmez */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
@@ -12,6 +12,12 @@ import {
   Gauge,
   LogOut,
   Maximize2,
+  Megaphone,
+  CalendarX2,
+  Inbox,
+  Activity,
+  Medal,
+  Building,
   Minimize2,
   Pause,
   Play,
@@ -74,16 +80,84 @@ function Pager({ page, pages }: { page: number; pages: number }) {
   );
 }
 
+function Empty({ icon, text, hint }: { icon: ReactNode; text: string; hint?: string }) {
+  return (
+    <div className="tv-empty">
+      <span className="tv-empty-icon">{icon}</span>
+      <p>{text}</p>
+      {hint ? <small>{hint}</small> : null}
+    </div>
+  );
+}
+
 function Card({ title, icon, className = "", pager, children }: { title: string; icon: ReactNode; className?: string; pager?: ReactNode; children: ReactNode }) {
   return (
     <section className={`tv-card ${className}`} aria-label={title}>
       <h2 className="tv-card-title">
-        {icon}
-        {title}
+        <span className="tv-card-ico">{icon}</span>
+        <span className="tv-card-name">{title}</span>
         {pager}
       </h2>
       {children}
     </section>
+  );
+}
+
+/**
+ * Sayfalı liste kartı: satır yüksekliği sabit (3,6 birim + 0,5 boşluk); sayfa başına satır sayısı kartın gerçek
+ * yüksekliğinden ölçülür, böylece hiçbir satır yarım kesilmez. Satırlar üstten dizilir.
+ */
+function PagedCard<T extends { id: string }>({
+  title,
+  icon,
+  className,
+  items,
+  tick,
+  ordered,
+  empty,
+  row,
+}: {
+  title: string;
+  icon: ReactNode;
+  className?: string;
+  items: readonly T[];
+  tick: number;
+  ordered?: boolean;
+  empty: ReactNode;
+  row: (item: T, rank: number) => ReactNode;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const probeRef = useRef<HTMLElement>(null);
+  const [cap, setCap] = useState(3);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => {
+      const u = probeRef.current?.offsetWidth ?? 0;
+      if (!u) return;
+      const next = Math.max(1, Math.floor((el.clientHeight + 0.5 * u) / (4.1 * u) + 0.03));
+      setCap((c) => (c === next ? c : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const { page, pages, slice } = pageAt(items, cap, tick);
+  const List = ordered ? "ol" : "ul";
+  return (
+    <Card title={title} icon={icon} className={className} pager={<Pager page={page} pages={pages} />}>
+      <div className="tv-list-wrap" ref={wrapRef}>
+        <i className="tv-probe" ref={probeRef} aria-hidden />
+        {items.length === 0 ? (
+          empty
+        ) : (
+          <List className="tv-list" key={page}>
+            {slice.map((it, i) => row(it, page * cap + i + 1))}
+          </List>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -109,8 +183,15 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
   const prevIds = useRef<{ appt: Set<string>; prop: Set<string>; ev: Set<string> } | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
+  const [hintOn, setHintOn] = useState(true);
 
   useWakeLock(true);
+
+  // Tam ekran ipucu 6 sn sonra kendiliğinden kaybolur
+  useEffect(() => {
+    const t = setTimeout(() => setHintOn(false), 6000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Kabuğu örten katman: gövde kaydırması kapalı
   useEffect(() => {
@@ -250,7 +331,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
       data-tv-idle={idle}
       onClick={onRootClick}
     >
-      <div className="tv-shift" style={{ transform: reduced ? undefined : `translate(${shift.x}px, ${shift.y}px)` }}>
+      <div className="tv-shift" data-hint={!fs && hintOn} style={{ transform: reduced ? undefined : `translate(${shift.x}px, ${shift.y}px)` }}>
         <header className="tv-head">
           <Brand variant="mark" tone={dark ? "dark" : "light"} height={56} alt="" />
           <div style={{ minWidth: 0 }}>
@@ -285,7 +366,7 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
           {data ? <Sections data={data} settings={settings} tick={tick} showRev={showRev} vis={vis} fresh={fresh} /> : null}
         </main>
 
-        {data && vis("ticker") && data.announcements.length > 0 ? <Ticker items={data.announcements} reduced={reduced} tick={tick} /> : null}
+        {data && vis("ticker") && data.announcements.length > 0 ? <Ticker items={data.announcements} /> : null}
       </div>
 
       {!data && status === "loading" ? (
@@ -346,9 +427,9 @@ export function TvBoard({ tenantId, officeName }: { tenantId: string; officeName
         </div>
       ) : null}
 
-      {!fs ? (
+      {!fs && hintOn ? (
         <div className="tv-hint" aria-hidden>
-          Tam ekran için ekrana bir kez tıklayın ya da F11 / F tuşuna basın
+          <Maximize2 style={{ width: "1.1em", height: "1.1em" }} /> Tam ekran için ekrana tıklayın veya F tuşuna basın
         </div>
       ) : null}
 
@@ -404,11 +485,6 @@ function Sections({
   vis: (s: TvSection) => boolean;
   fresh: Set<string>;
 }) {
-  const appts = useMemo(() => pageAt(data.appointments, 6, tick), [data.appointments, tick]);
-  const league = useMemo(() => pageAt(data.league, 6, tick), [data.league, tick]);
-  // Tek hücrelik kartlar 3'er satır sayfalar (büyük yazı sığsın)
-  const events = useMemo(() => pageAt(data.events, 3, tick), [data.events, tick]);
-  const leads = useMemo(() => pageAt(data.leads, 3, tick), [data.leads, tick]);
   // Alt orta hücre dönüşümlü: canlı akış ↔ yeni portföyler (her rotasyonda biri)
   const rotor = (["events", "properties"] as const).filter((k) => vis(k));
   const rotorNow = rotor.length ? rotor[Math.floor(tick) % rotor.length] : null;
@@ -419,30 +495,30 @@ function Sections({
   return (
     <>
       {vis("appointments") ? (
-        <Card title="Bugünün randevuları" icon={<CalendarClock style={{ width: "1.3em", height: "1.3em" }} aria-hidden />} className="tv-span2" pager={<Pager page={appts.page} pages={appts.pages} />}>
-          {appts.slice.length === 0 ? (
-            <p className="tv-empty">Bugün için planlı randevu yok.</p>
-          ) : (
-            <ul className="tv-list" key={appts.page}>
-              {appts.slice.map((a) => (
-                <li key={a.id} className="tv-row" data-fresh={fresh.has(a.id)}>
-                  <span className="tv-time">{a.time}</span>
-                  <span className="tv-row-main">
-                    <b>{a.customer}</b>
-                    <span className="tv-row-sub">
-                      {a.advisor}
-                      {STATUS_LABEL[a.status] ? ` · ${STATUS_LABEL[a.status]}` : ""}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+        <PagedCard
+          title="Bugünün randevuları"
+          icon={<CalendarClock aria-hidden />}
+          className="tv-span2"
+          items={data.appointments}
+          tick={tick}
+          empty={<Empty icon={<CalendarX2 aria-hidden />} text="Bugün için planlı randevu yok" hint="Yeni randevular eklendiğinde burada görünür" />}
+          row={(a) => (
+            <li key={a.id} className="tv-row" data-fresh={fresh.has(a.id)}>
+              <span className="tv-time">{a.time}</span>
+              <span className="tv-row-main">
+                <b>{a.customer}</b>
+                <span className="tv-row-sub">
+                  {a.advisor}
+                  {STATUS_LABEL[a.status] ? ` · ${STATUS_LABEL[a.status]}` : ""}
+                </span>
+              </span>
+            </li>
           )}
-        </Card>
+        />
       ) : null}
 
       {vis("goal") ? (
-        <Card title={`Aylık hedef · ${data.monthLabel}`} icon={<Gauge style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
+        <Card title={`Aylık hedef · ${data.monthLabel}`} icon={<Gauge aria-hidden />}>
           <div className="tv-goal">
             {goal.dealTarget ? (
               <div className="tv-ring">
@@ -476,42 +552,36 @@ function Sections({
       ) : null}
 
       {vis("league") ? (
-        <Card title="Danışman ligi · bu ay" icon={<Trophy style={{ width: "1.3em", height: "1.3em" }} aria-hidden />} className="tv-span2" pager={<Pager page={league.page} pages={league.pages} />}>
-          {league.slice.length === 0 ? (
-            <p className="tv-empty">Bu ay henüz kayıt yok.</p>
-          ) : (
-            <ol className="tv-list" key={league.page}>
-              {league.slice.map((r, i) => {
-                const rank = league.page * 6 + i + 1;
-                return (
-                  <li key={r.id} className="tv-row">
-                    <span className="tv-rank" data-top={rank <= 3 ? rank : undefined}>
-                      {rank}
-                    </span>
-                    <span className="tv-row-main">
-                      <b>{r.name}</b>
-                      <span className="tv-row-sub">
-                        {r.appointments} randevu{r.conversionPct !== null ? ` · %${Math.round(r.conversionPct)} dönüşüm` : ""}
-                      </span>
-                    </span>
-                    <span style={{ textAlign: "right" }}>
-                      <span className="tv-num">
-                        {showRev && r.revenue !== null ? compactMoney(r.revenue) : <TvNumber value={r.deals} />}
-                      </span>
-                      <span className="tv-row-sub" style={{ display: "block" }}>
-                        {showRev && r.revenue !== null ? `${r.deals} satış` : "satış"}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
+        <PagedCard
+          title="Danışman ligi · bu ay"
+          icon={<Trophy aria-hidden />}
+          className="tv-span2"
+          ordered
+          items={data.league}
+          tick={tick}
+          empty={<Empty icon={<Medal aria-hidden />} text="Bu ay henüz kayıt yok" hint="Anlaşmalar kapandıkça sıralama oluşur" />}
+          row={(r, rank) => (
+            <li key={r.id} className="tv-row">
+              <span className="tv-rank" data-top={rank <= 3 ? rank : undefined}>
+                {rank}
+              </span>
+              <span className="tv-row-main">
+                <b>{r.name}</b>
+                <span className="tv-row-sub">
+                  {r.appointments} randevu{r.conversionPct !== null ? ` · %${Math.round(r.conversionPct)} dönüşüm` : ""}
+                </span>
+              </span>
+              <span className="tv-row-end">
+                <span className="tv-num">{showRev && r.revenue !== null ? compactMoney(r.revenue) : <TvNumber value={r.deals} />}</span>
+                <span className="tv-row-sub">{showRev && r.revenue !== null ? `${r.deals} satış` : "satış"}</span>
+              </span>
+            </li>
           )}
-        </Card>
+        />
       ) : null}
 
       {vis("stats") ? (
-        <Card title="Talep ve müşteri" icon={<Users style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
+        <Card title="Talep ve müşteri" icon={<Users aria-hidden />}>
           <div className="tv-stats">
             <Stat label="Aktif talep" value={stats.activeDemands} />
             <Stat label="Yeni müşteri · ay" value={stats.newCustomers} />
@@ -522,29 +592,28 @@ function Sections({
       ) : null}
 
       {vis("leads") ? (
-        <Card title="Yeni talepler" icon={<UserPlus style={{ width: "1.3em", height: "1.3em" }} aria-hidden />} pager={<Pager page={leads.page} pages={leads.pages} />}>
-          {leads.slice.length === 0 ? (
-            <p className="tv-empty">Henüz yeni talep yok.</p>
-          ) : (
-            <ul className="tv-list" key={leads.page}>
-              {leads.slice.map((l) => (
-                <li key={l.id} className="tv-row" data-fresh={fresh.has(`customer:${l.id}`)}>
-                  <span className="tv-row-main">
-                    <b>{l.name}</b>
-                    {l.source ? <span className="tv-row-sub">{l.source}</span> : null}
-                  </span>
-                  <span className="tv-row-sub" suppressHydrationWarning>
-                    {fmtAgo(l.at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+        <PagedCard
+          title="Yeni talepler"
+          icon={<UserPlus aria-hidden />}
+          items={data.leads}
+          tick={tick}
+          empty={<Empty icon={<Inbox aria-hidden />} text="Henüz yeni talep yok" />}
+          row={(l) => (
+            <li key={l.id} className="tv-row" data-fresh={fresh.has(`customer:${l.id}`)}>
+              <span className="tv-row-main">
+                <b>{l.name}</b>
+                {l.source ? <span className="tv-row-sub">{l.source}</span> : null}
+              </span>
+              <span className="tv-row-sub" suppressHydrationWarning>
+                {fmtAgo(l.at)}
+              </span>
+            </li>
           )}
-        </Card>
+        />
       ) : null}
 
       {vis("alerts") ? (
-        <Card title="Geciken / riskli" icon={<AlertTriangle style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
+        <Card title="Geciken / riskli" icon={<AlertTriangle aria-hidden />}>
           <div className="tv-stats">
             <Stat label="Geciken görev" value={alerts.overdueTasks} tone={alerts.overdueTasks ? "warn" : "good"} />
             <Stat label="Takipsiz talep" value={alerts.untrackedDemands} tone={alerts.untrackedDemands ? "warn" : "good"} />
@@ -554,30 +623,29 @@ function Sections({
       ) : null}
 
       {rotorNow === "events" ? (
-        <Card title="Canlı akış" icon={<Radio style={{ width: "1.3em", height: "1.3em" }} aria-hidden />} pager={<Pager page={events.page} pages={events.pages} />}>
-          {events.slice.length === 0 ? (
-            <p className="tv-empty">Henüz hareket yok.</p>
-          ) : (
-            <ul className="tv-list" key={events.page}>
-              {events.slice.map((e) => (
-                <li key={e.id} className="tv-row" data-fresh={fresh.has(e.id)}>
-                  <span className="tv-row-main">
-                    <b>{e.label}</b>
-                  </span>
-                  <span className="tv-row-sub" suppressHydrationWarning>
-                    {fmtAgo(e.at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+        <PagedCard
+          title="Canlı akış"
+          icon={<Radio aria-hidden />}
+          items={data.events}
+          tick={tick}
+          empty={<Empty icon={<Activity aria-hidden />} text="Henüz hareket yok" />}
+          row={(e) => (
+            <li key={e.id} className="tv-row" data-fresh={fresh.has(e.id)}>
+              <span className="tv-row-main">
+                <b>{e.label}</b>
+              </span>
+              <span className="tv-row-sub" suppressHydrationWarning>
+                {fmtAgo(e.at)}
+              </span>
+            </li>
           )}
-        </Card>
+        />
       ) : null}
 
       {rotorNow === "properties" ? (
-        <Card title="Yeni portföyler" icon={<Building2 style={{ width: "1.3em", height: "1.3em" }} aria-hidden />}>
+        <Card title="Yeni portföyler" icon={<Building2 aria-hidden />}>
           {data.properties.length === 0 ? (
-            <p className="tv-empty">Henüz portföy yok.</p>
+            <Empty icon={<Building aria-hidden />} text="Henüz portföy yok" />
           ) : (
             <div className="tv-props">
               {data.properties.map((p) => (
@@ -615,22 +683,37 @@ function Stat({ label, value, tone }: { label: string; value: number | null; ton
   );
 }
 
-function Ticker({ items, reduced, tick }: { items: string[]; reduced: boolean; tick: number }) {
-  const text = items.join("   •   ");
-  // Kayan şerit hızı metin uzunluğuna bağlı (okunabilir sabit hız)
-  const seconds = Math.max(25, Math.round(text.length * 0.35));
+const TICKER_MS = 9000;
+
+/** Duyuru bandı: kayan yazı yok. Tek duyuru sabit durur; birden çoksa 9 sn'de bir yumuşak geçişle değişir. */
+function Ticker({ items }: { items: string[] }) {
+  const [i, setI] = useState(0);
+  const n = items.length;
+  useEffect(() => {
+    if (n < 2) return;
+    const t = setInterval(() => setI((x) => x + 1), TICKER_MS);
+    return () => clearInterval(t);
+  }, [n]);
+  const idx = n ? i % n : 0;
+  const text = items[idx] ?? "";
+  // Bant yüksekliği en uzun duyuruya göre sabit: geçişte ızgara oynamaz
+  const longest = items.reduce((m, t) => Math.max(m, t.length), 0);
+  const size = text.length > 150 ? "xs" : text.length > 80 ? "sm" : "md";
   return (
-    <div className="tv-ticker" role="marquee" aria-label="Duyurular">
-      <b>DUYURU</b>
-      {reduced ? (
-        <span className="tv-ticker-static">{items[tick % items.length]}</span>
-      ) : (
-        <span style={{ overflow: "hidden", flex: 1 }}>
-          <span className="tv-ticker-track" style={{ "--tv-marquee": `${seconds}s` } as React.CSSProperties}>
-            <span>{text}</span>
-          </span>
+    <div className="tv-ticker" role="status" aria-label="Duyurular" data-tall={longest > 80}>
+      <b className="tv-ticker-tag">
+        <Megaphone style={{ width: "1.2em", height: "1.2em" }} aria-hidden /> Duyuru
+      </b>
+      <div className="tv-ticker-body">
+        <p key={idx} className="tv-ticker-text" data-size={size} title={text}>
+          {text}
+        </p>
+      </div>
+      {n > 1 ? (
+        <span className="tv-ticker-count" aria-hidden>
+          {idx + 1} / {n}
         </span>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -690,7 +773,7 @@ function SettingsPanel({
         ))}
         <label>
           <input type="checkbox" checked={settings.ticker} onChange={(e) => update({ ticker: e.target.checked })} />
-          Kayan duyuru şeridi
+          Duyuru şeridi
         </label>
       </fieldset>
       <fieldset>
