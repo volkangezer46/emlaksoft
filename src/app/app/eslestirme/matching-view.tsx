@@ -321,7 +321,7 @@ export async function MatchingView({
           {tenantWeights ? "ofise özel" : "varsayılan"}
         </span>
         <Link
-          href="/app/ayarlar#eslestirme-agirliklari"
+          href="/app/ayarlar?sekme=eslestirme#eslestirme-agirliklari"
           className="ml-auto inline-flex items-center gap-1 font-semibold text-brand-600"
         >
           Ayarlar <ArrowUpRight className="h-3.5 w-3.5" />
