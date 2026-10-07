@@ -40,7 +40,7 @@ export const OFFICE_SETTING_GROUPS = [
   { id: "atama", label: "Akıllı atama", description: "Ofis Merkezi'nde havuzdan danışman önerisinin ölçüt ağırlıkları ve atanmamış ilan SLA'sı." },
   { id: "erisim", label: "Erişim kapsamı", description: "Liste ekranlarının kullanıcı kapsamıyla (kendi / takım / şube) daraltılması." },
   { id: "iletisim", label: "Malik ve müşteri iletişimi", description: "Malik haftalık raporu, müşteri portalında güncel değer özeti ve vitrin sohbet asistanı (hepsi varsayılan kapalı)." },
-  { id: "uyum", label: "Uyum hatırlatmaları", description: "Yetki belgesi yıllık harç kontrolü gibi yasal takvim hatırlatmaları." },
+  { id: "uyum", label: "Uyum ve veri paylaşımı", description: "Yetki belgesi yıllık harç hatırlatması ve anonim piyasa verisi paylaşım izni (varsayılan kapalı)." },
 ] as const;
 export type OfficeSettingGroupId = (typeof OFFICE_SETTING_GROUPS)[number]["id"];
 
