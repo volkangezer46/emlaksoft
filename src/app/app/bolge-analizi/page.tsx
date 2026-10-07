@@ -4,6 +4,7 @@ import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, T
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PageHeader } from "@/components/ui/page-header";
+import { ReportExportBar } from "@/components/app/report-export-bar";
 import { DataTable } from "@/components/ui/data-table";
 import { ChartFrame, BarCompare, AreaTrend } from "@/app/app/_ui/lazy-chart";
 import { compareTr } from "@/lib/tr-text";
@@ -275,6 +276,24 @@ export default async function RegionAnalysisPage({
         eyebrow="Kendi verinizden piyasa görünümü"
         title="Bölge analizi"
         description="İlçe bazında medyan m² fiyatı, listede kalma süresi ve kapanan işlem hacmi. Bir ilçeyi seçince EmlakFiyati piyasa endeksi de görünür."
+        actions={
+          <ReportExportBar
+            rows={rows.map((r) => ({
+              il: r.province_name,
+              ilce: r.district_name,
+              aktif_portfoy: r.active_count,
+              toplam_portfoy: r.total_count,
+              medyan_m2: r.median_sqm_price,
+              min_m2: r.min_sqm_price,
+              max_m2: r.max_sqm_price,
+              ort_listede_gun: r.avg_days_listed == null ? null : Math.round(r.avg_days_listed),
+              kapanan: r.closed_count,
+              kapanan_tutar: r.closed_value,
+              fiyat_degisim_yuzde: r.price_change_pct,
+            }))}
+            filename={`bolge-analizi-${months}ay.csv`}
+          />
+        }
       />
 
       <div className="no-print grid grid-cols-2 gap-3 lg:grid-cols-4">

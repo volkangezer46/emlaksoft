@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { createExpense, type ExpenseResult } from "@/app/actions/expenses";
 import { useToast } from "@/components/app/toast-provider";
+import { Combobox } from "@/components/ui/combobox";
+import { searchProperties } from "@/app/actions/lookup";
 
 type Category = { value: string; label: string };
 
@@ -14,9 +16,12 @@ const inputClass =
 export function ExpenseCreateForm({
   categories,
   defaultDate,
+  defaultProperty = null,
 }: {
   categories: readonly Category[];
   defaultDate: string;
+  /** Portföy detayından gelen ön seçim (?portfoy=). */
+  defaultProperty?: { value: string; label: string } | null;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
@@ -53,6 +58,26 @@ export function ExpenseCreateForm({
       <input id="expense-date" name="expense_date" type="date" min="1900-01-01" max="2100-12-31" defaultValue={defaultDate} className={inputClass} />
       <label htmlFor="expense-notes" className="sr-only">Not (opsiyonel)</label>
       <input id="expense-notes" name="notes" maxLength={2000} placeholder="Not (opsiyonel)" className={`sm:col-span-2 ${inputClass}`} />
+      <Combobox
+        name="property_id"
+        aria-label="İlgili portföy (opsiyonel)"
+        placeholder="Portföy (opsiyonel)"
+        searchPlaceholder="Portföy kodu veya başlığı…"
+        emptyText="Eşleşen portföy yok"
+        onSearch={searchProperties}
+        options={defaultProperty ? [defaultProperty] : []}
+        defaultValue={defaultProperty?.value ?? ""}
+      />
+      <label htmlFor="expense-receipt" className="sr-only">Fiş bağlantısı (opsiyonel)</label>
+      <input
+        id="expense-receipt"
+        name="receipt_url"
+        type="url"
+        inputMode="url"
+        maxLength={500}
+        placeholder="Fiş / e-Arşiv bağlantısı (https://…)"
+        className={inputClass}
+      />
       <button
         type="submit"
         disabled={pending}

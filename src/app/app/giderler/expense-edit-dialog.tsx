@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import { Pencil } from "lucide-react";
 import { updateExpense, type ExpenseResult } from "@/app/actions/expenses";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
+import { Combobox } from "@/components/ui/combobox";
+import { searchProperties } from "@/app/actions/lookup";
 
 type Category = { value: string; label: string };
 export type Expense = {
@@ -13,6 +15,9 @@ export type Expense = {
   category: string;
   expense_date: string;
   notes: string | null;
+  property_id?: string | null;
+  property_label?: string | null;
+  receipt_url?: string | null;
 };
 
 export function ExpenseEditDialog({
@@ -60,7 +65,7 @@ export function ExpenseEditDialog({
       error={state.error}
       summary
       hiddenFields={<input type="hidden" name="id" value={expense.id} />}
-      fieldLabels={{ title: "Başlık", amount: "Tutar (TRY)", expense_date: "Tarih", category: "Kategori", notes: "Not" }}
+      fieldLabels={{ title: "Başlık", amount: "Tutar (TRY)", expense_date: "Tarih", category: "Kategori", notes: "Not", property_id: "Portföy", receipt_url: "Fiş bağlantısı" }}
       trigger={
         !controlled
           ? ({ onClick, ...aria }) => (
@@ -76,7 +81,7 @@ export function ExpenseEditDialog({
             )
           : undefined
       }
-      tabs={[{ id: "gider", label: "Gider", fields: ["title", "amount", "expense_date", "category", "notes"] }]}
+      tabs={[{ id: "gider", label: "Gider", fields: ["title", "amount", "expense_date", "category", "notes", "property_id", "receipt_url"] }]}
       panels={{
         gider: (
           <>
@@ -103,6 +108,23 @@ export function ExpenseEditDialog({
             <div>
               <label htmlFor={`expense-notes-${expense.id}`} className={lbl}>Not (opsiyonel)</label>
               <input id={`expense-notes-${expense.id}`} name="notes" maxLength={2000} defaultValue={expense.notes ?? ""} placeholder="Not (opsiyonel)" className={fieldClass} />
+            </div>
+            <div>
+              <span className={lbl}>İlgili portföy</span>
+              <Combobox
+                name="property_id"
+                aria-label="İlgili portföy"
+                placeholder="Bağlı değil"
+                searchPlaceholder="Portföy kodu veya başlığı…"
+                emptyText="Eşleşen portföy yok"
+                onSearch={searchProperties}
+                options={expense.property_id ? [{ value: expense.property_id, label: expense.property_label ?? "Bağlı portföy" }] : []}
+                defaultValue={expense.property_id ?? ""}
+              />
+            </div>
+            <div>
+              <label htmlFor={`expense-receipt-${expense.id}`} className={lbl}>Fiş bağlantısı</label>
+              <input id={`expense-receipt-${expense.id}`} name="receipt_url" type="url" inputMode="url" maxLength={500} defaultValue={expense.receipt_url ?? ""} placeholder="https://…" className={fieldClass} />
             </div>
           </>
         ),

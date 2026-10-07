@@ -92,6 +92,8 @@ type AppointmentRow = {
   /** Danışmanın randevu değerlendirmesi (migration 126) — eşleştirme geri bildirimi DEĞİL. */
   outcome: string | null;
   outcome_note: string | null;
+  /** Gösterim belgesi imzalandı (randevu teyit sayfasında imza). */
+  signed_at?: string | null;
   customer: Rel;
   property: Rel;
 };
@@ -128,6 +130,7 @@ export default async function AppointmentsPage({
     tarih?: string;
     gun?: string;
     danisman?: string;
+    sube?: string;
     sayfa?: string;
     yogunluk?: string;
     yeni?: string;
@@ -164,6 +167,8 @@ export default async function AppointmentsPage({
   const isYonetici = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
   // Danışman filtresi (Ekip Merkezi / Kıyas bağlantıları): yalnız yönetici rolleri; doğrulanmış uuid.
   const danismanF = isYonetici ? uuidParam(sp.danisman) : "";
+  // Şube filtresi (appointments.branch_id): yalnız yönetim katmanı; doğrulanmış uuid.
+  const subeF = isYonetici ? uuidParam(sp.sube) : "";
   const tarihMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sp.tarih ?? "");
   // todayStart: TR takvim günü (sunucu UTC'de olsa da gece 00–03 TRT arası doğru gün).
   // "Sahte yerel" Date — yalnız gün bileşenleri anlamlı; DB sınırı için toIso() kullan.
@@ -225,12 +230,13 @@ export default async function AppointmentsPage({
     if (customerF) query = query.eq("customer_id", customerF);
     if (propertyF) query = query.eq("property_id", propertyF);
     if (danismanF) query = query.eq("assigned_to", danismanF);
+    if (subeF) query = query.eq("branch_id", subeF);
     if (search.empty) query = query.eq("id", NIL_UUID);
     else if (search.clause) query = query.or(search.clause);
     return query;
   };
   const apptQuery = buildApptQuery(
-    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
+    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, signed_at, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
   );
 
   // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count; danışman kapsamlı);
@@ -238,6 +244,7 @@ export default async function AppointmentsPage({
   const countBase = () => {
     let c = supabase.from("appointments").select("id", { count: "exact", head: true }).neq("status", "cancelled");
     if (danismanF) c = c.eq("assigned_to", danismanF);
+    if (subeF) c = c.eq("branch_id", subeF);
     return c;
   };
   const todayEndIso = toIso(new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1));
@@ -384,6 +391,10 @@ export default async function AppointmentsPage({
 
   const advisorList = (advisorRows ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "İsimsiz danışman") }));
   const advisorName = new Map(advisorList.map((a) => [a.id, a.name]));
+  // Şube seçenekleri (yönetim katmanı; tek şubeli ofiste seçici çizilmez).
+  const branchList = isYonetici
+    ? (((await supabase.from("branches").select("id, name").eq("is_active", true).order("name").limit(100)).data ?? []) as { id: string; name: string }[])
+    : [];
   // Düzenleme panelindeki danışman seçici: yalnız yönetim katmanında (sunucu aynı kuralı uygular).
   const editAdvisors = isYonetici ? advisorList.map((a) => ({ id: a.id, label: a.name })) : undefined;
 
@@ -424,6 +435,7 @@ export default async function AppointmentsPage({
   if ((gorunum === "hafta" || gorunum === "gun") && sp.tarih) urlParams.tarih = sp.tarih;
   if (gorunum === "rota" && rotaGun !== "bugun") urlParams.gun = rotaGun;
   if (danismanF) urlParams.danisman = danismanF;
+  if (subeF) urlParams.sube = subeF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   const savedViewParams = Object.fromEntries(
     Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "gorunum", "danisman"].includes(k)),
@@ -610,6 +622,9 @@ export default async function AppointmentsPage({
           ? { label: outcome.label, emoji: outcome.emoji, tone: OUTCOME_TONE[appt.outcome] ?? "neutral", note: appt.outcome_note }
           : null,
       followUp: needsFollowUp(appt.status, date.getTime(), nowMs),
+      signedLabel: appt.signed_at
+        ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(appt.signed_at))
+        : null,
       confirmToken: appt.confirm_token,
       isShowing: appt.appointment_type === "showing",
       tutanakHref: `/app/sozlesmeler?${tutanakParams.toString()}`,
@@ -659,6 +674,7 @@ export default async function AppointmentsPage({
     { key: "customer", label: "Müşteri", format: () => filteredCustomer?.full_name ?? "Seçili müşteri" },
     { key: "property", label: "Portföy", format: () => filteredProperty?.title || filteredProperty?.property_code || "Seçili portföy" },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
+    { key: "sube", label: "Şube", format: (v) => branchList.find((b) => b.id === v)?.name ?? "Seçili şube" },
   ]);
 
   return (
@@ -739,16 +755,26 @@ export default async function AppointmentsPage({
         activeView={gorunum}
         searchPlaceholder="Müşteri, portföy veya konum ara…"
         searchLabel="Randevu ara"
-        panelParamKeys={["danisman"]}
+        panelParamKeys={["danisman", "sube"]}
         panel={
-          isYonetici && advisorList.length > 0 ? (
+          isYonetici && (advisorList.length > 0 || branchList.length > 1) ? (
             <FilterGrid>
-              <FilterSelect
-                name="danisman"
-                label="Danışman"
-                value={danismanF}
-                options={[{ value: "", label: "Tüm danışmanlar" }, ...advisorList.map((a) => ({ value: a.id, label: a.name }))]}
-              />
+              {advisorList.length > 0 ? (
+                <FilterSelect
+                  name="danisman"
+                  label="Danışman"
+                  value={danismanF}
+                  options={[{ value: "", label: "Tüm danışmanlar" }, ...advisorList.map((a) => ({ value: a.id, label: a.name }))]}
+                />
+              ) : null}
+              {branchList.length > 1 || subeF ? (
+                <FilterSelect
+                  name="sube"
+                  label="Şube"
+                  value={subeF}
+                  options={[{ value: "", label: "Tüm şubeler" }, ...branchList.map((b) => ({ value: b.id, label: b.name }))]}
+                />
+              ) : null}
             </FilterGrid>
           ) : undefined
         }

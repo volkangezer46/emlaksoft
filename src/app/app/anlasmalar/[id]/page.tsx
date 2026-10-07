@@ -121,7 +121,7 @@ export default async function DealDetailPage({
   const { data: deal } = await supabase
     .from("deals")
     .select(
-      "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, property_id, customer_id, assigned_to",
+      "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, property_id, customer_id, assigned_to, project_unit_id",
     )
     .eq("id", id)
     .maybeSingle();
@@ -133,6 +133,20 @@ export default async function DealDetailPage({
   // B1: başkasının anlaşmasında danışman kimliği ve brüt komisyon, earnings_all yoksa gizlenir.
   const ownDeal = deal.assigned_to === userId;
   const earningsVisible = seeAllEarnings || ownDeal;
+  // Proje dairesi bağı (deals.project_unit_id; bileşik FK gömmesi yerine tek ayrı okuma).
+  const unitRow = deal.project_unit_id
+    ? (
+        await supabase
+          .from("project_units")
+          .select("id, unit_no, block, project_id, project:projects!project_units_project_id_fkey(name)")
+          .eq("id", deal.project_unit_id)
+          .maybeSingle()
+      ).data
+    : null;
+  const unitProject = unitRow ? (Array.isArray(unitRow.project) ? unitRow.project[0] : unitRow.project) as { name?: string } | null : null;
+  const unitLabel = unitRow
+    ? [unitProject?.name, unitRow.block ? `${unitRow.block} blok` : null, `No ${unitRow.unit_no}`].filter(Boolean).join(" · ")
+    : null;
 
   const [
     { data: property },
@@ -421,6 +435,15 @@ export default async function DealDetailPage({
           role="status"
         >
           <span className="font-bold">Kayıp nedeni:</span> {formatLossReason(deal.loss_reason, lossReasonLabels(lossOptions))}
+        </p>
+      ) : null}
+
+      {unitRow && unitLabel ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-sm text-text-muted" role="status">
+          <span className="font-bold text-ink-950">Proje dairesi:</span>
+          <Link href={`/app/projeler/${unitRow.project_id}`} className="font-semibold text-brand-600 hover:underline">
+            {unitLabel}
+          </Link>
         </p>
       ) : null}
 
@@ -778,6 +801,8 @@ export default async function DealDetailPage({
                   <ChecklistLoader
                     dealId={deal.id}
                     dealType={deal.deal_type}
+                    customerId={deal.customer_id}
+                    canUpload={(perms.customers ?? []).includes("edit")}
                     canEdit={(perms.commissions ?? []).includes("edit")}
                   />
                 </Suspense>
@@ -863,9 +888,19 @@ export default async function DealDetailPage({
                     <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                       <ListChecks className="h-4 w-4 text-brand-600" /> Bağlı görevler
                     </h2>
-                    <Link href="/app/gorevler" className="text-xs font-semibold text-brand-600 hover:underline">
-                      Görev merkezine git →
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {(perms.tasks ?? []).includes("create") ? (
+                        <Link
+                          href={`/app/gorevler/yeni?deal=${deal.id}${deal.customer_id ? `&customer=${deal.customer_id}` : ""}`}
+                          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800"
+                        >
+                          Görev ekle
+                        </Link>
+                      ) : null}
+                      <Link href={`/app/gorevler?filter=all&anlasma=${deal.id}`} className="text-xs font-semibold text-brand-600 hover:underline">
+                        Görev listesinde aç →
+                      </Link>
+                    </div>
                   </div>
                   {(tasks ?? []).length === 0 ? (
                     <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
@@ -878,7 +913,7 @@ export default async function DealDetailPage({
                         return (
                           <li key={t.id}>
                             <Link
-                              href={`/app/gorevler?filter=${bitti ? "done" : "open"}`}
+                              href={`/app/gorevler?filter=${bitti ? "done" : "all"}&anlasma=${deal.id}`}
                               className="focus-ring flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5 transition hover:border-brand-300"
                             >
                               <span className={`font-medium ${bitti ? "text-text-faint line-through" : "text-ink-950"}`}>
@@ -887,7 +922,7 @@ export default async function DealDetailPage({
                               <span className="flex items-center gap-2 text-xs text-text-muted">
                                 {t.due_at ? tarih(t.due_at) : "Tarihsiz"}
                                 <Badge variant={bitti ? "success" : t.priority === "high" ? "danger" : "default"}>
-                                  {bitti ? "Tamam" : (t.status ?? "Açık")}
+                                  {bitti ? "Tamam" : t.status === "cancelled" ? "İptal" : "Açık"}
                                 </Badge>
                                 <ArrowUpRight className="h-3.5 w-3.5" />
                               </span>

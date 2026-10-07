@@ -106,7 +106,11 @@ export default async function KampanyalarPage({
       c.status === "done" || c.status === "failed"
         ? `${c.sent_count ?? 0}/${c.total_count ?? 0}${(c.failed_count ?? 0) > 0 ? ` · ${c.failed_count} hata` : ""}`
         : `${c.total_count ?? 0} alıcı`,
-    dateLabel: relativeDate(c.created_at),
+    // Zamanlanmış kampanyada planlanan gönderim anı gösterilir (TR saati).
+    dateLabel:
+      c.status === "scheduled" && c.scheduled_at
+        ? `Plan: ${new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(c.scheduled_at))}`
+        : relativeDate(c.created_at),
     _href: `/app/kampanyalar/${c.id}`,
   }));
 

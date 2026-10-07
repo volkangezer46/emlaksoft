@@ -3,12 +3,13 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "next/link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { ReportExportBar } from "@/components/app/report-export-bar";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { daysAgoIso, now } from "@/lib/clock";
+import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { getSetting } from "@/lib/settings/read";
 import {
@@ -107,10 +108,25 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
   const listTotal = scoped.filter((r) => durum.match.includes(r.status)).length;
 
   const base = { donem: donem.key, esik, danisman: danismanFilter ?? undefined };
+  // CSV: danışman bazında özet (kişi adı = ekip üyesi; müşteri kişisel verisi yok).
+  const exportRows: Record<string, string | number | null>[] = [
+    { danisman: "Seçili kapsam (toplam)", kayit: overall.total, yanitlanan: overall.responded, bekleyen: overall.waiting, ortalama_dk: overall.avgMin, medyan_dk: overall.medianMin, hedef_ici_yuzde: overall.withinSlaPct, esigi_asan_bekleyen: overall.overdueWaiting },
+    ...byAdvisor.map((a) => ({
+      danisman: advisorName(a.advisorId),
+      kayit: a.summary.total,
+      yanitlanan: a.summary.responded,
+      bekleyen: a.summary.waiting,
+      ortalama_dk: a.summary.avgMin,
+      medyan_dk: a.summary.medianMin,
+      hedef_ici_yuzde: a.summary.withinSlaPct,
+      esigi_asan_bekleyen: a.summary.overdueWaiting,
+    })),
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
+        actions={<ReportExportBar rows={exportRows} filename={`aday-hizi-${donem.key}-${trDayKey(nowMs)}.csv`} />}
         eyebrow="Raporlar"
         title="Aday Hızı"
         description={`Yeni müşteri kaydından ilk temasa geçen süre. Yalnız çalışma saatleri sayılır (Pzt-Cmt ${String(WORK_START_HOUR).padStart(2, "0")}:00-${WORK_END_HOUR}:00); gece ve pazar gelen talep sabah saatinde başlar. Not kayıtları temas sayılmaz.`}

@@ -55,6 +55,8 @@ import {
 } from "@/components/ui/list-kit";
 import { getSetting } from "@/lib/settings/read";
 import { DealMobileList, DealTable, type DealVM } from "./deal-rows";
+import { DealBulkBar } from "./deal-bulk-bar";
+import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
   DEAL_STAGE_KEYS,
   OPEN_STAGES,
@@ -161,7 +163,7 @@ export default async function DealsPage({
   const scope: Record<string, string> = danismanF ? { assigned_to: danismanF } : {};
 
   const SELECT_COLS =
-    "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, property:properties!deals_property_id_fkey(id, title, property_code), customer:customers!deals_customer_id_fkey(id, full_name, phone), deal_notes!deal_notes_deal_id_fkey(count)";
+    "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, project_unit_id, property:properties!deals_property_id_fkey(id, title, property_code), customer:customers!deals_customer_id_fkey(id, full_name, phone), deal_notes!deal_notes_deal_id_fkey(count)";
 
   // Liste/pano ortak filtreleri (danışman kapsamı, arama, bayat); aşama yalnız liste görünümünde.
   let listQuery = scoped(supabase.from("deals").select(SELECT_COLS, { count: "exact" }).match(scope));
@@ -180,19 +182,24 @@ export default async function DealsPage({
 
   const dealsP = Promise.resolve(search.empty ? { data: [], count: 0 } : listQuery);
   const relatedP = dealsP.then(async (res) => {
-    const rows = (res.data ?? []) as unknown as Array<{ id: string }>;
+    const rows = (res.data ?? []) as unknown as Array<{ id: string; project_unit_id?: string | null }>;
     const ids = rows.map((d) => d.id);
+    const unitIds = [...new Set(rows.map((d) => d.project_unit_id).filter((v): v is string => Boolean(v)))];
     return Promise.all([
       ids.length
         ? supabase.from("deal_checklist_items").select("deal_id, is_required, is_done").in("deal_id", ids).eq("is_required", true)
         : Promise.resolve({ data: [] as { deal_id: string; is_required: boolean; is_done: boolean }[] }),
+      // Proje dairesi bağı (deals.project_unit_id): bileşik FK gömmesine güvenmeden ayrı, tek sorgu.
+      unitIds.length
+        ? supabase.from("project_units").select("id, unit_no, block, project_id, project:projects!project_units_project_id_fkey(name)").in("id", unitIds)
+        : Promise.resolve({ data: [] as unknown[] }),
     ]);
   });
 
   const [
     { data: dealsRaw, count: dealCount },
     { data: members },
-    [{ data: checklistRows }],
+    [{ data: checklistRows }, { data: unitRows }],
     stageLabels,
     savedViews,
     sumScan,
@@ -228,6 +235,14 @@ export default async function DealsPage({
     checklistByDeal.set(r.deal_id, agg);
   }
   const advisors = (members ?? []).map((m) => ({ id: String(m.id), name: String(m.full_name ?? "") }));
+  type UnitRow = { id: string; unit_no: string; block: string | null; project_id: string; project: { name?: string } | { name?: string }[] | null };
+  const unitById = new Map(
+    ((unitRows ?? []) as UnitRow[]).map((u) => {
+      const proj = Array.isArray(u.project) ? u.project[0] : u.project;
+      const label = [proj?.name, u.block ? `${u.block} blok` : null, `No ${u.unit_no}`].filter(Boolean).join(" · ");
+      return [u.id, { label, href: `/app/projeler/${u.project_id}` }] as const;
+    }),
+  );
   const advisorName = new Map(advisors.map((a) => [a.id, a.name]));
 
   type RawDeal = {
@@ -240,6 +255,7 @@ export default async function DealsPage({
     updated_at: string;
     property_id: string | null;
     customer_id: string | null;
+    project_unit_id?: string | null;
     property: unknown;
     customer: unknown;
     deal_notes: unknown;
@@ -368,6 +384,10 @@ export default async function DealsPage({
             stale: open && days >= STALE_DAYS,
             checklist: d.checklist_total > 0 ? { done: d.checklist_done, total: d.checklist_total } : null,
             noteCount: d.note_count,
+            unit: (() => {
+              const raw = rawRows.find((r) => r.id === d.id);
+              return raw?.project_unit_id ? (unitById.get(raw.project_unit_id) ?? null) : null;
+            })(),
           };
         })
       : [];
@@ -501,10 +521,17 @@ export default async function DealsPage({
                   action={{ href: `${PATH}?gorunum=liste`, label: "Filtreleri temizle" }}
                 />
               ) : (
-                <>
-                  <DealTable rows={viewModels} density={density} />
+                <BulkSelectionProvider>
+                  {canEdit ? (
+                    <DealBulkBar
+                      stages={OPEN_STAGES.map((k) => ({ value: k, label: stageLabels[k].label }))}
+                      members={advisors}
+                      canAssign={officeWide}
+                    />
+                  ) : null}
+                  <DealTable rows={viewModels} density={density} selectable={canEdit} />
                   <DealMobileList rows={viewModels} />
-                </>
+                </BulkSelectionProvider>
               )}
               <ListPager pathname={PATH} params={urlParams} window={win} total={dealCount ?? rawRows.length} />
             </>

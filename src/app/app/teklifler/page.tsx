@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { Banknote, CheckCircle2, Plus, Search, Tag, Timer, Undo2 } from "lucide-react";
-import { daysAgoIso, now } from "@/lib/clock";
+import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -32,6 +32,9 @@ import {
 } from "@/components/ui/list-kit";
 import { buildHref } from "@/lib/ui/filter-params";
 import { OfferMobileList, OfferTable, type OfferVM } from "./offer-rows";
+import { OfferBulkBar } from "./offer-bulk-bar";
+import { BulkSelectionProvider } from "@/components/app/bulk-selection";
+import { daysUntilOfferExpiry } from "@/lib/offer-expiry";
 import { OFFER_STATUS_LABELS, offerStatusTone, offerVolume } from "./offer-list-logic";
 
 export const metadata = { title: "Teklifler" };
@@ -83,6 +86,7 @@ export default async function TekliflerPage({
 }) {
   const { perms } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
+  const canEditOffers = perms.offers?.includes("edit") ?? perms.commissions?.includes("edit") ?? false;
   const params = (await searchParams) ?? {};
   // Eski popup adresleri: ?yeni=1 ve eşleştirme kısayolu (?musteri=&portfoy=) artık tam sayfa forma gider.
   if (canCreate && (params.yeni === "1" || params.musteri || params.portfoy)) {
@@ -119,7 +123,7 @@ export default async function TekliflerPage({
   const scope: Record<string, string> = danismanF ? { created_by: danismanF } : {};
 
   const LIST_COLS =
-    "id, amount, counter_amount, status, created_at, created_by, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title), customer:customers!offers_customer_id_fkey(id, full_name)";
+    "id, amount, counter_amount, status, valid_until, created_at, created_by, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title), customer:customers!offers_customer_id_fkey(id, full_name)";
   let listQuery = supabase.from("offers").select(LIST_COLS, { count: "exact" }).match(scope);
   if (durum) listQuery = listQuery.eq("status", durum);
   if (from) listQuery = listQuery.gte("created_at", from);
@@ -149,6 +153,7 @@ export default async function TekliflerPage({
   const advisorName = new Map(advisors.map((a) => [a.id, a.name]));
 
   const offersRaw = (listRes.data ?? []) as unknown as Array<Record<string, unknown>>;
+  const todayKey = trDayKey(now());
   const viewModels: OfferVM[] = offersRaw.map((o) => {
     const p = one(o.property as { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null);
     const c = one(o.customer as { id: string; full_name: string } | { id: string; full_name: string }[] | null);
@@ -166,6 +171,14 @@ export default async function TekliflerPage({
       statusTone: offerStatusTone(status),
       advisor: o.created_by ? (advisorName.get(String(o.created_by)) ?? null) : null,
       dateLabel: tarih(String(o.created_at)),
+      ...(() => {
+        if (!["draft", "submitted", "countered"].includes(status)) return {};
+        const left = daysUntilOfferExpiry(o.valid_until as string | null, todayKey);
+        if (left == null || left > 2) return {};
+        return left < 0
+          ? { expiryLabel: "Süresi doldu", expiryTone: "danger" as const }
+          : { expiryLabel: left === 0 ? "Bugün bitiyor" : `${left} gün kaldı`, expiryTone: "warn" as const };
+      })(),
     };
   });
 
@@ -287,10 +300,11 @@ export default async function TekliflerPage({
               action={{ href: PATH, label: "Filtreleri temizle" }}
             />
           ) : (
-            <>
-              <OfferTable rows={viewModels} density={density} />
+            <BulkSelectionProvider>
+              {canEditOffers ? <OfferBulkBar /> : null}
+              <OfferTable rows={viewModels} density={density} selectable={canEditOffers} />
               <OfferMobileList rows={viewModels} />
-            </>
+            </BulkSelectionProvider>
           )}
 
           <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} />

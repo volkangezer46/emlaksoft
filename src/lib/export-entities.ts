@@ -144,6 +144,8 @@ export const mapExpense = (e: RawRow) => ({
   kategori: e.category,
   tarih: e.expense_date,
   not: e.notes,
+  portfoy_kodu: relOne(e.property)?.property_code ?? "",
+  fis_baglantisi: e.receipt_url ?? "",
   kayit: e.created_at,
 });
 export const mapOffer = (o: RawRow) => {
@@ -235,6 +237,7 @@ export const mapContract = (k: RawRow) => ({
   olusturuldu: k.created_at,
   imzalandi: k.signed_at ?? "",
   bitis: k.expires_at ?? "",
+  iptal: k.cancelled_at ?? "",
 });
 export const mapReferral = (r: RawRow) => ({
   tavsiye_edilen: r.referred_name,

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { now } from "@/lib/clock";
 import { normalizeReminderSettings } from "@/lib/rent-reminders/logic";
+import { logActivity } from "@/lib/activity";
 
 /**
  * Kiracı hatırlatma ayarları ve kiracı opt-out (H3). Tümü oturumlu istemciyle (RLS) çalışır; service_role YOK.
@@ -91,6 +92,40 @@ export async function setRenterReminderOptOut(rentalId: string, optOut: boolean)
     return { error: "Tercih kaydedilemedi." };
   }
   revalidatePath(`/app/kiralama/${rentalId}`);
+  return { ok: true };
+}
+
+/**
+ * Müşteri kartından kira hatırlatması tercihi (KVKK: kişinin "istemiyorum" talebi kayda alınır, zaman damgalı).
+ * Kiralama ekranındaki `setRenterReminderOptOut` ile aynı sütunlar; burada kapı müşteri düzenleme iznidir.
+ */
+export async function setCustomerRentReminderOptOut(customerId: string, optOut: boolean): Promise<RentReminderResult> {
+  const gate = await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(customerId ?? ""))) return { error: "Müşteri bulunamadı." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("customers")
+    .update({ rent_reminder_opt_out: optOut === true, rent_reminder_opt_out_at: optOut ? new Date(now()).toISOString() : null })
+    .eq("id", customerId)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    if (isMissingSchema(error)) return { error: MISSING_MSG };
+    console.error("setCustomerRentReminderOptOut", { code: error.code });
+    return { error: "Tercih kaydedilemedi." };
+  }
+  if (!data) return { error: "Müşteri bulunamadı." };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "customer.rent_reminder_opt_out",
+    entityType: "customer",
+    entityId: customerId,
+    newValue: { opt_out: optOut === true },
+  });
+  revalidatePath(`/app/musteriler/${customerId}`);
   return { ok: true };
 }
 

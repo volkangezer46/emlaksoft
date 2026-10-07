@@ -1,19 +1,18 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Loader2, Send, Undo2, X } from "lucide-react";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { BulkBar } from "@/components/ui/list-kit";
+import { useBulkSelection } from "@/components/app/bulk-selection";
+import { useToast } from "@/components/app/toast-provider";
 import {
   addApprovalComment,
   cancelApprovalRequest,
   decideApproval,
+  decideApprovalsBulk,
   type ApprovalResult,
 } from "@/app/actions/approvals";
 
@@ -23,101 +22,140 @@ const fieldCls =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
- * Onay / ret kararı.
- *
- * NEDEN ConfirmDialog DEĞİL: ret için GEREKÇE zorunlu, yani onay penceresinin
- * içinde bir metin alanı olmalı. `ConfirmDialog` yalnız evet/hayır taşıyor ve
- * paylaşılan bir primitive — bu ekran için genişletmek yerine aynı görsel dili
- * kullanan yerel bir pencere kuruldu (Dialog + DialogHeader zaten ortak).
+ * Onay / ret kararı — SAYFA İÇİ panel (popup yok). Düğmeye basınca satırın altında
+ * gerekçe alanı açılır; ret için gerekçe zorunlu. Açıkken kapsayıcı tam satır genişliği alır
+ * (`basis-full`), böylece liste satırının içinde kalır.
  */
-export function DecisionDialog({
-  requestId,
-  decision,
-  requestTitle,
-}: {
-  requestId: string;
-  decision: "onaylandi" | "reddedildi";
-  requestTitle: string;
-}) {
-  const [open, setOpen] = useState(false);
+export function DecisionControls({ requestId, requestTitle }: { requestId: string; requestTitle: string }) {
+  const [mode, setMode] = useState<"onaylandi" | "reddedildi" | null>(null);
   const [state, action, isPending] = useActionState(decideApproval, init);
-  const red = decision === "reddedildi";
+  const red = mode === "reddedildi";
+  if (state?.ok && mode) setMode(null);
 
-  if (state?.ok && open) setOpen(false);
+  const toggleBtn = (decision: "onaylandi" | "reddedildi") => {
+    const isRed = decision === "reddedildi";
+    const active = mode === decision;
+    return (
+      <button
+        type="button"
+        aria-expanded={active}
+        onClick={() => setMode(active ? null : decision)}
+        className={`focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
+          isRed
+            ? "border border-danger-500/30 bg-danger-500/8 text-danger-600 hover:bg-danger-500/15"
+            : "bg-mint-500/12 text-mint-700 hover:bg-mint-500/20"
+        } ${active ? "ring-2 ring-offset-1 ring-brand-300" : ""}`}
+      >
+        {isRed ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+        {isRed ? "Reddet" : "Onayla"}
+      </button>
+    );
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className={`focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
-            red
-              ? "border border-danger-500/30 bg-danger-500/8 text-danger-600 hover:bg-danger-500/15"
-              : "bg-mint-500/12 text-mint-700 hover:bg-mint-500/20"
-          }`}
-        >
-          {red ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-          {red ? "Reddet" : "Onayla"}
-        </button>
-      </DialogTrigger>
-
-      <DialogContent size="sm">
-        <DialogHeader
-          icon={red ? <X /> : <Check />}
-          tone={red ? "danger" : "default"}
-          title={red ? "Talebi reddet" : "Talebi onayla"}
-          description={requestTitle}
-        />
-        <form action={action} className="space-y-4 p-6">
+    <span className={`flex flex-wrap items-center justify-end gap-2 ${mode ? "basis-full" : ""}`}>
+      {toggleBtn("onaylandi")}
+      {toggleBtn("reddedildi")}
+      {mode ? (
+        <form action={action} className="w-full space-y-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
           <input type="hidden" name="id" value={requestId} />
-          <input type="hidden" name="decision" value={decision} />
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor={`note-${requestId}-${decision}`}>
-              {red ? (
-                <>Ret gerekçesi <span className="text-danger-500">*</span></>
-              ) : (
-                <>Karar notu <span className="text-xs text-text-faint">(opsiyonel)</span></>
-              )}
-            </label>
-            <textarea
-              id={`note-${requestId}-${decision}`}
-              name="decision_note"
-              rows={3}
-              required={red}
-              className={`${fieldCls} resize-none`}
-              placeholder={red ? "Neden reddedildi? Talep sahibine bu metin gider." : "Koşul/uyarı eklemek isterseniz…"}
-            />
-          </div>
-
+          <input type="hidden" name="decision" value={mode} />
+          <label className="block text-xs font-semibold text-ink-950" htmlFor={`note-${requestId}`}>
+            {red ? (
+              <>Ret gerekçesi <span className="text-danger-500">*</span> <span className="font-normal text-text-faint">({requestTitle})</span></>
+            ) : (
+              <>Karar notu <span className="font-normal text-text-faint">(opsiyonel · {requestTitle})</span></>
+            )}
+          </label>
+          <textarea
+            id={`note-${requestId}`}
+            name="decision_note"
+            rows={2}
+            required={red}
+            autoFocus
+            className={`${fieldCls} resize-none`}
+            placeholder={red ? "Neden reddedildi? Talep sahibine bu metin gider." : "Koşul/uyarı eklemek isterseniz…"}
+          />
           {state?.error ? (
-            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
+            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-xs font-medium text-danger-600" role="alert">
               {state.error}
             </p>
           ) : null}
-
-          <div className="hairline-t flex justify-end gap-2 pt-4">
-            <DialogClose asChild>
-              <button
-                type="button"
-                className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:bg-canvas"
-              >
-                Vazgeç
-              </button>
-            </DialogClose>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setMode(null)}
+              className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas"
+            >
+              Vazgeç
+            </button>
             <button
               type="submit"
               disabled={isPending}
-              className={`focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] px-5 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50 ${
+              className={`focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-4 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${
                 red ? "bg-danger-500 hover:bg-danger-600" : "bg-mint-600 hover:bg-mint-700"
               }`}
             >
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : red ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+              {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : red ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
               {isPending ? "Kaydediliyor…" : red ? "Reddet" : "Onayla"}
             </button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Toplu karar çubuğu (yalnız "Bekleyen" sekmesinde, karar yetkili rollerde). Her talep sunucuda
+ * tek tek aynı kurallardan geçer; kendi talebi olan ya da artık beklemeyen atlanır ve raporlanır.
+ */
+export function ApprovalBulkBar() {
+  const { selected, clear } = useBulkSelection();
+  const router = useRouter();
+  const { push } = useToast();
+  const [note, setNote] = useState("");
+  const [pending, startTransition] = useTransition();
+  if (selected.size === 0) return null;
+  const ids = [...selected];
+
+  function run(decision: "onaylandi" | "reddedildi") {
+    if (decision === "reddedildi" && !note.trim()) {
+      push("Toplu ret için gerekçe yazın.", "err");
+      return;
+    }
+    startTransition(async () => {
+      const res = await decideApprovalsBulk(ids, decision, note);
+      if (res.error) return push(res.error, "err");
+      const skipped = res.skipped ?? 0;
+      push(
+        `${res.decided ?? 0} talep ${decision === "onaylandi" ? "onaylandı" : "reddedildi"}${skipped > 0 ? ` · ${skipped} atlandı${res.firstError ? ` (${res.firstError})` : ""}` : ""}`,
+        skipped > 0 ? "err" : "ok",
+      );
+      clear();
+      setNote("");
+      router.refresh();
+    });
+  }
+
+  return (
+    <BulkBar count={selected.size} noun="talep" onClear={clear}>
+      <label className="sr-only" htmlFor="approval-bulk-note">Karar notu / ret gerekçesi</label>
+      <input
+        id="approval-bulk-note"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        maxLength={2000}
+        placeholder="Not / ret gerekçesi (ret için zorunlu)"
+        className="h-8 min-w-[16rem] rounded-[var(--radius-control)] border border-line bg-surface px-2.5 text-sm"
+      />
+      <Button size="sm" loading={pending} onClick={() => run("onaylandi")}>
+        <Check className="h-3.5 w-3.5" /> Onayla
+      </Button>
+      <Button size="sm" variant="danger" loading={pending} onClick={() => run("reddedildi")}>
+        <X className="h-3.5 w-3.5" /> Reddet
+      </Button>
+    </BulkBar>
   );
 }
 

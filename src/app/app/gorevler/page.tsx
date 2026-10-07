@@ -1,10 +1,16 @@
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlarmClock, CalendarClock, CheckCircle2, Plus, Sunrise } from "lucide-react";
+import { AlarmClock, CalendarClock, CalendarDays, CheckCircle2, Columns3, List, Plus, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
-import { DAY_MS, daysFromNowIso, now, trDayStartMs } from "@/lib/clock";
+import { DAY_MS, daysFromNowIso, now, shiftMonthKey, trDayKey, trDayStartMs, trMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
+import { isMonthKey } from "@/lib/month-grid";
+import { DEAL_OPTION_SELECT, dealOptionLabel, type DealOptionSource } from "@/lib/deal-option-label";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportTasksCsv } from "@/app/actions/export";
+import { TaskCalendar, type CalendarTask } from "./task-calendar";
 import { QuickTask } from "./quick-task";
 import { TaskCard, type TaskRow } from "./task-card";
 import { TaskBulkList } from "./task-bulk-list";
@@ -25,6 +31,7 @@ import {
   KpiStrip,
   ListPager,
   ListToolbar,
+  ViewSwitcher,
   buildActiveChips,
   mergeResetPage,
   pageWindow,
@@ -70,7 +77,10 @@ function endOfToday() {
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string; danisman?: string }>;
+  searchParams?: Promise<{
+    q?: string; filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string; danisman?: string;
+    gorunum?: string; ay?: string; gun?: string; zincir?: string; anlasma?: string;
+  }>;
 }) {
   const ctx = await requireModulePage("tasks");
   const canEdit = (ctx.perms.tasks ?? []).includes("edit");
@@ -86,6 +96,13 @@ export default async function TasksPage({
   const isManager = MANAGEMENT_TIER_ROLES.includes(ctx.role as TeamRole);
   const danismanF = isManager && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.danisman ?? "") ? params.danisman! : "";
   const q = (params.q ?? "").trim().slice(0, 80);
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // Görünüm: liste (varsayılan) | kanban (durum sütunları) | takvim (vade, ay ızgarası).
+  const gorunum = params.gorunum === "kanban" || params.gorunum === "takvim" ? params.gorunum : "liste";
+  const ay = isMonthKey(params.ay) ? params.ay : trMonthKey(now());
+  const gun = /^\d{4}-\d{2}-\d{2}$/.test(params.gun ?? "") ? params.gun! : "";
+  const zincir = UUID_RE.test(params.zincir ?? "") ? params.zincir! : "";
+  const anlasma = UUID_RE.test(params.anlasma ?? "") ? params.anlasma! : "";
   const page = parsePage(params.sayfa);
   const offset = (page - 1) * PAGE_SIZE;
 
@@ -97,6 +114,11 @@ export default async function TasksPage({
   if (tekrar) urlParams.tekrar = "1";
   if (mine) urlParams.mine = "1";
   if (danismanF) urlParams.danisman = danismanF;
+  if (gun) urlParams.gun = gun;
+  if (zincir) urlParams.zincir = zincir;
+  if (anlasma) urlParams.anlasma = anlasma;
+  if (gorunum !== "liste") urlParams.gorunum = gorunum;
+  if (gorunum === "takvim" && params.ay && isMonthKey(params.ay)) urlParams.ay = ay;
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = urlParams;
 
@@ -111,22 +133,34 @@ export default async function TasksPage({
   ]);
   const members = (memberRows ?? []).map((m) => ({ id: m.id as string, name: (m.full_name as string | null) ?? "İsimsiz" }));
   const nowIso = new Date(now()).toISOString();
+  const canSeeDeals = (ctx.perms.commissions ?? []).includes("view");
+  // Görev seçimi: anlaşma bağı etiketi gömme ile (FK adlı) gelir, kartta dealOptionLabel ile yazılır.
+  const TASK_SELECT = `id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, deal_id, recurrence, recurrence_parent_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name)${canSeeDeals ? `, deal:deals!tasks_deal_id_fkey(${DEAL_OPTION_SELECT})` : ""}`;
+  // Ortak filtreler (liste/kanban/takvim aynı kontratı paylaşır): kapsam, atanan, tür, tekrar, arama, gün, zincir.
+  const gunStartMs = gun ? Date.parse(`${gun}T00:00:00+03:00`) : Number.NaN;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyBase = (qb: any) => {
+    let out = scoped(qb);
+    if (mine) out = out.eq("assigned_to", ctx.userId);
+    if (danismanF) out = out.eq("assigned_to", danismanF);
+    if (tur) out = out.eq("kind", tur);
+    if (tekrar) out = out.not("recurrence", "is", null);
+    if (q) out = out.or(orIlike(["title", "notes"], q));
+    if (zincir) out = out.or(`id.eq.${zincir},recurrence_parent_id.eq.${zincir}`);
+    if (anlasma) out = out.eq("deal_id", anlasma);
+    if (Number.isFinite(gunStartMs)) {
+      out = out.gte("due_at", new Date(gunStartMs).toISOString()).lt("due_at", new Date(gunStartMs + DAY_MS).toISOString());
+    }
+    return out;
+  };
 
-  let query = supabase
-    .from("tasks")
-    // count: filtreye göre sayfalama ("X–Y / Toplam Z") gerçek toplamı ister.
-    .select(
-      "id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name)",
-      { count: "exact" },
-    )
-    .eq("tenant_id", ctx.tenantId);
-  query = scoped(query);
-
-  if (mine) query = query.eq("assigned_to", ctx.userId);
-  if (danismanF) query = query.eq("assigned_to", danismanF);
-  if (tur) query = query.eq("kind", tur);
-  if (tekrar) query = query.not("recurrence", "is", null);
-  if (q) query = query.or(orIlike(["title", "notes"], q));
+  let query = applyBase(
+    supabase
+      .from("tasks")
+      // count: filtreye göre sayfalama ("X–Y / Toplam Z") gerçek toplamı ister.
+      .select(TASK_SELECT, { count: "exact" })
+      .eq("tenant_id", ctx.tenantId),
+  );
 
   // Dal yalnız sıralamayı/durumu belirler, .range() aşağıda tek yerde uygulanır (gerçek sayfalama).
   if (filter === "done") {
@@ -190,7 +224,66 @@ export default async function TasksPage({
     kindCounts[k.key] = (kindRes[i] as { count: number | null }).count ?? 0;
   });
 
-  const tasks = (tasksData ?? []) as unknown as TaskRow[];
+  type RawTask = TaskRow & { deal?: DealOptionSource | DealOptionSource[] | null };
+  const withDealLabel = (rows: unknown[] | null | undefined): TaskRow[] =>
+    ((rows ?? []) as RawTask[]).map(({ deal, ...t }) => {
+      const d = Array.isArray(deal) ? deal[0] : deal;
+      return { ...t, deal_label: d ? dealOptionLabel(d) : null };
+    });
+  const tasks = withDealLabel(tasksData as unknown[]);
+
+  // Anlaşma bağı seçici (düzenleme paneli): son açık anlaşmalar.
+  const dealOptions = canSeeDeals && canEdit
+    ? (((await supabase
+        .from("deals")
+        .select(DEAL_OPTION_SELECT)
+        .eq("tenant_id", ctx.tenantId)
+        .not("stage", "in", "(won,lost)")
+        .order("updated_at", { ascending: false })
+        .limit(100)).data ?? []) as unknown as DealOptionSource[]).map((d) => ({ id: d.id, label: dealOptionLabel(d) }))
+    : undefined;
+
+  // Kanban (durum sütunları) ve takvim (vade) verisi — yalnız o görünüm açıkken çekilir.
+  const KANBAN_LIMIT = 50;
+  type Lane = { key: string; label: string; tone: string; rows: TaskRow[]; total: number; href: string };
+  let lanes: Lane[] = [];
+  let calendarTasks: CalendarTask[] = [];
+  let calendarTruncated = false;
+  if (gorunum === "kanban") {
+    const laneQ = () => applyBase(supabase.from("tasks").select(TASK_SELECT, { count: "exact" }).eq("tenant_id", ctx.tenantId));
+    const [upcomingLane, overdueLane, doneLane, cancelledLane] = await Promise.all([
+      laneQ().eq("status", "open").or(`due_at.is.null,due_at.gte.${nowIso}`).order("due_at", { ascending: true, nullsFirst: false }).limit(KANBAN_LIMIT),
+      laneQ().eq("status", "open").lt("due_at", nowIso).order("due_at", { ascending: true }).limit(KANBAN_LIMIT),
+      laneQ().eq("status", "done").order("completed_at", { ascending: false }).limit(KANBAN_LIMIT),
+      laneQ().eq("status", "cancelled").order("created_at", { ascending: false }).limit(KANBAN_LIMIT),
+    ]);
+    const listBase = { ...urlParams, gorunum: "" };
+    lanes = [
+      { key: "overdue", label: "Gecikmiş", tone: "border-danger-500/30 text-danger-500", rows: withDealLabel(overdueLane.data), total: overdueLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "overdue" })) },
+      { key: "open", label: "Açık", tone: "border-brand-400/30 text-brand-600", rows: withDealLabel(upcomingLane.data), total: upcomingLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "" })) },
+      { key: "done", label: "Tamamlandı", tone: "border-mint-500/30 text-mint-600", rows: withDealLabel(doneLane.data), total: doneLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "done" })) },
+      { key: "cancelled", label: "İptal", tone: "border-line text-text-muted", rows: withDealLabel(cancelledLane.data), total: cancelledLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "all" })) },
+    ];
+  } else if (gorunum === "takvim") {
+    const startMs = trMonthStartMsFromKey(ay);
+    const endMs = trMonthStartMsFromKey(shiftMonthKey(ay, 1) ?? ay);
+    const { data: calRows } = await applyBase(
+      supabase.from("tasks").select("id, title, status, due_at, priority").eq("tenant_id", ctx.tenantId),
+    )
+      .in("status", ["open", "done"])
+      .gte("due_at", new Date(startMs).toISOString())
+      .lt("due_at", new Date(endMs).toISOString())
+      .order("due_at", { ascending: true })
+      .limit(1000);
+    calendarTasks = (calRows ?? []) as CalendarTask[];
+    calendarTruncated = calendarTasks.length >= 1000;
+  }
+  const viewHref = (v: string) => buildHref(PATH, mergeResetPage({ ...urlParams, ay: "" }, { gorunum: v === "liste" ? "" : v }));
+  const viewOptions = [
+    { value: "liste", label: "Liste", icon: List, href: viewHref("liste") },
+    { value: "kanban", label: "Kanban", icon: Columns3, href: viewHref("kanban") },
+    { value: "takvim", label: "Takvim", icon: CalendarDays, href: viewHref("takvim") },
+  ];
   const totalFiltered = taskTotal ?? tasks.length;
   const win = pageWindow(page, totalFiltered, PAGE_SIZE, tasks.length);
 
@@ -238,7 +331,7 @@ export default async function TasksPage({
         bulkItems.push({
           id: t.id,
           selectable: canEdit && t.status === "open",
-          card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} />,
+          card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} />,
         });
       }
     }
@@ -247,7 +340,7 @@ export default async function TasksPage({
       bulkItems.push({
         id: t.id,
         selectable: canEdit && t.status === "open",
-        card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} />,
+        card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} />,
       });
     }
   }
@@ -268,6 +361,9 @@ export default async function TasksPage({
     { key: "tekrar", label: "Tekrar", format: () => "Tekrarlayan" },
     { key: "mine", label: "Atanan", format: () => "Sadece benim" },
     { key: "danisman", label: "Danışman", format: (v) => members.find((m) => m.id === v)?.name ?? v },
+    { key: "gun", label: "Vade günü", format: (v) => v.split("-").reverse().join(".") },
+    { key: "zincir", label: "Tekrar zinciri", format: () => "Seçili zincir" },
+    { key: "anlasma", label: "Anlaşma", format: () => tasks.find((t) => t.deal_id === anlasma)?.deal_label ?? "Seçili anlaşma" },
   ]);
 
   const emptyAll = counts.all === 0;
@@ -278,7 +374,19 @@ export default async function TasksPage({
         title="Görevler"
         description="Arama, ziyaret, evrak ve takip görevlerini planlayın; ekibe atayın, gecikmeleri anında görün."
         meta={<ScopeBadge text={listScope.badge} />}
-        actions={canCreate ? <ButtonLink href="/app/gorevler/yeni" icon={Plus}>Yeni görev</ButtonLink> : null}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <ViewSwitcher options={viewOptions} active={gorunum} label="Görev görünümü" />
+            {emptyAll ? null : (
+              <ExportCsvButton
+                action={exportTasksCsv.bind(null, { filter, tur, mine: mine ? "1" : "", danisman: danismanF, q, tekrar: tekrar ? "1" : "", gun, zincir, anlasma })}
+                label="CSV"
+                hint="Ekrandaki filtreyle en fazla 2000 görev"
+              />
+            )}
+            {canCreate ? <ButtonLink href="/app/gorevler/yeni" icon={Plus}>Yeni görev</ButtonLink> : null}
+          </div>
+        }
       />
       {canCreate ? <QuickTask /> : null}
 
@@ -355,7 +463,42 @@ export default async function TasksPage({
         </>
       )}
 
-      {tasks.length === 0 ? (
+      {gorunum === "kanban" && !emptyAll ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {lanes.map((lane) => (
+            <section key={lane.key} aria-label={`${lane.label} görevler`} className="flex min-w-0 flex-col rounded-[var(--radius-panel)] border border-line bg-canvas/50 p-2.5">
+              <Link href={lane.href} className={`mb-2 flex items-center justify-between rounded-[var(--radius-card)] border bg-surface px-3 py-2 text-xs font-extrabold uppercase tracking-[0.08em] transition hover:border-brand-300 ${lane.tone}`}>
+                {lane.label}
+                <span className="numeric rounded-full bg-canvas px-2 py-0.5 text-ink-950">{lane.total}</span>
+              </Link>
+              <div className="space-y-2">
+                {lane.rows.length === 0 ? (
+                  <p className="px-2 py-6 text-center text-xs text-text-muted">Bu sütunda görev yok.</p>
+                ) : (
+                  lane.rows.map((t) => (
+                    <TaskCard key={t.id} task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} compact />
+                  ))
+                )}
+                {lane.total > lane.rows.length ? (
+                  <Link href={lane.href} className="block px-2 py-1 text-center text-xs font-semibold text-brand-600 hover:underline">
+                    Tümünü listede gör ({lane.total})
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : gorunum === "takvim" && !emptyAll ? (
+        <TaskCalendar
+          monthKey={ay}
+          tasks={calendarTasks}
+          todayKey={trDayKey(now())}
+          truncated={calendarTruncated}
+          prevHref={buildHref(PATH, mergeResetPage(urlParams, { ay: shiftMonthKey(ay, -1) ?? ay }))}
+          nextHref={buildHref(PATH, mergeResetPage(urlParams, { ay: shiftMonthKey(ay, 1) ?? ay }))}
+          dayHref={(dayKey) => buildHref(PATH, mergeResetPage({ ...urlParams, gorunum: "", ay: "" }, { gun: dayKey, filter: "all" }))}
+        />
+      ) : tasks.length === 0 ? (
         <EmptyState
           icon={ICONS.gorev}
           illustration={emptyAll ? "start" : "search"}
@@ -377,7 +520,7 @@ export default async function TasksPage({
         </div>
       )}
 
-      <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} />
+      {gorunum === "liste" ? <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} /> : null}
     </div>
   );
 }

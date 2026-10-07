@@ -5,7 +5,7 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { now } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
 import { IMPORT_CHUNK_SIZE, IMPORT_ROW_LIMIT } from "@/app/app/ice-aktarma/import-config";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { neutralizeFormulaCells } from "@/lib/import-sanitize";
@@ -33,6 +33,17 @@ import {
   type RowIssue,
   type RowStatus,
 } from "@/lib/import-rows";
+import {
+  appointmentKey,
+  expenseKey,
+  isActivityTarget,
+  parseTrDateTime,
+  planActivityRows,
+  taskKey,
+  validateAppointmentRow,
+  validateExpenseRow,
+  validateTaskRow,
+} from "@/lib/import-rows-activity";
 
 /**
  * İçe aktarma (müşteri / portföy / talep) — /app/ice-aktarma sihirbazı.
@@ -125,10 +136,25 @@ export type ChunkResult = {
   pooled?: number;
 };
 
-const ENTITY: Record<ImportTarget, { action: string; entityType: string; path: string; module: "customers" | "properties" | "demands" }> = {
+const ENTITY: Record<
+  ImportTarget,
+  { action: string; entityType: string; path: string; module: "customers" | "properties" | "demands" | "tasks" | "appointments" | "expenses" }
+> = {
   customers: { action: "customer.import", entityType: "customer", path: "/app/musteriler", module: "customers" },
   properties: { action: "property.import", entityType: "property", path: "/app/portfoyler", module: "properties" },
   demands: { action: "demand.import", entityType: "customer_demand", path: "/app/talepler", module: "demands" },
+  tasks: { action: "task.import", entityType: "task", path: "/app/gorevler", module: "tasks" },
+  appointments: { action: "appointment.import", entityType: "appointment", path: "/app/randevular", module: "appointments" },
+  expenses: { action: "expense.import", entityType: "expense", path: "/app/giderler", module: "expenses" },
+};
+
+const TABLE: Record<ImportTarget, string> = {
+  customers: "customers",
+  properties: "properties",
+  demands: "customer_demands",
+  tasks: "tasks",
+  appointments: "appointments",
+  expenses: "expenses",
 };
 
 type Db = Awaited<ReturnType<typeof createClient>>;
@@ -252,6 +278,8 @@ type AnyPlan = PlannedRow<Record<string, unknown>>;
 function labelOf(target: ImportTarget, r: ImportRow, p: AnyPlan): string {
   if (target === "customers") return String(r.full_name ?? "").trim();
   if (target === "properties") return String(r.title ?? "").trim();
+  if (target === "tasks" || target === "expenses") return String(r.title ?? "").trim();
+  if (target === "appointments") return String(p.existingName ?? r.scheduled_at ?? "").trim();
   return String(p.existingName ?? r.customer_phone ?? r.customer_email ?? "").trim();
 }
 
@@ -273,12 +301,73 @@ async function planChunk(
     if (!existing) return null;
     return planPropertyRows(rows, existing, policy, seen) as unknown as AnyPlan[];
   }
+  if (isActivityTarget(target)) return planActivityChunk(supabase, tenantId, target, rows, policy, seen);
   const lookup = await loadCustomerLookup(supabase, tenantId, rows, { phone: "customer_phone", email: "customer_email" });
   if (!lookup) return null;
   const customerIds = [...new Set([...lookup.byPhone.values(), ...lookup.byEmail.values()].map((c) => c.id))];
   const existing = await loadExistingDemandKeys(supabase, tenantId, customerIds);
   if (!existing) return null;
   return planDemandRows(rows, lookup, existing, policy, seen) as unknown as AnyPlan[];
+}
+
+/**
+ * Faaliyet türleri (görev / randevu / gider): müşteri bağı isteğe bağlı (telefon/e-posta), mükerrer anahtarı
+ * mevcut kayıtlardan aynı ofiste okunur. Okuma hatasında null (çağıran "kontrol yapılamadı" döner).
+ */
+async function planActivityChunk(
+  supabase: Db,
+  tenantId: string,
+  target: "tasks" | "appointments" | "expenses",
+  rows: ImportRow[],
+  policy: DuplicatePolicy,
+  seen: Set<string>,
+): Promise<AnyPlan[] | null> {
+  const existing = new Set<string>();
+  if (target === "expenses") {
+    const today = trDayKey(now());
+    const dates = new Set<string>();
+    for (const r of rows) {
+      const d = parseTrDateTime(String(r.expense_date ?? ""));
+      dates.add(d?.day ?? today);
+    }
+    for (const part of chunked([...dates], LOOKUP_CHUNK)) {
+      const { data, error } = await supabase.from("expenses").select("title, amount, expense_date").eq("tenant_id", tenantId).in("expense_date", part).limit(5000);
+      if (error) return null;
+      for (const x of data ?? []) existing.add(expenseKey({ title: String(x.title), amount: Number(x.amount), expense_date: String(x.expense_date).slice(0, 10) }));
+    }
+    return planActivityRows(rows, (r) => validateExpenseRow(r, today), expenseKey, existing, policy, seen) as unknown as AnyPlan[];
+  }
+  const lookup = await loadCustomerLookup(supabase, tenantId, rows, { phone: "customer_phone", email: "customer_email" });
+  if (!lookup) return null;
+  if (target === "tasks") {
+    const titles = [...new Set(rows.map((r) => String(r.title ?? "").trim()).filter(Boolean))];
+    for (const part of chunked(titles, LOOKUP_CHUNK)) {
+      const { data, error } = await supabase.from("tasks").select("title, due_at, customer_id").eq("tenant_id", tenantId).in("title", part).limit(5000);
+      if (error) return null;
+      for (const t of data ?? []) {
+        existing.add(taskKey({ title: String(t.title), due_at: t.due_at ? new Date(String(t.due_at)).toISOString() : null, customer_id: (t.customer_id as string | null) ?? null }));
+      }
+    }
+    return planActivityRows(rows, (r) => validateTaskRow(r, lookup), taskKey, existing, policy, seen) as unknown as AnyPlan[];
+  }
+  const whens = new Set<string>();
+  for (const r of rows) {
+    const w = parseTrDateTime(String(r.scheduled_at ?? ""));
+    if (w) whens.add(w.hasTime ? w.iso : parseTrDateTime(`${w.day} 10:00`)!.iso);
+  }
+  for (const part of chunked([...whens], LOOKUP_CHUNK)) {
+    const { data, error } = await supabase
+      .from("appointments")
+      .select("scheduled_at, appointment_type, customer_id")
+      .eq("tenant_id", tenantId)
+      .in("scheduled_at", part)
+      .limit(5000);
+    if (error) return null;
+    for (const a of data ?? []) {
+      existing.add(appointmentKey({ scheduled_at: new Date(String(a.scheduled_at)).toISOString(), appointment_type: String(a.appointment_type), customer_id: (a.customer_id as string | null) ?? null }));
+    }
+  }
+  return planActivityRows(rows, (r) => validateAppointmentRow(r, lookup), appointmentKey, existing, policy, seen) as unknown as AnyPlan[];
 }
 
 async function resolveAssignee(
@@ -334,6 +423,7 @@ async function runChunk(
   if (!gate.ok) return { error: gate.error };
   if (policy === "update") {
     if (target === "demands") return { error: "Talepler için güncelleme politikası desteklenmez (atla veya yeni oluştur)." };
+    if (isActivityTarget(target)) return { error: "Görev, randevu ve gider aktarımında güncelleme politikası yoktur (atla veya yeni oluştur)." };
     const edit = await requirePermission(meta.module, "edit");
     if (!edit.ok) return { error: "Mevcut kayıtları güncellemek için düzenleme yetkisi gerekir." };
   }
@@ -418,6 +508,45 @@ async function runChunk(
         created_by: gate.userId,
       };
     }
+    if (target === "tasks") {
+      return {
+        tenant_id: gate.tenantId,
+        title: d.title,
+        notes: d.notes,
+        kind: d.kind,
+        priority: d.priority,
+        status: "open",
+        due_at: d.due_at,
+        customer_id: d.customer_id,
+        assigned_to: assignee.id,
+        created_by: gate.userId,
+      };
+    }
+    if (target === "appointments") {
+      return {
+        tenant_id: gate.tenantId,
+        customer_id: d.customer_id,
+        appointment_type: d.appointment_type,
+        scheduled_at: d.scheduled_at,
+        duration_min: d.duration_min,
+        location: d.location,
+        notes: d.notes,
+        status: "pending",
+        assigned_to: assignee.id,
+        created_by: gate.userId,
+      };
+    }
+    if (target === "expenses") {
+      return {
+        tenant_id: gate.tenantId,
+        created_by: gate.userId,
+        title: d.title,
+        amount: d.amount,
+        category: d.category,
+        expense_date: d.expense_date,
+        notes: d.notes,
+      };
+    }
     return {
       tenant_id: gate.tenantId,
       customer_id: d.customer_id,
@@ -427,7 +556,7 @@ async function runChunk(
     };
   };
 
-  const table = target === "customers" ? "customers" : target === "properties" ? "properties" : "customer_demands";
+  const table = TABLE[target];
   for (const part of chunked(toCreate, INSERT_CHUNK)) {
     const res = await supabase.from(table).insert(part.map(buildInsert)).select("id");
     if (res?.error) {

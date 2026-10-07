@@ -3,6 +3,7 @@
  * Filtre eklerken yalnız burası değişir; liste ile dışa aktarma ayrışamaz (P1-C4).
  * Saf modül: "use server" değil, istemciden de içe aktarılabilir (searchParams → filtre).
  */
+import { normalizeLeadChannelParam } from "@/lib/lead-channel";
 
 export type CustomerListFilters = {
   q: string;
@@ -14,6 +15,8 @@ export type CustomerListFilters = {
   to: string;
   /** Sıcaklık segmenti (skor bellekte hesaplanır; sorguya uygulanmaz): sicak | ilgili | soguk | uykuda */
   segment: string;
+  /** Başvuru kanalı (customers.lead_channel): web_form | webhook | ... */
+  kanal: string;
 };
 
 export const HEAT_SEGMENT_KEYS = ["sicak", "ilgili", "soguk", "uykuda"] as const;
@@ -27,6 +30,7 @@ export const EMPTY_CUSTOMER_FILTERS: CustomerListFilters = {
   from: "",
   to: "",
   segment: "",
+  kanal: "",
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -52,6 +56,7 @@ export function normalizeCustomerFilters(sp: Raw | Partial<CustomerListFilters>)
     from: ISO_DATE.test(from) ? from : "",
     to: ISO_DATE.test(to) ? to : "",
     segment: (HEAT_SEGMENT_KEYS as readonly string[]).includes(one(r.segment)) ? one(r.segment) : "",
+    kanal: normalizeLeadChannelParam(one(r.kanal)),
   };
 }
 
@@ -61,7 +66,7 @@ export function customerSearchTerm(q: string): string {
 }
 
 export function hasCustomerFilters(f: CustomerListFilters): boolean {
-  return Boolean(f.segment || f.type || f.etiket || f.source || f.assigned || f.from || f.to || customerSearchTerm(f.q));
+  return Boolean(f.segment || f.type || f.etiket || f.source || f.assigned || f.from || f.to || f.kanal || customerSearchTerm(f.q));
 }
 
 type Chainable = {
@@ -78,6 +83,7 @@ export function applyCustomerFilters<Q>(query: Q, f: CustomerListFilters): Q {
   if (f.type) b = b.contains("customer_types", [f.type]);
   if (f.etiket) b = b.contains("tags", [f.etiket]);
   if (f.source) b = b.eq("source", f.source);
+  if (f.kanal) b = b.eq("lead_channel", f.kanal);
   if (f.assigned) b = b.eq("assigned_to", f.assigned);
   if (f.from) b = b.gte("created_at", f.from);
   if (f.to) b = b.lte("created_at", `${f.to}T23:59:59.999`);

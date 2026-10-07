@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Building2,
+  CalendarDays,
   CheckCircle2,
   Download,
   FileSpreadsheet,
   FileWarning,
   History,
+  ListChecks,
+  Receipt,
   RefreshCw,
   Search,
   Undo2,
@@ -74,7 +77,31 @@ const TARGETS: { key: ImportTarget; desc: string; icon: typeof Users2 }[] = [
   { key: "customers", desc: "Ad soyad, telefon, e-posta, tip, kaynak, not", icon: Users2 },
   { key: "properties", desc: "Başlık, işlem/portföy türü, fiyat, oda, m², adres", icon: Building2 },
   { key: "demands", desc: "Müşteri telefonu/e-postası ile eşlenen alıcı/kiracı talepleri", icon: Search },
+  { key: "tasks", desc: "Görev, son tarih, tür, öncelik; müşteri telefonu ile isteğe bağlı bağ", icon: ListChecks },
+  { key: "appointments", desc: "Tarih-saat, randevu türü, konum; müşteri telefonu ile isteğe bağlı bağ", icon: CalendarDays },
+  { key: "expenses", desc: "Gider başlığı, tutar, kategori, tarih", icon: Receipt },
 ];
+
+/** Bu türlerde "güncelle" politikası yoktur (kimlik anahtarı yok): yalnız atla / yeni oluştur. */
+const NO_UPDATE_TARGETS: readonly ImportTarget[] = ["demands", "tasks", "appointments", "expenses"];
+/** Danışman ataması anlamsız olan türler. */
+const NO_ASSIGNEE_TARGETS: readonly ImportTarget[] = ["demands", "expenses"];
+const TARGET_LIST_HREF: Record<ImportTarget, string> = {
+  customers: "/app/musteriler",
+  properties: "/app/portfoyler",
+  demands: "/app/talepler",
+  tasks: "/app/gorevler",
+  appointments: "/app/randevular",
+  expenses: "/app/giderler",
+};
+const DUPLICATE_RULE: Record<ImportTarget, string> = {
+  customers: "Telefon, yoksa e-posta ile mevcut müşteri aranır.",
+  properties: "Aynı başlık + adres mevcut portföy sayılır.",
+  demands: "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep mükerrer sayılır.",
+  tasks: "Aynı başlık + son tarih + müşteri mevcut görev sayılır.",
+  appointments: "Aynı tarih-saat + tür + müşteri mevcut randevu sayılır.",
+  expenses: "Aynı başlık + tutar + tarih mevcut gider sayılır.",
+};
 
 const POLICIES: { key: DuplicatePolicy; label: string; desc: string }[] = [
   { key: "skip", label: "Atla", desc: "Mevcut kayıtlara dokunma; mükerrer satırlar eklenmez." },
@@ -141,6 +168,8 @@ function CounterCards({ c, labels }: { c: ImportCounters; labels: [string, strin
 export type ImportWizardProps = {
   canImportProperties: boolean;
   canImportDemands: boolean;
+  /** Görev / randevu / gider aktarımı: ilgili modülde oluşturma yetkisi. */
+  canImportActivity?: { tasks: boolean; appointments: boolean; expenses: boolean };
   /** Hedef bazında: mevcut kaydı güncelleme (edit) yetkisi. */
   updateAllowed: Record<ImportTarget, boolean>;
   /** Hedef bazında: geri alma (delete) yetkisi. */
@@ -152,6 +181,7 @@ export type ImportWizardProps = {
 export function ImportWizard({
   canImportProperties,
   canImportDemands,
+  canImportActivity = { tasks: false, appointments: false, expenses: false },
   updateAllowed,
   rollbackAllowed,
   team,
@@ -177,7 +207,8 @@ export function ImportWizard({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fields = fieldsFor(target);
-  const effectivePolicy: DuplicatePolicy = policy === "update" && !updateAllowed[target] ? "skip" : policy;
+  const effectivePolicy: DuplicatePolicy =
+    policy === "update" && (!updateAllowed[target] || NO_UPDATE_TARGETS.includes(target)) ? "skip" : policy;
 
   const reset = () => {
     setStep(1);
@@ -402,7 +433,14 @@ export function ImportWizard({
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               {TARGETS.map((t) => {
                 const active = target === t.key;
-                const allowed = t.key === "properties" ? canImportProperties : t.key === "demands" ? canImportDemands : true;
+                const allowed =
+                  t.key === "properties"
+                    ? canImportProperties
+                    : t.key === "demands"
+                      ? canImportDemands
+                      : t.key === "tasks" || t.key === "appointments" || t.key === "expenses"
+                        ? canImportActivity[t.key]
+                        : true;
                 return (
                   <button
                     key={t.key}
@@ -426,7 +464,9 @@ export function ImportWizard({
                           ? t.desc
                           : t.key === "properties"
                             ? "Portföy ekleme yetkisi gerekir."
-                            : "Talep ekleme yetkisi gerekir."}
+                            : t.key === "demands"
+                              ? "Talep ekleme yetkisi gerekir."
+                              : `${TARGET_LABEL[t.key]} için ekleme yetkisi gerekir.`}
                       </span>
                     </span>
                   </button>
@@ -505,7 +545,7 @@ export function ImportWizard({
           {/* şablonlar */}
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
             <span className="text-xs font-semibold text-text-muted">Örnek şablon:</span>
-            {(["customers", "properties", "demands"] as const).map((k) => (
+            {(["customers", "properties", "demands", "tasks", "appointments", "expenses"] as const).map((k) => (
               <Button
                 key={k}
                 variant="secondary"
@@ -579,15 +619,11 @@ export function ImportWizard({
             <div>
               <h3 className="text-sm font-bold text-ink-950">Mükerrer kayıt politikası</h3>
               <p className="text-xs text-text-muted">
-                {target === "customers"
-                  ? "Telefon, yoksa e-posta ile mevcut müşteri aranır."
-                  : target === "properties"
-                    ? "Aynı başlık + adres mevcut portföy sayılır."
-                    : "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep mükerrer sayılır."}
+                {DUPLICATE_RULE[target]}
               </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Mükerrer politikası">
                 {POLICIES.map((p) => {
-                  const disabled = p.key === "update" && (!updateAllowed[target] || target === "demands");
+                  const disabled = p.key === "update" && (!updateAllowed[target] || NO_UPDATE_TARGETS.includes(target));
                   const active = effectivePolicy === p.key;
                   return (
                     <button
@@ -604,7 +640,7 @@ export function ImportWizard({
                       <span className="block font-bold text-ink-950">{p.label}</span>
                       {disabled ? (
                         <span className="mt-0.5 block text-text-faint">
-                          {target === "demands" ? "Talepte desteklenmez." : "Düzenleme yetkisi gerekir."}
+                          {NO_UPDATE_TARGETS.includes(target) ? "Bu türde desteklenmez." : "Düzenleme yetkisi gerekir."}
                         </span>
                       ) : null}
                     </button>
@@ -617,7 +653,7 @@ export function ImportWizard({
               </p>
             </div>
 
-            {target !== "demands" ? (
+            {!NO_ASSIGNEE_TARGETS.includes(target) ? (
               <FormField label="Danışman ataması" hint="Yeni oluşan kayıtların sorumlusu.">
                 <Select value={assignee} onValueChange={setAssignee}>
                   <SelectTrigger placeholder="Danışman seçin" />
@@ -890,12 +926,11 @@ export function ImportWizard({
                 </div>
                 <Button
                   onClick={() => {
-                    window.location.href =
-                      target === "customers" ? "/app/musteriler" : target === "properties" ? "/app/portfoyler" : "/app/talepler";
+                    window.location.href = TARGET_LIST_HREF[target];
                   }}
                 >
                   <FileSpreadsheet className="h-4 w-4" />
-                  {target === "customers" ? "Müşteri listesine git" : target === "properties" ? "Portföy listesine git" : "Talep listesine git"}
+                  {`${TARGET_LABEL[target]} listesine git`}
                 </Button>
               </div>
             </>

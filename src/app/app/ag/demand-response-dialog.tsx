@@ -9,7 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea, FormField } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";

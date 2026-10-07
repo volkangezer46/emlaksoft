@@ -5,16 +5,12 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Building2,
-  Calendar,
-  CheckCircle2,
-  Clock,
   FileSignature,
   Handshake,
   History,
   Mail,
   MessageCircle,
   Phone,
-  Tag,
   User,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -28,6 +24,10 @@ import { OfferStatusActions } from "./offer-status-actions";
 import { OfferEditDialog } from "./offer-edit-dialog";
 import { OfferRoundDialog } from "./offer-round-dialog";
 import { ConvertToDealButton } from "./convert-to-deal-button";
+import { ActivityTimeline } from "@/components/ui/activity-timeline";
+import { now, trDayKey } from "@/lib/clock";
+import { daysUntilOfferExpiry } from "@/lib/offer-expiry";
+import { buildOfferEvents } from "./offer-events";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Taslak",
@@ -171,6 +171,24 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
   const lastVsListPct =
     listPrice && lastVsListDiff !== null ? Math.round((lastVsListDiff / listPrice) * 1000) / 10 : null;
 
+  const todayKey = trDayKey(now());
+  const timelineEvents = buildOfferEvents({
+    offer: {
+      id: offer.id,
+      status: offer.status,
+      created_at: offer.created_at,
+      submitted_at: offer.submitted_at ?? null,
+      responded_at: offer.responded_at ?? null,
+      valid_until: offer.valid_until ?? null,
+    },
+    rounds,
+    statusLabel: STATUS_LABELS[offer.status] ?? offer.status,
+    money,
+    todayKey,
+    deal: relatedDeal ? { id: relatedDeal.id, stageLabel: stageNames[relatedDeal.stage] ?? relatedDeal.stage } : null,
+  });
+  const expiryLeft = isClosed ? null : daysUntilOfferExpiry(offer.valid_until, todayKey);
+
   const telHref = toTelHref(customer?.phone);
   const waHref = toWhatsAppLink(customer?.phone);
   // Sözleşme ön dolgusu: sozlesmeler sayfasındaki yeni sözleşme diyaloğu
@@ -192,8 +210,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         eyebrow="Teklif detayı"
         title={money(offerAmount)}
         meta={
-          <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[offer.status] ?? STATUS_STYLE.draft}`}>
-            {STATUS_LABELS[offer.status] ?? offer.status}
+          <span className="inline-flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${STATUS_STYLE[offer.status] ?? STATUS_STYLE.draft}`}>
+              {STATUS_LABELS[offer.status] ?? offer.status}
+            </span>
+            {expiryLeft != null && expiryLeft <= 2 ? (
+              <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${expiryLeft < 0 ? "bg-danger-500/10 text-danger-600" : "bg-amber-400/15 text-amber-700"}`}>
+                {expiryLeft < 0 ? "Geçerlilik süresi doldu" : expiryLeft === 0 ? "Geçerlilik bugün bitiyor" : `Geçerliliğe ${expiryLeft} gün`}
+              </span>
+            ) : null}
           </span>
         }
         description={
@@ -403,30 +428,11 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
 
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <h2 className="mb-3 text-sm font-bold text-ink-950">Zaman çizelgesi</h2>
-            <ul className="space-y-3 text-sm">
-              <li className="flex items-start gap-2.5">
-                <Clock className="mt-0.5 h-4 w-4 text-brand-600" />
-                <div><p className="font-medium text-ink-950">Oluşturuldu</p><p className="text-xs text-text-muted">{dateTime(offer.created_at)}</p></div>
-              </li>
-              {offer.submitted_at ? (
-                <li className="flex items-start gap-2.5">
-                  <Tag className="mt-0.5 h-4 w-4 text-brand-600" />
-                  <div><p className="font-medium text-ink-950">Sunuldu</p><p className="text-xs text-text-muted">{dateTime(offer.submitted_at)}</p></div>
-                </li>
-              ) : null}
-              {offer.responded_at ? (
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-mint-600" />
-                  <div><p className="font-medium text-ink-950">Yanıtlandı</p><p className="text-xs text-text-muted">{dateTime(offer.responded_at)}</p></div>
-                </li>
-              ) : null}
-              {offer.valid_until ? (
-                <li className="flex items-start gap-2.5">
-                  <Calendar className="mt-0.5 h-4 w-4 text-amber-500" />
-                  <div><p className="font-medium text-ink-950">Geçerlilik</p><p className="text-xs text-text-muted">{dateTime(offer.valid_until)}</p></div>
-                </li>
-              ) : null}
-            </ul>
+            <ActivityTimeline
+              events={timelineEvents}
+              emptyTitle="Henüz olay yok."
+              emptyHint="Sunum, pazarlık turları ve yanıt oluştukça burada listelenir."
+            />
           </section>
 
           {canEdit ? (

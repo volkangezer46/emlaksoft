@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { PropertyExtraPanel } from "./property-extra-panel";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -632,6 +633,15 @@ export default async function PropertyDetailPage({
               </p>
             </section>
           </div>
+
+          {/* Kaynak/atama/yabancıya satış künyesi + portföye bağlı giderler (kendi sorgusu) */}
+          <Suspense fallback={null}>
+            <PropertyExtraPanel
+              propertyId={property.id}
+              canSeeExpenses={(perms.expenses ?? []).includes("view")}
+              canCreateExpense={(perms.expenses ?? []).includes("create")}
+            />
+          </Suspense>
 
           {/* Mahalle notları (F5): ofis içi saha notları, vitrine çıkmaz */}
           <Suspense fallback={null}>

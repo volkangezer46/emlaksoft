@@ -16,7 +16,7 @@ export const TASK_TABS = [
     id: "zamanlama",
     label: "Zamanlama ve atama",
     description: "Son tarih, tekrar ve sorumlu kişi.",
-    fields: ["due_at", "recurrence", "assigned_to", "customer_id"],
+    fields: ["due_at", "recurrence", "assigned_to", "customer_id", "deal_id"],
     required: [],
   },
 ] as const;

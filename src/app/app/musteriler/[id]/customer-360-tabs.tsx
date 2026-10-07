@@ -164,6 +164,7 @@ export function Customer360Tabs({
   showTasks = true,
   ozetSlot,
   tasksSlot,
+  preferencesSlot,
   stageNames,
 }: {
   customerId: string;
@@ -200,6 +201,8 @@ export function Customer360Tabs({
   /** Özet sekmesinin akan bölümleri (portföy önerileri + memnuniyet) — yalnız aktifken çizilir. */
   ozetSlot?: ReactNode;
   tasksSlot?: ReactNode;
+  /** "İletişim tercihleri" sekmesinin ek bölümleri (kira hatırlatması tercihi vb.). */
+  preferencesSlot?: ReactNode;
   /** Ofisin görünen anlaşma aşaması adları (aşama anahtarı → ad); verilmezse varsayılan adlar. */
   stageNames?: Record<string, string>;
 }) {
@@ -427,6 +430,7 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
+        {preferencesSlot}
       </Pane>
 
       <Pane id="randevu" active={active}>

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ClipboardCheck, Eye, MessageSquareText, SearchCheck } from "lucide-react";
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogClose } from "@/components/ui/inline-dialog";
 import { Button, ButtonLink } from "@/components/ui/button";
 import {
   acknowledgeAnomaly,

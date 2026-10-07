@@ -21,7 +21,7 @@ import {
   DialogClose,
   DialogContent,
   DialogHeader,
-} from "@/components/ui/dialog";
+} from "@/components/ui/inline-dialog";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 
 type PropertyOption = { id: string; property_code: string; title: string | null };

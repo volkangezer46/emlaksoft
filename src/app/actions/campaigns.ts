@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logActivity } from "@/lib/activity";
+import { DAY_MS, now, parseTrLocalDateTime } from "@/lib/clock";
 import {
   listApprovedTenantWhatsAppTemplates,
   type ApprovedWhatsAppTemplate,
@@ -209,6 +211,81 @@ export async function sendCampaign(campaignId: string): Promise<CampaignResult> 
 }
 
 // ---------------------------------------------------------------------------
+// Zamanlama: taslak -> zamanlandı (gönderim cron'u `scheduled_at <= now()` olunca kuyruğa alır)
+// ---------------------------------------------------------------------------
+
+const SCHEDULE_MAX_DAYS = 90;
+
+/**
+ * Taslak kampanyayı ileri bir zamana kurar. Teslimat cron'u (`campaign-delivery`, 2 dk) yalnız
+ * `status='scheduled' AND scheduled_at <= now()` olanları alır (claim RPC); yeni cron YOK.
+ * Saat Türkiye saatiyle girilir; en az 5 dk sonrası, en çok 90 gün.
+ */
+export async function scheduleCampaign(campaignId: string, localDateTime: string): Promise<CampaignResult> {
+  const gate = await requirePermission("campaigns", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const at = parseTrLocalDateTime(String(localDateTime ?? "").trim());
+  if (!at) return { error: "Geçerli bir tarih ve saat seçin." };
+  const nowMs = now();
+  if (at.getTime() < nowMs + 5 * 60_000) return { error: "Zamanlama en az 5 dakika sonrası olmalı." };
+  if (at.getTime() > nowMs + SCHEDULE_MAX_DAYS * DAY_MS) return { error: `Zamanlama en fazla ${SCHEDULE_MAX_DAYS} gün sonrası olabilir.` };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update({ status: "scheduled", scheduled_at: at.toISOString(), updated_at: new Date(nowMs).toISOString() })
+    .eq("id", campaignId)
+    .eq("tenant_id", gate.tenantId)
+    .in("status", ["draft", "scheduled"])
+    .select("id");
+  if (error) {
+    console.error("scheduleCampaign", error);
+    return { error: "Kampanya zamanlanamadı." };
+  }
+  if (!data || data.length === 0) return { error: "Yalnız taslak ya da zamanlanmış kampanya zamanlanabilir." };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "campaign.schedule",
+    entityType: "campaign",
+    entityId: campaignId,
+    newValue: { scheduled_at: at.toISOString() },
+  });
+  revalidatePath("/app/kampanyalar");
+  revalidatePath(`/app/kampanyalar/${campaignId}`);
+  return { ok: true, id: campaignId };
+}
+
+/** Zamanlamayı kaldırır: kampanya taslağa döner (gönderim başlamadıysa). */
+export async function unscheduleCampaign(campaignId: string): Promise<CampaignResult> {
+  const gate = await requirePermission("campaigns", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update({ status: "draft", scheduled_at: null, updated_at: new Date(now()).toISOString() })
+    .eq("id", campaignId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "scheduled")
+    .select("id");
+  if (error) {
+    console.error("unscheduleCampaign", error);
+    return { error: "Zamanlama kaldırılamadı." };
+  }
+  if (!data || data.length === 0) return { error: "Kampanya artık zamanlanmış durumda değil (gönderim başlamış olabilir)." };
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "campaign.unschedule",
+    entityType: "campaign",
+    entityId: campaignId,
+  });
+  revalidatePath("/app/kampanyalar");
+  revalidatePath(`/app/kampanyalar/${campaignId}`);
+  return { ok: true, id: campaignId };
+}
+
+// ---------------------------------------------------------------------------
 // Kampanyaları listele
 // ---------------------------------------------------------------------------
 
@@ -219,7 +296,7 @@ export async function listCampaigns() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("campaigns")
-    .select("id, title, channel, status, total_count, sent_count, failed_count, created_at, sent_at")
+    .select("id, title, channel, status, total_count, sent_count, failed_count, created_at, sent_at, scheduled_at")
     .eq("tenant_id", gate.tenantId)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -234,7 +311,7 @@ export async function getCampaign(id: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("campaigns")
-    .select("id, title, channel, message, whatsapp_template_name, whatsapp_template_language, status, total_count, sent_count, failed_count, scheduled_at, sent_at, created_at")
+    .select("id, title, channel, message, whatsapp_template_name, whatsapp_template_language, status, total_count, sent_count, failed_count, scheduled_at, sent_at, created_at, last_error")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();

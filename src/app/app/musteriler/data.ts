@@ -4,6 +4,7 @@
  * önceki hâliyle aynıdır, tek fark: ana sorgu hataları sessizce "kayıt yok" yerine error.tsx
  * sınırına düşer (assertQueryBatchSucceeded) ve lead sinyalleri yalnız görünen satırlar için çekilir.
  */
+import { leadChannelLabel } from "@/lib/lead-channel";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { formatLeadSource } from "@/lib/lead-sources";
@@ -47,6 +48,7 @@ type CustomerRow = {
   customer_types: string[] | null;
   tags: string[] | null;
   source: string | null;
+  lead_channel?: string | null;
   notes: string | null;
   blacklist: boolean | null;
   assigned_to: string | null;
@@ -79,7 +81,7 @@ type HeatPoolRow = { id: string; created_at: string; blacklist: boolean | null }
 
 /** Müşteri listesi ana sorgusunun kolonları — segment diliminde de aynı set çekilir. */
 const LIST_COLS =
-  "id, full_name, phone, email, customer_types, tags, source, notes, blacklist, assigned_to, created_at, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name)";
+  "id, full_name, phone, email, customer_types, tags, source, lead_channel, notes, blacklist, assigned_to, created_at, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name)";
 
 export type Occasion = { id: string; name: string; kind: "birthday" | "anniversary"; days: number; note: string | null };
 
@@ -479,6 +481,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
       lead: lead && !c.blacklist ? { score: lead.score, hot: lead.tier === "hot" } : null,
       blacklist: Boolean(c.blacklist),
       sourceLabel: formatLeadSource(c.source, sourceLabel),
+      channelLabel: leadChannelLabel(c.lead_channel),
       phone: c.phone,
       phoneDisplay: c.phone ? formatTurkishPhone(c.phone) : null,
       telHref: c.phone ? toTelHref(c.phone) : null,

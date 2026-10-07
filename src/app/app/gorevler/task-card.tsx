@@ -3,7 +3,7 @@
 import { useContext, useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Clock, FileText, Loader2, MapPin, Phone, Repeat, RotateCcw, Trash2, User } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, FileText, Link2, Loader2, MapPin, Phone, Repeat, RotateCcw, Trash2, User } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
@@ -26,6 +26,10 @@ export type TaskRow = {
   customer_id: string | null;
   property_id: string | null;
   recurrence: string | null;
+  recurrence_parent_id?: string | null;
+  deal_id?: string | null;
+  /** Anlaşma bağı etiketi (sunucuda `dealOptionLabel` ile çözülür). */
+  deal_label?: string | null;
   assignee: Rel;
   customer: Rel;
 };
@@ -65,12 +69,18 @@ export function TaskCard({
   canEdit,
   canDelete,
   members,
+  deals,
+  compact = false,
 }: {
   task: TaskRow;
   canEdit: boolean;
   canDelete: boolean;
   /** Düzenleme panelindeki "Atanan" seçici için ofis üyeleri. */
   members?: { id: string; name: string }[];
+  /** Düzenleme panelindeki "İlgili anlaşma" seçici için seçenekler. */
+  deals?: { id: string; label: string }[];
+  /** Kanban sütunu: notu ve ikonu gizleyen dar kart. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -133,7 +143,12 @@ export function TaskCard({
     ? `/app/musteriler/${task.customer_id}`
     : task.property_id
       ? `/app/portfoyler/${task.property_id}`
-      : null;
+      : task.deal_id
+        ? `/app/anlasmalar/${task.deal_id}`
+        : null;
+  // Tekrar zinciri: kök = recurrence_parent_id ya da (tekrarlıysa) görevin kendisi.
+  const chainRoot = task.recurrence_parent_id ?? (task.recurrence ? task.id : null);
+  const editTask = { id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence, assigned_to: task.assigned_to, deal_id: task.deal_id ?? null };
 
   return (
     <article
@@ -146,18 +161,17 @@ export function TaskCard({
       ) : canEdit && !done ? (
         // Müşterisiz/portföysüz görevde gidilecek kayıt yok — kartın kendisi
         // düzenleme diyaloğunu açar (overlay tetikleyicili ikinci diyalog örneği).
-        <TaskEditDialog
-          task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence, assigned_to: task.assigned_to }} members={members}
-          variant="overlay"
-        />
+        <TaskEditDialog task={editTask} members={members} deals={deals} variant="overlay" />
       ) : null}
-      <span
-        className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
-          done ? "bg-mint-500/10 text-mint-600" : "bg-brand-600/10 text-brand-600"
-        }`}
-      >
-        <meta.icon className="h-4 w-4" />
-      </span>
+      {compact ? null : (
+        <span
+          className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
+            done ? "bg-mint-500/10 text-mint-600" : "bg-brand-600/10 text-brand-600"
+          }`}
+        >
+          <meta.icon className="h-4 w-4" />
+        </span>
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -175,7 +189,7 @@ export function TaskCard({
             <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-faint">Düşük</span>
           ) : null}
         </div>
-        {task.notes ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
+        {task.notes && !compact ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <span className={`flex items-center gap-1 ${due.cls}`}>
             <Clock className="h-3 w-3" /> {due.text}
@@ -202,12 +216,30 @@ export function TaskCard({
               {customer}
             </Link>
           ) : null}
+          {task.deal_id ? (
+            <Link
+              href={`/app/anlasmalar/${task.deal_id}`}
+              className="relative z-10 flex items-center gap-1 font-semibold text-brand-600 hover:underline"
+              title="Bağlı anlaşma"
+            >
+              <Briefcase className="h-3 w-3" /> {task.deal_label ?? "Anlaşma"}
+            </Link>
+          ) : null}
+          {chainRoot ? (
+            <Link
+              href={`/app/gorevler?filter=all&zincir=${chainRoot}`}
+              className="relative z-10 flex items-center gap-1 text-cyan-600 hover:underline"
+              title="Bu tekrar zincirindeki tüm görevler"
+            >
+              <Link2 className="h-3 w-3" /> Tekrar zinciri
+            </Link>
+          ) : null}
         </div>
       </div>
 
       <div className="relative z-10 flex shrink-0 items-center gap-1.5">
         {canEdit && !done ? (
-          <TaskEditDialog task={{ id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence, assigned_to: task.assigned_to }} members={members} />
+          <TaskEditDialog task={editTask} members={members} deals={deals} />
         ) : null}
         {canEdit ? (
           done ? (

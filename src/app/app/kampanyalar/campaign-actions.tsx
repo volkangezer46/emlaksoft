@@ -19,7 +19,8 @@ export function CampaignActions({
   canSend: boolean;
   canDelete: boolean;
 }) {
-  const canSendNow = canSend && campaign.status === "draft";
+  // Zamanlanmış kampanya da beklemeden kuyruğa alınabilir (sendCampaign draft|scheduled kabul eder).
+  const canSendNow = canSend && (campaign.status === "draft" || campaign.status === "scheduled");
 
   const canDeleteNow = canDelete && campaign.status !== "sending";
 

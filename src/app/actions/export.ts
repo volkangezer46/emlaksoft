@@ -3,7 +3,8 @@
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { daysAgoIso, daysFromNowIso, trDayKey } from "@/lib/clock";
+import { daysAgoIso, daysFromNowIso, trDayKey, trDayStartMs } from "@/lib/clock";
+import { orIlike } from "@/lib/pgrst";
 import {
   mapAppointment, mapAudit, mapCommission, mapContract, mapCustomer, mapDealWith, mapDemand, mapDue, mapExpense,
   mapOffer, mapPortalListing, mapProject, mapProperty, mapReferral, relOne, toCsv,
@@ -220,17 +221,20 @@ export async function exportPropertiesCsv(): Promise<ExportResult> {
   return exportResult(gate, "portfoyler", rows, `portfoyler-${trDayKey()}.csv`);
 }
 
-export async function exportExpensesCsv(): Promise<ExportResult> {
+/** `ids` verilirse yalnız seçili giderler (liste toplu işlemi). */
+export async function exportExpensesCsv(ids?: string[]): Promise<ExportResult> {
   const gate = await requirePermission("expenses", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   let q = supabase
     .from("expenses")
-    .select("title, amount, category, expense_date, notes, created_at")
+    .select("title, amount, category, expense_date, notes, receipt_url, created_at, property:properties!expenses_property_id_fkey(property_code, tenant_id)")
     .eq("tenant_id", gate.tenantId)
     .order("expense_date", { ascending: false })
     .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const pickExp = selectedIds(ids);
+  if (pickExp) q = q.in("id", pickExp);
   const { data, error } = await q;
   if (error) {
     console.error("exportExpensesCsv", error);
@@ -240,7 +244,8 @@ export async function exportExpensesCsv(): Promise<ExportResult> {
   return exportResult(gate, "giderler", rows, `giderler-${trDayKey()}.csv`);
 }
 
-export async function exportOffersCsv(): Promise<ExportResult> {
+/** `ids` verilirse yalnız seçili teklifler (liste toplu işlemi). */
+export async function exportOffersCsv(ids?: string[]): Promise<ExportResult> {
   const gate = await requirePermission("offers", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
@@ -255,6 +260,8 @@ export async function exportOffersCsv(): Promise<ExportResult> {
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const pickOffers = selectedIds(ids);
+  if (pickOffers) q = q.in("id", pickOffers);
   const { data, error } = await q;
   if (error) {
     console.error("exportOffersCsv", error);
@@ -288,6 +295,16 @@ export async function exportPortalListingsCsv(): Promise<ExportResult> {
 }
 
 const today10 = () => trDayKey();
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Toplu işlem seçimi: yalnız geçerli UUID'ler, en fazla EXPORT_LIMIT; verilmemiş → null (tüm liste). */
+function selectedIds(ids: unknown): string[] | null {
+  if (!Array.isArray(ids) || ids.length === 0) return null;
+  const rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const out = [...new Set(ids.map((v) => String(v)).filter((v) => rx.test(v)))].slice(0, EXPORT_LIMIT);
+  // Seçim verildi ama hiçbiri geçerli değilse hiçbir satır dönmesin (tüm listeye düşmez).
+  return out.length > 0 ? out : ["00000000-0000-0000-0000-000000000000"];
+}
 
 // ── Talepler (müşteri talepleri) — ekranın aktif filtresini uygular ──────────
 const DEMAND_URGENCY_TR: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek", urgent: "Acil" };
@@ -382,7 +399,8 @@ export async function exportAppointmentsCsv(filters: AppointmentExportFilters = 
 
 // ── Anlaşmalar (satış hattı) — tahta filtresiz; tüm anlaşmalar ────────────────
 
-export async function exportDealsCsv(): Promise<ExportResult> {
+/** `ids` verilirse yalnız seçili anlaşmalar (liste toplu işlemi); kapsam kuralı aynı kalır. */
+export async function exportDealsCsv(ids?: string[]): Promise<ExportResult> {
   const gate = await requirePermission("commissions", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
@@ -398,6 +416,8 @@ export async function exportDealsCsv(): Promise<ExportResult> {
     .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
   else q = applyScopeFilter(q, (await exportScope(gate)).filter, { ownerColumn: "assigned_to" });
+  const pick = selectedIds(ids);
+  if (pick) q = q.in("id", pick);
   const { data, error } = await q;
   if (error) {
     console.error("exportDealsCsv", error);
@@ -584,14 +604,15 @@ export async function exportDuesCsv(): Promise<ExportResult> {
   return exportResult(gate, "aidatlar", rows, `aidatlar-${today10()}.csv`);
 }
 
-export async function exportContractsCsv(): Promise<ExportResult> {
+/** `ids` verilirse yalnız seçili sözleşmeler (liste toplu işlemi). */
+export async function exportContractsCsv(ids?: string[]): Promise<ExportResult> {
   const gate = await requirePermission("contracts", "view");
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   let q = supabase
     .from("contracts")
     .select(
-      "title, contract_type, status, created_at, signed_at, expires_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
+      "title, contract_type, status, created_at, signed_at, expires_at, cancelled_at, property:properties!contracts_property_id_fkey(property_code, title, tenant_id), customer:customers!contracts_customer_id_fkey(full_name, tenant_id)",
     )
     .eq("tenant_id", gate.tenantId)
     .eq("property.tenant_id", gate.tenantId)
@@ -599,6 +620,8 @@ export async function exportContractsCsv(): Promise<ExportResult> {
     .order("created_at", { ascending: false })
     .limit(EXPORT_LIMIT);
   if (!hasOfficeWideDataScope(gate.role)) q = q.eq("created_by", gate.userId);
+  const pickContracts = selectedIds(ids);
+  if (pickContracts) q = q.in("id", pickContracts);
   const { data, error } = await q;
   if (error) {
     console.error("exportContractsCsv", error);
@@ -629,4 +652,157 @@ export async function exportReferralsCsv(): Promise<ExportResult> {
   }
   const rows = (data ?? []).map((r) => mapReferral(r));
   return exportResult(gate, "tavsiyeler", rows, `tavsiyeler-${today10()}.csv`);
+}
+
+// ── Kampanya alıcı listesi — kampanya detayındaki ?durum= filtresi uygulanır ──
+const RECIPIENT_STATUS_TR: Record<string, string> = {
+  pending: "Bekliyor", sent: "Gönderildi", delivered: "Teslim edildi", failed: "Ulaşmadı", opted_out: "İzin yok (gönderilmedi)",
+};
+
+export async function exportCampaignRecipientsCsv(campaignId: string, durum = ""): Promise<ExportResult> {
+  const gate = await requirePermission("campaigns", "view");
+  if (!gate.ok) return { error: gate.error };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(campaignId ?? ""))) return { error: "Kampanya bulunamadı." };
+  const supabase = await createClient();
+  let q = supabase
+    .from("campaign_recipients")
+    .select("full_name, phone, status, error_msg, sent_at, created_at, campaign:campaigns!inner(title, tenant_id)")
+    .eq("campaign_id", campaignId)
+    .eq("campaign.tenant_id", gate.tenantId)
+    .order("full_name", { ascending: true })
+    .limit(EXPORT_LIMIT);
+  if (durum === "ulasan") q = q.in("status", ["sent", "delivered"]);
+  else if (RECIPIENT_STATUS_TR[durum]) q = q.eq("status", durum);
+  // Kampanya modülü ofis geneli bir pazarlama aracıdır; alıcı listesi kampanya kapsamındadır (aktör filtresi yok).
+  const { data, error } = await q;
+  if (error) {
+    console.error("exportCampaignRecipientsCsv", error);
+    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+  }
+  const rows = (data ?? []).map((r) => ({
+    ad_soyad: r.full_name ?? "",
+    telefon: r.phone,
+    durum: RECIPIENT_STATUS_TR[String(r.status)] ?? r.status,
+    hata: r.error_msg ?? "",
+    gonderim: r.sent_at ?? "",
+    kayit: r.created_at,
+  }));
+  return exportResult(gate, "kampanya-alicilari", rows, `kampanya-alicilari-${today10()}.csv`, true);
+}
+
+// ── Onaylar — ekranın filtreleri (durum/tür/kim/talep eden/tarih) ───────────────
+const APPROVAL_STATUS_TR: Record<string, string> = { bekliyor: "Bekliyor", onaylandi: "Onaylandı", reddedildi: "Reddedildi", iptal: "İptal" };
+const APPROVAL_KIND_TR: Record<string, string> = {
+  komisyon_indirimi: "Komisyon indirimi", gider: "Gider", fiyat_degisikligi: "Fiyat değişikliği", ozel_izin: "Özel izin", diger: "Diğer",
+};
+export type ApprovalExportFilters = { durum?: string; tur?: string; kim?: string; talepEden?: string; bas?: string; bit?: string };
+
+export async function exportApprovalsCsv(filters: ApprovalExportFilters = {}): Promise<ExportResult> {
+  const gate = await requirePermission("commissions", "view");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  let q = supabase
+    .from("approval_requests")
+    .select("kind, title, status, current_value, requested_value, requested_by, decided_by, decided_at, decision_note, created_at")
+    .eq("tenant_id", gate.tenantId)
+    .order("created_at", { ascending: false })
+    .limit(EXPORT_LIMIT);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("requested_by", gate.userId);
+  if (filters.durum && APPROVAL_STATUS_TR[filters.durum]) q = q.eq("status", filters.durum);
+  if (filters.tur && APPROVAL_KIND_TR[filters.tur]) q = q.eq("kind", filters.tur);
+  if (filters.kim === "benim") q = q.eq("requested_by", gate.userId);
+  else if (filters.kim === "bana") q = q.neq("requested_by", gate.userId);
+  if (filters.talepEden && UUID_RX.test(filters.talepEden)) q = q.eq("requested_by", filters.talepEden);
+  if (filters.bas && /^\d{4}-\d{2}-\d{2}$/.test(filters.bas)) q = q.gte("created_at", new Date(Date.parse(`${filters.bas}T00:00:00+03:00`)).toISOString());
+  if (filters.bit && /^\d{4}-\d{2}-\d{2}$/.test(filters.bit)) q = q.lt("created_at", new Date(Date.parse(`${filters.bit}T00:00:00+03:00`) + 86_400_000).toISOString());
+  const { data, error } = await q;
+  if (error) {
+    console.error("exportApprovalsCsv", error);
+    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+  }
+  const ids = [...new Set((data ?? []).flatMap((r) => [r.requested_by, r.decided_by]).filter(Boolean) as string[])];
+  const names = new Map<string, string>();
+  if (ids.length) {
+    const { data: people } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", gate.tenantId).in("id", ids);
+    for (const p of people ?? []) names.set(p.id as string, (p.full_name as string | null) ?? "");
+  }
+  const rows = (data ?? []).map((r) => ({
+    tur: APPROVAL_KIND_TR[String(r.kind)] ?? r.kind,
+    baslik: r.title,
+    durum: APPROVAL_STATUS_TR[String(r.status)] ?? r.status,
+    mevcut_deger: r.current_value ?? "",
+    talep_edilen: r.requested_value ?? "",
+    talep_eden: r.requested_by ? (names.get(r.requested_by) ?? "") : "",
+    karar_veren: r.decided_by ? (names.get(r.decided_by) ?? "") : "",
+    karar_tarihi: r.decided_at ?? "",
+    karar_notu: r.decision_note ?? "",
+    talep_tarihi: r.created_at,
+  }));
+  return exportResult(gate, "onaylar", rows, `onaylar-${today10()}.csv`, true);
+}
+
+// ── Görevler — ekranın filtrelerini (zaman/tür/atanan/arama/gün/zincir) uygular ─────
+const TASK_KIND_TR: Record<string, string> = { followup: "Takip", call: "Arama", visit: "Ziyaret", document: "Evrak", other: "Diğer" };
+const TASK_STATUS_TR: Record<string, string> = { open: "Açık", done: "Tamamlandı", cancelled: "İptal" };
+const TASK_PRIORITY_TR: Record<string, string> = { low: "Düşük", normal: "Normal", high: "Yüksek" };
+const TASK_RECURRENCE_TR: Record<string, string> = { daily: "Her gün", weekly: "Her hafta", biweekly: "İki haftada bir", monthly: "Her ay" };
+
+export type TaskExportFilters = {
+  filter?: string; tur?: string; mine?: string; danisman?: string; q?: string; tekrar?: string; gun?: string; zincir?: string; anlasma?: string;
+};
+
+export async function exportTasksCsv(filters: TaskExportFilters = {}): Promise<ExportResult> {
+  const gate = await requirePermission("tasks", "view");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  let q = supabase
+    .from("tasks")
+    .select(
+      "title, kind, priority, status, due_at, completed_at, recurrence, recurrence_parent_id, created_at, assignee:profiles!tasks_assigned_to_fkey(full_name), customer:customers!tasks_customer_id_fkey(full_name), deal_id",
+    )
+    .eq("tenant_id", gate.tenantId)
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(EXPORT_LIMIT);
+  if (!hasOfficeWideDataScope(gate.role)) q = q.eq("assigned_to", gate.userId);
+  else q = applyScopeFilter(q, (await exportScope(gate)).filter, { ownerColumn: "assigned_to" });
+  const nowIso = new Date().toISOString();
+  const dayStart = trDayStartMs();
+  if (filters.filter === "done") q = q.eq("status", "done");
+  else if (filters.filter === "overdue") q = q.eq("status", "open").lt("due_at", nowIso);
+  else if (filters.filter === "yaklasan") q = q.eq("status", "open").gte("due_at", nowIso).lte("due_at", daysFromNowIso(7));
+  else if (filters.filter === "today") {
+    q = q.eq("status", "open").gte("due_at", new Date(dayStart).toISOString()).lte("due_at", new Date(dayStart + 86_400_000 - 1).toISOString());
+  } else if (filters.filter !== "all") q = q.eq("status", "open");
+  if (filters.tur && TASK_KIND_TR[filters.tur]) q = q.eq("kind", filters.tur);
+  if (filters.mine === "1") q = q.eq("assigned_to", gate.userId);
+  if (filters.danisman && UUID_RX.test(filters.danisman)) q = q.eq("assigned_to", filters.danisman);
+  if (filters.tekrar === "1") q = q.not("recurrence", "is", null);
+  if (filters.zincir && UUID_RX.test(filters.zincir)) q = q.or(`id.eq.${filters.zincir},recurrence_parent_id.eq.${filters.zincir}`);
+  if (filters.anlasma && UUID_RX.test(filters.anlasma)) q = q.eq("deal_id", filters.anlasma);
+  if (filters.gun && /^\d{4}-\d{2}-\d{2}$/.test(filters.gun)) {
+    const start = Date.parse(`${filters.gun}T00:00:00+03:00`);
+    if (Number.isFinite(start)) q = q.gte("due_at", new Date(start).toISOString()).lt("due_at", new Date(start + 86_400_000).toISOString());
+  }
+  const term = (filters.q ?? "").trim().slice(0, 80);
+  if (term) q = q.or(orIlike(["title", "notes"], term));
+  const { data, error } = await q;
+  if (error) {
+    console.error("exportTasksCsv", error);
+    return { error: "Dışa aktarma başarısız. Lütfen tekrar deneyin." };
+  }
+  const rows = (data ?? []).map((t) => ({
+    baslik: t.title,
+    tur: TASK_KIND_TR[String(t.kind)] ?? t.kind,
+    oncelik: TASK_PRIORITY_TR[String(t.priority)] ?? t.priority,
+    durum: TASK_STATUS_TR[String(t.status)] ?? t.status,
+    vade: t.due_at ?? "",
+    tamamlanma: t.completed_at ?? "",
+    tekrar: t.recurrence ? (TASK_RECURRENCE_TR[String(t.recurrence)] ?? t.recurrence) : "",
+    zincir_kopyasi: t.recurrence_parent_id ? "Evet" : "",
+    atanan: relOne(t.assignee as { full_name?: string } | { full_name?: string }[] | null)?.full_name ?? "",
+    musteri: relOne(t.customer as { full_name?: string } | { full_name?: string }[] | null)?.full_name ?? "",
+    anlasma_bagli: t.deal_id ? "Evet" : "",
+    kayit: t.created_at,
+  }));
+  return exportResult(gate, "gorevler", rows, `gorevler-${today10()}.csv`, true);
 }

@@ -15,6 +15,7 @@ type Task = {
   due_at: string | null;
   recurrence: string | null;
   assigned_to?: string | null;
+  deal_id?: string | null;
 };
 
 const KINDS = [
@@ -46,10 +47,13 @@ export function TaskEditDialog({
   task,
   variant = "icon",
   members,
+  deals,
 }: {
   task: Task;
   /** Atanan seçici (görev devri); verilmezse atama alanı gösterilmez. */
   members?: { id: string; name: string }[];
+  /** Anlaşma bağı seçici; verilmezse alan gösterilmez (eski bağ korunur). */
+  deals?: { id: string; label: string }[];
   /**
    * "icon": eylem çubuğundaki kalem düğmesi (varsayılan).
    * "overlay": kartın tamamını kaplayan görünmez tetikleyici — müşterisiz/
@@ -72,6 +76,12 @@ export function TaskEditDialog({
   );
   const fieldClass =
     "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300";
+  // Mevcut bağ seçenek listesinde yoksa da kaybolmasın (sayfa yalnız son açık anlaşmaları taşır).
+  const dealOptions = deals
+    ? task.deal_id && !deals.some((d) => d.id === task.deal_id)
+      ? [{ id: task.deal_id, label: "Mevcut anlaşma" }, ...deals]
+      : deals
+    : null;
   /* Popup yok: sayfa içi sekme alanı (InlineTabbedPanel). Action ve alan adları değişmedi. */
   return (
     <InlineTabbedPanel
@@ -84,7 +94,7 @@ export function TaskEditDialog({
       pending={pending}
       error={state.error}
       hiddenFields={<input type="hidden" name="id" value={task.id} />}
-      fieldLabels={{ title: "Başlık", kind: "Tür", priority: "Öncelik", due_at: "Son tarih", recurrence: "Tekrar", assigned_to: "Atanan", notes: "Not" }}
+      fieldLabels={{ title: "Başlık", kind: "Tür", priority: "Öncelik", due_at: "Son tarih", recurrence: "Tekrar", assigned_to: "Atanan", deal_id: "İlgili anlaşma", notes: "Not" }}
       trigger={({ onClick, ...aria }) =>
         variant === "overlay" ? (
           <button
@@ -108,7 +118,7 @@ export function TaskEditDialog({
       }
       tabs={[
         { id: "genel", label: "Genel", icon: ListTodo, fields: ["title", "kind", "priority", "notes"] },
-        { id: "zaman", label: "Zamanlama", icon: CalendarClock, fields: ["due_at", "recurrence", ...(members && members.length > 0 ? ["assigned_to"] : [])] },
+        { id: "zaman", label: "Zamanlama", icon: CalendarClock, fields: ["due_at", "recurrence", ...(members && members.length > 0 ? ["assigned_to"] : []), ...(dealOptions ? ["deal_id"] : [])] },
       ]}
       panels={{
         genel: (
@@ -172,6 +182,17 @@ export function TaskEditDialog({
                   {!task.assigned_to ? <option value="">Atanmamış</option> : null}
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {dealOptions ? (
+              <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+                İlgili anlaşma
+                <select name="deal_id" defaultValue={task.deal_id ?? ""} className={`mt-1 ${fieldClass}`}>
+                  <option value="">Bağlı değil</option>
+                  {dealOptions.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
                   ))}
                 </select>
               </label>

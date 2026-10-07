@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createTask } from "@/app/actions/tasks";
-import { searchCustomers } from "@/app/actions/lookup";
+import { searchCustomers, searchDeals } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
@@ -13,6 +13,7 @@ import { TASK_DRAFT_FIELDS, TASK_FORM_ID, TASK_TABS } from "./task-tabs";
 
 type Member = { id: string; full_name: string | null };
 type Customer = { id: string; full_name: string };
+type DealOption = { id: string; label: string };
 
 const kindOptions = [
   { value: "followup", label: "Takip" },
@@ -50,12 +51,28 @@ function dueLabel(value: string | undefined): string | null {
   return `${m[3]}.${m[2]}.${m[1]}${m[4] ? ` ${m[4]}` : ""}`;
 }
 
-export function TaskForm({ members, customers, userId }: { members: Member[]; customers: Customer[]; userId: string }) {
+export function TaskForm({
+  members,
+  customers,
+  deals = [],
+  userId,
+  initialCustomerId = "",
+  initialDealId = "",
+}: {
+  members: Member[];
+  customers: Customer[];
+  /** Son açık anlaşmalar (seçici kısayolu; arama sunucuda). */
+  deals?: DealOption[];
+  userId: string;
+  /** Talep/müşteri/anlaşma detayından gelen ön dolgu (?customer= / ?deal=). */
+  initialCustomerId?: string;
+  initialDealId?: string;
+}) {
   // Tekrar yalnız terminli görevde seçilebilir — termin alanını izle.
   const [due, setDue] = useState("");
   const { onSubmit, pending, error } = useCreateForm((fd) => createTask({}, fd), {
     successMessage: "Görev eklendi",
-    redirectTo: () => "/app/gorevler",
+    redirectTo: () => (initialDealId ? `/app/anlasmalar/${initialDealId}` : "/app/gorevler"),
   });
 
   const tabs: FormTab[] = useMemo(
@@ -116,7 +133,20 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
             searchPlaceholder="Müşteri ara…"
             emptyText="Eşleşen müşteri yok"
             onSearch={searchCustomers}
+            defaultValue={initialCustomerId}
             options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
+          />
+        </FormField>
+        <FormField label="İlgili anlaşma" htmlFor="task-deal" hint="Anlaşma detayındaki görev listesinde görünür.">
+          <Combobox
+            name="deal_id"
+            aria-label="İlgili anlaşma"
+            placeholder="Seçiniz (opsiyonel)"
+            searchPlaceholder="Müşteri adı veya portföy kodu…"
+            emptyText="Eşleşen anlaşma yok"
+            onSearch={searchDeals}
+            defaultValue={initialDealId}
+            options={deals.map((d) => ({ value: d.id, label: d.label }))}
           />
         </FormField>
       </>
@@ -135,6 +165,8 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
     const customerId = (values.customer_id ?? "").trim();
     const notes = (values.notes ?? "").trim();
     const customer = customerId ? (customers.find((c) => c.id === customerId)?.full_name ?? display.customer_id ?? null) : null;
+    const dealId = (values.deal_id ?? "").trim();
+    const deal = dealId ? (deals.find((d) => d.id === dealId)?.label ?? display.deal_id ?? "Seçilen anlaşma") : null;
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -149,6 +181,7 @@ export function TaskForm({ members, customers, userId }: { members: Member[]; cu
           <SummaryRow label="Tekrar" value={dueText ? recurrence : "Yok"} muted={!dueText || recurrence === "Yok"} tab="zamanlama" field="recurrence" />
           <SummaryRow label="Atanan" value={assignee} tab="zamanlama" field="assigned_to" />
           <SummaryRow label="Müşteri" value={customer ?? "Bağlı değil"} muted={!customer} tab="zamanlama" field="customer_id" />
+          <SummaryRow label="Anlaşma" value={deal ?? "Bağlı değil"} muted={!deal} tab="zamanlama" field="deal_id" />
           <SummaryRow label="Not" value={notes || "Girilmedi"} muted={!notes} tab="gorev" field="notes" />
         </SummaryGroup>
       </>

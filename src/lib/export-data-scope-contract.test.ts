@@ -17,8 +17,18 @@ describe("CSV export tenant and actor scope contract", () => {
   it("puts an explicit tenant boundary on every Supabase table query", () => {
     const queryChains = [...source.matchAll(/\.from\("([^"]+)"\)([\s\S]*?);/g)];
 
-    expect(queryChains).toHaveLength(19);
+    expect(queryChains).toHaveLength(23);
+    // tenant_id sütunu olmayan çocuk tablolar (campaign_recipients) yalnız !inner ebeveyn + ebeveynin
+    // tenant eşitliğiyle sınırlanabilir; bu istisna açıkça listelenir.
+    const PARENT_BOUNDED: Record<string, RegExp> = {
+      campaign_recipients: /campaign:campaigns!inner[\s\S]*\.eq\("campaign\.tenant_id", gate\.tenantId\)/,
+    };
     for (const chain of queryChains) {
+      const parentRule = PARENT_BOUNDED[chain[1]!];
+      if (parentRule) {
+        expect(chain[0], `${chain[1]} query must be bounded through its !inner parent`).toMatch(parentRule);
+        continue;
+      }
       expect(chain[0], `${chain[1]} query is missing an explicit tenant boundary`).toContain(
         '.eq("tenant_id", gate.tenantId)',
       );
@@ -41,6 +51,8 @@ describe("CSV export tenant and actor scope contract", () => {
     ["exportDuesCsv", '.eq("created_by", gate.userId)'],
     ["exportContractsCsv", '.eq("created_by", gate.userId)'],
     ["exportReferralsCsv", '.eq("handled_by", gate.userId)'],
+    ["exportTasksCsv", '.eq("assigned_to", gate.userId)'],
+    ["exportApprovalsCsv", '.eq("requested_by", gate.userId)'],
   ])("keeps %s office-wide only unless the row belongs to the actor", (name, actorFilter) => {
     const action = exportFunction(name);
     expect(action).toContain("hasOfficeWideDataScope(gate.role)");

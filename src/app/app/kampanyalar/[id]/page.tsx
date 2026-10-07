@@ -7,6 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
+import { toTrLocalInput } from "@/lib/clock";
+import { ExportCsvButton } from "@/components/app/export-csv-button";
+import { exportCampaignRecipientsCsv } from "@/app/actions/export";
+import { CampaignSchedule } from "./campaign-schedule";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kampanya detayı" };
@@ -181,6 +185,9 @@ export default async function CampaignDetailPage({
         <Badge variant={campaign.status === "done" ? "success" : campaign.status === "failed" ? "danger" : "info"}>
           {STATUS_LABELS[campaign.status] ?? campaign.status}
         </Badge>
+        {campaign.status === "scheduled" && campaign.scheduled_at ? (
+          <span className="text-xs font-semibold text-text-muted">Planlanan gönderim: {tarih(campaign.scheduled_at)}</span>
+        ) : null}
         {sayacTutarsiz ? (
           <span className="text-xs text-amber-600" role="status">
             Kampanya sayacı {sayacSent} diyor, alıcı kayıtlarında {gonderilen} gönderim var. Gerçek satırlar
@@ -188,6 +195,26 @@ export default async function CampaignDetailPage({
           </span>
         ) : null}
       </div>
+
+      {/* Teslimat işçisinin son hatası (campaigns.last_error): kampanya düzeyinde, alıcı hatalarından ayrı */}
+      {campaign.last_error ? (
+        <section className="rounded-[var(--radius-panel)] border border-danger-500/30 bg-danger-500/5 p-4" role="status">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-danger-600">
+            <AlertTriangle className="h-4 w-4" /> Son gönderim hatası
+          </h2>
+          <p className="mt-1 text-sm text-ink-950">{campaign.last_error}</p>
+          <p className="mt-1 text-xs text-text-muted">Sağlayıcı ayarlarını (SMS/WhatsApp entegrasyonu) kontrol edin; teslimat bir sonraki turda yeniden denenir.</p>
+        </section>
+      ) : null}
+
+      {canEdit && (campaign.status === "draft" || campaign.status === "scheduled") ? (
+        <CampaignSchedule
+          campaignId={campaign.id}
+          status={campaign.status}
+          scheduledLocal={campaign.scheduled_at ? toTrLocalInput(campaign.scheduled_at) : ""}
+          scheduledLabel={campaign.scheduled_at ? tarih(campaign.scheduled_at) : null}
+        />
+      ) : null}
 
       {/* Gönderilen mesajın kendisi — hangi metnin gittiği kaydın parçası */}
       <section className="surface-card rounded-[var(--radius-panel)] p-5">
@@ -229,9 +256,18 @@ export default async function CampaignDetailPage({
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Users className="h-4 w-4 text-brand-600" /> Alıcılar
           </h2>
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
-            {visibleRecipients.length} kayıt
-            {visibleRecipients.length !== recipients.length ? ` · ${recipients.length} içinden` : ""}
+          <span className="flex items-center gap-2">
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
+              {visibleRecipients.length} kayıt
+              {visibleRecipients.length !== recipients.length ? ` · ${recipients.length} içinden` : ""}
+            </span>
+            {recipients.length > 0 ? (
+              <ExportCsvButton
+                action={exportCampaignRecipientsCsv.bind(null, campaign.id, durum)}
+                label="Alıcı listesi CSV"
+                hint="Ekrandaki durum filtresiyle"
+              />
+            ) : null}
           </span>
         </div>
 

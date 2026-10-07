@@ -36,6 +36,8 @@ export type AppointmentVM = {
   outcome: { label: string; emoji: string; tone: PillTone; note: string | null } | null;
   /** Geçmişte kalmış ama teyit/imza bekleyen. */
   followUp: boolean;
+  /** Gösterim belgesi imza zamanı (appointments.signed_at); imzasızsa null. */
+  signedLabel?: string | null;
   confirmToken: string | null;
   isShowing: boolean;
   tutanakHref: string;
@@ -137,6 +139,11 @@ function Pills({ a }: { a: AppointmentVM }) {
             {a.outcome.emoji} {a.outcome.label}
           </StatusPill>
         </span>
+      ) : null}
+      {a.signedLabel ? (
+        <StatusPill tone="success" dot={false} title={`Gösterim belgesi imzalandı · ${a.signedLabel}`}>
+          Belge imzalandı
+        </StatusPill>
       ) : null}
       {a.followUp ? (
         <StatusPill tone="warning" dot={false} title="Tarihi geçti, teyit/imza hâlâ bekliyor">

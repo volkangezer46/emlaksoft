@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { parseTrLocalDateTime } from "@/lib/clock";
+import { DAY_MS, now, parseTrLocalDateTime, trDayStartMs } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
@@ -42,6 +42,7 @@ type RecurringSource = {
   assigned_to: string | null;
   customer_id: string | null;
   property_id: string | null;
+  deal_id?: string | null;
   recurrence: string | null;
   recurrence_parent_id: string | null;
 };
@@ -86,6 +87,8 @@ async function spawnNextRecurring(
     assigned_to: task.assigned_to,
     customer_id: task.customer_id,
     property_id: task.property_id,
+    // Anlaşma bağı zincir boyunca korunur (anlaşma detayındaki görev listesi kopyayı da görür).
+    deal_id: task.deal_id ?? null,
     recurrence: task.recurrence,
     recurrence_parent_id: rootId,
     created_by: userId,
@@ -203,6 +206,8 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   const dueRaw = String(formData.get("due_at") ?? "").trim();
   const assignedTo = String(formData.get("assigned_to") ?? "").trim();
   const recurrenceRaw = String(formData.get("recurrence") ?? "").trim();
+  // Anlaşma bağı yalnız alan formda varsa değişir ("" = bağı kaldır); eski formlar dokunmaz.
+  const dealField = formData.has("deal_id") ? String(formData.get("deal_id") ?? "").trim() : undefined;
 
   if (!title) return { error: "Görev başlığı zorunlu." };
   if (!KINDS.includes(kind)) return { error: "Geçersiz görev türü." };
@@ -215,6 +220,15 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
+  if (dealField) {
+    const { data: ownDeal } = await supabase
+      .from("deals")
+      .select("id")
+      .eq("id", dealField)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle();
+    if (!ownDeal) return { error: "Anlaşma bulunamadı." };
+  }
   const { error } = await supabase
     .from("tasks")
     .update({
@@ -226,6 +240,7 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
       // Termin silinirse tekrar da düşer (terminsiz tekrar anlamsız).
       recurrence: dueRaw && recurrenceRaw ? recurrenceRaw : null,
       ...(assignedTo ? { assigned_to: assignedTo } : {}),
+      ...(dealField !== undefined ? { deal_id: dealField || null } : {}),
     })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
@@ -245,7 +260,71 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   });
 
   revalidatePath("/app/gorevler");
+  if (dealField) revalidatePath(`/app/anlasmalar/${dealField}`);
   return { ok: true, id };
+}
+
+const REMINDER_DAYS = [1, 3, 7, 14];
+
+/**
+ * Tek tık hatırlatıcı (talep/müşteri detayı): N gün sonra 09:00'da (TR) vadeli takip
+ * görevi açar, kullanıcıya atanır. Saat sunucuda hesaplanır (istemci saatine güvenilmez).
+ */
+export async function createFollowupReminder(input: {
+  customerId: string;
+  title: string;
+  days: number;
+  dealId?: string | null;
+}): Promise<TaskResult> {
+  const gate = await requirePermission("tasks", "create");
+  if (!gate.ok) return { error: gate.error };
+  const days = Number(input?.days);
+  if (!REMINDER_DAYS.includes(days)) return { error: "Geçersiz hatırlatma süresi." };
+  const title = String(input?.title ?? "").trim().slice(0, 200);
+  if (!title) return { error: "Hatırlatma başlığı zorunlu." };
+  const customerId = String(input?.customerId ?? "").trim();
+  const references = await validateTenantReferences(gate.tenantId, { customerId: customerId || null });
+  if (!references.ok) return { error: references.error };
+
+  const supabase = await createClient();
+  const dealId = String(input?.dealId ?? "").trim();
+  if (dealId) {
+    const { data: ownDeal } = await supabase.from("deals").select("id").eq("id", dealId).eq("tenant_id", gate.tenantId).maybeSingle();
+    if (!ownDeal) return { error: "Anlaşma bulunamadı." };
+  }
+  // TR gün başı + N gün + 09:00 (UTC+3 → 06:00Z)
+  const dueAt = new Date(trDayStartMs(now()) + days * DAY_MS + 9 * 3_600_000).toISOString();
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      tenant_id: gate.tenantId,
+      title,
+      kind: "followup",
+      priority: "normal",
+      status: "open",
+      due_at: dueAt,
+      assigned_to: gate.userId,
+      customer_id: customerId || null,
+      deal_id: dealId || null,
+      created_by: gate.userId,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("createFollowupReminder", error);
+    return { error: "Hatırlatma oluşturulamadı." };
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "task.create",
+    entityType: "task",
+    entityId: data.id,
+    newValue: { title, kind: "followup", reminder_days: days },
+  });
+  revalidatePath("/app/gorevler");
+  if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
+  return { ok: true, id: data.id };
 }
 
 export type CompleteTaskResult = { nextDueAt: string | null };
@@ -260,7 +339,7 @@ export async function completeTask(formData: FormData): Promise<CompleteTaskResu
   // Tekrar üretimi için satırı tamamlamadan ÖNCE oku (kopyalanacak alanlar).
   const { data: task } = await supabase
     .from("tasks")
-    .select("id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, recurrence_parent_id")
+    .select("id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, deal_id, recurrence, recurrence_parent_id")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -304,7 +383,7 @@ export async function completeTasksBulk(formData: FormData): Promise<void> {
   // Tekrarlı satırları tamamlamadan ÖNCE oku (kopyalanacak alanlar).
   const { data: recurring } = await supabase
     .from("tasks")
-    .select("id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, recurrence, recurrence_parent_id")
+    .select("id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, deal_id, recurrence, recurrence_parent_id")
     .in("id", ids)
     .eq("tenant_id", gate.tenantId)
     .eq("status", "open")

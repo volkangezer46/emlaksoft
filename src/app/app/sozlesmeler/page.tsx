@@ -32,6 +32,8 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { ContractMobileList, ContractTable, type ContractVM } from "./contract-rows";
+import { ContractBulkBar } from "./contract-bulk-bar";
+import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
   CONTRACT_STATUS_LABELS,
   CONTRACT_TYPE_LABELS,
@@ -92,6 +94,7 @@ export default async function SozlesmelerPage({
   const { perms } = await requireModulePage("contracts", "/app/sozlesmeler");
   const params = (await searchParams) ?? {};
   const canCreate = perms.contracts?.includes("create") ?? false;
+  const canEditContracts = perms.contracts?.includes("edit") ?? false;
   // Eski popup adresleri: ?yeni=1 ve teklif/randevu ön dolgusu (?customer=&property=&tur=) tam sayfa forma gider.
   if (canCreate && (params.yeni === "1" || params.customer || params.property || params.tur)) {
     const q = new URLSearchParams();
@@ -354,10 +357,11 @@ export default async function SozlesmelerPage({
               action={{ href: PATH, label: "Filtreleri temizle" }}
             />
           ) : (
-            <>
-              <ContractTable rows={viewModels} density={density} />
+            <BulkSelectionProvider>
+              {canEditContracts ? <ContractBulkBar /> : null}
+              <ContractTable rows={viewModels} density={density} selectable={canEditContracts} />
               <ContractMobileList rows={viewModels} />
-            </>
+            </BulkSelectionProvider>
           )}
 
           <ListPager pathname={PATH} params={urlParams} window={win} total={totalFiltered} />

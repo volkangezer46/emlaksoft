@@ -25,8 +25,17 @@ describe("expense input", () => {
         expenseDate: "2026-08-13",
         notes: "Ağustos kampanyası",
         propertyId: null,
+        receiptUrl: null,
       },
     });
+  });
+
+  it("fiş bağlantısı yalnız https kabul eder ve normalize eder", () => {
+    const ok = parseExpenseForm(form({ receipt_url: "https://earsiv.example.com/fatura/1" }));
+    expect(ok.ok && ok.value.receiptUrl).toBe("https://earsiv.example.com/fatura/1");
+    expect(parseExpenseForm(form({ receipt_url: "http://x.example.com" })).ok).toBe(false);
+    expect(parseExpenseForm(form({ receipt_url: "javascript:alert(1)" })).ok).toBe(false);
+    expect(parseExpenseForm(form({ receipt_url: "https://u:p@x.example.com" })).ok).toBe(false);
   });
 
   it.each(["1abc", "-1", "0", "1.234", "NaN", "Infinity"])(

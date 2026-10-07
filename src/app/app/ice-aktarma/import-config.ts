@@ -64,9 +64,43 @@ export const DEMAND_FIELDS: FieldDef[] = [
   { key: "urgency", label: "Aciliyet", hints: ["aciliyet", "oncelik"], sample: "Yüksek" },
 ];
 
+const CONTACT_FIELDS: FieldDef[] = [
+  { key: "customer_phone", label: "Müşteri telefonu", hints: ["musteri telefonu", "telefon", "cep telefonu", "cep", "gsm", "tel"], sample: "0532 123 45 67" },
+  { key: "customer_email", label: "Müşteri e-postası", hints: ["musteri e postasi", "e posta", "eposta", "email", "mail"], sample: "ayse@example.com" },
+];
+
+export const TASK_FIELDS: FieldDef[] = [
+  { key: "title", label: "Görev", required: true, hints: ["gorev", "baslik", "is", "yapilacak", "konu", "title", "task"], sample: "Ayşe Hanım'ı geri ara" },
+  { key: "due_at", label: "Son tarih", hints: ["son tarih", "vade", "tarih", "termin", "due"], sample: "15.11.2026 10:00" },
+  { key: "kind", label: "Tür", hints: ["gorev turu", "tur", "tip", "kind"], sample: "Arama" },
+  { key: "priority", label: "Öncelik", hints: ["oncelik", "aciliyet", "priority"], sample: "Yüksek" },
+  { key: "notes", label: "Not", hints: ["notlar", "not", "aciklama", "detay", "notes"], sample: "Teklif sonrası dönüş" },
+  ...CONTACT_FIELDS,
+];
+
+export const APPOINTMENT_FIELDS: FieldDef[] = [
+  { key: "scheduled_at", label: "Tarih ve saat", required: true, hints: ["randevu tarihi", "tarih saat", "tarih", "zaman", "saat", "date"], sample: "15.11.2026 14:30" },
+  { key: "appointment_type", label: "Randevu türü", hints: ["randevu turu", "tur", "tip", "type"], sample: "Yer gösterme" },
+  { key: "duration_min", label: "Süre (dk)", hints: ["sure", "dakika", "duration"], sample: "45" },
+  { key: "location", label: "Konum", hints: ["konum", "adres", "yer", "location"], sample: "Moda Cad. No:12" },
+  { key: "notes", label: "Not", hints: ["notlar", "not", "aciklama", "detay", "notes"], sample: "Anahtar kapıcıda" },
+  ...CONTACT_FIELDS,
+];
+
+export const EXPENSE_FIELDS: FieldDef[] = [
+  { key: "title", label: "Gider", required: true, hints: ["gider", "baslik", "aciklama", "kalem", "title"], sample: "Portal ilan paketi" },
+  { key: "amount", label: "Tutar", required: true, hints: ["tutar", "bedel", "miktar", "fiyat", "amount"], sample: "2.450" },
+  { key: "category", label: "Kategori", hints: ["kategori", "gider turu", "tur", "category"], sample: "Reklam & Pazarlama" },
+  { key: "expense_date", label: "Tarih", hints: ["tarih", "gider tarihi", "fatura tarihi", "date"], sample: "01.11.2026" },
+  { key: "notes", label: "Not", hints: ["notlar", "not", "detay", "notes"], sample: "Kasım dönemi" },
+];
+
 export function fieldsFor(target: ImportTarget): FieldDef[] {
   if (target === "customers") return CUSTOMER_FIELDS;
   if (target === "properties") return PROPERTY_FIELDS;
+  if (target === "tasks") return TASK_FIELDS;
+  if (target === "appointments") return APPOINTMENT_FIELDS;
+  if (target === "expenses") return EXPENSE_FIELDS;
   return DEMAND_FIELDS;
 }
 
@@ -74,6 +108,9 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
   customers: "Müşteriler",
   properties: "Portföyler",
   demands: "Talepler",
+  tasks: "Görevler",
+  appointments: "Randevular",
+  expenses: "Giderler",
 };
 
 // ---------------------------------------------------------------------------
