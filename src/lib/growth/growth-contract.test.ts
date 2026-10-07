@@ -38,7 +38,9 @@ describe("büyüme sözleşmesi", () => {
   it("kayıt akışı: gizli alanlar form ve sunucuda bağlı, atıf hatası kaydı bozmaz", () => {
     expect(read("src/app/kayit/register-form.tsx")).toContain("<AttributionFields");
     expect(read("src/app/kayit/page.tsx")).toContain("utm_source");
-    expect(read("src/app/actions/auth.ts")).toContain("recordSignupAttributionFromRequest(tenantId, formData)");
+    // Provizyon çekirdeği (e-posta + Google kayıt yolu ortak) atfı kaydeder; signUp çekirdeği çağırır.
+    expect(read("src/lib/registration/provision-office.ts")).toContain("recordSignupAttributionFromRequest(tenantId, formData)");
+    expect(read("src/app/actions/auth.ts")).toContain("provisionOfficeForUser(admin");
     expect(read("src/lib/growth/capture.ts")).toMatch(/catch \(e\)/);
   });
 

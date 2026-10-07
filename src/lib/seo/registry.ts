@@ -244,6 +244,9 @@ export const NEVER_INDEX_PREFIXES = [
   "/sifre-yenile",
   "/brand-asset",
   "/site-menu-asset",
+  // Google OAuth dönüşü ve Google ile kurulum tamamlama (oturumlu ara adımlar).
+  "/auth",
+  "/kayit/tamamla",
 ] as const;
 
 /** robots.txt'te her zaman Disallow olan yollar (çıkarılamaz). */
@@ -267,4 +270,6 @@ export const ALWAYS_DISALLOW = [
   "/r/",
   "/p/",
   "/vitrin/*/favoriler",
+  "/auth/",
+  "/kayit/tamamla",
 ] as const;

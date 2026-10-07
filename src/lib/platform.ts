@@ -23,6 +23,12 @@ function allowlist(): string[] {
     .filter(Boolean);
 }
 
+/** E-posta platform personeli ön-izin listesinde mi (PLATFORM_ADMIN_EMAILS). Google ile ofis açma kapısı kullanır. */
+export function isPlatformAllowlistedEmail(email: string | null | undefined): boolean {
+  const e = (email ?? "").trim().toLowerCase();
+  return e !== "" && allowlist().includes(e);
+}
+
 /** Ensure allowlisted emails are inserted into platform_staff on first access. */
 export async function bootstrapPlatformStaffIfAllowed(
   userId: string,

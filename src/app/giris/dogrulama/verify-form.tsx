@@ -1,20 +1,41 @@
 "use client";
 
-import { useActionState } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { ArrowRight, Loader2, LogOut, MessageSquareText, RotateCcw, ShieldCheck } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { cancelLoginVerification, resendLoginCode, verifyLoginCode, type VerifyResult } from "./actions";
 
 const initial: VerifyResult = {};
 
-export function VerifyForm({ next, maskedPhone }: { next: string; maskedPhone: string }) {
+export function VerifyForm({
+  next,
+  maskedPhone,
+  autoSend = false,
+}: {
+  next: string;
+  maskedPhone: string;
+  /** Google ile girişte kod henüz gönderilmedi: sayfa açılınca bir kez gönderilir (sunucuda hız sınırlı). */
+  autoSend?: boolean;
+}) {
   const [state, action, pending] = useActionState(verifyLoginCode, initial);
   const [resendState, resendAction, resendPending] = useActionState(resendLoginCode, initial);
+  const autoSent = useRef(false);
+
+  // Google girişinde SMS'i signIn değil bu sayfa başlatır (tek sefer; yenilemede tekrar göndermemek için
+  // `kaynak` parametresi adresten silinir).
+  useEffect(() => {
+    if (!autoSend || autoSent.current) return;
+    autoSent.current = true;
+    startTransition(() => resendAction(new FormData()));
+    const url = new URL(window.location.href);
+    url.searchParams.delete("kaynak");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }, [autoSend, resendAction]);
 
   return (
     <AuthShell
       panelTitle="Hesabınız iki adımlı doğrulamayla korunuyor"
-      panelDesc="Şifreniz doğrulandı. Son adım olarak telefonunuza gönderilen 6 haneli kodu girin."
+      panelDesc={`${autoSend ? "Google hesabınız" : "Şifreniz"} doğrulandı. Son adım olarak telefonunuza gönderilen 6 haneli kodu girin.`}
     >
       <div className="mt-8 lg:mt-0">
         <span className="inline-flex items-center gap-2 rounded-full bg-mint-500/12 px-3 py-1.5 text-xs font-semibold text-mint-600">

@@ -10,6 +10,7 @@ import { AUTH_VERIFIED_HEADER, claimsMatchLiveUser } from "@/lib/supabase/verifi
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform-flags-cache";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
+import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
 
 /** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
 function maintenanceResponse(request: NextRequest) {
@@ -181,6 +182,26 @@ export async function updateSession(request: NextRequest) {
       redirect.pathname = "/giris/mfa";
       redirect.search = "";
       redirect.searchParams.set("next", path);
+      return NextResponse.redirect(redirect);
+    }
+
+    // Google ile gelip ofis kurulumunu bitirmemiş kullanıcı: oturumu KAPATMADAN kuruluma (döngüsüz;
+    // /kayit/tamamla proxy kapısı dışında, ofis claim'i oluşunca bu dal bir daha tetiklenmez).
+    if (
+      isApp &&
+      !canonicalIdentity &&
+      needsOAuthOnboarding({
+        hasProfile: Boolean(profile),
+        profileError: Boolean(profileError),
+        isPlatformStaff: Boolean(staff),
+        claimTenantId: tenantId || null,
+        impersonating,
+        providers: userProviders(user),
+      })
+    ) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = GOOGLE_ONBOARDING_PATH;
+      redirect.search = "";
       return NextResponse.redirect(redirect);
     }
 

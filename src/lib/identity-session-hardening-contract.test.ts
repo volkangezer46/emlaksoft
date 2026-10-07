@@ -157,13 +157,17 @@ describe("identity and session hardening contract", () => {
   });
 
   it("preserves allowlisted pricing choices during registration", () => {
-    expect(auth).toContain("registrationPlanForTeamSize(requestedPlan, teamSize)");
-    expect(auth).toContain("normalizeBillingCycle(requestedCycle)");
-    expect(auth).toContain('"provision_registration"');
-    expect(auth).toContain("p_billing_cycle: billingCycle");
-    expect(auth).toContain("p_terms_version: REGISTRATION_TERMS_VERSION");
-    expect(auth).toContain("admin.auth.admin.deleteUser(created.user.id)");
+    // Provizyon çekirdeği e-posta ve Google kayıt yolunda ortak (signUp → provisionOfficeForUser).
+    const core = read("src/lib/registration/provision-office.ts");
+    expect(auth).toContain("provisionOfficeForUser(admin, publicClient");
+    expect(core).toContain("registrationPlanForTeamSize(requestedPlan, teamSize)");
+    expect(core).toContain("normalizeBillingCycle(requestedCycle)");
+    expect(core).toContain('"provision_registration"');
+    expect(core).toContain("p_billing_cycle: billingCycle");
+    expect(core).toContain("p_terms_version: REGISTRATION_TERMS_VERSION");
+    expect(auth).toContain("admin.auth.admin.deleteUser(userId)");
     expect(auth).not.toContain('.from("subscriptions").insert');
+    expect(core).not.toContain('.from("subscriptions").insert');
     expect(migration).toContain("sync_inserted_profile_auth_identity");
     expect(registrationForm).toContain('name="legal_consent"');
     expect(auth).toContain("bootstrapPlatformStaffIfAllowed");

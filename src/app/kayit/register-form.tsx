@@ -21,7 +21,8 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { signUp, type AuthResult } from "@/app/actions/auth";
+import { signOut, signUp, type AuthResult } from "@/app/actions/auth";
+import { AuthDivider, GoogleAuthButton, GoogleGIcon } from "@/components/auth/google-button";
 import { listDistricts, type GeoOption } from "@/app/actions/geo";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
@@ -95,7 +96,16 @@ export function RegisterForm({
   efLive = false,
   copy,
   provinces = [],
+  googleEnabled = false,
+  googleAccount = null,
 }: {
+  /** "Google ile devam et" düğmesi 1. adımda görünsün mü (NEXT_PUBLIC_GOOGLE_AUTH_ENABLED, sunucuda okunur). */
+  googleEnabled?: boolean;
+  /**
+   * Google ile gelen, ofisi henüz olmayan kullanıcı (/kayit/tamamla): hesap adımı kısalır (ad önceden dolu,
+   * e-posta salt-okunur, şifre yok, telefon zorunlu); diğer adımlar ve rıza AYNI.
+   */
+  googleAccount?: { name: string; email: string } | null;
   /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
   efValuationCost?: number;
   /** EmlakFiyati canlı mı (tek durum kaynağı); değilse kontör satırı "(planlanan)" ve satın alma cümlesi yok. */
@@ -120,6 +130,7 @@ export function RegisterForm({
   // Tek hesapta satılabilecek en yüksek kullanıcı sayısı katalogdan gelir (sabit yok).
   const MAX_SEATS_INPUT = seatBounds(plans).inputMax;
   const [state, action, pending] = useActionState(signUp, initial);
+  const googleMode = googleAccount !== null;
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [pw, setPw] = useState("");
@@ -249,7 +260,8 @@ export function RegisterForm({
     if (step === 1) {
       // Telefon opsiyonel ama girildiyse TR cep olmalı (sunucu aynı kuralı parsePhoneStrict ile uygular).
       const stored = formRef.current?.querySelector<HTMLInputElement>('input[type="hidden"][name="phone"]')?.value;
-      const phoneError = signupPhoneClientError(stored);
+      const phoneError =
+        googleMode && !(stored ?? "").trim() ? "Telefon numarası zorunlu (cep)." : signupPhoneClientError(stored);
       if (phoneError) {
         setFieldErrors((cur) => ({ ...cur, phone: phoneError }));
         document.getElementById("phone")?.focus();
@@ -298,7 +310,8 @@ export function RegisterForm({
   }
 
   const effectiveHex = parseBrandColor(customHex) ?? brandColor;
-  const current = STEPS[step - 1]!;
+  const baseStep = STEPS[step - 1]!;
+  const current = googleMode && step === 1 ? { ...baseStep, question: "Bilgilerini onayla" } : baseStep;
   const progress = Math.round(((step - 1) / (LAST - 1)) * 100);
   const trialText = trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme";
 
@@ -311,8 +324,14 @@ export function RegisterForm({
       }
     >
       <div className="mt-8 lg:mt-0">
-        <h1 className="font-display text-3xl font-extrabold text-ink-950">{copy?.title ?? "Ofisini ücretsiz kur"}</h1>
-        <p className="mt-2 text-sm text-text-muted">{copy?.text ?? `${LAST} kısa adım · ${trialText} · kart gerekmez.`}</p>
+        <h1 className="font-display text-3xl font-extrabold text-ink-950">
+          {googleMode ? "Ofis kurulumunu tamamla" : (copy?.title ?? "Ofisini ücretsiz kur")}
+        </h1>
+        <p className="mt-2 text-sm text-text-muted">
+          {googleMode
+            ? `Google hesabın doğrulandı. ${LAST} kısa adımda ofisini kur · ${trialText} · kart gerekmez.`
+            : (copy?.text ?? `${LAST} kısa adım · ${trialText} · kart gerekmez.`)}
+        </p>
 
         {/* İlerleme: çubuk + adım sayacı; tamamlanmış adımlara tıklanarak dönülür */}
         <div className="mt-6" aria-live="polite">
@@ -366,6 +385,7 @@ export function RegisterForm({
             <input key={id} type="hidden" name={FIELD.workDistricts} value={id} />
           ))}
           <AttributionFields attribution={attribution} />
+          {googleMode ? <input type="hidden" name="auth_mode" value="google" /> : null}
 
           {/* Adım başlığı: tek soru */}
           <h2 key={`q-${step}`} className="tfs-panel font-display text-lg font-bold text-ink-950">
@@ -374,57 +394,87 @@ export function RegisterForm({
 
           {/* ADIM 1 — Hesap */}
           <div data-step="1" className={step === 1 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+            {googleMode ? (
+              <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white">
+                  <GoogleGIcon />
+                </span>
+                <div className="min-w-0 text-xs">
+                  <p className="font-semibold text-ink-950">Google hesabınla devam ediyorsun</p>
+                  <p className="truncate text-text-muted">Giriş için şifre gerekmez; Google ile giriş yaparsın.</p>
+                </div>
+              </div>
+            ) : googleEnabled ? (
+              <>
+                <GoogleAuthButton next="/app" />
+                <AuthDivider />
+              </>
+            ) : null}
             <div data-field="name">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="name">Ad soyad</label>
               <div className="relative">
                 <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input id="name" name="name" required autoComplete="name" placeholder="Adınız Soyadınız" className={inputCls} aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "name-error" : undefined} />
+                <input id="name" name="name" required defaultValue={googleAccount?.name ?? undefined} autoComplete="name" placeholder="Adınız Soyadınız" className={inputCls} aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? "name-error" : undefined} />
               </div>
               {fieldErrorEl("name")}
             </div>
-            <div data-field="email">
-              <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="email">E-posta</label>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <EmailInput id="email" name="email" required autoComplete="email" placeholder="ornek@ofis.com" className={inputCls} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={fieldErrors.email ? "email-error" : undefined} />
+            {googleMode ? (
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="google-email">E-posta</label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                  <EmailInput id="google-email" value={googleAccount?.email ?? ""} readOnly aria-readonly="true" className={`${inputCls} cursor-not-allowed bg-canvas text-text-muted`} />
+                </div>
+                <p className="mt-1 text-xs text-text-faint">Google hesabından gelir, değiştirilemez.</p>
               </div>
-              {fieldErrorEl("email")}
-            </div>
+            ) : (
+              <div data-field="email">
+                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="email">E-posta</label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                  <EmailInput id="email" name="email" required autoComplete="email" placeholder="ornek@ofis.com" className={inputCls} aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={fieldErrors.email ? "email-error" : undefined} />
+                </div>
+                {fieldErrorEl("email")}
+              </div>
+            )}
             <div data-field="phone">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="phone">
-                Telefon <span className="font-normal text-text-faint">(opsiyonel, cep)</span>
+                Telefon{" "}
+                <span className="font-normal text-text-faint">{googleMode ? "(cep, zorunlu: güvenlik ve bildirimler için)" : "(opsiyonel, cep)"}</span>
               </label>
-              <PhoneInput id="phone" name="phone" className={plainInputCls} aria-invalid={fieldErrors.phone ? true : undefined} aria-describedby={fieldErrors.phone ? "phone-error" : undefined} />
+              <PhoneInput id="phone" name="phone" required={googleMode} className={plainInputCls} aria-invalid={fieldErrors.phone ? true : undefined} aria-describedby={fieldErrors.phone ? "phone-error" : undefined} />
               {fieldErrorEl("phone")}
             </div>
-            <div data-field="password">
-              <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="password">Şifre</label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  placeholder="En az 8 karakter"
-                  value={pw}
-                  onChange={(e) => setPw(e.target.value)}
-                  className="w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
-                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+            {googleMode ? null : (
+              <div data-field="password">
+                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="password">Şifre</label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    placeholder="En az 8 karakter"
+                    value={pw}
+                    onChange={(e) => setPw(e.target.value)}
+                    className="w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
+                    aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <PasswordStrengthMeter password={pw} />
+                {fieldErrorEl("password")}
               </div>
-              <PasswordStrengthMeter password={pw} />
-              {fieldErrorEl("password")}
-            </div>
+            )}
             <button type="button" onClick={next} className={primaryBtn}>
               Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </button>
@@ -794,12 +844,23 @@ export function RegisterForm({
 
         </form>
 
-        <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
-          Zaten hesabın var mı?{" "}
-          <Link href="/giris" className="font-semibold text-brand-600 hover:underline">
-            Giriş yap
-          </Link>
-        </p>
+        {googleMode ? (
+          <form action={signOut} className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
+            <p className="text-xs text-text-faint">
+              Bir ofise davet edildiysen yeni ofis açma; davet e-postasındaki bağlantıyı kullan.
+            </p>
+            <button type="submit" className="mt-2 font-semibold text-brand-600 hover:underline">
+              Farklı bir hesapla devam et
+            </button>
+          </form>
+        ) : (
+          <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
+            Zaten hesabın var mı?{" "}
+            <Link href="/giris" className="font-semibold text-brand-600 hover:underline">
+              Giriş yap
+            </Link>
+          </p>
+        )}
       </div>
     </AuthShell>
   );

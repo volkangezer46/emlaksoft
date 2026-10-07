@@ -19,6 +19,10 @@ const h = vi.hoisted(() => ({
   wantsDemo: false,
   demoSeed: vi.fn(),
   applyProfile: vi.fn(),
+  getUser: vi.fn(),
+  refreshSession: vi.fn(),
+  profileRow: null as null | { id: string },
+  staffRow: null as null | { id: string },
 }));
 
 class RedirectSignal extends Error {
@@ -40,7 +44,10 @@ vi.mock("@/lib/platform-mfa", () => ({ isPlatformMfaRequired: () => false }));
 vi.mock("@/app/giris/_lib/login-events", () => ({ logLoginEvent: h.loginEvent }));
 vi.mock("@/app/imza/_lib/sms", () => ({ sendSignerSms: vi.fn() }));
 vi.mock("@/lib/impersonation", () => ({ restoreImpersonationMetadata: vi.fn() }));
-vi.mock("@/lib/platform", () => ({ bootstrapPlatformStaffIfAllowed: vi.fn() }));
+vi.mock("@/lib/platform", () => ({
+  bootstrapPlatformStaffIfAllowed: vi.fn(),
+  isPlatformAllowlistedEmail: (e: string) => e === "patron@emlaksoft.com",
+}));
 vi.mock("@/lib/messaging/netgsm", () => ({ sendSms: vi.fn() }));
 vi.mock("@/lib/platform-flags", () => ({ isRegistrationOpen: async () => h.open }));
 vi.mock("@/lib/growth/capture", () => ({ recordSignupAttributionFromRequest: h.attribution }));
@@ -52,10 +59,19 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     auth: { admin: { createUser: h.createUser, deleteUser: h.deleteUser } },
     rpc: h.rpc,
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: table === "profiles" ? h.profileRow : h.staffRow, error: null }),
+        }),
+      }),
+    }),
   }),
 }));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: { signInWithPassword: h.signInWithPassword } }),
+  createClient: async () => ({
+    auth: { signInWithPassword: h.signInWithPassword, getUser: h.getUser, refreshSession: h.refreshSession },
+  }),
 }));
 vi.mock("@/lib/sample-registration-seed", () => ({
   DEMO_SEED_FAILED_COOKIE: "demo_seed_failed",
@@ -89,6 +105,24 @@ function form(over: Record<string, string> = {}) {
   return f;
 }
 
+function googleUser(over: Record<string, unknown> = {}) {
+  return {
+    id: "google-user-1",
+    email: "Ayse.Yilmaz@gmail.com",
+    app_metadata: { provider: "google", providers: ["google"] },
+    identities: [{ provider: "google" }],
+    ...over,
+  };
+}
+
+/** /kayit/tamamla formu: hesap adımı Google oturumundan; e-posta/şifre alanı YOK. */
+function googleForm(over: Record<string, string> = {}) {
+  const f = form({ auth_mode: "google", ...over });
+  f.delete("email");
+  f.delete("password");
+  return f;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -102,6 +136,11 @@ beforeEach(() => {
   h.attribution.mockResolvedValue(undefined);
   h.demoSeed.mockResolvedValue({ ok: true });
   h.applyProfile.mockResolvedValue({ warnings: [], invited: 0 });
+  h.profileRow = null;
+  h.staffRow = null;
+  h.getUser.mockResolvedValue({ data: { user: googleUser() } });
+  h.refreshSession.mockResolvedValue({ error: null });
+  process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED = "true";
 });
 
 describe("signUp — ön kapılar (hiçbir kaynak oluşmaz)", () => {
@@ -229,5 +268,76 @@ describe("signUp — başarılı akış", () => {
     expect(h.demoSeed).toHaveBeenCalledWith(expect.anything(), "tenant-1", "user-1", "ticari");
     expect(h.applyProfile.mock.invocationCallOrder[0]!).toBeLessThan(h.demoSeed.mock.invocationCallOrder[0]!);
     expect(h.deleteUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("signUp — Google ile tamamlama (auth_mode=google)", () => {
+  it("auth kullanıcısı OLUŞTURULMAZ; aynı çekirdek oturumdaki kullanıcıyla çalışır, claim'ler yenilenir, /app", async () => {
+    await expect(signUp({}, googleForm())).rejects.toMatchObject({ to: "/app" });
+    expect(h.createUser).not.toHaveBeenCalled();
+    expect(h.signInWithPassword).not.toHaveBeenCalled();
+    const [fn, args] = h.rpc.mock.calls[0]!;
+    expect(fn).toBe("provision_registration");
+    expect(args).toMatchObject({ p_user_id: "google-user-1", p_full_name: "Ayşe Yılmaz", p_phone: "05321234567" });
+    // Rıza: e-posta yoluyla aynı sürümler.
+    expect(args).toMatchObject({ p_terms_version: "kullanim-sartlari-2026-07-31", p_kvkk_version: "kvkk-aydinlatma-2026-07-31" });
+    expect(h.attribution).toHaveBeenCalledWith("tenant-1", expect.any(FormData));
+    expect(h.refreshSession).toHaveBeenCalledTimes(1);
+    expect(h.loginEvent).toHaveBeenCalledWith(expect.objectContaining({ userId: "google-user-1", tenantId: "tenant-1", result: "success" }));
+  });
+
+  it("telefon zorunlu ve TR cep olmalı; rıza zorunlu", async () => {
+    expect(await signUp({}, googleForm({ phone: "" }))).toMatchObject({ field: "phone" });
+    expect(await signUp({}, googleForm({ phone: "+4915123456789" }))).toMatchObject({ field: "phone" });
+    expect(await signUp({}, googleForm({ legal_consent: "" }))).toMatchObject({ field: "legal_consent" });
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it("kayıt kapalı, bayrak kapalı, oturum yok veya Google kimliği yoksa hiçbir şey oluşmaz", async () => {
+    h.open = false;
+    expect((await signUp({}, googleForm())).error).toBeTruthy();
+    h.open = true;
+    process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED = "false";
+    expect((await signUp({}, googleForm())).error).toMatch(/kullanılamıyor/);
+    process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED = "true";
+    h.getUser.mockResolvedValue({ data: { user: null } });
+    expect((await signUp({}, googleForm())).error).toMatch(/Google oturumunuz/);
+    h.getUser.mockResolvedValue({ data: { user: googleUser({ app_metadata: { provider: "email" }, identities: [{ provider: "email" }] }) } });
+    expect((await signUp({}, googleForm())).error).toMatch(/Google oturumunuz/);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it("demo hesabı ve platform personeli Google ile ofis açamaz", async () => {
+    h.getUser.mockResolvedValue({ data: { user: googleUser({ email: "sahip@demo.emlaksoft.test" }) } });
+    expect((await signUp({}, googleForm())).error).toMatch(/yeni ofis açılamaz/);
+    h.getUser.mockResolvedValue({ data: { user: googleUser({ email: "patron@emlaksoft.com" }) } });
+    expect((await signUp({}, googleForm())).error).toMatch(/yeni ofis açılamaz/);
+    h.getUser.mockResolvedValue({ data: { user: googleUser() } });
+    h.staffRow = { id: "google-user-1" };
+    expect((await signUp({}, googleForm())).error).toMatch(/yeni ofis açılamaz/);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it("zaten provizyonlu kullanıcı (profil var ya da claim var) yeniden ofis açmaz → /app", async () => {
+    h.profileRow = { id: "google-user-1" };
+    await expect(signUp({}, googleForm())).rejects.toMatchObject({ to: "/app" });
+    h.profileRow = null;
+    h.getUser.mockResolvedValue({ data: { user: googleUser({ app_metadata: { provider: "google", tenant_id: "t-9" } }) } });
+    await expect(signUp({}, googleForm())).rejects.toMatchObject({ to: "/app" });
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it("provizyon başarısızsa Google kullanıcısı SİLİNMEZ (yeniden dener)", async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+    const r = await signUp({}, googleForm());
+    expect(r.error).toMatch(/güvenli şekilde oluşturulamadı/);
+    expect(h.deleteUser).not.toHaveBeenCalled();
+    expect(h.refreshSession).not.toHaveBeenCalled();
+  });
+
+  it("claim yenileme başarısızsa anlaşılır mesaj döner", async () => {
+    h.refreshSession.mockResolvedValue({ error: { message: "x" } });
+    const r = await signUp({}, googleForm());
+    expect(r.error).toMatch(/yeniden giriş/);
   });
 });
