@@ -215,7 +215,7 @@ function TenantRow({
               <Link href={`/admin/members?tenant=${row.id}`} className="font-semibold text-accent-text hover:underline" title="Ofisin kullanıcılarını listele">
                 <Users aria-hidden="true" /> {row.members === null ? "—" : `${row.members} üye`}
               </Link>
-              <span title="Kayıt tarihi">
+              <span title="Kayıt tarihi" className="adm-meta-opt">
                 <CalendarDays aria-hidden="true" /> {row.createdLabel}
               </span>
               <span className={HEALTH_TEXT[row.health.tone]} title={healthTitle}>

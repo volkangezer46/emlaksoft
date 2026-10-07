@@ -48,12 +48,13 @@ export function RowSaveActions<T extends DraftValues>({
             ? "Kaydedilmemiş değişiklik var"
             : "";
 
+  const confirming = status === "confirming" && Boolean(risk);
   return (
-    <div className="rs-actions">
-      {status === "confirming" && risk ? (
+    <div className="rs-wrap">
+      {confirming ? (
         <div className="rs-confirm" role="group" aria-label="Riskli değişiklik onayı">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>{risk}</span>
+          <span className="min-w-0 flex-1">{risk}</span>
           <Button size="xs" variant="danger" onClick={() => void draft.submit()} autoFocus>
             {confirmLabel}
           </Button>
@@ -61,29 +62,43 @@ export function RowSaveActions<T extends DraftValues>({
             Vazgeç
           </Button>
         </div>
-      ) : (
-        <>
-          {dirty && showUnsavedLabel && !saving ? <span className="rs-unsaved">Kaydedilmemiş</span> : null}
-          {dirty && !saving ? (
-            <Button size="icon" variant="ghost" onClick={draft.reset} aria-label="Değişikliği geri al (Esc)" title="Değişikliği geri al (Esc)">
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          ) : null}
+      ) : null}
+      <div className="rs-actions">
+        {/* Yer sabit: ↺ temizken görünmez ama yerini korur, etiket Kaydet'in köşesinde rozet, Kaydet genişliği sabit
+            → kirlenince/kaydederken tablo sütunları kaymaz. */}
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={draft.reset}
+          aria-label="Değişikliği geri al (Esc)"
+          title="Değişikliği geri al (Esc)"
+          className={dirty && !saving ? undefined : "invisible"}
+          aria-hidden={dirty && !saving ? undefined : true}
+          tabIndex={dirty && !saving ? undefined : -1}
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <span className="rs-save">
           <Button
             size="sm"
             variant="navy"
             icon={Check}
             loading={saving}
-            disabled={!canSave && !saving}
+            disabled={(!canSave || confirming) && !saving}
             onClick={() => void draft.submit()}
-            className={saved ? "btn-saved" : undefined}
+            className={saved ? "btn-saved rs-save-btn" : "rs-save-btn"}
             title={invalidReason ?? (canSave ? "Kaydet (Enter)" : dirty ? undefined : "Değişiklik yok")}
           >
             {saving ? "Kaydediliyor…" : saved ? "Kaydedildi" : saveLabel}
           </Button>
-        </>
-      )}
-      {children}
+          {dirty && showUnsavedLabel && !saving && !confirming ? (
+            <span className="rs-unsaved" aria-hidden="true">
+              Kaydedilmemiş
+            </span>
+          ) : null}
+        </span>
+        {children}
+      </div>
       {stale ? (
         <p className="rs-hint" data-tone="error" role="alert">
           Bu satır başkası tarafından güncellendi.{" "}
