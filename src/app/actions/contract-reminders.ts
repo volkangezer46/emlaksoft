@@ -25,7 +25,7 @@ const CODE_MESSAGE: Record<string, string> = {
   throttled: "Bu kişiye son 10 dakikada hatırlatma gönderildi; biraz sonra tekrar deneyin.",
   limit: "Bu kişiye en fazla 10 hatırlatma gönderilebilir.",
   forbidden: "Bu işlem için yetkiniz yok.",
-  unauthorized: "Oturum doğrulanamadı.",
+  unauthorized: "Oturumunuz doğrulanamadı; sayfayı yenileyip yeniden giriş yapın.",
 };
 
 export async function remindContractSignerBySms(contractId: string, signerId: string): Promise<SignerReminderResult> {
@@ -44,17 +44,17 @@ export async function remindContractSignerBySms(contractId: string, signerId: st
   if (error) {
     if (error.code === "PGRST202" || error.code === "42883") return { fallback: true };
     console.error("remindContractSignerBySms rpc", { code: error.code });
-    return { error: "Hatırlatma hazırlanamadı. Lütfen tekrar deneyin." };
+    return { error: "Hatırlatma şu an hazırlanamadı; birkaç dakika sonra yeniden deneyin ya da WhatsApp ile iletin." };
   }
   const res = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
   if (!res || res.ok !== true) {
     const code = String(res?.code ?? "");
     if (code === "no_phone") return { fallback: true };
-    return { error: CODE_MESSAGE[code] ?? "Hatırlatma gönderilemedi." };
+    return { error: CODE_MESSAGE[code] ?? "Hatırlatma gönderilemedi; imzacının durumunu kontrol edip WhatsApp veya bağlantıyı kopyala ile iletin." };
   }
   const phone = typeof res.phone === "string" ? res.phone : "";
   const shortCode = typeof res.short_code === "string" ? res.short_code : "";
-  if (!/^[0-9a-f]{16}$/.test(shortCode)) return { error: "Hatırlatma bağlantısı oluşturulamadı." };
+  if (!/^[0-9a-f]{16}$/.test(shortCode)) return { error: "Kısa imza bağlantısı üretilemedi; bağlantıyı kopyala düğmesiyle tam bağlantıyı iletin." };
   if (!(await isSignerSmsAvailable(gate.tenantId, phone))) return { fallback: true };
 
   const link = `${getBaseUrl()}/imza/k/${shortCode}`;

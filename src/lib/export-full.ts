@@ -271,7 +271,10 @@ export async function openFullCsvStream(
 
   // Özel alanlar (`ozel: <etiket>` sütunları): tanımlar bir kez, değerler sayfa başına (RLS'li istemci + tenant filtresi).
   const cfEntity = CUSTOM_FIELD_EXPORT_ENTITY[def.slug] ?? null;
-  const cfDefs = cfEntity ? (await loadCustomFieldDefs(supabase, gate.tenantId, cfEntity)).defs : [];
+  // Özel alan okuması dışa aktarmayı asla bozmaz: hata/şema yoksa sütunlar eklenmez.
+  const cfDefs = cfEntity
+    ? await loadCustomFieldDefs(supabase, gate.tenantId, cfEntity).then((r) => r.defs).catch(() => [])
+    : [];
   let cfValues = new Map<string, Map<string, CustomFieldValueRow>>();
   const customFor = (r: RawRow): Record<string, string> => {
     if (cfDefs.length === 0) return {};
@@ -288,7 +291,9 @@ export async function openFullCsvStream(
     const rows = (data ?? []) as RawRow[];
     await resolveNames(supabase, gate, def, rows, names);
     if (cfEntity && cfDefs.length > 0) {
-      cfValues = await loadCustomFieldValues(supabase, gate.tenantId, cfEntity, rows.map((r) => String((r as { id?: unknown }).id ?? "")));
+      cfValues = await loadCustomFieldValues(supabase, gate.tenantId, cfEntity, rows.map((r) => String((r as { id?: unknown }).id ?? ""))).catch(
+        () => new Map(),
+      );
     }
     return rows;
   };

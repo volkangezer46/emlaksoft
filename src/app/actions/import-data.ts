@@ -688,7 +688,7 @@ const RENTAL_OUTCOME_MESSAGE: Record<string, string> = {
   assignee_not_found: "Seçilen danışman bu ofiste aktif değil.",
   invalid_input: "Kira bilgileri geçersiz.",
   forbidden: "Kira ve komisyon ekleme yetkisi gerekir.",
-  unauthorized: "Oturum doğrulanamadı.",
+  unauthorized: "Oturumunuz doğrulanamadı; sayfayı yenileyip yeniden giriş yapın.",
 };
 
 type RentalPlanData = NormalizedRental & {
@@ -744,20 +744,20 @@ async function runRentalChunk(
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
       .in("property_code", part);
-    if (error) return { error: "Portföy eşleşmesi yapılamadı. Lütfen tekrar deneyin." };
+    if (error) return { error: "Portföyler şu an eşleştirilemiyor; birkaç dakika sonra aynı dosyayla yeniden deneyin." };
     for (const p of data ?? []) propertyByCode.set(foldText(String(p.property_code)), { id: String(p.id), status: (p.status as string | null) ?? null });
   }
   const activeRentalProps = new Set<string>();
   const propertyIds = [...propertyByCode.values()].map((p) => p.id);
   for (const part of chunked(propertyIds, LOOKUP_CHUNK)) {
     const { data, error } = await supabase.from("rentals").select("property_id").eq("tenant_id", gate.tenantId).eq("status", "active").in("property_id", part);
-    if (error) return { error: "Aktif kira kontrolü yapılamadı. Lütfen tekrar deneyin." };
+    if (error) return { error: "Aktif kira kontrolü şu an yapılamıyor; birkaç dakika sonra aynı dosyayla yeniden deneyin." };
     for (const r of data ?? []) activeRentalProps.add(String(r.property_id));
   }
   const customerByPhone = new Map<string, { id: string; name: string | null }>();
   for (const part of chunked(phones, LOOKUP_CHUNK)) {
     const { data, error } = await supabase.from("customers").select("id, full_name, phone").eq("tenant_id", gate.tenantId).is("deleted_at", null).in("phone", part);
-    if (error) return { error: "Müşteri eşleşmesi yapılamadı. Lütfen tekrar deneyin." };
+    if (error) return { error: "Kiracı/malik eşleşmesi şu an yapılamıyor; birkaç dakika sonra aynı dosyayla yeniden deneyin." };
     for (const c of data ?? []) if (c.phone && !customerByPhone.has(String(c.phone))) customerByPhone.set(String(c.phone), { id: String(c.id), name: (c.full_name as string | null) ?? null });
   }
 
@@ -857,7 +857,7 @@ async function runRentalChunk(
         if (rpcMissing) return fail(p, "Kiralama içe aktarma henüz etkin değil.");
         const d = p.data!;
         const renterId = d.renter_id ?? (d.renter.phone ? customerByPhone.get(d.renter.phone)?.id : undefined);
-        if (!renterId) return fail(p, "Kiracı müşteri kaydı oluşturulamadı.");
+        if (!renterId) return fail(p, "Kiracı müşteri olarak eklenemedi; telefon ve adı kontrol edip satırı yeniden aktarın.");
         const ownerId = d.owner_id ?? (d.owner?.phone ? customerByPhone.get(d.owner.phone)?.id ?? null : null);
         const { data, error } = await supabase.rpc("import_rental_with_deal", {
           p_property_id: d.property_id,
@@ -876,11 +876,11 @@ async function runRentalChunk(
         if (error) {
           if (error.code === "PGRST202" || error.code === "42883") rpcMissing = true;
           console.error("import_rental_with_deal", error.code);
-          return fail(p, rpcMissing ? "Kiralama içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı.");
+          return fail(p, rpcMissing ? "Kiralama içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Kiralama ekranından ekleyin.");
         }
         const res = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
         if (res?.outcome !== "created" || typeof res.rental_id !== "string") {
-          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı.");
+          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Kiralama ekranından ekleyin.");
         }
         createdRentalIds.push(res.rental_id);
       }),

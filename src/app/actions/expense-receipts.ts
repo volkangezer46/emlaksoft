@@ -40,7 +40,7 @@ async function expenseUploadGate(expenseId: string): Promise<{ ok: true; gate: U
     .maybeSingle();
   if (error) {
     console.error("expense receipt ownership", { code: error.code });
-    return { ok: false, error: "Gider kaydı okunamadı." };
+    return { ok: false, error: "Gider kaydı şu an okunamıyor; sayfayı yenileyip yeniden deneyin." };
   }
   if (!data) return { ok: false, error: "Gider kaydı bulunamadı." };
   if (!edit.ok && data.created_by !== gate.userId) {
@@ -118,7 +118,7 @@ export async function deleteExpenseReceipt(expenseIdValue: string): Promise<{ ok
   if (error) {
     if (isMissingExpenseReceiptSchema(error)) return { error: NOT_READY };
     console.error("deleteExpenseReceipt", { code: error.code });
-    return { error: "Fiş dosyası kaldırılamadı." };
+    return { error: "Fiş dosyası şu an kaldırılamadı; sayfayı yenileyip yeniden deneyin." };
   }
   if (!data || data.length === 0) return { error: "Fiş dosyası bulunamadı." };
   await logActivity({
