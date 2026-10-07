@@ -497,6 +497,7 @@ export function PropertyMediaManager({
         {canEdit ? (
           <div className="flex flex-wrap items-center gap-2">
             <input
+              aria-label="Fotoğraf seç"
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
@@ -507,6 +508,7 @@ export function PropertyMediaManager({
             {/* Saha çekimi: arka kamerayı doğrudan açar. UA yerine CSS ile yalnız
                 dokunmatik cihazda görünür (hover-action deseniyle aynı yaklaşım). */}
             <input
+              aria-label="Kamerayla fotoğraf çek"
               ref={cameraRef}
               type="file"
               accept="image/*"

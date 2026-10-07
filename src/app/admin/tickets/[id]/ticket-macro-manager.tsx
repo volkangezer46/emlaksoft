@@ -81,8 +81,8 @@ export function TicketMacroManager({ macros }: { macros: { id: string; title: st
           </ul>
         ) : <p className="text-xs text-text-faint">Henüz hazır yanıt yok.</p>}
         <form ref={formRef} action={action} className="space-y-2">
-          <input type="text" name="title" required maxLength={120} placeholder="Makro başlığı" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
-          <textarea name="body" required minLength={3} maxLength={5000} rows={3} placeholder="Hazır yanıt metni…" className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
+          <input aria-label="Makro başlığı" type="text" name="title" required maxLength={120} placeholder="Makro başlığı" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
+          <textarea aria-label="Makro metni" name="body" required minLength={3} maxLength={5000} rows={3} placeholder="Hazır yanıt metni…" className="w-full resize-y rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-2 text-xs outline-none focus:border-brand-400" />
           <Button type="submit" size="sm" icon={Plus} loading={pending} className="w-full">Makro ekle</Button>
           {state.error ? <p className="text-xs font-semibold text-danger-600" role="alert">{state.error}</p> : null}
           {state.ok ? <p className="text-xs font-semibold text-mint-700" role="status">Hazır yanıt eklendi.</p> : null}

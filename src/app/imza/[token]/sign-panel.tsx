@@ -126,6 +126,7 @@ export function SignPanel({
               <form action={verifyAction} className="mt-3 flex gap-2">
                 <input type="hidden" name="token" value={token} />
                 <input
+                  aria-label="6 haneli doğrulama kodu"
                   type="text"
                   name="code"
                   inputMode="numeric"

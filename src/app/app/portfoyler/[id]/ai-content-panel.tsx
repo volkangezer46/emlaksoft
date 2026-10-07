@@ -112,6 +112,7 @@ export function AiContentPanel({ propertyId, canEdit = false }: { propertyId: st
         ) : text ? (
           <div className="mt-4">
             <textarea
+              aria-label="Üretilen metin"
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={10}

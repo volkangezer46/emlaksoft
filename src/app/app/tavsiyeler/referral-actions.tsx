@@ -191,6 +191,7 @@ export function ReferralNoteButton({ id }: { id: string }) {
   return (
     <div className="w-[240px] space-y-1.5">
       <textarea
+        aria-label="Not"
         value={note}
         onChange={(e) => setNote(e.target.value)}
         rows={2}

@@ -64,6 +64,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
             />
           </label>
           <textarea
+            aria-label="Tur notu"
             name="note"
             rows={3}
             placeholder="Not (opsiyonel)"
