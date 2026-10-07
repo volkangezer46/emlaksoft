@@ -69,9 +69,13 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
+  const timing = process.env.EMLAKSOFT_SERVER_TIMING === "1";
+  const tAuth0 = timing ? performance.now() : 0;
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const tAuth = timing ? performance.now() - tAuth0 : 0;
+  let tGates = 0;
 
   const path = request.nextUrl.pathname;
   const isApp = path.startsWith("/app");
@@ -97,6 +101,7 @@ export async function updateSession(request: NextRequest) {
     const impersonating = user.app_metadata?.impersonating === true;
     // Dördü de birbirinden bağımsız (tenantId JWT'den, DB'den değil) → tek
     // Promise.all'da paralel; her navigasyonda 2 seri round-trip yerine 1.
+    const tGates0 = timing ? performance.now() : 0;
     const [
       { data: profile, error: profileError },
       { data: staff },
@@ -119,6 +124,7 @@ export async function updateSession(request: NextRequest) {
         ? supabase.from("tenants").select("status").eq("id", tenantId).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
+    if (timing) tGates = performance.now() - tGates0;
     const sessionId = claimsData?.claims?.session_id;
 
     const canonicalTenantUser = Boolean(
@@ -251,5 +257,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirect);
   }
 
+  // Ölçüm (yalnız EMLAKSOFT_SERVER_TIMING=1): proxy'nin ağ doğrulaması ve kapı okumaları ayrı görünür.
+  if (timing) supabaseResponse.headers.set("Server-Timing", `proxy-auth;dur=${tAuth.toFixed(1)}, proxy-gates;dur=${tGates.toFixed(1)}`);
   return supabaseResponse;
 }
