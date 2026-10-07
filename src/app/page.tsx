@@ -26,6 +26,7 @@ import { buildMetadata } from "@/lib/seo/store";
 import "./marketing.css";
 import "./marketing-sections.css";
 import "./marketing-motion.css";
+import "./marketing-mobile.css";
 
 // Canonical "/" burada verilir (kökte yok); başlık/açıklama/OG ayarlardan, ayar yokken layout varsayılanı.
 export async function generateMetadata(): Promise<Metadata> {

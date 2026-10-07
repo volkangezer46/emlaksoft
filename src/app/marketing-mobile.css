@@ -1,0 +1,101 @@
+/* Ana sayfa MOBİL aşama 2 (< 768 px): bölüm ritmi, yatay kaydırmalı kartlar, şeritler, sekmeler, SSS.
+   Masaüstü/tablet kuralları marketing.css ve marketing-sections.css'te DEĞİŞMEZ; bu dosya yalnız max-width: 767px içinde etki eder
+   (footer akordeonu marketing-sections.css'te: araçlar sayfası da aynı alt bilgiyi kullanır).
+   JS yok: kaydırma kancaları (scroll-snap), nokta göstergesi (::scroll-marker, destekleyen tarayıcıda), akordeon (<details>).
+   Hareket yok (yalnız kullanıcı kaydırması); CLS yok (yüksekliler içerikten, genişlikler sabit oranlı). */
+@media (max-width: 767px) {
+  .mk { --mk-edge: 1rem; --mk-section-y: 3rem; --mk-head-gap: 1.5rem; --mk-stack: 1.25rem; --mk-gap: 0.875rem; --mk-pad: 1.125rem; }
+
+  /* ---- bölüm başlığı hiyerarşisi: eyebrow 12 / h2 26-28 / lead 16 (en çok 3 satır) ---- */
+  .mk-head > * + * { margin-top: 0.625rem; }
+  .mk-h2 { font-size: clamp(1.625rem, 1.2rem + 1.8vw, 1.75rem); line-height: 1.14; }
+  .mk-lead { font-size: 1rem; line-height: 1.5rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  .mk-fine { margin-top: var(--mk-s-4); font-size: 0.8125rem; }
+
+  /* ---- yatay kaydırmalı şerit iskeleti (değer kartları, özellik kartları, fiyat kartları) ---- */
+  .mk-values, .mk-bento, .mk-price-wrap .pricing-grid {
+    display: flex; flex-wrap: nowrap; align-items: stretch; gap: 0.75rem;
+    overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory; scroll-padding-inline: var(--mk-edge); scrollbar-width: none;
+    margin-inline: calc(-1 * var(--mk-edge)); padding: 0.25rem var(--mk-edge) 1.25rem;
+  }
+  .mk-values::-webkit-scrollbar, .mk-bento::-webkit-scrollbar, .mk-price-wrap .pricing-grid::-webkit-scrollbar { display: none; }
+  .mk-values > li { flex: 0 0 78%; max-width: 20rem; scroll-snap-align: start; }
+  .mk-bento > .mk-bcard { flex: 0 0 86%; max-width: 24rem; scroll-snap-align: start; }
+  .mk-price-wrap .pricing-card { flex: 0 0 86%; max-width: 21rem; scroll-snap-align: start; }
+  /* önerilen paket ilk görünen kart (tek gerçek kaynak: PlanDef.popular => .theme-dark) */
+  .mk-price-wrap .pricing-card.theme-dark { order: -1; }
+
+  /* nokta göstergesi: Chromium ::scroll-marker (JS'siz); desteklemeyen tarayıcıda yok, bir sonraki kartın görünen kenarı ipucu olur */
+  @supports (scroll-marker-group: after) {
+    .mk-values, .mk-bento, .mk-price-wrap .pricing-grid { scroll-marker-group: after; }
+    .mk-values::scroll-marker-group, .mk-bento::scroll-marker-group, .mk-price-wrap .pricing-grid::scroll-marker-group {
+      display: flex; justify-content: center; gap: 0.5rem; margin-top: -0.25rem;
+    }
+    .mk-values > li::scroll-marker, .mk-bento > .mk-bcard::scroll-marker, .mk-price-wrap .pricing-card::scroll-marker {
+      content: ""; width: 0.5rem; height: 0.5rem; border-radius: 999px; background: #c5cfe6;
+    }
+    .mk-values > li::scroll-marker:target-current, .mk-bento > .mk-bcard::scroll-marker:target-current, .mk-price-wrap .pricing-card::scroll-marker:target-current {
+      width: 1.25rem; background: var(--mk-blue-text);
+    }
+  }
+
+  /* ---- değer kartları: kompakt ---- */
+  .mk-values-wrap { padding-top: 1.25rem; }
+  .mk-value { padding: var(--mk-s-4); }
+  .mk-value-ico { width: 2.5rem; height: 2.5rem; }
+  .mk-value small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; font-size: 0.8125rem; line-height: 1.25rem; }
+
+  /* ---- portal şeridi: tek satır kaydırmalı çip şeridi ---- */
+  .mk-portals { padding: 1rem; gap: 0.75rem; margin-top: var(--mk-s-4); }
+  .mk-portals-head h2 { font-size: 1rem; }
+  .mk-portals-head p { font-size: 0.875rem; line-height: 1.375rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  .mk-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -1rem; padding-inline: 1rem; scroll-padding-inline: 1rem; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 1rem, #000 calc(100% - 2rem), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 1rem, #000 calc(100% - 2rem), transparent 100%); }
+  .mk-chips::-webkit-scrollbar { display: none; }
+  .mk-chips li { flex: none; scroll-snap-align: start; min-height: 2rem; padding-inline: 0.75rem; font-size: 0.8125rem; }
+  .mk-portals-note { font-size: 0.75rem; line-height: 1.125rem; }
+
+  /* ---- istatistikler: 2x2 ızgara (5. öğe varsa tam satır), dikey kompakt hücre ---- */
+  .mk-trust { margin-top: var(--mk-s-4); }
+  .mk-trust a { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.5rem; min-height: 5.5rem; padding: 0.875rem 1rem; }
+  .mk-trust b { font-size: 1.375rem; }
+  .mk-trust small { font-size: 0.75rem; line-height: 1.125rem; }
+  .mk-trust[data-count="4"] > li:nth-child(n+3) { border-bottom: 0; }
+
+  /* ---- ürün turu: kenardan kenara kaydırmalı sekme çubuğu ---- */
+  .mk-tour-tabs { margin-inline: calc(-1 * var(--mk-edge)); padding: 0.25rem var(--mk-edge) 0.875rem; scroll-padding-inline: var(--mk-edge); scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--mk-edge), #000 calc(100% - 2rem), transparent 100%); mask-image: linear-gradient(90deg, transparent 0, #000 var(--mk-edge), #000 calc(100% - 2rem), transparent 100%); }
+  .mk-tour-tabs label { padding: 0.5rem 1rem; font-size: 0.875rem; }
+  .mk-scr { gap: 1rem; }
+  .mk-scr-cap .mk-h3 { font-size: 1.25rem; }
+  .mk-scr-cap p { font-size: 0.9375rem; line-height: 1.5rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+  .mk-scr-cap ul { margin-top: 0.875rem; gap: 0.5rem; }
+  .mk-scr-cap li { font-size: 0.875rem; }
+
+  /* ---- özellik kartları (bento): tek tip dikey kart, yatay kaydırma ---- */
+  .mk .mk-bento > .mk-b-leak { display: flex; flex-direction: column; }
+  .mk .mk-bento > .mk-b-leak .mk-b-art { grid-column: auto; grid-row: auto; margin-top: var(--mk-stack); }
+  .mk-bcard { padding: 1.125rem; }
+  .mk-bcard-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; font-size: 0.875rem; line-height: 1.375rem; }
+  .mk-bcard .mk-list { margin-top: 0.75rem; gap: 0.375rem; }
+  .mk-bcard .mk-list li { font-size: 0.875rem; }
+  .mk-bcard .mk-list li:nth-child(n+4) { display: none; }
+  .mk-b-art { margin-top: auto; padding-top: var(--mk-stack); }
+
+  /* ---- ayrıntılar / nasıl çalışır / güvenlik: sıkı dikey ritim ---- */
+  .mk-hl p, .mk-step p { font-size: 0.875rem; line-height: 1.5rem; }
+  .mk-sec-items li { padding: var(--mk-s-4) var(--mk-s-3); gap: var(--mk-s-3); }
+  .mk-sec-items p { font-size: 0.875rem; line-height: 1.5rem; }
+  .mk-shield { max-width: 15rem; }
+
+  /* ---- fiyat ---- */
+  .mk-price-wrap .pricing-card { padding: 1.25rem; }
+
+  /* ---- SSS: erişilebilir akordeon, 48+ px dokunma hedefi ---- */
+  .mk-faq { gap: 0.5rem; }
+  .mk-faq summary { min-height: 3.5rem; padding: 0.75rem 1rem; gap: 0.75rem; font-size: 1rem; line-height: 1.375rem; }
+  .mk-faq details p { padding: 0 1rem 1rem; font-size: 0.9375rem; line-height: 1.5rem; }
+  .mk-faq-note { font-size: 0.875rem; }
+
+  /* ---- son CTA ---- */
+  .mk-final { padding-block: 3rem; }
+}

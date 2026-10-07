@@ -131,7 +131,7 @@ export function Pricing({
         </span>
       </div>
 
-      <div className={`mt-9 grid gap-4 sm:grid-cols-2 ${cols}`}>
+      <div className={`pricing-grid mt-9 grid gap-4 sm:grid-cols-2 ${cols}`}>
         {plans.map((plan) => {
           const PlanIcon = PLAN_ICONS[plan.id];
           const offer = offers?.[plan.id];
