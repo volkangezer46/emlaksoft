@@ -38,7 +38,7 @@ export const ATTENTION_LEVEL_LABEL: Record<AttentionLevel, string> = {
 
 export function AttentionList({
   title = "Dikkat gerektirenler",
-  subtitle = "Acil ve önemli konulara odaklanın.",
+  subtitle = "Önem sırasıyla",
   items,
   emptyTitle = "Şu an bekleyen iş yok",
   emptyDescription = "Yeni bir durum oluşunca burada önem sırasıyla listelenir.",
@@ -60,8 +60,8 @@ export function AttentionList({
           <AlertTriangle />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="ds-title">{title}</h2>
-          {subtitle ? <p className="ds-sub mt-0.5">{subtitle}</p> : null}
+          <h2 className="ds-title" title={title}>{title}</h2>
+          {subtitle ? <p className="ds-sub mt-0.5" title={subtitle}>{subtitle}</p> : null}
         </div>
       </header>
       {items.length > 0 ? (
@@ -75,8 +75,8 @@ export function AttentionList({
                     <lv.icon />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-text">{it.label}</span>
-                    {it.hint ? <span className="block truncate text-xs text-text-muted">{it.hint}</span> : null}
+                    <span className="block truncate text-sm font-semibold text-text" title={it.label}>{it.label}</span>
+                    {it.hint ? <span className="block truncate text-xs text-text-muted" title={it.hint}>{it.hint}</span> : null}
                   </span>
                   {typeof it.count === "number" ? (
                     <span className="ds-num shrink-0 text-sm text-text" aria-label={`${it.count} adet`}>

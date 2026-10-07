@@ -88,9 +88,10 @@ html[data-theme="dark"] {
   /* Tutar tek satırda kalır (₺ alt satıra düşmez); uzun değerde boyut küçülür. */
   white-space: nowrap;
   max-width: 100%;
+  min-width: 0;
 }
 .pm-value-long { font-size: clamp(1.125rem, 0.9rem + 1vw, var(--fs-kpi)); }
-.pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .pm-chart { margin-top: auto; padding-top: 0.6rem; }
 
 /* ---- TrendPill --------------------------------------------------------------- */
@@ -518,6 +519,10 @@ html[data-density="compact"] {
 .ds-head { display: flex; align-items: flex-start; gap: var(--space-3); }
 .ds-title { font-family: var(--font-manrope), system-ui, sans-serif; font-size: 1rem; line-height: 1.35; font-weight: 700; letter-spacing: -0.01em; color: var(--heading); text-wrap: balance; }
 .ds-sub { font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
+/* Taşma koruması: kart başlık şeridindeki başlık/alt başlık kısıtlı satır (tam metin `title` ile), uzun sözcük kırılır. */
+.ds-head .ds-title, .ds-head .ds-sub { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.ds-head .ds-sub { -webkit-line-clamp: 1; line-clamp: 1; }
+@media (max-width: 639px) { .ds-head .ds-sub { -webkit-line-clamp: 2; line-clamp: 2; } }
 .ds-eyebrow { font-size: var(--fs-eyebrow); line-height: 1rem; font-weight: 700; letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--text-muted); }
 .ds-link {
   display: inline-flex; align-items: center; gap: 0.25rem; flex: none;
@@ -615,7 +620,8 @@ html[data-theme="dark"] .ds-hero {
 .ds-hero-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
 .ds-hero-body { min-width: 0; max-width: 46rem; }
 .ds-hero-title { margin-top: 0.35rem; font-family: var(--font-manrope), system-ui, sans-serif; font-size: clamp(1.375rem, 1.1rem + 0.9vw, 1.75rem); line-height: 1.15; font-weight: 800; letter-spacing: -0.025em; color: var(--heading); text-wrap: balance; }
-.ds-hero-summary { margin-top: 0.3rem; max-width: 44rem; min-height: 1.45em; font-size: var(--text-base, 0.9375rem); line-height: 1.5; color: var(--text-muted); }
+.ds-hero-summary { margin-top: 0.3rem; max-width: 44rem; min-height: 1.45em; font-size: var(--text-base, 0.9375rem); line-height: 1.5; color: var(--text-muted); overflow-wrap: anywhere; }
+.ds-hero-summary > p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 
 /* ---- SegmentedControl: eşit genişlikli seçenekler, kayan dolgulu hap (transform). ---- */
 .ds-seg {

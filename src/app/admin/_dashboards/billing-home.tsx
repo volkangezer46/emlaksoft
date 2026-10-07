@@ -203,7 +203,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           )}
         </ChartCard>
 
-        <ChartCard as="h2" className="md:col-span-6 xl:col-span-5" title="Gelir dağılımı" subtitle="Plan bazlı aylık gelir · aktif abonelikler" icon={TrendingUp} tone="gold" height={0}>
+        <ChartCard as="h2" className="md:col-span-6 xl:col-span-5" title="Gelir dağılımı" subtitle="Plan bazlı aylık gelir" icon={TrendingUp} tone="gold" height={0}>
           <ul className="space-y-3">
             {planRevenue.map((p) => (
               <li key={p.key}>

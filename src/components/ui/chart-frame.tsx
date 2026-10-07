@@ -70,8 +70,8 @@ export const ChartFrame = memo(function ChartFrame({
           </span>
         ) : null}
         <div className="min-w-0 flex-1">
-          <Heading className="ds-title">{title}</Heading>
-          {sub ? <p className="ds-sub mt-0.5">{sub}</p> : null}
+          <Heading className="ds-title" title={title}>{title}</Heading>
+          {sub ? <p className="ds-sub mt-0.5" title={sub}>{sub}</p> : null}
         </div>
         {aside || action || href ? (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">

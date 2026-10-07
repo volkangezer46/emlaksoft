@@ -111,8 +111,8 @@ export async function SupportHome({ staffName }: { staffName: string }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-6 xl:grid-cols-12">
         <div className="min-w-0 md:col-span-6 xl:col-span-7">
           <AttentionList
-            title="En uzun bekleyen açık talepler"
-            subtitle="Bekleme süresine göre; önem öncelikten gelir."
+            title="En uzun bekleyenler"
+            subtitle="Bekleme süresine göre"
             items={waitingQueue.slice(0, 7).map((t) => {
               const days = Math.floor(msSince(t.created_at) / DAY_MS);
               return {

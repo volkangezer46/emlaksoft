@@ -41,7 +41,7 @@ export default async function PerformansimPage({
       <DashboardHero
         eyebrow={`${p.day} ${MONTHS[p.month]} ${WEEKDAYS[p.weekday]} · Performansım`.toLocaleUpperCase("tr-TR")}
         title={`${greetingFor(p.hour)}${firstName ? `, ${firstName}` : ""}`}
-        summary={<p>Bu ayın karnesi, hedef ilerlemen ve verinden çıkan sıradaki en iyi eylem tek ekranda.</p>}
+        summary={<p>Bu ayın karnesi, hedef ilerlemen ve sıradaki en iyi eylem.</p>}
         freshness={<DataFreshness asOf={nowMs} />}
         aside={
           canTargets ? (
