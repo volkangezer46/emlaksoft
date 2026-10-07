@@ -53,3 +53,6 @@ next-env.d.ts
 /playwright/.cache/
 /e2e/.auth/
 .tmp*
+
+# Ajan çalışma kopyaları (Tailwind kaynak taraması ve git dışında kalmalı)
+.claude/worktrees/
