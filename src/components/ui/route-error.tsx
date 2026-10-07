@@ -95,7 +95,7 @@ export function RouteError({
               type="button"
               disabled={pending}
               onClick={() => startTransition(() => again())}
-              className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 touch:min-h-11"
+              className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-hover disabled:opacity-60 touch:min-h-11"
             >
               <RotateCcw className={`h-4 w-4 ${pending ? "animate-spin" : ""}`} aria-hidden="true" />
               {pending ? "Yükleniyor…" : "Tekrar dene"}

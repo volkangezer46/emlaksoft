@@ -20,7 +20,7 @@ const TONES = {
   /** Koyu kahraman/şerit üstünde beyaz düğme. */
   light: "bg-white text-ink-950 shadow-[var(--elev-2)]",
   /** Birincil marka düğmesi. */
-  brand: "bg-brand-600 text-white shadow-[var(--inner-top-dark)] hover:bg-brand-700",
+  brand: "bg-brand-600 text-white shadow-[var(--inner-top-dark)] hover:bg-accent-hover",
   /** Açık zeminde koyu düğme. */
   dark: "bg-ink-950 text-white shadow-[var(--elev-2)] hover:bg-ink-700",
   /** Koyu zeminde yarı saydam düğme. */
