@@ -28,6 +28,7 @@ import { applyScopeFilter, type ScopeFilter } from "@/lib/access-control/query-s
 import type { CustomerVM } from "./customer-rows";
 import { countCustomerTypes, heatTone, relativeFromDays } from "./customer-list-logic";
 import { fetchTenantTags } from "./tenant-tags";
+import { applyCustomFieldIds } from "@/lib/custom-fields/filter";
 
 /** Sayfa başına kayıt — gerçek sayfalama, 500'lük dilim yerine. */
 export const PAGE_SIZE = 50;
@@ -121,6 +122,8 @@ export type CustomersDataInput = {
   offset: number;
   /** Kullanıcı kapsamı (assigned_to); verilmezse süzgeç yok (eski davranış). Liste + KPI sayıları aynı kapsamla. */
   scopeFilter?: ScopeFilter;
+  /** Özel alan filtresi eşleşen kimlikler (`?ozel=`); null = filtre yok. Liste + sıcaklık havuzu aynı kümeyle. */
+  customIds?: string[] | null;
 };
 
 export async function loadCustomersData(input: CustomersDataInput) {
@@ -138,14 +141,15 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const term = customerSearchTerm(q);
 
   // Aynı filtre seti hem ana listeye hem sıcaklık havuzuna uygulanır.
+  const customIds = input.customIds ?? null;
   const buildFilteredQuery = (select: string, opts?: { count: "exact" }) =>
-    applyCustomerFilters(scoped(supabase.from("customers").select(select, opts).is("deleted_at", null)), filters);
+    applyCustomFieldIds(applyCustomerFilters(scoped(supabase.from("customers").select(select, opts).is("deleted_at", null)), filters), customIds);
 
   // count: "exact" — sayfalama ("X-Y / Toplam Z") gerçek toplamı ister;
   // sayı aynı yanıtta gelir, ek gidiş-dönüş yok.
   // Filtresiz görünümde filtreli toplam = "Toplam kayıt" KPI'ı (totalAll, aynı
   // koşul: deleted_at is null) — listeye ikinci bir COUNT bindirmeye gerek yok.
-  const unfilteredList = !typeF && !etiketF && !sourceF && !assignedF && !fromF && !toF && !term;
+  const unfilteredList = !typeF && !etiketF && !sourceF && !assignedF && !fromF && !toF && !term && customIds === null;
   let listQuery = buildFilteredQuery(LIST_COLS, unfilteredList ? undefined : { count: "exact" });
   if (sortKey === "ad") {
     listQuery = listQuery

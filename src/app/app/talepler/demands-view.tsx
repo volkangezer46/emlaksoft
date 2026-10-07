@@ -19,6 +19,8 @@ import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { exportDemandsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
+import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
+import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
 import { relatedSearchClause } from "@/lib/list-search";
 import { buildHref } from "@/lib/ui/filter-params";
 import {
@@ -164,6 +166,9 @@ export async function DemandsView({
   if (eklenenF) urlParams.eklenen = String(eklenenF);
   if (danismanF) urlParams.danisman = danismanF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
+  // Özel alan filtresi (?ozel=anahtar:değer): liste sorgusuna eşleşen kimliklerle iner.
+  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "demand", customFilterRaw(sp as Record<string, string | undefined>));
+  if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
@@ -205,6 +210,7 @@ export async function DemandsView({
     if (yasF) query = query.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
     if (eklenenF) query = query.gte("created_at", daysAgoIso(eklenenF));
     if (search.clause) query = query.or(search.clause);
+    query = applyCustomFieldIds(query, customFilter.ids);
     return query;
   };
 
@@ -462,6 +468,7 @@ export async function DemandsView({
             chips={chips}
             savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
           />
+          <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
 
           <div className="space-y-2">
             <CategoryChips

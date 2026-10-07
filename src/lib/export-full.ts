@@ -10,6 +10,16 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { csvLine, type ExportEntityDef, type NameMap, type RawRow } from "@/lib/export-entities";
+import { csvColumnName, formatValue, type CustomFieldEntity, type CustomFieldValueRow } from "@/lib/custom-fields/core";
+import { loadCustomFieldDefs, loadCustomFieldValues } from "@/lib/custom-fields/load";
+
+/** Tam dışa aktarmada `ozel: <etiket>` sütunu alan varlıklar (sorguda `id` seçili olmalı). */
+export const CUSTOM_FIELD_EXPORT_ENTITY: Record<string, CustomFieldEntity> = {
+  musteriler: "customer",
+  portfoyler: "property",
+  talepler: "demand",
+  anlasmalar: "deal",
+};
 
 export const FULL_EXPORT_PAGE_SIZE = 1000;
 /** Güvenlik üst sınırı: tek indirmede en fazla satır. */
@@ -259,12 +269,27 @@ export async function openFullCsvStream(
   const names: NameMap = new Map();
   const startedAt = now();
 
+  // Özel alanlar (`ozel: <etiket>` sütunları): tanımlar bir kez, değerler sayfa başına (RLS'li istemci + tenant filtresi).
+  const cfEntity = CUSTOM_FIELD_EXPORT_ENTITY[def.slug] ?? null;
+  const cfDefs = cfEntity ? (await loadCustomFieldDefs(supabase, gate.tenantId, cfEntity)).defs : [];
+  let cfValues = new Map<string, Map<string, CustomFieldValueRow>>();
+  const customFor = (r: RawRow): Record<string, string> => {
+    if (cfDefs.length === 0) return {};
+    const rowValues = cfValues.get(String((r as { id?: unknown }).id ?? ""));
+    const out: Record<string, string> = {};
+    for (const d of cfDefs) out[csvColumnName(d)] = formatValue(d, rowValues?.get(d.id));
+    return out;
+  };
+
   const fetchPage = async (offset: number) => {
     // Her sayfa için taze builder: paylaşılan URL/parametre durumu sızmasın.
     const { data, error } = await buildQuery(supabase, gate, params).range(offset, offset + pageSize - 1);
     if (error) throw error;
     const rows = (data ?? []) as RawRow[];
     await resolveNames(supabase, gate, def, rows, names);
+    if (cfEntity && cfDefs.length > 0) {
+      cfValues = await loadCustomFieldValues(supabase, gate.tenantId, cfEntity, rows.map((r) => String((r as { id?: unknown }).id ?? "")));
+    }
     return rows;
   };
 
@@ -303,7 +328,7 @@ export async function openFullCsvStream(
         const remaining = maxRows - total;
         const take = rows.length > remaining ? rows.slice(0, remaining) : rows;
         for (const r of take) {
-          const mapped = def.map(r, names);
+          const mapped = { ...def.map(r, names), ...customFor(r) };
           if (!headerKeys) {
             headerKeys = Object.keys(mapped);
             out += headerKeys.join(",") + "\n";
