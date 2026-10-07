@@ -14,13 +14,12 @@ import {
 } from "@/lib/admin/office-create-input";
 import {
   OFFICE_ADMIN_CREATE_SOURCE,
-  OFFICE_TRIAL_DEFAULT_DAYS,
   confirmationMatches,
-  trialEndIso,
 } from "@/lib/admin/office-create-rules";
 import { officeSlugCandidates, provisionSafeCompanyName, validateOfficeSlug } from "@/lib/admin/office-slug";
 import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvince } from "@/lib/geo/reader";
+import { getEffectiveTrialDays } from "@/lib/billing/plan-support";
 import { planLabel } from "@/lib/billing/plans";
 import { readEffectiveSeatLimit } from "@/lib/billing/seat-purchase";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -351,22 +350,6 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
     }
   }
 
-  // (6c) Deneme süresi (varsayılan 14 gün RPC'de yazıldı)
-  if (input.trialDays !== OFFICE_TRIAL_DEFAULT_DAYS) {
-    const endsAt = trialEndIso(Date.now(), input.trialDays);
-    const [subResult, tenantResult] = await Promise.all([
-      admin
-        .from("subscriptions")
-        .update({ trial_ends_at: endsAt, current_period_end: endsAt, updated_at: nowIso })
-        .eq("tenant_id", tenantId),
-      admin.from("tenants").update({ trial_ends_at: endsAt, updated_at: nowIso }).eq("id", tenantId),
-    ]);
-    if (subResult.error || tenantResult.error) {
-      console.error("createTenantByAdmin:trial", subResult.error ?? tenantResult.error);
-      warnings.push(`Deneme süresi ${input.trialDays} güne ayarlanamadı; ${OFFICE_TRIAL_DEFAULT_DAYS} gün olarak kaldı.`);
-    }
-  }
-
   // (6d) Faturalama döngüsü
   if (input.billingCycle === "yearly") {
     const { error: cycleError } = await admin
@@ -446,7 +429,8 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
       via: "admin",
       slug: finalSlug,
       plan: input.plan,
-      trial_days: input.trialDays,
+      // Deneme süresi platform politikası (RPC platform_default_trial_days ile yazar); formdan değiştirilemez.
+      trial_days: input.initialStatus === "trial" ? await getEffectiveTrialDays() : null,
       billing_cycle: input.billingCycle,
       initial_status: input.initialStatus,
       access_mode: input.accessMode,

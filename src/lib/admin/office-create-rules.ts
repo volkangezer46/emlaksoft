@@ -6,14 +6,11 @@ import { DEFAULT_TRIAL_DAYS } from "@/lib/platform-setting-keys";
 /**
  * Platform yönetiminden ofis açma kuralları (saf; form ve sunucu action'ı ortak kullanır, zod içermez).
  *
- * Deneme süresi varsayılanı kayıt akışındaki mevcut kuraldır (14 gün; provizyon RPC'leri de 14 gün yazar).
- * Farklı bir süre seçilirse provizyondan SONRA deneme bitişi güncellenir.
+ * Deneme süresi platform politikasıdır (Ayar Kayıt Defteri `billing.default_trial_days`, varsayılan 14 gün);
+ * ofis açarken formdan seçilmez/değiştirilmez — provizyon RPC'si platform_default_trial_days() ile yazar.
  */
 /** Tek kaynak: Ayar Kayit Defteri varsayilani (platform-setting-keys DEFAULT_TRIAL_DAYS = 14). SQL platform_default_trial_days() ayri kalir. */
 export const OFFICE_TRIAL_DEFAULT_DAYS: number = DEFAULT_TRIAL_DAYS;
-export const OFFICE_TRIAL_MIN_DAYS = 1;
-export const OFFICE_TRIAL_MAX_DAYS = 90;
-export const OFFICE_TRIAL_PRESETS = [7, 14, 30, 60] as const;
 
 export const OFFICE_ACCESS_MODES = ["link", "link_temp"] as const;
 export type OfficeAccessMode = (typeof OFFICE_ACCESS_MODES)[number];
@@ -40,16 +37,6 @@ export const OFFICE_ADMIN_CREATE_SOURCE = "admin_office_create";
  */
 export function teamSizeForPlan(plan: PlanId): RegistrationTeamSize {
   return defaultTeamSizeForPlan(plan);
-}
-
-export function clampTrialDays(value: number): number {
-  if (!Number.isFinite(value)) return OFFICE_TRIAL_DEFAULT_DAYS;
-  return Math.min(OFFICE_TRIAL_MAX_DAYS, Math.max(OFFICE_TRIAL_MIN_DAYS, Math.round(value)));
-}
-
-/** `fromMs` anından `days` gün sonrası (ISO). Zaman çağırandan gelir (bileşende Date.now yasak). */
-export function trialEndIso(fromMs: number, days: number): string {
-  return new Date(fromMs + clampTrialDays(days) * 86_400_000).toISOString();
 }
 
 /** Platformdan atanabilen ofis rolleri (`owner` yalnız sahiplik devriyle değişir; team.ts ASSIGNABLE_ROLES ile aynı). */

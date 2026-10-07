@@ -36,13 +36,22 @@ describe("ofis oluşturma girdisi", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.ownerEmail).toBe("ali@example.com");
   });
+  it("deneme süresi formdan alınmaz; döngü yalnız aktif açılışta seçilir", () => {
+    const r = parseOfficeCreateInput({ ...base, trial_days: "500", billing_cycle: "yearly" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect("trialDays" in r.data).toBe(false);
+      expect(r.data.billingCycle).toBe("monthly");
+    }
+    const active = parseOfficeCreateInput({ ...base, initial_status: "active", billing_cycle: "yearly" });
+    if (active.ok) expect(active.data.billingCycle).toBe("yearly");
+  });
   it("hatalı alanı alan adıyla bildirir", () => {
     const r = parseOfficeCreateInput({ ...base, owner_email: "gecersiz" });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.field).toBe("owner_email");
     expect(parseOfficeCreateInput({ ...base, office_name: "" }).ok).toBe(false);
     expect(parseOfficeCreateInput({ ...base, tax_number: "123" }).ok).toBe(false);
-    expect(parseOfficeCreateInput({ ...base, trial_days: "500" }).ok).toBe(false);
     expect(parseOfficeCreateInput({ ...base, plan: "yok" }).ok).toBe(false);
   });
 });

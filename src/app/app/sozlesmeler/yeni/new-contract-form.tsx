@@ -452,7 +452,12 @@ export function NewContractForm({
               </FormSelect>
             </FormField>
             {increaseBasis === "sabit" ? (
-              <FormField label="Sabit artış yüzdesi (%)" htmlFor="sozl-increase-pct" required>
+              <FormField
+                label="Sabit artış yüzdesi (%)"
+                htmlFor="sozl-increase-pct"
+                required
+                hint="Konut kirasında yıllık artış, yasal olarak önceki 12 ayın TÜFE ortalamasını aşamaz (TBK m.344)."
+              >
                 <FormInput
                   id="sozl-increase-pct"
                   name="rent_increase_fixed_pct"

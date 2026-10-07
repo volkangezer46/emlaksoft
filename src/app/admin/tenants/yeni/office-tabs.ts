@@ -25,8 +25,8 @@ export const OFFICE_CREATE_TABS = [
   {
     id: "paket",
     label: "Paket ve deneme",
-    description: "Paket, deneme süresi, faturalama döngüsü ve ofisin başlangıç durumu.",
-    fields: ["plan", "trial_days", "billing_cycle", "initial_status"],
+    description: "Paket ve ofisin başlangıç durumu. Deneme süresi platform kuralıdır, değiştirilemez.",
+    fields: ["plan", "billing_cycle", "initial_status"],
     required: ["plan"],
   },
   {

@@ -3,6 +3,7 @@ import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { requirePlatformModule } from "@/lib/platform";
 import { OfficeForm } from "./office-form";
 import { provinceOptionsResult } from "@/lib/geo/reader";
+import { getEffectiveTrialDays } from "@/lib/billing/plan-support";
 
 export const metadata = { title: "Yeni ofis" };
 
@@ -15,12 +16,13 @@ export default async function YeniOfisPage() {
   if (!officeAdminCan(staff.role, "create")) redirect("/admin/tenants");
 
   // İl listesi coğrafya merkezinden gelir (aktif iller).
-  const { data: provinces } = await provinceOptionsResult();
+  const [{ data: provinces }, trialDays] = await Promise.all([provinceOptionsResult(), getEffectiveTrialDays()]);
 
   return (
     <OfficeForm
       provinces={(provinces ?? []) as { id: string; name: string }[]}
       canCreateActive={officeAdminCan(staff.role, "create_active")}
+      trialDays={trialDays}
     />
   );
 }

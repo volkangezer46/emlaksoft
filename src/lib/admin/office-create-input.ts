@@ -7,9 +7,6 @@ import { emailSchema } from "@/lib/validation/contact";
 import {
   OFFICE_ACCESS_MODES,
   OFFICE_INITIAL_STATUSES,
-  OFFICE_TRIAL_DEFAULT_DAYS,
-  OFFICE_TRIAL_MAX_DAYS,
-  OFFICE_TRIAL_MIN_DAYS,
   OFFICE_USER_ROLES,
   TAX_NUMBER_RE,
   teamSizeForPlan,
@@ -108,20 +105,6 @@ function trMobile(label: string) {
 }
 const ownerPhone = trMobile("Sahip telefonu");
 
-const trialDays = z.unknown().transform((v, ctx): number => {
-  const s = text(v);
-  if (!s) return OFFICE_TRIAL_DEFAULT_DAYS;
-  const n = Number(s);
-  if (!Number.isInteger(n) || n < OFFICE_TRIAL_MIN_DAYS || n > OFFICE_TRIAL_MAX_DAYS) {
-    ctx.addIssue({
-      code: "custom",
-      message: `Deneme süresi ${OFFICE_TRIAL_MIN_DAYS} ile ${OFFICE_TRIAL_MAX_DAYS} gün arasında tam sayı olmalı.`,
-    });
-    return z.NEVER;
-  }
-  return n;
-});
-
 const plan = z.unknown().transform((v, ctx): PlanId => {
   const s = text(v) || "office";
   if (!isPlanId(s)) {
@@ -165,7 +148,6 @@ export const officeCreateSchema = z
     owner_phone: ownerPhone,
     access_mode: oneOf<OfficeAccessMode>("Erişim yöntemi", OFFICE_ACCESS_MODES, "link"),
     plan,
-    trial_days: trialDays,
     billing_cycle: z.unknown().transform((v): BillingCycle => normalizeBillingCycle(text(v))),
     initial_status: oneOf<OfficeInitialStatus>("Başlangıç durumu", OFFICE_INITIAL_STATUSES, "trial"),
     tax_office: optionalText("Vergi dairesi", 80),
@@ -208,7 +190,6 @@ export type OfficeCreateInput = {
   accessMode: OfficeAccessMode;
   plan: PlanId;
   teamSize: RegistrationTeamSize;
-  trialDays: number;
   billingCycle: BillingCycle;
   initialStatus: OfficeInitialStatus;
   taxOffice: string | null;
@@ -225,7 +206,7 @@ export function parseOfficeCreateInput(raw: Record<string, unknown>): OfficeCrea
   // Formda gönderilmeyen alan (işaretsiz onay kutusu, boş bırakılan isteğe bağlı alan) undefined gelir.
   const keys = [
     "office_name", "slug", "office_phone", "province_id", "district_id", "address_line", "license_no",
-    "owner_name", "owner_email", "owner_phone", "access_mode", "plan", "trial_days", "billing_cycle",
+    "owner_name", "owner_email", "owner_phone", "access_mode", "plan", "billing_cycle",
     "initial_status", "tax_office", "tax_number", "seed_sample",
   ] as const;
   const shaped: Record<string, unknown> = {};
@@ -254,8 +235,9 @@ export function parseOfficeCreateInput(raw: Record<string, unknown>): OfficeCrea
       accessMode: v.access_mode,
       plan: v.plan,
       teamSize: teamSizeForPlan(v.plan),
-      trialDays: v.trial_days,
-      billingCycle: v.billing_cycle,
+      // Deneme süresi platform politikasıdır (formdan gelmez); faturalama döngüsü yalnız aktif açılışta seçilir,
+      // denemede ofis ödeme anında kendisi seçer.
+      billingCycle: v.initial_status === "active" ? v.billing_cycle : "monthly",
       initialStatus: v.initial_status,
       taxOffice: v.tax_office,
       taxNumber: v.tax_number,

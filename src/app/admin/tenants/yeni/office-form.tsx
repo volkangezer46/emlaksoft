@@ -3,7 +3,24 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Check, CircleCheck, Copy, Eye, EyeOff, Loader2, Plus, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  ArrowUpRight,
+  Building2,
+  Check,
+  CircleCheck,
+  Copy,
+  Eye,
+  EyeOff,
+  House,
+  Loader2,
+  Lock,
+  Plus,
+  RotateCcw,
+  Sparkles,
+  TriangleAlert,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { checkOfficeSlugAvailability, createTenantByAdmin, type CreateOfficeResult, type SlugCheckResult } from "@/app/actions/platform-tenants";
 import { GeoSelect } from "@/components/app/geo-select";
@@ -14,10 +31,6 @@ import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSum
 import {
   OFFICE_ACCESS_MODE_LABELS,
   OFFICE_INITIAL_STATUS_LABELS,
-  OFFICE_TRIAL_DEFAULT_DAYS,
-  OFFICE_TRIAL_MAX_DAYS,
-  OFFICE_TRIAL_MIN_DAYS,
-  OFFICE_TRIAL_PRESETS,
   type OfficeAccessMode,
   type OfficeInitialStatus,
 } from "@/lib/admin/office-create-rules";
@@ -42,7 +55,6 @@ const FIELD_LABELS: Record<string, string> = {
   owner_phone: "Sahip telefonu",
   access_mode: "Erişim yöntemi",
   plan: "Paket",
-  trial_days: "Deneme süresi (gün)",
   billing_cycle: "Faturalama döngüsü",
   initial_status: "Başlangıç durumu",
   tax_office: "Vergi dairesi",
@@ -56,6 +68,15 @@ const nf = new Intl.NumberFormat("tr-TR");
 const tl = (n: number) => `${nf.format(n)} ₺`;
 const limitText = (n: number | null) => (n == null ? "sınırsız" : nf.format(n));
 
+function planLimitTiles(plan: PlanDef): { label: string; value: string; Icon: typeof Users }[] {
+  return [
+    { label: "Kullanıcı", value: limitText(plan.limits.seats), Icon: Users },
+    { label: "Şube", value: limitText(plan.limits.branches), Icon: Building2 },
+    { label: "Müşteri", value: limitText(plan.limits.customers), Icon: UserRound },
+    { label: "Aktif portföy", value: limitText(plan.limits.activeProperties), Icon: House },
+  ];
+}
+
 function planLimitLines(plan: PlanDef): [string, string][] {
   return [
     ["Kullanıcı", limitText(plan.limits.seats)],
@@ -65,10 +86,22 @@ function planLimitLines(plan: PlanDef): [string, string][] {
   ];
 }
 
+const planCard =
+  "flex h-full flex-col rounded-[var(--radius-card)] border border-line bg-canvas p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition duration-200 group-hover:-translate-y-0.5 group-hover:border-brand-300 group-hover:shadow-[0_10px_24px_-12px_rgb(30_64_175/0.25)] peer-checked:border-brand-500 peer-checked:bg-gradient-to-b peer-checked:from-brand-600/[0.07] peer-checked:to-transparent peer-checked:ring-2 peer-checked:ring-brand-500/30 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0";
+
 const choiceCard =
   "block h-full rounded-[var(--radius-card)] border border-line bg-canvas p-3.5 transition peer-checked:border-brand-500 peer-checked:bg-brand-600/[0.06] peer-checked:ring-2 peer-checked:ring-brand-500/30 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500 peer-disabled:cursor-not-allowed peer-disabled:opacity-55 group-hover:border-brand-300";
 
-export function OfficeForm({ provinces, canCreateActive }: { provinces: Province[]; canCreateActive: boolean }) {
+export function OfficeForm({
+  provinces,
+  canCreateActive,
+  trialDays,
+}: {
+  provinces: Province[];
+  canCreateActive: boolean;
+  /** Platform politikası (Ayar Kayıt Defteri); formdan değiştirilemez. */
+  trialDays: number;
+}) {
   const [result, setResult] = useState<CreateOfficeResult | null>(null);
   // "Bir ofis daha ekle": formu sıfırdan kurmak için anahtar değişir (tüm alanlar ve parola bellekten gider).
   const [formKey, setFormKey] = useState(0);
@@ -84,16 +117,18 @@ export function OfficeForm({ provinces, canCreateActive }: { provinces: Province
       />
     );
   }
-  return <OfficeFormInner key={formKey} provinces={provinces} canCreateActive={canCreateActive} onCreated={setResult} />;
+  return <OfficeFormInner key={formKey} provinces={provinces} canCreateActive={canCreateActive} trialDays={trialDays} onCreated={setResult} />;
 }
 
 function OfficeFormInner({
   provinces,
   canCreateActive,
+  trialDays,
   onCreated,
 }: {
   provinces: Province[];
   canCreateActive: boolean;
+  trialDays: number;
   onCreated: (result: CreateOfficeResult) => void;
 }) {
   const [pending, setPending] = useState(false);
@@ -102,7 +137,7 @@ function OfficeFormInner({
   // null: vitrin adresi ofis adından otomatik önerilir; metin: kullanıcı elle yazdı.
   const [slugManual, setSlugManual] = useState<string | null>(null);
   const [provinceId, setProvinceId] = useState("");
-  const [trialDays, setTrialDays] = useState(String(OFFICE_TRIAL_DEFAULT_DAYS));
+  const [initialStatus, setInitialStatus] = useState<OfficeInitialStatus>("trial");
   const [checked, setChecked] = useState<{ slug: string; res: SlugCheckResult } | null>(null);
 
   const slug = slugManual ?? slugifyOffice(officeName);
@@ -154,7 +189,7 @@ function OfficeFormInner({
         fields: [...t.fields],
         required: [...t.required],
         // Varsayılanı seçili gelen alanlar isteğe bağlı sekmeyi "tamam" saymaz.
-        passive: ["access_mode", "trial_days", "billing_cycle", "initial_status"],
+        passive: ["access_mode", "billing_cycle", "initial_status"],
       })),
     [],
   );
@@ -352,26 +387,77 @@ function OfficeFormInner({
             Paket<span aria-hidden="true" className="ml-0.5 text-danger-500">*</span>
           </legend>
           <div className="grid gap-3 sm:grid-cols-2">
-            {PLANS.map((p) => (
-              <label key={p.id} className="group cursor-pointer">
-                <input type="radio" name="plan" value={p.id} defaultChecked={p.id === "office"} required className="peer sr-only" />
-                <span className={choiceCard}>
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-bold text-ink-950">{p.name}</span>
-                    <span className="numeric text-sm font-bold text-brand-700">{tl(p.monthlyTry)}/ay</span>
-                  </span>
-                  <span className="mt-0.5 block text-xs text-text-muted">{p.blurb}</span>
-                  <span className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
-                    {planLimitLines(p).map(([k, v]) => (
-                      <span key={k} className="flex justify-between gap-2 text-text-muted">
-                        {k}
-                        <span className="numeric font-semibold text-ink-950">{v}</span>
+            {PLANS.filter((p) => !p.hidden).map((p) => {
+              const yearlyMonthly = Math.round(planAmountTry(p.id, "yearly") / 12);
+              return (
+                <label key={p.id} className="group relative cursor-pointer">
+                  <input type="radio" name="plan" value={p.id} defaultChecked={p.id === "office"} required className="peer sr-only" />
+                  <span className={planCard}>
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[0.95rem] font-bold tracking-tight text-ink-950">{p.name}</span>
+                          {p.popular ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+                              <Sparkles className="size-3" aria-hidden="true" />
+                              Önerilen
+                            </span>
+                          ) : (
+                            <span className="rounded-full border border-line bg-surface px-2 py-0.5 text-xs font-semibold text-text-muted">
+                              {p.eyebrow.toLocaleLowerCase("tr-TR").replace(/^./, (c) => c.toLocaleUpperCase("tr-TR"))}
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-text-muted">{p.blurb}</span>
                       </span>
-                    ))}
+                      <span
+                        aria-hidden="true"
+                        className="grid size-5 shrink-0 place-items-center rounded-full border border-line bg-surface text-transparent transition group-has-[input:checked]:border-brand-600 group-has-[input:checked]:bg-brand-600 group-has-[input:checked]:text-white"
+                      >
+                        <Check className="size-3" strokeWidth={3} />
+                      </span>
+                    </span>
+
+                    <span className="mt-3 flex items-baseline gap-1">
+                      <span className="numeric text-2xl font-bold tracking-tight text-ink-950">{tl(p.monthlyTry)}</span>
+                      <span className="text-xs font-medium text-text-muted">/ay · KDV hariç</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-text-muted">
+                      Yıllıkta <span className="numeric font-semibold text-brand-700">{tl(yearlyMonthly)}/ay</span> karşılığı
+                    </span>
+
+                    <span className="mt-3 grid grid-cols-2 gap-1.5">
+                      {planLimitTiles(p).map(({ label, value, Icon }) => (
+                        <span key={label} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line/70 bg-surface/70 px-2 py-1.5">
+                          <Icon className="size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                          <span className="min-w-0 leading-tight">
+                            <span className="numeric block text-xs font-bold text-ink-950">{value}</span>
+                            <span className="block truncate text-xs text-text-muted">{label}</span>
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+
+                    <span className="mt-3 block space-y-1 border-t border-line/70 pt-2.5">
+                      {p.features.slice(2, 5).map((f) => (
+                        <span key={f} className="flex items-start gap-1.5 text-xs text-text-muted">
+                          <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                          <span className="min-w-0">{f}</span>
+                        </span>
+                      ))}
+                      {p.efCreditsMonthly ? (
+                        <span className="flex items-start gap-1.5 text-xs text-text-muted">
+                          <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                          <span className="min-w-0">
+                            Aylık <span className="numeric font-semibold text-ink-950">{nf.format(p.efCreditsMonthly)}</span> EmlakFiyatı kontörü
+                          </span>
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
-                </span>
-              </label>
-            ))}
+                </label>
+              );
+            })}
           </div>
         </fieldset>
 
@@ -379,14 +465,30 @@ function OfficeFormInner({
           <legend className="mb-2 text-sm font-medium text-ink-950">Başlangıç durumu</legend>
           <div className="grid gap-2">
             <label className="group cursor-pointer">
-              <input type="radio" name="initial_status" value="trial" defaultChecked className="peer sr-only" />
+              <input
+                type="radio"
+                name="initial_status"
+                value="trial"
+                defaultChecked
+                onChange={() => setInitialStatus("trial")}
+                className="peer sr-only"
+              />
               <span className={choiceCard}>
                 <span className="block text-sm font-bold text-ink-950">{OFFICE_INITIAL_STATUS_LABELS.trial}</span>
-                <span className="mt-0.5 block text-xs text-text-muted">Süre dolunca ödeme istenir; dolmadan paket satın alabilir.</span>
+                <span className="mt-0.5 block text-xs text-text-muted">
+                  {trialDays} gün ücretsiz; ofis bu sürede istediği an ücretli pakete geçebilir.
+                </span>
               </span>
             </label>
             <label className={cn("group", canCreateActive ? "cursor-pointer" : "cursor-not-allowed")}>
-              <input type="radio" name="initial_status" value="active" disabled={!canCreateActive} className="peer sr-only" />
+              <input
+                type="radio"
+                name="initial_status"
+                value="active"
+                disabled={!canCreateActive}
+                onChange={() => setInitialStatus("active")}
+                className="peer sr-only"
+              />
               <span className={choiceCard}>
                 <span className="block text-sm font-bold text-ink-950">{OFFICE_INITIAL_STATUS_LABELS.active}</span>
                 <span className="mt-0.5 block text-xs text-text-muted">
@@ -400,40 +502,36 @@ function OfficeFormInner({
         </fieldset>
 
         <div className="space-y-4">
-          <FormField
-            label="Deneme süresi (gün)"
-            htmlFor="trial_days"
-            hint={`Varsayılan ${OFFICE_TRIAL_DEFAULT_DAYS} gün. ${OFFICE_TRIAL_MIN_DAYS}-${OFFICE_TRIAL_MAX_DAYS} gün arası.`}
-          >
-            <FormInput
-              name="trial_days"
-              type="number"
-              inputMode="numeric"
-              min={OFFICE_TRIAL_MIN_DAYS}
-              max={OFFICE_TRIAL_MAX_DAYS}
-              step={1}
-              value={trialDays}
-              onChange={(e) => setTrialDays(e.target.value)}
-              className="numeric"
-            />
-          </FormField>
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Hazır deneme süreleri">
-            {OFFICE_TRIAL_PRESETS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setTrialDays(String(d))}
-                aria-pressed={trialDays === String(d)}
-                className={cn(
-                  "focus-ring press min-h-9 rounded-full border px-3 text-xs font-semibold transition",
-                  trialDays === String(d) ? "border-brand-500 bg-brand-600/10 text-brand-700" : "border-line bg-surface text-text-muted hover:text-ink-950",
-                )}
-              >
-                {d} gün
-              </button>
-            ))}
-          </div>
+          {initialStatus === "trial" ? (
+            <div className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3.5" aria-live="polite">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-text-muted">Deneme süresi</p>
+                  <p className="numeric mt-0.5 text-2xl font-bold tracking-tight text-ink-950">{trialDays} gün</p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-xs font-semibold text-text-muted">
+                  <Lock className="size-3" aria-hidden="true" />
+                  Platform kuralı
+                </span>
+              </div>
+              <ul className="mt-2.5 space-y-1 text-xs text-text-muted">
+                <li className="flex gap-1.5">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                  Her yeni ofise aynı süre tanınır; uzatılmaz, kısaltılmaz.
+                </li>
+                <li className="flex gap-1.5">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                  Ofis süre dolmadan istediği an ücretli pakete geçebilir.
+                </li>
+                <li className="flex gap-1.5">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+                  Aylık / yıllık seçimi ödeme sırasında ofis tarafından yapılır.
+                </li>
+              </ul>
+            </div>
+          ) : null}
 
+          {initialStatus === "active" ? (
           <fieldset>
             <legend className="mb-2 text-sm font-medium text-ink-950">Faturalama döngüsü</legend>
             <div className="grid grid-cols-2 gap-2">
@@ -453,6 +551,7 @@ function OfficeFormInner({
               </label>
             </div>
           </fieldset>
+          ) : null}
         </div>
       </>
     ),
@@ -506,7 +605,6 @@ function OfficeFormInner({
     const name = (values.office_name ?? "").trim();
     const ownerName = (values.owner_name ?? "").trim();
     const ownerEmail = (values.owner_email ?? "").trim();
-    const days = (values.trial_days ?? "").trim();
     const text = (v: string | undefined) => (v ?? "").trim();
     return (
       <>
@@ -550,16 +648,21 @@ function OfficeFormInner({
         <SummaryGroup title={`${plan.name} paketi`}>
           <SummaryRow
             label="Tutar"
-            value={cycle === "yearly" ? `${tl(planAmountTry(plan.id, "yearly"))}/yıl` : `${tl(plan.monthlyTry)}/ay`}
+            value={
+              status !== "active"
+                ? `${tl(plan.monthlyTry)}/ay · döngü ödemede seçilir`
+                : cycle === "yearly"
+                  ? `${tl(planAmountTry(plan.id, "yearly"))}/yıl`
+                  : `${tl(plan.monthlyTry)}/ay`
+            }
             tab="paket"
             field="billing_cycle"
           />
           <SummaryRow
             label="Deneme"
-            value={status === "active" ? "Uygulanmaz (aktif başlar)" : days ? `${days} gün` : "Girilmedi"}
-            muted={status !== "active" && !days}
+            value={status === "active" ? "Uygulanmaz (aktif başlar)" : `${trialDays} gün (sabit)`}
             tab="paket"
-            field="trial_days"
+            field="initial_status"
           />
           {planLimitLines(plan).map(([k, v]) => (
             <SummaryRow key={k} label={k} value={v} tab="paket" field="plan" />
