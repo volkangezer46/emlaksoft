@@ -118,6 +118,13 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
     expect(chainTo("src/lib/validation/contact.ts", "zod")).toBe("src/lib/validation/contact.ts -> zod");
   });
 
+  it(".xlsx kütüphanesi yalnız dinamik içe aktarılır (statik zincir yok)", () => {
+    for (const entry of ["src/app/app/ice-aktarma/import-wizard.tsx", "src/components/listing-control/inventory-import-form.tsx", ...CLIENT_ENTRIES]) {
+      expect(chainTo(entry, "read-excel-file"), entry).toBeNull();
+    }
+    expect(read("src/lib/xlsx-import.ts")).toContain('await import("read-excel-file/browser")');
+  });
+
   it("demand-criteria zod'suz kalır (istemci formlarının ortak modülü)", () => {
     expect(chainTo("src/lib/demand-criteria.ts", "zod")).toBeNull();
   });
