@@ -15,6 +15,8 @@ import { formatDateTimeTr } from "@/lib/format";
 import { deviceLabel, summarizeDevices } from "@/lib/account/device-label";
 import { Alert } from "@/components/ui/alert";
 import { EmailChangeForm, OtherDevicesForm, PasswordForm, ProfileForm } from "./account-forms";
+import { GoogleIdentityCard } from "./google-identity-card";
+import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
 
 export const metadata = { title: "Hesabım" };
 
@@ -63,6 +65,16 @@ export default async function AccountPage({
         ).data ?? [])
       : [];
   const devices = summarizeDevices(events);
+  // Google bağlama dönüşü (/auth/callback?akis=link → ?google=baglandi | hata kodu).
+  const googleEnabled = isGoogleAuthEnabled();
+  const googleParam = typeof sp.google === "string" ? sp.google : null;
+  const googleNotice: { tone: "success" | "danger"; text: string } | null = !googleParam
+    ? null
+    : googleParam === "baglandi"
+      ? { tone: "success", text: "Google hesabınız bağlandı. Artık giriş sayfasında \"Google ile devam et\" ile girebilirsiniz." }
+      : googleErrorMessage(googleParam)
+        ? { tone: "danger", text: googleErrorMessage(googleParam)! }
+        : null;
   const prefs = active === "bildirimler" ? await getNotificationPrefs() : undefined;
   const channels = active === "bildirimler" ? await loadNotificationChannels(auth.tenantId) : undefined;
 
@@ -109,6 +121,22 @@ export default async function AccountPage({
           </CardHeader>
           <CardContent>
             <EmailChangeForm email={user?.email ?? ""} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {googleNotice ? <Alert tone={googleNotice.tone}>{googleNotice.text}</Alert> : null}
+
+      {active === "parola" && googleEnabled ? (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Giriş yöntemleri</CardTitle>
+              <CardDescription>Google hesabınızı bağlayarak tek tıkla giriş yapın; en az bir giriş yöntemi her zaman kalır.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <GoogleIdentityCard />
           </CardContent>
         </Card>
       ) : null}

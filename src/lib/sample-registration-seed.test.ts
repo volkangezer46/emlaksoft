@@ -43,10 +43,14 @@ describe("kayıt demo veri sözleşmesi", () => {
   it("signUp provizyondan SONRA, aynı admin client ile ve yeni createAdminClient çağrısı eklemeden tohumlar", () => {
     const src = read("src/app/actions/auth.ts");
     const fn = src.slice(src.indexOf("export async function signUp"), src.indexOf("export async function signOut"));
-    expect(fn.indexOf("provision_registration")).toBeLessThan(fn.indexOf("applyWizardOfficeProfile(admin"));
-    expect(fn.indexOf("applyWizardOfficeProfile(admin")).toBeLessThan(fn.indexOf("seedDemoDataForNewTenant(admin"));
-    expect(fn.match(/createAdminClient\(\)/g)).toHaveLength(1);
-    expect(fn).toContain("wantsDemoData(formData)");
+    // signUp (e-posta + Google yolu) tek provizyon çekirdeğini AYNI admin client ile çağırır.
+    expect(fn.match(/createAdminClient()/g)).toHaveLength(1);
+    expect(fn).toContain("provisionOfficeForUser(admin, publicClient");
+    const core = read("src/lib/registration/provision-office.ts");
+    expect(core).not.toContain("createAdminClient(");
+    expect(core.indexOf("provision_registration")).toBeLessThan(core.indexOf("applyWizardOfficeProfile(admin"));
+    expect(core.indexOf("applyWizardOfficeProfile(admin")).toBeLessThan(core.indexOf("seedDemoDataForNewTenant(admin"));
+    expect(core).toContain("wantsDemoData(formData)");
   });
 
   it("kayıt sihirbazında 'Demo veriyle başla' kutusu varsayılan açıktır ve açıklaması tek tuşla temizlemeyi söyler", () => {

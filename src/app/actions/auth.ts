@@ -5,27 +5,18 @@ import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { redirect } from "next/navigation";
 import { logLoginEvent } from "@/app/giris/_lib/login-events";
 import { sendSignerSms } from "@/app/imza/_lib/sms";
-import {
-  normalizeBillingCycle,
-} from "@/lib/billing/plans";
-import {
-  normalizeRegistrationTeamSize,
-  registrationPlanForTeamSize,
-} from "@/lib/billing/registration-plan";
 import { restoreImpersonationMetadata } from "@/lib/impersonation";
-import { bootstrapPlatformStaffIfAllowed } from "@/lib/platform";
+import { bootstrapPlatformStaffIfAllowed, isPlatformAllowlistedEmail } from "@/lib/platform";
+import { hasGoogleIdentity, isDemoIdentityEmail, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
+import { provisionOfficeForUser } from "@/lib/registration/provision-office";
 import { sendSms } from "@/lib/messaging/netgsm";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isRegistrationOpen } from "@/lib/platform-flags";
-import { recordSignupAttributionFromRequest } from "@/lib/growth/capture";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { DEMO_SEED_FAILED_COOKIE, seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
-import { FIELD as WIZARD_FIELD, readWizardOfficeProfile } from "@/lib/sample-data/office-profile";
-import { applyWizardOfficeProfile } from "@/lib/sample-data/apply-office-profile";
 import { createClient } from "@/lib/supabase/server";
 import {
   generateLoginCode,
@@ -35,20 +26,6 @@ import {
 import { hashOtpForStorage } from "@/lib/otp-hmac";
 import type { SignupField } from "@/lib/signup-errors";
 import { actionErrorMessage } from "@/lib/action-errors";
-
-const REGISTRATION_TERMS_VERSION = "kullanim-sartlari-2026-07-31";
-const REGISTRATION_KVKK_VERSION = "kvkk-aydinlatma-2026-07-31";
-
-function slugify(input: string) {
-  return input
-    .toLocaleLowerCase("tr-TR")
-    .normalize("NFKD")
-    .replace(/\u0131/g, "i")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 48);
-}
 
 export type AuthResult = {
   error?: string;
@@ -319,6 +296,13 @@ export async function signIn(
   redirect(target);
 }
 
+/**
+ * Kayıt — iki giriş yolu, TEK provizyon çekirdeği (`provisionOfficeForUser`):
+ * - e-posta/şifre: auth kullanıcısı burada oluşur; provizyon başarısızsa tek telafi hedefi odur (silinir).
+ * - Google (`auth_mode=google`, /kayit/tamamla): auth kullanıcısı OAuth oturumundan gelir; şifre/e-posta
+ *   formdan alınmaz, telefon zorunlu; provizyon sonrası oturum claim'leri yenilenir. Başarısızlıkta
+ *   Google kullanıcısı silinmez (yeniden dener). Kapılar (kayıt açık, rıza, hız sınırı) iki yolda AYNI.
+ */
 export async function signUp(
   _prev: AuthResult,
   formData: FormData,
@@ -329,21 +313,48 @@ export async function signUp(
     return { error: REGISTRATION_CLOSED_MESSAGE };
   }
 
+  const googleMode = String(formData.get("auth_mode") ?? "") === "google";
   const fullName = String(formData.get("name") ?? "").trim();
   const rawPhone = String(formData.get("phone") ?? "").trim();
-  const email = normalizeEmail(String(formData.get("email") ?? ""));
-  const password = String(formData.get("password") ?? "");
   const company = String(formData.get("company") ?? "").trim();
-  const requestedTeamSize = String(formData.get("agents") ?? "2-10");
-  const requestedPlan = String(formData.get("plan") ?? "").trim();
-  const requestedCycle = String(formData.get("cycle") ?? "").trim();
   const legalConsent = String(formData.get("legal_consent") ?? "");
+  const publicClient = await createClient();
 
-  if (!fullName || !email || !password || !company) {
-    return { error: "Ad, e-posta, şifre ve firma adı zorunlu." };
-  }
-  if (password.length < 8) {
-    return { error: "Şifre en az 8 karakter olmalı.", field: "password" };
+  // Google yolu: kimlik oturumdan (OAuth), e-posta formdan DEĞİL.
+  let email: string;
+  let password = "";
+  let oauthUserId: string | null = null;
+  if (googleMode) {
+    if (!isGoogleAuthEnabled()) return { error: "Google ile kayıt şu an kullanılamıyor." };
+    const {
+      data: { user: oauthUser },
+    } = await publicClient.auth.getUser();
+    if (!oauthUser?.email || !hasGoogleIdentity(oauthUser)) {
+      return { error: "Google oturumunuz bulunamadı. Lütfen Google ile yeniden devam edin." };
+    }
+    if (typeof oauthUser.app_metadata?.tenant_id === "string") {
+      redirect("/app");
+    }
+    if (isDemoIdentityEmail(oauthUser.email) || isPlatformAllowlistedEmail(oauthUser.email)) {
+      return { error: "Bu hesapla Google üzerinden yeni ofis açılamaz." };
+    }
+    oauthUserId = oauthUser.id;
+    email = normalizeEmail(oauthUser.email);
+    if (!fullName || !company) {
+      return { error: "Ad soyad ve firma adı zorunlu." };
+    }
+    if (!rawPhone) {
+      return { error: "Telefon numarası zorunlu (cep).", field: "phone" };
+    }
+  } else {
+    email = normalizeEmail(String(formData.get("email") ?? ""));
+    password = String(formData.get("password") ?? "");
+    if (!fullName || !email || !password || !company) {
+      return { error: "Ad, e-posta, şifre ve firma adı zorunlu." };
+    }
+    if (password.length < 8) {
+      return { error: "Şifre en az 8 karakter olmalı.", field: "password" };
+    }
   }
   if (legalConsent !== "accepted") {
     return { error: "Kullanım şartları ve KVKK aydınlatma metni onayı zorunlu.", field: "legal_consent" };
@@ -370,101 +381,83 @@ export async function signUp(
     if (parsed.country !== "TR" || parsed.kind !== "mobile") return { error: TR_MOBILE_ERROR_MESSAGE, field: "phone" };
     phone = parsed.stored;
   }
-  const teamSize = normalizeRegistrationTeamSize(requestedTeamSize);
-  const plan = registrationPlanForTeamSize(requestedPlan, teamSize);
-  const billingCycle = normalizeBillingCycle(requestedCycle);
-  const baseSlug = slugify(company) || "ofis";
   const userAgent = ((await headers()).get("user-agent") ?? "").slice(0, 512);
   const admin = createAdminClient();
 
-  // Auth is the only resource outside the provisioning transaction. If the
-  // atomic RPC fails, this pending Auth user is the sole compensation target.
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: fullName, phone },
-    app_metadata: { role: "owner", account_active: true },
-  });
-  if (createError || !created.user) {
-    console.error("signUp auth", createError);
-    return createError?.message?.includes("already")
-      ? { error: "Bu e-posta zaten kayıtlı.", field: "email" }
-      : { error: actionErrorMessage(createError, "Hesap oluşturulamadı.") };
-  }
-
-  const { data: provisioned, error: provisionError } = await admin.rpc(
-    "provision_registration",
-    {
-      p_user_id: created.user.id,
-      p_company: company,
-      p_slug_base: baseSlug,
-      p_full_name: fullName,
-      p_phone: phone || null,
-      p_plan: plan,
-      p_billing_cycle: billingCycle,
-      p_team_size: teamSize,
-      p_terms_version: REGISTRATION_TERMS_VERSION,
-      p_kvkk_version: REGISTRATION_KVKK_VERSION,
-      p_ip_address: ip ? ip.slice(0, 128) : null,
-      p_user_agent: userAgent || null,
-    },
-  );
-  const tenantId =
-    provisioned &&
-    typeof provisioned === "object" &&
-    !Array.isArray(provisioned) &&
-    typeof (provisioned as Record<string, unknown>).tenantId === "string"
-      ? ((provisioned as Record<string, unknown>).tenantId as string)
-      : null;
-
-  if (provisionError || !tenantId) {
-    console.error("signUp provision_registration", provisionError);
-    const { error: cleanupError } = await admin.auth.admin.deleteUser(created.user.id);
-    if (cleanupError) console.error("signUp auth compensation", cleanupError);
-    return { error: actionErrorMessage(provisionError, "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin.") };
-  }
-
-  await recordSignupAttributionFromRequest(tenantId, formData); // büyüme atfı: en iyi çaba, asla fırlatmaz
-
-  // Sihirbaz profili (konum, ofis türü, marka, odak, ekip daveti): best-effort, kayıt akışını kesmez; uyarılar
-  // etkinlik günlüğüne düşer. Aynı admin client (yeni service_role kullanımı yok).
-  const wizard = readWizardOfficeProfile(formData, email);
-  const logoField = formData.get(WIZARD_FIELD.logo);
-  const logo = typeof logoField === "object" && logoField !== null && "arrayBuffer" in logoField ? (logoField as File) : null;
-  const publicClient = await createClient();
-  await applyWizardOfficeProfile(admin, publicClient, { tenantId, ownerId: created.user.id, profile: wizard, logo }).catch((e) =>
-    console.error("signUp applyWizardOfficeProfile", e),
-  );
-
-  // "Demo verileriyle başla": is_sample işaretli tam demo set (paket = odak seçimi); hata kaydı engellemez,
-  // ofis sahibi ana ekran / Başlangıç sihirbazından yükleyebilir. Aynı admin client (yeni service_role kullanımı yok).
-  if (wantsDemoData(formData)) {
-    const demoSeed = await seedDemoDataForNewTenant(admin, tenantId, created.user.id, wizard.pack);
-    if (!demoSeed.ok) {
-      // Kayıt başarılı ama örnek veri yüklenemedi: ana ekran "yeniden dene" bandı için kısa ömürlü işaret.
-      (await cookies()).set(DEMO_SEED_FAILED_COOKIE, "1", {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-        sameSite: "lax",
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-      });
+  let userId: string;
+  if (oauthUserId) {
+    // Google: kullanıcı zaten provizyonlu ya da platform personeli ise yeni ofis açılmaz.
+    const [{ data: existingProfile, error: profileReadError }, { data: staffRow, error: staffReadError }] = await Promise.all([
+      admin.from("profiles").select("id").eq("id", oauthUserId).maybeSingle(),
+      admin.from("platform_staff").select("id").eq("id", oauthUserId).maybeSingle(),
+    ]);
+    if (profileReadError || staffReadError) {
+      console.error("signUp google identity", profileReadError ?? staffReadError);
+      return { error: actionErrorMessage(profileReadError ?? staffReadError, "Hesap durumu doğrulanamadı.") };
     }
+    if (staffRow) return { error: "Bu hesapla Google üzerinden yeni ofis açılamaz." };
+    if (existingProfile) redirect("/app");
+    userId = oauthUserId;
+  } else {
+    // Auth is the only resource outside the provisioning transaction. If the
+    // atomic RPC fails, this pending Auth user is the sole compensation target.
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName, phone },
+      app_metadata: { role: "owner", account_active: true },
+    });
+    if (createError || !created.user) {
+      console.error("signUp auth", createError);
+      return createError?.message?.includes("already")
+        ? { error: "Bu e-posta zaten kayıtlı.", field: "email" }
+        : { error: actionErrorMessage(createError, "Hesap oluşturulamadı.") };
+    }
+    userId = created.user.id;
   }
 
-  const supabase = publicClient;
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+  // Ortak provizyon çekirdeği (ofis + profil + abonelik + rıza → atıf → sihirbaz profili → demo veri).
+  // Aynı admin client (yeni service_role kullanımı yok).
+  const result = await provisionOfficeForUser(admin, publicClient, {
+    userId,
     email,
-    password,
+    fullName,
+    phone,
+    company,
+    formData,
+    ip,
+    userAgent,
   });
-  if (signInError) {
-    return { error: "Hesap oluştu ancak giriş yapılamadı. Giriş sayfasından deneyin." };
+  if (!result.ok) {
+    if (!oauthUserId) {
+      const { error: cleanupError } = await admin.auth.admin.deleteUser(userId);
+      if (cleanupError) console.error("signUp auth compensation", cleanupError);
+    }
+    return { error: actionErrorMessage(result.error, "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin.") };
+  }
+  const tenantId = result.tenantId;
+
+  if (oauthUserId) {
+    // Profil tetikleyicisi app_metadata'ya tenant_id/role yazdı; mevcut JWT'yi yenile ki proxy kapısı geçsin.
+    const { error: refreshError } = await publicClient.auth.refreshSession();
+    if (refreshError) {
+      console.error("signUp google refresh", refreshError);
+      return { error: "Ofisiniz oluşturuldu ancak oturum yenilenemedi. Lütfen Google ile yeniden giriş yapın." };
+    }
+  } else {
+    const { error: signInError } = await publicClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (signInError) {
+      return { error: "Hesap oluştu ancak giriş yapılamadı. Giriş sayfasından deneyin." };
+    }
   }
 
   (await cookies()).delete(TWO_FACTOR_COOKIE);
   await logLoginEvent({
-    userId: created.user.id,
+    userId,
     tenantId,
     ip,
     userAgent,

@@ -404,7 +404,9 @@ describe("arayüz sözleşmesi", () => {
     expect(read("src/components/app/referral-nudge-card.tsx")).toContain("Bu öneriyi kapat");
   });
   it("kayıt ekranı: davetle gelene 'X sizi davet etti' ve avantaj", () => {
-    expect(read("src/app/kayit/page.tsx")).toContain("readInvitePreview(await createClient(), touch.code)");
+    // Kayıt sihirbazı verisi /kayit ve /kayit/tamamla (Google) için tek yükleyicide.
+    expect(read("src/app/kayit/page.tsx")).toContain("loadRegisterFormProps(params)");
+    expect(read("src/app/kayit/_lib/register-page-data.tsx")).toContain("readInvitePreview(await createClient(), touch.code)");
     expect(read("src/app/kayit/register-form.tsx")).toContain("<InviteBanner invite={invite} />");
     expect(read("src/app/kayit/invite-banner.tsx")).toContain("sizi EmlakSoft&apos;a davet etti");
   });

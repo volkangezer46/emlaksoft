@@ -18,7 +18,7 @@ export const metadata = {
 export default async function VerifyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; kaynak?: string }>;
 }) {
   const params = await searchParams;
   const next = params.next && /^\/(?![/\\])/.test(params.next) ? params.next : "/app";
@@ -57,6 +57,7 @@ export default async function VerifyPage({
     <VerifyForm
       next={next}
       maskedPhone={profile.phone ? maskPhone(profile.phone) : "Telefon tanimli degil"}
+      autoSend={params.kaynak === "google"}
     />
   );
 }

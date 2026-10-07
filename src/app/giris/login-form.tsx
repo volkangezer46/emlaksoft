@@ -6,11 +6,24 @@ import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucid
 import { signIn, type AuthResult } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { EmailInput } from "@/components/ui/email-input";
+import { AuthDivider, GoogleAuthButton } from "@/components/auth/google-button";
 import { DemoQuickLogin } from "./demo-quick-login";
 
 const initial: AuthResult = {};
 
-export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: boolean }) {
+export function LoginForm({
+  next,
+  demoEnabled,
+  googleEnabled = false,
+  googleError = null,
+}: {
+  next: string;
+  demoEnabled: boolean;
+  /** NEXT_PUBLIC_GOOGLE_AUTH_ENABLED (sunucuda okunur); kapalıyken düğme hiç görünmez. */
+  googleEnabled?: boolean;
+  /** Google dönüşü hata mesajı (?hata=..., bilinen kodlar). */
+  googleError?: string | null;
+}) {
   const [state, action, pending] = useActionState(signIn, initial);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -25,7 +38,20 @@ export function LoginForm({ next, demoEnabled }: { next: string; demoEnabled: bo
           Ofis çalışma alanınıza veya EmlakSoft personel paneline aynı kapıdan girin.
         </p>
 
-        <form action={action} className="mt-8 space-y-4">
+        {googleError ? (
+          <p className="mt-6 rounded-[var(--radius-control)] border border-danger-500/25 bg-danger-500/8 px-3.5 py-2.5 text-sm font-medium text-danger-600" role="alert">
+            {googleError}
+          </p>
+        ) : null}
+
+        {googleEnabled ? (
+          <div className="mt-8">
+            <GoogleAuthButton next={next} />
+            <AuthDivider />
+          </div>
+        ) : null}
+
+        <form action={action} className={googleEnabled ? "space-y-4" : "mt-8 space-y-4"}>
           <input type="hidden" name="next" value={next} />
 
           <div>
