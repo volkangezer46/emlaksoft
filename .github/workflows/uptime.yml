@@ -1,0 +1,54 @@
+name: Uptime
+
+# Dış erişilebilirlik izleyicisi (salt-okunur GET). Başarısız koşu GitHub bildirimi olarak gelir.
+# - Public: /api/health (db dahil), ana sayfa, /kayit, /giris 200 olmalı.
+# - Cron kalp atışı: HEALTHCHECK_SECRET secret'ı tanımlıysa /api/health/cron (bayat/hatalı iş → 503).
+# Yazma yapan hiçbir adım yok.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: Erişilebilirlik
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      APP_URL: ${{ vars.APP_URL || 'https://emlaksoft.vercel.app' }}
+      HEALTHCHECK_SECRET: ${{ secrets.HEALTHCHECK_SECRET }}
+    steps:
+      - name: Public uçlar
+        run: |
+          set -u
+          fail=0
+          for path in /api/health / /kayit /giris; do
+            code=000
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$APP_URL$path" || echo 000)
+              [ "$code" = "200" ] && break
+              sleep 10
+            done
+            echo "$path -> $code"
+            [ "$code" = "200" ] || fail=1
+          done
+          body=$(curl -s --max-time 20 "$APP_URL/api/health" || true)
+          echo "health: $body"
+          echo "$body" | grep -q '"status":"ready"' || fail=1
+          exit $fail
+      - name: Cron kalp atışı
+        if: ${{ env.HEALTHCHECK_SECRET != '' }}
+        run: |
+          code=$(curl -s -o cron.json -w "%{http_code}" --max-time 30 \
+            -H "Authorization: Bearer $HEALTHCHECK_SECRET" "$APP_URL/api/health/cron" || echo 000)
+          echo "cron health -> $code"
+          head -c 2000 cron.json || true
+          [ "$code" = "200" ]
