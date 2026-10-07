@@ -45,7 +45,7 @@ export async function exportSubscriptionsCsv(): Promise<ExportResult> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("subscriptions")
-    .select("plan, status, amount_try, billing_cycle, current_period_end, created_at, tenant:tenants(name)")
+    .select("plan, status, amount_try, billing_cycle, current_period_end, created_at, tenant:tenants!profiles_tenant_id_fkey(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
   if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
@@ -114,7 +114,7 @@ export async function exportInvoicesCsv(): Promise<ExportResult> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("invoices")
-    .select("invoice_no, status, total_try, due_at, paid_at, reminder_count, created_at, tenant:tenants(name)")
+    .select("invoice_no, status, total_try, due_at, paid_at, reminder_count, created_at, tenant:tenants!profiles_tenant_id_fkey(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
   if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
@@ -136,7 +136,7 @@ export async function exportMembersCsv(): Promise<ExportResult> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .select("full_name, phone, role, is_active, created_at, tenant:tenants(name)")
+    .select("full_name, phone, role, is_active, created_at, tenant:tenants!profiles_tenant_id_fkey(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
   if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };
@@ -156,7 +156,7 @@ export async function exportTicketsCsv(): Promise<ExportResult> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("support_tickets")
-    .select("subject, category, status, priority, created_at, tenant:tenants(name)")
+    .select("subject, category, status, priority, created_at, tenant:tenants!profiles_tenant_id_fkey(name)")
     .order("created_at", { ascending: false })
     .limit(5000);
   if (error) return { error: actionErrorMessage(error, "Dışa aktarma başarısız.") };

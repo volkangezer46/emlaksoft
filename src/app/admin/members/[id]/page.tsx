@@ -73,7 +73,7 @@ export default async function AdminMemberDetailPage({
   const [{ data: profile }, authRes, loginRes, auditRes] = await Promise.all([
     admin
       .from("profiles")
-      .select("id, full_name, phone, role, is_active, created_at, tenant_id, branch_id, tenant:tenants(name), branch:branches!profiles_branch_id_fkey(name)")
+      .select("id, full_name, phone, role, is_active, created_at, tenant_id, branch_id, tenant:tenants!profiles_tenant_id_fkey(name), branch:branches!profiles_branch_id_fkey(name)")
       .eq("id", id)
       .maybeSingle(),
     admin.auth.admin.getUserById(id).catch(() => ({ data: { user: null } })),

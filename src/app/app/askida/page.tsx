@@ -37,7 +37,7 @@ export default async function SuspendedPage() {
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("full_name, role, tenants(name, status, plan, created_at)")
+        .select("full_name, role, tenants!profiles_tenant_id_fkey(name, status, plan, created_at)")
         .eq("id", user.id)
         .maybeSingle()
     : { data: null };

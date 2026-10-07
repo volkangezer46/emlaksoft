@@ -43,7 +43,7 @@ export type RequestIdentity = {
 export type RequestIdentityResult = { data: RequestIdentity | null; error: { code?: string; message?: string } | null };
 
 const IDENTITY_SELECT =
-  "tenant_id, role, full_name, is_active, created_at, two_factor_sms, two_factor_version, tenants(name, plan, status, brand_color, created_at, slug, trial_ends_at, sample_seeded_at)";
+  "tenant_id, role, full_name, is_active, created_at, two_factor_sms, two_factor_version, tenants!profiles_tenant_id_fkey(name, plan, status, brand_color, created_at, slug, trial_ends_at, sample_seeded_at)";
 
 /** Oturumdaki kullanıcının profil + kendi tenant satırı — istek başına TEK sorgu. Hata çağırana aynen döner (fail-closed kararı orada). */
 export const getRequestIdentity = cache(async (userId: string): Promise<RequestIdentityResult> => {

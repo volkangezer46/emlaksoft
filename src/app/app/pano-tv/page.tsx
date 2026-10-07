@@ -29,7 +29,7 @@ export default async function PanoTvPage() {
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("profiles").select("tenants(name)").eq("id", userId).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("tenants!profiles_tenant_id_fkey(name)").eq("id", userId).maybeSingle();
   const tenant = profile?.tenants as { name?: string } | { name?: string }[] | null | undefined;
   const officeName = (Array.isArray(tenant) ? tenant[0]?.name : tenant?.name) || "Ofis";
 

@@ -61,7 +61,7 @@ export default async function AdminMembersPage({
 
   let memberQuery = admin
     .from("profiles")
-    .select("id, full_name, phone, role, is_active, created_at, tenant_id, tenant:tenants(name)", { count: "exact" })
+    .select("id, full_name, phone, role, is_active, created_at, tenant_id, tenant:tenants!profiles_tenant_id_fkey(name)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(...pageRange(page));
   if (f.tenant) memberQuery = memberQuery.eq("tenant_id", f.tenant);
