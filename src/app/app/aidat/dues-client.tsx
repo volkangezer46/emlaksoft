@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Check, CheckCheck, Coins, Loader2, Plus, Trash2, Undo2, X } from "lucide-react";
+import { Check, CheckCheck, Coins, Loader2, MoreVertical, Plus, Trash2, Undo2, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { createDue, toggleDuePaid, deleteDue, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
 import { useToast } from "@/components/app/toast-provider";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -36,6 +37,41 @@ function monthLabel(iso: string) {
 }
 function propOf(p: Due["property"]) {
   return Array.isArray(p) ? p[0] : p;
+}
+
+/** Aidat satırının ikincil eylemi (⋮): silme. Onay diyaloğu menü kapansa da açık kalır. */
+function DueRowMore({ title, disabled, onDelete }: { title: string; disabled: boolean; onDelete: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={`Diğer işlemler: ${title}`}
+            title="Diğer işlemler"
+            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 disabled:opacity-50 touch:h-11 touch:w-11"
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem danger onSelect={() => setOpen(true)}>
+            <Trash2 aria-hidden="true" /> Aidat kaydını sil…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Aidat kaydını sil"
+        description={`"${title}" kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+        confirmLabel="Sil"
+        onConfirm={onDelete}
+      />
+    </>
+  );
 }
 
 export function DuesClient({
@@ -311,18 +347,7 @@ export function DuesClient({
                             {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : paid ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3 text-mint-600" />}
                             {paid ? "Geri al" : "Ödendi"}
                           </button>
-                          <ConfirmDialog
-                            title="Aidat kaydını sil"
-                            description={`"${d.title}" kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
-                            confirmLabel="Sil"
-                            onConfirm={() => remove(d.id)}
-                            trigger={
-                              <button type="button" disabled={busy === d.id} aria-label={`${d.title} aidatını sil`}
-                                className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            }
-                          />
+                          <DueRowMore title={d.title} disabled={busy === d.id} onDelete={() => remove(d.id)} />
                         </div>
                       </TD>
                     </TR>
