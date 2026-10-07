@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader } from "@/components/ui/page-header";
+import { Coins } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { StatRow } from "@/components/ui/stat-row";
 import { Table, TableEmptyRow, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ListPager } from "@/components/ui/list-kit/list-pager";
@@ -52,11 +53,12 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Faturalama"
+      <AdminPageHeader
+        art="coins"
+        icon={Coins}
+        eyebrow="Faturalama · kontör"
         title="EmlakFiyati kontör"
         description="Tarife, paket kataloğu, ofis bakiyeleri ve manuel yükleme tek merkezde. Kontör YALNIZ Emlaksoft'ta tutulur."
-        breadcrumbs={[{ label: "Yönetim", href: "/admin" }, { label: "Abonelik & fatura", href: "/admin/billing" }, { label: "EmlakFiyati kontör" }]}
       />
 
       {!ready ? (

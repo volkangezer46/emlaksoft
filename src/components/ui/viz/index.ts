@@ -10,6 +10,8 @@ export { DonutRing, type DonutSegment } from "./donut-ring";
 export { TubeGradient } from "./tube-gradient";
 export { FunnelChart, type FunnelStage } from "./funnel-chart";
 export { Heatmap } from "./heatmap";
+export { BarColumns, niceTicks, type BarColumn } from "./bar-columns";
+export { DonutBreakdown, percentShares, type BreakdownItem } from "./donut-breakdown";
 export { SkeletonCard } from "./skeleton-card";
 export { ChartCard } from "../chart-frame";
 export { VIZ_SERIES, VIZ_SEQ, vizToneColor, formatViz, type VizFormat, type VizTone } from "./colors";

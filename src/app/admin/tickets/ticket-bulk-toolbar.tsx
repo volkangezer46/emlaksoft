@@ -152,7 +152,7 @@ export function TicketBulkToolbar({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button type="submit" size="md" icon={CheckCircle2} loading={pending} disabled={!effectiveValue} className="flex-1 bg-amber-400 text-ink-950 hover:bg-amber-300 lg:flex-none">
+          <Button type="submit" size="md" variant="gold" icon={CheckCircle2} loading={pending} disabled={!effectiveValue} className="flex-1 lg:flex-none">
             Uygula
           </Button>
           <button

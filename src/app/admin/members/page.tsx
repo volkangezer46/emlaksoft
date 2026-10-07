@@ -1,47 +1,33 @@
-import Link from "next/link";
-import { Building2, Phone, UserCheck, UserMinus, Users, X } from "lucide-react";
+import { BarChart3, Building2, UserCheck, UserMinus, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { formatTurkishPhone } from "@/lib/phone";
 import { orIlike } from "@/lib/pgrst";
+import { formatDateTr } from "@/lib/format";
 import { exportMembersCsv } from "@/app/actions/platform-export";
 import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { AdminActiveFilters, AdminChip, AdminInfo, AdminListCard, AdminListSearch } from "@/components/admin/admin-list";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
-import { AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
-import { DataTable, ROW_HREF, type DataTableColumn, type DataTableRow } from "@/components/ui/data-table";
+import { ChartCard } from "@/components/ui/chart-frame";
+import { BarColumns } from "@/components/ui/viz/bar-columns";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { MembersTable, type MemberRowData } from "./members-table";
 
-const roleLabel: Record<string, string> = ROLE_LABELS; // tek kaynak: lib/role-labels.ts
+/** Rol sırası (grafik + süzgeç): tek kaynak ROLE_LABELS anahtarları. */
+const ROLE_KEYS = Object.keys(ROLE_LABELS);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Rol etiketleri rozet haritasına türetiliyor — tek kaynak `roleLabel`. */
-const ROLE_BADGES: DataTableColumn["badges"] = Object.fromEntries(
-  Object.entries(roleLabel).map(([k, label]) => [k, { label, variant: "info" as const }]),
-);
+type Filters = { tenant?: string; q?: string; durum?: "aktif" | "pasif"; rol?: string; sayfa?: number };
 
-const MEMBER_COLUMNS: DataTableColumn[] = [
-  { key: "full_name", header: "Kullanıcı", sortable: true, subtitleKey: "phone" },
-  { key: "tenantName", header: "Ofis", sortable: true },
-  { key: "role", header: "Rol", format: "badge", badges: ROLE_BADGES, sortable: true },
-  {
-    key: "status",
-    header: "Durum",
-    format: "badge",
-    sortable: true,
-    badges: {
-      active: { label: "Aktif", variant: "success" },
-      passive: { label: "Pasif", variant: "outline" },
-    },
-  },
-  { key: "created_at", header: "Kayıt", format: "date", align: "right", sortable: true },
-];
-
-function buildMembersHref(p: { tenant?: string; q?: string; durum?: string; sayfa?: number }) {
+function buildMembersHref(p: Filters) {
   const sp = new URLSearchParams();
   if (p.tenant) sp.set("tenant", p.tenant);
   if (p.q) sp.set("q", p.q);
   if (p.durum) sp.set("durum", p.durum);
+  if (p.rol) sp.set("rol", p.rol);
   if (p.sayfa && p.sayfa > 1) sp.set("sayfa", String(p.sayfa));
   const s = sp.toString();
   return s ? `/admin/members?${s}` : "/admin/members";
@@ -57,15 +43,19 @@ function tenantName(value: Rel) {
 export default async function AdminMembersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tenant?: string; q?: string; durum?: string; sayfa?: string }>;
+  searchParams?: Promise<{ tenant?: string; q?: string; durum?: string; rol?: string; sayfa?: string }>;
 }) {
-  await requirePlatformModule("members");
+  const staff = await requirePlatformModule("members");
   const sp = (await searchParams) ?? {};
-  const tenantFilter = (sp.tenant ?? "").trim() || undefined;
-  const query = (sp.q ?? "").trim();
-  const durum = sp.durum === "aktif" || sp.durum === "pasif" ? sp.durum : undefined;
+  const f: Filters = {
+    tenant: sp.tenant && UUID_RE.test(sp.tenant.trim()) ? sp.tenant.trim() : undefined,
+    q: (sp.q ?? "").trim().slice(0, 80) || undefined,
+    durum: sp.durum === "aktif" || sp.durum === "pasif" ? sp.durum : undefined,
+    rol: sp.rol && ROLE_KEYS.includes(sp.rol) ? sp.rol : undefined,
+  };
   const page = parsePage(sp.sayfa);
-  const filtered = Boolean(tenantFilter || query || durum);
+  const filtered = Boolean(f.tenant || f.q || f.durum || f.rol);
+  const toggle = <K extends keyof Filters>(key: K, value: Filters[K]) => buildMembersHref({ ...f, [key]: f[key] === value ? undefined : value, sayfa: undefined });
 
   const admin = createAdminClient();
 
@@ -74,160 +64,117 @@ export default async function AdminMembersPage({
     .select("id, full_name, phone, role, is_active, created_at, tenant_id, tenant:tenants(name)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(...pageRange(page));
-  if (tenantFilter) memberQuery = memberQuery.eq("tenant_id", tenantFilter);
+  if (f.tenant) memberQuery = memberQuery.eq("tenant_id", f.tenant);
   // Ad + telefon birlikte taranır: destek ekibi çoğu zaman elinde numarayla gelir.
-  if (query) memberQuery = memberQuery.or(orIlike(["full_name", "phone"], query));
-  if (durum) memberQuery = memberQuery.eq("is_active", durum === "aktif");
+  if (f.q) memberQuery = memberQuery.or(orIlike(["full_name", "phone"], f.q));
+  if (f.durum) memberQuery = memberQuery.eq("is_active", f.durum === "aktif");
+  if (f.rol) memberQuery = memberQuery.eq("role", f.rol);
 
-  // Özet kartlar filtreden bağımsız — tüm platformun üye tablosunu anlatır.
-  const [{ data, count: memberTotal }, filterTenantRes, { count: allMembers }, { count: activeMembers }, { count: officeCount }] =
+  // Özet kartlar ve rol grafiği filtreden bağımsız — tüm platformu anlatır (head sayımı: satır çekilmez).
+  const roleCount = (role: string) => admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", role).eq("is_active", true);
+  const [{ data, count: memberTotal, error: listError }, filterTenantRes, { count: allMembers }, { count: activeMembers }, { count: officeCount }, ...roleRes] =
     await Promise.all([
       memberQuery,
-      tenantFilter
-        ? admin.from("tenants").select("id, name").eq("id", tenantFilter).maybeSingle()
-        : Promise.resolve({ data: null as { id: string; name: string } | null }),
+      f.tenant ? admin.from("tenants").select("id, name").eq("id", f.tenant).maybeSingle() : Promise.resolve({ data: null as { id: string; name: string } | null }),
       admin.from("profiles").select("id", { count: "exact", head: true }),
       admin.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
       admin.from("tenants").select("id", { count: "exact", head: true }),
+      ...ROLE_KEYS.map(roleCount),
     ]);
 
   const rows = data ?? [];
   const filterTenant = filterTenantRes.data;
   const totalMembers = allMembers ?? 0;
   const active = activeMembers ?? 0;
+  const roleBars = ROLE_KEYS.map((r, i) => ({
+    label: ROLE_LABELS[r] ?? r,
+    value: roleRes[i]?.count ?? 0,
+    href: toggle("rol", r),
+    active: f.rol === r,
+    title: f.rol === r ? "Rol süzgecini kaldır" : `Yalnız ${ROLE_LABELS[r]} rolündekileri göster`,
+  })).filter((b) => b.value > 0 || b.active);
 
-  const memberRows: DataTableRow[] = rows.map((m) => ({
-    id:         m.id,
-    full_name:  m.full_name,
-    phone:      m.phone ? formatTurkishPhone(m.phone) : null,
+  const tableRows: MemberRowData[] = rows.map((m) => ({
+    id: m.id,
+    name: m.full_name,
+    phone: m.phone ?? null,
+    phoneDisplay: m.phone ? formatTurkishPhone(m.phone) : null,
+    tenantId: m.tenant_id ?? null,
     tenantName: tenantName(m.tenant as Rel),
-    role:       m.role,
-    status:     m.is_active ? "active" : "passive",
-    created_at: m.created_at,
-    [ROW_HREF]: `/admin/members/${m.id}`,
+    role: m.role,
+    active: Boolean(m.is_active),
+    createdLabel: formatDateTr(m.created_at),
   }));
 
-  // Telefon + ofis linki: DataTable satır overlay'inin ÜSTÜNDE kalan aksiyonlar
-  const rowActions = Object.fromEntries(
-    rows.map((m): [string, React.ReactNode] => [
-      m.id,
-      <>
-        {m.phone ? (
-          <a
-            href={`tel:${m.phone}`}
-            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas"
-          >
-            <Phone className="h-3 w-3" /> Ara
-          </a>
-        ) : null}
-        {m.tenant_id ? (
-          <Link
-            href={`/admin/tenants/${m.tenant_id}`}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
-          >
-            Ofis
-          </Link>
-        ) : null}
-        <Link
-          href={`/admin/members/${m.id}`}
-          className="focus-ring press relative z-10 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-3 py-1.5 text-xs font-semibold text-brand-700 shadow-[var(--elev-1)] transition hover:bg-brand-600/5"
-        >
-          Detay
-        </Link>
-      </>,
-    ]),
-  );
+  const chips = [
+    ...(f.q ? [{ key: "q", label: `Arama: ${f.q}`, removeHref: buildMembersHref({ ...f, q: undefined }) }] : []),
+    ...(f.durum ? [{ key: "durum", label: `Durum: ${f.durum === "aktif" ? "Aktif" : "Pasif"}`, removeHref: buildMembersHref({ ...f, durum: undefined }) }] : []),
+    ...(f.rol ? [{ key: "rol", label: `Rol: ${ROLE_LABELS[f.rol]}`, removeHref: buildMembersHref({ ...f, rol: undefined }) }] : []),
+    ...(filterTenant ? [{ key: "tenant", label: `Ofis: ${filterTenant.name}`, removeHref: buildMembersHref({ ...f, tenant: undefined }) }] : []),
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <AdminPageHeader
         eyebrow="Üye envanteri"
         icon={Users}
         title="Tüm platform kullanıcıları"
-        description={
-          filtered
-            ? `${memberTotal ?? rows.length} sonuç · toplam ${totalMembers} profil içinde filtreleniyor`
-            : `${totalMembers} profil · ofis bazlı görünüm`
-        }
-        actions={<ExportButton action={exportMembersCsv} label="Excel'e aktar" variant="light" />}
+        art="users"
+        description={filtered ? `${memberTotal ?? rows.length} sonuç · toplam ${totalMembers} profil içinde süzülüyor` : `${totalMembers} profil · ofis bazlı görünüm`}
+        actions={<ExportButton action={exportMembersCsv} label="Excel'e aktar" />}
       >
-        <KpiGrid label="Kullanıcı göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
-          <KpiCard layout="inline" label="Toplam kullanıcı" value={totalMembers || "—"} href="/admin/members" icon={Users} tone="gold" hint={totalMembers ? undefined : "Henüz kullanıcı yok"} />
-          <KpiCard
-            layout="inline"
-            label="Aktif"
-            value={totalMembers ? active : "—"}
-            href={buildMembersHref({ tenant: tenantFilter, q: query, durum: durum === "aktif" ? undefined : "aktif" })}
-            icon={UserCheck}
-            tone="success"
-            hint={!totalMembers ? "Henüz kullanıcı yok" : durum === "aktif" ? "filtre aktif · kaldırmak için tıkla" : undefined}
-          />
-          <KpiCard
-            layout="inline"
-            label="Pasif"
-            value={totalMembers ? totalMembers - active : "—"}
-            href={buildMembersHref({ tenant: tenantFilter, q: query, durum: durum === "pasif" ? undefined : "pasif" })}
-            icon={UserMinus}
-            tone="danger"
-            hint={!totalMembers ? "Henüz kullanıcı yok" : durum === "pasif" ? "filtre aktif · kaldırmak için tıkla" : undefined}
-          />
-          <KpiCard
-            layout="inline"
-            label="Ofis"
-            value={officeCount ?? "—"}
-            href="/admin/tenants"
-            icon={Building2}
-            tone="brand"
-            hint={officeCount ? `ofis başına ~${Math.round(totalMembers / officeCount)} kullanıcı` : "Henüz ofis yok"}
-          />
+        <KpiGrid label="Kullanıcı göstergeleri">
+          <KpiCard layout="inline" label="Toplam kullanıcı" value={totalMembers || "—"} href="/admin/members" icon={Users} tone="gold" tinted={!filtered} hint={totalMembers ? undefined : "Henüz kullanıcı yok"} />
+          <KpiCard layout="inline" label="Aktif" value={totalMembers ? active : "—"} href={toggle("durum", "aktif")} icon={UserCheck} tone="success" tinted={f.durum === "aktif"} hint={totalMembers ? `%${Math.round((active / totalMembers) * 100)} aktif` : "Henüz kullanıcı yok"} />
+          <KpiCard layout="inline" label="Pasif" value={totalMembers ? totalMembers - active : "—"} href={toggle("durum", "pasif")} icon={UserMinus} tone="danger" tinted={f.durum === "pasif"} hint={totalMembers ? "Giriş yapamaz" : "Henüz kullanıcı yok"} />
+          <KpiCard layout="inline" label="Ofis" value={officeCount ?? "—"} href="/admin/tenants" icon={Building2} tone="brand" hint={officeCount ? `ofis başına ~${Math.round(totalMembers / officeCount)} kullanıcı` : "Henüz ofis yok"} />
         </KpiGrid>
+        {roleBars.length > 0 ? (
+          <ChartCard className="mt-4" title="Rol dağılımı" subtitle="Aktif kullanıcıların ofis rollerine göre dağılımı · sütuna tıklayınca liste süzülür" icon={BarChart3} tone="brand" height={0}>
+            <BarColumns data={roleBars} ariaLabel="Role göre aktif kullanıcı sayısı" height={180} tone="brand" />
+          </ChartCard>
+        ) : null}
       </AdminPageHeader>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
-        <AdminSearchForm
-          action="/admin/members"
-          defaultValue={query}
-          placeholder="Ad soyad veya telefon ara…"
-          hidden={{ tenant: tenantFilter, durum }}
-        />
-        {query ? (
-          <AdminFilterChip href={buildMembersHref({ tenant: tenantFilter, durum })}>
-            Arama: {query} <X className="h-3 w-3" />
-          </AdminFilterChip>
-        ) : null}
-        {durum ? (
-          <AdminFilterChip href={buildMembersHref({ tenant: tenantFilter, q: query })}>
-            Durum: {durum === "aktif" ? "Aktif" : "Pasif"} <X className="h-3 w-3" />
-          </AdminFilterChip>
-        ) : null}
-        {filterTenant ? (
-          <AdminFilterChip href={buildMembersHref({ q: query, durum })}>
-            Ofis: {filterTenant.name} <X className="h-3 w-3" />
-          </AdminFilterChip>
-        ) : null}
-        <p className="ml-auto text-xs text-text-faint">
-          Arama sunucuda çalışır ve tüm sayfaları tarar; tablodaki arama yalnız açık sayfayı süzer.
-        </p>
-      </div>
+      <AdminListCard
+        label="Kullanıcı listesi"
+        toolbar={
+          <>
+            <AdminListSearch action="/admin/members" defaultValue={f.q} placeholder="Ad soyad veya telefon ara…" hidden={{ tenant: f.tenant, durum: f.durum, rol: f.rol }} />
+            <nav aria-label="Hızlı süzgeçler" className="flex flex-wrap items-center gap-1.5">
+              <AdminChip href={toggle("rol", "owner")} on={f.rol === "owner"}>
+                Ofis sahipleri
+              </AdminChip>
+              <AdminChip href={toggle("durum", "pasif")} on={f.durum === "pasif"} count={totalMembers - active}>
+                Pasif
+              </AdminChip>
+            </nav>
+            <AdminInfo>
+              {staff.role === "super_admin" ? "Rol ve durum satırda değişir; Kaydet ile yazılır." : staff.role === "ops" ? "Durum satırda değişir; rol yalnız süper admin." : "Düzenleme yetkisi: süper admin ve operasyon."}
+            </AdminInfo>
+          </>
+        }
+        filters={<AdminActiveFilters chips={chips} clearHref="/admin/members" />}
+      >
+        {listError ? (
+          <div role="alert" className="px-5 py-10 text-center text-sm text-[var(--pm-danger-text)]">
+            Kullanıcı listesi okunamadı. Sayfayı yenileyin.
+          </div>
+        ) : tableRows.length === 0 ? (
+          <div className="px-5 py-10">
+            <EmptyState
+              illustration={filtered ? "aramaYok" : "musteri"}
+              title={filtered ? "Süzgeçle eşleşen kullanıcı yok" : "Henüz kullanıcı kaydı yok"}
+              description={filtered ? "Arama terimini değiştirin ya da süzgeçleri kaldırın." : "Ofisler üye davet ettiğinde burada görünür."}
+              action={filtered ? { href: "/admin/members", label: "Süzgeçleri temizle" } : { href: "/admin/tenants", label: "Ofislere git" }}
+            />
+          </div>
+        ) : (
+          <MembersTable rows={tableRows} canRole={staff.role === "super_admin"} canActive={staff.role === "super_admin" || staff.role === "ops"} />
+        )}
+      </AdminListCard>
 
-      <DataTable
-        columns={MEMBER_COLUMNS}
-        rows={memberRows}
-        rowActions={rowActions}
-        minWidth={760}
-        searchPlaceholder="Bu sayfada süz (ofis, rol)…"
-        empty={{
-          description: filtered
-            ? "Filtreyle eşleşen kullanıcı yok — arama terimini değiştirin ya da filtreleri temizleyin."
-            : "Henüz kullanıcı kaydı yok. Ofisler üye davet ettiğinde burada görünür.",
-        }}
-      />
-
-      <Pagination
-        page={page}
-        total={memberTotal ?? 0}
-        hrefFor={(p) => buildMembersHref({ tenant: tenantFilter, q: query, durum, sayfa: p })}
-      />
+      <Pagination page={page} total={memberTotal ?? 0} hrefFor={(p) => buildMembersHref({ ...f, sayfa: p })} />
     </div>
   );
 }

@@ -7,6 +7,7 @@
 @import "./motion.css";
 @import "./viz.css";
 @import "./list-page.css";
+@import "./kit.css";
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }

@@ -145,6 +145,7 @@ export default async function AdminGrowthPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        art="rocket"
         eyebrow="EmlakSoft · Organik büyüme"
         icon={Sprout}
         title="Büyüme"

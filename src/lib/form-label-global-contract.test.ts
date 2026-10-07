@@ -29,7 +29,6 @@ const EXEMPT: Record<string, string> = {
   "src/app/admin/geo/page.tsx": "A kapsamı (admin liste sayfası): arama kutusu → aria-label=\"İl ara\" birleştirmede.",
   "src/app/admin/geo/[provinceId]/page.tsx": "A kapsamı: arama kutusu → aria-label=\"İlçe ara\" birleştirmede.",
   "src/app/admin/geo/[provinceId]/[districtId]/page.tsx": "A kapsamı: arama kutusu → aria-label=\"Mahalle ara\" birleştirmede.",
-  "src/app/admin/tenants/page.tsx": "A kapsamı: arama kutusu → aria-label=\"Ofis ara\" birleştirmede.",
   "src/components/admin/openai-key-form.tsx": "A kapsamı (src/components/admin/**): anahtar alanı → aria-label=\"OpenAI API anahtarı\" birleştirmede.",
   "src/components/admin/portal-keys-form.tsx": "A kapsamı: üç alan → aria-label (API anahtarı / Acente ID / API adresi) birleştirmede.",
   "src/app/app/ekip/branch-card.tsx": "B kapsamı (ekip listesi görünümü): şube adı / il → aria-label birleştirmede.",

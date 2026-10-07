@@ -1,14 +1,16 @@
 "use client";
 
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { useTransition, useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
-  ChevronDown,
   Clock,
-  Loader2,
+  Crown,
+  Headphones,
   Plus,
+  Receipt,
   Search,
+  Settings2,
   ShieldCheck,
   UserCheck,
   UserMinus,
@@ -16,14 +18,17 @@ import {
   UserX,
   Users,
 } from "lucide-react";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { InlineSelect, type InlineSelectOption } from "@/components/ui/inline-select";
+import { RowSaveActions, rowDraftProps } from "@/components/ui/row-save-actions";
+import { DraftTable } from "@/components/ui/draft-table";
+import { ButtonLink } from "@/components/ui/button";
+import { useRowDraft } from "@/lib/ui/use-row-draft";
 import {
   updateStaffRole,
   deactivateStaff,
   reactivateStaff,
 } from "@/app/actions/platform-staff";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { daysAgoIso } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
@@ -46,57 +51,77 @@ type StaffRow = {
 type StatusFilter = "all" | "active" | "passive" | "recent" | "never";
 
 // ---------------------------------------------------------------------------
-// Role badge colours
+// Rol / durum seçenekleri (satır içi kaydetme standardı: docs/DESIGN_SYSTEM.md)
 // ---------------------------------------------------------------------------
-const roleCls: Record<PlatformRole, string> = {
-  super_admin: "bg-amber-400/15 text-amber-600",
-  ops: "bg-brand-600/12 text-brand-600",
-  support: "bg-cyan-400/12 text-cyan-600",
-  billing: "bg-mint-500/12 text-mint-600",
+const ROLE_META: Record<PlatformRole, Pick<InlineSelectOption, "icon" | "tone">> = {
+  super_admin: { icon: Crown, tone: "gold" },
+  ops: { icon: Settings2, tone: "brand" },
+  support: { icon: Headphones, tone: "brand" },
+  billing: { icon: Receipt, tone: "success" },
 };
+const ROLE_OPTIONS: InlineSelectOption[] = (Object.entries(PLATFORM_ROLE_LABELS) as [PlatformRole, string][]).map(([value, label]) => ({
+  value,
+  label,
+  ...ROLE_META[value],
+}));
+const ACTIVE_OPTIONS: InlineSelectOption[] = [
+  { value: "1", label: "Aktif", icon: UserCheck, tone: "success" },
+  { value: "0", label: "Pasif", icon: UserX, tone: "neutral", hint: "Admin paneline giriş yapamaz" },
+];
+
+type StaffDraft = { role: string; active: string };
+
+/** Saf kurallar: pasif personelin rolü (aynı kayıtta aktif edilmeden) değiştirilmez; pasifleştirme risklidir. */
+function validateStaffRow(d: StaffDraft, s: StaffDraft) {
+  if (d.role !== s.role && d.active === "0") return { ok: false as const, reason: "Pasif personelin rolü değiştirilemez; önce aktif edin." };
+  return { ok: true as const };
+}
+function staffRisk(d: StaffDraft, s: StaffDraft) {
+  if (d.active === "0" && s.active === "1") return "Personel admin paneline giriş yapamayacak.";
+  if (d.role !== s.role && s.role === "super_admin") return "Süper admin yetkisi kaldırılıyor.";
+  return null;
+}
 
 // ---------------------------------------------------------------------------
-// Staff row — inline role change + deactivate
+// Staff row — rol + durum taslağı, tek Kaydet
 // ---------------------------------------------------------------------------
-function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) {
-  const [pending, startTransition] = useTransition();
-  const [err, setErr] = useState<string | null>(null);
-
-  function changeRole(e: React.ChangeEvent<HTMLSelectElement>) {
-    const fd = new FormData();
-    fd.set("id", member.id);
-    fd.set("role", e.target.value);
-    setErr(null);
-    startTransition(async () => {
-      const res = await updateStaffRole(fd);
-      if (res.error) setErr(res.error);
-      else onDone();
-    });
-  }
-
-  // Pasifleştirme ConfirmDialog üzerinden gelir (dialog kendi transition'ını yönetir)
-  async function deactivate() {
-    const fd = new FormData();
-    fd.set("id", member.id);
-    setErr(null);
-    const res = await deactivateStaff(fd);
-    if (res.error) setErr(res.error);
-    else onDone();
-  }
-
-  function reactivate() {
-    const fd = new FormData();
-    fd.set("id", member.id);
-    setErr(null);
-    startTransition(async () => {
-      const res = await reactivateStaff(fd);
-      if (res.error) setErr(res.error);
-      else onDone();
-    });
-  }
+function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => Promise<void> | void }) {
+  const draft = useRowDraft<StaffDraft>({
+    id: member.id,
+    label: member.full_name,
+    saved: { role: member.role, active: member.is_active ? "1" : "0" },
+    validate: validateStaffRow,
+    risk: staffRisk,
+    save: async (d, { saved }) => {
+      const fd = new FormData();
+      fd.set("id", member.id);
+      // Aktifleştirme önce (pasif personelin rolü değişmez), pasifleştirme en son.
+      if (d.active === "1" && saved.active === "0") {
+        const r = await reactivateStaff(fd);
+        if (r.error) return { error: r.error };
+      }
+      if (d.role !== saved.role) {
+        fd.set("role", d.role);
+        const r = await updateStaffRole(fd);
+        if (r.error) {
+          await onDone();
+          return { error: r.error };
+        }
+      }
+      if (d.active === "0" && saved.active === "1") {
+        const r = await deactivateStaff(fd);
+        if (r.error) {
+          await onDone();
+          return { error: r.error };
+        }
+      }
+      await onDone();
+      return { ok: true };
+    },
+  });
 
   return (
-    <TR>
+    <TR {...rowDraftProps(draft)}>
       <TD>
         <Link
           href={`/admin/personel/${member.id}`}
@@ -106,28 +131,28 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
           {member.full_name}
         </Link>
         <p className="text-xs text-text-faint">{member.email}</p>
-        {err ? <p className="mt-0.5 text-xs font-medium text-danger-600" role="alert">{err}</p> : null}
       </TD>
       <TD>
-        <div className="relative">
-          <select
-            defaultValue={member.role}
-            onChange={changeRole}
-            disabled={pending || !member.is_active}
-            aria-label={`${member.full_name} rolü`}
-            className={`focus-ring appearance-none rounded-[var(--radius-control)] border border-hairline bg-canvas py-1.5 pl-2.5 pr-8 text-xs font-semibold outline-none disabled:opacity-50 ${roleCls[member.role]}`}
-          >
-            {(Object.entries(PLATFORM_ROLE_LABELS) as [PlatformRole, string][]).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-current opacity-60" />
-        </div>
+        <InlineSelect
+          value={draft.draft.role}
+          onValueChange={(v) => draft.set("role", v)}
+          options={ROLE_OPTIONS}
+          label={`${member.full_name} rolü`}
+          changed={draft.changed.has("role")}
+          disabled={draft.locked}
+          className="w-[11rem]"
+        />
       </TD>
       <TD>
-        <Badge variant={member.is_active ? "success" : "outline"} size="sm">
-          {member.is_active ? "Aktif" : "Pasif"}
-        </Badge>
+        <InlineSelect
+          value={draft.draft.active}
+          onValueChange={(v) => draft.set("active", v)}
+          options={ACTIVE_OPTIONS}
+          label={`${member.full_name} durumu`}
+          changed={draft.changed.has("active")}
+          disabled={draft.locked}
+          className="w-[7.5rem]"
+        />
       </TD>
       <TD align="right" className="text-xs text-text-muted">
         {member.last_sign_in_at ? relativeTimeTR(member.last_sign_in_at) : "Hiç giriş yok"}
@@ -136,57 +161,34 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => void }) 
         {new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(member.created_at))}
       </TD>
       <TD align="right">
-        {member.is_active ? (
-          <ConfirmDialog
-            trigger={
-              <button
-                type="button"
-                disabled={pending}
-                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-danger-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-danger-600 shadow-[var(--elev-1)] transition hover:bg-danger-500/8 disabled:opacity-50"
-              >
-                <UserMinus className="h-3 w-3" /> Pasif yap
-              </button>
-            }
-            title={`${member.full_name} pasif yapılsın mı?`}
-            description="Pasif personel admin paneline giriş yapamaz. Kayıt silinmez; daha sonra tekrar aktif edilebilir."
-            confirmLabel="Pasif yap"
-            onConfirm={deactivate}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={reactivate}
-            disabled={pending}
-            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-mint-500/30 bg-surface px-2.5 py-1.5 text-xs font-semibold text-mint-700 shadow-[var(--elev-1)] transition hover:bg-mint-500/8 disabled:opacity-50"
-          >
-            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <><UserPlus className="h-3 w-3" /> Aktif yap</>}
-          </button>
-        )}
+        <RowSaveActions draft={draft} confirmLabel="Onayla" />
       </TD>
     </TR>
   );
 }
 
 /** İki tabloda (aktif/pasif) aynı başlıklar — tek yerde tutuluyor. */
-function StaffTable({ rows, onDone }: { rows: StaffRow[]; onDone: () => void }) {
+function StaffTable({ rows, onDone }: { rows: StaffRow[]; onDone: () => Promise<void> | void }) {
   return (
-    <TableFrame minWidth={780} className="rounded-none border-0 shadow-none">
-      <Table>
-        <THead>
-          <TR>
-            <TH>Personel</TH>
-            <TH>Rol</TH>
-            <TH>Durum</TH>
-            <TH align="right">Son giriş</TH>
-            <TH align="right">Katılım</TH>
-            <TH align="right">İşlem</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {rows.map((m) => <StaffRow key={m.id} member={m} onDone={onDone} />)}
-        </TBody>
-      </Table>
-    </TableFrame>
+    <DraftTable>
+      <TableFrame minWidth={860} className="rounded-none border-0 shadow-none">
+        <Table>
+          <THead>
+            <TR>
+              <TH>Personel</TH>
+              <TH>Rol</TH>
+              <TH>Durum</TH>
+              <TH align="right">Son giriş</TH>
+              <TH align="right">Katılım</TH>
+              <TH align="right">İşlem</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {rows.map((m) => <StaffRow key={m.id} member={m} onDone={onDone} />)}
+          </TBody>
+        </Table>
+      </TableFrame>
+    </DraftTable>
   );
 }
 
@@ -282,13 +284,11 @@ export default function PersonelPage() {
         icon={ShieldCheck}
         title="Personel yönetimi"
         description="EmlakSoft çalışanları · departman rolü, erişim ve durum yönetimi."
+        art="shield"
         actions={
-          <Link
-            href="/admin/personel/yeni"
-            className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] bg-accent px-4 text-sm font-semibold text-accent-fg transition hover:bg-accent-hover"
-          >
-            <Plus className="h-4 w-4" aria-hidden /> Yeni personel
-          </Link>
+          <ButtonLink href="/admin/personel/yeni" size="lg" variant="primary" icon={Plus}>
+            Yeni personel
+          </ButtonLink>
         }
       >
         {/* Rol dağılımı — her kart o rolü filtreler */}
