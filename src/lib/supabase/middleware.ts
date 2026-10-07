@@ -6,6 +6,7 @@ import {
   twoFactorBindingFromClaims,
 } from "@/lib/two-factor";
 import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
+import { AUTH_VERIFIED_HEADER, claimsMatchLiveUser } from "@/lib/supabase/verified-request";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform-flags-cache";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
@@ -23,6 +24,8 @@ function maintenanceResponse(request: NextRequest) {
 }
 
 export async function updateSession(request: NextRequest) {
+  // "Ağ ile doğrulandı" işareti yalnız aşağıda, tüm kapılar geçtikten sonra konur; istemcinin gönderdiği silinir.
+  request.headers.delete(AUTH_VERIFIED_HEADER);
   let supabaseResponse = NextResponse.next({ request });
 
   // Bakım modu (K5): kısa TTL önbellekli hafif okuma; okuma hatasında site AÇIK kalır.
@@ -218,6 +221,15 @@ export async function updateSession(request: NextRequest) {
         redirect.searchParams.set("next", path);
         return NextResponse.redirect(redirect);
       }
+    }
+
+    // Ağ doğrulaması (getUser) + kimlik/askı/2FA kapıları geçti: sunucu bileşenleri ikinci ağ turu yerine
+    // JWKS ile yerel doğrulama yapabilir (auth-cache). Token canlı kullanıcıdan farklıysa işaret konmaz.
+    if (!claimsError && claimsMatchLiveUser(user, claimsData?.claims as Record<string, unknown> | undefined)) {
+      request.headers.set(AUTH_VERIFIED_HEADER, user.id);
+      const verified = NextResponse.next({ request });
+      for (const cookie of supabaseResponse.cookies.getAll()) verified.cookies.set(cookie);
+      supabaseResponse = verified;
     }
   }
 
