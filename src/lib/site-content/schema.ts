@@ -17,6 +17,7 @@ export const LIMITS = {
   em: 60,
   tail: 60,
   lead: 400,
+  mobileLead: 140,
   text: 320,
   badge: 60,
   cta: 40,
@@ -101,6 +102,8 @@ export const siteContentSchema = z.strictObject({
     em: text(LIMITS.em, "Vurgulu kısım"),
     tail: text(LIMITS.tail, "Başlık sonu"),
     lead: text(LIMITS.lead, "Açıklama"),
+    /** Mobil (< 768 px) tek cümle açıklama; boşsa `lead`in ilk cümlesi (`heroMobileLead`). Tek satır alan. */
+    mobileLead: text(LIMITS.mobileLead, "Mobil açıklama"),
     primary: ctaSchema,
     secondary: ctaSchema,
     checks: z.array(checkSchema).max(LIMITS.maxChecks, `En fazla ${LIMITS.maxChecks} madde olabilir.`),
@@ -267,7 +270,23 @@ export function upgradeSiteContent(value: unknown): unknown {
     }
   }
   if (Array.isArray(out.layout)) out.layout = normalizeLayout(out.layout as Array<{ id?: unknown; hidden?: unknown }>);
+  // Sonradan eklenen hero alanı: eski yayında yoksa boş (boş = uzun açıklamanın ilk cümlesi).
+  if (out.hero && typeof out.hero === "object" && !Array.isArray(out.hero) && (out.hero as Record<string, unknown>).mobileLead === undefined) {
+    out.hero = { ...(out.hero as Record<string, unknown>), mobileLead: "" };
+  }
   return out;
+}
+
+/** Metnin ilk cümlesi (satır sonları boşluk sayılır; nokta/ünlem/soru/üç nokta ile biten ilk parça; yoksa metnin tamamı). Saf. */
+export function firstSentence(value: string): string {
+  const t = value.replace(/\s+/g, " ").trim();
+  const m = /^(.+?[.!?…])(?=\s|$)/.exec(t);
+  return (m ? m[1]! : t).trim();
+}
+
+/** Mobil hero açıklaması: yönetimden yazılan tek cümle; boşsa uzun açıklamanın ilk cümlesi (değişkenler çağıranda çözülür). */
+export function heroMobileLead(hero: Pick<SiteContent["hero"], "lead" | "mobileLead">): string {
+  return hero.mobileLead.trim() || firstSentence(hero.lead);
 }
 
 export function parseSiteContent(value: unknown): SiteContent | null {

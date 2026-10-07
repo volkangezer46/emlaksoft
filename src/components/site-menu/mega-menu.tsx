@@ -357,6 +357,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
           </nav>
           <div className="mk-nav-cta">
             <Link href="/giris" className="mk-btn mk-btn-line mk-login">Giriş yap</Link>
+            <Link href="/giris" className="mk-login-m">Giriş</Link>
             <Link href="/kayit" className="mk-btn mk-btn-primary mk-nav-trial">
               <span className="mk-long">Ücretsiz dene</span><span className="mk-short">Ücretsiz dene</span> <ArrowRight size={16} aria-hidden="true" />
             </Link>

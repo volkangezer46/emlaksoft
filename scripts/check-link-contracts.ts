@@ -21,6 +21,8 @@ const ROOT = join(process.cwd(), "src", "app");
 // Anahtar: "<rota>::<param>"  (rota, dinamik segmentler [x] normalize edilmiş)
 // ---------------------------------------------------------------------------
 const ALLOWLIST: Record<string, string> = {
+  // Hedef bir GET route handler (indirme ucu); `bicim` paramını route.ts okur, betik yalnız page.tsx'i tarar.
+  "/admin/ef-kontor/piyasa-verisi::bicim": "route handler — EF piyasa verisi CSV/JSON indirme biçimi",
   // Kira yenileme bildiriminin mükerrer freni: href'teki ?yenileme={yıl}
   // işlevsel filtre değil, notifications tablosunda yıl bazlı tekillik
   // marker'ı (cron her yıl tek bildirim atsın diye). Hedef sayfa okumaz.

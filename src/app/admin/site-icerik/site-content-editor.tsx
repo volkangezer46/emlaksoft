@@ -7,7 +7,7 @@ import { AlertTriangle, CheckCircle2, History, Loader2, RotateCcw, Save, Send, U
 import { discardSiteContentDraft, publishSiteContent, resetSiteContentToDefault, rollbackSiteContent, saveSiteContentDraft } from "@/app/actions/site-content";
 import { Input } from "@/components/ui/input";
 import { PIONEER_CLAIM } from "@/lib/site-content/claims";
-import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, hasErrors, sameContent, validateSiteContent, type SectionKey, type SiteContent } from "@/lib/site-content/schema";
+import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, sameContent, validateSiteContent, type SectionKey, type SiteContent } from "@/lib/site-content/schema";
 
 import { InlineConfirm, TargetDatalist, btn } from "../site-menu/editor-ui";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
@@ -296,6 +296,17 @@ function HeroTab({ cfg, update, issues, readOnly }: TabProps) {
           </div>
         </Full>
         <Full><Txt label="Açıklama" multiline value={h.lead} max={LIMITS.lead} onChange={(v) => update((d) => void (d.hero.lead = v))} path="hero.lead" {...f} /></Full>
+        <Full>
+          <Txt
+            label="Mobil açıklama (tek cümle)"
+            value={h.mobileLead}
+            max={LIMITS.mobileLead}
+            onChange={(v) => update((d) => void (d.hero.mobileLead = v))}
+            path="hero.mobileLead"
+            hint={`Telefonda uzun açıklamanın yerine görünür; en fazla iki satır kalacak kısa bir cümle yazın. Boşsa: “${firstSentence(h.lead)}”`}
+            {...f}
+          />
+        </Full>
         <CtaFields label="Ana düğme" value={h.primary} onChange={(v) => update((d) => void (d.hero.primary = v))} path="hero.primary" {...f} />
         <CtaFields label="İkinci düğme" value={h.secondary} onChange={(v) => update((d) => void (d.hero.secondary = v))} path="hero.secondary" {...f} />
         <Txt label="EmlakFiyati rozeti (boşsa gösterilmez)" value={h.integrationBadge} max={LIMITS.badge} onChange={(v) => update((d) => void (d.hero.integrationBadge = v))} path="hero.integrationBadge" {...f} />

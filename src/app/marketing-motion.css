@@ -3,8 +3,8 @@
    süreler motion.css token'ları; her keyframe `prefers-reduced-motion: no-preference` içinde; TEMEL CSS = SON KARE
    (JS yok / reduce / otomasyon tarayıcısında hiçbir şey gizli ya da yarım kalmaz). Hareket yalnız MotionRoot'un koyduğu
    .mk[data-motion="on"] altında oynar. Gizleme yalnız .js-reveal altında ve yalnız viewport ALTINDAKİ .mk-reveal öğelerine uygulanır.
-   Fare/imleç takibi yok. Sonsuz döngü yok; uzun hareket (.mk-demo, ~14 sn) tek sefer oynar, ekran dışı/sekme gizli/kullanıcı
-   duraklattığında data-paused="true" ile durur. */
+   Fare/imleç takibi yok. Uzun hareket (.mk-demo, ~14 sn) tek sefer oynar; tek sonsuz döngü mobil telefon sahnesinin hafif
+   süzülmesidir (.mk-demo kapsamında). İkisi de ekran dışı/sekme gizli/kullanıcı duraklattığında data-paused="true" ile durur. */
 
 .mk {
   --mk-demo-loop: 14s; /* hero zaman çizelgesi uzunluğu (son ~3-4 sn duraklama) */
@@ -75,6 +75,11 @@
   .mk[data-motion="on"] .mk-demo .mk-float-1 { animation: mk-card-1 var(--mk-demo-loop) var(--ease-out) both; }
   .mk[data-motion="on"] .mk-demo .mk-float-2 { animation: mk-card-2 var(--mk-demo-loop) var(--ease-out) both; }
   .mk[data-motion="on"] .mk-demo .mk-float-3 { animation: mk-card-3 var(--mk-demo-loop) var(--ease-out) both; }
+  /* mobil telefon sahnesi: çok hafif süzülme (yalnız transform; .mk-demo => ekran dışında / sekme gizliyken / duraklatınca durur) */
+  @keyframes mk-float-y { from { transform: translateY(0); } to { transform: translateY(var(--mk-float-d, -5px)); } }
+  .mk[data-motion="on"] .mk-demo .mk-mphone-wrap { animation: mk-float-y 6s ease-in-out infinite alternate; }
+  .mk[data-motion="on"] .mk-demo .mk-mcard-attn { --mk-float-d: -7px; animation: mk-float-y 5s ease-in-out -1.5s infinite alternate; }
+  .mk[data-motion="on"] .mk-demo .mk-mcard-money { --mk-float-d: 6px; animation: mk-float-y 5.6s ease-in-out -3s infinite alternate; }
   /* ekran dışı / sekme gizli / kullanıcı duraklattı */
   .mk-demo[data-paused="true"], .mk-demo[data-paused="true"] *, .mk-demo[data-paused="true"] *::before, .mk-demo[data-paused="true"] *::after { animation-play-state: paused !important; }
 

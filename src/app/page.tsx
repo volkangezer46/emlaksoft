@@ -69,7 +69,7 @@ export default async function HomePage() {
         <HeroSection trialDays={trialDays} plans={plans} content={content.hero} />
         {shown.map((id) => <Fragment key={id}>{sections[id]}</Fragment>)}
       </main>
-      <SiteFooter />
+      <SiteFooter smartCta trialDays={trialDays} />
     </div>
   );
 }
