@@ -6,7 +6,10 @@ import {
   type DetectedDocument,
 } from "@/lib/file-validation";
 
-export type DirectFileUploadKind = "customer_file" | "property_media";
+export type DirectFileUploadKind = "customer_file" | "property_media" | "expense_receipt";
+
+/** Doğrudan yükleme kovaları (özel). Tür → kova eşlemesi `DIRECT_FILE_UPLOAD_CONFIG`. */
+export type DirectFileUploadBucket = "customer-files" | "property-media" | "expense-receipts";
 
 export type DirectFileUploadMetadata = {
   parentId: string;
@@ -28,7 +31,7 @@ export type ValidDirectFileUpload = {
 
 export type DirectFileUploadTarget = {
   sessionId: string;
-  bucket: "customer-files" | "property-media";
+  bucket: DirectFileUploadBucket;
   path: string;
   token: string;
   contentType: DetectedDocument;
@@ -66,7 +69,21 @@ export const DIRECT_FILE_UPLOAD_CONFIG = {
     allowedMime: ["image/jpeg", "image/png", "image/gif", "image/webp"] as readonly DetectedDocument[],
     cacheControl: "31536000",
   },
+  // Gider fişi (20261007000700): görsel veya PDF, 10 MB; okuma yalnız sunucu indirme ucundan.
+  expense_receipt: {
+    bucket: "expense-receipts",
+    maxBytes: 10 * 1024 * 1024,
+    allowedMime: ["image/jpeg", "image/png", "image/webp", "application/pdf"] as readonly DetectedDocument[],
+    cacheControl: "3600",
+  },
 } as const;
+
+/** Kova adından yükleme ayarı (istemci yükleyicisi için tek eşleme). */
+export function directUploadConfigForBucket(bucket: DirectFileUploadBucket) {
+  if (bucket === "customer-files") return DIRECT_FILE_UPLOAD_CONFIG.customer_file;
+  if (bucket === "expense-receipts") return DIRECT_FILE_UPLOAD_CONFIG.expense_receipt;
+  return DIRECT_FILE_UPLOAD_CONFIG.property_media;
+}
 
 export const DIRECT_FILE_UPLOAD_FINALIZE_TTL_MS = 15 * 60 * 1000;
 // Supabase Storage signed-upload tokens currently have a fixed two-hour TTL.
@@ -99,7 +116,10 @@ export function validateDirectFileUploadMetadata(
 ): { ok: true; value: ValidDirectFileUpload } | { ok: false; error: string } {
   const config = DIRECT_FILE_UPLOAD_CONFIG[kind];
   if (!isUuid(input.parentId)) {
-    return { ok: false, error: kind === "customer_file" ? "Geçerli bir müşteri seçin." : "Geçerli bir portföy seçin." };
+    return {
+      ok: false,
+      error: kind === "customer_file" ? "Geçerli bir müşteri seçin." : kind === "expense_receipt" ? "Geçerli bir gider seçin." : "Geçerli bir portföy seçin.",
+    };
   }
   if (!Number.isSafeInteger(input.fileSize) || input.fileSize <= 0) {
     return { ok: false, error: "Boş veya geçersiz dosya yüklenemez." };
@@ -114,11 +134,18 @@ export function validateDirectFileUploadMetadata(
 
   const claimedMime = normalizeDocumentMime(input.fileType);
   if (!claimedMime || !config.allowedMime.includes(claimedMime)) {
-    return { ok: false, error: kind === "property_media" ? "Desteklenmeyen görsel türü." : "Desteklenmeyen dosya tipi." };
+    return {
+      ok: false,
+      error: kind === "property_media"
+        ? "Desteklenmeyen görsel türü."
+        : kind === "expense_receipt"
+          ? "Fiş için JPEG, PNG, WEBP görsel veya PDF yükleyin."
+          : "Desteklenmeyen dosya tipi.",
+    };
   }
   const label = normalizeLabel(input.label);
   if (!label.ok) return { ok: false, error: "Dosya etiketi geçersiz veya çok uzun." };
-  if (kind === "property_media" && label.value !== null) {
+  if (kind !== "customer_file" && label.value !== null) {
     return { ok: false, error: "Görsel yüklemesinde dosya etiketi kullanılamaz." };
   }
 

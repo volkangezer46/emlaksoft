@@ -3,6 +3,7 @@ export const STORAGE_DELETION_BUCKETS = [
   "property-media",
   "agent-photos",
   "tenant-logos",
+  "expense-receipts",
 ] as const;
 
 export type StorageDeletionBucket = (typeof STORAGE_DELETION_BUCKETS)[number];
@@ -39,7 +40,7 @@ export function isSafeStorageDeletionPath(input: StorageDeletionPathInput): bool
     return false;
   }
 
-  if (bucket === "customer-files" || bucket === "property-media") {
+  if (bucket === "customer-files" || bucket === "property-media" || bucket === "expense-receipts") {
     if (!parentId || !UUID_RE.test(parentId)) return false;
     const prefix = `${tenantId}/${parentId}/`;
     return objectPath.startsWith(prefix) && NESTED_FILE_RE.test(objectPath.slice(prefix.length));
