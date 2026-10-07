@@ -225,7 +225,11 @@ html[data-theme="dark"] {
 .fab-bar[data-kb="1"] { position: static; }
 
 /* ---- KpiCard inline (referans: ikon kapsülü + değer + trend + mini çubuk) ------- */
-.pm-card-inline { flex-direction: row; align-items: flex-start; gap: 0.75rem; min-height: 5.25rem; }
+.pm-card-inline { flex-direction: row; align-items: center; gap: 0.75rem; min-height: 6rem; }
+/* Izgarada `h-full` (height:100%) belirsiz üst yükseklikte stretch'i kapatıyordu → satırdaki kartlar farklı boyda bitiyordu. */
+.kpi-flow > .pm-card { height: auto; }
+.pm-card-inline .pm-ico { width: 2.5rem; height: 2.5rem; }
+.pm-card-inline .pm-sub { -webkit-line-clamp: 1; line-clamp: 1; }
 .pm-ico-lg { width: 3rem; height: 3rem; border-radius: 0.9rem; }
 .pm-ico-lg svg { width: 1.4rem; height: 1.4rem; }
 .pm-card-bars { align-self: flex-end; margin-bottom: 0.15rem; }
@@ -661,8 +665,15 @@ html[data-theme="dark"] .ds-hero {
 /* ---- Mobil (360 px) ana ekran ve KPI: dar ekranda 2 sütun KPI sığar, dokunma hedefi 44 px ---------------------- */
 @media (max-width: 767.98px) { .ds-seg-opt { min-height: 44px; } }
 @media (max-width: 479px) {
-  .pm-card-inline { gap: 0.6rem; padding: 0.75rem 0.75rem; min-height: 4.75rem; }
+  .pm-card-inline { gap: 0.6rem; padding: 0.75rem 0.75rem; min-height: 5rem; }
   .pm-card-inline .pm-ico { width: 2.125rem; height: 2.125rem; }
   .pm-card-inline .pm-card-bars { display: none; }
   .ds-hero-row > .relative { width: 100%; }
 }
+
+/* KPI kartı + mini çubuk (dar kart): ikon karosu yerine çubuk; başlık tek satıra, alt açıklama 2 satıra sığar, kart boş görünmez. */
+@container (max-width: 17.5rem) {
+  .pm-card-inline:has(.pm-card-bars) > .pm-ico { display: none; }
+}
+.pm-card-inline:has(.pm-card-bars) .pm-sub { -webkit-line-clamp: 2; line-clamp: 2; }
+.pm-card-inline:has(.pm-card-bars) .pm-card-title { white-space: normal; }

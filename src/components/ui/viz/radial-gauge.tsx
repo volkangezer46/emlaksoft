@@ -99,6 +99,8 @@ export function RadialGauge({
             />
         ) : null}
         <circle cx={cx} cy={cx} r={r} fill="none" stroke={`url(#${tubeId})`} strokeWidth={stroke} pointerEvents="none" />
+        <circle cx={cx} cy={cx} r={r - stroke / 2 + 1} fill="none" stroke="var(--viz-shade)" strokeWidth={2} pointerEvents="none" />
+        <circle cx={cx} cy={cx} r={r + stroke / 2 - 0.75} fill="none" stroke="var(--viz-sheen)" strokeWidth={1.5} pointerEvents="none" />
         {tIn && tOut ? <line x1={tIn.x} y1={tIn.y} x2={tOut.x} y2={tOut.y} stroke="var(--text)" strokeWidth="2" strokeLinecap="round" /> : null}
         {tip ? (
           <g className="viz-fade-late">

@@ -99,7 +99,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         label: `Yeni talep · ${ctx.period} gün`,
         value: p.demands,
         previous: p.demandsPrev,
-        previousText: `Önceki ${ctx.period} gün ${p.demandsPrev}`,
+        previousText: p.demandsPrev > 0 ? `Geçen dönem ${p.demandsPrev}` : "Geçen dönem —",
         tone: "success",
         // Dönemde açılan TÜM talepler (kapalılar dahil) — sayımla aynı koşul.
         href: `/app/talepler?status=all&eklenen=${ctx.period}`,
@@ -114,7 +114,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         label: `Yeni müşteri · ${ctx.period} gün`,
         value: p.customers,
         previous: p.customersPrev,
-        previousText: `Önceki ${ctx.period} gün ${p.customersPrev}`,
+        previousText: p.customersPrev > 0 ? `Geçen dönem ${p.customersPrev}` : "Geçen dönem —",
         tone: "brand",
         href: `/app/musteriler?from=${trDayKey(daysAgoIso(ctx.period))}&to=${trDayKey(nowMs)}`,
         series: p.customerDates ? bucketDates(p.customerDates, nowMs, ctx.period, bucketCountFor(ctx.period)) : null,

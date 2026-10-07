@@ -64,7 +64,7 @@ const axisProps = {
   axisLine: false,
 } as const;
 
-const gridProps = { strokeDasharray: "3 4", stroke: "var(--viz-grid)", strokeOpacity: 0.8 } as const;
+const gridProps = { strokeDasharray: "2 5", stroke: "var(--viz-grid)", strokeOpacity: 0.5 } as const;
 
 type Row = Record<string, string | number>;
 
@@ -102,6 +102,22 @@ function depthBar(horizontal: boolean, sheenId: string) {
       <g className="viz-bar" data-active={props.isActive ? "true" : undefined}>
         <Rectangle x={x} y={y} width={width} height={height} radius={radius} fill={props.fill} />
         <Rectangle x={x} y={y} width={width} height={height} radius={radius} fill={`url(#${sheenId})`} pointerEvents="none" />
+        {/* Yan yüz (sağda koyu ince şerit) + üst yüz parlaması: hafif izometrik derinlik (perspektif yok, oran bozulmaz). */}
+        {!horizontal && width >= 10 ? (
+          <rect x={x + width - Math.min(5, width / 4)} y={y + r} width={Math.min(5, width / 4)} height={Math.max(0, height - r)} fill="var(--viz-shade)" pointerEvents="none" />
+        ) : null}
+        {horizontal && height >= 10 ? (
+          <rect x={x} y={y + height - Math.min(4, height / 4)} width={Math.max(0, width - r)} height={Math.min(4, height / 4)} fill="var(--viz-shade)" pointerEvents="none" />
+        ) : null}
+        <Rectangle
+          x={x}
+          y={y}
+          width={horizontal ? Math.min(3, width) : width}
+          height={horizontal ? height : Math.min(3, height)}
+          radius={radius}
+          fill="var(--viz-sheen)"
+          pointerEvents="none"
+        />
         <rect x={x} y={y + height - shade} width={horizontal ? Math.max(0, width - r) : width} height={shade} fill="var(--viz-shade)" pointerEvents="none" />
       </g>
     );
@@ -133,6 +149,9 @@ function depthSector(idPrefix: string) {
         </defs>
         <Sector {...common} fill={fill} />
         <Sector {...common} fill={`url(#${gid})`} pointerEvents="none" />
+        {/* İç kenar gölgesi + dış kenar ince ışık: halka kalınlığı */}
+        <Sector {...common} outerRadius={innerRadius + 3} fill="var(--viz-shade)" pointerEvents="none" />
+        <Sector {...common} innerRadius={Math.max(innerRadius, out - 1.5)} fill="var(--viz-sheen)" pointerEvents="none" />
       </g>
     );
   };
@@ -170,8 +189,8 @@ export function AreaTrend({
             const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
             return (
               <linearGradient key={s.key} id={`area-${gid}-${index}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.32} />
-                <stop offset="45%" stopColor={color} stopOpacity={0.12} />
+                <stop offset="0%" stopColor={color} stopOpacity={0.42} />
+                <stop offset="45%" stopColor={color} stopOpacity={0.16} />
                 <stop offset="100%" stopColor={color} stopOpacity={0} />
               </linearGradient>
             );
@@ -184,6 +203,27 @@ export function AreaTrend({
         {series.length > 1 ? (
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
         ) : null}
+        {series.map((s, index) => {
+          const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
+          return (
+            <Area
+              key={`sh-${s.key}`}
+              className="viz-shadow-line"
+              type="monotone"
+              dataKey={s.key}
+              stroke={color}
+              strokeWidth={4}
+              fill="none"
+              dot={false}
+              activeDot={false}
+              legendType="none"
+              tooltipType="none"
+              isAnimationActive={!reduce}
+              animationDuration={DRAW_MS}
+              animationEasing="ease-out"
+            />
+          );
+        })}
         {series.map((s, index) => {
           const color = s.color ?? CHART_COLORS[index % CHART_COLORS.length];
           return (
@@ -273,7 +313,7 @@ export function BarCompare({
         ) : (
           <>
             <XAxis dataKey={xKey} {...axisProps} minTickGap={8} />
-            <YAxis {...axisProps} width={48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v)} />
+            <YAxis {...axisProps} width={format === "money" ? 68 : 48} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
           </>
         )}
         <Tooltip content={<ChartTooltip format={format} hint={hint} />} cursor={{ fill: "var(--accent)", fillOpacity: 0.05 }} />
@@ -445,7 +485,7 @@ export function AreaTrendChart({
     const w = Math.max(48, text.length * 7.4 + 18);
     return (
       <g key={`d-${index}`}>
-        <circle cx={cx} cy={cy} r={10} fill={color} opacity={0.18} />
+        <circle cx={cx} cy={cy} r={10} fill={color} opacity={0.18} className="viz-pulse" />
         <circle cx={cx} cy={cy} r={5} fill="var(--surface-raised)" stroke={color} strokeWidth={3} className="viz-dot" />
         {showLastLabel ? (
           <g transform={`translate(${Math.max(4, cx - w + 8)}, ${Math.max(2, cy - 38)})`}>
@@ -465,17 +505,33 @@ export function AreaTrendChart({
         <AreaChart key={animationKey} data={rows} margin={{ top: 40, right: 14, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id={`atc-${gid}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.34} />
-              <stop offset="45%" stopColor={color} stopOpacity={0.13} />
+              <stop offset="0%" stopColor={color} stopOpacity={0.44} />
+              <stop offset="48%" stopColor={color} stopOpacity={0.15} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid {...gridProps} vertical={false} />
           <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
-          <YAxis {...axisProps} width={44} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v)} />
+          <YAxis {...axisProps} width={format === "money" ? 68 : 44} tickCount={4} tickFormatter={(v: number) => formatChartAxis(v, true, format === "money" ? "₺" : "")} />
           <Tooltip
             content={<ChartTooltip formatValue={fmt} />}
             cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: "3 3" }}
+          />
+          <Area
+            className="viz-shadow-line"
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            strokeWidth={4}
+            fill="none"
+            connectNulls={false}
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            tooltipType="none"
+            isAnimationActive={!reduce}
+            animationDuration={500}
+            animationEasing="ease-out"
           />
           <Area
             className="viz-glow"
@@ -503,6 +559,22 @@ export function AreaTrendChart({
             connectNulls={false}
             dot={renderDot}
             activeDot={{ r: 5, strokeWidth: 2.5, stroke: "var(--surface-raised)", fill: color, className: "viz-dot" }}
+            isAnimationActive={!reduce}
+            animationDuration={500}
+            animationEasing="ease-out"
+          />
+          <Area
+            className="viz-edge"
+            type="monotone"
+            dataKey="value"
+            stroke="var(--viz-sheen)"
+            strokeWidth={1}
+            fill="none"
+            connectNulls={false}
+            dot={false}
+            activeDot={false}
+            legendType="none"
+            tooltipType="none"
             isAnimationActive={!reduce}
             animationDuration={500}
             animationEasing="ease-out"

@@ -92,6 +92,8 @@ export function DonutRing({
           );
         })}
         <circle cx={cx} cy={cx} r={r} fill="none" stroke={`url(#${tubeId})`} strokeWidth={stroke} pointerEvents="none" />
+        <circle cx={cx} cy={cx} r={r - stroke / 2 + 1} fill="none" stroke="var(--viz-shade)" strokeWidth={2} pointerEvents="none" />
+        <circle cx={cx} cy={cx} r={r + stroke / 2 - 0.75} fill="none" stroke="var(--viz-sheen)" strokeWidth={1.5} pointerEvents="none" />
       </svg>
       {children ? <div className="absolute inset-0 grid place-items-center text-center">{children}</div> : null}
     </div>

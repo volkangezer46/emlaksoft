@@ -15,6 +15,14 @@
 
 /* Alan/çizgi: parlama katmanı (aynı eğri, kalın, düşük opaklık) ve etkin nokta gölgesi. */
 .viz-glow .recharts-area-curve { stroke-opacity: var(--viz-glow); }
+/* Çizgi altı gölge: aynı eğri, ince, aşağı kaydırılmış, düşük opaklık (SVG filtresi yok). Kenar: üstte 1 px ışık çizgisi. */
+.viz-shadow-line .recharts-area-curve { transform: translateY(5px); stroke-opacity: calc(var(--viz-glow) * 1.1); stroke-linecap: round; }
+.viz-edge .recharts-area-curve { transform: translateY(-1px); }
+/* Son nokta nabzı: ilk görünümde 3 kez (süs sonsuz animasyon yok); reduced-motion'da hiç. */
+@media (prefers-reduced-motion: no-preference) {
+  .viz-pulse { transform-box: fill-box; transform-origin: center; animation: viz-pulse 1.6s var(--ease-out) 600ms 3 both; }
+}
+@keyframes viz-pulse { 0% { transform: scale(0.8); opacity: 0.35; } 100% { transform: scale(2.1); opacity: 0; } }
 .viz-dot { filter: drop-shadow(0 2px 3px var(--viz-shadow)); }
 
 /* Eksen etiketleri: sade ama okunur (AA metin tonu); ızgara yalnız yatay ve kesikli (bileşende). */

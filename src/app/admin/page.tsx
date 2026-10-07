@@ -276,7 +276,7 @@ async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }
   const d = derive(data);
   const conv = data.trials && data.payingTenantIds ? trialConversion(data.trials, new Set(data.payingTenantIds), now(), period) : null;
   const convText =
-    conv === null ? "Deneme→ücretli okunamadı" : conv.rate === null ? `Son ${period} günde biten deneme yok` : `Deneme→ücretli %${conv.rate} · son ${period} gün`;
+    conv === null ? "Dönüşüm okunamadı" : conv.rate === null ? "Biten deneme yok" : `Deneme dönüşümü %${conv.rate}`;
   return (
     <KpiGrid label="Platform özet göstergeleri">
       <KpiCard
@@ -287,10 +287,10 @@ async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }
         icon={Building2}
         tone="brand"
         trend={computeTrend(d.totalTenants, Math.max(0, d.totalTenants - data.newTenants))}
-        hint={`Dönem başına göre · ${period} gün`}
+        hint={data.newTenants > 0 ? `Son ${period} günde +${data.newTenants}` : "Dönemde yeni ofis yok"}
       />
       <KpiCard layout="inline" label="Aktif abone" value={d.active} href="/admin/tenants?durum=active" icon={Crown} tone="gold" hint={convText} />
-      <KpiCard layout="inline" label="Deneme" value={d.trial} href="/admin/tenants?durum=trial" icon={FlaskConical} tone="neutral" hint="Deneme sürecinde" />
+      <KpiCard layout="inline" label="Deneme" value={d.trial} href="/admin/tenants?durum=trial" icon={FlaskConical} tone="neutral" hint="Süreçte olan ofis" />
       <KpiCard
         layout="inline"
         tinted
@@ -300,7 +300,7 @@ async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }
         icon={Plus}
         tone="success"
         trend={computeTrend(data.newTenants, data.prevTenants)}
-        hint={`Önceki ${period} gün: ${data.prevTenants}`}
+        hint={data.prevTenants > 0 ? `Geçen dönem ${data.prevTenants}` : "Geçen dönem —"}
       />
       {platformCanAccess(role, "tickets") ? (
         <KpiCard
@@ -312,7 +312,7 @@ async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }
           icon={LifeBuoy}
           tone="danger"
           trend={computeTrend(data.newTickets, data.prevTickets, true)}
-          hint={`Önceki ${period} gün: ${data.prevTickets}`}
+          hint={data.prevTickets > 0 ? `Geçen dönem ${data.prevTickets}` : "Geçen dönem —"}
         />
       ) : null}
       {platformCanAccess(role, "members") ? (
@@ -346,7 +346,7 @@ async function MrrSection({ period }: { period: Period }) {
   const prev = series.length >= 2 ? series[series.length - 2]!.value : null;
   const trend = last !== null && prev !== null ? computeTrend(last, prev) : null;
   const hasCurve = series.length >= 2 && series.some((s) => s.value > 0);
-  const forecast = linearForecast(series.map((s) => s.value));
+  const forecast = linearForecast(series.map((s) => s.value), 2);
   const points = [
     ...series.map((s, i) => ({ label: s.label, value: s.value, forecast: forecast && i === series.length - 1 ? s.value : null })),
     ...(forecast ? nextMonthLabels(now(), forecast.values.length).map((label, i) => ({ label, value: null, forecast: forecast.values[i]! })) : []),
@@ -363,7 +363,8 @@ async function MrrSection({ period }: { period: Period }) {
       href="/admin/billing"
       hrefLabel="Gelir ayrıntısı"
       height={0}
-      className="h-full"
+      className="flex h-full flex-col"
+      bodyClassName="flex flex-1 flex-col"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -388,16 +389,18 @@ async function MrrSection({ period }: { period: Period }) {
           </Link>
         ) : null}
       </div>
-      <div className="mt-4 h-60">
+      <div className="relative mt-4 min-h-60 flex-1">
         {hasCurve ? (
+          <div className="absolute inset-0">
           <AreaTrendChart
             data={points}
             tone="gold"
             format="money"
             name="MRR"
             forecastName="Tahmin"
-            ariaLabel={`Son ${series.length} ay aylık yinelenen gelir${forecast ? " ve 3 aylık doğrusal tahmin" : ""}`}
+            ariaLabel={`Son ${series.length} ay aylık yinelenen gelir${forecast ? " ve 2 aylık doğrusal tahmin" : ""}`}
           />
+          </div>
         ) : (
           <EmptyState variant="compact" illustration="rapor" title="Gelir eğrisi için veri birikiyor" description="En az iki aylık abonelik kaydı oluşunca eğri burada çizilir." />
         )}
