@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { getPlatformSetting, getPlatformSettingsMany } from "@/lib/platform-settings";
 import { createClient } from "@/lib/supabase/server";
 import { ALL_SETTING_DEFS, getSettingDef, isSecretDef, listSettingDefs, storageKeyOf } from "./registry";
@@ -31,7 +32,7 @@ const cachedPlatformSnapshot = unstable_cache(
   { revalidate: 30, tags: [SETTINGS_PLATFORM_TAG] },
 );
 
-async function readTenantRows(tenantId: string): Promise<Record<string, unknown>> {
+const readTenantRows = cache(async function readTenantRows(tenantId: string): Promise<Record<string, unknown>> {
   try {
     const supabase = await createClient();
     const { data } = await supabase.from("tenant_settings").select("key, value").eq("tenant_id", tenantId);
@@ -41,7 +42,7 @@ async function readTenantRows(tenantId: string): Promise<Record<string, unknown>
   } catch {
     return {}; // tablo yok / yetki yok = ofis katmanı boş (varsayılana düşer)
   }
-}
+});
 
 function resolveFrom(def: AnySettingDef, platformRaw: string | null, tenantRaw: unknown): unknown {
   if (def.scope !== "platform" && tenantRaw !== undefined && tenantRaw !== null) {

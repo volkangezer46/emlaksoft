@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { Building2, Eye, FileCheck2, Handshake, Layers, MessageSquare, User } from "lucide-react";
+import { Building2, Eye, Handshake, User } from "lucide-react";
+import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -41,7 +42,7 @@ function Badges({ d }: { d: DealVM }) {
     <span className="inline-flex items-center gap-2 text-xs text-text-muted">
       {d.checklist ? (
         <span className="inline-flex items-center gap-1" title={`Zorunlu evrak: ${d.checklist.done}/${d.checklist.total}`}>
-          <FileCheck2 aria-hidden="true" className="h-3.5 w-3.5" />
+          <SpriteIcon name="file-check-2" className="h-3.5 w-3.5" />
           <span className="numeric">
             {d.checklist.done}/{d.checklist.total}
           </span>
@@ -49,7 +50,7 @@ function Badges({ d }: { d: DealVM }) {
       ) : null}
       {d.noteCount > 0 ? (
         <span className="inline-flex items-center gap-1" title={`${d.noteCount} not`}>
-          <MessageSquare aria-hidden="true" className="h-3.5 w-3.5" />
+          <SpriteIcon name="message-square" className="h-3.5 w-3.5" />
           <span className="numeric">{d.noteCount}</span>
         </span>
       ) : null}
@@ -113,7 +114,7 @@ export function DealTable({ rows, density, selectable = false }: { rows: DealVM[
                       </p>
                       {d.unit ? (
                         <Link href={d.unit.href} prefetch={false} className={`${LINK} mt-0.5 inline-flex items-center gap-1 text-xs text-text-muted`}>
-                          <Layers aria-hidden="true" className="h-3 w-3" /> {d.unit.label}
+                          <SpriteIcon name="layers" className="h-3 w-3" /> {d.unit.label}
                         </Link>
                       ) : null}
                     </div>

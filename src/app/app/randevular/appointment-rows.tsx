@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, CheckCircle2, Clock3, Eye, FileSignature, MapPin, Undo2, XCircle } from "lucide-react";
+import { Eye, FileSignature } from "lucide-react";
+import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";
 import { IntentLink } from "@/components/app/intent-link";
@@ -80,7 +81,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
             title="Randevuyu tamamlanmamışa çevir (sonuç notu silinir)"
             className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-amber-400 hover:text-amber-600"
           >
-            <Undo2 aria-hidden="true" className="h-3 w-3" /> Geri al
+            <SpriteIcon name="undo-2" className="h-3 w-3" /> Geri al
           </button>
         </form>
       )}
@@ -89,12 +90,12 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
         {a.cardHref ? <RowActionLink href={a.cardHref} label={`${a.customerName} randevusu detayı`} icon={Eye} /> : null}
         {a.status === "pending" ? (
           <StatusForm id={a.id} status="confirmed" label="Randevuyu onayla" className="text-[var(--success-strong)] hover:text-[var(--success-strong)]">
-            <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+            <SpriteIcon name="check-circle-2" className="h-4 w-4" />
           </StatusForm>
         ) : null}
         {a.status === "confirmed" ? (
           <StatusForm id={a.id} status="signature" label="İmzaya al (imza bekleniyor olarak işaretle)" className="text-brand-600 hover:text-brand-600">
-            <FileSignature aria-hidden="true" className="h-4 w-4" />
+            <SpriteIcon name="file-signature" className="h-4 w-4" />
           </StatusForm>
         ) : null}
         {!completed ? (
@@ -106,7 +107,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
                 title="Randevuyu iptal et"
                 className={`${FORM_ICON_BTN} text-[var(--danger-strong)] hover:text-[var(--danger-strong)]`}
               >
-                <XCircle aria-hidden="true" className="h-4 w-4" />
+                <SpriteIcon name="x-circle" className="h-4 w-4" />
               </button>
             }
             title="Randevuyu iptal et"
@@ -162,7 +163,7 @@ function LeaveFlag({ a }: { a: AppointmentVM }) {
       className="relative z-10 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600 transition hover:bg-amber-400/25"
       title="Randevunun danışmanı o gün izinli — devretmeyi düşünün"
     >
-      <AlertTriangle aria-hidden="true" className="h-3 w-3" /> Danışman izinde
+      <SpriteIcon name="alert-triangle" className="h-3 w-3" /> Danışman izinde
     </Link>
   );
 }
@@ -221,12 +222,12 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-faint">
                     {a.location ? (
                       <span className="inline-flex items-center gap-1">
-                        <MapPin aria-hidden="true" className="h-3 w-3" /> {a.location}
+                        <SpriteIcon name="map-pin" className="h-3 w-3" /> {a.location}
                       </span>
                     ) : null}
                     {a.durationMin ? (
                       <span className="inline-flex items-center gap-1">
-                        <Clock3 aria-hidden="true" className="h-3 w-3" /> {a.durationMin} dk
+                        <SpriteIcon name="clock-3" className="h-3 w-3" /> {a.durationMin} dk
                       </span>
                     ) : null}
                     <LeaveFlag a={a} />

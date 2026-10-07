@@ -125,12 +125,15 @@ export default async function TasksPage({
   const supabase = await createClient();
   const savedViewsPromise = listSavedViews(PATH);
   // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; sayaçlar da aynı kapsamla.
-  const listScope = await getListScope({ userId: ctx.userId, tenantId: ctx.tenantId, role: ctx.role });
-  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
-  // Atama / düzenleme / filtre için ofis üyeleri (kiracı RLS ile sınırlı).
-  const [{ data: memberRows }] = await batchAll("Görevler", ["members"], [
-    supabase.from("profiles").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("full_name").limit(200),
+  // Ofis üyeleri kapsamdan bağımsız: kapsam çözümüyle AYNI turda.
+  const [listScope, [{ data: memberRows }]] = await Promise.all([
+    getListScope({ userId: ctx.userId, tenantId: ctx.tenantId, role: ctx.role }),
+    batchAll("Görevler", ["members"], [
+      supabase.from("profiles").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("full_name").limit(200),
+    ]),
   ]);
+  const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
+  // Atama / düzenleme / filtre için ofis üyeleri (kiracı RLS ile sınırlı) yukarıda kapsamla birlikte çekildi.
   const members = (memberRows ?? []).map((m) => ({ id: m.id as string, name: (m.full_name as string | null) ?? "İsimsiz" }));
   const nowIso = new Date(now()).toISOString();
   const canSeeDeals = (ctx.perms.commissions ?? []).includes("view");
@@ -183,6 +186,45 @@ export default async function TasksPage({
   }
   query = query.range(offset, offset + PAGE_SIZE - 1);
 
+  // Anlaşma seçici ve kanban/takvim verisi sayaç turunu BEKLEMEZ: sayaçlarla aynı anda başlar.
+  const dealOptionsPromise = canSeeDeals && canEdit
+    ? Promise.resolve(
+        supabase
+          .from("deals")
+          .select(DEAL_OPTION_SELECT)
+          .eq("tenant_id", ctx.tenantId)
+          .not("stage", "in", "(won,lost)")
+          .order("updated_at", { ascending: false })
+          .limit(100),
+      )
+    : null;
+  const KANBAN_LIMIT = 50;
+  const viewDataPromise: Promise<unknown[]> =
+    gorunum === "kanban"
+      ? (() => {
+          const laneQ = () => applyBase(supabase.from("tasks").select(TASK_SELECT, { count: "exact" }).eq("tenant_id", ctx.tenantId));
+          return Promise.all([
+            laneQ().eq("status", "open").or(`due_at.is.null,due_at.gte.${nowIso}`).order("due_at", { ascending: true, nullsFirst: false }).limit(KANBAN_LIMIT),
+            laneQ().eq("status", "open").lt("due_at", nowIso).order("due_at", { ascending: true }).limit(KANBAN_LIMIT),
+            laneQ().eq("status", "done").order("completed_at", { ascending: false }).limit(KANBAN_LIMIT),
+            laneQ().eq("status", "cancelled").order("created_at", { ascending: false }).limit(KANBAN_LIMIT),
+          ]);
+        })()
+      : gorunum === "takvim"
+        ? (() => {
+            const startMs = trMonthStartMsFromKey(ay);
+            const endMs = trMonthStartMsFromKey(shiftMonthKey(ay, 1) ?? ay);
+            return Promise.resolve(
+              applyBase(supabase.from("tasks").select("id, title, status, due_at, priority").eq("tenant_id", ctx.tenantId))
+                .in("status", ["open", "done"])
+                .gte("due_at", new Date(startMs).toISOString())
+                .lt("due_at", new Date(endMs).toISOString())
+                .order("due_at", { ascending: true })
+                .limit(1000),
+            ).then((r) => [r] as unknown[]);
+          })()
+        : Promise.resolve([]);
+
   const head = () => scoped(supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId));
 
   const [
@@ -233,30 +275,18 @@ export default async function TasksPage({
   const tasks = withDealLabel(tasksData as unknown[]);
 
   // Anlaşma bağı seçici (düzenleme paneli): son açık anlaşmalar.
-  const dealOptions = canSeeDeals && canEdit
-    ? (((await supabase
-        .from("deals")
-        .select(DEAL_OPTION_SELECT)
-        .eq("tenant_id", ctx.tenantId)
-        .not("stage", "in", "(won,lost)")
-        .order("updated_at", { ascending: false })
-        .limit(100)).data ?? []) as unknown as DealOptionSource[]).map((d) => ({ id: d.id, label: dealOptionLabel(d) }))
+  const dealOptions = dealOptionsPromise
+    ? (((await dealOptionsPromise).data ?? []) as unknown as DealOptionSource[]).map((d) => ({ id: d.id, label: dealOptionLabel(d) }))
     : undefined;
 
   // Kanban (durum sütunları) ve takvim (vade) verisi — yalnız o görünüm açıkken çekilir.
-  const KANBAN_LIMIT = 50;
   type Lane = { key: string; label: string; tone: string; rows: TaskRow[]; total: number; href: string };
   let lanes: Lane[] = [];
   let calendarTasks: CalendarTask[] = [];
   let calendarTruncated = false;
   if (gorunum === "kanban") {
-    const laneQ = () => applyBase(supabase.from("tasks").select(TASK_SELECT, { count: "exact" }).eq("tenant_id", ctx.tenantId));
-    const [upcomingLane, overdueLane, doneLane, cancelledLane] = await Promise.all([
-      laneQ().eq("status", "open").or(`due_at.is.null,due_at.gte.${nowIso}`).order("due_at", { ascending: true, nullsFirst: false }).limit(KANBAN_LIMIT),
-      laneQ().eq("status", "open").lt("due_at", nowIso).order("due_at", { ascending: true }).limit(KANBAN_LIMIT),
-      laneQ().eq("status", "done").order("completed_at", { ascending: false }).limit(KANBAN_LIMIT),
-      laneQ().eq("status", "cancelled").order("created_at", { ascending: false }).limit(KANBAN_LIMIT),
-    ]);
+    type LaneRes = { data: unknown[] | null; count: number | null };
+    const [upcomingLane, overdueLane, doneLane, cancelledLane] = (await viewDataPromise) as LaneRes[];
     const listBase = { ...urlParams, gorunum: "" };
     lanes = [
       { key: "overdue", label: "Gecikmiş", tone: "border-danger-500/30 text-danger-500", rows: withDealLabel(overdueLane.data), total: overdueLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "overdue" })) },
@@ -265,16 +295,7 @@ export default async function TasksPage({
       { key: "cancelled", label: "İptal", tone: "border-line text-text-muted", rows: withDealLabel(cancelledLane.data), total: cancelledLane.count ?? 0, href: buildHref(PATH, mergeResetPage(listBase, { filter: "all" })) },
     ];
   } else if (gorunum === "takvim") {
-    const startMs = trMonthStartMsFromKey(ay);
-    const endMs = trMonthStartMsFromKey(shiftMonthKey(ay, 1) ?? ay);
-    const { data: calRows } = await applyBase(
-      supabase.from("tasks").select("id, title, status, due_at, priority").eq("tenant_id", ctx.tenantId),
-    )
-      .in("status", ["open", "done"])
-      .gte("due_at", new Date(startMs).toISOString())
-      .lt("due_at", new Date(endMs).toISOString())
-      .order("due_at", { ascending: true })
-      .limit(1000);
+    const [{ data: calRows }] = (await viewDataPromise) as { data: unknown[] | null }[];
     calendarTasks = (calRows ?? []) as CalendarTask[];
     calendarTruncated = calendarTasks.length >= 1000;
   }

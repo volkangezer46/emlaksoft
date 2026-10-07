@@ -11,6 +11,7 @@ import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
+import { IconSprite } from "@/components/ui/icon-sprite";
 import { PLATFORM_MFA_DB_SETTING_KEY, isPlatformMfaRequired, platformMfaSyncIssue } from "@/lib/platform-mfa";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
@@ -22,9 +23,12 @@ import { OwnPasswordForm } from "@/app/admin/hesabim/account-forms";
 /** Kok loading.tsx kaldirildi: kabuk sorgulari Suspense icinde, splash hemen ustunde. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense fallback={<RouteSplash />}>
-      <AdminShell>{children}</AdminShell>
-    </Suspense>
+    <>
+      <IconSprite />
+      <Suspense fallback={<RouteSplash />}>
+        <AdminShell>{children}</AdminShell>
+      </Suspense>
+    </>
   );
 }
 
