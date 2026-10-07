@@ -72,7 +72,7 @@
 }
 .lp-cols > li { min-width: 0; }
 .lp-col {
-  height: 100%; display: grid; grid-template-rows: 1.2rem minmax(0, 1fr) 1.4rem; justify-items: center; gap: 0;
+  height: 100%; display: grid; grid-template-rows: 1.2rem minmax(0, 1fr) auto; justify-items: center; gap: 0;
   border-radius: var(--radius-control); text-decoration: none; color: var(--text);
   transition: background-color var(--motion-fast) var(--ease-out);
 }
@@ -82,7 +82,7 @@
 .lp-col-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0.5rem 0.5rem 0.2rem 0.2rem; transform-origin: bottom; }
 .lp-col:hover .lp-col-bar { box-shadow: inset 0 -2px 0 var(--viz-shade), 0 4px 10px -3px var(--viz-shadow); }
 .lp-cols:has(.lp-col:hover) .lp-col:not(:hover) .lp-col-bar { opacity: 0.6; }
-.lp-col-label { font-size: 0.75rem; color: var(--text-muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; }
+.lp-col-label { padding-top: 0.25rem; font-size: 0.75rem; line-height: 1.15; color: var(--text-muted); max-width: 100%; text-align: center; overflow-wrap: anywhere; align-self: start; }
 @media (prefers-reduced-motion: no-preference) {
   @keyframes lp-grow-y { from { transform: scaleY(0); } to { transform: none; } }
   .lp-col-bar { animation: lp-grow-y var(--motion-draw) var(--ease-out-expo) both; animation-delay: var(--viz-delay, 0ms); transition: opacity var(--motion-fast) var(--ease-out); }
