@@ -32,7 +32,7 @@ import {
   parsePage,
   type KpiItem,
 } from "@/components/ui/list-kit";
-import { RentalMobileList, RentalTable, type RentalVM } from "./rental-rows";
+import { RentalTable, type RentalVM } from "./rental-rows";
 import { ReminderSettingsCard } from "./reminder-settings-card";
 import { normalizeReminderSettings } from "@/lib/rent-reminders/logic";
 import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
@@ -474,7 +474,6 @@ export default async function KiralamaPage({
           ) : (
             <>
               <RentalTable rows={viewModels} density={density} />
-              <RentalMobileList rows={viewModels} />
             </>
           )}
 

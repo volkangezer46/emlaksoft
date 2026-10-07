@@ -5,8 +5,6 @@ import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection"
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
-  MobileCard,
-  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -55,8 +53,8 @@ function Flags({ c }: { c: ContractVM }) {
 /** md+ tablo görünümü. */
 export function ContractTable({ rows, density, selectable = false }: { rows: ContractVM[]; density: Density; selectable?: boolean }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={900} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={900} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -83,7 +81,7 @@ export function ContractTable({ rows, density, selectable = false }: { rows: Con
                     <BulkRowCheckbox id={c.id} label={`${c.title} sözleşmesini`} />
                   </TD>
                 ) : null}
-                <TD>
+                <TD primary>
                   <IntentLink href={c.href} className="absolute inset-0" aria-label={`${c.title} detayları`} />
                   <div className="flex items-center gap-3">
                     <EntityThumb alt="" icon={FileSignature} size="sm" />
@@ -117,7 +115,7 @@ export function ContractTable({ rows, density, selectable = false }: { rows: Con
                   )}
                 </TD>
                 <TD className="hidden text-text-muted xl:table-cell">{c.dateLabel}</TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={c.href} label={`${c.title} detayını aç`} icon={Eye} />
                     {c.propertyId ? <RowActionLink href={`/app/portfoyler/${c.propertyId}`} label={`${c.propertyLabel ?? "Portföy"} kaydını aç`} icon={Building2} /> : null}
@@ -133,29 +131,3 @@ export function ContractTable({ rows, density, selectable = false }: { rows: Con
   );
 }
 
-/** <md: tablo yerine kart listesi. */
-export function ContractMobileList({ rows }: { rows: ContractVM[] }) {
-  return (
-    <MobileCardList>
-      {rows.map((c) => (
-        <MobileCard key={c.id}>
-          <div className="flex items-start gap-3">
-            <EntityThumb alt="" icon={FileSignature} size="sm" />
-            <div className="min-w-0 flex-1">
-              <Link href={c.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                {c.title}
-              </Link>
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {c.typeLabel}
-                {c.customerName ? ` · ${c.customerName}` : ""} · {c.dateLabel}
-              </p>
-              <div className="mt-1.5">
-                <Flags c={c} />
-              </div>
-            </div>
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

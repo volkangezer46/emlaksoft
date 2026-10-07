@@ -47,7 +47,7 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { CustomerPortalPanel } from "./customer-portal-panel";
-import { CustomerMobileList, CustomerTable } from "./customer-rows";
+import { CustomerTable } from "./customer-rows";
 import { heatTone } from "./customer-list-logic";
 import { HEAT_SEGMENT_KEYS, PAGE_SIZE, WINDOW_DAYS, loadCustomersData } from "./data";
 import { getListScope } from "@/lib/access-control";
@@ -544,7 +544,6 @@ export default async function CustomersPage({
               createdSort: columnSortActive && sortKey === "tarih" ? (sortDir === "asc" ? "ascending" : "descending") : undefined,
             }}
           />
-          <CustomerMobileList rows={viewModels} canBulk={canBulk} canEdit={canEdit} canDelete={canDelete} />
         </CustomerBulkProvider>
       )}
 

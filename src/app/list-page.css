@@ -90,8 +90,8 @@
 
 .lp-funnel { gap: 0; }
 
-/* ---- Tablo → kart (360 px): `TableFrame stack` + `TD label` ---- */
-@media (max-width: 479.98px) {
+/* ---- Tablo → kart (<768 px): `TableFrame stack` + `TD label`; ayrı mobil kart listesi yok (tek işaretleme) ---- */
+@media (max-width: 767.98px) {
   .tbl-stack > div, .tbl-stack > div > div { width: 100% !important; min-width: 0 !important; overflow: visible; }
   .tbl-stack table, .tbl-stack tbody, .tbl-stack tfoot { display: block; width: 100%; }
   .tbl-stack thead { display: none; }

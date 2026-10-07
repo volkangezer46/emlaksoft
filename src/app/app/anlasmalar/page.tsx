@@ -57,7 +57,7 @@ import {
   type ViewOption,
 } from "@/components/ui/list-kit";
 import { getSetting } from "@/lib/settings/read";
-import { DealMobileList, DealTable, type DealVM } from "./deal-rows";
+import { DealTable, type DealVM } from "./deal-rows";
 import { DealBulkBar } from "./deal-bulk-bar";
 import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
@@ -571,7 +571,6 @@ export default async function DealsPage({
                     />
                   ) : null}
                   <DealTable rows={viewModels} density={density} selectable={canEdit} />
-                  <DealMobileList rows={viewModels} />
                 </BulkSelectionProvider>
               )}
               <ListPager pathname={PATH} params={urlParams} window={win} total={dealCount ?? rawRows.length} />

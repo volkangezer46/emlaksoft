@@ -5,8 +5,6 @@ import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import {
   EntityThumb,
-  MobileCard,
-  MobileCardList,
   RowActionLink,
   RowActions,
   StatusPill,
@@ -77,8 +75,8 @@ function CriteriaPills({ items }: { items: string[] }) {
 /** md+ tablo görünümü. */
 export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM[]; density: Density; canBulk?: boolean }) {
   return (
-    <div className="hidden md:block">
-      <TableFrame minWidth={960} density={density} maxHeight="75vh">
+    <div>
+      <TableFrame stack minWidth={960} density={density} maxHeight="75vh">
         <Table>
           <THead sticky>
             <TR>
@@ -107,7 +105,7 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                     <DemandRowCheckbox id={d.id} name={d.customerName ?? "Talep"} />
                   </TD>
                 ) : null}
-                <TD>
+                <TD primary>
                   <IntentLink
                     href={d.href}
                     className="absolute inset-0"
@@ -163,7 +161,7 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                     <Clock3 aria-hidden="true" className="h-3 w-3" /> {d.ageLabel}
                   </span>
                 </TD>
-                <TD>
+                <TD actions>
                   <RowActions>
                     <RowActionLink href={d.href} label="Talep detayını aç" icon={Eye} />
                     {d.customerId ? <RowActionLink href={`/app/musteriler/${d.customerId}`} label={`${d.customerName ?? "Müşteri"} kartını aç`} icon={User} /> : null}
@@ -179,50 +177,3 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
   );
 }
 
-/** <md: tablo yerine kart listesi. */
-export function DemandMobileList({ rows, canBulk = false }: { rows: DemandVM[]; canBulk?: boolean }) {
-  return (
-    <MobileCardList>
-      {rows.map((d) => (
-        <MobileCard key={d.id}>
-          <div className="flex items-start gap-3">
-            {canBulk ? (
-              <span className="mt-1 grid min-h-9 min-w-6 place-items-center">
-                <DemandRowCheckbox id={d.id} name={d.customerName ?? "Talep"} />
-              </span>
-            ) : null}
-            <EntityThumb alt="" name={d.customerName ?? "Talep"} size="sm" />
-            <div className="min-w-0 flex-1">
-              <Link href={d.href} prefetch={false} className="focus-ring block truncate font-semibold text-text after:absolute after:inset-0">
-                {d.customerName ?? "Talep"}
-              </Link>
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {d.kind}
-                {d.province ? ` · ${d.province}` : ""}
-              </p>
-              <p className="numeric mt-1 text-sm font-semibold text-text">{d.budget}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <StatusPill tone={d.statusTone}>{d.statusLabel}</StatusPill>
-                {d.urgencyLabel ? (
-                  <StatusPill tone={d.urgencyTone} dot={false}>
-                    {d.urgencyLabel}
-                  </StatusPill>
-                ) : null}
-                <CriteriaPills items={d.criteria} />
-              </div>
-              <div className="relative z-10 mt-2 flex flex-wrap items-center gap-2">
-                <MatchPill d={d} />
-                <span className="text-xs text-text-faint">{d.ageLabel}</span>
-              </div>
-              <div className="relative z-10 mt-2 flex flex-wrap items-center gap-1 border-t border-line pt-2">
-                <RowActionLink href={d.href} label="Talep detayını aç" icon={Eye} />
-                {d.customerId ? <RowActionLink href={`/app/musteriler/${d.customerId}`} label={`${d.customerName ?? "Müşteri"} kartını aç`} icon={User} /> : null}
-                <RowActionLink href={`/app/eslestirme?demand=${d.id}`} label="Bu talebi eşleştir" icon={Crosshair} />
-              </div>
-            </div>
-          </div>
-        </MobileCard>
-      ))}
-    </MobileCardList>
-  );
-}

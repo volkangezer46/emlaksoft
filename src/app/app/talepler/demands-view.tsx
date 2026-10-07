@@ -45,7 +45,7 @@ import {
 import { getSetting } from "@/lib/settings/read";
 import { applyScopeFilter, getListScope, isNarrowing } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
-import { DemandMobileList, DemandTable, type DemandVM } from "./demand-rows";
+import { DemandTable, type DemandVM } from "./demand-rows";
 import { DemandBulkBar, DemandBulkProvider } from "./demand-bulk";
 import {
   AGING_DAYS as DEFAULT_AGING_DAYS,
@@ -690,7 +690,6 @@ async function DemandList({
           <DemandBulkProvider key={viewModels.map((v) => v.id).join(",")}>
             {canEdit ? <DemandBulkBar canDelete={canDelete} /> : null}
             <DemandTable rows={viewModels} density={density} canBulk={canEdit} />
-            <DemandMobileList rows={viewModels} canBulk={canEdit} />
           </DemandBulkProvider>
         </>
       )}

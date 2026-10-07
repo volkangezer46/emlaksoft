@@ -31,7 +31,7 @@ import {
   weeklySeriesOf,
   type KpiItem,
 } from "@/components/ui/list-kit";
-import { ContractMobileList, ContractTable, type ContractVM } from "./contract-rows";
+import { ContractTable, type ContractVM } from "./contract-rows";
 import { ContractBulkBar } from "./contract-bulk-bar";
 import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
@@ -397,7 +397,6 @@ export default async function SozlesmelerPage({
             <BulkSelectionProvider>
               {canEditContracts ? <ContractBulkBar /> : null}
               <ContractTable rows={viewModels} density={density} selectable={canEditContracts} />
-              <ContractMobileList rows={viewModels} />
             </BulkSelectionProvider>
           )}
 

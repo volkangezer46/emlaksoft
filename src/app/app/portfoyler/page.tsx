@@ -36,7 +36,7 @@ import type { CompareItem } from "@/components/public/compare-table";
 import { PropertyCompareShell } from "./compare-shell";
 import { PropertyBulkBar, PropertyBulkProvider } from "./property-bulk-actions";
 import { PropertySortSelect } from "./property-sort-select";
-import { PropertyMobileList, PropertyTable, type PropertyVM } from "./property-rows";
+import { PropertyTable, type PropertyVM } from "./property-rows";
 import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatusTone } from "./property-list-logic";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
@@ -850,7 +850,6 @@ export default async function PropertiesPage({
             <PropertyBulkProvider key={`${page}|${Object.values(urlParams).join("|")}`}>
               {canEditProperty ? <PropertyBulkBar /> : null}
               <PropertyTable rows={viewModels} ids={pageIds} canBulk={canEditProperty} canEdit={canEditProperty} density={density} />
-              <PropertyMobileList rows={viewModels} />
             </PropertyBulkProvider>
           ) : (
             <div className="list-stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3">
