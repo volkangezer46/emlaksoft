@@ -188,6 +188,8 @@ const F = {
   contractSignerReminder: "20261007000720_contract_signer_reminder.sql",
   // PB53 hiz: proxy kapi okumalari (profil + platform personeli + ofis durumu) tek INVOKER RPC.
   proxyGateSnapshot: "20261007000900_proxy_gate_snapshot.sql",
+  // PB53 perf turu 3 (2026-10-07): RLS yardimci fonksiyonlari SQL -> plpgsql (govde birebir, plan onbellegi) + customer_demands indeksi.
+  perfIndexesRpc: "20261007001100_perf_indexes_rpc.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -311,6 +313,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.importRentalWithDeal]: "ek", // yeni authenticated DEFINER RPC import_rental_with_deal (yetki icerde; guard'lar yalniz kendi transaction'inda service_role kimligiyle gecilir)
     [F.proxyGateSnapshot]: "ek", // yeni salt-okunur SECURITY INVOKER RPC proxy_gate_snapshot (RLS eski okumalarla ayni; kod RPC yokken eski yola duser)
     [F.contractSignerReminder]: "ek", // contract_signers'a short_code/reminder_count/last_reminded_at + 2 DEFINER RPC (hatirlatma yuku: tam token donmez; kisa kod cozumu anon)
+    [F.perfIndexesRpc]: "davranis", // current_session_two_factor_satisfied/is_platform_staff/support_is_ticket_staff dili sql->plpgsql (govde+ACL birebir; sorgu basi ~360us ayristirma biter) + idx_customer_demands_tenant_created
     [F.customerPortalRequests]: "ek", // yeni portal_customer_requests (iz) + anon/authenticated DEFINER RPC portal_customer_request (token icerde dogrulanir; yalniz taslak teklif/gorev/bakim yazar) + portal_customer_request_ready
     [F.closureLossAnomalies]: "davranis", // listing_anomalies.type CHECK'ine closure_loss; listing_closures AFTER tetikleyicisi + tek seferlik uzlastirma (yalniz 'explained' satir, SLA yok); lc_closure_loss_ready yoklamasi
     [F.webhookEnqueueGate]: "siki", // webhook_enqueue modul izni + 30 sn tekrar freni; webhook_mark_delivery yalniz kuyruga yazan + ilk deneme; webhook_deliveries.enqueued_by
@@ -429,6 +432,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB51-persona-turu", order: 29.997, title: "Persona turu: webhook kuyrugu izin kapisi (dogrudan RPC acigi kapanir) -> potansiyel kayip tek kaynak (kapanis kaybi anomaliye) -> musteri tek portali yazma kapisi", files: [F.webhookEnqueueGate, F.closureLossAnomalies, F.customerPortalRequests] },
     { id: "PB52-kalan-isler", order: 29.998, title: "Kalan isler turu: gider fisi dosya yukleme (yukleme hatti RPC'leri) -> kira ice aktarma atomik RPC -> imza hatirlatmasi kisa baglanti", files: [F.expenseReceiptUploads, F.importRentalWithDeal, F.contractSignerReminder] },
     { id: "PB53-proxy-hiz", order: 29.999, title: "Hiz: proxy kapi okumalari tek INVOKER RPC (proxy_gate_snapshot)", files: [F.proxyGateSnapshot] },
+    { id: "PB53-perf-rls-yardimcilari", order: 29.9995, title: "Perf turu 3: RLS yardimci fonksiyonlari plpgsql (tenant cozumu ~420->~60us/cagri) + customer_demands tenant/created_at indeksi", files: [F.perfIndexesRpc] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
