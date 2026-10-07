@@ -2,7 +2,7 @@
 
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   Clock,
   Crown,

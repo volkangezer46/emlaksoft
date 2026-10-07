@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Clock3, Crosshair, Eye, MapPin, Sparkles, User } from "lucide-react";
 import { DemandRowCheckbox, DemandSelectAllCheckbox } from "./demand-bulk";
 import { IntentLink } from "@/components/app/intent-link";

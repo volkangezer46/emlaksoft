@@ -1,6 +1,6 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReportExportBar } from "@/components/app/report-export-bar";

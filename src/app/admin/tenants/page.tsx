@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso, isPast } from "@/lib/clock";
 import { formatDateTr } from "@/lib/format";
 import {

@@ -2,7 +2,7 @@
 
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Save, TriangleAlert } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createPipelineDeal } from "@/app/actions/deals";

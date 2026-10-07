@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, ScrollText } from "lucide-react";
 import { riskOf, type RiskLevel } from "@/lib/audit-labels";
 import { trDayKey } from "@/lib/clock";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { now as nowMs, daysAgoIso } from "@/lib/clock";
 import {
   AlarmClock, AlertTriangle, ArrowUpRight, BadgeDollarSign, ClipboardPlus, Compass, Lightbulb,

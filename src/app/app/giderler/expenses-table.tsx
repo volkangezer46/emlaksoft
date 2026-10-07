@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Paperclip, Receipt, SearchX, Trash2 } from "lucide-react";
 import { expenseReceiptHref } from "@/lib/expense-receipts";
 import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";

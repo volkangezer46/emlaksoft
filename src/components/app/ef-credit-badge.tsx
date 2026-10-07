@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { unstable_cache } from "next/cache";
 import { Coins } from "lucide-react";
 import { lowBalanceState } from "@/lib/billing/credit-pack-purchase-core";

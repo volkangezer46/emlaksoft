@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { saveEfWelcomeUnits } from "@/app/actions/platform-billing-plans";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";

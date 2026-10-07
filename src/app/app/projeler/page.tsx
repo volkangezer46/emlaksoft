@@ -1,5 +1,5 @@
 import { ListHero, ListPage } from "@/components/ui/list-page";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import {
   ArrowUpRight,

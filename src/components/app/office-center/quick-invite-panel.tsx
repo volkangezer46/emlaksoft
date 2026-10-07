@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { addAdvisor } from "@/app/actions/office-center";

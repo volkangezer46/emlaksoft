@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ComponentType, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { CountUp } from "@/components/ui/count-up";

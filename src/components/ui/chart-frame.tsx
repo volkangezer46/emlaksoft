@@ -1,5 +1,5 @@
 import { memo, type ComponentType, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Illustration, type IllustrationKind } from "@/components/ui/illustrations";

@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- portföy kapakları oturumlu indirme ucundan gelir; next/image optimizasyonu gerekmez */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
   CalendarClock,

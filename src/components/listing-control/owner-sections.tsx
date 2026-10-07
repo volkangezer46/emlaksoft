@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronRight } from "lucide-react";
 import { TableFrame, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { districtListHref } from "./helpers";

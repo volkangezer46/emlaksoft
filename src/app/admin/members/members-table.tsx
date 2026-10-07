@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Building2, Crown, Eye, Phone, ShieldCheck, User, UserCheck, UserX, Users } from "lucide-react";
 import { setMemberActiveAsStaff, setMemberRoleAsStaff } from "@/app/actions/platform-members";

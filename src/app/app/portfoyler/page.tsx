@@ -1,5 +1,5 @@
 import { formatTry } from "@/lib/format";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
 import Image from "next/image";

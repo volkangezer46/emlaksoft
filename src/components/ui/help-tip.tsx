@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useId, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { glossaryEntry } from "@/lib/help-content";

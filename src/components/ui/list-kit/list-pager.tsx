@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCount, type ParamRecord } from "@/lib/ui/filter-params";
 import { pageHrefOf, type PageWindow } from "./list-logic";

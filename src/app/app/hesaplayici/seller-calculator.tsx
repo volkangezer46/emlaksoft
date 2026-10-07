@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, Banknote, Info } from "lucide-react";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { LegalConstantsPanel } from "@/components/app/legal-constants-panel";

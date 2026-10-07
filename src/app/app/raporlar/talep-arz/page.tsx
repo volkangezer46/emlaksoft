@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { SkeletonCard } from "@/components/ui/viz";
 import { shareOfMax } from "../report-math";
 import { getDistrictNameMap, getProvinces } from "@/lib/geo/reader";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import dynamic from "next/dynamic";
 import {
   ArrowUpRight,

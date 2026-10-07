@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { KeyRound, Layers } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
 import { loadRentalsAndProjects, type HomeCtx } from "./data";

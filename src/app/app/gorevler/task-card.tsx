@@ -2,7 +2,7 @@
 
 import { useContext, useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Briefcase, CheckCircle2, Clock, FileText, Link2, Loader2, MapPin, Phone, Repeat, RotateCcw, Trash2, User } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";

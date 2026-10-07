@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useMemo, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import {

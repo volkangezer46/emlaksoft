@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Eye, User } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
 import { BulkRowCheckbox, BulkSelectAll } from "@/components/app/bulk-selection";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatListingPrice } from "@/lib/format";

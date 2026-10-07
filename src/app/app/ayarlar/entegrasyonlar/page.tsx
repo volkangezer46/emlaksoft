@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { CheckCircle2, Clock, Landmark, MessageSquare, LineChart, Image as ImageIcon, ArrowLeft, CreditCard } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listIntegrations, type IntegrationCategory } from "@/lib/integrations/registry";

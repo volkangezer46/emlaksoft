@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { Eye, MonitorPlay, Presentation, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

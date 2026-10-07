@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { AlertTriangle, CalendarClock, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";

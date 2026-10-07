@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Lightbulb, Undo2, Wand2, X } from "lucide-react";
 import { loadNlNeighborhoods, loadNlProvincesAndDistricts } from "@/lib/nl-search/geo-source";
 import { parseNlQuery, NL_GROUPS, NL_GROUP_LABELS, type NlGroup } from "@/lib/nl-search/parse";

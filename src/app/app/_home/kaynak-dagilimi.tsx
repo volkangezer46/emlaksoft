@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Megaphone } from "lucide-react";
 import { EmptyArt } from "@/components/ui/premium";
 import { getDefinitionsOrDefault } from "@/lib/definitions";

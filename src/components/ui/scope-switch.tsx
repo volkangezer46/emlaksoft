@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { Building2, User } from "lucide-react";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { Period } from "@/lib/accounting/period";
 
 /** Dönem seçici (sunucu bileşeni, GET formu + bağlantılar): bu ay / geçen ay / tüm zamanlar / özel aralık. */

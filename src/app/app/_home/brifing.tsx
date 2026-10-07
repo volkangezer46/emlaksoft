@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronRight, Sparkles } from "lucide-react";
 import type { Insight, InsightKind } from "@/lib/insights/types";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, Copy, Download, Loader2, MonitorSmartphone, Printer, QrCode } from "lucide-react";
 import { fetchTrustedQrPng } from "@/lib/client-download";
 

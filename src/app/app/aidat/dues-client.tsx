@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, CheckCheck, Coins, Loader2, Plus, Trash2, Undo2, X } from "lucide-react";
 import { createDue, toggleDuePaid, deleteDue, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
 import { useToast } from "@/components/app/toast-provider";

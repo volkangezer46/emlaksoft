@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { daysAgoIso } from "@/lib/clock";
 import { Building2, RotateCcw, Trash2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Wallet } from "lucide-react";
 import { ChartCard } from "@/components/ui/chart-frame";
 import { AreaTrendChart } from "@/components/ui/lazy-charts";

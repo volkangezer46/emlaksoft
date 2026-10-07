@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight } from "lucide-react";
 import { DefinitionsForm } from "@/components/app/office-center/definitions-form";
 import { definitionKeys, definitionsFromSettings } from "@/lib/office-center/definitions";

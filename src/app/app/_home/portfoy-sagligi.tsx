@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { ArrowUpRight, ChevronRight, HeartPulse } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

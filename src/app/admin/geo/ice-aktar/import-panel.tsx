@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Download, FileUp } from "lucide-react";
 import { applyGeoImport, previewGeoImport, type GeoImportPreview, type ImportItem } from "@/app/actions/geo-admin";

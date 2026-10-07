@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Users2 } from "lucide-react";
 import { getPlanDefinition, getSeatSettings } from "@/lib/billing/plan-definitions";

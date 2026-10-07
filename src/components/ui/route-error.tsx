@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, ArrowLeft, RotateCcw } from "lucide-react";
 
 import { reportClientError } from "@/app/actions/report-error";

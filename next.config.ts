@@ -39,6 +39,12 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  // Uygulama kodu sharp kullanmıyor (filigran istemcide); Vercel görseli kendi altyapısında optimize eder.
+  // Her sunucu fonksiyonunun izine giren sharp + @img ikilileri paketi şişirip soğuk başlangıcı uzatıyordu.
+  outputFileTracingExcludes: {
+    "/*": ["node_modules/sharp/**", "node_modules/@img/**"],
+  },
+
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,

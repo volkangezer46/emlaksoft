@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
 import { USER_MENU_TRIGGER_CLASS, UserMenuFace } from "./user-menu-face";

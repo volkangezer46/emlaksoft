@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Landmark } from "lucide-react";
 import { GOS_CHECKLIST_ITEMS, GOS_DATE_NOTE, GOS_NO_MONEY_NOTE, GOS_SOURCES, GOS_SUMMARY, gosStatusLabel } from "@/lib/gos-info";
 import { now, trDayKey } from "@/lib/clock";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Wallet } from "lucide-react";
 import { maxCreditForInvoice } from "@/lib/try-credits/invoice-credit";
 import { TRY_WALLET_LINKS, formatShare, formatTry } from "@/lib/try-credits/view";

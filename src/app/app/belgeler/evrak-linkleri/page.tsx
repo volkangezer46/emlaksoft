@@ -1,5 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowLeft, FileUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";

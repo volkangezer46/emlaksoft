@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, Copy, ExternalLink, MessageCircle, Search, Settings2 } from "lucide-react";
 import {
   Dialog,

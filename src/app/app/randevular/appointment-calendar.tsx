@@ -3,7 +3,7 @@
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { useState } from "react";
 import { trDayKey, formatTrTime } from "@/lib/clock";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowDown, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 
 type AppointmentItem = {

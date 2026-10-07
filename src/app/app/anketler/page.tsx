@@ -1,5 +1,5 @@
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CheckCircle2, Clock, Gauge, Headphones, MessageSquareQuote, SearchX, Smile, TrendingDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";

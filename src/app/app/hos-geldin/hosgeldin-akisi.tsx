@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Target, UserPlus, ListChecks, UserRound } from "lucide-react";
 import { FileInput } from "@/components/ui/file-input";

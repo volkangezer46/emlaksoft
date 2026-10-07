@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { isValidElement, type ComponentType, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Illustration, resolveIllustration, type IllustrationKind } from "./illustrations";

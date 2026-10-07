@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, Copy, ExternalLink, Link2, MessageCircle, Share2 } from "lucide-react";
 import { createOwnerPortalToken } from "@/app/actions/owner-portal";
 import { toWhatsAppLink } from "@/lib/phone";

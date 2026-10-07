@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, ChevronRight, Gauge } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Widget } from "../dashboard-widgets";

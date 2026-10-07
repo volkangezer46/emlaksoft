@@ -1,5 +1,5 @@
 import { cache, Suspense, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   Activity,
   BrainCircuit,

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { CheckCircle2, CircleHelp, Link2 } from "lucide-react";
 import { now } from "@/lib/clock";

@@ -2,7 +2,7 @@
 
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Ban, CalendarClock, Check, Plus, ShieldCheck, ShieldOff } from "lucide-react";
 import { cancelScopeOverride, createScopeOverride, searchScopeResources } from "@/app/actions/access-control";

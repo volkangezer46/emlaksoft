@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Landmark } from "lucide-react";
 import { AreaTrend, ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";

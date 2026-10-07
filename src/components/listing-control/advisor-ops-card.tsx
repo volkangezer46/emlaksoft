@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Suspense } from "react";
 import { StatRow } from "@/components/ui/stat-row";
 import { SkeletonCard } from "@/components/ui/viz";

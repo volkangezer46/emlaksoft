@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Clock, FileText, Info } from "lucide-react";
 import { now } from "@/lib/clock";
 import { formatDateTimeTr } from "@/lib/format";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useState, useTransition } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";

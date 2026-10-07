@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Funnel, Goal } from "lucide-react";
 import { ChartCard } from "@/components/ui/chart-frame";
 import { FunnelChart } from "@/components/ui/viz";

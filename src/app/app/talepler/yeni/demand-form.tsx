@@ -2,7 +2,7 @@
 
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useCallback, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createDemand } from "@/app/actions/demands";

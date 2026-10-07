@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { FEED_CATEGORIES, feedActionOptions } from "@/lib/oversight/feed";
 import { hasFeedFilter, type FeedFilters } from "@/lib/oversight/feed-query";
 

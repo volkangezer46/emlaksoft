@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { Check, Lock } from "lucide-react";
 import { formatBadgeCount, ringPercent, tabDensity, type MorphBadge, type MorphDensity } from "@/lib/morph-tabs";

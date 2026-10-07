@@ -1,5 +1,5 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

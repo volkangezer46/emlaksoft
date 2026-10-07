@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Link2 } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { listTenantGeoCandidates } from "@/lib/geo/backfill";

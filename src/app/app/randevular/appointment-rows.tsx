@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CheckCircle2, Clock3, Eye, FileSignature, MapPin, Undo2, XCircle } from "lucide-react";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { AddToCalendarButton } from "@/components/app/add-to-calendar-button";

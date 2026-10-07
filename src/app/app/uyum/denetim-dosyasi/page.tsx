@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, FileCheck2, Info } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";

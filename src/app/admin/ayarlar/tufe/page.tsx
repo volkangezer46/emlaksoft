@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowLeft, Percent } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { requirePlatformModule } from "@/lib/platform";

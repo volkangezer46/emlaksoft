@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Link2, UserPlus, X } from "lucide-react";
 import { Combobox } from "@/components/ui/combobox";

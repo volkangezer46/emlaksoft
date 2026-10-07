@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, ChevronsUpDown, Loader2, LocateFixed, TriangleAlert } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";

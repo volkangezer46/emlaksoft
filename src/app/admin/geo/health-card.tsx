@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CheckCircle2, MapPin } from "lucide-react";
 import { getGeoHealth } from "@/lib/geo/admin-store";
 import { formatDateTimeTr } from "@/lib/format";

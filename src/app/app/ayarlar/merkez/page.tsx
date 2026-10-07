@@ -1,5 +1,5 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowLeft, ArrowUpRight, Search, SlidersHorizontal } from "lucide-react";
 import { ReadOnlyGate } from "../read-only-gate";
 import { SettingField } from "@/components/settings/setting-field";

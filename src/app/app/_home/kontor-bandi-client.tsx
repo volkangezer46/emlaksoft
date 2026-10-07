@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { AlertTriangle, X } from "lucide-react";
 

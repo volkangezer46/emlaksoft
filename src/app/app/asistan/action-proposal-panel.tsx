@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Check, Sparkles, X } from "lucide-react";
 import { approveAssistantAction, proposeAssistantAction } from "@/app/actions/assistant-actions";
 import type { AssistantProposal } from "@/lib/ai/assistant-actions";

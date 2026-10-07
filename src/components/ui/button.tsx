@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Loader2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";

@@ -1,5 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CheckCircle2, Clock, Hand, Inbox, Layers, Settings2, UserX } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";

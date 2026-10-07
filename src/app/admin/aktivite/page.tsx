@@ -1,5 +1,5 @@
 import { Activity, ArrowUpRight, ChevronDown, Search, ShieldCheck, UserCog, X } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";

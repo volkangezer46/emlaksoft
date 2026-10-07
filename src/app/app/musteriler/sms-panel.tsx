@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { MessageSquare, Send, ShieldAlert, ShieldCheck } from "lucide-react";
 import { sendCustomerSms } from "@/app/actions/communications";
 import { useToast } from "@/components/app/toast-provider";

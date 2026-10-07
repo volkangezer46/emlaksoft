@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";

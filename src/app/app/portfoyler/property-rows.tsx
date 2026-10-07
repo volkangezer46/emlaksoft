@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Building2, Eye, MapPin, Radio } from "lucide-react";
 import { IntentLink } from "@/components/app/intent-link";
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";

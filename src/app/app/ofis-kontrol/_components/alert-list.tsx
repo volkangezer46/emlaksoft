@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, BellRing, CheckCircle2 } from "lucide-react";
 import type { OversightAlertView } from "@/lib/oversight/load";
 import { SEVERITY_LABEL, type AlertSeverity } from "@/lib/oversight/alert-rules";

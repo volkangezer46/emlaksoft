@@ -12,7 +12,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   ArrowDown,
   ArrowUp,

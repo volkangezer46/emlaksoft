@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { RadialGauge } from "@/components/ui/viz";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,

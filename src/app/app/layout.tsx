@@ -1,5 +1,5 @@
 import { Suspense, cache } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Shield } from "lucide-react";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";

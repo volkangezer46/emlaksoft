@@ -1,5 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, PieChart, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";

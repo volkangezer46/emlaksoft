@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { trDayKey } from "@/lib/clock";
 import { buildMonthGrid, monthLabel, WEEKDAY_SHORT } from "@/lib/month-grid";

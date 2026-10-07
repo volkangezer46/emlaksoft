@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Target } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getRequestUser } from "@/lib/supabase/auth-cache";

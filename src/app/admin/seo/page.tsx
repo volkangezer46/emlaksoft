@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Archive, Bot, Braces, Globe, ListChecks, Map as MapIcon, SearchCheck, Shuffle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PageTabs } from "@/components/app/page-tabs";

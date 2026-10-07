@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { Wallet } from "lucide-react";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { now as clockNow } from "@/lib/clock";

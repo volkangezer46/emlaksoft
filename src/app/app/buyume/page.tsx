@@ -1,6 +1,6 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { Award, HeartHandshake, MousePointerClick, UserPlus, Wallet, Hourglass, CheckCircle2, Undo2, PiggyBank } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";

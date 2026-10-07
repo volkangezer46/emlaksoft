@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { BellRing, Check, MessageCircle } from "lucide-react";
 import { markReminderSent, setRenterReminderOptOut } from "@/app/actions/rent-reminders";

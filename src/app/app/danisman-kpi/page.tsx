@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   CalendarCheck2, ChevronLeft, ChevronRight, Crown, FileSignature,
   Handshake, PhoneCall, Trophy, Users, Wallet,

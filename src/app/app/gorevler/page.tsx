@@ -1,5 +1,5 @@
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { AlarmClock, CalendarClock, CalendarDays, CheckCircle2, Columns3, List, PieChart, Plus, Sunrise } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";

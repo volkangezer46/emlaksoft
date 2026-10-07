@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { loadNotificationChannels } from "@/lib/notification-channels";

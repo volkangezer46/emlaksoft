@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { FileDown, FileText, ShieldAlert } from "lucide-react";
 import type { OrtakValuationOk } from "@/lib/integrations/emlakfiyati/ortak-contract";
 import { presentValuation, type EfLine } from "@/lib/ef-credits/present";

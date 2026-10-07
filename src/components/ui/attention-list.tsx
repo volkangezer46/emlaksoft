@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { AlertOctagon, AlertTriangle, ChevronRight, Clock, Info } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 

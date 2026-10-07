@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { KeyRound, Mail, Power, Save, Send } from "lucide-react";
 import {
   requestMemberEmailChange,

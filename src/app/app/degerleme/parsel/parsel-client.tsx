@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Loader2, MapPin, Wallet } from "lucide-react";
 import { efCheckGeoMatch, efLoadIlceler, efLoadMahalleler, submitParcelValuation, type EfGeoOption } from "@/app/actions/ef-valuation";

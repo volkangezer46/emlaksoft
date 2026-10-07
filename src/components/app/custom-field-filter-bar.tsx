@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { SlidersHorizontal, X } from "lucide-react";
 import { CUSTOM_FIELD_TYPE_LABELS } from "@/lib/custom-fields/core";
 import type { CustomFieldFilterState } from "@/lib/custom-fields/filter";

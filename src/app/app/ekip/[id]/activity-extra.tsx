@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, Handshake, Users } from "lucide-react";
 import type { createClient } from "@/lib/supabase/server";
 import { getStageLabels } from "@/lib/definitions";

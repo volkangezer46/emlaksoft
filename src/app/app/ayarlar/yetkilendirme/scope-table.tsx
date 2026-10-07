@@ -2,7 +2,7 @@
 
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, RotateCcw, X } from "lucide-react";
 import { resetUserScope, upsertUserScope } from "@/app/actions/access-control";

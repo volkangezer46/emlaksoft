@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { House } from "lucide-react";
 import { useMemo } from "react";

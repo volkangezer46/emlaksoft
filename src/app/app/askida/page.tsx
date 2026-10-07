@@ -17,7 +17,7 @@ import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import { planLabel } from "@/lib/billing/plans";
 import { closureDownloadAllowed } from "@/lib/admin/office-closure";
 import { ClosureDataPanel } from "./closure-data-panel";

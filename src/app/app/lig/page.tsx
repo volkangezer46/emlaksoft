@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/smart-link";
 import {
   Award, Building2, CalendarCheck2, CalendarClock, ChevronLeft, ChevronRight, Crown, Flame,
   Handshake, HelpCircle, Medal, Minus, Rocket, Star, Target, TrendingDown, TrendingUp, Trophy,
