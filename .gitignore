@@ -20,6 +20,9 @@
 # production
 /build
 
+# tarayıcı eklentisi paketi (npm run build:extension / prebuild üretir; indirme ucu okur)
+/public/downloads/
+
 # misc
 .DS_Store
 *.pem

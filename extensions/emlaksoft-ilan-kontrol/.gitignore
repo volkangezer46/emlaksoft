@@ -1,2 +1,3 @@
 # Derleme çıktısı (npm run build:extension) depoya girmez.
 dist/
+release/

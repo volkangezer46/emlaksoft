@@ -8,6 +8,7 @@ import {
   BRIDGE_DEFER_ERRORS,
   BRIDGE_RESPONSE_SOURCE,
   bridgeAutorun,
+  bridgeConnected,
   bridgeInstalled,
   bridgePaused,
   parseBridgeMessage,
@@ -79,6 +80,10 @@ export function VerificationWorker() {
     const step = async (): Promise<StepOutcome> => {
       if (bridgeInstalled() && bridgePaused()) {
         setStatus({ text: "Tarayıcı eklentisi duraklatıldı: kontrol yapılmıyor", active: false });
+        return "idle";
+      }
+      if (bridgeInstalled() && !bridgeConnected()) {
+        setStatus({ text: "Tarayıcı eklentisi kurulu ama bağlı değil: bağlanana kadar kontrol yapılmaz", active: false, install: true });
         return "idle";
       }
       if (bridgeInstalled() && bridgeAutorun()) {

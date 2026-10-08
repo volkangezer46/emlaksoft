@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "prebuild": "tsx scripts/build-extension.ts --soft",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

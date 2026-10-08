@@ -44,6 +44,11 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/*": ["node_modules/sharp/**", "node_modules/@img/**"],
   },
+  // Tarayıcı eklentisi paketi (build sırasında public/downloads'a yazılır): indirme ucu ve kurulum sayfası çalışma anında okur.
+  outputFileTracingIncludes: {
+    "/api/app/ilan-kontrol/eklenti.zip": ["./public/downloads/**/*"],
+    "/app/ilan-kontrol/eklenti": ["./public/downloads/**/*"],
+  },
 
   images: {
     formats: ["image/avif", "image/webp"],

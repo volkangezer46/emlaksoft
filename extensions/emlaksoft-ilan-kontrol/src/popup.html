@@ -5,32 +5,149 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>EmlakSoft İlan Kontrol</title>
     <style>
-      :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-      body { margin: 0; width: 320px; color: #0f172a; background: #ffffff; }
-      main { padding: 16px; }
-      h1 { margin: 0 0 4px; font-size: 15px; }
-      .muted { color: #475569; font-size: 12px; }
-      .row { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid #e2e8f0; font-size: 13px; }
-      .row strong { font-variant-numeric: tabular-nums; }
-      .state { margin: 10px 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; background: #f1f5f9; }
-      .state.ok { background: #ecfdf5; color: #065f46; }
-      .state.warn { background: #fffbeb; color: #92400e; }
-      button { width: 100%; margin-top: 10px; padding: 9px 12px; border: 0; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; background: #1e3a8a; color: #fff; }
-      button.secondary { background: #e2e8f0; color: #0f172a; }
-      button:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
-      p.legal { margin: 12px 0 0; font-size: 11px; line-height: 1.45; color: #475569; }
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff; --surface: #f6f8fc; --line: #e2e8f0; --text: #0f172a; --muted: #475569;
+        --brand: #1463ff; --brand-ink: #0b2a5b; --gold: #d9a441;
+        --ok: #047857; --ok-bg: #ecfdf5; --warn: #92400e; --warn-bg: #fffbeb; --bad: #b91c1c; --bad-bg: #fef2f2; --idle: #94a3b8;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1220; --surface: #121b2e; --line: #243049; --text: #e8eefc; --muted: #9fb0cf;
+          --ok: #34d399; --ok-bg: #062a22; --warn: #fbbf24; --warn-bg: #2a1d05; --bad: #f87171; --bad-bg: #2d1010; --idle: #64748b;
+        }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; width: 380px; color: var(--text); background: var(--bg); font-size: 13px; }
+      main { padding: 14px 14px 12px; }
+      h1 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
+      h2 { margin: 14px 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+      .top { display: flex; align-items: center; gap: 10px; }
+      .top svg { width: 34px; height: 34px; flex: none; }
+      .top .grow { flex: 1; min-width: 0; }
+      .muted { color: var(--muted); font-size: 11.5px; }
+      .pill { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--surface); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+      .pill.ok { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+      .pill.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+      .pill.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+      .hero { margin-top: 12px; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); transition: background 0.2s; }
+      .hero.ok { background: var(--ok-bg); border-color: transparent; }
+      .hero.warn { background: var(--warn-bg); border-color: transparent; }
+      .hero.bad { background: var(--bad-bg); border-color: transparent; }
+      .hero .txt { flex: 1; min-width: 0; }
+      .hero strong { display: block; font-size: 14px; }
+      .hero span { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+      .switch { position: relative; flex: none; width: 52px; height: 30px; padding: 0; border: 0; border-radius: 999px; background: var(--idle); cursor: pointer; transition: background 0.2s; }
+      .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform 0.2s; }
+      .switch[aria-checked="true"] { background: var(--ok); }
+      .switch[aria-checked="true"]::after { transform: translateX(22px); }
+      .switch:disabled { opacity: 0.45; cursor: not-allowed; }
+      .cta { width: 100%; margin-top: 10px; padding: 10px 12px; border: 0; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-ink)); }
+      .cta.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+      .cta[hidden] { display: none; }
+      button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+      .kpi { padding: 9px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+      .kpi b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+      .kpi small { color: var(--muted); font-size: 11px; }
+      .meter { margin-top: 8px; }
+      .meter .lbl { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+      .meter .bar { height: 6px; margin-top: 3px; border-radius: 999px; background: var(--line); overflow: hidden; }
+      .meter .bar i { display: block; height: 100%; width: 0; background: var(--brand); border-radius: 999px; transition: width 0.3s; }
+      .meter .bar i.hot { background: var(--warn); }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li.row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px solid var(--line); }
+      li.row:first-child { border-top: 0; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--idle); }
+      .dot.green { background: var(--ok); } .dot.yellow { background: var(--gold); } .dot.red { background: var(--bad); }
+      .row .name { flex: 1; min-width: 0; }
+      .row .name small { display: block; color: var(--muted); font-size: 11px; }
+      .tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); white-space: nowrap; }
+      .tag.live { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+      .tag.blocked, .tag.unknown { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+      .empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+      details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+      summary { cursor: pointer; font-weight: 700; font-size: 12px; color: var(--muted); }
+      .field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; }
+      .field label { display: flex; align-items: center; gap: 6px; }
+      select, input[type="number"] { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 12px; }
+      input[type="number"] { width: 70px; }
+      p.legal { margin: 12px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--muted); }
+      .foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10.5px; color: var(--muted); }
+      .link[hidden] { display: none; }
+      .link { background: none; border: 0; padding: 0; color: var(--brand); cursor: pointer; font-size: 10.5px; text-decoration: underline; }
+      @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     </style>
   </head>
   <body>
     <main>
-      <h1>EmlakSoft İlan Kontrol</h1>
-      <p class="muted" id="version"></p>
-      <div class="state" id="state" role="status">Yükleniyor…</div>
-      <div class="row"><span>Bugünkü kontrol</span><strong id="today">-</strong></div>
-      <div class="row"><span>Son kontrol</span><strong id="last">-</strong></div>
-      <button type="button" id="toggle">Duraklat</button>
-      <button type="button" id="help" class="secondary">Kurulum ve bilgi</button>
+      <div class="top">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b3a78" /><stop offset="1" stop-color="#071a38" /></linearGradient>
+            <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6d27a" /><stop offset="1" stop-color="#d9a441" /></linearGradient>
+          </defs>
+          <rect width="64" height="64" rx="15" fill="url(#t)" />
+          <path d="M9 29 32 9.5 55 29" fill="none" stroke="url(#g)" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" />
+          <g fill="#fff"><rect x="19" y="32" width="6.4" height="22.5" rx="2.2" /><rect x="19" y="32" width="26" height="6.2" rx="2.2" /><rect x="19" y="48.3" width="26" height="6.2" rx="2.2" /></g>
+          <rect x="19" y="40.1" width="20" height="6.2" rx="2.2" fill="#5b9bff" />
+        </svg>
+        <div class="grow">
+          <h1>İlan Kontrol</h1>
+          <div class="muted" id="version"></div>
+        </div>
+        <span class="pill" id="pill" role="status">Yükleniyor…</span>
+      </div>
+
+      <section class="hero" id="hero" aria-live="polite">
+        <div class="txt"><strong id="heroTitle">Yükleniyor…</strong><span id="heroSub"></span></div>
+        <button type="button" class="switch" id="switch" role="switch" aria-checked="false" aria-label="Kontrolü çalıştır" disabled></button>
+      </section>
+      <button type="button" class="cta" id="cta" hidden></button>
+
+      <div class="kpis">
+        <div class="kpi"><b id="today">-</b><small>Bugün</small></div>
+        <div class="kpi"><b id="week">-</b><small>Son 7 gün</small></div>
+        <div class="kpi"><b id="next">-</b><small>Sıradaki kontrol</small></div>
+      </div>
+      <div class="meter"><div class="lbl"><span>Saatlik hız limiti</span><span id="hourLbl"></span></div><div class="bar"><i id="hourBar"></i></div></div>
+      <div class="meter"><div class="lbl"><span>Günlük limit</span><span id="dayLbl"></span></div><div class="bar"><i id="dayBar"></i></div></div>
+
+      <h2>Portal sağlığı</h2>
+      <ul id="portals"></ul>
+
+      <div id="reasonsWrap" hidden>
+        <h2>Kontrol edilemedi nedenleri</h2>
+        <ul id="reasons"></ul>
+      </div>
+
+      <h2>Son sonuçlar</h2>
+      <ul id="recent"></ul>
+
+      <details id="settings">
+        <summary>Ayarlar</summary>
+        <h2>Portallar</h2>
+        <div id="portalToggles"></div>
+        <h2>Çalışma saatleri</h2>
+        <div class="field">
+          <label><input type="checkbox" id="hoursEnabled" /> Yalnız bu saatlerde çalış</label>
+        </div>
+        <div class="field">
+          <span>Başlangıç / bitiş</span>
+          <span><select id="hoursFrom" aria-label="Başlangıç saati"></select> – <select id="hoursTo" aria-label="Bitiş saati"></select></span>
+        </div>
+        <h2>Günlük üst sınır</h2>
+        <div class="field">
+          <span id="capHelp">Günde en çok</span>
+          <span><input type="number" id="dailyCap" min="10" max="600" step="10" aria-labelledby="capHelp" /> kontrol</span>
+        </div>
+        <p class="muted">Ayarlar yalnızca kısabilir; saatte 60 ve iki kontrol arası en az 20 sn kuralı değiştirilemez.</p>
+        <button type="button" class="cta secondary" id="save">Ayarları kaydet</button>
+      </details>
+
       <p class="legal" id="legal"></p>
+      <div class="foot"><span id="parser"></span><span><button type="button" class="link" id="disconnect" hidden>Bağlantıyı kes</button> <button type="button" class="link" id="help">Kurulum ve bilgi</button></span></div>
     </main>
     <script src="popup.js"></script>
   </body>
