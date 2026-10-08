@@ -1,5 +1,4 @@
 import { ListHero, ListPage } from "@/components/ui/list-page";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import {
@@ -85,7 +84,6 @@ export default async function ProjelerPage({
         description="Müteahhit projelerinin daire stoğunu, rezervasyon ve satışlarını tek ekrandan yönetin."
         actions={
           <>
-            <ReportOpenLink report="projeler" filters={{ durum: ["planning", "selling", "delivered"].includes(durum ?? "") ? durum : undefined }} />
             {canCreate ? <ButtonLink href="/app/projeler/yeni" icon={Plus}>Yeni proje</ButtonLink> : null}
           </>
         }

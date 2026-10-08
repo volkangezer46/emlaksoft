@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { AlertTriangle, CalendarClock, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";
@@ -287,7 +286,6 @@ export default async function KiralamaPage({
             <ButtonLink href="/app/kira-artis" variant="secondary" size="sm">
               Kira artış hesaplayıcı
             </ButtonLink>
-            <ReportOpenLink report={durumF ? "kira-tahakkuklari" : "kiralamalar"} filters={{ durum: durumF || undefined }} />
             {canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
           </>
         }

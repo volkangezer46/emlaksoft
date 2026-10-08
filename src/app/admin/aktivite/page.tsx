@@ -1,5 +1,4 @@
 import { Button, ButtonLink } from "@/components/ui/button";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { Activity, ArrowUpRight, ChevronDown, Search, ShieldCheck, UserCog, X } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -149,11 +148,6 @@ function ActivityFilterBar({ filters, total }: { filters: ActivityFilters; total
         ))}
         <span className="ml-auto flex items-center gap-3">
           <span className="text-xs text-text-faint">{total} kayıt eşleşiyor</span>
-          <ReportOpenLink
-            scope="platform"
-            report={filters.kaynak === "tenant" ? "ofis-denetim-kayitlari" : "platform-denetim"}
-            filters={{ from: filters.baslangic, to: filters.bitis, q: filters.q }}
-          />
         </span>
       </div>
     </form>

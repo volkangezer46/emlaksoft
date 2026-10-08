@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { AlertTriangle, FileSpreadsheet, Info } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -188,7 +187,6 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
     },
   ];
 
-  const exportQs = new URLSearchParams(periodSearchParams(period)).toString();
   const creditSoldNet = summary.byKind.credit_pack.net;
 
   return (
@@ -198,9 +196,6 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
         eyebrow="Finans"
         title="Muhasebe"
         description="Tahsilat, KDV, iade, gelir türü ve ödeme yöntemi özeti. Her kart ilgili fatura defterine gider."
-        actions={
-          <ReportOpenLink scope="platform" report="muhasebe-fatura-defteri" filters={Object.fromEntries(new URLSearchParams(exportQs))} label="Raporlarda aç (muhasebe defteri)" />
-        }
       />
 
       <PeriodBar basePath="/admin/muhasebe" period={period} />

@@ -1,5 +1,4 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import {
   Activity,
@@ -215,7 +214,6 @@ export default async function AuditPage({
               Zaman çizelgesi · aktör + değişiklik · ofis izole{totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
             </p>
           </div>
-          <ReportOpenLink report="aktivite-denetim" filters={{ from: filters.from, to: filters.to, advisor: filters.aktor, risk: filters.risk, ara: filters.ara }} />
         </div>
         {/* ?from=&to=&aktor= — sunucu tarafı filtre formu; submit sayfayı 1'e döndürür */}
         <form method="get" action="/app/denetim" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">

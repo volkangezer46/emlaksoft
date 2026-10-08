@@ -1,5 +1,4 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import Link from "@/components/ui/smart-link";
@@ -326,9 +325,6 @@ export default async function ReferralsPage({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-end">
-              <ReportOpenLink report="tavsiyeler" filters={{ status: sp.durum }} />
-            </div>
             <TableFrame minWidth={980}>
             <Table>
               <THead>

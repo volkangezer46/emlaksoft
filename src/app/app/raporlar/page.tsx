@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { ReportCenter } from "@/components/report-center/report-center";
+import { ReportCenter, ReportCenterEntry } from "@/components/report-center/report-center";
 import { ReportTabs } from "@/components/report-center/report-tabs";
 import Link from "@/components/ui/smart-link";
 import {
@@ -276,6 +276,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-6">
       <ReportTabs scope="tenant" active="ozet" overviewLabel="Ofis sağlık & performans" />
+      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
+        <ReportCenterEntry scope="tenant" />
+      </Suspense>
       <PageHeader
         eyebrow="Raporlar"
         freshness

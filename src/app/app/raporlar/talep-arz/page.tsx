@@ -1,7 +1,6 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { PrintButton } from "@/components/ui/print-button";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -230,7 +229,6 @@ export default async function TalepArzPage({
         description={`${donem.label.toLowerCase()}de açılan açık talepler ile şu an yayındaki portföy stoku ilçe kırılımında karşılaştırılır — nerede portföy toplamalı, nerede talep üretmeli.`}
         actions={
           <span className="flex flex-wrap items-center gap-2">
-            <ReportOpenLink report="talep-arz" filters={{ islem: islem.db ?? undefined, donem: donem.key }} />
             <PrintButton tone="outline" size="sm" />
             <ButtonLink href="/app/raporlar" variant="secondary" icon={BarChart3}>Rapor merkezi</ButtonLink>
           </span>

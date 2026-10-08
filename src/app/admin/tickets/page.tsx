@@ -1,5 +1,4 @@
 import { Input } from "@/components/ui/input";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
@@ -494,7 +493,6 @@ export default async function AdminTicketsPage({
             <ButtonLink href={filters.tenant ? `/admin/tickets/yeni?tenant=${filters.tenant}` : "/admin/tickets/yeni"} size="lg" variant="primary" icon={LifeBuoy}>
               Yeni talep
             </ButtonLink>
-            <ReportOpenLink scope="platform" report="destek-talepleri" filters={{ durum: filters.durum ?? undefined, oncelik: filters.oncelik ?? undefined, kategori: filters.kategori ?? undefined }} />
             <ButtonLink href="/admin/tickets/makrolar" size="lg" variant="outline">
               Hazır yanıtlar
             </ButtonLink>

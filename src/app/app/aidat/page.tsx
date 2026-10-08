@@ -1,5 +1,4 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, PieChart, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -198,7 +197,6 @@ export default async function AidatPage({
         art="aidat"
         title="Aidat takibi"
         description="Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde."
-        actions={<ReportOpenLink report="aidatlar" filters={{ durum: params.durum === "paid" || params.durum === "unpaid" ? params.durum : undefined }} />}
       />
 
       <KpiStrip items={kpis} />

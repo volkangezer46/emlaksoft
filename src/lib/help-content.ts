@@ -435,7 +435,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Komisyon raporu (Excel / PDF / CSV)",
     intro: "Komisyon listesini muhasebeniz için Rapor merkezinden Excel, PDF ya da CSV olarak indirin.",
     steps: [
-      "Komisyon sayfasında \"Raporlarda aç\" bağlantısına basın; durum ve tarih filtreniz rapora taşınır.",
+      "Raporlar sayfasında Rapor merkezi sekmesini açın ve \"Komisyonlar\" raporunu seçin.",
       "Rapor merkezinde filtreyi gözden geçirin, önizlemeyi görün.",
       "Excel (.xlsx), PDF ya da CSV düğmesine basın. CSV noktalı virgül ayraçlıdır; Excel Türkçe doğrudan açar.",
     ],

@@ -3,7 +3,6 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "@/components/ui/smart-link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { PrintButton } from "@/components/ui/print-button";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -114,7 +113,6 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
       <PageHeader
         actions={
           <span className="flex flex-wrap items-center gap-2">
-            <ReportOpenLink report="aday-hizi" filters={{ donem: donem.key, esik: String(esik) }} />
             <PrintButton tone="outline" size="sm" />
           </span>
         }

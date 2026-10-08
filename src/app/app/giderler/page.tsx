@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs } from "@/lib/clock";
@@ -220,7 +219,6 @@ export default async function GiderlerPage({
         description="Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
         actions={
           <>
-            <ReportOpenLink report="giderler" filters={{ kategori: params.kategori, from: params.from, to: params.to }} />
             {canCreate ? (
               <ButtonLink href="#gider-ekle" icon={Plus}>
                 Yeni gider

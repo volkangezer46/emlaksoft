@@ -1,5 +1,4 @@
 import { Input } from "@/components/ui/input";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { Button } from "@/components/ui/button";
 ﻿import Link from "@/components/ui/smart-link";
 import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
@@ -189,7 +188,6 @@ export default async function AdminBillingPage({
         title="Gelir operasyonu"
         art="invoice"
         description="Abonelik, fatura ve tahsilat tek ekranda · iyzico bağlanınca tahsilat otomatikleşir"
-        actions={<ReportOpenLink scope="platform" report="abonelikler" />}
       />
       <BillingNav active="genel" />
       <section aria-label="Gelir özeti" className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
@@ -488,7 +486,6 @@ export default async function AdminBillingPage({
               {invCount ?? 0}
             </span>
           </h2>
-          <ReportOpenLink scope="platform" report="muhasebe-fatura-defteri" filters={{ donem: "tumu" }} label="Raporlarda aç (tüm faturalar)" />
         </div>
         {invRows.length === 0 ? (
           <AdminEmpty
