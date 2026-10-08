@@ -7,7 +7,10 @@ import { requirePermission } from "@/lib/require-permission";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { getBaseUrl } from "@/lib/base-url";
-import { buildPortalTabs, signerMatchesCustomer, type PortalOwnerProperty, type PortalRental, type PortalDocuments, type PortalTab } from "@/lib/customer-portal/portal-model";
+import { buildPortalTabs, signerMatchesCustomer, type PortalDealProcess, type PortalOwnerProperty, type PortalRental, type PortalDocuments, type PortalTab } from "@/lib/customer-portal/portal-model";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
+import { buildDealProcess, toPortalSteps } from "@/lib/deal-process";
+import { now as clockNow } from "@/lib/clock";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 function relName(v: unknown): string | null {
@@ -163,6 +166,8 @@ export type CustomerPortalData = {
   /** Kiracı: `rentals.renter_customer_id` bu kişi olan aktif kira kayıtları. */
   renter: PortalRental[];
   documents: PortalDocuments;
+  /** Tapu süreci ilerlemesi (alıcı/satıcı, salt-okunur); adım takibi başlamamışsa boş. */
+  processes: PortalDealProcess[];
   /** İstek RPC'si (20261007000620) var mı: yoksa teklif/erteleme/bakım formları çizilmez. */
   requestsEnabled: boolean;
 };
@@ -233,6 +238,7 @@ export async function getCustomerPortalData(
       .eq("is_sample", false)
       .is("deleted_at", null)
       .in("status", ["live", "reserved", "Yayında"])
+      .or(OPEN_LISTING_OR_FILTER) // kapalı portföy müşteri portalında görünmez
       .order("created_at", { ascending: false })
       .limit(200),
     // Ofise özel eşleştirme ağırlıkları — panel/eşleştirme sayfasıyla aynı skor
@@ -268,6 +274,7 @@ export async function getCustomerPortalData(
 
   // TEK PORTAL ekleri (aynı service_role istemcisi; her sorgu token'ın müşteri + ofis kimliğine bağlı, örnek kayıt süzülür).
   const extras = await loadPortalRoles(admin, tenantId, customerId, customer.phone ?? null);
+  const processes = await loadPortalDealProcesses(admin, tenantId, customerId, extras.owner.map((o) => o.id), clockNow());
 
   return {
     customer: {
@@ -308,10 +315,12 @@ export async function getCustomerPortalData(
       owner: extras.owner.length,
       renter: extras.renter.length,
       documents: extras.documents.pendingSign.length + extras.documents.signed.length,
+      process: processes.length,
     }),
     owner: extras.owner,
     renter: extras.renter,
     documents: extras.documents,
+    processes,
     requestsEnabled: extras.requestsEnabled,
   };
 }
@@ -420,4 +429,48 @@ async function loadPortalRoles(admin: AdminDb, tenantId: string, customerId: str
   }
 
   return { owner, renter, documents, requestsEnabled: !readyRes.error && readyRes.data === true };
+}
+
+/**
+ * Tapu süreci (salt-okunur): kişi ALICI (deals.customer_id) ya da SATICI (portföyün owner_customer_id'si) olduğu satış anlaşmaları.
+ * Yalnız ofisin adım takibini başlattığı (en az bir adım kaydı olan) ve kaybedilmemiş anlaşmalar görünür. KVKK: yalnız adım
+ * adı/durum/tarih; iç not, sorumlu kişi, tutar ve karşı tarafın kimliği GİTMEZ. Tablo yoksa boş döner (hata sayfası yok).
+ */
+async function loadPortalDealProcesses(admin: AdminDb, tenantId: string, customerId: string, ownedPropertyIds: string[], nowMs: number): Promise<PortalDealProcess[]> {
+  const dealsSelect = "id, customer_id, property_id, deal_type, stage, property:properties!deals_property_id_fkey(title, property_code)";
+  const base = () =>
+    admin.from("deals").select(dealsSelect).eq("tenant_id", tenantId).eq("deal_type", "sale").eq("is_sample", false).neq("stage", "lost").order("created_at", { ascending: false }).limit(10);
+  const [buyerRes, sellerRes] = await Promise.all([
+    base().eq("customer_id", customerId),
+    ownedPropertyIds.length ? base().in("property_id", ownedPropertyIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  type DealRaw = { id: string; customer_id: string | null; property_id: string | null; property: { title: string | null; property_code: string } | { title: string | null; property_code: string }[] | null };
+  const byId = new Map<string, { raw: DealRaw; role: "alici" | "satici" }>();
+  for (const d of (sellerRes.error ? [] : (sellerRes.data ?? [])) as unknown as DealRaw[]) byId.set(d.id, { raw: d, role: "satici" });
+  for (const d of (buyerRes.error ? [] : (buyerRes.data ?? [])) as unknown as DealRaw[]) byId.set(d.id, { raw: d, role: "alici" });
+  if (byId.size === 0) return [];
+
+  const stepsRes = await admin.from("deal_process_steps").select("deal_id, step_key, done_at, planned_at").eq("tenant_id", tenantId).in("deal_id", [...byId.keys()]);
+  if (stepsRes.error) return [];
+  const stepRows = (stepsRes.data ?? []) as { deal_id: string; step_key: string; done_at: string | null; planned_at: string | null }[];
+  // TKGM yedek tarihi (GÖS kartı): kolon yoksa sessizce yok sayılır.
+  const deedRes = await admin.from("deals").select("id, title_deed_appointment_at").eq("tenant_id", tenantId).in("id", [...byId.keys()]);
+  const deedById = new Map<string, string | null>();
+  if (!deedRes.error) for (const r of (deedRes.data ?? []) as { id: string; title_deed_appointment_at: string | null }[]) deedById.set(r.id, r.title_deed_appointment_at);
+
+  const out: PortalDealProcess[] = [];
+  for (const [dealId, { raw, role }] of byId) {
+    const mine = stepRows.filter((s) => s.deal_id === dealId);
+    if (mine.length === 0) continue;
+    const view = toPortalSteps(
+      buildDealProcess(
+        mine.map((s) => ({ stepKey: s.step_key, doneAt: s.done_at, plannedAt: s.planned_at, assignedTo: null, note: null })),
+        nowMs,
+        deedById.get(dealId) ?? null,
+      ),
+    );
+    const p = Array.isArray(raw.property) ? raw.property[0] : raw.property;
+    out.push({ dealId, role, label: p?.title || p?.property_code || "Satış işlemi", ...view });
+  }
+  return out;
 }

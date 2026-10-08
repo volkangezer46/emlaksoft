@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest) {
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
       .eq("is_sample", false)
+      .or(OPEN_LISTING_OR_FILTER)
       .is("deleted_at", null)
       .in("id", ids);
     if (propertiesError) return databaseUnavailable(operation, propertiesError);

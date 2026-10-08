@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { cache } from "react";
@@ -171,6 +172,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         .eq("status", "live")
         .is("deleted_at", null)
         .eq("is_sample", false)
+        .or(OPEN_LISTING_OR_FILTER)
         .order("created_at", { ascending: false })
         .limit(MAX_LISTINGS),
       admin

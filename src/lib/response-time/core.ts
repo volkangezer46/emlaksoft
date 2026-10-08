@@ -26,6 +26,12 @@ export const DEFAULT_SLA_MIN = 60;
 /** Temas sayılan iletişim kanalları (not/dahili HARİÇ). */
 export const TOUCH_CHANNELS: readonly string[] = ["call", "whatsapp", "sms", "email", "meeting"];
 
+/** Verilen an çalışma saati içinde mi (TR Pzt-Cmt 09:00-19:00)? Talep dağıtımı mesai kuralı da bunu kullanır. */
+export function isWorkingTime(ms: number): boolean {
+  const t = trParts(ms);
+  return WORK_WEEKDAYS.includes(t.weekday) && t.hour >= WORK_START_HOUR && t.hour < WORK_END_HOUR;
+}
+
 /** `startMs`-`endMs` arasındaki çalışma dakikası (TR takvimi). endMs <= startMs ise 0. */
 export function workingMinutesBetween(startMs: number, endMs: number): number {
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { unstable_cache } from "next/cache";
 import { vitrinSignatureHref } from "@/lib/growth/attribution";
 import { ArrowRight, Building2, Calculator, MapPin, Ruler, BedDouble, Search, ShieldCheck } from "lucide-react";
@@ -91,7 +92,8 @@ export async function generateMetadata({
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
     .is("deleted_at", null)
-    .eq("is_sample", false);
+    .eq("is_sample", false)
+    .or(OPEN_LISTING_OR_FILTER);
 
   const title = `${tenant.name} | Portföy Vitrini`;
   const description =
@@ -162,7 +164,8 @@ export default async function VitrinPage({
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
       .is("deleted_at", null)
-      .eq("is_sample", false);
+      .eq("is_sample", false)
+      .or(OPEN_LISTING_OR_FILTER);
 
     if (q) {
       // Tek yerde temizleme: PostgREST gramerini bozan karakterler ve LIKE jokerleri safeLike/orIlike ile atılır, uzunluk sınırlıdır.
@@ -190,6 +193,7 @@ export default async function VitrinPage({
         .eq("status", "live")
         .is("deleted_at", null)
         .eq("is_sample", false)
+        .or(OPEN_LISTING_OR_FILTER)
         .limit(200),
       // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur.
       fetchLatestRates(admin),

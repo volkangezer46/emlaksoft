@@ -8,6 +8,7 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { ButtonLink } from "@/components/ui/button";
 import { CopyLinkButton, DeletePresentationButton } from "./presentation-actions";
 import { SharedPortals, type SharedPortalRow } from "./shared-portals";
+import { WhatsAppShareButton } from "@/components/app/whatsapp-share-button";
 import { now } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
 
@@ -220,6 +221,7 @@ export default async function PresentationsPage({
                     <TD align="right">
                       <span className="inline-flex items-center justify-end gap-1.5">
                         <CopyLinkButton url={url} />
+                        <WhatsAppShareButton kind="presentation" id={p.id} compact label="WhatsApp" />
                         {canDelete ? <DeletePresentationButton id={p.id} title={p.title} /> : null}
                       </span>
                     </TD>

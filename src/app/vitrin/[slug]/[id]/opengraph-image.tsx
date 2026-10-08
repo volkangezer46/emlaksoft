@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { OG_SIZE, renderVitrinOg } from "@/lib/vitrin-og";
 
 export const alt = "Emlak ilanı";
@@ -30,6 +31,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         .eq("status", "live")
         .is("deleted_at", null)
         .eq("is_sample", false)
+        .or(OPEN_LISTING_OR_FILTER)
         .maybeSingle()
     : { data: null };
 

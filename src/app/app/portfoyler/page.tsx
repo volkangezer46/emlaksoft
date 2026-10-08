@@ -74,6 +74,7 @@ import { formatDateTr } from "@/lib/format";
 import { searchGeoIds } from "@/lib/geo/reader";
 import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
 import { CustomFieldFilterBar } from "@/components/app/custom-field-filter-bar";
+import { isClosedListing } from "@/lib/closed-listing";
 
 export const metadata = { title: "Portföyler" };
 
@@ -540,6 +541,7 @@ export default async function PropertiesPage({
       createdLabel: formatDate(property.created_at),
       // Son 7 günde yayına giren portföy — published_at gerçek yayın damgası (vitrindeki rozetle aynı kural)
       isNew: property.published_at != null && msSince(property.published_at) < 7 * DAY_MS,
+      isClosed: isClosedListing(property.features),
       compareItem,
     };
   });
@@ -884,6 +886,9 @@ export default async function PropertiesPage({
                         )}
                         <span className="absolute left-3 top-3 flex max-w-[60%] items-center gap-1.5">
                           <span className="truncate rounded-full bg-surface/90 px-2.5 py-1 text-xs font-bold text-ink-950 shadow-[var(--shadow-xs)] backdrop-blur">{property.property_code}</span>
+                          {vm.isClosed ? (
+                            <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Kapalı</span>
+                          ) : null}
                           {vm.isNew ? (
                             <span className="shrink-0 rounded-full bg-mint-500 px-2 py-0.5 text-xs font-bold text-white shadow-[var(--shadow-xs)]">Yeni</span>
                           ) : null}

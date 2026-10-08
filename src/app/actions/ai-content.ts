@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { generateContent, translateListingText, type ContentKind } from "@/lib/ai/content";
 import { TRANSLATE_MAX_SOURCE_CHARS, isTranslateLang } from "@/lib/ai/translate-logic";
 import { logActivity } from "@/lib/activity";
+import { getSetting } from "@/lib/settings/read";
+import { AI_LISTING_TEXT_KEY } from "@/lib/settings/registry/tenant";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { SOCIAL_LINK_REQUIRED_MESSAGE, ensureSocialCompliance, pickListingLink, type SocialCompliance } from "@/lib/social-card/core";
 import { loadSocialCardData } from "@/lib/social-card/load";
@@ -14,6 +16,16 @@ import { actionErrorMessage } from "@/lib/action-errors";
 export type AiContentResult = { text?: string; source?: "ai" | "template"; error?: string };
 
 const KINDS: ContentKind[] = ["listing", "whatsapp", "social", "email"];
+const AI_LISTING_OFF_MESSAGE = "AI ilan metni ve çeviri bu ofiste kapalı. Ofis Merkezi > Tanımlar'dan (Ayarlar > Yapay zekâ özellikleri) açabilirsiniz.";
+
+/** Ofis ayarı (varsayılan KAPALI). Okuma hatasında kapalı sayılır. */
+async function aiListingTextEnabled(tenantId: string): Promise<boolean> {
+  try {
+    return (await getSetting<boolean>(AI_LISTING_TEXT_KEY, { tenantId })) === true;
+  } catch {
+    return false;
+  }
+}
 
 export async function generatePropertyContent(propertyId: string, kind: ContentKind): Promise<AiContentResult> {
   const gate = await requirePermission("properties", "view");
@@ -53,6 +65,8 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
   const district = rel(property.district as { name?: string } | { name?: string }[] | null);
   const features = (property.features ?? {}) as { rooms?: string | null; sqm?: number | null };
 
+  // Ofis ayarı kapalıyken (varsayılan) yapay zekâ ÇAĞRILMAZ: yalnız şablon metni üretilir.
+  const aiOn = await aiListingTextEnabled(gate.tenantId);
   const { text, source } = await generateContent(kind, {
     title: property.title,
     transactionType: property.transaction_type,
@@ -67,7 +81,7 @@ export async function generatePropertyContent(propertyId: string, kind: ContentK
     agentName: agent?.full_name ?? null,
     agentPhone: agent?.phone ?? null,
     features,
-  }, { tenantId: gate.tenantId, actorId: gate.userId });
+  }, aiOn ? { tenantId: gate.tenantId, actorId: gate.userId } : undefined, aiOn);
 
   return { text: social ? ensureSocialCompliance(text, social) : text, source };
 }
@@ -98,6 +112,7 @@ export async function translatePropertyContent(propertyId: string, text: string,
     .maybeSingle();
   if (!property) return { error: "Portföy bulunamadı." };
 
+  if (!(await aiListingTextEnabled(gate.tenantId))) return { error: AI_LISTING_OFF_MESSAGE };
   const res = await translateListingText(source, lang, { tenantId: gate.tenantId, actorId: gate.userId });
   return res.ok ? { text: res.text } : { error: res.error };
 }

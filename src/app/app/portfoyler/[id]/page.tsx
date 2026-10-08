@@ -41,6 +41,8 @@ import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
 import { AiContentPanel } from "./ai-content-panel";
+import { ClosedListingCard } from "./closed-listing-card";
+import { isClosedListing } from "@/lib/closed-listing";
 import { SocialCardPanel } from "@/components/app/social-card-panel";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
@@ -385,6 +387,7 @@ export default async function PropertyDetailPage({
               </span>
               <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
               <SampleRecordBadge show={property.is_sample === true} />
+              {isClosedListing(property.features) ? <span className="rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-bold text-amber-300">Kapalı portföy</span> : null}
             </div>
             <h1 className="mt-3 font-display text-2xl font-extrabold text-white md:text-3xl">
               {property.title ?? property.property_code}
@@ -681,6 +684,8 @@ export default async function PropertyDetailPage({
           <Suspense fallback={null}>
             <PhotoQualityCard propertyId={property.id} />
           </Suspense>
+
+          <ClosedListingCard propertyId={property.id} initialClosed={isClosedListing(property.features)} canEdit={canEdit} />
 
           <AiContentPanel propertyId={property.id} canEdit={canEdit} />
 

@@ -4,12 +4,13 @@
  * çalışır; tek portal yalnız o portföyün aktif malik bağlantısına köprü verir, yeni bağlantı ÜRETMEZ.
  */
 
-export type PortalTab = "alici" | "malik" | "kiraci" | "belgeler";
+export type PortalTab = "alici" | "malik" | "kiraci" | "surec" | "belgeler";
 
 export const PORTAL_TAB_LABELS: Record<PortalTab, string> = {
   alici: "Arayışım",
   malik: "Mülküm",
   kiraci: "Kiram",
+  surec: "Tapu sürecim",
   belgeler: "Belgeler",
 };
 
@@ -34,17 +35,31 @@ export type PortalRental = {
   maintenance: { title: string; status: string; at: string }[];
 };
 
+/** Tapu süreci (salt-okunur): bu kişi alıcı ya da satıcı olduğu satış anlaşması. Not/sorumlu YOK (KVKK). */
+export type PortalDealProcess = {
+  dealId: string;
+  /** Kişinin anlaşmadaki rolü. */
+  role: "alici" | "satici";
+  label: string;
+  steps: { key: string; label: string; status: "done" | "current" | "upcoming"; doneAt: string | null; plannedAt: string | null }[];
+  doneCount: number;
+  total: number;
+  percent: number;
+  complete: boolean;
+};
+
 export type PortalDocuments = {
   pendingSign: { id: string; title: string; href: string }[];
   signed: { id: string; title: string; signedAt: string | null }[];
 };
 
 /** Veri olan roller sırayla; hiçbiri yoksa alıcı (boş durum orada anlatılır). */
-export function buildPortalTabs(counts: { buyer: number; owner: number; renter: number; documents: number }): PortalTab[] {
+export function buildPortalTabs(counts: { buyer: number; owner: number; renter: number; documents: number; process?: number }): PortalTab[] {
   const tabs: PortalTab[] = [];
   if (counts.buyer > 0) tabs.push("alici");
   if (counts.owner > 0) tabs.push("malik");
   if (counts.renter > 0) tabs.push("kiraci");
+  if ((counts.process ?? 0) > 0) tabs.push("surec");
   if (counts.documents > 0) tabs.push("belgeler");
   return tabs.length ? tabs : ["alici"];
 }

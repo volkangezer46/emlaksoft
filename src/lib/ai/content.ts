@@ -1,6 +1,7 @@
 import "server-only";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat, type OpenAiAudit } from "@/lib/ai/openai-client";
+import { canAutoCallAi } from "@/lib/ai/auto-call-gate";
 import { buildTranslateMessages, checkTranslation, type TranslateLang } from "@/lib/ai/translate-logic";
 
 const OPENAI_TIMEOUT_MS = 45_000;
@@ -222,6 +223,7 @@ export async function translateListingText(
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false, error: "AI çeviri için OpenAI anahtarı tanımlı değil." };
+  if (audit?.tenantId && !(await canAutoCallAi(audit.tenantId))) return { ok: false, error: "AI kotanız doldu; çeviri bu dönem yapılamıyor." };
   const { system, user } = buildTranslateMessages(text, lang);
   try {
     const { content } = await openAiChat({
@@ -250,8 +252,11 @@ export async function generateContent(
   kind: ContentKind,
   input: PropertyContentInput,
   audit?: OpenAiAudit,
+  useAi = true,
 ): Promise<{ text: string; source: "ai" | "template" }> {
-  const ai = await openAiContent(kind, input, audit);
+  // Ofis ayarı kapalı ya da AI kotası doluysa LLM çağrılmaz; şablon metni döner.
+  const quotaOpen = useAi && audit?.tenantId ? await canAutoCallAi(audit.tenantId) : useAi;
+  const ai = quotaOpen ? await openAiContent(kind, input, audit) : null;
   if (ai) return { text: ai, source: "ai" };
   return { text: templateContent(kind, input), source: "template" };
 }

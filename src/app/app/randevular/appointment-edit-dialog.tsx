@@ -8,6 +8,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { updateAppointment } from "@/app/actions/appointments";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
+import { VoiceNoteRecorder } from "@/components/app/voice-note-recorder";
 
 type TypeOption = { value: string; label: string };
 type Appointment = {
@@ -190,6 +191,7 @@ export function AppointmentEditDialog({
               Not
               <textarea name="notes" rows={3} defaultValue={appointment.notes ?? ""} placeholder="Not (opsiyonel)" className={`mt-1 ${fieldClass}`} />
             </label>
+            <div className="sm:col-span-2"><VoiceNoteRecorder kind="appointment" id={appointment.id} /></div>
           </>
         ),
       }}

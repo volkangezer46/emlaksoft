@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
@@ -107,6 +108,7 @@ export async function GET(req: NextRequest) {
       .eq("tenant_id", tenantId)
       .eq("status", "live")
       .is("deleted_at", null)
+      .or(OPEN_LISTING_OR_FILTER)
       .gte("published_at", since)
       .limit(200);
     if (!props?.length) continue;

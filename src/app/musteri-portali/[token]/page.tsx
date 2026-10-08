@@ -30,6 +30,7 @@ import {
   resolvePortalTab,
 } from "@/lib/customer-portal/portal-model";
 import { MatchFeedback } from "./match-feedback";
+import { DealProcessProgress } from "@/components/public/deal-process-progress";
 import { CompareBar, CompareToggle } from "@/components/public/compare-select";
 import {
   PortalContactBar,
@@ -106,7 +107,7 @@ export default async function CustomerPortalPage({
     );
   }
 
-  const { customer, tenant, demands, appointments, matches, tabs, owner, renter, documents, requestsEnabled } = data;
+  const { customer, tenant, demands, appointments, matches, tabs, owner, renter, documents, processes, requestsEnabled } = data;
   // TEK PORTAL: rolüne göre sekme (alıcı / malik / kiracı / belgeler); yalnız veri olan sekme görünür.
   const active = resolvePortalTab(sp?.sekme, tabs);
 
@@ -582,6 +583,17 @@ export default async function CustomerPortalPage({
                 </div>
               ))}
             </div>
+          </PortalSection>
+        ) : null}
+
+        {active === "surec" ? (
+          <PortalSection id="tapu-sureci" icon={FileSignature} title="Tapu sürecim">
+            <div className="space-y-3">
+              {processes.map((p) => (
+                <DealProcessProgress key={p.dealId} process={p} />
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-text-faint">Bu görünüm bilgilendirme amaçlıdır; ödeme veya belge işlemi yapılmaz. Sorularınız için danışmanınızla iletişime geçin.</p>
           </PortalSection>
         ) : null}
 

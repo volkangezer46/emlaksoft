@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { getBaseUrl } from "@/lib/base-url";
 import { filterSafeEntries, staticSitemapEntries, tenantInSitemap, chunkEntries, type SitemapEntry } from "./sitemap-rules";
 import { SEO_CACHE_TAG, getSeoSettings } from "./store";
@@ -105,6 +106,7 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
               .eq("status", "live")
               .eq("is_sample", false)
               .is("deleted_at", null)
+              .or(OPEN_LISTING_OR_FILTER)
               .order("updated_at", { ascending: false })
               .range(from, to) as unknown as PromiseLike<{ data: Row[] | null; error: unknown }>,
           HARD_CAP,

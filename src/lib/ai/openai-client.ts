@@ -223,6 +223,73 @@ async function openAiChatRequestCore(opts: OpenAiRequestOptions): Promise<OpenAi
   }
 }
 
+const OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions";
+const TRANSCRIBE_MODEL = "whisper-1";
+/** Ses yükleme üst sınırı (sunucu eylemi gövde sınırı 4 MB'ın altında). */
+export const OPENAI_MAX_AUDIO_BYTES = 3 * 1024 * 1024;
+
+/**
+ * Ses -> metin (TEK yer). Ses dosyası yalnız bu çağrı süresince bellekte tutulur, hiçbir yere YAZILMAZ. Ham ses maskelenemez;
+ * bu yüzden çağıran yalnız ofis izni açıkken çağırır. Çıkan METİN çağıran tarafından `openAiChat` ile (maskelenerek) özetlenir.
+ * Denetim kaydı (ai.openai_call) ve kredi ölçümü chat çağrılarıyla aynı defterlere yazılır; ham içerik YAZILMAZ.
+ */
+export async function openAiTranscribe(opts: {
+  apiKey: string;
+  purpose: string;
+  audio: Blob;
+  fileName: string;
+  timeoutMs: number;
+  maxResponseBytes: number;
+  audit?: OpenAiAudit | null;
+  signal?: AbortSignal;
+}): Promise<string | null> {
+  if (opts.audio.size > OPENAI_MAX_AUDIO_BYTES) throw new OpenAiRequestTooLargeError();
+  const form = new FormData();
+  form.append("file", opts.audio, opts.fileName);
+  form.append("model", TRANSCRIBE_MODEL);
+  form.append("language", "tr");
+  form.append("response_format", "json");
+  let outcome: "ok" | OpenAiErrorKind = "ok";
+  try {
+    const response = await fetchExternal(
+      OPENAI_TRANSCRIBE_URL,
+      { method: "POST", headers: { Authorization: `Bearer ${opts.apiKey}` }, body: form },
+      { timeoutMs: opts.timeoutMs, signal: opts.signal },
+    );
+    await requireExternalSuccess(response);
+    const json = await readExternalJson<{ text?: unknown }>(response, opts.maxResponseBytes);
+    return typeof json?.text === "string" && json.text.trim() ? json.text.trim() : null;
+  } catch (error) {
+    outcome = classifyOpenAiError(error);
+    throw error;
+  } finally {
+    if (opts.audit?.tenantId) {
+      await logActivity({
+        tenantId: opts.audit.tenantId,
+        actorId: opts.audit.actorId ?? null,
+        action: "ai.openai_call",
+        entityType: "ai",
+        newValue: { purpose: opts.purpose, model: TRANSCRIBE_MODEL, outcome, attempts: 1, audio_bytes: opts.audio.size },
+      });
+      if (outcome === "ok") {
+        try {
+          // Süre bilinmez: bayt/16000 ≈ saniye (düşük bit hızı) -> jeton eşdeğeri tahmini.
+          await chargeAiUsage({
+            tenantId: opts.audit.tenantId,
+            actorId: opts.audit.actorId ?? null,
+            feature: opts.purpose,
+            model: TRANSCRIBE_MODEL,
+            tokensIn: Math.max(100, Math.ceil(opts.audio.size / 16)),
+            tokensOut: 0,
+          });
+        } catch (e) {
+          console.error("openai-client transcribe meter", e instanceof Error ? e.message : "bilinmeyen hata");
+        }
+      }
+    }
+  }
+}
+
 export type OpenAiChatResult = {
   /** Geri çevrilmiş (orijinal değerlere dönmüş) ilk mesaj içeriği; yoksa null. */
   content: string | null;

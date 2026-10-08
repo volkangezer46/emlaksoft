@@ -9,6 +9,7 @@ import { normalizeCloseFlags } from "@/lib/leak-shield";
 import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
+import { closedListingBlock } from "@/lib/closed-listing-guard";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PortalResult = { error?: string; ok?: boolean };
@@ -30,6 +31,9 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
   if (portalUrl && !/^https?:\/\//i.test(portalUrl)) return { error: "Geçerli bir ilan bağlantısı girin." };
   const references = await validateTenantReferences(gate.tenantId, { propertyId });
   if (!references.ok) return { error: references.error };
+  // Kapalı portföy portal yayını kaydı açılamaz (tek kapı: closed-listing-guard).
+  const closedBlock = await closedListingBlock(admin, gate.tenantId, propertyId);
+  if (closedBlock) return { error: closedBlock };
 
   // İlan no DEĞİŞİMİ: eski satır kapanır ('superseded'), yenisi supersedes_id ile zincirlenir (yeni geçmiş tablosu yok).
   const supersedesId = String(formData.get("supersedes_id") ?? "").trim();

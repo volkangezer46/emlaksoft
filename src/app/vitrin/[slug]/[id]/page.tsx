@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Avatar } from "@/components/ui/avatar";
 import { notFound } from "next/navigation";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import {
   ArrowLeft,
   BedDouble,
@@ -155,6 +156,7 @@ export async function generateMetadata({
     .eq("status", "live")
     .is("deleted_at", null)
     .eq("is_sample", false)
+    .or(OPEN_LISTING_OR_FILTER)
     .maybeSingle();
   if (!property) return { title: "İlan bulunamadı" };
 
@@ -226,6 +228,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .eq("status", "live")
     .is("deleted_at", null)
     .eq("is_sample", false)
+    .or(OPEN_LISTING_OR_FILTER)
     .maybeSingle();
   if (!property) notFound();
 
@@ -256,6 +259,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     .eq("status", "live")
     .is("deleted_at", null)
     .eq("is_sample", false)
+    .or(OPEN_LISTING_OR_FILTER)
     .neq("id", property.id)
     .eq("transaction_type", property.transaction_type)
     .order("created_at", { ascending: false })
@@ -306,6 +310,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         .eq("status", "live")
         .is("deleted_at", null)
         .eq("is_sample", false)
+        .or(OPEN_LISTING_OR_FILTER)
         .eq("district_id", property.district_id)
         .eq("transaction_type", property.transaction_type)
         .neq("id", property.id)
