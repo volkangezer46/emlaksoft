@@ -13,6 +13,8 @@ import { CALL_MIN_QUIET_DAYS, CALL_PRIORITY_RULE_ID, evaluateCallPriority } from
 import { DEAL_MIN_IDLE_DAYS, DEAL_RISK_RULE_ID, evaluateDealRisk } from "@/lib/insights/rules/deal-risk";
 import { PRICE_ACTION_RULE_ID, PRICE_MIN_DAYS, evaluatePriceAction } from "@/lib/insights/rules/price-action";
 import { DEADLINE_RULE_ID, evaluateDeadlines } from "@/lib/insights/rules/deadline";
+import { AUTHORITY_EXPIRED_RULE_ID, evaluateAuthorityExpired } from "@/lib/insights/rules/authority-expired";
+import { loadExpiredAuthorities } from "@/lib/insights/authority-facts";
 import { ANOMALY_RULE_ID, evaluateAnomalies } from "@/lib/insights/rules/anomaly";
 import { LIFECYCLE_RULE_ID, evaluateLifecycle } from "@/lib/insights/rules/lifecycle";
 import { loadLifecycleFacts } from "@/lib/insights/lifecycle-facts";
@@ -124,6 +126,12 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     id: AUTHORITY_RENEWAL_RULE_ID,
     kind: "deadline",
     run: async (admin, tenantId, nowMs) => evaluateAuthorityRenewal(await loadAuthorityRenewals(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    // Süresi DOLMUŞ yetki (0-15 gün deadline@1, 16-30 gün authority_renewal@1; bu kural yalnız bitişi geçmişi kapsar).
+    id: AUTHORITY_EXPIRED_RULE_ID,
+    kind: "deadline",
+    run: async (admin, tenantId, nowMs) => evaluateAuthorityExpired(await loadExpiredAuthorities(admin, tenantId, nowMs), nowMs),
   },
   {
     id: UNSHOWN_MATCH_RULE_ID,

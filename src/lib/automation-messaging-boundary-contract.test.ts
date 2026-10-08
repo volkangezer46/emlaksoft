@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
 const engine = read("src/lib/automation-engine.ts");
+const iysGate = read("src/lib/iys/gate.ts");
 const actions = read("src/app/actions/automations.ts");
 const labels = read("src/app/app/otomasyonlar/labels.ts");
 const netgsm = read("src/lib/messaging/netgsm.ts");
@@ -16,11 +17,14 @@ describe("automation marketing messaging boundary", () => {
     expect(engine).not.toContain('from "@/lib/messaging/netgsm"');
     expect(engine).toContain("prepareTenantSmsSender(automation.tenant_id)");
     expect(engine).toContain("resolveConsentedMarketingPhone(");
-    expect(engine).toContain('.eq("tenant_id", tenantId)');
-    expect(engine).toContain('.eq("customer_id", payload.customerId)');
-    expect(engine).toContain('.eq("channel", channel)');
-    expect(engine).toContain('consent?.status !== "granted"');
-    expect(engine).toContain("consent.revoked_at !== null");
+    // Kanal bazlı izin kararı merkezi İYS kapısındadır (tenant + müşteri + kanal sorgusu, granted ve geri alınmamış kuralı).
+    expect(engine).toContain('from "@/lib/iys/gate"');
+    expect(engine).toContain('kind: "automation"');
+    expect(engine).toContain("gateIysRecipient(admin, { tenantId, kind: \"automation\", channel, customerId: payload.customerId })");
+    expect(iysGate).toContain('.eq("tenant_id", tenantId)');
+    expect(iysGate).toContain('.eq("channel", channel)');
+    expect(iysGate).toContain('row.status === "granted"');
+    expect(iysGate).toContain("row.revoked_at");
     expect(engine).toContain('.is("deleted_at", null)');
     expect(engine).toContain('.eq("blacklist", false)');
     expect(engine).not.toContain("if (payload.phone) return payload.phone");

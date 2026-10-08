@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTenant } from "@/lib/notify";
 import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
+import { gateIysRecipient } from "@/lib/iys/gate";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
 import { getDisabledModulesByTenant, isDisabledFor, loadTenantModuleState } from "@/lib/modules/state";
 import type { FeatureKey } from "@/lib/modules/registry";
@@ -215,20 +216,9 @@ async function resolveConsentedMarketingPhone(
   const phone = typeof customer?.phone === "string" ? customer.phone.trim() : "";
   if (customerError || !phone) return { ok: false, reason: "customer_or_phone_unavailable" };
 
-  const { data: consent, error: consentError } = await admin
-    .from("iys_consents")
-    .select("status, revoked_at")
-    .eq("tenant_id", tenantId)
-    .eq("customer_id", payload.customerId)
-    .eq("channel", channel)
-    .maybeSingle();
-  if (
-    consentError ||
-    consent?.status !== "granted" ||
-    consent.revoked_at !== null
-  ) {
-    return { ok: false, reason: "iys_consent_not_granted" };
-  }
+  // Merkezi İYS kapısı (src/lib/iys/gate.ts): kanal bazlı izin; yoksa/geri alınmışsa/okunamazsa gönderilmez.
+  const verdict = await gateIysRecipient(admin, { tenantId, kind: "automation", channel, customerId: payload.customerId });
+  if (!verdict.allowed) return { ok: false, reason: "iys_consent_not_granted" };
 
   return { ok: true, phone };
 }

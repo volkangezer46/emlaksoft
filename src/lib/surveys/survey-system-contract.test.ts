@@ -116,8 +116,10 @@ describe("eksik bildirimler bağlı (TEK YOL + tek seferlik anahtar)", () => {
 
   it("otomatik anket gönderimi İYS iznine, 30 gün kişi sınırına ve iyimser kilide bağlı", () => {
     const d = read("src/lib/surveys/dispatch.ts");
-    expect(d).toContain('.from("iys_consents")');
-    expect(d).toContain('c.status === "granted" && !c.revoked_at');
+    // İzin kararı merkezi İYS kapısından gelir (kanal bazlı; granted + geri alınmamış kuralı gate.ts'te).
+    expect(d).toContain('from "@/lib/iys/gate"');
+    expect(d).toContain('kind: "survey"');
+    expect(read("src/lib/iys/gate.ts")).toContain('row.status === "granted"');
     expect(d).toContain("CONTACT_COOLDOWN_DAYS");
     expect(d).toContain('.eq("send_attempts", t.send_attempts)');
     expect(d).not.toMatch(/createAdminClient\(|from "@\/lib\/supabase\/admin"/);

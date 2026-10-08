@@ -8,6 +8,7 @@ import {
   getPropertyStatusHistory,
   updatePropertyAuthorization,
 } from "@/app/actions/property-management";
+import Link from "@/components/ui/smart-link";
 import { publishPropertyToPortal } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
 import { DAY_MS, msSince, now } from "@/lib/clock";
@@ -222,7 +223,7 @@ export function PublishToPortalsPanel({
   propertyId: string;
   configuredPortals: PortalName[];
 }) {
-  const [results, setResults] = useState<Record<string, { ok?: boolean; error?: string }>>({});
+  const [results, setResults] = useState<Record<string, { ok?: boolean; error?: string; warning?: string }>>({});
   const [publishingAll, startAll] = useTransition();
   const [, startOne] = useTransition();
 
@@ -239,7 +240,7 @@ export function PublishToPortalsPanel({
       const settled = await Promise.allSettled(
         portalsToPublish.map((p) => publishPropertyToPortal(propertyId, p.name)),
       );
-      const next: Record<string, { ok?: boolean; error?: string }> = {};
+      const next: Record<string, { ok?: boolean; error?: string; warning?: string }> = {};
       portalsToPublish.forEach((p, i) => {
         const r = settled[i];
         next[p.name] = r.status === "fulfilled" ? r.value : { error: "Hata oluştu" };
@@ -251,6 +252,7 @@ export function PublishToPortalsPanel({
   if (configuredPortals.length === 0) return null;
 
   const successCount = Object.values(results).filter((r) => r.ok).length;
+  const authorityWarning = Object.values(results).find((r) => r.warning)?.warning;
 
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
@@ -279,6 +281,13 @@ export function PublishToPortalsPanel({
       {successCount > 0 && (
         <p className="mt-3 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600">
           ✓ {successCount} portale başarıyla gönderildi.
+        </p>
+      )}
+
+      {authorityWarning && (
+        <p role="status" className="mt-3 rounded-[var(--radius-control)] bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700">
+          {authorityWarning}{" "}
+          <Link href="/app/ilan-kontrol/yetki" className="underline">Yetki kuyruğu</Link>
         </p>
       )}
 

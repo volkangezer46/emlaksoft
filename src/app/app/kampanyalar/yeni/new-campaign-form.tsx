@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Plus, RefreshCw, Sparkles } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
@@ -10,6 +11,8 @@ import { useToast } from "@/components/app/toast-provider";
 import {
   createCampaign,
   listApprovedWhatsAppTemplates,
+  previewCampaignAudience,
+  type CampaignAudiencePreview,
   type CampaignResult,
 } from "@/app/actions/campaigns";
 import { CAMPAIGN_TEMPLATES } from "@/lib/campaign-templates";
@@ -55,6 +58,27 @@ export function NewCampaignForm({ userId, initial }: { userId: string; initial?:
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const charCount = message.length;
+  const [filter, setFilter] = useState<string>(
+    initial?.filter && FILTERS.some((f) => f.value === initial.filter) ? initial.filter : "all",
+  );
+  // İYS önizlemesi: izinli / izinsiz alıcı sayısı (merkezi kapı; src/lib/iys/gate.ts).
+  const [preview, setPreview] = useState<CampaignAudiencePreview | null>(null);
+  const [previewPending, startPreview] = useTransition();
+  const previewSeq = useRef(0);
+
+  function refreshPreview(nextChannel: string, nextFilter: string) {
+    const seq = ++previewSeq.current;
+    startPreview(async () => {
+      const result = await previewCampaignAudience(nextChannel, nextFilter);
+      if (seq === previewSeq.current) setPreview(result);
+    });
+  }
+
+  useEffect(() => {
+    refreshPreview(initial?.channel ?? "sms", filter);
+    // Yalnız ilk açılışta; sonraki değişimler olay işleyicilerinden tetiklenir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function loadApprovedTemplates(force = false) {
     if (templatesPending || (templatesLoaded && !force)) return;
@@ -122,6 +146,7 @@ export function NewCampaignForm({ userId, initial }: { userId: string; initial?:
               setChannel(nextChannel);
               setMessage("");
               setState(init);
+              refreshPreview(nextChannel, filter);
               if (nextChannel === "whatsapp") loadApprovedTemplates();
             }}
             className="appearance-none"
@@ -132,12 +157,44 @@ export function NewCampaignForm({ userId, initial }: { userId: string; initial?:
         </FormField>
 
         <FormField label="Hedef kitle" htmlFor="kamp-filter">
-          <FormSelect name="filter" defaultValue={initial?.filter && FILTERS.some((f) => f.value === initial.filter) ? initial.filter : "all"} className="appearance-none">
+          <FormSelect
+            name="filter"
+            value={filter}
+            onChange={(event) => {
+              setFilter(event.target.value);
+              refreshPreview(channel, event.target.value);
+            }}
+            className="appearance-none"
+          >
             {FILTERS.map((f) => (
               <option key={f.value} value={f.value}>{f.label}</option>
             ))}
           </FormSelect>
         </FormField>
+
+        <div className="sm:col-span-2" role="status" aria-live="polite" data-testid="iys-preview">
+          {previewPending && !preview ? (
+            <p className="text-xs text-text-faint">İYS izin durumu hesaplanıyor…</p>
+          ) : preview?.ok ? (
+            <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2.5 text-sm">
+              <p className="font-semibold text-ink-950">
+                <span className="text-mint-600">{preview.allowed} izinli</span>
+                {" · "}
+                <span className={preview.skipped > 0 ? "text-amber-600" : "text-text-muted"}>{preview.skipped} izinsiz (atlanacak)</span>
+                <span className="font-normal text-text-muted"> · toplam {preview.total}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                Yalnız seçilen kanalda İYS izni olan alıcılara teslim edilir; izinsizler atlanır ve kampanya raporunda sayılır.
+                {preview.detail ? ` ${preview.detail}.` : ""}{" "}
+                {preview.skipped > 0 ? (
+                  <Link href="/app/uyum" className="font-semibold text-accent-text hover:underline">İzinleri Uyum sayfasından yönet</Link>
+                ) : null}
+              </p>
+            </div>
+          ) : preview && !preview.ok ? (
+            <p className="text-xs text-amber-600">{preview.error}</p>
+          ) : null}
+        </div>
       </>
     ),
     icerik: (
@@ -301,6 +358,20 @@ export function NewCampaignForm({ userId, initial }: { userId: string; initial?:
         <SummaryGroup title="Kampanya özeti">
           <SummaryRow label="Kanal" value={isSms ? "SMS (Netgsm)" : "WhatsApp"} tab="kanal" field="channel" />
           <SummaryRow label="Hedef kitle" value={filterLabel} tab="kanal" field="filter" />
+          <SummaryRow
+            label="İYS izinli alıcı"
+            value={preview?.ok ? `${preview.allowed} / ${preview.total}` : previewPending ? "Hesaplanıyor…" : "-"}
+            muted={!preview?.ok}
+            tab="kanal"
+            field="filter"
+          />
+          <SummaryRow
+            label="İzinsiz (atlanacak)"
+            value={preview?.ok ? String(preview.skipped) : "-"}
+            muted={!preview?.ok || preview.skipped === 0}
+            tab="kanal"
+            field="filter"
+          />
           {isSms ? (
             <>
               <SummaryRow label="Karakter" value={`${charCount}/612`} muted={charCount === 0} tab="icerik" field="message" />

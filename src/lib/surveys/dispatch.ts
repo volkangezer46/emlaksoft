@@ -16,6 +16,7 @@ import {
   autoSendDecision,
   surveySmsText,
 } from "@/lib/surveys/logic";
+import { gateIysRecipients } from "@/lib/iys/gate";
 import { isMissingColumn } from "@/lib/surveys/server";
 import type { SurveySettings } from "@/lib/surveys/types";
 
@@ -87,23 +88,21 @@ export async function dispatchSurveyLinks(
 
   const customerIds = [...new Set(tasks.map((t) => String(t.customer_id)))];
   const sinceIso = new Date(nowMs - CONTACT_COOLDOWN_DAYS * 86_400_000).toISOString();
-  const [{ data: tenant }, { data: customers }, { data: consents }, { data: recent }] = await Promise.all([
+  const [{ data: tenant }, { data: customers }, [smsGate, waGate], { data: recent }] = await Promise.all([
     db.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
     db.from("customers").select("id, phone, is_sample, blacklist, deleted_at").eq("tenant_id", tenantId).in("id", customerIds),
-    db
-      .from("iys_consents")
-      .select("customer_id, channel, status, revoked_at")
-      .eq("tenant_id", tenantId)
-      .in("customer_id", customerIds)
-      .in("channel", ["sms", "whatsapp"]),
+    // Merkezi İYS kapısı (src/lib/iys/gate.ts): anket ticari ileti sayılır; kanal bazlı izin burada denetlenir.
+    Promise.all([
+      gateIysRecipients(db, { tenantId, kind: "survey", channel: "sms", customerIds }),
+      gateIysRecipients(db, { tenantId, kind: "survey", channel: "whatsapp", customerIds }),
+    ]),
     db.from("survey_tasks").select("customer_id").eq("tenant_id", tenantId).in("customer_id", customerIds).gte("sent_at", sinceIso),
   ]);
   const custById = new Map(((customers ?? []) as CustomerRow[]).map((c) => [String(c.id), c]));
-  const granted = new Set(
-    ((consents ?? []) as { customer_id: string; channel: string; status: string; revoked_at: string | null }[])
-      .filter((c) => c.status === "granted" && !c.revoked_at)
-      .map((c) => `${c.customer_id}:${c.channel}`),
-  );
+  const granted = new Set<string>([
+    ...smsGate.allowed.map((id) => `${id}:sms`),
+    ...waGate.allowed.map((id) => `${id}:whatsapp`),
+  ]);
   const recentlySent = new Set(((recent ?? []) as { customer_id: string | null }[]).map((r) => String(r.customer_id)));
   const office = String((tenant as { name?: string } | null)?.name ?? "");
 
