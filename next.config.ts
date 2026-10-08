@@ -44,6 +44,11 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/*": ["node_modules/sharp/**", "node_modules/@img/**"],
   },
+  // Rapor merkezi PDF yazı tipi (src/assets/fonts) çalışma anında fs ile okunur; izleme dosyayı kendiliğinden bulamaz.
+  outputFileTracingIncludes: {
+    "/api/app/rapor/[id]": ["./src/assets/fonts/**"],
+    "/api/admin/rapor/[id]": ["./src/assets/fonts/**"],
+  },
 
   images: {
     formats: ["image/avif", "image/webp"],
