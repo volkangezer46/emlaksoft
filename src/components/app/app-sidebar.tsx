@@ -3,19 +3,21 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, Lock, Menu, Pin, PinOff, X } from "lucide-react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { ChevronDown, Ellipsis, Lock, Menu, Pin, PinOff, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
-import { MOBILE_TAB_SECTIONS, moreSections, resolveActiveNav, visibleSections, type NavItem, type VisibleSection } from "@/lib/nav-config";
+import { itemSubTabs, MOBILE_TAB_SECTIONS, resolveActiveNav, sidebarModel, visibleSections, type NavItem, type SidebarGroup, type VisibleSection } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
-import { getHrefStore, MAX_RECENT_SHOWN, pushRecent, togglePin } from "@/lib/nav-memory";
+import { getHrefStore, navStateId } from "@/lib/nav-memory";
+import { findActiveNavigationHref } from "@/lib/navigation";
 import { getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { useClosedModules } from "@/components/app/closed-modules-context";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
+import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } from "@/components/ui/console/quick-access";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 const VitrinIcon = ICONS.portal;
@@ -27,6 +29,14 @@ function isLocked(href: string, lockedHrefs: readonly string[]) {
 function badgeFor(item: NavItem, badges: readonly NavBadge[]): NavBadge | null {
   return badges.find((b) => item.href === b.itemHref || item.tabs?.some((t) => t.href === b.itemHref)) ?? null;
 }
+
+/** Bir başlıktaki (görünen + katlanan) öğelerin toplam rozet sayısı: başlık kapalıyken bekleyen iş gözden kaçmaz. */
+function groupBadgeCount(items: readonly NavItem[], badges: readonly NavBadge[]) {
+  return items.reduce((n, i) => n + (badgeFor(i, badges)?.count ?? 0), 0);
+}
+
+/** Başlık varsayılanı: yalnız etkin sayfanın başlığı ve günlük "Bugün" başlığı açık; kullanıcının değiştirdikleri hatırlanır. */
+const DEFAULT_OPEN_GROUPS: readonly string[] = ["bugun"];
 
 export function AppSidebar({
   officeName,
@@ -61,11 +71,11 @@ export function AppSidebar({
   usage?: PlanUsageRow[];
   canUpgrade?: boolean;
   vitrinHref?: string | null;
-  /** `${tenantId}:${userId}` — sabitlenen/son kullanılan/kapalı bölüm tercihlerinin yerel anahtarı. */
+  /** `${tenantId}:${userId}` — sabitlenen/kullanım/kapalı bölüm tercihlerinin yerel anahtarı. */
   storageScope?: string;
   /** Etkin rol: sade görünümde rol çekirdek menüsünü belirler (yetkiyi değiştirmez). */
   role?: string | null;
-  /** Sade görünüm: yalnız rol çekirdeği, gerisi "Daha fazla" altında. Tercih çerezden SSR'da gelir. */
+  /** Sade görünüm: her başlıkta yalnız rol çekirdeği, gerisi başlık içinde "+N daha" ya da "Daha fazla" altında. */
   simple?: boolean;
 }) {
   const pathname = usePathname();
@@ -73,46 +83,33 @@ export function AppSidebar({
   const [open, setOpen] = useState(false);
 
   // Menü 9 iş başlığıdır (bkz. src/lib/nav-config.ts). Başlıkta izinli hiçbir sayfa yoksa gizlenir.
-  // Tam liste: etkin sayfa tespiti, sabitlenenler ve son kullanılanlar için (hiçbir sayfa kaybolmaz).
+  // Tam liste: etkin sayfa tespiti ve Hızlı erişim için (hiçbir sayfa kaybolmaz).
   // Ofisin kapattığı modüller menüden ve "Daha fazla" listesinden çıkar (veri silinmez).
   const closedModules = useClosedModules();
   const allSections = useMemo(() => visibleSections(accessibleModules, { closed: closedModules }), [accessibleModules, closedModules]);
-  // Sade görünümde ana liste yalnız çekirdek; çekirdek dışı "Daha fazla" altındadır.
-  const sections = useMemo(
-    () => (simple ? visibleSections(accessibleModules, { mode: "simple", role, closed: closedModules }) : allSections),
-    [simple, accessibleModules, role, allSections, closedModules],
-  );
-  const more = useMemo(
-    () => (simple ? moreSections(accessibleModules, { role, closed: closedModules }) : []),
+  const model = useMemo(
+    () => sidebarModel(accessibleModules, { simple, role, closed: closedModules }),
     [simple, accessibleModules, role, closedModules],
   );
   const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, allSections);
   const activeId = activeSection?.id ?? null;
-  const activeInMore = more.some((s) => s.items.some((i) => i.href === activeHref));
+  const activeInRest = model.rest.some((s) => s.items.some((i) => i.href === activeHref));
 
-  const pinStore = getHrefStore("pins", storageScope);
-  const recentStore = getHrefStore("recent", storageScope);
   const closedStore = getHrefStore("closed", storageScope);
-  const pins = useSyncExternalStore(pinStore.subscribe, pinStore.read, pinStore.getServerSnapshot);
-  const recents = useSyncExternalStore(recentStore.subscribe, recentStore.read, recentStore.getServerSnapshot);
-  const closed = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
+  // "closed" deposu menü DURUM kimliklerini tutar: t-<başlık> (varsayılandan ayrılan başlık), fold-<başlık> (açık "+N daha"),
+  // alt-<sayfa> (açık alt liste), daha-fazla-acik (açık "Daha fazla").
+  const stateIds = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
+  const toggleState = (id: string) => {
+    const cur = closedStore.read();
+    closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+  };
 
-  // Son kullanılanlar: yalnız sayfa yolu. Zaten başta ise yazılmaz (döngü yok).
-  useEffect(() => {
-    if (!activeHref) return;
-    const cur = recentStore.read();
-    if (cur[0] !== activeHref) recentStore.write(pushRecent(cur, activeHref));
-  }, [activeHref, recentStore]);
-
+  const quickItems = useMemo<QuickItem[]>(
+    () => allSections.flatMap((s) => s.items).map((i) => ({ href: i.href, label: i.label, icon: i.icon, description: i.description })),
+    [allSections],
+  );
   const itemByHref = useMemo(() => new Map(allSections.flatMap((s) => s.items).map((i) => [i.href, i])), [allSections]);
-  // Yetki süzgeci: bellekteki yol menüde (yetkili) yoksa görünmez.
-  const pinnedItems = pins.flatMap((h) => itemByHref.get(h) ?? []);
-  // Son kullanılanlar: tekil, sabitlenmiş/aktif olmayan, aktif başlığın zaten görünen öğeleri hariç; en çok 3 satır.
-  const activeSectionHrefs = new Set(sections.find((s) => s.id === activeId)?.items.map((i) => i.href) ?? []);
-  const recentItems = [...new Set(recents)]
-    .filter((h) => !pins.includes(h) && h !== activeHref && !activeSectionHrefs.has(h))
-    .flatMap((h) => itemByHref.get(h) ?? [])
-    .slice(0, MAX_RECENT_SHOWN);
+  const quick = useQuickAccess({ scope: storageScope, kind: "app", items: quickItems, activeHref });
 
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (section: VisibleSection) => {
@@ -121,68 +118,106 @@ export function AppSidebar({
   };
 
   const totalBadges = badges.reduce((n, b) => n + b.count, 0);
-
-  // "Daha fazla": varsayılan kapalı; kullanıcı açtıysa ya da etkin sayfa içindeyse açık ("closed" deposunda
-  // bu kimlik AÇIK anlamına gelir).
-  const moreOpen = activeInMore || closed.includes("daha-fazla-acik");
-  // "Son kullanılanlar" da varsayılan KAPALI; kimlik depoda varsa AÇIK (aynı desen).
-  const recentOpen = closed.includes("son-acik");
-  const toggleMore = () => {
-    const cur = closedStore.read();
-    closedStore.write(cur.includes("daha-fazla-acik") ? cur.filter((x) => x !== "daha-fazla-acik") : [...cur, "daha-fazla-acik"]);
-  };
-
-  const toggleSection = (id: string) => {
-    const cur = closedStore.read();
-    closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
-  };
+  const moreOpen = activeInRest || stateIds.includes("daha-fazla-acik");
 
   const renderItem = (item: NavItem, opts: { group: string; pinnable?: boolean }) => {
     const active = item.href === activeHref;
     const badge = badgeFor(item, badges);
-    const pinned = pins.includes(item.href);
+    const pinned = quick.pins.includes(item.href);
     const locked = isLocked(item.href, lockedHrefs);
+    // Alt liste (iç içe menü): yalnız ana başlık satırlarında; Hızlı erişim satırları kompakt kalır.
+    const sub = opts.group === "pin" || opts.group === "auto" ? null : itemSubTabs(item);
+    const subId = navStateId("alt", item.href);
+    const subOpen = Boolean(sub) && (active || stateIds.includes(subId));
+    const activeSubHref = sub && active ? findActiveNavigationHref(pathname, sub.map((t) => t.href), "/app") : null;
+    const hasChevron = Boolean(sub) && !active;
+    // Sağdaki küçük denetimler (alt liste oku, rozet, iğne) yan yana; ofsetler rem olarak hesaplanır.
+    const chevOffset = hasChevron ? 1.75 : 0;
+    const badgeRight = 0.5 + chevOffset;
+    const pinRight = (badge ? 2.25 : 0.25) + chevOffset;
+    const padRight = badge ? (hasChevron ? "pr-[5.5rem]" : "pr-16") : hasChevron ? "pr-16" : "pr-9";
+    const tip = [item.description ? `${item.label} — ${item.description}` : item.label, item.shortcut ? `(kısayol: ${item.shortcut})` : ""].filter(Boolean).join(" ");
     return (
-      <div key={`${opts.group}-${item.href}`} className="nav-item group relative">
-        <Link
-          href={item.href}
-          data-nav-link
-          data-nav-active={active ? "true" : undefined}
-          aria-current={active ? "page" : undefined}
-          title={item.description ? `${item.label} — ${item.description}` : item.label}
-          onClick={() => setOpen(false)}
-          className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 touch:min-h-11 ${
-            badge ? "pr-16" : "pr-9"
-          } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
-        >
-          <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
-        </Link>
-        {badge ? (
+      <div key={`${opts.group}-${item.href}`}>
+        <div className="nav-item group relative">
           <Link
-            href={badge.href}
+            href={item.href}
+            data-nav-link
+            data-nav-active={active && !activeSubHref ? "true" : undefined}
+            aria-current={active ? "page" : undefined}
+            title={tip}
             onClick={() => setOpen(false)}
-            aria-label={`${badge.count} ${badge.label}`}
-            title={`${badge.count} ${badge.label}`}
-            className={`nav-badge absolute right-2 top-1/2 -translate-y-1/2 ${badge.tone === "danger" ? "is-danger" : "is-warn"}`}
-          >
-            {badge.count > 99 ? "99+" : badge.count}
-          </Link>
-        ) : null}
-        {opts.pinnable || pinned ? (
-          <button
-            type="button"
-            aria-pressed={pinned}
-            aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
-            title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
-            onClick={() => pinStore.write(togglePin(pinStore.read(), item.href))}
-            className={`nav-pin focus-ring absolute top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white ${
-              badge ? "right-9" : "right-1"
+            className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 touch:min-h-11 ${padRight} ${
+              active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"
             }`}
           >
-            {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
-          </button>
+            <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
+          </Link>
+          {badge ? (
+            <Link
+              href={badge.href}
+              onClick={() => setOpen(false)}
+              aria-label={`${badge.count} ${badge.label}`}
+              title={`${badge.count} ${badge.label}`}
+              style={{ right: `${badgeRight}rem` }}
+              className={`nav-badge absolute top-1/2 -translate-y-1/2 ${badge.tone === "danger" ? "is-danger" : "is-warn"}`}
+            >
+              {badge.count > 99 ? "99+" : badge.count}
+            </Link>
+          ) : null}
+          {opts.pinnable || pinned ? (
+            <button
+              type="button"
+              aria-pressed={pinned}
+              aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
+              title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
+              onClick={() => quick.togglePin(item.href)}
+              style={{ right: `${pinRight}rem` }}
+              className="nav-pin focus-ring absolute top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
+            >
+              {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
+            </button>
+          ) : null}
+          {hasChevron ? (
+            <button
+              type="button"
+              aria-expanded={subOpen}
+              aria-controls={`sb-${subId}`}
+              aria-label={`${item.label} alt sayfaları`}
+              title={subOpen ? "Alt sayfaları gizle" : "Alt sayfaları göster"}
+              onClick={() => toggleState(subId)}
+              className="focus-ring absolute right-1 top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
+            >
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${subOpen ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          ) : null}
+        </div>
+        {sub && subOpen ? (
+          <ul id={`sb-${subId}`} aria-label={`${item.label} alt sayfaları`} className="ml-[1.375rem] space-y-0.5 border-l border-white/10 py-0.5 pl-2">
+            {sub.map((tab) => {
+              const tabActive = tab.href === activeSubHref;
+              return (
+                <li key={tab.href}>
+                  <Link
+                    href={tab.href}
+                    data-nav-link
+                    data-nav-active={tabActive ? "true" : undefined}
+                    aria-current={tabActive ? "page" : undefined}
+                    title={tab.description ? `${tab.label} — ${tab.description}` : tab.label}
+                    onClick={() => setOpen(false)}
+                    className={`focus-ring flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] px-2.5 text-[0.8125rem] transition-colors touch:min-h-11 ${
+                      tabActive ? "bg-white/10 font-semibold text-white" : "text-white/70 hover:bg-white/6 hover:text-white"
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{tab.label}</span>
+                    {isLocked(tab.href, lockedHrefs) ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         ) : null}
       </div>
     );
@@ -199,8 +234,8 @@ export function AppSidebar({
     const adv = visible.filter((i) => i.advanced);
     // "Yönetim" alt grubu: başlık içinde katlanır; etkin sayfa içindeyse ya da kullanıcı açtıysa açık
     // (depoda "yonetim-acik-<grup>" kimliği AÇIK anlamına gelir; varsayılan kapalı).
-    const adminKey = `yonetim-acik-${group}`;
-    const adminOpen = admin.some((i) => i.href === activeHref) || closed.includes(adminKey);
+    const adminKey = navStateId("yon", group);
+    const adminOpen = admin.some((i) => i.href === activeHref) || stateIds.includes(adminKey);
     return (
       <>
         {base.map((i) => renderItem(i, { group, pinnable: true }))}
@@ -212,10 +247,7 @@ export function AppSidebar({
           <div>
             <button
               type="button"
-              onClick={() => {
-                const cur = closedStore.read();
-                closedStore.write(cur.includes(adminKey) ? cur.filter((x) => x !== adminKey) : [...cur, adminKey]);
-              }}
+              onClick={() => toggleState(adminKey)}
               aria-expanded={adminOpen}
               aria-controls={`sb-${adminKey}`}
               className="focus-ring mt-1 flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 text-left text-xs font-semibold uppercase tracking-wide text-white/60 transition-colors hover:text-white"
@@ -235,18 +267,21 @@ export function AppSidebar({
     );
   };
 
-  const groupHeader = (id: string, title: string, opts?: { collapsible?: boolean; expanded?: boolean }) => (
+  const groupHeader = (id: string, title: string, opts?: { collapsible?: boolean; expanded?: boolean; badgeCount?: number }) => (
     <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-1.5 text-white/70">
       {opts?.collapsible ? (
         <button
           type="button"
-          onClick={() => toggleSection(id)}
+          onClick={() => toggleState(`t-${id}`)}
           aria-expanded={opts.expanded}
           aria-controls={`sb-${id}`}
           title={title}
           className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
         >
           <span className="min-w-0 truncate">{title}</span>
+          {!opts.expanded && opts.badgeCount ? (
+            <span className="nav-badge is-warn" aria-label={`${opts.badgeCount} bekleyen iş`}>{opts.badgeCount > 99 ? "99+" : opts.badgeCount}</span>
+          ) : null}
           <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />
           <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${opts.expanded ? "" : "-rotate-90"}`} aria-hidden />
           <span className="sr-only">{opts.expanded ? "bölümü daralt" : "bölümü aç"}</span>
@@ -260,52 +295,94 @@ export function AppSidebar({
     </div>
   );
 
+  const renderGroup = (group: SidebarGroup) => {
+    const { section, items, folded } = group;
+    const isActiveGroup = section.id === activeId;
+    // Etkin başlık hep açık; diğerleri varsayılana göre, kullanıcı değiştirdiyse tersine.
+    const expanded = isActiveGroup || DEFAULT_OPEN_GROUPS.includes(section.id) !== stateIds.includes(`t-${section.id}`);
+    const foldId = `fold-${section.id}`;
+    const foldOpen = folded.some((i) => i.href === activeHref) || stateIds.includes(foldId);
+    return (
+      <div key={section.id}>
+        {groupHeader(section.id, section.title, {
+          collapsible: !isActiveGroup,
+          expanded,
+          badgeCount: groupBadgeCount([...items, ...folded], badges),
+        })}
+        {expanded ? (
+          <div id={`sb-${section.id}`} className="space-y-0.5">
+            {renderItems(items, section.id)}
+            {folded.length > 0 ? (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => toggleState(foldId)}
+                  aria-expanded={foldOpen}
+                  aria-controls={`sb-${foldId}`}
+                  className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 text-left text-xs font-medium text-white/60 transition-colors hover:bg-white/6 hover:text-white"
+                >
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${foldOpen ? "" : "-rotate-90"}`} aria-hidden />
+                  <span className="min-w-0 truncate">{foldOpen ? "Daha az göster" : `+${folded.length} daha`}</span>
+                </button>
+                {foldOpen ? (
+                  <div id={`sb-${foldId}`} className="space-y-0.5">
+                    {renderItems(folded, `fold-${section.id}`)}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const railItems = (items: readonly NavItem[]) =>
+    items.map((i) => {
+      const sub = itemSubTabs(i);
+      const activeSub = sub && i.href === activeHref ? findActiveNavigationHref(pathname, sub.map((t) => t.href), "/app") : null;
+      return {
+        href: i.href,
+        label: i.label,
+        icon: i.icon,
+        active: i.href === activeHref,
+        badge: badgeFor(i, badges),
+        children: sub?.map((t) => ({ href: t.href, label: t.label, active: t.href === activeSub })),
+      };
+    });
+
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
       <div className="sb-head flex min-h-11 shrink-0 items-center gap-3 border-b border-white/8 px-4">
         <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">Ofis konsolu</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{role === "advisor" || role === "team_lead" ? "Danışman konsolu" : "Ofis konsolu"}</p>
         </div>
         <SidebarCollapseButton />
       </div>
 
+      <MenuSearchButton onActivate={() => setOpen(false)} />
+
       <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
         <div className="sb-expanded">
-          {pinnedItems.length > 0 ? (
-            <div>
-              {groupHeader("sabit", "Sabitlenenler")}
-              <div className="space-y-0.5">{pinnedItems.map((i) => renderItem(i, { group: "pin", pinnable: true }))}</div>
-            </div>
-          ) : null}
-          {recentItems.length > 0 ? (
-            <div>
-              {groupHeader("son-acik", "Son açılanlar", { collapsible: true, expanded: recentOpen })}
-              {recentOpen ? (
-                <div id="sb-son-acik" className="space-y-0.5">{recentItems.map((i) => renderItem(i, { group: "recent", pinnable: true }))}</div>
-              ) : null}
-            </div>
-          ) : null}
-          {sections.map((section) => {
-            const expanded = section.id === activeId || !closed.includes(section.id);
-            return (
-              <div key={section.id}>
-                {groupHeader(section.id, section.title, { collapsible: section.id !== activeId, expanded })}
-                {expanded ? (
-                  <div id={`sb-${section.id}`} className="space-y-0.5">
-                    {renderItems(section.items, section.id)}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-          {more.length > 0 ? (
+          <QuickAccessSection
+            pinned={quick.pinned}
+            auto={quick.auto}
+            hasUsage={quick.hasUsage}
+            onReset={quick.resetUsage}
+            renderRow={(q, kind) => {
+              const item = itemByHref.get(q.href);
+              return item ? renderItem(item, { group: kind, pinnable: true }) : null;
+            }}
+          />
+          {model.groups.map(renderGroup)}
+          {model.rest.length > 0 ? (
             <>
               <div className="sb-eyebrow sticky bottom-0 z-[1] bg-[var(--sb-bg-bottom)] px-3 pb-0.5 pt-1 text-white/70 shadow-[0_-8px_12px_-8px_rgba(0,0,0,.6)]">
                 <button
                   type="button"
-                  onClick={toggleMore}
+                  onClick={() => toggleState("daha-fazla-acik")}
                   aria-expanded={moreOpen}
                   aria-controls="sb-daha-fazla"
                   className="focus-ring flex min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
@@ -317,7 +394,7 @@ export function AppSidebar({
               </div>
               {moreOpen ? (
                 <div id="sb-daha-fazla" className="space-y-0.5">
-                  {more.map((section) => (
+                  {model.rest.map((section) => (
                     <div key={section.id}>
                       <p className="px-3 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-white/55">{section.title}</p>
                       {renderItems(section.items, `more-${section.id}`)}
@@ -329,25 +406,20 @@ export function AppSidebar({
           ) : null}
         </div>
 
-        {/* İkon modu (64px): başlık başına tek ikon; hover/odakta sağda alt menü + hızlı eylemler. */}
+        {/* İkon modu (64px): başlık başına tek ikon; hover/odakta sağda alt menü (alt sayfalar dahil) + hızlı eylemler. */}
         <div className="sb-rail space-y-1 pt-3">
-          {sections.map((section) => {
+          {model.groups.map(({ section, items, folded }) => {
             const active = section.id === activeId;
-            const sectionBadge = section.items.reduce((n, i) => n + (badgeFor(i, badges)?.count ?? 0), 0);
+            const all = [...items, ...folded];
+            const sectionBadge = groupBadgeCount(all, badges);
             return (
               <NavFlyout
                 key={section.id}
                 enabled={variant === "desktop"}
                 title={section.title}
                 href={section.href}
-                items={section.items.map((i) => ({
-                  href: i.href,
-                  label: i.label,
-                  icon: i.icon,
-                  active: i.href === activeHref,
-                  badge: badgeFor(i, badges),
-                }))}
-                actions={actionsFor(section)}
+                items={railItems(all)}
+                actions={actionsFor({ ...section, items: all })}
               >
                 <Link
                   href={section.href}
@@ -365,6 +437,26 @@ export function AppSidebar({
               </NavFlyout>
             );
           })}
+          {model.rest.length > 0 ? (
+            <NavFlyout
+              enabled={variant === "desktop"}
+              title="Daha fazla"
+              items={railItems(model.rest.flatMap((s) => s.items))}
+            >
+              <Link
+                href={model.rest[0]!.href}
+                data-nav-link
+                data-nav-active={activeInRest ? "true" : undefined}
+                aria-current={activeInRest ? "true" : undefined}
+                aria-label="Daha fazla"
+                className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
+                  activeInRest ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
+                }`}
+              >
+                <Ellipsis className="h-[18px] w-[18px]" aria-hidden />
+              </Link>
+            </NavFlyout>
+          ) : null}
         </div>
       </NavScroller>
 
@@ -401,7 +493,8 @@ export function AppSidebar({
   // Mobil alt gezinme: 4 ana iş başlığı (Bugün, Müşteriler, Portföy, Anlaşmalar) + "Daha fazla" çekmecesi.
   // Tek kaynak nav-config `MOBILE_TAB_SECTIONS`; sekme başlığın ilk görünen sayfasına gider ve
   // izin/kapalı-modül süzgeci menüyle aynıdır (başlık görünmüyorsa sekme de çıkmaz).
-  // Hızlı kayıt ("Yeni") üst çubuktaki Yeni menüsünde ve komut paletinde kalır.
+  // Çekmece masaüstüyle AYNI içeriktir (Hızlı erişim en üstte). Hızlı kayıt ("Yeni") üst çubuktaki
+  // Yeni menüsünde ve komut paletinde kalır.
   const tabItems = MOBILE_TAB_SECTIONS.flatMap((t) => {
     const section = allSections.find((s) => s.id === t.id);
     return section ? [{ id: t.id, href: section.href, label: t.label, icon: section.icon }] : [];
@@ -434,7 +527,7 @@ export function AppSidebar({
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
           {tabItems.map((tab) => {
             // Etkin sekme = etkin iş başlığı (alt sayfalar dahil; nav-config ile aynı çözümleme).
-            const active = tab.id === activeId && !activeInMore;
+            const active = tab.id === activeId && !activeInRest;
             return (
               <Link
                 key={tab.id}

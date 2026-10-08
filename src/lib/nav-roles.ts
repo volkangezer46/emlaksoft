@@ -27,21 +27,23 @@ const MANAGER_CORE = [
   "/app/ekip",
 ] as const;
 
-/** Danışman: Komisyon öğesi Kazanç sekmesini de taşır; Performansım = kendi karnesi (Ekip Merkezi yerine); Destek = Yardım. */
+/**
+ * Danışman (ve takım lideri) konsolu: 9 satır, 5 iş başlığı. Gerekçe (2026-10 menü sadeleştirme): günlük döngü =
+ * Bugün (Ana ekran, Randevular, Görevler) -> Müşteriler (Müşteriler, Talepler, Gelen Kutusu) -> Portföy -> Anlaşmalar
+ * (Teklifler bu öğenin alt sekmesi) -> Performansım. Komisyon/Kazanç, İlan Kontrol, Değerleme ve Yardım "Daha fazla"
+ * altına indi; sık kullanılıyorsa otomatik "Hızlı erişim"e (kullanım sayacı) ya da sabitlemeye çıkar, ⌘K ve g-kısayolları
+ * (g k, g d) çalışmaya devam eder. Yalnız görünürlük: yetki matrisi ve sayfa yolları değişmez.
+ */
 const ADVISOR_CORE = [
   HOME,
-  "/app/performansim",
-  "/app/musteriler",
-  "/app/talepler",
-  "/app/portfoyler",
-  "/app/ilan-kontrol",
   "/app/randevular",
   "/app/gorevler",
-  "/app/anlasmalar",
-  "/app/komisyon",
+  "/app/musteriler",
+  "/app/talepler",
   "/app/gelen-kutusu",
-  "/app/degerleme",
-  "/app/yardim",
+  "/app/portfoyler",
+  "/app/anlasmalar",
+  "/app/performansim",
 ] as const;
 
 export const NAV_CORE_BY_ROLE: Readonly<Record<AppRole, readonly string[]>> = {

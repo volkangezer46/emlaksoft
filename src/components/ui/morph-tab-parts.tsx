@@ -1,7 +1,8 @@
 import Link from "@/components/ui/smart-link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { Check, Lock } from "lucide-react";
-import { formatBadgeCount, ringPercent, tabDensity, type MorphBadge, type MorphDensity } from "@/lib/morph-tabs";
+import { MorphNavMore } from "@/components/ui/morph-nav-more";
+import { formatBadgeCount, MAX_VISIBLE_TABS, ringPercent, splitNavTabs, tabDensity, type MorphBadge, type MorphDensity } from "@/lib/morph-tabs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -129,6 +130,7 @@ export function MorphNav({
   inactive = "auto",
   variant = "pill",
   className,
+  maxVisible = MAX_VISIBLE_TABS,
   children,
 }: {
   items: MorphNavItem[];
@@ -140,9 +142,12 @@ export function MorphNav({
   /** "pill": kapsül içinde segment (alt şerit); "underline": ikon kapsüllü + alt çizgili üst şerit. */
   variant?: "pill" | "underline";
   className?: string;
+  /** Bu sayıdan fazla sekmede taşanlar "Daha fazla" menüsüne iner (etkin sekme hep şeritte kalır). */
+  maxVisible?: number;
   /** Şeridin sonuna eklenen içerik (ör. sağda eylem). */
   children?: ReactNode;
 }) {
+  const { shown, more } = splitNavTabs(items, activeId, maxVisible);
   return (
     <nav aria-label={label} className={cn("mt-box", className)}>
       <ul
@@ -152,7 +157,7 @@ export function MorphNav({
           variant === "pill" ? "rounded-[var(--radius-card)] border border-line bg-canvas p-1" : "border-b border-line px-1 pt-1.5",
         )}
       >
-        {items.map((item) => {
+        {shown.map((item) => {
           const active = item.id === activeId;
           const density: MorphDensity = tabDensity({ active, orientation: "horizontal", inactive: item.icon ? "icon" : "label" });
           return (
@@ -180,6 +185,11 @@ export function MorphNav({
             </li>
           );
         })}
+        {more.length > 0 ? (
+          <li className="shrink-0">
+            <MorphNavMore items={more} label={label} />
+          </li>
+        ) : null}
         {children}
       </ul>
     </nav>

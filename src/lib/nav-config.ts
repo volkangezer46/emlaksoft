@@ -427,7 +427,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Değerleme",
         icon: ICONS.skor,
         module: "valuation",
-        tier: "core",
+        tier: "more",
         description: "Emsal tabanlı değerleme ve piyasa endeksi",
         keywords: ["ekspertiz", "emsal", "fiyat tahmini", "rayiç", "endeks", "parsel"],
         shortcut: "g d",
@@ -549,7 +549,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Yardım",
         icon: ICONS.destek,
         module: "support",
-        tier: "core",
+        tier: "more",
         tabs: [
           { href: "/app/yardim", label: "Yardım", icon: ICONS.destek, module: "support" },
           { href: "/app/destek", label: "Destek talepleri", icon: ICONS.destek, module: "support", description: "EmlakSoft ekibine açılan destek talepleri", keywords: ["ticket", "destek", "talep"] },
@@ -753,6 +753,44 @@ export function moreSections(
     );
     return { ...section, items, href: items[0]?.href ?? "/app" };
   }).filter((section) => section.items.length > 0);
+}
+
+/**
+ * Yan menüde öğenin altında açılan alt liste: ≥2 görünür sekmesi olan öğeler (ör. Müşteriler > Akıllı Listeler).
+ * Tek sekmeli öğede alt liste yoktur. Sekme yetkisi/kapalı modül süzgeci `visibleItem` ile zaten uygulanmıştır.
+ */
+export function itemSubTabs(item: Pick<NavItem, "tabs">): readonly NavTab[] | null {
+  return item.tabs && item.tabs.length > 1 ? item.tabs : null;
+}
+
+export type SidebarGroup = {
+  section: VisibleSection;
+  /** Her zaman görünen (rol çekirdeği) öğeler. */
+  items: NavItem[];
+  /** Grup içinde "+N daha" ile katlanan çekirdek dışı öğeler. */
+  folded: NavItem[];
+};
+export type SidebarModel = {
+  groups: SidebarGroup[];
+  /** Hiç çekirdek öğesi olmayan başlıklar: tek bir "Daha fazla" bölümünde toplanır. */
+  rest: VisibleSection[];
+};
+
+/**
+ * Yan menünün görünür yüzeyi (TEK hesap; masaüstü, çekmece ve testler aynı sonucu kullanır).
+ * Tam görünümde her başlık tüm öğeleriyle gelir. Sade görünümde (varsayılan) her başlıkta yalnız rolün çekirdek öğeleri
+ * görünür, kalanı başlık içinde katlanır; hiç çekirdek öğesi olmayan başlıklar `rest` ("Daha fazla") altına toplanır.
+ * Hiçbir yetkili sayfa kaybolmaz (yönetim-gizli sayfalar hariç, bkz. `isHiddenInSimple`).
+ */
+export function sidebarModel(accessible: readonly AppModule[], opts: NavViewOptions & { simple?: boolean } = {}): SidebarModel {
+  const { simple = false, role, closed } = opts;
+  if (!simple) return { groups: visibleSections(accessible, { closed }).map((section) => ({ section, items: section.items, folded: [] })), rest: [] };
+  const core = visibleSections(accessible, { mode: "simple", role, closed });
+  const more = moreSections(accessible, { role, closed });
+  return {
+    groups: core.map((section) => ({ section, items: section.items, folded: more.find((m) => m.id === section.id)?.items ?? [] })),
+    rest: more.filter((m) => !core.some((c) => c.id === m.id)),
+  };
 }
 
 /** Menü öğeleri, sekmeleri ve eski (yönlendirmeli) yollar: hiçbir sayfa kaybolmaz. */

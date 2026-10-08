@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ALL_NAV_HREFS, NAV_SECTIONS, moreSections, visibleSections } from "@/lib/nav-config";
+import { ALL_NAV_HREFS, NAV_SECTIONS, moreSections, sidebarModel, visibleSections } from "@/lib/nav-config";
 import { NAV_CORE_BY_ROLE } from "@/lib/nav-roles";
 import { DEFAULT_MATRIX, canAccessModule, type AppModule, type AppRole } from "@/lib/permissions";
 import { findGate } from "@/lib/billing/page-gates";
@@ -21,11 +21,19 @@ describe("İlan Kontrol kayıtları", () => {
     expect(ALL_NAV_HREFS.filter((h) => h === HREF)).toHaveLength(1);
   });
 
-  it("yönetim kademesi ve danışman çekirdek menüsünde görünür", () => {
-    for (const role of ["owner", "gm", "branch_manager", "team_lead", "advisor"] as const) {
+  it("yönetim kademesinin çekirdek menüsünde görünür; danışman konsolunda Portföy başlığı içinde katlı ulaşılır", () => {
+    for (const role of ["owner", "gm", "branch_manager"] as const) {
       expect(NAV_CORE_BY_ROLE[role], role).toContain(HREF);
       expect(canAccessModule(role, "portals"), role).toBe(true);
       expect(hrefs(visibleSections(accessibleOf(role), { mode: "simple", role })), role).toContain(HREF);
+    }
+    // Danışman/takım lideri çekirdeği 9 satırla sınırlıdır (menü sadeleştirme); İlan Kontrol Portföy başlığında katlıdır, kaybolmaz.
+    for (const role of ["team_lead", "advisor"] as const) {
+      expect(canAccessModule(role, "portals"), role).toBe(true);
+      expect(hrefs(visibleSections(accessibleOf(role), { mode: "simple", role })), role).not.toContain(HREF);
+      const m = sidebarModel(accessibleOf(role), { simple: true, role });
+      const portfoy = m.groups.find((g) => g.section.id === "portfoy");
+      expect(portfoy?.folded.map((i) => i.href), role).toContain(HREF);
     }
   });
 
