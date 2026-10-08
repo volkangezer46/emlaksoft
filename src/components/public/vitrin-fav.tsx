@@ -57,9 +57,9 @@ export function FavEmptyNotice({ slug, ids }: { slug: string; ids: string[] }) {
       <button
         type="button"
         onClick={() => setFavMode(false)}
-        className="focus-ring press mt-4 inline-block rounded-full border border-line px-4 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
+        className="focus-ring press mt-4 inline-block min-h-11 rounded-full border border-line px-4 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
       >
-        Tüm ilanları göster
+        {favorites.length === 0 ? "İlanlara göz at" : "Tüm ilanları göster"}
       </button>
     </div>
   );

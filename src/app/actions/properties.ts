@@ -1,7 +1,7 @@
 "use server";
 
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
@@ -78,6 +78,8 @@ const MANUAL_STATUSES = ["draft", "live", "reserved", "archived"];
 function revalidateVitrinPaths() {
   revalidatePath("/vitrin/[slug]", "page");
   revalidatePath("/vitrin/[slug]/[id]", "page");
+  // Liste verisi unstable_cache içinde ("vitrin" etiketi) — yol geçersizleştirmesine ek olarak etiket de düşer.
+  revalidateTag("vitrin", "max");
 }
 
 /** Boş ise null; pozitif tam sayıya çevrilebiliyorsa döndürür (kat/bina yaşı). */

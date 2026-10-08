@@ -50,6 +50,18 @@ export default function NotFound() {
           >
             <LayoutDashboard className="h-4 w-4 text-cyan-300" /> Panele dön
           </Link>
+          <Link
+            href="/fiyatlar"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-cyan-400/40 hover:bg-white/12"
+          >
+            Fiyatlar
+          </Link>
+          <Link
+            href="/giris"
+            className="inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-cyan-400/40 hover:bg-white/12"
+          >
+            Giriş yap
+          </Link>
         </div>
 
         {/* Popüler bağlantılar */}

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled } from "@/lib/vitrin-settings";
-import { toTelHref, toWhatsAppLink } from "@/lib/phone";
+import { formatPhoneDisplay, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import dynamicImport from "next/dynamic";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
 import { ShareButton } from "@/components/public/share-button";
@@ -501,7 +501,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
               </div>
             ) : (
               <div className="grid aspect-[16/10] place-items-center rounded-[var(--radius-panel)] border border-line bg-surface text-text-faint">
-                <Building2 className="h-12 w-12" />
+                <div className="text-center">
+                  <Building2 className="mx-auto h-12 w-12" aria-hidden="true" />
+                  <p className="mt-2 text-sm font-semibold">Fotoğraf yakında</p>
+                </div>
               </div>
             )}
 
@@ -613,19 +616,30 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
               ) : null}
             </section>
 
-            {mapEmbed ? (
-              <section className="mt-5 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface" aria-labelledby="konum-baslik">
-                <h2 id="konum-baslik" className="flex items-center gap-2 px-5 pt-5 font-display text-base font-extrabold text-ink-950">
-                  <MapPin className="h-4 w-4 text-brand-600" aria-hidden="true" /> Konum
-                </h2>
-                <MapEmbed src={mapEmbed} openHref={osmOpenHref as string} />
-                {mapsHref ? (
-                  <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="block px-5 pb-3 text-xs font-semibold text-brand-600 hover:underline">
-                    Google Haritalar&apos;da aç
-                  </a>
-                ) : null}
-              </section>
-            ) : null}
+            <section className="mt-5 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface" aria-labelledby="konum-baslik">
+              <h2 id="konum-baslik" className="flex items-center gap-2 px-5 pt-5 font-display text-base font-extrabold text-ink-950">
+                <MapPin className="h-4 w-4 text-brand-600" aria-hidden="true" /> Konum
+              </h2>
+              {mapEmbed ? (
+                // Tek "Haritayı aç" bağlantısı (MapEmbed içinde); Google varsa o, yoksa OSM.
+                <MapEmbed src={mapEmbed} openHref={mapsHref ?? (osmOpenHref as string)} />
+              ) : (
+                <div className="px-5 pb-5">
+                  <div className="mt-3 grid h-40 place-items-center rounded-[var(--radius-card)] border border-dashed border-line bg-canvas px-4 text-center text-text-muted">
+                    <div>
+                      <MapPin className="mx-auto h-7 w-7 text-text-faint" aria-hidden="true" />
+                      <p className="mt-2 text-sm font-semibold text-ink-950">{loc || "Konum bilgisi yakında"}</p>
+                      <p className="text-xs">Bu ilan için harita konumu henüz eklenmedi.</p>
+                    </div>
+                  </div>
+                  {mapsHref ? (
+                    <a href={mapsHref} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs font-semibold text-brand-600 hover:underline">
+                      Haritada ara
+                    </a>
+                  ) : null}
+                </div>
+              )}
+            </section>
 
             {/* Alım maliyeti & kredi hesaplayıcısı — yalnız fiyatlı SATILIK ilanda
                 (kiralıkta peşinat/taksit kavramı yok). Tamamen client hesap:
@@ -715,9 +729,27 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 {leadOpen && tenant.lead_capture_token ? (
                   <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
                 ) : (
-                  <p className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
-                    Talep formu şu anda kapalı.
-                  </p>
+                  // Form yoksa müşteri çıkmaza girmesin: kapalı olduğunu söylemeden iletişim yolunu öne çıkar.
+                  <div className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-5 text-center">
+                    <p className="text-sm font-semibold text-white">Bu ilan için bizimle hemen iletişime geçin</p>
+                    {officeTel || officeWhatsApp ? (
+                      <p className="mt-1 text-xs text-white/55">Yukarıdaki düğmelerle arayabilir veya WhatsApp&apos;tan yazabilirsiniz.</p>
+                    ) : null}
+                    {officeTel && tenant.phone ? (
+                      <a
+                        href={officeTel}
+                        className="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 text-sm font-bold text-ink-950 transition hover:bg-white/90"
+                      >
+                        <Phone className="h-4 w-4" aria-hidden="true" /> {formatPhoneDisplay(tenant.phone)}
+                      </a>
+                    ) : null}
+                    <Link
+                      href={`/vitrin/${slug}`}
+                      className="mt-3 block text-xs font-semibold text-mint-300 underline-offset-2 hover:underline"
+                    >
+                      {tenant.name} vitrinine dön
+                    </Link>
+                  </div>
                 )}
               </div>
             </div>
@@ -770,7 +802,10 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                         />
                       ) : (
                         <div className="grid h-full w-full place-items-center text-text-faint">
-                          <Building2 className="h-10 w-10" />
+                          <div className="text-center">
+                            <Building2 className="mx-auto h-10 w-10" aria-hidden="true" />
+                            <p className="mt-1 text-xs font-semibold">Fotoğraf yakında</p>
+                          </div>
                         </div>
                       )}
                       <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
