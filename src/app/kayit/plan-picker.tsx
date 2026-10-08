@@ -65,9 +65,24 @@ export function PlanPicker(props: Props) {
   const selected = rows.find((r) => r.plan.id === selectedId);
   const yearlyPct = Math.max(0, ...sellable.map((p) => yearlyDiscountPercentOf(p)));
 
-  // Mobilde seçilen kart yatay şeritte ortalanır (ilk çizimde değil, kullanıcı seçince).
+  // Mobilde seçilen kart yatay şeritte ortalanır. İlk görünüşte (adım gizliyken genişlik 0) şerit görünür olunca
+  // yalnız yatay kaydırılır (sayfa dikey kaymaz); sonra kullanıcı seçtikçe yumuşak ortalanır.
   const stripRef = useRef<HTMLDivElement>(null);
   const first = useRef(true);
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (strip.clientWidth === 0 || strip.scrollWidth <= strip.clientWidth) return;
+      const el = strip.querySelector<HTMLElement>('[aria-checked="true"]');
+      const card = el?.closest<HTMLElement>(".snap-center") ?? el;
+      if (card) strip.scrollLeft = card.offsetLeft - (strip.clientWidth - card.offsetWidth) / 2;
+      ro.disconnect();
+    });
+    ro.observe(strip);
+    return () => ro.disconnect();
+    // Yalnız ilk görünüş için; sonraki seçimler aşağıdaki efektte.
+  }, []);
   useEffect(() => {
     if (first.current) {
       first.current = false;

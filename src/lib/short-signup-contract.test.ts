@@ -31,8 +31,9 @@ describe("kısa kayıt (2 adım) sözleşmesi", () => {
 
   it("paket seçici: LazyMotion m.*, reduced-motion, sahte rakam yok (tutar motordan)", () => {
     const picker = read("src/app/kayit/plan-picker.tsx");
-    expect(picker).toContain("MotionProvider");
-    expect(picker).toContain('from "motion/react-m"');
+    // Hareket katmanı kuralı: motion yalnız src/components/ui/motion altında (RiseIn/GrowBar = LazyMotion m.*).
+    expect(picker).toContain('from "@/components/ui/motion/grow"');
+    expect(read("src/components/ui/motion/grow.tsx")).toContain("MotionProvider");
     expect(picker).toContain("useReducedMotion");
     expect(picker).toContain("registrationQuote(");
     expect(picker).toContain("AnimatedNumber");
