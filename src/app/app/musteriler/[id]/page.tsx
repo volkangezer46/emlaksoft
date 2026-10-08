@@ -47,6 +47,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 import { CustomerIntelCard } from "./customer-intel-card";
+import { VoiceNoteRecorder } from "@/components/app/voice-note-recorder";
 import { OwnedPropertiesCard } from "./owned-properties-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
 import { provinceOptionsResult } from "@/lib/geo/reader";
@@ -745,6 +746,7 @@ export default async function CustomerDetailPage({
           )}
           {sellerPrediction ? <SellerPotentialCard prediction={sellerPrediction} /> : null}
           <OwnedPropertiesCard customerId={customer.id} tenantId={tenantId} />
+          <VoiceNoteRecorder kind="customer" id={customer.id} />
           <CustomerIntelCard
             customerId={customer.id}
             tenantId={tenantId}
