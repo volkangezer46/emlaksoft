@@ -128,6 +128,7 @@ const ACCOUNT_ACTION_TITLES: Record<string, string> = {
   "iys.upsert": "İYS izni güncellendi",
   "export.csv": "Veri dışa aktarıldı (CSV)",
   "export.csv.full": "Tam veri dışa aktarıldı (CSV)",
+  "export.report": "Rapor indirildi (Rapor merkezi)",
   "sample_data.seed": "Örnek veri yüklendi",
   "sample_data.clear": "Örnek veri temizlendi",
   "valuation.create": "Değerleme oluşturuldu",
