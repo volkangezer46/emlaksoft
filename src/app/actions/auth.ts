@@ -372,6 +372,15 @@ export async function signUp(
   if (!isValidEmail(email)) {
     return { error: EMAIL_ERROR_MESSAGE, field: "email" };
   }
+  // E-posta (normalize) başına ve global saatlik tavan: IP rotasyonlu toplu kayıt/posta bombalamayı keser.
+  const emailLimit = await checkRateLimit(`signup:email:${email}`, { limit: 3, windowSec: 3600, failurePolicy: "deny" });
+  if (!emailLimit.allowed) {
+    return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
+  }
+  const globalLimit = await checkRateLimit("signup:global", { limit: 300, windowSec: 3600, failurePolicy: "deny" });
+  if (!globalLimit.allowed) {
+    return { error: "Kayıt şu anda yoğun. Lütfen biraz sonra tekrar deneyin." };
+  }
   // profiles.phone şu an DB'de yalnız TR cep (05XXXXXXXXX) kabul eder (profiles_phone_tr_format);
   // 2FA SMS'i de Netgsm (yalnız TR) ile gider. Yabancı numara için migration gerekir.
   let phone = "";

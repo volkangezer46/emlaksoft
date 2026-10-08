@@ -146,7 +146,7 @@ export type WizardOfficeProfile = {
 };
 
 /** FormData → doğrulanmış profil. Hiçbir alan zorunlu değildir; eksik alan null/boş kalır (kayıt akışını kesmez). */
-export function readWizardOfficeProfile(formData: FormData, ownerEmail: string): WizardOfficeProfile {
+export function readWizardOfficeProfile(formData: FormData, _ownerEmail: string): WizardOfficeProfile {
   const focus = parseFocusSegments(formData.getAll(FIELD.focus));
   return {
     provinceId: parseUuid(formData.get(FIELD.provinceId)),
@@ -155,7 +155,8 @@ export function readWizardOfficeProfile(formData: FormData, ownerEmail: string):
     brandColor: parseBrandColor(formData.get(FIELD.brandColor)),
     focus,
     workDistrictIds: parseWorkDistrictIds(formData.getAll(FIELD.workDistricts)),
-    inviteEmails: parseInviteEmails(formData.getAll(FIELD.inviteEmails), ownerEmail),
+    // Kimliksiz kayıt akışında davet GÖNDERİLMEZ (sunucu alanı yok sayar); uygulama içi davet ayrı akış.
+    inviteEmails: [],
     pack: packForFocus(focus),
     officePhoneRaw: String(formData.get(FIELD.officePhone) ?? "").trim() || null,
     addressLine: parseAddressLine(formData.get(FIELD.addressLine)),

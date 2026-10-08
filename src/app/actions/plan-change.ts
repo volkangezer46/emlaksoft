@@ -67,6 +67,8 @@ const DOWNGRADE_CODE_MESSAGES: Record<string, string> = {
   not_active: "Planlı düşürme yalnızca aktif ücretli abonelikte yapılır.",
   same_plan: "Zaten bu paketi kullanıyorsunuz.",
   not_downgrade: "Seçilen paket mevcut paketten daha ucuz değil.",
+  not_sold: "Bu paket çevrimiçi seçilemiyor.",
+  over_capacity: "Seçilen paketin sınırlarını aşan kullanımınız var; önce kullanımı azaltın.",
   nothing_scheduled: "Planlı bir paket değişikliği yok.",
 };
 
@@ -161,6 +163,21 @@ export async function startPlanUpgrade(formData: FormData): Promise<PlanUpgradeR
         ? `${error.message} Ofis ve fatura bilgilerini Ayarlar bölümünden tamamlayın.`
         : actionErrorMessage(error, "Ödeme sahibi bilgileri doğrulanamadı."),
     };
+  }
+
+  // İdempotens: aynı abonelik için açık (süresi dolmamış) plan_upgrade faturası varsa önce iptal edilir; böylece
+  // çift tıklama / yeniden deneme birden fazla ödenebilir fatura bırakmaz (yalnız en son fatura geçerli olur).
+  const { data: openInvoices } = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("tenant_id", gate.tenantId)
+    .eq("subscription_id", state.subscriptionId)
+    .eq("status", "draft")
+    .in("checkout_status", ["pending_checkout", "initialized"])
+    .eq("meta->>kind", "plan_upgrade")
+    .gt("checkout_expires_at", new Date(now()).toISOString());
+  for (const open of openInvoices ?? []) {
+    await markCheckoutInvoiceFailed({ invoiceId: open.id as string, tenantId: gate.tenantId });
   }
 
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;

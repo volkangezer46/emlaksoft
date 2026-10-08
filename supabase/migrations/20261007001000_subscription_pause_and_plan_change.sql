@@ -42,6 +42,9 @@ begin
   if to_regprocedure('public.current_tenant_id()') is null then
     raise exception '20261007001000: public.current_tenant_id() yok.';
   end if;
+  if to_regprocedure('public.plan_catalog_document()') is null then
+    raise exception '20261007001000: public.plan_catalog_document() yok; once 20260825000300 uygulanmali.';
+  end if;
   if to_regprocedure('public.plan_monthly_amount(text)') is null
      or to_regprocedure('public.plan_campaign_lock_amount(text)') is null then
     raise exception '20261007001000: plan_monthly_amount/plan_campaign_lock_amount yok; once 20260825000300 uygulanmali.';
@@ -119,6 +122,34 @@ as $$
     p_default
   );
 $$;
+
+-- Plan cevrimici satista mi? TS `PlanDef.hidden` ile ayni kural: katalog ayarinda plans.<plan>.hidden boolean ise o;
+-- yoksa varsayilan (yalniz 'business' sablonu gizli, plans.ts BUSINESS_PLAN_TEMPLATE). Gizli plana planli dusurme reddedilir.
+create or replace function public.billing_plan_is_hidden(p_plan text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_plan text := lower(btrim(coalesce(p_plan, '')));
+  v_doc jsonb;
+  v_val jsonb;
+begin
+  v_doc := public.plan_catalog_document();
+  if v_doc is not null then
+    v_val := v_doc -> 'plans' -> v_plan -> 'hidden';
+    if jsonb_typeof(v_val) = 'boolean' then
+      return (v_val #>> '{}')::boolean;
+    end if;
+  end if;
+  return v_plan = 'business';
+end;
+$$;
+
+revoke all privileges on function public.billing_plan_is_hidden(text) from public, anon, authenticated;
+grant execute on function public.billing_plan_is_hidden(text) to service_role;
 
 revoke all privileges on function public.billing_setting_on(text) from public, anon, authenticated;
 revoke all privileges on function public.billing_setting_int(text, integer, integer, integer) from public, anon, authenticated;
@@ -276,6 +307,9 @@ declare
   v_sub public.subscriptions%rowtype;
   v_cur_amount numeric;
   v_new_amount numeric;
+  v_lim record;
+  v_used bigint;
+  v_extra integer := 0;
 begin
   if v_uid is null or v_tenant is null then
     raise exception 'Oturum gerekli.' using errcode = '42501';
@@ -309,6 +343,46 @@ begin
   v_new_amount := public.plan_monthly_amount(v_plan);
   if v_new_amount is null or v_new_amount <= 0 or v_cur_amount is null or v_new_amount >= v_cur_amount then
     return jsonb_build_object('ok', false, 'code', 'not_downgrade');
+  end if;
+  -- Gizli (cevrimici satilmayan) plana planli gecis yok; TS evaluatePlanChange `to.hidden` ile ayni.
+  if public.billing_plan_is_hidden(v_plan) then
+    return jsonb_build_object('ok', false, 'code', 'not_sold');
+  end if;
+
+  -- Kapasite on-kontrolu (TS assertBillingPlanPreflight + koltuk karsiligi): hedef planin sinirlarini asan kullanim varsa reddet.
+  -- Son hakem yine donem sonundaki kapasite tetikleyicisidir; tablolar/sutunlar yoksa ilgili kontrol atlanir.
+  if to_regclass('public.plan_entitlements') is not null then
+    select pe.seat_limit, pe.customer_limit, pe.active_property_limit, pe.branch_limit
+      into v_lim
+      from public.plan_entitlements pe where pe.plan = v_plan;
+    if found then
+      if exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'subscriptions' and column_name = 'extra_seats') then
+        execute 'select coalesce(extra_seats, 0) from public.subscriptions where id = $1' into v_extra using v_sub.id;
+      end if;
+      select count(*) into v_used from public.profiles p where p.tenant_id = v_tenant and p.is_active;
+      if v_lim.seat_limit is not null and v_used > v_lim.seat_limit + coalesce(v_extra, 0) then
+        return jsonb_build_object('ok', false, 'code', 'over_capacity', 'metric', 'seats', 'usage', v_used, 'limit', v_lim.seat_limit + coalesce(v_extra, 0));
+      end if;
+      if v_lim.customer_limit is not null and to_regclass('public.customers') is not null then
+        execute 'select count(*) from public.customers where tenant_id = $1 and deleted_at is null' into v_used using v_tenant;
+        if v_used > v_lim.customer_limit then
+          return jsonb_build_object('ok', false, 'code', 'over_capacity', 'metric', 'customers', 'usage', v_used, 'limit', v_lim.customer_limit);
+        end if;
+      end if;
+      if v_lim.active_property_limit is not null and to_regclass('public.properties') is not null then
+        execute 'select count(*) from public.properties where tenant_id = $1 and deleted_at is null and status in (''draft'', ''live'', ''reserved'')' into v_used using v_tenant;
+        if v_used > v_lim.active_property_limit then
+          return jsonb_build_object('ok', false, 'code', 'over_capacity', 'metric', 'active_properties', 'usage', v_used, 'limit', v_lim.active_property_limit);
+        end if;
+      end if;
+      if v_lim.branch_limit is not null and to_regclass('public.branches') is not null then
+        execute 'select count(*) from public.branches where tenant_id = $1 and is_active = true' into v_used using v_tenant;
+        if v_used > v_lim.branch_limit then
+          return jsonb_build_object('ok', false, 'code', 'over_capacity', 'metric', 'branches', 'usage', v_used, 'limit', v_lim.branch_limit);
+        end if;
+      end if;
+    end if;
   end if;
 
   update public.subscriptions s

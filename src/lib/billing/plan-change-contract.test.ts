@@ -40,6 +40,17 @@ describe("plan-change action'ları", () => {
     }
   });
 
+  it("yükseltme idempotent: yeni fatura açılmadan önce aynı aboneliğin açık plan_upgrade faturaları iptal edilir", () => {
+    const cleanup = upgrade.indexOf('.eq("meta->>kind", "plan_upgrade")');
+    expect(cleanup).toBeGreaterThan(0);
+    expect(upgrade).toContain('.in("checkout_status", ["pending_checkout", "initialized"])');
+    expect(upgrade).toContain('.eq("subscription_id", state.subscriptionId)');
+    expect(upgrade).toContain('.gt("checkout_expires_at"');
+    const cancelAt = upgrade.indexOf("markCheckoutInvoiceFailed({ invoiceId: open.id");
+    expect(cancelAt).toBeGreaterThan(cleanup);
+    expect(upgrade.indexOf("createCheckoutInvoice({")).toBeGreaterThan(cancelAt);
+  });
+
   it("yükseltme: sıra = izin, rol, hız sınırı, bayrak, hazırlık, iyzico, hesap, kapasite, onay, fatura, ödeme; tutar istemciden alınmaz", () => {
     const order = [
       'requirePermission("billing", "edit")',
