@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSampleScope, sampleValues } from "@/lib/sample-scope";
-import { shiftMonthKey, trMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
+import { now } from "@/lib/clock";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { loadLeadResponses, type LeadResponsesResult } from "@/lib/response-time/load";
 import {
   computeAgentScores,
   computeStreak,
@@ -11,6 +13,14 @@ import {
   type AgentScore,
   type AgentStats,
 } from "@/lib/gamification";
+import {
+  currentLeaguePeriod,
+  leaguePeriod,
+  previousLeaguePeriod,
+  type LeaguePeriod,
+  type LeaguePeriodKind,
+} from "@/lib/league/periods";
+import { DEFAULT_LEAGUE_SETTINGS, resolveLeagueSettings, type LeagueSettings } from "@/lib/league/settings";
 
 /**
  * Lig verisi toplayıcı — SUNUCU tarafı.
@@ -25,58 +35,32 @@ import {
  *  - Sayfa: RLS'li kullanıcı istemcisi (tenant filtresi zaten RLS'te; yine de
  *    `tenantId` verilirse ek eq uygulanır — zararsız, admin istemciyle ortak kod).
  *  - Cron: service role admin istemcisi (RLS yok → `tenantId` ZORUNLU).
+ *
+ * P12 (kazanç gizliliği): bu dosya HİÇBİR tutar/ciro/komisyon kolonu seçmez; lig yalnız puan ve adet bilir.
  */
 
 /** Puan/rozet hesabına giren rollerin listesi — call_center/accounting ligde yarışmaz. */
 export const LEAGUE_ROLES = ["advisor", "team_lead", "branch_manager", "gm", "owner"] as const;
 
-/** Satır limiti — tek ofis/tek ay için fazlasıyla yeterli, kaçak sorguya karşı tavan. */
-const ROW_LIMIT = 5000;
-
-export type PeriodRange = {
-  /** YYYY-MM */
-  period: string;
-  /** Dönem başı (dahil) ISO */
-  startIso: string;
-  /** Dönem sonu (HARİÇ) ISO — bir sonraki ayın 1'i */
-  endIso: string;
-  /** Türkçe etiket, ör. "Temmuz 2026" */
-  label: string;
-};
+export type PeriodRange = LeaguePeriod;
 
 /**
- * "YYYY-MM" → kapalı-açık aralık [ay başı, sonraki ay başı).
- *
- * Sınırlar Türkiye takvimine göre (UTC+3, `clock.ts` ay yardımcıları): sunucu UTC çalışsa da
- * ayın ilk 3 saati (00:00-03:00 TRT) önceki aya yazılmaz. Sayfa ve snapshot cron'u AYNI
- * fonksiyonu kullandığı için ekrandaki dönem ile arşivlenen dönem ayrışmaz.
+ * "YYYY-MM" veya "YYYY-Www" → kapalı-açık aralık [başlangıç, sonraki dönem başı).
+ * Sınırlar Türkiye takvimine göre; sayfa ve snapshot cron'u AYNI fonksiyonu kullanır.
+ * Geçersiz anahtar içinde bulunulan aya düşer.
  */
 export function periodRange(period: string): PeriodRange {
-  const m = /^(\d{4})-(\d{2})$/.exec(period);
-  const year = m ? Number(m[1]) : NaN;
-  const month = m ? Number(m[2]) : NaN;
-  const valid = m !== null && month >= 1 && month <= 12;
-  const key = valid ? `${year}-${String(month).padStart(2, "0")}` : trMonthKey();
-  const next = shiftMonthKey(key, 1) as string;
-  const start = new Date(trMonthStartMsFromKey(key));
-  const end = new Date(trMonthStartMsFromKey(next));
-  return {
-    period: key,
-    startIso: start.toISOString(),
-    endIso: end.toISOString(),
-    // TR ay başı (UTC+3) = önceki günün 21:00'ı; etiket TR saat diliminde biçimlenir.
-    label: new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(start),
-  };
+  return leaguePeriod(period, now());
 }
 
 /** Verilen tarihten (varsayılan: şimdi) dönem anahtarı. */
-export function periodOf(date: Date): string {
-  return trMonthKey(date);
+export function periodOf(date: Date, kind: LeaguePeriodKind = "month"): string {
+  return currentLeaguePeriod(kind, date.getTime());
 }
 
-/** Bir önceki dönem anahtarı ("2026-01" → "2025-12"). */
+/** Bir önceki dönem anahtarı ("2026-01" → "2025-12", "2026-W01" → "2025-W52"). */
 export function previousPeriod(period: string): string {
-  return shiftMonthKey(periodRange(period).period, -1) as string;
+  return previousLeaguePeriod(period, now());
 }
 
 export type LeagueAgent = {
@@ -95,43 +79,192 @@ export type LeagueData = {
   statsById: Map<string, AgentStats>;
   /** Danışman bazlı kesintisiz gün serisi */
   streakById: Map<string, number>;
+  /** Dönemin ham aktivite satırları (meydan okuma / koçluk aynı kaynağı kullanır) */
+  activity: ActivityRow[];
+  /** Hesapta kullanılan ofis ayarı (kural puanları + tutar gösterimi) */
+  settings: LeagueSettings;
+  /** Örnek (demo) kayıtlar bu hesaba dahil mi */
+  includeSample: boolean;
 };
 
 type Row = Record<string, unknown>;
-
-/** `select` sonucundan güvenli dizi çıkarımı — hata durumunda boş dizi. */
-function rowsOf(res: { data: unknown; error: unknown } | null | undefined): Row[] {
-  if (!res || res.error || !Array.isArray(res.data)) return [];
-  return res.data as Row[];
-}
 
 function str(v: unknown): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
 }
 
 /**
+ * Ofis lig ayarı. Tablo yoksa / okunamazsa / satır yoksa varsayılan kurallar (lig asla ayar yüzünden çökmez).
+ */
+export async function loadLeagueSettings(client: SupabaseClient, tenantId: string): Promise<LeagueSettings> {
+  try {
+    const { data, error } = await client
+      .from("league_settings")
+      .select("rules, show_amounts")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (error || !data) return DEFAULT_LEAGUE_SETTINGS;
+    return resolveLeagueSettings(data as { rules?: unknown; show_amounts?: unknown });
+  } catch {
+    return DEFAULT_LEAGUE_SETTINGS;
+  }
+}
+
+/** Sayfalı okuma (PostgREST 1000 satır sınırı): hata = boş dizi (lig kısmi veriyle de açılır). */
+type Builder = {
+  eq: (c: string, v: unknown) => Builder;
+  in: (c: string, v: readonly unknown[]) => Builder;
+  is: (c: string, v: null) => Builder;
+  not: (c: string, op: string, v: unknown) => Builder;
+  neq: (c: string, v: unknown) => Builder;
+  gte: (c: string, v: unknown) => Builder;
+  lt: (c: string, v: unknown) => Builder;
+  order: (c: string, o: { ascending: boolean }) => Builder;
+  range: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+};
+
+async function paged(
+  client: SupabaseClient,
+  table: string,
+  columns: string,
+  apply: (q: Builder) => Builder,
+): Promise<Row[]> {
+  const res = await fetchAllRows<Row>((from, to) =>
+    apply(client.from(table).select(columns) as unknown as Builder)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  return res.error ? [] : res.data;
+}
+
+function sampleFlag(r: Row): boolean {
+  return r.is_sample === true;
+}
+
+/**
+ * Bir zaman aralığının tüm puan satırlarını toplar (lig + meydan okuma + koçluk TEK kaynak).
+ *
+ * PUAN KAYNAKLARI:
+ *  - deal_won           → deals: stage='won', updated_at aralıkta, assigned_to
+ *  - property_new       → properties: created_at aralıkta, silinmemiş, assigned_to
+ *  - listing_authorized → aynı portföy satırı, authorization_type='exclusive' (bonus)
+ *  - appointment_done   → appointments: status='completed', scheduled_at aralıkta, tür 'showing' DEĞİL
+ *  - showing_done       → appointments: status='completed', tür 'showing'
+ *  - task_done          → tasks: status='done', completed_at aralıkta
+ *  - customer_new       → customers: created_at aralıkta, silinmemiş, kara listede değil, created_by (yoksa assigned_to)
+ *  - offer_made         → offers: submitted_at aralıkta, taslak değil, created_by
+ *  - fast_response      → Aday Hızı ölçümü (response-time/load): yeni müşteriye SLA içinde ilk dönüş, assigned_to
+ *  - listing_confirmed  → portal_listings: status='live', last_confirmed_at aralıkta (ilan başına dönemde 1), portföy sahibi
+ *  - nps_promoter       → surveys + survey_tasks (9-10)
+ *  - leak_sla_response  → listing_closures: sla_warning_sent_at IS NULL
+ *
+ * Hile koruması: her satıra kaynak kayıt kimliği (`ref`) ve örnek bayrağı (`isSample`) taşınır;
+ * hesap katmanı aynı kaydı iki kez saymaz, örnek veriyi (ofis eşiği geçince) dışlar. Silinen / geri alınan
+ * kayıt zaten sorgu koşuluna uymadığı için puanı kendiliğinden düşer (puan her seferinde canlı kayıttan hesaplanır;
+ * yalnız kapanan ay `agent_score_snapshots`'a mühürlenir).
+ *
+ * `stage='won'` için `updated_at`: `deals` tablosunda "kazanıldığı an" kolonu yok; aşama değiştiğinde updated_at
+ * güncelleniyor (bilinçli kabul edilen yaklaşım).
+ */
+export async function loadLeagueActivity(
+  client: SupabaseClient,
+  opts: {
+    tenantId: string;
+    startIso: string;
+    endIso: string;
+    agentIds: ReadonlySet<string>;
+    sampleVals: boolean[];
+    nowMs: number;
+    /** Önceden okunmuş Aday Hızı ölçümü (verilmezse burada okunur) */
+    responses?: LeadResponsesResult;
+  },
+): Promise<ActivityRow[]> {
+  const { tenantId, startIso, endIso, sampleVals } = opts;
+  const rangeOf = (q: Builder, col: string) => q.gte(col, startIso).lt(col, endIso);
+
+  const [deals, props, appts, tasks, surveys, surveyTasks, closures, customers, offers, listings] = await Promise.all([
+    paged(client, "deals", "id, assigned_to, updated_at, is_sample", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won").not("assigned_to", "is", null), "updated_at")),
+    paged(client, "properties", "id, assigned_to, created_at, authorization_type, is_sample", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).not("assigned_to", "is", null), "created_at")),
+    paged(client, "appointments", "id, assigned_to, scheduled_at, appointment_type, is_sample", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed").not("assigned_to", "is", null), "scheduled_at")),
+    paged(client, "tasks", "id, assigned_to, completed_at, is_sample", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done").not("assigned_to", "is", null), "completed_at")),
+    paged(client, "surveys", "id, agent_id, answered_at", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).eq("status", "answered").gte("score", 9).not("agent_id", "is", null), "answered_at")),
+    // Anket modülü destekleyenleri (9-10): satıcı/ev sahibi/malik kitleleri. Alıcı/kiracı cevabı `surveys`'e zaten
+    // yansıtıldığı için burada SAYILMAZ (çift puan yok). Tablo yoksa hata = boş.
+    paged(client, "survey_tasks", "id, agent_id, completed_at", (q) =>
+      rangeOf(
+        q.eq("tenant_id", tenantId).eq("status", "completed").in("audience", ["seller", "landlord", "owner"]).gte("score", 9).not("agent_id", "is", null),
+        "completed_at",
+      )),
+    paged(client, "listing_closures", "id, created_by, created_at", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).is("sla_warning_sent_at", null).not("created_by", "is", null), "created_at")),
+    paged(client, "customers", "id, created_by, assigned_to, created_at, is_sample", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).eq("blacklist", false), "created_at")),
+    paged(client, "offers", "id, created_by, submitted_at, is_sample", (q) =>
+      rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).neq("status", "draft").not("created_by", "is", null), "submitted_at")),
+    paged(
+      client,
+      "portal_listings",
+      "id, last_confirmed_at, property:properties!portal_listings_property_id_fkey(assigned_to, is_sample)",
+      (q) => rangeOf(q.eq("tenant_id", tenantId).eq("status", "live"), "last_confirmed_at"),
+    ),
+  ]);
+
+  const activity: ActivityRow[] = [];
+  const push = (staffId: string | null, kind: ActivityRow["kind"], at: unknown, ref: unknown, isSample: boolean) => {
+    if (!staffId || !opts.agentIds.has(staffId)) return;
+    const when = str(at);
+    if (!when) return;
+    activity.push({ staffId, kind, at: when, ref: str(ref) ?? undefined, isSample });
+  };
+
+  for (const r of deals) push(str(r.assigned_to), "deal_won", r.updated_at, r.id, sampleFlag(r));
+  for (const r of props) {
+    push(str(r.assigned_to), "property_new", r.created_at, r.id, sampleFlag(r));
+    if (r.authorization_type === "exclusive") push(str(r.assigned_to), "listing_authorized", r.created_at, r.id, sampleFlag(r));
+  }
+  for (const r of appts) {
+    const kind = r.appointment_type === "showing" ? "showing_done" : "appointment_done";
+    push(str(r.assigned_to), kind, r.scheduled_at, r.id, sampleFlag(r));
+  }
+  for (const r of tasks) push(str(r.assigned_to), "task_done", r.completed_at, r.id, sampleFlag(r));
+  for (const r of surveys) push(str(r.agent_id), "nps_promoter", r.answered_at, `s:${String(r.id)}`, false);
+  for (const r of surveyTasks) push(str(r.agent_id), "nps_promoter", r.completed_at, `t:${String(r.id)}`, false);
+  for (const r of closures) push(str(r.created_by), "leak_sla_response", r.created_at, r.id, false);
+  for (const r of customers) push(str(r.created_by) ?? str(r.assigned_to), "customer_new", r.created_at, r.id, sampleFlag(r));
+  for (const r of offers) push(str(r.created_by), "offer_made", r.submitted_at, r.id, sampleFlag(r));
+  for (const r of listings) {
+    const p = Array.isArray(r.property) ? (r.property[0] as Row | undefined) : (r.property as Row | null | undefined);
+    if (!p) continue;
+    const isSample = p.is_sample === true;
+    if (isSample && !sampleVals.includes(true)) continue;
+    push(str(p.assigned_to), "listing_confirmed", r.last_confirmed_at, r.id, isSample);
+  }
+
+  // Hızlı ilk dönüş: Aday Hızı ile AYNI ölçüm (tek okuma yolu). Örnek müşteri bayrağı yukarıdaki müşteri satırından gelir.
+  const sampleByCustomer = new Map(customers.map((c) => [String(c.id), sampleFlag(c)]));
+  const responses = opts.responses ?? (await loadLeadResponses(client, { tenantId, startIso, endIso, nowMs: opts.nowMs }));
+  for (const lr of responses.rows) {
+    if (lr.status !== "hizli" || !lr.assignedTo || !lr.firstTouchAt) continue;
+    // Ölçümün tanımladığı müşteri yukarıdaki sayfalı okumada yoksa (örnek dışlandı) puan verilmez.
+    if (!sampleByCustomer.has(lr.customerId)) continue;
+    push(lr.assignedTo, "fast_response", lr.createdAt, lr.customerId, sampleByCustomer.get(lr.customerId) ?? false);
+  }
+
+  return activity;
+}
+
+/**
  * Bir dönemin tüm lig verisini tek seferde toplar.
- *
- * PUAN KAYNAKLARI (SCORE_RULES ile birebir):
- *  - deal_won          → deals: stage='won', updated_at aralıkta, assigned_to
- *  - property_new      → properties: created_at aralıkta, silinmemiş, assigned_to
- *  - appointment_done  → appointments: status='completed', scheduled_at aralıkta
- *  - task_done         → tasks: status='done', completed_at aralıkta
- *  - nps_promoter      → surveys: status='answered', score>=9, answered_at aralıkta + survey_tasks (satıcı/ev sahibi/
- *    malik kitlesi, completed, score>=9, completed_at aralıkta; alıcı/kiracı `surveys`'e yansıdığı için hariç)
- *  - leak_sla_response → listing_closures: created_at aralıkta ve
- *    `sla_warning_sent_at IS NULL`. Yorum: kayıp-kaçak kapanışı danışman
- *    tarafından kaydedilmiş ve proaktif SLA uyarısının (7 gün) HİÇ ateşlenmesi
- *    gerekmemiş — yani SLA penceresi içinde yanıt verilmiş demektir.
- *
- * `stage='won'` için `updated_at` kullanılıyor: `deals` tablosunda "kazanıldığı
- * an" kolonu yok; aşama değiştiğinde updated_at güncelleniyor. Bu, kazanıldıktan
- * sonra düzenlenen anlaşmanın dönemini kaydırabilir — bilinçli kabul edilen
- * yaklaşım (alternatifi yeni kolon + backfill migration'ı).
  */
 export async function loadLeagueData(
   client: SupabaseClient,
   opts: {
+    /** "YYYY-MM" veya "YYYY-Www" */
     period: string;
     /**
      * ZORUNLU. Admin (service role) istemcide RLS yok — tenant filtresi tek
@@ -144,80 +277,47 @@ export async function loadLeagueData(
     branchId?: string | null;
     /** Seri hesabı için "bugün" (YYYY-MM-DD) — saflık gereği dışarıdan gelir */
     todayIso: string;
+    /** Hızlı dönüş ölçümü için "şimdi"; verilmezse `clock.now()` */
+    nowMs?: number;
+    /** Önceden yüklenmiş ayar (verilmezse okunur) */
+    settings?: LeagueSettings;
   },
 ): Promise<LeagueData> {
-  const range = periodRange(opts.period);
-  const { startIso, endIso } = range;
+  const range = leaguePeriod(opts.period, opts.nowMs ?? now());
   const tenantId = opts.tenantId;
+  const nowMs = opts.nowMs ?? now();
 
-  // Seri penceresi: 400 gün geriye — "Maratoncu" (30 gün) için fazlasıyla
-  // yeterli, tek danışman için satır sayısı yönetilebilir kalır.
   // Demo kayıtlar yalnız ofiste gerçek kayıt eşiği altındayken lige girer (sample-scope).
-  const sampleVals = sampleValues((await getSampleScope(client, tenantId)).include);
+  const includeSample = (await getSampleScope(client, tenantId)).include;
+  const sampleVals = sampleValues(includeSample);
+  const settings = opts.settings ?? (await loadLeagueSettings(client, tenantId));
 
+  // Seri penceresi: 400 gün geriye — "Maratoncu" (30 gün) için fazlasıyla yeterli.
   const streakSince = new Date(Date.parse(`${opts.todayIso.slice(0, 10)}T00:00:00.000Z`) - 400 * 86_400_000).toISOString();
 
-  const [
-    profilesRes,
-    dealsRes,
-    propsRes,
-    apptRes,
-    tasksRes,
-    surveysRes,
-    closuresRes,
-    dealsAllRes,
-    propsAllRes,
-    networkRes,
-    streakDealsRes,
-    streakApptRes,
-    streakTasksRes,
-    streakPropsRes,
-    surveyTaskPromotersRes,
-  ] = await Promise.all([
-    client.from("profiles").select("id, full_name, role, branch_id")
-      .eq("tenant_id", tenantId).eq("is_active", true).limit(200),
-
-    // ── Dönem içi puan kaynakları ────────────────────────────────────────
-    client.from("deals").select("assigned_to, updated_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won")
-      .gte("updated_at", startIso).lt("updated_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
-      .gte("created_at", startIso).lt("created_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("appointments").select("assigned_to, scheduled_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed")
-      .gte("scheduled_at", startIso).lt("scheduled_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("tasks").select("assigned_to, completed_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done")
-      .gte("completed_at", startIso).lt("completed_at", endIso).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("surveys").select("agent_id, answered_at, score").eq("tenant_id", tenantId).eq("status", "answered")
-      .gte("score", 9).gte("answered_at", startIso).lt("answered_at", endIso).not("agent_id", "is", null).limit(ROW_LIMIT),
-    client.from("listing_closures").select("created_by, created_at").eq("tenant_id", tenantId).is("sla_warning_sent_at", null)
-      .gte("created_at", startIso).lt("created_at", endIso).not("created_by", "is", null).limit(ROW_LIMIT),
+  const [profiles, dealsAll, propsAll, networkAll, streakDeals, streakAppts, streakTasks, streakProps] = await Promise.all([
+    paged(client, "profiles", "id, full_name, role, branch_id", (q) => q.eq("tenant_id", tenantId).eq("is_active", true)),
 
     // ── Ömür boyu rozet sayaçları ────────────────────────────────────────
-    client.from("deals").select("assigned_to").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won")
-      .not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("properties").select("assigned_to").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
-      .not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("network_listings").select("created_by").eq("tenant_id", tenantId)
-      .not("created_by", "is", null).limit(ROW_LIMIT),
+    paged(client, "deals", "id, assigned_to", (q) =>
+      q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won").not("assigned_to", "is", null)),
+    paged(client, "properties", "id, assigned_to", (q) =>
+      q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).not("assigned_to", "is", null)),
+    paged(client, "network_listings", "id, created_by", (q) => q.eq("tenant_id", tenantId).not("created_by", "is", null)),
 
     // ── Seri (streak) pencereleri: yalnız tarih kolonları ────────────────
-    client.from("deals").select("assigned_to, updated_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won")
-      .gte("updated_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("appointments").select("assigned_to, scheduled_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed")
-      .gte("scheduled_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("tasks").select("assigned_to, completed_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done")
-      .gte("completed_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-    client.from("properties").select("assigned_to, created_at").eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null)
-      .gte("created_at", streakSince).not("assigned_to", "is", null).limit(ROW_LIMIT),
-
-    // Anket modülü destekleyenleri (9-10): satıcı/ev sahibi/malik kitleleri. Alıcı/kiracı cevabı `surveys`'e zaten
-    // yansıtıldığı için burada SAYILMAZ (çift puan yok). Tablo yoksa hata = boş (rowsOf).
-    client.from("survey_tasks").select("agent_id, completed_at").eq("tenant_id", tenantId).eq("status", "completed")
-      .in("audience", ["seller", "landlord", "owner"]).gte("score", 9)
-      .gte("completed_at", startIso).lt("completed_at", endIso).not("agent_id", "is", null).limit(ROW_LIMIT),
+    paged(client, "deals", "id, assigned_to, updated_at", (q) =>
+      q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won").gte("updated_at", streakSince).not("assigned_to", "is", null)),
+    paged(client, "appointments", "id, assigned_to, scheduled_at", (q) =>
+      q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed").gte("scheduled_at", streakSince).not("assigned_to", "is", null)),
+    paged(client, "tasks", "id, assigned_to, completed_at", (q) =>
+      q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done").gte("completed_at", streakSince).not("assigned_to", "is", null)),
+    paged(client, "properties", "id, assigned_to, created_at", (q) =>
+      q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).gte("created_at", streakSince).not("assigned_to", "is", null)),
   ]);
 
   // ── Yarışan danışman listesi ────────────────────────────────────────────
-  const agents: LeagueAgent[] = rowsOf(profilesRes)
+  const agents: LeagueAgent[] = profiles
     .filter((p) => LEAGUE_ROLES.includes(String(p.role) as (typeof LEAGUE_ROLES)[number]))
     .filter((p) => (opts.branchId ? str(p.branch_id) === opts.branchId : true))
     .map((p) => ({
@@ -228,24 +328,18 @@ export async function loadLeagueData(
     }));
   const agentIds = new Set(agents.map((a) => a.id));
 
-  // ── Aktivite satırları → saf hesap katmanının beklediği şekil ───────────
-  const activity: ActivityRow[] = [];
-  const push = (rows: Row[], staffKey: string, atKey: string, kind: ActivityRow["kind"]) => {
-    for (const r of rows) {
-      const staffId = str(r[staffKey]);
-      if (!staffId || !agentIds.has(staffId)) continue;
-      activity.push({ staffId, kind, at: String(r[atKey] ?? "") });
-    }
-  };
-  push(rowsOf(dealsRes), "assigned_to", "updated_at", "deal_won");
-  push(rowsOf(propsRes), "assigned_to", "created_at", "property_new");
-  push(rowsOf(apptRes), "assigned_to", "scheduled_at", "appointment_done");
-  push(rowsOf(tasksRes), "assigned_to", "completed_at", "task_done");
-  push(rowsOf(surveysRes), "agent_id", "answered_at", "nps_promoter");
-  push(rowsOf(surveyTaskPromotersRes), "agent_id", "completed_at", "nps_promoter");
-  push(rowsOf(closuresRes), "created_by", "created_at", "leak_sla_response");
+  const responses = await loadLeadResponses(client, { tenantId, startIso: range.startIso, endIso: range.endIso, nowMs });
+  const activity = await loadLeagueActivity(client, {
+    tenantId,
+    startIso: range.startIso,
+    endIso: range.endIso,
+    agentIds,
+    sampleVals,
+    nowMs,
+    responses,
+  });
 
-  const scores = computeAgentScores(activity);
+  const scores = computeAgentScores(activity, settings.ruleset, { includeSample });
   // Hiç aktivitesi olmayan danışman da tabloda 0 puanla görünmeli.
   const seen = new Set(scores.map((s) => s.staffId));
   const zeroFilled = [
@@ -267,10 +361,10 @@ export async function loadLeagueData(
       else daysById.set(staffId, [at]);
     }
   };
-  collectDays(rowsOf(streakDealsRes), "assigned_to", "updated_at");
-  collectDays(rowsOf(streakApptRes), "assigned_to", "scheduled_at");
-  collectDays(rowsOf(streakTasksRes), "assigned_to", "completed_at");
-  collectDays(rowsOf(streakPropsRes), "assigned_to", "created_at");
+  collectDays(streakDeals, "assigned_to", "updated_at");
+  collectDays(streakAppts, "assigned_to", "scheduled_at");
+  collectDays(streakTasks, "assigned_to", "completed_at");
+  collectDays(streakProps, "assigned_to", "created_at");
 
   const streakById = new Map<string, number>();
   for (const a of agents) {
@@ -287,9 +381,12 @@ export async function loadLeagueData(
     }
     return m;
   };
-  const dealsAll = countBy(rowsOf(dealsAllRes), "assigned_to");
-  const propsAll = countBy(rowsOf(propsAllRes), "assigned_to");
-  const networkAll = countBy(rowsOf(networkRes), "created_by");
+  const dealsAllBy = countBy(dealsAll, "assigned_to");
+  const propsAllBy = countBy(propsAll, "assigned_to");
+  const networkAllBy = countBy(networkAll, "created_by");
+
+  // Ortalama ilk yanıt süresi (çalışma dakikası): yalnız dönemde yanıtlanan yeni müşteriler; en az 3 ölçüm şart.
+  const responseMinutes = averageFirstResponse(responses, agentIds);
 
   // ── Rozet girdisi ───────────────────────────────────────────────────────
   const statsById = new Map<string, AgentStats>();
@@ -302,13 +399,15 @@ export async function loadLeagueData(
         appointmentCount: r.breakdown.appointment_done.count,
         taskCount: r.breakdown.task_done.count,
         npsPromoterCount: r.breakdown.nps_promoter.count,
-        dealCountAllTime: dealsAll.get(r.staffId) ?? 0,
-        propertyCountAllTime: propsAll.get(r.staffId) ?? 0,
-        networkShareCount: networkAll.get(r.staffId) ?? 0,
-        // İlk yanıt süresi ölçümü henüz tek bir kaynakta tutulmuyor
-        // (çağrı/mesaj/talep ayrı akışlar). Ölçemediğimiz için null
-        // bırakıyoruz — "Hız Ustası" rozeti sahte veriyle dağıtılmaz.
-        avgFirstResponseMin: null,
+        showingCount: r.breakdown.showing_done.count,
+        authorizedCount: r.breakdown.listing_authorized.count,
+        customerCount: r.breakdown.customer_new.count,
+        offerCount: r.breakdown.offer_made.count,
+        fastResponseCount: r.breakdown.fast_response.count,
+        dealCountAllTime: dealsAllBy.get(r.staffId) ?? 0,
+        propertyCountAllTime: propsAllBy.get(r.staffId) ?? 0,
+        networkShareCount: networkAllBy.get(r.staffId) ?? 0,
+        avgFirstResponseMin: responseMinutes.get(r.staffId) ?? null,
         streakDays: streakById.get(r.staffId) ?? 0,
         rank: r.rank,
         score: r.total,
@@ -316,5 +415,20 @@ export async function loadLeagueData(
     );
   }
 
-  return { range, agents, ranked, statsById, streakById };
+  return { range, agents, ranked, statsById, streakById, activity, settings, includeSample };
+}
+
+/** Danışman başına ortalama ilk yanıt süresi (dk); ölçüm sayısı 3'ten azsa o kişi için değer yok (sahte hız rozeti yok). */
+export function averageFirstResponse(res: LeadResponsesResult, agentIds: ReadonlySet<string>): Map<string, number> {
+  const out = new Map<string, number>();
+  const acc = new Map<string, { sum: number; n: number }>();
+  for (const r of res.rows) {
+    if (!r.responded || !r.assignedTo || !agentIds.has(r.assignedTo)) continue;
+    const a = acc.get(r.assignedTo) ?? { sum: 0, n: 0 };
+    a.sum += r.minutes;
+    a.n += 1;
+    acc.set(r.assignedTo, a);
+  }
+  for (const [id, a] of acc) if (a.n >= 3) out.set(id, a.sum / a.n);
+  return out;
 }

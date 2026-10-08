@@ -4,7 +4,8 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
 import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
 import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
-import { getDisabledModulesByTenant, tenantsDisabledFor } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, tenantsDisabledFor } from "@/lib/modules/state";
+import { runLeagueDailyForTenant } from "@/lib/league/daily";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
 
 
@@ -119,13 +120,30 @@ export async function GET(req: NextRequest) {
     console.error("gunluk-ozet ilan kontrol raporu", e);
   }
 
+  // Lig 2.0: biten meydan okumaları mühürle + yeni rozetleri ofise duyur (en iyi çaba; özet işini bozmaz).
+  let leagueFinished = 0;
+  let leagueBadges = 0;
+  try {
+    const leagueDisabled = await getDisabledModulesByTenant(admin);
+    for (const t of tenants) {
+      if (isPastDeadline(Date.now(), deadline)) break;
+      if (isDisabledFor(leagueDisabled, t.id, "team_perf")) continue;
+      const r = await runLeagueDailyForTenant(admin, t.id, Date.now());
+      leagueFinished += r.finishedChallenges;
+      leagueBadges += r.badgesWritten;
+      failed += r.failed;
+    }
+  } catch (e) {
+    console.error("gunluk-ozet lig", e);
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet`,
   });
   await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 

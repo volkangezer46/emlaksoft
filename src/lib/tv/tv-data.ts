@@ -140,6 +140,7 @@ export async function loadTvData(
     evAppts,
     evOffers,
     evProps,
+    evBadges,
     sampleRes,
   ] = await Promise.all([
     loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs, withTargets: true, withLeadSignals: true, sample }),
@@ -175,6 +176,8 @@ export async function loadTvData(
     tsq(supabase.from("appointments").select("id, updated_at")).eq("status", "completed").order("updated_at", { ascending: false }).limit(10),
     tsq(supabase.from("offers").select("id, created_at")).eq("status", "accepted").order("created_at", { ascending: false }).limit(10),
     tsq(supabase.from("properties").select("id, created_at")).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
+    // Lig 2.0: yeni kazanılan rozetler (yalnız olay zamanı; kişi/rozet adı TV olayına taşınmaz)
+    tq(supabase.from("agent_badges").select("id, earned_at")).order("earned_at", { ascending: false }).limit(10),
     // Örnek kayıt var mı (sütun yoksa hata → false; demo etiketi yalnız gerçekten varsa çıkar)
     tq(supabase.from("customers").select("id", { count: "exact", head: true })).eq("is_sample", true),
   ]);
@@ -243,6 +246,7 @@ export async function loadTvData(
     ...rows(evAppts).map((r) => ({ id: String(r.id), kind: "appointment" as const, at: r.updated_at as string })),
     ...rows(evOffers).map((r) => ({ id: String(r.id), kind: "deal" as const, at: r.created_at as string })),
     ...rows(evProps).map((r) => ({ id: String(r.id), kind: "property" as const, at: r.created_at as string })),
+    ...rows(evBadges).map((r) => ({ id: String(r.id), kind: "badge" as const, at: r.earned_at as string })),
   ]);
 
   const leads: TvLead[] = rows(evCustomers)

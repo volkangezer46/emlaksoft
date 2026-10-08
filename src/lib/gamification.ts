@@ -31,7 +31,14 @@ export type ScoreRuleKey =
   | "appointment_done"
   | "task_done"
   | "nps_promoter"
-  | "leak_sla_response";
+  | "leak_sla_response"
+  // Lig 2.0
+  | "customer_new"
+  | "showing_done"
+  | "offer_made"
+  | "listing_authorized"
+  | "fast_response"
+  | "listing_confirmed";
 
 /**
  * PUAN TABLOSU — ofis motivasyonunun tek doğruluk kaynağı.
@@ -63,6 +70,18 @@ export const SCORE_RULES: Readonly<Record<ScoreRuleKey, number>> = {
   nps_promoter: 30,
   /** Kayıp-kaçak kapanışına SLA penceresi içinde verilen yanıt */
   leak_sla_response: 15,
+  /** Yeni müşteri kaydı (silinmemiş) */
+  customer_new: 5,
+  /** Tamamlanmış yer gösterme randevusu (appointment_type='showing'); `appointment_done` gösterimi SAYMAZ */
+  showing_done: 15,
+  /** Müşteriye iletilmiş teklif (taslak sayılmaz) */
+  offer_made: 15,
+  /** Tek yetkili (authorization_type='exclusive') portföy alma — `property_new` puanının ÜSTÜNE bonus */
+  listing_authorized: 25,
+  /** Yeni müşteriye çalışma saati SLA'sı içinde ilk dönüş (Aday Hızı ile aynı ölçüm) */
+  fast_response: 8,
+  /** Yayındaki ilanın bu dönemde teyit edilmesi (ilan başına dönemde en çok 1) */
+  listing_confirmed: 3,
 };
 
 /** Kırılım sütunlarının Türkçe başlıkları (UI tek yerden okur). */
@@ -73,6 +92,28 @@ export const SCORE_RULE_LABELS: Readonly<Record<ScoreRuleKey, string>> = {
   task_done: "Görev",
   nps_promoter: "NPS 9-10",
   leak_sla_response: "SLA yanıtı",
+  customer_new: "Yeni müşteri",
+  showing_done: "Gösterim",
+  offer_made: "Teklif",
+  listing_authorized: "Yetkili portföy",
+  fast_response: "Hızlı dönüş",
+  listing_confirmed: "İlan teyidi",
+};
+
+/** Kuralın ne zaman puan getirdiği — ayar ekranı ve kural kartı tek yerden okur. */
+export const SCORE_RULE_HINTS: Readonly<Record<ScoreRuleKey, string>> = {
+  deal_won: "Kazanılan anlaşma",
+  property_new: "Yeni portföy kaydı",
+  appointment_done: "Tamamlanan randevu (gösterim hariç)",
+  task_done: "Tamamlanan görev",
+  nps_promoter: "Müşteriden 9-10 anket puanı",
+  leak_sla_response: "Kayıp-kaçak SLA içinde yanıt",
+  customer_new: "Yeni müşteri kaydı",
+  showing_done: "Tamamlanan yer gösterme",
+  offer_made: "İletilen teklif",
+  listing_authorized: "Tek yetkili portföy alma (bonus)",
+  fast_response: "Yeni müşteriye SLA içinde ilk dönüş",
+  listing_confirmed: "Yayındaki ilanı teyit etme",
 };
 
 /** Puan tablosu türü — cron/test farklı bir ruleset geçirebilsin diye ayrı. */
@@ -86,6 +127,12 @@ export const SCORE_RULE_KEYS: readonly ScoreRuleKey[] = [
   "task_done",
   "nps_promoter",
   "leak_sla_response",
+  "customer_new",
+  "showing_done",
+  "offer_made",
+  "listing_authorized",
+  "fast_response",
+  "listing_confirmed",
 ];
 
 // ============================================================
@@ -103,6 +150,13 @@ export type ActivityRow = {
   kind: ScoreRuleKey;
   /** ISO zaman damgası veya YYYY-MM-DD — seri hesabında gün olarak kullanılır */
   at: string;
+  /**
+   * Kaynak kaydın kimliği. Verilirse AYNI (kind, ref) ikinci kez SAYILMAZ (tekrar eden satır/çift sorgu puan şişirmez).
+   * Verilmezse tekilleştirme yapılmaz (eski çağıranlar).
+   */
+  ref?: string;
+  /** Örnek (demo) kayıt: `includeSample` açık değilse puana ve seriye girmez. */
+  isSample?: boolean;
 };
 
 export type ScoreBreakdown = Record<ScoreRuleKey, { count: number; points: number }>;
@@ -118,14 +172,9 @@ export type AgentScore = {
 };
 
 function emptyBreakdown(): ScoreBreakdown {
-  return {
-    deal_won: { count: 0, points: 0 },
-    property_new: { count: 0, points: 0 },
-    appointment_done: { count: 0, points: 0 },
-    task_done: { count: 0, points: 0 },
-    nps_promoter: { count: 0, points: 0 },
-    leak_sla_response: { count: 0, points: 0 },
-  };
+  const out = {} as ScoreBreakdown;
+  for (const k of SCORE_RULE_KEYS) out[k] = { count: 0, points: 0 };
+  return out;
 }
 
 /**
@@ -150,15 +199,26 @@ export function emptyAgentScore(staffId: string): AgentScore {
 export function computeAgentScores(
   rows: readonly ActivityRow[],
   ruleset: ScoreRuleset = SCORE_RULES,
+  opts: { includeSample?: boolean } = {},
 ): AgentScore[] {
   const byStaff = new Map<string, AgentScore>();
+  const seenRefs = new Set<string>();
 
   for (const row of rows ?? []) {
     if (!row || !row.staffId) continue;
+    // Hile koruması: örnek (demo) veri sayılmaz — yalnız ofis açıkça "örnek dahil" demişse.
+    if (row.isSample && !opts.includeSample) continue;
     const points = ruleset[row.kind];
     // Bilinmeyen kural anahtarı sessizce atlanır: ruleset daraltılmış
     // olabilir (ör. bir kalem geçici kapatıldı) ve bu bir hata değil.
-    if (typeof points !== "number") continue;
+    // 0 puan = ofis kuralı kapattı: kayıt adet olarak da sayılmaz.
+    if (typeof points !== "number" || points <= 0) continue;
+    // Aynı kaydın tekrarı (aynı kind+kişi+ref) tek sayılır.
+    if (row.ref) {
+      const dedupeKey = `${row.kind}|${row.staffId}|${row.ref}`;
+      if (seenRefs.has(dedupeKey)) continue;
+      seenRefs.add(dedupeKey);
+    }
 
     let agent = byStaff.get(row.staffId);
     if (!agent) {
@@ -267,6 +327,12 @@ export type AgentStats = {
   appointmentCount: number;
   taskCount: number;
   npsPromoterCount: number;
+  /** Lig 2.0 dönem sayaçları */
+  showingCount: number;
+  authorizedCount: number;
+  customerCount: number;
+  offerCount: number;
+  fastResponseCount: number;
   /** Ömür boyu (tüm zamanlar) sayılar */
   dealCountAllTime: number;
   propertyCountAllTime: number;
@@ -290,6 +356,11 @@ export function emptyAgentStats(over: Partial<AgentStats> = {}): AgentStats {
     appointmentCount: 0,
     taskCount: 0,
     npsPromoterCount: 0,
+    showingCount: 0,
+    authorizedCount: 0,
+    customerCount: 0,
+    offerCount: 0,
+    fastResponseCount: 0,
     dealCountAllTime: 0,
     propertyCountAllTime: 0,
     networkShareCount: 0,
@@ -321,7 +392,7 @@ export type BadgeDefinition = {
 };
 
 /**
- * ROZET KATALOĞU (12 rozet).
+ * ROZET KATALOĞU (15 rozet).
  *
  * Eşikler ofis ölçeğine göre seçildi: bir danışman ayda ~1-3 anlaşma, ~8-15
  * portföy, ~20-40 randevu üretir. Eşikler "çalışkanın ulaşabileceği ama
@@ -429,6 +500,33 @@ export const BADGES: readonly BadgeDefinition[] = [
     howTo: "Bir dönemde 20 randevu tamamla.",
     scope: "monthly",
     earned: (s) => s.appointmentCount >= 20,
+  },
+  {
+    code: "gosterim_10",
+    name: "Gösterim Ustası",
+    description: "Bu dönem 10 yer gösterme tamamladın.",
+    icon: "CalendarCheck2",
+    howTo: "Bir dönemde 10 yer gösterme randevusunu tamamla.",
+    scope: "monthly",
+    earned: (s) => s.showingCount >= 10,
+  },
+  {
+    code: "yetki_avcisi",
+    name: "Yetki Avcısı",
+    description: "Bu dönem 3 tek yetkili portföy aldın.",
+    icon: "Target",
+    howTo: "Bir dönemde 3 tek yetkili portföy al.",
+    scope: "monthly",
+    earned: (s) => s.authorizedCount >= 3,
+  },
+  {
+    code: "seri_5",
+    name: "Beş Gün Seri",
+    description: "5 gün üst üste aktivite.",
+    icon: "Flame",
+    howTo: "5 gün üst üste en az bir puanlı aktivite yap.",
+    scope: "lifetime",
+    earned: (s) => s.streakDays >= 5,
   },
   {
     code: "takim_oyuncusu",
