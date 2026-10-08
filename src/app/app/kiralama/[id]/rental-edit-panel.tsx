@@ -10,7 +10,7 @@ import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300";
 const triggerClass =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15";
+  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] surface-interactive border border-border-interactive bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-border-strong";
 
 type RentalLite = {
   id: string;

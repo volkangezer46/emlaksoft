@@ -351,7 +351,7 @@ export default async function GiderlerPage({
             </ChartFrame>
           ) : null}
           {hasTrend ? (
-            <ChartFrame title="Aylık gider trendi" subtitle="Son 6 ay · filtrelerden bağımsız" height={250}>
+            <ChartFrame title="Aylık gider trendi" subtitle="Son 6 ay · filtrelerden bağımsız" height={0}>
               {/* Etkileşimli çizgi trend — crosshair + aylık tutar tooltip'i */}
               <InteractiveChart
                 data={trendChart.map((t) => ({ label: t.ay, value: t.tutar }))}

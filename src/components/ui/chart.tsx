@@ -592,13 +592,16 @@ export function DonutSplit({
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="max-w-[40%] text-center">
-              <p className="numeric font-display text-xl font-extrabold tracking-[-0.02em] text-[color:var(--viz-tooltip-text)]">
-                {formatChartValue(focused ? focused.value : total, format)}
-              </p>
-              <p className="truncate text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
-                {focused ? `${focused.key} · ${share(focused.value)}` : centerLabel}
-              </p>
+            {/* Halka deliğine sığan kare: yazı boyutu deliğe göre ölçeklenir (dar kartta halkaya taşmaz). */}
+            <div className="grid aspect-square h-[46%] max-h-full place-items-center text-center [container-type:size]">
+              <div className="min-w-0 max-w-full">
+                <p className="numeric truncate font-display text-[clamp(0.8rem,17cqmin,1.25rem)] font-extrabold leading-tight tracking-[-0.02em] text-[color:var(--viz-tooltip-text)]">
+                  {formatChartValue(focused ? focused.value : total, format)}
+                </p>
+                <p className="truncate text-[clamp(0.55rem,9cqmin,0.75rem)] font-semibold uppercase tracking-[0.06em] text-text-faint">
+                  {focused ? `${focused.key} · ${share(focused.value)}` : centerLabel}
+                </p>
+              </div>
             </div>
           </div>
         </PlotBox>
