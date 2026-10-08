@@ -411,9 +411,7 @@ const KNOWN_TENANT_ONLY_WRITE: Record<string, Known> = {
   "supabase/migrations/20260724000039_property_dues.sql :: property_dues.property_dues_tenant_update": live(),
   "supabase/migrations/20260725000042_definitions.sql :: definitions.definitions_update": live(),
   "supabase/migrations/20260725000042_definitions.sql :: definitions.definitions_delete": live(),
-  "supabase/migrations/20260725000049_property_price_history.sql :: property_price_history.pph_tenant": live(
-    "Fiyat değişim izi herhangi bir üyece silinebilir/değiştirilebilir; bkz. GUVENLIK_DENETIMI_3 Ek.",
-  ),
+  "supabase/migrations/20260725000049_property_price_history.sql :: property_price_history.pph_tenant": fixer("20261007000800_properties_price_drop_db_guard"),
   "supabase/migrations/20260725000054_rls_tenant_helper_drift.sql :: tasks.tasks_tenant": dropped("20260802000300_identity_session_authorization_hardening"),
   "supabase/migrations/20260725000054_rls_tenant_helper_drift.sql :: property_media.property_media_tenant": dropped("20260802000420_customer_document_security_boundary"),
   "supabase/migrations/20260726000060_tenant_integrations.sql :: tenant_integrations.tenant_integrations_update": dropped("20260726000077_hardening"),
@@ -530,7 +528,7 @@ describe("statik SQL/RLS kalıp sözleşmesi (U13/P5)", { timeout: 60_000 }, () 
       duzeltici: count("duzeltici"),
       etkin: count("etkin"),
       trigger: count("trigger"),
-    }).toEqual({ toplam: 85, dusuruldu: 49, duzeltici: 6, etkin: 29, trigger: 1 });
+    }).toEqual({ toplam: 85, dusuruldu: 49, duzeltici: 7, etkin: 28, trigger: 1 });
   });
 
   it("(b) yeni SECURITY DEFINER fonksiyonu set search_path taşıyor", () => {

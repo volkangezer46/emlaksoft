@@ -15,6 +15,8 @@ import { CategoryBars } from "./category-bars";
 import { categoryChartMode } from "@/lib/expense-category-chart";
 import { ExpensesTable } from "./expenses-table";
 import { ExpenseCreateForm } from "./expense-create-form";
+import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
+import { SampleDataBadge } from "@/components/ui/sample-data-badge";
 import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-receipts";
 
 import { ListHero, ListPage } from "@/components/ui/list-page";
@@ -78,7 +80,7 @@ export default async function GiderlerPage({
   const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
 
   const supabase = await createClient();
-  const [expenses, catDefs, aggregateResult] = await Promise.all([
+  const [expenses, catDefs, aggregateResult, sample] = await Promise.all([
     // Tablo listesi — ?from=&to= sunucu tarafında uygulanır (expense_date aralığı).
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
@@ -86,13 +88,17 @@ export default async function GiderlerPage({
     listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined, propertyId: portfoyF ?? undefined }, adet),
     getDefinitionsOrDefault("expense_category"),
     supabase.rpc("tenant_expense_aggregates", { p_from: fromF, p_to: toF, p_as_of: now.toISOString() }),
+    loadSampleKpiScope(supabase, tenantId),
   ]);
   const aggregate = requireReportingData("tenant-expense-aggregates", aggregateResult) as unknown as {
     total: number;
     record_count: number;
     by_category: { category: string; total: number }[];
     monthly: { month_start: string; total: number }[];
+    sample_included?: boolean;
   };
+  // Örnek veri eşik kararını RPC verir (20261007000810, `sample_included`); migration yoksa yüklü örnek veri etiketlenir.
+  const sampleLabel = aggregateSampleLabel(sample.seeded, aggregate.sample_included);
   const canCreate = perms.expenses?.includes("create") ?? false;
   const canEdit = perms.expenses?.includes("edit") ?? false;
   const canDelete = perms.expenses?.includes("delete") ?? false;
@@ -196,6 +202,7 @@ export default async function GiderlerPage({
         eyebrow="Gider takibi"
         art="gider"
         title="Masraf & Giderler"
+        meta={<SampleDataBadge label={sampleLabel} />}
         description="Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
         actions={
           <>
