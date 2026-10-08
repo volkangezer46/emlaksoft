@@ -67,6 +67,11 @@ export type NavItem = {
   keywords?: readonly string[];
   /** İleri düzey / nadir kullanılan öğe: yan menüde bölüm ayracının altında listelenir. */
   advanced?: boolean;
+  /**
+   * Başlık içi alt grup: "yonetim" öğeleri yan menüde başlığın altında katlanır "Yönetim" bölümünde toplanır
+   * (çekirdek öğeler görünür kalır). Yalnız görünürlük; yol, yetki ve paket kapısı değişmez.
+   */
+  group?: "yonetim";
   /** `g` önekli gezinme kısayolu (ör. "g m"); tek kaynak, keyboard-shortcuts.tsx ve palet buradan okur. */
   shortcut?: string;
 };
@@ -87,7 +92,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "bugun",
     title: "Bugün",
     icon: ICONS.baslikBugun,
-    description: "Günün özeti, randevular, görevler ve bildirimler.",
+    description: "Günün özeti, randevular ve görevler.",
     items: [
       {
         href: "/app",
@@ -119,22 +124,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["yapılacak", "todo", "hatırlatma", "vade"],
         shortcut: "g g",
       },
-      {
-        href: "/app/bildirimler",
-        label: "Bildirimler",
-        icon: ICONS.bildirim,
-        module: "dashboard",
-        tier: "more",
-        description: "Tüm bildirimler ve ofis duyuruları",
-        keywords: ["duyuru", "zil", "uyarı", "haber"],
-      },
     ],
   },
   {
     id: "musteriler",
     title: "Müşteriler",
     icon: ICONS.baslikMusteri,
-    description: "Müşteri kartları, talepler, eşleşme ve toplu veri girişi.",
+    description: "Müşteri kartları, talepler, gelen mesajlar, çağrı kaydı ve toplu veri girişi.",
     items: [
       {
         // Akıllı Listeler ve Tavsiyeler Müşteriler öğesinin sekmesidir (yollar değişmez; modül kapalıysa sekme gizlenir).
@@ -145,12 +141,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         tabs: [
           { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
           { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers", description: "Kimi aramalıyım? Risk, sıcak ve sessiz müşteri grupları", keywords: ["segment", "churn", "sıcak"] },
+          { href: "/app/kayip-satis", label: "Riskli müşteriler", icon: ICONS.dusus, module: "customers", description: "Kaybedilme riski taşıyan müşteriler ve kayıp nedenleri", keywords: ["kayıp", "risk", "churn", "neden"] },
           { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", description: "Müşteri tavsiye bağlantıları ve referans zinciri", keywords: ["referans", "tavsiye"] },
           // Modül ayarı modülün içinde (yol sabit; aynı sayfa Ayarlar dizininden de açılır — tek form, iki giriş).
           { href: "/app/ayarlar/etiketler", label: "Ayarlar", icon: ICONS.musteri, module: "customers", description: "Müşteri etiketlerini yeniden adlandır, birleştir ya da kaldır", keywords: ["etiket", "ayar"] },
         ],
         tier: "core",
-        description: "Müşteri kartları, akıllı listeler ve tavsiyeler",
+        description: "Müşteri kartları, akıllı listeler, riskli müşteriler ve tavsiyeler",
         keywords: ["kişi", "alıcı", "malik", "mülk sahibi", "aday", "cari"],
         shortcut: "g m",
       },
@@ -164,6 +161,16 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         description: "Alıcı ve kiracı talepleri, portföy eşleşmesi",
         keywords: ["lead", "aday", "istek", "başvuru", "eşleştirme", "eşleşme"],
         shortcut: "g t",
+      },
+      // İkinci sekme "Çağrı kaydı" (eski /app/arama, yönlendirir): iki sekme de `calls` modülünde.
+      {
+        href: "/app/gelen-kutusu",
+        label: "Gelen Kutusu",
+        icon: ICONS.gelenKutusu,
+        module: "calls",
+        tier: "core",
+        description: "WhatsApp, SMS, form başvuruları ve çağrı kaydı",
+        keywords: ["whatsapp", "sms", "mesaj", "çağrı", "arama", "telefon", "başvuru", "inbox"],
       },
       // İçe aktarma bir EYLEM sayfasıdır: menü öğesi değil; Müşteriler/Portföyler başlığında "İçe aktar" düğmesi
       // ve komut paleti eylemi (HIDDEN_APP_PAGES gerekçesi).
@@ -199,6 +206,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "İlan Kontrol",
         icon: ICONS.ilanKontrol,
         module: "portals",
+        // Portal ilanları (teyit/yenileme/kapanış kaydı) İlan Kontrol'ün sekmesidir; aynı `portals` modülü, yol sabit.
+        tabs: [
+          { href: "/app/ilan-kontrol", label: "İlan Kontrol", icon: ICONS.ilanKontrol, module: "portals" },
+          { href: "/app/portallar", label: "Portal ilanları", icon: ICONS.portal, module: "portals", description: "Portal ilanlarının teyit, yenileme ve kapanış kaydı", keywords: ["sahibinden", "hepsiemlak", "emlakjet", "portal", "teyit"] },
+        ],
         tier: "core",
         description: "Portal yayın takibi, kayıp ve kaçak uyarıları, kapanış kayıpları",
         keywords: ["kayıp", "kaçak", "anomali", "sla", "yayın", "kaçan komisyon", "kapanış kaybı", "kalkan", "rakip"],
@@ -238,16 +250,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["open house", "ziyaretçi", "etkinlik", "qr"],
       },
       {
-        href: "/app/portallar",
-        label: "Portal ilanları",
-        icon: ICONS.portal,
-        module: "portals",
-        tier: "more",
-        advanced: true,
-        description: "Portal ilanlarının teyit, yenileme ve kapanış kaydı",
-        keywords: ["sahibinden", "hepsiemlak", "emlakjet", "portal", "teyit"],
-      },
-      {
         href: "/app/ag",
         label: "Ofis Ağı",
         icon: ICONS.ag,
@@ -263,32 +265,22 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "anlasmalar",
     title: "Satış",
     icon: ICONS.baslikAnlasma,
-    description: "Teklif, anlaşma hattı ve imzalı sözleşme.",
+    description: "Anlaşma hattı, teklifler ve imzalı sözleşme.",
     items: [
       {
-        // Kayıp nedenleri Anlaşmalar öğesinin sekmesidir; sekme kendi izniyle (müşteriler) gizlenir.
+        // Teklifler Anlaşmalar öğesinin sekmesidir (yol sabit); sekme kendi izniyle (teklifler) gizlenir.
         href: "/app/anlasmalar",
         label: "Anlaşmalar",
         icon: ICONS.anlasma,
         module: "commissions",
         tabs: [
           { href: "/app/anlasmalar", label: "Anlaşmalar", icon: ICONS.anlasma, module: "commissions" },
-          { href: "/app/kayip-satis", label: "Riskli müşteriler", icon: ICONS.dusus, module: "customers", description: "Kaybedilme riski taşıyan müşteriler ve kayıp nedenleri", keywords: ["kayıp", "risk", "churn", "neden"] },
+          { href: "/app/teklifler", label: "Teklifler", icon: ICONS.teklif, module: "offers", description: "Teklif turları, karşı teklif ve kabul", keywords: ["offer", "pazarlık", "karşı teklif"] },
         ],
-        needsItemModule: true,
         tier: "core",
-        description: "Satış hattı, aşamalar ve risk altındaki müşteriler",
+        description: "Satış hattı, aşamalar ve teklifler",
         keywords: ["deal", "satış hattı", "pipeline", "pano", "kanban", "aşama"],
         shortcut: "g a",
-      },
-      {
-        href: "/app/teklifler",
-        label: "Teklifler",
-        icon: ICONS.teklif,
-        module: "offers",
-        tier: "more",
-        description: "Teklif turları, karşı teklif ve kabul",
-        keywords: ["offer", "pazarlık", "karşı teklif"],
       },
       {
         href: "/app/sozlesmeler",
@@ -309,18 +301,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "iletisim",
     title: "Pazarlama",
     icon: ICONS.baslikIletisim,
-    description: "Gelen mesajlar, çağrı kaydı ve toplu kampanyalar.",
+    description: "İYS uyumlu toplu SMS ve WhatsApp kampanyaları.",
     items: [
-      // İkinci sekme "Çağrı kaydı" (eski /app/arama, yönlendirir): iki sekme de `calls` modülünde.
-      {
-        href: "/app/gelen-kutusu",
-        label: "Gelen Kutusu",
-        icon: ICONS.gelenKutusu,
-        module: "calls",
-        tier: "core",
-        description: "WhatsApp, SMS, form başvuruları ve çağrı kaydı",
-        keywords: ["whatsapp", "sms", "mesaj", "çağrı", "arama", "telefon", "başvuru", "inbox"],
-      },
       {
         href: "/app/kampanyalar",
         label: "Kampanyalar",
@@ -498,7 +480,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "ofis",
     title: "Ofis",
     icon: ICONS.baslikOfis,
-    description: "Ekip, ofis yönetimi, abonelik, yardım, uyum ve yapılandırma.",
+    description: "Ekip, abonelik, yardım ve katlanır Yönetim bölümü (ayarlar, uyum, denetim, otomasyon).",
     items: [
       {
         // Ekip Merkezi: tek kabuk, mevcut sayfalar sekme olarak yeniden kullanılır
@@ -526,6 +508,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Ofis Merkezi",
         icon: ICONS.ofisMerkezi,
         module: "office_center",
+        group: "yonetim",
         tier: "more",
         description: "Danışman yönetimi, havuzdan atama, ofis ayar ve tanımları",
         keywords: ["atama", "tanım", "yönetim merkezi"],
@@ -546,6 +529,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           // Sayfa her üyeye açıktır (devralması istenen kişi onayı burada verir; bildirim buraya götürür); sekme ayar yetkisiyle görünür.
           { href: "/app/ayarlar/sahiplik-devri", label: "Sahiplik devri", icon: ICONS.sahiplik, module: "settings", description: "Ofis sahipliğini ekipten birine iki adımda devret", keywords: ["sahip", "devir", "devret", "ofis sahibi"] },
         ],
+        group: "yonetim",
         tier: "more",
         description: "Ofis kimliği, roller, yetkilendirme, modüller ve entegrasyonlar",
         keywords: ["settings", "yapılandırma", "entegrasyon", "rol", "izin", "logo", "netgsm", "kurulum", "sihirbaz"],
@@ -583,6 +567,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/otomasyonlar", label: "Kurallar", icon: ICONS.otomasyon, module: "settings" },
           { href: "/app/ayarlar/is-akislari", label: "İş akışları", icon: ICONS.isAkisi, module: "settings", description: "Adım adım iş akışı senaryoları", keywords: ["workflow", "akış", "senaryo"] },
         ],
+        group: "yonetim",
         tier: "more",
         advanced: true,
         description: "Tetikleyicili kurallar ve iş akışları",
@@ -593,6 +578,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Uyum",
         icon: ICONS.uyum,
         module: "compliance",
+        group: "yonetim",
         tier: "more",
         advanced: true,
         description: "KVKK, İYS izinleri, yetki belgesi ve denetim dosyası",
@@ -603,6 +589,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Belge Merkezi",
         icon: ICONS.belge,
         module: "settings",
+        group: "yonetim",
         tier: "more",
         advanced: true,
         description: "Ofis belgeleri, evrak linkleri ve şablonlar",
@@ -618,6 +605,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/denetim", label: "Denetim kaydı", icon: ICONS.denetim, module: "settings" },
           { href: "/app/ofis-kontrol", label: "Ofis Kontrol", icon: ICONS.denetim, module: "team", description: "Danışman işlem akışı, uyarılar ve onay kuralları", keywords: ["kontrol", "uyarı", "kural"] },
         ],
+        group: "yonetim",
         tier: "more",
         advanced: true,
         description: "Kim ne zaman neyi değiştirdi; Ofis Kontrol Merkezi",
@@ -628,12 +616,28 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Davet et",
         icon: ICONS.davet,
         module: "settings",
+        group: "yonetim",
         tier: "more",
         advanced: true,
         description: "Meslektaş davet et, hesap kredisi kazan",
         keywords: ["referans", "davet", "ödül", "arkadaş", "büyüme"],
       },
     ],
+  },
+];
+
+/**
+ * Menüde olmayan ama komut paletinde ("Git") aranabilen sayfalar: Bildirimler üst çubuktaki zilden açılır
+ * (menü öğesi değil). Yetki = `module`; yol HIDDEN_APP_PAGES'te de gerekçeli durur.
+ */
+export const PALETTE_ONLY_PAGES: readonly (NavTab & { description: string })[] = [
+  {
+    href: "/app/bildirimler",
+    label: "Bildirimler",
+    icon: ICONS.bildirim,
+    module: "dashboard",
+    description: "Tüm bildirimler ve ofis duyuruları",
+    keywords: ["duyuru", "zil", "uyarı", "haber"],
   },
 ];
 
@@ -658,6 +662,7 @@ export const NAV_ALIASES: Readonly<Record<string, string>> = {
 export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
   "/app/arama-sonuclari": "Komut paletindeki 'Tüm sonuçları gör' hedefi; menü öğesi değil arama yüzeyi",
   "/app/askida": "Askıya alınmış/ödemesi geciken ofis bilgilendirme ekranı; kabuk yönlendirir",
+  "/app/bildirimler": "Üst çubuktaki zilden ('Tüm bildirimleri gör') açılır; komut paletinde aranabilir, menü öğesi değil",
   "/app/baslangic": "Kurulum sihirbazı bir EYLEM akışıdır: ana ekran kurulum şeridi, Ayarlar dizini kartı ve komut paleti eylemi",
   "/app/brifing": "Ana ekrana yönlendirir (içerik Bugün bloğunda)",
   "/app/hesabim": "Kullanıcı menüsünden (sağ üst) açılır",
@@ -669,7 +674,9 @@ export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
 };
 
 /**
- * Mobil alt sekme çubuğu: 4 ana iş başlığı + "Daha fazla" (çekmece). Her sekme başlığın
+ * Mobil alt sekme çubuğu: 4 ana iş başlığı + "Daha fazla" (çekmece). Gelen Kutusu artık Müşteriler başlığındadır
+ * (başlık sekmesi onu kapsar; alt çubuğa 5. sekme eklenmedi: 4 sekme + Daha fazla = 5 sütun, dar ekranda daha fazlası
+ * dokunma hedefini küçültür). Her sekme başlığın
  * ilk görünen sayfasına gider; başlık yetkisiz/kapalıysa sekme çıkmaz.
  */
 export const MOBILE_TAB_SECTIONS: readonly { id: string; label: string }[] = [

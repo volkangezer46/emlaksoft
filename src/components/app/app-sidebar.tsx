@@ -193,8 +193,14 @@ export function AppSidebar({
    * ayracın altında. Sıra nav-config'teki sıradır (en sık kullanılan üstte).
    */
   const renderItems = (items: readonly NavItem[], group: string) => {
-    const base = items.filter((i) => !i.advanced);
-    const adv = items.filter((i) => i.advanced);
+    const visible = items.filter((i) => i.group !== "yonetim");
+    const admin = items.filter((i) => i.group === "yonetim");
+    const base = visible.filter((i) => !i.advanced);
+    const adv = visible.filter((i) => i.advanced);
+    // "Yönetim" alt grubu: başlık içinde katlanır; etkin sayfa içindeyse ya da kullanıcı açtıysa açık
+    // (depoda "yonetim-acik-<grup>" kimliği AÇIK anlamına gelir; varsayılan kapalı).
+    const adminKey = `yonetim-acik-${group}`;
+    const adminOpen = admin.some((i) => i.href === activeHref) || closed.includes(adminKey);
     return (
       <>
         {base.map((i) => renderItem(i, { group, pinnable: true }))}
@@ -202,6 +208,29 @@ export function AppSidebar({
           <div role="separator" aria-label="İleri düzey" className="mx-3 my-1.5 h-px bg-white/10" />
         ) : null}
         {adv.map((i) => renderItem(i, { group, pinnable: true }))}
+        {admin.length > 0 ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                const cur = closedStore.read();
+                closedStore.write(cur.includes(adminKey) ? cur.filter((x) => x !== adminKey) : [...cur, adminKey]);
+              }}
+              aria-expanded={adminOpen}
+              aria-controls={`sb-${adminKey}`}
+              className="focus-ring mt-1 flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 text-left text-xs font-semibold uppercase tracking-wide text-white/60 transition-colors hover:text-white"
+            >
+              <span className="shrink-0">Yönetim</span>
+              <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />
+              <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${adminOpen ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+            {adminOpen ? (
+              <div id={`sb-${adminKey}`} className="space-y-0.5">
+                {admin.map((i) => renderItem(i, { group, pinnable: true }))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </>
     );
   };
