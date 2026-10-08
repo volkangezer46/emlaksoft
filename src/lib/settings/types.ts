@@ -38,6 +38,8 @@ export const OFFICE_SETTING_GROUPS = [
   { id: "komisyon", label: "Komisyon varsayılanları", description: "Komisyon hesaplayıcı ve bölüşüm ekranlarının başlangıç oran ve payları." },
   { id: "bildirim", label: "Bildirim varsayılanları", description: "Kendi tercihini kaydetmemiş kullanıcıların bildirim tercihleri." },
   { id: "atama", label: "Akıllı atama", description: "Ofis Merkezi'nde havuzdan danışman önerisinin ölçüt ağırlıkları ve atanmamış ilan SLA'sı." },
+  { id: "dagitim", label: "Talep dağıtımı", description: "Yeni talebin hangi danışmana gideceği, mesai kuralı ve ilk dönüş süresi dolunca yeniden atama." },
+  { id: "ai", label: "Yapay zekâ özellikleri", description: "AI ilan metni/çeviri ve sesli not özeti (hepsi varsayılan kapalı; kişisel veri maskelenir)." },
   { id: "erisim", label: "Erişim kapsamı", description: "Liste ekranlarının kullanıcı kapsamıyla (kendi / takım / şube) daraltılması." },
   { id: "iletisim", label: "Malik ve müşteri iletişimi", description: "Malik haftalık raporu, müşteri portalında güncel değer özeti ve vitrin sohbet asistanı (hepsi varsayılan kapalı)." },
   { id: "uyum", label: "Uyum ve veri paylaşımı", description: "Yetki belgesi yıllık harç hatırlatması ve anonim piyasa verisi paylaşım izni (varsayılan kapalı)." },

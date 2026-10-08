@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AdvisorsTab } from "./_tabs/advisors-tab";
 import { AssignmentsTab } from "./_tabs/assignments-tab";
 import { DefinitionsTab } from "./_tabs/definitions-tab";
+import { RoutingTab } from "./_tabs/routing-tab";
 import { StatsTab } from "./_tabs/stats-tab";
 import type { TabContext } from "./_tabs/context";
 
@@ -92,6 +93,7 @@ export default async function OfficeCenterPage({ searchParams }: { searchParams:
 
       {tab === "danismanlar" ? <AdvisorsTab ctx={ctx} /> : null}
       {tab === "atamalar" ? <AssignmentsTab ctx={ctx} /> : null}
+      {tab === "dagitim" ? <RoutingTab ctx={ctx} /> : null}
       {tab === "tanimlar" ? <DefinitionsTab ctx={ctx} /> : null}
       {tab === "istatistikler" ? <StatsTab ctx={ctx} /> : null}
     </div>

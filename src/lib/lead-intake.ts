@@ -6,6 +6,8 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { notifyTenant } from "@/lib/notify";
 import { buildLeadCommunication } from "@/lib/lead-message";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { routeNewLead } from "@/lib/lead-routing/server";
+import { now } from "@/lib/clock";
 
 export type LeadInput = {
   fullName: string;
@@ -121,6 +123,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
   let customerId: string | null = null;
   let assignedTo: string | null = null;
   let duplicate = false;
+  let routing: { strategy: string; reason: string; deferred: boolean } | null = null;
 
   if (phone) {
     const { data: existing } = await admin
@@ -139,7 +142,19 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
   }
 
   if (!customerId) {
-    assignedTo = await pickAssignee(admin, tenantId);
+    // TEK MOTOR (lead-routing): yöntem/mesai ofis ayarından; motor hata verirse eski "en az yüklü" yoluna düşer.
+    const route = await routeNewLead(
+      admin,
+      tenantId,
+      { provinceId: input.provinceId || null, propertyType: input.propertyType || null, transactionType: input.transactionType || null, budgetMax: input.budgetMax ?? null },
+      now(),
+    );
+    if (route.ok) {
+      assignedTo = route.assigneeId;
+      routing = { strategy: route.strategy, reason: route.reason, deferred: route.deferred };
+    } else {
+      assignedTo = await pickAssignee(admin, tenantId);
+    }
     const { data: created, error } = await admin
       .from("customers")
       .insert({
@@ -241,7 +256,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     action: duplicate ? "lead.intake.duplicate" : "lead.intake",
     entity_type: "customer",
     entity_id: customerId,
-    new_value: { full_name: fullName, phone, channel, source, assigned_to: assignedTo },
+    new_value: { full_name: fullName, phone, channel, source, assigned_to: assignedTo, ...(routing ? { routing } : {}) },
   });
 
   /*

@@ -7,10 +7,11 @@
  * Sekmeler: "Ayarlar" ve "Tanımlamalar" AYNI ayar anahtarlarına yazıyordu → tek "Tanımlar" sekmesi (tüm ayarlar,
  * geçmiş ve geri alma Ayarlar > Tanımlar merkezinde). "Atamalar" yalnız özet + İlan Havuzu bağlantısıdır (atama tek ekranda).
  */
-export type OfficeCenterTab = "danismanlar" | "atamalar" | "tanimlar" | "istatistikler";
+export type OfficeCenterTab = "danismanlar" | "atamalar" | "dagitim" | "tanimlar" | "istatistikler";
 export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }[] = [
   { id: "danismanlar", label: "Danışmanlar" },
   { id: "atamalar", label: "Atamalar" },
+  { id: "dagitim", label: "Talep dağıtımı" },
   { id: "tanimlar", label: "Tanımlar" },
   { id: "istatistikler", label: "İstatistikler" },
 ];

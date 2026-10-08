@@ -375,4 +375,92 @@ const compliance: AnySettingDef[] = [
   }),
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...compliance];
+/**
+ * Talep dağıtımı (lead routing; Ofis Merkezi > Talep dağıtımı sekmesi). Hepsi varsayılan = BUGÜNKÜ davranış:
+ * en az yüklü danışman, mesai kuralı yok, SLA aşımında yeniden atama yok. Motor: `src/lib/lead-routing/*` (uzmanlık/bölge/yük
+ * puanı ilan havuzu ve akıllı atama ile AYNI kod). Okuyucular: `lead-intake.ts` (yeni talep), havuz-atama cron adımı (SLA).
+ */
+export const LEAD_ROUTING_KEYS = {
+  strategy: "office.lead_routing.strategy",
+  hoursOnly: "office.lead_routing.hours_only",
+  reassign: "office.lead_routing.reassign_on_breach",
+  maxReassign: "office.lead_routing.max_reassign",
+  slaMin: "office.sla.lead_first_response_min",
+} as const;
+
+const leadRouting: AnySettingDef[] = [
+  defineEnum({
+    ...TENANT,
+    key: LEAD_ROUTING_KEYS.strategy,
+    group: "dagitim",
+    default: "least_loaded",
+    options: [
+      { value: "least_loaded", label: "En az yüklü danışman" },
+      { value: "round_robin", label: "Sırayla (döngüsel)" },
+      { value: "smart", label: "Akıllı (uzmanlık + yük)" },
+    ],
+    label: "Yeni talep dağıtım yöntemi",
+    description: "Vitrin, portal ve başvuru formundan gelen yeni talebin hangi danışmana atanacağını belirler. Akıllı yöntem bölge/ilçe uzmanlığı, portföy türü ve iş yükünü birlikte puanlar.",
+    impact: "Yalnız bundan sonra gelen talepler etkilenir; mevcut atamalar değişmez. Varsayılan (en az yüklü) bugünkü davranıştır.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: LEAD_ROUTING_KEYS.hoursOnly,
+    group: "dagitim",
+    default: false,
+    label: "Mesai dışı talebi mesai başında dağıt",
+    description: "Açıkken Pazar günü ve 09:00-19:00 dışında gelen talep atanmadan bekler; mesai başlayınca dağıtılır (aday hızı raporundaki çalışma saati tanımıyla aynı).",
+    impact: "Mesai dışı talepler sabaha kadar sorumlusuz görünür. Kapalıyken talep anında atanır.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: LEAD_ROUTING_KEYS.reassign,
+    group: "dagitim",
+    default: false,
+    label: "İlk dönüş süresi dolunca yeniden ata",
+    description: "Talebe İlk yanıt SLA süresi içinde dönülmezse (çalışma saatiyle) talep başka uygun danışmana devredilir; eski ve yeni sorumluya bildirim gider.",
+    impact: "Açılırsa her 10 dakikada bir kontrol edilir; bir talep en çok aşağıdaki sayıda yeniden atanır, sonrasında yöneticiye uyarı düşer. Kapalıyken hiçbir talep otomatik devredilmez.",
+  }),
+  defineInt({
+    ...TENANT,
+    key: LEAD_ROUTING_KEYS.maxReassign,
+    group: "dagitim",
+    default: 2,
+    min: 1,
+    max: 5,
+    label: "En çok yeniden atama sayısı",
+    description: "Bir talep SLA aşımı yüzünden en fazla kaç kez başka danışmana devredilsin.",
+    impact: "Sınır dolunca talep yeniden atanmaz; ofis sahibi ve genel müdüre bir kez uyarı gider.",
+    unit: "kez",
+  }),
+];
+
+/**
+ * Yapay zekâ özellikleri (ofis izni, hepsi varsayılan KAPALI). Her çağrı `openai-client.ts` üzerinden gider (kişisel veri
+ * maskelenir, denetim kaydı + kredi defteri yazılır) ve çıktı yalnız TASLAKTIR; kullanıcı onaylamadan hiçbir kayıt değişmez.
+ */
+export const AI_LISTING_TEXT_KEY = "office.ai.listing_text_enabled";
+export const AI_VOICE_NOTES_KEY = "office.ai.voice_notes_enabled";
+
+const aiFeatures: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    key: AI_LISTING_TEXT_KEY,
+    group: "ai",
+    default: false,
+    label: "AI ile ilan açıklaması ve çeviri",
+    description: "Portföy sayfasında \"AI ile ilan açıklaması oluştur\" ve İngilizce/Almanca/Arapça/Rusça çeviri düğmeleri çalışır. Çıktı taslaktır; siz onaylayıp kaydetmeden portföy değişmez.",
+    impact: "AI kotanızdan harcar. Telefon, e-posta, TC, IBAN gibi kişisel veriler yapay zekâya gitmeden maskelenir. Kapalıyken yalnız şablon metni üretilir, çeviri kapalıdır.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: AI_VOICE_NOTES_KEY,
+    group: "ai",
+    default: false,
+    label: "Sesli not ve AI özeti",
+    description: "Müşteri ve randevu kartında ses kaydı yapılır; kayıt yazıya çevrilip özetlenir ve not olarak saklanır. Ses dosyası SAKLANMAZ, yalnız metin tutulur. Kayıttan önce ilgili kişinin açık rızası onay kutusuyla alınır.",
+    impact: "Ses kaydı yapay zekâ sağlayıcısına yazıya çevrilmek üzere gönderilir (KVKK aydınlatma/rıza sorumluluğu ofistedir). AI kotanızdan harcar. Kapalıyken düğme hiç görünmez.",
+  }),
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...compliance, ...leadRouting, ...aiFeatures];
