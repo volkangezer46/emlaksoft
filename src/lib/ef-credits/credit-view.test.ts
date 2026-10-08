@@ -47,12 +47,12 @@ describe("admin manuel yükleme doğrulaması", () => {
 });
 
 describe("örnek ön ayar", () => {
-  it("4 paket, geçerli şema, azalan kontör başı fiyat, uyarısız", () => {
+  it("önerilen katalog: 5 paket, geçerli şema, azalan kontör başı fiyat, uyarısız", () => {
     const p = examplePackPreset();
-    expect(p).toHaveLength(4);
+    expect(p).toHaveLength(5);
     expect(efPacksSchema.safeParse(p).success).toBe(true);
     expect(efPackWarnings(p)).toEqual([]);
-    expect(p.filter((x) => x.popular).map((x) => x.id)).toEqual(["standart"]);
+    expect(p.filter((x) => x.popular).map((x) => x.id)).toEqual(["ef-1000"]);
   });
   it("paket kimliği", () => {
     expect(packIdFromName("Çok Büyük Paket!")).toBe("cok-buyuk-paket");

@@ -30,7 +30,7 @@ describe("computeSeatAnalytics", () => {
     row({ tenantId: "a", usedSeats: 2 }), // ok
     row({ tenantId: "b", usedSeats: 4 }), // %80 -> uyarı
     row({ tenantId: "c", usedSeats: 5 }), // dolu
-    row({ tenantId: "d", extraSeats: 3, amountTry: 2490 + 3 * 399, usedSeats: 7 }), // 7/8 uyarı
+    row({ tenantId: "d", extraSeats: 3, amountTry: 2790 + 3 * 499, usedSeats: 7 }), // 7/8 uyarı
     row({ tenantId: "e", plan: "advisor", amountTry: 749, usedSeats: 1 }), // dolu
     row({ tenantId: "f", status: "past_due" }), // sayılmaz
     row({ tenantId: "g", cycle: "yearly", amountTry: 24900, usedSeats: null }), // 2075/ay, bilinmiyor
@@ -39,14 +39,14 @@ describe("computeSeatAnalytics", () => {
 
   it("MRR yıllığı 12'ye böler; yalnız aktifler sayılır; ARPA", () => {
     expect(monthlyEquivalent(rows[6]!)).toBe(2075);
-    const expected = 2490 * 3 + (2490 + 1197) + 749 + 2075;
+    const expected = 2490 * 3 + (2790 + 1497) + 749 + 2075;
     expect(a.activeSubscribers).toBe(6);
     expect(a.mrrTry).toBe(Math.round(expected));
     expect(a.arpaTry).toBe(Math.round(expected / 6));
   });
 
   it("genişleme MRR kayıtlı ek koltuk x kademe", () => {
-    expect(a.expansionMrrTry).toBe(1197);
+    expect(a.expansionMrrTry).toBe(1497);
     expect(a.extraSeatsTotal).toBe(3);
     expect(a.officesWithExtraSeats).toBe(1);
   });
@@ -83,11 +83,11 @@ describe("computeSeatAnalytics", () => {
 describe("simulatePriceChange", () => {
   const office = catalog.find((p) => p.id === "office")!;
   const subs = [
-    { plan: "office", status: "active", cycle: "monthly" as const, amountTry: 2490, extraSeats: 0, locked: false },
+    { plan: "office", status: "active", cycle: "monthly" as const, amountTry: 2790, extraSeats: 0, locked: false },
     { plan: "office", status: "active", cycle: "monthly" as const, amountTry: 1990, extraSeats: 0, locked: true },
     { plan: "office", status: "trialing", cycle: "monthly" as const, amountTry: 0, extraSeats: 0, locked: false },
   ];
-  const raised = catalog.map((p) => (p.id === "office" ? { ...office, monthlyTry: 2990 } : p));
+  const raised = catalog.map((p) => (p.id === "office" ? { ...office, monthlyTry: 3290 } : p));
 
   it("varsayılan politika: mevcut abonenin kayıtlı tutarı değişmez, yalnız yeni satış etkilenir", () => {
     const r = simulatePriceChange({
@@ -97,8 +97,8 @@ describe("simulatePriceChange", () => {
       newSales: [{ planId: "office", totalSeats: 5, count: 4, cycle: "monthly" }],
       repriceExistingAtRenewal: false,
     });
-    expect(r.before.mrrTry).toBe(2490 + 1990 + 4 * 2490);
-    expect(r.after.mrrTry).toBe(2490 + 1990 + 4 * 2990);
+    expect(r.before.mrrTry).toBe(2790 + 1990 + 4 * 2790);
+    expect(r.after.mrrTry).toBe(2790 + 1990 + 4 * 3290);
     expect(r.deltaMrrTry).toBe(4 * 500);
     expect(r.unchangedSubscribers).toBe(2);
     expect(r.repricedSubscribers).toBe(0);
@@ -112,7 +112,7 @@ describe("simulatePriceChange", () => {
       newSales: [],
       repriceExistingAtRenewal: true,
     });
-    expect(r.after.mrrTry).toBe(2990 + 1990);
+    expect(r.after.mrrTry).toBe(3290 + 1990);
     expect(r.lockedSubscribers).toBe(1);
     expect(r.repricedSubscribers).toBe(1);
     expect(r.deltaMrrTry).toBe(500);
@@ -138,8 +138,8 @@ describe("simulatePriceChange", () => {
       newSales: [{ planId: "office", totalSeats: 5, count: 1, cycle: "monthly" }],
       repriceExistingAtRenewal: false,
     });
-    expect(r.before.arpaTry).toBe(2490);
-    expect(r.after.arpaTry).toBe(Math.round((2490 + 2990) / 2));
+    expect(r.before.arpaTry).toBe(2790);
+    expect(r.after.arpaTry).toBe(Math.round((2790 + 3290) / 2));
   });
 });
 

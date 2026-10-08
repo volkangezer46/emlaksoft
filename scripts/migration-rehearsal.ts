@@ -316,9 +316,9 @@ async function helperChecks(): Promise<void> {
     if (noDoc) {
       await runExistence("3-yardimci", {
         id: "3.1",
-        title: "katalog ayarı yok: onaylı fiyatlar 749/2490/4990/8990/12900, bilinmeyen plan NULL",
+        title: "katalog ayarı yok: onaylı fiyatlar 749/2790/5490/8990/14900, bilinmeyen plan NULL",
         sql: HELPERS.prices,
-        expect: { advisor: "749", office: "2490", professional: "4990", business: "8990", enterprise: "12900", bilinmeyen: "NULL" },
+        expect: { advisor: "749", office: "2790", professional: "5490", business: "8990", enterprise: "14900", bilinmeyen: "NULL" },
       });
       await runExistence("3-yardimci", {
         id: "3.2",

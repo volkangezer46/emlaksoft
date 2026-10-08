@@ -16,7 +16,7 @@ import {
   validateSeatTiers,
 } from "@/lib/billing/seat-pricing";
 
-// Onaylı katalog: Danışman 749, Ofis 2490 (ek 399/349/299), Profesyonel 4990 (15 kullanıcı), Business gizli, Kurumsal 12.900 (50 dahil, ek 249/199/149, en fazla 500).
+// Onaylı katalog (2026-10-08): Danışman 749 (ek 559), Ofis 2790 (ek 499/449/399), Profesyonel 5490 (15 kullanıcı, ek 449/399), Business gizli, Kurumsal 14.900 (50 dahil, ek 289/249/199, en fazla 500).
 const catalog = applyPlanOverrides(RECOMMENDED_CATALOG_OVERRIDES);
 const office = catalog.find((p) => p.id === "office")!;
 const pro = catalog.find((p) => p.id === "professional")!;
@@ -29,20 +29,20 @@ describe("quoteSeats: kademeli marjinal fiyat", () => {
   it("dahil kullanıcı içinde yalnız taban fiyat", () => {
     const q = quoteSeats(catalog, "office", 5, "monthly");
     expect(q.extraSeats).toBe(0);
-    expect(q.totalMonthlyTry).toBe(2490);
+    expect(q.totalMonthlyTry).toBe(2790);
     expect(q.breakdown).toEqual([]);
     expect(q.maxSeatsExceeded).toBe(false);
   });
 
-  it("kademeleri marjinal uygular (5x399 + 3x349)", () => {
+  it("kademeleri marjinal uygular (5x499 + 3x449)", () => {
     const q = quoteSeats(catalog, "office", 13, "monthly");
     expect(q.extraSeats).toBe(8);
     expect(q.breakdown).toEqual([
-      { fromSeat: 1, toSeat: 5, count: 5, unitTry: 399, subtotalTry: 1995 },
-      { fromSeat: 6, toSeat: 8, count: 3, unitTry: 349, subtotalTry: 1047 },
+      { fromSeat: 1, toSeat: 5, count: 5, unitTry: 499, subtotalTry: 2495 },
+      { fromSeat: 6, toSeat: 8, count: 3, unitTry: 449, subtotalTry: 1347 },
     ]);
-    expect(q.extraMonthlyTry).toBe(3042);
-    expect(q.totalMonthlyTry).toBe(2490 + 3042);
+    expect(q.extraMonthlyTry).toBe(3842);
+    expect(q.totalMonthlyTry).toBe(2790 + 3842);
   });
 
   it("toplam fiyat koltukla monoton artar, ani düşüş yok", () => {
@@ -70,17 +70,17 @@ describe("quoteSeats: kademeli marjinal fiyat", () => {
   it("tek kademeli extraSeatMonthlyTry (kademe yok) geriye uyumlu", () => {
     const plans = withPlan("office", { extraSeatTiers: null, extraSeatMonthlyTry: 400 });
     const q = quoteSeats(plans, "office", 8, "monthly");
-    expect(q.totalMonthlyTry).toBe(2490 + 3 * 400);
+    expect(q.totalMonthlyTry).toBe(2790 + 3 * 400);
     expect(resolveSeatTiers(plans.find((p) => p.id === "office")!)).toEqual([{ fromSeat: 1, toSeat: null, monthlyTry: 400 }]);
   });
 
-  it("Danışman'da da ek kullanıcı satılır (499 TL); 5 kullanıcıda Ofis önerilir", () => {
+  it("Danışman'da da ek kullanıcı satılır (559 TL); 5 kullanıcıda Ofis önerilir", () => {
     const q2 = quoteSeats(catalog, "advisor", 2, "monthly");
     expect(q2.maxSeatsExceeded).toBe(false);
-    expect(q2.extraMonthlyTry).toBe(499);
+    expect(q2.extraMonthlyTry).toBe(559);
     expect(q2.recommendation).toBeNull();
     const q5 = quoteSeats(catalog, "advisor", 5, "monthly");
-    expect(q5.totalMonthlyTry).toBe(749 + 4 * 499);
+    expect(q5.totalMonthlyTry).toBe(749 + 4 * 559);
     expect(q5.recommendation?.planId).toBe("office");
   });
 
@@ -109,27 +109,27 @@ describe("quoteSeats: kademeli marjinal fiyat", () => {
 describe("yıllık", () => {
   it("aylık x ödenen ay (10); ek kullanıcı da aynı", () => {
     const q = quoteSeats(catalog, "office", 8, "yearly");
-    expect(q.totalMonthlyTry).toBe(2490 + 3 * 399);
+    expect(q.totalMonthlyTry).toBe(2790 + 3 * 499);
     expect(q.totalForCycleTry).toBe(q.totalMonthlyTry * 10);
     expect(q.cycle).toBe("yearly");
   });
 
   it("plan başına yıllık ödenen ay panelden gelir", () => {
     const plans = withPlan("office", { yearlyPaidMonths: 9 });
-    expect(quoteSeats(plans, "office", 5, "yearly").totalForCycleTry).toBe(2490 * 9);
+    expect(quoteSeats(plans, "office", 5, "yearly").totalForCycleTry).toBe(2790 * 9);
   });
 });
 
 describe("çapraz nokta ve öneri", () => {
-  it("Ofis -> Profesyonel çapraz noktası katalogda 12 kullanıcıdır", () => {
-    expect(findCrossoverSeat(catalog, "office", "professional")).toBe(12);
+  it("Ofis -> Profesyonel çapraz noktası katalogda 11 kullanıcıdır", () => {
+    expect(findCrossoverSeat(catalog, "office", "professional")).toBe(11);
+    const q10 = quoteSeats(catalog, "office", 10, "monthly");
     const q11 = quoteSeats(catalog, "office", 11, "monthly");
-    const q12 = quoteSeats(catalog, "office", 12, "monthly");
-    expect(q11.totalMonthlyTry).toBe(4834);
-    expect(q11.recommendation).toBeNull();
-    expect(q12.totalMonthlyTry).toBe(5183);
-    expect(q12.recommendation).toMatchObject({ planId: "professional", totalMonthlyTry: 4990, savingsMonthlyTry: 193 });
-    expect(q12.recommendation?.reason).toContain("tasarruf");
+    expect(q10.totalMonthlyTry).toBe(5285);
+    expect(q10.recommendation).toBeNull();
+    expect(q11.totalMonthlyTry).toBe(5734);
+    expect(q11.recommendation).toMatchObject({ planId: "professional", totalMonthlyTry: 5490, savingsMonthlyTry: 244 });
+    expect(q11.recommendation?.reason).toContain("tasarruf");
   });
 
   it("alt plana düşürme önerilmez (özellik kaybı)", () => {
@@ -143,7 +143,7 @@ describe("çapraz nokta ve öneri", () => {
     expect(r.alternatives.map((a) => a.planId)).toEqual(["office", "professional", "enterprise"]);
     const r15 = recommendPlanForSeats(catalog, 15, "monthly");
     expect(r15.planId).toBe("professional");
-    expect(r15.quote.totalMonthlyTry).toBe(4990);
+    expect(r15.quote.totalMonthlyTry).toBe(5490);
     expect(r15.alternatives.every((a) => a.totalMonthlyTry >= r15.quote.totalMonthlyTry)).toBe(true);
   });
 
@@ -151,7 +151,7 @@ describe("çapraz nokta ve öneri", () => {
     const r = recommendPlanForSeats(catalog, 41, "monthly");
     expect(r.planId).toBe("enterprise");
     expect(r.quote.maxSeatsExceeded).toBe(false);
-    expect(r.quote.totalMonthlyTry).toBe(12900);
+    expect(r.quote.totalMonthlyTry).toBe(14900);
     const over = recommendPlanForSeats(catalog, 501, "monthly");
     expect(over.planId).toBe("enterprise");
     expect(over.quote.maxSeatsExceeded).toBe(true);
@@ -163,7 +163,7 @@ describe("çapraz nokta ve öneri", () => {
   it("öneri yıllıkta da aynı planı bulur ve dönem tutarını verir", () => {
     const r = recommendPlanForSeats(catalog, 12, "yearly");
     expect(r.planId).toBe("professional");
-    expect(r.quote.totalForCycleTry).toBe(4990 * 10);
+    expect(r.quote.totalForCycleTry).toBe(5490 * 10);
   });
 
   it("findSeatCrossovers ardışık planları listeler", () => {
@@ -176,9 +176,9 @@ describe("çapraz nokta ve öneri", () => {
 describe("kilitli fiyat (price_lock)", () => {
   it("kilitli taban fiyat liste değişse de korunur", () => {
     const raised = withPlan("office", { monthlyTry: 3000 });
-    const q = quoteSeats(raised, "office", 7, "monthly", { lockedBaseMonthlyTry: 2490 });
-    expect(q.baseMonthlyTry).toBe(2490);
-    expect(q.totalMonthlyTry).toBe(2490 + 2 * 399);
+    const q = quoteSeats(raised, "office", 7, "monthly", { lockedBaseMonthlyTry: 2790 });
+    expect(q.baseMonthlyTry).toBe(2790);
+    expect(q.totalMonthlyTry).toBe(2790 + 2 * 499);
   });
 
   it("kilitli kademeler yeni listeyi ezer", () => {
@@ -208,13 +208,13 @@ describe("prorateSeatChange", () => {
     const now = start + (end - start) / 2; // yarı dönem
     const r = prorateSeatChange({ fromQuote: from, toQuote: to, periodStartMs: start, periodEndMs: end, nowMs: now });
     expect(r.effectiveAtPeriodEnd).toBe(false);
-    expect(r.immediateChargeTry).toBe(Math.round(((3 * 399) / 2) * 100) / 100);
+    expect(r.immediateChargeTry).toBe(Math.round(((3 * 499) / 2) * 100) / 100);
     expect(r.note).toContain("hemen");
   });
 
   it("dönem başında tam fark, sonunda sıfır", () => {
     const a = prorateSeatChange({ fromQuote: from, toQuote: to, periodStartMs: start, periodEndMs: end, nowMs: start });
-    expect(a.immediateChargeTry).toBe(1197);
+    expect(a.immediateChargeTry).toBe(1497);
     const b = prorateSeatChange({ fromQuote: from, toQuote: to, periodStartMs: start, periodEndMs: end, nowMs: end });
     expect(b.immediateChargeTry).toBe(0);
     const c = prorateSeatChange({ fromQuote: from, toQuote: to, periodStartMs: start, periodEndMs: end, nowMs: end + 5 * 86_400_000 });
@@ -239,7 +239,7 @@ describe("prorateSeatChange", () => {
     const ys = Date.UTC(2026, 0, 1);
     const ye = Date.UTC(2027, 0, 1);
     const r = prorateSeatChange({ fromQuote: fy, toQuote: ty, periodStartMs: ys, periodEndMs: ye, nowMs: ys + (ye - ys) / 4 });
-    expect(r.immediateChargeTry).toBe(Math.round(399 * 10 * 0.75 * 100) / 100);
+    expect(r.immediateChargeTry).toBe(Math.round(499 * 10 * 0.75 * 100) / 100);
   });
 
   it("TR ay sınırı UTC+3'e göre hesaplanır", () => {
@@ -367,14 +367,14 @@ describe("Kurumsal: kullanıcı başı kademeli fiyat (50 dahil, en fazla 500)",
   const ent = catalog.find((p) => p.id === "enterprise")!;
   const total = (n: number) => quoteSeats(catalog, "enterprise", n, "monthly").totalMonthlyTry;
 
-  it("dahil 50 kullanıcıda taban, sonrası 249 / 199 / 149 marjinal", () => {
+  it("dahil 50 kullanıcıda taban, sonrası 289 / 249 / 199 marjinal", () => {
     expect(ent.limits.seats).toBe(50);
-    expect(total(50)).toBe(12900);
-    expect(total(51)).toBe(12900 + 249);
-    expect(total(100)).toBe(12900 + 50 * 249);
-    expect(total(101)).toBe(12900 + 50 * 249 + 199);
-    expect(total(250)).toBe(12900 + 50 * 249 + 150 * 199);
-    expect(total(500)).toBe(12900 + 50 * 249 + 150 * 199 + 250 * 149);
+    expect(total(50)).toBe(14900);
+    expect(total(51)).toBe(14900 + 289);
+    expect(total(100)).toBe(14900 + 50 * 289);
+    expect(total(101)).toBe(14900 + 50 * 289 + 249);
+    expect(total(250)).toBe(14900 + 50 * 289 + 150 * 249);
+    expect(total(500)).toBe(14900 + 50 * 289 + 150 * 249 + 250 * 199);
   });
 
   it("toplam monoton artar, kullanıcı başı ortalama düşer (hacim indirimi) ve kademeler x9", () => {
@@ -390,10 +390,10 @@ describe("Kurumsal: kullanıcı başı kademeli fiyat (50 dahil, en fazla 500)",
     for (const t of resolveSeatTiers(ent)) expect(t.monthlyTry % 10).toBe(9);
   });
 
-  it("Profesyonel'in son kademesinden (299) ucuz; Profesyonel 40 kullanıcıdan sonra Kurumsal ucuzdur", () => {
+  it("Profesyonel'in son kademesinden (399) ucuz; Profesyonel 38 kullanıcıdan sonra Kurumsal ucuzdur", () => {
     const tiers = resolveSeatTiers(ent);
     expect(Math.max(...tiers.map((t) => t.monthlyTry))).toBeLessThan(Math.min(...resolveSeatTiers(pro).slice(-1).map((t) => t.monthlyTry)));
-    expect(findCrossoverSeat(catalog, "professional", "enterprise")).toBe(40);
+    expect(findCrossoverSeat(catalog, "professional", "enterprise")).toBe(38);
     expect(quoteSeats(catalog, "enterprise", 501, "monthly").maxSeatsExceeded).toBe(true);
     expect(quoteSeats(catalog, "enterprise", 500, "monthly").maxSeatsExceeded).toBe(false);
   });

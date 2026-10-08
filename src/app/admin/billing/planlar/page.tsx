@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Layers } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { getEfTariff, getPlanCatalog, getPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
-import { EF_WELCOME_SETTING_KEY, efUnitsFor, parseEfWelcomeUnits } from "@/lib/ef-credits/config";
+import { EF_WELCOME_SETTING_KEY, efEntryValuationUnits, parseEfWelcomeUnits } from "@/lib/ef-credits/config";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { computeSeatAnalytics } from "@/lib/billing/seat-analytics";
 import { findSeatCrossovers, validateSeatCatalog } from "@/lib/billing/seat-pricing";
@@ -44,7 +44,7 @@ export default async function PlansAdminPage({
   const founders = await getFoundersStatus(catalog.campaign);
   const seatSettings = await getSeatSettings();
   const efTariff = await getEfTariff();
-  const efValuationCost = efUnitsFor("valuation_arsa", efTariff);
+  const efValuationCost = efEntryValuationUnits(efTariff);
   const welcomeUnits = parseEfWelcomeUnits(await getPlatformSetting(EF_WELCOME_SETTING_KEY));
 
   const admin = createAdminClient();

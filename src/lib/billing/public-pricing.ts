@@ -1,4 +1,4 @@
-import { efUnitsFor } from "@/lib/ef-credits/config";
+import { efEntryValuationUnits } from "@/lib/ef-credits/config";
 import { getEfPublicState } from "@/lib/ef-credits/public-state";
 import type { EfPublicState } from "@/lib/ef-credits/public-state-core";
 import {
@@ -63,7 +63,7 @@ export async function getPublicPricing(): Promise<PublicPricing> {
     trialDays,
     offers,
     founders: open && anyCampaign ? { name: status.name, remaining: status.remaining, quota: status.quota } : null,
-    efValuationCost: efUnitsFor("valuation_arsa", efTariff),
+    efValuationCost: efEntryValuationUnits(efTariff),
     efState: efPublic.state,
     efLive: efPublic.live,
   };

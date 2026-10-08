@@ -215,7 +215,7 @@ export function seatCalcAnnouncement(r: SeatCalcResult): string {
 export type ExtraSeatSummary = {
   /** "15 kullanıcı dahil" */
   included: string;
-  /** "ilk 5 ek kullanıcı 349 ₺", "sonraki 10 ek kullanıcı 299 ₺", "sonrası 249 ₺" */
+  /** "ilk 5 ek kullanıcı 499 ₺", "sonraki 10 ek kullanıcı 449 ₺", "sonrası 399 ₺" */
   tiers: string[];
   /** "En fazla 40 kullanıcı" ya da null. */
   max: string | null;
