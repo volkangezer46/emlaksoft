@@ -10,13 +10,16 @@ export function AuthShell({
   children,
   panelTitle,
   panelDesc,
+  wide = false,
 }: {
   children: React.ReactNode;
   panelTitle: string;
   panelDesc: string;
+  /** Geniş içerik (kayıt paket seçici): sağ sütun max-w-md yerine max-w-3xl. */
+  wide?: boolean;
 }) {
   return (
-    <div className="grid min-h-screen bg-canvas lg:grid-cols-[1.05fr_1fr]">
+    <div className="grid min-h-screen grid-cols-[minmax(0,1fr)] bg-canvas lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
       {/* Sol: marka paneli */}
       <aside className="theme-dark relative hidden overflow-hidden bg-[image:var(--grad-ink)] text-white lg:flex lg:flex-col">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -59,8 +62,8 @@ export function AuthShell({
       </aside>
 
       {/* Sağ: form alanı */}
-      <main id="main-content" className="flex items-center justify-center px-4 py-10 sm:px-8">
-        <div className="w-full max-w-md">
+      <main id="main-content" className="flex min-w-0 items-center justify-center px-4 py-10 sm:px-8">
+        <div className={wide ? "w-full max-w-3xl" : "w-full max-w-md"}>
           <Link href="/" aria-label="EmlakSoft ana sayfa" className="inline-flex lg:hidden">
             <Brand variant="horizontal" tone="light" height={34} alt="" />
           </Link>

@@ -30,6 +30,7 @@ import { BostaOnyukle } from "./_home/bosta-onyukle";
 import { DurumCubugu } from "./_home/durum-cubugu";
 import { KontorBandi } from "./_home/kontor-bandi";
 import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
+import { ProfilTamamla } from "./_home/profil-tamamla";
 import { DuyuruSatiri } from "./_home/duyuru-satiri";
 import { Gorevler } from "./_home/gorevler";
 import { KayipKacak } from "./_home/kayip-kacak";
@@ -389,6 +390,7 @@ export default async function AppHomePage({
           ) : null}
         </div>
 
+        <Suspense fallback={null}><ProfilTamamla ctx={ctx} /></Suspense>
         {/* Müşteri + portföy yokken tüm dolu bloklar yerine tek "Başlayalım" kartı */}
         <Suspense fallback={<PanelIskelet rows={2} />}>
           <BosOfisKapisi ctx={ctx}>

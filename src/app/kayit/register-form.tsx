@@ -1,42 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { startTransition, useActionState, useEffect, useRef, useState, useTransition } from "react";
-import {
-  ArrowLeft,
-  ArrowRight,
-  BadgeCheck,
-  Building2,
-  Check,
-  Eye,
-  EyeOff,
-  Loader2,
-  House,
-  Lock,
-  Mail,
-  MapPin,
-  Palette,
-  Pencil,
-  Rocket,
-  Sparkles,
-  Target,
-  Upload,
-  User,
-  UserRound,
-  Users,
-} from "lucide-react";
+import dynamic from "next/dynamic";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Building2, Check, Eye, EyeOff, Loader2, Lock, Mail, Rocket, Sparkles, User } from "lucide-react";
 import { signOut, signUp, type AuthResult } from "@/app/actions/auth";
 import { AuthDivider, GoogleAuthButton, GoogleGIcon } from "@/components/auth/google-button";
-import { listDistricts, type GeoOption } from "@/app/actions/geo";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
-import { GeoSelect } from "@/components/app/geo-select";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import { Progress } from "@/components/ui/progress";
 import { formatNumberTr } from "@/lib/format";
-import { formatPhoneDisplay } from "@/lib/phone";
 import {
   SIGNUP_FIELD_STEP,
   signupErrorTarget,
@@ -47,33 +22,27 @@ import {
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
 import { PLANS, getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { defaultTeamSizeForPlan } from "@/lib/billing/registration-plan";
 import { registrationQuote, registrationSelection, seatBounds } from "@/lib/billing/seat-calculator-model";
-import {
-  ADDRESS_LINE_MAX,
-  BRAND_COLOR_PRESETS,
-  FIELD,
-  FOCUS_SEGMENTS,
-  MAX_INVITES,
-  MAX_WORK_DISTRICTS,
-  OFFICE_TYPES,
-  parseBrandColor,
-  type FocusSegment,
-  type OfficeType,
-} from "@/lib/sample-data/office-profile";
 
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
 import { InviteBanner, type InviteBannerData } from "./invite-banner";
 
 const initial: AuthResult = {};
 
-/** Sihirbaz adımları: her adım TEK soruya odaklanır. Tamamlananlara geri dönülebilir. */
+/**
+ * Paket seçici (motion + animasyonlu sayı) yalnız 2. adım açılınca iner: ilk boyamada ağır JS yok.
+ * Yükleme sırasında aynı yükseklikte iskelet (CLS yok).
+ */
+const PlanPicker = dynamic(() => import("./plan-picker").then((m) => m.PlanPicker), {
+  ssr: false,
+  loading: () => <div className="h-[34rem] animate-pulse rounded-[var(--radius-card)] bg-line/60" aria-hidden />,
+});
+
+/** Kısa kayıt: 2 adım. Konum, adres, telefon, belge, marka, odak ve ekip uygulama içi "Ofis profilini tamamla" sihirbazındadır. */
 const STEPS = [
   { no: 1, label: "Hesap", question: "Seni nasıl tanıyalım?", icon: User },
-  { no: 2, label: "Ofis", question: "Ofisin nerede ve ne kadar büyük?", icon: Building2 },
-  { no: 3, label: "Marka", question: "Panel senin renklerinde olsun", icon: Palette },
-  { no: 4, label: "Odak", question: "Ne satıyorsun, nerede çalışıyorsun?", icon: Target },
-  { no: 5, label: "Ekip", question: "Ekibini şimdi mi davet edelim?", icon: Users },
-  { no: 6, label: "Başla", question: "Ofisin dolu mu gelsin, boş mu?", icon: Rocket },
+  { no: 2, label: "Ofis ve paket", question: "Ofisin ve paketin", icon: Building2 },
 ] as const;
 const LAST = STEPS.length;
 
@@ -85,10 +54,6 @@ const primaryBtn =
   "btn-shine group flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-brand)] px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-glow-brand)] transition hover:brightness-[1.06] disabled:opacity-60";
 const ghostBtn =
   "flex items-center justify-center gap-1.5 rounded-[var(--radius-card)] border border-line px-4 py-3 text-sm font-semibold text-text-muted transition hover:bg-surface";
-const cardChoice = (active: boolean) =>
-  `focus-within:ring-2 focus-within:ring-brand-400 flex cursor-pointer flex-col gap-0.5 rounded-[var(--radius-card)] border p-3 text-sm transition ${
-    active ? "border-brand-600 bg-brand-600/[0.05] shadow-[var(--elev-2)]" : "border-line bg-surface hover:border-brand-300"
-  }`;
 
 export function RegisterForm({
   initialPlan = "office",
@@ -102,7 +67,6 @@ export function RegisterForm({
   efValuationCost,
   efLive = false,
   copy,
-  provinces = [],
   googleEnabled = false,
   googleAccount = null,
 }: {
@@ -110,7 +74,7 @@ export function RegisterForm({
   googleEnabled?: boolean;
   /**
    * Google ile gelen, ofisi henüz olmayan kullanıcı (/kayit/tamamla): hesap adımı kısalır (ad önceden dolu,
-   * e-posta salt-okunur, şifre yok, telefon zorunlu); diğer adımlar ve rıza AYNI.
+   * e-posta salt-okunur, şifre yok, telefon zorunlu); ofis ve paket adımı ve rıza AYNI.
    */
   googleAccount?: { name: string; email: string } | null;
   /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
@@ -131,8 +95,6 @@ export function RegisterForm({
   attribution?: SignupAttributionFields;
   /** Davet bağlantısıyla gelen ziyaretçi için "X sizi davet etti" (program açık ve kod aktifse). */
   invite?: InviteBannerData | null;
-  /** İl listesi (coğrafya tek merkez, sunucudan). */
-  provinces?: GeoOption[];
 }) {
   // Tek hesapta satılabilecek en yüksek kullanıcı sayısı katalogdan gelir (sabit yok).
   const MAX_SEATS_INPUT = seatBounds(plans).inputMax;
@@ -146,25 +108,12 @@ export function RegisterForm({
       ? Math.min(MAX_SEATS_INPUT, Math.floor(initialSeats))
       : (plans.find((p) => p.id === initialPlan) ?? getPlan(initialPlan)).limits.seats,
   );
-  const [seatsText, setSeatsText] = useState(String(seats));
   // Kullanıcı sayıyı değiştirene kadar fiyat sayfasından gelen bilinçli paket seçimi korunur.
   const [seatsTouched, setSeatsTouched] = useState(initialSeats !== undefined);
-  const [officeType, setOfficeType] = useState<OfficeType>("bagimsiz");
-  const [brandColor, setBrandColor] = useState<string>(BRAND_COLOR_PRESETS[0]!.hex);
-  const [customHex, setCustomHex] = useState("");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoName, setLogoName] = useState<string | null>(null);
-  const [focus, setFocus] = useState<FocusSegment[]>(["satilik", "kiralik"]);
-  const [provinceId, setProvinceId] = useState("");
-  const [districts, setDistricts] = useState<GeoOption[]>([]);
-  const [loadingDistricts, startDistricts] = useTransition();
-  const [workDistricts, setWorkDistricts] = useState<string[]>([]);
+  const [cycle, setCycle] = useState<BillingCycle>(initialCycle);
+  // Kullanıcının elle seçtiği paket (null = motor önerisini izle). Kapasite yetmezse otomatik düşer.
+  const [chosen, setChosen] = useState<PlanId | null>(null);
   const [demo, setDemo] = useState(true);
-  const [officePhone, setOfficePhone] = useState("");
-  const [addressLine, setAddressLine] = useState("");
-  const [licenseNo, setLicenseNo] = useState("");
-  // Son adım özeti için adım geçişlerinde alınan form görüntüsü (alanlar kontrolsüz; render'da DOM okunmaz).
-  const [snap, setSnap] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLFormElement>(null);
   // Sunucu yanıtı işlendi mi (hata dönünce ilgili adıma geçiş, render sırasında durum ayarı; efekt yok).
   const [handledState, setHandledState] = useState(state);
@@ -172,25 +121,17 @@ export function RegisterForm({
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<SignupField, string>>>({});
   // Alanla eşleşmeyen sunucu hatası (kayıt kapalı, hız sınırı, teknik hata): yalnız son adımın bandında.
   const [generalError, setGeneralError] = useState<string | null>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  // Paket önerisi fiyat sayfasındaki hesaplayıcıyla AYNI motordan gelir (sabit eşik yok).
-  const selection = registrationSelection(plans, offers, seats, initialCycle, seatsTouched ? null : initialPlan);
-  const selectedPlanId = selection.planId as PlanId;
-  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? getPlan(selectedPlanId);
-  const quote = registrationQuote(plans, offers, selectedPlanId, seats, initialCycle);
 
-  // Çalışılan ilçeler: ofis ili seçilince o ilin ilçeleri gelir (coğrafya tek merkez, aynı sunucu ucu).
-  useEffect(() => {
-    if (!provinceId) return;
-    let stale = false;
-    startDistricts(async () => {
-      const rows = await listDistricts(provinceId);
-      if (!stale) setDistricts(rows);
-    });
-    return () => {
-      stale = true;
-    };
-  }, [provinceId]);
+  // Paket önerisi fiyat sayfasındaki hesaplayıcıyla AYNI motordan gelir (sabit eşik yok).
+  const selection = registrationSelection(plans, offers, seats, cycle, seatsTouched ? null : initialPlan);
+  const recommendedId = selection.calc.planId as PlanId;
+  const chosenQuote = chosen ? registrationQuote(plans, offers, chosen, seats, cycle) : null;
+  // Kullanıcı seçimi saygı görür; kapasite yetmiyorsa (veya hiç seçmediyse) motor önerisi geçerlidir.
+  const selectedPlanId: PlanId = chosen && chosenQuote && !chosenQuote.maxSeatsExceeded ? chosen : (selection.planId as PlanId);
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? getPlan(selectedPlanId);
+  const quote = registrationQuote(plans, offers, selectedPlanId, seats, cycle);
+  // Sunucuya giden ekip kovası SEÇİLEN planın tabanıdır: sunucu seçimi yükseltir/korur, kapasiteyi düşürmez.
+  const agentsBucket = defaultTeamSizeForPlan(selectedPlanId);
 
   // Sunucu hatası dönünce: alan hatasıysa o alanın adımına dön + alanın altına yaz; değilse genel bant.
   if (state !== handledState) {
@@ -250,10 +191,8 @@ export function RegisterForm({
     );
   }
 
-  function commitSeats(n: number) {
-    const v = Math.min(MAX_SEATS_INPUT, Math.max(1, Math.floor(Number.isFinite(n) ? n : 1)));
-    setSeats(v);
-    setSeatsText(String(v));
+  function changeSeats(n: number) {
+    setSeats(n);
     setSeatsTouched(true);
   }
 
@@ -281,67 +220,30 @@ export function RegisterForm({
       }
     }
     // Bu adımda düzeltilmemiş alan hatası varsa ilerleme; alanı odakla.
-    const pending = (Object.keys(fieldErrors) as SignupField[]).find((f) => SIGNUP_FIELD_STEP[f] === step);
-    if (pending) {
-      document.getElementById(signupFieldInputId(pending))?.focus();
+    const stuck = (Object.keys(fieldErrors) as SignupField[]).find((f) => SIGNUP_FIELD_STEP[f] === step);
+    if (stuck) {
+      document.getElementById(signupFieldInputId(stuck))?.focus();
       return;
     }
-    takeSnapshot();
     setStep((s) => Math.min(s + 1, LAST));
-  }
-  function takeSnapshot() {
-    if (!formRef.current) return;
-    const fd = new FormData(formRef.current);
-    const out: Record<string, string> = {};
-    for (const [k, v] of fd.entries()) if (typeof v === "string" && !(k in out)) out[k] = v;
-    out.__invites = String(fd.getAll(FIELD.inviteEmails).filter((v) => typeof v === "string" && v.trim()).length);
-    setSnap(out);
   }
   function back() {
     setStep((s) => Math.max(1, s - 1));
   }
 
-  function handleLogo(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setLogoPreview(null);
-      setLogoName(null);
-      return;
-    }
-    setLogoName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => setLogoPreview(typeof ev.target?.result === "string" ? ev.target.result : null);
-    reader.readAsDataURL(file);
-  }
-  function clearLogo() {
-    if (logoInputRef.current) logoInputRef.current.value = "";
-    setLogoPreview(null);
-    setLogoName(null);
-  }
-
-  function toggleFocus(key: FocusSegment) {
-    setFocus((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
-  }
-  function toggleDistrict(id: string) {
-    setWorkDistricts((cur) => {
-      if (cur.includes(id)) return cur.filter((x) => x !== id);
-      if (cur.length >= MAX_WORK_DISTRICTS) return cur;
-      return [...cur, id];
-    });
-  }
-
-  const effectiveHex = parseBrandColor(customHex) ?? brandColor;
   const baseStep = STEPS[step - 1]!;
   const current = googleMode && step === 1 ? { ...baseStep, question: "Bilgilerini onayla" } : baseStep;
-  const progress = Math.round(((step - 1) / (LAST - 1)) * 100);
+  const progress = Math.round((step / LAST) * 100);
   const trialText = trialDays ? `${trialDays} gün ücretsiz` : "Ücretsiz deneme";
+  const efLine = efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive);
 
   return (
     <AuthShell
+      wide={step === LAST}
       panelTitle="Ofisini dakikalar içinde kur"
       panelDesc={
         copy?.panelText ??
-        `${trialText}, kart gerekmez, taahhüt yok. Kurulum sihirbazı ofisini adım adım hazırlar; istersen örnek müşteri, portföy ve anlaşmalarla dolu başlar, tek tuşla gerçek kullanıma geçersin.`
+        `${trialText}, kart gerekmez, taahhüt yok. Yalnız hesap ve ofis adı yeterli; istersen örnek müşteri, portföy ve anlaşmalarla dolu başlar, sistemi hemen dener, tek tuşla gerçek kullanıma geçersin.`
       }
     >
       <div className="mt-8 lg:mt-0">
@@ -351,10 +253,10 @@ export function RegisterForm({
         <p className="mt-2 text-sm text-text-muted">
           {googleMode
             ? `Google hesabın doğrulandı. ${LAST} kısa adımda ofisini kur · ${trialText} · kart gerekmez.`
-            : (copy?.text ?? `${LAST} kısa adım · ${trialText} · kart gerekmez.`)}
+            : (copy?.text ?? `${LAST} kısa adım · ${trialText} · kart gerekmez. Kalan bilgileri giriş yaptıktan sonra tamamlarsın.`)}
         </p>
 
-        {/* İlerleme: çubuk + adım sayacı; tamamlanmış adımlara tıklanarak dönülür */}
+        {/* İlerleme: çubuk + adım sayacı; tamamlanmış adıma tıklanarak dönülür */}
         <div className="mt-6" aria-live="polite">
           <div className="flex items-center justify-between text-xs font-semibold text-text-muted">
             <span>
@@ -362,8 +264,8 @@ export function RegisterForm({
             </span>
             <span className="tabular-nums">%{progress}</span>
           </div>
-          <Progress value={progress} label={`Kurulum ilerlemesi: adım ${step} / ${LAST}`} className="mt-2" />
-          <ol className="mt-3 flex items-center gap-1.5" aria-label="Kurulum adımları">
+          <Progress value={progress} label={`Kayıt ilerlemesi: adım ${step} / ${LAST}`} className="mt-2" />
+          <ol className="mt-3 flex items-center gap-1.5" aria-label="Kayıt adımları">
             {STEPS.map((s) => {
               const done = step > s.no;
               const active = step === s.no;
@@ -395,16 +297,8 @@ export function RegisterForm({
 
         <form ref={formRef} onSubmit={handleSubmit} onChange={handleFormChange} className="mt-6" encType="multipart/form-data">
           <input type="hidden" name="plan" value={selectedPlanId} />
-          <input type="hidden" name="cycle" value={initialCycle} />
-          <input type="hidden" name="agents" value={selection.teamSize} />
-          <input type="hidden" name={FIELD.officeType} value={officeType} />
-          <input type="hidden" name={FIELD.brandColor} value={effectiveHex} />
-          {focus.map((f) => (
-            <input key={f} type="hidden" name={FIELD.focus} value={f} />
-          ))}
-          {workDistricts.map((id) => (
-            <input key={id} type="hidden" name={FIELD.workDistricts} value={id} />
-          ))}
+          <input type="hidden" name="cycle" value={cycle} />
+          <input type="hidden" name="agents" value={agentsBucket} />
           <AttributionFields attribution={attribution} />
           {googleMode ? <input type="hidden" name="auth_mode" value="google" /> : null}
 
@@ -501,8 +395,8 @@ export function RegisterForm({
             </button>
           </div>
 
-          {/* ADIM 2 — Ofis */}
-          <div data-step="2" className={step === 2 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
+          {/* ADIM 2 — Ofis adı + paket + demo + onay */}
+          <div data-step="2" className={step === 2 ? "tfs-panel mt-4 space-y-5" : "hidden"}>
             <div data-field="company">
               <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="company">Ofis / firma adı</label>
               <div className="relative">
@@ -510,399 +404,57 @@ export function RegisterForm({
                 <input id="company" name="company" required placeholder="Örn. Gezertaşar Emlak" className={inputCls} aria-invalid={fieldErrors.company ? true : undefined} aria-describedby={fieldErrors.company ? "company-error" : undefined} />
               </div>
               {fieldErrorEl("company")}
+              <p className="mt-1 text-xs text-text-faint">Konum, adres, telefon, logo ve ekip bilgilerini giriş yaptıktan sonra &quot;Ofis profilini tamamla&quot; ekranından eklersin.</p>
             </div>
-            <div>
-              <p className="mb-1.5 text-sm font-semibold text-ink-900">Ofisin konumu</p>
-              <GeoSelect
-                provinces={provinces}
-                withNeighborhood={false}
-                names={{ province: FIELD.provinceId, district: FIELD.districtId }}
-                onSelectionChange={(sel) => {
-                  if (sel.province_id !== provinceId) {
-                    setWorkDistricts([]);
-                    setDistricts([]);
-                  }
-                  setProvinceId(sel.province_id);
-                }}
+
+            {step === 2 ? (
+              <PlanPicker
+                plans={plans}
+                offers={offers}
+                seats={seats}
+                seatsMax={MAX_SEATS_INPUT}
+                onSeatsChange={changeSeats}
+                cycle={cycle}
+                onCycleChange={setCycle}
+                recommendedId={recommendedId}
+                selectedId={selectedPlanId}
+                onSelect={setChosen}
+                overMaxNote={selection.calc.status === "over_max" ? selection.calc.limitNote : null}
+                trialText={trialText}
               />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="address_line">
-                Açık adres <span className="font-normal text-text-faint">(opsiyonel)</span>
-              </label>
-              <div className="relative">
-                <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                <input
-                  id="address_line"
-                  name={FIELD.addressLine}
-                  value={addressLine}
-                  onChange={(e) => setAddressLine(e.target.value)}
-                  maxLength={ADDRESS_LINE_MAX}
-                  autoComplete="street-address"
-                  placeholder="Mahalle, cadde/sokak, bina no"
-                  className={inputCls}
-                />
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="office_phone">
-                  Ofis telefonu <span className="font-normal text-text-faint">(opsiyonel)</span>
-                </label>
-                <PhoneInput id="office_phone" name={FIELD.officePhone} value={officePhone} onValueChange={setOfficePhone} className={plainInputCls} />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="license_no">
-                  Yetki belgesi no <span className="font-normal text-text-faint">(opsiyonel)</span>
-                </label>
-                <div className="relative">
-                  <BadgeCheck className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                  <input
-                    id="license_no"
-                    name={FIELD.licenseNo}
-                    value={licenseNo}
-                    onChange={(e) => setLicenseNo(e.target.value.replace(/[^\p{L}\p{N} ./-]/gu, "").slice(0, 40))}
-                    inputMode="text"
-                    autoComplete="off"
-                    placeholder="Taşınmaz Ticareti Yetki Belgesi"
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="-mt-2 text-xs text-text-faint">İletişim ve belge bilgileri vitrinde ve belgelerde kullanılır; sonradan Ayarlar&apos;dan değiştirilebilir.</p>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-ink-900">Ofis türü</legend>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {OFFICE_TYPES.map((t) => (
-                  <label key={t.key} className={cardChoice(officeType === t.key)}>
-                    <span className="flex items-center gap-2 font-semibold text-ink-950">
-                      <input type="radio" name="office_type_choice" value={t.key} checked={officeType === t.key} onChange={() => setOfficeType(t.key)} className="accent-[var(--brand-600)]" />
-                      {t.label}
-                    </span>
-                    <span className="pl-6 text-xs text-text-muted">{t.description}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ink-900">
-                <Users className="h-4 w-4 text-brand-600" /> Danışman sayısı
-              </legend>
-              <div className="flex items-center gap-2.5">
-                <button type="button" aria-label="Danışman sayısını azalt" disabled={seats <= 1} onClick={() => commitSeats(seats - 1)} className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] border border-line bg-surface text-lg font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-40">
-                  −
-                </button>
-                <input
-                  id="seats"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  aria-label="Danışman sayısı"
-                  value={seatsText}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, "").slice(0, 3);
-                    setSeatsText(digits);
-                    if (digits !== "") {
-                      setSeats(Math.min(MAX_SEATS_INPUT, Math.max(1, Number(digits))));
-                      setSeatsTouched(true);
-                    }
-                  }}
-                  onBlur={() => commitSeats(seatsText === "" ? 1 : Number(seatsText))}
-                  className="h-11 w-24 rounded-[var(--radius-card)] border border-line bg-surface px-3 text-center text-base font-bold tabular-nums text-ink-950 outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10"
-                />
-                <button type="button" aria-label="Danışman sayısını artır" disabled={seats >= MAX_SEATS_INPUT} onClick={() => commitSeats(seats + 1)} className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] border border-line bg-surface text-lg font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-40">
-                  +
-                </button>
-                <span className="text-sm text-text-muted">kullanıcı</span>
-              </div>
-              <div className="mt-3" aria-live="polite">
-                {selection.calc.status === "over_max" ? (
-                  <p className="rounded-[var(--radius-card)] bg-brand-600/[0.06] px-3.5 py-2.5 text-sm text-ink-950">{selection.calc.limitNote}</p>
-                ) : (
-                  <RecommendedPlanCard plan={selectedPlan} seats={seats} monthlyTry={quote?.totalMonthlyTry ?? null} />
-                )}
-              </div>
-              {efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive) ? (
-                <p className="mt-1.5 text-xs font-semibold text-mint-700">
-                  {efPlannedLine(efCreditsLine(selectedPlan.efCreditsMonthly, efValuationCost ?? 0), efLive)}
-                  {efLive ? "; kontör ile ek sorgu satın alınabilir." : "."}
-                </p>
-              ) : null}
-              <p className="mt-2 text-xs text-text-faint">
-                Deneme boyunca tüm özellikler açık · paket ve aylık/yıllık seçimi ödeme sırasında yapılır.
+            ) : null}
+            {efLine ? (
+              <p className="-mt-2 text-xs font-semibold text-mint-700">
+                {efLine}
+                {efLive ? "; kontör ile ek sorgu satın alınabilir." : "."}
               </p>
-            </fieldset>
-            <div className="flex gap-2.5">
-              <button type="button" onClick={back} className={ghostBtn}>
-                <ArrowLeft className="h-4 w-4" /> Geri
-              </button>
-              <button type="button" onClick={next} className={primaryBtn}>
-                Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-              </button>
-            </div>
-          </div>
+            ) : null}
 
-          {/* ADIM 3 — Marka */}
-          <div data-step="3" className={step === 3 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
-            <div className="flex items-center gap-4">
-              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas">
-                {logoPreview ? (
-                  <Image src={logoPreview} alt="Seçilen logo önizlemesi" fill className="object-contain p-1" unoptimized />
-                ) : (
-                  <Building2 className="h-8 w-8 text-text-faint" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink-900">
-                  Ofis logosu <span className="font-normal text-text-faint">(opsiyonel)</span>
-                </p>
-                <p className="text-xs text-text-muted">PNG, JPG veya WebP · en çok 2 MB. Sonradan Ayarlar&apos;dan değiştirilebilir.</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => logoInputRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface">
-                    <Upload className="h-3.5 w-3.5" /> {logoPreview ? "Değiştir" : "Logo seç"}
-                  </button>
-                  {logoPreview ? (
-                    <button type="button" onClick={clearLogo} className="rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:bg-surface">
-                      Kaldır
-                    </button>
-                  ) : null}
-                </div>
-                {logoName ? <p className="mt-1 truncate text-xs text-text-faint">{logoName}</p> : null}
-                <input ref={logoInputRef} type="file" name={FIELD.logo} accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleLogo} aria-label="Logo seç" />
-              </div>
-            </div>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-ink-900">Marka rengi</legend>
-              <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Marka rengi">
-                {BRAND_COLOR_PRESETS.map((c) => {
-                  const active = !parseBrandColor(customHex) && brandColor === c.hex;
-                  return (
-                    <button
-                      key={c.hex}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      aria-label={c.label}
-                      title={c.label}
-                      onClick={() => {
-                        setBrandColor(c.hex);
-                        setCustomHex("");
-                      }}
-                      className={`focus-ring grid h-9 w-9 place-items-center rounded-full border-2 transition ${active ? "border-ink-950 scale-110" : "border-transparent hover:scale-105"}`}
-                      style={{ background: c.hex }}
-                    >
-                      {active ? <Check className="h-4 w-4 text-white" /> : null}
-                    </button>
-                  );
-                })}
-                <label className="ml-1 flex items-center gap-2 text-xs text-text-muted">
-                  <span>Özel:</span>
-                  <input
-                    type="text"
-                    inputMode="text"
-                    value={customHex}
-                    onChange={(e) => setCustomHex(e.target.value.trim())}
-                    placeholder="#1d5fd6"
-                    maxLength={7}
-                    pattern="^#[0-9a-fA-F]{6}$"
-                    aria-label="Özel marka rengi (hex)"
-                    className="h-9 w-24 rounded-[var(--radius-control)] border border-line bg-surface px-2 font-mono text-xs outline-none focus:border-brand-400"
-                  />
-                </label>
-              </div>
-              {/* Canlı önizleme: brand-scope token'ları (uygulama kabuğundaki beyaz etiketle aynı değişkenler) */}
-              <div
-                className="brand-scope mt-3 flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3"
-                style={{ "--brand-600": effectiveHex, "--brand-700": `color-mix(in srgb, ${effectiveHex} 80%, #000)` } as React.CSSProperties}
-                aria-label="Panel önizlemesi"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-white" style={{ background: effectiveHex }}>
-                    <Sparkles className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs font-bold text-ink-950">Panel bu renkte görünür</p>
-                    <p className="text-xs text-text-muted">Düğmeler, vurgular ve vitrin</p>
-                  </div>
-                </div>
-                <span className="rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold text-white" style={{ background: effectiveHex }}>
-                  Yeni portföy
-                </span>
-              </div>
-            </fieldset>
-            <div className="flex gap-2.5">
-              <button type="button" onClick={back} className={ghostBtn}>
-                <ArrowLeft className="h-4 w-4" /> Geri
-              </button>
-              <button type="button" onClick={next} className={primaryBtn}>
-                Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* ADIM 4 — Odak */}
-          <div data-step="4" className={step === 4 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-ink-900">Çalışma alanın (birden fazla seçebilirsin)</legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {FOCUS_SEGMENTS.map((f) => {
-                  const active = focus.includes(f.key);
-                  return (
-                    <label key={f.key} className={cardChoice(active)}>
-                      <span className="flex items-center gap-2 font-semibold text-ink-950">
-                        <input type="checkbox" checked={active} onChange={() => toggleFocus(f.key)} className="accent-[var(--brand-600)]" />
-                        {f.label}
-                      </span>
-                      <span className="pl-6 text-xs text-text-muted">{f.description}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-xs text-text-faint">Örnek veri paketi ve kayıp nedeni/kaynak tanımları bu seçime göre gelir.</p>
-            </fieldset>
-            <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-ink-900">
-                Çalıştığın ilçeler <span className="font-normal text-text-faint">(opsiyonel, en çok {MAX_WORK_DISTRICTS})</span>
-              </legend>
-              {!provinceId ? (
-                <p className="rounded-[var(--radius-card)] border border-dashed border-line px-3.5 py-3 text-xs text-text-muted">
-                  İlçe seçmek için 2. adımda ofis ilini seç.{" "}
-                  <button type="button" onClick={() => setStep(2)} className="font-semibold text-brand-600 hover:underline">
-                    Ofis adımına dön
-                  </button>
-                </p>
-              ) : loadingDistricts ? (
-                <p className="flex items-center gap-2 text-xs text-text-muted">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> İlçeler yükleniyor…
-                </p>
-              ) : districts.length === 0 ? (
-                <p className="text-xs text-text-muted">Bu ilde kayıtlı ilçe bulunamadı.</p>
-              ) : (
-                <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-[var(--radius-card)] border border-line p-2" role="group" aria-label="Çalışılan ilçeler">
-                  {districts.map((d) => {
-                    const active = workDistricts.includes(d.id);
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => toggleDistrict(d.id)}
-                        className={`focus-ring rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
-                          active ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface text-text-muted hover:border-brand-300"
-                        }`}
-                      >
-                        {d.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {workDistricts.length > 0 ? <p className="mt-1.5 text-xs text-text-faint">{workDistricts.length} ilçe seçildi.</p> : null}
-            </fieldset>
-            <div className="flex gap-2.5">
-              <button type="button" onClick={back} className={ghostBtn}>
-                <ArrowLeft className="h-4 w-4" /> Geri
-              </button>
-              <button type="button" onClick={next} className={primaryBtn}>
-                Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-              </button>
-            </div>
-          </div>
-
-          {/* ADIM 5 — Ekip daveti (opsiyonel) */}
-          <div data-step="5" className={step === 5 ? "tfs-panel mt-4 space-y-4" : "hidden"}>
-            <p className="text-sm text-text-muted">
-              En çok {MAX_INVITES} danışmanın e-postasını yaz; ofis açılır açılmaz erişim bağlantısı gider. Sonradan Ekip sayfasından
-              dilediğin kadar davet edebilirsin.
-            </p>
-            <div className="space-y-2.5">
-              {Array.from({ length: MAX_INVITES }, (_, i) => (
-                <div key={i} className="relative">
-                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-                  <EmailInput id={`invite-${i}`} name={FIELD.inviteEmails} autoComplete="off" placeholder={`danisman${i + 1}@ofis.com`} aria-label={`${i + 1}. danışman e-postası`} className={inputCls} />
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-text-faint">Davet edilenler Ekip sayfasında görünür; ulaşmayan daveti oradan yineleyebilirsin. Paket koltuk sınırı aşılırsa davet atlanır ve not düşülür.</p>
-            <div className="flex gap-2.5">
-              <button type="button" onClick={back} className={ghostBtn}>
-                <ArrowLeft className="h-4 w-4" /> Geri
-              </button>
-              <button type="button" onClick={next} className={primaryBtn}>
-                Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                takeSnapshot();
-                setStep(LAST);
-              }}
-              className="w-full text-center text-xs font-semibold text-text-muted hover:text-ink-950"
-            >
-              Şimdilik atla
-            </button>
-          </div>
-
-          {/* ADIM 6 — Demo veri + onay */}
-          <div data-step="6" className={step === LAST ? "tfs-panel mt-4 space-y-4" : "hidden"}>
             <label className={`flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border px-3.5 py-3 text-xs leading-relaxed transition ${demo ? "border-brand-300/60 bg-brand-600/[0.04]" : "border-line bg-surface"}`}>
               <input type="checkbox" name="demo_data" defaultChecked onChange={(e) => setDemo(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
               <span className="text-text-muted">
                 <strong className="flex items-center gap-1.5 text-sm text-ink-900">
                   <Sparkles className="h-4 w-4 text-amber-500" /> Demo veriyle başla
                 </strong>
-                Ofisin örnek müşteri, portföy, anlaşma ve randevularla dolu gelir; her ekranı gerçek akışla dene. Örnek kayıtlar
-                &quot;Örnek veri&quot; rozetiyle ayrışır, vitrine ve portallara çıkmaz. Hazır olunca Ayarlar &gt; Gerçek kullanıma geç ile her an{" "}
-                <strong className="text-ink-900">tek tuşla</strong> temizlenir; kendi girdiğin kayıtlara dokunulmaz.
+                Örnek müşteri, portföy, anlaşma ve randevularla dolu gelir; sistemi hemen dene. Örnek kayıtlar &quot;Örnek veri&quot; rozetiyle ayrışır,
+                vitrine ve portallara çıkmaz; Ayarlar &gt; Gerçek kullanıma geç ile <strong className="text-ink-900">tek tuşla</strong> temizlenir.
               </span>
             </label>
             {!demo ? (
-              <p className="rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-2.5 text-xs text-text-muted">
-                Boş başlıyorsun: yalnız ofis tipine uygun tanımlar gelir. Örnek veriyi sonradan Başlangıç sihirbazından da yükleyebilirsin.
+              <p className="-mt-3 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-2.5 text-xs text-text-muted">
+                Boş başlıyorsun. Örnek veriyi sonradan Başlangıç sihirbazından da yükleyebilirsin.
               </p>
             ) : null}
 
-            <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-canvas">
-              <SummarySection title="Hesap" onEdit={() => setStep(1)}>
-                <SummaryItem label="Ad soyad" value={snap.name || googleAccount?.name} />
-                <SummaryItem label="E-posta" value={googleAccount?.email ?? snap.email} />
-              </SummarySection>
-              <SummarySection title="Ofis" onEdit={() => setStep(2)}>
-                <SummaryItem label="Ofis adı" value={snap.company} />
-                <SummaryItem
-                  label="Konum"
-                  value={[districts.find((d) => d.id === snap[FIELD.districtId])?.name, provinces.find((p) => p.id === snap[FIELD.provinceId])?.name]
-                    .filter(Boolean)
-                    .join(", ")}
-                />
-                <SummaryItem label="Telefon" value={officePhone ? formatPhoneDisplay(officePhone) : ""} />
-                <SummaryItem label="Yetki belgesi" value={licenseNo} />
-                <SummaryItem label="Ofis türü" value={OFFICE_TYPES.find((t) => t.key === officeType)?.label} />
-              </SummarySection>
-              <SummarySection title="Paket" onEdit={() => setStep(2)}>
-                <SummaryItem label="Önerilen" value={`${selectedPlan.name} · ${formatNumberTr(seats)} kullanıcı`} />
-                <SummaryItem label="Tahmini tutar" value={quote ? `${formatNumberTr(quote.totalMonthlyTry)} ₺/ay + KDV` : ""} />
-                <SummaryItem label="Deneme" value={`${trialText} · kart gerekmez`} />
-              </SummarySection>
-              <SummarySection title="Kurulum" onEdit={() => setStep(4)}>
-                <SummaryItem label="Odak" value={FOCUS_SEGMENTS.filter((f) => focus.includes(f.key)).map((f) => f.label).join(", ")} />
-                <SummaryItem label="Çalışılan ilçe" value={workDistricts.length ? `${workDistricts.length} ilçe` : ""} />
-                <SummaryItem label="Davet" value={Number(snap.__invites ?? 0) > 0 ? `${snap.__invites} danışman` : ""} />
-                <SummaryItem label="Marka rengi" value={effectiveHex} swatch={effectiveHex} />
-              </SummarySection>
-            </div>
-
             <div data-field="legal_consent">
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
-              <input id="legal_consent" type="checkbox" name="legal_consent" value="accepted" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" aria-invalid={fieldErrors.legal_consent ? true : undefined} aria-describedby={fieldErrors.legal_consent ? "legal_consent-error" : undefined} />
-              <span>
-                <Link href="/kullanim-sartlari" target="_blank" className="font-semibold text-brand-600 hover:underline">Kullanım Şartları</Link>&apos;nı ve{" "}
-                <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-brand-600 hover:underline">KVKK Aydınlatma Metni</Link>&apos;ni okudum, kabul ediyorum.
-              </span>
-            </label>
-            {fieldErrorEl("legal_consent")}
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-surface px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
+                <input id="legal_consent" type="checkbox" name="legal_consent" value="accepted" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" aria-invalid={fieldErrors.legal_consent ? true : undefined} aria-describedby={fieldErrors.legal_consent ? "legal_consent-error" : undefined} />
+                <span>
+                  <Link href="/kullanim-sartlari" target="_blank" className="font-semibold text-brand-600 hover:underline">Kullanım Şartları</Link>&apos;nı ve{" "}
+                  <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-brand-600 hover:underline">KVKK Aydınlatma Metni</Link>&apos;ni okudum, kabul ediyorum.
+                </span>
+              </label>
+              {fieldErrorEl("legal_consent")}
             </div>
 
             {/* Genel bant: yalnız alanla eşleşmeyen sunucu hatası (alan hataları kendi adımında, alanın altında). */}
@@ -912,6 +464,10 @@ export function RegisterForm({
               </div>
             ) : null}
 
+            <p className="text-center text-xs text-text-muted" aria-live="polite">
+              <strong className="text-ink-950">{selectedPlan.name}</strong> · {formatNumberTr(seats)} kullanıcı
+              {quote ? ` · ${formatNumberTr(cycle === "yearly" ? Math.round(quote.totalForCycleTry / 12) : quote.totalMonthlyTry)} ₺/ay + KDV (deneme sonrası)` : ""}
+            </p>
             <div className="flex gap-2.5">
               <button type="button" onClick={back} className={ghostBtn} disabled={pending}>
                 <ArrowLeft className="h-4 w-4" /> Geri
@@ -930,7 +486,6 @@ export function RegisterForm({
             </div>
             <p className="text-center text-xs text-text-faint">Kredi kartı gerekmez · {trialText} · Taahhütsüz</p>
           </div>
-
         </form>
 
         {googleMode ? (
@@ -952,88 +507,5 @@ export function RegisterForm({
         )}
       </div>
     </AuthShell>
-  );
-}
-
-const nfTr = new Intl.NumberFormat("tr-TR");
-const limitTr = (n: number | null) => (n == null ? "Sınırsız" : nfTr.format(n));
-
-/** Danışman sayısından motorun önerdiği paket: fiyat, sınırlar ve öne çıkanlar (deneme sonrası; şimdi ödeme yok). */
-function RecommendedPlanCard({ plan, seats, monthlyTry }: { plan: PlanDef; seats: number; monthlyTry: number | null }) {
-  const tiles = [
-    { label: "Kullanıcı", value: limitTr(plan.limits.seats), Icon: Users },
-    { label: "Şube", value: limitTr(plan.limits.branches), Icon: Building2 },
-    { label: "Müşteri", value: limitTr(plan.limits.customers), Icon: UserRound },
-    { label: "Aktif portföy", value: limitTr(plan.limits.activeProperties), Icon: House },
-  ];
-  return (
-    <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-brand-300/70 bg-gradient-to-b from-brand-600/[0.07] to-surface p-4 shadow-[var(--elev-2)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-text-muted">Deneme sonrası önerilen paket</p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            <span className="font-display text-lg font-bold tracking-tight text-ink-950">{plan.name}</span>
-            {plan.popular ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-2 py-0.5 text-xs font-bold text-white">
-                <Sparkles className="h-3 w-3" aria-hidden="true" /> En çok tercih
-              </span>
-            ) : null}
-          </p>
-          <p className="text-xs text-text-muted">{plan.blurb}</p>
-        </div>
-        {monthlyTry != null ? (
-          <div className="shrink-0 text-right">
-            <p className="font-display text-xl font-bold tabular-nums tracking-tight text-ink-950">{nfTr.format(monthlyTry)} ₺</p>
-            <p className="text-xs text-text-muted">/ay + KDV · {nfTr.format(seats)} kullanıcı</p>
-          </div>
-        ) : null}
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-1.5">
-        {tiles.map(({ label, value, Icon }) => (
-          <div key={label} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line/70 bg-surface/80 px-2 py-1.5">
-            <Icon className="h-3.5 w-3.5 shrink-0 text-brand-600" aria-hidden="true" />
-            <div className="min-w-0 leading-tight">
-              <p className="text-xs font-bold tabular-nums text-ink-950">{value}</p>
-              <p className="truncate text-xs text-text-muted">{label}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      <ul className="mt-3 grid gap-1 border-t border-line/70 pt-2.5 sm:grid-cols-2">
-        {plan.features.slice(2, 6).map((f) => (
-          <li key={f} className="flex items-start gap-1.5 text-xs text-text-muted">
-            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600" aria-hidden="true" />
-            <span className="min-w-0">{f}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function SummarySection({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
-  return (
-    <section className="border-b border-line px-3.5 py-2.5 last:border-b-0">
-      <div className="mb-1 flex items-center justify-between">
-        <h3 className="text-xs font-bold text-ink-950">{title}</h3>
-        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1 rounded-[var(--radius-control)] px-1.5 py-0.5 text-xs font-semibold text-brand-600 hover:bg-brand-600/[0.06]">
-          <Pencil className="h-3 w-3" aria-hidden="true" /> Düzenle
-        </button>
-      </div>
-      <dl className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">{children}</dl>
-    </section>
-  );
-}
-
-function SummaryItem({ label, value, swatch }: { label: string; value?: string | null; swatch?: string }) {
-  const v = (value ?? "").trim();
-  return (
-    <>
-      <dt className="text-text-faint">{label}</dt>
-      <dd className={`flex min-w-0 items-center gap-1.5 truncate ${v ? "font-semibold text-ink-950" : "font-normal text-text-faint"}`}>
-        {swatch ? <span className="h-3 w-3 shrink-0 rounded-full border border-line" style={{ background: swatch }} aria-hidden="true" /> : null}
-        <span className="truncate">{v || "—"}</span>
-      </dd>
-    </>
   );
 }
