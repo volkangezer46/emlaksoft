@@ -1,4 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
@@ -41,8 +42,6 @@ import {
 import { ButtonLink } from "@/components/ui/button";
 import { ApprovalBulkBar, ApprovalCommentForm, CancelApprovalButton, DecisionControls } from "./approval-actions";
 import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportApprovalsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 
@@ -270,11 +269,7 @@ export default async function OnaylarPage({
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ExportCsvButton
-              action={exportApprovalsCsv.bind(null, { durum, tur, kim, talepEden, bas, bit })}
-              label="CSV"
-              hint="Ekrandaki filtrelerle en fazla 2000 talep"
-            />
+            <ReportOpenLink report="onaylar" filters={{ durum: durum || undefined, tur: tur || undefined, talepEden: talepEden || undefined, from: bas || undefined, to: bit || undefined }} />
             {manager ? (
               <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
                 Onay kuralları

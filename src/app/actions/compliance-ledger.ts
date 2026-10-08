@@ -4,18 +4,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
-import { now, trDayKey } from "@/lib/clock";
-import { toCsv } from "@/lib/export-entities";
-import type { ExportResult } from "@/app/actions/export";
+import { now } from "@/lib/clock";
 import {
   DEFAULT_LEDGER_THRESHOLDS,
   computeLedgerFlags,
   computeRetainUntil,
-  mapLedgerCsvRow,
   parseLedgerForm,
   parseRetentionYears,
   parseThreshold,
-  type LedgerCsvRow,
   type LedgerThresholds,
 } from "@/lib/compliance/ledger";
 import { actionErrorMessage } from "@/lib/action-errors";
@@ -24,8 +20,6 @@ export type LedgerActionResult = { ok?: boolean; error?: string; message?: strin
 
 const MISSING_TABLE = /compliance_ledger|schema cache|does not exist/i;
 const MISSING_MSG = "Yasal kayıt defteri bu ortamda henüz etkin değil.";
-const EXPORT_LIMIT = 5000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isOfficeLevel(role: string) {
   return role === "owner" || role === "gm";
@@ -195,52 +189,4 @@ export async function saveLedgerSettings(
   });
   revalidatePath("/app/uyum/kayit-defteri");
   return { ok: true, message: "Ayarlar kaydedildi. Yeni kayıtlar bu eşiklerle işaretlenir; eski kayıtlar değişmez." };
-}
-
-/** Defteri CSV olarak indirir (ofis sahibi / genel müdür); indirme denetim kaydına yazılır. */
-export async function exportLedgerCsv(): Promise<ExportResult> {
-  const gate = await requirePermission("compliance", "view");
-  if (!gate.ok) return { error: gate.error };
-  if (!isOfficeLevel(gate.role)) return { error: "Defteri yalnız ofis sahibi veya genel müdür indirebilir." };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("compliance_ledger_entries")
-    .select(
-      "created_at, transaction_date, kind, transaction_type, party_name, party_role, counterparty_name, identity_checked, amount_try, payment_method, flags, retain_until, corrects_entry_id, note, created_by",
-    )
-    .eq("tenant_id", gate.tenantId)
-    .order("transaction_date", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(EXPORT_LIMIT);
-  if (error) {
-    console.error("exportLedgerCsv", error.message);
-    return { error: MISSING_TABLE.test(error.message) ? MISSING_MSG : actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
-  }
-
-  const creatorIds = [...new Set((data ?? []).map((r) => r.created_by as string).filter((id) => UUID_RE.test(id)))];
-  const names = new Map<string, string>();
-  if (creatorIds.length) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("tenant_id", gate.tenantId)
-      .in("id", creatorIds);
-    for (const p of profiles ?? []) names.set(p.id, p.full_name);
-  }
-  const rows = (data ?? []).map((r) =>
-    mapLedgerCsvRow({ ...(r as unknown as LedgerCsvRow), creator: names.get(r.created_by as string) ?? null }),
-  );
-  const truncated = rows.length >= EXPORT_LIMIT;
-  let csv = toCsv(rows);
-  if (truncated) csv += `\n"UYARI: Yalnızca ilk ${EXPORT_LIMIT} kayıt dışa aktarıldı."`;
-  const filename = `kayit-defteri-${trDayKey()}.csv`;
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "export.csv",
-    entityType: "compliance_ledger",
-    newValue: { rows: rows.length, truncated, filename },
-  });
-  return { csv, filename, truncated, rowCount: rows.length, entity: "compliance_ledger" };
 }

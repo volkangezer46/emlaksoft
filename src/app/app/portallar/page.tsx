@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, msSince, msUntil, DAY_MS } from "@/lib/clock";
@@ -17,8 +18,6 @@ import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getExpiringAuthorizations } from "@/app/actions/property-management";
-import { exportPortalListingsCsv } from "@/app/actions/export";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { NewPortalPanel, NewPortalTrigger } from "./portal-dialogs";
 import { PortalRowMore } from "./portal-row-more";
 import { ConfirmListingButton } from "./confirm-listing-button";
@@ -220,7 +219,7 @@ export default async function PortalsPage({
         actions={
           <>
             <ButtonLink href="/app/kayip-kacak" variant="secondary" iconRight={ArrowUpRight}>Kayıp-kaçak panosu</ButtonLink>
-            <ExportCsvButton action={exportPortalListingsCsv} label="Dışa aktar" />
+            <ReportOpenLink report="portal-ilanlari" filters={{ portal: sp.portal, status: ["live", "removed", "superseded"].includes(sp.durum ?? "") ? sp.durum : undefined }} />
             <NewPortalTrigger variant="solid" disabled={propertyOptions.length === 0} />
           </>
         }

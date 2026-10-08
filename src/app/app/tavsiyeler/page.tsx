@@ -1,4 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import Link from "@/components/ui/smart-link";
@@ -19,8 +20,6 @@ import { createClient } from "@/lib/supabase/server";
 import { StatCard } from "@/components/app/stat-card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportReferralsCsv } from "@/app/actions/export";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { getBaseUrl } from "@/lib/base-url";
 import {
@@ -328,7 +327,7 @@ export default async function ReferralsPage({
         ) : (
           <>
             <div className="flex items-center justify-end">
-              <ExportCsvButton action={exportReferralsCsv} label="Dışa aktar" />
+              <ReportOpenLink report="tavsiyeler" filters={{ status: sp.durum }} />
             </div>
             <TableFrame minWidth={980}>
             <Table>

@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { daysAgoIso, daysFromNowIso, isPast } from "@/lib/clock";
 import { formatDateTr } from "@/lib/format";
 import {
@@ -25,8 +26,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { OFFICE_STATUS_LABELS } from "@/lib/admin/office-create-rules";
 import { embeddedCount } from "@/lib/admin/platform-metrics";
-import { exportTenantsCsv } from "@/app/actions/platform-export";
-import { ExportButton } from "@/components/admin/export-button";
 import { AdminActiveFilters, AdminChip, AdminInfo, AdminListCard, AdminListSearch } from "@/components/admin/admin-list";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -221,7 +220,7 @@ export default async function AdminTenantsPage({
                 Yeni ofis
               </ButtonLink>
             ) : null}
-            <ExportButton action={exportTenantsCsv} label="Excel'e aktar" />
+            <ReportOpenLink scope="platform" report="ofisler" filters={{ q: raw.q, durum: raw.durum, plan: raw.plan }} />
           </>
         }
       >

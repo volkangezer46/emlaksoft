@@ -213,7 +213,7 @@ export default async function AuditDossierPage() {
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-600" />
             <span>
               Bu dosya sistemdeki kayıtlardan <strong>otomatik</strong> üretilmiştir ve bir özettir;
-              satır bazlı döküm için ilgili sayfalardaki CSV dışa aktarımlarını kullanın. Mekanik
+              satır bazlı döküm için Raporlar bölümündeki Rapor merkezini kullanın. Mekanik
               kontroller yalnızca sistemde <strong>tespit edilebilen</strong> eksikleri gösterir —
               hukuki uygunluk beyanı değildir. Komisyon oranı uyarısı bir teyit çağrısıdır, hukuki
               tespit değil.

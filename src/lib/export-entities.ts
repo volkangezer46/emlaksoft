@@ -1,8 +1,8 @@
 /**
- * CSV dışa aktarma ortak çekirdeği — hem hızlı server action'lar
- * (`src/app/actions/export.ts`, 2000 satır sınırı) hem tam akış route'u
- * (`/api/export/[entity]`) aynı yetki modülünü, aynı kolon eşlemesini ve aynı
- * CSV kaçışını buradan kullanır. Saf modül: sunucu/istemci bağımlılığı yok.
+ * CSV eşleme çekirdeği — YALNIZ ofis kapatma veri paketi (`/api/export/kapanis/[entity]`, KVKK veri taşınabilirliği) için.
+ * Sayfa/panel dışa aktarmaları KALDIRILDI: dosya çıktısı (Excel / PDF / CSV) artık Rapor merkezindedir
+ * (`src/lib/report-center/`). Aynı yetki modülü, aynı kolon eşlemesi ve aynı CSV kaçışı buradan gelir.
+ * Saf modül: sunucu/istemci bağımlılığı yok.
  */
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { escapeCsvCell } from "@/lib/csv";

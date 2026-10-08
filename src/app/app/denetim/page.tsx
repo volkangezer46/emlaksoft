@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import {
   Activity,
@@ -10,7 +11,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { AuditExportButton } from "./audit-export-button";
 import {
   actionLabel,
   HIGH_RISK_ACTIONS,
@@ -93,7 +93,7 @@ export default async function AuditPage({
       { count: "exact" },
     )
     .order("created_at", { ascending: false });
-  // Tarih, aktör, risk, işlem türü ve metin araması sunucu tarafında (CSV aynı süzgeci kullanır).
+  // Tarih, aktör, risk, işlem türü ve metin araması sunucu tarafında (Rapor merkezi aynı süzgeci kullanır).
   logQuery = applyAuditFilters(logQuery, filters);
   const [{ data: logs, count: logTotal }, { count: highCount }, { count: last24Count }] = await batchAll("Denetim günlüğü", [], [
     logQuery.range(offset, offset + PAGE_SIZE - 1),
@@ -208,7 +208,7 @@ export default async function AuditPage({
               Zaman çizelgesi · aktör + değişiklik · ofis izole{totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
             </p>
           </div>
-          <AuditExportButton filters={filters} filtered={hasFilter} />
+          <ReportOpenLink report="aktivite-denetim" filters={{ from: filters.from, to: filters.to, advisor: filters.aktor, risk: filters.risk, ara: filters.ara }} />
         </div>
         {/* ?from=&to=&aktor= — sunucu tarafı filtre formu; submit sayfayı 1'e döndürür */}
         <form method="get" action="/app/denetim" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">

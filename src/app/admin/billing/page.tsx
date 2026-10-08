@@ -1,14 +1,12 @@
 import { Input } from "@/components/ui/input";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { Button } from "@/components/ui/button";
 ﻿import Link from "@/components/ui/smart-link";
-import { Activity, AlertTriangle, ArrowUpRight, CreditCard, Download, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { orIlike } from "@/lib/pgrst";
-import { exportSubscriptionsCsv } from "@/app/actions/platform-export";
-import { ACCOUNTING_EXPORT_PATH } from "@/lib/accounting/csv";
 import { loadPlatformMrr } from "@/lib/accounting/loaders";
-import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
@@ -191,7 +189,7 @@ export default async function AdminBillingPage({
         title="Gelir operasyonu"
         art="invoice"
         description="Abonelik, fatura ve tahsilat tek ekranda · iyzico bağlanınca tahsilat otomatikleşir"
-        actions={<ExportButton action={exportSubscriptionsCsv} label="Abonelikleri indir" />}
+        actions={<ReportOpenLink scope="platform" report="abonelikler" />}
       />
       <BillingNav active="genel" />
       <section aria-label="Gelir özeti" className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
@@ -490,13 +488,7 @@ export default async function AdminBillingPage({
               {invCount ?? 0}
             </span>
           </h2>
-          {/* Dosya indirme (route handler): sayfa gezintisi değil, Link ile önceden yüklenmemeli. */}
-          <a
-            href={`${ACCOUNTING_EXPORT_PATH}?donem=tumu`}
-            className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
-          >
-            <Download className="h-3.5 w-3.5" /> Muhasebeci CSV (tüm faturalar)
-          </a>
+          <ReportOpenLink scope="platform" report="muhasebe-fatura-defteri" filters={{ donem: "tumu" }} label="Raporlarda aç (tüm faturalar)" />
         </div>
         {invRows.length === 0 ? (
           <AdminEmpty

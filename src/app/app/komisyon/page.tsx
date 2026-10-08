@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import {
   ArrowUpRight,
   CalendarRange,
@@ -20,8 +21,6 @@ import { summarizeAdvisorEarning, type ShareRow } from "@/lib/team/advisor-share
 import { trMonthContext } from "@/lib/team/scorecard";
 import { ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import { exportCommissionsCsv } from "@/app/actions/export";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { CommissionSimulator } from "./commission-simulator";
@@ -491,7 +490,7 @@ export default async function CommissionPage({
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div><p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><ReceiptText className="h-4 w-4" /> Gerçek kayıtlar</p><h2 className="mt-1 font-display font-bold text-text">Komisyon defteri</h2></div>
           <div className="flex items-center gap-2">
-            <ExportCsvButton action={exportCommissionsCsv} label="Dışa aktar" hint="Hızlı dışa aktarma en çok 2.000 satır içerir; daha fazlası varsa indirmeden sonra çıkan Tümünü indir bağlantısını kullanın." />
+            <ReportOpenLink report="komisyonlar" filters={{ durum: params.durum, from: params.from, to: params.to }} />
             <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-xs font-bold text-accent-text">{totalCount} kayıt</span>
           </div>
         </div>

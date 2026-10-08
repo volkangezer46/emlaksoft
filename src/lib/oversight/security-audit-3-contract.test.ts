@@ -73,9 +73,10 @@ describe("#5 yonetici muafiyeti dar", () => {
 });
 
 describe("#2 export kanali", () => {
-  it("hizli ve tam export farkli kanal gonderir", () => {
-    expect(src("src/app/actions/export.ts")).toContain('channel: "quick"');
-    expect(src("src/app/api/export/[entity]/route.ts")).toContain('channel: "full"');
+  it("rapor merkezi indirmesi toplu export sayilir (tam kanal) ve gercek satir sayisiyla degerlendirilir", () => {
+    const s = src("src/lib/report-center/download.ts");
+    expect(s).toContain('channel: "full"');
+    expect(s).toContain("rows: probe.total");
   });
 });
 

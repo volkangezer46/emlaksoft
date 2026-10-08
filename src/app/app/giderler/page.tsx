@@ -1,10 +1,9 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
-import { exportExpensesCsv } from "@/app/actions/export";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listExpenses } from "@/app/actions/expenses";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { requireReportingData } from "@/lib/reporting/result";
@@ -206,7 +205,7 @@ export default async function GiderlerPage({
         description="Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
         actions={
           <>
-            <ExportCsvButton action={exportExpensesCsv} label="Dışa aktar" />
+            <ReportOpenLink report="giderler" filters={{ kategori: params.kategori, from: params.from, to: params.to }} />
             {canCreate ? (
               <ButtonLink href="#gider-ekle" icon={Plus}>
                 Yeni gider

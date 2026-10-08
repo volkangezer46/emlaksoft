@@ -1,6 +1,7 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
-import { ReportExportBar } from "@/components/app/report-export-bar";
+import { ReportCenter } from "@/components/report-center/report-center";
+import { ReportTabs } from "@/components/report-center/report-tabs";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
@@ -25,7 +26,7 @@ import { defaultLabelMap } from "@/lib/definition-defaults";
 import { requireModulePage } from "@/lib/require-module-page";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { computeOfficeScore, type OfficeScoreInputs } from "@/lib/office-score";
-import { now as clockNow, trDayKey } from "@/lib/clock";
+import { now as clockNow } from "@/lib/clock";
 import { ICONS } from "@/lib/icons";
 import { requireReportingData } from "@/lib/reporting/result";
 import { getTenantReportingAggregates } from "@/lib/reporting/cache";
@@ -76,8 +77,18 @@ function istanbulYearMonth(iso: string) {
   return { year: get("year"), month: get("month") - 1 };
 }
 
-export default async function ReportsPage() {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { tenantId } = await requireModulePage("reports", "/app/raporlar");
+  const sp = await searchParams;
+  // Rapor merkezi sekmesi (?sekme=merkez): tüm dışa aktarma (Excel / PDF / CSV) burada; dashboard sorguları çalışmaz.
+  if ((Array.isArray(sp.sekme) ? sp.sekme[0] : sp.sekme) === "merkez") {
+    return (
+      <div className="space-y-5">
+        <ReportTabs scope="tenant" active="merkez" overviewLabel="Ofis sağlık & performans" />
+        <ReportCenter scope="tenant" params={sp} />
+      </div>
+    );
+  }
   const supabase = await createClient();
   // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
   const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
@@ -257,23 +268,11 @@ export default async function ReportsPage() {
     valueText: `${r.count} · %${shareOfTotal(r.count, lostCount)} · ${money(r.value)}${r.value > 0 ? ` · ≈ ${money(lostCommission(r.value))} komisyon` : ""}`,
   }));
 
-  // CSV: ekrandaki toplulaştırılmış satırlar (kişisel veri yok). Bölüm · kalem · değer · ek bilgi.
-  const reportRows: Record<string, string | number | null>[] = [
-    { bolum: "Ofis skoru", kalem: office.label, deger: office.score, ek: "baz 42 puan" },
-    ...bars.map((b) => ({ bolum: "Hacim", kalem: b.label, deger: b.value, ek: null })),
-    { bolum: "Bu ay", kalem: "Komisyon", deger: commissionTotal, ek: "TRY" },
-    { bolum: "Bu ay", kalem: "Kayıp-kaçak", deger: lost, ek: "TRY" },
-    ...sourceBars.map((b) => ({ bolum: "Müşteri kaynağı", kalem: b.value ? sourceLabel(b.value) : b.label, deger: b.count, ek: `%${shareOfTotal(b.count, sourceTotal)}` })),
-    ...allRoiRows.map((r) => ({ bolum: "Kaynak getirisi", kalem: sourceLabel(r.source), deger: r.wonValue, ek: `${r.customers} müşteri · ${r.wonCount} kazanılan` })),
-    ...allLossRows.map((r) => ({ bolum: "Kayıp nedeni", kalem: r.reason, deger: r.count, ek: `kaybedilen tutar ${r.value}` })),
-    ...trendMonths.map((m) => ({ bolum: "Aylık gelir/gider", kalem: m.key, deger: m.income, ek: `gider ${m.expense}` })),
-  ];
-
   return (
     <div className="space-y-6">
-      <ReportExportBar rows={reportRows} filename={`rapor-merkezi-${trDayKey(clockNow())}.csv`} className="justify-end" />
+      <ReportTabs scope="tenant" active="ozet" overviewLabel="Ofis sağlık & performans" />
       <PageHeader
-        eyebrow="Rapor merkezi"
+        eyebrow="Raporlar"
         freshness
         title="Ofis sağlık & performans"
         meta={<SampleDataBadge label={sampleLabel} />}

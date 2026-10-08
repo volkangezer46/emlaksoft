@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { AlertTriangle, CalendarClock, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";
@@ -12,8 +13,6 @@ import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { Badge } from "@/components/ui/badge";
 import { ApplyIncreaseDialog } from "./apply-increase-dialog";
 import { ButtonLink } from "@/components/ui/button";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportRentalsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
@@ -288,7 +287,7 @@ export default async function KiralamaPage({
             <ButtonLink href="/app/kira-artis" variant="secondary" size="sm">
               Kira artış hesaplayıcı
             </ButtonLink>
-            <ExportCsvButton label="Dışa aktar" action={exportRentalsCsv.bind(null, { durum: durumF, ariza: arizaF ? "acik" : "", evre: evreF })} />
+            <ReportOpenLink report={durumF ? "kira-tahakkuklari" : "kiralamalar"} filters={{ durum: durumF || undefined }} />
             {canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
           </>
         }

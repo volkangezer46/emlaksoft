@@ -1,4 +1,5 @@
 import { formatTry } from "@/lib/format";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
@@ -27,8 +28,6 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
-import { exportPropertiesCsv } from "@/app/actions/export";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { CompareBar } from "@/components/public/compare-select";
@@ -643,11 +642,7 @@ export default async function PropertiesPage({
         meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
-            <ExportCsvButton
-              action={exportPropertiesCsv}
-              label="Dışa aktar"
-              className="focus-ring press inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50"
-            />
+            <ReportOpenLink report="portfoyler" filters={{ status: sp0?.status, islem: sp0?.islem === "Satılık" || sp0?.islem === "Kiralık" ? sp0.islem : undefined, advisor: sp0?.danisman }} />
             {canCreate && (perms.customers ?? []).includes("create") ? (
               <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
                 İçe aktar

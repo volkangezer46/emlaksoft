@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { Banknote, CheckCircle2, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { exportOffersCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ButtonLink } from "@/components/ui/button";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
@@ -248,7 +247,7 @@ export default async function TekliflerPage({
         description="Portföylere gelen teklifleri ve durumlarını izleyin."
         actions={
           <>
-            <ExportCsvButton action={exportOffersCsv} label="Dışa aktar" />
+            <ReportOpenLink report="teklifler" filters={{ durum: params.durum, advisor: params.danisman, from: params.from, to: params.to }} />
             {canCreate ? <ButtonLink href="/app/teklifler/yeni" icon={Plus}>Yeni teklif</ButtonLink> : null}
           </>
         }

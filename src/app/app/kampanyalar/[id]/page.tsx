@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Copy, Pencil, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -8,8 +9,6 @@ import { ButtonLink } from "@/components/ui/button";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { toTrLocalInput } from "@/lib/clock";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportCampaignRecipientsCsv } from "@/app/actions/export";
 import { CampaignSchedule } from "./campaign-schedule";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -262,11 +261,7 @@ export default async function CampaignDetailPage({
               {visibleRecipients.length !== recipients.length ? ` · ${recipients.length} içinden` : ""}
             </span>
             {recipients.length > 0 ? (
-              <ExportCsvButton
-                action={exportCampaignRecipientsCsv.bind(null, campaign.id, durum)}
-                label="Alıcı listesi CSV"
-                hint="Ekrandaki durum filtresiyle"
-              />
+              <ReportOpenLink report="kampanya-alicilari" filters={{ kampanya: campaign.id, durum: ["pending", "sent", "delivered", "failed", "opted_out"].includes(durum) ? durum : undefined }} />
             ) : null}
           </span>
         </div>

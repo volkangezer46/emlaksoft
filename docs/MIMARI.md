@@ -12,7 +12,7 @@ Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `sup
 | Platform admin | `/admin/*` (tenant, fatura, ticket, cron sağlık, SEO, impersonation) | `platform_staff` + `PLATFORM_ADMIN_EMAILS` bootstrap |
 | Vitrin | `/vitrin/[slug]` — tenant'ın halka açık ofis sitesi | Açık, slug bazlı |
 | Token sayfaları | `/paylas/[token]` (portföy paylaşım) · `/musteri-portali/[token]` · `/malik-portali/[token]` · `/imza/[token]` (SMS OTP e-imza) · `/odeme-link/[token]` (iyzico) · `/degerleme-raporu/[token]` · `/lead` | Tekil token, oturumsuz |
-| API | `/api/cron/*` (36), `/api/app/*` (bootstrap, tv-data), `/api/export/[entity]`, `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
+| API | `/api/cron/*` (36), `/api/app/*` (bootstrap, tv-data), `/api/app/rapor/[id]` + `/api/admin/rapor/[id]` (Rapor merkezi: Excel/PDF/CSV), `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
 
 Veri erişimi: Server Component + server action ağırlıklı; mutasyonlar `src/app/actions/*` ve modül içi `actions.ts`.
 

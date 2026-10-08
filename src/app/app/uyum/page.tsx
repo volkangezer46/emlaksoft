@@ -393,7 +393,7 @@ export default async function CompliancePage({
       >
         <span>
           <span className="block font-display font-bold text-ink-950">Yasal kayıt defteri</span>
-          <span className="block text-xs text-text-muted">İşlem kayıtları yalnız eklenir, düzeltme yeni kayıt olur; ofis eşikleriyle işaretlenir, CSV olarak indirilir.</span>
+          <span className="block text-xs text-text-muted">İşlem kayıtları yalnız eklenir, düzeltme yeni kayıt olur; ofis eşikleriyle işaretlenir; Rapor merkezinden Excel, PDF ya da CSV indirilir.</span>
         </span>
         <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-brand-600" />
       </Link>

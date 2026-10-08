@@ -14,6 +14,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { redirect } from "next/navigation";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ButtonLink } from "@/components/ui/button";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { createClient } from "@/lib/supabase/server";
@@ -29,8 +30,6 @@ import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
 import { buildRoutePlan, type RoutePlanStop, directionsHref as directionsHrefFor } from "@/lib/route-plan";
 import { ExportIcsButton } from "./export-ics-button";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportAppointmentsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { CalendarSubscribeCard } from "./calendar-subscribe-card";
@@ -701,10 +700,7 @@ export default async function AppointmentsPage({
                 };
               })}
             />
-            <ExportCsvButton
-              label="CSV"
-              action={exportAppointmentsCsv.bind(null, { tip: tipF, durum: durumF, customer: customerF, property: propertyF })}
-            />
+            <ReportOpenLink report="randevular" filters={{ tip: tipF || undefined, durum: durumF || undefined }} />
             {canCreateAppt ? <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink> : null}
           </>
         }

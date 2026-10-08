@@ -1,7 +1,8 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { ReportExportBar } from "@/components/app/report-export-bar";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
+import { PrintButton } from "@/components/ui/print-button";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { SkeletonCard } from "@/components/ui/viz";
@@ -229,18 +230,8 @@ export default async function TalepArzPage({
         description={`${donem.label.toLowerCase()}de açılan açık talepler ile şu an yayındaki portföy stoku ilçe kırılımında karşılaştırılır — nerede portföy toplamalı, nerede talep üretmeli.`}
         actions={
           <span className="flex flex-wrap items-center gap-2">
-            <ReportExportBar
-              rows={rows.map((r) => ({
-                il: r.provinceName,
-                ilce: r.districtName ?? "(belirtilmedi)",
-                talep: r.demandCount,
-                arz: r.supplyCount,
-                arz_talep_orani: r.ratio === null ? null : Math.round(r.ratio * 10) / 10,
-                medyan_butce: r.medianBudget,
-                medyan_fiyat: r.medianPrice,
-              }))}
-              filename={`talep-arz-${islem.key || "tumu"}-${donem.key}.csv`}
-            />
+            <ReportOpenLink report="talep-arz" filters={{ islem: islem.db ?? undefined, donem: donem.key }} />
+            <PrintButton tone="outline" size="sm" />
             <ButtonLink href="/app/raporlar" variant="secondary" icon={BarChart3}>Rapor merkezi</ButtonLink>
           </span>
         }

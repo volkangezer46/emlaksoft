@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { AlarmClock, Crosshair, Flame, PieChart, Plus, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -16,8 +17,6 @@ import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { weekBucketsOf } from "@/lib/ui/list-charts";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportDemandsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
@@ -422,16 +421,7 @@ export async function DemandsView({
             <ButtonLink href="/app/eslestirme" variant="secondary" size="sm" icon={Crosshair}>
               Eşleştirme motoru
             </ButtonLink>
-            <ExportCsvButton
-              label="Dışa aktar"
-              action={exportDemandsCsv.bind(null, {
-                status: statusF,
-                aciliyet: aciliyetF,
-                il: ilF,
-                butce: butceF,
-                yas: yasF ? String(AGING_DAYS) : "",
-              })}
-            />
+            <ReportOpenLink report="talepler" filters={{ status: ["new", "active", "matched", "closed"].includes(statusF ?? "") ? statusF : undefined, aciliyet: (aciliyetF ?? "").split(",")[0] || undefined, butce: butceF || undefined }} />
             {canCreate ? <ButtonLink href="/app/talepler/yeni" size="sm" icon={Plus}>Yeni talep</ButtonLink> : null}
           </>
         }

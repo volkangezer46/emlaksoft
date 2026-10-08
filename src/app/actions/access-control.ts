@@ -4,13 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { now, trDayKey } from "@/lib/clock";
-import { toCsv } from "@/lib/export-entities";
-import { logActivity } from "@/lib/activity";
+import { now } from "@/lib/clock";
 import { orIlike, safeLike } from "@/lib/pgrst";
 import type { AppRole } from "@/lib/permissions";
 import {
-  AUDIT_CHANGE_LABELS,
   OVERRIDE_RESOURCE_LABELS,
   OVERRIDE_RESOURCE_TYPES,
   canChangeScope,
@@ -23,7 +20,6 @@ import { recordAccessAudit } from "@/lib/access-control/audit";
 import { ASSIGNABLE_SCOPES, SCOPE_LABELS, defaultUserScopeForRole } from "@/lib/access-control/scope-rules";
 import { applyAccessAuditFilters, normalizeAccessAuditFilters, type AccessAuditFilters } from "@/lib/access-control/audit-filters";
 import type { ScopeOverride } from "@/lib/access-control/types";
-import type { ExportResult } from "@/app/actions/export";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
@@ -402,56 +398,4 @@ export async function listAccessAudit(filters: Partial<AccessAuditFilters>, page
     return { rows: [], total: 0, schemaMissing: missing, error: missing ? undefined : actionErrorMessage(error, "Denetim günlüğü okunamadı.") };
   }
   return { rows: (data ?? []) as AccessAuditRow[], total: count ?? 0, schemaMissing: false };
-}
-
-const AUDIT_EXPORT_LIMIT = 2000;
-
-/** Denetim günlüğü CSV'si EKRANDAKİ filtreyi uygular; kişisel veri taşımaz (ad + değişiklik + önce/sonra JSON). */
-export async function exportAccessAuditCsv(filters: Partial<AccessAuditFilters> = {}): Promise<ExportResult> {
-  const gate = await requirePermission("settings", "view");
-  if (!gate.ok) return { error: gate.error };
-  if (!isScopeEditorRole(gate.role)) return { error: "Denetim günlüğünü yalnız ofis sahibi ve genel müdür dışa aktarır." };
-  const f = normalizeAccessAuditFilters(filters);
-  const supabase = await createClient();
-  const { data, error } = await applyAccessAuditFilters(
-    supabase.from("access_audit_log").select("user_id, change_type, details, reason, created_by, created_at").eq("tenant_id", gate.tenantId),
-    f,
-  )
-    .order("created_at", { ascending: false })
-    .limit(AUDIT_EXPORT_LIMIT);
-  if (error) {
-    return { error: MISSING_SCHEMA.has(String(error.code)) ? SCHEMA_ERROR : actionErrorMessage(error, "Dışa aktarma başarısız. Lütfen tekrar deneyin.") };
-  }
-  const rows = (data ?? []) as Omit<AccessAuditRow, "id">[];
-  const ids = [...new Set(rows.flatMap((r) => [r.user_id, r.created_by]).filter(Boolean))];
-  const names = new Map<string, string>();
-  if (ids.length) {
-    const { data: profiles } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", gate.tenantId).in("id", ids);
-    for (const p of profiles ?? []) names.set(p.id as string, p.full_name as string);
-  }
-  const csvRows = rows.map((r) => {
-    const d = (r.details ?? {}) as Record<string, unknown>;
-    return {
-      tarih: r.created_at,
-      islem: AUDIT_CHANGE_LABELS[r.change_type] ?? r.change_type,
-      yapan: names.get(r.created_by) ?? r.created_by.slice(0, 8),
-      kullanici: names.get(r.user_id) ?? r.user_id.slice(0, 8),
-      kaynak: d.resource_type ? `${OVERRIDE_RESOURCE_LABELS[d.resource_type as ScopeOverride["resource_type"]] ?? d.resource_type} ${String(d.resource_id ?? "").slice(0, 8)}` : (d.module ? String(d.module) : ""),
-      gerekce: r.reason ?? "",
-      once: d.before ? JSON.stringify(d.before) : "",
-      sonra: d.after ? JSON.stringify(d.after) : "",
-    };
-  });
-  const truncated = csvRows.length >= AUDIT_EXPORT_LIMIT;
-  let csv = toCsv(csvRows);
-  if (truncated) csv += `\n"UYARI: Yalnızca ilk ${AUDIT_EXPORT_LIMIT} kayıt dışa aktarıldı. Tamamı için filtreyi daraltın."`;
-  const filename = `yetkilendirme-denetim-${trDayKey()}.csv`;
-  await logActivity({
-    tenantId: gate.tenantId,
-    actorId: gate.userId,
-    action: "export.csv",
-    entityType: "yetkilendirme-denetim",
-    newValue: { rows: csvRows.length, truncated, filename, filtered: Object.values(f).some(Boolean) },
-  });
-  return { csv, filename, truncated, rowCount: csvRows.length };
 }

@@ -4,7 +4,7 @@ import { daysAgoIso, parseTrLocalDateTime } from "@/lib/clock";
 
 /**
  * Aktivite / denetim izi sunucu sorgusu — sayfa (`/admin/aktivite`) ve CSV dışa aktarma
- * (`exportActivityCsv`) AYNI süzgeci kullanır: ekranda görünen ile indirilen aynı kayıtlardır.
+ * (Rapor merkezi "platform-denetim" / "ofis-denetim-kayitlari" raporları) benzer süzgeci kullanır: ekranda görünen ile indirilen aynı kayıtlardır.
  * Yalnız sunucuda çağrılır (service role); çağıran `requirePlatformModule("activity")` ile kapılar.
  */
 export type ActivityFilters = {
