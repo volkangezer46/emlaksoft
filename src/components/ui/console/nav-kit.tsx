@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/ui/smart-link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { cloneElement, isValidElement, useCallback, useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { SIDEBAR_EVENT, useSidebarCollapsed } from "@/components/ui/console/sidebar-collapse";
 import type { LucideIcon } from "lucide-react";
@@ -132,6 +132,8 @@ export type FlyoutItem = {
   icon: LucideIcon;
   active?: boolean;
   badge?: { count: number; href: string; label: string; tone: "danger" | "warn" } | null;
+  /** Öğenin alt sayfaları (ör. Müşteriler > Akıllı Listeler): flyout'ta girintili alt bağlantı olarak listelenir. */
+  children?: { href: string; label: string; active?: boolean }[];
 };
 
 const noopSubscribe = () => () => {};
@@ -155,6 +157,7 @@ export function NavFlyout({
   const collapsed = useSidebarCollapsed();
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const active = enabled && collapsed;
@@ -184,6 +187,35 @@ export function NavFlyout({
 
   useEffect(() => () => cancel(), []);
 
+  /** Klavye: Sağ ok tetikleyiciden alt menüye geçer; Esc/Sol ok kapatıp odağı tetikleyiciye döndürür; Yukarı/Aşağı alt menüde gezer. */
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const trigger = wrapRef.current?.querySelector<HTMLElement>("a, button");
+    const links = [...(panelRef.current?.querySelectorAll<HTMLElement>("a") ?? [])];
+    const inPanel = panelRef.current?.contains(document.activeElement) ?? false;
+    if (e.key === "Escape" && pos) {
+      e.preventDefault();
+      e.stopPropagation();
+      setPos(null);
+      trigger?.focus();
+    } else if (e.key === "ArrowRight" && !inPanel && pos && links[0]) {
+      e.preventDefault();
+      e.stopPropagation();
+      cancel();
+      links[0].focus();
+    } else if (inPanel && e.key === "ArrowLeft") {
+      e.preventDefault();
+      e.stopPropagation();
+      setPos(null);
+      trigger?.focus();
+    } else if (inPanel && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+      e.preventDefault();
+      e.stopPropagation();
+      const idx = links.indexOf(document.activeElement as HTMLElement);
+      const next = e.key === "ArrowDown" ? Math.min(links.length - 1, idx + 1) : Math.max(0, idx - 1);
+      links[next]?.focus();
+    }
+  };
+
   if (!active) return <>{children}</>;
 
   const hasBody = items.length > 0 || actions.length > 0;
@@ -191,11 +223,14 @@ export function NavFlyout({
   const maxTop = typeof window !== "undefined" ? Math.max(8, window.innerHeight - (hasBody ? 40 + items.length * 40 + (actions.length ? 40 + actions.length * 36 : 0) + 16 : 44) - 8) : 8;
 
   return (
-    <div ref={wrapRef} onMouseEnter={openNow} onMouseLeave={closeSoon} onFocus={openNow} onBlur={closeSoon}>
-      {children}
+    <div ref={wrapRef} onMouseEnter={openNow} onMouseLeave={closeSoon} onFocus={openNow} onBlur={closeSoon} onKeyDown={onKeyDown}>
+      {hasBody && isValidElement(children)
+        ? cloneElement(children as ReactElement<Record<string, unknown>>, { "aria-haspopup": "true", "aria-expanded": pos ? "true" : "false" })
+        : children}
       {pos && mounted
         ? createPortal(
             <div
+              ref={panelRef}
               role="group"
               aria-label={title}
               className="nav-flyout"
@@ -211,26 +246,39 @@ export function NavFlyout({
                 <p className="nav-flyout-title">{title}</p>
               )}
               {items.map((it) => (
-                <div key={it.href} className="relative">
-                  <Link
-                    href={it.href}
-                    onClick={() => setPos(null)}
-                    aria-current={it.active ? "page" : undefined}
-                    className={`nav-flyout-item ${it.active ? "is-active" : ""} ${it.badge ? "pr-12" : ""}`}
-                  >
-                    <it.icon className="h-4 w-4 shrink-0" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                  </Link>
-                  {it.badge ? (
+                <div key={it.href}>
+                  <div className="relative">
                     <Link
-                      href={it.badge.href}
+                      href={it.href}
                       onClick={() => setPos(null)}
-                      aria-label={`${it.badge.count} ${it.badge.label}`}
-                      className={`nav-badge absolute right-2 top-1/2 -translate-y-1/2 ${it.badge.tone === "danger" ? "is-danger" : "is-warn"}`}
+                      aria-current={it.active ? "page" : undefined}
+                      className={`nav-flyout-item ${it.active ? "is-active" : ""} ${it.badge ? "pr-12" : ""}`}
                     >
-                      {it.badge.count > 99 ? "99+" : it.badge.count}
+                      <it.icon className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate">{it.label}</span>
                     </Link>
-                  ) : null}
+                    {it.badge ? (
+                      <Link
+                        href={it.badge.href}
+                        onClick={() => setPos(null)}
+                        aria-label={`${it.badge.count} ${it.badge.label}`}
+                        className={`nav-badge absolute right-2 top-1/2 -translate-y-1/2 ${it.badge.tone === "danger" ? "is-danger" : "is-warn"}`}
+                      >
+                        {it.badge.count > 99 ? "99+" : it.badge.count}
+                      </Link>
+                    ) : null}
+                  </div>
+                  {it.children?.map((c) => (
+                    <Link
+                      key={c.href}
+                      href={c.href}
+                      onClick={() => setPos(null)}
+                      aria-current={c.active ? "page" : undefined}
+                      className={`nav-flyout-item ml-6 min-h-8 text-[0.8125rem] ${c.active ? "is-active" : ""}`}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                    </Link>
+                  ))}
                 </div>
               ))}
               {actions.length > 0 ? (

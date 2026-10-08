@@ -3,17 +3,19 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
-import { ChevronDown, ExternalLink, Globe, Menu, X, Crown } from "lucide-react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff, X } from "lucide-react";
 import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
-import { adminNavFor, isAdminNavActive, type AdminNavItem } from "@/lib/admin/nav";
-import { getHrefStore } from "@/lib/nav-memory";
+import { activeTabHref, adminSidebarModel, isAdminNavActive, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
+import { getHrefStore, navStateId } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
+import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } from "@/components/ui/console/quick-access";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 
 type Item = AdminNavItem;
 const isActive = (pathname: string, item: Item) => isAdminNavActive(pathname, item);
+const ADMIN_SCOPE = "admin";
 
 export function AdminSidebar({
   staffName,
@@ -31,58 +33,185 @@ export function AdminSidebar({
   const [open, setOpen] = useState(false);
   const allowed = platformModulesFor(role);
 
-  // Kapalı bölümler: kullanıcı tercihi (localStorage, try/catch store). Aktif sayfanın bölümü hep açık.
-  const closedStore = getHrefStore("closed", "admin");
+  // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, her grupta çekirdek öğeler görünür, kalanı "+N daha".
+  const groups = useMemo(() => adminSidebarModel(allowed), [allowed]);
+  const allItems = useMemo(() => groups.flatMap((g) => [...g.items, ...g.folded]), [groups]);
+  const activeItem = allItems.find((i) => isActive(pathname, i)) ?? null;
+  const activeHref = activeItem?.href ?? null;
+
+  // Menü durumu (localStorage, try/catch store): "<grup>" kapalı grup, "fold-<grup>" açık "+N daha", "alt-<sayfa>" açık alt liste.
+  // Aktif sayfanın grubu/katı/alt listesi hep açık.
+  const closedStore = getHrefStore("closed", ADMIN_SCOPE);
   const closed = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
   const toggle = (id: string) => {
     const cur = closedStore.read();
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
 
-  // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, boş bölüm atılır.
-  const sections = adminNavFor(allowed);
+  const quickItems = useMemo<QuickItem[]>(() => allItems.map((i) => ({ href: i.href, label: i.label, icon: i.icon, description: i.description })), [allItems]);
+  const itemByHref = useMemo(() => new Map(allItems.map((i) => [i.href, i])), [allItems]);
+  const quick = useQuickAccess({ scope: ADMIN_SCOPE, kind: "admin", items: quickItems, activeHref });
 
-  // Mobil alt gezinme: erişilebilir ilk dört rota + menü çekmecesi.
-  const tabItems = sections.flatMap((s) => s.items).slice(0, 4);
-  const allItems = sections.flatMap((s) => s.items);
+  // Mobil alt gezinme: erişilebilir ilk dört çekirdek rota + menü çekmecesi.
+  const tabItems = groups.flatMap((g) => g.items).slice(0, 4);
 
-  const renderItem = (item: Item) => {
+  const renderItem = (item: Item, opts: { group: string; flat?: boolean }) => {
     const active = isActive(pathname, item);
     const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
+    const hasBadge = Boolean(badge && badge > 0);
+    const pinned = quick.pins.includes(item.href);
+    const sub = !opts.flat && item.tabs && item.tabs.length > 1 ? item.tabs : null;
+    const subId = navStateId("alt", item.href);
+    const subOpen = Boolean(sub) && (active || closed.includes(subId));
+    const hasChevron = Boolean(sub) && !active;
+    const activeSub = sub && active ? activeTabHref(pathname, sub) : null;
+    const chevOffset = hasChevron ? 1.75 : 0;
+    const badgeRight = 0.5 + chevOffset;
+    const pinRight = (hasBadge ? 2.5 : 0.25) + chevOffset;
+    const padRight = hasBadge ? (hasChevron ? "pr-[5.5rem]" : "pr-16") : hasChevron ? "pr-16" : "pr-9";
     return (
-      <div key={item.href} className="nav-item group relative">
-        <Link
-          href={item.href}
-          data-nav-link
-          data-nav-active={active ? "true" : undefined}
-          aria-current={active ? "page" : undefined}
-          title={`${item.label} · ${item.description}`}
-          prefetch
-          onClick={() => setOpen(false)}
-          onMouseEnter={() => router.prefetch(item.href)}
-          onFocus={() => router.prefetch(item.href)}
-          className={`focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors md:min-h-10 ${
-            badge && badge > 0 ? "pr-12" : "pr-3"
-          } ${active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"}`}
-        >
-          <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-        </Link>
-        {badge && badge > 0 ? (
-          <span
-            aria-label={`${badge} bekleyen`}
-            className={`nav-badge pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 ${item.badgeKey === "risk" ? "is-danger" : "is-warn"}`}
+      <div key={`${opts.group}-${item.href}`}>
+        <div className="nav-item group relative">
+          <Link
+            href={item.href}
+            data-nav-link
+            data-nav-active={active && !activeSub ? "true" : undefined}
+            aria-current={active ? "page" : undefined}
+            title={`${item.label} · ${item.description}`}
+            prefetch
+            onClick={() => setOpen(false)}
+            onMouseEnter={() => router.prefetch(item.href)}
+            onFocus={() => router.prefetch(item.href)}
+            className={`focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors md:min-h-10 ${padRight} ${
+              active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"
+            }`}
           >
-            {badge > 99 ? "99+" : badge}
-          </span>
+            <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          </Link>
+          {hasBadge ? (
+            <span
+              aria-label={`${badge} bekleyen`}
+              style={{ right: `${badgeRight}rem` }}
+              className={`nav-badge pointer-events-none absolute top-1/2 -translate-y-1/2 ${item.badgeKey === "risk" ? "is-danger" : "is-warn"}`}
+            >
+              {badge! > 99 ? "99+" : badge}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            aria-pressed={pinned}
+            aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
+            title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
+            onClick={() => quick.togglePin(item.href)}
+            style={{ right: `${pinRight}rem` }}
+            className="nav-pin focus-ring absolute top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
+          >
+            {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
+          </button>
+          {hasChevron ? (
+            <button
+              type="button"
+              aria-expanded={subOpen}
+              aria-controls={`adm-${subId}`}
+              aria-label={`${item.label} alt sayfaları`}
+              title={subOpen ? "Alt sayfaları gizle" : "Alt sayfaları göster"}
+              onClick={() => toggle(subId)}
+              className="focus-ring absolute right-1 top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
+            >
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${subOpen ? "" : "-rotate-90"}`} aria-hidden />
+            </button>
+          ) : null}
+        </div>
+        {sub && subOpen ? (
+          <ul id={`adm-${subId}`} aria-label={`${item.label} alt sayfaları`} className="ml-[1.375rem] space-y-0.5 border-l border-white/10 py-0.5 pl-2">
+            {sub.map((tab) => {
+              const tabActive = activeSub !== null && tab.href.split(/[?#]/)[0] === activeSub;
+              return (
+                <li key={tab.href}>
+                  <Link
+                    href={tab.href}
+                    data-nav-link
+                    data-nav-active={tabActive ? "true" : undefined}
+                    aria-current={tabActive ? "page" : undefined}
+                    title={tab.description}
+                    onClick={() => setOpen(false)}
+                    className={`focus-ring flex min-h-9 items-center rounded-[var(--radius-control)] px-2.5 text-[0.8125rem] transition-colors touch:min-h-11 ${
+                      tabActive ? "bg-white/10 font-semibold text-white" : "text-white/70 hover:bg-white/6 hover:text-white"
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{tab.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         ) : null}
       </div>
     );
   };
 
+  const renderGroup = ({ section, items, folded }: AdminSidebarGroup) => {
+    const hasActive = [...items, ...folded].some((i) => isActive(pathname, i));
+    const expanded = !section.title || hasActive || !closed.includes(section.id);
+    const foldId = `fold-${section.id}`;
+    const foldOpen = folded.some((i) => isActive(pathname, i)) || closed.includes(foldId);
+    return (
+      <div key={section.id}>
+        {section.title ? (
+          <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
+            <button
+              type="button"
+              onClick={() => toggle(section.id)}
+              disabled={hasActive}
+              aria-expanded={expanded}
+              aria-controls={`adm-${section.id}`}
+              className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
+            >
+              <span className="shrink-0">{section.title}</span>
+              <span className="h-px flex-1 bg-white/10" aria-hidden />
+              <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
+              <span className="sr-only">{expanded ? "bölümü daralt" : "bölümü aç"}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="pt-3" />
+        )}
+        {expanded ? (
+          <div id={`adm-${section.id}`} className="space-y-0.5">
+            {items.map((i) => renderItem(i, { group: section.id }))}
+            {folded.length > 0 ? (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => toggle(foldId)}
+                  aria-expanded={foldOpen}
+                  aria-controls={`adm-${foldId}`}
+                  className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 text-left text-xs font-medium text-white/60 transition-colors hover:bg-white/6 hover:text-white"
+                >
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${foldOpen ? "" : "-rotate-90"}`} aria-hidden />
+                  <span className="min-w-0 truncate">{foldOpen ? "Daha az göster" : `+${folded.length} daha`}</span>
+                </button>
+                {foldOpen ? (
+                  <div id={`adm-${foldId}`} className="space-y-0.5">
+                    {folded.map((i) => renderItem(i, { group: foldId }))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const railFlyoutItems = (item: Item) =>
+    item.tabs && item.tabs.length > 1
+      ? item.tabs.map((t) => ({ href: t.href, label: t.label, icon: item.icon, active: isActive(pathname, item) && activeTabHref(pathname, item.tabs ?? []) === t.href.split(/[?#]/)[0] }))
+      : [];
+
   const renderContent = (variant: "desktop" | "drawer") => (
     <aside className="sb-surface flex h-full w-full flex-col">
-      {/* Arama üst çubukta (Ctrl K); menüde ikinci arama kutusu yok. */}
       <div className="sb-head relative flex min-h-16 shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3">
         <Brand variant="mark" tone="dark" height={38} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
@@ -96,43 +225,25 @@ export function AdminSidebar({
         <SidebarCollapseButton />
       </div>
 
+      {/* "Menüde ara" komut paletini açar (Ctrl K); ikinci bir arama kutusu yok. */}
+      <MenuSearchButton onActivate={() => setOpen(false)} />
+
       <NavScroller label="Platform menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
         <div className="sb-expanded">
-          {sections.map((section) => {
-            const hasActive = section.items.some((i) => isActive(pathname, i));
-            const expanded = !section.title || hasActive || !closed.includes(section.id);
-            return (
-              <div key={section.id}>
-                {section.title ? (
-                  <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-4 text-white/70">
-                    <button
-                      type="button"
-                      onClick={() => toggle(section.id)}
-                      disabled={hasActive}
-                      aria-expanded={expanded}
-                      aria-controls={`adm-${section.id}`}
-                      className="focus-ring flex min-h-8 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
-                    >
-                      <span className="shrink-0">{section.title}</span>
-                      <span className="h-px flex-1 bg-white/10" aria-hidden />
-                      <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
-                      <span className="sr-only">{expanded ? "bölümü daralt" : "bölümü aç"}</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="pt-3" />
-                )}
-                {expanded ? (
-                  <div id={`adm-${section.id}`} className="space-y-0.5">
-                    {section.items.map(renderItem)}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+          <QuickAccessSection
+            pinned={quick.pinned}
+            auto={quick.auto}
+            hasUsage={quick.hasUsage}
+            onReset={quick.resetUsage}
+            renderRow={(q, kind) => {
+              const item = itemByHref.get(q.href);
+              return item ? renderItem(item, { group: kind, flat: true }) : null;
+            }}
+          />
+          {groups.map(renderGroup)}
         </div>
 
-        {/* İkon modu: her öğe ikon + hover'da başlık/ipucu (erişilebilir tooltip) */}
+        {/* İkon modu: her öğe ikon + hover/odakta alt sayfalar ve ipucu (erişilebilir flyout) */}
         <div className="sb-rail space-y-1 pt-3">
           {allItems.map((item) => {
             const active = isActive(pathname, item);
@@ -143,6 +254,7 @@ export function AdminSidebar({
                 enabled={variant === "desktop"}
                 title={`${item.label} · ${item.description}`}
                 href={item.href}
+                items={railFlyoutItems(item)}
               >
                 <Link
                   href={item.href}

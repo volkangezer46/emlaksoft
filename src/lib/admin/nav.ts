@@ -42,6 +42,8 @@ export type AdminNavLink = { href: string; label: string; description: string; m
 export type AdminNavItem = AdminNavLink & {
   icon: LucideIcon;
   badgeKey?: AdminBadgeKey;
+  /** Yan menüde her zaman görünen ÇEKİRDEK öğe; çekirdek olmayanlar grup içinde "+N daha" ile katlanır (tam liste ⌘K'da). */
+  core?: boolean;
   match?: readonly string[];
   /** Aktif sayılmayacak alt yollar (ör. ayrı öğesi olan bir alt bölüm). */
   exclude?: readonly string[];
@@ -58,8 +60,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     id: "genel",
     title: "Genel bakış",
     items: [
-      { href: "/admin", label: "Kontrol paneli", description: "Canlı metrikler, dikkat kuyruğu, öneriler", icon: LayoutDashboard, modules: ["dashboard"] },
-      { href: "/admin/raporlar", label: "Raporlar", description: "Platform analizi: gelir, aktivasyon, modül kullanımı", icon: BarChart3, modules: ["reports"] },
+      { href: "/admin", core: true, label: "Kontrol paneli", description: "Canlı metrikler, dikkat kuyruğu, öneriler", icon: LayoutDashboard, modules: ["dashboard"] },
+      { href: "/admin/raporlar", core: true, label: "Raporlar", description: "Platform analizi: gelir, aktivasyon, modül kullanımı", icon: BarChart3, modules: ["reports"] },
       { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
     ],
   },
@@ -68,7 +70,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Müşteriler",
     items: [
       {
-        href: "/admin/tenants",
+        href: "/admin/tenants", core: true,
         label: "Ofisler",
         description: "Ofis envanteri, deneme, risk ve abonelik durumu",
         icon: Building2,
@@ -76,7 +78,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         badgeKey: "risk",
         palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["sales"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],
       },
-      { href: "/admin/members", label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
+      { href: "/admin/members", core: true, label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
     ],
   },
   {
@@ -84,7 +86,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Gelir",
     items: [
       {
-        href: "/admin/billing",
+        href: "/admin/billing", core: true,
         label: "Abonelik & fatura",
         description: "MRR, faturalar, planlar, kuponlar, muhasebe ve deneme ayarları",
         icon: CreditCard,
@@ -107,7 +109,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "İçerik",
     items: [
       {
-        href: "/admin/site",
+        href: "/admin/site", core: true,
         label: "Site & marka",
         description: "Ana sayfa içeriği, site menüsü, SEO, logo ve favicon",
         icon: Globe,
@@ -130,7 +132,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Destek",
     items: [
       {
-        href: "/admin/tickets",
+        href: "/admin/tickets", core: true,
         label: "Destek talepleri",
         description: "Destek kuyruğu ve yanıt süreleri",
         icon: LifeBuoy,
@@ -145,7 +147,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     title: "Sistem",
     items: [
       {
-        href: "/admin/sistem",
+        href: "/admin/sistem", core: true,
         label: "Sistem",
         description: "Sağlık, cron nabzı, entegrasyonlar, hata ve aktivite kaydı",
         icon: Radar,
@@ -239,4 +241,18 @@ export function adminPaletteFor(allowed: readonly PlatformModule[]): Array<Admin
   }
   for (const e of ADMIN_EXTRA_PALETTE) push(e, Settings);
   return out;
+}
+
+export type AdminSidebarGroup = { section: AdminNavSection; items: AdminNavItem[]; folded: AdminNavItem[] };
+
+/**
+ * Yan menü görünümü: her grupta çekirdek (`core`) öğeler görünür, kalanı "+N daha" ile katlanır. Gruptaki hiçbir öğe çekirdek
+ * değilse (ör. role göre süzülünce) grup tam gösterilir; böylece rol hiçbir sayfayı kaybetmez, yalnız menü kısalır.
+ */
+export function adminSidebarModel(allowed: readonly PlatformModule[]): AdminSidebarGroup[] {
+  return adminNavFor(allowed).map((section) => {
+    const items = section.items.filter((i) => i.core);
+    if (items.length === 0) return { section, items: [...section.items], folded: [] };
+    return { section, items, folded: section.items.filter((i) => !i.core) };
+  });
 }

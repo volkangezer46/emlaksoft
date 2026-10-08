@@ -77,7 +77,8 @@ export function SectionTabs({
             label={`${current.title} sayfaları`}
             activeId={activeHref}
             className="min-w-0 flex-1"
-            items={current.items.map((item) => ({
+            // Yönetim öğeleri şeridin sonunda: 6'dan fazla sayfa varsa taşanlar "Daha fazla" menüsüne iner (menüdeki Yönetim katlamasıyla tutarlı).
+            items={[...current.items.filter((i) => i.group !== "yonetim"), ...current.items.filter((i) => i.group === "yonetim")].map((item) => ({
               id: item.href,
               href: item.href,
               label: item.label,
