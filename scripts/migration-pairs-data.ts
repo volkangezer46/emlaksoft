@@ -488,11 +488,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB55-lig-2", order: 29.99985, title: "Lig 2.0: ofis ayarli puan kurallari + meydan okuma tablolari (kod tablo yokken varsayilan kurallara duser)", files: [F.leagueV2] },
     { id: "MOD1-kisisel-modul-gizleme", order: 29.99987, title: "Kisisel modul gizleme tablosu (yalniz gorunurluk; sira serbest, ek)", files: [F.userModulePrefs] },
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
-    { id: "P12-kazanc-gizliligi", order: 30.0, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
+    { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999862, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
-    { id: "P12-kazanc-gizliligi", order: 30.000001, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PB55-admin-panel-toplulastirma", order: 29.999863, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
-    { id: "P12-kazanc-gizliligi", order: 30.000002, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
   // (b) Birlikte uygulanmasi gerekenler (duzeltici ana'dan sonra numaralanmis ve ayni pencerede).
