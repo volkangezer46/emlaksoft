@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       const observed = typeof body.observed === "object" && body.observed !== null ? (body.observed as Record<string, unknown>) : {};
       const done = await workerComplete({ clientId: str("clientId"), jobId: str("jobId"), result, observed });
       // Ayrıştırıcı sayaç telemetrisi (en iyi çaba): yalnız ilk işlenişte ("applied"), yeniden gönderimde ("replay") çift sayılmaz.
-      if (done.ok && done.outcome === "applied" && body.telemetry) await workerReportParser(body.telemetry).catch(() => null);
+      if (done.ok && done.outcome === "applied" && body.parser) await workerReportParser(body.parser).catch(() => null);
       return NextResponse.json(done, { headers: NO_STORE });
     }
     case "release":

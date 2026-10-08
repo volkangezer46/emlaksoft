@@ -167,7 +167,7 @@ function schedule(ms: number) {
 async function flushOutbox(): Promise<void> {
   const due = await send<{ entries?: OutboxEntry[] }>({ kind: "outboxDue" });
   for (const e of due?.entries ?? []) {
-    const r = await api({ op: "complete", clientId: e.clientId, jobId: e.jobId, result: e.result, observed: e.observed, telemetry: e.telemetry });
+    const r = await api({ op: "complete", clientId: e.clientId, jobId: e.jobId, result: e.result, observed: e.observed, parser: e.telemetry });
     const verdict = sendVerdict(r.status, r.data);
     await send({ kind: verdict === "retry" ? "outboxFail" : "outboxDone", jobId: e.jobId });
     if (verdict === "retry") break; // ağ hâlâ yok: kalanlar sonraki turda
@@ -231,7 +231,7 @@ async function step(): Promise<StepOutcome | "wait"> {
   }
   const report = replyToReport(probeReply, new Date().toISOString());
   const telemetry = buildTelemetry(job.portal, probeReply);
-  const body = { op: "complete", clientId, jobId: job.jobId, result: report.result, observed: report.observed, telemetry };
+  const body = { op: "complete", clientId, jobId: job.jobId, result: report.result, observed: report.observed, parser: telemetry };
   const done = await api(body);
   const verdict = sendVerdict(done.status, done.data);
   if (verdict === "retry") {
