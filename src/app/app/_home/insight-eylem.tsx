@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "@/components/ui/smart-link";
+import { buttonClass, ButtonLink } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowRight, BellOff, ChevronDown, ListPlus, X } from "lucide-react";
@@ -18,8 +18,8 @@ const DISMISS: { label: string; reason: InsightDismissReason }[] = [
   { label: "İlgisiz", reason: "ilgisiz" },
 ];
 
-const btn =
-  "focus-ring press inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-950 transition hover:bg-surface-hover disabled:opacity-60";
+/** Kanonik ikincil düğme (dokunmatikte 44px: `touch:h-11`, Button boy ölçeği). */
+const btn = buttonClass({ variant: "secondary" });
 
 /** Küçük, bağımlılıksız açılır menü (details). Seçimde kapanır; Esc ile kapanır. */
 function Menu({ label, icon, children, disabled }: { label: string; icon: React.ReactNode; children: (close: () => void) => React.ReactNode; disabled?: boolean }) {
@@ -53,7 +53,7 @@ function Item({ onClick, children }: { onClick: () => void; children: React.Reac
         type="button"
         role="menuitem"
         onClick={onClick}
-        className="focus-ring flex min-h-9 w-full items-center rounded-[var(--radius-control)] px-3 text-left text-sm font-medium text-ink-950 hover:bg-surface-hover"
+        className="focus-ring flex min-h-9 touch:min-h-11 w-full items-center rounded-[var(--radius-control)] px-3 text-left text-sm font-medium text-ink-950 hover:bg-surface-hover"
       >
         {children}
       </button>
@@ -85,13 +85,9 @@ export function InsightEylemleri({ id, href, openLabel = "Aç", canTask }: { id:
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={href}
-          className="focus-ring press inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] bg-[image:var(--grad-brand)] px-4 text-sm font-bold text-white shadow-[var(--elev-1)] transition hover:brightness-110"
-        >
+        <ButtonLink href={href} size="lg" iconRight={ArrowRight}>
           {openLabel}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
+        </ButtonLink>
         {canTask ? (
           <button type="button" className={btn} disabled={pending} onClick={() => run(() => acceptInsightAsTask(id), "Görev oluşturuldu.")}>
             <ListPlus className="h-4 w-4" aria-hidden="true" />

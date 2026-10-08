@@ -4,20 +4,19 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { buildOnboarding, type OnboardingState } from "@/lib/onboarding-checklist";
 import { parseSkipped, setupSkipCookieName } from "@/lib/setup-skip";
+import { loadProfileSnapshot, type ProfileSnapshot } from "@/lib/profile-completion-data";
+import { isOfficeProfileDone } from "@/lib/profile-completion";
 
 export type OnboardingSnapshot = {
   state: OnboardingState;
   skipped: ReturnType<typeof parseSkipped>;
   tenant: {
     name: string;
-    phone: string | null;
-    city: string | null;
-    address_line: string | null;
-    license_no: string | null;
-    logo_url: string | null;
     slug: string | null;
     sample_seeded_at: string | null;
   } | null;
+  /** Ofis profili (TEK ilerleme modeli: `profile-completion`); "Ofis" adımının tamamlanması buradan türer. */
+  profile: ProfileSnapshot;
   counts: { customers: number; properties: number; sampleCustomers: number };
 };
 
@@ -32,10 +31,11 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const jar = await cookies();
   const skipped = user ? parseSkipped(jar.get(setupSkipCookieName(user.id))?.value) : [];
 
-  const results = await Promise.all([
+  const [profile, ...results] = await Promise.all([
+    loadProfileSnapshot(tenantId),
     supabase
       .from("tenants")
-      .select("name, phone, city, address_line, license_no, logo_url, slug, sample_seeded_at")
+      .select("name, slug, sample_seeded_at")
       .eq("id", tenantId)
       .maybeSingle(),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", false),
@@ -56,18 +56,14 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
     supabase.from("customer_demands").select("id", { count: "exact", head: true }).eq("is_sample", false),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("is_sample", false),
   ]);
-  if (results.some((r) => r.error)) return null;
+  if (!profile || results.some((r) => r.error)) return null;
 
   const tenant = results[0].data as OnboardingSnapshot["tenant"];
   const customers = results[1].count ?? 0;
   const properties = results[2].count ?? 0;
   const state = buildOnboarding(
     {
-      profileFilled: {
-        phone: Boolean(tenant?.phone),
-        city: Boolean(tenant?.city),
-        licenseNo: Boolean(tenant?.license_no),
-      },
+      officeProfileDone: isOfficeProfileDone(profile.completion),
       customers,
       properties,
       members: results[3].count ?? 0,
@@ -79,5 +75,5 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
     },
     skipped,
   );
-  return { state, skipped, tenant, counts: { customers, properties, sampleCustomers: results[7].count ?? 0 } };
+  return { state, skipped, tenant, profile, counts: { customers, properties, sampleCustomers: results[7].count ?? 0 } };
 });

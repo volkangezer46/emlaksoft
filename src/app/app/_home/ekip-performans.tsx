@@ -31,7 +31,7 @@ const DOT: Record<TeamStatus, string> = { ok: "pm-t-success", warn: "pm-t-warn",
 /** Sıfır çıkmaz metrik: her hücre danışman + metrik süzgeçli hedefe gider (dokunma hedefi satır yüksekliği kadar). */
 function CellLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
   return (
-    <Link href={href} aria-label={label} className="focus-ring -mx-1 inline-flex min-h-8 min-w-8 items-center justify-end rounded-sm px-1 hover:text-[var(--accent-text)] hover:underline">
+    <Link href={href} aria-label={label} className="focus-ring -mx-1 inline-flex min-h-8 min-w-8 touch:min-h-11 touch:min-w-11 items-center justify-end rounded-sm px-1 hover:text-[var(--accent-text)] hover:underline">
       {children}
     </Link>
   );

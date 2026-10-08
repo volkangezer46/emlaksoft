@@ -108,9 +108,6 @@ describe("buildAttentionItems", () => {
     overdueRent: null,
     staleDeals: null,
     staleDays: 14,
-    unconfirmedListings: null,
-    expiringAuthority: null,
-    expiringCapped: false,
     pendingCommission: null,
     pendingCommissionText: "",
     passiveAdvisors: null,
@@ -119,28 +116,26 @@ describe("buildAttentionItems", () => {
     userId: "u1",
   };
   it("yalnız gerçek sayı > 0 olan kalemler, önem sırasıyla ve filtrelenmiş hedefle", () => {
-    const items = buildAttentionItems({ ...base, approvals: 2, overdueRent: 0, passiveAdvisors: 1, expiringAuthority: 3, overdueTasks: 4, staleDeals: 2 });
-    expect(items.map((i) => i.id)).toEqual(["gorev", "onay", "riskli-anlasma", "yetki", "pasif"]);
-    expect(items.map((i) => i.level)).toEqual(["acil", "yuksek", "yuksek", "orta", "dusuk"]);
+    const items = buildAttentionItems({ ...base, approvals: 2, overdueRent: 0, passiveAdvisors: 1, overdueTasks: 4, staleDeals: 2 });
+    expect(items.map((i) => i.id)).toEqual(["gorev", "onay", "riskli-anlasma", "pasif"]);
+    expect(items.map((i) => i.level)).toEqual(["acil", "yuksek", "yuksek", "dusuk"]);
     // Hareketsiz danışman ekip listesine gider (ekipte süzgeç yok); diğerleri süzgeçli liste.
     expect(items.filter((i) => i.id !== "pasif").every((i) => i.href.startsWith("/app/") && i.href.includes("?"))).toBe(true);
-    expect(items.find((i) => i.id === "yetki")?.href).toBe("/app/portfoyler?yetki=bitiyor");
     expect(items.find((i) => i.id === "riskli-anlasma")?.href).toBe("/app/anlasmalar?bayat=1");
   });
   it("'Ben' kapsamı hedef bağlantıya taşınır", () => {
-    const items = buildAttentionItems({ ...base, mine: true, overdueTasks: 1, staleDeals: 1, expiringAuthority: 1 });
+    const items = buildAttentionItems({ ...base, mine: true, overdueTasks: 1, staleDeals: 1 });
     expect(items.find((i) => i.id === "gorev")?.href).toBe("/app/gorevler?filter=overdue&mine=1");
     expect(items.find((i) => i.id === "riskli-anlasma")?.href).toBe("/app/anlasmalar?bayat=1&danisman=u1");
-    expect(items.find((i) => i.id === "yetki")?.href).toBe("/app/portfoyler?yetki=bitiyor&danisman=u1");
   });
-  it("tavanlı sayı ve tutar kalemi sayı göstermez (yanlış sayı yok)", () => {
-    const items = buildAttentionItems({ ...base, expiringAuthority: 12, expiringCapped: true, pendingCommission: 5000, pendingCommissionText: "₺5.000" });
-    expect(items.find((i) => i.id === "yetki")?.count).toBeUndefined();
+  it("tutar kalemi sayı göstermez (yanlış sayı yok)", () => {
+    const items = buildAttentionItems({ ...base, pendingCommission: 5000, pendingCommissionText: "₺5.000" });
     expect(items.find((i) => i.id === "komisyon")?.count).toBeUndefined();
   });
-  it("hiçbiri yoksa boş; kaçan komisyon dikkat listesinde YOK (risk bloğunda)", () => {
+  it("hiçbiri yoksa boş; ilan olguları (teyitsiz, yetkisi dolan, kaçan) dikkat listesinde YOK (İlan sağlığı bloğunda)", () => {
     expect(buildAttentionItems(base)).toEqual([]);
-    expect(buildAttentionItems({ ...base, approvals: 1, overdueRent: 4 }).some((i) => i.id === "kacan")).toBe(false);
+    const ids = buildAttentionItems({ ...base, approvals: 1, overdueRent: 4 }).map((i) => i.id);
+    for (const gone of ["kacan", "teyit", "yetki"]) expect(ids).not.toContain(gone);
   });
   it("hero cümlesi en öncelikli kalemi söyler; kalem yoksa sakin durum + bağlantı", () => {
     const items = buildAttentionItems({ ...base, approvals: 1, overdueTasks: 3 });

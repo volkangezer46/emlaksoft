@@ -24,21 +24,17 @@ import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
 import { buildHomeBounds, type HomeCtx } from "./_home/data";
 import { preloadDashboardSnapshot } from "./_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
-import { OrnekVeriYenileBandi, HosgeldinKredisi, YetkiUyari } from "./_home/ust-bolum";
+import { HosgeldinKredisi } from "./_home/hosgeldin-kredisi";
 import { AnaHero } from "./_home/ana-hero";
 import { BostaOnyukle } from "./_home/bosta-onyukle";
 import { DurumCubugu } from "./_home/durum-cubugu";
 import { KontorBandi } from "./_home/kontor-bandi";
-import { BosOfisKapisi, KurulumSeridi } from "./_home/baslayalim";
-import { ProfilTamamla } from "./_home/profil-tamamla";
-import { DuyuruSatiri } from "./_home/duyuru-satiri";
+import { BosOfisKapisi } from "./_home/bos-ofis-kapisi";
+import { BaslangicKarti } from "./_home/baslangic-karti";
+import { IlanSagligi } from "./_home/ilan-sagligi";
 import { Gorevler } from "./_home/gorevler";
-import { KayipKacak } from "./_home/kayip-kacak";
-import { PortfoySagligi } from "./_home/portfoy-sagligi";
 import { KiralamaProje } from "./_home/kiralama-proje";
-import { PortalSagligi } from "./_home/portal-ekip";
 import { CanliAkis } from "./_home/canli-akis";
-import { HizliAksiyonlar } from "./_home/musteriler-hizli";
 import { PortfoySeridi } from "./_home/portfoy-seridi";
 import { KaynakDagilimi } from "./_home/kaynak-dagilimi";
 import { Brifing, BrifingIskelet } from "./_home/brifing";
@@ -65,7 +61,7 @@ export const metadata = { title: "Ana ekran" };
  * Her rol: DashboardHero (tarih · rol bağlamı, selamlama, tek cümle öncelik, tazelik, dönem/kapsam seçici) → durum çubuğu
  * → KpiGrid (dönem/kapsam değişince FadeSwap). Ardından:
  *  - Yönetim: Dikkat gerektirenler + içgörüler (7) | Komisyon geliri eğrisi (5) → Ekip performansı (7) | Satış hunisi +
- *    ofis hedefi (5) → Program / Görevler / Kaçan komisyon → "Daha fazla" (varsayılan kapalı).
+ *    ofis hedefi (5) → Program / Görevler → tek İlan sağlığı bloğu → "Daha fazla" (varsayılan kapalı). Üstte tek Başlangıç kartı + en çok 2 bant.
  *  - Danışman: Sıradaki eylem (7) + Bugün ara (5) → Program / Görevler / Kişisel hedef. Takım lideri: + ekip tablosu.
  *  - Muhasebe: Tahsilat odağı + gider özeti. Arama merkezi: Bugün ara + görevler.
  * Ekran altı satırlar DeferredSection ile görünür alana yaklaşınca bağlanır. Reveal (motion `m.*`) burada bilinçli
@@ -214,11 +210,6 @@ export default async function AppHomePage({
       <Gorevler ctx={ctx} />
     </Suspense>
   );
-  const risk = (
-    <Suspense fallback={<PanelIskelet />}>
-      <KayipKacak ctx={ctx} />
-    </Suspense>
-  );
   const kisiselHedef = (
     <Suspense fallback={<PanelIskelet rows={2} className="min-h-[13rem]" />}>
       <KisiselHedef ctx={ctx} />
@@ -241,8 +232,6 @@ export default async function AppHomePage({
         return program;
       case "gorevler":
         return gorevler;
-      case "risk":
-        return off("leak") ? null : risk;
       case "kisisel-hedef":
         return kisiselHedef;
       case "gider-ozeti":
@@ -332,31 +321,22 @@ export default async function AppHomePage({
   }
 
   /* ------------------------ "Daha fazla" (varsayılan kapalı) ------------------------ */
-  const MORE_SPAN: Record<MoreBlock, 4 | 5 | 7 | 12> = {
+  const MORE_SPAN: Record<MoreBlock, 4 | 7 | 12> = {
     "canli-akis": 7,
-    "portal-sagligi": 5,
     "kaynak-dagilimi": 4,
-    yetki: 12,
     portfoy: 12,
     kiralama: 12,
-    hizli: 12,
   };
   const moreNode = (key: MoreBlock): { node: ReactNode; className?: string } | null => {
     switch (key) {
-      case "yetki":
-        return { node: <Suspense fallback={null}><YetkiUyari ctx={ctx} /></Suspense>, className: "empty:hidden" };
       case "portfoy":
         return { node: <Suspense fallback={null}><PortfoySeridi ctx={ctx} /></Suspense>, className: "empty:hidden" };
       case "kiralama":
         return { node: <Suspense fallback={null}><KiralamaProje ctx={ctx} /></Suspense>, className: "empty:hidden" };
       case "canli-akis":
         return { node: <Suspense fallback={<BlokIskelet className="h-80" />}><CanliAkis ctx={ctx} auditLink={layout.auditLink} /></Suspense> };
-      case "portal-sagligi":
-        return off("portals") ? null : { node: <Suspense fallback={<PanelIskelet />}><PortalSagligi ctx={ctx} /></Suspense> };
       case "kaynak-dagilimi":
         return { node: <Suspense fallback={<PanelIskelet />}><KaynakDagilimi ctx={ctx} /></Suspense> };
-      case "hizli":
-        return { node: <HizliAksiyonlar /> };
     }
   };
   const moreCells = layout.more.flatMap((k) => {
@@ -371,33 +351,29 @@ export default async function AppHomePage({
           <AnaHero ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
           {layout.statusBar ? (
             <DurumCubugu>
-              <Suspense fallback={null}>
-                <OrnekVeriYenileBandi ctx={ctx} />
-              </Suspense>
+              {/* En çok 2 bant, öncelik sırasıyla: kontör (para/engel) > hoş geldin kredisi. Kurulum, profil, örnek veri ve duyurular
+                  burada DEĞİL: Başlangıç kartı / Bildirimler > Duyurular. */}
               <Suspense fallback={null}>
                 <KontorBandi ctx={ctx} valuationClosed={off("valuation")} />
               </Suspense>
               <Suspense fallback={null}>
-                <KurulumSeridi ctx={ctx} />
-              </Suspense>
-              <Suspense fallback={null}>
                 <HosgeldinKredisi ctx={ctx} />
-              </Suspense>
-              <Suspense fallback={null}>
-                <DuyuruSatiri />
               </Suspense>
             </DurumCubugu>
           ) : null}
         </div>
 
-        <Suspense fallback={null}><ProfilTamamla ctx={ctx} /></Suspense>
-        {/* Müşteri + portföy yokken tüm dolu bloklar yerine tek "Başlayalım" kartı */}
+        {/* Tek "Başlangıç" kartı: ofis profili + örnek veri durumu + ilk adımlar; tamamlanınca kaybolur */}
+        <Suspense fallback={null}>
+          <BaslangicKarti ctx={ctx} />
+        </Suspense>
+        {/* Müşteri + portföy yokken tüm dolu bloklar gizlenir; yerinde Başlangıç kartı ilk adımları gösterir */}
         <Suspense fallback={<PanelIskelet rows={2} />}>
           <BosOfisKapisi ctx={ctx}>
             <div className="flex min-w-0 flex-col gap-5">
               {kpis}
               {rows}
-              {off("portals") ? null : <PortfoySagligi ctx={ctx} />}
+              {layout.listingHealth ? <Widget id="ilan-sagligi"><IlanSagligi ctx={ctx} closed={{ portals: off("portals"), leak: off("leak") }} /></Widget> : null}
 
               {moreCells.length > 0 ? (
                 <section aria-label="Daha fazla" className="flex flex-col gap-4">

@@ -76,7 +76,9 @@ describe("coğrafya tek merkez sözleşmesi", () => {
   it("(c) ofis ayarları ve kurulum sihirbazı GeoSelect + sunucu doğrulaması kullanır", () => {
     const text = (p: string) => files.find((f) => f.path === p)?.text ?? "";
     expect(text("src/app/app/ayarlar/company-form.tsx")).toContain("GeoSelect");
-    expect(text("src/app/app/baslangic/office-step.tsx")).toContain("GeoSelect");
+    expect(text("src/app/app/ayarlar/profil-tamamla/profil-sihirbaz.tsx")).toContain("GeoSelect");
+    // Kurulum sihirbazının ofis adımı alanları yeniden sormaz: tek kaynak profil-tamamla sihirbazıdır.
+    expect(text("src/app/app/baslangic/office-step.tsx")).toContain("PROFILE_WIZARD_HREF");
     expect(text("src/app/actions/settings.ts")).toContain("resolveOfficeGeo");
     expect(text("src/app/actions/onboarding-setup.ts")).toContain("resolveOfficeGeo");
   });

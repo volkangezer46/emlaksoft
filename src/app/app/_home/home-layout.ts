@@ -7,14 +7,15 @@
  * Tasarım sistemi v4 (referans: /admin kontrol paneli): her rolde üstte DashboardHero (tarih, rol bazlı selamlama,
  * tek cümle öncelik, tazelik, dönem seçici) + KpiGrid. Altında role göre:
  *  - management  (owner/gm/branch_manager): Dikkat gerektirenler (+ içgörüler) + aylık komisyon eğrisi
- *                → ekip tablosu + satış hunisi/hedef → program/görev/kaçan komisyon.
+ *                → ekip tablosu + satış hunisi/hedef → program/görev → İlan sağlığı.
  *  - advisor     (advisor, readonly): "Sıradaki eylem" odağı + "Bugün ara" (nedenli) + program/görev/kişisel hedef.
  *  - team_lead   : danışman yerleşimi + ekip satırı.
  *  - accounting  : odak = Tahsilat durumu; satış/müşteri blokları YOK.
  *  - call_center : yalnız arama ve yanıt süresi odaklı sade yerleşim.
  *
- * "Bir metrik ekranda bir kez": teyitsiz ilan, yetkisi dolan portföy, bekleyen komisyon ve geciken görev
- * yönetimde YALNIZ Dikkat listesindedir (KPI'da ve risk bloğunda tekrarlanmaz). Danışmana ofis geneli
+ * "Bir metrik ekranda bir kez": teyitsiz ilan, yetkisi dolan, kayıp/kapanmış ilan ve portal sağlığı YALNIZ tek "İlan sağlığı"
+ * bloğundadır (`listingHealth`; danışmanda yalnız kendi ilanları, muhasebe/arama merkezinde yok); bekleyen komisyon ve geciken görev
+ * yönetimde YALNIZ Dikkat listesindedir (KPI'da tekrarlanmaz). Danışmana ofis geneli
  * teyit metriği gösterilmez (portal teyidi yönetimin işi).
  */
 
@@ -35,8 +36,8 @@ export type MetricKey =
   | "tahsil-edilen"
   | "yanit-suresi";
 
-export type BottomBlock = "program" | "gorevler" | "risk" | "kisisel-hedef" | "gider-ozeti";
-export type MoreBlock = "canli-akis" | "portal-sagligi" | "kaynak-dagilimi" | "yetki" | "portfoy" | "kiralama" | "hizli";
+export type BottomBlock = "program" | "gorevler" | "kisisel-hedef" | "gider-ozeti";
+export type MoreBlock = "canli-akis" | "kaynak-dagilimi" | "portfoy" | "kiralama";
 
 export type HomeLayout = {
   variant: HomeVariant;
@@ -60,6 +61,8 @@ export type HomeLayout = {
   callList: boolean;
   /** Canlı akış başlığındaki "Denetim kaydı" bağlantısı (denetim yönetimin işi). */
   auditLink: boolean;
+  /** Tek "İlan sağlığı" bloğu (teyitsiz, kayıp/kapanmış, yetkisi dolan, portal sağlığı). Muhasebe/arama merkezi görmez; danışmanda yalnız kendi ilanları. */
+  listingHealth: boolean;
   bottom: BottomBlock[];
   more: MoreBlock[];
 };
@@ -87,9 +90,9 @@ const MANAGEMENT: HomeLayout = {
   funnelTarget: "office",
   callList: false,
   auditLink: true,
-  bottom: ["program", "gorevler", "risk"],
-  // "yetki" yok: yetkisi dolan portföy Dikkat listesinde (aynı sayı iki kez gösterilmez).
-  more: ["portfoy", "kiralama", "canli-akis", "portal-sagligi", "kaynak-dagilimi", "hizli"],
+  listingHealth: true,
+  bottom: ["program", "gorevler"],
+  more: ["portfoy", "kiralama", "canli-akis", "kaynak-dagilimi"],
 };
 
 const ADVISOR: HomeLayout = {
@@ -106,8 +109,9 @@ const ADVISOR: HomeLayout = {
   funnelTarget: null,
   callList: true,
   auditLink: false,
+  listingHealth: true,
   bottom: ["program", "gorevler", "kisisel-hedef"],
-  more: ["yetki", "portfoy", "kiralama", "canli-akis", "hizli"],
+  more: ["portfoy", "kiralama", "canli-akis"],
 };
 
 const LAYOUTS: Record<HomeVariant, HomeLayout> = {
@@ -128,6 +132,7 @@ const LAYOUTS: Record<HomeVariant, HomeLayout> = {
     funnelTarget: null,
     callList: false,
     auditLink: false,
+    listingHealth: false,
     bottom: ["gider-ozeti"],
     more: [],
   },
@@ -144,6 +149,7 @@ const LAYOUTS: Record<HomeVariant, HomeLayout> = {
     funnelTarget: null,
     callList: true,
     auditLink: false,
+    listingHealth: false,
     bottom: ["gorevler"],
     more: [],
   },

@@ -6,8 +6,6 @@ import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { resolveWizardStep } from "@/lib/onboarding-checklist";
 import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
-import { createClient } from "@/lib/supabase/server";
-import { getProvinceOptions } from "@/lib/geo/reader";
 import { SetupWizard } from "./setup-wizard";
 
 export const metadata = { title: "Ofis kurulumu" };
@@ -29,14 +27,11 @@ export default async function OnboardingPage({
     );
   }
 
-  const supabase = await createClient();
-  const [snap, { adim }, lossReasons, stageLabels, provinces, { data: geoRow }] = await Promise.all([
+  const [snap, { adim }, lossReasons, stageLabels] = await Promise.all([
     loadOnboardingSnapshot(tenantId),
     searchParams,
     getLossReasonOptions(),
     getStageLabels(),
-    getProvinceOptions(),
-    supabase.from("tenants").select("province_id, district_id, tax_number").eq("id", tenantId).maybeSingle(),
   ]);
   if (!snap) {
     return (
@@ -75,23 +70,12 @@ export default async function OnboardingPage({
         showSampleData={showSampleData}
         showStartChoice={showStartChoice}
         canSeedSample={canSeedSample}
-        office={{
-          name: tenant?.name ?? "",
-          phone: tenant?.phone ?? "",
-          city: tenant?.city ?? "",
-          provinceId: (geoRow?.province_id as string | null) ?? null,
-          districtId: (geoRow?.district_id as string | null) ?? null,
-          addressLine: tenant?.address_line ?? "",
-          licenseNo: tenant?.license_no ?? "",
-          taxNumber: (geoRow?.tax_number as string | null) ?? "",
-          logoUrl: tenant?.logo_url ?? null,
-        }}
+        profile={snap.profile.completion}
         lossReasons={lossReasons.map((r) => ({ value: r.value, label: r.label }))}
         stageLabels={Object.entries(stageLabels).map(([key, v]) => ({ key, label: v.label }))}
         customers={counts.customers}
         properties={counts.properties}
         vitrinHref={tenant?.slug ? `/vitrin/${tenant.slug}` : null}
-        provinces={provinces}
       />
     </div>
   );

@@ -94,7 +94,15 @@ export function computeProfileCompletion(f: ProfileFacts): ProfileCompletion {
   };
 }
 
-export const PROFILE_WIZARD_HREF = "/app/ayarlar/profil-tamamla";
+/**
+ * Kurulum sihirbazının "Ofis bilgileri" adımı bu hesaba bağlıdır (TEK ilerleme modeli): ekip daveti hariç tüm
+ * profil maddeleri tamamsa adım tamamdır; "Ekip" kurulumda ayrı adım olduğundan burada sayılmaz.
+ */
+export function isOfficeProfileDone(c: ProfileCompletion): boolean {
+  return c.missing.every((m) => m.step === "ekip");
+}
+
+export const PROFILE_WIZARD_HREF ="/app/ayarlar/profil-tamamla";
 
 export function profileStepHref(step: ProfileStepKey): string {
   return `${PROFILE_WIZARD_HREF}?adim=${step}`;
