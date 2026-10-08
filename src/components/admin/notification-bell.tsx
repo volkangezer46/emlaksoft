@@ -1,5 +1,6 @@
 "use client";
 
+import { now as clockNow, msSince, trDayStartMs } from "@/lib/clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ function kindMeta(kind: string) {
 }
 
 function relTime(iso: string) {
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  const min = Math.floor(msSince(iso) / 60000);
   if (min < 1) return "az önce";
   if (min < 60) return `${min} dk`;
   const hr = Math.floor(min / 60);
@@ -48,9 +49,8 @@ function relTime(iso: string) {
 }
 
 function groupByTime(items: Notif[]) {
-  const now = Date.now();
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
+  const now = clockNow();
+  const dayStart = trDayStartMs(now);
   const weekMs = 7 * 86_400_000;
   const groups: { label: string; items: Notif[] }[] = [
     { label: "Bugün", items: [] },
@@ -59,7 +59,7 @@ function groupByTime(items: Notif[]) {
   ];
   for (const n of items) {
     const t = new Date(n.created_at).getTime();
-    if (t >= dayStart.getTime()) groups[0].items.push(n);
+    if (t >= dayStart) groups[0].items.push(n);
     else if (now - t < weekMs) groups[1].items.push(n);
     else groups[2].items.push(n);
   }

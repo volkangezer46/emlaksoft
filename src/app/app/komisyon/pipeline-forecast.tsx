@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getSettings } from "@/lib/settings/read";
 import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 import { buildPipelineForecast, LOOKBACK_DAYS, MIN_CLOSED } from "@/lib/forecast/pipeline";
@@ -18,13 +19,17 @@ export async function PipelineForecastCard({ tenantId }: { tenantId: string }) {
   const supabase = await createClient();
   const sinceIso = new Date(now() - LOOKBACK_DAYS * 2 * 86_400_000).toISOString();
   const [{ data, error }, settings] = await Promise.all([
-    supabase
-      .from("deals")
-      .select("deal_type, stage, deal_value, created_at, updated_at")
-      .eq("tenant_id", tenantId)
-      .eq("is_sample", false)
-      .or(`stage.not.in.(won,lost),updated_at.gte.${sinceIso}`)
-      .limit(5000),
+    // max_rows (1000) sınırı: tahmin tüm açık hattı görmeli; sayfalı okuma, eksikse (error) kart gizlenir.
+    fetchAllRows<{ deal_type: string; stage: string; deal_value: number | string | null; created_at: string; updated_at: string }>((from, to) =>
+      supabase
+        .from("deals")
+        .select("id, deal_type, stage, deal_value, created_at, updated_at")
+        .eq("tenant_id", tenantId)
+        .eq("is_sample", false)
+        .or(`stage.not.in.(won,lost),updated_at.gte.${sinceIso}`)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     getSettings(["office.commission.default_rate"], { tenantId }),
   ]);
   if (error) return null;

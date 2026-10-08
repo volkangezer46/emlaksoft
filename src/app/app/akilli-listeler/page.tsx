@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso, msSince, DAY_MS } from "@/lib/clock";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { fetchLeadSignals } from "@/lib/lead-signals";
 import { computeChurnRisk } from "@/lib/churn-risk";
 import { scoreSellerLikelihood, isOwnerCustomer } from "@/lib/seller-prediction";
@@ -49,11 +50,15 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
   const supabase = await createClient();
 
   const [custRes, upcomingRes] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, full_name, phone, email, customer_types, blacklist, source, created_at")
-      .is("deleted_at", null)
-      .limit(3000),
+    // max_rows (1000) sınırı: tüm müşteriler sayfalı okunur; eksik liste sessizce gösterilmez.
+    fetchAllRows((from, to) =>
+      supabase
+        .from("customers")
+        .select("id, full_name, phone, email, customer_types, blacklist, source, created_at")
+        .is("deleted_at", null)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     supabase
       .from("appointments")
       .select("customer_id")

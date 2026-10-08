@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { createCommunication, type CommResult } from "@/app/actions/communications";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
+import { msSince } from "@/lib/clock";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,7 +57,7 @@ function authorName(p: CommRow["created_by"]) {
 }
 
 function relTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = msSince(iso);
   const m = Math.floor(diff / 60_000);
   if (m < 1)  return "az önce";
   if (m < 60) return `${m} dk önce`;

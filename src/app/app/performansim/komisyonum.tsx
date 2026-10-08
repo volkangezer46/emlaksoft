@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { HandCoins } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { daysAgoIso, now, trParts } from "@/lib/clock";
 import { formatTry } from "@/lib/format";
 import { getSettings } from "@/lib/settings/read";
@@ -23,14 +24,18 @@ export async function Komisyonum({ userId, tenantId, officeWide }: { userId: str
   const [{ data: profile }, commission, dealsRes, settings] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     fetchCommissionRows(supabase, { tenantId, viewerId: userId, seeAll: false, limit: 1000 }),
-    supabase
-      .from("deals")
-      .select("deal_type, stage, deal_value, created_at, updated_at")
-      .eq("tenant_id", tenantId)
-      .eq("assigned_to", userId)
-      .eq("is_sample", false)
-      .or(`stage.not.in.(won,lost),updated_at.gte.${sinceIso}`)
-      .limit(2000),
+    // max_rows (1000) sınırı: sayfalı okuma; eksikse (error) tahmin gösterilmez.
+    fetchAllRows<{ deal_type: string; stage: string; deal_value: number | string | null; created_at: string; updated_at: string }>((from, to) =>
+      supabase
+        .from("deals")
+        .select("id, deal_type, stage, deal_value, created_at, updated_at")
+        .eq("tenant_id", tenantId)
+        .eq("assigned_to", userId)
+        .eq("is_sample", false)
+        .or(`stage.not.in.(won,lost),updated_at.gte.${sinceIso}`)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     getSettings(["office.commission.default_rate"], { tenantId }),
   ]);
   if (commission.error) return null;

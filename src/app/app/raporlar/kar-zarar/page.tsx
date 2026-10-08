@@ -8,6 +8,8 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { createClient } from "@/lib/supabase/server";
 import { formatTry } from "@/lib/format";
 import { now, trMonthKey } from "@/lib/clock";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
 
 export const metadata = { title: "Kâr / zarar" };
@@ -41,20 +43,27 @@ export default async function ProfitLossPage() {
   const startIso = `${keys[0]}-01T00:00:00+03:00`;
   const supabase = await createClient();
   const [commRes, expRes] = await Promise.all([
-    supabase
-      .from("commissions")
-      .select("id, created_at, gross_amount, vat_amount, status")
-      .eq("tenant_id", tenantId)
-      .eq("is_sample", false)
-      .gte("created_at", startIso)
-      .limit(5000),
-    supabase
-      .from("expenses")
-      .select("expense_date, amount")
-      .eq("tenant_id", tenantId)
-      .eq("is_sample", false)
-      .gte("expense_date", `${keys[0]}-01`)
-      .limit(10000),
+    // max_rows (1000) sınırı: sayfalı okuma; sayfa üst sınırı/hata `error` olarak yüzeye çıkar.
+    fetchAllRows<{ id: string; created_at: string; gross_amount: number | string; vat_amount: number | string | null; status: string }>((from, to) =>
+      supabase
+        .from("commissions")
+        .select("id, created_at, gross_amount, vat_amount, status")
+        .eq("tenant_id", tenantId)
+        .eq("is_sample", false)
+        .gte("created_at", startIso)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllRows<{ expense_date: string; amount: number | string }>((from, to) =>
+      supabase
+        .from("expenses")
+        .select("id, expense_date, amount")
+        .eq("tenant_id", tenantId)
+        .eq("is_sample", false)
+        .gte("expense_date", `${keys[0]}-01`)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
   ]);
   const commissions: PlCommission[] = ((commRes.data ?? []) as { id: string; created_at: string; gross_amount: number | string; vat_amount: number | string | null; status: string }[]).map((c) => ({
     id: c.id,
@@ -65,20 +74,35 @@ export default async function ProfitLossPage() {
   }));
   const ids = commissions.map((c) => c.id);
   const splits: PlSplit[] = [];
+  const splitErrors: { error: unknown }[] = [];
   for (let i = 0; i < ids.length; i += 200) {
-    const { data, error } = await supabase
-      .from("commission_splits")
-      .select("commission_id, kind, amount")
-      .eq("tenant_id", tenantId)
-      .in("commission_id", ids.slice(i, i + 200));
-    if (error) break;
+    const part = ids.slice(i, i + 200);
+    // 200 komisyon × çok paylı kayıt 1000 satırı aşabilir (max_rows): parça başına sayfalı okuma.
+    const { data, error } = await fetchAllRows<{ commission_id: string; kind: string; amount: number | string }>((from, to) =>
+      supabase
+        .from("commission_splits")
+        .select("id, commission_id, kind, amount")
+        .eq("tenant_id", tenantId)
+        .in("commission_id", part)
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
+    if (error) {
+      // Eksik pay verisiyle net hesaplanmaz (net olduğundan yüksek görünürdü): aşağıda sayfa hata sınırına düşer.
+      splitErrors.push({ error });
+      break;
+    }
     for (const s of (data ?? []) as { commission_id: string; kind: string; amount: number | string }[]) {
       splits.push({ commissionId: s.commission_id, kind: s.kind, amount: Number(s.amount) || 0 });
     }
   }
   const expenses: PlExpense[] = ((expRes.data ?? []) as { expense_date: string; amount: number | string }[]).map((e) => ({ date: String(e.expense_date), amount: Number(e.amount) || 0 }));
+  assertQueryBatchSucceeded(
+    [commRes, expRes, ...splitErrors],
+    ["kar-zarar-komisyon", "kar-zarar-gider", ...splitErrors.map(() => "kar-zarar-paylar")],
+    "Kâr / zarar",
+  );
   const pl = buildProfitLoss(keys, commissions, splits, expenses);
-  const truncated = (commRes.data?.length ?? 0) >= 5000 || (expRes.data?.length ?? 0) >= 10000;
 
   return (
     <div className="space-y-5">
@@ -88,8 +112,6 @@ export default async function ProfitLossPage() {
         description="Son 12 ay: komisyon gelirinden KDV, danışman ve diğer dış paylar ile ofis giderleri düşülünce kalan net."
         breadcrumbs={crumbs}
       />
-      {commRes.error || expRes.error ? <Alert tone="danger">Veriler okunamadı. Sayfayı yenileyin.</Alert> : null}
-      {truncated ? <Alert tone="warning">Kayıt sayısı sınırına ulaşıldı; en eski aylar eksik olabilir.</Alert> : null}
       {!pl.hasData ? (
         <EmptyState
           variant="panel"

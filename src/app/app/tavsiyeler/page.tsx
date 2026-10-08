@@ -1,5 +1,6 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { batchAll } from "@/lib/supabase/query-batch";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import Link from "@/components/ui/smart-link";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -159,7 +160,8 @@ export default async function ReferralsPage({
       )
       .order("created_at", { ascending: false })
       .limit(200),
-    supabase.from("referrals").select("link_id").limit(5000),
+    // max_rows (1000) sınırı: link başına sayı için tüm tavsiyeler sayfalı okunur.
+    fetchAllRows((from, to) => supabase.from("referrals").select("id, link_id").order("id", { ascending: true }).range(from, to)),
     // Müşteri seçici sunucu taraflı aranır (ReferralLinkCreator → searchCustomers).
     supabase.from("profiles").select("id, full_name").eq("is_active", true).limit(200),
     // NPS entegrasyonu: destekleyenler (9-10) — linki olmayanlar önerilecek.
