@@ -98,12 +98,16 @@ function mapAgreement(r: RawAgreement): AgreementView {
 
 export type OwnerFinanceCandidate = { kind: "expense" | "due"; id: string; date: string; label: string; amount: number; linked: boolean };
 
+/** Hakedişe yansıyan kalem türü: gider, tekil mülk aidatı, bina aidatı mahsubu (M2; defterde "aidat" sayılır). */
+export type LinkKind = "expense" | "due" | "unit_charge";
+const ledgerKind = (k: LinkKind): "expense" | "due" => (k === "expense" ? "expense" : "due");
+
 export type OwnerFinance = {
   available: boolean;
   agreement: AgreementView | null;
   ledger: OwnerLedger;
   payouts: { id: string; paidOn: string; amount: number; method: string; reference: string | null; note: string | null; voidedAt: string | null; voidReason: string | null }[];
-  links: { id: string; kind: "expense" | "due"; refId: string; amount: number; date: string; label: string }[];
+  links: { id: string; kind: LinkKind; refId: string; amount: number; date: string; label: string }[];
   candidates: OwnerFinanceCandidate[];
 };
 
@@ -130,13 +134,13 @@ export async function loadOwnerFinance(
   const payments: LedgerPayment[] = ((payRes.data ?? []) as { id: string; paid_on: string; amount: number | string; management_fee: number | string | null; receipt_no: number }[]).map((p) => ({
     id: p.id, paidOn: String(p.paid_on).slice(0, 10), amount: num(p.amount), managementFee: num(p.management_fee), receiptNo: p.receipt_no,
   }));
-  const links = ((linkRes.data ?? []) as { id: string; kind: "expense" | "due"; ref_id: string; amount: number | string; entry_date: string; label: string }[]).map((l) => ({
+  const links = ((linkRes.data ?? []) as { id: string; kind: LinkKind; ref_id: string; amount: number | string; entry_date: string; label: string }[]).map((l) => ({
     id: l.id, kind: l.kind, refId: l.ref_id, amount: num(l.amount), date: String(l.entry_date).slice(0, 10), label: l.label,
   }));
   const payoutsAll = ((payoutRes.data ?? []) as { id: string; paid_on: string; amount: number | string; method: string; reference: string | null; note: string | null; voided_at: string | null; void_reason: string | null }[]).map((o) => ({
     id: o.id, paidOn: String(o.paid_on).slice(0, 10), amount: num(o.amount), method: o.method, reference: o.reference, note: o.note, voidedAt: o.voided_at, voidReason: o.void_reason,
   }));
-  const charges: LedgerCharge[] = links.map((l) => ({ id: l.id, kind: l.kind, date: l.date, amount: l.amount, label: l.label }));
+  const charges: LedgerCharge[] = links.map((l) => ({ id: l.id, kind: ledgerKind(l.kind), date: l.date, amount: l.amount, label: l.label }));
   const payouts: LedgerPayout[] = payoutsAll.filter((o) => !o.voidedAt).map((o) => ({ id: o.id, paidOn: o.paidOn, amount: o.amount, reference: o.reference }));
   const ledger = computeOwnerLedger({ payments, charges, payouts });
 
@@ -189,7 +193,7 @@ export async function loadOwnerBalances(
     const [payRes, linkRes, outRes] = await Promise.all([
       fetchAllRows<{ id: string; rental_id: string; paid_on: string; amount: number | string; management_fee: number | string | null }>((from, to) =>
         db.from("rent_payments").select("id, rental_id, paid_on, amount, management_fee").eq("tenant_id", tenantId).in("rental_id", part).is("voided_at", null).order("id", { ascending: true }).range(from, to), 1000, 20),
-      fetchAllRows<{ id: string; rental_id: string; kind: "expense" | "due"; amount: number | string; entry_date: string; label: string }>((from, to) =>
+      fetchAllRows<{ id: string; rental_id: string; kind: LinkKind; amount: number | string; entry_date: string; label: string }>((from, to) =>
         db.from("owner_charge_links").select("id, rental_id, kind, amount, entry_date, label").eq("tenant_id", tenantId).in("rental_id", part).order("id", { ascending: true }).range(from, to), 1000, 20),
       fetchAllRows<{ id: string; rental_id: string; paid_on: string; amount: number | string }>((from, to) =>
         db.from("owner_payouts").select("id, rental_id, paid_on, amount").eq("tenant_id", tenantId).in("rental_id", part).is("voided_at", null).order("id", { ascending: true }).range(from, to), 1000, 20),
@@ -202,7 +206,7 @@ export async function loadOwnerBalances(
     }
     for (const l of linkRes.data) {
       const list = charges.get(l.rental_id) ?? [];
-      list.push({ id: l.id, kind: l.kind, date: String(l.entry_date).slice(0, 10), amount: num(l.amount), label: l.label });
+      list.push({ id: l.id, kind: ledgerKind(l.kind), date: String(l.entry_date).slice(0, 10), amount: num(l.amount), label: l.label });
       charges.set(l.rental_id, list);
     }
     for (const o of outRes.data) {
@@ -257,15 +261,22 @@ export async function loadManagementPnlInputs(
   input: { tenantId: string; firstMonthKey: string },
 ): Promise<{ fees: { date: string; amount: number }[]; passThroughExpenseIds: Set<string> }> {
   const { tenantId, firstMonthKey } = input;
-  const [feeRes, linkRes] = await Promise.all([
+  const [feeRes, bldFeeRes, linkRes] = await Promise.all([
     fetchAllRows<{ paid_on: string; management_fee: number | string }>((from, to) =>
       db.from("rent_payments").select("id, paid_on, management_fee").eq("tenant_id", tenantId).is("voided_at", null).gt("management_fee", 0)
+        .gte("paid_on", `${firstMonthKey}-01`).order("id", { ascending: true }).range(from, to), 1000, 20),
+    // M2: bina aidatı tahsilatlarından alınan yönetim ücreti de ofis gelirdir (tek kalem: tahsilatın kendisi gelir SAYILMAZ, çift sayım yok).
+    fetchAllRows<{ paid_on: string; management_fee: number | string }>((from, to) =>
+      db.from("building_payments").select("id, paid_on, management_fee").eq("tenant_id", tenantId).is("voided_at", null).gt("management_fee", 0)
         .gte("paid_on", `${firstMonthKey}-01`).order("id", { ascending: true }).range(from, to), 1000, 20),
     fetchAllRows<{ ref_id: string }>((from, to) =>
       db.from("owner_charge_links").select("id, ref_id").eq("tenant_id", tenantId).eq("kind", "expense").order("id", { ascending: true }).range(from, to), 1000, 20),
   ]);
   return {
-    fees: feeRes.error ? [] : feeRes.data.map((f) => ({ date: String(f.paid_on).slice(0, 10), amount: num(f.management_fee) })),
+    fees: [
+      ...(feeRes.error ? [] : feeRes.data.map((f) => ({ date: String(f.paid_on).slice(0, 10), amount: num(f.management_fee) }))),
+      ...(bldFeeRes.error ? [] : bldFeeRes.data.map((f) => ({ date: String(f.paid_on).slice(0, 10), amount: num(f.management_fee) }))),
+    ],
     passThroughExpenseIds: new Set(linkRes.error ? [] : linkRes.data.map((l) => l.ref_id)),
   };
 }

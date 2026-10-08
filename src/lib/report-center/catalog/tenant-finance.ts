@@ -1,7 +1,8 @@
 /**
  * Ofis raporları — finans: gider, kâr/zarar, kiralama, kira tahakkuku, aidat, sözleşme, uyum defteri, ofis faturaları.
  */
-import { now, trMonthKey } from "@/lib/clock";
+import { now, trDayKey, trMonthKey } from "@/lib/clock";
+import { computeUnitCari, type CariCharge, type CariPayment } from "@/lib/building-management/unit-ledger";
 import { LEDGER_FLAG_LABELS, LEDGER_METHOD_LABELS, LEDGER_PARTY_LABELS, LEDGER_TX_LABELS } from "@/lib/compliance/ledger";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
@@ -10,7 +11,7 @@ import { loadManagementPnlInputs } from "@/lib/property-management/load";
 import { DATE_RANGE_FIELDS } from "../filters";
 import { loadDefLabels, memoLabels, STATUS } from "../labels";
 import { applyActorScope, applyDateRange, applyTimestampRange, enrichProfiles, label, nameOf, one } from "../query-helpers";
-import type { Row } from "../types";
+import type { FilterField, Row } from "../types";
 import { defineReport, opts, tid } from "./define";
 
 const CONTRACT_TYPE_OPTIONS = [...DEFAULT_DEFINITIONS.contract_type.map((d) => ({ value: d.value, label: d.label })), { value: "yer_gosterme", label: "Yer gösterme" }, { value: "kapora", label: "Kapora" }];
@@ -440,4 +441,210 @@ export const mulkSahibiEkstresi = defineReport({
   },
 });
 
-export const FINANCE_REPORTS = [giderler, karZarar, kiralamalar, kiraTahakkuklari, mulkSahibiEkstresi, aidatlar, sozlesmeler, uyumKayitDefteri, ofisFaturalari];
+// ---------------------------------------------------------------------------
+// Bina & site yönetimi (M2): tahakkuk/tahsilat, daire cari ekstresi, gider paylaştırma dökümü
+// ---------------------------------------------------------------------------
+const BLD_STATUS: Record<string, string> = { pending: "Bekliyor", partial: "Kısmi ödendi", paid: "Ödendi", overdue: "Gecikti" };
+const BLD_STATUS_FILTER: Record<string, string> = { paid: "Ödendi", unpaid: "Ödenmemiş", overdue: "Vadesi geçmiş" };
+const BLD_KIND: Record<string, string> = { aidat: "Aylık aidat", expense_share: "Ortak gider" };
+const BLD_DIST: Record<string, string> = { equal: "Eşit", land_share: "Arsa payı", area: "Metrekare (m²)", fixed: "Sabit tutar" };
+const BLD_PAYER: Record<string, string> = { owner: "Malik", tenant: "Kiracı" };
+const BLD_FILTER_COMMON: FilterField[] = [{ kind: "text", key: "bina", label: "Bina / site adı", placeholder: "Ad ile ara" }];
+
+/** PostgREST ilike değerinden özel karakterleri ayıklar. */
+const likeValue = (v: string) => v.replace(/[%_,()*\\]/g, " ").trim().slice(0, 80);
+const unitText = (u: Row | null) => (u ? (u.block ? `${u.block} · ${u.unit_no}` : `Daire ${u.unit_no}`) : "");
+
+const BLD_CHARGE_SELECT =
+  "id, unit_id, amount, paid_amount, status, due_date, payer_role, " +
+  "batch:building_charge_batches!building_charges_batch_tenant_fkey!inner(kind, title, category, period, total_amount, distribution, voided_at, tenant_id), " +
+  "building:buildings!building_charges_building_tenant_fkey!inner(name, created_by, tenant_id), " +
+  "unit:building_units!building_charges_unit_tenant_fkey(block, unit_no, owner:customers!building_units_owner_customer_fkey(full_name), renter:customers!building_units_tenant_customer_fkey(full_name))";
+
+export const binaAidatTahsilat = defineReport({
+  id: "bina-aidat-tahsilat",
+  title: "Bina aidat tahakkuk ve tahsilat",
+  description:
+    "Yönetilen bina/sitelerin daire bazlı aidat ve ortak gider tahakkukları: tutar, ödenen, kalan, vade ve durum. İptal edilen tahakkuklar yer almaz; gecikme vade tarihi geçmiş ödenmemiş tahakkuktur.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  personalData: true,
+  keywords: ["bina", "site", "apartman", "aidat", "tahsilat", "daire", "yönetim"],
+  filters: [
+    ...BLD_FILTER_COMMON,
+    { kind: "select", key: "tur", label: "Tür", options: opts(BLD_KIND) },
+    { kind: "select", key: "durum", label: "Durum", options: opts(BLD_STATUS_FILTER) },
+    ...DATE_RANGE_FIELDS("Vade başlangıcı", "Vade bitişi"),
+  ],
+  columns: [
+    { key: "bina", label: "Bina / site", type: "text", width: 26, get: (r) => one(r.building)?.name },
+    { key: "daire", label: "Daire", type: "text", width: 14, get: (r) => unitText(one(r.unit)) },
+    { key: "tur", label: "Tür", type: "text", width: 14, get: (r) => BLD_KIND[String(one(r.batch)?.kind)] ?? one(r.batch)?.kind },
+    { key: "baslik", label: "Başlık", type: "text", width: 26, get: (r) => one(r.batch)?.title },
+    { key: "donem", label: "Dönem", type: "date", get: (r) => one(r.batch)?.period },
+    { key: "vade", label: "Vade", type: "date", get: (r) => r.due_date },
+    { key: "oyen", label: "Ödeyen rolü", type: "text", width: 12, get: (r) => BLD_PAYER[String(r.payer_role)] ?? r.payer_role },
+    { key: "odeyenAd", label: "Ödeyen adı", type: "text", width: 24, get: (r) => (r.payer_role === "tenant" ? one(one(r.unit)?.renter)?.full_name : one(one(r.unit)?.owner)?.full_name) },
+    { key: "tutar", label: "Tutar", type: "money", total: true, get: (r) => r.amount },
+    { key: "odenen", label: "Ödenen", type: "money", total: true, get: (r) => r.paid_amount },
+    { key: "kalan", label: "Kalan", type: "money", total: true, get: (r) => Math.round((Number(r.amount) - Number(r.paid_amount)) * 100) / 100 },
+    {
+      key: "durum",
+      label: "Durum",
+      type: "text",
+      width: 14,
+      get: (r) => (r.status !== "paid" && String(r.due_date).slice(0, 10) < trDayKey(now()) ? BLD_STATUS.overdue : (BLD_STATUS[String(r.status)] ?? r.status)),
+    },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase
+        .from("building_charges")
+        .select(BLD_CHARGE_SELECT, { count: "exact" })
+        .eq("tenant_id", tid(ctx))
+        .eq("building.tenant_id", tid(ctx))
+        .eq("batch.tenant_id", tid(ctx))
+        .is("voided_at", null);
+      q = applyActorScope(ctx, q, { actorColumn: "building.created_by" });
+      if (f.bina) q = q.ilike("building.name", `%${likeValue(f.bina)}%`);
+      if (f.tur && BLD_KIND[f.tur]) q = q.eq("batch.kind", f.tur);
+      if (f.durum === "paid") q = q.eq("status", "paid");
+      else if (f.durum === "unpaid") q = q.neq("status", "paid");
+      else if (f.durum === "overdue") q = q.neq("status", "paid").lt("due_date", trDayKey(now()));
+      q = applyDateRange(q, "due_date", f);
+      return q.order("due_date", { ascending: false }).order("id", { ascending: true });
+    },
+  },
+});
+
+export const giderPaylastirmaDokumu = defineReport({
+  id: "gider-paylastirma-dokumu",
+  title: "Bina gider paylaştırma dökümü",
+  description:
+    "Bina giderlerinin (asansör, temizlik, elektrik, bakım...) dairelere paylaştırılması: gider, dağıtım yöntemi, toplam, her dairenin payı, ödenen ve kalan. Paylaştırılan gider ofis gideri sayılmaz; kuruş farkı son daireye eklenmiştir.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  personalData: true,
+  keywords: ["ortak gider", "asansör", "temizlik", "paylaştırma", "bina", "site", "daire payı"],
+  filters: [...BLD_FILTER_COMMON, ...DATE_RANGE_FIELDS("Vade başlangıcı", "Vade bitişi")],
+  columns: [
+    { key: "bina", label: "Bina / site", type: "text", width: 26, get: (r) => one(r.building)?.name },
+    { key: "gider", label: "Gider", type: "text", width: 26, get: (r) => one(r.batch)?.title },
+    { key: "kategori", label: "Kategori", type: "text", width: 18, get: (r) => one(r.batch)?.category },
+    { key: "donem", label: "Dönem", type: "date", get: (r) => one(r.batch)?.period },
+    { key: "yontem", label: "Dağıtım yöntemi", type: "text", width: 18, get: (r) => BLD_DIST[String(one(r.batch)?.distribution)] ?? one(r.batch)?.distribution },
+    { key: "toplam", label: "Gider toplamı", type: "money", get: (r) => one(r.batch)?.total_amount },
+    { key: "daire", label: "Daire", type: "text", width: 14, get: (r) => unitText(one(r.unit)) },
+    { key: "pay", label: "Daire payı", type: "money", total: true, get: (r) => r.amount },
+    { key: "odenen", label: "Ödenen", type: "money", total: true, get: (r) => r.paid_amount },
+    { key: "kalan", label: "Kalan", type: "money", total: true, get: (r) => Math.round((Number(r.amount) - Number(r.paid_amount)) * 100) / 100 },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase
+        .from("building_charges")
+        .select(BLD_CHARGE_SELECT, { count: "exact" })
+        .eq("tenant_id", tid(ctx))
+        .eq("building.tenant_id", tid(ctx))
+        .eq("batch.tenant_id", tid(ctx))
+        .eq("batch.kind", "expense_share")
+        .is("voided_at", null);
+      q = applyActorScope(ctx, q, { actorColumn: "building.created_by" });
+      if (f.bina) q = q.ilike("building.name", `%${likeValue(f.bina)}%`);
+      q = applyDateRange(q, "due_date", f);
+      return q.order("due_date", { ascending: false }).order("id", { ascending: true });
+    },
+  },
+});
+
+export const daireCariEkstresi = defineReport({
+  id: "daire-cari-ekstresi",
+  title: "Daire cari ekstresi (borç-alacak)",
+  description:
+    "Bina dairelerinin cari hareketleri: tahakkuk (borç), tahsilat (alacak) ve kümülatif bakiye. Pozitif bakiye dairenin borcudur. İptal edilen tahakkuk ve tahsilatlar yer almaz; tarih filtresi yalnız gösterilen satırları daraltır, bakiye baştan hesaplanır.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  personalData: true,
+  keywords: ["cari", "ekstre", "daire", "bakiye", "borç", "alacak", "site"],
+  filters: [...BLD_FILTER_COMMON, ...DATE_RANGE_FIELDS("Hareket başlangıcı", "Hareket bitişi")],
+  columns: [
+    { key: "bina", label: "Bina / site", type: "text", width: 26, get: (r) => r.building },
+    { key: "daire", label: "Daire", type: "text", width: 14, get: (r) => r.unit },
+    { key: "tarih", label: "Tarih", type: "date", get: (r) => r.date },
+    { key: "aciklama", label: "Açıklama", type: "text", width: 36, get: (r) => r.label },
+    { key: "borc", label: "Borç", type: "money", total: true, get: (r) => r.debit },
+    { key: "alacak", label: "Alacak", type: "money", total: true, get: (r) => r.credit },
+    { key: "bakiye", label: "Bakiye", type: "money", get: (r) => r.balance },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      const bina = f.bina ? likeValue(f.bina) : "";
+      const chargesRes = await fetchAllRows<Row>((from, to) => {
+        let q = ctx.supabase
+          .from("building_charges")
+          .select(BLD_CHARGE_SELECT, { count: "exact" })
+          .eq("tenant_id", tid(ctx))
+          .eq("building.tenant_id", tid(ctx))
+          .eq("batch.tenant_id", tid(ctx))
+          .is("voided_at", null);
+        q = applyActorScope(ctx, q, { actorColumn: "building.created_by" });
+        if (bina) q = q.ilike("building.name", `%${bina}%`);
+        return q.order("id", { ascending: true }).range(from, to);
+      });
+      if (chargesRes.error) throw new Error("daire cari: tahakkuk okuma hatası");
+      const charges = chargesRes.data;
+      const chargeIds = new Set(charges.map((c) => String(c.id)));
+      const unitMeta = new Map<string, { building: string; unit: string }>();
+      const cariCharges = new Map<string, CariCharge[]>();
+      for (const c of charges) {
+        const unitId = String(c.unit_id ?? "");
+        if (!unitId) continue;
+        const b = one(c.building);
+        unitMeta.set(unitId, { building: String(b?.name ?? ""), unit: unitText(one(c.unit)) });
+        const list = cariCharges.get(unitId) ?? [];
+        const batch = one(c.batch);
+        const period = String(batch?.period ?? c.due_date).slice(0, 10);
+        const due = String(c.due_date).slice(0, 10);
+        list.push({ id: String(c.id), date: period > due ? due : period, amount: Number(c.amount) || 0, label: `${batch?.title ?? "Aidat"} (vade ${due})` });
+        cariCharges.set(unitId, list);
+      }
+      const payRes = await fetchAllRows<Row>((from, to) =>
+        ctx.supabase
+          .from("building_payments")
+          .select("id, charge_id, unit_id, amount, paid_on, receipt_no")
+          .eq("tenant_id", tid(ctx))
+          .is("voided_at", null)
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
+      if (payRes.error) throw new Error("daire cari: tahsilat okuma hatası");
+      const cariPays = new Map<string, CariPayment[]>();
+      for (const p of payRes.data) {
+        if (!chargeIds.has(String(p.charge_id))) continue; // yalnız kapsamdaki (kiracı + aktör + bina süzgeçli) tahakkuklar
+        const unitId = String(p.unit_id);
+        const list = cariPays.get(unitId) ?? [];
+        list.push({ id: String(p.id), date: String(p.paid_on).slice(0, 10), amount: Number(p.amount) || 0, label: "Tahsilat", receiptNo: p.receipt_no });
+        cariPays.set(unitId, list);
+      }
+      const out: Row[] = [];
+      const order = [...unitMeta.entries()].sort((a, b) => (a[1].building + a[1].unit).localeCompare(b[1].building + b[1].unit, "tr", { numeric: true }));
+      for (const [unitId, meta] of order) {
+        const cari = computeUnitCari({ charges: cariCharges.get(unitId) ?? [], payments: cariPays.get(unitId) ?? [] });
+        for (const e of cari.entries) {
+          if (f.from && e.date < f.from) continue;
+          if (f.to && e.date > f.to) continue;
+          out.push({ building: meta.building, unit: meta.unit, date: e.date, label: e.label, debit: e.debit, credit: e.credit, balance: e.balance });
+        }
+      }
+      return out;
+    },
+  },
+});
+
+export const FINANCE_REPORTS = [giderler, karZarar, kiralamalar, kiraTahakkuklari, mulkSahibiEkstresi, aidatlar, binaAidatTahsilat, daireCariEkstresi, giderPaylastirmaDokumu, sozlesmeler, uyumKayitDefteri, ofisFaturalari];
