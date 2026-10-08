@@ -498,8 +498,6 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999863, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
     { id: "PB55-admin-panel-toplulastirma", order: 29.999864, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
-    { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999865, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
-    { id: "PB55-admin-panel-toplulastirma", order: 29.999866, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
     { id: "PB57-bina-site-yonetimi", order: 29.999867, title: "Bina & site yonetimi: bina/daire modeli, donemlik toplu aidat tahakkuku, ortak gider paylastirma, tahsilat ve daire cari (M1 omurgasina baglanir; kod tablolar yokken sekmeyi gizler)", files: [F.buildingManagement] },
   ],
 
