@@ -1,3 +1,6 @@
+import { FilterChip } from "@/components/ui/filter-chip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "@/components/ui/smart-link";
 import { Search, Settings } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -84,36 +87,22 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
         <label className="relative flex-1">
           <span className="sr-only">Ayar ara</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-          <input
-            name="ara"
-            defaultValue={q}
-            placeholder="Ayar ara (ör. deneme, bakım, anahtar)"
-            className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-9 pr-3 text-sm outline-none focus:border-brand-400 focus:bg-surface"
-          />
+          <Input name="ara" defaultValue={q} placeholder="Ayar ara (ör. deneme, bakım, anahtar)" className="pl-9" />
         </label>
         {category ? <input type="hidden" name="kategori" value={category} /> : null}
-        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2.5 text-xs font-semibold text-white">
+        <Button variant="navy" size="sm" type="submit">
           Ara
-        </button>
+        </Button>
       </form>
 
       <nav aria-label="Ayar kategorileri" className="flex flex-wrap gap-2">
-        <Link
-          href={href()}
-          aria-current={!category ? "page" : undefined}
-          className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold ${!category ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-surface text-ink-950 hover:bg-canvas"}`}
-        >
+        <FilterChip href={href()} active={!category}>
           Tümü ({views.length})
-        </Link>
+        </FilterChip>
         {SETTING_CATEGORIES.map((c) => (
-          <Link
-            key={c.id}
-            href={href(c.id)}
-            aria-current={category === c.id ? "page" : undefined}
-            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold ${category === c.id ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-surface text-ink-950 hover:bg-canvas"}`}
-          >
+          <FilterChip key={c.id} href={href(c.id)} active={category === c.id}>
             {c.label} ({(counts.get(c.id) ?? 0) + (CATEGORY_LINKS[c.id]?.length ?? 0)})
-          </Link>
+          </FilterChip>
         ))}
       </nav>
 

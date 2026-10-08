@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Layers, Loader2 } from "lucide-react";
@@ -47,8 +48,7 @@ export function ModulePanel({
     });
   }
 
-  const btn =
-    "focus-ring press inline-flex min-h-8 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50";
+  const btn = buttonClass({ variant: "outline", size: "sm" });
 
   return (
     <section

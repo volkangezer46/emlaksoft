@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,9 +118,9 @@ export default async function AdminAiUsagePage({ searchParams }: { searchParams:
               defaultValue={JSON.stringify(table, null, 2)}
               className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-surface p-3 font-mono text-xs text-ink-950"
             />
-            <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-sm font-semibold text-white">
+            <Button variant="navy" size="md" type="submit">
               Kaydet
-            </button>
+            </Button>
           </form>
         </CardContent>
       </Card>

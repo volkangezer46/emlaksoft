@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applySimulatedSeatPricing } from "@/app/actions/platform-billing-plans";
@@ -155,24 +156,26 @@ function SimulatorBody({
                 Yeni abonelik adedi
                 <input value={s.count} onChange={(e) => updateSale(i, { count: e.target.value })} inputMode="numeric" className={`mt-1 w-full ${opFieldClass}`} />
               </label>
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 type="button"
                 onClick={() => setSales(sales.filter((_, idx) => idx !== i))}
                 aria-label={`Satış varsayımı ${i + 1} sil`}
-                className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:text-danger-600"
               >
                 Sil
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           onClick={() => setSales([...sales, { planId: plan.id, seats: String(plan.limits.seats), count: "0" }])}
-          className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950"
         >
           Varsayım ekle
-        </button>
+        </Button>
       </fieldset>
 
       <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line">
@@ -223,22 +226,17 @@ function SimulatorBody({
       {canWrite ? (
         <div className="flex flex-wrap items-center gap-2">
           {!confirm ? (
-            <button
-              type="button"
-              disabled={hasErrors || !changed}
-              onClick={() => setConfirm(true)}
-              className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-            >
+            <Button variant="navy" size="sm" type="button" disabled={hasErrors || !changed} onClick={() => setConfirm(true)}>
               Bu fiyatlamayı uygula
-            </button>
+            </Button>
           ) : (
             <>
               <span className="text-xs text-text-muted">
                 {plan.name} paketinin fiyatı ve kademeleri güncellenir; mevcut abonelerin kayıtlı/kilitli tutarı değişmez.
               </span>
-              <button type="button" disabled={pending} onClick={apply} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
+              <Button variant="navy" size="sm" type="button" disabled={pending} onClick={apply}>
                 {pending ? "Uygulanıyor…" : "Onayla"}
-              </button>
+              </Button>
               <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted">
                 Vazgeç
               </button>

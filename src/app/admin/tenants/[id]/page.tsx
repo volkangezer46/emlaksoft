@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { formatTry } from "@/lib/format";
 import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
@@ -424,9 +425,9 @@ export default async function AdminTenantDetailPage({
               plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
             />
             <form action={stopImpersonation}>
-              <button type="submit" className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
+              <Button variant="outline" size="md" type="submit">
                 Önizlemeyi bitir
-              </button>
+              </Button>
             </form>
           </>
         }

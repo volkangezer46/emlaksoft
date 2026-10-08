@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { resolveGeoRequest } from "@/app/actions/geo-admin";
@@ -32,9 +34,9 @@ export function ResolveForm({ id }: { id: string }) {
         decide(submitter?.value === "rejected" ? "rejected" : "approved", note);
       }}
     >
-      <input name="note" aria-label="Karar notu" placeholder="Not (ops.)" maxLength={500} className="min-w-[200px] flex-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-brand-400" />
-      <button type="submit" value="approved" disabled={pending} className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">Onayla</button>
-      <button type="submit" value="rejected" disabled={pending} className="rounded-[var(--radius-control)] border border-danger-500/40 px-3 py-1.5 text-xs font-semibold text-danger-500 disabled:opacity-60">Reddet</button>
+      <Input name="note" aria-label="Karar notu" placeholder="Not (ops.)" maxLength={500} className="min-w-[200px] flex-1" />
+      <Button variant="primary" size="sm" type="submit" value="approved" disabled={pending}>Onayla</Button>
+      <Button variant="outline" size="sm" type="submit" value="rejected" disabled={pending} className="text-danger-500">Reddet</Button>
       {error ? <p role="alert" className="w-full text-xs text-danger-500">{error}</p> : null}
     </form>
   );

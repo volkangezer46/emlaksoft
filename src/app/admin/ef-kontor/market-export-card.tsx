@@ -1,3 +1,4 @@
+import { buttonClass } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
 
 /**
@@ -5,8 +6,7 @@ import { Download, ShieldCheck } from "lucide-react";
  * (opt-in ofisler, k≥5, hücre başına en az 2 ofis; kişisel veri yok). Otomatik gönderim YOK: dosya elle paylaşılır.
  */
 export function MarketExportCard() {
-  const link =
-    "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm font-semibold text-text transition hover:border-brand-300 hover:text-accent-text";
+  const link = buttonClass({ variant: "outline", size: "md" });
   return (
     <section id="piyasa-verisi" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">

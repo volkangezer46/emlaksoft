@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyTenantGeoBackfill } from "@/app/actions/geo-admin";
@@ -28,11 +29,11 @@ export function ApplyMatchButton({ ids, label, allowFuzzy = false }: { ids: stri
       {confirm ? (
         <>
           <span className="text-xs text-text-muted">{ids.length} ofisin il kimliği ve gösterim adı yazılacak.</span>
-          <button type="button" disabled={pending} onClick={run} className="rounded-[var(--radius-control)] bg-brand-600 px-2.5 py-1 text-xs font-bold text-white disabled:opacity-60">Onayla</button>
-          <button type="button" onClick={() => setConfirm(false)} className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs text-text-muted">Vazgeç</button>
+          <Button variant="primary" size="xs" type="button" disabled={pending} onClick={run}>Onayla</Button>
+          <Button variant="outline" size="xs" type="button" onClick={() => setConfirm(false)}>Vazgeç</Button>
         </>
       ) : (
-        <button type="button" disabled={ids.length === 0} onClick={() => setConfirm(true)} className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold hover:border-brand-400 disabled:opacity-50">{label}</button>
+        <Button variant="outline" size="xs" type="button" disabled={ids.length === 0} onClick={() => setConfirm(true)}>{label}</Button>
       )}
       {msg ? <span role="status" className="text-xs text-text-muted">{msg}</span> : null}
     </span>

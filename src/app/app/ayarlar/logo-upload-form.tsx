@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useRef, useState, useTransition } from "react";
 import { Building2, Check, Loader2, Trash2, Upload } from "lucide-react";
 import { uploadTenantLogo, deleteTenantLogo } from "@/app/actions/tenant-logo";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function LogoUploadForm({
   currentUrl,
@@ -37,7 +39,6 @@ export function LogoUploadForm({
   }
 
   function handleDelete() {
-    if (!confirm("Logo silinsin mi?")) return;
     setResult(null);
     startTransition(async () => {
       const res = await deleteTenantLogo();
@@ -74,25 +75,22 @@ export function LogoUploadForm({
         <p className="text-xs text-text-muted">PNG, JPG veya WebP · maks. 2 MB</p>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface disabled:opacity-50"
-          >
-            <Upload className="h-3.5 w-3.5" />
+          <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={pending} icon={Upload}>
             {preview ? "Değiştir" : "Yükle"}
-          </button>
+          </Button>
 
           {preview && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={pending}
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:border-danger-500/30 hover:bg-danger-500/5 disabled:opacity-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Sil
-            </button>
+            <ConfirmDialog
+              title="Logo silinsin mi?"
+              description="Ofis logosu kaldırılır; istediğiniz zaman yenisini yükleyebilirsiniz."
+              confirmLabel="Logoyu sil"
+              onConfirm={handleDelete}
+              trigger={
+                <Button variant="outline" size="sm" disabled={pending} icon={Trash2} className="text-danger-500">
+                  Sil
+                </Button>
+              }
+            />
           )}
         </div>
 

@@ -1,4 +1,4 @@
-import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { getPlanSupport } from "@/lib/billing/plan-support";
 
 const TABS = [
@@ -16,16 +16,9 @@ export async function BillingNav({ active }: { active: (typeof TABS)[number]["id
   return (
     <nav aria-label="Faturalama bölümleri" className="flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-1">
       {tabs.map((t) => (
-        <Link
-          key={t.id}
-          href={t.href}
-          aria-current={active === t.id ? "page" : undefined}
-          className={`focus-ring min-h-9 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition ${
-            active === t.id ? "bg-ink-950 text-white" : "text-text-muted hover:bg-canvas hover:text-ink-950"
-          }`}
-        >
+        <FilterChip key={t.id} href={t.href} active={active === t.id}>
           {t.label}
-        </Link>
+        </FilterChip>
       ))}
     </nav>
   );

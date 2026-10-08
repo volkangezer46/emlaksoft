@@ -1,3 +1,6 @@
+import { Input } from "@/components/ui/input";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, Bug, CheckCircle2, ChevronDown, Clock3, Info, Repeat, Search, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -167,28 +170,17 @@ export async function ErrorsView({
           { v: "", l: "Açık" },
           { v: "cozulmus", l: "Çözülmüş" },
         ].map((o) => (
-          <Link
+          <FilterChip
             key={o.l}
             href={hrefWith({ ...base, durum: o.v || undefined })}
-            aria-current={(o.v === "cozulmus") === cozulmusGoster ? "page" : undefined}
-            className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
-              (o.v === "cozulmus") === cozulmusGoster
-                ? "bg-ink-950 text-white"
-                : "border border-line text-text-muted hover:text-ink-950"
-            }`}
+            active={(o.v === "cozulmus") === cozulmusGoster}
           >
             {o.l}
-          </Link>
+          </FilterChip>
         ))}
-        <Link
-          href={hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" })}
-          aria-current={sonBirSaat ? "page" : undefined}
-          className={`focus-ring press ml-auto inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
-            sonBirSaat ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-          }`}
-        >
-          <Clock3 className="h-3.5 w-3.5" /> Son 1 saat
-        </Link>
+        <FilterChip href={hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" })} active={sonBirSaat} className="ml-auto">
+          <Clock3 className="h-3.5 w-3.5" aria-hidden /> Son 1 saat
+        </FilterChip>
       </nav>
 
       <form
@@ -202,13 +194,13 @@ export async function ErrorsView({
         {ofis ? <input type="hidden" name="ofis" value={ofis} /> : null}
         <label className="relative min-w-0 flex-1 basis-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" aria-hidden />
-          <input
+          <Input
             type="search"
             name="q"
             defaultValue={q}
             placeholder="Hata metni veya sayfa yolu ara…"
             aria-label="Hata metni veya sayfa yolu ara"
-            className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2 pl-9 pr-3 text-sm outline-none transition focus:border-brand-400"
+            className="w-full pl-9 pr-3"
           />
         </label>
         <select
@@ -221,26 +213,23 @@ export async function ErrorsView({
           <option value="server">Sunucu</option>
           <option value="client">İstemci</option>
         </select>
-        <button
-          type="submit"
-          className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-semibold text-white"
-        >
+        <Button variant="navy" size="sm" type="submit">
           Filtrele
-        </button>
+        </Button>
         {q || kaynak || ofis ? (
           <span className="flex flex-wrap items-center gap-2">
             {q ? (
-              <Link href={hrefWith({ ...base, q: undefined })} className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+              <Link href={hrefWith({ ...base, q: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                 Arama: {q} <X className="h-3 w-3" />
               </Link>
             ) : null}
             {kaynak ? (
-              <Link href={hrefWith({ ...base, kaynak: undefined })} className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+              <Link href={hrefWith({ ...base, kaynak: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                 Kaynak: {kaynak === "server" ? "Sunucu" : "İstemci"} <X className="h-3 w-3" />
               </Link>
             ) : null}
             {ofis ? (
-              <Link href={hrefWith({ ...base, ofis: undefined })} className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+              <Link href={hrefWith({ ...base, ofis: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                 Ofis: {ofisAdi ?? "Kiracı"} <X className="h-3 w-3" />
               </Link>
             ) : null}

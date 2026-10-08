@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Undo2 } from "lucide-react";
@@ -28,13 +29,13 @@ export function RollbackButton({ versionId, label }: { versionId: string; label:
       {confirm ? (
         <>
           <span className="text-xs text-text-muted">“{label}” sürümünün değişiklikleri geri alınacak (eklenenler pasife alınır, güncellenenler eski değerine döner). Referans kırılmaz.</span>
-          <button type="button" disabled={pending} onClick={run} className="rounded-[var(--radius-control)] bg-danger-500 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60">{pending ? "Geri alınıyor…" : "Geri almayı onayla"}</button>
-          <button type="button" onClick={() => setConfirm(false)} className="rounded-[var(--radius-control)] border border-line px-2 py-1.5 text-xs text-text-muted">Vazgeç</button>
+          <Button variant="danger" size="sm" type="button" disabled={pending} onClick={run}>{pending ? "Geri alınıyor…" : "Geri almayı onayla"}</Button>
+          <Button variant="outline" size="sm" type="button" onClick={() => setConfirm(false)}>Vazgeç</Button>
         </>
       ) : (
-        <button type="button" onClick={() => setConfirm(true)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted hover:border-danger-500/40 hover:text-danger-500">
+        <Button variant="outline" size="sm" type="button" onClick={() => setConfirm(true)}>
           <Undo2 className="h-3.5 w-3.5" /> Geri al
-        </button>
+        </Button>
       )}
       {msg ? <span role={msg.ok ? "status" : "alert"} className={`text-xs ${msg.ok ? "text-success-600" : "text-danger-500"}`}>{msg.text}</span> : null}
     </div>

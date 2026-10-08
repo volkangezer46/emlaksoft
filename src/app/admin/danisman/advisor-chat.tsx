@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   ArrowUp,
@@ -114,14 +115,9 @@ function SessionSidebar({
     <aside className="hidden w-[220px] shrink-0 flex-col border-r border-line bg-canvas/40 md:flex">
       <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
         <p className="text-xs font-semibold text-text-muted">Geçmiş sohbetler</p>
-        <button
-          type="button"
-          onClick={onNew}
-          aria-label="Yeni sohbet başlat"
-          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
-        >
+        <Button variant="ghost" size="icon" type="button" onClick={onNew} aria-label="Yeni sohbet başlat">
           <MessageSquarePlus className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
       <div className="flex-1 overflow-y-auto py-1">
         {loading ? (
@@ -429,15 +425,17 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
             Yapay zeka iş danışmanı
           </p>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               type="button"
               onClick={newChat}
               title="Yeni sohbet başlat"
               aria-label="Yeni sohbet başlat"
-              className="focus-ring press grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600 md:hidden"
+              className="shrink-0 md:hidden"
             >
               <MessageSquarePlus className="h-4 w-4" />
-            </button>
+            </Button>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
                 aiEnabled ? "bg-mint-500/12 text-mint-600" : "bg-amber-400/15 text-amber-600"
@@ -447,18 +445,17 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
               {aiEnabled ? "OpenAI aktif" : "Akıllı yedek kip"}
             </span>
             {messages.length > 0 && (
-              <button
-                type="button"
-                title="Sohbeti TXT olarak indir"
-                onClick={() => {
-                  const activeSession = sessions.find((s) => s.id === sessionId);
-                  exportChatAsTxt(messages, activeSession?.title);
-                }}
-                className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
-                aria-label="Sohbeti indir"
-              >
+              <Button variant="ghost" size="icon"
+ type="button"
+ title="Sohbeti TXT olarak indir"
+ onClick={() => {
+ const activeSession = sessions.find((s) => s.id === sessionId);
+ exportChatAsTxt(messages, activeSession?.title);
+ }}
+ 
+ aria-label="Sohbeti indir">
                 <Download className="h-4 w-4" />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -532,13 +529,9 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
           {error ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/8 px-4 py-3">
               <p className="text-sm text-danger-500">{error}</p>
-              <button
-                type="button"
-                onClick={retry}
-                className="focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
-              >
+              <Button variant="outline" size="sm" type="button" onClick={retry} className="shrink-0">
                 <RotateCcw className="h-3.5 w-3.5" /> Yeniden dene
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>

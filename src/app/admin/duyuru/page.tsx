@@ -1,4 +1,4 @@
-import Link from "@/components/ui/smart-link";
+import { ButtonLink } from "@/components/ui/button";
 import { Bell, History, Megaphone, Send } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -104,12 +104,9 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
           <p className="text-sm text-text-muted">
             Hedef kitle: {allCount ?? 0} ofis (aktif {activeCount ?? 0}, deneme {trialCount ?? 0}). İçerik, tür ve hedefi sekmeli formda canlı özetle birlikte hazırlayın.
           </p>
-          <Link
-            href="/admin/duyuru?yeni=1"
-            className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-ink-950 px-5 py-3 text-sm font-bold text-white"
-          >
+          <ButtonLink variant="navy" size="md" href="/admin/duyuru?yeni=1" className="btn-shine">
             <Send className="h-4 w-4" /> Yeni duyuru
-          </Link>
+          </ButtonLink>
         </section>
 
         {/* Bilgi paneli */}

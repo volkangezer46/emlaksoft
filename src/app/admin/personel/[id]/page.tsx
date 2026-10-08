@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useParams } from "next/navigation";
@@ -116,9 +117,9 @@ export default function PersonelDetayPage() {
             {member.is_active ? (
               <ConfirmDialog
                 trigger={
-                  <button type="button" disabled={pending} className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] border border-danger-500/40 bg-surface px-3 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/8 disabled:opacity-50">
+                  <Button variant="outline" size="sm" type="button" disabled={pending} className="text-danger-600">
                     <UserMinus className="h-3.5 w-3.5" aria-hidden /> Pasif yap
-                  </button>
+                  </Button>
                 }
                 title={`${member.full_name} pasif yapılsın mı?`}
                 description="Pasif personel admin paneline giriş yapamaz. Kayıt silinmez; daha sonra tekrar aktif edilebilir."

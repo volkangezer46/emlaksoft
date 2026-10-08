@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -95,20 +96,15 @@ export function EfCreditsSection({
         {canWrite ? (
           <div className="flex flex-wrap items-center gap-2">
             {!confirm ? (
-              <button
-                type="button"
-                disabled={!valid || pending}
-                onClick={() => setConfirm(true)}
-                className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950 disabled:opacity-60"
-              >
+              <Button variant="outline" size="sm" type="button" disabled={!valid || pending} onClick={() => setConfirm(true)}>
                 Kaydet
-              </button>
+              </Button>
             ) : (
               <>
                 <span className="text-xs text-text-muted">Değer {value.trim()} olarak kaydedilecek. Onaylıyor musunuz?</span>
-                <button type="button" disabled={pending} onClick={submit} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
+                <Button variant="navy" size="sm" type="button" disabled={pending} onClick={submit}>
                   {pending ? "Kaydediliyor…" : "Onayla"}
-                </button>
+                </Button>
                 <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted">
                   Vazgeç
                 </button>

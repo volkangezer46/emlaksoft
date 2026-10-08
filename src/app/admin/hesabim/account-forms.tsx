@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -124,15 +125,17 @@ export function OwnPasswordForm({ forced = false }: { forced?: boolean }) {
               value={next}
               onChange={(e) => setNext(e.target.value)}
             />
-            <button
+            <Button
+              variant="outline"
+              size="icon"
               type="button"
               onClick={() => setShow((v) => !v)}
               aria-label={show ? "Parolayı gizle" : "Parolayı göster"}
               aria-pressed={show}
-              className="focus-ring press inline-flex w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line bg-canvas text-text-muted"
+              className="shrink-0"
             >
               {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         </FormField>
         <FormField label="Yeni parola (tekrar)" htmlFor="confirm_password" required>

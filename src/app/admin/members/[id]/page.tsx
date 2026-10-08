@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
@@ -139,9 +140,9 @@ export default async function AdminMemberDetailPage({
         }
         actions={
           profile.tenant_id ? (
-            <Link href={`/admin/tenants/${profile.tenant_id}`} className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
+            <ButtonLink variant="outline" size="md" href={`/admin/tenants/${profile.tenant_id}`}>
               <Building2 className="h-4 w-4" aria-hidden /> {tenantName ?? "Ofis"} <ArrowUpRight className="h-4 w-4" aria-hidden />
-            </Link>
+            </ButtonLink>
           ) : null
         }
       >

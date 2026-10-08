@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { Building2, CreditCard, Hourglass, LifeBuoy, Settings2, Sparkles, TrendingUp } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
@@ -28,12 +29,9 @@ export default async function AdvisorPage() {
         description="Platformunuzun canlı verilerine bağlı akıllı danışman. Gelir, müşteri kaybı, deneme hunisi ve destek üzerine somut, uygulanabilir öneriler alın."
         actions={
           staff.role === "super_admin" ? (
-            <Link
-              href="/admin/sistem"
-              className="focus-ring inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
-            >
+            <ButtonLink variant="outline" size="sm" href="/admin/sistem">
               <Settings2 className="h-3.5 w-3.5" aria-hidden /> Yapay zeka ayarları
-            </Link>
+            </ButtonLink>
           ) : null
         }
       >

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -163,22 +164,20 @@ export function PlanEditor({
           ) : null}
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={pending || draft.report.errors.length > 0} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+            <Button variant="navy" size="sm" type="submit" disabled={pending || draft.report.errors.length > 0}>
               {pending ? "Kaydediliyor…" : "Paketi kaydet"}
-            </button>
+            </Button>
             {customized ? (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  const fd = new FormData();
-                  fd.set("plan_id", plan.id);
-                  run(() => resetPlanDefinition(fd));
-                }}
-                className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:text-ink-950 disabled:opacity-60"
-              >
+              <Button variant="outline" size="sm"
+ type="button"
+ disabled={pending}
+ onClick={() => {
+ const fd = new FormData();
+ fd.set("plan_id", plan.id);
+ run(() => resetPlanDefinition(fd));
+ }}>
                 Varsayılana dön
-              </button>
+              </Button>
             ) : null}
             <Msg msg={msg} />
           </div>
@@ -234,9 +233,9 @@ export function CampaignForm({
         <p className="text-xs text-warn-600">Deneme günü, 20260816010100 migration&apos;ı uygulanana kadar fiilen 14 gündür; sitedeki metinler gerçekte verilen süreyi söyler.</p>
       ) : null}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={pending} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+        <Button variant="navy" size="sm" type="submit" disabled={pending}>
           {pending ? "Kaydediliyor…" : "Kaydet"}
-        </button>
+        </Button>
         <Msg msg={msg} />
       </div>
     </form>

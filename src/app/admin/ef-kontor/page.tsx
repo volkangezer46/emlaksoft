@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import Link from "@/components/ui/smart-link";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,14 +113,14 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
         </CardHeader>
         <CardContent className="space-y-3">
           <form action={BASE} method="get" className="flex flex-wrap gap-2">
-            <input
+            <Input
               name="q"
               defaultValue={q}
               placeholder="Ofis adı ara"
               aria-label="Ofis adı ara"
-              className="min-h-9 w-full max-w-xs rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm"
+              className="min-h-9 w-full max-w-xs"
             />
-            <button type="submit" className="focus-ring min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-sm font-semibold">Ara</button>
+            <Button variant="outline" size="md" type="submit">Ara</Button>
             {q ? <Link href={`${BASE}#bakiyeler`} className="focus-ring inline-flex min-h-9 items-center px-2 text-sm font-semibold text-brand-600">Temizle</Link> : null}
           </form>
           {!list ? (

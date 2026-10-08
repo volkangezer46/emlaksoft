@@ -195,6 +195,14 @@ odak halkası `--focus-ring`. Pasif: opaklık yerine sönük yüzey (`--surface-
 ama okunur. Düğme olmayan öğeye aynı görünüm: `buttonClass({ variant, size })`. Taban renk `background-color`
 olduğundan `<Button className="bg-mint-600">` gibi ton ezmeleri çalışır.
 
+### FilterChip (`ui/filter-chip.tsx`)
+
+Kategori/sekme/durum çipi: bağlantıdır (sunucu filtresi, değer URL'de). `<FilterChip href active>`; seçiliyse
+`aria-current="page"` otomatik. Dokunmada 44 px (`touch:min-h-11`), odak halkası ve basma tabandan gelir.
+Düğme olmayan öğeye aynı görünüm: `filterChipClass({ active })`. Admin'de ham `<Link className="focus-ring ... rounded-full">`
+çip reçetesi yazma. Ham `<button className="focus-ring press ... bg-ink-950 text-white">` da yasak: `Button`/`ButtonLink`
+(`navy`/`outline`/`ghost`, ikon düğmesi `size="icon"` + `aria-label`). Admin filtre formlarında ham `<input>` yerine `Input`.
+
 ### InlineSelect (`ui/inline-select.tsx`)
 
 Tablo hücresi seçicisi: rozet/ikon görünümlü tetik (`pm-t-*` tonu, ikon, etiket, ok) + portal liste (tablo

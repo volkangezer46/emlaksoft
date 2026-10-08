@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
@@ -11,19 +12,18 @@ export function ResolveErrorButton({ id }: { id: string }) {
   const [pending, start] = useTransition();
 
   return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={() =>
-        start(async () => {
-          await resolveErrorLog(id);
-          router.refresh();
-        })
-      }
-      className="focus-ring press inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-mint-500/40 hover:text-mint-600 disabled:opacity-60"
-    >
+    <Button variant="outline" size="sm"
+ type="button"
+ disabled={pending}
+ onClick={() =>
+ start(async () => {
+ await resolveErrorLog(id);
+ router.refresh();
+ })
+ }
+ className="shrink-0">
       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
       Çözüldü
-    </button>
+    </Button>
   );
 }

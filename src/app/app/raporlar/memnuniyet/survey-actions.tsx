@@ -1,31 +1,34 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Link2, Loader2, Send } from "lucide-react";
+import { Check, Link2, Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/app/toast-provider";
 import { createSurveyForDeal } from "@/app/actions/surveys";
 
 /** Anket linkini panoya kopyalar — 2 sn "Kopyalandı" (presentation-actions deseni). */
 export function CopySurveyLinkButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
+  const { push } = useToast();
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="sm"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(url);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {
-          // Pano izni yoksa prompt en garantili yedek (eski Safari/kiosk).
-          window.prompt("Linki kopyalayın:", url);
+          // Pano izni yoksa bağlantı bildirimde gösterilir (eski Safari/kiosk).
+          push(`Pano erişimi yok; bağlantıyı elle kopyalayın: ${url}`, "info");
         }
       }}
       title="Anket linkini kopyala"
-      className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-text transition hover:bg-canvas"
+      icon={copied ? Check : Link2}
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-[color:var(--viz-pos)]" /> : <Link2 className="h-3.5 w-3.5" />}
       {copied ? "Kopyalandı" : "Linki kopyala"}
-    </button>
+    </Button>
   );
 }
 
@@ -50,9 +53,11 @@ export function CreateSurveyButton({ dealId }: { dealId: string }) {
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={pending}
+      <Button
+        variant="primary"
+        size="sm"
+        loading={pending}
+        icon={Send}
         onClick={() => {
           setError(null);
           const fd = new FormData();
@@ -66,11 +71,9 @@ export function CreateSurveyButton({ dealId }: { dealId: string }) {
             setUrl(res.url ?? null);
           });
         }}
-        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3 text-xs font-bold text-white transition hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-55"
       >
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
         Anket oluştur
-      </button>
+      </Button>
       {error ? (
         <span className="text-xs font-semibold text-danger-500" role="alert">
           {error}

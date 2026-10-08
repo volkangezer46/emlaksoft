@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { startTransition, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -132,37 +133,39 @@ export function StaffForm() {
               className="numeric font-mono"
               placeholder="En az 10 karakter"
             />
-            <button
+            <Button
+              variant="outline"
+              size="icon"
               type="button"
               onClick={() => setShowPw((v) => !v)}
               aria-label={showPw ? "Parolayı gizle" : "Parolayı göster"}
               aria-pressed={showPw}
-              className="focus-ring press inline-flex w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line bg-canvas text-text-muted transition hover:bg-surface"
+              className="shrink-0"
             >
               {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
               type="button"
               onClick={copyPassword}
               disabled={!password}
               aria-label="Parolayı kopyala"
-              className="focus-ring press inline-flex w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line bg-canvas text-text-muted transition hover:bg-surface disabled:opacity-40"
+              className="shrink-0"
             >
               {copied ? <Check className="h-4 w-4 text-mint-600" /> : <Copy className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
         </FormField>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setPassword(generatePassword(secureRandomInt));
-              setShowPw(true);
-            }}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
-          >
+          <Button variant="outline" size="sm"
+ type="button"
+ onClick={() => {
+ setPassword(generatePassword(secureRandomInt));
+ setShowPw(true);
+ }}>
             <RefreshCw className="h-3.5 w-3.5" /> Güçlü parola üret
-          </button>
+          </Button>
           <div className="min-w-40 flex-1" role="status" aria-live="polite">
             <div className="flex gap-1" aria-hidden>
               {[1, 2, 3, 4].map((i) => (

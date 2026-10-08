@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { startTransition, useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreditCard } from "lucide-react";
@@ -62,12 +63,9 @@ export function SubscriptionPanel({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          type="button"
-          className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
-        >
+        <Button variant="outline" size="md" type="button">
           <CreditCard className="h-4 w-4" /> Abonelik değiştir
-        </button>
+        </Button>
       </DialogTrigger>
 
       <DialogContent size="sm">
@@ -131,20 +129,13 @@ export function SubscriptionPanel({
 
           <DialogFooter>
             <DialogClose asChild>
-              <button
-                type="button"
-                className="rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-medium text-ink-950 hover:bg-canvas"
-              >
+              <Button variant="outline" size="md" type="button">
                 Vazgeç
-              </button>
+              </Button>
             </DialogClose>
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-            >
+            <Button variant="primary" size="md" type="submit" disabled={pending}>
               {pending ? "Kaydediliyor…" : "Kaydet"}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

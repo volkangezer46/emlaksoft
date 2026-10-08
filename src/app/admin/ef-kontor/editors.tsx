@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Plus, Sparkles } from "lucide-react";
@@ -27,10 +28,8 @@ import {
 const field =
   "min-h-9 w-full rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm text-ink-950 disabled:opacity-60";
 const lbl = "block text-xs font-semibold text-text-muted";
-const primary =
-  "focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60";
-const ghost =
-  "focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-sm font-semibold text-ink-950 disabled:opacity-60";
+const primary = buttonClass({ variant: "primary", size: "md" });
+const ghost = buttonClass({ variant: "outline", size: "md" });
 const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Satır içi iki adımlı onay (popup yok): Kaydet -> Onayla / Vazgeç. */

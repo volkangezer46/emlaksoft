@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCheck, Loader2, RotateCcw } from "lucide-react";
@@ -58,39 +59,26 @@ export function ErrorsBulkBar({ pageCount }: { pageCount: number }) {
       onSubmit={(e) => e.preventDefault()}
       className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2.5"
     >
-      <button
-        type="button"
-        onClick={() => selectAll(true)}
-        className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
-      >
+      <Button variant="outline" size="sm" type="button" onClick={() => selectAll(true)}>
         Sayfadakileri seç ({pageCount})
-      </button>
-      <button
-        type="button"
-        onClick={() => selectAll(false)}
-        className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
-      >
+      </Button>
+      <Button variant="outline" size="sm" type="button" onClick={() => selectAll(false)}>
         Seçimi temizle
-      </button>
+      </Button>
       {confirmCount === null ? (
-        <button
-          type="button"
-          onClick={ask}
-          disabled={pending}
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-60"
-        >
+        <Button variant="navy" size="sm" type="button" onClick={ask} disabled={pending}>
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
           Seçilenleri çözüldü yap
-        </button>
+        </Button>
       ) : (
         <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-800">
           {confirmCount} hata çözüldü olarak işaretlensin mi?
-          <button type="button" onClick={run} className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-2.5 py-1 text-white">
+          <Button variant="navy" size="xs" type="button" onClick={run}>
             Evet, işaretle
-          </button>
-          <button type="button" onClick={() => setConfirmCount(null)} className="focus-ring press rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1 text-ink-950">
+          </Button>
+          <Button variant="outline" size="xs" type="button" onClick={() => setConfirmCount(null)}>
             Vazgeç
-          </button>
+          </Button>
         </span>
       )}
       {message ? (
@@ -113,24 +101,23 @@ export function ReopenErrorButton({ id }: { id: string }) {
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() =>
-          start(async () => {
-            const res = await reopenErrorLog(id);
-            if (res.error) setError(res.error);
-            else {
-              setError(null);
-              router.refresh();
-            }
-          })
-        }
-        className="focus-ring press inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-amber-400/50 hover:text-amber-700 disabled:opacity-60"
-      >
+      <Button variant="outline" size="sm"
+ type="button"
+ disabled={pending}
+ onClick={() =>
+ start(async () => {
+ const res = await reopenErrorLog(id);
+ if (res.error) setError(res.error);
+ else {
+ setError(null);
+ router.refresh();
+ }
+ })
+ }
+ className="shrink-0">
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
         Yeniden aç
-      </button>
+      </Button>
       {error ? <span role="alert" className="text-xs font-semibold text-danger-600">{error}</span> : null}
     </span>
   );

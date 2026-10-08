@@ -1,3 +1,4 @@
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Activity, ArrowUpRight, ChevronDown, Search, ShieldCheck, UserCog, X } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,6 +17,7 @@ import {
 import { ActivityExportButton } from "./activity-export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { Input } from "@/components/ui/input";
 
 
 function pretty(v: unknown): string {
@@ -84,9 +86,6 @@ function DiffPanel({ oldValue, newValue }: { oldValue: unknown; newValue: unknow
   );
 }
 
-const INPUT_CLS =
-  "focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400";
-
 const FILTER_LABELS: Record<string, string> = {
   q: "Arama",
   islem: "İşlem",
@@ -107,43 +106,43 @@ function ActivityFilterBar({ filters, total }: { filters: ActivityFilters; total
         <label className="relative block">
           <span className="mb-1 block text-xs font-semibold text-text-muted">Arama (işlem veya varlık)</span>
           <Search className="pointer-events-none absolute bottom-2.5 left-3 h-3.5 w-3.5 text-text-faint" aria-hidden />
-          <input type="search" name="q" defaultValue={filters.q} placeholder="ör. ticket, personel" className={`${INPUT_CLS} pl-9`} />
+          <Input type="search" name="q" defaultValue={filters.q} placeholder="ör. ticket, personel" className="pl-9" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-text-muted">İşlem türü</span>
-          <input type="text" name="islem" defaultValue={filters.islem} placeholder="ör. platform_staff.role_change" className={INPUT_CLS} />
+          <Input type="text" name="islem" defaultValue={filters.islem} placeholder="ör. platform_staff.role_change" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-text-muted">Kişi (ad)</span>
-          <input type="text" name="kisi" defaultValue={filters.kisi} placeholder="İşlemi yapan" className={INPUT_CLS} />
+          <Input type="text" name="kisi" defaultValue={filters.kisi} placeholder="İşlemi yapan" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-text-muted">Ofis (ad)</span>
-          <input type="text" name="ofis" defaultValue={filters.ofis} placeholder="Yalnız ofis kayıtları" className={INPUT_CLS} />
+          <Input type="text" name="ofis" defaultValue={filters.ofis} placeholder="Yalnız ofis kayıtları" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-text-muted">Başlangıç tarihi</span>
-          <input type="date" name="baslangic" defaultValue={filters.baslangic} className={INPUT_CLS} />
+          <Input type="date" name="baslangic" defaultValue={filters.baslangic} />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-text-muted">Bitiş tarihi</span>
-          <input type="date" name="bitis" defaultValue={filters.bitis} className={INPUT_CLS} />
+          <Input type="date" name="bitis" defaultValue={filters.bitis} />
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-semibold text-white">
+        <Button variant="navy" size="sm" type="submit">
           Filtrele
-        </button>
+        </Button>
         {hasActivityFilter(filters) ? (
-          <Link href="/admin/aktivite" className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:text-ink-950">
+          <ButtonLink variant="outline" size="sm" href="/admin/aktivite">
             Tümünü temizle
-          </Link>
+          </ButtonLink>
         ) : null}
         {chips.map((k) => (
           <Link
             key={k}
             href={activityHref({ ...filters, [k]: undefined })}
-            className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600"
+            className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600"
           >
             {FILTER_LABELS[k]}: {filters[k]} <X className="h-3 w-3" />
           </Link>

@@ -1,3 +1,5 @@
+import { FilterChip } from "@/components/ui/filter-chip";
+import { Button, ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { Bell, BellRing, CheckCheck, Inbox, MailOpen } from "lucide-react";
 import { requirePlatformStaff } from "@/lib/platform";
@@ -27,11 +29,6 @@ const kindLabel: Record<string, string> = {
   danger: "Kritik",
   system: "Sistem",
 };
-
-const chipCls = (active: boolean) =>
-  `focus-ring press rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
-    active ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-  }`;
 
 function buildHref(p: { tur?: string; durum?: string; sayfa?: number }) {
   const sp = new URLSearchParams();
@@ -97,12 +94,9 @@ export default async function AdminNotificationsPage({
         actions={
           unread > 0 ? (
             <form action={markAllPlatformNotificationsReadForm}>
-              <button
-                type="submit"
-                className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
-              >
+              <Button variant="outline" size="sm" type="submit">
                 <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
-              </button>
+              </Button>
             </form>
           ) : null
         }
@@ -142,23 +136,18 @@ export default async function AdminNotificationsPage({
       </AdminPageHeader>
 
       <nav aria-label="Tür filtresi" className="flex flex-wrap gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
-        <Link href={buildHref({ durum })} aria-current={!tur ? "page" : undefined} className={chipCls(!tur)}>
+        <FilterChip href={buildHref({ durum })} active={!tur}>
           Tümü
-        </Link>
+        </FilterChip>
         {Object.entries(kindLabel).map(([v, l]) => (
-          <Link
-            key={v}
-            href={buildHref({ tur: tur === v ? undefined : v, durum })}
-            aria-current={tur === v ? "page" : undefined}
-            className={chipCls(tur === v)}
-          >
+          <FilterChip key={v} href={buildHref({ tur: tur === v ? undefined : v, durum })} active={tur === v}>
             {l}
-          </Link>
+          </FilterChip>
         ))}
         {durum ? (
-          <Link href={buildHref({ tur })} className={`${chipCls(true)} ml-auto`}>
+          <FilterChip href={buildHref({ tur })} active className="ml-auto">
             {durum === "okunmamis" ? "Okunmamış" : "Okundu"} · filtreyi kaldır
-          </Link>
+          </FilterChip>
         ) : null}
       </nav>
 
@@ -178,12 +167,9 @@ export default async function AdminNotificationsPage({
             }
             action={
               filtered ? (
-                <Link
-                  href="/admin/bildirimler"
-                  className="focus-ring press inline-flex rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
-                >
+                <ButtonLink variant="outline" size="sm" href="/admin/bildirimler">
                   Filtreyi temizle
-                </Link>
+                </ButtonLink>
               ) : null
             }
           />

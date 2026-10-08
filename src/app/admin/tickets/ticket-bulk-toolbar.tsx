@@ -155,15 +155,17 @@ export function TicketBulkToolbar({
           <Button type="submit" size="md" variant="gold" icon={CheckCircle2} loading={pending} disabled={!effectiveValue} className="flex-1 lg:flex-none">
             Uygula
           </Button>
-          <button
+          <Button
+            variant="outline"
+            size="icon"
             type="button"
             onClick={onClear}
             disabled={pending}
             aria-label="Seçimi temizle"
-            className="focus-ring grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] border border-white/12 text-white/65 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+            className="shrink-0"
           >
             <X className="h-4 w-4" aria-hidden />
-          </button>
+          </Button>
         </div>
 
         {error ? (

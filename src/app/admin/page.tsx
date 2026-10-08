@@ -402,7 +402,7 @@ async function MrrSection({ period }: { period: Period }) {
           />
           </div>
         ) : (
-          <EmptyState variant="compact" illustration="rapor" title="Gelir eğrisi için veri birikiyor" description="En az iki aylık abonelik kaydı oluşunca eğri burada çizilir." />
+          <EmptyState variant="compact" illustration="rapor" title="Gelir eğrisi için veri birikiyor" description="En az iki aylık abonelik kaydı oluşunca eğri burada çizilir." action={{ href: "/admin/billing", label: "Faturalamayı aç" }} />
         )}
       </div>
       {forecast ? (
@@ -440,7 +440,7 @@ async function ChurnSection({ period }: { period: Period }) {
       className="h-full"
     >
       {rows.length === 0 ? (
-        <EmptyState variant="compact" illustration="basari" title="Risk sinyali olan ofis yok" description="Ödeme gecikmesi, askıya alma veya 14 gündür düşük kullanım olursa burada listelenir." />
+        <EmptyState variant="compact" illustration="basari" title="Risk sinyali olan ofis yok" description="Ödeme gecikmesi, askıya alma veya 14 gündür düşük kullanım olursa burada listelenir." action={{ href: "/admin/tenants", label: "Ofisleri gör" }} />
       ) : (
         <div className="-mx-1.5 overflow-x-auto">
           <Table className="pm-tbl min-w-[34rem]">
@@ -554,7 +554,7 @@ async function ActivationSection({ period }: { period: Period }) {
       className="h-full"
     >
       {funnel === null ? (
-        <EmptyState variant="compact" illustration="hata" title="Aktivasyon verisi okunamadı" description="Gömülü sayım sorgusu yanıt vermedi; ofis listesinden kohortu inceleyebilirsiniz." />
+        <EmptyState variant="compact" illustration="hata" title="Aktivasyon verisi okunamadı" description="Gömülü sayım sorgusu yanıt vermedi; ofis listesinden kohortu inceleyebilirsiniz." action={{ href: "/admin/tenants", label: "Ofisleri gör" }} />
       ) : (
         <FunnelChart
           ardisik
@@ -603,7 +603,7 @@ async function ModulesSection({ period }: { period: Period }) {
   return (
     <ChartCard as="h2" title="Modül kullanımı" subtitle="Son 30 gün · işlem yapan ofis oranı" icon={LayoutGrid} tone="brand" href="/admin/raporlar" hrefLabel="Raporlar" height={0} className="h-full">
       {rows.length === 0 ? (
-        <EmptyState variant="compact" illustration="rapor" title="Henüz modül kullanımı yok" description="Ofisler müşteri, portföy, anlaşma gibi işlemler yaptıkça dağılım burada görünür." />
+        <EmptyState variant="compact" illustration="rapor" title="Henüz modül kullanımı yok" description="Ofisler müşteri, portföy, anlaşma gibi işlemler yaptıkça dağılım burada görünür." action={{ href: "/admin/raporlar", label: "Raporları aç" }} />
       ) : (
         <ul className="space-y-2.5">
           {rows.map((r) => (
@@ -645,7 +645,7 @@ async function UnitEconomicsSection({ period }: { period: Period }) {
         {real.length >= 2 ? (
           <AreaTrendChart data={points.map((p) => ({ label: p.label, value: p.arpa }))} tone="brand" format="money" name="ARPA" ariaLabel="Son 12 ay aktif ofis başına aylık gelir" />
         ) : (
-          <EmptyState variant="compact" illustration="rapor" title="ARPA eğrisi için veri birikiyor" description="En az iki ay aktif ofis ve gelir oluşunca çizilir." />
+          <EmptyState variant="compact" illustration="rapor" title="ARPA eğrisi için veri birikiyor" description="En az iki ay aktif ofis ve gelir oluşunca çizilir." action={{ href: "/admin/billing", label: "Faturalamayı aç" }} />
         )}
       </div>
       <p className="mt-3 rounded-[var(--radius-control)] bg-[var(--surface-sunken)] px-3 py-2 text-xs leading-5 text-text-muted">
@@ -664,9 +664,9 @@ async function UsageSection({ period }: { period: Period }) {
   return (
     <ChartCard as="h2" title="AI ve kontör tüketimi" subtitle="Son 6 ay · harcanan birim" icon={BrainCircuit} tone="gold" href="/admin/ai-kullanim" hrefLabel="AI kullanımı" height={0} className="h-full">
       {usage === null ? (
-        <EmptyState variant="compact" illustration="rapor" title="Tüketim defteri okunamadı" description="Kredi defteri bu ortamda etkin değil veya sorgu yanıt vermedi." />
+        <EmptyState variant="compact" illustration="rapor" title="Tüketim defteri okunamadı" description="Kredi defteri bu ortamda etkin değil veya sorgu yanıt vermedi." action={{ href: "/admin/ai-kullanim", label: "AI kullanımını aç" }} />
       ) : usage.total === 0 ? (
-        <EmptyState variant="compact" illustration="rapor" title="Son 6 ayda tüketim yok" description="Ofisler AI asistanı, değerleme raporu veya EmlakFiyati kontörü kullandıkça burada görünür." />
+        <EmptyState variant="compact" illustration="rapor" title="Son 6 ayda tüketim yok" description="Ofisler AI asistanı, değerleme raporu veya EmlakFiyati kontörü kullandıkça burada görünür." action={{ href: "/admin/ai-kullanim", label: "AI kullanımını aç" }} />
       ) : (
         <div className="h-52">
           <BarCompare
@@ -703,9 +703,9 @@ async function ChurnReasonsSection({ period }: { period: Period }) {
       className="h-full"
     >
       {reasons === null ? (
-        <EmptyState variant="compact" illustration="hata" title="İptal nedeni kaydı okunamadı" description="İptal talebi alanları bu ortamda etkin değil veya sorgu yanıt vermedi." />
+        <EmptyState variant="compact" illustration="hata" title="İptal nedeni kaydı okunamadı" description="İptal talebi alanları bu ortamda etkin değil veya sorgu yanıt vermedi." action={{ href: "/admin/tenants?durum=cancelled", label: "İptal eden ofisler" }} />
       ) : reasons.length === 0 ? (
-        <EmptyState variant="compact" illustration="basari" title="Henüz iptal talebi yok" description="Bir ofis aboneliğini iptal ederken neden yazarsa burada gruplanır." />
+        <EmptyState variant="compact" illustration="basari" title="Henüz iptal talebi yok" description="Bir ofis aboneliğini iptal ederken neden yazarsa burada gruplanır." action={{ href: "/admin/tenants", label: "Ofisleri gör" }} />
       ) : (
         <ul className="space-y-2.5">
           {reasons.map((r) => (
@@ -787,7 +787,7 @@ async function CompositionSection({ period }: { period: Period }) {
       {total > 0 ? (
         <StackedBar rows={rows} format={formatTry} ariaLabel="Plan bazında aylık yinelenen gelir payı" />
       ) : (
-        <EmptyState variant="compact" illustration="komisyon" title="Henüz gelir getiren plan yok" description="Aktif abonelikler oluştukça plan bazında dağılım burada görünür." />
+        <EmptyState variant="compact" illustration="komisyon" title="Henüz gelir getiren plan yok" description="Aktif abonelikler oluştukça plan bazında dağılım burada görünür." action={{ href: "/admin/billing/planlar", label: "Planları aç" }} />
       )}
     </ChartCard>
   );
@@ -823,7 +823,7 @@ async function ActivitySection({ period }: { period: Period }) {
       </ChartCard>
       <ChartCard as="h2" title="Platform aktivite akışı" icon={Activity} tone="neutral" href="/admin/aktivite" hrefLabel="Tümü" height={0}>
         {auditRows.length === 0 ? (
-          <EmptyState variant="compact" illustration="liste" title="Henüz hareket kaydı yok" description="Platformdaki işlemler burada akar." />
+          <EmptyState variant="compact" illustration="liste" title="Henüz hareket kaydı yok" description="Platformdaki işlemler burada akar." action={{ href: "/admin/aktivite", label: "Aktivite kaydını aç" }} />
         ) : (
           <ul className="ds-sep -mx-1.5">
             {auditRows.slice(0, 5).map((a, i) => {

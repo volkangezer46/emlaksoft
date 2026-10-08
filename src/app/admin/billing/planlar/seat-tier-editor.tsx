@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { quoteSeats } from "@/lib/billing/seat-pricing";
 import type { PlanDef, SeatRounding } from "@/lib/billing/plans";
 import { opFieldClass } from "../inline-op";
@@ -80,14 +81,9 @@ export function SeatTierEditor({ plan, draft, readOnly = false }: { plan: PlanDe
                 />
               </label>
               {readOnly ? null : (
-                <button
-                  type="button"
-                  onClick={() => remove(i)}
-                  aria-label={`Kademe ${i + 1} sil`}
-                  className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:text-danger-600"
-                >
+                <Button variant="outline" size="sm" type="button" onClick={() => remove(i)} aria-label={`Kademe ${i + 1} sil`}>
                   Sil
-                </button>
+                </Button>
               )}
             </li>
           ))}
@@ -123,12 +119,12 @@ export function SeatTierEditor({ plan, draft, readOnly = false }: { plan: PlanDe
         </label>
         {readOnly ? null : (
           <div className="flex flex-wrap items-end gap-2">
-            <button type="button" onClick={add} className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950">
+            <Button variant="outline" size="sm" type="button" onClick={add}>
               Kademe ekle
-            </button>
-            <button type="button" onClick={draft.applySuggested} className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-ink-950">
+            </Button>
+            <Button variant="outline" size="sm" type="button" onClick={draft.applySuggested}>
               Önerilen kademeleri uygula
-            </button>
+            </Button>
           </div>
         )}
       </div>

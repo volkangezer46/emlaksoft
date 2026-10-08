@@ -1,5 +1,7 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
@@ -77,38 +79,32 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
         <span className="rounded-full bg-ink-950/5 px-2.5 py-1 text-center text-xs font-bold text-text-muted">
           {province.plate_code}
         </span>
-        <input
-          name="name"
-          aria-label="İl adı"
-          defaultValue={province.name}
-          required
-          className="rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-brand-400"
-        />
-        <input
+        <Input name="name" aria-label="İl adı" defaultValue={province.name} required className="font-semibold" />
+        <Input
           name="lat"
           aria-label={`${province.name} enlem`}
           defaultValue={province.lat ?? ""}
           placeholder="Enlem"
-          className="w-24 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          className="w-24 text-xs"
         />
-        <input
+        <Input
           name="lng"
           aria-label={`${province.name} boylam`}
           defaultValue={province.lng ?? ""}
           placeholder="Boylam"
-          className="w-24 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs outline-none focus:border-brand-400"
+          className="w-24 text-xs"
         />
         <label className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
           <input type="checkbox" name="is_active" defaultChecked={province.is_active} className="h-3.5 w-3.5" />
           Aktif
         </label>
         <div className="flex items-center gap-2">
-          <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink-800 disabled:opacity-60">
+          <Button variant="navy" size="sm" type="submit" disabled={pending}>
             {pending ? "Kaydediliyor…" : "Kaydet"}
-          </button>
-          <button type="button" aria-label={`${province.name} düzenlemesini iptal et`} onClick={() => setEditing(false)} className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas">
+          </Button>
+          <Button variant="ghost" size="icon" type="button" aria-label={`${province.name} düzenlemesini iptal et`} onClick={() => setEditing(false)}>
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         {state.error ? <p role="alert" className="lg:col-span-6 text-xs text-danger-500">{state.error}</p> : null}
       </form>
@@ -194,22 +190,20 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
           {syncPending ? "Kuyruğa alınıyor" : activeSync ? status?.label : "Tara ve tamamla"}
         </button>
       </form>
-      <Link
-        href={`/admin/geo/${province.id}`}
-        className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600"
-      >
+      <ButtonLink variant="outline" size="sm" href={`/admin/geo/${province.id}`}>
         İlçeler <ChevronRight className="h-3.5 w-3.5" />
-      </Link>
+      </ButtonLink>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             type="button"
             aria-label={`Diğer işlemler: ${province.name}`}
             title="Diğer işlemler"
-            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700"
           >
             <MoreVertical className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem onSelect={() => setEditing(true)}>
