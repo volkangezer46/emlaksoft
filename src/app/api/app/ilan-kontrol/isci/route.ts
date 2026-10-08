@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
-import { workerClaim, workerComplete, workerRegister, workerRelease } from "@/app/actions/listing-control-worker";
+import { workerClaim, workerComplete, workerRegister, workerReportParser, workerRelease } from "@/app/actions/listing-control-worker";
 import { isSameOriginBridgeRequest } from "@/lib/listing-control/worker/bridge-request";
 import { CHECK_RESULTS, type CheckResultKind } from "@/lib/listing-control/types";
 
@@ -39,7 +39,10 @@ export async function POST(request: Request) {
       const result = str("result") as CheckResultKind;
       if (!CHECK_RESULTS.includes(result)) return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400, headers: NO_STORE });
       const observed = typeof body.observed === "object" && body.observed !== null ? (body.observed as Record<string, unknown>) : {};
-      return NextResponse.json(await workerComplete({ clientId: str("clientId"), jobId: str("jobId"), result, observed }), { headers: NO_STORE });
+      const done = await workerComplete({ clientId: str("clientId"), jobId: str("jobId"), result, observed });
+      // Ayrıştırıcı sayaç telemetrisi (en iyi çaba): yalnız ilk işlenişte ("applied"), yeniden gönderimde ("replay") çift sayılmaz.
+      if (done.ok && done.outcome === "applied" && body.telemetry) await workerReportParser(body.telemetry).catch(() => null);
+      return NextResponse.json(done, { headers: NO_STORE });
     }
     case "release":
       return NextResponse.json(await workerRelease(str("clientId"), str("jobId"), str("reason")), { headers: NO_STORE });

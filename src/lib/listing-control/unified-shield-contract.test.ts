@@ -61,7 +61,7 @@ describe("istemci/sunucu sınırları", () => {
   it("worker eylemleri admin client kullanmaz; her eylem requirePermission ile başlar", () => {
     const a = src("src/app/actions/listing-control-worker.ts");
     expect(a).not.toMatch(/createAdminClient|supabase\/admin/);
-    expect(a.match(/requirePermission\("portals", "edit"\)/g)?.length).toBe(4);
+    expect(a.match(/requirePermission\("portals", "edit"\)/g)?.length).toBe(5); // register/claim/complete/release + ayrıştırıcı telemetrisi
     expect(src("src/app/actions/listing-control-report.ts")).not.toMatch(/createAdminClient|supabase\/admin/);
   });
   it("çekirdek ve köprü portala sunucudan istek atmaz", () => {

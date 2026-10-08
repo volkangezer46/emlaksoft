@@ -195,6 +195,8 @@ const F = {
   // PB53 guvenlik/rapor turu (2026-10-07): properties fiyat dusurme DB kapisi + price_history salt-okunur; Giderler ornek veri kapsami.
   propertiesPriceDropGuard: "20261007000800_properties_price_drop_db_guard.sql",
   expenseSampleScope: "20261007000810_expense_aggregates_sample_scope.sql",
+  // PB55 ilan kontrol eklentisi (2026-10-08): ayristirici telemetri sayaclari (portal/surum/sinif; kisisel veri yok) + yazma RPC.
+  lcParserTelemetry: "20261008000400_lc_parser_telemetry.sql",
   // PB53 oransal paket yukseltme + abonelik duraklatma (2026-10-08; her ikisi de VARSAYILAN KAPALI bayrakli).
   subscriptionPause: "20261007001000_subscription_pause_and_plan_change.sql",
   // PB53: fulfill + v2 TAM govde (000300 tabanindan; plan_upgrade faturasi). 001000 sutunlarina bakar.
@@ -321,6 +323,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.expenseReceiptUploads]: "davranis", // direct_file_uploads kisitlari + claim/finalize/enqueue tam govde (3. tur expense_receipt), yeni expense_receipt_files + ozel kova expense-receipts, outbox kova izin listesi genisler
     [F.importRentalWithDeal]: "ek", // yeni authenticated DEFINER RPC import_rental_with_deal (yetki icerde; guard'lar yalniz kendi transaction'inda service_role kimligiyle gecilir)
     [F.proxyGateSnapshot]: "ek", // yeni salt-okunur SECURITY INVOKER RPC proxy_gate_snapshot (RLS eski okumalarla ayni; kod RPC yokken eski yola duser)
+    [F.lcParserTelemetry]: "ek", // yeni tablo + yeni RPC; mevcut ilan kontrol govdeleri degismez
     [F.leadCaptureTokenDefault]: "davranis", // NULL tokenli ofislerde vitrin talep formu acilir (lead_capture_enabled degismez)
     [F.subscriptionPause]: "ek", // subscriptions'a duraklatma/planli dusurme sutunlari + 4 authenticated JWT RPC + 2 service_role cron RPC + hazirlik yoklamasi; bayraklar SQL'de de kontrol edilir, mevcut davranis degismez (bayrak KAPALI)
     [F.planUpgradeFulfillment]: "davranis", // fulfill + v2 tam govde yeniden tanimi: plan_upgrade faturasi islenir (taban 000300 govdesi bayt bayt korunur); bayrak kapaliyken kimse bu turde fatura kesmez
@@ -447,6 +450,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB52-kalan-isler", order: 29.998, title: "Kalan isler turu: gider fisi dosya yukleme (yukleme hatti RPC'leri) -> kira ice aktarma atomik RPC -> imza hatirlatmasi kisa baglanti", files: [F.expenseReceiptUploads, F.importRentalWithDeal, F.contractSignerReminder] },
     { id: "PB53-proxy-hiz", order: 29.999, title: "Hiz: proxy kapi okumalari tek INVOKER RPC (proxy_gate_snapshot)", files: [F.proxyGateSnapshot] },
     { id: "PB53-perf-rls-yardimcilari", order: 29.9995, title: "Perf turu 3: RLS yardimci fonksiyonlari plpgsql (tenant cozumu ~420->~60us/cagri) + customer_demands tenant/created_at indeksi", files: [F.perfIndexesRpc] },
+    { id: "PB55-ilan-kontrol-eklenti", order: 29.9998, title: "Ilan kontrol eklentisi: ayristirici telemetri sayaclari (lc_parser_telemetry + lc_parser_report JWT RPC); kod yokken telemetri atlanir (sira serbest)", files: [F.lcParserTelemetry] },
     { id: "PB54-vitrin-talep-tokeni", order: 29.9997, title: "Vitrin talep formu tokeni: varsayilan + NULL ofislere uretim (sira serbest)", files: [F.leadCaptureTokenDefault] },
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },
     { id: "PB53-abonelik-duraklatma-yukseltme", order: 29.9992, title: "Abonelik duraklatma + planli dusurme (sutun + RPC) -> oransal paket yukseltme faturasi (fulfill/v2 tam govde)", files: [F.subscriptionPause, F.planUpgradeFulfillment] },

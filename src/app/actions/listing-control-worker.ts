@@ -7,6 +7,7 @@ import { isAllowedProbeUrl } from "@/lib/listing-control/worker/core";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { sanitizeObserved } from "@/lib/listing-control/server/process-check";
 import { CHECK_RESULTS, type CheckResultKind } from "@/lib/listing-control/types";
+import { sanitizeTelemetry } from "@/lib/listing-control/worker/extension-telemetry";
 
 /**
  * Tarayıcı doğrulama işçisinin sunucu eylemleri. Hepsi `requirePermission("portals","edit")` kapısından geçer ve
@@ -100,5 +101,30 @@ export async function workerRelease(clientId: string, jobId: string, reason: str
   if (error) return fail(error);
   const outcome = (data as { outcome?: string } | null)?.outcome;
   if (outcome !== "released") return fail(null, outcome);
+  return { ok: true };
+}
+
+/**
+ * Eklentinin ayrıştırıcı SAYAÇ telemetrisi (portal, ayrıştırıcı sürümü, sınıf, katman, hata kodu, kısmi okuma). Kişisel veri
+ * YOK (ilan no/başlık/fiyat gitmez). Telemetri hatası kontrol sonucunu ASLA bozmaz: çağıran yok sayabilir; migration yoksa
+ * `schema_missing` döner. Yalnız sonuç "applied" iken çağrılır (yeniden gönderimde çift sayılmaz).
+ */
+export async function workerReportParser(raw: unknown): Promise<WorkerActionResult> {
+  const gate = await requirePermission("portals", "edit");
+  if (!gate.ok) return { ok: false, error: "forbidden" };
+  const t = sanitizeTelemetry(raw);
+  if (!t) return { ok: false, error: "invalid_input" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("lc_parser_report", {
+    p_portal: t.portal,
+    p_parser_version: t.parserVersion,
+    p_classification: t.classification,
+    p_layer: t.layer,
+    p_error_code: t.errorCode,
+    p_partial: t.partial,
+  });
+  if (error) return fail(error);
+  const outcome = (data as { outcome?: string } | null)?.outcome;
+  if (outcome !== "ok") return fail(null, outcome);
   return { ok: true };
 }
