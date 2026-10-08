@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Insight } from "@/lib/insights/types";
-import { buildCallRows, evidenceChips, leadReasons, pickBriefing, scheduleWarnings, scheduleWarningText, sortInsights } from "./home-brief";
+import { buildCallRows, evidenceChips, pickBriefing, scheduleWarnings, scheduleWarningText, sortInsights } from "./home-brief";
 
 function ins(over: Partial<Insight> & { id: string }): Insight {
   return {
@@ -91,22 +91,6 @@ describe("buildCallRows (nedenli arama listesi)", () => {
   it("içgörü müşteriye bağlı değilse yine de satır olur (href içgörüden)", () => {
     const rows = buildCallRows([], [ins({ id: "z", kind: "call_priority", title: "Veli ile görüş", href: "/app/talepler" })]);
     expect(rows[0]).toMatchObject({ customerId: null, name: "Veli", href: "/app/talepler" });
-  });
-});
-
-describe("leadReasons", () => {
-  it("önemsiz bileşenleri eler, puana göre sıralar, yakın etkileşimi ekler", () => {
-    const r = leadReasons([
-      { label: "Telefon var", points: 12 },
-      { label: "Kaynak kalitesi", points: 15 },
-      { label: "Açık talep", points: 20 },
-      { label: "Randevu", points: 9 },
-      { label: "Güncellik", points: 14 },
-    ]);
-    expect(r).toEqual(["Açık talep", "Randevu", "Yakın zamanda etkileşim"]);
-  });
-  it("hiç anlamlı bileşen yoksa boş", () => {
-    expect(leadReasons([{ label: "Telefon var", points: 12 }])).toEqual([]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { TrendingUp, Check } from "lucide-react";
-import type { SellerPrediction } from "@/lib/seller-prediction";
+import type { SellerPrediction } from "@/lib/customer-state/seller";
 
 const TIER = {
   high: { cls: "border-mint-500/30 bg-mint-500/10 text-mint-700", bar: "bg-mint-500" },

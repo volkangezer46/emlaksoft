@@ -25,6 +25,8 @@ export type CustomerVM = {
   tags: string[];
   heat: { label: string; tone: PillTone; title: string } | null;
   lead: { score: number; hot: boolean } | null;
+  /** Müşteri durumu okuyucusunun riski (yalnız yüksek risk gösterilir); yoksa null. */
+  risk?: { label: string; title: string } | null;
   blacklist: boolean;
   sourceLabel: string | null;
   /** Başvuru kanalı rozeti (customers.lead_channel); kanaldan gelmeyen kayıtta null. */
@@ -77,6 +79,11 @@ function HeatCell({ c }: { c: CustomerVM }) {
       {c.heat ? (
         <span title={c.heat.title}>
           <StatusPill tone={c.heat.tone}>{c.heat.label}</StatusPill>
+        </span>
+      ) : null}
+      {c.risk ? (
+        <span title={c.risk.title}>
+          <StatusPill tone="danger">{c.risk.label}</StatusPill>
         </span>
       ) : null}
       {c.lead ? (

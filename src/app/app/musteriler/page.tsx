@@ -29,7 +29,7 @@ import { HEAT_POOL_LIMIT, normalizeCustomerFilters } from "@/lib/customer-list-f
 import { LEAD_CHANNEL_OPTIONS, leadChannelLabel } from "@/lib/lead-channel";
 import { SavedViews } from "@/components/app/saved-views";
 import { CustomerBulkBar, CustomerBulkProvider } from "./customer-bulk-actions";
-import { HEAT_SEGMENTS, type HeatSegment } from "@/lib/customer-heat";
+import { HEAT_SEGMENTS, type HeatSegment } from "@/lib/customer-state/heat";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ICONS } from "@/lib/icons";
 import {

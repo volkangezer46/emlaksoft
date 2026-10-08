@@ -3,7 +3,7 @@ import { DEFAULT_SLA_MIN } from "@/lib/response-time/core";
 import { STALE_DAYS } from "@/app/app/anlasmalar/deal-list-logic";
 import { AGING_DAYS } from "@/app/app/talepler/demand-list-logic";
 import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
-import { DORMANT_DAYS } from "@/lib/customer-heat";
+import { DORMANT_DAYS } from "@/lib/customer-state/heat";
 import { CALL_MIN_QUIET_DAYS } from "@/lib/insights/rules/call-priority";
 import { PRICE_MIN_DAYS } from "@/lib/insights/rules/price-action";
 import { DEAL_MIN_IDLE_DAYS } from "@/lib/insights/rules/deal-risk";

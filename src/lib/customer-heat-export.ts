@@ -1,7 +1,8 @@
 import "server-only";
 import type { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
-import { scoreCustomerHeat } from "@/lib/customer-heat";
+import { computeCustomerHeat } from "@/lib/customer-state/core";
+import { loadDormantDays } from "@/lib/customer-state/load";
 import { applyCustomerFilters, HEAT_POOL_LIMIT, HEAT_RPC_CHUNK, type CustomerListFilters } from "@/lib/customer-list-filters";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 
@@ -37,23 +38,11 @@ export async function filterCustomersByHeatSegment(
     for (const s of (res.data ?? []) as { customer_id: string; last_contact: string | null; open_demands: number; urgent_demands: number; portal_likes_30d: number; open_offers: number; open_deals: number }[]) signals.set(s.customer_id, s);
   }
   const nowMs = now();
-  const matching = poolRows.filter((r) => {
-    const s = signals.get(r.id);
-    return (
-      scoreCustomerHeat(
-        {
-          lastContactAt: s?.last_contact ?? null,
-          openDemands: s?.open_demands ?? 0,
-          urgentDemands: s?.urgent_demands ?? 0,
-          portalLikes30d: s?.portal_likes_30d ?? 0,
-          hasOpenOfferOrDeal: (s?.open_offers ?? 0) > 0 || (s?.open_deals ?? 0) > 0,
-          createdAt: r.created_at,
-          blacklist: Boolean(r.blacklist),
-        },
-        nowMs,
-      ).segment === segment
-    );
-  });
+  // Ekranla aynı eşik: ofis tanımlı uykuda günü + ortak ısı hesabı (customer-state).
+  const dormantDays = await loadDormantDays(gate.tenantId);
+  const matching = poolRows.filter(
+    (r) => computeCustomerHeat({ createdAt: r.created_at, blacklist: Boolean(r.blacklist) }, signals.get(r.id) ?? null, nowMs, { dormantDays }).segment === segment,
+  );
   const rows: Record<string, unknown>[] = [];
   for (let i = 0; i < matching.length; i += 200) {
     const ids = matching.slice(i, i + 200).map((r) => r.id);

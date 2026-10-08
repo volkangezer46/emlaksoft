@@ -3,8 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { getOpenAiKey } from "@/lib/ai-advisor";
-import { computeLeadScore } from "@/lib/lead-score";
-import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
+import { loadCustomerStates } from "@/lib/customer-state/load";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
@@ -189,12 +188,12 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
         .not("status", "in", "(paid,collected)")
         .limit(500),
     ),
-    // Sıcak lead hesabı — dashboard/musteriler'deki lead-score deseni (ad yalnız customers izniyle)
+    // Sıcak lead hesabı — tek okuyucu: lib/customer-state (ad yalnız customers izniyle)
     gated(scope.customers, () =>
       mine(
         supabase
           .from("customers")
-          .select("id, full_name, phone, email, source, blacklist, created_at")
+          .select("id, full_name, phone, email, source, blacklist, created_at, customer_types")
           .is("deleted_at", null)
           .order("created_at", { ascending: false })
           .limit(200),
@@ -212,32 +211,16 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
     ),
   ]);
 
-  // Yalnız skorlanan (≤200) müşterilerin sinyalleri; tüm tenant'ı döndüren eski imza 1000 satırda kesiliyordu.
-  const { data: leadSignals } = await fetchLeadSignals(
-    supabase,
-    tenantId,
-    (leadCustomers ?? []).map((c) => c.id as string),
-  );
-  const signalMap = new Map<string, LeadSignalRow>(
-    leadSignals.map((s) => [s.customer_id, s]),
-  );
-
+  // Sıcaklık: tek okuyucu (lib/customer-state) — ekranlarla aynı müşteri aynı sıcaklıkta.
+  const leadRows = (leadCustomers ?? []) as {
+    id: string; full_name: string; phone: string | null; email: string | null; source: string | null;
+    blacklist: boolean | null; created_at: string; customer_types: string[] | null;
+  }[];
+  const states = await loadCustomerStates(supabase, tenantId, leadRows, { context: "AI danışman" });
   const hotLeads: HotLead[] = [];
-  for (const c of leadCustomers ?? []) {
-    const s = signalMap.get(c.id);
-    const { score, tier } = computeLeadScore({
-      hasPhone: Boolean(c.phone),
-      hasEmail: Boolean(c.email),
-      source: c.source,
-      activeDemands: s?.active_demands ?? 0,
-      communications: s?.comms ?? 0,
-      appointments: s?.appts ?? 0,
-      calls: s?.calls ?? 0,
-      lastActivityAt: s?.last_activity ?? null,
-      createdAt: c.created_at,
-      blacklist: Boolean(c.blacklist),
-    });
-    if (tier === "hot") hotLeads.push({ id: c.id, name: c.full_name, score });
+  for (const c of leadRows) {
+    const st = states.get(c.id);
+    if (st && st.temperature === "sicak" && !c.blacklist) hotLeads.push({ id: c.id, name: c.full_name, score: st.scores.heat.score });
   }
   hotLeads.sort((a, b) => b.score - a.score);
 

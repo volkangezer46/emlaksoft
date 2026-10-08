@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent, type SellerSignals } from "./seller-prediction";
+import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent, type SellerSignals } from "./seller";
 
 const base: SellerSignals = {
   isOwnerType: true,

@@ -3,6 +3,8 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+// Ofis tanımlı uykuda eşiği ayar okumasından gelir; birim testte ayar deposu yok (varsayılan eşik kullanılır).
+vi.mock("@/lib/settings/read", () => ({ getSetting: async () => undefined }));
 
 import {
   TAG_UPDATE_CHUNK,

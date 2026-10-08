@@ -1,3 +1,5 @@
+import { callPriorityLevel } from "@/lib/customer-state/core";
+import { CALL_MIN_QUIET_DAYS } from "@/lib/customer-state/thresholds";
 import { buildDedupeKey, weekPeriod } from "@/lib/insights/dedupe";
 import type { InsightDraft } from "@/lib/insights/types";
 import { capPerUser, dayMs, gunText, nameOr } from "@/lib/insights/rules/common";
@@ -12,7 +14,7 @@ import { capPerUser, dayMs, gunText, nameOr } from "@/lib/insights/rules/common"
 
 export const CALL_PRIORITY_RULE_ID = "call_priority@1";
 /** Bundan az sessizlikte aranmaya değer sayılmaz. */
-export const CALL_MIN_QUIET_DAYS = 14;
+export { CALL_MIN_QUIET_DAYS };
 /** Alıcı başına en çok 3 müşteri (odaklı liste). */
 export const CALL_MAX_PER_USER = 3;
 
@@ -29,8 +31,9 @@ export function evaluateCallPriority(facts: readonly QuietCustomerFact[], nowMs:
   const week = weekPeriod(nowMs);
   const drafts: InsightDraft[] = [];
   for (const f of facts) {
-    if (!f.assignedTo || f.activeDemands < 1 || f.quietDays < minQuietDays) continue;
-    const severity = f.quietDays >= 30 || f.activeDemands >= 2 ? "orta" : "bilgi";
+    // Uygunluk + öncelik eşikleri tek yerde (customer-state/core `callPriorityLevel`).
+    const severity = f.assignedTo ? callPriorityLevel(f, minQuietDays) : null;
+    if (!severity) continue;
     const who = nameOr(f.fullName, "Müşteri");
     drafts.push({
       kind: "call_priority",

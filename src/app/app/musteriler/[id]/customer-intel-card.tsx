@@ -1,10 +1,9 @@
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Gauge } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
-import { heatTitle, HEAT_SEGMENTS } from "@/lib/customer-heat";
+import { heatTitle, HEAT_SEGMENTS, type CustomerHeat } from "@/lib/customer-state/heat";
 import { formatMinutes } from "@/lib/response-time/core";
-import { buildCustomerIntel, type CustomerIntelInput, type IntelTouch } from "@/lib/customer-intelligence/summary";
+import { buildCustomerIntel, type IntelTouch } from "@/lib/customer-intelligence/summary";
 
 type CommRow = { channel: string; direction: string; created_at: string };
 type CallRow = { direction: string; started_at: string };
@@ -19,12 +18,12 @@ const FIRST_RESPONSE_LABEL = {
 /**
  * Müşteri zekâsı kartı (Müşteri 360 sağ sütun): ısı + formül nedenleri, son 30 gün etkileşim sayıları,
  * ilk yanıt süresi ve gerekçeli ek öneriler. Hesap `lib/customer-intelligence/summary.ts` (saf);
- * burada yalnız tek RPC okuması (`customer_heat_signals`, aynı liste kaynağı) ve sunum vardır.
+ * burada yalnız sunum vardır (ısı, `lib/customer-state` okuyucusundan gelir).
  * Mevcut "Sonraki en iyi eylem" kartını DEĞİŞTİRMEZ; onun kapsamadığı durumları ekler.
  */
 export async function CustomerIntelCard({
   customerId,
-  tenantId,
+  heat,
   createdAt,
   blacklist,
   comms,
@@ -33,7 +32,8 @@ export async function CustomerIntelCard({
   hasOpenOfferOrDeal,
 }: {
   customerId: string;
-  tenantId: string | null;
+  /** Tek okuyucudan (lib/customer-state) ısı — liste/Akıllı Listelerle aynı sonuç. */
+  heat: CustomerHeat;
   createdAt: string;
   blacklist: boolean;
   comms: readonly CommRow[];
@@ -41,23 +41,6 @@ export async function CustomerIntelCard({
   openDemands: number;
   hasOpenOfferOrDeal: boolean;
 }) {
-  let heatSignals: CustomerIntelInput["heatSignals"] = null;
-  if (tenantId) {
-    const supabase = await createClient();
-    const res = await supabase.rpc("customer_heat_signals", { p_tenant_id: tenantId, p_customer_ids: [customerId] });
-    const row = Array.isArray(res.data) ? (res.data[0] as Record<string, unknown> | undefined) : undefined;
-    if (!res.error && row) {
-      heatSignals = {
-        last_contact: (row.last_contact as string | null) ?? null,
-        open_demands: Number(row.open_demands) || 0,
-        urgent_demands: Number(row.urgent_demands) || 0,
-        portal_likes_30d: Number(row.portal_likes_30d) || 0,
-        open_offers: Number(row.open_offers) || 0,
-        open_deals: Number(row.open_deals) || 0,
-      };
-    }
-  }
-
   const touches: IntelTouch[] = [
     ...comms.map((c): IntelTouch => ({
       at: c.created_at,
@@ -73,7 +56,7 @@ export async function CustomerIntelCard({
   ];
 
   const intel = buildCustomerIntel(
-    { customerId, createdAt, blacklist, touches, openDemands, hasOpenOfferOrDeal, heatSignals },
+    { customerId, createdAt, blacklist, touches, openDemands, hasOpenOfferOrDeal, heat, heatSignals: null },
     now(),
   );
   const seg = HEAT_SEGMENTS[intel.heat.segment];

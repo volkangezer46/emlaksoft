@@ -7,6 +7,8 @@
  * Saf/deterministik; mevcut sinyallerden hesaplanır, şema değişikliği yok.
  */
 
+import { CHURN_CUTS } from "@/lib/customer-state/thresholds";
+
 export type ChurnSignals = {
   /** Son temastan bu yana gün (null = hiç temas yok). */
   daysSinceContact: number | null;
@@ -54,7 +56,7 @@ export function computeChurnRisk(s: ChurnSignals): ChurnRisk {
   risk += Math.min(12, s.openDemands * 6);
 
   risk = Math.max(0, Math.min(100, Math.round(risk)));
-  const tier: ChurnRisk["tier"] = risk >= 60 ? "high" : risk >= 32 ? "medium" : "low";
+  const tier: ChurnRisk["tier"] = risk >= CHURN_CUTS.high ? "high" : risk >= CHURN_CUTS.medium ? "medium" : "low";
 
   let action: string;
   if (tier === "high") {

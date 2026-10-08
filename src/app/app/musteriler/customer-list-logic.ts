@@ -1,5 +1,5 @@
 import type { PillTone } from "@/components/ui/list-kit";
-import type { HeatSegment } from "@/lib/customer-heat";
+import type { HeatSegment } from "@/lib/customer-state/heat";
 
 /** Müşteri listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir). */
 

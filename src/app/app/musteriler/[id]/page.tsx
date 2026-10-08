@@ -32,7 +32,10 @@ import { WaTemplateMenu } from "@/components/app/wa-template-menu";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
 import { MoreActions } from "@/components/app/more-actions";
 import { HelpTip } from "@/components/ui/help-tip";
-import { computeLeadScore, leadTierCls } from "@/lib/lead-score";
+import { leadTierCls } from "@/lib/customer-state/lead";
+import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
+import { loadCustomerStates } from "@/lib/customer-state/load";
+import { heatTitle } from "@/lib/customer-state/heat";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
 import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
@@ -44,7 +47,6 @@ import { ReassignAdvisorForm } from "./reassign-advisor-form";
 import { computeNextBestAction } from "./next-best-action";
 import { isPast, msSince, DAY_MS } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
-import { scoreSellerLikelihood, isOwnerCustomer, hasListingIntent } from "@/lib/seller-prediction";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 import { CustomerIntelCard } from "./customer-intel-card";
 import { VoiceNoteRecorder } from "@/components/app/voice-note-recorder";
@@ -299,7 +301,7 @@ export default async function CustomerDetailPage({
   const types: string[] = customer.customer_types ?? [];
   const tags: string[] = customer.tags ?? [];
 
-  // Lead skoru — mevcut sinyallerden anlık (bkz. lib/lead-score)
+  // Sıcaklık / risk / aday / satıcı: TEK okuyucu (lib/customer-state) — liste ve Akıllı Listelerle aynı sonuç.
   const activeDemandCount = demands.filter((d) => ["new", "active", "matched"].includes(d.status)).length;
   const commsList = (commsData ?? []) as { created_at: string }[];
   const lastActivityAt = [
@@ -307,33 +309,23 @@ export default async function CustomerDetailPage({
     ...appts.map((a) => a.scheduled_at),
     ...commsList.map((c) => c.created_at),
   ].filter(Boolean).sort().at(-1) ?? null;
-  const lead = computeLeadScore({
-    hasPhone: Boolean(customer.phone),
-    hasEmail: Boolean(customer.email),
-    source: customer.source,
-    activeDemands: activeDemandCount,
-    communications: commsList.length,
-    appointments: appts.length,
-    calls: calls.length,
-    lastActivityAt,
-    createdAt: customer.created_at,
-    blacklist: Boolean(customer.blacklist),
-    offers: (offersData ?? []).length,
-    hasActiveDeal: (dealsData ?? []).some((d) => d.stage !== "won" && d.stage !== "lost"),
-  });
+  const state = (await loadCustomerStates(
+    supabase,
+    tenantId,
+    [{
+      id: customer.id,
+      created_at: customer.created_at,
+      blacklist: customer.blacklist,
+      phone: customer.phone,
+      email: customer.email,
+      source: customer.source,
+      customer_types: types,
+    }],
+    { context: "Müşteri 360" },
+  )).get(customer.id)!;
+  const lead = state.scores.lead;
   const score = lead.score;
-
-  // Satıcı-tahmini — yalnız malik-tipi müşteride (bkz. lib/seller-prediction)
-  const daysAgoOf = (iso: string | null) => (iso ? Math.floor(msSince(iso) / DAY_MS) : null);
-  const sellerPrediction = isOwnerCustomer(types)
-    ? scoreSellerLikelihood({
-        isOwnerType: true,
-        daysSinceContact: daysAgoOf(lastActivityAt),
-        tenureDays: daysAgoOf(customer.created_at) ?? 0,
-        pastWonDeals: (dealsData ?? []).filter((d) => d.stage === "won").length,
-        hasListingIntentDemand: hasListingIntent(demands),
-      })
-    : null;
+  const sellerPrediction = state.scores.seller;
 
   // Sonraki en iyi aksiyon — kural motoru, mevcut sayfaverisiyle (bkz. ./next-best-action)
   const submittedOffer = (offersData ?? []).find((o) => o.status === "submitted") ?? null;
@@ -345,8 +337,8 @@ export default async function CustomerDetailPage({
     : computeNextBestAction(
         {
           customerId: customer.id,
-          leadTier: lead.tier,
-          leadLabel: lead.label,
+          leadTier: state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold",
+          leadLabel: TEMPERATURE_LABELS[state.temperature],
           hasPhone: Boolean(customer.phone),
           lastActivityAt,
           createdAt: customer.created_at,
@@ -453,10 +445,16 @@ export default async function CustomerDetailPage({
                   <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400">Kara liste</span>
                 ) : (
                   <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(lead.tier)}`}
-                    title={lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold")}`}
+                    title={`${heatTitle(state.scores.heat)}
+Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`}
                   >
-                    {lead.tier === "hot" ? "🔥" : lead.tier === "warm" ? "🌤️" : "❄️"} {lead.label} · {lead.score}
+                    {state.temperature === "sicak" ? "🔥" : state.temperature === "ilik" ? "🌤️" : "❄️"} {TEMPERATURE_LABELS[state.temperature]} · {lead.score}
+                  </span>
+                )}
+                {customer.blacklist || state.risk !== "yuksek" ? null : (
+                  <span className="rounded-full bg-danger-500/20 px-2 py-0.5 text-xs font-bold text-danger-400" title={state.reasons[0] ? `${state.reasons[0].label}: ${state.reasons[0].evidence}` : "Kayıp riski yüksek"}>
+                    Yüksek risk
                   </span>
                 )}
                 {customer.blacklist ? null : <HelpTip topic="lead-skoru" label="Aday skoru" />}
@@ -749,7 +747,7 @@ export default async function CustomerDetailPage({
           <VoiceNoteRecorder kind="customer" id={customer.id} />
           <CustomerIntelCard
             customerId={customer.id}
-            tenantId={tenantId}
+            heat={state.scores.heat}
             createdAt={customer.created_at}
             blacklist={Boolean(customer.blacklist)}
             comms={(commsData ?? []) as { channel: string; direction: string; created_at: string }[]}

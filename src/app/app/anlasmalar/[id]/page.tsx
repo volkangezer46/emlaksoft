@@ -30,7 +30,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { Badge } from "@/components/ui/badge";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { computeDealScore, scoreGap } from "@/lib/deal-score";
+import { computeDealScore, scoreGap } from "@/lib/customer-state/deal";
 import { getBaseUrl } from "@/lib/base-url";
 import {
   ChecklistLoader,

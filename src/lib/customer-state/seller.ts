@@ -8,6 +8,8 @@
  * Saf/deterministik. Kesin bir kehanet değil, bir öncelik sinyalidir.
  */
 
+import { SELLER_CUTS } from "@/lib/customer-state/thresholds";
+
 export type SellerSignals = {
   /** customer_types "malik/mülk sahibi/owner" içeriyor mu — birincil kapı. */
   isOwnerType: boolean;
@@ -74,7 +76,7 @@ export function scoreSellerLikelihood(s: SellerSignals): SellerPrediction {
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  const tier: SellerPrediction["tier"] = score >= 62 ? "high" : score >= 34 ? "medium" : "low";
+  const tier: SellerPrediction["tier"] = score >= SELLER_CUTS.high ? "high" : score >= SELLER_CUTS.medium ? "medium" : "low";
   const label = tier === "high" ? "Yüksek olasılık" : tier === "medium" ? "Orta olasılık" : "Düşük olasılık";
   if (reasons.length === 0) reasons.push("Belirgin sinyal yok");
   return { score, tier, label, reasons };

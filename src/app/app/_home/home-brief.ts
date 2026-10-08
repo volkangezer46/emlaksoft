@@ -67,16 +67,6 @@ export type CallRow = {
   source: "insight" | "lead";
 };
 
-/** Lead-skoru bileşenlerinden "neden" etiketleri (anlamsız/önemsiz bileşenler elenir; puan DEĞİL gerekçe). */
-const TRIVIAL_FACTORS = new Set(["Telefon var", "E-posta var", "Kaynak kalitesi", "Güncellik"]);
-export function leadReasons(factors: readonly { label: string; points: number }[], max = 3): string[] {
-  const out = factors.filter((f) => f.points > 0 && !TRIVIAL_FACTORS.has(f.label)).sort((a, b) => b.points - a.points);
-  const recent = factors.find((f) => f.label === "Güncellik" && f.points >= 10);
-  const labels = out.map((f) => f.label);
-  if (recent) labels.push("Yakın zamanda etkileşim");
-  return labels.slice(0, max);
-}
-
 export function buildCallRows(leads: readonly CallLeadInput[], insights: readonly Insight[], max = 6): CallRow[] {
   const byCustomer = new Map(leads.map((l) => [l.id, l]));
   const used = new Set<string>();

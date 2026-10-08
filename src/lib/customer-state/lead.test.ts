@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeLeadScore, type LeadSignals } from "./lead-score";
+import { computeLeadScore, type LeadSignals } from "./lead";
 
 /**
  * Lead skoru danışmanın gün içinde KİMİ ARAYACAĞINI belirliyor. Yanlış bir

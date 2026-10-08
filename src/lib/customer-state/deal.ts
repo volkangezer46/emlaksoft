@@ -32,6 +32,8 @@
  * görebilsin.
  */
 
+import { DEAL_CUTS } from "@/lib/customer-state/thresholds";
+
 export type DealSignals = {
   stage: string;
   /** Anlaşmanın açılış tarihi (ISO). */
@@ -153,7 +155,7 @@ export function computeDealScore(s: DealSignals, now: number = Date.now()): Deal
   }
 
   const score = Math.max(0, Math.min(100, Math.round(puan)));
-  const tier: DealScore["tier"] = score >= 65 ? "high" : score >= 35 ? "medium" : "low";
+  const tier: DealScore["tier"] = score >= DEAL_CUTS.high ? "high" : score >= DEAL_CUTS.medium ? "medium" : "low";
   const label = tier === "high" ? "Yüksek" : tier === "medium" ? "Orta" : "Düşük";
   return { score, tier, label, factors };
 }

@@ -18,8 +18,10 @@ import {
 import { listSavedViews } from "@/app/actions/saved-views";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
-import { computeLeadScore } from "@/lib/lead-score";
-import { HEAT_SEGMENTS, heatTitle, scoreCustomerHeat, type CustomerHeat, type HeatSegment } from "@/lib/customer-heat";
+import { buildCustomerState, computeCustomerHeat, type CustomerState } from "@/lib/customer-state/core";
+import { fetchOwnerHistory, fetchUpcomingAppointmentIds } from "@/lib/customer-state/load";
+import { isOwnerCustomer } from "@/lib/customer-state/seller";
+import { HEAT_SEGMENTS, heatTitle, type CustomerHeat, type HeatSegment } from "@/lib/customer-state/heat";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
 import { getSetting } from "@/lib/settings/read";
@@ -173,15 +175,7 @@ export async function loadCustomersData(input: CustomersDataInput) {
 
   const eightWeeksAgo = daysAgoIso(56);
 
-  type IntentRows = { data: { customer_id: string | null }[] | null; error?: unknown };
-  const fetchIntentSignals = async (ids: string[]): Promise<[IntentRows, IntentRows]> =>
-    ids.length
-      ? Promise.all([
-          supabase.from("offers").select("customer_id").in("customer_id", ids),
-          supabase.from("deals").select("customer_id").in("customer_id", ids).not("stage", "in", "(won,lost)"),
-        ])
-      : [{ data: [] }, { data: [] }];
-  // Liste + havuz sorguları hemen başlar; ısı RPC'si ve niyet sinyalleri bunlara bağlıdır
+  // Liste + havuz sorguları hemen başlar; ısı RPC'si bunlara bağlıdır
   // ama diğer (referans/KPI) sorguları BEKLEMEZ — eskiden hepsi bitince seri başlıyordu.
   const listP = segmentF
     ? Promise.resolve({ data: null, count: null })
@@ -206,9 +200,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
       error: results.find((r) => r.error)?.error,
     };
   })();
-  const intentP: Promise<[IntentRows, IntentRows] | null> = segmentF
-    ? Promise.resolve(null)
-    : listP.then((l) => fetchIntentSignals(((l.data ?? []) as unknown as CustomerRow[]).map((c) => c.id)));
   // Lead sinyalleri YALNIZ görünen sayfanın id'leri için (eski imza tüm tenant'ı döndürür ve 1000'de kesilirdi).
   // Segment filtresinde satırlar havuzdan kesildiği için sinyaller aşağıda satırlar bilinince çekilir.
   const signalsP = segmentF
@@ -259,7 +250,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
     getDefinitionsOrDefault("customer_source"),
     savedViewsPromise,
     heatP,
-    intentP,
     // Ofis tanımı: uykuda eşiği (varsayılan 90 gün = DORMANT_DAYS) — ana sorgularla aynı turda (eskiden ardışıktı).
     tenantId ? getSetting<number>("office.insight.dormant_days", { tenantId }) : Promise.resolve(undefined),
   ]);
@@ -279,7 +269,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
     sourceDefs,
     savedViews,
     heatRes,
-    intentRes,
     dormantDays,
   ] = batch;
   // Hata sessizce "kayıt yok"a dönüşmesin: error.tsx sınırına düşer (sahte sıfır yok).
@@ -299,7 +288,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
     ],
     "Müşteri listesi",
   );
-  if (intentRes) assertQueryBatchSucceeded(intentRes, ["intent-offers", "intent-deals"], "Müşteri listesi");
   if (signalsRes) assertQueryBatchSucceeded([signalsRes], ["lead-signals"], "Müşteri listesi");
   const customers = listRes.data;
   const customerTotal = listRes.count;
@@ -322,7 +310,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
   // Isı sinyalleri (heatP): havuz + görünen sayfa id'leri için, diğer sorgularla paralel.
   // Niyet sinyalleri (teklif/açık anlaşma) sayfa satırlarına bağlıdır, ısı RPC'sine
   // değil: segment filtresi yokken satırlar = pageRowsRaw → ısı RPC'siyle paralel başlar.
-  const intentPrefetch = intentRes;
   const { data: heatSignals } = heatRes;
 
   const heatSignalMap = new Map<string, HeatSignalRow>();
@@ -330,19 +317,8 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const nowMs = now();
   const heatOf = (id: string, createdAt: string, blacklist: boolean | null): CustomerHeat => {
     const s = heatSignalMap.get(id);
-    return scoreCustomerHeat(
-      {
-        lastContactAt: s?.last_contact ?? null,
-        openDemands: s?.open_demands ?? 0,
-        urgentDemands: s?.urgent_demands ?? 0,
-        portalLikes30d: s?.portal_likes_30d ?? 0,
-        hasOpenOfferOrDeal: (s?.open_offers ?? 0) > 0 || (s?.open_deals ?? 0) > 0,
-        createdAt,
-        blacklist: Boolean(blacklist),
-      },
-      nowMs,
-      { dormantDays },
-    );
+    // Havuz sayımı: tam durum okuyucusunun ısı parçasıyla BİREBİR aynı hesap (tek tanım: customer-state/core).
+    return computeCustomerHeat({ createdAt, blacklist: Boolean(blacklist) }, s ?? null, nowMs, { dormantDays });
   };
   const heatMap = new Map<string, CustomerHeat>();
   for (const r of poolRows) heatMap.set(r.id, heatOf(r.id, r.created_at, r.blacklist));
@@ -383,48 +359,46 @@ export async function loadCustomersData(input: CustomersDataInput) {
   const rangeStart = totalFiltered === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + rows.length, totalFiltered);
 
-  // Davranışsal niyet sinyalleri — YALNIZ görünen satırlar için (≤50, customer_id
-  // indeksli). Teklif = güçlü niyet, açık anlaşma = en yüksek niyet.
+  // Tam durum (sıcaklık + risk + aday): YALNIZ görünen sayfa için — okuyucu tek kapı (customer-state/core).
+  // Niyet sinyalleri (açık teklif/anlaşma) ısı RPC'sinden gelir; ayrıca teklif/anlaşma sorgusu yoktur.
   const rowIds = rows.map((c) => c.id);
-  const intentPair = intentPrefetch ?? (await fetchIntentSignals(rowIds));
-  if (!intentPrefetch) assertQueryBatchSucceeded(intentPair, ["intent-offers", "intent-deals"], "Müşteri listesi");
-  const [{ data: offerRows }, { data: openDealRows }] = intentPair;
-  const offerCount = new Map<string, number>();
-  for (const o of (offerRows ?? []) as { customer_id: string | null }[]) {
-    if (o.customer_id) offerCount.set(o.customer_id, (offerCount.get(o.customer_id) ?? 0) + 1);
-  }
-  const activeDealSet = new Set(
-    ((openDealRows ?? []) as { customer_id: string | null }[]).map((d) => d.customer_id).filter(Boolean) as string[],
-  );
-
-  // Lead skoru — YALNIZCA görünen sayfa için hesaplanır (bellek dostu)
   const leadSignalRes = signalsRes ?? (await fetchLeadSignals(supabase, tenantId, rowIds));
   if (!signalsRes) assertQueryBatchSucceeded([leadSignalRes], ["lead-signals"], "Müşteri listesi");
   const signalMap = new Map<string, LeadSignalRow>();
   for (const s of leadSignalRes.data) signalMap.set(s.customer_id, s);
-  const leadOf = (c: CustomerRow) => {
-    const s = signalMap.get(c.id);
-    return computeLeadScore({
-      hasPhone: Boolean(c.phone),
-      hasEmail: Boolean(c.email),
-      source: c.source,
-      activeDemands: s?.active_demands ?? 0,
-      communications: s?.comms ?? 0,
-      appointments: s?.appts ?? 0,
-      calls: s?.calls ?? 0,
-      lastActivityAt: s?.last_activity ?? null,
-      createdAt: c.created_at,
-      blacklist: Boolean(c.blacklist),
-      offers: offerCount.get(c.id) ?? 0,
-      hasActiveDeal: activeDealSet.has(c.id),
-    });
-  };
-  const leadMap = new Map(rows.map((c) => [c.id, leadOf(c)]));
-  // "Sıcak önce" — skor sıralaması yalnızca görünen sayfa içinde uygulanır
+  const [upcomingRes, ownerHistRes] = await Promise.all([
+    fetchUpcomingAppointmentIds(supabase, rowIds, daysAgoIso(0)),
+    fetchOwnerHistory(supabase, rows.filter((c) => isOwnerCustomer(c.customer_types)).map((c) => c.id)),
+  ]);
+  assertQueryBatchSucceeded([upcomingRes, ownerHistRes], ["upcoming-appointments", "owner-history"], "Müşteri listesi");
+  const stateMap = new Map<string, CustomerState>(
+    rows.map((c) => [
+      c.id,
+      buildCustomerState(
+        {
+          customerId: c.id,
+          createdAt: c.created_at,
+          blacklist: Boolean(c.blacklist),
+          hasPhone: Boolean(c.phone),
+          hasEmail: Boolean(c.email),
+          source: c.source,
+          types: c.customer_types ?? [],
+          leadSignals: signalMap.get(c.id) ?? null,
+          heatSignals: heatSignalMap.get(c.id) ?? null,
+          hasUpcomingAppointment: upcomingRes.data.has(c.id),
+          wonDeals: ownerHistRes.data.wonDeals.get(c.id) ?? 0,
+          hasListingIntentDemand: ownerHistRes.data.listingIntent.has(c.id),
+        },
+        nowMs,
+        { dormantDays },
+      ),
+    ]),
+  );
+  // "Sıcak önce" — ısı skoru sıralaması yalnızca görünen sayfa içinde uygulanır
   const displayRows = sortF === "hot"
-    ? [...rows].sort((a, b) => (leadMap.get(b.id)?.score ?? 0) - (leadMap.get(a.id)?.score ?? 0))
+    ? [...rows].sort((a, b) => (stateMap.get(b.id)?.scores.heat.score ?? 0) - (stateMap.get(a.id)?.scores.heat.score ?? 0))
     : rows;
-  const hotCount = rows.filter((c) => leadMap.get(c.id)?.tier === "hot").length;
+  const hotCount = rows.filter((c) => stateMap.get(c.id)?.temperature === "sicak").length;
 
   const advisorList = (advisors ?? []).map((a) => ({
     id: String(a.id),
@@ -466,8 +440,8 @@ export async function loadCustomersData(input: CustomersDataInput) {
 
   // ---- Satır modelleri (tablo + mobil liste ortak veri) ----------------------
   const viewModels: CustomerVM[] = displayRows.map((c) => {
-    const lead = leadMap.get(c.id);
-    const heat = heatMap.get(c.id);
+    const state = stateMap.get(c.id);
+    const heat = state?.scores.heat ?? heatMap.get(c.id);
     const lastContactIso = heatSignalMap.get(c.id)?.last_contact ?? null;
     const lastDays = lastContactIso && !Number.isNaN(new Date(lastContactIso).getTime())
       ? Math.floor(msSince(lastContactIso) / 86_400_000)
@@ -485,7 +459,8 @@ export async function loadCustomersData(input: CustomersDataInput) {
             title: heatTitle(heat),
           }
         : null,
-      lead: lead && !c.blacklist ? { score: lead.score, hot: lead.tier === "hot" } : null,
+      lead: state && !c.blacklist ? { score: state.scores.lead.score, hot: state.temperature === "sicak" } : null,
+      risk: state && !c.blacklist && state.risk === "yuksek" ? { label: "Yüksek risk", title: state.reasons[0] ? `${state.reasons[0].label}: ${state.reasons[0].evidence}` : "Kayıp riski yüksek" } : null,
       blacklist: Boolean(c.blacklist),
       sourceLabel: formatLeadSource(c.source, sourceLabel),
       channelLabel: leadChannelLabel(c.lead_channel),

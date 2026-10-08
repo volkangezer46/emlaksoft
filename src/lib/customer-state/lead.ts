@@ -4,6 +4,8 @@
  * Amaç: danışmanın en sıcak adaylara öncelik vermesi (Follow Up Boss / kvCORE mantığı).
  */
 
+import { LEAD_CUTS } from "@/lib/customer-state/thresholds";
+
 export type LeadSignals = {
   hasPhone: boolean;
   hasEmail: boolean;
@@ -120,7 +122,7 @@ export function computeLeadScore(s: LeadSignals): LeadScore {
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  const tier: LeadScore["tier"] = score >= 65 ? "hot" : score >= 35 ? "warm" : "cold";
+  const tier: LeadScore["tier"] = score >= LEAD_CUTS.hot ? "hot" : score >= LEAD_CUTS.warm ? "warm" : "cold";
   const label = tier === "hot" ? "Sıcak" : tier === "warm" ? "Ilık" : "Soğuk";
   return { score, tier, label, factors };
 }

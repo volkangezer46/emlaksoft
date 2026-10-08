@@ -2,13 +2,11 @@ import Link from "@/components/ui/smart-link";
 import { Phone, ArrowUpRight, Flame, AlarmClock, TrendingUp, MoonStar } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { daysAgoIso, msSince, DAY_MS } from "@/lib/clock";
-import { computeLeadScore } from "@/lib/lead-score";
+import { now } from "@/lib/clock";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { fetchLeadSignals } from "@/lib/lead-signals";
-import { computeChurnRisk } from "@/lib/churn-risk";
-import { scoreSellerLikelihood, isOwnerCustomer } from "@/lib/seller-prediction";
+import type { CustomerState } from "@/lib/customer-state/core";
+import { loadCustomerStates } from "@/lib/customer-state/load";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -26,17 +24,6 @@ type Cust = {
   source: string | null;
   created_at: string;
 };
-type Signal = {
-  customer_id: string;
-  active_demands: number;
-  comms: number;
-  appts: number;
-  calls: number;
-  last_activity: string | null;
-};
-
-const daysOf = (iso: string | null) => (iso ? Math.floor(msSince(iso) / DAY_MS) : null);
-
 /** URL kontratı: ?segment=churn|hot|seller|dormant (boş = tüm gruplar). Başlık kartları ve çipler aynı parametreyi yazar. */
 const PATH = "/app/akilli-listeler";
 const SEGMENT_KEYS = ["churn", "hot", "seller", "dormant"] as const;
@@ -49,7 +36,7 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
   const segmentF: SegmentKey | "" = (SEGMENT_KEYS as readonly string[]).includes(sp.segment ?? "") ? (sp.segment as SegmentKey) : "";
   const supabase = await createClient();
 
-  const [custRes, upcomingRes] = await Promise.all([
+  const custRes = await
     // max_rows (1000) sınırı: tüm müşteriler sayfalı okunur; eksik liste sessizce gösterilmez.
     fetchAllRows((from, to) =>
       supabase
@@ -58,92 +45,55 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
         .is("deleted_at", null)
         .order("id", { ascending: true })
         .range(from, to),
-    ),
-    supabase
-      .from("appointments")
-      .select("customer_id")
-      .gte("scheduled_at", daysAgoIso(0))
-      .in("status", ["pending", "confirmed"]),
-  ]);
-  assertQueryBatchSucceeded([custRes, upcomingRes], ["akilli-customers", "akilli-upcoming"], "Akıllı listeler");
-  const { data: custData } = custRes;
-  const { data: upcomingData } = upcomingRes;
-
-  const customers = (custData ?? []) as Cust[];
-  // Yalnız listelenen müşterilerin sinyalleri (tüm tenant'ı döndüren eski imza 1000 satırda kesiliyordu).
-  const signalRes = await fetchLeadSignals(supabase, tenantId, customers.map((c) => c.id));
-  assertQueryBatchSucceeded([signalRes], ["lead-signals"], "Akıllı listeler");
-  const signalData = signalRes.data;
-  const sigMap = new Map<string, Signal>();
-  for (const s of (signalData ?? []) as Signal[]) sigMap.set(s.customer_id, s);
-  const hasUpcoming = new Set(
-    ((upcomingData ?? []) as { customer_id: string | null }[]).map((a) => a.customer_id).filter(Boolean) as string[],
-  );
+    );
+  assertQueryBatchSucceeded([custRes], ["akilli-customers"], "Akıllı listeler");
+  const customers = (custRes.data ?? []) as Cust[];
+  // Sıcaklık/risk/aday/satıcı: tek okuyucu (müşteri listesi, 360 ve ana ekranla AYNI sonuç).
+  const stateMap = await loadCustomerStates(supabase, tenantId, customers, { nowMs: now(), context: "Akıllı listeler" });
 
   type Enriched = {
     c: Cust;
+    state: CustomerState;
+    /** Son temastan (yoksa kayıttan) bu yana gün. */
     days: number | null;
     leadScore: number;
     leadTier: "hot" | "warm" | "cold";
-    churn: ReturnType<typeof computeChurnRisk>;
-    seller: ReturnType<typeof scoreSellerLikelihood> | null;
+    churn: CustomerState["scores"]["churn"];
+    seller: CustomerState["scores"]["seller"];
     upcoming: boolean;
-    openDemands: number;
   };
 
   const enriched: Enriched[] = customers.map((c) => {
-    const s = sigMap.get(c.id);
-    const days = daysOf(s?.last_activity ?? c.created_at);
-    const lead = computeLeadScore({
-      hasPhone: Boolean(c.phone),
-      hasEmail: Boolean(c.email),
-      source: c.source,
-      activeDemands: s?.active_demands ?? 0,
-      communications: s?.comms ?? 0,
-      appointments: s?.appts ?? 0,
-      calls: s?.calls ?? 0,
-      lastActivityAt: s?.last_activity ?? null,
-      createdAt: c.created_at,
-      blacklist: Boolean(c.blacklist),
-    });
-    const upcoming = hasUpcoming.has(c.id);
-    const openDemands = s?.active_demands ?? 0;
-    const churn = computeChurnRisk({
-      daysSinceContact: daysOf(s?.last_activity ?? null),
-      engagementScore: lead.score,
-      openDemands,
-      hasUpcomingAppointment: upcoming,
-      blacklist: Boolean(c.blacklist),
-    });
-    const seller = isOwnerCustomer(c.customer_types)
-      ? scoreSellerLikelihood({
-          isOwnerType: true,
-          daysSinceContact: daysOf(s?.last_activity ?? null),
-          tenureDays: daysOf(c.created_at) ?? 0,
-          pastWonDeals: 0,
-          hasListingIntentDemand: false,
-        })
-      : null;
-    return { c, days, leadScore: lead.score, leadTier: lead.tier, churn, seller, upcoming, openDemands };
+    const state = stateMap.get(c.id)!;
+    return {
+      c,
+      state,
+      days: state.scores.heat.daysSinceContact,
+      leadScore: state.scores.lead.score,
+      leadTier: state.scores.lead.tier,
+      churn: state.scores.churn,
+      seller: state.scores.seller,
+      upcoming: state.upcomingAppointment,
+    };
   });
 
   const active = enriched.filter((e) => !e.c.blacklist);
 
   // --- Segmentler ---------------------------------------------------------
   const churnRisk = active
-    .filter((e) => e.churn.tier === "high")
+    .filter((e) => e.state.risk === "yuksek")
     .sort((a, b) => b.churn.risk - a.churn.risk);
 
   const hotNoAppt = active
-    .filter((e) => e.leadTier === "hot" && !e.upcoming)
-    .sort((a, b) => b.leadScore - a.leadScore);
+    .filter((e) => e.state.temperature === "sicak" && !e.upcoming)
+    .sort((a, b) => b.state.scores.heat.score - a.state.scores.heat.score);
 
   const sellerReady = active
     .filter((e) => e.seller && e.seller.tier !== "low")
     .sort((a, b) => (b.seller?.score ?? 0) - (a.seller?.score ?? 0));
 
   const dormantValuable = active
-    .filter((e) => (e.days ?? 0) >= 30 && e.leadTier !== "cold" && !e.upcoming && e.churn.tier !== "high")
+    .filter((e) => (e.days ?? 0) >= 30 && e.leadTier !== "cold" && !e.upcoming && e.state.risk !== "yuksek")
     .sort((a, b) => (b.days ?? 0) - (a.days ?? 0));
 
   const segments: Array<{
@@ -177,7 +127,7 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
       emptyHint: "Tüm sıcak adayların planlı bir randevusu var.",
       rows: hotNoAppt,
       reason: () => "Gösterim randevusu planla, momentumu kaybetme.",
-      metric: (e) => `skor ${e.leadScore}`,
+      metric: (e) => `ısı ${e.state.scores.heat.score}`,
     },
     {
       key: "seller",
@@ -195,11 +145,11 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
       icon: MoonStar,
       tone: "brand",
       title: "Uzun sessiz değerliler",
-      sub: "30+ gün temassız, hâlâ sıcak/ılık — yeniden ısıt.",
-      emptyHint: "30 gündür temas kurulmamış sıcak/ılık müşteri yok.",
+      sub: "30+ gün temassız, aday değeri hâlâ yüksek — yeniden ısıt.",
+      emptyHint: "30 gündür temas kurulmamış değerli müşteri yok.",
       rows: dormantValuable,
       reason: (e) => `${e.days} gündür temassız`,
-      metric: (e) => `skor ${e.leadScore}`,
+      metric: (e) => `aday skoru ${e.leadScore}`,
     },
   ];
   const shown = segmentF ? segments.filter((s) => s.key === segmentF) : segments;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeChurnRisk, type ChurnSignals } from "./churn-risk";
+import { computeChurnRisk, type ChurnSignals } from "./churn";
 
 const base: ChurnSignals = {
   daysSinceContact: 45,

@@ -11,6 +11,9 @@
  */
 
 import { DAY_MS } from "@/lib/clock";
+import { DORMANT_DAYS, HEAT_CUTS } from "@/lib/customer-state/thresholds";
+
+export { DORMANT_DAYS };
 
 export type CustomerHeatInputs = {
   /** En yeni temas anı: çağrı / randevu / görüşme notu (ISO). Hiç yoksa null. */
@@ -38,9 +41,6 @@ export type CustomerHeat = {
   daysSinceContact: number | null;
   factors: { label: string; points: number }[];
 };
-
-/** Uykuda eşiği: skor < 15 VE en az bu kadar gündür temassız. */
-export const DORMANT_DAYS = 90;
 
 export const HEAT_SEGMENTS: Record<
   HeatSegment,
@@ -136,9 +136,9 @@ export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number, opt
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   let segment: HeatSegment;
-  if (score >= 70) segment = "sicak";
-  else if (score >= 40) segment = "ilgili";
-  else if (score >= 15) segment = "soguk";
+  if (score >= HEAT_CUTS.sicak) segment = "sicak";
+  else if (score >= HEAT_CUTS.ilgili) segment = "ilgili";
+  else if (score >= HEAT_CUTS.soguk) segment = "soguk";
   else segment = daysSinceContact !== null && daysSinceContact >= dormantDays ? "uykuda" : "soguk";
 
   return { score, segment, label: HEAT_SEGMENTS[segment].label, daysSinceContact, factors };

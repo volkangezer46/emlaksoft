@@ -31,7 +31,7 @@ export type BriefingInput = {
   tasksOverdue: number;
   /** 7+ gündür teyit edilmemiş canlı ilan sayısı. */
   unconfirmedListings: number;
-  /** Sıcak (hot) lead sayısı — bkz. lib/lead-score. */
+  /** Sıcak (hot) lead sayısı — bkz. lib/customer-state. */
   hotLeads: number;
   /** Bekleyen komisyon toplamı (TL). */
   pendingCommission: number;

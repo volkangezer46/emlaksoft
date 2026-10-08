@@ -3,7 +3,7 @@
  *
  * Kullanıcıya görünen metinde kanonik ad kullanılır; `forbidden` desenleri kullanıcıya
  * görünmeyecek varyantlardır ve `terminology-contract.test.ts` ile taranır. Yol adları ve
- * kod tanımlayıcıları (ör. `/app/ayarlar/lead`, `lead-score.ts`) değişmez; yalnız METİN düzelir.
+ * kod tanımlayıcıları (ör. `/app/ayarlar/lead`, `customer-state/lead.ts`) değişmez; yalnız METİN düzelir.
  * İstemciden de import edilebilir (sunucu modülü içermez).
  */
 

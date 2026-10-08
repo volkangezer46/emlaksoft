@@ -1,7 +1,7 @@
 /**
  * Müşteri zekâsı — tek müşteri için AÇIKLANABİLİR etkileşim özeti (kural tabanlı, AI yok, sahte skor yok).
  *
- * Yeni formül YAZMAZ: sıcaklık `scoreCustomerHeat` (customer-heat.ts), ilk yanıt `measureLead`
+ * Yeni formül YAZMAZ: sıcaklık `scoreCustomerHeat` (customer-state/heat.ts; liste/360 `heat` girdisiyle aynı okuyucudan gelir), ilk yanıt `measureLead`
  * (response-time/core.ts) çıktısıdır. Burada yalnız o çıktılar tek özette birleşir ve mevcut
  * "Sonraki en iyi eylem" kartının (musteriler/[id]/next-best-action.ts) KAPSAMADIĞI durumlar için
  * ek, gerekçeli öneriler üretilir (yanıt bekleyen mesaj, temas edilmemiş kayıt, talepsiz sıcak müşteri, uykuda).
@@ -9,7 +9,7 @@
  * SAF: "şimdi" dışarıdan gelir.
  */
 import { DAY_MS } from "@/lib/clock";
-import { scoreCustomerHeat, type CustomerHeat, type CustomerHeatInputs } from "@/lib/customer-heat";
+import { scoreCustomerHeat, type CustomerHeat, type CustomerHeatInputs } from "@/lib/customer-state/heat";
 import { DEFAULT_SLA_MIN, measureLead, TOUCH_CHANNELS, type LeadResponse } from "@/lib/response-time/core";
 
 export type IntelTouch = {
@@ -29,6 +29,8 @@ export type CustomerIntelInput = {
   touches: readonly IntelTouch[];
   openDemands: number;
   hasOpenOfferOrDeal: boolean;
+  /** Tek okuyucudan (lib/customer-state) gelen ısı; verilirse YENİDEN hesaplanmaz ve `heatApproximate` false olur. */
+  heat?: CustomerHeat;
   /** `customer_heat_signals` RPC satırı; yoksa ısı yalnız temas/talep verisinden hesaplanır. */
   heatSignals: {
     last_contact: string | null;
@@ -99,7 +101,7 @@ export function buildCustomerIntel(input: CustomerIntelInput, nowMs: number): Cu
     createdAt: input.createdAt,
     blacklist: input.blacklist,
   };
-  const heat = scoreCustomerHeat(heatInputs, nowMs);
+  const heat = input.heat ?? scoreCustomerHeat(heatInputs, nowMs);
 
   const firstResponse = measureLead(
     { customerId: input.customerId, name: "", assignedTo: null, createdAt: input.createdAt },
@@ -154,7 +156,7 @@ export function buildCustomerIntel(input: CustomerIntelInput, nowMs: number): Cu
 
   return {
     heat,
-    heatApproximate: sig === null,
+    heatApproximate: input.heat ? false : sig === null,
     last30,
     lastInboundAt,
     lastOutboundAt,

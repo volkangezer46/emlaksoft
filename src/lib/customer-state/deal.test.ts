@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDealScore, scoreGap, type DealSignals } from "./deal-score";
+import { computeDealScore, scoreGap, type DealSignals } from "./deal";
 
 /**
  * Bu skor danışmanın hangi anlaşmaya zaman ayıracağını etkiliyor. Asıl risk

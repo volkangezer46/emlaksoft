@@ -10,15 +10,13 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { computeLeadScore } from "@/lib/lead-score";
+import { loadCustomerStates } from "@/lib/customer-state/load";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
-import { fetchLeadSignals } from "@/lib/lead-signals";
 import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from "@/lib/clock";
 import type { Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import type { SampleKpiScope } from "@/lib/sample-scope";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
-import { leadReasons } from "./home-brief";
 import {
   commissionSummaryFromAggregate,
   type CommissionAggregate,
@@ -118,16 +116,6 @@ export function buildHomeBounds(): Pick<
     last24hIso: daysAgoIso(1),
   };
 }
-
-// customer_lead_signals RPC satırı — bkz. /app/musteriler sayfasındaki aynı desen
-export type LeadSignalRow = {
-  customer_id: string;
-  active_demands: number;
-  comms: number;
-  appts: number;
-  calls: number;
-  last_activity: string | null;
-};
 
 /* ------------------------------ Dönem (7/30/90) ----------------------------- */
 
@@ -238,39 +226,22 @@ export type HotLead = { id: string; fullName: string; phone: string | null; scor
  */
 export const loadHotLeads = cache(async (ctx: HomeCtx): Promise<HotLead[]> => {
   const supabase = await createClient();
-  let custQ = ctx.sample.apply(supabase.from("customers").select("id, full_name, phone, email, source, blacklist, created_at"))
+  let custQ = ctx.sample.apply(supabase.from("customers").select("id, full_name, phone, email, source, blacklist, created_at, customer_types"))
     .is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
   if (ctx.scopeMine) custQ = custQ.eq("assigned_to", ctx.userId);
   const custRes = await custQ;
   assertQueryBatchSucceeded([custRes], ["briefing-customers"], "Ana panel");
-  const customers = custRes.data;
-  // Yalnız skorlanan 200 müşterinin id'leri (tüm tenant'ı döndüren eski imza 1000 satırda kesiliyordu).
-  const signalRes = await fetchLeadSignals(
-    supabase,
-    ctx.tenantId,
-    (customers ?? []).map((c) => c.id as string),
-  );
-  assertQueryBatchSucceeded([signalRes], ["lead-signals"], "Ana panel");
-  const signals = signalRes.data;
-  const signalMap = new Map<string, LeadSignalRow>();
-  for (const s of (signals ?? []) as LeadSignalRow[]) signalMap.set(s.customer_id, s);
+  const customers = (custRes.data ?? []) as {
+    id: string; full_name: string | null; phone: string | null; email: string | null; source: string | null;
+    blacklist: boolean | null; created_at: string; customer_types: string[] | null;
+  }[];
+  // Sıcaklık: müşteri listesi / 360 / Akıllı Listelerle AYNI tek okuyucu (lib/customer-state).
+  const states = await loadCustomerStates(supabase, ctx.tenantId, customers, { context: "Ana panel" });
   const hot: HotLead[] = [];
-  for (const c of customers ?? []) {
-    const s = signalMap.get(c.id);
-    const lead = computeLeadScore({
-      hasPhone: Boolean(c.phone),
-      hasEmail: Boolean(c.email),
-      source: c.source,
-      activeDemands: s?.active_demands ?? 0,
-      communications: s?.comms ?? 0,
-      appointments: s?.appts ?? 0,
-      calls: s?.calls ?? 0,
-      lastActivityAt: s?.last_activity ?? null,
-      createdAt: c.created_at,
-      blacklist: Boolean(c.blacklist),
-    });
-    if (lead.tier === "hot") {
-      hot.push({ id: c.id, fullName: c.full_name ?? "Müşteri", phone: c.phone ?? null, score: lead.score, reasons: leadReasons(lead.factors) });
+  for (const c of customers) {
+    const st = states.get(c.id);
+    if (st && st.temperature === "sicak" && !c.blacklist) {
+      hot.push({ id: c.id, fullName: c.full_name ?? "Müşteri", phone: c.phone ?? null, score: st.scores.heat.score, reasons: st.reasons.slice(0, 3).map((r) => r.label) });
     }
   }
   return hot.sort((a, b) => b.score - a.score);

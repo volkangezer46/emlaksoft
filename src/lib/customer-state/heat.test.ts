@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DORMANT_DAYS, scoreCustomerHeat, heatTitle } from "@/lib/customer-heat";
+import { DORMANT_DAYS, scoreCustomerHeat, heatTitle } from "@/lib/customer-state/heat";
 import { DAY_MS } from "@/lib/clock";
 
 /** Sabit "şimdi" — testler duvar saatinden bağımsız. */

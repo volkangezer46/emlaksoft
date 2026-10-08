@@ -1,4 +1,5 @@
-import { computeDealScore } from "@/lib/deal-score";
+import { computeDealScore } from "@/lib/customer-state/deal";
+import { DEAL_HIGH_IDLE_DAYS, DEAL_MIN_IDLE_DAYS } from "@/lib/customer-state/thresholds";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import { buildDedupeKey, weekPeriod } from "@/lib/insights/dedupe";
 import type { InsightDraft } from "@/lib/insights/types";
@@ -13,8 +14,7 @@ import { capPerUser, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from "@/lib/ins
  */
 
 export const DEAL_RISK_RULE_ID = "deal_risk@1";
-export const DEAL_MIN_IDLE_DAYS = 14;
-export const DEAL_HIGH_IDLE_DAYS = 45;
+export { DEAL_MIN_IDLE_DAYS, DEAL_HIGH_IDLE_DAYS };
 
 export type StalledDealFact = {
   dealId: string;
