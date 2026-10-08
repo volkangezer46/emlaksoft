@@ -5,12 +5,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requireModulePage } from "@/lib/require-module-page";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
-import { createClient } from "@/lib/supabase/server";
 import { formatTry } from "@/lib/format";
 import { now, trMonthKey } from "@/lib/clock";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { loadOfficeProfitData } from "@/lib/finance/office-profit-data";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { Suspense } from "react";
+import { SkeletonCard } from "@/components/ui/viz";
 import { AdvisorProfitCard } from "./advisor-profit";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
 
@@ -30,7 +30,7 @@ function monthRange(key: string): { from: string; to: string } {
  * görebilenler (earnings_all). Her tutar ilgili filtreli listeye gider. Örnek veri hariç. Yöntem `src/lib/reporting/profit-loss.ts`.
  */
 export default async function ProfitLossPage() {
-  const { perms, tenantId, role } = await requireModulePage("reports", "/app/raporlar");
+  const { perms, tenantId, role, userId } = await requireModulePage("reports", "/app/raporlar");
   const crumbs = [{ label: "Raporlar", href: "/app/raporlar" }, { label: "Kâr / zarar" }];
   if (!tenantId || !canSeeAllEarnings(perms)) {
     return (
@@ -42,68 +42,17 @@ export default async function ProfitLossPage() {
   }
 
   const keys = lastMonthKeys(trMonthKey(now()), 12);
-  const startIso = `${keys[0]}-01T00:00:00+03:00`;
-  const supabase = await createClient();
-  const [commRes, expRes] = await Promise.all([
-    // max_rows (1000) sınırı: sayfalı okuma; sayfa üst sınırı/hata `error` olarak yüzeye çıkar.
-    fetchAllRows<{ id: string; created_at: string; gross_amount: number | string; vat_amount: number | string | null; status: string }>((from, to) =>
-      supabase
-        .from("commissions")
-        .select("id, created_at, gross_amount, vat_amount, status")
-        .eq("tenant_id", tenantId)
-        .eq("is_sample", false)
-        .gte("created_at", startIso)
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
-    fetchAllRows<{ expense_date: string; amount: number | string }>((from, to) =>
-      supabase
-        .from("expenses")
-        .select("id, expense_date, amount")
-        .eq("tenant_id", tenantId)
-        .eq("is_sample", false)
-        .gte("expense_date", `${keys[0]}-01`)
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
-  ]);
-  const commissions: PlCommission[] = ((commRes.data ?? []) as { id: string; created_at: string; gross_amount: number | string; vat_amount: number | string | null; status: string }[]).map((c) => ({
-    id: c.id,
-    createdAt: c.created_at,
-    gross: Number(c.gross_amount) || 0,
-    vat: Number(c.vat_amount) || 0,
-    status: c.status,
-  }));
-  const ids = commissions.map((c) => c.id);
-  const splits: PlSplit[] = [];
-  const splitErrors: { error: unknown }[] = [];
-  for (let i = 0; i < ids.length; i += 200) {
-    const part = ids.slice(i, i + 200);
-    // 200 komisyon × çok paylı kayıt 1000 satırı aşabilir (max_rows): parça başına sayfalı okuma.
-    const { data, error } = await fetchAllRows<{ commission_id: string; kind: string; amount: number | string }>((from, to) =>
-      supabase
-        .from("commission_splits")
-        .select("id, commission_id, kind, amount")
-        .eq("tenant_id", tenantId)
-        .in("commission_id", part)
-        .order("id", { ascending: true })
-        .range(from, to),
-    );
-    if (error) {
-      // Eksik pay verisiyle net hesaplanmaz (net olduğundan yüksek görünürdü): aşağıda sayfa hata sınırına düşer.
-      splitErrors.push({ error });
-      break;
-    }
-    for (const s of (data ?? []) as { commission_id: string; kind: string; amount: number | string }[]) {
-      splits.push({ commissionId: s.commission_id, kind: s.kind, amount: Number(s.amount) || 0 });
-    }
+  // Komisyon + paylar + giderler TEK ortak okuma (kısa TTL'li ofis önbelleği; "Danışman kârlılığı" kartıyla paylaşılır).
+  let data;
+  try {
+    data = await loadOfficeProfitData(tenantId, userId, keys[0]!);
+  } catch {
+    assertQueryBatchSucceeded([{ error: new Error("okuma") }], ["kar-zarar"], "Kâr / zarar");
+    throw new Error("Kâr / zarar verisi okunamadı");
   }
-  const expenses: PlExpense[] = ((expRes.data ?? []) as { expense_date: string; amount: number | string }[]).map((e) => ({ date: String(e.expense_date), amount: Number(e.amount) || 0 }));
-  assertQueryBatchSucceeded(
-    [commRes, expRes, ...splitErrors],
-    ["kar-zarar-komisyon", "kar-zarar-gider", ...splitErrors.map(() => "kar-zarar-paylar")],
-    "Kâr / zarar",
-  );
+  const commissions: PlCommission[] = data.commissions.map((c) => ({ id: c.id, createdAt: c.createdAt, gross: c.gross, vat: c.vat, status: c.status }));
+  const splits: PlSplit[] = data.splits.map((s) => ({ commissionId: s.commissionId, kind: s.kind, amount: s.amount }));
+  const expenses: PlExpense[] = data.expenses.map((e) => ({ date: e.date, amount: e.amount }));
   const pl = buildProfitLoss(keys, commissions, splits, expenses);
 
   return (
@@ -189,8 +138,8 @@ export default async function ProfitLossPage() {
           </p>
           {/* Danışman bazlı kırılım yalnız ofis sahibi / genel müdür (kazanç gizliliği P12). */}
           {role === "owner" || role === "gm" ? (
-            <Suspense fallback={null}>
-              <AdvisorProfitCard tenantId={tenantId} firstMonthKey={keys[0]!} />
+            <Suspense fallback={<SkeletonCard height={320} label="Danışman kârlılığı yükleniyor" />}>
+              <AdvisorProfitCard tenantId={tenantId} userId={userId} firstMonthKey={keys[0]!} />
             </Suspense>
           ) : null}
         </>

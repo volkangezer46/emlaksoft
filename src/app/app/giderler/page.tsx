@@ -20,6 +20,7 @@ import { FinancePanel } from "./finance-panel";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { PORTAL_LABEL, isPortalKey } from "@/lib/finance/portal-roi";
 import { Suspense } from "react";
+import { SkeletonCard } from "@/components/ui/viz";
 import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-receipts";
 
 import { ListHero, ListPage } from "@/components/ui/list-page";
@@ -72,7 +73,7 @@ export default async function GiderlerPage({
 }: {
   searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string }>;
 }) {
-  const { perms, tenantId } = await requireModulePage("expenses", "/app/giderler");
+  const { perms, tenantId, userId } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
@@ -85,7 +86,7 @@ export default async function GiderlerPage({
   const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
 
   const supabase = await createClient();
-  const [expenses, catDefs, aggregateResult, sample, financeProbe] = await Promise.all([
+  const [expenses, catDefs, aggregateResult, sample, financeProbe, pickedPropertyRes] = await Promise.all([
     // Tablo listesi — ?from=&to= sunucu tarafında uygulanır (expense_date aralığı).
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
@@ -96,6 +97,10 @@ export default async function GiderlerPage({
     loadSampleKpiScope(supabase, tenantId),
     // Bütçe / tekrar / portal özellikleri (migration 20261008000700) için şema yoklaması; hata = henüz yok.
     supabase.from("expense_budgets").select("id", { count: "exact", head: true }),
+    // Portföy süzgeci başlığı: listeyle birlikte tek turda (eskiden ardışık ek tur).
+    portfoyF
+      ? supabase.from("properties").select("id, property_code, title").eq("id", portfoyF).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const financeFields = !financeProbe.error;
   const aggregate = requireReportingData("tenant-expense-aggregates", aggregateResult) as unknown as {
@@ -195,9 +200,7 @@ export default async function GiderlerPage({
       receipt_file:   receiptFile ? { id: receiptFile.id, name: receiptFile.fileName, type: receiptFile.fileType } : null,
     };
   });
-  const pickedProperty = portfoyF
-    ? (await supabase.from("properties").select("id, property_code, title").eq("id", portfoyF).maybeSingle()).data
-    : null;
+  const pickedProperty = pickedPropertyRes.data;
   const portfoyLabel = pickedProperty ? (pickedProperty.property_code ?? pickedProperty.title ?? "Portföy") : null;
 
   // KPI şeridi: kayıt + seçili aralık toplamı (RPC) + bu ay; her kart filtreli listeye gider.
@@ -389,8 +392,8 @@ export default async function GiderlerPage({
 
       {/* Bütçe, tekrarlayan giderler ve portal getirisi (gider düşür / gelir artır) */}
       {tenantId ? (
-        <Suspense fallback={null}>
-          <FinancePanel tenantId={tenantId} canEdit={canEdit} categories={categories} showEarnings={canSeeAllEarnings(perms)} />
+        <Suspense fallback={<SkeletonCard height={360} label="Bütçe ve verimlilik yükleniyor" />}>
+          <FinancePanel tenantId={tenantId} userId={userId} canEdit={canEdit} categories={categories} showEarnings={canSeeAllEarnings(perms)} />
         </Suspense>
       ) : null}
 

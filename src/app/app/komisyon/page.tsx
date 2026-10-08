@@ -42,6 +42,7 @@ import { StatusStackBar } from "./status-stack-bar";
 import { PipelineForecastCard } from "./pipeline-forecast";
 import { DiscountAnalysisCard } from "./discount-analysis";
 import { Suspense } from "react";
+import { SkeletonCard } from "@/components/ui/viz";
 
 export const metadata = { title: "Komisyon" };
 type CommissionRow = {
@@ -346,14 +347,14 @@ export default async function CommissionPage({
         }
       />
       {seeAllEarnings && tenantId ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SkeletonCard height={220} label="Tahmin yükleniyor" />}>
           <PipelineForecastCard tenantId={tenantId} />
         </Suspense>
       ) : null}
       {seeAllEarnings && tenantId ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<SkeletonCard height={360} label="İndirim analizi yükleniyor" />}>
           {/* Danışman bazlı kırılım yalnız ofis sahibi / genel müdür (kazanç gizliliği). */}
-          <DiscountAnalysisCard tenantId={tenantId} showAdvisors={role === "owner" || role === "gm"} />
+          <DiscountAnalysisCard tenantId={tenantId} userId={userId} showAdvisors={role === "owner" || role === "gm"} />
         </Suspense>
       ) : null}
 <p className="text-xs font-semibold text-text-muted">{kpiScopeLabel}</p>

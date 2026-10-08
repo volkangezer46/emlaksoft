@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { ArrowUpRight, ChevronRight, FileClock, Gauge, HeartPulse, Radar, ShieldAlert } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
 import { createClient } from "@/lib/supabase/server";
+import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { getControlSummary } from "@/lib/listing-control/server/readers";
 import type { Db } from "@/lib/listing-control/server/db";
 import { healthyPercent, kpiHref, sumSummaryRows, type GroupParam } from "@/components/listing-control/helpers";
@@ -58,7 +59,21 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
 
   const [control, listings, expiring, closures] = await Promise.all([
     canPortals
-      ? createClient().then((c) => getControlSummary(c as unknown as Db, ownRow ? "advisor" : "tenant")).catch(() => null)
+      ? createClient()
+          .then((c) =>
+            // Sağlık özeti RPC'si ağır ve dakikalar içinde değişmez: kısa TTL ofis önbelleği. Anahtar ofis + kullanıcı + rol + kapsam
+            // (RLS rol/şube kapsamı başka kullanıcıya sızmaz); portföy/ilan yazmaları etiketi düşürür. Hata/şema yok durumu yazılmaz.
+            cachedTenantAggregate(
+              "home-listing-health",
+              { tenantId: ctx.tenantId!, userId: ctx.userId, scope: `${ctx.role}:${ownRow ? "own" : "office"}` },
+              async () => {
+                const res = await getControlSummary(c as unknown as Db, ownRow ? "advisor" : "tenant");
+                if (!res.available) throw new Error("home-listing-health: yok");
+                return res;
+              },
+            ),
+          )
+          .catch(() => null)
       : Promise.resolve(null),
     canPortals ? loadLiveListings(ctx).catch(() => null) : Promise.resolve(null),
     ctx.canSeeProperties ? loadExpiringAuthority(ctx).catch(() => null) : Promise.resolve(null),
