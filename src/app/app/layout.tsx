@@ -48,6 +48,8 @@ import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getAppActions } from "@/lib/palette-core";
 import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
 import { getClosedFeatures } from "@/lib/modules/state";
+import { getUserHiddenModules } from "@/lib/modules/prefs";
+import { mergeHidden } from "@/lib/modules/registry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { measure } from "@/lib/server-timing";
@@ -261,13 +263,18 @@ async function buildShellModel() {
         ? Promise.resolve(resolveModuleState(boot.modules).closed)
         : getClosedFeatures(tenantId).catch(() => [])
       : Promise.resolve([]);
-  const [effectivePerms, planUsage, specBadges, closedModules, jar] = await Promise.all([
+  // Kişisel gizleme (user_module_prefs): yalnız görünürlük; ofis kapalılarıyla birleşir.
+  const hiddenModulesPromise: Promise<string[]> =
+    tenantId && user && !impersonating && !platformStaffFullAccess ? getUserHiddenModules(user.id, tenantId) : Promise.resolve([]);
+  const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar] = await Promise.all([
     effectivePermsPromise,
     usagePromise,
     speculationValid && specBadgesPromise ? specBadgesPromise : Promise.resolve(null),
     closedModulesPromise,
+    hiddenModulesPromise,
     cookies(),
   ]);
+  const closedModules = mergeHidden(officeClosedModules, hiddenModules);
   // Paket kilidi: menüde kilit simgesi gösterilecek sayfalar (platform personeli hariç)
   const lockedNavHrefs = platformStaffFullAccess
     ? []

@@ -8,16 +8,36 @@ import { findGate, planRank, type PlanGate } from "@/lib/billing/page-gates";
  * Satır yoksa modül AÇIK; çekirdek/sistem alanlar kapatılamaz (aşağıdaki `CORE_AREAS`).
  */
 
-export type FeatureGroupId = "satis" | "iletisim" | "portfoy" | "finans" | "ekip" | "gelismis";
+export type BundleId = "mulk" | "pazarlama" | "satis_plus" | "ekip" | "analiz" | "proje" | "araclar";
+/** Eski ad (modül `group` alanı artık paket kimliğidir). */
+export type FeatureGroupId = BundleId;
 
-export const FEATURE_GROUPS: readonly { id: FeatureGroupId; title: string }[] = [
-  { id: "satis", title: "Satış süreci" },
-  { id: "iletisim", title: "İletişim ve pazarlama" },
-  { id: "portfoy", title: "Portföy araçları" },
-  { id: "finans", title: "Finans ve raporlar" },
-  { id: "ekip", title: "Ekip" },
-  { id: "gelismis", title: "Gelişmiş" },
+export type BundleDef = {
+  id: BundleId;
+  title: string;
+  /** Sade Türkçe: pakete ne zaman ihtiyaç var. */
+  desc: string;
+  /** İlk kurulum sorusu (evet = paket açık kalır, hayır = paket kapanır). */
+  question: string;
+};
+
+/**
+ * Modül PAKETLERİ: ofis tek anahtarla bir grup modülü açar/kapatır. Her modül TAM BİR pakettedir
+ * (`MODULES[].group`); paket kapatmak üyelerini kapatır ve `dependsOn` zinciri (`normalizeClosed`) uygulanır.
+ * Çekirdek alanlar (müşteri, portföy, anlaşma...) hiçbir pakette değildir ve kapatılamaz.
+ */
+export const BUNDLES: readonly BundleDef[] = [
+  { id: "mulk", title: "Mülk yönetimi", desc: "Kiraya verilen mülkleri takip eden ofisler için: kira sözleşmesi, tahakkuk, kira artışı, anahtar.", question: "Kira ve mülk yönetimi yapıyor musunuz?" },
+  { id: "pazarlama", title: "Pazarlama ve iletişim", desc: "Kampanya, vitrin, sunum, açık ev, tavsiye ve müşteri/malik portalları.", question: "Müşterilere toplu mesaj, vitrin ve sunum gibi pazarlama araçları kullanıyor musunuz?" },
+  { id: "satis_plus", title: "Satış süreci plus", desc: "Teklif turları, e-imzalı sözleşme, çok adımlı onay ve kayıp satış analizi.", question: "Teklif, sözleşme ve onay akışlarını sistemden yürütüyor musunuz?" },
+  { id: "ekip", title: "Ekip ve kurumsal", desc: "Ekip performansı, lig, şube/franchise, ofis merkezi, otomasyon ve TV panosu.", question: "Birden çok danışmanla çalışıyor, ekip hedefi ve performans takibi yapıyor musunuz?" },
+  { id: "analiz", title: "Değerleme ve analiz", desc: "Değerleme, bölge analizi, talep-arz raporları, ilan kontrolü ve kaçan komisyon takibi.", question: "Değerleme, bölge analizi ve portal ilan kontrolü kullanıyor musunuz?" },
+  { id: "proje", title: "Projeler ve özel", desc: "Proje satışı, yabancıya satış ve ofisler arası ağ.", question: "Proje satışı, yabancıya satış veya ofisler arası ortak çalışma yapıyor musunuz?" },
+  { id: "araclar", title: "Ofis araçları", desc: "Giderler ve aidat, belge merkezi ve AI asistan.", question: "Ofis giderlerini, belgeleri ve AI asistanı sistemde tutuyor musunuz?" },
 ];
+
+/** Eski ad: ekranlar paket listesini bu adla okuyordu. */
+export const FEATURE_GROUPS: readonly { id: BundleId; title: string }[] = BUNDLES.map((b) => ({ id: b.id, title: b.title }));
 
 export type ModuleDef = {
   key: string;
@@ -36,33 +56,33 @@ export type ModuleDef = {
 };
 
 export const MODULES = [
-  { key: "offers", label: "Teklifler", desc: "Teklif turlarını, karşı teklifi ve kabulü tek yerde yönetin.", group: "satis", routes: ["/app/teklifler"], publicRoutes: [], dependsOn: [], stops: "Malik portalında teklif bölümü ve teklif tetikleyicili otomasyonlar çalışmaz." },
-  { key: "contracts", label: "Sözleşmeler ve e-imza", desc: "Şablondan sözleşme hazırlayın, SMS onaylı dijital imzaya gönderin.", group: "satis", routes: ["/app/sozlesmeler"], publicRoutes: ["/imza"], dependsOn: [], stops: "Bekleyen imza bağlantıları \"kapalı\" sayfası gösterir." },
-  { key: "approvals", label: "Onay akışları", desc: "Komisyon ve indirim gibi kararlar için çok adımlı onay.", group: "satis", routes: ["/app/onaylar"], publicRoutes: [], dependsOn: [], stops: "Ana ekrandaki onay satırı gizlenir." },
-  { key: "lost_sales", label: "Kayıp nedenleri", desc: "Kaybedilen anlaşmaların nedenlerini ve erken uyarıları görün.", group: "satis", routes: ["/app/kayip-satis"], publicRoutes: [], dependsOn: [] },
-  { key: "surveys", label: "Anketler ve anketör", desc: "Yayından kalkan, uzayan ve işlem gören işlemler için anketör aramaları, şablonlar ve sonuçlar.", group: "iletisim", routes: ["/app/anketler"], publicRoutes: [], dependsOn: [], stops: "Yeni anket görevi üretilmez; anketör kuyruğu ve görev bağlantıları durur (kayıtlar silinmez)." },
-  { key: "campaigns", label: "Kampanyalar", desc: "İYS izinlerine uygun toplu SMS ve mesaj kampanyaları gönderin.", group: "iletisim", routes: ["/app/kampanyalar"], publicRoutes: [], dependsOn: [], stops: "Zamanlanmış gönderimler çalışmaz (silinmez)." },
-  { key: "smart_lists", label: "Akıllı Listeler ve Tavsiyeler", desc: "Müşterileri kurala göre listeleyin; tavsiye bağlantılarını yönetin.", group: "iletisim", routes: ["/app/akilli-listeler", "/app/tavsiyeler"], publicRoutes: ["/tavsiye"], dependsOn: [], stops: "Herkese açık tavsiye bağlantıları \"kapalı\" sayfası gösterir." },
-  { key: "open_house", label: "Açık Ev", desc: "QR ile ziyaretçi kaydı alın, ziyaretçiyi otomatik talebe çevirin.", group: "portfoy", routes: ["/app/acik-ev"], publicRoutes: ["/acik-ev-kayit"], dependsOn: [], stops: "Herkese açık kayıt sayfası \"kapalı\" gösterir." },
-  { key: "rentals", label: "Kiralama ve kira artışı", desc: "Kira sözleşmeleri, aylık tahakkuk, gecikme, depozito ve kira artışı.", group: "portfoy", routes: ["/app/kiralama", "/app/kira-artis"], publicRoutes: [], dependsOn: [], stops: "Aylık kira tahakkuku üretilmez; ana ekran kiralama şeridi gizlenir." },
-  { key: "projects", label: "Proje Satışı", desc: "Proje ve daire stoğu, ödeme planı ve proje satış yönetimi.", group: "portfoy", routes: ["/app/projeler"], publicRoutes: [], dependsOn: [], stops: "Proje vade hatırlatmaları çalışmaz." },
-  { key: "portals", label: "Portal Kontrol", desc: "Portal ilanlarınızın teyit, yenileme ve kapanış durumunu takip edin.", group: "portfoy", routes: ["/app/portallar", "/app/ilan-kontrol"], publicRoutes: [], dependsOn: [], stops: "Portal teyit hatırlatmaları çalışmaz." },
-  { key: "keys", label: "Anahtar Takibi", desc: "Anahtarın kimde olduğunu ve gecikmeleri izleyin.", group: "portfoy", routes: ["/app/portfoyler/anahtarlar"], publicRoutes: [], dependsOn: [], stops: "Anahtar gecikme uyarıları çalışmaz." },
-  { key: "presentations", label: "Sunumlar", desc: "Müşteriye gönderilecek portföy sunumları ve paylaşım bağlantıları.", group: "portfoy", routes: ["/app/portfoyler/sunumlar"], publicRoutes: ["/sunum", "/paylas"], dependsOn: [], stops: "Aktif sunum bağlantıları \"kapalı\" sayfası gösterir." },
-  { key: "network", label: "Ofisler Arası Ağ", desc: "Başka ofislerle ilan ve talep paylaşımı, ortak satış.", group: "portfoy", routes: ["/app/ag"], publicRoutes: [], dependsOn: [] },
-  { key: "foreign_sale", label: "Yabancıya Satış", desc: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi.", group: "portfoy", routes: ["/app/yabanci-satis"], publicRoutes: [], dependsOn: [] },
-  { key: "valuation", label: "Değerleme ve Hesaplayıcılar", desc: "Emsal tabanlı değerleme, alım maliyeti ve yatırım getirisi hesaplayıcıları.", group: "finans", routes: ["/app/degerleme", "/app/hesaplayici"], publicRoutes: ["/degerleme", "/degerleme-raporu"], dependsOn: [], stops: "Herkese açık değerleme sayfaları \"kapalı\" gösterir." },
-  { key: "expenses", label: "Giderler ve Aidat", desc: "Ofis giderleri, aidat ve vergi ödemeleri; kâr-zarar tablosu.", group: "finans", routes: ["/app/giderler", "/app/aidat"], publicRoutes: [], dependsOn: [], stops: "Muhasebe rolünün menüsü boşalır." },
-  { key: "reports", label: "Raporlar", desc: "Ofis performansı, bölge analizi, talep-arz ve memnuniyet raporları.", group: "finans", routes: ["/app/raporlar", "/app/bolge-analizi"], publicRoutes: [], dependsOn: [], stops: "Bölge anlık görüntüsü ve haftalık özet üretilmez." },
-  { key: "leak", label: "Kaçan komisyonlar", desc: "Portal ilanlarından rakibe kapanan satışları ve kaçan komisyonu bulur.", group: "finans", routes: ["/app/kayip-kacak"], publicRoutes: [], dependsOn: ["portals"], stops: "Kaçak SLA uyarıları çalışmaz; ana ekran bloğu gizlenir." },
+  { key: "offers", label: "Teklifler", desc: "Teklif turlarını, karşı teklifi ve kabulü tek yerde yönetin.", group: "satis_plus", routes: ["/app/teklifler"], publicRoutes: [], dependsOn: [], stops: "Malik portalında teklif bölümü ve teklif tetikleyicili otomasyonlar çalışmaz." },
+  { key: "contracts", label: "Sözleşmeler ve e-imza", desc: "Şablondan sözleşme hazırlayın, SMS onaylı dijital imzaya gönderin.", group: "satis_plus", routes: ["/app/sozlesmeler"], publicRoutes: ["/imza"], dependsOn: [], stops: "Bekleyen imza bağlantıları \"kapalı\" sayfası gösterir." },
+  { key: "approvals", label: "Onay akışları", desc: "Komisyon ve indirim gibi kararlar için çok adımlı onay.", group: "satis_plus", routes: ["/app/onaylar"], publicRoutes: [], dependsOn: [], stops: "Ana ekrandaki onay satırı gizlenir." },
+  { key: "lost_sales", label: "Kayıp nedenleri", desc: "Kaybedilen anlaşmaların nedenlerini ve erken uyarıları görün.", group: "satis_plus", routes: ["/app/kayip-satis"], publicRoutes: [], dependsOn: [] },
+  { key: "surveys", label: "Anketler ve anketör", desc: "Yayından kalkan, uzayan ve işlem gören işlemler için anketör aramaları, şablonlar ve sonuçlar.", group: "pazarlama", routes: ["/app/anketler"], publicRoutes: [], dependsOn: [], stops: "Yeni anket görevi üretilmez; anketör kuyruğu ve görev bağlantıları durur (kayıtlar silinmez)." },
+  { key: "campaigns", label: "Kampanyalar", desc: "İYS izinlerine uygun toplu SMS ve mesaj kampanyaları gönderin.", group: "pazarlama", routes: ["/app/kampanyalar"], publicRoutes: [], dependsOn: [], stops: "Zamanlanmış gönderimler çalışmaz (silinmez)." },
+  { key: "smart_lists", label: "Akıllı Listeler ve Tavsiyeler", desc: "Müşterileri kurala göre listeleyin; tavsiye bağlantılarını yönetin.", group: "pazarlama", routes: ["/app/akilli-listeler", "/app/tavsiyeler"], publicRoutes: ["/tavsiye"], dependsOn: [], stops: "Herkese açık tavsiye bağlantıları \"kapalı\" sayfası gösterir." },
+  { key: "open_house", label: "Açık Ev", desc: "QR ile ziyaretçi kaydı alın, ziyaretçiyi otomatik talebe çevirin.", group: "pazarlama", routes: ["/app/acik-ev"], publicRoutes: ["/acik-ev-kayit"], dependsOn: [], stops: "Herkese açık kayıt sayfası \"kapalı\" gösterir." },
+  { key: "rentals", label: "Kiralama ve kira artışı", desc: "Kira sözleşmeleri, aylık tahakkuk, gecikme, depozito ve kira artışı.", group: "mulk", routes: ["/app/kiralama", "/app/kira-artis"], publicRoutes: [], dependsOn: [], stops: "Aylık kira tahakkuku üretilmez; ana ekran kiralama şeridi gizlenir." },
+  { key: "projects", label: "Proje Satışı", desc: "Proje ve daire stoğu, ödeme planı ve proje satış yönetimi.", group: "proje", routes: ["/app/projeler"], publicRoutes: [], dependsOn: [], stops: "Proje vade hatırlatmaları çalışmaz." },
+  { key: "portals", label: "Portal Kontrol", desc: "Portal ilanlarınızın teyit, yenileme ve kapanış durumunu takip edin.", group: "analiz", routes: ["/app/portallar", "/app/ilan-kontrol"], publicRoutes: [], dependsOn: [], stops: "Portal teyit hatırlatmaları çalışmaz." },
+  { key: "keys", label: "Anahtar Takibi", desc: "Anahtarın kimde olduğunu ve gecikmeleri izleyin.", group: "mulk", routes: ["/app/portfoyler/anahtarlar"], publicRoutes: [], dependsOn: [], stops: "Anahtar gecikme uyarıları çalışmaz." },
+  { key: "presentations", label: "Sunumlar", desc: "Müşteriye gönderilecek portföy sunumları ve paylaşım bağlantıları.", group: "pazarlama", routes: ["/app/portfoyler/sunumlar"], publicRoutes: ["/sunum", "/paylas"], dependsOn: [], stops: "Aktif sunum bağlantıları \"kapalı\" sayfası gösterir." },
+  { key: "network", label: "Ofisler Arası Ağ", desc: "Başka ofislerle ilan ve talep paylaşımı, ortak satış.", group: "proje", routes: ["/app/ag"], publicRoutes: [], dependsOn: [] },
+  { key: "foreign_sale", label: "Yabancıya Satış", desc: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi.", group: "proje", routes: ["/app/yabanci-satis"], publicRoutes: [], dependsOn: [] },
+  { key: "valuation", label: "Değerleme ve Hesaplayıcılar", desc: "Emsal tabanlı değerleme, alım maliyeti ve yatırım getirisi hesaplayıcıları.", group: "analiz", routes: ["/app/degerleme", "/app/hesaplayici"], publicRoutes: ["/degerleme", "/degerleme-raporu"], dependsOn: [], stops: "Herkese açık değerleme sayfaları \"kapalı\" gösterir." },
+  { key: "expenses", label: "Giderler ve Aidat", desc: "Ofis giderleri, aidat ve vergi ödemeleri; kâr-zarar tablosu.", group: "araclar", routes: ["/app/giderler", "/app/aidat"], publicRoutes: [], dependsOn: [], stops: "Muhasebe rolünün menüsü boşalır." },
+  { key: "reports", label: "Raporlar", desc: "Ofis performansı, bölge analizi, talep-arz ve memnuniyet raporları.", group: "analiz", routes: ["/app/raporlar", "/app/bolge-analizi"], publicRoutes: [], dependsOn: [], stops: "Bölge anlık görüntüsü ve haftalık özet üretilmez." },
+  { key: "leak", label: "Kaçan komisyonlar", desc: "Portal ilanlarından rakibe kapanan satışları ve kaçan komisyonu bulur.", group: "analiz", routes: ["/app/kayip-kacak"], publicRoutes: [], dependsOn: ["portals"], stops: "Kaçak SLA uyarıları çalışmaz; ana ekran bloğu gizlenir." },
   { key: "team_perf", label: "Ekip performansı", desc: "Danışman kıyası, KPI, ekip ligi ve hedefler.", group: "ekip", routes: ["/app/ekip/kiyas", "/app/danisman-kpi", "/app/lig", "/app/hedefler"], publicRoutes: [], dependsOn: [], stops: "Lig anlık görüntüsü üretilmez; ana ekran hedef kartı gizlenir." },
   { key: "franchise", label: "Şube ve Franchise", desc: "Şube ve ofis bazlı karşılaştırmalı yönetim raporları.", group: "ekip", routes: ["/app/franchise"], publicRoutes: [], dependsOn: ["team_perf"] },
   { key: "tv_board", label: "Ofis Panosu (TV)", desc: "Ofis ekranı için canlı skor ve günün özeti panosu.", group: "ekip", routes: ["/app/pano-tv"], publicRoutes: [], dependsOn: ["reports"] },
-  { key: "automation", label: "Otomasyon ve iş akışları", desc: "Tetikleyicili kurallar, hatırlatmalar ve adım adım iş akışları.", group: "gelismis", routes: ["/app/otomasyonlar", "/app/ayarlar/is-akislari"], publicRoutes: [], dependsOn: [], stops: "Kurallar ve iş akışları çalıştırılmaz (silinmez)." },
-  { key: "documents", label: "Belge Merkezi", desc: "Ofis belgeleri ve şablonları tek yerde. Müşteri ve portföy dosya sekmeleri etkilenmez.", group: "gelismis", routes: ["/app/belgeler"], publicRoutes: ["/evrak"], dependsOn: [] },
-  { key: "ai_assistant", label: "AI Asistan", desc: "Ofis verilerinizle sohbet eden yardımcı. Kapalıyken yapay zekâ çağrısı yapılmaz.", group: "gelismis", routes: ["/app/asistan"], publicRoutes: [], dependsOn: [], stops: "Yapay zekâ çağrısı yapılmaz." },
-  { key: "vitrin", label: "Vitrin ve danışman sayfaları", desc: "Herkese açık ofis vitrini, danışman sayfaları ve randevu al.", group: "gelismis", routes: [], publicRoutes: ["/vitrin", "/danisman", "/randevu-al"], dependsOn: [], stops: "Herkese açık vitrin sayfaları \"kapalı\" gösterir; vitrin alarmları çalışmaz." },
-  { key: "client_portals", label: "Müşteri ve malik portalı", desc: "Müşteriye ve ev sahibine özel, bağlantıyla açılan bilgi sayfaları.", group: "gelismis", routes: [], publicRoutes: ["/musteri-portali", "/malik-portali"], dependsOn: [] },
+  { key: "automation", label: "Otomasyon ve iş akışları", desc: "Tetikleyicili kurallar, hatırlatmalar ve adım adım iş akışları.", group: "ekip", routes: ["/app/otomasyonlar", "/app/ayarlar/is-akislari"], publicRoutes: [], dependsOn: [], stops: "Kurallar ve iş akışları çalıştırılmaz (silinmez)." },
+  { key: "documents", label: "Belge Merkezi", desc: "Ofis belgeleri ve şablonları tek yerde. Müşteri ve portföy dosya sekmeleri etkilenmez.", group: "araclar", routes: ["/app/belgeler"], publicRoutes: ["/evrak"], dependsOn: [] },
+  { key: "ai_assistant", label: "AI Asistan", desc: "Ofis verilerinizle sohbet eden yardımcı. Kapalıyken yapay zekâ çağrısı yapılmaz.", group: "araclar", routes: ["/app/asistan"], publicRoutes: [], dependsOn: [], stops: "Yapay zekâ çağrısı yapılmaz." },
+  { key: "vitrin", label: "Vitrin ve danışman sayfaları", desc: "Herkese açık ofis vitrini, danışman sayfaları ve randevu al.", group: "pazarlama", routes: [], publicRoutes: ["/vitrin", "/danisman", "/randevu-al"], dependsOn: [], stops: "Herkese açık vitrin sayfaları \"kapalı\" gösterir; vitrin alarmları çalışmaz." },
+  { key: "client_portals", label: "Müşteri ve malik portalı", desc: "Müşteriye ve ev sahibine özel, bağlantıyla açılan bilgi sayfaları.", group: "pazarlama", routes: [], publicRoutes: ["/musteri-portali", "/malik-portali"], dependsOn: [] },
   { key: "office_center", label: "Ofis Merkezi", desc: "Danışman yönetimi, havuzdan atama, ofis ayarları ve tanımlamalar.", group: "ekip", routes: ["/app/ofis-merkezi"], publicRoutes: [], dependsOn: [], stops: "Ofis merkezi yönetim sayfası gizlenir." },
 ] as const satisfies readonly ModuleDef[];
 
@@ -162,6 +182,25 @@ export function normalizeClosed(closed: Iterable<string>): FeatureKey[] {
     set.add(k);
     for (const d of dependentsOf(k)) set.add(d);
   }
+  return FEATURE_KEYS.filter((k) => set.has(k));
+}
+
+/** Paketin üyesi modüller (kayıt defteri sırasıyla). */
+export function modulesOfBundle(id: BundleId): FeatureKey[] {
+  return MODULES.filter((m) => m.group === id).map((m) => m.key);
+}
+
+export function getBundle(id: string): BundleDef | null {
+  return BUNDLES.find((b) => b.id === id) ?? null;
+}
+
+/**
+ * Kişisel gizleme dahil görünmezlik kümesi: ofis kapalıları ∪ kullanıcının gizledikleri (bilinmeyen anahtar atılır).
+ * YALNIZ görünürlük içindir (menü, palet, ana ekran, sekme); kapalı modülün yazma reddi ofis düzeyinde kalır.
+ */
+export function mergeHidden(officeClosed: Iterable<string>, userHidden: Iterable<string>): FeatureKey[] {
+  const set = new Set<string>(officeClosed);
+  for (const k of userHidden) if (isFeatureKey(k)) set.add(k);
   return FEATURE_KEYS.filter((k) => set.has(k));
 }
 
