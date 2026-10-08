@@ -34,8 +34,10 @@ export default async function MessageTemplatesSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Mesaj şablonları" eyebrow="WhatsApp mesaj kütüphanesi" description="Ofisinizin standart WhatsApp metinlerini bir kez yazın; danışman müşteri kartındaki WhatsApp düğmesinden şablonu seçsin, değişkenler otomatik dolsun. Mesaj kendi WhatsApp'ınızdan gönderilir — otomatik gönderim yoktur." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-3">
+      <PageHeader title="Mesaj şablonları" eyebrow="WhatsApp mesaj kütüphanesi" description="Ofisinizin standart WhatsApp metinlerini bir kez yazın; danışman müşteri kartındaki WhatsApp düğmesinden şablonu seçsin, değişkenler otomatik dolsun. Mesaj kendi WhatsApp'ınızdan gönderilir — otomatik gönderim yoktur." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="flex flex-wrap items-center gap-3">
             <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
               <p className="text-xs text-white/55">aktif şablon</p>
@@ -44,8 +46,8 @@ export default async function MessageTemplatesSettingsPage() {
               <p className="font-display text-xl font-extrabold text-white">{totalUsage}</p>
               <p className="text-xs text-white/55">toplam kullanım</p>
             </div>
-          </div></div>
-} />
+          </div>
+      </section>
 
       <section className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-amber-400/15 text-amber-600">

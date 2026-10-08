@@ -124,8 +124,10 @@ export default async function IsAkislariPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="İş akışları" eyebrow="Hazır görev listeleri" description={<>Otomasyonlar tek bir iş yapar; iş akışları ise bir olay olunca sıralı ve tarihli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer. <HelpTip topic="playbook" label="İş akışı" /></>} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex gap-3">
+      <PageHeader title="İş akışları" eyebrow="Hazır görev listeleri" description={<>Otomasyonlar tek bir iş yapar; iş akışları ise bir olay olunca sıralı ve tarihli bir görev listesini tek seferde açar. Örneğin yeni satılık portföy alındığında tapu, fotoğraf, portal, komşu ve fiyat kontrolü görevleri kendiliğinden takvime düşer. <HelpTip topic="playbook" label="İş akışı" /></>} />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="flex flex-wrap gap-3">
             <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center">
               <p className="font-display text-xl font-extrabold text-mint-300">{activeCount}</p>
               <p className="text-xs text-white/55">aktif akış</p>
@@ -140,8 +142,8 @@ export default async function IsAkislariPage() {
                 <p className="text-xs text-white/55">tanımlı adım</p>
               </div>
             </Link>
-          </div></div>
-} />
+          </div>
+      </section>
 
       <PlaybooksManager playbooks={rows} staff={staff} templates={templates} canEdit={canEdit} />
     </div>

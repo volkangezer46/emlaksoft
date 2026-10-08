@@ -314,8 +314,10 @@ export default async function BillingPage({
 
       <PageHeader title="Paket ve ödeme" eyebrow="Abonelik & iyzico" description={<>{configured
                 ? "Ödeme altyapısı (iyzico) bağlı. Ödeme sonrası aboneliğiniz otomatik başlar."
-                : "Ödeme altyapısı henüz bağlı değil; paket yükseltmeyi deneme amaçlı demo ödemeyle görebilirsiniz."} <HelpTip topic="paket-kota" /></>} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
+                : "Ödeme altyapısı henüz bağlı değil; paket yükseltmeyi deneme amaçlı demo ödemeyle görebilirsiniz."} <HelpTip topic="paket-kota" /></>} />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
             <p className="mt-1 font-display text-2xl font-extrabold">{planLabel(currentPlan)}</p>
             <p className="mt-1 text-xs text-mint-400">
@@ -336,8 +338,8 @@ export default async function BillingPage({
                   : "Deneme süresi doldu — paket seçin."}
               </p>
             ) : null}
-          </div></div>
-} />
+          </div>
+      </section>
 
       {sp.paid ? (
         <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-success-strong">

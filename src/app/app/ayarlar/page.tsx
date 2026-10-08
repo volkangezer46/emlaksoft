@@ -58,8 +58,10 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <PageHeader title={tenant.name || "Ayarlar"} eyebrow="Ofis yapılandırması" description={`${planLabel(tenant.plan)} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.`} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><details className="group/ring text-left">
+      <PageHeader title={tenant.name || "Ayarlar"} eyebrow="Ofis yapılandırması" description={`${planLabel(tenant.plan)} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.`} />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<details className="group/ring text-left">
             <summary
               className="focus-ring block cursor-pointer list-none rounded-full [&::-webkit-details-marker]:hidden"
               title="Eksik kurulum alanlarını görmek için tıklayın"
@@ -114,8 +116,8 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
                 Ofis profilini adım adım tamamla →
               </Link>
             </div>
-          </details></div>
-} />
+          </details>
+      </section>
 
       <HashTabRedirect active={tab} />
       <nav aria-label="Ayarlar sekmeleri" className="flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">

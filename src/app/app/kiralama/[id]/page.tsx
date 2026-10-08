@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
@@ -141,9 +142,8 @@ export default async function KiraDetayPage({
       </Link>
 
       {/* Hero — kira künyesi */}
-      <PageHeader title={prop?.title ?? prop?.property_code ?? "Portföy"} eyebrow="Kira kaydı" description={`Başlangıç: ${dateLabel(rental.start_date)}${rental.end_date ? ` · Bitiş: ${dateLabel(rental.end_date)}` : " · Süresiz"}`} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2">
-            <Badge variant={active ? "success" : "outline"} className={active ? "" : "text-white/70 ring-white/25"}>
+      <PageHeader title={prop?.title ?? prop?.property_code ?? "Portföy"} eyebrow="Kira kaydı" description={`Başlangıç: ${dateLabel(rental.start_date)}${rental.end_date ? ` · Bitiş: ${dateLabel(rental.end_date)}` : " · Süresiz"}`} actions={<>
+            <Badge variant={active ? "success" : "outline"}>
               {active ? "Aktif" : "Bitti"}
             </Badge>
             {canEdit && active ? (
@@ -159,16 +159,10 @@ export default async function KiraDetayPage({
               />
             ) : null}
             {canCreateContract && active ? (
-              <Link
-                href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`}
-                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/20"
-              >
-                <FileSignature className="h-3.5 w-3.5" /> Sözleşme oluştur
-              </Link>
+              <ButtonLink href={`/app/sozlesmeler/yeni?tur=kira&kira=${rental.id}`} variant="outline" size="sm" icon={FileSignature}>Sözleşme oluştur</ButtonLink>
             ) : null}
             {canEdit && active ? <EndRentalButton rentalId={rental.id} /> : null}
-          </div></div>
-} />
+          </>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         

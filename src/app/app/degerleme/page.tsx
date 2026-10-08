@@ -260,11 +260,11 @@ export default async function ValuationPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + EmlakFiyati bölge endeksi — insan onayı şart." actions={
-<div className="theme-dark flex flex-col gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">
-            <DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={await isEmlakFiyatiConfigured()} />
-          </div>
-} />
+      <PageHeader title="Değerleme motoru" eyebrow="Çok kaynaklı değerleme" description="Ofis listesi + emsal m² + EmlakFiyati bölge endeksi — insan onayı şart." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<DataPartnerStatus name="EmlakFiyati" icon={Landmark} configured={await isEmlakFiyatiConfigured()} />
+      </section>
       <DegerlemeTabs active="motor" parselReady={parselReady} />
       <ReferralNudge moment="first_valuation" show={rows.length >= 1} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">

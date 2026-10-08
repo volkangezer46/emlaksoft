@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
@@ -231,17 +232,10 @@ export default async function LeavesPage({
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <PageHeader title="Tatil ve izin takvimi" eyebrow="Ekip müsaitliği" description="Kim bugün sahada, kim izinde? Onaylanan izinlerde danışmanın online randevu linki o günler için otomatik kapanır — müşteri izinli güne randevu alamaz." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex flex-wrap items-center gap-2">
-              <Link
-                href="/app/ekip"
-                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                <ArrowLeft className="h-4 w-4" /> Ekip
-              </Link>
-              <AddLeaveTrigger />
-            </div></div>
-} />
+      <PageHeader title="Tatil ve izin takvimi" eyebrow="Ekip müsaitliği" description="Kim bugün sahada, kim izinde? Onaylanan izinlerde danışmanın online randevu linki o günler için otomatik kapanır — müşteri izinli güne randevu alamaz." actions={<><ButtonLink href="/app/ekip" variant="outline" icon={ArrowLeft}>
+                Ekip
+              </ButtonLink>
+              <AddLeaveTrigger /></>} />
 <AddLeavePanel
   members={selectableMembers}
   canManage={canManage}

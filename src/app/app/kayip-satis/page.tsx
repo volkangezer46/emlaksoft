@@ -205,9 +205,11 @@ export default async function KayipSatisPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <PageHeader title="Risk altındaki müşteriler" eyebrow="Müşteri riski ve kaybedilen anlaşmalar" description="Uzun süredir iletişim kurulmamış, portföy gönderilmemiş veya hareketsiz kalan müşteriler. Hemen arayın, müşteriyi kaybetmeyin." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* KPI'lar ilgili bölüm çapalarına iner */}
-          <div className="flex gap-3">
+      <PageHeader title="Risk altındaki müşteriler" eyebrow="Müşteri riski ve kaybedilen anlaşmalar" description="Uzun süredir iletişim kurulmamış, portföy gönderilmemiş veya hareketsiz kalan müşteriler. Hemen arayın, müşteriyi kaybetmeyin." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+{/* KPI'lar ilgili bölüm çapalarına iner */}
+          <div className="flex flex-wrap gap-3">
             <Link
               href="#kritik"
               className="focus-ring press lift block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
@@ -237,8 +239,8 @@ export default async function KayipSatisPage() {
               <p className="font-display text-lg font-extrabold text-danger-300">{money(lostRevenue)}</p>
               <p className="text-xs text-white/70">Kaybedilen ciro · 12 ay</p>
             </Link>
-          </div></div>
-} />
+          </div>
+      </section>
 
       {hiddenCount > 0 ? (
         <p className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">

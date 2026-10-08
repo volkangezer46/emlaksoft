@@ -234,8 +234,10 @@ export async function MatchingView({
           çıkmaz; talebi il/işlem türüne göre daraltın veya belirli bir portföyden başlatın.
         </p>
       ) : null}
-      <PageHeader title="Müşteriye uygun ilanlar" eyebrow="Talep ve portföy eşleştirme" description={<>Müşteri taleplerini ilanlarınızla bütçe, konum, oda ve işlem türüne göre puanlar. Yalnızca kendi kayıtlarınız kullanılır. <HelpTip topic="eslestirme" /></>} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
+      <PageHeader title="Müşteriye uygun ilanlar" eyebrow="Talep ve portföy eşleştirme" description={<>Müşteri taleplerini ilanlarınızla bütçe, konum, oda ve işlem türüne göre puanlar. Yalnızca kendi kayıtlarınız kullanılır. <HelpTip topic="eslestirme" /></>} />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4 lg:grid-cols-2">
+<div className="flex items-center gap-5 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="relative grid h-28 w-28 place-items-center">
               <div
                 className="conic-spin pointer-events-none absolute inset-2 rounded-full opacity-25 blur-md"
@@ -287,7 +289,7 @@ export async function MatchingView({
               </div>
             </div>
           </div>
-<><div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+<div className="min-w-0 space-y-3"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {/* Güçlü/iyi kutuları öneri listesini ?kademe= ile daraltır;
                   aktifken tekrar tıklamak filtreyi kaldırır. */}
               {[
@@ -308,8 +310,8 @@ export async function MatchingView({
                   <p className="text-xs text-white/45">{item.label}</p>
                 </Link>
               ))}
-            </div></></div>
-} />
+            </div></div>
+      </section>
 
       {/* Aktif ağırlık seti — şeffaflık satırı + Ayarlar bağlantısı */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-xs text-text-muted">

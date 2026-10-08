@@ -211,8 +211,10 @@ export default async function AgPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Ağ" eyebrow="Ofisler arası ağ" description="Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex gap-3">
+      <PageHeader title="Ağ" eyebrow="Ofisler arası ağ" description="Portföyünüzü diğer ofislerin talebine açın; komisyon paylaşımlı iş birliği kurun." actions={<>{canCreate ? <ShareNetworkTrigger /> : null}</>} />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="flex flex-wrap gap-3">
             {[
               { label: "Havuzdaki ilan", value: pool.length, href: "#havuz" },
               { label: "Havuzdaki talep", value: demandPool.length, href: "#talep-havuzu" },
@@ -232,12 +234,7 @@ export default async function AgPage({
               </a>
             ))}
           </div>
-<>{canCreate ? (
-              <div className="mt-4">
-                <ShareNetworkTrigger />
-              </div>
-            ) : null}</></div>
-} />
+      </section>
 {canCreate ? <ShareNetworkPanel properties={liveProperties} /> : null}
 
       {/* Güven metni — ağın veri sözleşmesi */}

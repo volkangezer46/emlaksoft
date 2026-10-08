@@ -213,8 +213,10 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Akıllı Listeler" eyebrow="Kimi aramalıyım?" description={<>Müşterilerinizi son görüşme tarihine ve ilgisine göre gruplar; önce kimi arayacağınızı gösterir. <HelpTip topic="segment" label="Müşteri grupları" /></>} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <PageHeader title="Akıllı Listeler" eyebrow="Kimi aramalıyım?" description={<>Müşterilerinizi son görüşme tarihine ve ilgisine göre gruplar; önce kimi arayacağınızı gösterir. <HelpTip topic="segment" label="Müşteri grupları" /></>} />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {/* Kartlar listeyi ?segment= ile süzer (sıfır çıkmaz metrik: sayı = hedef). */}
             {segments.map((s) => (
               <Link
@@ -229,8 +231,8 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
                 <p className="text-xs text-white/60">{s.title}</p>
               </Link>
             ))}
-          </div></div>
-} />
+          </div>
+      </section>
 
       {active.length === 0 ? (
         <EmptyState

@@ -1,4 +1,5 @@
-import { ShieldCheck, Scale } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { requireModulePage } from "@/lib/require-module-page";
 import { TUFE_PENDING_MONTHS, TUFE_UNVERIFIED_NOTICE, latestOfficialTufeMonthIn, latestTufeMonthIn, tufeMonths } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
@@ -18,15 +19,7 @@ export default async function KiraArtisPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-4 py-3">
-            <Scale className="h-5 w-5 text-cyan-400" />
-            <div>
-              <p className="text-xs text-white/60">TBK m.344</p>
-              <p className="text-sm font-semibold text-white">Yasal tavan uyumlu</p>
-            </div>
-          </div></div>
-} />
+      <PageHeader title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={<><Badge variant="outline">TBK m.344 · Yasal tavan uyumlu</Badge></>} />
 
       {!hasAnyOfficial ? (
         <p role="status" className="rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">

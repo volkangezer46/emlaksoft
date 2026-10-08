@@ -39,8 +39,10 @@ export default async function LeadCaptureSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Gelen aday & hızlı yanıt" eyebrow="Aday yakalama" description="Web sitesi formu, reklam veya portal adaylarını CRM'e otomatik düşürün. Her aday sırayla en uygun danışmana atanır ve anında bildirim gönderilir." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><Link
+      <PageHeader title="Gelen aday & hızlı yanıt" eyebrow="Aday yakalama" description="Web sitesi formu, reklam veya portal adaylarını CRM'e otomatik düşürün. Her aday sırayla en uygun danışmana atanır ve anında bildirim gönderilir." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<Link
             href="/app/musteriler"
             className="focus-ring press lift group relative block rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-5 py-3 text-center transition hover:border-mint-400/40"
           >
@@ -48,9 +50,9 @@ export default async function LeadCaptureSettingsPage() {
             <p className="flex items-center justify-center gap-1.5 font-display text-2xl font-extrabold text-mint-300">
               <Zap className="h-5 w-5" /> {leadCount ?? 0}
             </p>
-            <p className="text-xs text-white/50">otomatik atanan aday · müşterilere git</p>
-          </Link></div>
-} />
+            <p className="text-xs text-white/50">otomatik atanan aday</p>
+          </Link>
+      </section>
 
       <ReadOnlyGate canEdit={(ctx.perms.settings ?? []).includes("edit")}>
         <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />

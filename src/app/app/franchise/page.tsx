@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "@/components/ui/smart-link";
 import {
@@ -193,14 +194,7 @@ export default async function FranchiseBiPage({
     <div className="space-y-6">
       <PageHeader title={tenant?.name ?? "Ofis ağı"} eyebrow="Şube analitiği" description={isMultiBranch
                 ? "Şube bazlı canlı rollup: portföy, müşteri, danışman ve kazanılan işlem hacmi."
-                : "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer."} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><Link
-            href="/app/ekip#subeler"
-            className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
-          >
-            <Plus className="h-4 w-4" /> Şube ekle / yönet
-          </Link></div>
-} />
+                : "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer."} actions={<><ButtonLink href="/app/ekip#subeler" variant="outline" icon={Plus}>Şube ekle / yönet</ButtonLink></>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-amber-400/20 blur-[70px]" />

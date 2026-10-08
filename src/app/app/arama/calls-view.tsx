@@ -184,8 +184,10 @@ export async function CallsView({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Akıllı Arama" eyebrow="Görüşme kayıt merkezi" description="Müşteri eşleştirme, sonuç kodu ve görüşme geçmişi tek akışta kayıt altında." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{/* live call volume */}
+      <PageHeader title="Akıllı Arama" eyebrow="Görüşme kayıt merkezi" description="Müşteri eşleştirme, sonuç kodu ve görüşme geçmişi tek akışta kayıt altında." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4 lg:grid-cols-2">
+{/* live call volume */}
           <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4 backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-white/75"><Activity className="h-3.5 w-3.5 text-cyan-400" /> Arama hacmi · son 7 gün</p>
@@ -213,7 +215,7 @@ export async function CallsView({
               <span className="text-xs text-white/55">Ort. görüşme {duration(avgDur)} · {rows.length} kayıt</span>
             </div>
           </div>
-<><div className="mt-6 grid grid-cols-3 gap-3">
+<div className="min-w-0 space-y-3"><div className="grid grid-cols-3 gap-3">
               {[
                 { label: "Gelen çağrı", value: inbound, icon: PhoneIncoming, tone: "text-cyan-400", href: kpiHref({ yon: "inbound" }), active: yon === "inbound" },
                 { label: "Cevapsız", value: missed, icon: PhoneMissed, tone: "text-danger-500", href: kpiHref({ yon: "missed" }), active: yon === "missed" },
@@ -231,8 +233,8 @@ export async function CallsView({
                   <p className="text-xs text-white/45 sm:text-xs">{item.label}</p>
                 </Link>
               ))}
-            </div></></div>
-} />
+            </div></div>
+      </section>
 
       <CallConsole customers={customerList} demandCounts={demandCounts} matchCounts={matchCounts} initialCustomerId={preCustomerId} />
 

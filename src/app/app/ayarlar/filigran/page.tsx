@@ -45,16 +45,18 @@ export default async function WatermarkSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="İlanlarınızı damgalayın" eyebrow="Fotoğraf filigranı" description="Yüklenen her ilan fotoğrafına ofis logonuz veya adınız otomatik basılır. Fotoğrafınız başka bir ilanda kullanılsa bile kaynağı belli olur." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-4 py-3 text-xs text-white/70">
+      <PageHeader title="İlanlarınızı damgalayın" eyebrow="Fotoğraf filigranı" description="Yüklenen her ilan fotoğrafına ofis logonuz veya adınız otomatik basılır. Fotoğrafınız başka bir ilanda kullanılsa bile kaynağı belli olur." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.05] px-4 py-3 text-xs text-white/70">
             <ShieldCheck className="h-4 w-4 text-mint-400" />
             <span>
               Damga <strong className="text-white">yüklenen kopyaya</strong> basılır;
               <br />
               cihazınızdaki orijinal dosya bozulmaz.
             </span>
-          </div></div>
-} />
+          </div>
+      </section>
 
       <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <ReadOnlyGate canEdit={(ctx.perms.settings ?? []).includes("edit")}>

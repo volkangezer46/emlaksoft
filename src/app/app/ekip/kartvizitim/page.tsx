@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeft, IdCard, ShieldCheck } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -79,14 +80,7 @@ export default async function KartvizitimPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={view.isSelf ? "Kartvizitim" : `${view.fullName} kartviziti`} eyebrow="Dijital kartvizit" description="Tek link paylaşın: müşteri fotoğrafınızı, uzmanlığınızı, yayındaki portföylerinizi ve memnuniyet puanınızı görsün; tek tıkla arasın, WhatsApp yazsın veya randevu alsın." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><Link
-            href="/app/ekip"
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4" /> Ekip
-          </Link></div>
-} />
+      <PageHeader title={view.isSelf ? "Kartvizitim" : `${view.fullName} kartviziti`} eyebrow="Dijital kartvizit" description="Tek link paylaşın: müşteri fotoğrafınızı, uzmanlığınızı, yayındaki portföylerinizi ve memnuniyet puanınızı görsün; tek tıkla arasın, WhatsApp yazsın veya randevu alsın." actions={<><ButtonLink href="/app/ekip" variant="outline" icon={ArrowLeft}>Ekip</ButtonLink></>} />
 
       {!view.isSelf ? (
         <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-sm text-ink-950">

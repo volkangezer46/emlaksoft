@@ -25,12 +25,14 @@ export default async function EntegrasyonlarPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <PageHeader title="Entegrasyonlar" eyebrow="Bağlantı merkezi" description="Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center">
+      <PageHeader title="Entegrasyonlar" eyebrow="Bağlantı merkezi" description="Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır." />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center">
             <p className="font-display text-3xl font-extrabold">{configured}/{integrations.length}</p>
             <p className="text-xs text-white/60">yapılandırılmış bağlantı</p>
-          </div></div>
-} />
+          </div>
+      </section>
 
       {CATS.map((cat) => {
         const items = integrations.filter((i) => i.category === cat.key);

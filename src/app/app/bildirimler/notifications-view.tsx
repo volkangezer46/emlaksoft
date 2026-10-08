@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Bell, BellRing, CheckCheck, Gauge, Inbox, Sparkles } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -155,18 +156,13 @@ export async function NotificationsView({
   return (
     <div className="space-y-5">
       {/* Koyu hero — KPI şeridi filtre kısayoludur */}
-      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{unread > 0 ? (
+      <PageHeader title="Bildirimler" eyebrow="Bildirim merkezi" description={`${unread > 0 ? `${unread} okunmamış bildiriminiz var.` : "Tüm bildirimler okundu — güncel durumdasınız."}${tur ? ` · "${kindLabel[tur]}" türü filtrede` : ""}${durum ? " · yalnız okunmamışlar" : ""}`} actions={<>{unread > 0 ? (
               <form action={markAllNotificationsReadForm}>
-                <button
-                  type="submit"
-                  className="focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] border border-white/20 bg-white/5 px-3.5 py-2 text-xs font-semibold text-white/85 transition hover:border-white/40 hover:text-white"
-                >
-                  <CheckCheck className="h-3.5 w-3.5" /> Tümünü okundu işaretle
-                </button>
+                <Button type="submit" variant="outline" size="sm" icon={CheckCheck}>
+                  Tümünü okundu işaretle
+                </Button>
               </form>
-            ) : null}</div>
-} />
+            ) : null}</>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-5 text-white md:p-6">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-brand-600/30 blur-[80px]" />

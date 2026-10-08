@@ -91,9 +91,11 @@ export default async function AcikEvPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Açık Ev Takibi" eyebrow="Açık ev günleri" description="Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2">{live.length > 0 ? (
-            <Link
+      <PageHeader title="Açık Ev Takibi" eyebrow="Açık ev günleri" description="Portföy tanıtım günlerini planlayın, ziyaretçileri kapıda kaydedin, tamamlanan etkinliklerin verimini izleyin." actions={<>{canCreate ? <ButtonLink href="/app/acik-ev/yeni">Yeni açık ev</ButtonLink> : null}</>} />
+
+      {live.length > 0 ? (
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+<Link
               href="/app/acik-ev?durum=active"
               className="focus-ring press lift flex items-center gap-3 rounded-[var(--radius-card)] border border-mint-400/40 bg-mint-500/15 px-4 py-3"
             >
@@ -106,13 +108,8 @@ export default async function AcikEvPage({
                 <p className="text-sm font-bold text-white">{live.length} etkinlik devam ediyor</p>
               </div>
             </Link>
-          ) : null}
-<>{canCreate ? (
-              <div className="mt-4">
-                <ButtonLink href="/app/acik-ev/yeni">Yeni açık ev</ButtonLink>
-              </div>
-            ) : null}</></div>
-} />
+      </section>
+      ) : null}
 
       {/* KPI şeridi — hepsi listeyi süzer */}
       <KpiGrid>
