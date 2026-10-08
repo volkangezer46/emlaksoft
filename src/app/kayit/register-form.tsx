@@ -393,6 +393,7 @@ export function RegisterForm({
             <button type="button" onClick={next} className={primaryBtn}>
               Devam et <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </button>
+            <p className="text-center text-xs text-text-faint">Kart gerekmez · {trialText} · Taahhüt yok</p>
           </div>
 
           {/* ADIM 2 — Ofis adı + paket + demo + onay */}

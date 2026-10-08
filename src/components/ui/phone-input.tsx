@@ -125,6 +125,8 @@ export function PhoneInput(props: PhoneInputProps) {
   // '+4' gibi henüz tamamlanmamış ülke kodu taslağı.
   const [draft, setDraft] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
+  // Ülke listesi (~200 option) DOM'a yalnız seçici açılmaya yaklaşınca (odak/dokunma/ok tuşu) girer.
+  const [listOpen, setListOpen] = useState(false);
   const [rules, setRules] = useState<RulesModule | null>(rulesCache);
   // Hafif uyarı: fazla hane kırpıldı / harf atıldı / ülke değişiminde numara kırpıldı.
   const [notice, setNotice] = useState<string | null>(null);
@@ -201,6 +203,9 @@ export function PhoneInput(props: PhoneInputProps) {
         </span>
         <select
           aria-label="Ülke kodu"
+          onFocus={() => setListOpen(true)}
+          onPointerDown={() => setListOpen(true)}
+          onKeyDown={() => setListOpen(true)}
           value={entry.country}
           onChange={(event) => {
             setDraft(null);
@@ -217,7 +222,7 @@ export function PhoneInput(props: PhoneInputProps) {
           }}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         >
-          {PHONE_COUNTRIES.map((c) => (
+          {(listOpen ? PHONE_COUNTRIES : [country]).map((c) => (
             <option key={c.iso} value={c.iso}>
               {c.iso} · {c.ad} (+{c.dial})
             </option>

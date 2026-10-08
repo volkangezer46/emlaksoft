@@ -10,6 +10,7 @@ import { LeadForm } from "@/app/lead/[token]/lead-form";
 import { SavedSearchBox } from "@/components/public/saved-search-box";
 import { FavChip, FavEmptyNotice, VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "./fav-nav-badge";
+import { VitrinFilterPanel } from "./filter-panel";
 import { CompareBar } from "@/components/public/compare-select";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
@@ -246,6 +247,7 @@ export default async function VitrinPage({
   const typeOptions = [...typeSet].sort((a, b) => a.localeCompare(b, "tr"));
   const roomOptions = [...roomSet].sort((a, b) => a.localeCompare(b, "tr"));
 
+  const activeFilterCount = [q, min != null, max != null, oda, sirala].filter(Boolean).length;
   const hasFilter = Boolean(q || min != null || max != null || oda || sirala || tur || sp.tx);
 
   // tx sekmeleri diğer filtreleri korur
@@ -276,6 +278,8 @@ export default async function VitrinPage({
   }
 
   const coverMap = new Map<string, string>(listing.coverEntries);
+  // Varsayılan (en yeni) sıralamada fotoğraflı ilanlar öne; fiyat sıralamaları aynen korunur. Kararlı bölme: grup içi sıra değişmez.
+  if (!sirala) properties = [...properties.filter((p) => coverMap.has(p.id)), ...properties.filter((p) => !coverMap.has(p.id))];
 
   // JSON-LD: ofis (RealEstateAgent) + ilan listesi (ItemList) — yalnız doğrulanabilir alanlar.
   const siteUrl = getBaseUrl();
@@ -302,7 +306,7 @@ export default async function VitrinPage({
   };
 
   const fieldCls =
-    "w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
+    "min-h-11 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -314,7 +318,7 @@ export default async function VitrinPage({
       <header className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
         <div className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-brand-600/25 blur-[120px]" />
-        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-16">
+        <div className="relative mx-auto max-w-6xl px-4 py-8 sm:py-16">
           <Link
             href={`/vitrin/${slug}`}
             className="focus-ring flex w-fit items-center gap-3 rounded-[var(--radius-card)] transition hover:opacity-90"
@@ -365,7 +369,7 @@ export default async function VitrinPage({
                 <Link
                   key={f.key}
                   href={txHref(f.key)}
-                  className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                  className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 text-xs font-bold transition ${
                     active ? "bg-white text-ink-950" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
                   }`}
                 >
@@ -388,7 +392,7 @@ export default async function VitrinPage({
                     key={t || "tum"}
                     href={turHref(t)}
                     aria-current={active ? "true" : undefined}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                    className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
                       active ? "bg-mint-500 text-ink-950" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
                     }`}
                   >
@@ -400,10 +404,11 @@ export default async function VitrinPage({
           ) : null}
 
           {/* Sunucu filtreleri — GET formu, JS gerektirmez */}
+          <VitrinFilterPanel activeCount={activeFilterCount}>
           <form
             method="get"
             action={`/vitrin/${slug}`}
-            className="mt-5 grid max-w-4xl gap-2 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1.1fr_1.2fr_auto]"
+            className="grid max-w-4xl gap-2 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1.1fr_1.2fr_auto]"
           >
             {sp.tx ? <input type="hidden" name="tx" value={sp.tx} /> : null}
             {tur ? <input type="hidden" name="tur" value={tur} /> : null}
@@ -425,15 +430,16 @@ export default async function VitrinPage({
             </select>
             <button
               type="submit"
-              className="inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-xs font-bold text-ink-950 transition hover:bg-white/90"
+              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-xs font-bold text-ink-950 transition hover:bg-white/90"
             >
               <Search className="h-3.5 w-3.5" /> Filtrele
             </button>
           </form>
+          </VitrinFilterPanel>
           {hasFilter ? (
             <Link
               href={`/vitrin/${slug}`}
-              className="mt-3 inline-block text-xs font-semibold text-white/50 underline-offset-2 transition hover:text-white hover:underline"
+              className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-white/50 underline-offset-2 transition hover:text-white hover:underline"
             >
               Filtreleri temizle
             </Link>
@@ -507,7 +513,10 @@ export default async function VitrinPage({
                       />
                     ) : (
                       <div className="grid h-full w-full place-items-center text-text-faint">
-                        <Building2 className="h-10 w-10" />
+                        <div className="text-center">
+                          <Building2 className="mx-auto h-10 w-10" aria-hidden="true" />
+                          <p className="mt-1 text-xs font-semibold">Fotoğraf yakında</p>
+                        </div>
                       </div>
                     )}
                     <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">

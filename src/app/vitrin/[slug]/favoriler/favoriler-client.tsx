@@ -70,7 +70,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
           href={`/vitrin/${slug}`}
           className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-line px-4 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> İlanlara dön
+          <ArrowLeft className="h-3.5 w-3.5" /> İlanlara göz at
         </Link>
       </div>
     );
