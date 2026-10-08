@@ -29,6 +29,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Brand } from "@/components/brand/brand";
+import { Avatar } from "@/components/ui/avatar";
 import { Celebration } from "@/components/ui/illustrations";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { RadialGauge } from "@/components/ui/viz/radial-gauge";
@@ -565,6 +566,7 @@ function Sections({
               <span className="tv-rank" data-top={rank <= 3 ? rank : undefined}>
                 {rank}
               </span>
+              <Avatar name={r.name} src={r.avatarUrl} preset={r.avatarPreset} size="md" className="h-[calc(var(--u)*3.2)] w-[calc(var(--u)*3.2)] text-[length:calc(var(--u)*1.2)]" />
               <span className="tv-row-main">
                 <b>{r.name}</b>
                 <span className="tv-row-sub">

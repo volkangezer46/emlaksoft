@@ -28,6 +28,8 @@ export function UserMenuPanel({
   initials,
   name,
   subtitle,
+  avatarUrl,
+  avatarPreset,
   links = [],
   viewPrefs,
   fontScale,
@@ -36,6 +38,8 @@ export function UserMenuPanel({
   initials: string;
   name: string;
   subtitle: string;
+  avatarUrl?: string | null;
+  avatarPreset?: string | null;
   links?: UserMenuLink[];
   /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
@@ -48,7 +52,7 @@ export function UserMenuPanel({
   return (
     <DropdownMenu defaultOpen={initialOpen}>
       <DropdownMenuTrigger aria-label={`Kullanıcı menüsü: ${name}`} className={USER_MENU_TRIGGER_CLASS}>
-        <UserMenuFace initials={initials} name={name} subtitle={subtitle} />
+        <UserMenuFace initials={initials} name={name} subtitle={subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-72">
         <DropdownMenuLabel>

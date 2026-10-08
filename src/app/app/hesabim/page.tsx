@@ -14,6 +14,9 @@ import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { formatDateTimeTr } from "@/lib/format";
 import { deviceLabel, summarizeDevices } from "@/lib/account/device-label";
 import { Alert } from "@/components/ui/alert";
+import { loadOwnProfileAvatar } from "@/lib/avatar-read";
+import { AvatarEditor } from "@/components/app/avatar-editor";
+import { removeOwnAvatar, setOwnAvatarPreset, uploadOwnAvatar } from "@/app/actions/avatar";
 import { EmailChangeForm, OtherDevicesForm, PasswordForm, ProfileForm } from "./account-forms";
 import { GoogleIdentityCard } from "./google-identity-card";
 import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
@@ -52,6 +55,8 @@ export default async function AccountPage({
     .eq("id", auth.userId)
     .maybeSingle();
 
+  // Avatar sütunları ayrı ve hata-toleranslı okunur (migration gecikse bile profil formu bozulmaz).
+  const avatar = active === "profil" ? await loadOwnProfileAvatar(auth.userId) : null;
   const canSecurityPage = effectiveCanAccessModule(auth.perms, "settings");
   const events =
     active === "oturumlar"
@@ -89,6 +94,25 @@ export default async function AccountPage({
 
       {active === "profil" && sp.eposta === "onay" ? (
         <Alert tone="success">E-posta değişikliği onaylandı. Bir sonraki girişinizde yeni adresinizi kullanın.</Alert>
+      ) : null}
+
+      {active === "profil" ? (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Profil fotoğrafı</CardTitle>
+              <CardDescription>Fotoğrafınızı yükleyin veya hazır bir avatar seçin; üst çubukta, ekip ve sıralama listelerinde görünür.</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <AvatarEditor
+              name={profile?.full_name ?? user?.email ?? "Ben"}
+              avatarUrl={avatar?.avatar_url ?? null}
+              avatarPreset={avatar?.avatar_preset ?? null}
+              actions={{ upload: uploadOwnAvatar, preset: setOwnAvatarPreset, remove: removeOwnAvatar }}
+            />
+          </CardContent>
+        </Card>
       ) : null}
 
       {active === "profil" ? (

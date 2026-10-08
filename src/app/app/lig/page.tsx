@@ -6,6 +6,8 @@ import {
   Tv, Users, Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { Avatar } from "@/components/ui/avatar";
+import { loadAvatarMap } from "@/lib/avatar-read";
 import { requireModulePage } from "@/lib/require-module-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -54,7 +56,7 @@ function badgeIcon(name: string) {
   return BADGE_ICONS[name] ?? Award;
 }
 
-/** Ad → monogram (fotoğraf alanı yok; profiles'ta avatar kolonu bulunmuyor). */
+/** Ad → monogram (podyumda avatar yoksa baş harf yedeği). */
 function monogram(name: string) {
   return name.split(" ").map((p) => p[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
 }
@@ -243,6 +245,8 @@ export default async function LigPage({
     };
   }).filter((r) => r.agent !== null);
 
+  // Profil fotoğrafı / hazır avatar (ayrı, hata-toleranslı tek sorgu; yoksa baş harf).
+  const avatars = await loadAvatarMap(rows.map((r) => r.staffId));
   const hasActivity = rows.some((r) => r.total > 0);
   const podium = rows.filter((r) => r.total > 0).slice(0, 3);
 
@@ -310,7 +314,10 @@ export default async function LigPage({
                       </span>
                     </TD>
                     <TD>
-                      <span className="font-display text-xl font-bold text-text">{r.agent!.fullName}</span>
+                      <span className="flex items-center gap-3 font-display text-xl font-bold text-text">
+                        <Avatar name={r.agent!.fullName} src={avatars.get(r.staffId)?.avatar_url} preset={avatars.get(r.staffId)?.avatar_preset} size="lg" />
+                        {r.agent!.fullName}
+                      </span>
                     </TD>
                     <TD align="right">
                       <span className="numeric font-display text-2xl font-extrabold text-accent-text">{r.total}</span>
@@ -461,8 +468,12 @@ export default async function LigPage({
                         className={`focus-ring press lift group flex flex-col rounded-[var(--radius-panel)] border-2 bg-canvas/40 p-4 text-center transition hover:border-brand-300 ${s.tone} ${s.order}`}
                         aria-label={`${r.rank}. sıra: ${r.agent!.fullName} — ${r.total} puan`}
                       >
-                        <span className={`mx-auto grid h-14 w-14 place-items-center rounded-full font-display text-base font-extrabold ${s.ring}`}>
-                          {monogram(r.agent!.fullName)}
+                        <span className={`mx-auto grid h-14 w-14 place-items-center overflow-hidden rounded-full font-display text-base font-extrabold ${s.ring}`}>
+                          {avatars.get(r.staffId)?.avatar_url || avatars.get(r.staffId)?.avatar_preset ? (
+                            <Avatar name={r.agent!.fullName} src={avatars.get(r.staffId)?.avatar_url} preset={avatars.get(r.staffId)?.avatar_preset} className="h-full w-full" />
+                          ) : (
+                            monogram(r.agent!.fullName)
+                          )}
                         </span>
                         <p className="mt-2 flex items-center justify-center gap-1 truncate font-display text-sm font-bold text-text group-hover:text-accent-text">
                           <span aria-hidden="true">{s.medal}</span> {r.agent!.fullName}
@@ -525,7 +536,8 @@ export default async function LigPage({
                           className="absolute inset-0"
                           aria-label={`${r.agent!.fullName} danışman detayı`}
                         />
-                        <p className="font-semibold text-text group-hover:text-accent-text">
+                        <p className="flex items-center gap-2 font-semibold text-text group-hover:text-accent-text">
+                          <Avatar name={r.agent!.fullName} src={avatars.get(r.staffId)?.avatar_url} preset={avatars.get(r.staffId)?.avatar_preset} size="sm" />
                           {r.agent!.fullName}
                           {ben ? (
                             <span className="ml-1.5 rounded-full bg-surface-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-text">

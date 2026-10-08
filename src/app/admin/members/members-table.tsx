@@ -4,6 +4,7 @@ import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Building2, Crown, Eye, Phone, ShieldCheck, User, UserCheck, UserX, Users } from "lucide-react";
 import { setMemberActiveAsStaff, setMemberRoleAsStaff } from "@/app/actions/platform-members";
+import { Avatar } from "@/components/ui/avatar";
 import { ButtonLink } from "@/components/ui/button";
 import { DraftTable } from "@/components/ui/draft-table";
 import { InlineSelect, type InlineSelectOption } from "@/components/ui/inline-select";
@@ -29,6 +30,8 @@ export type MemberRowData = {
   role: string;
   active: boolean;
   createdLabel: string;
+  avatarUrl?: string | null;
+  avatarPreset?: string | null;
 };
 
 const ROLE_ICON: Record<string, InlineSelectOption["icon"]> = { gm: ShieldCheck, branch_manager: Building2, team_lead: Users };
@@ -111,9 +114,13 @@ function MemberRow({ row, canRole, canActive }: { row: MemberRowData; canRole: b
     <tr {...rowDraftProps(draft)}>
       <td>
         <div className="adm-ent">
-          <span className="adm-ent-ico" aria-hidden="true">
-            {isOwner ? <Crown /> : <User />}
-          </span>
+          {row.avatarUrl || row.avatarPreset ? (
+            <Avatar name={row.name} src={row.avatarUrl} preset={row.avatarPreset} size="md" />
+          ) : (
+            <span className="adm-ent-ico" aria-hidden="true">
+              {isOwner ? <Crown /> : <User />}
+            </span>
+          )}
           <div className="min-w-0">
             <Link href={`/admin/members/${row.id}`} className="adm-ent-name focus-ring rounded-sm hover:text-accent-text">
               {row.name}

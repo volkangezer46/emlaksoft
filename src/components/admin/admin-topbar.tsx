@@ -37,12 +37,16 @@ const QUICK: { label: string; href: string; icon: typeof Building2; module: Plat
 export function AdminTopbar({
   roleLabel,
   staffName,
+  avatarUrl = null,
+  avatarPreset = null,
   modules,
   fontScale,
   health = null,
 }: {
   roleLabel: string;
   staffName: string;
+  avatarUrl?: string | null;
+  avatarPreset?: string | null;
   modules: PlatformModule[];
   fontScale?: FontScale;
   /** Gerçek sağlık ölçümü (yalnız "sistem" modülü görenlere); yoksa çip çizilmez. */
@@ -142,6 +146,8 @@ export function AdminTopbar({
         <UserMenu
           initials={staffName.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "P"}
           name={staffName}
+          avatarUrl={avatarUrl}
+          avatarPreset={avatarPreset}
           subtitle={roleLabel}
           fontScale={fontScale}
           links={[

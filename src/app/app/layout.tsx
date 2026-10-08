@@ -10,6 +10,7 @@ import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage
 import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { loadOwnProfileAvatar } from "@/lib/avatar-read";
 import { getPlatformStaffIdentity } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandSearch } from "@/components/app/command-search";
@@ -105,6 +106,12 @@ type OfficeSummary = {
 async function NotificationBellStream() {
   const notifications = await listMyNotifications().catch(() => []);
   return <NotificationBell initial={notifications} />;
+}
+
+/** Kullanıcı menüsü + profil avatarı (tek PK sorgusu, Suspense içinde akar). */
+async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & React.ComponentProps<typeof UserMenu>) {
+  const avatar = userId ? await loadOwnProfileAvatar(userId) : null;
+  return <UserMenu {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
 }
 
 /** Ofis skoru rozeti: kabuğu BEKLETMEZ (ilk hesap 5 sorgu; 3 dk önbellekli), kendi sınırında akar. */
@@ -437,6 +444,17 @@ async function ShellSidebar() {
 async function ShellHeader() {
   const m = await loadShellModel();
   const showNotifications = Boolean(m.userId && m.tenantId);
+  const userMenuProps = {
+    initials: m.initials,
+    name: m.fullName,
+    subtitle: `${planLabel(m.office?.plan ?? "office")} plan`,
+    links: [
+      { href: "/app/hesabim", label: "Hesabım", iconName: "account" as const },
+      ...(m.accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),
+    ],
+    viewPrefs: m.uiPrefCookie ? { cookieName: m.uiPrefCookie, initial: m.uiPrefs } : undefined,
+    fontScale: m.userId && !m.impersonating ? m.fontScale : undefined,
+  };
   return (
     <ClosedModulesProvider closed={m.closedModules}>
       {m.impersonating && m.platformStaff ? <OpsImpersonationBanner tenantName={m.impName || m.office?.name || "Ofis"} /> : null}
@@ -473,17 +491,10 @@ async function ShellHeader() {
           ) : (
             <NotificationBell initial={[]} />
           )}
-          <UserMenu
-            initials={m.initials}
-            name={m.fullName}
-            subtitle={`${planLabel(m.office?.plan ?? "office")} plan`}
-            links={[
-              { href: "/app/hesabim", label: "Hesabım", iconName: "account" as const },
-              ...(m.accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),
-            ]}
-            viewPrefs={m.uiPrefCookie ? { cookieName: m.uiPrefCookie, initial: m.uiPrefs } : undefined}
-            fontScale={m.userId && !m.impersonating ? m.fontScale : undefined}
-          />
+          {/* Avatar kabuğu bekletmez: önce baş harfli menü, avatar gelince değişir. */}
+          <Suspense fallback={<UserMenu {...userMenuProps} />}>
+            <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
+          </Suspense>
         </div>
       </header>
     </ClosedModulesProvider>

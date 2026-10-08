@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { Avatar } from "@/components/ui/avatar";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
@@ -275,6 +276,17 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         .eq("is_active", true)
         .maybeSingle()
     : Promise.resolve({ data: null });
+  // Profil avatarı (foto/hazır avatar; kişisel veri değil). Ayrı ve hata-toleranslı: sütun yoksa kart bozulmaz.
+  const avatarPromise = property.assigned_to
+    ? Promise.resolve(
+        admin
+          .from("profiles")
+          .select("avatar_url, avatar_preset")
+          .eq("id", property.assigned_to)
+          .eq("tenant_id", tenant.id)
+          .maybeSingle(),
+      ).then((r) => r, () => ({ data: null }))
+    : Promise.resolve({ data: null });
   const bookingPromise = property.assigned_to
     ? admin
         .from("booking_settings")
@@ -300,7 +312,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
         .gt("list_price", 0)
         .limit(60)
     : Promise.resolve({ data: null });
-  const [description, { data: similarData }, fxRates, , { data: advisorRow }, { data: bookingRow }, { data: compRows }] =
+  const [description, { data: similarData }, fxRates, , { data: advisorRow }, { data: bookingRow }, { data: compRows }, { data: avatarRow }] =
     await Promise.all([
     fetchDescription(admin, id, property.features),
     similarQuery,
@@ -319,7 +331,9 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     advisorPromise,
     bookingPromise,
     compsPromise,
+    avatarPromise,
   ]);
+  const advisorAvatar = avatarRow as { avatar_url?: string | null; avatar_preset?: string | null } | null;
   const advisor =
     advisorRow && (advisorRow as { is_public?: boolean }).is_public
       ? (advisorRow as {
@@ -674,9 +688,8 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
 
                 {advisor ? (
                   <div className="mt-4 flex items-center gap-3 rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3">
-                    {advisor.photo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- danışman fotoğrafı keyfi Storage URL'i
-                      <img src={advisor.photo_url} alt="" width={44} height={44} className="h-11 w-11 rounded-full object-cover" />
+                    {advisorAvatar?.avatar_url || advisor.photo_url || advisorAvatar?.avatar_preset ? (
+                      <Avatar name={advisor.full_name} src={advisorAvatar?.avatar_url || advisor.photo_url} preset={advisorAvatar?.avatar_preset} className="h-11 w-11" />
                     ) : (
                       <span className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white/70">
                         <UserRound className="h-5 w-5" aria-hidden="true" />

@@ -5,6 +5,8 @@ import { AdvisorRowActions, type Option } from "@/components/app/office-center/a
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { relativeTimeTR } from "@/lib/admin-format";
 import type { AdvisorSortKey, OfficeAdvisorRow } from "@/lib/office-center/types";
+import { Avatar } from "@/components/ui/avatar";
+import { loadAvatarMap } from "@/lib/avatar-read";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
 /**
@@ -38,7 +40,7 @@ export type AdvisorTableActions = {
   handoffTargets: Option[];
 };
 
-export function AdvisorTable({
+export async function AdvisorTable({
   rows,
   sort,
   actions,
@@ -49,6 +51,8 @@ export function AdvisorTable({
   actions?: AdvisorTableActions | null;
   extra?: ReadonlyMap<string, ReactNode>;
 }) {
+  // Avatarlar ayrı, hata-toleranslı tek IN sorgusu (satır yükleyicisini ve kolon yokken sayfayı bozmaz).
+  const avatars = await loadAvatarMap(rows.map((r) => r.id));
   return (
     <TableFrame stickyFirst minWidth={960}>
       <Table>
@@ -74,6 +78,9 @@ export function AdvisorTable({
           {rows.map((r) => (
             <TR key={r.id} className={`group ${!r.isActive ? "opacity-70" : ""}`}>
               <TD>
+                <div className="flex items-center gap-2.5">
+                <Avatar name={r.fullName} src={avatars.get(r.id)?.avatar_url} preset={avatars.get(r.id)?.avatar_preset} size="md" />
+                <div className="min-w-0">
                 <Link href={`/app/ekip/${r.id}`} className="focus-ring inline-flex items-center gap-1 font-semibold text-ink-950 hover:text-brand-600">
                   {r.fullName} <ArrowUpRight className="h-3.5 w-3.5 opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                 </Link>
@@ -87,6 +94,8 @@ export function AdvisorTable({
                   ) : null}
                 </p>
                 {extra?.get(r.id) ?? null}
+                </div>
+                </div>
               </TD>
               <TD align="right">
                 <Num value={r.openProperties} href={`/app/portfoyler?danisman=${r.id}`} label={`${r.fullName} açık portföyleri`} dim={r.openProperties === 0} />

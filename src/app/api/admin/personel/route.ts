@@ -72,5 +72,20 @@ export async function GET(req: Request) {
   ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json((data ?? []).map((m) => ({ ...m, last_sign_in_at: logins.get(m.id) ?? null })));
+  // Avatar alanları ayrı ve hata-toleranslı okunur (sütun yoksa liste yine çalışır).
+  const avatars = new Map<string, { avatar_url: string | null; avatar_preset: string | null }>();
+  try {
+    const { data: av } = await admin.from("platform_staff").select("id, avatar_url, avatar_preset");
+    for (const r of av ?? []) avatars.set(r.id as string, { avatar_url: r.avatar_url ?? null, avatar_preset: r.avatar_preset ?? null });
+  } catch {
+    /* avatar süs */
+  }
+  return NextResponse.json(
+    (data ?? []).map((m) => ({
+      ...m,
+      last_sign_in_at: logins.get(m.id) ?? null,
+      avatar_url: avatars.get(m.id)?.avatar_url ?? null,
+      avatar_preset: avatars.get(m.id)?.avatar_preset ?? null,
+    })),
+  );
 }
