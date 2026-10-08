@@ -1,5 +1,8 @@
+import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeftRight, Info, UsersRound } from "lucide-react";
+import { SkeletonCard } from "@/components/ui/viz";
+import { LigOzeti } from "./lig-ozeti";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
@@ -141,6 +144,11 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
               hint: filter === f.value ? "filtre açık" : "listeyi daralt",
             }))}
           />
+
+          {/* Lig 2.0: puan dağılımı + düşük aktivite uyarısı + meydan okuma yönetimi (yalnız puan/adet; tutar yok). */}
+          <Suspense fallback={<SkeletonCard height={180} label="Lig özeti yükleniyor" />}>
+            <LigOzeti tenantId={tenantId} nowMs={nowMs} />
+          </Suspense>
 
           {needAttention.length > 0 ? (
             <section aria-label="Takip uyarıları" className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/[0.05] p-4">

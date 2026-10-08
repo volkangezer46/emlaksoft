@@ -14,6 +14,7 @@ import { greetingFor } from "@/app/app/_home/helpers";
 import { PersonalGoal } from "./personal-goal";
 import { Son30Gun } from "./son-30-gun";
 import { Komisyonum } from "./komisyonum";
+import { LigKocu } from "./lig-kocu";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 
 export const metadata = { title: "Performansım" };
@@ -73,6 +74,10 @@ export default async function PerformansimPage({
           <Komisyonum userId={auth.userId} tenantId={auth.tenantId} officeWide={hasOfficeWideDataScope(auth.role)} />
         </Suspense>
       ) : null}
+      {/* Lig koçu: haftalık sıraya göre liderliğe kalan puan + en çok 3 gerçek bekleyen eylem (veri yoksa çizilmez). */}
+      <Suspense fallback={<SkeletonCard height={150} label="Lig koçu yükleniyor" />}>
+        <LigKocu tenantId={auth.tenantId} userId={auth.userId} />
+      </Suspense>
       <Suspense fallback={null}>
         <CoachInsightSlot tenantId={auth.tenantId} userId={auth.userId} role={auth.role} perms={auth.perms} />
       </Suspense>
