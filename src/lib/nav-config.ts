@@ -410,7 +410,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/ekip/kiyas", label: "Kıyas", icon: ICONS.kiyas, module: "reports", description: "Danışman karnesi: dönüşüm, iş yükü, hedef", keywords: ["kıyas", "karşılaştır", "karne"] },
         ],
         matchPaths: ["/app/pano-tv"],
-        tier: "core",
+        tier: "more",
         description: "Danışman KPI özeti, ekip ligi ve danışman kıyası",
         keywords: ["kpi", "lig", "kıyas", "sıralama", "performans", "tv", "pano"],
       },
@@ -499,7 +499,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         ],
         // Ekip Merkezi ekip modülü olanın girişidir; modülsüz rolde (danışman) yerine Performansım vardır.
         needsItemModule: true,
-        tier: "core",
+        tier: "more",
         description: "Danışmanlar, hedefler, devir, şube ve takımlar",
         keywords: ["danışman", "çalışan", "personel", "ekip", "şube", "takım", "izin"],
       },
@@ -756,8 +756,8 @@ export function moreSections(
 }
 
 /**
- * Yan menüde öğenin altında açılan alt liste: ≥2 görünür sekmesi olan öğeler (ör. Müşteriler > Akıllı Listeler).
- * Tek sekmeli öğede alt liste yoktur. Sekme yetkisi/kapalı modül süzgeci `visibleItem` ile zaten uygulanmıştır.
+ * Öğenin sekmeleri (>=2 görünür sekme). YAN MENÜDE LİSTELENMEZ (ana ilke: yalnız üst düzey sayfalar; sekmeler sayfa içi
+ * şeritte). Yalnız daraltılmış (ikon) modun hover flyout'u ve sayfa içi şeritler kullanır.
  */
 export function itemSubTabs(item: Pick<NavItem, "tabs">): readonly NavTab[] | null {
   return item.tabs && item.tabs.length > 1 ? item.tabs : null;
@@ -765,31 +765,31 @@ export function itemSubTabs(item: Pick<NavItem, "tabs">): readonly NavTab[] | nu
 
 export type SidebarGroup = {
   section: VisibleSection;
-  /** Her zaman görünen (rol çekirdeği) öğeler. */
+  /** Her zaman görünen (rol çekirdeği) üst düzey öğeler; alt sayfa/sekme içermez. */
   items: NavItem[];
-  /** Grup içinde "+N daha" ile katlanan çekirdek dışı öğeler. */
-  folded: NavItem[];
 };
 export type SidebarModel = {
   groups: SidebarGroup[];
-  /** Hiç çekirdek öğesi olmayan başlıklar: tek bir "Daha fazla" bölümünde toplanır. */
+  /**
+   * Çekirdek olmayan tüm yetkili öğeler: menünün en altındaki TEK, varsayılan kapalı "Diğer" grubu (başlıklara göre
+   * kümelenmiş). "+N daha" / "Daha az göster" satırları yoktur.
+   */
   rest: VisibleSection[];
 };
 
 /**
  * Yan menünün görünür yüzeyi (TEK hesap; masaüstü, çekmece ve testler aynı sonucu kullanır).
  * Tam görünümde her başlık tüm öğeleriyle gelir. Sade görünümde (varsayılan) her başlıkta yalnız rolün çekirdek öğeleri
- * görünür, kalanı başlık içinde katlanır; hiç çekirdek öğesi olmayan başlıklar `rest` ("Daha fazla") altına toplanır.
+ * görünür (bütçe: danışman <= 8, ofis <= 10; bkz. nav-budget-contract), kalan yetkili sayfalar `rest` ("Diğer") altındadır.
  * Hiçbir yetkili sayfa kaybolmaz (yönetim-gizli sayfalar hariç, bkz. `isHiddenInSimple`).
  */
 export function sidebarModel(accessible: readonly AppModule[], opts: NavViewOptions & { simple?: boolean } = {}): SidebarModel {
   const { simple = false, role, closed } = opts;
-  if (!simple) return { groups: visibleSections(accessible, { closed }).map((section) => ({ section, items: section.items, folded: [] })), rest: [] };
+  if (!simple) return { groups: visibleSections(accessible, { closed }).map((section) => ({ section, items: section.items })), rest: [] };
   const core = visibleSections(accessible, { mode: "simple", role, closed });
-  const more = moreSections(accessible, { role, closed });
   return {
-    groups: core.map((section) => ({ section, items: section.items, folded: more.find((m) => m.id === section.id)?.items ?? [] })),
-    rest: more.filter((m) => !core.some((c) => c.id === m.id)),
+    groups: core.map((section) => ({ section, items: section.items })),
+    rest: moreSections(accessible, { role, closed }),
   };
 }
 

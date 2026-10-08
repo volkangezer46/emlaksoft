@@ -27,13 +27,12 @@ describe("İlan Kontrol kayıtları", () => {
       expect(canAccessModule(role, "portals"), role).toBe(true);
       expect(hrefs(visibleSections(accessibleOf(role), { mode: "simple", role })), role).toContain(HREF);
     }
-    // Danışman/takım lideri çekirdeği 9 satırla sınırlıdır (menü sadeleştirme); İlan Kontrol Portföy başlığında katlıdır, kaybolmaz.
+    // Danışman/takım lideri çekirdeği 8 satırla sınırlıdır (menü bütçesi); İlan Kontrol "Diğer" grubundadır, kaybolmaz.
     for (const role of ["team_lead", "advisor"] as const) {
       expect(canAccessModule(role, "portals"), role).toBe(true);
       expect(hrefs(visibleSections(accessibleOf(role), { mode: "simple", role })), role).not.toContain(HREF);
       const m = sidebarModel(accessibleOf(role), { simple: true, role });
-      const portfoy = m.groups.find((g) => g.section.id === "portfoy");
-      expect(portfoy?.folded.map((i) => i.href), role).toContain(HREF);
+      expect(m.rest.flatMap((s) => s.items).map((i) => i.href), role).toContain(HREF);
     }
   });
 

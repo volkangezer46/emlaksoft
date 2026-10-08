@@ -10,29 +10,32 @@ import type { AppRole } from "@/lib/permissions";
 
 const HOME = "/app";
 
-/** Ofis sahibi / genel müdür / şube müdürü: 12 çekirdek sayfa (İlan Kontrol dahil; Eşleşme, Talepler sekmesidir). */
+/**
+ * ANA İLKE (menü bütçesi, 2026-10): yan menüde görünür satır sayısı SINIRLIDIR; kullanım zorluğu yaşatmamak ana ilkedir.
+ * Yeni özellik = yeni menü öğesi DEĞİL: önce mevcut sayfaya sekme/kart. Bütçe: danışman <= 8, ofis yönetimi <= 10, admin <= 8
+ * (`nav-budget-contract.test.ts`). Çekirdek olmayan öğeler menünün en altındaki kapalı "Diğer" grubundadır.
+ */
+export const NAV_BUDGET = { advisor: 8, office: 10, admin: 8 } as const;
+
+/** Ofis sahibi / genel müdür / şube müdürü: 10 çekirdek sayfa. Ekip Merkezi, Gelen Kutusu, Ekip karnesi, Ayarlar, Abonelik "Diğer"de / kullanıcı menüsünde / ⌘K'dadır. */
 const MANAGER_CORE = [
   HOME,
+  "/app/randevular",
+  "/app/gorevler",
   "/app/musteriler",
   "/app/talepler",
   "/app/portfoyler",
   "/app/ilan-kontrol",
-  "/app/randevular",
-  "/app/gorevler",
   "/app/anlasmalar",
   "/app/komisyon",
-  "/app/gelen-kutusu",
   "/app/raporlar",
-  "/app/danisman-kpi",
-  "/app/ekip",
 ] as const;
 
 /**
- * Danışman (ve takım lideri) konsolu: 9 satır, 5 iş başlığı. Gerekçe (2026-10 menü sadeleştirme): günlük döngü =
- * Bugün (Ana ekran, Randevular, Görevler) -> Müşteriler (Müşteriler, Talepler, Gelen Kutusu) -> Portföy -> Anlaşmalar
- * (Teklifler bu öğenin alt sekmesi) -> Performansım. Komisyon/Kazanç, İlan Kontrol, Değerleme ve Yardım "Daha fazla"
- * altına indi; sık kullanılıyorsa otomatik "Hızlı erişim"e (kullanım sayacı) ya da sabitlemeye çıkar, ⌘K ve g-kısayolları
- * (g k, g d) çalışmaya devam eder. Yalnız görünürlük: yetki matrisi ve sayfa yolları değişmez.
+ * Danışman (ve takım lideri) konsolu: 8 satır. Günlük döngü = Bugün (Ana ekran, Randevular, Görevler) -> Müşteriler
+ * (Müşteriler, Talepler) -> Portföyler -> Anlaşmalar -> Performansım. Gelen Kutusu, Komisyon/Kazanç, İlan Kontrol, Değerleme
+ * ve Yardım "Diğer" altında; sık kullanılıyorsa otomatik "Hızlı erişim"e çıkar, ⌘K ve g-kısayolları çalışır.
+ * Yalnız görünürlük: yetki matrisi ve sayfa yolları değişmez.
  */
 const ADVISOR_CORE = [
   HOME,
@@ -40,7 +43,6 @@ const ADVISOR_CORE = [
   "/app/gorevler",
   "/app/musteriler",
   "/app/talepler",
-  "/app/gelen-kutusu",
   "/app/portfoyler",
   "/app/anlasmalar",
   "/app/performansim",
