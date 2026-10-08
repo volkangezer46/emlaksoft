@@ -32,6 +32,8 @@ import { OWNER_WEEKLY_REPORT_KEY } from "@/lib/settings/registry/tenant";
 import { OwnerRentStatementSection, OwnerWeeklyReportSection } from "./owner-extras";
 import { OwnerRentStatementView } from "./rent-statement-view";
 import { OwnerPayoutSection } from "./owner-payout-section";
+import { BuildingDuesSection } from "@/components/public/building-dues-section";
+import { now as clockNow, trDayKey } from "@/lib/clock";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -429,6 +431,9 @@ export default async function MalikPortaliPage({
 
         {/* Hakediş ekstresi (ofis bu mülkü yönetiyorsa) */}
         <OwnerPayoutSection db={admin} tenantId={tenant.id} propertyId={property.id} />
+
+        {/* Bina aidatım (mülk bir bina dairesine bağlıysa; salt-okunur) */}
+        <BuildingDuesSection db={admin} tenantId={tenant.id} propertyId={property.id} role="owner" today={trDayKey(clockNow())} />
 
         {/* Açıklama */}
         {property.description && (

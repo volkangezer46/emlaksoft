@@ -9,6 +9,7 @@ import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/r
 import { trDayKey } from "@/lib/clock";
 import { runOwnerPayoutReminders } from "@/lib/property-management/payout-reminders";
 import { findNotifiedKeys, insertNotifications } from "@/lib/notify-batch";
+import { runBuildingDueReminders } from "@/lib/building-management/reminders";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
 
@@ -60,6 +61,9 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
  *     mükerrer koruması href'teki `?yenileme={yıl}` işaretiyle sağlanır.
  *  4. Kiracı hatırlatması (H3): ofis ayarı AÇIKSA (KAPALI doğar) vade yaklaşan/gelen/geciken kiralar için ofise wa.me
  *     bildirimi ve (ayrıca açıksa + ofisin kendi SMS entegrasyonu hazırsa) kiracıya SMS. Ayrıntı: src/lib/rent-reminders/run.ts.
+ *
+ *  5. Bina aidat vade hatırlatması (M2): vadesi 3 gün içinde / geçmiş açık bina aidatları için ofise bina başına özet bildirim
+ *     (mükerrer korumalı, yalnız ofis içi; ayrıntı: src/lib/building-management/reminders.ts).
  *
  * NOT: vercel.json'a bilerek DOKUNULMADI — cron path: /api/cron/kira-tahakkuk
  * (CRON_SECRET Bearer başlığıyla çağrılır).
@@ -259,6 +263,21 @@ export async function GET(req: NextRequest) {
     console.error("kira-tahakkuk cron mulk sahibi hatirlatma", e instanceof Error ? e.message : "hata");
   }
 
+  // ---- 4c) Bina aidat vade hatırlatması (M2; yalnız ofis içi bildirim, mükerrer korumalı; hata asıl işi bozmaz) ----
+  let buildingNote = "";
+  try {
+    const bld = await runBuildingDueReminders({
+      admin,
+      today: trDayKey(Date.now()),
+      skipTenant: (tenantId) => isDisabledFor(disabledModules, tenantId, "expenses"),
+      findSeen: (tenantIds, keys) => findNotifiedKeys(admin, { tenantIds, keys }),
+      write: (rows) => insertNotifications(admin, rows),
+    });
+    if (bld.notified > 0) buildingNote = `, ${bld.notified} bina aidat hatırlatması`;
+  } catch (e) {
+    console.error("kira-tahakkuk cron bina aidat hatirlatma", e instanceof Error ? e.message : "hata");
+  }
+
   // ---- 5) Mart: kira geliri beyanı hatırlatması (ofise yılda bir; tutar YAZILMAZ). Anahtar kolonu yoksa yazılmaz. ----
   let declarationNotified = 0;
   try {
@@ -295,7 +314,7 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat(
     "kira-tahakkuk",
     "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
   );
 
   return NextResponse.json({
