@@ -221,7 +221,6 @@ export default async function AdminReportsPage({
               data={trendFallback.map((v, i) => ({ label: months[i]?.label ?? "", value: v, href: "/admin/billing" }))}
               tone="gold"
               format="money"
-              formatValue={formatTry}
               name="Kümülatif MRR"
               summary="last"
               ariaLabel="Son 12 ay aktif abonelik kohortu kümülatif MRR"

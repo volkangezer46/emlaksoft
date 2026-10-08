@@ -86,7 +86,9 @@ export function TableFrame({
 }
 
 export function Table({ className, ...props }: ComponentProps<"table">) {
-  return <table {...props} className={cn("w-full text-left text-sm", className)} />;
+  // sr-only tablo `w-full` ile çakışırsa 1px kırpma bozulur ve sayfa yatay taşar.
+  const srOnly = className?.split(/\s+/).includes("sr-only");
+  return <table {...props} className={cn("text-left text-sm", !srOnly && "w-full", className)} />;
 }
 
 export function THead({

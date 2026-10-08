@@ -234,7 +234,6 @@ export default async function AdminBillingPage({
                   data={trendVals.map((v, i) => ({ label: months[i]?.label ?? "", value: v, href: "/admin/muhasebe" }))}
                   tone="gold"
                   format="money"
-                  formatValue={money}
                   name="Aylık yinelenen gelir"
                   ariaLabel="Son 8 ay aylık gelir trendi"
                 />

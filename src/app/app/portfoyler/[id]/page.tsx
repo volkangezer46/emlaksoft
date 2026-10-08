@@ -1081,7 +1081,7 @@ export default async function PropertyDetailPage({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-text-muted">Piyasada</dt>
-                <dd className="font-semibold text-ink-950">{daysOnMarket >= 999 ? "—" : `${daysOnMarket} gün`}</dd>
+                <dd className="font-semibold text-ink-950">{daysOnMarket >= 999 ? "—" : `${Math.max(0, daysOnMarket)} gün`}</dd>
               </div>
             </dl>
           </section>
