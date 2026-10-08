@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useActionState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -35,9 +36,9 @@ export function NewEntityForm({ level, parentId }: { level: GeoLevel; parentId?:
       <input name="lat" aria-label="Enlem" placeholder="Enlem (ops.)" className={`${field} w-28 text-xs`} />
       <input name="lng" aria-label="Boylam" placeholder="Boylam (ops.)" className={`${field} w-28 text-xs`} />
       <input name="description" aria-label="Açıklama" placeholder="Açıklama (ops.)" className={`${field} min-w-[140px] flex-1 text-xs`} />
-      <button type="submit" disabled={pending} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">
+      <Button variant="primary" size="sm" type="submit" disabled={pending}>
         <Plus className="h-3.5 w-3.5" /> {pending ? "Ekleniyor…" : `${label} ekle`}
-      </button>
+      </Button>
       {state.error ? <p role="alert" className="w-full text-xs text-danger-500">{state.error}</p> : null}
     </form>
   );

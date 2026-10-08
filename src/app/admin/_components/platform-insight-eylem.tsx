@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { BellOff, ChevronDown, X } from "lucide-react";
@@ -17,8 +18,7 @@ const DISMISS: { label: string; reason: InsightDismissReason }[] = [
   { label: "İlgisiz", reason: "ilgisiz" },
 ];
 
-const btn =
-  "focus-ring press inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-surface-hover [&::-webkit-details-marker]:hidden";
+const btn = buttonClass({ variant: "outline", size: "sm" });
 
 /** Platform içgörüsü eylemleri: Ertele ▾ / Yoksay ▾ (sunucu eylemi, RLS'li RPC). İçgörü kendi işini yapmaz. */
 export function PlatformInsightEylem({ id }: { id: string }) {

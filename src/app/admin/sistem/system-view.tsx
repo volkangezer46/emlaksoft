@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -265,12 +266,9 @@ export async function SystemView() {
           <p className="mt-2 text-xs text-text-faint">
             Kaynak: TurkiyeAPI v2. Kaynakta bulunmayan yerel kayıtlar silinmez ve pasif kayıtlar otomatik yeniden açılmaz.
           </p>
-          <Link
-            href="/admin/geo"
-            className="mt-4 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
-          >
+          <ButtonLink variant="outline" size="sm" href="/admin/geo" className="mt-4">
             Coğrafya yönetimine git <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
+          </ButtonLink>
         </section>
 
         {/* Uretim hatalari: onceden yalnizca Vercel loglarinda vardi ve
@@ -291,12 +289,9 @@ export async function SystemView() {
             </Link>{" "}
             <span className="text-xs text-text-muted">açık hata türü</span>
           </p>
-          <Link
-            href="/admin/sistem?sekme=hatalar"
-            className="mt-4 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-brand-600 transition hover:border-brand-400"
-          >
+          <ButtonLink variant="outline" size="sm" href="/admin/sistem?sekme=hatalar" className="mt-4">
             Hataları aç <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
+          </ButtonLink>
         </section>
 
         {/* Cron sağlığı: her job son çalışmasında cron_heartbeats'e tek satır

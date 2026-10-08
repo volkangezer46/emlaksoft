@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, UserRound, X } from "lucide-react";
@@ -202,9 +203,9 @@ export function TicketDetailControls({
             Çözüm özeti
             <textarea name="resolution_summary" required minLength={3} maxLength={2000} rows={3} placeholder="Uygulanan çözümü kısa ve ölçülebilir şekilde yazın…" className="mt-1 w-full resize-y rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-2 text-xs leading-relaxed outline-none focus:border-brand-400" />
           </label>
-          <button type="submit" disabled={statusPending} className="focus-ring press w-full rounded-[var(--radius-control)] bg-mint-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">
+          <Button variant="primary" size="sm" type="submit" disabled={statusPending} className="w-full">
             {statusPending ? "Kaydediliyor…" : terminalTarget === "resolved" ? "Çözüldü olarak kaydet" : "Kapat ve kaydet"}
-          </button>
+          </Button>
         </form>
       ) : null}
 

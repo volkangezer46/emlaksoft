@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveSeatSettings } from "@/app/actions/platform-billing-plans";
@@ -28,9 +29,9 @@ export function SeatSettingsForm({ warnPercent }: { warnPercent: number }) {
         Doluluk uyarı eşiği (%)
         <input name="warn_percent" required inputMode="numeric" defaultValue={warnPercent} className={`mt-1 w-28 ${opFieldClass}`} />
       </label>
-      <button type="submit" disabled={pending} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+      <Button variant="navy" size="sm" type="submit" disabled={pending}>
         {pending ? "Kaydediliyor…" : "Eşiği kaydet"}
-      </button>
+      </Button>
       <p className="basis-full text-xs text-text-muted">%100 ve üstü &quot;dolu&quot; sayılır. Ofis tarafında bu eşikte ek kullanıcı satın alma yönlendirmesi gösterilir.</p>
       {msg ? (
         <p role={msg.ok ? "status" : "alert"} className={`basis-full text-xs font-semibold ${msg.ok ? "text-mint-700" : "text-danger-600"}`}>

@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
@@ -8,9 +10,6 @@ import type { TufeTable } from "@/lib/tufe";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
 type Row = { month: string; rate: string; official: boolean };
-
-const inputCls =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400 disabled:opacity-60";
 
 /** TÜFE tablosu düzenleyici: satır = ay + oran + resmi işareti; resmi satır için doğrulama tarihi ve kaynak zorunlu. */
 export function TufeForm({ initial, canEdit }: { initial: TufeTable; canEdit: boolean }) {
@@ -65,17 +64,17 @@ export function TufeForm({ initial, canEdit }: { initial: TufeTable; canEdit: bo
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tufe-verified">Doğrulama tarihi</label>
-            <input id="tufe-verified" type="date" value={verifiedAt} onChange={(e) => setVerifiedAt(e.target.value)} className={inputCls} />
+            <Input id="tufe-verified" type="date" value={verifiedAt} onChange={(e) => setVerifiedAt(e.target.value)} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tufe-source">Kaynak</label>
-            <input
+            <Input
               id="tufe-source"
               value={source}
               maxLength={300}
               onChange={(e) => setSource(e.target.value)}
               placeholder="Örn. TÜİK TÜFE bülteni, yayın tarihi"
-              className={inputCls}
+             
             />
           </div>
         </div>
@@ -94,19 +93,19 @@ export function TufeForm({ initial, canEdit }: { initial: TufeTable; canEdit: bo
               {rows.map((r, i) => (
                 <TR key={i} className="border-t border-line">
                   <TD className="py-1.5 pr-2">
-                    <input value={r.month} onChange={(e) => update(i, { month: e.target.value })} aria-label="Ay" placeholder="2026-08" className={inputCls} />
+                    <Input value={r.month} onChange={(e) => update(i, { month: e.target.value })} aria-label="Ay" placeholder="2026-08" />
                   </TD>
                   <TD className="py-1.5 pr-2">
-                    <input value={r.rate} onChange={(e) => update(i, { rate: e.target.value })} inputMode="decimal" aria-label="Oran" className={inputCls} />
+                    <Input value={r.rate} onChange={(e) => update(i, { rate: e.target.value })} inputMode="decimal" aria-label="Oran" />
                   </TD>
                   <TD className="py-1.5 pr-2">
                     <input type="checkbox" checked={r.official} onChange={(e) => update(i, { official: e.target.checked })} aria-label="Resmi" className="h-4 w-4 accent-brand-600" />
                     {!r.official ? <span className="ml-2 text-xs text-amber-700">Teyit edilmeli</span> : null}
                   </TD>
                   <TD className="py-1.5 text-right">
-                    <button type="button" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))} aria-label="Satırı sil" className="rounded p-1.5 text-text-muted hover:text-danger-500">
+                    <Button variant="ghost" size="icon" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))} aria-label="Satırı sil" className="hover:text-danger-500">
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </TD>
                 </TR>
               ))}
@@ -114,13 +113,14 @@ export function TufeForm({ initial, canEdit }: { initial: TufeTable; canEdit: bo
           </Table>
         </div>
 
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           type="button"
           onClick={() => setRows((prev) => [{ month: "", rate: "", official: false }, ...prev])}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
         >
           <Plus className="h-4 w-4" /> Ay ekle
-        </button>
+        </Button>
 
         <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
           {notice ? (
@@ -129,9 +129,9 @@ export function TufeForm({ initial, canEdit }: { initial: TufeTable; canEdit: bo
             </span>
           ) : null}
           {canEdit ? (
-            <button type="submit" className="inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+            <Button variant="primary" size="md" type="submit">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Kaydet
-            </button>
+            </Button>
           ) : (
             <span className="text-xs text-text-muted">Yalnız süper admin düzenleyebilir.</span>
           )}

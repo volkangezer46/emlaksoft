@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import type { Period } from "@/lib/accounting/period";
 
@@ -48,25 +50,25 @@ export function PeriodBar({
         <input type="hidden" name="donem" value="ozel" />
         <label className="text-xs font-semibold text-text-muted">
           Başlangıç
-          <input
+          <Input
             type="date"
             name="from"
             defaultValue={period.preset === "ozel" ? (period.fromDay ?? "") : ""}
-            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block text-xs"
           />
         </label>
         <label className="text-xs font-semibold text-text-muted">
           Bitiş
-          <input
+          <Input
             type="date"
             name="to"
             defaultValue={period.preset === "ozel" ? (period.toDay ?? "") : ""}
-            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
+            className="mt-1 block text-xs"
           />
         </label>
-        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">
+        <Button variant="navy" size="sm" type="submit">
           Aralığı uygula
-        </button>
+        </Button>
       </form>
       <p className="ml-auto text-xs font-semibold text-ink-950" aria-live="polite">
         Dönem: {period.label}

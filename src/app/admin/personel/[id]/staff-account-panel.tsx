@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { Check, Copy, Eye, EyeOff, KeyRound, Loader2, LogOut, RefreshCw, Save } from "lucide-react";
@@ -200,19 +201,18 @@ export function StaffAccountPanel({
           Parola hemen değişir; personel bir sonraki girişte kendi parolasını belirlemeden yönetim paneline giremez.
         </p>
         <div className="flex flex-wrap gap-2">
-          <input
-            type={showPw ? "text" : "password"}
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setConfirmPw(false);
-            }}
-            maxLength={72}
-            autoComplete="new-password"
-            aria-label="Geçici parola"
-            placeholder="En az 10 karakter"
-            className="numeric focus-ring min-w-0 flex-1 basis-56 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 font-mono text-sm"
-          />
+          <Input
+ type={showPw ? "text" : "password"}
+ value={password}
+ onChange={(e) => {
+ setPassword(e.target.value);
+ setConfirmPw(false);
+ }}
+ maxLength={72}
+ autoComplete="new-password"
+ aria-label="Geçici parola"
+ placeholder="En az 10 karakter"
+ className="numeric min-w-0 flex-1 basis-56 font-mono" />
           <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Parolayı gizle" : "Parolayı göster"} aria-pressed={showPw} className={`${btn} border border-line text-text-muted`}>
             {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>

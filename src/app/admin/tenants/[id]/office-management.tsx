@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 import { useEffect, useState, useTransition } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
@@ -111,12 +112,9 @@ export type OfficeManagementProps = {
 
 type ActionState = { error?: string; message?: string } | null;
 
-const btn =
-  "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50";
-const btnPrimary =
-  "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50";
-const btnDanger =
-  "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500 px-3 text-xs font-semibold text-white transition hover:bg-danger-600 disabled:opacity-50";
+const btn = buttonClass({ variant: "outline", size: "sm" });
+const btnPrimary = buttonClass({ variant: "primary", size: "sm" });
+const btnDanger = buttonClass({ variant: "danger", size: "sm" });
 
 /** Sunucu action'ını çalıştırır; başarıda sayfa verisini yeniler. Hata/başarı metni bölümde gösterilir. */
 function useOfficeAction<R extends OfficeActionResult>(

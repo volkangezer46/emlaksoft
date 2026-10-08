@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyRecommendedCatalog } from "@/app/actions/platform-billing-plans";
@@ -13,27 +14,25 @@ export function ApplyRecommended() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {!confirm ? (
-        <button type="button" onClick={() => setConfirm(true)} className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950">
+        <Button variant="outline" size="sm" type="button" onClick={() => setConfirm(true)}>
           Önerilen kataloğu uygula
-        </button>
+        </Button>
       ) : (
         <>
           <span className="text-xs text-text-muted">Tüm paket düzenlemelerinin üzerine yazılır. Mevcut abonelikler kendi tutarını korur.</span>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              start(async () => {
-                const r = await applyRecommendedCatalog();
-                setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: r.notice ?? "Uygulandı." });
-                setConfirm(false);
-                if (!r.error) router.refresh();
-              })
-            }
-            className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
-          >
+          <Button variant="navy" size="sm"
+ type="button"
+ disabled={pending}
+ onClick={() =>
+ start(async () => {
+ const r = await applyRecommendedCatalog();
+ setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: r.notice ?? "Uygulandı." });
+ setConfirm(false);
+ if (!r.error) router.refresh();
+ })
+ }>
             {pending ? "Uygulanıyor…" : "Onayla"}
-          </button>
+          </Button>
           <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted">Vazgeç</button>
         </>
       )}

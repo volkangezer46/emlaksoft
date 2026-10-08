@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 /* eslint-disable @next/next/no-img-element -- marka önizlemeleri <img> ile (SVG inline gömülmez) */
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -128,14 +129,9 @@ function SlotCard({ slot, meta }: { slot: BrandSlot; meta: BrandMeta }) {
           onChange={(e) => pick(e.target.files?.[0] ?? null)}
           disabled={pending}
         />
-        <button
-          type="button"
-          onClick={upload}
-          disabled={!file || pending}
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-700 disabled:opacity-45"
-        >
+        <Button variant="primary" size="sm" type="button" onClick={upload} disabled={!file || pending}>
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageUp className="h-3.5 w-3.5" />} Yükle ve yayınla
-        </button>
+        </Button>
         {info ? (
           <ConfirmDialog
             tone="default"
@@ -144,13 +140,9 @@ function SlotCard({ slot, meta }: { slot: BrandSlot; meta: BrandMeta }) {
             confirmLabel="Varsayılana dön"
             onConfirm={reset}
             trigger={
-              <button
-                type="button"
-                disabled={pending}
-                className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-ink-950"
-              >
+              <Button variant="outline" size="sm" type="button" disabled={pending}>
                 <RotateCcw className="h-3.5 w-3.5" /> Varsayılana dön
-              </button>
+              </Button>
             }
           />
         ) : null}
@@ -211,13 +203,9 @@ export function BrandManager({ meta }: { meta: BrandMeta }) {
               confirmLabel="Hepsini sıfırla"
               onConfirm={resetAll}
               trigger={
-                <button
-                  type="button"
-                  disabled={pending}
-                  className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-danger-500 hover:text-danger-500"
-                >
+                <Button variant="outline" size="sm" type="button" disabled={pending}>
                   <RotateCcw className="h-3.5 w-3.5" /> Tüm markayı varsayılana döndür
-                </button>
+                </Button>
               }
             />
           ) : null}

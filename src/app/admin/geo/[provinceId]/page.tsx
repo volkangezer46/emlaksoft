@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui/input";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, MapPin, Search } from "lucide-react";
@@ -60,13 +61,7 @@ export default async function AdminGeoProvincePage({
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">
           <form className="relative max-w-sm flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
-            <input
-              type="text"
-              name="q"
-              defaultValue={query}
-              placeholder="İlçe ara…"
-              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-8 py-2 text-sm outline-none focus:border-brand-400"
-            />
+            <Input type="text" name="q" defaultValue={query} placeholder="İlçe ara…" className="w-full pl-8" />
             {durum ? <input type="hidden" name="durum" value={durum} /> : null}
           </form>
           <nav aria-label="Durum süzgeci" className="flex gap-1 text-xs font-semibold">

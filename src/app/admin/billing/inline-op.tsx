@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -93,14 +94,9 @@ export function InlineOp({
       >
         {pending ? "İşleniyor…" : confirmLabel}
       </button>
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => setOpen(false)}
-        className="focus-ring press min-h-9 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold text-text-muted hover:text-ink-950"
-      >
+      <Button variant="ghost" size="sm" type="button" disabled={pending} onClick={() => setOpen(false)}>
         Vazgeç
-      </button>
+      </Button>
     </form>
   );
 }

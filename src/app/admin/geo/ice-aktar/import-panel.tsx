@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useRef, useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -69,18 +70,18 @@ export function ImportPanel({ canWrite }: { canWrite: boolean }) {
             <option value="merge">Birleştir (yalnız ekle/güncelle)</option>
             <option value="full">Tam kaynak (olmayanları pasife al; 81 il şart)</option>
           </select>
-          <button type="button" onClick={template} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted hover:border-brand-400">
+          <Button variant="outline" size="sm" type="button" onClick={template}>
             <Download className="h-3.5 w-3.5" /> CSV şablonu
-          </button>
+          </Button>
         </div>
         <textarea name="pasted" rows={4} aria-label="Ya da içeriği yapıştırın" placeholder="…ya da CSV/JSON içeriğini buraya yapıştırın" className={`${field} w-full font-mono text-xs`} />
         <div className="flex flex-wrap items-center gap-2">
           <input name="source" placeholder="Kaynak (örn. turkiyeapi-v2)" aria-label="Kaynak" className={`${field} w-56`} />
           <input name="version" placeholder="Kaynak sürümü" aria-label="Kaynak sürümü" className={`${field} w-40`} />
           <input name="date" type="date" aria-label="Kaynak tarihi" className={field} />
-          <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <Button variant="navy" size="md" type="submit" disabled={pending}>
             {pending ? "Çalışıyor…" : "Kuru çalıştır"}
-          </button>
+          </Button>
         </div>
         <p className="text-xs text-text-muted">
           Kuru çalıştırma hiçbir şey yazmaz. Silme yoktur: kaynakta olmayan kayıtlar (yalnız Tam kaynak kipinde) pasife alınır; pasif kayıtlar yeniden açılmaz. 3 MB üstü kaynaklar için <code>npm run geo:import</code>.
@@ -151,9 +152,9 @@ export function ImportPanel({ canWrite }: { canWrite: boolean }) {
                   <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
                   Bu farkı uygulamak istiyorum (partilerle yazılır; Sürümler ekranından geri alınabilir).
                 </label>
-                <button type="button" onClick={apply} disabled={pending || preview.versionsReady === false} className="rounded-[var(--radius-control)] bg-danger-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+                <Button variant="danger" size="md" type="button" onClick={apply} disabled={pending || preview.versionsReady === false}>
                   {pending ? "Uygulanıyor…" : "Uygula"}
-                </button>
+                </Button>
               </div>
             ) : (
               <p className="border-t border-line pt-3 text-xs text-text-muted">{preview?.errors?.length ? "Hatalar giderilmeden uygulanamaz." : "Uygulanacak fark yok."}</p>

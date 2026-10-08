@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -94,9 +95,9 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
             error={error}
             summary={false}
             trigger={({ onClick, ...aria }) => (
-              <button type="button" onClick={onClick} {...aria} className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300">
+              <Button variant="outline" size="sm" type="button" onClick={onClick} {...aria}>
                 <Pencil className="h-3.5 w-3.5 text-brand-600" /> Düzenle
-              </button>
+              </Button>
             )}
             tabs={[{ id: "icerik", label: "İçerik", fields: ["title", "body", "kind"] }]}
             panels={{
@@ -150,9 +151,9 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
                 {delError ? <span role="alert" className="w-full font-semibold text-danger-600">{delError}</span> : null}
               </span>
             ) : (
-              <button type="button" onClick={() => setConfirmDelete(true)} className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 px-2.5 py-1.5 text-xs font-semibold text-danger-600 hover:bg-danger-500/10">
+              <Button variant="outline" size="sm" type="button" onClick={() => setConfirmDelete(true)} className="text-danger-600">
                 <Trash2 className="h-3.5 w-3.5" /> Geri çek
-              </button>
+              </Button>
             )
           ) : null}
         </div>

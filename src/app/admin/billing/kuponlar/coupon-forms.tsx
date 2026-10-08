@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createCoupon, deleteCoupon, setCouponActive, updateCoupon, type CouponOpResult } from "@/app/actions/platform-coupons";
@@ -75,9 +76,9 @@ function CouponForm({ plans, coupon, onDone }: { plans: PlanOpt[]; coupon?: Coup
         ))}
       </fieldset>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={pending} className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-4 py-2 text-xs font-bold text-white disabled:opacity-60">
+        <Button variant="navy" size="sm" type="submit" disabled={pending}>
           {pending ? "Kaydediliyor…" : editing ? "Güncelle" : "Kuponu oluştur"}
-        </button>
+        </Button>
         {msg ? <span role={msg.ok ? "status" : "alert"} className={`text-xs font-semibold ${msg.ok ? "text-mint-700" : "text-danger-600"}`}>{msg.text}</span> : null}
       </div>
     </form>
@@ -112,9 +113,9 @@ export function CouponRowView({ coupon, plans, isSuperAdmin }: { coupon: CouponR
         {coupon.description ? <span className="text-xs text-text-muted">{coupon.description}</span> : null}
       </div>
       <div className="flex flex-wrap items-start gap-2">
-        <button type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing} className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 text-xs font-semibold text-ink-950">
+        <Button variant="outline" size="sm" type="button" onClick={() => setEditing((v) => !v)} aria-expanded={editing}>
           {editing ? "Düzenlemeyi kapat" : "Düzenle"}
-        </button>
+        </Button>
         <InlineOp
           label={coupon.is_active ? "Devre dışı bırak" : "Etkinleştir"}
           confirmLabel="Onayla"

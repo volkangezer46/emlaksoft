@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "@/components/ui/smart-link";
@@ -357,13 +358,13 @@ export default function PersonelPage() {
       <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
-          <input
+          <Input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ad soyad veya e-posta ara…"
             aria-label="Personel ara"
-            className="focus-ring w-full rounded-[var(--radius-control)] border border-line bg-canvas px-8 py-2 text-sm outline-none transition focus:border-brand-400"
+            className="w-full pl-8"
           />
         </div>
         {searching ? (

@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, Download, FileText, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -136,9 +137,9 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
           En çok (₺)
           <input name="max" inputMode="decimal" defaultValue={sp.max ?? ""} className={`${selectClass} w-24`} />
         </label>
-        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white">
+        <Button variant="navy" size="sm" type="submit">
           Süz
-        </button>
+        </Button>
       </form>
 
       {chips.length > 0 ? (

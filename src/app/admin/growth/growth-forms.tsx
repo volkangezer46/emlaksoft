@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -20,10 +21,8 @@ import type { SettingsKey } from "@/lib/growth/engine";
 const FIELD =
   "w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm text-ink-950 outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
 const LABEL = "block text-xs font-semibold text-text-muted";
-const PRIMARY =
-  "focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60";
-const SMALL =
-  "focus-ring press inline-flex min-h-[32px] items-center rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1 text-xs font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-60";
+const PRIMARY = buttonClass({ variant: "primary", size: "md" });
+const SMALL = buttonClass({ variant: "outline", size: "xs" });
 
 function useFormAction(action: (fd: FormData) => Promise<GrowthResult>, resetOnOk = false) {
   const router = useRouter();

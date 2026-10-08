@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui/input";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
@@ -623,7 +624,7 @@ export default async function AdminTicketsPage({
           <div className="relative min-w-0 sm:col-span-2 xl:col-span-2 2xl:col-span-1">
             <label htmlFor="ticket-search" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Ara</label>
             <Search className="pointer-events-none absolute bottom-2.5 left-3 h-4 w-4 text-text-faint" aria-hidden />
-            <input
+            <Input
               id="ticket-search"
               name="q"
               type="search"
@@ -631,7 +632,7 @@ export default async function AdminTicketsPage({
               minLength={2}
               maxLength={80}
               placeholder="Talep no, konu veya ofis…"
-              className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas pl-9 pr-3 text-sm text-ink-950 outline-none transition placeholder:text-text-faint focus:border-brand-400 focus:bg-surface"
+              className="h-10 w-full pl-9 pr-3"
             />
           </div>
 

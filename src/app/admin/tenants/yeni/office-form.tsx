@@ -1,8 +1,8 @@
 "use client";
 
+import { Button, ButtonLink } from "@/components/ui/button";
 import { startTransition, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
   Building2,
@@ -266,15 +266,17 @@ function OfficeFormInner({
               placeholder="kadikoy-emlak-ofisi"
             />
             {slugManual !== null ? (
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 type="button"
                 onClick={() => setSlugManual(null)}
                 title="Ofis adından önerilen adrese dön"
                 aria-label="Ofis adından önerilen adrese dön"
-                className="focus-ring press inline-flex w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line bg-canvas text-text-muted transition hover:bg-surface"
+                className="shrink-0"
               >
                 <RotateCcw className="h-4 w-4" aria-hidden />
-              </button>
+              </Button>
             ) : null}
           </div>
           <div id="slug-status" role="status" aria-live="polite" className="mt-1.5 min-h-5 text-xs font-semibold">
@@ -756,23 +758,27 @@ function OfficeCreated({ result, onAnother }: { result: CreateOfficeResult; onAn
               <code className="numeric flex min-h-11 min-w-0 flex-1 items-center break-all rounded-[var(--radius-control)] border border-line bg-surface px-3 font-mono text-sm text-ink-950">
                 {show ? password : "•".repeat(Math.min(password.length, 16))}
               </code>
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 type="button"
                 onClick={() => setShow((v) => !v)}
                 aria-pressed={show}
                 aria-label={show ? "Parolayı gizle" : "Parolayı göster"}
-                className="focus-ring press inline-flex w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-canvas"
+                className="shrink-0"
               >
                 {show ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
                 type="button"
                 onClick={copyPassword}
                 aria-label="Parolayı kopyala"
-                className="focus-ring press inline-flex w-11 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-canvas"
+                className="shrink-0"
               >
                 {copied ? <Check className="h-4 w-4 text-mint-600" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
-              </button>
+              </Button>
             </div>
             <p className="mt-2 text-xs text-amber-800">
               Bu sayfadan ayrıldığınızda parola bir daha gösterilmez; kaydedilmedi ve denetim kaydına yazılmadı. Sahibe
@@ -795,31 +801,18 @@ function OfficeCreated({ result, onAnother }: { result: CreateOfficeResult; onAn
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link
-            href={`/admin/tenants/${result.tenantId}`}
-            className="focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
+          <ButtonLink variant="primary" size="md" href={`/admin/tenants/${result.tenantId}`}>
             Ofis 360&apos;a git <ArrowUpRight className="h-4 w-4" aria-hidden />
-          </Link>
-          <Link
-            href={`/admin/tenants/${result.tenantId}?sekme=yonetim`}
-            className="focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
-          >
+          </ButtonLink>
+          <ButtonLink variant="outline" size="md" href={`/admin/tenants/${result.tenantId}?sekme=yonetim`}>
             Yönetim sekmesi
-          </Link>
-          <button
-            type="button"
-            onClick={onAnother}
-            className="focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
-          >
+          </ButtonLink>
+          <Button variant="outline" size="md" type="button" onClick={onAnother}>
             <Plus className="h-4 w-4" aria-hidden /> Bir ofis daha ekle
-          </button>
-          <Link
-            href="/admin/tenants"
-            className="focus-ring press inline-flex min-h-11 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold text-text-muted transition hover:text-ink-950"
-          >
+          </Button>
+          <ButtonLink variant="ghost" size="md" href="/admin/tenants">
             Ofis listesi
-          </Link>
+          </ButtonLink>
         </div>
       </section>
     </div>

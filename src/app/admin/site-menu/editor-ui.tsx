@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonClass, Button } from "@/components/ui/button";
 import { useId, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { AlertTriangle, ImageUp, Loader2, Search, X } from "lucide-react";
 import { uploadSiteMenuMedia } from "@/app/actions/site-menu";
@@ -11,12 +12,9 @@ import { HOME_ANCHORS, knownPublicPaths } from "@/lib/site-menu/known-routes";
 import type { IconRef, Issue } from "@/lib/site-menu/schema";
 import type { MediaEntry } from "@/lib/site-menu/store";
 
-export const btn =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-ink-950 disabled:opacity-45";
-export const btnPrimary =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-brand-700 disabled:opacity-45";
-export const iconBtn =
-  "focus-ring press inline-grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-400 hover:text-ink-950 disabled:opacity-35";
+export const btn = buttonClass({ variant: "outline", size: "sm" });
+export const btnPrimary = buttonClass({ variant: "primary", size: "sm" });
+export const iconBtn = buttonClass({ variant: "outline", size: "icon" });
 
 export const assetUrl = (id: string) => `/site-menu-asset/${id}`;
 
@@ -185,9 +183,10 @@ export function IconPicker({
 
   return (
     <div className="min-w-0">
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         type="button"
-        className="focus-ring press inline-flex h-10 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 text-xs font-semibold text-ink-950 hover:border-brand-400 disabled:opacity-45"
         aria-expanded={open}
         aria-controls={panelId}
         disabled={disabled}
@@ -197,7 +196,7 @@ export function IconPicker({
           {value.kind === "none" ? <X className="h-3.5 w-3.5" aria-hidden="true" /> : renderMenuIcon(value, 16, assetUrl)}
         </span>
         {value.kind === "lucide" ? "İkon" : value.kind === "media" ? "Logo" : "Yok"}
-      </button>
+      </Button>
       {open ? (
         <div id={panelId} className="mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
           <div className="relative">

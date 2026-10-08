@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 ﻿import Link from "@/components/ui/smart-link";
 import { Activity, AlertTriangle, ArrowUpRight, CreditCard, Download, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -362,28 +364,15 @@ export default async function AdminBillingPage({
         {query ? <input type="hidden" name="q" value={query} /> : null}
         <label className="text-xs font-semibold text-text-muted">
           Başlangıç
-          <input
-            type="date"
-            name="from"
-            defaultValue={from}
-            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
-          />
+          <Input type="date" name="from" defaultValue={from} className="mt-1 block text-xs" />
         </label>
         <label className="text-xs font-semibold text-text-muted">
           Bitiş
-          <input
-            type="date"
-            name="to"
-            defaultValue={to}
-            className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs text-ink-950 outline-none focus:border-brand-400"
-          />
+          <Input type="date" name="to" defaultValue={to} className="mt-1 block text-xs" />
         </label>
-        <button
-          type="submit"
-          className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs font-semibold text-white"
-        >
+        <Button variant="navy" size="sm" type="submit">
           Uygula
-        </button>
+        </Button>
         {dateFiltered ? (
           <Link
             href={billingHref({ durum, q: query })}
@@ -440,7 +429,7 @@ export default async function AdminBillingPage({
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+        <section className="min-w-0 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
           <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <CreditCard className="h-4 w-4 text-brand-600" /> Abonelikler
@@ -493,7 +482,7 @@ export default async function AdminBillingPage({
         </section>
       </div>
 
-      <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+      <section className="min-w-0 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <FileText className="h-4 w-4 text-brand-600" /> Faturalar

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -99,18 +100,20 @@ function Card({
             confirmClear ? (
               <span className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold text-amber-800">
                 Bilgiler silinsin mi?
-                <button type="button" onClick={clear} className="focus-ring press rounded-[var(--radius-control)] bg-ink-950 px-2.5 py-1 text-white">Evet, sil</button>
-                <button type="button" onClick={() => setConfirmClear(false)} className="focus-ring press rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1 text-ink-950">Vazgeç</button>
+                <Button variant="navy" size="xs" type="button" onClick={clear}>Evet, sil</Button>
+                <Button variant="outline" size="xs" type="button" onClick={() => setConfirmClear(false)}>Vazgeç</Button>
               </span>
             ) : (
-              <button
+              <Button
+                variant="outline"
+                size="xs"
                 type="button"
                 onClick={() => setConfirmClear(true)}
                 disabled={pending}
-                className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-danger-500 transition hover:border-danger-500/40 disabled:opacity-50"
+                className="text-danger-500"
               >
                 <Trash2 className="h-3 w-3" /> Kaldır
-              </button>
+              </Button>
             )
           ) : null}
         </div>
@@ -123,13 +126,9 @@ function Card({
           {children}
           {error ? <p role="alert" className="text-xs font-medium text-danger-600">{error}</p> : null}
           {saved ? <p role="status" className="text-xs font-medium text-mint-700">Kaydedildi.</p> : null}
-          <button
-            type="submit"
-            disabled={pending}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-60"
-          >
+          <Button variant="navy" size="sm" type="submit" disabled={pending}>
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Kaydet
-          </button>
+          </Button>
         </form>
       ) : (
         <p className="mt-3 text-xs text-text-faint">Bu bilgiler yalnız süper admin tarafından düzenlenir.</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button, ButtonLink } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -203,16 +204,16 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
           )}
         </div>
         {childHref ? (
-          <Link href={childHref(row)} className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-400 hover:text-brand-600">
+          <ButtonLink variant="outline" size="sm" href={childHref(row)}>
             {childLabel ?? "Alt"} <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
+          </ButtonLink>
         ) : <span />}
       </div>
 
       {panel ? (
         <div className="space-y-3 border-t border-line bg-brand-600/[0.03] px-5 py-4">
           <div className="flex justify-end">
-            <button type="button" onClick={close} aria-label="Paneli kapat" className="focus-ring grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas"><X className="h-4 w-4" /></button>
+            <Button variant="ghost" size="icon" type="button" onClick={close} aria-label="Paneli kapat"><X className="h-4 w-4" /></Button>
           </div>
 
           {panel === "edit" ? (
@@ -231,7 +232,7 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
               <input name="lng" defaultValue={row.lng ?? ""} placeholder="Boylam" aria-label="Boylam" className={`${input} w-28`} />
               {level === "neighborhood" ? <input name="postal_code" defaultValue={row.postalCode ?? ""} placeholder="Posta kodu" aria-label="Posta kodu" className={`${input} w-28`} /> : null}
               <input name="description" placeholder="Açıklama (ops.)" aria-label="Açıklama" className={`${input} min-w-[160px] flex-1`} />
-              <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">{pending ? "Kaydediliyor…" : "Kaydet"}</button>
+              <Button variant="navy" size="sm" type="submit" disabled={pending}>{pending ? "Kaydediliyor…" : "Kaydet"}</Button>
               <p className="w-full text-xs text-text-muted">Ad değişirse eski ad otomatik takma ad olur; eski kayıtlar ve yazımlar bulunabilir kalır.</p>
             </form>
           ) : null}
@@ -291,7 +292,7 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
                       <option value="old_name">Eski ad</option>
                     </select>
                     <input name="valid_to" type="date" aria-label="Eski ad geçerlilik sonu" className={input} />
-                    <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">Ekle</button>
+                    <Button variant="primary" size="sm" type="submit" disabled={pending}>Ekle</Button>
                   </form>
                 </>
               )}
@@ -323,9 +324,9 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
                     {moveDistricts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 ) : null}
-                <button type="button" disabled={pending || !target} onClick={() => run(() => moveGeoEntity(fd({ level, id: row.id, new_parent_id: target })), close)} className="rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
+                <Button variant="navy" size="sm" type="button" disabled={pending || !target} onClick={() => run(() => moveGeoEntity(fd({ level, id: row.id, new_parent_id: target })), close)}>
                   Taşımayı onayla
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-text-muted">Bağlı ilan/talep/müşterilerin il ve ilçe sütunları aynı işlemde güncellenir.</p>
             </div>
@@ -339,9 +340,9 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
                   <option value="">Hedef kayıt (bunun içine birleşir)…</option>
                   {siblings.filter((s) => s.id !== row.id && s.isActive).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                <button type="button" disabled={pending || !target} onClick={() => run(() => mergeGeoEntity(fd({ level, from_id: row.id, to_id: target })), close)} className="rounded-[var(--radius-control)] bg-danger-500 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
+                <Button variant="danger" size="sm" type="button" disabled={pending || !target} onClick={() => run(() => mergeGeoEntity(fd({ level, from_id: row.id, to_id: target })), close)}>
                   Birleştirmeyi onayla
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-text-muted">
                 {row.name} kaydını kullanan tüm ilan/talep/müşteri/danışman bölgesi kayıtları tek işlemde hedefe taşınır; {row.name} takma ad + pasif olarak kalır ve Sürümler ekranından geri alınabilir.
@@ -361,7 +362,7 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
               }}
             >
               <input name="note" required minLength={3} maxLength={500} placeholder="Ne düzeltilmeli? (süper admin kuyruğuna gider)" aria-label="Düzeltme önerisi" className={`${input} min-w-[260px] flex-1`} />
-              <button type="submit" disabled={pending} className="rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60">Öneriyi gönder</button>
+              <Button variant="primary" size="sm" type="submit" disabled={pending}>Öneriyi gönder</Button>
             </form>
           ) : null}
 
@@ -417,14 +418,14 @@ export function GeoEntityList({ level, rows, canWrite, provinceOptions, childBas
           {selected.size > 0 ? (
             confirm === null ? (
               <>
-                <button type="button" onClick={() => setConfirm(false)} className="rounded-[var(--radius-control)] border border-danger-500/40 px-2.5 py-1 text-xs font-semibold text-danger-500">Seçilenleri pasife al</button>
-                <button type="button" onClick={() => setConfirm(true)} className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted">Seçilenleri etkinleştir</button>
+                <Button variant="outline" size="xs" type="button" onClick={() => setConfirm(false)} className="text-danger-500">Seçilenleri pasife al</Button>
+                <Button variant="outline" size="xs" type="button" onClick={() => setConfirm(true)}>Seçilenleri etkinleştir</Button>
               </>
             ) : (
               <span className="flex items-center gap-2 text-xs">
                 <b>{selected.size}</b> kayıt {confirm ? "etkinleştirilecek" : "pasife alınacak (silinmez, mevcut kayıtlar korunur)"}.
-                <button type="button" disabled={pending} onClick={() => bulk(confirm)} className="rounded-[var(--radius-control)] bg-ink-950 px-2.5 py-1 font-bold text-white disabled:opacity-60">Onayla</button>
-                <button type="button" onClick={() => setConfirm(null)} className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-text-muted">Vazgeç</button>
+                <Button variant="navy" size="xs" type="button" disabled={pending} onClick={() => bulk(confirm)}>Onayla</Button>
+                <Button variant="outline" size="xs" type="button" onClick={() => setConfirm(null)}>Vazgeç</Button>
               </span>
             )
           ) : null}

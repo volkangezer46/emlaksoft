@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
@@ -47,9 +48,9 @@ function MacroPanel({ macro, canEdit }: { macro?: MacroRow; canEdit: boolean }) 
       error={error}
       summary={false}
       trigger={({ onClick, ...aria }) => (
-        <button type="button" onClick={onClick} {...aria} className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300">
+        <Button variant="outline" size="sm" type="button" onClick={onClick} {...aria}>
           <Pencil className="h-3.5 w-3.5 text-brand-600" /> {macro ? "Düzenle" : "Yeni hazır yanıt"}
-        </button>
+        </Button>
       )}
       tabs={[{ id: "makro", label: "Makro", fields: ["title", "body"] }]}
       panels={{
@@ -75,9 +76,9 @@ function DeleteMacro({ id, title }: { id: string; title: string }) {
   const [error, setError] = useState<string | null>(null);
   if (!confirm) {
     return (
-      <button type="button" onClick={() => setConfirm(true)} className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-danger-500/30 px-2.5 py-1.5 text-xs font-semibold text-danger-600 hover:bg-danger-500/10">
+      <Button variant="outline" size="sm" type="button" onClick={() => setConfirm(true)} className="text-danger-600">
         Sil
-      </button>
+      </Button>
     );
   }
   return (
