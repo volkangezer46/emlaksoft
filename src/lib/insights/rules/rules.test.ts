@@ -243,10 +243,47 @@ describe("kural kayıt listesi", () => {
     const ids = INSIGHT_RULES.map((r) => r.id);
     expect(ids).toEqual([
       "call_priority@1", "deal_risk@1", "price_action@1", "deadline@1", "anomaly@1", "lifecycle@1",
-      "authority_renewal@1", "unshown_match@1", "home_value@1", "price_revision@1", "referral_invite@1",
+      "authority_renewal@1", "authority_expired@1", "unshown_match@1", "home_value@1", "price_revision@1", "referral_invite@1",
       "expense_budget@1", "subscription@1", "portal_roi@1",
     ]);
     expect(new Set(ids).size).toBe(ids.length);
     for (const r of INSIGHT_RULES) expect(r.id).toMatch(/^[a-z_]+@\d+$/);
+  });
+});
+
+import { evaluateAuthorityExpired, AUTHORITY_EXPIRED_RULE_ID, AUTHORITY_EXPIRED_MAX_DAYS } from "@/lib/insights/rules/authority-expired";
+import { AUTHORITY_WINDOW_DAYS } from "@/lib/insights/rules/deadline";
+import { AUTHORITY_RENEWAL_MIN_DAYS } from "@/lib/insights/rules/revenue";
+
+describe("authority_expired@1: süresi dolmuş yetki", () => {
+  const NOW = Date.UTC(2026, 9, 8, 9, 0, 0);
+  const fact = (daysOverdue: number, id = "p1", user = "u1") => ({ propertyId: id, assignedTo: user, label: "Kadıköy 2+1", endDate: "2026-09-20", daysOverdue });
+
+  it("bitişi geçmiş yetki için kanıtlı, href'li, tahmin olmayan kart üretir", () => {
+    const [d] = evaluateAuthorityExpired([fact(18)], NOW);
+    expect(d.ruleId).toBe(AUTHORITY_EXPIRED_RULE_ID);
+    expect(d.severity).toBe("yuksek");
+    expect(d.isForecast).toBe(false);
+    expect(d.href).toBe("/app/ilan-kontrol/yetki?kova=dolmus");
+    expect(d.evidence.map((e) => e.label)).toEqual(["Bitiş", "Geçen süre"]);
+    expect(d.audience).toEqual({ type: "user", userId: "u1" });
+  });
+
+  it("bitmemiş, çok eski ve danışmansız yetki kart üretmez (veri yoksa kart yok)", () => {
+    expect(evaluateAuthorityExpired([fact(0), fact(AUTHORITY_EXPIRED_MAX_DAYS + 1), { ...fact(5), assignedTo: "" }], NOW)).toEqual([]);
+  });
+
+  it("deadline@1 ve authority_renewal@1 ile pencere çakışması yok (yalnız geçmiş)", () => {
+    expect(AUTHORITY_WINDOW_DAYS).toBeGreaterThanOrEqual(0);
+    expect(AUTHORITY_RENEWAL_MIN_DAYS).toBeGreaterThan(AUTHORITY_WINDOW_DAYS);
+    // deadline@1 daysLeft < 0 olanı atlar; bu kural yalnız daysOverdue >= 1 (daysLeft <= -1) alır.
+    expect(evaluateAuthorityExpired([fact(1)], NOW)).toHaveLength(1);
+  });
+
+  it("alıcı başına en çok 5 kart; en eski bitiş önce", () => {
+    const many = Array.from({ length: 8 }, (_, i) => fact(i + 1, `p${i}`));
+    const out = evaluateAuthorityExpired(many, NOW);
+    expect(out).toHaveLength(5);
+    expect(out[0]!.entityId).toBe("p7");
   });
 });

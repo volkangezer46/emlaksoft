@@ -29,6 +29,8 @@ export const actionLabel: Record<string, string> = {
   "property_media.document_flag": "Portföy medyası belge/fotoğraf olarak işaretlendi",
   "valuation.create": "Değerleme oluşturuldu",
   "iys.upsert": "İYS izin kaydı",
+  "property.authority_status": "Portföy yetki (EİDS) durumu güncellendi",
+  "property.authority_reminder": "Mal sahibine e-Devlet onay hatırlatması",
   "task.create": "Görev oluşturuldu",
   "task.update": "Görev güncellendi",
   "task.complete": "Görev tamamlandı",

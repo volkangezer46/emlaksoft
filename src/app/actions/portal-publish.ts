@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { publishBlockReason } from "@/lib/property-owner/server";
+import { authorityPublishWarning } from "@/lib/eids/authority-status";
+import { now as clockNow } from "@/lib/clock";
 import {
   publishToPortal,
   updateOnPortal,
@@ -18,7 +20,7 @@ import {
   type PropertyPayload,
 } from "@/lib/integrations/portals";
 
-export type PortalPublishResult = { ok?: boolean; error?: string; externalId?: string; externalUrl?: string };
+export type PortalPublishResult = { ok?: boolean; error?: string; externalId?: string; externalUrl?: string; warning?: string };
 
 const PROPERTY_SELECT = `
   id, property_code, title, address_line, list_price,
@@ -191,6 +193,24 @@ export async function publishPropertyToPortal(
     return { error: `${portalName} API anahtarı tanımlanmamış. /admin/sistem'den ekleyin.` };
   }
 
+  // Yetki (EİDS) uyarısı: engellemez; yeni sütunlar yoksa (migration uygulanmamış) sessizce atlanır.
+  const { data: authRow } = await supabase
+    .from("properties")
+    .select("authorization_start, authorization_end, authority_eids_status")
+    .eq("id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  const warning = authRow
+    ? (authorityPublishWarning(
+        {
+          authorization_start: (authRow as { authorization_start?: string | null }).authorization_start ?? null,
+          authorization_end: (authRow as { authorization_end?: string | null }).authorization_end ?? null,
+          authority_eids_status: (authRow as { authority_eids_status?: string | null }).authority_eids_status ?? null,
+        },
+        clockNow(),
+      ) ?? undefined)
+    : undefined;
+
   // Portale gönder
   const result = await publishToPortal(portalName, toPayload(property as PropertyRow));
 
@@ -222,7 +242,7 @@ export async function publishPropertyToPortal(
 
   revalidatePath("/app/portallar");
   revalidatePath(`/app/portfoyler/${propertyId}`);
-  return { ok: true, externalId: result.externalId, externalUrl: result.externalUrl };
+  return { ok: true, externalId: result.externalId, externalUrl: result.externalUrl, warning };
 }
 
 // ---------------------------------------------------------------------------
