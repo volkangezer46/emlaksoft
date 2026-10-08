@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { eventKey, latestRentAnniversary, rentRenewalEventDate, RENT_RENEWAL_LEAD_DAYS } from "@/lib/surveys/logic";
 import type { EventCandidate } from "@/lib/surveys/server";
 import type { SurveyEventType } from "@/lib/surveys/types";
@@ -30,13 +31,16 @@ type OwnerContact = { name: string | null; phone: string | null };
 async function ownerContacts(db: SupabaseClient, tenantId: string, propertyIds: string[]): Promise<Map<string, OwnerContact>> {
   const map = new Map<string, OwnerContact>();
   if (propertyIds.length === 0) return map;
-  const { data } = await db
-    .from("owner_portal_tokens")
-    .select("property_id, owner_name, owner_phone, created_at")
-    .eq("tenant_id", tenantId)
-    .in("property_id", propertyIds)
-    .order("created_at", { ascending: false })
-    .limit(2000);
+  const { data } = await fetchAllRows((from, to) =>
+    db
+      .from("owner_portal_tokens")
+      .select("property_id, owner_name, owner_phone, created_at")
+      .eq("tenant_id", tenantId)
+      .in("property_id", propertyIds)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   for (const r of data ?? []) {
     const id = String(r.property_id);
     if (!map.has(id)) map.set(id, { name: (r.owner_name as string | null) ?? null, phone: (r.owner_phone as string | null) ?? null });
@@ -420,16 +424,19 @@ export async function collectRentRenewal(db: SupabaseClient, tenantId: string, s
 export async function collectTenantAnnual(db: SupabaseClient, tenantId: string, sinceIso: string, todayDate: string): Promise<EventCandidate[]> {
   const sinceDate = sinceIso.slice(0, 10);
   const rentals = rentalRows(
-    await db
-      .from("rentals")
-      .select(RENTAL_COLS)
-      .eq("tenant_id", tenantId)
-      .eq("status", "active")
-      .eq("is_sample", false)
-      .not("start_date", "is", null)
-      .lte("start_date", addDays(todayDate, -365))
-      .order("start_date", { ascending: false })
-      .limit(1000),
+    await fetchAllRows((from, to) =>
+      db
+        .from("rentals")
+        .select(RENTAL_COLS)
+        .eq("tenant_id", tenantId)
+        .eq("status", "active")
+        .eq("is_sample", false)
+        .not("start_date", "is", null)
+        .lte("start_date", addDays(todayDate, -365))
+        .order("start_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
   );
   const rows = rentals.flatMap((rental) => {
     const anniv = latestRentAnniversary(rental.start_date, todayDate);

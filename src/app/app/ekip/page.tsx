@@ -1,3 +1,5 @@
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
@@ -93,13 +95,17 @@ export default async function TeamPage() {
     ? (async () => {
         try {
           const admin = createAdminClient();
-          const { data, error } = await admin
-            .from("login_events")
-            .select("user_id, created_at")
-            .eq("tenant_id", tenantId)
-            .eq("result", "success")
-            .order("created_at", { ascending: false })
-            .limit(2000);
+          // PostgREST 1000 satır sınırı: "son giriş" eksik kalmasın diye sayfalı okunur.
+          const { data, error } = await fetchAllRows<{ user_id: string | null; created_at: string }>((from, to) =>
+            admin
+              .from("login_events")
+              .select("user_id, created_at")
+              .eq("tenant_id", tenantId)
+              .eq("result", "success")
+              .order("created_at", { ascending: false })
+              .order("id", { ascending: true })
+              .range(from, to),
+          );
           return error ? null : ((data ?? []) as { user_id: string | null; created_at: string }[]);
         } catch (e) {
           console.error("ekip login_events", e);
@@ -109,8 +115,8 @@ export default async function TeamPage() {
     : Promise.resolve(null);
 
   const [
-    { data: membersData },
-    { data: branchesData },
+    membersRes,
+    branchesRes,
     { data: provincesData },
     { data: advisorCounts },
     loginRows,
@@ -143,7 +149,10 @@ export default async function TeamPage() {
     tenantId ? loadOfficeAdvisors(supabase, tenantId, { userId, role: viewerRole, perms }, now()) : Promise.resolve(null),
   ]);
 
-  const members =(membersData ?? []) as Member[];
+  assertQueryBatchSucceeded([membersRes, branchesRes], ["members", "branches"], "Ekip");
+  const membersData = membersRes.data;
+  const branchesData = branchesRes.data;
+  const members = (membersData ?? []) as Member[];
 
   const lastLoginByUser = new Map<string, string>();
   const loginDataAvailable = loginRows !== null;

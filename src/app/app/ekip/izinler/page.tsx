@@ -1,3 +1,5 @@
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
@@ -120,7 +122,7 @@ export default async function LeavesPage({
   // JS getUTCDay: pazar=0 → pazartesi başlangıçlı ızgarada kaç boş hücre var.
   const firstWeekday = (new Date(monthStartMs).getUTCDay() + 6) % 7;
 
-  const [{ data: memberRows }, { data: monthLeaveRows }, { data: listLeaveRows }] = await Promise.all([
+  const [memberRes, monthLeaveRes, listLeaveRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, is_active")
@@ -150,6 +152,10 @@ export default async function LeavesPage({
           .limit(50),
   ]);
 
+  assertQueryBatchSucceeded([memberRes, monthLeaveRes, listLeaveRes], ["members", "month-leaves", "list-leaves"], "İzinler");
+  const memberRows = memberRes.data;
+  const monthLeaveRows = monthLeaveRes.data;
+  const listLeaveRows = listLeaveRes.data;
   const members = (memberRows ?? []) as { id: string; full_name: string; is_active: boolean }[];
   const nameById = new Map(members.map((m) => [m.id, m.full_name]));
   const monthLeaves = (monthLeaveRows ?? []) as LeaveRow[];
@@ -167,14 +173,19 @@ export default async function LeavesPage({
   if (activeListLeaves.length > 0) {
     const from = activeListLeaves.reduce((a, l) => (l.starts_on < a ? l.starts_on : a), activeListLeaves[0]!.starts_on);
     const to = activeListLeaves.reduce((a, l) => (l.ends_on > a ? l.ends_on : a), activeListLeaves[0]!.ends_on);
-    const { data: apptRows } = await supabase
-      .from("appointments")
-      .select("assigned_to, scheduled_at")
-      .neq("status", "cancelled")
-      .gte("scheduled_at", `${from}T00:00:00.000Z`)
-      .lt("scheduled_at", `${shiftDay(to, 1)}T00:00:00.000Z`)
-      .limit(2000);
+    const apptRes = await fetchAllRows((pageFrom, pageTo) =>
+      supabase
+        .from("appointments")
+        .select("assigned_to, scheduled_at")
+        .neq("status", "cancelled")
+        .gte("scheduled_at", `${from}T00:00:00.000Z`)
+        .lt("scheduled_at", `${shiftDay(to, 1)}T00:00:00.000Z`)
+        .order("id", { ascending: true })
+        .range(pageFrom, pageTo),
+    );
 
+    assertQueryBatchSucceeded([apptRes], ["appointments"], "İzinler");
+    const apptRows = apptRes.data;
     const appts = ((apptRows ?? []) as { assigned_to: string | null; scheduled_at: string }[]).map((r) => ({
       staffId: r.assigned_to ?? "",
       // Randevu anı TR duvar gününe çevrilir — izin de duvar günü tutar.

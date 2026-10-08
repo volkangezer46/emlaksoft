@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { notifyTenant } from "@/lib/notify";
 import { getBaseUrl } from "@/lib/base-url";
 import { isFeatureEnabledIn } from "@/lib/modules/logic";
@@ -90,13 +91,16 @@ export async function loadAssigneeIds(db: SupabaseClient, tenantId: string): Pro
 
 /** Her anketörün açık (bekleyen) görev sayısı. */
 export async function loadOpenLoad(db: SupabaseClient, tenantId: string): Promise<Map<string, number>> {
-  const { data } = await db
-    .from("survey_tasks")
-    .select("assigned_to")
-    .eq("tenant_id", tenantId)
-    .eq("status", "pending")
-    .not("assigned_to", "is", null)
-    .limit(5000);
+  const { data } = await fetchAllRows((from, to) =>
+    db
+      .from("survey_tasks")
+      .select("assigned_to")
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending")
+      .not("assigned_to", "is", null)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   const load = new Map<string, number>();
   for (const r of data ?? []) {
     const id = String(r.assigned_to);

@@ -6,6 +6,7 @@ import { Check, Pencil, Plus, Power, Trash2, UserRound, Users } from "lucide-rea
 import { createTeam, deleteTeam, setMemberTeam, updateTeam } from "@/app/actions/teams";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { ROLE_LABELS } from "@/lib/role-labels";
@@ -148,21 +149,21 @@ export function TeamManager({ teams, members, branches, canManage }: { teams: Te
                     >
                       {t.isActive ? "Pasife al" : "Aktifleştir"}
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      icon={Trash2}
-                      loading={pending}
-                      onClick={() => {
-                        if (!window.confirm(`"${t.name}" takımı silinsin mi? Üyesi olan takım silinemez.`)) return;
+                    <ConfirmDialog
+                      trigger={
+                        <Button type="button" size="sm" variant="ghost" icon={Trash2} loading={pending}>
+                          Sil
+                        </Button>
+                      }
+                      title={`"${t.name}" takımı silinsin mi?`}
+                      description="Üyesi olan takım silinemez."
+                      confirmLabel="Sil"
+                      onConfirm={() => {
                         const fd = new FormData();
                         fd.set("id", t.id);
                         run(() => deleteTeam(fd), "Takım silindi.");
                       }}
-                    >
-                      Sil
-                    </Button>
+                    />
                   </div>
                 ) : null}
               </article>

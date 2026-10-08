@@ -1,3 +1,4 @@
+import { fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, trDayStartIso } from "@/lib/clock";
 import { SUPPRESSION_DAYS, suppressionKey } from "@/lib/insights/dedupe";
@@ -68,7 +69,9 @@ export function toInsightRow(args: {
 
 /** Aktif, içgörü alabilen kullanıcılar (readonly hariç). */
 export async function loadActiveRecipients(admin: SupabaseClient, tenantId: string): Promise<Recipient[]> {
-  const { data, error } = await admin.from("profiles").select("id, role").eq("tenant_id", tenantId).eq("is_active", true).limit(2000);
+  const { data, error } = await fetchAllRowsKeepError((from, to) =>
+    admin.from("profiles").select("id, role").eq("tenant_id", tenantId).eq("is_active", true).order("id", { ascending: true }).range(from, to),
+  );
   if (error) throw new Error(`profiles: ${error.code ?? "hata"}`);
   const excluded = new Set<string>(INSIGHT_EXCLUDED_ROLES);
   return ((data ?? []) as { id: string; role: string }[]).filter((p) => !excluded.has(p.role)).map((p) => ({ id: p.id, role: p.role }));
@@ -84,13 +87,16 @@ export type SuppressionState = {
 export async function loadSuppressions(admin: SupabaseClient, tenantId: string, nowMs: number): Promise<SuppressionState> {
   const out: SuppressionState = { suppressed: new Set(), dismissalsByRule: new Map() };
   const since = new Date(nowMs - SUPPRESSION_DAYS * DAY_MS).toISOString();
-  const { data, error } = await admin
-    .from("insights")
-    .select("recipient_user_id, rule_id, entity_id, state_reason, updated_at")
-    .eq("tenant_id", tenantId)
-    .eq("state", "dismissed")
-    .gte("updated_at", since)
-    .limit(5000);
+  const { data, error } = await fetchAllRowsKeepError((from, to) =>
+    admin
+      .from("insights")
+      .select("recipient_user_id, rule_id, entity_id, state_reason, updated_at")
+      .eq("tenant_id", tenantId)
+      .eq("state", "dismissed")
+      .gte("updated_at", since)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (error) {
     if (isMissingSchemaError(error)) return out;
     throw new Error(`insights(suppressions): ${error.code ?? "hata"}`);
@@ -127,13 +133,16 @@ export async function loadRuleQuality(admin: SupabaseClient, tenantId: string): 
 /** Kullanıcı başına AÇIK (new/seen/snoozed ve süresi dolmamış) içgörülerin dedupe anahtarları (üst sınır + tekrar eleme). */
 export async function loadOpenKeys(admin: SupabaseClient, tenantId: string, nowMs: number): Promise<Map<string, Set<string>>> {
   const out = new Map<string, Set<string>>();
-  const { data, error } = await admin
-    .from("insights")
-    .select("recipient_user_id, dedupe_key")
-    .eq("tenant_id", tenantId)
-    .in("state", ["new", "seen", "snoozed"])
-    .gt("valid_until", new Date(nowMs).toISOString())
-    .limit(10000);
+  const { data, error } = await fetchAllRowsKeepError((from, to) =>
+    admin
+      .from("insights")
+      .select("recipient_user_id, dedupe_key")
+      .eq("tenant_id", tenantId)
+      .in("state", ["new", "seen", "snoozed"])
+      .gt("valid_until", new Date(nowMs).toISOString())
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (error) {
     if (isMissingSchemaError(error)) return out;
     throw new Error(`insights(open): ${error.code ?? "hata"}`);
@@ -149,12 +158,15 @@ export async function loadOpenKeys(admin: SupabaseClient, tenantId: string, nowM
 /** Bugün (TR günü) zile düşürülmüş içgörü sayısı, kullanıcı başına (günlük üst sınır için). */
 export async function loadNotifiedToday(admin: SupabaseClient, tenantId: string, nowMs: number): Promise<Map<string, number>> {
   const out = new Map<string, number>();
-  const { data, error } = await admin
-    .from("insights")
-    .select("recipient_user_id")
-    .eq("tenant_id", tenantId)
-    .gte("notified_at", trDayStartIso(nowMs))
-    .limit(10000);
+  const { data, error } = await fetchAllRowsKeepError((from, to) =>
+    admin
+      .from("insights")
+      .select("recipient_user_id")
+      .eq("tenant_id", tenantId)
+      .gte("notified_at", trDayStartIso(nowMs))
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (error) {
     if (isMissingSchemaError(error)) return out;
     throw new Error(`insights(notified): ${error.code ?? "hata"}`);

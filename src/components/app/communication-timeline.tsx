@@ -8,6 +8,7 @@ import {
 import { createCommunication, type CommResult } from "@/app/actions/communications";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
 import { msSince } from "@/lib/clock";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -232,21 +233,27 @@ export function CommunicationTimeline({
 
                 {/* Sil */}
                 {canCreate && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!confirm("Bu kayıt silinsin mi?")) return;
+                  <ConfirmDialog
+                    trigger={
+                      <button
+                        type="button"
+                        className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-faint transition hover:bg-red-50 hover:text-red-600"
+                        aria-label="Kaydı sil"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    }
+                    title="Bu kayıt silinsin mi?"
+                    description="İletişim kaydı kalıcı olarak silinir."
+                    confirmLabel="Sil"
+                    onConfirm={() => {
                       startTransition(async () => {
                         const { deleteCommunication } = await import("@/app/actions/communications");
                         await deleteCommunication(item.id, customerId);
                         setItems((prev) => prev.filter((i) => i.id !== item.id));
                       });
                     }}
-                    className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-faint transition hover:bg-red-50 hover:text-red-600"
-                    aria-label="Kaydı sil"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  />
                 )}
               </div>
             );

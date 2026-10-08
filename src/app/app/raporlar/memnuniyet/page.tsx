@@ -1,3 +1,5 @@
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
@@ -79,12 +81,16 @@ export default async function SatisfactionReportPage() {
   const supabase = await createClient();
 
   const canSurveys = effectiveCanAccessModule(ctx.perms, "surveys");
-  const [{ data: surveys }, { data: wonDeals }, { data: profiles }, { data: taskData }] = await Promise.all([
-    supabase
-      .from("surveys")
-      .select("id, deal_id, agent_id, public_token, score, comment, status, sent_at, answered_at, customer:customers!surveys_customer_id_fkey(id, full_name)")
-      .order("sent_at", { ascending: false })
-      .limit(1000),
+  const [surveysRes, { data: wonDeals }, { data: profiles }, { data: taskData }] = await Promise.all([
+    // PostgREST 1000 satır sınırı: NPS/oran gerçek sayıdan hesaplansın diye sayfalı okunur.
+    fetchAllRows((from, to) =>
+      supabase
+        .from("surveys")
+        .select("id, deal_id, agent_id, public_token, score, comment, status, sent_at, answered_at, customer:customers!surveys_customer_id_fkey(id, full_name)")
+        .order("sent_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     supabase
       .from("deals")
       .select("id, deal_value, deal_type, customer_id, assigned_to, updated_at, customer:customers!deals_customer_id_fkey(id, full_name)")
@@ -94,17 +100,21 @@ export default async function SatisfactionReportPage() {
     supabase.from("profiles").select("id, full_name").limit(500),
     // Anket modülü görevleri (satıcı/malik, ziyaretçi, kira, kayıp kitleleri). Tablo yoksa / yetki yoksa boş.
     canSurveys
-      ? supabase
-          .from("survey_tasks")
-          .select("id, event_type, audience, status, score, agent_id, assigned_to, deal_id, completed_at")
-          .neq("event_type", "advisor_pulse")
-          .eq("status", "completed")
-          .limit(2000)
+      ? fetchAllRows((from, to) =>
+          supabase
+            .from("survey_tasks")
+            .select("id, event_type, audience, status, score, agent_id, assigned_to, deal_id, completed_at")
+            .neq("event_type", "advisor_pulse")
+            .eq("status", "completed")
+            .order("id", { ascending: true })
+            .range(from, to),
+        )
       : Promise.resolve({ data: [] as StatTask[] }),
   ]);
 
   const agentName = new Map((profiles ?? []).map((p) => [String(p.id), String(p.full_name)]));
-  const rows = surveys ?? [];
+  assertQueryBatchSucceeded([surveysRes], ["surveys"], "Memnuniyet");
+  const rows = surveysRes.data ?? [];
   const answered = rows.filter((s) => s.status === "answered" && s.score !== null);
   const pending = rows.filter((s) => s.status === "pending");
   const tasks = (taskData ?? []) as (StatTask & { deal_id?: string | null })[];

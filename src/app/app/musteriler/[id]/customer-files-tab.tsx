@@ -7,6 +7,7 @@ import {
   finalizeCustomerFileUpload,
   prepareCustomerFileUpload,
 } from "@/app/actions/customer-files";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/app/toast-provider";
 import { useRouter } from "next/navigation";
 import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
@@ -82,7 +83,6 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Bu dosya silinsin mi?")) return;
     setDeleting(id);
     const res = await deleteCustomerFile(id);
     setDeleting(null);
@@ -170,19 +170,26 @@ export function CustomerFilesTab({ customerId, files }: { customerId: string; fi
                     <Download className="h-3.5 w-3.5" />
                     İndir
                   </a>
-                  <button
-                    type="button"
-                    disabled={deleting === f.id}
-                    onClick={() => handleDelete(f.id)}
-                    className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-danger-600 hover:border-danger-300 disabled:opacity-50"
-                  >
-                    {deleting === f.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    Sil
-                  </button>
+                  <ConfirmDialog
+                    trigger={
+                      <button
+                        type="button"
+                        disabled={deleting === f.id}
+                        className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-danger-600 hover:border-danger-300 disabled:opacity-50"
+                      >
+                        {deleting === f.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                        Sil
+                      </button>
+                    }
+                    title="Bu dosya silinsin mi?"
+                    description="Dosya kalıcı olarak silinir."
+                    confirmLabel="Sil"
+                    onConfirm={() => handleDelete(f.id)}
+                  />
                 </div>
               </div>
             );

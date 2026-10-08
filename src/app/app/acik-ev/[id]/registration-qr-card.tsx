@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { Check, Copy, Download, Loader2, MonitorSmartphone, Printer, QrCode } from "lucide-react";
+import { useToast } from "@/components/app/toast-provider";
 import { fetchTrustedQrPng } from "@/lib/client-download";
 
 /**
@@ -17,6 +18,7 @@ import { fetchTrustedQrPng } from "@/lib/client-download";
 export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { push } = useToast();
 
   const kioskUrl = `${publicUrl}?kiosk=1`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=2&format=png&data=${encodeURIComponent(publicUrl)}`;
@@ -28,9 +30,8 @@ export function RegistrationQrCard({ publicUrl }: { publicUrl: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard izni yoksa (eski tarayıcı/HTTP) linki seçilebilir göstermek
-      // için prompt son çare olarak yeterli.
-      window.prompt("Linki kopyalayın:", publicUrl);
+      // Pano izni yoksa linki toast ile gösteririz (elle kopyalanabilir).
+      push(`Pano erişimi yok. Link: ${publicUrl}`, "err");
     }
   }
 

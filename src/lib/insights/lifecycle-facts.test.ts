@@ -12,7 +12,7 @@ function fakeAdmin(results: Record<string, { data: unknown; error?: unknown }>) 
       const rec: Rec = { table, filters: [] };
       recs.push(rec);
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "order", "limit", "not", "is", "gte", "lte"]) b[m] = () => b;
+      for (const m of ["select", "order", "limit", "range", "not", "is", "gte", "lte"]) b[m] = () => b;
       for (const m of ["eq", "in"]) {
         b[m] = (col: string, val: unknown) => {
           rec.filters.push([col, val]);

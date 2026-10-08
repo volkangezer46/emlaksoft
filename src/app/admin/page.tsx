@@ -23,6 +23,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformStaff } from "@/lib/platform";
 import { daysAgoIso, now, trMonthStartIso, trParts } from "@/lib/clock";
 import { fetchAllPaged } from "@/lib/cron-run";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { PERIODS, computeTrend, parsePeriod, periodHref, type Period } from "@/components/ui/premium";
@@ -122,19 +123,34 @@ const getAdminDashboardData = unstable_cache(
       admin.from("support_tickets").select("id", { count: "exact", head: true }).gte("created_at", prevIso).lt("created_at", fromIso),
       admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "refund_required"),
       admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "manual_review"),
-      admin.from("tenants").select("id, name, status, trial_ends_at").in("status", ["active", "trial", "past_due", "suspended"]).limit(1000),
-      admin.from("audit_logs").select("tenant_id, created_at").gte("created_at", daysAgoIso(14)).limit(10000),
+      // Aşağıdaki sayım/toplam kaynakları PostgREST 1000 satır sınırına takılmasın diye sayfalı okunur.
+      fetchAllRows((from, to) =>
+        admin.from("tenants").select("id, name, status, trial_ends_at").in("status", ["active", "trial", "past_due", "suspended"]).order("id", { ascending: true }).range(from, to),
+      ),
+      fetchAllRows(
+        (from, to) =>
+          admin.from("audit_logs").select("tenant_id, created_at").gte("created_at", daysAgoIso(14)).order("id", { ascending: true }).range(from, to),
+        1000,
+        50,
+      ),
       // Aktivasyon: dönemde kayıt olan ofislerin GERÇEK (örnek veri hariç) portföy/anlaşma varlığı (gömülü sayım).
-      admin
-        .from("tenants")
-        .select("id, properties!properties_tenant_id_fkey(count), deals!deals_tenant_id_fkey(count)")
-        .gte("created_at", fromIso)
-        .eq("properties.is_sample", false)
-        .eq("deals.is_sample", false)
-        .limit(1000),
+      fetchAllRows((from, to) =>
+        admin
+          .from("tenants")
+          .select("id, properties!properties_tenant_id_fkey(count), deals!deals_tenant_id_fkey(count)")
+          .gte("created_at", fromIso)
+          .eq("properties.is_sample", false)
+          .eq("deals.is_sample", false)
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
       // Deneme → ücretli: dönemde denemesi BİTEN ofisler + bugün ücretli aktif aboneliği olanlar.
-      admin.from("tenants").select("id, status, trial_ends_at").gte("trial_ends_at", fromIso).lte("trial_ends_at", nowIso).limit(1000),
-      admin.from("subscriptions").select("tenant_id").eq("status", "active").gt("amount_try", 0).limit(1000),
+      fetchAllRows((from, to) =>
+        admin.from("tenants").select("id, status, trial_ends_at").gte("trial_ends_at", fromIso).lte("trial_ends_at", nowIso).order("id", { ascending: true }).range(from, to),
+      ),
+      fetchAllRows((from, to) =>
+        admin.from("subscriptions").select("tenant_id").eq("status", "active").gt("amount_try", 0).order("id", { ascending: true }).range(from, to),
+      ),
       // Churn nedenleri (sütun yoksa hata → "okunamadı", uydurma yok).
       admin.from("subscriptions").select("cancel_reason").not("cancel_requested_at", "is", null).order("cancel_requested_at", { ascending: false }).limit(500),
       // Tüketim defteri: son 6 TR ayı, harcama kayıtları; sayfalı (PostgREST 1000 satır sınırı), en çok 10 sayfa.
