@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getPlanSupport = vi.fn();
 vi.mock("@/lib/billing/plan-support", () => ({ getPlanSupport: () => getPlanSupport() }));
+const isPauseEnabled = vi.fn();
+vi.mock("@/lib/billing/plan-change", () => ({ isPauseEnabled: () => isPauseEnabled() }));
 
 let pausedRow: { pause_started_at: string | null } | null = null;
 let selectError: { message: string } | null = null;
@@ -27,12 +29,19 @@ import { pausedWriteBlock } from "@/lib/billing/pause-guard";
 beforeEach(() => {
   getPlanSupport.mockReset();
   getPlanSupport.mockResolvedValue({ pauseReady: true });
+  isPauseEnabled.mockReset();
+  isPauseEnabled.mockResolvedValue(true);
   fromSpy.mockClear();
   pausedRow = { pause_started_at: "2026-10-07T00:00:00Z" };
   selectError = null;
 });
 
 describe("duraklatılmış abonelikte salt-okunur kapı", () => {
+  it("duraklatma bayrağı kapalıyken sorgu atılmaz", async () => {
+    isPauseEnabled.mockResolvedValue(false);
+    expect(await pausedWriteBlock("t1", "customers", "create")).toBeNull();
+    expect(fromSpy).not.toHaveBeenCalled();
+  });
   it("yazma eylemi reddedilir", async () => {
     expect(await pausedWriteBlock("t1", "customers", "create")).toBe(PAUSE_BLOCK_MESSAGE);
     expect(await pausedWriteBlock("t1", "properties", "delete")).toBe(PAUSE_BLOCK_MESSAGE);
