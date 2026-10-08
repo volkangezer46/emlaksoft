@@ -239,9 +239,13 @@ describe("digest", () => {
 });
 
 describe("kural kayıt listesi", () => {
-  it("olgu kuralları kayıtlı (ilk 5 + lifecycle), kimlikler sürümlü ve benzersiz", () => {
+  it("olgu kuralları kayıtlı (ilk 5 + lifecycle + gelir + gider), kimlikler sürümlü ve benzersiz", () => {
     const ids = INSIGHT_RULES.map((r) => r.id);
-    expect(ids).toEqual(["call_priority@1", "deal_risk@1", "price_action@1", "deadline@1", "anomaly@1", "lifecycle@1"]);
+    expect(ids).toEqual([
+      "call_priority@1", "deal_risk@1", "price_action@1", "deadline@1", "anomaly@1", "lifecycle@1",
+      "authority_renewal@1", "unshown_match@1", "home_value@1", "price_revision@1", "referral_invite@1",
+      "expense_budget@1", "subscription@1", "portal_roi@1",
+    ]);
     expect(new Set(ids).size).toBe(ids.length);
     for (const r of INSIGHT_RULES) expect(r.id).toMatch(/^[a-z_]+@\d+$/);
   });
