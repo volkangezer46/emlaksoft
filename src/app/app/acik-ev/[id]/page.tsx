@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { isPast } from "@/lib/clock";
+import { isPast, toTrLocalInput } from "@/lib/clock";
 import { getOpenHouse, listOpenHouseVisitors } from "@/app/actions/targets-openhouse-sources";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -21,6 +21,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { VisitorForm } from "./visitor-form";
 import { RegistrationQrCard } from "./registration-qr-card";
 import { StatusSelect } from "./status-select";
+import { EditOpenHousePanel } from "./edit-open-house-panel";
 import { ConvertVisitorButton } from "./convert-visitor-button";
 import { OPEN_HOUSE_STATUS_LABELS } from "@/lib/status-labels";
 
@@ -153,6 +154,16 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
             {STATUS_LABELS[event.status] ?? event.status}
           </Badge>
         )}
+        {canEdit && (event.status === "planned" || event.status === "active") ? (
+          <EditOpenHousePanel
+            openHouseId={event.id}
+            scheduledLocal={toTrLocalInput(event.scheduled_at)}
+            durationMin={event.duration_min ?? null}
+            location={event.location ?? null}
+            maxVisitors={event.max_visitors ?? null}
+            notes={event.notes ?? null}
+          />
+        ) : null}
         {gecmis && event.status === "planned" ? (
           <span className="text-xs text-text-muted">Tarihi geçmiş ama durumu hâlâ &quot;Planlandı&quot;.</span>
         ) : null}

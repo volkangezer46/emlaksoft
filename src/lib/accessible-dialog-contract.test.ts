@@ -9,7 +9,6 @@ const convertedDialogs = [
   // Pano: yalnız "Anlaşmayı düzenle" diyaloğu. Kazanma ve kayıp diyalogları kaldırıldı; kapanış artık
   // anlaşma detayındaki Kapanış sekmesidir (aşağıdaki "anlaşma kapanışı" sözleşmesi bunu korur).
   { file: "src/app/app/anlasmalar/deal-board.tsx", count: 1 },
-  { file: "src/app/app/portfoyler/[id]/property-media-manager.tsx", count: 1 },
 ] as const;
 
 const sharedDialogSurfaces = [

@@ -1,24 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "@/components/ui/smart-link";
-import { Check, Copy, ExternalLink, Link2, MessageCircle, Share2 } from "lucide-react";
-import { createOwnerPortalToken } from "@/app/actions/owner-portal";
-import { toWhatsAppLink } from "@/lib/phone";
+import { Check, Copy, ExternalLink, MessageCircle, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/inline-dialog";
 
 /**
- * Malik portalı (/malik-portali/[token]) link diyaloğu. Müşteri portalı artık sayfa içi panel:
+ * Portal link yardımcıları. Müşteri portalı sayfa içi panel:
  * `app/musteriler/customer-portal-panel.tsx` (ResultPanel ve WA_CUSTOMER buradan paylaşılır).
+ * Malik portalı da sayfa içi panel: `app/portfoyler/[id]/owner-portal-panel.tsx`.
  *
  * Bu ekran olmadan `createCustomerPortalToken` / `createOwnerPortalToken`
  * server action'larının repoda HİÇBİR çağıranı yoktu: public portal sayfaları
@@ -33,9 +23,6 @@ import {
 
 export const WA_CUSTOMER = (name: string, url: string) =>
   `Merhaba ${name}, size özel müşteri portalınız hazır. Taleplerinizi, randevularınızı ve size uygun portföyleri buradan takip edebilirsiniz: ${url}`;
-
-const WA_OWNER = (name: string, label: string, url: string) =>
-  `Merhaba ${name}, ${label} için mülk sahibi portalınız hazır. İlan durumunu, gelen teklifleri ve randevuları buradan izleyebilirsiniz: ${url}`;
 
 export function ResultPanel({
   url,
@@ -106,8 +93,10 @@ export function ResultPanel({
     </div>
   );
 }
-
-/** Malik portalı linki — /app/portfoyler kart aksiyonu. */
+/**
+ * Malik portalı linki: portföy kart / satır eylemi. Popup YOK; portföy detayındaki
+ * "Portallar" sekmesinde sayfa içi panel açılır (oluştur, kopyala, süre uzat, iptal).
+ */
 export function OwnerPortalLinkButton({
   propertyId,
   propertyLabel,
@@ -115,105 +104,14 @@ export function OwnerPortalLinkButton({
   propertyId: string;
   propertyLabel: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [ownerName, setOwnerName] = useState("");
-  const [ownerPhone, setOwnerPhone] = useState("");
-  const [pending, startTransition] = useTransition();
-
-  const generate = () => {
-    setError(null);
-    if (!ownerName.trim()) {
-      setError("Malik adı zorunludur.");
-      return;
-    }
-    startTransition(async () => {
-      const res = await createOwnerPortalToken(propertyId, ownerName, ownerPhone || undefined);
-      if (res.error || !res.url) setError(res.error ?? "Link üretilemedi.");
-      else setUrl(res.url);
-    });
-  };
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          setUrl(null);
-          setError(null);
-        }
-      }}
+    <Link
+      href={`/app/portfoyler/${propertyId}?sekme=portallar#malik-portali`}
+      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600"
+      aria-label={`${propertyLabel} için malik portalı linki`}
+      title="Malik portalı linki"
     >
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600"
-          aria-label={`${propertyLabel} için malik portalı linki üret`}
-          title="Malik portalı linki"
-        >
-          <Share2 className="h-4 w-4" />
-        </button>
-      </DialogTrigger>
-      <DialogContent size="md">
-        <DialogHeader
-          icon={<Link2 />}
-          title="Malik portalı linki"
-          description={`${propertyLabel} — mülk sahibi ilan durumunu, teklifleri ve randevuları bu linkten izler.`}
-        />
-        <DialogBody>
-          {url ? (
-            <ResultPanel
-              url={url}
-              waHref={toWhatsAppLink(ownerPhone, WA_OWNER(ownerName, propertyLabel, url))}
-              onReset={() => setOpen(false)}
-            />
-          ) : (
-            <div className="space-y-4">
-              <label className="block">
-                <span className="text-xs font-semibold text-text-muted">
-                  Malik adı <span className="text-danger-500">*</span>
-                </span>
-                <input
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  maxLength={120}
-                  placeholder="Örn. Ahmet Yılmaz"
-                  className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-text-muted">
-                  Telefon <span className="font-medium text-text-faint">(WhatsApp ile göndermek için)</span>
-                </span>
-                <input
-                  value={ownerPhone}
-                  onChange={(e) => setOwnerPhone(e.target.value)}
-                  inputMode="tel"
-                  maxLength={20}
-                  placeholder="05XX XXX XX XX"
-                  className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-                />
-              </label>
-              <p className="text-xs text-text-faint">
-                Bu portföy için geçerli bir link zaten varsa yenisi üretilmez — mevcut link döner.
-              </p>
-              {error ? <p className="text-sm font-semibold text-danger-500">{error}</p> : null}
-            </div>
-          )}
-        </DialogBody>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="secondary">Kapat</Button>
-          </DialogClose>
-          {url ? null : (
-            <Button type="button" onClick={generate} loading={pending}>
-              Linki üret
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <Share2 className="h-4 w-4" />
+    </Link>
   );
 }

@@ -33,6 +33,47 @@ import { PropertyPriceHistory } from "./property-price-history";
 import { PropertyStatusHistory, PublishToPortalsPanel } from "./property-extras";
 import { PropertyTimeline } from "./property-timeline";
 import { PropertyKeysSection } from "./property-keys-section";
+import { OwnerPortalPanel, type OwnerPortalTokenRow } from "./owner-portal-panel";
+import { getBaseUrl } from "@/lib/base-url";
+
+export const OwnerPortalSkeleton = () => <Skeleton className="h-48" />;
+
+// ---------------------------------------------------------------------------
+// Malik portalı — oluştur / iptal / süre uzat (sayfa içi panel)
+// ---------------------------------------------------------------------------
+
+export async function OwnerPortalSection({
+  propertyId,
+  propertyLabel,
+  canEdit,
+}: {
+  propertyId: string;
+  propertyLabel: string;
+  canEdit: boolean;
+}) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("owner_portal_tokens")
+    .select("id, token, owner_name, owner_phone, expires_at, last_seen_at")
+    .eq("property_id", propertyId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  const base = getBaseUrl();
+  const tokens: OwnerPortalTokenRow[] = (data ?? []).map((t) => {
+    const msLeft = new Date(t.expires_at as string).getTime() - now();
+    return {
+      id: t.id as string,
+      url: `${base}/malik-portali/${t.token}`,
+      ownerName: t.owner_name as string,
+      ownerPhone: (t.owner_phone as string | null) ?? null,
+      expiresAt: t.expires_at as string,
+      lastSeenAt: (t.last_seen_at as string | null) ?? null,
+      active: msLeft > 0,
+      daysLeft: msLeft > 0 ? Math.ceil(msLeft / DAY_MS) : null,
+    };
+  });
+  return <OwnerPortalPanel propertyId={propertyId} propertyLabel={propertyLabel} tokens={tokens} canEdit={canEdit} />;
+}
 
 // ---------------------------------------------------------------------------
 // İskeletler — her Suspense sınırının anlamlı fallback'i

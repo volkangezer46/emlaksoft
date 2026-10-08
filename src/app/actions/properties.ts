@@ -761,6 +761,18 @@ export async function deleteProperty(formData: FormData): Promise<{ error?: stri
   if (approval.status !== "not_required" && approval.status !== "approved") return { error: approval.message };
 
   const supabase = await createClient();
+  // Bağlı açık kayıt varsa silme (canlı ilan sahipsiz kalmasın): açık anlaşma, canlı portal ilanı,
+  // dışarıdaki anahtar, planlı/aktif açık ev.
+  const [deals, portals, keys, openHouses] = await Promise.all([
+    supabase.from("deals").select("id", { count: "exact", head: true }).eq("tenant_id", gate.tenantId).eq("property_id", id).not("stage", "in", "(won,lost)"),
+    supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("tenant_id", gate.tenantId).eq("property_id", id).eq("status", "live"),
+    supabase.from("property_keys").select("id", { count: "exact", head: true }).eq("tenant_id", gate.tenantId).eq("property_id", id).not("status", "in", "(ofiste,kayip)"),
+    supabase.from("open_houses").select("id", { count: "exact", head: true }).eq("tenant_id", gate.tenantId).eq("property_id", id).in("status", ["planned", "active"]),
+  ]);
+  if ((deals.count ?? 0) + (portals.count ?? 0) + (keys.count ?? 0) + (openHouses.count ?? 0) > 0) {
+    if (redirectTo) redirect(`/app/portfoyler/${id}?silme=engellendi`);
+    return;
+  }
   const { error } = await supabase
     .from("properties")
     .update({ deleted_at: new Date().toISOString(), status: "archived", updated_at: new Date().toISOString() })

@@ -20,6 +20,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { returnPropertyKey } from "@/app/actions/property-keys";
+import { AddKeyPanel } from "./add-key-panel";
 import { orIlike, inFilter } from "@/lib/pgrst";
 import { now } from "@/lib/clock";
 import {
@@ -76,7 +77,8 @@ export default async function PropertyKeysBoardPage({
 }: {
   searchParams?: Promise<{ durum?: string; danisman?: string; q?: string; sayfa?: string }>;
 }) {
-  await requireModulePage("properties", "/app/portfoyler/anahtarlar");
+  const { perms } = await requireModulePage("properties", "/app/portfoyler/anahtarlar");
+  const canAddKey = (perms.properties ?? []).includes("edit");
   const { durum = "", danisman = "", q = "", sayfa = "" } = (await searchParams) ?? {};
   const query = q.trim();
   const supabase = await createClient();
@@ -187,6 +189,7 @@ export default async function PropertyKeysBoardPage({
         eyebrow="Anahtar &amp; emanet"
         title="Anahtar panosu"
         description="Ofisteki, dışarıdaki ve iadesi geciken tüm anahtarlar tek ekranda."
+        actions={canAddKey ? <AddKeyPanel /> : undefined}
       />
 
       <KpiGrid>

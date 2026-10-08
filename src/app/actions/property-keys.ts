@@ -421,6 +421,8 @@ export async function deletePropertyKey(fd: FormData): Promise<void> {
 
   const key = await loadKey(keyId, gate.tenantId);
   if (!key) return;
+  // Dışarıdaki (zimmetli) anahtar silinmez: önce iade alınmalı.
+  if (isKeyOut(key.status)) return;
 
   const supabase = await createClient();
   const { error } = await supabase

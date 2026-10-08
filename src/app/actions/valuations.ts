@@ -67,6 +67,109 @@ export async function generateValuationShareLink(id: string): Promise<ValuationS
   return { ok: true, url: `${appUrl()}/degerleme-raporu/${token}` };
 }
 
+/** Rapor başlığı ve notunu günceller (tutarlar emsal anlık görüntüsünden gelir, elle değişmez). */
+export async function updateValuation(id: string, formData: FormData): Promise<ValuationResult> {
+  const gate = await requirePermission("valuation", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const valuationId = String(id ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  if (!valuationId) return { error: "Değerleme bulunamadı." };
+  if (!title) return { error: "Rapor başlığı zorunlu." };
+  if (title.length > 200) return { error: "Başlık en fazla 200 karakter olabilir." };
+  if (notes.length > 5000) return { error: "Not en fazla 5000 karakter olabilir." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("valuations")
+    .update({ title, notes: notes || null })
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("updateValuation", error);
+    return { error: actionErrorMessage(error, "Değerleme güncellenemedi.") };
+  }
+  if (!data) return { error: "Değerleme bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "valuation.update",
+    entityType: "valuation",
+    entityId: valuationId,
+    newValue: { title },
+  });
+  revalidatePath(`/app/degerleme/${valuationId}`);
+  revalidatePath("/app/degerleme");
+  return { ok: true, id: valuationId };
+}
+
+/** Paylaşım linkini kapatır: token silinir, eski link çalışmaz (yeniden paylaşınca yeni link üretilir). */
+export async function revokeValuationShare(id: string): Promise<ValuationResult> {
+  const gate = await requirePermission("valuation", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const valuationId = String(id ?? "").trim();
+  if (!valuationId) return { error: "Değerleme bulunamadı." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("valuations")
+    .update({ share_token: null, shared_at: null })
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("revokeValuationShare", error);
+    return { error: actionErrorMessage(error, "Paylaşım kapatılamadı.") };
+  }
+  if (!data) return { error: "Değerleme bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "valuation.unshare",
+    entityType: "valuation",
+    entityId: valuationId,
+  });
+  revalidatePath(`/app/degerleme/${valuationId}`);
+  return { ok: true, id: valuationId };
+}
+
+/** Değerleme raporunu siler (paylaşım linki de ölür). */
+export async function deleteValuation(id: string): Promise<ValuationResult> {
+  const gate = await requirePermission("valuation", "delete");
+  if (!gate.ok) return { error: gate.error };
+  const valuationId = String(id ?? "").trim();
+  if (!valuationId) return { error: "Değerleme bulunamadı." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("valuations")
+    .delete()
+    .eq("id", valuationId)
+    .eq("tenant_id", gate.tenantId)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("deleteValuation", error);
+    return { error: actionErrorMessage(error, "Değerleme silinemedi.") };
+  }
+  if (!data) return { error: "Değerleme bulunamadı." };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "valuation.delete",
+    entityType: "valuation",
+    entityId: valuationId,
+  });
+  revalidatePath("/app/degerleme");
+  return { ok: true };
+}
+
 export async function createValuation(formData: FormData): Promise<ValuationResult> {
   const gate = await requirePermission("valuation", "create");
   if (!gate.ok) return { error: gate.error };

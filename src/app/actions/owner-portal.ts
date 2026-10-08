@@ -7,6 +7,9 @@ import { requirePermission } from "@/lib/require-permission";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { getBaseUrl } from "@/lib/base-url";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
+import { DAY_MS, now } from "@/lib/clock";
 
 export type OwnerPortalResult = { ok?: boolean; error?: string; token?: string; url?: string };
 
@@ -37,6 +40,15 @@ export async function createOwnerPortalToken(
 
   if (!property) return { error: "Portföy bulunamadı (örnek kayıtlar için portal bağlantısı üretilmez)." };
   if (!ownerName.trim()) return { error: "Malik adı zorunludur." };
+  if (ownerName.trim().length > 120) return { error: "Malik adı en fazla 120 karakter olabilir." };
+
+  // Telefon opsiyonel; girildiyse saklama biçimine (05XXXXXXXXX / +E.164) normalize edilir.
+  let storedPhone: string | null = null;
+  if (ownerPhone?.trim()) {
+    const parsed = parsePhoneStrict(ownerPhone);
+    if (!parsed.ok) return { error: parsed.error ?? PHONE_ERROR_MESSAGE };
+    storedPhone = parsed.stored;
+  }
 
   // Aktif token var mı?
   const { data: existing } = await supabase
@@ -61,7 +73,7 @@ export async function createOwnerPortalToken(
       tenant_id:   gate.tenantId,
       property_id: propertyId,
       owner_name:  ownerName.trim(),
-      owner_phone: ownerPhone?.trim() || null,
+      owner_phone: storedPhone,
       created_by:  gate.userId,
     })
     .select("token")
@@ -107,6 +119,44 @@ export async function revokeOwnerPortalToken(formData: FormData): Promise<OwnerP
 
   revalidatePath("/app/portfoyler/sunumlar");
   revalidatePath("/app/portfoyler");
+  return { ok: true };
+}
+
+/**
+ * Malik portal linkinin süresini uzatır (varsayılan 90 gün; 7-365 arası).
+ * Süresi dolmuş ya da iptal edilmiş link de yeniden açılır: yeni süre "şimdiden" sayılır.
+ */
+export async function extendOwnerPortalToken(formData: FormData): Promise<OwnerPortalResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+
+  const id = String(formData.get("id") ?? "").trim();
+  const days = Math.round(Number(formData.get("days") ?? 90));
+  if (!id) return { error: "Portal linki bulunamadı." };
+  if (!Number.isFinite(days) || days < 7 || days > 365) return { error: "Süre 7-365 gün arasında olmalı." };
+
+  const supabase = await createClient();
+  const { data: row } = await supabase
+    .from("owner_portal_tokens")
+    .select("id, property_id, expires_at")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!row) return { error: "Portal linki bulunamadı." };
+
+  const base = Math.max(now(), new Date(row.expires_at).getTime());
+  const { error } = await supabase
+    .from("owner_portal_tokens")
+    .update({ expires_at: new Date(base + days * DAY_MS).toISOString() })
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("extendOwnerPortalToken", error);
+    return { error: "Süre uzatılamadı." };
+  }
+
+  revalidatePath(`/app/portfoyler/${row.property_id}`);
+  revalidatePath("/app/portfoyler/sunumlar");
   return { ok: true };
 }
 

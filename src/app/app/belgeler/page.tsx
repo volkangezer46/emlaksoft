@@ -41,6 +41,7 @@ import { DocumentList } from "./document-list";
 
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
+import { DocumentUploadPanel } from "./document-upload-panel";
 /**
  * Belge Merkezi — ofisin dört ayrı yerde duran dosyaları tek listede.
  *
@@ -653,9 +654,12 @@ export default async function DocumentsPage({
         title="Ofisin tüm dosyaları"
         description="Müşteri dosyaları, portföy medyası, sözleşmeler ve anlaşma evrakları tek listede. “Şu müşterinin kimlik fotokopisi nerede?” sorusunun tek cevabı burada."
         actions={
-          <ButtonLink href="/app/belgeler/evrak-linkleri" icon={Link2}>
-            Evrak linkleri
-          </ButtonLink>
+          <>
+            {(perms.customers ?? []).includes("edit") ? <DocumentUploadPanel /> : null}
+            <ButtonLink href="/app/belgeler/evrak-linkleri" icon={Link2}>
+              Evrak linkleri
+            </ButtonLink>
+          </>
         }
       />
 
