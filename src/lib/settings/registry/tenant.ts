@@ -356,6 +356,19 @@ const contact: AnySettingDef[] = [
 const compliance: AnySettingDef[] = [
   defineEnum({
     ...TENANT,
+    key: "office.compliance.iys_mode",
+    group: "uyum",
+    default: "warn",
+    options: [
+      { value: "warn", label: "Yalnız uyar (gönderim yapılır)" },
+      { value: "block", label: "İzinsiz alıcıyı atla" },
+    ],
+    label: "İYS izin kontrolü",
+    description: "Ticari SMS/WhatsApp/e-posta gönderiminde alıcının kayıtlı izni yoksa ne yapılsın. Varsayılan: gönderim yapılır, izni eksik alıcı sayısı bilgi olarak gösterilir.",
+    impact: "\"İzinsiz alıcıyı atla\" seçilirse kayıtlı izni olmayan alıcılara ticari ileti gönderilmez. İşlem amaçlı iletiler (randevu, imza, kira hatırlatma) her iki modda da gider.",
+  }),
+  defineEnum({
+    ...TENANT,
     key: LICENSE_FEE_MONTH_KEY,
     group: "uyum",
     default: "0",

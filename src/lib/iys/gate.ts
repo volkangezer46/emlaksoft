@@ -63,6 +63,8 @@ export type IysGateResult = {
   skipped: { customerId: string; reason: IysSkipReason }[];
   skippedCount: number;
   reasons: Partial<Record<IysSkipReason, number>>;
+  /** "Yalnız uyar" modunda izni eksik olduğu halde gönderilen alıcılar (bilgi amaçlı). */
+  warned?: { customerId: string; reason: IysSkipReason }[];
 };
 
 /** Tek alıcı için izin kararı (SAF). */
@@ -166,8 +168,24 @@ export async function gateIysRecipients(
   if (messagePurpose(input.kind) === "transactional") {
     return evaluateIysGate({ kind: input.kind, channel: input.channel, customerIds: ids, rows: [] });
   }
+  // Ofis ayarı (varsayılan "warn"): mevzuat kontrolü gönderimi ENGELLEMEZ, yalnız izni eksik alıcıları raporlar.
+  // "block" seçilirse izinsiz alıcılar atlanır.
+  const mode = await readIysMode(input.tenantId);
   const { rows, failed } = await loadConsentRows(db, input.tenantId, input.channel, ids);
-  return evaluateIysGate({ kind: input.kind, channel: input.channel, customerIds: ids, rows, lookupFailed: failed });
+  const strict = evaluateIysGate({ kind: input.kind, channel: input.channel, customerIds: ids, rows, lookupFailed: failed });
+  if (mode === "block") return strict;
+  return { ...strict, allowed: ids, warned: strict.skipped, skipped: [], skippedCount: 0 };
+}
+
+export type IysMode = "warn" | "block";
+
+async function readIysMode(tenantId: string): Promise<IysMode> {
+  try {
+    const { getSetting } = await import("@/lib/settings/read");
+    return (await getSetting<string>("office.compliance.iys_mode", { tenantId })) === "block" ? "block" : "warn";
+  } catch {
+    return "warn";
+  }
 }
 
 /** Tek alıcı kısayolu (tekil mesaj / otomasyon). */

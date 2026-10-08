@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   COMMERCIAL_KINDS,
@@ -13,6 +13,10 @@ import {
   messagePurpose,
   type IysConsentRow,
 } from "@/lib/iys/gate";
+
+// Ofis İYS modu ayarı (varsayılan "warn"); her test kendi modunu seçer.
+let iysMode = "block";
+vi.mock("@/lib/settings/read", () => ({ getSetting: async () => iysMode }));
 
 const row = (customer_id: string, status: string, channel = "sms", revoked_at: string | null = null): IysConsentRow => ({ customer_id, channel, status, revoked_at });
 
@@ -109,6 +113,19 @@ function fakeDb(rows: IysConsentRow[], opts: { fail?: boolean } = {}) {
 }
 
 describe("gateIysRecipients (veritabanı)", () => {
+  beforeEach(() => {
+    iysMode = "block";
+  });
+
+  it("varsayılan 'yalnız uyar' modunda gönderim engellenmez, izni eksikler bilgi olarak döner", async () => {
+    iysMode = "warn";
+    const { db } = fakeDb([row("a", "granted")]);
+    const r = await gateIysRecipients(db, { tenantId: "t1", kind: "campaign", channel: "sms", customerIds: ["a", "b"] });
+    expect(r.allowed).toEqual(["a", "b"]);
+    expect(r.skippedCount).toBe(0);
+    expect(r.warned?.map((w) => w.customerId)).toEqual(["b"]);
+  });
+
   it("sorguyu tenant + kanal ile sınırlar ve kararı verir", async () => {
     const { db, calls } = fakeDb([row("a", "granted")]);
     const r = await gateIysRecipients(db, { tenantId: "t1", kind: "campaign", channel: "sms", customerIds: ["a", "b"] });
