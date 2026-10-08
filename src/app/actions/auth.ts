@@ -373,7 +373,7 @@ export async function signUp(
     return { error: EMAIL_ERROR_MESSAGE, field: "email" };
   }
   // E-posta (normalize) başına ve global saatlik tavan: IP rotasyonlu toplu kayıt/posta bombalamayı keser.
-  const emailLimit = await checkRateLimit(`signup:email:${email}`, { limit: 3, windowSec: 3600, failurePolicy: "deny" });
+  const emailLimit = await checkRateLimit(`signup:email:${email}`, { limit: 10, windowSec: 3600, failurePolicy: "deny" });
   if (!emailLimit.allowed) {
     return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
   }
