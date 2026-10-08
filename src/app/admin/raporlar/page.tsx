@@ -14,7 +14,7 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
 import { formatTry } from "@/lib/format";
 import { now as clockNow } from "@/lib/clock";
-import { AreaChart } from "@/components/ui/viz";
+import { AreaTrendChart } from "@/components/ui/lazy-charts";
 import { StackedBar } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
@@ -215,14 +215,16 @@ export default async function AdminReportsPage({
           </span>
         </div>
         <p className="mt-1 text-xs text-text-faint">Bugün aktif aboneliklerin başlangıç tarihine göre kümülatif MRR görünümü.</p>
-        <div className="mt-4" style={{ minHeight: 176 }}>
+        <div className="mt-4" style={{ height: 300 }}>
           {hasCohort ? (
-            <AreaChart
-              series={[{ name: "Kümülatif MRR", values: trendFallback, tone: "gold" }]}
-              pointLabels={months.map((m) => m.label)}
+            <AreaTrendChart
+              data={trendFallback.map((v, i) => ({ label: months[i]?.label ?? "", value: v, href: "/admin/billing" }))}
+              tone="gold"
+              format="money"
               formatValue={formatTry}
+              name="Kümülatif MRR"
+              summary="last"
               ariaLabel="Son 12 ay aktif abonelik kohortu kümülatif MRR"
-              href="/admin/billing"
             />
           ) : (
             <p className="py-10 text-center text-sm text-text-muted">Aktif abonelik oluştukça kohort eğrisi burada çizilir.</p>

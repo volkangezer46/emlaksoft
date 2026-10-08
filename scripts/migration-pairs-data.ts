@@ -217,6 +217,8 @@ const F = {
   propertyAuthorityStatus: "20261008001300_property_authority_status.sql",
   // M1 Mulk yonetimi omurgasi (2026-10-08): kira tahsilat kaydi + yonetim sozlesmesi + mulk sahibi hakedis defteri.
   propertyManagementCore: "20261008001100_property_management_core.sql",
+  // /admin kontrol paneli toplulastirmalari (2026-10-08): audit/aktivasyon/deneme/iptal/defter sayimlari tek service_role RPC.
+  platformDashboardRollups: "20261008001400_platform_dashboard_rollups.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -349,6 +351,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.planPricesEfTariff]: "davranis", // yeni abonelik/yenileme liste fiyati (SQL yedek) + yalniz dokunulmamis ef.* seed ayarlari; abonelik/fatura satiri ve plan override'i degismez
     [F.propertyAuthorityStatus]: "ek", // properties'e 6 nullable/varsayilanli yetki durumu sutunu + kisit + kismi indeks; mevcut satir/RLS degismez
     [F.propertyManagementCore]: "davranis", // rent_charges durum CHECK'i 'partial' ile genisler + paid_amount; yeni tahsilat/sozlesme/odeme tablolari + 4 DEFINER RPC; eski 'odendi' tahakkuklar icin tek seferlik legacy tahsilat dolgusu
+    [F.platformDashboardRollups]: "ek", // yeni salt-okunur service_role RPC platform_dashboard_rollups (tablo/politika/veri degismez; RPC yokken ilgili paneller "okunamadi" gosterir, uydurma sifir yok)
     [F.leagueV2]: "ek", // yeni tablolar league_settings + league_challenges (RLS: okuma ofis, yazma targets izni); mevcut tablo/politika degismez
     [F.planUpgradeFulfillment]: "davranis", // fulfill + v2 tam govde yeniden tanimi: plan_upgrade faturasi islenir (taban 000300 govdesi bayt bayt korunur); bayrak kapaliyken kimse bu turde fatura kesmez
     [F.contractSignerReminder]: "ek", // contract_signers'a short_code/reminder_count/last_reminded_at + 2 DEFINER RPC (hatirlatma yuku: tam token donmez; kisa kod cozumu anon)
@@ -488,6 +491,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P12-kazanc-gizliligi", order: 30.0, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999862, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
     { id: "P12-kazanc-gizliligi", order: 30.000001, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
+    { id: "PB55-admin-panel-toplulastirma", order: 29.999863, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
+    { id: "P12-kazanc-gizliligi", order: 30.000002, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
   // (b) Birlikte uygulanmasi gerekenler (duzeltici ana'dan sonra numaralanmis ve ayni pencerede).

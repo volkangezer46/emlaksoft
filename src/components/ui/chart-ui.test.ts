@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined })
 import { ChartLegend } from "./chart-legend";
 import { ChartRangePanel } from "./chart-range";
 import { ChartTooltip } from "./chart-tooltip";
-import { AreaTrendChart, BarCompare, DonutSplit } from "./chart";
+import { AreaTrend, AreaTrendChart, BarCompare, DonutSplit } from "./chart";
 import { InteractiveChart } from "../app/interactive-chart";
 
 const labels = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu"];
@@ -170,5 +170,64 @@ describe("AreaTrendChart / InteractiveChart (sunucu anlık görüntüsü)", () =
     expect(donut).toContain("Daire");
     expect(donut).toContain("%75");
     expect(donut).toContain("Toplam");
+  });
+
+  it("BarCompare colorKey ile işaretli (kâr/zarar) tek seride çökmeden çizilir", () => {
+    const html = renderToStaticMarkup(
+      h(BarCompare, {
+        data: [
+          { ay: "Eki", net: 100, renk: "var(--viz-pos)", href: "/app/komisyon" },
+          { ay: "Kas", net: -40, renk: "var(--viz-neg)", href: "/app/giderler" },
+        ],
+        xKey: "ay",
+        series: [{ key: "net", label: "Net" }],
+        colorKey: "renk",
+        hrefKey: "href",
+        format: "money",
+      }),
+    );
+    expect(html.length).toBeGreaterThan(0);
+  });
+
+  it("AreaTrend çoklu seride lejant ve (>= 8 nokta) aralık paneli çıkarır", () => {
+    const rows = Array.from({ length: 8 }, (_, i) => ({ hafta: `H${i + 1}`, ofis: i, abonelik: i * 2 }));
+    const html = renderToStaticMarkup(
+      h(AreaTrend, {
+        data: rows,
+        xKey: "hafta",
+        series: [
+          { key: "ofis", label: "Yeni ofis" },
+          { key: "abonelik", label: "Yeni aktif abonelik" },
+        ],
+        granularity: "week",
+        summary: "total",
+      }),
+    );
+    expect(html).toContain("Yeni ofis");
+    expect(html).toContain("Yeni aktif abonelik");
+    expect(html).toContain("Hazır zaman aralıkları");
+  });
+});
+
+describe("/app/raporlar çubuk grafikleri (RankBars / NetBars)", () => {
+  it("RankBars sr-only tam değer listesini verir ve boş listede çökmez", async () => {
+    const { RankBars } = await import("../../app/app/raporlar/rank-bars");
+    const html = renderToStaticMarkup(
+      h(RankBars, {
+        ariaLabel: "Kayıp nedenleri",
+        items: [{ key: "a", label: "Fiyat", href: "/app/anlasmalar", value: 3, valueText: "3 · %60" }],
+      }),
+    );
+    expect(html).toContain("Fiyat: 3 · %60");
+    expect(html).toContain('aria-label="Kayıp nedenleri"');
+    expect(() => renderToStaticMarkup(h(RankBars, { ariaLabel: "x", items: [] }))).not.toThrow();
+  });
+
+  it("NetBars sr-only gelir/gider/net tablosunu verir", async () => {
+    const { NetBars } = await import("../../app/app/raporlar/net-bars");
+    const html = renderToStaticMarkup(h(NetBars, { points: [{ label: "Eki", income: 1000, expense: 400, net: 600 }] }));
+    expect(html).toContain("Aylık gelir, gider ve net fark");
+    expect(html).toContain("Eki");
+    expect(html).toContain("600");
   });
 });

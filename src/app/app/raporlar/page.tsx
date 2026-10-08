@@ -15,9 +15,9 @@ import {
   Trophy,
 } from "lucide-react";
 import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
-import { HBarList } from "./hbar-list";
-import { NetDiffChart } from "./net-diff-chart";
-import { hasNetData, netSeries, shareOfMax, shareOfTotal } from "./report-math";
+import { RankBars } from "./rank-bars";
+import { NetBars } from "./net-bars";
+import { hasNetData, netSeries, shareOfTotal } from "./report-math";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
@@ -159,7 +159,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     // value: müşteriler sayfasının ?source= filtresine giden ham DB değeri
     .map(({ label, count }) => ({ label, count, value: label === "Belirtilmedi" ? null : label }));
   const sourceTotal = Math.max(1, customers);
-  const sourceMax = Math.max(1, ...sourceBars.map((b) => b.count));
 
   // Kayıp nedeni raporu — neden × adet + kaybedilen toplam değer
   // Nedenler `loss_reason` tanımına bağlanır: "<değer>" ve "<değer> | not" aynı etiket altında toplanır;
@@ -179,7 +178,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const lossRows = allLossRows
     .sort((a, b) => b.count - a.count || b.value - a.value)
     .slice(0, 8);
-  const lossMax = Math.max(1, ...lossRows.map((r) => r.count));
 
   // Kaynak ROI — customers.source × kazanılan anlaşmalar (customer_id join)
   // Etiketler: tek sabit kaynak (eski/yeni değerler) üstüne ofisin tanımları
@@ -196,7 +194,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const roiRows = allRoiRows
     .sort((a, b) => b.wonValue - a.wonValue || b.wonCount - a.wonCount || b.customers - a.customers)
     .slice(0, 8);
-  const roiValueMax = Math.max(1, ...roiRows.map((r) => r.wonValue));
   // En değerli kaynak: kazanılan değeri sıfırdan büyük ilk satır
   const bestSource = roiRows.length > 0 && roiRows[0].wonValue > 0 ? roiRows[0].source : null;
 
@@ -243,24 +240,22 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     key: b.label,
     label: b.label,
     href: b.href,
-    pct: shareOfMax(b.value, b.max),
+    value: b.value,
     valueText: String(b.value),
   }));
   const sourceItems = sourceBars.map((b) => ({
     key: b.label,
     label: b.value ? sourceLabel(b.value) : b.label,
     href: b.value ? `/app/musteriler?source=${encodeURIComponent(b.value)}` : "/app/musteriler",
-    pct: shareOfMax(b.count, sourceMax),
+    value: b.count,
     valueText: `${b.count} · %${shareOfTotal(b.count, sourceTotal)}`,
   }));
   const roiItems = roiRows.map((r) => ({
     key: r.source,
     label: sourceLabel(r.source),
     href: `/app/musteriler?source=${encodeURIComponent(r.source)}`,
-    pct: shareOfMax(r.wonValue, roiValueMax),
-    valueText: money(r.wonValue),
-    sub: `${r.customers} müşteri · ${r.wonCount} kazanılan`,
-    highlight: r.source === bestSource,
+    value: r.wonValue,
+    valueText: `${money(r.wonValue)} · ${r.customers} müşteri · ${r.wonCount} kazanılan${r.source === bestSource ? " · en değerli kaynak" : ""}`,
   }));
   // Tahmini kaçan komisyon: kaybedilen anlaşma tutarı × ofis varsayılan komisyon oranı (Ofis Tanımları; yoksa %3). TAHMİN.
   const lossRate = Number(lossRateSettings["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
@@ -269,7 +264,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     key: r.reason,
     label: r.reason,
     href: "/app/anlasmalar?gorunum=liste&asama=lost",
-    pct: shareOfMax(r.count, lossMax),
+    value: r.count,
     valueText: `${r.count} · %${shareOfTotal(r.count, lostCount)} · ${money(r.value)}${r.value > 0 ? ` · ≈ ${money(lostCommission(r.value))} komisyon` : ""}`,
   }));
 
@@ -417,7 +412,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   Net fark · gelir eksi gider
                   <span className="ml-1 font-normal text-text-faint">(sıfır çizgisinin üstü kâr, altı zarar)</span>
                 </h3>
-                <NetDiffChart className="mt-3" points={netPoints} />
+                <NetBars className="mt-3" points={netPoints} />
               </div>
             ) : null}
 
@@ -461,7 +456,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <section className={SECTION}>
         <h2 className={H2}>Hacim dağılımı</h2>
         <p className="mt-0.5 text-xs text-text-faint">Dört sayı ortak ölçekte; satıra tıklayınca liste açılır.</p>
-        <HBarList className="mt-3" items={volumeItems} ariaLabel="Hacim dağılımı" />
+        <RankBars className="mt-3" items={volumeItems} ariaLabel="Hacim dağılımı" seriesLabel="Adet" />
       </section>
 
       {sourceItems.length > 0 ? (
@@ -471,7 +466,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <h2 className={H2}>Müşteri kaynak dağılımı</h2>
             <span className="ml-auto text-xs tabular-nums text-text-muted">{sourceTotal} müşteri · en yüksek 8 kaynak</span>
           </div>
-          <HBarList className="mt-3" items={sourceItems} ariaLabel="Müşteri kaynak dağılımı" />
+          <RankBars className="mt-3" items={sourceItems} ariaLabel="Müşteri kaynak dağılımı" seriesLabel="Müşteri" />
         </section>
       ) : null}
 
@@ -495,7 +490,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             action={<Link href="/app/musteriler" className="text-sm font-semibold text-accent-text hover:underline">Müşterilere git</Link>}
           />
         ) : (
-          <HBarList className="mt-3" items={roiItems} tone="success" ariaLabel="Kaynak bazında kazanılan değer" />
+          <RankBars className="mt-3" items={roiItems} format="money" color="var(--viz-2)" ariaLabel="Kaynak bazında kazanılan değer" seriesLabel="Kazanılan değer" />
         )}
       </section>
 
@@ -519,7 +514,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             action={<Link href="/app/anlasmalar" className="text-sm font-semibold text-accent-text hover:underline">Anlaşma tahtasına git</Link>}
           />
         ) : (
-          <HBarList className="mt-3" items={lossItems} tone="danger" ariaLabel="Kayıp nedenleri" />
+          <RankBars className="mt-3" items={lossItems} color="var(--viz-neg)" ariaLabel="Kayıp nedenleri" seriesLabel="Kaybedilen anlaşma" />
         )}
       </section>
 
