@@ -131,6 +131,7 @@ export async function applyWizardOfficeProfile(
 
   // 4) Ekip daveti (isteğe bağlı, en çok 3).
   let invited = 0;
+  // Kayıt akışında davet gönderilmez: readWizardOfficeProfile inviteEmails'i her zaman boş döner (kimliksiz davet kapalı).
   for (const email of profile.inviteEmails) {
     const created = await provisionTeamMember(admin, {
       tenantId,

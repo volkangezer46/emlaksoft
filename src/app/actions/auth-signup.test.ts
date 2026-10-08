@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   open: true,
   rateAllowed: true,
+  rateKeys: [] as string[],
+  rateDenyPrefix: "",
   createUser: vi.fn(),
   deleteUser: vi.fn(),
   rpc: vi.fn(),
@@ -52,7 +54,10 @@ vi.mock("@/lib/messaging/netgsm", () => ({ sendSms: vi.fn() }));
 vi.mock("@/lib/platform-flags", () => ({ isRegistrationOpen: async () => h.open }));
 vi.mock("@/lib/growth/capture", () => ({ recordSignupAttributionFromRequest: h.attribution }));
 vi.mock("@/lib/rate-limit", () => ({
-  checkRateLimit: async () => ({ allowed: h.rateAllowed }),
+  checkRateLimit: async (key: string) => {
+    h.rateKeys.push(key);
+    return { allowed: h.rateAllowed && !(h.rateDenyPrefix && key.startsWith(h.rateDenyPrefix)) };
+  },
   clientIp: async () => "203.0.113.7",
 }));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -128,6 +133,8 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   h.open = true;
   h.rateAllowed = true;
+  h.rateKeys = [];
+  h.rateDenyPrefix = "";
   h.wantsDemo = false;
   h.createUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
   h.deleteUser.mockResolvedValue({ error: null });
@@ -161,6 +168,20 @@ describe("signUp — ön kapılar (hiçbir kaynak oluşmaz)", () => {
     expect((await signUp({}, form())).error).toMatch(/Çok fazla/);
     expect(h.createUser).not.toHaveBeenCalled();
     expect(h.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("signUp — e-posta ve global hız sınırı", () => {
+  it("IP + normalize e-posta + global anahtarlarıyla sınırlar; hiçbiri reddederse hesap oluşmaz", async () => {
+    await signUp({}, form({ email: "  Ayse@Example.COM " })).catch(() => {}); // başarıda /app'e yönlenir
+    expect(h.rateKeys).toEqual(["signup:203.0.113.7", "signup:email:ayse@example.com", "signup:global"]);
+    for (const prefix of ["signup:email:", "signup:global"]) {
+      h.createUser.mockClear();
+      h.rateDenyPrefix = prefix;
+      const res = await signUp({}, form());
+      expect(res.error).toMatch(/Çok fazla|yoğun/);
+      expect(h.createUser).not.toHaveBeenCalled();
+    }
   });
 });
 

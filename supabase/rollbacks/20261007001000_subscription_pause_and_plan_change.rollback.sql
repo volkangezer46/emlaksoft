@@ -15,6 +15,7 @@ drop function if exists public.subscription_cancel_scheduled_downgrade();
 drop function if exists public.subscription_schedule_downgrade(text);
 drop function if exists public.subscription_resume();
 drop function if exists public.subscription_pause(integer);
+drop function if exists public.billing_plan_is_hidden(text);
 drop function if exists public.billing_setting_int(text, integer, integer, integer);
 drop function if exists public.billing_setting_on(text);
 

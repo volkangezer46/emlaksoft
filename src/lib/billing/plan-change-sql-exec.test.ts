@@ -40,6 +40,10 @@ create table public.billing_fulfillment_events(
   unique (provider, conversation_id), unique (provider, payment_id));
 create function public.plan_monthly_amount(p text) returns numeric language sql immutable as $$
   select case p when 'advisor' then 749 when 'office' then 2490 when 'professional' then 4990 when 'business' then 8990 when 'enterprise' then 12900 end $$;
+create function public.plan_catalog_document() returns jsonb language sql stable as $$
+  select nullif(value,'')::jsonb from public.platform_settings where key = 'billing.plan_definitions' $$;
+create table public.plan_entitlements(plan text primary key, seat_limit int, customer_limit int, active_property_limit int, branch_limit int);
+insert into public.plan_entitlements values ('advisor',1,null,null,null),('office',10,null,null,null),('professional',20,null,null,null),('business',40,null,null,null),('enterprise',50,null,null,null);
 create function public.plan_period_amount(p text, c text) returns numeric language sql immutable as $$
   select public.plan_monthly_amount(p) * case when c = 'yearly' then 10 else 1 end $$;
 create function public.plan_campaign_lock_amount(p text) returns numeric language sql immutable as $$ select null::numeric $$;
@@ -235,6 +239,22 @@ describe.skipIf(!mod)("duraklatma / planlı düşürme / plan_upgrade fulfill �
       expect((await subRow(o.t)).pending_plan).toBeNull();
       expect(await call(`select public.subscription_cancel_scheduled_downgrade()`)).toMatchObject({ ok: false, code: "nothing_scheduled" });
       expect(await audit(o.t)).toEqual(["billing.plan_downgrade_scheduled", "billing.plan_downgrade_cancelled"]);
+    });
+
+    it("gizli plana (business) ve kapasiteyi aşan plana planlı düşürme reddedilir; katalogda gizli kapatılırsa izin verilir", async () => {
+      await setFlag("billing.plan_change_proration_enabled", "on");
+      const o = await office({ plan: "enterprise" });
+      await as("authenticated", o.owner, o.t);
+      expect(await call(`select public.subscription_schedule_downgrade('business')`)).toMatchObject({ ok: false, code: "not_sold" });
+      // 3 aktif kullanıcı > advisor koltuk sınırı (1)
+      const p = await office({ plan: "professional" });
+      await as("authenticated", p.owner, p.t);
+      expect(await call(`select public.subscription_schedule_downgrade('advisor')`)).toMatchObject({ ok: false, code: "over_capacity", metric: "seats", usage: 3, limit: 1 });
+      expect((await subRow(p.t)).pending_plan).toBeNull();
+      await setFlag("billing.plan_definitions", JSON.stringify({ v: 2, plans: { business: { hidden: false } } }));
+      await as("authenticated", o.owner, o.t);
+      expect(await call(`select public.subscription_schedule_downgrade('business')`)).toMatchObject({ ok: true, plan: "business" });
+      await setFlag("billing.plan_definitions", null);
     });
 
     it("cron: dönemi bitince uygulanır (plan + tenants.plan + aylık tutar); bayraktan bağımsız", async () => {

@@ -47,7 +47,7 @@ describe("sihirbaz ofis profili ayrıştırıcıları", () => {
     f.append(FIELD.focus, "kiralik");
     f.append(FIELD.workDistricts, U2);
     f.append(FIELD.inviteEmails, "d@x.com");
-    expect(readWizardOfficeProfile(f, "o@x.com")).toMatchObject({ provinceId: U1, officeType: "kurumsal", focus: ["kiralik"], workDistrictIds: [U2], inviteEmails: ["d@x.com"] });
+    expect(readWizardOfficeProfile(f, "o@x.com")).toMatchObject({ provinceId: U1, officeType: "kurumsal", focus: ["kiralik"], workDistrictIds: [U2], inviteEmails: [] });
   });
   it("iletişim ve yetki belgesi: isteğe bağlı, kurala uymayan değer yazılmaz", () => {
     const f = new FormData();
