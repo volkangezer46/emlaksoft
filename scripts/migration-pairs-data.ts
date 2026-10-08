@@ -190,6 +190,8 @@ const F = {
   proxyGateSnapshot: "20261007000900_proxy_gate_snapshot.sql",
   // Konsey D1 persona KRITIK: vitrin talep formu tokeni her ofiste (varsayilan + NULL doldurma).
   leadCaptureTokenDefault: "20261008000200_lead_capture_token_default.sql",
+  // Gorsel QA: giderler aylik trend ay ekseni tarih (UTC kaymasi).
+  expenseTrendMonthAxis: "20261008001900_expense_trend_month_axis.sql",
   // Canli hata: {1,512} regex PostgreSQL tekrar siniri (255) asiyor -> esdeger gecerli ifade.
   fixRegexRepetitionLimit: "20261008000900_fix_regex_repetition_limit.sql",
   // Profil fotografi / hazir avatar: profiles + platform_staff sutunlari, avatars kovasi, set_my_avatar RPC.
@@ -352,6 +354,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcParserTelemetry]: "ek", // yeni tablo + yeni RPC; mevcut ilan kontrol govdeleri degismez
     [F.expenseBudgetsRecurring]: "ek", // yeni expense_budgets tablosu (RLS) + expenses.recurrence/portal_key null'lanabilir sutunlari; mevcut satirlar degismez
     [F.leadCaptureTokenDefault]: "davranis", // NULL tokenli ofislerde vitrin talep formu acilir (lead_capture_enabled degismez)
+    [F.expenseTrendMonthAxis]: "davranis", // trend etiketleri ve ay toplamlari dogru aya yazilir
     [F.fixRegexRepetitionLimit]: "davranis", // kampanya kuyrugu ve WhatsApp sablonlu kayitlar yeniden calisir (anlam ayni)
     [F.profileAvatar]: "ek", // profiles/platform_staff'a 2 nullable sutun + public avatars kovasi + sahip-yolu storage politikalari + kendi satirina yazan DEFINER RPC set_my_avatar; mevcut davranis degismez
     [F.subscriptionPause]: "ek", // subscriptions'a duraklatma/planli dusurme sutunlari + 4 authenticated JWT RPC + 2 service_role cron RPC + hazirlik yoklamasi; bayraklar SQL'de de kontrol edilir, mevcut davranis degismez (bayrak KAPALI)
@@ -492,6 +495,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB55-ilan-kontrol-eklenti", order: 29.9998, title: "Ilan kontrol eklentisi: ayristirici telemetri sayaclari (lc_parser_telemetry + lc_parser_report JWT RPC); kod yokken telemetri atlanir (sira serbest)", files: [F.lcParserTelemetry] },
     { id: "PB55-gider-butce-tekrar-portal", order: 29.99988, title: "Gider butcesi + tekrarlayan gider + portal gideri eslemesi (sira serbest, ek)", files: [F.expenseBudgetsRecurring] },
     { id: "PB54-vitrin-talep-tokeni", order: 29.9997, title: "Vitrin talep formu tokeni: varsayilan + NULL ofislere uretim (sira serbest)", files: [F.leadCaptureTokenDefault] },
+    { id: "PB58-gider-trend-ay-ekseni", order: 29.999985, title: "Giderler aylik trend ay ekseni tarih (UTC kaymasi duzeltmesi; sira serbest)", files: [F.expenseTrendMonthAxis] },
     { id: "PB56-regex-tekrar-siniri", order: 29.99995, title: "Gecersiz {1,512} regex duzeltmesi (kampanya claim/onay/olusturma + 2 kisit; sira serbest)", files: [F.fixRegexRepetitionLimit] },
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },
     { id: "PB53-abonelik-duraklatma-yukseltme", order: 29.9992, title: "Abonelik duraklatma + planli dusurme (sutun + RPC) -> oransal paket yukseltme faturasi (fulfill/v2 tam govde)", files: [F.subscriptionPause, F.planUpgradeFulfillment] },
