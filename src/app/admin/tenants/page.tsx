@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { daysAgoIso, daysFromNowIso, isPast } from "@/lib/clock";
 import { formatDateTr } from "@/lib/format";
 import {
@@ -220,7 +219,6 @@ export default async function AdminTenantsPage({
                 Yeni ofis
               </ButtonLink>
             ) : null}
-            <ReportOpenLink scope="platform" report="ofisler" filters={{ q: raw.q, durum: raw.durum, plan: raw.plan }} />
           </>
         }
       >

@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Copy, Pencil, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -260,9 +259,6 @@ export default async function CampaignDetailPage({
               {visibleRecipients.length} kayıt
               {visibleRecipients.length !== recipients.length ? ` · ${recipients.length} içinden` : ""}
             </span>
-            {recipients.length > 0 ? (
-              <ReportOpenLink report="kampanya-alicilari" filters={{ kampanya: campaign.id, durum: ["pending", "sent", "delivered", "failed", "opted_out"].includes(durum) ? durum : undefined }} />
-            ) : null}
           </span>
         </div>
 

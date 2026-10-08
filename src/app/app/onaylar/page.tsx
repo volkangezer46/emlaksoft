@@ -1,5 +1,4 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
@@ -269,7 +268,6 @@ export default async function OnaylarPage({
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <ReportOpenLink report="onaylar" filters={{ durum: durum || undefined, tur: tur || undefined, talepEden: talepEden || undefined, from: bas || undefined, to: bit || undefined }} />
             {manager ? (
               <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
                 Onay kuralları

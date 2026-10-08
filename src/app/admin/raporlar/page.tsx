@@ -7,7 +7,7 @@ import { moduleAdoption } from "@/lib/admin/platform-metrics";
 import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { ReportCenter } from "@/components/report-center/report-center";
+import { ReportCenter, ReportCenterEntry } from "@/components/report-center/report-center";
 import { ReportTabs } from "@/components/report-center/report-tabs";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
@@ -155,6 +155,9 @@ export default async function AdminReportsPage({
   return (
     <div className="space-y-5">
       <ReportTabs scope="platform" active="ozet" overviewLabel="Platform analizi" />
+      <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
+        <ReportCenterEntry scope="platform" />
+      </Suspense>
       <AdminPageHeader
         eyebrow="Platform analizi"
         icon={BarChart3}

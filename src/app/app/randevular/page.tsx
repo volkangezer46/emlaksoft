@@ -14,7 +14,6 @@ import {
   Hourglass,
 } from "lucide-react";
 import { redirect } from "next/navigation";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ButtonLink } from "@/components/ui/button";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { createClient } from "@/lib/supabase/server";
@@ -700,7 +699,6 @@ export default async function AppointmentsPage({
                 };
               })}
             />
-            <ReportOpenLink report="randevular" filters={{ tip: tipF || undefined, durum: durumF || undefined }} />
             {canCreateAppt ? <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink> : null}
           </>
         }

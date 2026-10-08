@@ -1,5 +1,4 @@
 import { batchAll } from "@/lib/supabase/query-batch";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeft, BookLock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -239,7 +238,6 @@ export default async function LedgerPage({
                 ) : null}
               </CardDescription>
             </div>
-            {officeLevel ? <ReportOpenLink report="uyum-kayit-defteri" /> : null}
           </div>
         </CardHeader>
         <CardContent>

@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ArrowLeft, ArrowUpRight, Fingerprint, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -211,7 +210,7 @@ export default async function AccessControlPage({
       ) : null}
 
       {active === "gunluk" ? (
-        <AuditLog sp={sp} nameOf={nameOf} canExport={canEdit} />
+        <AuditLog sp={sp} nameOf={nameOf} />
       ) : null}
     </div>
   );
@@ -321,15 +320,13 @@ async function PermissionExceptions({
   );
 }
 
-/** (d) Denetim günlüğü: URL filtre kontratı + gerçek sayfalama; rapor için "Raporlarda aç" (aynı süzgeç). */
+/** (d) Denetim günlüğü: URL filtre kontratı + gerçek sayfalama. */
 async function AuditLog({
   sp,
   nameOf,
-  canExport,
 }: {
   sp: { kullanici?: string; yapan?: string; tur?: string; from?: string; to?: string; sayfa?: string };
   nameOf: Map<string, string>;
-  canExport: boolean;
 }) {
   const filters = normalizeAccessAuditFilters(sp);
   const page = parsePage(sp.sayfa);
@@ -347,9 +344,6 @@ async function AuditLog({
           <h2 className="font-display font-bold text-ink-950">Denetim günlüğü</h2>
           <p className="text-xs text-text-muted">Yalnız yetki DEĞİŞİKLİKLERİ yazılır (kim, kime, ne, önce/sonra, gerekçe). Okuma izi tutulmaz.</p>
         </div>
-        {canExport ? (
-          <ReportOpenLink report="yetki-denetimi" filters={{ tur: filters.tur, kullanici: filters.kullanici, yapan: filters.yapan, from: filters.from, to: filters.to }} />
-        ) : null}
       </div>
       <form method="get" action={PATH} className="border-b border-line bg-canvas/50 px-5 py-3">
         <input type="hidden" name="sekme" value="gunluk" />

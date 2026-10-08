@@ -21,7 +21,7 @@ Amaç: sayfalar arası tutarlılık. Aynı iş için tek bileşen.
 | Panel karşılama | `DashboardHero` (`ui/dashboard-hero`) | tek h1; özet KPI tekrarlamaz; `aside` = dönem seçici |
 | URL filtresi segmenti | `SegmentedControl` (`ui/segmented-control`) | seçenekler bağlantıdır; kayan hap |
 | Durum mini kartı | `StatusTile` (`ui/status-tile`) | ilerleme yalnız gerçek pay ile |
-| Sayfa içi rapor bağlantısı | `ReportOpenLink` (`components/report-center`) | İndirme düğmesi YASAK; "Raporlarda aç" liste filtresini rapor merkezine taşır |
+| Rapor düğmesi | YOK | Raporlar yalnız /app/raporlar ve /admin/raporlar (Rapor merkezi) içinde; diğer sayfalarda rapor/indir/Excel/CSV düğmesi YASAK (`report-buttons-contract.test.ts`) |
 | Raporlar bölüm sekmesi | `ReportTabs` + `ReportCenter` | `?sekme=merkez`; katalog → filtre → önizleme → Excel/PDF/CSV |
 | Görünürlükte giriş / içerik geçişi | `Reveal`, `Stagger`, `FadeSwap` (`ui/motion`) | ilk ekranın ALTINDA; reduce'ta durağan |
 

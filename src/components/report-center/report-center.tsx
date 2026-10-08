@@ -73,7 +73,7 @@ async function load(scope: ReportScope): Promise<Loaded> {
 /**
  * RAPOR MERKEZİ — /app/raporlar ve /admin/raporlar `?sekme=merkez`. Katalog (arama + kategori) → rapor çalışma alanı
  * (filtre formu, sunucuda önizleme, Excel / PDF / CSV indirme) → son indirmeler. Filtre kontratı: durum URL'dedir
- * (`rapor`, rapora özel filtre anahtarları, `ara`, `kategori`); sayfa içi "Raporlarda aç" bağlantıları aynı adresi üretir.
+ * (`rapor`, rapora özel filtre anahtarları, `ara`, `kategori`); Rapor merkezi girişi (`ReportCenterEntry`) ve son indirmeler aynı adresi üretir.
  */
 export async function ReportCenter({ scope, params }: { scope: ReportScope; params: Params }) {
   const { ctx, reports } = await load(scope);
@@ -423,6 +423,59 @@ function PreviewTable({ table }: { table: { columns: readonly { key: string; lab
         ) : null}
       </Table>
     </TableFrame>
+  );
+}
+
+/**
+ * Raporlar ana görünümünün üstündeki belirgin "Rapor merkezi" girişi (SUNUCU): görünür rapor/kategori sayısı +
+ * son indirmeler. Raporlar yalnız Raporlar sayfasında üretilir; bu kart sayfa dışına düğme eklemez.
+ */
+export async function ReportCenterEntry({ scope }: { scope: ReportScope }) {
+  const { ctx, reports } = await load(scope);
+  const history = await loadRecentDownloads(ctx, 3);
+  const categoryCount = categoriesFor(scope).filter((c) => reports.some((r) => r.category === c.id)).length;
+  const href = `${REPORT_CENTER_PATH[scope]}?sekme=merkez`;
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-center">
+        <div className="min-w-0 space-y-3">
+          <p className="flex items-center gap-2 text-xs font-semibold text-accent-text">
+            <FileSpreadsheet className="h-4 w-4" aria-hidden /> Rapor merkezi
+          </p>
+          <h2 className="font-display text-lg font-bold text-text">İstediğiniz raporu seçin, süzün, indirin</h2>
+          <p className="text-sm text-text-muted">
+            Tüm raporlar tek yerde: filtreleyin, önizleyin, Excel, PDF ya da CSV olarak indirin.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <ButtonLink href={href} icon={BarChart3}>Rapor merkezini aç</ButtonLink>
+            <Link href={href} className="focus-ring text-xs font-semibold text-text-muted hover:text-accent-text">
+              {reports.length} rapor · {categoryCount} kategori
+            </Link>
+          </div>
+        </div>
+        <div className="min-w-0">
+          <p className="mb-1 flex items-center gap-2 text-xs font-semibold text-text-muted">
+            <Clock3 className="h-3.5 w-3.5" aria-hidden /> Son indirmeleriniz
+          </p>
+          {history.length === 0 ? (
+            <p className="text-sm text-text-muted">Henüz rapor indirmediniz.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {history.map((h) => (
+                <li key={h.id} className="py-2">
+                  <Link href={reportCenterHref(scope, h.reportId, h.filters)} className="focus-ring text-sm font-semibold text-text hover:text-accent-text">
+                    {h.title}
+                  </Link>
+                  <p className="text-xs text-text-muted">
+                    {formatDateTimeTr(h.at)} · {REPORT_FORMAT_LABELS[h.format as keyof typeof REPORT_FORMAT_LABELS] ?? h.format} · {h.rows.toLocaleString("tr-TR")} satır
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

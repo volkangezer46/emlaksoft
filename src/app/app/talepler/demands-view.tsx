@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { AlarmClock, Crosshair, Flame, PieChart, Plus, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -421,7 +420,6 @@ export async function DemandsView({
             <ButtonLink href="/app/eslestirme" variant="secondary" size="sm" icon={Crosshair}>
               Eşleştirme motoru
             </ButtonLink>
-            <ReportOpenLink report="talepler" filters={{ status: ["new", "active", "matched", "closed"].includes(statusF ?? "") ? statusF : undefined, aciliyet: (aciliyetF ?? "").split(",")[0] || undefined, butce: butceF || undefined }} />
             {canCreate ? <ButtonLink href="/app/talepler/yeni" size="sm" icon={Plus}>Yeni talep</ButtonLink> : null}
           </>
         }

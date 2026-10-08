@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -328,7 +327,6 @@ export default async function CustomersPage({
                 İçe aktar
               </ButtonLink>
             ) : null}
-            <ReportOpenLink report="musteriler" filters={{ q: filters.q, type: filters.type, source: filters.source, etiket: filters.etiket, assigned: filters.assigned, kanal: filters.kanal, from: filters.from, to: filters.to }} />
             {canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null}
           </>
         ),

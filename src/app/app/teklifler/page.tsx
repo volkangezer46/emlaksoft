@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { Banknote, CheckCircle2, PieChart, Plus, Search, Tag, Timer, TrendingUp, Undo2 } from "lucide-react";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -247,7 +246,6 @@ export default async function TekliflerPage({
         description="Portföylere gelen teklifleri ve durumlarını izleyin."
         actions={
           <>
-            <ReportOpenLink report="teklifler" filters={{ durum: params.durum, advisor: params.danisman, from: params.from, to: params.to }} />
             {canCreate ? <ButtonLink href="/app/teklifler/yeni" icon={Plus}>Yeni teklif</ButtonLink> : null}
           </>
         }

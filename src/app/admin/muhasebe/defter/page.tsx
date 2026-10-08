@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, FileText, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -57,8 +56,6 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
     for (const k of drop) delete merged[k];
     return `/admin/muhasebe/defter?${new URLSearchParams(merged).toString()}`;
   };
-  // Rapor merkezi muhasebe defteri: dönem + rapordaki süzgeçler (ofis / kupon / tutar aralığı sayfaya özgüdür).
-  const exportFilters: Record<string, string | undefined> = { ...periodQs, durum: filterQs.durum, tur: filterQs.tur, yontem: filterQs.yontem, q: filterQs.q };
 
   const chips: { label: string; href: string }[] = [];
   if (filter.durum) chips.push({ label: `Durum: ${LEDGER_STATUS_FILTER_LABELS[filter.durum]}`, href: href({}, ["durum"]) });
@@ -82,9 +79,6 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
         title="Fatura defteri"
         description="Dönem ve süzgeçlere göre fatura listesi. Satıra tıklayınca fatura detayı ve işlemler açılır."
         breadcrumbs={[{ label: "Muhasebe", href: "/admin/muhasebe" }, { label: "Fatura defteri" }]}
-        actions={
-          <ReportOpenLink scope="platform" report="muhasebe-fatura-defteri" filters={exportFilters} label="Raporlarda aç (bu liste)" />
-        }
       />
 
       <PeriodBar basePath="/admin/muhasebe/defter" period={period} keep={filterQs} />

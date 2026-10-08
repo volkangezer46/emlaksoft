@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import {
   AlarmClock,
@@ -447,7 +446,6 @@ export default async function DealsPage({
         description={`${stageLabels.new.label} → ${stageLabels.qualified.label} → ${stageLabels.negotiation.label} → ${stageLabels.won.label}/${stageLabels.lost.label}. Kazanıldığında komisyon otomatik üretilir.`}
         actions={
           <>
-            <ReportOpenLink report="anlasmalar" filters={{ advisor: officeWide ? danismanF || undefined : undefined }} />
             {canCreate ? <ButtonLink href="/app/anlasmalar/yeni" icon={Plus}>Yeni anlaşma</ButtonLink> : null}
           </>
         }

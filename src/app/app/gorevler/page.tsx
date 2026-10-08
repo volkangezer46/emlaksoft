@@ -1,5 +1,4 @@
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { AlarmClock, CalendarClock, CalendarDays, CheckCircle2, Columns3, List, PieChart, Plus, Sunrise } from "lucide-react";
@@ -399,12 +398,6 @@ export default async function TasksPage({
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <ViewSwitcher options={viewOptions} active={gorunum} label="Görev görünümü" />
-            {emptyAll ? null : (
-              <ReportOpenLink
-                report="gorevler"
-                filters={{ durum: filter === "done" ? "done" : filter === "overdue" ? undefined : filter === "all" ? undefined : "open", gecikmis: filter === "overdue" ? "evet" : undefined, tur: tur || undefined, advisor: danismanF || undefined }}
-              />
-            )}
             {canCreate ? <ButtonLink href="/app/gorevler/yeni" icon={Plus}>Yeni görev</ButtonLink> : null}
           </div>
         }

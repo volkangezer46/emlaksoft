@@ -1,5 +1,4 @@
 import { formatTry } from "@/lib/format";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
@@ -642,7 +641,6 @@ export default async function PropertiesPage({
         meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
-            <ReportOpenLink report="portfoyler" filters={{ status: sp0?.status, islem: sp0?.islem === "Satılık" || sp0?.islem === "Kiralık" ? sp0.islem : undefined, advisor: sp0?.danisman }} />
             {canCreate && (perms.customers ?? []).includes("create") ? (
               <ButtonLink href="/app/ice-aktarma" variant="secondary" size="sm" icon={Upload}>
                 İçe aktar

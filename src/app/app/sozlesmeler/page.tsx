@@ -1,5 +1,4 @@
 import Link from "@/components/ui/smart-link";
-import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { AlarmClock, BarChart3, CalendarX2, FileSignature, PenLine, PieChart, Plus, Search, Send } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
@@ -275,7 +274,6 @@ export default async function SozlesmelerPage({
         description="Kira, satış ve diğer sözleşme taslakları oluşturun. İmza linki ile dijital onay alın."
         actions={
           <>
-            {totalAll > 0 ? <ReportOpenLink report="sozlesmeler" filters={{ durum: params.durum, tur: params.tur, from: params.from, to: params.to }} /> : null}
             {canCreate ? <ButtonLink href="/app/sozlesmeler/yeni" icon={Plus}>Yeni sözleşme</ButtonLink> : null}
           </>
         }
