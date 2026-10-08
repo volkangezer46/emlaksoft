@@ -8,8 +8,8 @@
  */
 
 export type OnboardingCounts = {
-  /** Telefon / şehir / ruhsat alanlarından dolu olanlar. */
-  profileFilled: { phone: boolean; city: boolean; licenseNo: boolean };
+  /** Ofis profili tamam mı? TEK kaynak: `profile-completion` (ekip daveti ayrı "Ekip" adımıdır; bkz. `isOfficeProfileDone`). */
+  officeProfileDone: boolean;
   /** Örnek (is_sample) olmayan müşteri sayısı. */
   customers: number;
   /** Örnek olmayan portföy sayısı. */
@@ -55,12 +55,6 @@ export type OnboardingState = {
   complete: boolean;
 };
 
-export const PROFILE_MIN_FIELDS = 2;
-
-export function isProfileComplete(p: OnboardingCounts["profileFilled"]): boolean {
-  return [p.phone, p.city, p.licenseNo].filter(Boolean).length >= PROFILE_MIN_FIELDS;
-}
-
 export const ONBOARDING_STEP_IDS: readonly OnboardingStepId[] = ["office", "team", "data", "property", "demand", "appointment", "defs", "portals"];
 
 export function isOnboardingStepId(v: unknown): v is OnboardingStepId {
@@ -80,8 +74,8 @@ export function buildOnboarding(
       id: "office",
       short: "Ofis",
       title: "Ofis bilgileriniz",
-      description: "Ad, telefon ve şehir sözleşme, portal ve vitrinde görünür.",
-      done: isProfileComplete(counts.profileFilled),
+      description: "Konum, iletişim, vergi ve marka bilgileri sözleşme, portal ve vitrinde görünür.",
+      done: counts.officeProfileDone,
     },
     {
       id: "team",

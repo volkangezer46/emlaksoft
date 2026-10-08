@@ -112,10 +112,11 @@ describe("tek sistem: Kalkan ile birleşik akış", () => {
     expect(a).toContain("lc_submit_manual_check");
     expect(a.match(/createAdminClient\s*\(/g)).toHaveLength(4);
   });
-  it("ana ekran Kalkan bloğu 'portalda kayıp' sayısını İlan Kontrol özetinden okur", () => {
-    const h = src("src/app/app/_home/kayip-kacak.tsx");
+  it("ana ekran İlan sağlığı bloğu 'portalda kayıp' sayısını İlan Kontrol özetinden okur ve aynı bayrakla filtreli listeye bağlar", () => {
+    const h = src("src/app/app/_home/ilan-sagligi.tsx");
     expect(h).toContain("getControlSummary");
-    expect(h).toContain('kpiHref("portal_missing")');
+    expect(h).toContain("kpiHref(k, group, groupId)");
+    expect(h).toContain('href("portal_missing")');
   });
   it("olay tüketicisi: kapanış ve doğrulama olaylarını işler", () => {
     const rows = [

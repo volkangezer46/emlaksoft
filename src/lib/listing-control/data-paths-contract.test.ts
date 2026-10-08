@@ -74,10 +74,15 @@ describe("istemci/sunucu sınırları", () => {
     expect(src("src/lib/listing-control/server/escalate.ts")).toContain("createSlaTasks(");
     expect(src("src/lib/listing-control/server/escalate.ts")).toContain("notifyTenant(");
   });
-  it("ana ekran kartı yalnız yeni dosyada; page.tsx'te tek import + tek satır", () => {
+  it("ana ekran ilan sağlığı TEK blok: yalnız ilan-sagligi.tsx; page.tsx'te tek import + tek kullanım, rol yerleşimi home-layout'tan", () => {
     const p = src("src/app/app/page.tsx");
-    expect(p.match(/PortfoySagligi/g)?.length).toBe(2);
-    expect(src("src/app/app/_home/portfoy-sagligi.tsx")).toContain("getControlSummary");
+    expect(p.match(/IlanSagligi/g)?.length).toBe(2);
+    expect(p).toContain("layout.listingHealth");
+    expect(p).not.toMatch(/PortfoySagligi|KayipKacak|PortalSagligi/);
+    expect(src("src/app/app/_home/ilan-sagligi.tsx")).toContain("getControlSummary");
+    for (const gone of ["portfoy-sagligi", "kayip-kacak", "portal-ekip"]) {
+      expect(existsSync(join(ROOT, `src/app/app/_home/${gone}.tsx`)), gone).toBe(false);
+    }
   });
 });
 

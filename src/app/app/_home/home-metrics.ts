@@ -120,10 +120,6 @@ export type AttentionInput = {
   overdueRent: number | null;
   staleDeals: number | null;
   staleDays: number;
-  unconfirmedListings: number | null;
-  expiringAuthority: number | null;
-  /** Yükleyici tavanına ulaşıldı: sayı kesin değil → sayı gösterilmez. */
-  expiringCapped: boolean;
   /** Tahsil edilmemiş komisyon tutarı (₺); tutar olduğu için `count` taşımaz. */
   pendingCommission: number | null;
   pendingCommissionText: string;
@@ -138,7 +134,7 @@ const LEVEL_ORDER: Record<AttentionLevelKey, number> = { acil: 0, yuksek: 1, ort
 /**
  * "Dikkat gerektirenler" kalemlerini tek yerde kurar (eski "Karar bekleyenler" + "Bugün kuyruğu" birleşti).
  * Yalnız sayısı > 0 olan kalem girer; sıra önem düzeyi, eşitlikte tanım sırası. Her kalem filtrelenmiş listeye gider.
- * (Kaçan komisyon burada DEĞİL: "Kaçan komisyonlar" bloğundadır — aynı sayı iki yerde yok.)
+ * (İlan olguları — teyitsiz ilan, yetkisi dolan, kayıp/kapanmış — burada DEĞİL: tek "İlan sağlığı" bloğundadır; aynı sayı iki yerde yok.)
  */
 export function buildAttentionItems(d: AttentionInput): HomeAttentionItem[] {
   const items: HomeAttentionItem[] = [];
@@ -186,28 +182,6 @@ export function buildAttentionItems(d: AttentionInput): HomeAttentionItem[] {
       level: "yuksek",
       count: d.staleDeals,
       brief: `${d.staleDeals} anlaşma ${d.staleDays}+ gündür hareketsiz`,
-    });
-  }
-  if (d.unconfirmedListings) {
-    items.push({
-      id: "teyit",
-      label: "Teyitsiz ilan",
-      hint: "7+ gündür portalda teyit edilmedi",
-      href: "/app/portallar?durum=teyit",
-      level: "orta",
-      count: d.unconfirmedListings,
-      brief: `${d.unconfirmedListings} ilan 7+ gündür teyitsiz`,
-    });
-  }
-  if (d.expiringAuthority) {
-    items.push({
-      id: "yetki",
-      label: "Yetkisi dolan portföy",
-      hint: "Yetki belgesi 15 gün içinde bitiyor",
-      href: `/app/portfoyler?yetki=bitiyor${mineOwner}`,
-      level: "orta",
-      ...(d.expiringCapped ? {} : { count: d.expiringAuthority }),
-      brief: d.expiringCapped ? "Yetkisi 15 gün içinde dolan portföyler var" : `${d.expiringAuthority} portföyün yetkisi 15 gün içinde doluyor`,
     });
   }
   if (d.pendingCommission && d.pendingCommission > 0) {

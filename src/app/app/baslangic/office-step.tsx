@@ -1,108 +1,56 @@
-"use client";
-
-import { FileInput } from "@/components/ui/file-input";
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import Link from "@/components/ui/smart-link";
+import { ArrowRight, Circle } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { PhoneInput } from "@/components/ui/phone-input";
-import { GeoSelect } from "@/components/app/geo-select";
-import type { GeoOption } from "@/lib/geo/types";
-import { saveOfficeProfile } from "@/app/actions/onboarding-setup";
-import { uploadTenantLogo } from "@/app/actions/tenant-logo";
+import { ButtonLink } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { isOfficeProfileDone, PROFILE_WIZARD_HREF, profileStepHref, type ProfileCompletion } from "@/lib/profile-completion";
 
-type Props = {
-  canEdit: boolean;
-  nextHref: string;
-  initial: { name: string; phone: string; city: string; provinceId: string | null; districtId: string | null; addressLine: string; licenseNo: string; taxNumber: string; logoUrl: string | null };
-  provinces: GeoOption[];
-};
-
-const inputCls =
-  "focus-ring w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm text-text";
-
-function Field({ label, htmlFor, children, hint }: { label: string; htmlFor: string; children: React.ReactNode; hint?: string }) {
-  return (
-    <div className="min-w-0">
-      <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold text-text-muted">
-        {label}
-      </label>
-      {children}
-      {hint ? <p className="mt-1 text-xs text-text-faint">{hint}</p> : null}
-    </div>
-  );
-}
-
-/** Adım 1: ofis bilgileri. Yalnız mevcut tenants alanları; logo varsa mevcut yükleme action'ı. */
-export function OfficeStep({ canEdit, nextHref, initial, provinces }: Props) {
-  const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
+/**
+ * Adım 1 (Ofis bilgileri): TEK kaynak `/app/ayarlar/profil-tamamla` sihirbazıdır — aynı alanları iki yerde sormayız.
+ * Burada yalnız ilerleme (profil-tamamlama ile AYNI hesap; ekip daveti kurulumda ayrı adım olduğundan sayılmaz) ve
+ * eksik maddelerden ilgili sihirbaz adımına bağlantılar gösterilir; form, doğrulama ve kayıt sihirbazdadır.
+ */
+export function OfficeStep({ canEdit, completion }: { canEdit: boolean; completion: ProfileCompletion }) {
   if (!canEdit) {
     return <Alert tone="info">Ofis bilgilerini yalnız ayar yetkisi olan kullanıcılar düzenleyebilir. Bu adımı atlayabilirsiniz.</Alert>;
   }
-
-  function submit(formData: FormData) {
-    setError(null);
-    startTransition(async () => {
-      const result = await saveOfficeProfile(formData);
-      if (result.error) return setError(result.error);
-      const file = fileRef.current?.files?.[0];
-      if (file && file.size > 0) {
-        const logoData = new FormData();
-        logoData.set("logo", file);
-        const logo = await uploadTenantLogo(logoData);
-        if (logo.error) return setError(`Bilgiler kaydedildi ama logo yüklenemedi: ${logo.error}`);
-      }
-      router.push(nextHref);
-    });
-  }
+  const missing = completion.missing.filter((m) => m.step !== "ekip");
+  const done = isOfficeProfileDone(completion);
+  const total = completion.total - completion.items.filter((i) => i.step === "ekip").length;
+  const doneCount = total - missing.length;
+  const percent = total === 0 ? 100 : Math.round((doneCount / total) * 100);
 
   return (
-    <form action={submit} className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
-      <div className="sm:col-span-2">
-        <Field label="Ofis adı" htmlFor="kur-name">
-          <input id="kur-name" name="name" required defaultValue={initial.name} className={inputCls} autoComplete="organization" />
-        </Field>
-      </div>
-      <Field label="Telefon" htmlFor="kur-phone">
-        <PhoneInput id="kur-phone" name="phone" defaultValue={initial.phone} className={inputCls} />
-      </Field>
-      <Field label="Ruhsat no" htmlFor="kur-license">
-        <input id="kur-license" name="license_no" defaultValue={initial.licenseNo} className={inputCls} />
-      </Field>
-      <div className="sm:col-span-2">
-        <GeoSelect provinces={provinces} defaultProvinceId={initial.provinceId} defaultDistrictId={initial.districtId} withNeighborhood={false} />
-      </div>
-      <Field label="Vergi no / T.C. kimlik no" htmlFor="kur-tax" hint="Ödeme ve fatura için gerekir; 10 haneli vergi no ya da 11 haneli T.C. kimlik no.">
-        <input id="kur-tax" name="tax_number" inputMode="numeric" maxLength={11} defaultValue={initial.taxNumber} className={inputCls} placeholder="1234567890" />
-      </Field>
-      <Field label="Açık adres" htmlFor="kur-address" hint="Fatura için en az 10 karakter.">
-        <input id="kur-address" name="address_line" defaultValue={initial.addressLine} placeholder="Kadıköy, Bağdat Cad. No:42" className={inputCls} />
-      </Field>
-      <div className="sm:col-span-2">
-        <Field label="Logo (isteğe bağlı)" htmlFor="kur-logo" hint="PNG, JPG veya WebP. Sözleşme, brifing ve portal çıktılarında görünür.">
-          <div className="flex items-center gap-3">
-            {initial.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- tenant logosu dış depodan gelir
-              <img src={initial.logoUrl} alt="Mevcut logo" className="h-10 w-10 rounded-[var(--radius-control)] border border-line object-contain" />
-            ) : null}
-            <FileInput id="kur-logo" ref={fileRef} accept="image/png,image/jpeg,image/webp" />
-          </div>
-        </Field>
-      </div>
-      {error ? (
-        <div className="sm:col-span-2">
-          <Alert tone="danger">{error}</Alert>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold text-text">
+            {doneCount} / {total} ofis bilgisi tamam
+          </p>
+          <p className="text-sm font-semibold text-text-muted">%{percent}</p>
         </div>
-      ) : null}
-      <div className="sm:col-span-2">
-        <Button type="submit" loading={pending}>
-          Kaydet ve devam et
-        </Button>
+        <Progress value={percent} label="Ofis bilgileri ilerlemesi" tone={done ? "success" : "accent"} />
       </div>
-    </form>
+      {done ? (
+        <Alert tone="success">Ofis bilgileriniz tamam. Değiştirmek için profil sihirbazını açabilirsiniz.</Alert>
+      ) : (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Eksik bilgiler">
+          {missing.map((m) => (
+            <li key={m.id}>
+              <Link
+                href={profileStepHref(m.step)}
+                className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-ink-950"
+              >
+                <Circle className="h-3 w-3 text-text-faint" aria-hidden="true" />
+                {m.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ButtonLink href={done ? PROFILE_WIZARD_HREF : profileStepHref(missing[0]?.step ?? "konum")} iconRight={ArrowRight}>
+        {done ? "Ofis profilini aç" : "Ofis profilini tamamla"}
+      </ButtonLink>
+    </div>
   );
 }

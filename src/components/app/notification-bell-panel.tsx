@@ -304,13 +304,20 @@ export function NotificationBellPanel({
             </div>
 
             {/* Arşiv: tüm bildirimlerin filtreli/sayfalı tam listesi */}
-            <div className="border-t border-line">
+            <div className="flex divide-x divide-line border-t border-line">
               <Link
                 href="/app/bildirimler"
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
+                className="block flex-1 px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
               >
                 Tümünü gör
+              </Link>
+              <Link
+                href="/app/bildirimler?sekme=duyurular"
+                onClick={() => setOpen(false)}
+                className="block flex-1 px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
+              >
+                Duyurular
               </Link>
             </div>
       </PopoverContent>

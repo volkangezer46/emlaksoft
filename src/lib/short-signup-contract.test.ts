@@ -84,9 +84,19 @@ describe("ofis profili sihirbazı sözleşmesi", () => {
     expect(read("src/app/actions/onboarding-setup.ts")).toContain("parsePhoneStrict");
   });
 
-  it("sayfa yetki kapısı ve ana ekran kartı tek satırlık Suspense ile bağlı", () => {
+  it("sayfa yetki kapısı; ana ekranda TEK Başlangıç kartı profil ilerlemesini taşır, kurulum ofis adımı aynı modeli kullanır", () => {
     expect(read("src/app/app/ayarlar/profil-tamamla/page.tsx")).toContain('requireModulePage("settings"');
-    expect(read("src/app/app/page.tsx")).toContain("<ProfilTamamla ctx={ctx} />");
+    const page = read("src/app/app/page.tsx");
+    expect(page).toContain("<BaslangicKarti ctx={ctx} />");
+    expect(page).not.toMatch(/ProfilTamamla|KurulumSeridi|DuyuruSatiri|OrnekVeriYenileBandi|HizliAksiyonlar/);
+    const card = read("src/app/app/_home/baslangic-karti.tsx");
+    expect(card).toContain("profileStepHref");
+    expect(card).toContain("snap.profile.completion");
+    // Kurulum sihirbazı ofis adımı alanları yeniden sormaz: ilerleme ve form tek kaynak (profil-tamamla).
+    const office = read("src/app/app/baslangic/office-step.tsx");
+    expect(office).toContain("PROFILE_WIZARD_HREF");
+    expect(office).not.toMatch(/saveOfficeProfile|PhoneInput|GeoSelect/);
+    expect(read("src/lib/onboarding-state.ts")).toContain("isOfficeProfileDone");
   });
 
   it("her adımın sihirbazda gövdesi var", () => {

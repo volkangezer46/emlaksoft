@@ -26,7 +26,7 @@ describe("homeLayoutFor rol matrisi", () => {
     const l = homeLayoutFor("owner");
     expect(l).toMatchObject({ focus: "attention", attention: true, revenueChart: true, team: true, funnelTarget: "office", scopeSwitch: true, callList: false, auditLink: true });
     expect(l.metrics).toEqual(["ciro", "aktif-anlasma", "yeni-talep", "yeni-musteri", "arama"]);
-    expect(l.bottom).toEqual(["program", "gorevler", "risk"]);
+    expect(l.bottom).toEqual(["program", "gorevler"]);
   });
   it("danışman: sıradaki eylem odağı, nedenli arama listesi, kişisel hedef; ekip/dikkat/denetim YOK", () => {
     const l = homeLayoutFor("advisor");
@@ -72,6 +72,16 @@ describe("homeLayoutFor rol matrisi", () => {
       if (l.attention) expect(l.metrics, r).not.toContain("bekleyen-komisyon");
     }
     expect(homeLayoutFor("owner").more as string[]).not.toContain("kuyruk");
+  });
+  it("ilan olguları TEK 'İlan sağlığı' bloğunda: satış rolleri görür, muhasebe/arama merkezi görmez; eski parçalı bloklar yok", () => {
+    for (const r of ["owner", "gm", "branch_manager", "team_lead", "advisor", "readonly"]) expect(homeLayoutFor(r).listingHealth, r).toBe(true);
+    for (const r of ["accounting", "call_center"]) expect(homeLayoutFor(r).listingHealth, r).toBe(false);
+    for (const r of ROLES) {
+      const l = homeLayoutFor(r);
+      for (const gone of ["risk", "yetki", "portal-sagligi", "hizli"]) {
+        expect([...l.bottom, ...l.more] as string[], `${r}:${gone}`).not.toContain(gone);
+      }
+    }
   });
   it("her çağrı bağımsız kopya döner (dış mutasyon yerleşimi bozmaz)", () => {
     const a = homeLayoutFor("owner");

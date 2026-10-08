@@ -34,7 +34,7 @@ export function DikkatIskelet() {
 }
 
 /**
- * DİKKAT GEREKTİRENLER (yönetim): geciken tahsilat/görev, onay, riskli anlaşma, teyitsiz ilan, yetkisi dolan portföy,
+ * DİKKAT GEREKTİRENLER (yönetim): geciken tahsilat/görev, onay, riskli anlaşma,
  * bekleyen komisyon, hareketsiz danışman — hepsi gerçek sayım, önem haplı, filtreli hedefe gider (`loadAttention`).
  * Altında içgörü motorunun GERÇEK içgörüleri (`insights` okuyucusu; yoksa bölüm çizilmez, içgörü UYDURULMAZ) ve
  * opsiyonel AI özet satırı. Eski "Karar bekleyenler", "Bugün kuyruğu" ve brifing odak kartı burada birleşti.
@@ -53,7 +53,7 @@ export async function Dikkat({ ctx, params }: { ctx: HomeCtx; params: HomeParams
     <AttentionList
       items={items.map((i) => ({ id: i.id, label: i.label, hint: i.hint, href: i.href, level: i.level, count: i.count }))}
       emptyTitle="Şu an dikkat bekleyen iş yok"
-      emptyDescription="Geciken görev, onay, riskli anlaşma ya da teyitsiz ilan oluşunca burada önem sırasıyla listelenir."
+      emptyDescription="Geciken görev, onay ya da riskli anlaşma oluşunca burada önem sırasıyla listelenir. İlan sorunları İlan sağlığı bloğundadır."
     >
       <Suspense fallback={null}>
         <BugunAiOzet attention={items} ctx={ctx} />

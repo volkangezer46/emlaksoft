@@ -31,7 +31,6 @@ import { periodStatsFromSnapshot, type TaskOpenRow } from "./snapshot-core";
 import { getSetting } from "@/lib/settings/read";
 import { moneyTry } from "@/lib/leak-shield";
 import { STALE_DAYS as DEFAULT_STALE_DAYS } from "../anlasmalar/deal-list-logic";
-import { overdueListingsOf } from "./helpers";
 import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
 
 /**
@@ -743,8 +742,8 @@ export const loadDecisions = cache(async (ctx: HomeCtx) => {
 
 /* ------------------------- Dikkat gerektirenler (tek yükleyici) ------------------------- */
 
-/** Yükleyicinin tavanı (`loadExpiringAuthority` limit 12): tavana ulaşan sayı kesin değildir. */
-const EXPIRING_CAP = 12;
+/** Yükleyicinin tavanı (`loadExpiringAuthority` limit 12): tavana ulaşan sayı kesin değildir (İlan sağlığı bloğu kullanır). */
+export const EXPIRING_CAP = 12;
 
 /**
  * Riskli anlaşma = eşik (Ofis Tanımları `office.alert.deal_stale_days`, varsayılan 14) gündür hareketsiz AÇIK anlaşma.
@@ -768,12 +767,10 @@ export const loadStaleDeals = cache(async (ctx: HomeCtx) => {
  */
 export const loadAttention = cache(async (ctx: HomeCtx): Promise<HomeAttentionItem[]> => {
   const salesRole = ctx.role !== "accounting" && ctx.role !== "call_center";
-  const [tasks, decisions, stale, listings, expiring, commission] = await Promise.all([
+  const [tasks, decisions, stale, commission] = await Promise.all([
     loadTaskSummary(ctx).catch(() => null),
     ctx.isManagement ? loadDecisions(ctx).catch(() => null) : Promise.resolve(null),
     salesRole ? loadStaleDeals(ctx).catch(() => null) : Promise.resolve(null),
-    ctx.isManagement ? loadLiveListings(ctx).catch(() => null) : Promise.resolve(null),
-    salesRole && ctx.canSeeProperties ? loadExpiringAuthority(ctx).catch(() => null) : Promise.resolve(null),
     ctx.canSeeCommissions && ctx.role !== "accounting" ? loadCommissionSummary(ctx).catch(() => null) : Promise.resolve(null),
   ]);
   return buildAttentionItems({
@@ -782,9 +779,6 @@ export const loadAttention = cache(async (ctx: HomeCtx): Promise<HomeAttentionIt
     overdueRent: decisions?.overdueRent ?? null,
     staleDeals: stale?.count ?? null,
     staleDays: stale?.days ?? DEFAULT_STALE_DAYS,
-    unconfirmedListings: listings ? overdueListingsOf(listings).length : null,
-    expiringAuthority: expiring ? expiring.data.length : null,
-    expiringCapped: (expiring?.data.length ?? 0) >= EXPIRING_CAP,
     pendingCommission: commission?.pending ?? null,
     pendingCommissionText: moneyTry(commission?.pending ?? 0),
     passiveAdvisors: decisions?.passiveAdvisors ?? null,

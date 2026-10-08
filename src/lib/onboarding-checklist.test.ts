@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOnboarding,
-  isProfileComplete,
   resolveWizardStep,
   wizardNeighbors,
   type OnboardingCounts,
 } from "./onboarding-checklist";
+import { computeProfileCompletion, isOfficeProfileDone, type ProfileFacts } from "./profile-completion";
 
 const empty: OnboardingCounts = {
-  profileFilled: { phone: false, city: false, licenseNo: false },
+  officeProfileDone: false,
   customers: 0,
   properties: 0,
   members: 1,
@@ -29,9 +29,17 @@ describe("onboarding-checklist", () => {
     expect(s.settled).toBe(false);
   });
 
-  it("profil için en az iki alan gerekir", () => {
-    expect(isProfileComplete({ phone: true, city: false, licenseNo: false })).toBe(false);
-    expect(isProfileComplete({ phone: true, city: true, licenseNo: false })).toBe(true);
+  it("ofis adımı TEK ilerleme modelinden türer: profil-tamamlama (ekip hariç) tamamsa adım tamam", () => {
+    const facts: ProfileFacts = {
+      provinceId: "p", districtId: "d", addressLine: "Bağdat Cad. No:42 Kadıköy", phone: "05321234567", licenseNo: "L-1",
+      taxNumber: "1234567890", logoUrl: "x", brandColor: "#123456", extAvailable: true, officeType: "ofis",
+      focusSegments: ["konut"], workDistrictIds: ["d"], memberCount: 1,
+    };
+    // Ekip daveti eksik olsa da (kurulumda ayrı adım) ofis adımı tamam sayılır.
+    expect(isOfficeProfileDone(computeProfileCompletion(facts))).toBe(true);
+    expect(isOfficeProfileDone(computeProfileCompletion({ ...facts, phone: null }))).toBe(false);
+    expect(buildOnboarding({ ...empty, officeProfileDone: true }).steps[0].done).toBe(true);
+    expect(buildOnboarding(empty).steps[0].done).toBe(false);
   });
 
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
@@ -39,7 +47,7 @@ describe("onboarding-checklist", () => {
       ...empty,
       customers: 3,
       properties: 1,
-      profileFilled: { phone: true, city: true, licenseNo: false },
+      officeProfileDone: true,
     });
     expect(s.doneCount).toBe(3);
     expect(s.percent).toBe(38);
@@ -62,7 +70,7 @@ describe("onboarding-checklist", () => {
 
   it("tüm adımlar dolu: complete", () => {
     const s = buildOnboarding({
-      profileFilled: { phone: true, city: true, licenseNo: true },
+      officeProfileDone: true,
       customers: 1,
       properties: 1,
       members: 2,
