@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { Avatar } from "@/components/ui/avatar";
+import { loadAvatarMap } from "@/lib/avatar-read";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { Activity, ArrowLeft, BadgeCheck, MapPinned, UserCog, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
@@ -86,6 +88,7 @@ export async function AdvisorDetailView({
     .maybeSingle();
   if (!member) notFound();
 
+  const memberAvatar = (await loadAvatarMap([id], supabase)).get(id);
   const nowMs = now();
   const year = trMonthContext(nowMs).monthKey.slice(0, 4);
   const yearPeriod = trYearPeriod(Number(year));
@@ -173,9 +176,13 @@ export async function AdvisorDetailView({
         className="mb-0"
         as={headingAs}
         icon={
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
-            {initials(member.full_name)}
-          </span>
+          memberAvatar?.avatar_url || memberAvatar?.avatar_preset ? (
+            <Avatar name={member.full_name} src={memberAvatar.avatar_url} preset={memberAvatar.avatar_preset} className="h-16 w-16" />
+          ) : (
+            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-[var(--radius-panel)] bg-[image:var(--grad-brand)] font-display text-xl font-extrabold text-white shadow-[var(--shadow-glow-brand)]">
+              {initials(member.full_name)}
+            </span>
+          )
         }
         title={member.full_name}
         meta={

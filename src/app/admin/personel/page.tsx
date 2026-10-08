@@ -1,6 +1,7 @@
 "use client";
 
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "@/components/ui/smart-link";
@@ -48,6 +49,8 @@ type StaffRow = {
   is_active: boolean;
   created_at: string;
   last_sign_in_at?: string | null;
+  avatar_url?: string | null;
+  avatar_preset?: string | null;
 };
 
 type StatusFilter = "all" | "active" | "passive" | "recent" | "never";
@@ -125,14 +128,19 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => Promise<
   return (
     <TR {...rowDraftProps(draft)}>
       <TD>
-        <Link
-          href={`/admin/personel/${member.id}`}
-          title="Personel detayı ve aktivitesi"
-          className="font-semibold text-ink-950 transition hover:text-brand-600"
-        >
-          {member.full_name}
-        </Link>
-        <p className="text-xs text-text-faint">{member.email}</p>
+        <div className="flex items-center gap-2.5">
+          <Avatar name={member.full_name} src={member.avatar_url} preset={member.avatar_preset} size="md" />
+          <div className="min-w-0">
+            <Link
+              href={`/admin/personel/${member.id}`}
+              title="Personel detayı ve aktivitesi"
+              className="font-semibold text-ink-950 transition hover:text-brand-600"
+            >
+              {member.full_name}
+            </Link>
+            <p className="text-xs text-text-faint">{member.email}</p>
+          </div>
+        </div>
       </TD>
       <TD>
         <InlineSelect

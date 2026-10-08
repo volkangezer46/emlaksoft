@@ -8,6 +8,7 @@ import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
+import { loadStaffAvatar } from "@/lib/avatar-read";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { ThemeController } from "@/components/theme-controller";
@@ -63,9 +64,11 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
 
   // Sidebar rozet sayıları — 30 sn önbellekli (bkz. admin-badges.ts); her
   // gezinmede 3 count sorgusu koşmasın.
-  const [badges, health] = await Promise.all([
+  const [badges, health, avatar] = await Promise.all([
     getAdminBadges(modules),
     modules.includes("sistem") ? getAdminHealth().catch(() => null) : Promise.resolve(null),
+    // Üst çubuk avatarı: kendi satırı (RLS platform_staff_self_select); hata/yoksa baş harf.
+    loadStaffAvatar(staff.id),
   ]);
 
   // MFA tek kaynak uyumu: env ile DB ayarı (SQL kapıları yalnız ayara bakar) ayrışırsa uyarı şeridi.
@@ -78,7 +81,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <SidebarBoot />
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} modules={modules} fontScale={fontScale} health={health} />
+        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} modules={modules} fontScale={fontScale} health={health} />
         {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
         <main

@@ -11,6 +11,7 @@ import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { OPEN_DEMAND_STATUSES } from "@/lib/team/advisor-360";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import { loadSampleKpiScope } from "@/lib/sample-scope";
+import { loadAvatarMap } from "@/lib/avatar-read";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -37,6 +38,9 @@ export type TvLeagueRow = {
   conversionPct: number | null;
   /** Yalnız gelir görünürse; aksi halde null. */
   revenue: number | null;
+  /** Profil fotoğrafı / hazır avatar (kişisel veri değil); yoksa baş harf. */
+  avatarUrl: string | null;
+  avatarPreset: string | null;
 };
 
 export type TvProperty = {
@@ -209,10 +213,17 @@ export async function loadTvData(
       appointments: r.appointCount,
       conversionPct: r.conversionPct,
       revenue: revenueVisible ? r.revenue : null,
+      avatarUrl: null as string | null,
+      avatarPreset: null as string | null,
     }))
     .filter((r) => r.deals > 0 || r.appointments > 0)
     .sort((a, b) => (revenueVisible ? (b.revenue ?? 0) - (a.revenue ?? 0) : 0) || b.deals - a.deals || b.appointments - a.appointments || a.name.localeCompare(b.name, "tr"))
     .slice(0, 20);
+  const leagueAvatars = await loadAvatarMap(league.map((r) => r.id), supabase);
+  for (const r of league) {
+    r.avatarUrl = leagueAvatars.get(r.id)?.avatar_url ?? null;
+    r.avatarPreset = leagueAvatars.get(r.id)?.avatar_preset ?? null;
+  }
 
   const propRows = rows(propRes);
   const propIds = propRows.map((p) => String(p.id));

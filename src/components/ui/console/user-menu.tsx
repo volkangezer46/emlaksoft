@@ -26,6 +26,9 @@ export function UserMenu(props: {
   initials: string;
   name: string;
   subtitle: string;
+  /** Profil fotoğrafı / hazır avatar (yoksa baş harf). */
+  avatarUrl?: string | null;
+  avatarPreset?: string | null;
   links?: UserMenuLink[];
   /** Sade görünüm (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
@@ -49,12 +52,16 @@ function Trigger({
   initials,
   name,
   subtitle,
+  avatarUrl,
+  avatarPreset,
   onOpen,
   warm,
 }: {
   initials: string;
   name: string;
   subtitle: string;
+  avatarUrl?: string | null;
+  avatarPreset?: string | null;
   onOpen?: () => void;
   warm?: () => void;
 }) {
@@ -69,7 +76,7 @@ function Trigger({
       aria-label={`Kullanıcı menüsü: ${name}`}
       className={USER_MENU_TRIGGER_CLASS}
     >
-      <UserMenuFace initials={initials} name={name} subtitle={subtitle} />
+      <UserMenuFace initials={initials} name={name} subtitle={subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />
     </button>
   );
 }

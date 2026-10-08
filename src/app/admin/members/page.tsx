@@ -13,6 +13,7 @@ import { BarColumns } from "@/components/ui/viz/bar-columns";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { loadAvatarMap } from "@/lib/avatar-read";
 import { MembersTable, type MemberRowData } from "./members-table";
 
 /** Rol sırası (grafik + süzgeç): tek kaynak ROLE_LABELS anahtarları. */
@@ -93,7 +94,10 @@ export default async function AdminMembersPage({
     title: f.rol === r ? "Rol süzgecini kaldır" : `Yalnız ${ROLE_LABELS[r]} rolündekileri göster`,
   })).filter((b) => b.value > 0 || b.active);
 
+  const memberAvatars = await loadAvatarMap(rows.map((m) => m.id), admin);
   const tableRows: MemberRowData[] = rows.map((m) => ({
+    avatarUrl: memberAvatars.get(m.id)?.avatar_url ?? null,
+    avatarPreset: memberAvatars.get(m.id)?.avatar_preset ?? null,
     id: m.id,
     name: m.full_name,
     phone: m.phone ?? null,

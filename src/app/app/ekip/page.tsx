@@ -33,6 +33,8 @@ import { ROLE_LABELS } from "@/lib/role-labels";
 import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
 import { ReferralNudge } from "@/components/app/referral-nudge";
 import { loadSeatUsageSummary } from "@/lib/billing/seat-purchase";
+import { Avatar } from "@/components/ui/avatar";
+import { loadAvatarMap } from "@/lib/avatar-read";
 import { AdvisorTable } from "@/components/app/office-center/advisor-table";
 import { loadOfficeAdvisors } from "@/lib/office-center/store";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
@@ -197,6 +199,7 @@ export default async function TeamPage() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.count));
+  const loadAvatars = await loadAvatarMap(loadRows.map((r) => r.id), supabase);
 
   const canOfficeCenter = effectiveCanAccessModule(perms, "office_center");
   const canOfficeCenterEdit = (perms.office_center ?? []).includes("edit");
@@ -355,7 +358,8 @@ export default async function TeamPage() {
               {loadRows.map((r, i) => (
                 <Link key={r.id} href={`/app/ekip/${r.id}`} className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
                   <div className="mb-1 flex justify-between text-xs">
-                    <span className="flex items-center gap-1 font-semibold text-ink-950 group-hover:text-brand-600">
+                    <span className="flex items-center gap-1.5 font-semibold text-ink-950 group-hover:text-brand-600">
+                      <Avatar name={r.name} src={loadAvatars.get(r.id)?.avatar_url} preset={loadAvatars.get(r.id)?.avatar_preset} size="xs" />
                       {r.name}
                       <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                     </span>
