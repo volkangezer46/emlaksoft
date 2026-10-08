@@ -53,8 +53,8 @@ export async function loadPortalOwnerStatement(
   const payments: LedgerPayment[] = ((pay.data ?? []) as { id: string; paid_on: string; amount: number | string; management_fee: number | string | null }[]).map((p) => ({
     id: p.id, paidOn: String(p.paid_on).slice(0, 10), amount: num(p.amount), managementFee: num(p.management_fee),
   }));
-  const charges: LedgerCharge[] = ((links.data ?? []) as { id: string; kind: "expense" | "due"; amount: number | string; entry_date: string; label: string }[]).map((l) => ({
-    id: l.id, kind: l.kind, date: String(l.entry_date).slice(0, 10), amount: num(l.amount), label: l.label,
+  const charges: LedgerCharge[] = ((links.data ?? []) as { id: string; kind: "expense" | "due" | "unit_charge"; amount: number | string; entry_date: string; label: string }[]).map((l) => ({
+    id: l.id, kind: l.kind === "expense" ? ("expense" as const) : ("due" as const), date: String(l.entry_date).slice(0, 10), amount: num(l.amount), label: l.label,
   }));
   const payoutRows = ((outs.data ?? []) as { id: string; paid_on: string; amount: number | string; method: string; reference: string | null }[]).map((o) => ({
     id: o.id, paidOn: String(o.paid_on).slice(0, 10), amount: num(o.amount), method: o.method, reference: o.reference,

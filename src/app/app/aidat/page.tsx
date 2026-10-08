@@ -3,12 +3,23 @@ import Link from "@/components/ui/smart-link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, PieChart, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { msSince, now, DAY_MS } from "@/lib/clock";
+import { msSince, now, DAY_MS, trDayKey, trMonthKey } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
+import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { Building2, Landmark, Scale } from "lucide-react";
+import { loadBuildingChargesPage, loadBuildingKpi } from "@/lib/building-management/load";
+import { BUILDING_STATUS_LABELS, deriveBuildingChargeStatus } from "@/lib/building-management/charges";
+import { BinalarTab } from "./binalar-tab";
+import { CariTab } from "./cari-tab";
 
-export const metadata = { title: "Aidat & Ortak Gider" };
+export const metadata = { title: "Aidat & Bina Yönetimi" };
+
+const TAB_IDS = ["genel", "binalar", "cari"] as const;
+const UUID_PARAM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const BUILDING_PAGE_SIZE = 15;
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -63,10 +74,51 @@ type DueLite = {
 export default async function AidatPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string }>;
+  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string; bsayfa?: string; sekme?: string; bina?: string; bolum?: string; daire?: string }>;
 }) {
   const { perms, tenantId } = await requireModulePage("expenses", "/app/aidat");
   const params = (await searchParams) ?? {};
+  const tab = resolveTab(params, TAB_IDS, "genel");
+  const tabDefs: DetailTabDef[] = [
+    { id: "genel", label: "Genel", icon: Landmark },
+    { id: "binalar", label: "Binalar", icon: Building2 },
+    { id: "cari", label: "Daire cari", icon: Scale },
+  ];
+  const tabStrip = <DetailTabs basePath="/app/aidat" tabs={tabDefs} active={tab} label="Aidat ve bina yönetimi sekmeleri" />;
+
+  if (tab !== "genel") {
+    const supabase = await createClient();
+    const today = trDayKey(now());
+    return (
+      <ListPage>
+        <ListHero
+          eyebrow="Aidat & bina yönetimi"
+          art="aidat"
+          title="Bina & site yönetimi"
+          description="Apartman ve siteleri komple yönetin: dairelere dönem aidatı, ortak gider paylaştırma, tahsilat ve daire cari tek yerde."
+        />
+        {tabStrip}
+        {tab === "binalar" ? (
+          <BinalarTab
+            db={supabase}
+            tenantId={tenantId ?? ""}
+            today={today}
+            binaId={UUID_PARAM.test(params.bina ?? "") ? params.bina! : ""}
+            bolum={params.bolum ?? ""}
+            perms={{
+              canCreate: perms.expenses?.includes("create") ?? false,
+              canEdit: perms.expenses?.includes("edit") ?? false,
+              canDelete: perms.expenses?.includes("delete") ?? false,
+              canOffset: perms.rentals?.includes("edit") ?? false,
+            }}
+          />
+        ) : (
+          <CariTab db={supabase} tenantId={tenantId ?? ""} daireId={UUID_PARAM.test(params.daire ?? "") ? params.daire! : ""} />
+        )}
+      </ListPage>
+    );
+  }
+
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const donemF = DONEM_RE.test(params.donem ?? "") ? params.donem! : "";
   const canCreate = perms.expenses?.includes("create") ?? false;
@@ -141,6 +193,31 @@ export default async function AidatPage({
     throw new Error("Aidat verileri güvenli şekilde yüklenemedi.");
   }
 
+  // ---- Bina aidatları (M2): KPI RPC + bu ay tekil mülk aidatı toplamları + bina tahakkuk listesi (aynı durum/dönem süzgeci).
+  // Tablolar/RPC yoksa (migration uygulanmamış) null döner ve bölüm sessizce gizlenir; tekil mülk aidatı çalışmaya devam eder.
+  const todayKey = trDayKey(now());
+  const bHref = (n: number) => `/app/aidat${qs({ durum: durumF || null, donem: donemF || null, bsayfa: n > 1 ? String(n) : null })}`;
+  const monthKey = donemF || trMonthKey(now());
+  const monthStart = `${monthKey}-01`;
+  const monthEnd = nextMonthFirst(monthKey);
+  const bPage = Math.max(1, Number.parseInt(params.bsayfa ?? "", 10) || 1);
+  const [bldKpi, bldList, monthChargedRes, monthPaidRes] = await Promise.all([
+    loadBuildingKpi(supabase, monthStart),
+    loadBuildingChargesPage(supabase, {
+      tenantId: tenantId ?? "",
+      today: todayKey,
+      durum: durumF,
+      donem: donemF,
+      offset: (bPage - 1) * BUILDING_PAGE_SIZE,
+      limit: BUILDING_PAGE_SIZE,
+    }),
+    supabase.from("property_dues").select("amount").eq("tenant_id", tenantId ?? "").gte("period", monthStart).lt("period", monthEnd).limit(5000),
+    supabase.from("property_dues").select("amount").eq("tenant_id", tenantId ?? "").eq("status", "paid").gte("paid_at", `${monthStart}T00:00:00+03:00`).lt("paid_at", `${monthEnd}T00:00:00+03:00`).limit(5000),
+  ]);
+  const sumRows = (rows: { amount: number | string }[] | null) => Math.round((rows ?? []).reduce((s, r) => s + Number(r.amount) * 100, 0)) / 100;
+  const duesMonthCharged = monthChargedRes.error ? 0 : sumRows(monthChargedRes.data as { amount: number | string }[] | null);
+  const duesMonthPaid = monthPaidRes.error ? 0 : sumRows(monthPaidRes.data as { amount: number | string }[] | null);
+
   const filteredDues = (listData ?? []) as unknown as DueLite[];
   const properties = (propData ?? []).map((p) => ({ id: p.id as string, property_code: p.property_code as string, title: p.title as string | null }));
 
@@ -151,8 +228,6 @@ export default async function AidatPage({
   const total = Number(kpi.total ?? 0);
   const unpaid = Number(kpi.unpaid ?? 0);
   const paidAmount = total - unpaid;
-  // Tahsilat oranı — ödenen tutarın toplam tahakkuka oranı (tutar bazlı)
-  const collectionRate = total > 0 ? Math.round((paidAmount / total) * 100) : 0;
   const overdue = Number(kpi.overdue_count ?? 0);
   const overdueTotal = Number(kpi.overdue_total ?? 0);
   const overdueDues = (overdueStripData ?? []) as unknown as DueLite[];
@@ -167,45 +242,60 @@ export default async function AidatPage({
     ? new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${donemF}-01T00:00:00`))
     : "";
 
-  // KPI şeridi (tüm kayıtlar, RPC toplamı; her kart ?durum= filtresine iner, dönem korunur).
+  // KPI şeridi: tekil mülk aidatları (aidat_kpi RPC) + bina aidatları (building_dues_kpi RPC) BİRLEŞİK; her kart ilgili süzgeçli listeye iner.
+  const monthName = new Intl.DateTimeFormat("tr-TR", { month: "long" }).format(new Date(`${monthStart}T00:00:00`));
+  const periodWord = donemF ? donemLabel : "Bu ay";
+  const chargedMonth = Math.round((duesMonthCharged + (bldKpi?.chargedMonth ?? 0)) * 100) / 100;
+  const collectedMonth = Math.round((duesMonthPaid + (bldKpi?.collectedMonth ?? 0)) * 100) / 100;
+  const overdueAll = overdue + (bldKpi?.overdueCount ?? 0);
+  const overdueAllTotal = Math.round((overdueTotal + (bldKpi?.overdueTotal ?? 0)) * 100) / 100;
+  const debtAll = Math.round((unpaid + (bldKpi?.outstandingTotal ?? 0)) * 100) / 100;
   const kpis: KpiItem[] = [
     {
-      label: "Tahsilat oranı",
-      value: `%${collectionRate}`,
+      label: `${periodWord} tahakkuk`,
+      value: money(chargedMonth),
+      icon: <TrendingUp />,
+      tone: "info",
+      href: href({ durum: null, donem: monthKey }),
+      hint: bldKpi ? `tekil mülk + bina · ${monthName}` : `tekil mülk aidatı · ${monthName}`,
+    },
+    {
+      label: `${periodWord} tahsil`,
+      value: money(collectedMonth),
       icon: <Gauge />,
       tone: "success",
-      href: href({ durum: "paid" }),
-      hint: total > 0 ? `${money(paidAmount)} tahsil edildi` : "tahakkuk yok",
+      href: href({ durum: "paid", donem: monthKey }),
+      hint: chargedMonth > 0 ? `tahakkukun %${Math.min(100, Math.round((collectedMonth / chargedMonth) * 100))}'i` : "tahakkuk yok",
     },
-    { label: "Toplam tahakkuk", value: money(total), icon: <TrendingUp />, tone: "info", href: href({ durum: null }), hint: "tüm aidat kayıtları" },
-    { label: "Bekleyen", value: money(unpaid), icon: <Coins />, tone: "warning", href: href({ durum: "unpaid" }), hint: "ödenmemiş tutar" },
     {
-      label: "Gecikmiş",
-      value: overdue,
+      label: "Geciken",
+      value: overdueAll,
       icon: <AlertTriangle />,
       tone: "danger",
       attention: true,
       href: href({ durum: "overdue" }),
-      hint: overdue > 0 ? money(overdueTotal) : "vadesi geçen yok",
+      hint: overdueAll > 0 ? money(overdueAllTotal) : "vadesi geçen yok",
     },
+    { label: "Toplam borç", value: money(debtAll), icon: <Coins />, tone: "warning", href: href({ durum: "unpaid" }), hint: "ödenmemiş toplam tutar" },
   ];
 
   return (
     <ListPage>
       <ListHero
-        eyebrow="Aidat & ortak gider"
+        eyebrow="Aidat & bina yönetimi"
         art="aidat"
-        title="Aidat takibi"
-        description="Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde."
+        title="Bina & site yönetimi"
+        description="Portföy aidatları ile yönettiğiniz bina/sitelerin aidat, gider paylaştırma ve tahsilat durumu tek yerde."
       />
+      {tabStrip}
 
       <KpiStrip items={kpis} />
 
       {/* Tahsilat dağılımı (tutar bazlı, RPC toplamı): dilim = filtreli liste */}
       <ListCharts>
         <DistributionCard
-          title="Tahsilat durumu"
-          subtitle="Tahakkukun ödenen ve bekleyen tutarı"
+          title="Tekil mülk aidatı tahsilatı"
+          subtitle="Portföy aidatlarının ödenen ve bekleyen tutarı"
           icon={PieChart}
           tone="success"
           format="money"
@@ -310,6 +400,54 @@ export default async function AidatPage({
           ) : null}
           <span className="numeric text-xs text-text-faint">{totalFiltered.toLocaleString("tr-TR")} kayıt</span>
         </div>
+      ) : null}
+
+      {/* Bina aidatları — aynı durum/dönem süzgeciyle; satır ilgili binanın tahsilat ekranına gider. */}
+      {bldList && bldList.count > 0 ? (
+        <section className="space-y-2" aria-label="Bina aidatları">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Building2 className="h-4 w-4 text-brand-600" /> Bina aidatları
+              <span className="numeric text-xs font-normal text-text-faint">{bldList.count.toLocaleString("tr-TR")} kayıt</span>
+            </h2>
+            <Link href="/app/aidat?sekme=binalar" className="text-xs font-semibold text-brand-600 hover:underline">Binalara git</Link>
+          </div>
+          <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+            {bldList.rows.map((r) => {
+              const status = deriveBuildingChargeStatus({ amount: r.amount, paid: r.paid, dueDate: r.dueDate, today: todayKey });
+              const tone = status === "paid" ? "bg-mint-500/12 text-mint-700" : status === "overdue" ? "bg-danger-500/10 text-danger-600" : status === "partial" ? "bg-brand-600/10 text-brand-700" : "bg-amber-400/15 text-amber-700";
+              return (
+                <li key={r.id}>
+                  <Link href={`/app/aidat?sekme=binalar&bina=${r.buildingId}&bolum=tahsilat`} className="focus-ring flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 transition hover:bg-canvas">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-ink-950">{r.buildingName} · {r.unitLabel}</span>
+                      <span className="block truncate text-xs text-text-muted">{r.batchTitle} · vade {r.dueDate}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="numeric text-sm font-bold text-ink-950">{money(r.amount)}</span>
+                      {r.paid > 0 && r.paid < r.amount ? <span className="numeric text-xs text-text-muted">ödenen {money(r.paid)}</span> : null}
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tone}`}>{BUILDING_STATUS_LABELS[status]}</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {bldList.count > BUILDING_PAGE_SIZE ? (
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span className="numeric">{(bPage - 1) * BUILDING_PAGE_SIZE + 1}–{Math.min(bPage * BUILDING_PAGE_SIZE, bldList.count)} / {bldList.count}</span>
+              <span className="flex gap-2">
+                {bPage > 1 ? <Link href={bHref(bPage - 1)} className={PAGER_BTN}>Önceki</Link> : null}
+                {bPage * BUILDING_PAGE_SIZE < bldList.count ? <Link href={bHref(bPage + 1)} className={PAGER_BTN}>Sonraki</Link> : null}
+              </span>
+            </div>
+          ) : null}
+        </section>
+      ) : bldList && !durumF && !donemF ? (
+        <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-3 text-sm text-text-muted">
+          Bir apartmanı ya da siteyi komple mi yönetiyorsunuz?{" "}
+          <Link href="/app/aidat?sekme=binalar" className="font-semibold text-brand-600 hover:underline">Binalar sekmesinden</Link> bina ve daireleri ekleyip dönem aidatını tek tıkla tüm dairelere tahakkuk ettirebilirsiniz.
+        </p>
       ) : null}
 
       <DuesClient dues={filteredDues as Parameters<typeof DuesClient>[0]["dues"]} properties={properties} canCreate={canCreate} canBulk={canEdit} />

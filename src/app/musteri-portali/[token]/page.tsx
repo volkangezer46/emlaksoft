@@ -31,6 +31,8 @@ import {
 } from "@/lib/customer-portal/portal-model";
 import { MatchFeedback } from "./match-feedback";
 import { DealProcessProgress } from "@/components/public/deal-process-progress";
+import { BuildingDuesSection } from "@/components/public/building-dues-section";
+import { now as clockNow, trDayKey } from "@/lib/clock";
 import { CompareBar, CompareToggle } from "@/components/public/compare-select";
 import {
   PortalContactBar,
@@ -540,6 +542,8 @@ export default async function CustomerPortalPage({
           </PortalSection>
         ) : null}
 
+        {active === "malik" ? <BuildingDuesSection db={admin} tenantId={tenant.id} customerId={customer.id} role="owner" today={trDayKey(clockNow())} /> : null}
+
         {active === "kiraci" ? (
           <PortalSection id="kiram" icon={KeyRound} title="Kiram">
             <div className="space-y-3">
@@ -596,6 +600,7 @@ export default async function CustomerPortalPage({
             <p className="mt-3 text-xs text-text-faint">Bu görünüm bilgilendirme amaçlıdır; ödeme veya belge işlemi yapılmaz. Sorularınız için danışmanınızla iletişime geçin.</p>
           </PortalSection>
         ) : null}
+        {active === "kiraci" ? <BuildingDuesSection db={admin} tenantId={tenant.id} customerId={customer.id} role="tenant" today={trDayKey(clockNow())} /> : null}
 
         {active === "belgeler" ? (
           <PortalSection id="belgeler" icon={FileSignature} title="Belgeler">
