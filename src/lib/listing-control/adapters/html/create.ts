@@ -12,6 +12,10 @@ export type PortalRulesFile = { version: string; verified: boolean; portals: Rec
 
 export const PORTAL_RULES = rulesFile as unknown as PortalRulesFile;
 export const PORTAL_RULES_VERSION = PORTAL_RULES.version;
+/** Ayrıştırıcı motor sürümü: katman/karar mantığı değişince artırılır (kural sürümü ayrıca `portal-rules.json`). */
+export const PARSER_ENGINE_VERSION = "e2";
+/** Sonuçla birlikte sunucuya gider: `motor@kural`. Sunucu hangi sürümün ne kadar "kontrol edilemedi" ürettiğini görür. */
+export const PARSER_VERSION = `${PARSER_ENGINE_VERSION}@${PORTAL_RULES.version}`;
 
 export type HtmlAdapter = {
   id: string;
@@ -56,7 +60,7 @@ export function createHtmlAdapter(id: string, rules: PortalHtmlRules | undefined
       const u = portalUrl(url);
       return u !== null && pathRe !== null && pathRe.test(u.pathname);
     },
-    parseListing: (page, expectedId) => parseListingPage(rules, page, expectedId),
+    parseListing: (page, expectedId) => ({ ...parseListingPage(rules, page, expectedId), parserVersion: PARSER_VERSION }),
     parseStore: (page) => parseStoreListPage(rules, page),
   };
 }

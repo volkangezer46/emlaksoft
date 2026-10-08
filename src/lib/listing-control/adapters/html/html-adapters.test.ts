@@ -48,7 +48,7 @@ describe("kayıt ve sürüm", () => {
 describe("sahibinden ilan sayfası", () => {
   it("yayında: ilan no + fiyat + başlık + ilan sahibi (reCAPTCHA betiği tek başına engel sayılmaz)", () => {
     const r = sah.parseListing(page(SAH_LIVE), "1234567890");
-    expect(r).toEqual({ found: true, price: 4_750_000, title: "Kadıköy Moda'da 3+1 120 m² Daire", advisorName: "Örnek Gayrimenkul", status: null });
+    expect(r).toMatchObject({ found: true, price: 4_750_000, title: "Kadıköy Moda'da 3+1 120 m² Daire", advisorName: "Örnek Gayrimenkul", status: null });
     expect(replyToReport(r, SEEN)).toEqual({
       result: "present",
       observed: { price: 4_750_000, title: "Kadıköy Moda'da 3+1 120 m² Daire", advisor_name: "Örnek Gayrimenkul" },
@@ -57,7 +57,7 @@ describe("sahibinden ilan sayfası", () => {
   it("404/410 → bulunamadı (absent)", () => {
     for (const status of [404, 410]) {
       const r = sah.parseListing(page("", { status }), "1234567890");
-      expect(r).toEqual({ found: false, notFound: true });
+      expect(r).toMatchObject({ found: false, notFound: true });
       expect(replyToReport(r, SEEN).result).toBe("absent");
     }
   });
@@ -67,21 +67,21 @@ describe("sahibinden ilan sayfası", () => {
   });
   it("CAPTCHA / 429 / 403 / giriş duvarı → blocked, ASLA absent değil", () => {
     const captcha = `<html><body><div id="challenge-platform">Olağandışı erişim tespit ettik</div></body></html>`;
-    expect(sah.parseListing(page(captcha), "1234567890")).toEqual({ error: "captcha" });
+    expect(sah.parseListing(page(captcha), "1234567890")).toMatchObject({ error: "captcha" });
     expect(replyToReport(sah.parseListing(page(captcha), "1234567890"), SEEN).result).toBe("blocked");
     expect(replyToReport(sah.parseListing(page("", { status: 429 }), "1234567890"), SEEN).result).toBe("blocked");
     expect(replyToReport(sah.parseListing(page("", { status: 403 }), "1234567890"), SEEN).result).toBe("blocked");
     expect(replyToReport(sah.parseListing(page("", { status: 503 }), "1234567890"), SEEN).result).toBe("blocked");
     const login = sah.parseListing(page("<html>Giriş yap</html>", { finalUrl: "https://secure.sahibinden.com/giris?return_url=x" }), "1234567890");
-    expect(login).toEqual({ error: "login_required" });
+    expect(login).toMatchObject({ error: "login_required" });
     expect(replyToReport(login, SEEN).result).toBe("blocked");
   });
   it("beklenmeyen yapı / farklı ilan no / portal dışına yönlendirme → error (kontrol edilemedi), absent değil", () => {
     const odd = sah.parseListing(page("<html><body><p>Hoş geldiniz</p></body></html>"), "1234567890");
-    expect(odd).toEqual({ error: "unexpected_structure" });
+    expect(odd).toMatchObject({ error: "unexpected_structure" });
     expect(replyToReport(odd, SEEN).result).toBe("error");
     const other = sah.parseListing(page(SAH_LIVE.replace("1234567890</span>", "9999999999</span>")), "1234567890");
-    expect(other).toEqual({ error: "id_mismatch" });
+    expect(other).toMatchObject({ error: "id_mismatch" });
     expect(replyToReport(sah.parseListing(page(SAH_LIVE, { finalUrl: "https://evil.example/x" }), "1234567890"), SEEN).result).toBe("error");
   });
   it("JSON-LD yedeği: kalıp tutmasa da schema.org Offer'dan okunur", () => {
@@ -95,13 +95,13 @@ describe("hepsiemlak ve emlakjet", () => {
     const url = "https://www.hepsiemlak.com/istanbul-kadikoy-satilik/daire/12345678-detay";
     const live = `<html><h1>Kadıköy 2+1 Satılık</h1><div class="price">2.900.000 TL</div><span>İlan No: <b>12345678</b></span><div class="firm-name"><a>Deneme Ofis</a></div></html>`;
     expect(he.parseListing({ status: 200, finalUrl: url, html: live }, "12345678")).toMatchObject({ found: true, price: 2_900_000, advisorName: "Deneme Ofis" });
-    expect(he.parseListing({ status: 200, finalUrl: url, html: "<p>Bu ilan artık yayında değil</p>" }, "12345678")).toEqual({ found: false, notFound: true });
+    expect(he.parseListing({ status: 200, finalUrl: url, html: "<p>Bu ilan artık yayında değil</p>" }, "12345678")).toMatchObject({ found: false, notFound: true });
   });
   it("emlakjet yayında / 410", () => {
     const url = "https://www.emlakjet.com/ilan/kadikoy-satilik-daire-87654321";
     const live = `<html><h1>Satılık 3+1</h1><span class="price-value">5.100.000 TL</span><div>İlan Numarası 87654321</div></html>`;
     expect(ej.parseListing({ status: 200, finalUrl: url, html: live }, "87654321")).toMatchObject({ found: true, price: 5_100_000 });
-    expect(ej.parseListing({ status: 410, finalUrl: url, html: "" }, "87654321")).toEqual({ found: false, notFound: true });
+    expect(ej.parseListing({ status: 410, finalUrl: url, html: "" }, "87654321")).toMatchObject({ found: false, notFound: true });
   });
 });
 

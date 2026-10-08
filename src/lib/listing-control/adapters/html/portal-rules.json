@@ -1,49 +1,152 @@
 {
-  "version": "2026-10-07.1",
+  "version": "2026-10-08.1",
   "verified": false,
   "note": "Tum kaliplar SENTETIK ornek sayfalara gore yazildi; gercek portal sayfasina karsi DOGRULANMADI. Kalip tutmazsa sonuc 'kontrol edilemedi' olur, ASLA 'ilan yok' olmaz. Guncelleme: surumu artir, eklentiyi yeniden paketle.",
   "portals": {
     "sahibinden": {
       "label": "Sahibinden",
-      "hosts": ["sahibinden.com"],
+      "hosts": [
+        "sahibinden.com"
+      ],
       "listingPath": "-(\\d{6,12})(?:/detay)?/?$",
-      "removedPhrases": ["yayından kaldırılmıştır", "ilan yayında değil", "aradığınız ilan bulunamadı", "bu ilan kaldırıldı", "ilan yayından kaldırıldı"],
-      "captchaMarkers": ["g-recaptcha", "h-captcha", "cf-challenge", "challenge-platform", "olağandışı erişim", "robot olmadığınızı", "captcha"],
-      "loginPaths": ["/giris", "/login", "/secure/giris"],
-      "listingNo": ["İlan No\\s*(?:<[^>]*>\\s*)*(\\d{6,12})", "\"classifiedId\"\\s*:\\s*\"?(\\d{6,12})"],
-      "price": ["\"classifiedPrice\"\\s*:\\s*\"?([\\d.,]+)", "class=\"[^\"]*classified-price[^\"]*\"[^>]*>\\s*([\\d.,]+)"],
-      "title": ["<h1[^>]*>([\\s\\S]{2,300}?)</h1>"],
-      "advisor": ["class=\"[^\"]*(?:store-name|username-info)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([^<]{2,120})<"],
+      "removedPhrases": [
+        "yayından kaldırılmıştır",
+        "ilan yayında değil",
+        "aradığınız ilan bulunamadı",
+        "bu ilan kaldırıldı",
+        "ilan yayından kaldırıldı",
+        "sayfa bulunamadı",
+        "bu sayfa mevcut değil"
+      ],
+      "captchaMarkers": [
+        "g-recaptcha",
+        "h-captcha",
+        "cf-challenge",
+        "challenge-platform",
+        "olağandışı erişim",
+        "robot olmadığınızı",
+        "captcha",
+        "just a moment",
+        "attention required",
+        "cf-browser-verification",
+        "güvenlik doğrulaması",
+        "access denied"
+      ],
+      "loginPaths": [
+        "/giris",
+        "/login",
+        "/secure/giris"
+      ],
+      "listingNo": [
+        "İlan No\\s*(?:<[^>]*>\\s*)*(\\d{6,12})",
+        "\"classifiedId\"\\s*:\\s*\"?(\\d{6,12})"
+      ],
+      "price": [
+        "\"classifiedPrice\"\\s*:\\s*\"?([\\d.,]+)",
+        "class=\"[^\"]*classified-price[^\"]*\"[^>]*>\\s*([\\d.,]+)"
+      ],
+      "title": [
+        "<h1[^>]*>([\\s\\S]{2,300}?)</h1>"
+      ],
+      "advisor": [
+        "class=\"[^\"]*(?:store-name|username-info)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([^<]{2,120})<"
+      ],
       "status": [],
       "storeItem": "href=\"((?:https://(?:www\\.)?sahibinden\\.com)?/ilan/[^\"?#]*-(\\d{6,12})/detay)\"",
       "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|title=\"Sonraki\")"
     },
     "hepsiemlak": {
       "label": "Hepsiemlak",
-      "hosts": ["hepsiemlak.com"],
+      "hosts": [
+        "hepsiemlak.com"
+      ],
       "listingPath": "(\\d{6,12})(?:-detay)?/?$",
-      "removedPhrases": ["ilan yayından kaldırılmıştır", "bu ilan artık yayında değil", "ilan bulunamadı"],
-      "captchaMarkers": ["g-recaptcha", "h-captcha", "cf-challenge", "challenge-platform", "captcha"],
-      "loginPaths": ["/giris", "/login", "/uye-girisi"],
-      "listingNo": ["İlan (?:No|Numarası)\\s*:?\\s*(?:<[^>]*>\\s*)*(\\d{6,12})", "\"listingId\"\\s*:\\s*\"?(\\d{6,12})"],
-      "price": ["\"price\"\\s*:\\s*\"?([\\d.,]+)", "class=\"[^\"]*price[^\"]*\"[^>]*>\\s*([\\d.,]+)"],
-      "title": ["<h1[^>]*>([\\s\\S]{2,300}?)</h1>"],
-      "advisor": ["class=\"[^\"]*(?:firm-name|owner-name)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([^<]{2,120})<"],
+      "removedPhrases": [
+        "ilan yayından kaldırılmıştır",
+        "bu ilan artık yayında değil",
+        "ilan bulunamadı",
+        "sayfa bulunamadı",
+        "bu sayfa mevcut değil"
+      ],
+      "captchaMarkers": [
+        "g-recaptcha",
+        "h-captcha",
+        "cf-challenge",
+        "challenge-platform",
+        "captcha",
+        "just a moment",
+        "attention required",
+        "cf-browser-verification",
+        "güvenlik doğrulaması",
+        "access denied"
+      ],
+      "loginPaths": [
+        "/giris",
+        "/login",
+        "/uye-girisi"
+      ],
+      "listingNo": [
+        "İlan (?:No|Numarası)\\s*:?\\s*(?:<[^>]*>\\s*)*(\\d{6,12})",
+        "\"listingId\"\\s*:\\s*\"?(\\d{6,12})"
+      ],
+      "price": [
+        "\"price\"\\s*:\\s*\"?([\\d.,]+)",
+        "class=\"[^\"]*price[^\"]*\"[^>]*>\\s*([\\d.,]+)"
+      ],
+      "title": [
+        "<h1[^>]*>([\\s\\S]{2,300}?)</h1>"
+      ],
+      "advisor": [
+        "class=\"[^\"]*(?:firm-name|owner-name)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([^<]{2,120})<"
+      ],
       "status": [],
       "storeItem": "href=\"((?:https://(?:www\\.)?hepsiemlak\\.com)?/[^\"?#]*?(\\d{6,12})(?:-detay)?)\"",
       "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|aria-label=\"Sonraki\")"
     },
     "emlakjet": {
       "label": "Emlakjet",
-      "hosts": ["emlakjet.com"],
+      "hosts": [
+        "emlakjet.com"
+      ],
       "listingPath": "-(\\d{6,12})/?$",
-      "removedPhrases": ["ilan yayından kaldırıldı", "aradığınız ilan yayında değil", "ilan bulunamadı"],
-      "captchaMarkers": ["g-recaptcha", "h-captcha", "cf-challenge", "challenge-platform", "captcha"],
-      "loginPaths": ["/giris", "/login", "/uye-girisi"],
-      "listingNo": ["İlan (?:No|Numarası)\\s*:?\\s*(?:<[^>]*>\\s*)*(\\d{6,12})", "\"listingId\"\\s*:\\s*\"?(\\d{6,12})"],
-      "price": ["\"price\"\\s*:\\s*\"?([\\d.,]+)", "class=\"[^\"]*price[^\"]*\"[^>]*>\\s*([\\d.,]+)"],
-      "title": ["<h1[^>]*>([\\s\\S]{2,300}?)</h1>"],
-      "advisor": ["class=\"[^\"]*(?:owner-name|firm-name)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([^<]{2,120})<"],
+      "removedPhrases": [
+        "ilan yayından kaldırıldı",
+        "aradığınız ilan yayında değil",
+        "ilan bulunamadı",
+        "sayfa bulunamadı",
+        "bu sayfa mevcut değil"
+      ],
+      "captchaMarkers": [
+        "g-recaptcha",
+        "h-captcha",
+        "cf-challenge",
+        "challenge-platform",
+        "captcha",
+        "just a moment",
+        "attention required",
+        "cf-browser-verification",
+        "güvenlik doğrulaması",
+        "access denied"
+      ],
+      "loginPaths": [
+        "/giris",
+        "/login",
+        "/uye-girisi"
+      ],
+      "listingNo": [
+        "İlan (?:No|Numarası)\\s*:?\\s*(?:<[^>]*>\\s*)*(\\d{6,12})",
+        "\"listingId\"\\s*:\\s*\"?(\\d{6,12})"
+      ],
+      "price": [
+        "\"price\"\\s*:\\s*\"?([\\d.,]+)",
+        "class=\"[^\"]*price[^\"]*\"[^>]*>\\s*([\\d.,]+)"
+      ],
+      "title": [
+        "<h1[^>]*>([\\s\\S]{2,300}?)</h1>"
+      ],
+      "advisor": [
+        "class=\"[^\"]*(?:owner-name|firm-name)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([^<]{2,120})<"
+      ],
       "status": [],
       "storeItem": "href=\"((?:https://(?:www\\.)?emlakjet\\.com)?/ilan/[^\"?#]*-(\\d{6,12}))/?\"",
       "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|aria-label=\"Sonraki\")"

@@ -1,7 +1,7 @@
 import { emlakjetHtml } from "./emlakjet-html";
 import { hepsiemlakHtml } from "./hepsiemlak-html";
 import { sahibindenHtml } from "./sahibinden-html";
-import { PORTAL_RULES_VERSION, type HtmlAdapter } from "./create";
+import { PARSER_ENGINE_VERSION, PARSER_VERSION, PORTAL_RULES_VERSION, type HtmlAdapter } from "./create";
 
 /**
  * Portal HTML adaptör kaydı (SAF; eklenti ve testler kullanır). Yeni portal: `portal-rules.json`'a kural + kendi
@@ -24,6 +24,6 @@ export function allPortalHosts(): string[] {
   return [...new Set(ADAPTERS.flatMap((a) => a.hosts))].sort();
 }
 
-export { PORTAL_RULES_VERSION };
+export { PARSER_ENGINE_VERSION, PARSER_VERSION, PORTAL_RULES_VERSION };
 export type { HtmlAdapter };
 export type { FetchedPage, StoreItem, StoreListResult } from "./parse-core";

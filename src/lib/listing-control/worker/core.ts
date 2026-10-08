@@ -91,7 +91,20 @@ export type ProbeReply = {
   status?: string | null;
   /** http_429, captcha, login_required, timeout, parse_error ... */
   error?: string | null;
+  /** Ayrıştırıcının sınıflandırması (arayüz + telemetri). Karar `found/notFound/error` alanlarındadır; bu etiket kararı DEĞİŞTİRMEZ. */
+  classification?: ProbeClassification;
+  /** Ayrıştırıcı sürümü (`motor@kural sürümü`): sunucu hangi sürümün ne kadar "kontrol edilemedi" ürettiğini görür. */
+  parserVersion?: string;
+  /** İlan kimliğini doğrulayan katman: json_ld | meta | state | pattern | url. */
+  layer?: string | null;
+  /** İlan bulundu ama fiyat ya da başlık okunamadı (seçici kayması belirtisi). */
+  partial?: boolean;
+  /** Sayfa 200 döndü ama hiçbir katman ilanı tanımadı (seçici kayması). */
+  drift?: boolean;
 };
+
+/** yayında | yayından kaldırıldı | bulunamadı (404/410) | engel (CAPTCHA/giriş/hız sınırı) | belirsiz (kontrol edilemedi). */
+export type ProbeClassification = "live" | "removed" | "not_found" | "blocked" | "unknown";
 
 export type WorkerReport = {
   result: CheckResultKind;
