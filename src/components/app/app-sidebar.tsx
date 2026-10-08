@@ -19,6 +19,7 @@ import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse"
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } from "@/components/ui/console/quick-access";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
+import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 
 const VitrinIcon = ICONS.portal;
 
@@ -110,6 +111,12 @@ export function AppSidebar({
   );
   const itemByHref = useMemo(() => new Map(allSections.flatMap((s) => s.items).map((i) => [i.href, i])), [allSections]);
   const quick = useQuickAccess({ scope: storageScope, kind: "app", items: quickItems, activeHref });
+  // Hızlı erişim (sabitlenen + en çok kullanılan) hedefleri boşta ısıtılır: tıklayınca kabuk anında açılır. Bağlantı tasarrufta
+  // (saveData/2g) yapılmaz; etkin sayfa ve kilitli (yükseltme) sayfalar atlanır. Sunucu turu/ düzen kayması yok.
+  useIdlePrefetch(
+    [...quick.pinned, ...quick.auto].map((i) => i.href).filter((h) => h !== activeHref && !isLocked(h, lockedHrefs)),
+    4,
+  );
 
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (section: VisibleSection) => {
