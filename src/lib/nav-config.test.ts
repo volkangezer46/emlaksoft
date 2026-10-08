@@ -5,6 +5,7 @@ import {
   MOBILE_TAB_SECTIONS,
   NAV_SECTIONS,
   NAV_SHORTCUTS,
+  PALETTE_ONLY_PAGES,
   resolveActiveNav,
   visibleSections,
 } from "./nav-config";
@@ -86,7 +87,9 @@ describe("menü yapısı", () => {
     // Anahtar Takibi ve Sunumlar Portföyler öğesinin sekmesidir (yol aynı, menü öğesi Portföyler).
     expect(resolveActiveNav("/app/portfoyler/anahtarlar", sections).href).toBe("/app/portfoyler");
     expect(resolveActiveNav("/app/akilli-listeler", sections).href).toBe("/app/musteriler");
-    expect(resolveActiveNav("/app/kayip-satis", sections).href).toBe("/app/anlasmalar");
+    expect(resolveActiveNav("/app/kayip-satis", sections).href).toBe("/app/musteriler");
+    expect(resolveActiveNav("/app/teklifler", sections).href).toBe("/app/anlasmalar");
+    expect(resolveActiveNav("/app/portallar", sections).href).toBe("/app/ilan-kontrol");
     expect(resolveActiveNav("/app/portfoyler/42", sections).href).toBe("/app/portfoyler");
   });
 
@@ -115,6 +118,29 @@ describe("mükerrer menü girişi yok (2026-10)", () => {
     expect(perf?.tabs?.map((t) => t.label)).toEqual(["Özet", "Lig", "Kıyas"]);
     const ekip = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.href === "/app/ekip");
     for (const h of ["/app/lig", "/app/danisman-kpi", "/app/ekip/kiyas"]) expect(ekip?.tabs?.map((t) => t.href)).not.toContain(h);
+  });
+});
+
+describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
+  const items = NAV_SECTIONS.flatMap((s) => s.items);
+  it("Portal ilanları ve Teklifler ayrı öğe değil, sahip öğenin sekmesi; Riskli müşteriler Müşteriler sekmesi", () => {
+    const hrefs = items.map((i) => i.href);
+    for (const gone of ["/app/portallar", "/app/teklifler", "/app/kayip-satis", "/app/bildirimler"]) expect(hrefs, gone).not.toContain(gone);
+    const tabsOf = (h: string) => items.find((i) => i.href === h)?.tabs?.map((t) => t.href) ?? [];
+    expect(tabsOf("/app/ilan-kontrol")).toEqual(["/app/ilan-kontrol", "/app/portallar"]);
+    expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/kayip-satis", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+  });
+  it("Ofis başlığında çekirdek görünür, 7 yönetim öğesi 'Yönetim' alt grubundadır", () => {
+    const ofis = NAV_SECTIONS.find((s) => s.id === "ofis")!;
+    expect(ofis.items.filter((i) => !i.group).map((i) => i.href)).toEqual(["/app/ekip", "/app/abonelik", "/app/yardim"]);
+    expect(ofis.items.filter((i) => i.group === "yonetim").map((i) => i.href).sort()).toEqual(
+      ["/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/denetim", "/app/ofis-merkezi", "/app/otomasyonlar", "/app/uyum"].sort(),
+    );
+  });
+  it("teklif izni olan ama anlaşma izni olmayan rol Teklifler'e Anlaşmalar öğesinden ulaşır", () => {
+    const it = visibleSections(["offers"]).flatMap((s) => s.items).find((i) => i.label === "Anlaşmalar");
+    expect(it?.tabs?.map((t) => t.href)).toEqual(["/app/teklifler"]);
   });
 });
 
@@ -172,12 +198,14 @@ describe("bilgi mimarisi 2026-10 (docs/design/MENU_IA_2026_10.md)", () => {
     expect(sectionOf("/app/asistan")).toBe("araclar");
     expect(sectionOf("/app/baslangic")).toBeUndefined();
     expect(HIDDEN_APP_PAGES["/app/baslangic"]).toBeTruthy();
-    expect(sectionOf("/app/gelen-kutusu")).toBe("iletisim");
+    expect(sectionOf("/app/gelen-kutusu")).toBe("musteriler");
     expect(sectionOf("/app/kampanyalar")).toBe("iletisim");
   });
 
-  it("yetim sayfalar menüye bağlandı: Bildirimler, Mahalle notları, Ayarlar sekmeleri; İçe aktarma eylem (başlık düğmesi)", () => {
-    expect(sectionOf("/app/bildirimler")).toBe("bugun");
+  it("yetim sayfalar: Bildirimler menüde değil (üst çubuk zili) ama komut paletinde aranabilir; Mahalle notları, Ayarlar sekmeleri; İçe aktarma eylem (başlık düğmesi)", () => {
+    expect(sectionOf("/app/bildirimler")).toBeUndefined();
+    expect(HIDDEN_APP_PAGES["/app/bildirimler"]).toBeTruthy();
+    expect(PALETTE_ONLY_PAGES.map((p) => p.href)).toContain("/app/bildirimler");
     expect(sectionOf("/app/ice-aktarma")).toBeUndefined();
     expect(HIDDEN_APP_PAGES["/app/ice-aktarma"]).toBeTruthy();
     expect(sectionOf("/app/mahalle-notlari")).toBe("araclar");

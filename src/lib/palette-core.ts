@@ -1,6 +1,6 @@
 import { ICONS } from "@/lib/icons";
 import { featureForHref } from "@/lib/modules/registry";
-import { navSearchText, visibleSections, type NavIcon } from "@/lib/nav-config";
+import { navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
 import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
@@ -116,6 +116,17 @@ export function getAppGoItems(accessible: readonly AppModule[], q = "", closed: 
         };
       });
     })
+    .concat(
+      // Menüde olmayan ama aranabilir sayfalar (ör. Bildirimler: üst çubuk zili).
+      PALETTE_ONLY_PAGES.filter((p) => accessible.includes(p.module) && !isClosedFeatureHref(p.href, closed)).map((p) => ({
+        label: p.label,
+        href: p.href,
+        icon: p.icon,
+        description: p.description,
+        keywords: p.keywords,
+        shortcut: undefined,
+      })),
+    )
     .filter((e) => matchesQuery(navSearchText(e), q))
     .map(({ label, href, icon, description, shortcut }) => ({ label, href, icon, description, shortcut }));
 }
