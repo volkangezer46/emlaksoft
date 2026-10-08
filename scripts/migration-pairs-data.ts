@@ -215,6 +215,8 @@ const F = {
   planPricesEfTariff: "20261008001000_plan_prices_ef_credit_tariff.sql",
   // TR1 (2026-10-08): portfoy yetki (EIDS) durumu sutunlari + kuyruk indeksi.
   propertyAuthorityStatus: "20261008001300_property_authority_status.sql",
+  // M1 Mulk yonetimi omurgasi (2026-10-08): kira tahsilat kaydi + yonetim sozlesmesi + mulk sahibi hakedis defteri.
+  propertyManagementCore: "20261008001100_property_management_core.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -346,6 +348,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.userModulePrefs]: "ek", // yeni tablo user_module_prefs (RLS: yalniz kendi satiri); kod tablo yokken hicbir sey gizlemez
     [F.planPricesEfTariff]: "davranis", // yeni abonelik/yenileme liste fiyati (SQL yedek) + yalniz dokunulmamis ef.* seed ayarlari; abonelik/fatura satiri ve plan override'i degismez
     [F.propertyAuthorityStatus]: "ek", // properties'e 6 nullable/varsayilanli yetki durumu sutunu + kisit + kismi indeks; mevcut satir/RLS degismez
+    [F.propertyManagementCore]: "davranis", // rent_charges durum CHECK'i 'partial' ile genisler + paid_amount; yeni tahsilat/sozlesme/odeme tablolari + 4 DEFINER RPC; eski 'odendi' tahakkuklar icin tek seferlik legacy tahsilat dolgusu
     [F.leagueV2]: "ek", // yeni tablolar league_settings + league_challenges (RLS: okuma ofis, yazma targets izni); mevcut tablo/politika degismez
     [F.planUpgradeFulfillment]: "davranis", // fulfill + v2 tam govde yeniden tanimi: plan_upgrade faturasi islenir (taban 000300 govdesi bayt bayt korunur); bayrak kapaliyken kimse bu turde fatura kesmez
     [F.contractSignerReminder]: "ek", // contract_signers'a short_code/reminder_count/last_reminded_at + 2 DEFINER RPC (hatirlatma yuku: tam token donmez; kisa kod cozumu anon)
@@ -483,6 +486,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "MOD1-kisisel-modul-gizleme", order: 29.99987, title: "Kisisel modul gizleme tablosu (yalniz gorunurluk; sira serbest, ek)", files: [F.userModulePrefs] },
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
     { id: "P12-kazanc-gizliligi", order: 30.0, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
+    { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999862, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
+    { id: "P12-kazanc-gizliligi", order: 30.000001, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
   // (b) Birlikte uygulanmasi gerekenler (duzeltici ana'dan sonra numaralanmis ve ayni pencerede).

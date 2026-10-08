@@ -6,6 +6,7 @@ import { LEDGER_FLAG_LABELS, LEDGER_METHOD_LABELS, LEDGER_PARTY_LABELS, LEDGER_T
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { loadManagementPnlInputs } from "@/lib/property-management/load";
 import { DATE_RANGE_FIELDS } from "../filters";
 import { loadDefLabels, memoLabels, STATUS } from "../labels";
 import { applyActorScope, applyDateRange, applyTimestampRange, enrichProfiles, label, nameOf, one } from "../query-helpers";
@@ -69,6 +70,7 @@ export const karZarar = defineReport({
     { key: "gelir", label: "Komisyon (brüt)", type: "money", total: true, get: (r) => r.revenue },
     { key: "kdv", label: "KDV", type: "money", total: true, get: (r) => r.vat },
     { key: "pay", label: "Dağıtılan paylar", type: "money", total: true, get: (r) => r.shares },
+    { key: "ucret", label: "Yönetim ücreti", type: "money", total: true, get: (r) => r.fees },
     { key: "gider", label: "Gider", type: "money", total: true, get: (r) => r.expenses },
     { key: "net", label: "Net sonuç", type: "money", total: true, get: (r) => r.net },
   ],
@@ -119,8 +121,9 @@ export const karZarar = defineReport({
         if (res.error) throw new Error("kar-zarar pay okuma hatası");
         for (const s of res.data) splits.push({ commissionId: s.commission_id, kind: s.kind, amount: Number(s.amount) || 0 });
       }
-      const expenses: PlExpense[] = expRes.data.map((e) => ({ date: String(e.expense_date), amount: Number(e.amount) || 0 }));
-      const pl = buildProfitLoss(keys, commissions, splits, expenses);
+      const pm = await loadManagementPnlInputs(ctx.supabase, { tenantId: tid(ctx), firstMonthKey: keys[0]! });
+      const expenses: PlExpense[] = expRes.data.map((e) => ({ date: String(e.expense_date), amount: Number(e.amount) || 0, passThrough: pm.passThroughExpenseIds.has(String(e.id)) }));
+      const pl = buildProfitLoss(keys, commissions, splits, expenses, pm.fees);
       return pl.months.map((m) => ({ ...m, label: `${m.key.slice(5, 7)}.${m.key.slice(0, 4)}` })).reverse();
     },
   },
@@ -393,4 +396,48 @@ export const ofisFaturalari = defineReport({
   },
 });
 
-export const FINANCE_REPORTS = [giderler, karZarar, kiralamalar, kiraTahakkuklari, aidatlar, sozlesmeler, uyumKayitDefteri, ofisFaturalari];
+const PM_METHODS: Record<string, string> = { cash: "Nakit", bank_transfer: "Havale / EFT", card: "Kart", cheque: "Çek" };
+
+export const mulkSahibiEkstresi = defineReport({
+  id: "mulk-sahibi-ekstresi",
+  title: "Mülk sahibi ekstresi (tahsilat ve hakediş)",
+  description:
+    "Yönetilen kiraların tahsilatları: tahsil edilen kira, ofisin yönetim ücreti ve mülk sahibine kalan hakediş (tahsilat − ücret). Gider/aidat kesintisi ve ödemeler kira detayındaki hakediş defterindedir; iptal edilen tahsilatlar yer almaz.",
+  category: "finans",
+  scope: "tenant",
+  module: "rentals",
+  personalData: true,
+  keywords: ["malik", "hakediş", "yönetim ücreti", "ekstre", "kira"],
+  filters: [{ kind: "select", key: "yontem", label: "Ödeme yöntemi", options: opts(PM_METHODS) }, ...DATE_RANGE_FIELDS("Tahsilat başlangıcı", "Tahsilat bitişi")],
+  columns: [
+    { key: "tarih", label: "Tahsilat tarihi", type: "date", get: (r) => r.paid_on },
+    { key: "makbuz", label: "Makbuz no", type: "number", get: (r) => r.receipt_no },
+    { key: "kod", label: "Portföy kodu", type: "text", width: 14, get: (r) => one(one(r.rental)?.property)?.property_code },
+    { key: "portfoy", label: "Portföy", type: "text", width: 30, get: (r) => one(one(r.rental)?.property)?.title },
+    { key: "kiraci", label: "Kiracı", type: "text", width: 24, get: (r) => one(one(r.rental)?.renter)?.full_name },
+    { key: "yontem", label: "Yöntem", type: "text", width: 14, get: (r) => PM_METHODS[String(r.method)] ?? r.method },
+    { key: "tahsilat", label: "Tahsil edilen", type: "money", total: true, get: (r) => r.amount },
+    { key: "ucret", label: "Yönetim ücreti", type: "money", total: true, get: (r) => r.management_fee },
+    { key: "hakedis", label: "Mülk sahibi hakedişi", type: "money", total: true, get: (r) => Math.round((Number(r.amount) - Number(r.management_fee)) * 100) / 100 },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase
+        .from("rent_payments")
+        .select(
+          "id, paid_on, receipt_no, method, amount, management_fee, rental:rentals!rent_payments_rental_tenant_fkey!inner(tenant_id, created_by, property:properties!rentals_property_id_fkey(property_code, title), renter:customers!rentals_renter_customer_id_fkey(full_name))",
+          { count: "exact" },
+        )
+        .eq("tenant_id", tid(ctx))
+        .eq("rental.tenant_id", tid(ctx))
+        .is("voided_at", null);
+      q = applyActorScope(ctx, q, { actorColumn: "rental.created_by" });
+      if (f.yontem) q = q.eq("method", f.yontem);
+      q = applyDateRange(q, "paid_on", f);
+      return q.order("paid_on", { ascending: false }).order("id", { ascending: true });
+    },
+  },
+});
+
+export const FINANCE_REPORTS = [giderler, karZarar, kiralamalar, kiraTahakkuklari, mulkSahibiEkstresi, aidatlar, sozlesmeler, uyumKayitDefteri, ofisFaturalari];

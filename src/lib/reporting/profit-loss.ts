@@ -12,9 +12,10 @@
 
 export type PlCommission = { id: string; createdAt: string; gross: number; vat: number; status: string };
 export type PlSplit = { commissionId: string; kind: string; amount: number };
-export type PlExpense = { date: string; amount: number };
+export type PlExpense = { date: string; amount: number; /** Mülk sahibine yansıtılan gider: ofis gideri sayılmaz (mülk sahibinden geri alınır). */ passThrough?: boolean };
+export type PlFee = { date: string; amount: number };
 
-export type PlMonth = { key: string; revenue: number; vat: number; shares: number; expenses: number; net: number; commissions: number };
+export type PlMonth = { key: string; revenue: number; vat: number; shares: number; expenses: number; net: number; commissions: number; fees: number };
 
 export type ProfitLoss = {
   months: PlMonth[];
@@ -40,8 +41,8 @@ export function lastMonthKeys(currentKey: string, n = 12): string[] {
   return out;
 }
 
-export function buildProfitLoss(monthKeys: readonly string[], commissions: readonly PlCommission[], splits: readonly PlSplit[], expenses: readonly PlExpense[]): ProfitLoss {
-  const months = new Map<string, PlMonth>(monthKeys.map((key) => [key, { key, revenue: 0, vat: 0, shares: 0, expenses: 0, net: 0, commissions: 0 }]));
+export function buildProfitLoss(monthKeys: readonly string[], commissions: readonly PlCommission[], splits: readonly PlSplit[], expenses: readonly PlExpense[], fees: readonly PlFee[] = []): ProfitLoss {
+  const months = new Map<string, PlMonth>(monthKeys.map((key) => [key, { key, revenue: 0, vat: 0, shares: 0, expenses: 0, net: 0, commissions: 0, fees: 0 }]));
   const splitsBy = new Map<string, PlSplit[]>();
   for (const s of splits) splitsBy.set(s.commissionId, [...(splitsBy.get(s.commissionId) ?? []), s]);
   let unsplitCount = 0;
@@ -58,13 +59,17 @@ export function buildProfitLoss(monthKeys: readonly string[], commissions: reado
   }
   for (const e of expenses) {
     const m = months.get(trMonth(e.date));
-    if (m) m.expenses += e.amount;
+    if (m && !e.passThrough) m.expenses += e.amount;
   }
-  for (const m of months.values()) m.net = m.revenue - m.vat - m.shares - m.expenses;
+  for (const f of fees) {
+    const m = months.get(trMonth(f.date));
+    if (m) m.fees += f.amount;
+  }
+  for (const m of months.values()) m.net = m.revenue + m.fees - m.vat - m.shares - m.expenses;
   const list = [...months.values()];
   const totals = list.reduce(
-    (a, m) => ({ revenue: a.revenue + m.revenue, vat: a.vat + m.vat, shares: a.shares + m.shares, expenses: a.expenses + m.expenses, net: a.net + m.net, commissions: a.commissions + m.commissions }),
-    { revenue: 0, vat: 0, shares: 0, expenses: 0, net: 0, commissions: 0 },
+    (a, m) => ({ revenue: a.revenue + m.revenue, vat: a.vat + m.vat, shares: a.shares + m.shares, expenses: a.expenses + m.expenses, net: a.net + m.net, commissions: a.commissions + m.commissions, fees: a.fees + m.fees }),
+    { revenue: 0, vat: 0, shares: 0, expenses: 0, net: 0, commissions: 0, fees: 0 },
   );
-  return { months: list, totals, unsplitCount, hasData: totals.revenue > 0 || totals.expenses > 0 };
+  return { months: list, totals, unsplitCount, hasData: totals.revenue > 0 || totals.expenses > 0 || totals.fees > 0 };
 }

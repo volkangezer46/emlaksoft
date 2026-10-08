@@ -52,8 +52,8 @@ export default async function ProfitLossPage() {
   }
   const commissions: PlCommission[] = data.commissions.map((c) => ({ id: c.id, createdAt: c.createdAt, gross: c.gross, vat: c.vat, status: c.status }));
   const splits: PlSplit[] = data.splits.map((s) => ({ commissionId: s.commissionId, kind: s.kind, amount: s.amount }));
-  const expenses: PlExpense[] = data.expenses.map((e) => ({ date: e.date, amount: e.amount }));
-  const pl = buildProfitLoss(keys, commissions, splits, expenses);
+  const expenses: PlExpense[] = data.expenses.map((e) => ({ date: e.date, amount: e.amount, passThrough: e.passThrough }));
+  const pl = buildProfitLoss(keys, commissions, splits, expenses, data.fees ?? []);
 
   return (
     <div className="space-y-5">
@@ -105,6 +105,7 @@ export default async function ProfitLossPage() {
                 <TR>
                   <TH>Ay</TH>
                   <TH className="text-right">Komisyon</TH>
+                  {pl.totals.fees > 0 ? <TH className="text-right">Yönetim ücreti</TH> : null}
                   <TH className="text-right">KDV</TH>
                   <TH className="text-right">Paylar</TH>
                   <TH className="text-right">Gider</TH>
@@ -120,6 +121,11 @@ export default async function ProfitLossPage() {
                       <TD className="text-right tabular-nums">
                         <Link href={`/app/komisyon?from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.revenue)}</Link>
                       </TD>
+                      {pl.totals.fees > 0 ? (
+                        <TD className="text-right tabular-nums">
+                          <Link href={`/app/kiralama?yonetim=ucret`} className="hover:underline">{formatTry(m.fees)}</Link>
+                        </TD>
+                      ) : null}
                       <TD className="text-right tabular-nums">{formatTry(m.vat)}</TD>
                       <TD className="text-right tabular-nums">{formatTry(m.shares)}</TD>
                       <TD className="text-right tabular-nums">
@@ -134,7 +140,7 @@ export default async function ProfitLossPage() {
           </TableFrame>
           <p className="text-xs leading-relaxed text-text-faint">
             Komisyon tahakkuk esasına göre (kayıt ayı) sayılır; tahsilat değildir. İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
-            danışman/referans/franchise paylarıdır (ofis payı düşülmez). Gelir/kurumlar vergisi hesaplanmaz; mali müşavirinizle doğrulayın.
+            danışman/referans/franchise paylarıdır (ofis payı düşülmez). Yönetim ücreti, mülk yönetimindeki kira tahsilatlarından ofise kalan ücrettir (tahsilat tarihi); mülk sahibine yansıtılan gider ofis gideri sayılmaz. Gelir/kurumlar vergisi hesaplanmaz; mali müşavirinizle doğrulayın.
           </p>
           {/* Danışman bazlı kırılım yalnız ofis sahibi / genel müdür (kazanç gizliliği P12). */}
           {role === "owner" || role === "gm" ? (

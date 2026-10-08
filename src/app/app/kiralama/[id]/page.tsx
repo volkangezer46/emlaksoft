@@ -2,7 +2,7 @@ import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
+import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, Landmark, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
@@ -17,6 +17,8 @@ import { RemindersPanel } from "./reminders-panel";
 import { loadReminderTab } from "./reminder-data";
 import { now, trDayKey } from "@/lib/clock";
 import { EdevletTransferCard } from "./edevlet-transfer-card";
+import { OwnerTab } from "./owner-tab";
+import { loadLateFeeSettings, loadRentalPayments } from "@/lib/property-management/load";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -39,7 +41,7 @@ function geoName(v: unknown): string | null {
 
 const CONTRACT_STATUS_LABELS: Record<string, string> = { draft: "Taslak", sent: "Gönderildi", signed: "İmzalandı", rejected: "Reddedildi", cancelled: "İptal" };
 
-const RENTAL_TAB_IDS = ["tahakkuk", "bakim", "hatirlatma", "sozlesme", "notlar"] as const;
+const RENTAL_TAB_IDS = ["tahakkuk", "sahip", "bakim", "hatirlatma", "sozlesme", "notlar"] as const;
 
 export default async function KiraDetayPage({
   params,
@@ -53,6 +55,7 @@ export default async function KiraDetayPage({
   const canViewContracts = perms.contracts?.includes("view") ?? false;
   const canCreate = perms.rentals?.includes("create") ?? false;
   const canEdit = perms.rentals?.includes("edit") ?? false;
+  const canDelete = perms.rentals?.includes("delete") ?? false;
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin paneli çizilir
   const tab = resolveTab(await searchParams, RENTAL_TAB_IDS, "tahakkuk", { bakım: "bakim" });
@@ -84,6 +87,22 @@ export default async function KiraDetayPage({
     a.created_at < b.created_at ? 1 : -1,
   );
 
+  // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
+  const [paidRes, paymentData, lateFeeData] = await Promise.all([
+    supabase.from("rent_charges").select("id, paid_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? ""),
+    loadRentalPayments(supabase, tenantId ?? "", id),
+    loadLateFeeSettings(supabase, tenantId ?? ""),
+  ]);
+  const paidById = new Map<string, number>(
+    paidRes.error ? [] : ((paidRes.data ?? []) as { id: string; paid_amount: number | string }[]).map((c) => [c.id, Number(c.paid_amount) || 0]),
+  );
+  const paymentsAvailable = !paidRes.error && paymentData.available;
+  const chargeRows = charges.map((c) => ({
+    ...c,
+    amount: Number(c.amount),
+    paid_amount: paymentsAvailable ? (paidById.get(c.id) ?? 0) : c.status === "paid" ? Number(c.amount) : 0,
+  }));
+
   const active = rental.status === "active";
   const today = daysAgoIso(0).slice(0, 10);
   const in30 = daysFromNowIso(30).slice(0, 10);
@@ -106,7 +125,7 @@ export default async function KiraDetayPage({
       : null;
 
   const overdueCount = charges.filter((c) => c.status === "overdue").length;
-  const pendingCount = charges.filter((c) => c.status === "pending").length;
+  const pendingCount = charges.filter((c) => c.status === "pending" || c.status === "partial").length;
   const openMaintenance = maintenance.filter((m) => m.status !== "done").length;
   const sekmeHref = (t: string) => `/app/kiralama/${rental.id}?sekme=${t}`;
 
@@ -125,7 +144,8 @@ export default async function KiraDetayPage({
               : { title: "Her şey yolunda", reason: "Geciken tahakkuk, açık bakım veya yaklaşan bitiş yok.", href: null, label: "" };
 
   const tabDefs: DetailTabDef[] = [
-    { id: "tahakkuk", label: "Tahakkuklar", icon: Banknote, count: charges.length },
+    { id: "tahakkuk", label: "Tahakkuk & tahsilat", icon: Banknote, count: charges.length },
+    { id: "sahip", label: "Mülk sahibi", icon: Landmark, hidden: !canEdit },
     { id: "bakim", label: "Bakım talepleri", icon: Wrench, count: maintenance.length },
     { id: "hatirlatma", label: "Hatırlatma", icon: BellRing },
     { id: "sozlesme", label: "Sözleşme", icon: FileSignature, count: linkedContracts.length },
@@ -235,8 +255,31 @@ export default async function KiraDetayPage({
           {tab === "tahakkuk" ? (
             <div className="space-y-4">
               {/* Tahakkuklar */}
-              <ChargesPanel rentalId={rental.id} charges={charges} canCreate={canCreate} canEdit={canEdit} />
+              <ChargesPanel
+                rentalId={rental.id}
+                dueDay={rental.due_day}
+                today={today}
+                charges={chargeRows}
+                payments={paymentData.payments}
+                paymentsAvailable={paymentsAvailable}
+                lateFee={lateFeeData.settings}
+                canCreate={canCreate}
+                canEdit={canEdit}
+                canDelete={canDelete}
+              />
             </div>
+          ) : null}
+
+          {tab === "sahip" && canEdit && tenantId ? (
+            <OwnerTab
+              supabase={supabase}
+              tenantId={tenantId}
+              rentalId={rental.id}
+              propertyId={prop?.id ?? null}
+              today={today}
+              canEdit={canEdit}
+              canDelete={canDelete}
+            />
           ) : null}
 
           {tab === "bakim" ? (
