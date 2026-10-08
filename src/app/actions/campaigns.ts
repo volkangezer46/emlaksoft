@@ -12,6 +12,7 @@ import {
   type ApprovedWhatsAppTemplate,
 } from "@/lib/messaging/whatsapp-cloud";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { describeIysGate, describeSkipReasons, gateIysRecipients, type IysGateResult } from "@/lib/iys/gate";
 
 export type CampaignResult = { ok?: boolean; error?: string; id?: string };
 export type WhatsAppTemplateListResult =
@@ -39,6 +40,61 @@ export async function listApprovedWhatsAppTemplates(): Promise<WhatsAppTemplateL
   }
 
   return listApprovedTenantWhatsAppTemplates(gate.tenantId);
+}
+
+// ---------------------------------------------------------------------------
+// Hedef kitle önizlemesi: izinli / izinsiz alıcı sayısı (merkezi İYS kapısı)
+// ---------------------------------------------------------------------------
+
+export type CampaignAudiencePreview =
+  | { ok: true; total: number; allowed: number; skipped: number; reasons: IysGateResult["reasons"]; summary: string; detail: string }
+  | { ok: false; error: string };
+
+const PREVIEW_PAGE = 1000;
+const PREVIEW_MAX_PAGES = 20;
+
+/**
+ * Kampanya oluşturma ekranı için: seçilen kanal + hedef kitle filtresine uyan (telefonu olan, kara listede olmayan) müşterilerden
+ * kaç tanesinin o kanalda İYS izni var, kaçı atlanacak. Hesap, gönderimde kullanılan merkezi kapıyla (src/lib/iys/gate.ts) AYNIDIR;
+ * teslimat anında izin yeniden doğrulanır (DB sözleşmesi), burada yalnız önizleme verilir. Hiçbir kayıt yazılmaz.
+ */
+export async function previewCampaignAudience(channel: string, filter: string): Promise<CampaignAudiencePreview> {
+  const gate = await requirePermission("campaigns", "create");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const ch = String(channel ?? "").trim();
+  const flt = String(filter ?? "all").trim();
+  if (ch !== "sms" && ch !== "whatsapp") return { ok: false, error: "Geçersiz kampanya kanalı." };
+  if (!CAMPAIGN_FILTERS.has(flt)) return { ok: false, error: "Geçersiz hedef kitle filtresi." };
+
+  const supabase = await createClient();
+  const ids: string[] = [];
+  for (let page = 0; page < PREVIEW_MAX_PAGES; page += 1) {
+    let q = supabase
+      .from("customers")
+      .select("id")
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      .eq("blacklist", false)
+      .not("phone", "is", null)
+      .neq("phone", "");
+    if (flt !== "all") q = q.contains("customer_types", [flt.split(":")[1]]);
+    const { data, error } = await q.order("id", { ascending: true }).range(page * PREVIEW_PAGE, page * PREVIEW_PAGE + PREVIEW_PAGE - 1);
+    if (error) return { ok: false, error: "Hedef kitle okunamadı; sayfayı yenileyip tekrar deneyin." };
+    const got = (data ?? []) as { id: string }[];
+    ids.push(...got.map((r) => r.id));
+    if (got.length < PREVIEW_PAGE) break;
+  }
+
+  const result = await gateIysRecipients(supabase, { tenantId: gate.tenantId, kind: "campaign", channel: ch, customerIds: ids });
+  return {
+    ok: true,
+    total: result.total,
+    allowed: result.allowed.length,
+    skipped: result.skippedCount,
+    reasons: result.reasons,
+    summary: describeIysGate(result),
+    detail: describeSkipReasons(result.reasons),
+  };
 }
 
 // ---------------------------------------------------------------------------

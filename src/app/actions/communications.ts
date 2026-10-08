@@ -8,6 +8,7 @@ import { normalizeTurkishPhone, isValidTurkishMobile } from "@/lib/phone";
 import { logActivity } from "@/lib/activity";
 import { isSignerSmsAvailable, sendSignerSms } from "@/app/imza/_lib/sms";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { gateIysRecipient, IYS_SKIP_LABELS } from "@/lib/iys/gate";
 
 export type CommResult = { ok?: boolean; error?: string; id?: string };
 
@@ -180,15 +181,15 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
   }
 
   // --- İYS onay kontrolü (zorunlu) ---
-  const { data: consent } = await supabase
-    .from("iys_consents")
-    .select("status")
-    .eq("tenant_id", gate.tenantId)
-    .eq("customer_id", customerId)
-    .eq("channel", "sms")
-    .maybeSingle();
-  if (consent?.status !== "granted") {
-    return { error: "İYS onayı yok — Uyum sayfasından (/app/uyum) SMS iznini kaydedin." };
+  // Merkezi İYS kapısı (src/lib/iys/gate.ts): kanal bazlı izin + geri alınmış izin kontrolü.
+  const iys = await gateIysRecipient(supabase, {
+    tenantId: gate.tenantId,
+    kind: "marketing_single",
+    channel: "sms",
+    customerId,
+  });
+  if (!iys.allowed) {
+    return { error: `İYS onayı yok (${IYS_SKIP_LABELS[iys.reason ?? "no_record"]}) — Uyum sayfasından (/app/uyum) SMS iznini kaydedin.` };
   }
 
   // Tenant provider is primary; platform fallback requires an explicit policy.
