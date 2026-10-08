@@ -172,16 +172,19 @@ export async function loadLeagueActivity(
     tenantId: string;
     startIso: string;
     endIso: string;
-    agentIds: ReadonlySet<string>;
+    /** Küme ya da (profil okuması bitince çözülen) söz: sorgular beklemeden başlar, süzme için en sonda beklenir. */
+    agentIds: ReadonlySet<string> | Promise<ReadonlySet<string>>;
     sampleVals: boolean[];
     nowMs: number;
     /** Önceden okunmuş Aday Hızı ölçümü (verilmezse burada okunur) */
-    responses?: LeadResponsesResult;
+    responses?: LeadResponsesResult | Promise<LeadResponsesResult>;
   },
 ): Promise<ActivityRow[]> {
   const { tenantId, startIso, endIso, sampleVals } = opts;
   const rangeOf = (q: Builder, col: string) => q.gte(col, startIso).lt(col, endIso);
 
+  // Aday Hızı okuması diğer 10 sorguyla BİRLİKTE başlar (eskiden onlar bittikten sonra ardışık okunuyordu).
+  const responsesP = opts.responses ?? loadLeadResponses(client, { tenantId, startIso, endIso, nowMs: opts.nowMs });
   const [deals, props, appts, tasks, surveys, surveyTasks, closures, customers, offers, listings] = await Promise.all([
     paged(client, "deals", "id, assigned_to, updated_at, is_sample", (q) =>
       rangeOf(q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won").not("assigned_to", "is", null), "updated_at")),
@@ -214,9 +217,10 @@ export async function loadLeagueActivity(
     ),
   ]);
 
+  const agentIds = await opts.agentIds;
   const activity: ActivityRow[] = [];
   const push = (staffId: string | null, kind: ActivityRow["kind"], at: unknown, ref: unknown, isSample: boolean) => {
-    if (!staffId || !opts.agentIds.has(staffId)) return;
+    if (!staffId || !agentIds.has(staffId)) return;
     const when = str(at);
     if (!when) return;
     activity.push({ staffId, kind, at: when, ref: str(ref) ?? undefined, isSample });
@@ -247,7 +251,7 @@ export async function loadLeagueActivity(
 
   // Hızlı ilk dönüş: Aday Hızı ile AYNI ölçüm (tek okuma yolu). Örnek müşteri bayrağı yukarıdaki müşteri satırından gelir.
   const sampleByCustomer = new Map(customers.map((c) => [String(c.id), sampleFlag(c)]));
-  const responses = opts.responses ?? (await loadLeadResponses(client, { tenantId, startIso, endIso, nowMs: opts.nowMs }));
+  const responses = await responsesP;
   for (const lr of responses.rows) {
     if (lr.status !== "hizli" || !lr.assignedTo || !lr.firstTouchAt) continue;
     // Ölçümün tanımladığı müşteri yukarıdaki sayfalı okumada yoksa (örnek dışlandı) puan verilmez.
@@ -287,16 +291,42 @@ export async function loadLeagueData(
   const tenantId = opts.tenantId;
   const nowMs = opts.nowMs ?? now();
 
-  // Demo kayıtlar yalnız ofiste gerçek kayıt eşiği altındayken lige girer (sample-scope).
-  const includeSample = (await getSampleScope(client, tenantId)).include;
+  // Demo kayıtlar yalnız ofiste gerçek kayıt eşiği altındayken lige girer (sample-scope). Ayar okuması ve örnek kapsamı
+  // birbirinden bağımsız: birlikte başlar (eskiden art arda 2 tur).
+  const [sampleScope, settings] = await Promise.all([
+    getSampleScope(client, tenantId),
+    opts.settings ? Promise.resolve(opts.settings) : loadLeagueSettings(client, tenantId),
+  ]);
+  const includeSample = sampleScope.include;
   const sampleVals = sampleValues(includeSample);
-  const settings = opts.settings ?? (await loadLeagueSettings(client, tenantId));
 
   // Seri penceresi: 400 gün geriye — "Maratoncu" (30 gün) için fazlasıyla yeterli.
   const streakSince = new Date(Date.parse(`${opts.todayIso.slice(0, 10)}T00:00:00.000Z`) - 400 * 86_400_000).toISOString();
 
-  const [profiles, dealsAll, propsAll, networkAll, streakDeals, streakAppts, streakTasks, streakProps] = await Promise.all([
-    paged(client, "profiles", "id, full_name, role, branch_id", (q) => q.eq("tenant_id", tenantId).eq("is_active", true)),
+  // Danışman listesi (profiller) yalnız SÜZME için gerekir; etkinlik/cevap sorguları ona bağlı değil. Hepsi tek turda başlar
+  // (eskiden profiller -> cevap hızı -> etkinlik olarak 3 ardışık tur).
+  const profilesP = paged(client, "profiles", "id, full_name, role, branch_id", (q) => q.eq("tenant_id", tenantId).eq("is_active", true));
+  const agentIdsP = profilesP.then((ps) =>
+    new Set(
+      ps
+        .filter((p) => LEAGUE_ROLES.includes(String(p.role) as (typeof LEAGUE_ROLES)[number]))
+        .filter((p) => (opts.branchId ? str(p.branch_id) === opts.branchId : true))
+        .map((p) => String(p.id)),
+    ) as ReadonlySet<string>,
+  );
+  const responsesP = loadLeadResponses(client, { tenantId, startIso: range.startIso, endIso: range.endIso, nowMs });
+  const activityP = loadLeagueActivity(client, {
+    tenantId,
+    startIso: range.startIso,
+    endIso: range.endIso,
+    agentIds: agentIdsP,
+    sampleVals,
+    nowMs,
+    responses: responsesP,
+  });
+
+  const [profiles, dealsAll, propsAll, networkAll, streakDeals, streakAppts, streakTasks, streakProps, activity] = await Promise.all([
+    profilesP,
 
     // ── Ömür boyu rozet sayaçları ────────────────────────────────────────
     paged(client, "deals", "id, assigned_to", (q) =>
@@ -314,7 +344,9 @@ export async function loadLeagueData(
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done").gte("completed_at", streakSince).not("assigned_to", "is", null)),
     paged(client, "properties", "id, assigned_to, created_at", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).gte("created_at", streakSince).not("assigned_to", "is", null)),
+    activityP,
   ]);
+  const responses = await responsesP;
 
   // ── Yarışan danışman listesi ────────────────────────────────────────────
   const agents: LeagueAgent[] = profiles
@@ -327,17 +359,6 @@ export async function loadLeagueData(
       branchId: str(p.branch_id),
     }));
   const agentIds = new Set(agents.map((a) => a.id));
-
-  const responses = await loadLeadResponses(client, { tenantId, startIso: range.startIso, endIso: range.endIso, nowMs });
-  const activity = await loadLeagueActivity(client, {
-    tenantId,
-    startIso: range.startIso,
-    endIso: range.endIso,
-    agentIds,
-    sampleVals,
-    nowMs,
-    responses,
-  });
 
   const scores = computeAgentScores(activity, settings.ruleset, { includeSample });
   // Hiç aktivitesi olmayan danışman da tabloda 0 puanla görünmeli.

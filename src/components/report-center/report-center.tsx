@@ -80,7 +80,14 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
   const pathname = REPORT_CENTER_PATH[scope];
   const selectedId = one(params.rapor);
   const selected = selectedId ? reports.find((r) => r.id === selectedId) : undefined;
-  const history = await loadRecentDownloads(ctx);
+  // Son indirmeler, önizleme ve filtre seçenekleri birbirine bağlı değil: TEK turda başlar (eskiden 3 ardışık tur).
+  const parsed = selected ? parseFilters(selected, params) : null;
+  const filters: Filters = parsed?.ok ? parsed.filters : {};
+  const [history, preview, options] = await Promise.all([
+    loadRecentDownloads(ctx),
+    selected && parsed?.ok ? previewReport(selected, ctx, filters) : Promise.resolve(null),
+    selected ? loadFilterOptions(selected, ctx) : Promise.resolve(null),
+  ]);
   const crumbs = [{ label: "Raporlar", href: pathname }, { label: "Rapor merkezi" }];
 
   if (!selected) {
@@ -103,10 +110,7 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
     );
   }
 
-  const parsed = parseFilters(selected, params);
-  const filters: Filters = parsed.ok ? parsed.filters : {};
-  const preview = parsed.ok ? await previewReport(selected, ctx, filters) : null;
-  const options = await loadFilterOptions(selected, ctx);
+  if (!parsed || !options) return null;
   const summary = parsed.ok ? summarizeFilters(selected, filters, options.advisorNames) : [];
   const total = preview?.ok ? preview.total : 0;
   const hrefs = {

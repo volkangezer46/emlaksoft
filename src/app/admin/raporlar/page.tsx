@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SkeletonCard } from "@/components/ui/viz";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
@@ -41,7 +43,9 @@ export default async function AdminReportsPage({
     return (
       <div className="space-y-5">
         <ReportTabs scope="platform" active="merkez" overviewLabel="Platform analizi" />
-        <ReportCenter scope="platform" params={rawSp} />
+        <Suspense fallback={<SkeletonCard height={480} label="Rapor merkezi yükleniyor" />}>
+          <ReportCenter scope="platform" params={rawSp} />
+        </Suspense>
       </div>
     );
   }

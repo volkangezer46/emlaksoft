@@ -85,13 +85,11 @@ export default async function LedgerPage({
   const today = trDayKey();
   const supabase = await createClient();
 
-  const settingsRes = await supabase
-    .from("compliance_ledger_settings")
-    .select("cash_threshold_try, amount_threshold_try, retention_years")
-    .maybeSingle();
-  const entriesProbe = await supabase
-    .from("compliance_ledger_entries")
-    .select("id", { count: "exact", head: true });
+  // Ayarlar ve şema yoklaması bağımsız: tek turda.
+  const [settingsRes, entriesProbe] = await Promise.all([
+    supabase.from("compliance_ledger_settings").select("cash_threshold_try, amount_threshold_try, retention_years").maybeSingle(),
+    supabase.from("compliance_ledger_entries").select("id", { count: "exact", head: true }),
+  ]);
   const supported = !settingsRes.error && !entriesProbe.error;
 
   const header = (
