@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone } from "lucide-react";
+import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
@@ -19,6 +19,9 @@ import { AvatarEditor } from "@/components/app/avatar-editor";
 import { removeOwnAvatar, setOwnAvatarPreset, uploadOwnAvatar } from "@/app/actions/avatar";
 import { EmailChangeForm, OtherDevicesForm, PasswordForm, ProfileForm } from "./account-forms";
 import { GoogleIdentityCard } from "./google-identity-card";
+import { ModuleVisibility } from "./module-visibility";
+import { getTenantModuleState } from "@/lib/modules/state";
+import { getUserHiddenModules } from "@/lib/modules/prefs";
 import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
 
 export const metadata = { title: "Hesabım" };
@@ -35,6 +38,7 @@ const TABS: DetailTabDef[] = [
   { id: "parola", label: "Parola", icon: KeyRound },
   { id: "oturumlar", label: "Oturumlar", icon: MonitorSmartphone },
   { id: "bildirimler", label: "Bildirimler", icon: Bell },
+  { id: "gorunum", label: "Görünüm", icon: LayoutGrid },
 ];
 
 /** Kullanıcının kendi hesabı: profil, parola, oturumlar, bildirim tercihleri, 2FA bağlantısı. */
@@ -82,12 +86,14 @@ export default async function AccountPage({
         : null;
   const prefs = active === "bildirimler" ? await getNotificationPrefs() : undefined;
   const channels = active === "bildirimler" ? await loadNotificationChannels(auth.tenantId) : undefined;
+  const officeClosed = active === "gorunum" && auth.tenantId ? (await getTenantModuleState(auth.tenantId)).closed : [];
+  const hiddenModules = active === "gorunum" && auth.tenantId ? await getUserHiddenModules(auth.userId, auth.tenantId) : [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Hesabım"
-        description="Kendi profiliniz, parolanız, oturumlarınız ve bildirim tercihleriniz."
+        description="Kendi profiliniz, parolanız, oturumlarınız, bildirim ve görünüm tercihleriniz."
         className="mb-0"
       />
       <DetailTabs basePath="/app/hesabim" tabs={TABS} active={active} label="Hesap sekmeleri" />
@@ -267,6 +273,23 @@ export default async function AccountPage({
       ) : null}
 
       {active === "bildirimler" ? <NotificationPrefsPanel initial={prefs} channels={channels} /> : null}
+
+      {active === "gorunum" ? (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>Görünüm: modüller</CardTitle>
+              <CardDescription>
+                Kullanmadığınız modülleri kendi menünüzden, ana ekranınızdan ve aramanızdan gizleyin. Yetkinizi ve ofis
+                ayarlarını değiştirmez; verileriniz silinmez.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ModuleVisibility officeClosed={officeClosed} hidden={hiddenModules} canEdit={Boolean(auth.tenantId)} />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

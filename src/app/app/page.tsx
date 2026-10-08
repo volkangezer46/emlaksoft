@@ -10,7 +10,7 @@ import { getRequestSampleScope } from "@/lib/cache/request";
 import type { SampleKpiScope } from "@/lib/sample-scope";
 import { measure } from "@/lib/server-timing";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getClosedFeatures } from "@/lib/modules/state";
+import { getInvisibleFeatures } from "@/lib/modules/prefs";
 import type { FeatureKey } from "@/lib/modules/registry";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
@@ -85,7 +85,7 @@ export default async function AppHomePage({
   const [showWelcome, closedFeatures, sample, user] = await measure("home-ctx", () =>
     Promise.all([
       tenantId ? loadShouldShowWelcome(userId, role) : Promise.resolve(false),
-      getClosedFeatures(tenantId),
+      getInvisibleFeatures(tenantId, userId),
       getRequestSampleScope(tenantId) as Promise<SampleKpiScope>,
       getRequestUser(),
     ]),

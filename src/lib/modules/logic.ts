@@ -1,4 +1,4 @@
-import { FEATURE_KEYS, isFeatureKey, normalizeClosed, type FeatureKey } from "@/lib/modules/registry";
+import { BUNDLES, FEATURE_KEYS, isFeatureKey, modulesOfBundle, normalizeClosed, type BundleId, type FeatureKey } from "@/lib/modules/registry";
 
 /**
  * Modül durumu saf mantığı (sunucu/istemci/test ortak). DB'den gelen satırlardan
@@ -120,7 +120,7 @@ export type PresetChange = { toClose: FeatureKey[]; toOpen: FeatureKey[]; skippe
  * Platform kilitli ve pakette olmayan modüllere dokunulmaz; bağımlılıklar tutarlı bırakılır.
  */
 export function computePresetChanges(
-  preset: ModulePreset,
+  preset: Pick<ModulePreset, "open" | "close">,
   currentClosed: readonly string[],
   opts: { locked?: readonly string[]; planLocked?: readonly string[] } = {},
 ): PresetChange {
@@ -155,4 +155,43 @@ export function computePresetChanges(
   const toClose = FEATURE_KEYS.filter((k) => normalized.has(k) && !before.has(k) && !locked.has(k) && !planLocked.has(k));
   const toOpen = FEATURE_KEYS.filter((k) => !normalized.has(k) && before.has(k) && !locked.has(k) && !planLocked.has(k));
   return { toClose, toOpen, skipped };
+}
+
+/* ------------------------------ Modül paketleri (bundle) ------------------------------ */
+
+export type BundleStatus = "open" | "closed" | "partial";
+
+/** Paketin üyelerinin tümü açıksa open, tümü kapalıysa closed, aksi halde partial. */
+export function bundleStatus(id: BundleId, closed: readonly string[]): BundleStatus {
+  const members = modulesOfBundle(id);
+  const n = members.filter((k) => closed.includes(k)).length;
+  if (n === 0) return "open";
+  return n === members.length ? "closed" : "partial";
+}
+
+/** Paket anahtarlarını ön ayar biçimine çevirir (önizleme + uygulama aynı `computePresetChanges` hesabını kullanır). */
+export function bundleAsPreset(enable: Partial<Record<BundleId, boolean>>): Pick<ModulePreset, "open" | "close"> {
+  const open: FeatureKey[] = [];
+  const close: FeatureKey[] = [];
+  for (const b of BUNDLES) {
+    const want = enable[b.id];
+    if (want === undefined) continue;
+    (want ? open : close).push(...modulesOfBundle(b.id));
+  }
+  return { open, close };
+}
+
+type ChangeOpts = { locked?: readonly string[]; planLocked?: readonly string[] };
+
+/**
+ * Tek paketin aç/kapat değişikliği. Kapatırken `dependsOn` zinciri (başka paketteki bağımlılar dahil) kapanır;
+ * açarken kapalı bağımlılığı olan üye kapalı kalır. Platform/paket kilitli üyelere dokunulmaz.
+ */
+export function computeBundleChanges(id: BundleId, enable: boolean, currentClosed: readonly string[], opts: ChangeOpts = {}): PresetChange {
+  return computePresetChanges(bundleAsPreset({ [id]: enable }), currentClosed, opts);
+}
+
+/** İlk kurulum: soru cevaplarından (evet=açık, hayır=kapalı) değişiklik önerisi. */
+export function computeSetupChanges(answers: Partial<Record<BundleId, boolean>>, currentClosed: readonly string[], opts: ChangeOpts = {}): PresetChange {
+  return computePresetChanges(bundleAsPreset(answers), currentClosed, opts);
 }

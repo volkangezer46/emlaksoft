@@ -6,18 +6,24 @@ import { OFFICE_ADMIN_DENIED, officeAdminCan } from "@/lib/admin/office-admin-ac
 import { getTenantGateContext } from "@/lib/cache/request";
 import { now } from "@/lib/clock";
 import {
+  computeBundleChanges,
   computePresetChanges,
+  computeSetupChanges,
   isMissingTableError,
   MODULE_PRESETS,
   resolveModuleState,
   type ModuleRow,
+  type PresetChange,
 } from "@/lib/modules/logic";
 import { canManageModules } from "@/lib/modules/permissions";
 import { planLockedKeys } from "@/lib/modules/plan";
 import {
+  BUNDLES,
   closedDependencies,
   dependentsOf,
+  getBundle,
   getModuleDef,
+  type BundleId,
   isFeatureKey,
   type FeatureKey,
 } from "@/lib/modules/registry";
@@ -149,6 +155,66 @@ export async function applyModulePreset(presetId: string): Promise<ModuleActionR
   });
   revalidatePath("/app", "layout");
   return { ok: true, message: `${preset.title} ön ayarı uygulandı: ${diff.toClose.length} modül kapandı, ${diff.toOpen.length} modül açıldı.` };
+}
+
+/** Paket (bundle) aç/kapat ya da ilk kurulum cevabı: ortak uygulama (önizleme ile AYNI hesap). */
+async function applyBundleChanges(
+  build: (state: { closed: FeatureKey[]; locked: FeatureKey[] }, planLocked: FeatureKey[]) => PresetChange,
+  describe: (diff: PresetChange) => string,
+  audit: { action: string; payload: Record<string, unknown> },
+): Promise<ModuleActionResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (gate.impersonating || !canManageModules(gate.role)) return { error: DENIED };
+
+  const state = await getTenantModuleState(gate.tenantId);
+  if (state.status === "unavailable") return { error: UNAVAILABLE };
+  const planCtx = await getTenantGateContext(gate.tenantId);
+  const diff = build(state, planLockedKeys(planCtx));
+  const changes: Change[] = [
+    ...diff.toClose.map((key) => ({ key, enabled: false })),
+    ...diff.toOpen.map((key) => ({ key, enabled: true })),
+  ];
+  if (changes.length === 0) return { ok: true, message: "Değişiklik yok." };
+
+  const failed = await writeChanges(gate.tenantId, gate.userId, changes);
+  if (failed) return failed;
+  await auditChanges(gate.tenantId, gate.userId, new Set(state.closed), changes);
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: audit.action,
+    entityType: "module",
+    newValue: { ...audit.payload, closed: diff.toClose, opened: diff.toOpen },
+  });
+  revalidatePath("/app", "layout");
+  return { ok: true, message: describe(diff) };
+}
+
+/** Modül paketini tek anahtarla aç/kapat (üyeler + bağımlılık zinciri; kilitli üyelere dokunulmaz). */
+export async function setBundleEnabled(bundleId: string, enabled: boolean): Promise<ModuleActionResult> {
+  const bundle = getBundle(bundleId);
+  if (!bundle) return { error: "Paket bulunamadı." };
+  return applyBundleChanges(
+    (state, planLocked) => computeBundleChanges(bundle.id, enabled, state.closed, { locked: state.locked, planLocked }),
+    (diff) =>
+      enabled
+        ? `${bundle.title} paketi açıldı (${diff.toOpen.length} modül). Verileriniz silinmedi.`
+        : `${bundle.title} paketi kapatıldı (${diff.toClose.length} modül). Verileriniz silinmedi.`,
+    { action: "module.bundle", payload: { bundle: bundle.id, enabled } },
+  );
+}
+
+/** İlk kurulum sihirbazı: paket soruları cevaplarına göre (evet=açık, hayır=kapalı) tek seferde uygular. */
+export async function applyModuleSetup(answers: Record<string, boolean>): Promise<ModuleActionResult> {
+  const clean: Partial<Record<BundleId, boolean>> = {};
+  for (const b of BUNDLES) if (typeof answers?.[b.id] === "boolean") clean[b.id] = answers[b.id];
+  if (Object.keys(clean).length === 0) return { error: "Önce soruları yanıtlayın." };
+  return applyBundleChanges(
+    (state, planLocked) => computeSetupChanges(clean, state.closed, { locked: state.locked, planLocked }),
+    (diff) => `Kurulum uygulandı: ${diff.toClose.length} modül kapandı, ${diff.toOpen.length} modül açıldı.`,
+    { action: "module.setup", payload: { answers: clean } },
+  );
 }
 
 /**

@@ -3,29 +3,29 @@
 import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
-import { Layers, Lock, PowerOff, Sparkles } from "lucide-react";
-import { applyModulePreset, setModuleEnabled } from "@/app/actions/modules";
+import { Layers, Lock, PowerOff, Sparkles, Wand2 } from "lucide-react";
+import { applyModulePreset, applyModuleSetup, setBundleEnabled, setModuleEnabled } from "@/app/actions/modules";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { computePresetChanges, MODULE_PRESETS, type ModulePreset } from "@/lib/modules/logic";
+import { bundleStatus, computeBundleChanges, computePresetChanges, computeSetupChanges, MODULE_PRESETS, type ModulePreset } from "@/lib/modules/logic";
 import type { PendingItem } from "@/lib/modules/pending-defs";
 import {
   CORE_AREAS,
   dependentsOf,
-  FEATURE_GROUPS,
+  BUNDLES,
   getModuleDef,
   isFeatureKey,
   type FeatureKey,
-  type FeatureGroupId,
+  type BundleId,
 } from "@/lib/modules/registry";
 
 export type ModuleCardData = {
   key: FeatureKey;
   label: string;
   desc: string;
-  group: FeatureGroupId;
+  group: BundleId;
   enabled: boolean;
   /** Platform kilidi: ofis değiştiremez. */
   platformLocked: boolean;
@@ -66,6 +66,12 @@ export function ModulesBoard({
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [confirmKey, setConfirmKey] = useState<FeatureKey | null>(null);
   const [previewId, setPreviewId] = useState<ModulePreset["id"] | null>(null);
+  const [confirmBundle, setConfirmBundle] = useState<BundleId | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [answers, setAnswers] = useState<Partial<Record<BundleId, boolean>>>(() =>
+    Object.fromEntries(BUNDLES.map((b) => [b.id, bundleStatus(b.id, closed) !== "closed"])),
+  );
+  const setupDiff = computeSetupChanges(answers, closed, { locked, planLocked });
 
   function run(task: () => Promise<{ ok?: boolean; error?: string; message?: string }>) {
     setFeedback(null);
@@ -79,6 +85,7 @@ export function ModulesBoard({
         setFeedback({ tone: "success", text: res.message ?? "Kaydedildi." });
         setConfirmKey(null);
         setPreviewId(null);
+        setConfirmBundle(null);
         router.refresh();
       } catch {
         setFeedback({ tone: "danger", text: "İşlem sırasında bağlantı kesildi. Lütfen tekrar deneyin." });
@@ -175,13 +182,121 @@ export function ModulesBoard({
         </ul>
       </section>
 
-      {FEATURE_GROUPS.map((group) => {
+      <section aria-labelledby="mod-setup" className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+        <div className="flex items-start gap-3 border-b border-line pb-4">
+          <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-700">
+            <Wand2 className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="mod-setup" className="font-display font-bold text-ink-950">Ofisinize göre kurulum</h2>
+            <p className="text-xs text-text-muted">Birkaç soruyu yanıtlayın; yapmadığınız işlerin paketleri kapansın. Önce neyin değişeceğini görürsünüz; verileriniz silinmez.</p>
+          </div>
+          <Button size="sm" variant="secondary" disabled={!canEdit} aria-expanded={setupOpen} onClick={() => setSetupOpen((v) => !v)}>
+            {setupOpen ? "Kapat" : "Başla"}
+          </Button>
+        </div>
+        {setupOpen ? (
+          <div className="mt-4 space-y-3">
+            <ul className="space-y-2">
+              {BUNDLES.map((b) => (
+                <li key={b.id} className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2">
+                  <span className="text-sm text-ink-950">{b.question}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs text-text-muted">
+                    {answers[b.id] ? "Evet" : "Hayır"}
+                    <Switch
+                      checked={Boolean(answers[b.id])}
+                      disabled={!canEdit || pending}
+                      aria-label={b.question}
+                      onCheckedChange={(next) => setAnswers((prev) => ({ ...prev, [b.id]: next }))}
+                    />
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="space-y-1 rounded-[var(--radius-control)] border border-brand-300/50 bg-brand-600/[0.04] p-3 text-xs">
+              <p>
+                <span className="font-semibold text-danger-600">Kapanacak ({setupDiff.toClose.length}):</span>{" "}
+                {setupDiff.toClose.length > 0 ? setupDiff.toClose.map(labelOf).join(", ") : "değişiklik yok"}
+              </p>
+              <p>
+                <span className="font-semibold text-mint-700">Açılacak ({setupDiff.toOpen.length}):</span>{" "}
+                {setupDiff.toOpen.length > 0 ? setupDiff.toOpen.map(labelOf).join(", ") : "değişiklik yok"}
+              </p>
+              <p className="text-text-muted">Çekirdek alanlar (müşteri, portföy, anlaşma, randevu...) her zaman açıktır.</p>
+            </div>
+            <Button
+              size="sm"
+              loading={pending}
+              disabled={setupDiff.toClose.length + setupDiff.toOpen.length === 0}
+              onClick={() => run(() => applyModuleSetup(answers))}
+            >
+              Kurulumu uygula
+            </Button>
+          </div>
+        ) : null}
+      </section>
+
+      <section aria-labelledby="mod-bundles" className="space-y-3">
+        <h2 id="mod-bundles" className="font-display text-base font-bold text-ink-950">Modül paketleri</h2>
+        <p className="text-xs text-text-muted">Her paket bir grup modülü tek anahtarla açıp kapatır. Tek tek modüller için paketin altındaki &quot;Modülleri göster&quot; bölümünü açın.</p>
+      </section>
+
+      {BUNDLES.map((group) => {
         const groupCards = cards.filter((c) => c.group === group.id);
         if (groupCards.length === 0) return null;
+        const status = bundleStatus(group.id, closed);
+        const planLockedCount = groupCards.filter((c) => c.planLocked).length;
+        const bundleFrozen = !canEdit || groupCards.every((c) => c.platformLocked || c.planLocked);
+        const bundleConfirming = confirmBundle === group.id;
+        const bundleDiff = bundleConfirming ? computeBundleChanges(group.id, false, closed, { locked, planLocked }) : null;
         return (
-          <section key={group.id} aria-labelledby={`mod-${group.id}`} className="space-y-3">
-            <h2 id={`mod-${group.id}`} className="font-display text-base font-bold text-ink-950">{group.title}</h2>
-            <ul className="grid gap-3 lg:grid-cols-2">
+          <section key={group.id} aria-labelledby={`mod-${group.id}`} className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-5">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 id={`mod-${group.id}`} className="font-display text-base font-bold text-ink-950">{group.title}</h2>
+                  {status === "closed" ? <Badge variant="neutral" size="sm">Kapalı</Badge> : null}
+                  {status === "partial" ? <Badge variant="warning" size="sm">Kısmen açık</Badge> : null}
+                  {planLockedCount > 0 ? (
+                    <Badge variant="info" size="sm">{planLockedCount === groupCards.length ? "Pakette yok" : `${planLockedCount} modül pakette yok`}</Badge>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">{group.desc}</p>
+                <p className="mt-1 text-xs text-text-faint">{groupCards.map((c) => c.label).join(" · ")}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 pt-0.5">
+                {bundleFrozen ? <Lock className="h-3.5 w-3.5 text-text-faint" aria-hidden /> : null}
+                <Switch
+                  checked={status === "open"}
+                  disabled={bundleFrozen || pending}
+                  aria-label={`${group.title} paketi ${status === "open" ? "açık" : status === "partial" ? "kısmen açık" : "kapalı"}`}
+                  onCheckedChange={(next) => {
+                    setFeedback(null);
+                    if (next) run(() => setBundleEnabled(group.id, true));
+                    else setConfirmBundle(group.id);
+                  }}
+                />
+              </div>
+            </div>
+            {bundleDiff ? (
+              <div role="group" aria-label={`${group.title} kapatma onayı`} className="mt-3 space-y-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/8 p-3 text-xs">
+                <p className="flex items-start gap-2 font-semibold text-ink-950">
+                  <PowerOff className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {group.title} paketi kapatılsın mı?
+                </p>
+                <p><span className="font-semibold text-danger-600">Kapanacak ({bundleDiff.toClose.length}):</span> {bundleDiff.toClose.length > 0 ? bundleDiff.toClose.map(labelOf).join(", ") : "değişiklik yok"}</p>
+                <p className="text-text-muted">Menüden, aramadan ve ana ekrandan gizlenir; otomasyon ve bildirim üretmez. Verileriniz silinmez, istediğiniz zaman yeniden açabilirsiniz.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="danger" loading={pending} disabled={bundleDiff.toClose.length === 0} onClick={() => run(() => setBundleEnabled(group.id, false))}>
+                    Paketi kapat
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmBundle(null)}>Vazgeç</Button>
+                </div>
+              </div>
+            ) : null}
+            <details className="group mt-3 border-t border-line pt-3">
+              <summary className="cursor-pointer text-xs font-semibold text-brand-600 hover:underline">Modülleri göster ({groupCards.length}, gelişmiş)</summary>
+            <ul className="mt-3 grid gap-3 lg:grid-cols-2">
               {groupCards.map((card) => {
                 const frozen = card.platformLocked || card.planLocked || !canEdit;
                 const dependents = openDependents(card.key);
@@ -282,6 +397,7 @@ export function ModulesBoard({
                 );
               })}
             </ul>
+            </details>
           </section>
         );
       })}
