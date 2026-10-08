@@ -42,6 +42,7 @@ import {
 } from "./sections";
 import { KapanisPanel } from "./kapanis-panel";
 import { DealGosSection } from "./deal-gos-section";
+import { DealProcessSection } from "./deal-process-section";
 import { CustomFieldsPanel } from "@/components/app/custom-fields-panel";
 import { DealLinkPanel } from "./deal-link-panel";
 import { parseOutcomeParam } from "./kapanis-model";
@@ -450,6 +451,12 @@ export default async function DealDetailPage({
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
           <DetailTabs basePath={`/app/anlasmalar/${deal.id}`} tabs={tabDefs} active={tab} label="Anlaşma sekmeleri" />
+
+          {tab === "kapanis" && deal.deal_type === "sale" && !kayip ? (
+            <Suspense fallback={null}>
+              <DealProcessSection dealId={deal.id} canEdit={(perms.commissions ?? []).includes("edit")} />
+            </Suspense>
+          ) : null}
 
           {tab === "kapanis" ? (
             <KapanisPanel
