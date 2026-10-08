@@ -13,6 +13,8 @@ declare namespace chrome {
     const onMessage: {
       addListener(cb: (message: unknown, sender: MessageSender, sendResponse: (response?: unknown) => void) => boolean | void): void;
     };
+    const onInstalled: { addListener(cb: (details: { reason: string }) => void): void };
+    const onStartup: { addListener(cb: () => void): void };
   }
   namespace storage {
     type StorageArea = {
@@ -28,5 +30,14 @@ declare namespace chrome {
   }
   namespace tabs {
     function create(props: { url: string }): Promise<unknown>;
+  }
+  namespace alarms {
+    function create(name: string, info: { periodInMinutes?: number; delayInMinutes?: number }): Promise<void> | void;
+    const onAlarm: { addListener(cb: (alarm: { name: string }) => void): void };
+  }
+  namespace action {
+    function setBadgeText(details: { text: string }): Promise<void>;
+    function setBadgeBackgroundColor(details: { color: string }): Promise<void>;
+    function setTitle(details: { title: string }): Promise<void>;
   }
 }

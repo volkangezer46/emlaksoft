@@ -37,9 +37,14 @@ export const INITIAL_PACING: PacingState = { nextAllowedAtMs: 0, recentMs: [], d
 export type PacingDecision = { ok: true } | { ok: false; waitMs: number; reason: "interval" | "hour_cap" | "day_cap" | "cooldown" };
 
 /** Şimdi bir portal isteği yapılabilir mi? `dayKey` çağıranın yerel günü. */
-export function pacingDecision(state: PacingState, nowMs: number, dayKey: string): PacingDecision {
+/**
+ * `opts.maxPerDay`: kullanıcının ayarladığı günlük üst sınır. ASLA `EXTENSION_LIMITS.maxPerDay` tavanını aşamaz (yalnız düşürür);
+ * saatlik tavan, 20 sn aralık ve engel beklemesi ayarla gevşetilemez.
+ */
+export function pacingDecision(state: PacingState, nowMs: number, dayKey: string, opts: { maxPerDay?: number } = {}): PacingDecision {
+  const dayCap = Math.min(EXTENSION_LIMITS.maxPerDay, Math.max(1, Math.floor(opts.maxPerDay ?? EXTENSION_LIMITS.maxPerDay)));
   if (state.cooldownUntilMs > nowMs) return { ok: false, waitMs: state.cooldownUntilMs - nowMs, reason: "cooldown" };
-  if (state.dayKey === dayKey && state.dayCount >= EXTENSION_LIMITS.maxPerDay) return { ok: false, waitMs: 60 * 60_000, reason: "day_cap" };
+  if (state.dayKey === dayKey && state.dayCount >= dayCap) return { ok: false, waitMs: 60 * 60_000, reason: "day_cap" };
   const hourAgo = nowMs - 3_600_000;
   const recent = state.recentMs.filter((t) => t > hourAgo).sort((a, b) => a - b);
   if (recent.length >= EXTENSION_LIMITS.maxPerHour) return { ok: false, waitMs: Math.max(1_000, recent[0] + 3_600_000 - nowMs), reason: "hour_cap" };
@@ -62,7 +67,7 @@ export function recordRequest(state: PacingState, nowMs: number, dayKey: string,
 
 /** Portal engel/hız sınırı döndürdüyse (429, CAPTCHA, giriş duvarı) bütün kontroller bir süre durur. */
 export function applyBlockCooldown(state: PacingState, nowMs: number, error: string | null | undefined): PacingState {
-  if (!error || !/^(http_429|http_403|captcha|login_required)$/.test(error)) return state;
+  if (!error || !/^(http_429|http_403|http_401|captcha|login_required)$/.test(error)) return state;
   return { ...state, cooldownUntilMs: Math.max(state.cooldownUntilMs, nowMs + EXTENSION_LIMITS.blockCooldownMs) };
 }
 
