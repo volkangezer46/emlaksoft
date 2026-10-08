@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from "react";
 import { Eye, EyeOff, RadioTower, Save, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { savePortalApiKey, clearPortalApiKey, type PortalKeyResult } from "@/app/actions/portal-keys";
 
 // ---------------------------------------------------------------------------
@@ -36,7 +37,6 @@ function PortalKeyCard({
   }
 
   function handleClear() {
-    if (!confirm(`${label} API anahtarı silinsin mi?`)) return;
     startClear(async () => {
       const res = await clearPortalApiKey(portal);
       setResult(res);
@@ -104,14 +104,21 @@ function PortalKeyCard({
               <Save className="h-3.5 w-3.5" /> {saving ? "Kaydediliyor…" : "Kaydet"}
             </button>
             {configured && (
-              <button
-                type="button"
-                onClick={handleClear}
-                disabled={clearing}
-                className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-red-50 disabled:opacity-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> Sil
-              </button>
+              <ConfirmDialog
+                trigger={
+                  <button
+                    type="button"
+                    disabled={clearing}
+                    className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Sil
+                  </button>
+                }
+                title={`${label} API anahtarı silinsin mi?`}
+                description="Anahtar silinince bu portalla senkron durur."
+                confirmLabel="Sil"
+                onConfirm={handleClear}
+              />
             )}
           </div>
         </form>

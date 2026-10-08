@@ -20,6 +20,7 @@ import {
   setReferralStatus,
   toggleReferralLink,
 } from "@/app/actions/referrals";
+import { useToast } from "@/components/app/toast-provider";
 import { formatTurkishPhone } from "@/lib/phone";
 import { searchCustomers } from "@/app/actions/lookup";
 
@@ -35,6 +36,7 @@ const SMALL_BTN =
 /** Tavsiye linkini panoya kopyalar — 2 sn "Kopyalandı" (CopySurveyLinkButton deseni). */
 export function CopyReferralLinkButton({ url, label }: { url: string; label?: string }) {
   const [copied, setCopied] = useState(false);
+  const { push } = useToast();
   return (
     <button
       type="button"
@@ -44,8 +46,7 @@ export function CopyReferralLinkButton({ url, label }: { url: string; label?: st
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {
-          // Pano izni yoksa prompt en garantili yedek (eski Safari/kiosk).
-          window.prompt("Linki kopyalayın:", url);
+          push(`Pano erişimi yok. Link: ${url}`, "err");
         }
       }}
       title={url}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useToast } from "@/components/app/toast-provider";
 import { useState } from "react";
 import { Check, Link2, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -8,6 +9,7 @@ import { deletePresentation } from "@/app/actions/presentations";
 /** Public sunum linkini panoya kopyalar — 2 sn "Kopyalandı" geri bildirimi. */
 export function CopyLinkButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
+  const { push } = useToast();
   return (
     <button
       type="button"
@@ -17,8 +19,7 @@ export function CopyLinkButton({ url }: { url: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         } catch {
-          // Pano izni yoksa prompt en garantili yedek (eski Safari/kiosk).
-          window.prompt("Linki kopyalayın:", url);
+          push(`Pano erişimi yok. Link: ${url}`, "err");
         }
       }}
       title="Public linki kopyala"

@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowDown, ArrowUp, ChevronsUpDown, SearchX } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -155,12 +156,9 @@ export function AdminEmpty({
 /** Aktif filtreyi tek tıkla kaldıran çip. */
 export function AdminFilterChip({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="focus-ring press inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600 transition hover:bg-brand-600/15"
-    >
+    <FilterChip href={href} active>
       {children}
-    </Link>
+    </FilterChip>
   );
 }
 
