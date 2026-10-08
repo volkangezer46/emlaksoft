@@ -23,7 +23,7 @@ import {
 import { filterByNotifPrefs, readNotifPrefs, type NotifPrefs } from "@/components/app/notification-prefs";
 import { useToast } from "@/components/app/toast-provider";
 import { markAllRead, markReadById, runOptimistic } from "@/lib/optimistic";
-import { daysFromNowIso } from "@/lib/clock";
+import { daysFromNowIso, msSince, now as clockNow, trDayStartMs } from "@/lib/clock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AutoAnimate } from "@/components/ui/auto-animate";
 
@@ -41,9 +41,8 @@ function kindMeta(kind: string) {
 
 /** Bildirimleri zaman dilimine göre grupla: Bugün / Bu hafta / Daha eski. */
 function groupByTime(items: NotificationRow[]) {
-  const now = Date.now();
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
+  const now = clockNow();
+  const dayStart = trDayStartMs(now);
   const weekMs = 7 * 86_400_000;
 
   const groups: { label: string; items: NotificationRow[] }[] = [
@@ -53,7 +52,7 @@ function groupByTime(items: NotificationRow[]) {
   ];
   for (const n of items) {
     const t = new Date(n.created_at).getTime();
-    if (t >= dayStart.getTime()) groups[0].items.push(n);
+    if (t >= dayStart) groups[0].items.push(n);
     else if (now - t < weekMs) groups[1].items.push(n);
     else groups[2].items.push(n);
   }
@@ -61,7 +60,7 @@ function groupByTime(items: NotificationRow[]) {
 }
 
 function relTime(iso: string) {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  const mins = Math.floor(msSince(iso) / 60_000);
   if (mins < 1) return "şimdi";
   if (mins < 60) return `${mins} dk önce`;
   const hrs = Math.floor(mins / 60);

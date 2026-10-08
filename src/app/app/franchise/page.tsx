@@ -17,6 +17,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
 import { moneyTry } from "@/lib/leak-shield";
 import { trDayKey } from "@/lib/clock";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { StatCard } from "@/components/app/stat-card";
 import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
 import { Table, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
@@ -82,27 +84,47 @@ export default async function FranchiseBiPage({
 
   // Dönem yalnız işlem akışına uygulanır (deals/closures); portföy, müşteri ve
   // danışman sayıları anlık envanterdir — tarihle süzülmez.
-  let dealsQuery = supabase.from("deals").select("id, assigned_to, deal_value, stage, created_at").limit(500);
-  if (fromIso) dealsQuery = dealsQuery.gte("created_at", fromIso);
-  if (toIso) dealsQuery = dealsQuery.lte("created_at", toIso);
-  let closuresQuery = supabase
-    .from("listing_closures")
-    .select("estimated_lost_commission, deal_happened, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(property:properties!portal_listings_property_id_fkey(branch_id))")
-    .limit(500);
-  if (fromIso) closuresQuery = closuresQuery.gte("created_at", fromIso);
-  if (toIso) closuresQuery = closuresQuery.lte("created_at", toIso);
+  // PostgREST max_rows (1000) sınırı: sayımlar sayfalı okunur (fetchAllRows); eksik veri sessizce gösterilmez.
+  const dealsPage = (from: number, to: number) => {
+    let q = supabase.from("deals").select("id, assigned_to, deal_value, stage, created_at").order("id", { ascending: true }).range(from, to);
+    if (fromIso) q = q.gte("created_at", fromIso);
+    if (toIso) q = q.lte("created_at", toIso);
+    return q;
+  };
+  const closuresPage = (from: number, to: number) => {
+    let q = supabase
+      .from("listing_closures")
+      .select("id, estimated_lost_commission, deal_happened, created_at, portal_listing:portal_listings!listing_closures_portal_listing_id_fkey(property:properties!portal_listings_property_id_fkey(branch_id))")
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (fromIso) q = q.gte("created_at", fromIso);
+    if (toIso) q = q.lte("created_at", toIso);
+    return q;
+  };
 
-  const [inputs, { data: tenant }, { data: branches }, { data: properties }, { data: customers }, { data: profiles }, { data: deals }, { data: closures }] =
+  const [inputs, tenantRes, branchesRes, propertiesRes, customersRes, profilesRes, dealsRes, closuresRes] =
     await Promise.all([
       loadOfficeScoreInputs(supabase),
       supabase.from("tenants").select("name, plan").limit(1).maybeSingle(),
       supabase.from("branches").select("id, name, is_active").eq("is_active", true).order("name").limit(50),
-      supabase.from("properties").select("id, branch_id").is("deleted_at", null).limit(2000),
-      supabase.from("customers").select("id, branch_id").is("deleted_at", null).limit(2000),
+      fetchAllRows((from, to) => supabase.from("properties").select("id, branch_id").is("deleted_at", null).order("id", { ascending: true }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from("customers").select("id, branch_id").is("deleted_at", null).order("id", { ascending: true }).range(from, to)),
       supabase.from("profiles").select("id, branch_id, full_name").eq("is_active", true).limit(200),
-      dealsQuery,
-      closuresQuery,
+      fetchAllRows(dealsPage),
+      fetchAllRows(closuresPage),
     ]);
+  assertQueryBatchSucceeded(
+    [tenantRes, branchesRes, propertiesRes, customersRes, profilesRes, dealsRes, closuresRes],
+    ["franchise-tenant", "franchise-branches", "franchise-properties", "franchise-customers", "franchise-profiles", "franchise-deals", "franchise-closures"],
+    "Şube analitiği",
+  );
+  const { data: tenant } = tenantRes;
+  const { data: branches } = branchesRes;
+  const { data: properties } = propertiesRes;
+  const { data: customers } = customersRes;
+  const { data: profiles } = profilesRes;
+  const { data: deals } = dealsRes;
+  const { data: closures } = closuresRes;
 
   const office = computeOfficeScore(inputs);
   const branchList = branches ?? [];

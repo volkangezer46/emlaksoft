@@ -5,6 +5,7 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setting-keys";
 import { authorizeCron } from "@/lib/cron-auth";
+import { cronDeadline, isPastDeadline } from "@/lib/cron-run";
 import { runLicenseReminders } from "@/lib/license-reminders";
 import { runOfferExpiryReminders } from "@/lib/offer-expiry-reminders";
 import { runPropertyAuthorityReminders } from "@/lib/property-authority-reminders";
@@ -13,7 +14,12 @@ import { sendTrialEndingEmails } from "@/lib/email/trial-reminder";
 import { getBaseUrl } from "@/lib/base-url";
 import { pausedSubscriptionIds, runSubscriptionLifecycle, type LifecycleSummary } from "@/lib/billing/subscription-lifecycle";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+/** Zaman bütçesi (maxDuration altında); dolunca kalan adımlar sonraki koşuya bırakılır (adımlar idempotenttir). */
+const TIME_BUDGET_MS = 100_000;
+/** Tek koşuda satır sınırı; dolarsa kalan iş sonraki koşuda sürer. */
+const BATCH_LIMIT = 100;
 
 const DAY_MS = 86_400_000;
 const BILLING_HREF = "/app/abonelik";
@@ -23,14 +29,21 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   const admin = createAdminClient();
-  const now = new Date().toISOString();
+  const startedMs = Date.now();
+  const now = new Date(startedMs).toISOString();
+  const deadline = cronDeadline(startedMs, TIME_BUDGET_MS);
+  const overBudget = () => isPastDeadline(Date.now(), deadline);
+  /** Sonraki koşuya bırakılan iş (heartbeat teşhisi). */
+  const deferred: string[] = [];
 
   const { data: trials } = await admin
     .from("subscriptions")
     .select("id, tenant_id, trial_ends_at, status")
     .eq("status", "trialing")
     .lt("trial_ends_at", now)
-    .limit(100);
+    .order("trial_ends_at", { ascending: true })
+    .limit(BATCH_LIMIT);
+  if ((trials?.length ?? 0) >= BATCH_LIMIT) deferred.push("deneme bitişi (limit)");
 
   // N+1 freni: satır başına 3 yazma yerine küme başına 3 toplu yazma.
   // 100 deneme için ~300 gidiş-dönüş → 3'e iner.
@@ -60,14 +73,17 @@ export async function GET(req: NextRequest) {
   // Kademe: kalan <=1 gün → trial1, <=3 gün → trial3. Aynı kademe 5 günlük pencerede tekrar yazılmaz.
   let trialReminded = 0;
   let trialEmailed = 0;
-  const nowMs = Date.now();
-  const { data: endingTrials } = await admin
+  const nowMs = startedMs;
+  const endingTrials = overBudget() ? null : (await admin
     .from("subscriptions")
     .select("id, tenant_id, trial_ends_at")
     .eq("status", "trialing")
     .gte("trial_ends_at", now)
     .lte("trial_ends_at", new Date(nowMs + 3 * DAY_MS).toISOString())
-    .limit(500);
+    .order("trial_ends_at", { ascending: true })
+    .limit(500)).data;
+  if (endingTrials === null) deferred.push("deneme hatırlatması (süre)");
+  else if (endingTrials.length >= 500) deferred.push("deneme hatırlatması (limit)");
   if (endingTrials && endingTrials.length > 0) {
     const since = new Date(nowMs - 5 * DAY_MS).toISOString();
     const tenantIdsEnding = [...new Set(endingTrials.map((s) => String(s.tenant_id)))];
@@ -109,13 +125,16 @@ export async function GET(req: NextRequest) {
   let suspended = 0;
   const graceDays = parseTrialGraceDays(await getPlatformSetting(PLATFORM_SETTING_KEYS.trialGraceDays));
   const graceCutoff = new Date(nowMs - graceDays * DAY_MS).toISOString();
-  const { data: graceExpired } = await admin
+  const graceExpired = overBudget() ? null : (await admin
     .from("subscriptions")
     .select("id, tenant_id, trial_ends_at, current_period_end")
     .eq("status", "past_due")
     .not("trial_ends_at", "is", null)
     .lt("trial_ends_at", graceCutoff)
-    .limit(100);
+    .order("trial_ends_at", { ascending: true })
+    .limit(BATCH_LIMIT)).data;
+  if (graceExpired === null) deferred.push("askıya alma (süre)");
+  else if (graceExpired.length >= BATCH_LIMIT) deferred.push("askıya alma (limit)");
   const unpaid = (graceExpired ?? []).filter(
     (s) => !s.current_period_end || new Date(String(s.current_period_end)).getTime() <= new Date(String(s.trial_ends_at)).getTime(),
   );
@@ -151,7 +170,8 @@ export async function GET(req: NextRequest) {
   // otomatik devam eden aboneliğin dönem sonu uzamış olur, iptal sebebi sayılmaz. Hata asıl işi bozmaz.
   let lifecycle: LifecycleSummary = { resumed: 0, downgraded: 0, downgradeFailed: 0, notified: 0, skipped: true };
   try {
-    lifecycle = await runSubscriptionLifecycle(admin);
+    if (overBudget()) deferred.push("abonelik yaşam döngüsü (süre)");
+    else lifecycle = await runSubscriptionLifecycle(admin);
   } catch (e) {
     console.error("abonelik-kontrol lifecycle", e instanceof Error ? e.message : "hata");
   }
@@ -160,13 +180,19 @@ export async function GET(req: NextRequest) {
   // Kolon henüz yoksa (migration uygulanmadı) sorgu hata verir; sessizce atlanır.
   // DURAKLATILMIŞ abonelik atlanır: duraklatma dönem sonunu zaten aşmış olabilir, devamda dönem sonu uzar.
   let cancelled = 0;
-  const { data: dueCancelAll, error: cancelReadError } = await admin
+  const cancelRes = overBudget()
+    ? { data: null, error: null }
+    : await admin
     .from("subscriptions")
     .select("id, tenant_id")
     .eq("cancel_at_period_end", true)
     .neq("status", "cancelled")
     .lt("current_period_end", now)
-    .limit(100);
+    .order("current_period_end", { ascending: true })
+    .limit(BATCH_LIMIT);
+  const { data: dueCancelAll, error: cancelReadError } = cancelRes;
+  if (cancelRes.data === null && !cancelRes.error) deferred.push("dönem sonu iptali (süre)");
+  else if ((dueCancelAll?.length ?? 0) >= BATCH_LIMIT) deferred.push("dönem sonu iptali (limit)");
   const pausedDue = cancelReadError ? new Set<string>() : await pausedSubscriptionIds(admin, (dueCancelAll ?? []).map((s) => String(s.id)));
   const dueCancel = (dueCancelAll ?? []).filter((s) => !pausedDue.has(String(s.id)));
   if (!cancelReadError && dueCancel.length > 0) {
@@ -185,7 +211,8 @@ export async function GET(req: NextRequest) {
   // Yetki belgesi hatırlatmaları (60/30/7 gün + yıllık harç ayı; ofis ayarı kapalı doğar). Hata asıl işi bozmaz.
   let license = { expiry: 0, annualFee: 0, skipped: true };
   try {
-    license = await runLicenseReminders(admin, trDayKey(nowMs));
+    if (overBudget()) deferred.push("yetki belgesi (süre)");
+    else license = await runLicenseReminders(admin, trDayKey(nowMs));
   } catch (e) {
     console.error("abonelik-kontrol license", e instanceof Error ? e.message : "hata");
   }
@@ -193,7 +220,8 @@ export async function GET(req: NextRequest) {
   // Teklif geçerlilik bitimine 2 gün kala hatırlatma (teklifi açana; tek seferlik). Hata asıl işi bozmaz.
   let offerExpiry = { notified: 0, skipped: true };
   try {
-    offerExpiry = await runOfferExpiryReminders(admin, trDayKey(nowMs));
+    if (overBudget()) deferred.push("teklif bitimi (süre)");
+    else offerExpiry = await runOfferExpiryReminders(admin, trDayKey(nowMs));
   } catch (e) {
     console.error("abonelik-kontrol offer-expiry", e instanceof Error ? e.message : "hata");
   }
@@ -201,16 +229,17 @@ export async function GET(req: NextRequest) {
   // Portföy yetkisi bitiş hatırlatması (30/7/0 gün; varsayılan açık bildirim, tercih "authority"). Hata asıl işi bozmaz.
   let authority = { candidates: 0, written: 0, skipped: true };
   try {
-    authority = await runPropertyAuthorityReminders(admin, trDayKey(nowMs));
+    if (overBudget()) deferred.push("portföy yetkisi (süre)");
+    else authority = await runPropertyAuthorityReminders(admin, trDayKey(nowMs));
   } catch (e) {
     console.error("abonelik-kontrol authority", e instanceof Error ? e.message : "hata");
   }
 
   await recordHeartbeat(
     "abonelik-kontrol",
-    "ok",
-    `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}`,
+    deferred.length > 0 ? "error" : "ok",
+    `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
   );
 
-  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle });
+  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, deferred });
 }

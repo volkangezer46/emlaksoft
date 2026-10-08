@@ -20,6 +20,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -91,34 +93,38 @@ export default async function TalepArzPage({
   // Talepler: dönem penceresinde AÇILAN açık talepler. Portföyler: şu an
   // yayında olan stok (stoka pencere uygulamak arzı yapay düşürür — dürüst
   // kıyas "güncel arz vs dönem içi talep akışı"dır, başlık altında belirtilir).
-  let demandQuery = supabase
-    .from("customer_demands")
-    .select("province_id, district_id, budget_min, budget_max")
-    .in("status", OPEN_DEMAND_STATUSES)
-    .gte("created_at", windowIso)
-    .limit(2000);
-  let propertyQuery = supabase
-    .from("properties")
-    .select("province_id, district_id, list_price")
-    .is("deleted_at", null)
-    .in("status", LIVE_PROPERTY_STATUSES)
-    .limit(2000);
-  if (islem.db) {
-    demandQuery = demandQuery.eq("transaction_type", islem.db);
-    propertyQuery = propertyQuery.eq("transaction_type", islem.db);
-  }
-  if (ilFilter) {
-    demandQuery = demandQuery.eq("province_id", ilFilter);
-    propertyQuery = propertyQuery.eq("province_id", ilFilter);
-  }
+  // max_rows (1000) sınırı: talep/arz sayımları sayfalı okunur (eksik sayı sessizce gösterilmez).
+  const demandPage = (from: number, to: number) => {
+    let q = supabase
+      .from("customer_demands")
+      .select("id, province_id, district_id, budget_min, budget_max")
+      .in("status", OPEN_DEMAND_STATUSES)
+      .gte("created_at", windowIso);
+    if (islem.db) q = q.eq("transaction_type", islem.db);
+    if (ilFilter) q = q.eq("province_id", ilFilter);
+    return q.order("id", { ascending: true }).range(from, to);
+  };
+  const propertyPage = (from: number, to: number) => {
+    let q = supabase
+      .from("properties")
+      .select("id, province_id, district_id, list_price")
+      .is("deleted_at", null)
+      .in("status", LIVE_PROPERTY_STATUSES);
+    if (islem.db) q = q.eq("transaction_type", islem.db);
+    if (ilFilter) q = q.eq("province_id", ilFilter);
+    return q.order("id", { ascending: true }).range(from, to);
+  };
 
-  const [{ data: demandData }, { data: propertyData }, { data: provinceData }] = await Promise.all([
-    demandQuery,
-    propertyQuery,
+  const [demandRes, propertyRes, { data: provinceData }] = await Promise.all([
+    fetchAllRows(demandPage),
+    fetchAllRows(propertyPage),
     // İl referansı: filtre dropdown'ı + harita daire koordinatları tek sorgudan
     getProvinces().then((list) => ({ data: list.map((p) => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng })) })),
   ]);
 
+  assertQueryBatchSucceeded([demandRes, propertyRes], ["talep-arz-talepler", "talep-arz-portfoyler"], "Talep-arz");
+  const demandData = demandRes.data;
+  const propertyData = propertyRes.data;
   const demands = (demandData ?? []) as TalepArzDemandRow[];
   const properties = (propertyData ?? []) as TalepArzPropertyRow[];
   const provinces = [...(provinceData ?? [])].sort((a, b) => compareTr(a.name, b.name)) as {

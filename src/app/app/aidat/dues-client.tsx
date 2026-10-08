@@ -7,6 +7,7 @@ import { Check, CheckCheck, Coins, Loader2, MoreVertical, Plus, Trash2, Undo2, X
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { createDue, toggleDuePaid, deleteDue, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
 import { useToast } from "@/components/app/toast-provider";
+import { isPast, trDayKey } from "@/lib/clock";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -186,7 +187,7 @@ export function DuesClient({
                 Gerçek <label> ile değiştirildi. */}
             <label className="block text-xs font-semibold text-text-muted">
               İlgili ay
-              <input name="period" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
+              <input name="period" type="date" defaultValue={trDayKey()} className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
             </label>
             <label className="block text-xs font-semibold text-text-muted">
               Son ödeme tarihi
@@ -283,7 +284,7 @@ export function DuesClient({
                 {dues.map((d) => {
                   const prop = propOf(d.property);
                   const paid = d.status === "paid";
-                  const overdue = !paid && d.due_date && new Date(d.due_date) < new Date();
+                  const overdue = !paid && d.due_date && isPast(d.due_date);
                   return (
                     /* Satırın tamamı ilgili portföye tıklanabilir — diğer liste
                        sayfalarıyla tutarlı. Aidatın kendi detay sayfası yok,
