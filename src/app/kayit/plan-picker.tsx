@@ -7,14 +7,15 @@ import { GrowBar, RiseIn } from "@/components/ui/motion/grow";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { yearlyDiscountPercentOf, yearlyOfferLabel, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
-import { maxTotalSeats, type SeatQuote } from "@/lib/billing/seat-pricing";
+import type { SeatQuote } from "@/lib/billing/seat-pricing";
 import { registrationQuote, type SeatCalcOffers } from "@/lib/billing/seat-calculator-model";
 
 /**
  * Kayıt paket seçici (premium): danışman sayısı -> motor önerisi, kullanıcı başka pakete geçebilir.
  * Tüm tutar ve sınırlar katalog/motordan gelir (`registrationQuote` = fiyat sayfası hesaplayıcısıyla AYNI motor);
- * hiçbir rakam burada uydurulmaz. Kapasite çubuğu: "Kullanıcı" satırı SEÇİLEN danışman sayısının paketin en yüksek
- * kullanıcı kapasitesine oranıdır; diğer satırlar paketlerin sınırını birbirine göre gösterir (∞ = sınırsız).
+ * hiçbir rakam burada uydurulmaz. Fiyat kırılımı: paket + ek kullanıcı, yıllık toplam ve kişi başı aylık maliyet.
+ * "Kullanıcı" çubuğu paketin DAHİL kullanıcılarının ekibi ne kadar karşıladığıdır; diğer satırlar paketlerin
+ * sınırını birbirine göre gösterir (∞ = sınırsız). Danışman sayısı değişince elle seçim bırakılır, öneri izlenir.
  * Hareket: LazyMotion + m.*; azaltılmış harekette süre 0.
  */
 
@@ -190,10 +191,12 @@ export function PlanPicker(props: Props) {
               {rows.map(({ plan, quote, fits, monthlyEq }, i) => {
                 const active = plan.id === selectedId;
                 const isRec = plan.id === recommendedId;
-                const seatCap = maxTotalSeats(plan);
-                const seatRatio = Number.isFinite(seatCap) ? Math.min(1, seats / seatCap) : Math.min(1, seats / Math.max(seats, 50));
+                // Kullanıcı satırı: paketin DAHİL kullanıcıları ekibin ne kadarını karşılıyor (kalanı ek kullanıcı ücretli).
+                const included = quote.includedSeats;
+                const seatRatio = quote.extraSeats > 0 ? included / seats : seats / Math.max(1, included);
+                const seatValue = quote.extraSeats > 0 ? `${nf.format(included)} dahil + ${nf.format(quote.extraSeats)} ek` : `${nf.format(seats)} / ${nf.format(included)} dahil`;
                 const bars = [
-                  { label: "Kullanıcı", Icon: Users, ratio: seatRatio, value: `${nf.format(seats)} / ${Number.isFinite(seatCap) ? nf.format(seatCap) : "∞"}`, strong: true },
+                  { label: "Kullanıcı", Icon: Users, ratio: seatRatio, value: seatValue, strong: true },
                   { label: "Şube", Icon: Building2, ratio: plan.limits.branches == null ? 1 : plan.limits.branches / maxBranches, value: limitText(plan.limits.branches) },
                   { label: "Aktif portföy", Icon: House, ratio: plan.limits.activeProperties == null ? 1 : plan.limits.activeProperties / maxProps, value: limitText(plan.limits.activeProperties) },
                   { label: "Müşteri", Icon: UserRound, ratio: plan.limits.customers == null ? 1 : plan.limits.customers / maxCustomers, value: limitText(plan.limits.customers) },
@@ -245,9 +248,19 @@ export function PlanPicker(props: Props) {
                             <AnimatedNumber value={monthlyEq} suffix=" ₺" className="font-display text-3xl font-extrabold tracking-tight text-ink-950" />
                             <span className="text-xs text-text-muted">/ay + KDV</span>
                           </p>
-                          <p className="mt-0.5 text-xs text-text-muted">
-                            {quote.extraSeats > 0 ? `${quote.includedSeats} dahil + ${quote.extraSeats} ek kullanıcı` : `${quote.includedSeats} kullanıcı dahil`}
-                            {cycle === "yearly" ? ` · yıllık ${nf.format(quote.totalForCycleTry)} ₺ (${yearlyOfferLabel(plan)})` : ""}
+                          <p className="mt-1 text-xs text-text-muted">
+                            {quote.extraSeats > 0
+                              ? `Paket ${nf.format(Math.round(quote.baseMonthlyTry))} ₺ + ${nf.format(quote.extraSeats)} ek kullanıcı ${nf.format(Math.round(quote.extraMonthlyTry))} ₺`
+                              : `${nf.format(quote.includedSeats)} kullanıcı pakete dahil`}
+                            {cycle === "yearly" ? " (aylık liste)" : ""}
+                          </p>
+                          {cycle === "yearly" ? (
+                            <p className="text-xs text-text-muted">
+                              Yıllık toplam <span className="font-semibold tabular-nums text-ink-900">{nf.format(quote.totalForCycleTry)} ₺</span> · {yearlyOfferLabel(plan)}
+                            </p>
+                          ) : null}
+                          <p className="text-xs text-text-muted">
+                            Kişi başı <span className="font-semibold tabular-nums text-ink-900">{nf.format(Math.round(monthlyEq / Math.max(1, seats)))} ₺/ay</span>
                           </p>
                           {diff !== 0 ? (
                             <p className={cn("mt-0.5 text-xs font-semibold", diff > 0 ? "text-text-muted" : "text-mint-700")}>
@@ -309,7 +322,7 @@ export function PlanPicker(props: Props) {
               <strong>{props.trialText}, kart gerekmez.</strong> Seçtiğin paket deneme sonunda geçerli olur; ödeme anında değiştirebilirsin.
               {selected && selected.plan.id !== recommendedId && recommended ? (
                 <span className="mt-1 block text-text-muted">
-                  Motor {nf.format(seats)} kullanıcı için {recommended.plan.name} paketini önerir; {selected.plan.name} da bu kapasiteyi karşıladığı için seçimine saygı gösterilir.
+                  {nf.format(seats)} kullanıcı için en uygun fiyat {recommended.plan.name} paketinde; seçtiğin {selected.plan.name} da bu ekibi karşılıyor.
                 </span>
               ) : null}
             </p>

@@ -194,6 +194,8 @@ export function RegisterForm({
   function changeSeats(n: number) {
     setSeats(n);
     setSeatsTouched(true);
+    // Ekip büyüklüğü değişince öneri yeniden hesaplanır; eski elle seçim (artık pahalı ya da yetersiz olabilir) bırakılır.
+    setChosen(null);
   }
 
   function validateStep(no: number) {
