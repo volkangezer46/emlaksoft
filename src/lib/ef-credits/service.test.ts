@@ -121,7 +121,7 @@ describe("EF kontör servisi", () => {
   beforeEach(() => {
     w.ready = true; w.walletDown = false; w.commitFail = false; w.balance = 100;
     w.res.clear(); w.reports.clear(); w.commitCalls = 0; w.releaseCalls = 0; w.reserveCalls = 0;
-    settings.values.clear(); settings.flag = true; settings.probe = "2026-10-05T09:00:00.000Z"; settings.configured = true;
+    settings.values.clear(); settings.values.set(EF_TARIFF_SETTING_KEY, JSON.stringify({ valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0 })); settings.flag = true; settings.probe = "2026-10-05T09:00:00.000Z"; settings.configured = true;
     ef.degerleme.mockReset(); ef.rapor.mockReset(); ef.pdf.mockReset();
     auditCalls.length = 0;
   });
@@ -150,6 +150,19 @@ describe("EF kontör servisi", () => {
       const r = await runParcelValuation({ tenantId: T1, userId: U, input: { mahalleId: 1, ada: "1", parsel: "1", tip: "konut", konut: { konutM2: 90 } } });
       expect(r).toMatchObject({ status: "ok", unitsCharged: 8 });
       expect(w.balance).toBe(92);
+    });
+
+    it("ayar yoksa varsayılan tarife (1 kontör = 1 TL): konut 700, arsa 850; ilk PDF rapora dahil (0)", async () => {
+      settings.values.clear();
+      w.balance = 3000;
+      ef.degerleme.mockResolvedValue(okValue({ tip: "konut" }));
+      const konut = await runParcelValuation({ tenantId: T1, userId: U, input: { mahalleId: 1, ada: "1", parsel: "1", tip: "konut", konut: { konutM2: 90 } } });
+      expect(konut).toMatchObject({ status: "ok", unitsCharged: 700 });
+      expect(w.balance).toBe(2300);
+      ef.degerleme.mockResolvedValue(okValue({ raporId: "11111111-1111-4111-8111-111111111111" }));
+      const arsa = await runParcelValuation({ tenantId: T1, userId: U, input: INPUT });
+      expect(arsa).toMatchObject({ status: "ok", unitsCharged: 850 });
+      expect(w.balance).toBe(1450);
     });
 
     it("tarife 0 ise rezerve AÇILMAZ ve commit yok", async () => {

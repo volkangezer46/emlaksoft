@@ -53,8 +53,11 @@ export async function saveEfTariff(formData: FormData): Promise<EfKontorResult> 
     valuationKonut: num("valuationKonut"),
     pdfFirst: num("pdfFirst"),
     reportDetail: num("reportDetail"),
+    // Eski formlarda alan yoksa NaN gitmesin: undefined -> şema varsayılanı.
+    valuationTicari: Number.isNaN(num("valuationTicari")) && !formData.has("valuationTicari") ? undefined : num("valuationTicari"),
+    listingAnalysis: Number.isNaN(num("listingAnalysis")) && !formData.has("listingAnalysis") ? undefined : num("listingAnalysis"),
   });
-  if (!parsed.success) return { error: "Tarife değerleri 0-1000 arası tam sayı olmalı." };
+  if (!parsed.success) return { error: "Tarife değerleri 0-10.000 arası tam sayı olmalı." };
   const ok = await setPlatformSetting(EF_TARIFF_SETTING_KEY, serializeEfTariff(parsed.data), w.staff.id);
   if (!ok) return { error: "Tarife kaydedilemedi; tekrar deneyin." };
   await logPlatformActivity({

@@ -22,9 +22,9 @@ describe("şema/RPC yokken zarif düşüş", () => {
     expect((await readEfHistory("t")).enabled).toBe(false);
     expect((await listTenantEfBalances({ page: 1 })).enabled).toBe(false);
   });
-  it("katalog boş, varsayılan tarife", async () => {
+  it("ayar yokken varsayılan paket kataloğu ve varsayılan tarife", async () => {
     const c = await getEfCatalog();
-    expect(c.packs).toEqual([]);
+    expect(c.packs.map((p) => p.units)).toEqual([100, 500, 1000, 2500, 5000]);
     expect(c.tariff.valuationArsa).toBeGreaterThan(0);
   });
 });

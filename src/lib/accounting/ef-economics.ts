@@ -45,11 +45,13 @@ export function parseWholesaleTl(raw: string): number | null {
   return Number.isFinite(n) && n <= 100_000 ? n : null;
 }
 
-export const EF_USAGE_ITEMS: readonly EfItem[] = ["valuation_arsa", "valuation_konut", "pdf_first", "report_detail"];
+export const EF_USAGE_ITEMS: readonly EfItem[] = ["valuation_arsa", "valuation_konut", "valuation_ticari", "listing_analysis", "pdf_first", "report_detail"];
 
 export const EF_ITEM_LABELS: Record<EfItem, string> = {
   valuation_arsa: "Ada/parsel değerleme (arsa)",
   valuation_konut: "Ada/parsel değerleme (konut)",
+  valuation_ticari: "Ada/parsel değerleme (ticari)",
+  listing_analysis: "İlan analizi",
   pdf_first: "İlk PDF indirme",
   report_detail: "Rapor detayı",
 };
@@ -59,7 +61,7 @@ export type EfItemUsage = { item: EfItem; transactions: number; units: number; c
 
 /** Kuruş cinsinden işlem başı maliyet. */
 export function wholesaleUnitCostKurus(item: EfItem, w: EfWholesale): number {
-  if (item === "valuation_arsa" || item === "valuation_konut") return Math.round(w.valuationTl * 100);
+  if (item === "valuation_arsa" || item === "valuation_konut" || item === "valuation_ticari") return Math.round(w.valuationTl * 100);
   if (item === "pdf_first") return Math.round(w.pdfTl * 100);
   return 0;
 }

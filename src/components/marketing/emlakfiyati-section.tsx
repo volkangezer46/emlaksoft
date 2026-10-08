@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Coins, FileText } from "lucide-react";
 import type { PublicPricing } from "@/lib/billing/public-pricing";
 import { activePacks, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
-import { efUnitsFor, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
+import { efEntryValuationUnits, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
 import { monthlyUnitsOf } from "@/lib/ef-credits/plan-credits";
 import { efPlannedLine, type EfPublicState } from "@/lib/ef-credits/public-state-core";
 import { trialCtaLabel } from "@/lib/marketing-copy";
@@ -23,7 +23,7 @@ const TD = "px-3 py-2.5 text-sm tabular-nums text-ink-950";
 export function EfPlanCreditsTable({ plans, tariff, live }: { plans: PublicPricing["plans"]; tariff: EfTariff; live: boolean }) {
   const entitled = plans.filter((p) => monthlyUnitsOf(p.efCreditsMonthly) > 0);
   if (entitled.length === 0) return null;
-  const valuation = efUnitsFor("valuation_arsa", tariff);
+  const valuation = efEntryValuationUnits(tariff);
   return (
     <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
       <table className="w-full min-w-[34rem] border-collapse">
@@ -64,7 +64,7 @@ export function EfPlanCreditsTable({ plans, tariff, live }: { plans: PublicPrici
 export function EfPackTiersTable({ packs, tariff, live }: { packs: EfPack[]; tariff: EfTariff; live: boolean }) {
   const sellable = activePacks(packs);
   if (sellable.length === 0) return null;
-  const valuation = efUnitsFor("valuation_arsa", tariff);
+  const valuation = efEntryValuationUnits(tariff);
   return (
     <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
       <table className="w-full min-w-[34rem] border-collapse">
@@ -124,7 +124,7 @@ export function EmlakFiyatiSection({
   const live = state === "live";
   if (!plans.some((p) => monthlyUnitsOf(p.efCreditsMonthly) > 0)) return null;
   const hasPacks = activePacks(packs).length > 0;
-  const valuation = efUnitsFor("valuation_arsa", tariff);
+  const valuation = efEntryValuationUnits(tariff);
   const badge = live ? "Canlı" : state === "maintenance" || state === "stale" ? "Bakımda" : "Yakında";
 
   return (
@@ -148,7 +148,7 @@ export function EmlakFiyatiSection({
               <h3 className="mt-3 font-display text-base font-bold text-ink-950">{tx(s.title, ctx)}</h3>
               <p className="mt-1 text-sm text-text-muted">
                 {tx(s.text, ctx)}
-                {s.id === "onay" && valuation > 0 ? ` Ada/parsel değerleme ${formatNumberTr(valuation)} kontördür.` : ""}
+                {s.id === "onay" && valuation > 0 ? ` Ada/parsel değerleme raporu ${formatNumberTr(valuation)} kontörden başlar.` : ""}
               </p>
             </li>
           ))}

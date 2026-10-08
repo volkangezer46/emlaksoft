@@ -72,7 +72,7 @@ describe("computeSeatCalc: tek kaynak motor", () => {
     const c = computeSeatCalc(catalog, undefined, b.inputMax, "monthly");
     expect(c.status).toBe("ok");
     expect(c.planId).toBe("enterprise");
-    expect(c.monthlyEquivalentTry).toBe(92450);
+    expect(c.monthlyEquivalentTry).toBe(116450);
     expect(seatCalcAnnouncement(c)).not.toContain("bize ulaşın");
   });
 

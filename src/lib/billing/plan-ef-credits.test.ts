@@ -61,7 +61,7 @@ describe("efCreditsMonthly plan alanı", () => {
     const defs = applyPlanOverrides(parsePlanCatalogSettings(saved).overrides);
     expect(defs.find((p) => p.id === "office")!.efCreditsMonthly).toBe(25);
     expect(defs.find((p) => p.id === "advisor")!.efCreditsMonthly).toBeNull();
-    expect(defs.find((p) => p.id === "professional")!.efCreditsMonthly).toBe(120);
+    expect(defs.find((p) => p.id === "professional")!.efCreditsMonthly).toBe(2100);
     expect(diffAgainstDefault(office, { ...office, efCreditsMonthly: 25 })).toEqual({ efCreditsMonthly: 25 });
     expect(diffAgainstDefault(office, office)).toEqual({});
   });

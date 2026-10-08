@@ -60,8 +60,10 @@ export type PlanDef = {
 
 /**
  * Paket, fiyat, satış metni ve kullanım sınırları için kod tarafı varsayılanı (ham katalog).
- * Sahibin onayladığı katalog: Danışman 749, Ofis 2.490 (ek kullanıcı kademeli 399/349/299),
- * Profesyonel 4.990 (15 kullanıcı, ek 349/299), Business 8.990 (gizli), Kurumsal Operasyon 12.900 (50 kullanıcı dahil, 500'e kadar kademeli ek kullanıcı).
+ * Sahibin onayladığı katalog (2026-10-08, rakiplerin %25-30 altı; ek kullanıcı dahil tüm özellikler her pakette):
+ * Danışman 749 (ek kullanıcı 559), Ofis 2.790 (5 dahil; ek kullanıcı kademeli 499/449/399),
+ * Profesyonel 5.490 (15 dahil; ek 449/399), Business 8.990 (gizli), Kurumsal 14.900 (50 dahil; ek 289/249/199, 500'e kadar).
+ * Aylık EmlakFiyati kontörü (1 kontör = 1 TL): 100 / 700 / 2.100 / 7.000; ek kullanıcı başı 50.
  * `RECOMMENDED_CATALOG_OVERRIDES` (plan-overrides.ts) ile AYNI değerleri taşır; ikisinin
  * uyumu plan-default-catalog.test.ts ile korunur. Fiyat değişikliği yalnız yeni satışları etkiler.
  * Yalnızca bugün çalışan özellikler burada listelenir; yol haritasındaki
@@ -82,17 +84,17 @@ export const PLANS: readonly PlanDef[] = [
       "Komisyon takibi ve emsal bazlı değerleme",
     ],
     limits: { seats: 1, customers: 1_000, activeProperties: 150, branches: 1 },
-    // Ek kullanıcı: 5 kullanıcıda 749 + 4 x 499 = 2.745 TL > Ofis 2.490 TL (ve 499 > Ofis kişi başı 498): Ofis 5. kullanıcıdan itibaren hem ucuz hem kapsamlı.
-    extraSeatMonthlyTry: 499,
+    // Ek kullanıcı: 5 kullanıcıda 749 + 4 x 559 = 2.985 TL > Ofis 2.790 TL: Ofis 5. kullanıcıdan itibaren hem ucuz hem kapsamlı (4 kullanıcıda 2.426 TL, Danışman daha ucuz). 559 > Ofis kişi başı 558: doğrulayıcı teşvik uyarısı çıkmaz.
+    extraSeatMonthlyTry: 559,
     maxSeats: 500,
     seatRounding: "x9",
-    efCreditsMonthly: 10,
-    efCreditsPerExtraSeat: 5,
+    efCreditsMonthly: 100,
+    efCreditsPerExtraSeat: 50,
   },
   {
     id: "office",
     name: "Ofis",
-    monthlyTry: 2490,
+    monthlyTry: 2790,
     blurb: "Küçük ve orta ölçekli ofis",
     eyebrow: "EN ÇOK TERCİH",
     popular: true,
@@ -105,21 +107,21 @@ export const PLANS: readonly PlanDef[] = [
       "Kampanya, gider ve raporlar",
     ],
     limits: { seats: 5, customers: null, activeProperties: null, branches: 3 },
-    extraSeatMonthlyTry: 399,
+    extraSeatMonthlyTry: 499,
     extraSeatTiers: [
-      { fromSeat: 1, toSeat: 5, monthlyTry: 399 },
-      { fromSeat: 6, toSeat: 15, monthlyTry: 349 },
-      { fromSeat: 16, toSeat: null, monthlyTry: 299 },
+      { fromSeat: 1, toSeat: 5, monthlyTry: 499 },
+      { fromSeat: 6, toSeat: 15, monthlyTry: 449 },
+      { fromSeat: 16, toSeat: null, monthlyTry: 399 },
     ],
     maxSeats: 500,
     seatRounding: "x9",
-    efCreditsMonthly: 40,
-    efCreditsPerExtraSeat: 6,
+    efCreditsMonthly: 700,
+    efCreditsPerExtraSeat: 50,
   },
   {
     id: "professional",
     name: "Profesyonel",
-    monthlyTry: 4990,
+    monthlyTry: 5490,
     blurb: "Büyük ofis ve çok şube",
     eyebrow: "ÖLÇEKLENEN EKİP",
     features: [
@@ -130,20 +132,20 @@ export const PLANS: readonly PlanDef[] = [
       "KVKK uyum ve ofisler arası ağ",
     ],
     limits: { seats: 15, customers: null, activeProperties: null, branches: 10 },
-    extraSeatMonthlyTry: 349,
+    extraSeatMonthlyTry: 449,
     extraSeatTiers: [
-      { fromSeat: 1, toSeat: 10, monthlyTry: 349 },
-      { fromSeat: 11, toSeat: null, monthlyTry: 299 },
+      { fromSeat: 1, toSeat: 10, monthlyTry: 449 },
+      { fromSeat: 11, toSeat: null, monthlyTry: 399 },
     ],
     maxSeats: 500,
     seatRounding: "x9",
-    efCreditsMonthly: 120,
-    efCreditsPerExtraSeat: 6,
+    efCreditsMonthly: 2100,
+    efCreditsPerExtraSeat: 50,
   },
   {
     id: "enterprise",
     name: "Kurumsal",
-    monthlyTry: 12900,
+    monthlyTry: 14900,
     blurb: "Franchise ve proje satış ekipleri",
     eyebrow: "KURUMSAL OPERASYON",
     features: [
@@ -153,17 +155,17 @@ export const PLANS: readonly PlanDef[] = [
       "Merkezi rol ve denetim yönetimi",
     ],
     limits: { seats: 50, customers: null, activeProperties: null, branches: null },
-    // Hacim indirimi: Profesyonel'in son kademesi 299 TL; Kurumsal bunun altından başlar ve ölçekle düşer.
-    extraSeatMonthlyTry: 249,
+    // Hacim indirimi: Profesyonel'in son kademesi 399 TL; Kurumsal bunun altından başlar (289; dahil kişi başı 14.900/50 = 298 TL'nin de altı, hacim indirimi ilk ek kullanıcıdan itibaren işler) ve ölçekle düşer.
+    extraSeatMonthlyTry: 289,
     extraSeatTiers: [
-      { fromSeat: 1, toSeat: 50, monthlyTry: 249 },
-      { fromSeat: 51, toSeat: 200, monthlyTry: 199 },
-      { fromSeat: 201, toSeat: null, monthlyTry: 149 },
+      { fromSeat: 1, toSeat: 50, monthlyTry: 289 },
+      { fromSeat: 51, toSeat: 200, monthlyTry: 249 },
+      { fromSeat: 201, toSeat: null, monthlyTry: 199 },
     ],
     maxSeats: 500,
     seatRounding: "x9",
-    efCreditsMonthly: 400,
-    efCreditsPerExtraSeat: 6,
+    efCreditsMonthly: 7000,
+    efCreditsPerExtraSeat: 50,
   },
 ] as const;
 
@@ -244,5 +246,5 @@ export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
   limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
   hidden: true,
   order: 35,
-  efCreditsMonthly: 240,
+  efCreditsMonthly: 3500,
 };

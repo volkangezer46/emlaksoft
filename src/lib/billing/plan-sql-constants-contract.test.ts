@@ -48,6 +48,8 @@ const SUPERSEDED_BY: Readonly<Record<string, string>> = {
   "20260802000400_atomic_demo_conversion.sql": "20260825000300_billing_plan_amount_integrity.sql", // convert_demo_request_to_tenant
   // Dosyadaki tek sabitli işlev 9 argümanlı ESKİ fulfill_billing_payment overload'udur; 20261006000700 onu DÜŞÜRÜR (drop function).
   "20260731000138_atomic_billing_fulfillment.sql": "20261006000700_fix_plan_subscription_amount.sql",
+  // plan_monthly_amount (dosyadaki fiyat sabiti taşıyan tek işlev) 2026-10-08 fiyat kararıyla yeniden tanımlanır.
+  "20260825000300_billing_plan_amount_integrity.sql": "20261008001000_plan_prices_ef_credit_tariff.sql",
 };
 
 const KNOWN_OPEN: readonly OpenItem[] = [
@@ -134,13 +136,13 @@ describe("SQL <-> TS plan sabit sözleşmesi", () => {
     expect(new Set(KNOWN_OPEN.map((k) => `${k.file}::${k.kind}`)).size).toBe(KNOWN_OPEN.length);
   });
 
-  it("onaylı katalog fiyatları plan tanımında: 749 / 2.490 / 4.990 / 8.990 (Business); Kurumsal 12.900 (SQL yedek tutarıyla aynı) ve özel fiyat yok", () => {
+  it("onaylı katalog fiyatları plan tanımında: 749 / 2.790 / 5.490 / 8.990 (Business); Kurumsal 14.900 (SQL yedek tutarıyla aynı) ve özel fiyat yok", () => {
     expect([...priceByPlan.entries()].filter(([id]) => id !== "enterprise")).toEqual([
       ["advisor", 749],
-      ["office", 2490],
-      ["professional", 4990],
+      ["office", 2790],
+      ["professional", 5490],
       ["business", 8990],
     ]);
-    expect(PLANS.find((p) => p.id === "enterprise")!.monthlyTry).toBe(12900);
+    expect(PLANS.find((p) => p.id === "enterprise")!.monthlyTry).toBe(14900);
   });
 });

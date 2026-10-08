@@ -23,11 +23,12 @@ describe("varsayılan katalog: panel kaydı yoksa önerilen katalog", () => {
     const defs = applyPlanOverrides(resolveCatalogSettings(null).overrides);
     const byId = Object.fromEntries(defs.map((p) => [p.id, p]));
     expect(byId.advisor!.monthlyTry).toBe(749);
-    expect(byId.office!.extraSeatMonthlyTry).toBe(399);
-    expect(byId.professional!.monthlyTry).toBe(4990);
+    expect(byId.office!.monthlyTry).toBe(2790);
+    expect(byId.office!.extraSeatMonthlyTry).toBe(499);
+    expect(byId.professional!.monthlyTry).toBe(5490);
     expect(byId.professional!.limits.seats).toBe(15);
     expect(byId.business!.hidden).toBe(true);
-    expect(byId.enterprise!.monthlyTry).toBe(12900);
+    expect(byId.enterprise!.monthlyTry).toBe(14900);
     expect(byId.enterprise!.maxSeats).toBe(500);
     expect(Object.keys(byId.enterprise!)).not.toContain("customPricing");
     // gizli Business public listede yok; ücretsiz paket yok
@@ -51,7 +52,7 @@ describe("fiyat sayfası modeli admin tanımlarını izler", () => {
   it("Kurumsal dahil her paket tabloda liste fiyatını gösterir (Özel teklif yok); isteğe bağlı satırlar yalnız doluysa çıkar", () => {
     const rows = buildComparison(defs)[0]!.rows;
     const monthly = rows.find((r) => r.label.startsWith("Aylık fiyat"))!;
-    expect(monthly.cells.at(-1)!.text).toBe("12.900 ₺");
+    expect(monthly.cells.at(-1)!.text).toBe("14.900 ₺");
     expect(rows.flatMap((r) => r.cells.map((c) => c.text))).not.toContain("Özel teklif");
     expect(rows.find((r) => r.label.startsWith("En fazla kullanıcı"))!.cells.at(-1)!.text).toBe("500");
     expect(rows.some((r) => r.label.startsWith("Ek kullanıcı"))).toBe(true);
@@ -96,16 +97,16 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     }
   });
 
-  it("önerilen aylık kontör hakkı: Danışman 10, Ofis 40, Profesyonel 120, Business 240, Kurumsal 400 (+ ek kullanıcı başına 5/6/6/6)", () => {
+  it("önerilen aylık kontör hakkı (1 kontör = 1 TL): Danışman 100, Ofis 700, Profesyonel 2.100, Business 3.500, Kurumsal 7.000 (+ ek kullanıcı başına 50)", () => {
     const got = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsMonthly ?? null]));
-    expect(got).toEqual({ advisor: 10, office: 40, professional: 120, business: 240, enterprise: 400 });
+    expect(got).toEqual({ advisor: 100, office: 700, professional: 2100, business: 3500, enterprise: 7000 });
     const seat = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsPerExtraSeat ?? null]));
-    expect(seat).toEqual({ advisor: 5, office: 6, professional: 6, business: null, enterprise: 6 });
+    expect(seat).toEqual({ advisor: 50, office: 50, professional: 50, business: null, enterprise: 50 });
   });
 
   it("ham katalogda eski fiyatlar yok ve ücretsiz paket yok", () => {
     const prices = Object.fromEntries(raw.map((p) => [p.id, p.monthlyTry]));
-    expect(prices).toMatchObject({ advisor: 749, office: 2490, professional: 4990, business: 8990 });
+    expect(prices).toMatchObject({ advisor: 749, office: 2790, professional: 5490, business: 8990, enterprise: 14900 });
     expect(Object.values(prices).every((v) => v > 0)).toBe(true);
     expect(raw.find((p) => p.id === "professional")!.limits.seats).toBe(15);
   });

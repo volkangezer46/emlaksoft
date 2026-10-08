@@ -43,24 +43,24 @@ describe("kontör paketi fiyat/KDV", () => {
 
 describe("düşük bakiye eşiği", () => {
   it("eşik en ucuz ücretli işlemin 2 katı (0 olanlar sayılmaz)", () => {
-    expect(cheapestPaidUnits({ ...EF_DEFAULT_TARIFF, valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0 })).toBe(2);
-    expect(cheapestPaidUnits({ valuationArsa: 0, valuationKonut: 0, pdfFirst: 0, reportDetail: 0 })).toBeNull();
+    expect(cheapestPaidUnits({ ...EF_DEFAULT_TARIFF, valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0, valuationTicari: 1050, listingAnalysis: 1 })).toBe(2);
+    expect(cheapestPaidUnits({ valuationArsa: 0, valuationKonut: 0, pdfFirst: 0, reportDetail: 0, valuationTicari: 1050, listingAnalysis: 1 })).toBeNull();
   });
   it("durumlar", () => {
-    const t = { valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0 };
+    const t = { valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0, valuationTicari: 1050, listingAnalysis: 1 };
     expect(lowBalanceState(0, t)).toEqual({ state: "empty", threshold: 4 });
     expect(lowBalanceState(4, t).state).toBe("low");
     expect(lowBalanceState(5, t).state).toBe("ok");
   });
   it("tüm işlemler ücretsizse yalnız 0 bakiye uyarır", () => {
-    const t = { valuationArsa: 0, valuationKonut: 0, pdfFirst: 0, reportDetail: 0 };
+    const t = { valuationArsa: 0, valuationKonut: 0, pdfFirst: 0, reportDetail: 0, valuationTicari: 1050, listingAnalysis: 1 };
     expect(lowBalanceState(1, t).state).toBe("ok");
     expect(lowBalanceState(0, t).state).toBe("empty");
   });
 });
 
 describe("paket önerisi", () => {
-  const t = { valuationArsa: 5, valuationKonut: 5, pdfFirst: 3, reportDetail: 0 };
+  const t = { valuationArsa: 5, valuationKonut: 5, pdfFirst: 3, reportDetail: 0, valuationTicari: 1050, listingAnalysis: 1 };
   it("katalog boşsa null", () => expect(suggestPack([], t)).toBeNull());
   it("popüler varsa o", () => {
     const p = [pack({ id: "s1", units: 10, priceNetTry: 100 }), pack({ id: "s2", units: 25, priceNetTry: 200, popular: true })];

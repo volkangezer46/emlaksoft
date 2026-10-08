@@ -141,12 +141,12 @@ describe("cron ef-kontor-hak", () => {
     expect(state.statusFilter.sort()).toEqual(["active", "trialing"]);
     const key = /^plan:(t\d):(\d{4}-\d{2})$/;
     expect(state.grants.map((g) => [g.p_tenant, g.p_units, g.p_kind]).sort()).toEqual([
-      ["t1", 40, "plan_monthly"],
-      // Kurumsal: 400 + 100 ek kullanıcı x 6
-      ["t4", 1000, "plan_monthly"],
+      ["t1", 700, "plan_monthly"],
+      // Kurumsal: 7.000 + 100 ek kullanıcı x 50
+      ["t4", 12000, "plan_monthly"],
     ]);
     for (const g of state.grants) expect(g.p_idem).toMatch(key);
-    expect(body).toMatchObject({ offices: 2, units: 1040, grants: 2, failed: 0 });
+    expect(body).toMatchObject({ offices: 2, units: 12700, grants: 2, failed: 0 });
   });
 
   it("aynı gün/ay ikinci çalıştırma çift hibe üretmez (idempotent)", async () => {
@@ -199,12 +199,12 @@ describe("cron ef-kontor-hak", () => {
     state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
     state.tenants = { t1: "active" };
     await GET(req("Bearer s3cret"));
-    state.subs = [{ tenant_id: "t1", plan: "enterprise", status: "active", extra_seats: 0 }]; // yükseltme: 400
+    state.subs = [{ tenant_id: "t1", plan: "enterprise", status: "active", extra_seats: 0 }]; // yükseltme: 7.000
     await GET(req("Bearer s3cret"));
     await GET(req("Bearer s3cret"));
     expect(state.grants.map((g) => [g.p_units, g.p_idem])).toEqual([
-      [40, expect.stringMatching(/^plan:t1:\d{4}-\d{2}$/)],
-      [360, expect.stringMatching(/^plan:t1:\d{4}-\d{2}:delta:400$/)],
+      [700, expect.stringMatching(/^plan:t1:\d{4}-\d{2}$/)],
+      [6300, expect.stringMatching(/^plan:t1:\d{4}-\d{2}:delta:7000$/)],
     ]);
   });
 
@@ -241,7 +241,7 @@ describe("cron ef-kontor-hak", () => {
     state.expireResult = "error";
     const res = await GET(req("Bearer s3cret"));
     expect(res.status).toBe(200);
-    expect(state.expires).toEqual([{ p_tenant: "t1", p_keep: 120, p_idem: "plan-expire:2026-10" }]);
+    expect(state.expires).toEqual([{ p_tenant: "t1", p_keep: 2100, p_idem: "plan-expire:2026-10" }]);
     expect(await res.json()).toMatchObject({ ok: true, expireFailed: 1, expiredUnits: 0 });
 
     state.expireResult = { ok: true, already: false, expired: 80, available: 120 };

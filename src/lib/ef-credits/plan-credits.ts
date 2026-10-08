@@ -77,13 +77,17 @@ export function monthlyUnitsWithSeats(
   return base + per * extra;
 }
 
-/** Bir değerlemenin kontör bedeli (= `efUnitsFor("valuation_arsa", tarife)`; config'i istemciye çekmemek için alan doğrudan okunur). */
-export function valuationUnitCost(tariff: Pick<EfTariff, "valuationArsa">): number {
-  return tariff.valuationArsa;
+/**
+ * Bir değerlemenin giriş kontör bedeli = en ucuz (0 olmayan) rapor bedeli (varsayılanda konut 700); config'i istemciye
+ * çekmemek için alanlar doğrudan okunur. Ticari alanı eski çağıranlarda olmayabilir.
+ */
+export function valuationUnitCost(tariff: Pick<EfTariff, "valuationArsa"> & Partial<Pick<EfTariff, "valuationKonut" | "valuationTicari">>): number {
+  const costs = [tariff.valuationKonut, tariff.valuationArsa, tariff.valuationTicari].filter((n): n is number => typeof n === "number" && n > 0);
+  return costs.length > 0 ? Math.min(...costs) : 0;
 }
 
 /** "Yaklaşık N değerleme": floor(units / değerleme bedeli). Bedel 0 ise hesaplanamaz (null). */
-export function approxValuations(units: number, tariff: Pick<EfTariff, "valuationArsa">): number | null {
+export function approxValuations(units: number, tariff: Parameters<typeof valuationUnitCost>[0]): number | null {
   const cost = valuationUnitCost(tariff);
   if (!(units > 0) || cost <= 0) return null;
   return Math.floor(units / cost);

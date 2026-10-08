@@ -13,7 +13,7 @@ import {
   filterAndPage,
   type EfMovementCategory,
 } from "@/lib/ef-credits/credit-view";
-import { efUnitsFor } from "@/lib/ef-credits/config";
+import { efEntryValuationUnits, efUnitsFor } from "@/lib/ef-credits/config";
 import { now, trNextMonthStartMs } from "@/lib/clock";
 import { monthlyAllowanceView } from "@/lib/ef-credits/visibility";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
@@ -276,7 +276,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <p className="text-xs font-semibold text-success-strong">{allowance.planName} paketinin aylık kontör hakkı</p>
                 <p className="numeric font-display text-xl font-extrabold text-text [text-wrap:balance]">
                   Her ay {fmt.format(allowance.units)} kontör
-                  {efUnitsFor("valuation_arsa", tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efUnitsFor("valuation_arsa", tariff)))} değerleme)` : ""}
+                  {efEntryValuationUnits(tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efEntryValuationUnits(tariff)))} değerleme)` : ""}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
                   Otomatik yüklenir, kullanılmayan kontör devreder.
@@ -356,7 +356,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-accent-text" />
               </div>
               <p className="numeric mt-1 font-display text-xl font-extrabold text-text">
-                {t.units > 0 ? `${fmt.format(t.units)} kontör` : "Ücretsiz"}
+                {t.units > 0 ? `${fmt.format(t.units)} kontör` : t.kalem === "pdf" ? "Rapora dahil" : "Ücretsiz"}
               </p>
             </Link>
           ))}

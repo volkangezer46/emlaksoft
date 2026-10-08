@@ -103,11 +103,15 @@ export function TariffForm({ tariff, canWrite }: { tariff: EfTariff; canWrite: b
     valuationKonut: String(tariff.valuationKonut),
     pdfFirst: String(tariff.pdfFirst),
     reportDetail: String(tariff.reportDetail),
+    valuationTicari: String(tariff.valuationTicari),
+    listingAnalysis: String(tariff.listingAnalysis),
   });
   const items: { k: keyof typeof v; label: string; hint?: string }[] = [
     { k: "valuationArsa", label: "Arsa değerlemesi" },
     { k: "valuationKonut", label: "Konut değerlemesi" },
-    { k: "pdfFirst", label: "PDF (ilk indirme)", hint: "Tekrar indirme her zaman 0." },
+    { k: "valuationTicari", label: "Ticari değerlemesi" },
+    { k: "listingAnalysis", label: "İlan analizi", hint: "Hızlı tahmin; varsayılan 1 kontör." },
+    { k: "pdfFirst", label: "PDF (ilk indirme)", hint: "Varsayılan 0: rapor bedeline dahil. Tekrar indirme her zaman 0." },
     { k: "reportDetail", label: "Rapor detayı (JSON)", hint: "Ürün kararı: varsayılan 0." },
   ];
   return (
@@ -119,7 +123,7 @@ export function TariffForm({ tariff, canWrite }: { tariff: EfTariff; canWrite: b
             <input
               type="number"
               min={0}
-              max={1000}
+              max={10000}
               step={1}
               inputMode="numeric"
               disabled={!canWrite}
@@ -195,7 +199,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
               setPresetNote(true);
             }}
           >
-            <Sparkles className="h-4 w-4" /> Örnek ön ayar uygula (4 örnek paket)
+            <Sparkles className="h-4 w-4" /> Önerilen kataloğu uygula (5 paket)
           </button>
           <button type="button" className={ghost} onClick={add} disabled={rows.length >= 12}>
             <Plus className="h-4 w-4" /> Paket ekle
@@ -204,7 +208,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
       ) : null}
       {presetNote ? (
         <p role="status" className="rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-700">
-          Örnek ön ayar TASLAĞA uygulandı, henüz KAYDEDİLMEDİ. {EF_PACK_PRESET_NOTE}
+          Önerilen katalog TASLAĞA uygulandı, henüz KAYDEDİLMEDİ. {EF_PACK_PRESET_NOTE}
         </p>
       ) : null}
       {rows.length === 0 ? (

@@ -53,15 +53,16 @@ describe("plan kontör hakkı: hesap ve metin", () => {
     expect(monthlyUnitsOf(120)).toBe(120);
   });
   it("yaklaşık değerleme = floor(N / değerleme bedeli); bedel 0 ise hesaplanamaz", () => {
-    expect(approxValuations(120, EF_DEFAULT_TARIFF)).toBe(24);
-    expect(approxValuations(10, EF_DEFAULT_TARIFF)).toBe(2);
-    expect(approxValuations(7, EF_DEFAULT_TARIFF)).toBe(1);
+    // En ucuz rapor (konut 700): paket hakları Danışman 100 / Ofis 700 / Profesyonel 2.100 / Kurumsal 7.000 = 0 / 1 / 3 / 10 rapor.
+    expect([100, 700, 2100, 7000].map((u) => approxValuations(u, EF_DEFAULT_TARIFF))).toEqual([0, 1, 3, 10]);
+    expect(approxValuations(699, EF_DEFAULT_TARIFF)).toBe(0);
     expect(approxValuations(40, { valuationArsa: 0 })).toBeNull();
   });
   it("satır: hak yoksa gizli, bedel yoksa parantezsiz", () => {
     expect(efCreditsLine(null, 5)).toBeNull();
     expect(efCreditsLine(0, 5)).toBeNull();
     expect(efCreditsLine(40, 5)).toBe("Aylık 40 kontör (yaklaşık 8 değerleme)");
+    expect(efCreditsLine(2100, 700)).toBe("Aylık 2.100 kontör (yaklaşık 3 değerleme)");
     expect(efCreditsLine(3, 5)).toBe("Aylık 3 kontör");
     expect(efCreditsLine(40, 0)).toBe("Aylık 40 kontör");
   });

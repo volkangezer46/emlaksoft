@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { EfPack } from "@/lib/ef-credits/config";
+import { EF_DEFAULT_PACKS, type EfPack } from "@/lib/ef-credits/config";
 
 /**
  * Admin kontör yönetimi: SAF doğrulama ve ön ayar (I/O yok; istemci/sunucu güvenli).
@@ -29,19 +29,14 @@ export const efAdminGrantSchema = z.object({
 export type EfAdminGrantInput = z.infer<typeof efAdminGrantSchema>;
 
 /**
- * "Örnek ön ayar": ADMİN'e öneri olarak sunulur, KAYDEDİLMEDEN uygulanmaz. Fiyatlar ÖRNEKTİR (KDV hariç net);
- * varsayılan katalog BOŞTUR, gerçek fiyat sahibin kararıdır.
+ * "Önerilen ön ayar": 2026-10-08 fiyat kararı paketleri (1 kontör = 1 TL; KDV hariç net; birim fiyat 1,00 -> 0,80).
+ * Admin'e taslak olarak sunulur, KAYDEDİLMEDEN uygulanmaz.
  */
 export const EF_PACK_PRESET_NOTE =
-  "ÖRNEK fiyatlardır (KDV hariç net), sahibin kararı değildir: düzenleyin. Bilgi: EmlakFiyati kendi sitesinde 5'li paketi 549 TL (KDV dahil) satar.";
+  "Önerilen katalog (1 kontör = 1 TL, KDV hariç net; büyük pakette kontör başı fiyat düşer). Düzenleyebilirsiniz.";
 
 export function examplePackPreset(): EfPack[] {
-  return [
-    { id: "mini", name: "Mini", units: 10, priceNetTry: 175, active: true, order: 10 },
-    { id: "standart", name: "Standart", units: 25, priceNetTry: 390, active: true, popular: true, order: 20 },
-    { id: "plus", name: "Plus", units: 100, priceNetTry: 1250, active: true, order: 30 },
-    { id: "pro", name: "Pro", units: 300, priceNetTry: 3300, active: true, order: 40 },
-  ];
+  return EF_DEFAULT_PACKS.map((p) => ({ ...p }));
 }
 
 /** Paket id'si üretimi: ad -> a-z0-9- (TR harfleri sadeleşir), 2-32 karakter. */

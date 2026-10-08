@@ -95,7 +95,7 @@ describe("saf fiyat hesabı (SQL plan_period_amount ile aynı kural)", () => {
 
   it("yıllık = aylık x ödenen ay (varsayılan 10), Math.round ile (SQL round)", () => {
     expect(DEFAULT_YEARLY_PAID_MONTHS).toBe(10);
-    expect(planAmountTry("professional", "yearly")).toBe(4990 * 10);
+    expect(planAmountTry("professional", "yearly")).toBe(5490 * 10);
     expect(planAmountOf({ monthlyTry: 2490, yearlyPaidMonths: 11 }, "yearly")).toBe(27390);
     expect(planAmountOf({ monthlyTry: 999.95, yearlyPaidMonths: 10 }, "yearly")).toBe(10000);
     expect(planAmountOf({ monthlyTry: 749 }, "yearly")).toBe(7490);
