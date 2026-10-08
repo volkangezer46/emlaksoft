@@ -10,14 +10,14 @@ import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/
 
 export type SignupField = "name" | "email" | "phone" | "password" | "company" | "legal_consent";
 
-/** Alan -> sihirbaz adımı (register-form STEPS sırası: 1 Hesap, 2 Ofis, ... 6 Başla). */
+/** Alan -> sihirbaz adımı (register-form STEPS sırası: 1 Hesap, 2 Ofis ve paket; kısa kayıt). */
 export const SIGNUP_FIELD_STEP: Record<SignupField, number> = {
   name: 1,
   email: 1,
   phone: 1,
   password: 1,
   company: 2,
-  legal_consent: 6,
+  legal_consent: 2,
 };
 
 /** Formdaki odaklanacak öğenin id'si (alan adıyla aynı; onay kutusu için ayrı id). */

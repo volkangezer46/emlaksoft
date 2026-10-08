@@ -13,7 +13,7 @@ describe("kayıt sihirbazı: hata -> adım eşlemesi", () => {
     expect(signupErrorTarget({ error: "  " })).toEqual({ kind: "none" });
   });
 
-  it("telefon/e-posta/şifre hatası 1. adıma, ofis adı 2. adıma, onay son adıma döner", () => {
+  it("telefon/e-posta/şifre hatası 1. adıma, ofis adı ve onay (kısa kayıt) 2. adıma döner", () => {
     expect(signupErrorTarget({ error: TR_MOBILE_ERROR_MESSAGE, field: "phone" })).toEqual({
       kind: "field",
       field: "phone",
@@ -23,7 +23,7 @@ describe("kayıt sihirbazı: hata -> adım eşlemesi", () => {
     expect(signupErrorTarget({ error: "Bu e-posta zaten kayıtlı.", field: "email" })).toMatchObject({ step: 1, field: "email" });
     expect(signupErrorTarget({ error: "x", field: "password" })).toMatchObject({ step: 1 });
     expect(signupErrorTarget({ error: "x", field: "company" })).toMatchObject({ step: 2 });
-    expect(signupErrorTarget({ error: "x", field: "legal_consent" })).toMatchObject({ step: 6 });
+    expect(signupErrorTarget({ error: "x", field: "legal_consent" })).toMatchObject({ step: 2 });
   });
 
   it("alanla eşleşmeyen hata genel banda gider (metin taranmaz)", () => {

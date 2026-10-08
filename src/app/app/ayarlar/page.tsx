@@ -110,6 +110,9 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
               {doneCount === items.length ? (
                 <p className="mt-3 border-t border-white/10 pt-3 text-xs font-semibold text-mint-400">Kurulum tamam 🎉</p>
               ) : null}
+              <Link href="/app/ayarlar/profil-tamamla" className="mt-3 block border-t border-white/10 pt-3 text-xs font-semibold text-mint-400 hover:text-mint-300">
+                Ofis profilini adım adım tamamla →
+              </Link>
             </div>
           </details></div>
 } />

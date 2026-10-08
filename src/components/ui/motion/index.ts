@@ -5,5 +5,6 @@
  */
 export { MotionProvider, loadMotionFeatures } from "./motion-provider";
 export { Reveal, Stagger } from "./reveal";
+export { RiseIn, GrowBar } from "./grow";
 export { FadeSwap } from "./fade-swap";
 export { EASE_OUT, MOTION_MS, STAGGER_MAX } from "./tokens";

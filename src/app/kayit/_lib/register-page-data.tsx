@@ -10,7 +10,6 @@ import { REF_COOKIE, REFERRAL_CODE_LENGTH, parseRefCookie, parseRefParam } from 
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { readInvitePreview } from "@/lib/growth/engine";
 import { createClient } from "@/lib/supabase/server";
-import { getProvinceOptions } from "@/lib/geo/reader";
 import { tx } from "@/lib/site-content/tokens";
 
 export type RegisterSearchParams = {
@@ -26,15 +25,13 @@ export type RegisterSearchParams = {
 type RegisterFormProps = ComponentProps<typeof RegisterForm>;
 
 /**
- * Kayıt sihirbazının sunucu verisi (fiyat, deneme günü, il listesi, davet önizlemesi, atıf) — `/kayit` ve
+ * Kayıt sihirbazının sunucu verisi (fiyat, deneme günü, davet önizlemesi, atıf) — `/kayit` ve
  * Google ile tamamlama (`/kayit/tamamla`) AYNI kaynaktan beslenir.
  */
 export async function loadRegisterFormProps(params: RegisterSearchParams): Promise<RegisterFormProps> {
-  // İl listesi coğrafya tek merkezinden (sihirbazın "Ofis" adımı); okunamazsa boş liste (konum adımı atlanabilir).
-  const [{ plans, trialDays, offers, efValuationCost, efLive }, content, provinces] = await Promise.all([
+  const [{ plans, trialDays, offers, efValuationCost, efLive }, content] = await Promise.all([
     getPublicPricing(),
     getLiveSiteContent(),
-    getProvinceOptions().catch(() => []),
   ]);
   const tokenCtx = { trialDays, plans, efLive };
   // Davet bağlantısı (çerez ya da ?ref): "X sizi davet etti" + hoş geldin avantajı. Hata/kapalı program = banner yok.
@@ -61,7 +58,6 @@ export async function loadRegisterFormProps(params: RegisterSearchParams): Promi
     initialCycle: normalizeBillingCycle(params.cycle),
     initialSeats: /^\d{1,3}$/.test(params.seats ?? "") && Number(params.seats) > 0 ? Number(params.seats) : undefined,
     invite: preview ? { officeName: preview.office_name, welcomeCreditTry: preview.welcome_credit_try } : null,
-    provinces,
     attribution: {
       ref: params.ref,
       utm_source: params.utm_source,
