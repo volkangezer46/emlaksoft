@@ -3,14 +3,18 @@
 import Link from "@/components/ui/smart-link";
 import { ChevronDown, Lock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import type { ReactNode } from "react";
 import type { MorphNavItem } from "@/components/ui/morph-tab-parts";
+
+/** Sunucudan gelen satır: ikon bileşeni yerine önceden çizilmiş öğe (RSC sınırında fonksiyon taşınamaz). */
+export type MorphNavMoreItem = Omit<MorphNavItem, "icon"> & { iconNode?: ReactNode };
 
 /**
  * Sekme şeridinde 6'dan fazla sekme olduğunda taşan sekmelerin "Daha fazla" menüsü.
  * Radix DropdownMenu: ok tuşları, Esc, odak dönüşü ve `aria-haspopup`/`aria-expanded` hazırdır.
  * Her satır gerçek bir bağlantıdır (yol ve yetki değişmez); 44px dokunma hedefi.
  */
-export function MorphNavMore({ items, label }: { items: MorphNavItem[]; label: string }) {
+export function MorphNavMore({ items, label }: { items: MorphNavMoreItem[]; label: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -26,7 +30,7 @@ export function MorphNavMore({ items, label }: { items: MorphNavItem[]; label: s
         {items.map((item) => (
           <DropdownMenuItem key={item.id} asChild>
             <Link href={item.href} title={item.label}>
-              {item.icon ? <item.icon className="text-text-muted" /> : null}
+              {item.iconNode ?? null}
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
               {item.count != null ? <span className="numeric text-xs text-text-muted">{item.count}</span> : null}
               {item.locked ? <Lock className="text-amber-600" aria-label="Paketinize dahil değil" /> : null}

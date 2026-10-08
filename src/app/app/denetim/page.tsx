@@ -146,59 +146,66 @@ export default async function AuditPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Denetim kayıtları" eyebrow="KVKK / denetim izi" description="Kim, ne zaman, neyi değiştirdi? Yapılan işlemlerin değiştirilemeyen kayıt defteri." actions={
-<div className="theme-dark flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] p-2"><div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
-            <p className="text-xs font-semibold text-white/70">Aktivite · son 24 saat (2s dilim)</p>
-            <div className="mt-4 flex h-28 items-end gap-1.5">
-              {buckets.map((b, i) => (
-                <div
-                  key={i}
-                  className="bar-live flex-1 rounded-t-[4px] bg-gradient-to-t from-amber-500/80 to-amber-300"
-                  style={{ height: `${Math.max(8, (b / maxB) * 100)}%`, animationDelay: `${i * 40}ms` }}
-                />
-              ))}
-            </div>
-          </div>
-<>{/* Belge Merkezi girişi — aynı modül kapısı (settings) arkasında.
-                Denetim izi "kim ne yaptı", belge merkezi "hangi dosya nerede"
-                sorusunu cevaplıyor; KVKK incelemesinde ikisi birlikte kullanılır. */}
+      <PageHeader
+        title="Denetim kayıtları"
+        eyebrow="KVKK / denetim izi"
+        description="Kim, ne zaman, neyi değiştirdi? Yapılan işlemlerin değiştirilemeyen kayıt defteri."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Belge Merkezi aynı modül kapısı (settings) arkasında; KVKK incelemesinde denetim iziyle birlikte kullanılır. */}
             <Link
               href="/app/belgeler"
-              className="focus-ring press mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-mint-400 transition hover:text-mint-300"
+              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300"
             >
-              <FolderArchive className="h-4 w-4" />
-              Belge merkezi — müşteri dosyaları, portföy medyası, sözleşmeler ve evraklar tek listede
-              <ArrowUpRight className="h-4 w-4" />
+              <FolderArchive className="h-4 w-4 text-brand-600" /> Belge merkezi
             </Link>
             <Link
               href="/app/ofis-kontrol"
-              className="focus-ring press mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-mint-400 transition hover:text-mint-300"
+              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300"
             >
-              Ofis Kontrol Merkezi — danışman bazlı işlem akışı, uyarılar ve onay kuralları
-              <ArrowUpRight className="h-4 w-4" />
+              <ShieldAlert className="h-4 w-4 text-brand-600" /> Ofis Kontrol
             </Link>
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {[
-                { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },
-                { label: "Son 24 saat", value: last24Count ?? 0, icon: Activity, href: `/app/denetim?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
-                { label: "Yüksek riskli", value: highCount ?? 0, icon: ShieldAlert, href: "/app/denetim?risk=yuksek", tone: "text-danger-300" },
-                { label: "Aktör", value: actorOptions.length, icon: Fingerprint, href: "#akis", tone: "text-cyan-400" },
-              ].map((k) => (
-                <a
-                  key={k.label}
-                  href={k.href}
-                  className="focus-ring press lift group block rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-white/30"
-                >
-                  <span className="flex items-start justify-between">
-                    <k.icon className={`h-4 w-4 ${k.tone}`} />
-                    <ArrowUpRight className="h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
-                  </span>
-                  <p className="numeric mt-1 font-display text-xl font-extrabold">{k.value}</p>
-                  <p className="text-xs text-white/45">{k.label}</p>
-                </a>
-              ))}
-            </div></></div>
-} />
+          </div>
+        }
+      />
+
+      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
+          <p className="text-xs font-semibold text-white/70">Aktivite · son 24 saat (2 saatlik dilim)</p>
+          <div className="mt-4 flex h-24 items-end gap-1.5">
+            {buckets.map((b, i) => (
+              <div
+                key={i}
+                className="bar-live flex-1 rounded-t-[4px] bg-gradient-to-t from-amber-500/80 to-amber-300"
+                style={{ height: `${Math.max(8, (b / maxB) * 100)}%`, animationDelay: `${i * 40}ms` }}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },
+            { label: "Son 24 saat", value: last24Count ?? 0, icon: Activity, href: `/app/denetim?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
+            { label: "Yüksek riskli", value: highCount ?? 0, icon: ShieldAlert, href: "/app/denetim?risk=yuksek", tone: "text-danger-300" },
+            { label: "Aktör", value: actorOptions.length, icon: Fingerprint, href: "#akis", tone: "text-cyan-400" },
+          ].map((k) => (
+            <a
+              key={k.label}
+              href={k.href}
+              className="focus-ring press lift group flex flex-col justify-between rounded-[var(--radius-card)] border border-white/10 bg-white/5 p-3 transition hover:border-white/30"
+            >
+              <span className="flex items-start justify-between">
+                <k.icon className={`h-4 w-4 ${k.tone}`} />
+                <ArrowUpRight className="h-4 w-4 text-white/30 opacity-0 transition group-hover:text-white group-hover:opacity-100" />
+              </span>
+              <span>
+                <span className="numeric mt-1 block font-display text-xl font-extrabold">{k.value}</span>
+                <span className="block text-xs text-white/60">{k.label}</span>
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
 
       <section id="akis" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">

@@ -187,7 +187,11 @@ export function MorphNav({
         })}
         {more.length > 0 ? (
           <li className="shrink-0">
-            <MorphNavMore items={more} label={label} />
+            {/* İstemci bileşenine bileşen (fonksiyon) geçirilemez: ikon sunucuda öğe olarak çizilir. */}
+            <MorphNavMore
+              items={more.map(({ icon: Icon, ...rest }) => ({ ...rest, iconNode: Icon ? <Icon className="text-text-muted" /> : null }))}
+              label={label}
+            />
           </li>
         ) : null}
         {children}
