@@ -67,6 +67,8 @@ describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history s
   const resetPrice = async (id: string, v = 1_000_000) => {
     await admin();
     await q(`update public.properties set list_price = $2 where id = $1`, [id, v]);
+    // Her senaryo temiz referansla başlasın (kapı son 30 günün en yüksek fiyatını referans alır).
+    await q(`delete from public.property_price_history where property_id = $1`, [id]);
   };
   const approval = async (o: { by: string; prop: string; value: number; status?: string; ageHours?: number; consumed?: boolean }) => {
     await admin();
@@ -140,6 +142,21 @@ describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history s
     await as(ADV, T1, "advisor");
     await expect(setPrice(P, 900_000)).rejects.toThrow(/yonetici onayi/);
     expect(await setPrice(P, 900_001)).toHaveLength(1);
+    await resetPrice(P);
+  });
+
+  it("NULL ara adımı kapıyı atlatamaz (önce boşalt, sonra düşük değer)", async () => {
+    await resetPrice(P);
+    await as(ADV, T1, "advisor");
+    await expect(setPrice(P, null as unknown as number)).rejects.toThrow(/yonetici onayi/);
+    await resetPrice(P);
+  });
+
+  it("kümülatif: eşik altı ardışık düşüşler 30 günlük en yüksek fiyata göre ölçülür", async () => {
+    await resetPrice(P);
+    await as(ADV, T1, "advisor");
+    expect(await setPrice(P, 900_001)).toHaveLength(1); // %10'a yakın — geçer
+    await expect(setPrice(P, 800_000)).rejects.toThrow(/yonetici onayi/); // referans 1.000.000 → %20
     await resetPrice(P);
   });
 
@@ -237,6 +254,7 @@ describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history s
 
   it("property_price_history: authenticated silemez, güncelleyemez, ekleyemez", async () => {
     await as(OWNER, T1, "owner"); // owner bile
+    expect(await setPrice(P, 1_100_000)).toHaveLength(1); // tarihçeye en az bir satır düşsün
     await expect(q(`delete from public.property_price_history where property_id = $1`, [P])).rejects.toThrow(/permission denied/);
     await expect(q(`update public.property_price_history set new_price = 1 where property_id = $1`, [P])).rejects.toThrow(/permission denied/);
     await expect(

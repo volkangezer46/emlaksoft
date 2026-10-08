@@ -125,6 +125,10 @@ describe("kredi tavanı seçimi (son ödenen düz yenileme)", () => {
     expect(pickPaidCapNetTry([{ amount_try: 500, meta: { kind: "plan_upgrade" } }, { amount_try: 2490, meta: {} }])).toBeNull();
   });
 
+  it("0 TL (tam kupon) ödenen dönemde tavan 0: ödenmemiş tutar krediye dönmez", () => {
+    expect(pickPaidCapNetTry([{ amount_try: 0, meta: { plan: "office" } }])).toBe(0);
+  });
+
   it("fatura yoksa / tutar bozuksa null", () => {
     expect(pickPaidCapNetTry([])).toBeNull();
     expect(pickPaidCapNetTry([{ amount_try: "x", meta: null }])).toBeNull();

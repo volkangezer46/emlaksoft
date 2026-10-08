@@ -11,7 +11,8 @@ export function pickPaidCapNetTry(rows: readonly PaidInvoiceRow[]): number | nul
     if (kind === "extra_seats" || kind === "credit_pack") continue;
     if (kind === "plan_upgrade") return null;
     const amount = Number(row.amount_try);
-    return Number.isFinite(amount) && amount > 0 ? amount : null;
+    // 0 TL (tam kupon/hediye) ödenen dönem için kredi tavanı 0'dır: ödenmemiş tutar krediye dönmez.
+    return Number.isFinite(amount) && amount >= 0 ? amount : null;
   }
   return null;
 }

@@ -44,11 +44,14 @@ as $$
       )
       from public.profiles p
       where p.id = p_user_id
+        -- Kimlik parametresi yalnız çağıranın kendisi olabilir (service_role hariç): başka kullanıcının profili dönmez.
+        and (p_user_id = (select auth.uid()) or (select auth.role()) = 'service_role')
       limit 1
     ),
     'staff', exists (
       select 1 from public.platform_staff s
       where s.id = p_user_id and s.is_active
+        and (p_user_id = (select auth.uid()) or (select auth.role()) = 'service_role')
     ),
     'tenant_status', (
       select t.status::text

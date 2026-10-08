@@ -65,6 +65,7 @@ declare
   v_raw text;
   v_threshold numeric := 15;
   v_drop_pct numeric;
+  v_ref numeric;
   v_approval uuid;
   v_rows integer;
 begin
@@ -73,9 +74,30 @@ begin
     return new;
   end if;
 
-  -- Yalniz DUSUS: artis, ayni deger, bos deger gecer.
-  if new.list_price is null or old.list_price is null or old.list_price <= 0
-     or new.list_price >= old.list_price then
+  -- Degismeyen deger ve ARTIS gecer. Fiyatin BOSALTILMASI (NULL) dusus sayilir (NULL ara adimiyla atlama kapanir).
+  if new.list_price is not distinct from old.list_price then
+    return new;
+  end if;
+  if new.list_price is not null and old.list_price is not null and new.list_price >= old.list_price then
+    return new;
+  end if;
+
+  -- Referans fiyat: mevcut deger ile son 30 gunluk tarihcedeki en yuksek liste fiyati. Esik altindaki ardisik
+  -- kucuk dususler (kumulatif) ve "once NULL, sonra dusuk deger" yolu bu referansa gore olculur.
+  select max(x.p) into v_ref
+    from (
+      select old.list_price as p
+      union all
+      select greatest(h.old_price, h.new_price)
+        from public.property_price_history h
+       where h.property_id = old.id
+         and h.price_field = 'list_price'
+         and h.created_at > now() - interval '30 days'
+    ) x;
+  if v_ref is null or v_ref <= 0 then
+    return new;
+  end if;
+  if new.list_price is not null and new.list_price >= v_ref then
     return new;
   end if;
 
@@ -101,7 +123,7 @@ begin
     v_threshold := least(90, greatest(1, v_raw::numeric));
   end if;
 
-  v_drop_pct := (old.list_price - new.list_price) / old.list_price * 100;
+  v_drop_pct := (v_ref - coalesce(new.list_price, 0)) / v_ref * 100;
   if v_drop_pct < v_threshold then
     return new;
   end if;
