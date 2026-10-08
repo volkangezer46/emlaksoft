@@ -1,3 +1,5 @@
+> **2026-10-08 akşam:** 7 migration (000800, 000810, 000900, 001000, 001010, 001100, 20261008000200) CANLIYA UYGULANDI; dry-run "eksik yok". Release çifti Vercel production: `20261008000200_lead_capture_token_default.sql` / `a740f1e66bc7b8bf`. Konsey Dalga 3 (A-G) main'de ve yayında (bkz. docs/design/konsey/).
+
 # EmlakSoft — Proje Hafızası (TEK MERKEZ)
 
 Yeni oturum/ajan işe başlarken ÖNCE bunu okur; durumu sıfırdan taramaz. İş bitince, karar alınınca, yayın yapılınca BURASI güncellenir (kısa tut; ayrıntı ilgili belgeye bağlanır).
@@ -22,7 +24,7 @@ Kod yorumlarındaki `HAFIZA §N` eski numaradır: `§7` = aşağıdaki "Kalıcı
 ## 2. Yayın ve migration durumu (özet)
 
 - `origin/main` = Vercel production (push'ta deploy). Push/deploy sahibin ya da birleştirme akışının işidir; otomatik sınıflandırıcı ajan `git push`'unu reddedebilir, aşılmaz. Ajan dalları doğrulanmadan `main`'e girmez.
-- **Migration durumu (kanıt):** salt-okunur `db:migrate --dry-run` (2026-10-07 akşam) diskte 300 / DB'de 300 — eksik yok; bu yüzden PB37-39, PB40, PB42-46, PB48, PB49, PB51, 000900/001000/001100 (`20260826…`), kayıtlı kart, referans motoru, TL kredi, EF kontör, insights (`002500-002700`), Ofis Merkezi, P12 kazanç gizliliği, koltuk/fiyat bütünlüğü CANLIDADIR. O günden sonra eklenen tek set yukarıdaki 6 dosyadır (şimdi diskte 306).
+- **Migration durumu (kanıt):** salt-okunur `db:migrate --dry-run` (2026-10-07 akşam) diskte 300 / DB'de 300 — eksik yok; bu yüzden PB37-39, PB40, PB42-46, PB48, PB49, PB51, 000900/001000/001100 (`20260826…`), kayıtlı kart, referans motoru, TL kredi, EF kontör, insights (`002500-002700`), Ofis Merkezi, P12 kazanç gizliliği, koltuk/fiyat bütünlüğü CANLIDADIR. O günden sonra eklenen tek set yukarıdaki 6 dosyadır (şimdi diskte 307).
 - **Kurallar:** uygulanmış dosya değiştirilmez (forward-only); enum `ADD VALUE` + kullanımı ayrı dosya; aynı fonksiyonu yeniden yazan migration önceki düzeltmeyi ezebilir (001000 B12'yi ezmişti → `20260826001900_growth_dashboard_b12_reapply` geri getirdi) — fonksiyon yeniden yazarken son tanımı baz al; uygulama öncesi `check:migrations -- --database` + `db:migrate -- --dry-run`; düz `db:migrate` yerine pencere/`--only`; `db:migrate`'e keşif bayrağı (`--help` vb.) VERİLMEZ (memory: canlıya yazdı). Kullanıcı her migration öncesi otomatik yedek aldığını beyan etti. `properties`↔`customers` ikinci FK varsa PostgREST gömmeleri FK adıyla yazılır. `supabase/proposed/` yalnız perf indeks önerileri (`CREATE INDEX CONCURRENTLY` runner transaction'ında çalışmaz).
 - Güvenlik düzeltici migration'lar ilgili ana migration'larla AYNI pencerede uygulanır (denetim 3). Rol smoke senaryoları (P12 + sec3 runbook duman testleri) HENÜZ yapılmadı.
 - Eski "CANLIYA UYGULANMADI" notları (PB45/46/48/49/51 vb.) BAYATTI; arşive bayat işaretiyle taşındı.
