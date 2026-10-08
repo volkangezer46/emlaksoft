@@ -2,13 +2,23 @@ import type { PillTone } from "@/components/ui/list-kit";
 
 /** Kiralama listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir; tarihler dışarıdan YYYY-MM-DD verilir). */
 
-export const DURUM_FILTERS = ["paid", "pending", "overdue"] as const;
+export const DURUM_FILTERS = ["paid", "partial", "collected", "pending", "overdue"] as const;
 export type DurumFilter = (typeof DURUM_FILTERS)[number];
 export const DURUM_LABELS: Record<DurumFilter, string> = {
-  paid: "Bu ay tahsil edilen",
-  pending: "Bu ay bekleyen",
+  paid: "Bu ay tam ödenen",
+  partial: "Bu ay kısmi ödenen",
+  collected: "Bu ay tahsilat yapılan",
+  pending: "Bu ay bekleyen (kısmi dahil)",
   overdue: "Geciken",
 };
+
+/** Mülk sahibi / yönetim ücreti süzgeçleri (kartların hedefi): ödenecek bakiyesi olan, bu ay ücret geliri olan kiralar. */
+export const SAHIP_FILTERS = ["odenecek"] as const;
+export type SahipFilter = (typeof SAHIP_FILTERS)[number];
+export const SAHIP_LABELS: Record<SahipFilter, string> = { odenecek: "Mülk sahibine ödenecek bakiyesi olan" };
+export const YONETIM_FILTERS = ["ucret"] as const;
+export type YonetimFilter = (typeof YONETIM_FILTERS)[number];
+export const YONETIM_LABELS: Record<YonetimFilter, string> = { ucret: "Bu ay yönetim ücreti alınan" };
 
 /** Sözleşme yaşam döngüsü evreleri — çipler listeyi ?evre= ile süzer. */
 export const EVRELER = ["yeni", "devam", "yenileme", "bitiyor", "bitti"] as const;
@@ -61,12 +71,18 @@ export type RentalFilterState = {
   ariza: boolean;
   durum: DurumFilter | "";
   q: string;
+  sahip?: SahipFilter | "";
+  yonetim?: YonetimFilter | "";
 };
 export type RentalFilterContext = {
   evreOf: (r: EvreInput) => Evre;
   openMaintRentals: ReadonlySet<string>;
   overdueRentals: ReadonlySet<string>;
   curMonthStatus: (rentalId: string) => string | undefined;
+  /** Ödenecek bakiyesi olan yönetilen kiralar (mülk sahibi kartı). */
+  payableRentals?: ReadonlySet<string>;
+  /** Bu ay yönetim ücreti alınan kiralar (yönetim ücreti kartı). */
+  feeRentals?: ReadonlySet<string>;
 };
 
 /** Liste filtreleri (KPI kartlarının drill-down hedefleri + arama). `text` aranabilir metin (küçük harf). */
@@ -79,7 +95,11 @@ export function matchesRentalFilters(
   if (f.ariza && !ctx.openMaintRentals.has(r.id)) return false;
   if (f.durum === "overdue" && !ctx.overdueRentals.has(r.id)) return false;
   if (f.durum === "paid" && ctx.curMonthStatus(r.id) !== "paid") return false;
-  if (f.durum === "pending" && ctx.curMonthStatus(r.id) !== "pending") return false;
+  if (f.durum === "partial" && ctx.curMonthStatus(r.id) !== "partial") return false;
+  if (f.durum === "collected" && !["paid", "partial"].includes(ctx.curMonthStatus(r.id) ?? "")) return false;
+  if (f.durum === "pending" && !["pending", "partial"].includes(ctx.curMonthStatus(r.id) ?? "")) return false;
+  if (f.sahip === "odenecek" && !ctx.payableRentals?.has(r.id)) return false;
+  if (f.yonetim === "ucret" && !ctx.feeRentals?.has(r.id)) return false;
   if (f.q && !r.text.includes(f.q.toLocaleLowerCase("tr-TR"))) return false;
   return true;
 }

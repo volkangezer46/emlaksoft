@@ -16,7 +16,7 @@ export async function KiralamaProje({ ctx }: { ctx: HomeCtx }) {
   const { activeRentals, rentCharges, projects } = await loadRentalsAndProjects(ctx);
 
   const rentPendingThisMonth = rentCharges
-    .filter((c) => (c.period ?? "").slice(0, 10) === ctx.monthStartKey && c.status === "pending")
+    .filter((c) => (c.period ?? "").slice(0, 10) === ctx.monthStartKey && (c.status === "pending" || c.status === "partial"))
     .reduce((s, c) => s + Number(c.amount ?? 0), 0);
   const rentOverdueRows = rentCharges.filter((c) => c.status === "overdue");
   const rentOverdueSum = rentOverdueRows.reduce((s, c) => s + Number(c.amount ?? 0), 0);

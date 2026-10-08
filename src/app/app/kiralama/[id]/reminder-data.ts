@@ -41,6 +41,7 @@ export async function loadReminderTab(input: {
       .from("rent_reminders")
       .select("id, period, kind, channel, status, reason, sent_at")
       .eq("rental_id", rental.id)
+      .neq("kind", "owner_payout")
       .order("created_at", { ascending: false })
       .limit(30),
     input.tenantId ? supabase.from("tenants").select("name").eq("id", input.tenantId).maybeSingle() : Promise.resolve({ data: null, error: null }),

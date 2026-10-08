@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
+import { loadManagementPnlInputs } from "@/lib/property-management/load";
 
 /**
  * Kâr/zarar sayfasının ORTAK ham verisi: son 12 ay komisyon (+ anlaşma sahibi danışman), komisyon payları ve giderler
@@ -21,11 +22,13 @@ export type OfficeProfitCommission = {
   advisorId: string | null;
 };
 export type OfficeProfitSplit = { commissionId: string; kind: string; amount: number };
-export type OfficeProfitExpense = { date: string; amount: number; advisorId: string | null };
+export type OfficeProfitExpense = { date: string; amount: number; advisorId: string | null; /** Mülk sahibine yansıtıldı: ofis gideri sayılmaz. */ passThrough?: boolean };
 export type OfficeProfitData = {
   commissions: OfficeProfitCommission[];
   splits: OfficeProfitSplit[];
   expenses: OfficeProfitExpense[];
+  /** Yönetim ücreti geliri (iptal edilmemiş tahsilatlardan); mülk yönetimi migration'ı yoksa boş. */
+  fees: { date: string; amount: number }[];
   advisorNames: Record<string, string>;
 };
 
@@ -59,7 +62,7 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
             .order("id", { ascending: true })
             .range(from, to),
         ),
-        fetchAllRows<{ expense_date: string; amount: number | string; property: Rel<{ assigned_to: string | null }> }>((from, to) =>
+        fetchAllRows<{ id: string; expense_date: string; amount: number | string; property: Rel<{ assigned_to: string | null }> }>((from, to) =>
           supabase
             .from("expenses")
             .select("id, expense_date, amount, property:properties!expenses_property_id_fkey(assigned_to)")
@@ -104,10 +107,13 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
         for (const s of res.data) splits.push({ commissionId: s.commission_id, kind: s.kind, amount: num(s.amount) });
       }
 
+      const pm = await loadManagementPnlInputs(supabase, { tenantId, firstMonthKey });
+      const passThroughIds = pm.passThroughExpenseIds;
       const expenses: OfficeProfitExpense[] = expRes.data.map((e) => ({
         date: String(e.expense_date),
         amount: num(e.amount),
         advisorId: one(e.property)?.assigned_to ?? null,
+        passThrough: passThroughIds.has(e.id),
       }));
 
       const advisorIds = [
@@ -122,7 +128,7 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
         for (const p of (profiles ?? []) as { id: string; full_name: string | null }[]) advisorNames[p.id] = p.full_name ?? "Danışman";
       }
 
-      return { commissions, splits, expenses, advisorNames };
+      return { commissions, splits, expenses, fees: pm.fees, advisorNames };
     },
     90,
   );

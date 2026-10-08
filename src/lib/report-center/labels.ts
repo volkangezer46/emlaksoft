@@ -21,7 +21,7 @@ export const STATUS = {
   recurrence: { daily: "Her gün", weekly: "Her hafta", biweekly: "İki haftada bir", monthly: "Her ay" },
   project: { planning: "Planlama", selling: "Satışta", delivered: "Teslim edildi" },
   rental: { active: "Aktif", ended: "Sona erdi" },
-  rentCharge: { pending: "Bekliyor", paid: "Ödendi", overdue: "Gecikti" },
+  rentCharge: { pending: "Bekliyor", partial: "Kısmi ödendi", paid: "Ödendi", overdue: "Gecikti" },
   due: { unpaid: "Ödenmedi", paid: "Ödendi" },
   referral: { yeni: "Yeni", iletisim: "İletişimde", musteri: "Müşteri oldu", kazanildi: "Kazanıldı", kayip: "Kayıp" },
   approval: { bekliyor: "Bekliyor", onaylandi: "Onaylandı", reddedildi: "Reddedildi", iptal: "İptal" },

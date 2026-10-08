@@ -353,12 +353,18 @@ export async function createRentCharge(rentalId: string, month: string): Promise
   return { ok: true, id: data?.id };
 }
 
-/** Tahakkuku ödendi işaretler / geri alır. Geri alınan kayıt 'pending'e döner (cron gerekirse yeniden 'overdue' yapar). */
+/**
+ * ESKİ yol (tahsilat kaydı migration'ı uygulanmadan önce): tahakkuku ödendi işaretler / geri alır. Geri alınan kayıt
+ * 'pending'e döner (cron gerekirse yeniden 'overdue' yapar). Tahsilat kayıtları (`rent_payments`) etkinse bu yol KAPALIDIR:
+ * durum yalnız `recordRentPayment` / `voidRentPayment` ile (makbuzlu, denetimli) değişir; aksi halde ödenen toplam ile durum ayrışırdı.
+ */
 export async function toggleChargePaid(id: string, rentalId: string, paid: boolean): Promise<RentalResult> {
   const gate = await requirePermission("rentals", "edit");
   if (!gate.ok) return { error: gate.error };
 
   const supabase = await createClient();
+  const probe = await supabase.from("rent_payments").select("id", { head: true, count: "exact" }).limit(1);
+  if (!probe.error) return { error: "Tahsilat artık makbuzlu kayıtla alınır: tahakkuktaki “Ödeme al” düğmesini kullanın." };
   const { data, error } = await supabase
     .from("rent_charges")
     .update({ status: paid ? "paid" : "pending", paid_at: paid ? new Date().toISOString() : null })

@@ -2,7 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
-import { AlertTriangle, CalendarClock, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, Coins, HandCoins, Hourglass, KeyRound, PieChart, Plus, Search, Wallet, Wrench } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
@@ -33,6 +33,9 @@ import {
 } from "@/components/ui/list-kit";
 import { RentalTable, type RentalVM } from "./rental-rows";
 import { ReminderSettingsCard } from "./reminder-settings-card";
+import { LateFeeCard } from "./late-fee-card";
+import { loadLateFeeSettings, loadManagementFeeIncome, loadOwnerBalances } from "@/lib/property-management/load";
+import { remainingAmount } from "@/lib/property-management/payments";
 import { normalizeReminderSettings } from "@/lib/rent-reminders/logic";
 import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import {
@@ -40,6 +43,10 @@ import {
   DURUM_LABELS,
   EVRELER,
   EVRE_META,
+  SAHIP_FILTERS,
+  SAHIP_LABELS,
+  YONETIM_FILTERS,
+  YONETIM_LABELS,
   dueDateOf,
   evreOf,
   matchesRentalFilters,
@@ -47,6 +54,8 @@ import {
   nextMonthOf,
   type DurumFilter,
   type Evre,
+  type SahipFilter,
+  type YonetimFilter,
 } from "./rental-list-logic";
 
 export const metadata = { title: "Kiralama" };
@@ -88,6 +97,8 @@ export default async function KiralamaPage({
     durum?: string;
     ariza?: string;
     evre?: string;
+    sahip?: string;
+    yonetim?: string;
     portfoy?: string;
     musteri?: string;
     tutar?: string;
@@ -113,12 +124,17 @@ export default async function KiralamaPage({
   const page = parsePage(params.sayfa);
   const canCreate = perms.rentals?.includes("create") ?? false;
   const canEdit = perms.rentals?.includes("edit") ?? false;
+  // Mülk sahibi finansı (hakediş, yönetim ücreti) yalnız `rentals:edit` olanlara görünür (RLS de aynı kapıda).
+  const sahipF = canEdit && SAHIP_FILTERS.includes(params.sahip as SahipFilter) ? (params.sahip as SahipFilter) : "";
+  const yonetimF = canEdit && YONETIM_FILTERS.includes(params.yonetim as YonetimFilter) ? (params.yonetim as YonetimFilter) : "";
 
   const urlParams: Record<string, string> = {};
   if (q) urlParams.q = q;
   if (durumF) urlParams.durum = durumF;
   if (arizaF) urlParams.ariza = "acik";
   if (evreF) urlParams.evre = evreF;
+  if (sahipF) urlParams.sahip = sahipF;
+  if (yonetimF) urlParams.yonetim = yonetimF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
@@ -130,6 +146,12 @@ export default async function KiralamaPage({
   const in60 = daysFromNowIso(60).slice(0, 10);
 
   const supabase = await createClient();
+  // Mülk yönetimi (tahsilat kaydı) migration'ı uygulanmış mı? Değilse eski sütunlarla çalışılır, yeni kartlar gizlenir.
+  const [pmProbe, lateFeeData] = await Promise.all([
+    supabase.from("rent_payments").select("id", { head: true, count: "exact" }).limit(1),
+    loadLateFeeSettings(supabase, tenantId ?? ""),
+  ]);
+  const pmReady = !pmProbe.error;
   // Kiracı hatırlatma ayarı (KAPALI doğar): tablo yoksa (migration uygulanmamış) kart "etkin değil" der, sayfa düşmez.
   const reminderRes = await supabase.from("rent_reminder_settings").select("*").maybeSingle();
   const reminderSchemaReady = !reminderRes.error;
@@ -148,9 +170,9 @@ export default async function KiralamaPage({
       .order("created_at", { ascending: false })
       .limit(RENTAL_LIMIT),
     // Bu ayın tahakkukları (tahsilat/bekleyen toplamları + satır durumu)
-    supabase.from("rent_charges").select("rental_id, amount, status").eq("period", curPeriodPrefix).limit(CHARGE_LIMIT),
-    // Geciken tahakkuklar (hangi dönemde olursa olsun) — satır işareti için kira kimlikleri
-    supabase.from("rent_charges").select("rental_id").eq("status", "overdue").limit(CHARGE_LIMIT),
+    supabase.from("rent_charges").select(pmReady ? "rental_id, amount, status, paid_amount" : "rental_id, amount, status").eq("period", curPeriodPrefix).limit(CHARGE_LIMIT),
+    // Geciken tahakkuklar (hangi dönemde olursa olsun) — satır işareti için kira kimlikleri + kalan tutar
+    supabase.from("rent_charges").select(pmReady ? "rental_id, amount, paid_amount" : "rental_id, amount").eq("status", "overdue").limit(CHARGE_LIMIT),
     supabase.from("rent_charges").select("id", { count: "exact", head: true }).eq("status", "overdue"),
     supabase.from("maintenance_requests").select("rental_id").neq("status", "done").limit(CHARGE_LIMIT),
     supabase.from("rentals").select("id", { count: "exact", head: true }).eq("status", "active"),
@@ -160,7 +182,7 @@ export default async function KiralamaPage({
   const rentals = rentalRes.data ?? [];
   const rentalTotal = rentalRes.count ?? rentals.length;
   const truncated = rentalTotal > rentals.length;
-  const curCharges = curChargeRes.data ?? [];
+  const curCharges = (curChargeRes.data ?? []) as unknown as { rental_id: string; amount: number | string; status: string; paid_amount?: number | string }[];
   const sumsReliable = curCharges.length < CHARGE_LIMIT;
 
   const curMonthByRental = new Map<string, string>();
@@ -168,11 +190,29 @@ export default async function KiralamaPage({
   let pendingSum = 0;
   for (const c of curCharges) {
     curMonthByRental.set(String(c.rental_id), String(c.status));
-    if (c.status === "paid") paidSum += Number(c.amount);
-    if (c.status === "pending") pendingSum += Number(c.amount);
+    const amount = Number(c.amount);
+    // Tahsilat kaydı etkinse ödenen toplam (kısmi dahil); değilse eski davranış (yalnız tam ödenenler).
+    const paidPart = pmReady ? Math.min(amount, Number(c.paid_amount ?? 0)) : c.status === "paid" ? amount : 0;
+    paidSum += paidPart;
+    if (c.status === "pending" || c.status === "partial") pendingSum += remainingAmount(amount, paidPart);
   }
-  const overdueRentals = new Set((overdueChargeRes.data ?? []).map((c) => String(c.rental_id)));
+  const overdueRows = (overdueChargeRes.data ?? []) as unknown as { rental_id: string; amount: number | string; paid_amount?: number | string }[];
+  const overdueRentals = new Set(overdueRows.map((c) => String(c.rental_id)));
+  const overdueSum = overdueRows.reduce((s, c) => s + remainingAmount(Number(c.amount), pmReady ? Number(c.paid_amount ?? 0) : 0), 0);
   const overdueCount = overdueHead.count ?? 0;
+
+  // Mülk sahibi finansı (yalnız rentals:edit): ödenecek bakiyeler + bu ay yönetim ücreti geliri.
+  const monthEndExclusive = `${nextMonthOf(curMonth)}-01`;
+  const [ownerBalances, feeIncome] =
+    pmReady && canEdit && tenantId
+      ? await Promise.all([
+          loadOwnerBalances(supabase, { tenantId }),
+          loadManagementFeeIncome(supabase, { tenantId, fromDay: curPeriodPrefix, toDayExclusive: monthEndExclusive }),
+        ])
+      : [null, null];
+  const payableRentals = new Set((ownerBalances?.rows ?? []).filter((r) => r.payable > 0).map((r) => r.rentalId));
+  const payableSum = (ownerBalances?.rows ?? []).reduce((s, r) => s + r.payable, 0);
+  const feeRentals = new Set(feeIncome ? [...feeIncome.byRental.keys()] : []);
   const openMaintRentals = new Set((maintRes.data ?? []).map((m) => String(m.rental_id)));
   const openMaint = (maintRes.data ?? []).length;
   const activeCount = activeHead.count ?? 0;
@@ -211,6 +251,8 @@ export default async function KiralamaPage({
     openMaintRentals,
     overdueRentals,
     curMonthStatus: (id: string) => curMonthByRental.get(id),
+    payableRentals,
+    feeRentals,
   };
   const filtered = rentals.filter((r) => {
     const prop = rel(r.property);
@@ -223,7 +265,7 @@ export default async function KiralamaPage({
         end_date: r.end_date ? String(r.end_date) : null,
         text: `${prop?.title ?? ""} ${prop?.property_code ?? ""} ${renter?.full_name ?? ""}`.toLocaleLowerCase("tr-TR"),
       },
-      { evre: evreF, ariza: arizaF, durum: durumF, q },
+      { evre: evreF, ariza: arizaF, durum: durumF, q, sahip: sahipF, yonetim: yonetimF },
       filterCtx,
     );
   });
@@ -262,10 +304,16 @@ export default async function KiralamaPage({
     { label: "Aktif kira", value: activeCount, icon: <KeyRound />, tone: "info", href: hrefWith({ durum: "", ariza: "", evre: "" }), hint: "sürmekte olan kira" },
   ];
   if (sumsReliable) {
-    kpis.push({ label: "Bu ay tahsilat", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: "paid", evre: "" }), hint: "ödenen tahakkuk" });
-    kpis.push({ label: "Bu ay bekleyen", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "" }), hint: "vadesi gelmemiş/ödenmemiş" });
+    kpis.push({ label: "Bu ay tahsil edilen", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: pmReady ? "collected" : "paid", evre: "", sahip: "", yonetim: "" }), hint: pmReady ? "kısmi ödemeler dahil" : "ödenen tahakkuk" });
+    kpis.push({ label: "Bu ay tahsil edilecek", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "", sahip: "", yonetim: "" }), hint: "kalan tutar" });
   }
-  kpis.push({ label: "Geciken tahakkuk", value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "" }), attention: true, hint: "tüm dönemler" });
+  kpis.push({ label: "Geciken tahakkuk", value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "", sahip: "", yonetim: "" }), attention: true, hint: pmReady ? `kalan ${money(overdueSum)}` : "tüm dönemler" });
+  if (ownerBalances) {
+    kpis.push({ label: "Mülk sahiplerine ödenecek", value: money(payableSum), icon: <HandCoins />, tone: payableSum > 0 ? "warning" : "neutral", href: hrefWith({ sahip: "odenecek", durum: "", evre: "", yonetim: "" }), hint: `${payableRentals.size} kira` });
+  }
+  if (feeIncome) {
+    kpis.push({ label: "Bu ay yönetim ücreti", value: money(feeIncome.total), icon: <Coins />, tone: "success", href: hrefWith({ yonetim: "ucret", durum: "", evre: "", sahip: "" }), hint: "ofis geliri" });
+  }
   kpis.push({ label: "Açık arıza", value: openMaint, icon: <Wrench />, tone: openMaint > 0 ? "warning" : "neutral", href: hrefWith({ ariza: "acik", evre: "" }), hint: "bakım talebi" });
 
   const chips = buildActiveChips(PATH, urlParams, [
@@ -273,6 +321,8 @@ export default async function KiralamaPage({
     { key: "evre", label: "Evre", format: (v) => EVRE_META[v as Evre]?.label ?? v },
     { key: "durum", label: "Tahsilat", format: (v) => DURUM_LABELS[v as DurumFilter] ?? v },
     { key: "ariza", label: "Arıza", format: () => "Açık arıza" },
+    { key: "sahip", label: "Mülk sahibi", format: (v) => SAHIP_LABELS[v as SahipFilter] ?? v },
+    { key: "yonetim", label: "Yönetim ücreti", format: (v) => YONETIM_LABELS[v as YonetimFilter] ?? v },
   ]);
 
   return (
@@ -293,6 +343,7 @@ export default async function KiralamaPage({
         }
       />
 
+      <LateFeeCard initial={lateFeeData.settings} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={pmReady && lateFeeData.available} />
       <ReminderSettingsCard initial={reminderSettings} smsAvailable={smsAvailable} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={reminderSchemaReady} />
 
       {rentals.length === 0 && rentalTotal === 0 ? (

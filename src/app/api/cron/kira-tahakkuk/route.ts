@@ -7,6 +7,7 @@ import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@
 import { authorizeCron } from "@/lib/cron-auth";
 import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
 import { trDayKey } from "@/lib/clock";
+import { runOwnerPayoutReminders } from "@/lib/property-management/payout-reminders";
 import { findNotifiedKeys, insertNotifications } from "@/lib/notify-batch";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
@@ -136,7 +137,7 @@ export async function GET(req: NextRequest) {
   const { data: pending, error: pendingErr } = await admin
     .from("rent_charges")
     .select("id, tenant_id, rental_id, period, amount, rental:rentals!rent_charges_rental_id_fkey(due_day, property:properties!rentals_property_id_fkey(property_code, title))")
-    .eq("status", "pending")
+    .in("status", ["pending", "partial"])
     .lte("period", period)
     .limit(2000);
 
@@ -248,6 +249,16 @@ export async function GET(req: NextRequest) {
     reminderNote = ", hatırlatma atlandı (hata)";
   }
 
+  // ---- 4b) Mülk sahibine ödeme günü hatırlatması (yönetilen kiralar; hata asıl işi bozmaz) ----
+  let payoutNote = "";
+  try {
+    const payoutTenants = [...new Set(((rentals ?? []) as RentalRow[]).map((r) => r.tenant_id))];
+    const payout = await runOwnerPayoutReminders({ admin, tenantIds: payoutTenants, today: trDayKey(Date.now()) });
+    if (payout.notified > 0) payoutNote = `, ${payout.notified} mülk sahibi ödeme hatırlatması`;
+  } catch (e) {
+    console.error("kira-tahakkuk cron mulk sahibi hatirlatma", e instanceof Error ? e.message : "hata");
+  }
+
   // ---- 5) Mart: kira geliri beyanı hatırlatması (ofise yılda bir; tutar YAZILMAZ). Anahtar kolonu yoksa yazılmaz. ----
   let declarationNotified = 0;
   try {
@@ -284,7 +295,7 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat(
     "kira-tahakkuk",
     "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
   );
 
   return NextResponse.json({
