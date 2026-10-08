@@ -2,6 +2,8 @@
 
 > **2026-10-08 akşam:** 7 migration (000800, 000810, 000900, 001000, 001010, 001100, 20261008000200) CANLIYA UYGULANDI; dry-run "eksik yok". Release çifti Vercel production: `20261008000200_lead_capture_token_default.sql` / `a740f1e66bc7b8bf`. Konsey Dalga 3 (A-G) main'de ve yayında (bkz. docs/design/konsey/).
 
+> **2026-10-08 gelir/gider turu (dal, canlıda DEĞİL):** migration `20261008000700_expense_budgets_recurring_portal` BEKLİYOR (expense_budgets + expenses.recurrence/portal_key; kod şema yokken eski akışa düşer). Gelir içgörüleri `rules/revenue.ts` (yetki yenileme 16-30 gün, gösterimsiz eşleşme, evin güncel değeri [yalnız emsal], fiyat revizyonu [yalnız emsal], tavsiye daveti) + gider içgörüleri `rules/finance.ts` (bütçe %80/%100, abonelik yenileme, kullanılmayan portal, portal ROI) mevcut `insight-engine` cron'una kayıtlı (yeni cron yok, 36). Saf hesaplar `src/lib/finance/*`; Giderler sayfasında Bütçe/Abonelikler/Portal getirisi kartları, Komisyon sayfasında indirim analizi, Kâr-zarar'da danışman kârlılığı (yalnız owner/gm). Kira bitişi 0-90 gün fırsatı zaten `lifecycle@1`'de.
+
 # EmlakSoft — Proje Hafızası (TEK MERKEZ)
 
 Yeni oturum/ajan işe başlarken ÖNCE bunu okur; durumu sıfırdan taramaz. İş bitince, karar alınınca, yayın yapılınca BURASI güncellenir (kısa tut; ayrıntı ilgili belgeye bağlanır).

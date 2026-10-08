@@ -7,6 +7,8 @@ import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
 import { ExpenseReceiptFileControl, type ReceiptFileRef } from "./expense-receipt-file";
+import { PORTAL_KEYS, PORTAL_LABEL } from "@/lib/finance/portal-roi";
+import { RECURRENCES, RECURRENCE_LABEL } from "@/lib/finance/recurring-expenses";
 
 type Category = { value: string; label: string };
 export type Expense = {
@@ -19,6 +21,9 @@ export type Expense = {
   property_id?: string | null;
   property_label?: string | null;
   receipt_url?: string | null;
+  /** Tekrarlayan gider dönemi ve portal eşlemesi (20261008000700). */
+  recurrence?: string | null;
+  portal_key?: string | null;
   /** Yüklenmiş fiş dosyası (20261007000700). */
   receipt_file?: ReceiptFileRef | null;
 };
@@ -27,6 +32,7 @@ export function ExpenseEditDialog({
   expense,
   categories,
   receiptUploads = false,
+  financeFields = false,
   open: openProp,
   onOpenChange,
 }: {
@@ -34,6 +40,8 @@ export function ExpenseEditDialog({
   categories: readonly Category[];
   /** Fiş dosyası yükleme/değiştirme etkin mi (migration + giderler:düzenle). */
   receiptUploads?: boolean;
+  /** Tekrar/portal alanları gösterilsin mi (migration uygulanmışsa). */
+  financeFields?: boolean;
   /** Kontrollü mod (satır tıklaması ile açma): open + onOpenChange verilirse
    *  tetikleyici buton render edilmez, açık/kapalı durum dışarıdan yönetilir. */
   open?: boolean;
@@ -71,7 +79,7 @@ export function ExpenseEditDialog({
       error={state.error}
       summary
       hiddenFields={<input type="hidden" name="id" value={expense.id} />}
-      fieldLabels={{ title: "Başlık", amount: "Tutar (TRY)", expense_date: "Tarih", category: "Kategori", notes: "Not", property_id: "Portföy", receipt_url: "Fiş bağlantısı" }}
+      fieldLabels={{ title: "Başlık", amount: "Tutar (TRY)", expense_date: "Tarih", category: "Kategori", notes: "Not", property_id: "Portföy", receipt_url: "Fiş bağlantısı", recurrence: "Tekrar", portal_key: "Portal" }}
       trigger={
         !controlled
           ? ({ onClick, ...aria }) => (
@@ -87,7 +95,7 @@ export function ExpenseEditDialog({
             )
           : undefined
       }
-      tabs={[{ id: "gider", label: "Gider", fields: ["title", "amount", "expense_date", "category", "notes", "property_id", "receipt_url"] }]}
+      tabs={[{ id: "gider", label: "Gider", fields: ["title", "amount", "expense_date", "category", "notes", "property_id", "receipt_url", "recurrence", "portal_key"] }]}
       panels={{
         gider: (
           <>
@@ -132,6 +140,24 @@ export function ExpenseEditDialog({
               <label htmlFor={`expense-receipt-${expense.id}`} className={lbl}>Fiş bağlantısı</label>
               <input id={`expense-receipt-${expense.id}`} name="receipt_url" type="url" inputMode="url" maxLength={500} defaultValue={expense.receipt_url ?? ""} placeholder="https://…" className={fieldClass} />
             </div>
+            {financeFields ? (
+              <>
+                <div>
+                  <label htmlFor={`expense-recurrence-${expense.id}`} className={lbl}>Tekrar dönemi</label>
+                  <select id={`expense-recurrence-${expense.id}`} name="recurrence" defaultValue={expense.recurrence ?? ""} className={fieldClass}>
+                    <option value="">Tek seferlik</option>
+                    {RECURRENCES.map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]} tekrarlar</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor={`expense-portal-${expense.id}`} className={lbl}>Portal gideri</label>
+                  <select id={`expense-portal-${expense.id}`} name="portal_key" defaultValue={expense.portal_key ?? ""} className={fieldClass}>
+                    <option value="">Portal gideri değil</option>
+                    {PORTAL_KEYS.map((k) => <option key={k} value={k}>{PORTAL_LABEL[k]}</option>)}
+                  </select>
+                </div>
+              </>
+            ) : null}
             {receiptUploads || expense.receipt_file ? (
               <div className="sm:col-span-2">
                 <span className={lbl}>Fiş dosyası (görsel / PDF)</span>

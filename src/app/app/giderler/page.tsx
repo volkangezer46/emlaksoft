@@ -17,6 +17,10 @@ import { ExpensesTable } from "./expenses-table";
 import { ExpenseCreateForm } from "./expense-create-form";
 import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
 import { SampleDataBadge } from "@/components/ui/sample-data-badge";
+import { FinancePanel } from "./finance-panel";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { PORTAL_LABEL, isPortalKey } from "@/lib/finance/portal-roi";
+import { Suspense } from "react";
 import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-receipts";
 
 import { ListHero, ListPage } from "@/components/ui/list-page";
@@ -67,7 +71,7 @@ function tarihKisa(iso: string) {
 export default async function GiderlerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string }>;
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string }>;
 }) {
   const { perms, tenantId } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
@@ -75,21 +79,26 @@ export default async function GiderlerPage({
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
   // ?portfoy= portföy detayındaki "Giderler" bağlantısı: liste yalnız o portföyün giderleri.
   const portfoyF = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.portfoy ?? "") ? params.portfoy! : null;
+  // ?portal= Portal getirisi kartından: liste yalnız o portala eşlenmiş giderler.
+  const portalF = isPortalKey(params.portal) ? params.portal : null;
   const now = new Date(nowMs());
   // Sayfalama: ?adet= 200'den başlar, "Daha fazla göster" 200 artırır (tavan 1000).
   const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
 
   const supabase = await createClient();
-  const [expenses, catDefs, aggregateResult, sample] = await Promise.all([
+  const [expenses, catDefs, aggregateResult, sample, financeProbe] = await Promise.all([
     // Tablo listesi — ?from=&to= sunucu tarafında uygulanır (expense_date aralığı).
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
     // tavana bağlı olmamalı (bkz. tenant_expense_aggregates).
-    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined, propertyId: portfoyF ?? undefined }, adet),
+    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined, propertyId: portfoyF ?? undefined, portalKey: portalF ?? undefined }, adet),
     getDefinitionsOrDefault("expense_category"),
     supabase.rpc("tenant_expense_aggregates", { p_from: fromF, p_to: toF, p_as_of: now.toISOString() }),
     loadSampleKpiScope(supabase, tenantId),
+    // Bütçe / tekrar / portal özellikleri (migration 20261008000700) için şema yoklaması; hata = henüz yok.
+    supabase.from("expense_budgets").select("id", { count: "exact", head: true }),
   ]);
+  const financeFields = !financeProbe.error;
   const aggregate = requireReportingData("tenant-expense-aggregates", aggregateResult) as unknown as {
     total: number;
     record_count: number;
@@ -112,12 +121,13 @@ export default async function GiderlerPage({
   const filteredExpenses = kategoriF ? expenses.filter((e) => e.category === kategoriF) : expenses;
 
   // Mevcut filtreleri koruyan link üretici
-  const href = (next: { kategori?: string | null; from?: string | null; to?: string | null; portfoy?: string | null }) =>
+  const href = (next: { kategori?: string | null; from?: string | null; to?: string | null; portfoy?: string | null; portal?: string | null }) =>
     `/app/giderler${qs({
       kategori: next.kategori === undefined ? kategoriF || null : next.kategori,
       from: next.from === undefined ? fromF : next.from,
       to: next.to === undefined ? toF : next.to,
       portfoy: next.portfoy === undefined ? portfoyF : next.portfoy,
+      portal: next.portal === undefined ? portalF : next.portal,
     })}`;
 
   // Hızlı tarih çipleri — İstanbul takvimine göre (sunucu UTC olabilir)
@@ -181,6 +191,8 @@ export default async function GiderlerPage({
       property_id:    (e.property_id as string | null) ?? null,
       property_label: prop ? (prop.property_code ?? prop.title ?? null) : null,
       receipt_url:    (e.receipt_url as string | null) ?? null,
+      recurrence:     (e.recurrence as string | null | undefined) ?? null,
+      portal_key:     (e.portal_key as string | null | undefined) ?? null,
       receipt_file:   receiptFile ? { id: receiptFile.id, name: receiptFile.fileName, type: receiptFile.fileType } : null,
     };
   });
@@ -240,6 +252,7 @@ export default async function GiderlerPage({
         })}
         <form action="/app/giderler" className="flex flex-wrap items-center gap-2">
           {kategoriF ? <input type="hidden" name="kategori" value={kategoriF} /> : null}
+          {portalF ? <input type="hidden" name="portal" value={portalF} /> : null}
           <input
             name="from"
             type="date"
@@ -375,6 +388,13 @@ export default async function GiderlerPage({
         </div>
       ) : null}
 
+      {/* Bütçe, tekrarlayan giderler ve portal getirisi (gider düşür / gelir artır) */}
+      {tenantId ? (
+        <Suspense fallback={null}>
+          <FinancePanel tenantId={tenantId} canEdit={canEdit} categories={categories} showEarnings={canSeeAllEarnings(perms)} />
+        </Suspense>
+      ) : null}
+
       {/* Yeni gider formu */}
       {canCreate && (
         <section id="gider-ekle" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
@@ -384,18 +404,27 @@ export default async function GiderlerPage({
             defaultDate={new Date(nowMs()).toISOString().slice(0, 10)}
             defaultProperty={pickedProperty && portfoyLabel ? { value: pickedProperty.id as string, label: portfoyLabel } : null}
             receiptUploads={receiptUploads}
+            financeFields={financeFields}
           />
         </section>
       )}
 
       {/* Aktif filtre çipleri */}
-      {kategoriF || fromF || toF || portfoyF ? (
+      {kategoriF || fromF || toF || portfoyF || portalF ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-muted">Filtre:</span>
           {portfoyF ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-accent-soft px-3 py-1 text-xs font-semibold text-accent-text">
               Portföy: {portfoyLabel ?? "Seçili portföy"}
               <Link href={href({ portfoy: null })} aria-label="Portföy filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                <X className="h-3.5 w-3.5" />
+              </Link>
+            </span>
+          ) : null}
+          {portalF ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-accent-soft px-3 py-1 text-xs font-semibold text-accent-text">
+              Portal: {PORTAL_LABEL[portalF]}
+              <Link href={href({ portal: null })} aria-label="Portal filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
                 <X className="h-3.5 w-3.5" />
               </Link>
             </span>
@@ -422,13 +451,13 @@ export default async function GiderlerPage({
 
       {/* Liste */}
       {expenses.length === 0 ? (
-        fromF || toF || portfoyF ? (
+        fromF || toF || portfoyF || portalF ? (
           <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
             <Receipt className="h-8 w-8 text-text-faint" />
             <h2 className="mt-3 font-display text-lg font-bold text-text">
-              {portfoyF ? "Bu portföye bağlı gider kaydı yok" : "Seçili tarih aralığında gider kaydı yok"}
+              {portalF ? "Bu portala eşlenmiş gider kaydı yok" : portfoyF ? "Bu portföye bağlı gider kaydı yok" : "Seçili tarih aralığında gider kaydı yok"}
             </h2>
-            <Link href={href({ from: null, to: null, portfoy: null })} className="mt-2 text-sm font-semibold text-accent-text hover:underline">
+            <Link href={href({ from: null, to: null, portfoy: null, portal: null })} className="mt-2 text-sm font-semibold text-accent-text hover:underline">
               Filtreleri temizle
             </Link>
           </div>
@@ -448,12 +477,13 @@ export default async function GiderlerPage({
           canEdit={canEdit}
           canDelete={canDelete}
           receiptUploads={receiptUploads && canEdit}
+          financeFields={financeFields && canEdit}
         />
       )}
       {expenses.length >= adet && adet < 1000 ? (
         <div className="text-center">
           <Link
-            href={qs({ kategori: kategoriF || null, from: fromF, to: toF, portfoy: portfoyF, adet: String(adet + 200) })}
+            href={qs({ kategori: kategoriF || null, from: fromF, to: toF, portfoy: portfoyF, portal: portalF, adet: String(adet + 200) })}
             className="focus-ring inline-flex rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-accent-text hover:border-brand-300"
           >
             Daha fazla göster ({adet} kayıt gösteriliyor)

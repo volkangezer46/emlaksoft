@@ -8,6 +8,8 @@ import { createExpense, type ExpenseResult } from "@/app/actions/expenses";
 import { useToast } from "@/components/app/toast-provider";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
+import { PORTAL_KEYS, PORTAL_LABEL } from "@/lib/finance/portal-roi";
+import { RECURRENCES, RECURRENCE_LABEL } from "@/lib/finance/recurring-expenses";
 
 type Category = { value: string; label: string };
 
@@ -19,6 +21,7 @@ export function ExpenseCreateForm({
   defaultDate,
   defaultProperty = null,
   receiptUploads = false,
+  financeFields = false,
 }: {
   categories: readonly Category[];
   defaultDate: string;
@@ -26,6 +29,8 @@ export function ExpenseCreateForm({
   defaultProperty?: { value: string; label: string } | null;
   /** Fiş DOSYASI yükleme etkin mi (20261007000700 uygulanmış + yetki). Kapalıysa yalnız https bağlantı alanı. */
   receiptUploads?: boolean;
+  /** Tekrarlayan gider + portal eşlemesi alanları (migration 20261008000700 uygulanmışsa). */
+  financeFields?: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -92,6 +97,20 @@ export function ExpenseCreateForm({
       <input id="expense-date" name="expense_date" type="date" min="1900-01-01" max="2100-12-31" defaultValue={defaultDate} className={inputClass} />
       <label htmlFor="expense-notes" className="sr-only">Not (opsiyonel)</label>
       <input id="expense-notes" name="notes" maxLength={2000} placeholder="Not (opsiyonel)" className={`sm:col-span-2 ${inputClass}`} />
+      {financeFields ? (
+        <>
+      <label htmlFor="expense-recurrence" className="sr-only">Tekrar dönemi</label>
+      <select id="expense-recurrence" name="recurrence" defaultValue="" className={inputClass}>
+        <option value="">Tek seferlik</option>
+        {RECURRENCES.map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]} tekrarlar</option>)}
+      </select>
+      <label htmlFor="expense-portal" className="sr-only">Portal (opsiyonel)</label>
+      <select id="expense-portal" name="portal_key" defaultValue="" className={inputClass}>
+        <option value="">Portal gideri değil</option>
+        {PORTAL_KEYS.map((k) => <option key={k} value={k}>{PORTAL_LABEL[k]} gideri</option>)}
+      </select>
+        </>
+      ) : null}
       <Combobox
         name="property_id"
         aria-label="İlgili portföy (opsiyonel)"
