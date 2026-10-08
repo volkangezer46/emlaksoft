@@ -54,6 +54,7 @@ import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { PropertyMap } from "@/components/app/property-map";
 import { PhotoQualityCard } from "@/components/app/photo-quality-card";
+import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
 import { computePriceHealth } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
@@ -463,6 +464,7 @@ export default async function PropertyDetailPage({
                       building_age?: number | string | null;
                       facade?: string | null;
                       description?: string | null;
+                      virtual_tour_url?: string | null;
                     },
                   }}
                   provinces={provinces ?? []}
@@ -705,6 +707,13 @@ export default async function PropertyDetailPage({
               <PriceHistorySection propertyId={property.id} isRent={isRentListing} />
             </Suspense>
           </div>
+
+          {/* İlan analizi (1 kontör, 24 saat önbellek): emsal + EmlakFiyati + kalite kontrol listesi */}
+          {tenantId ? (
+            <Suspense fallback={<div className="h-40 animate-pulse rounded-[var(--radius-panel)] bg-line" role="status" aria-label="İlan analizi yükleniyor" />}>
+              <ListingAnalysisCard propertyId={property.id} tenantId={tenantId} canRun={(perms.valuation ?? []).includes("create")} />
+            </Suspense>
+          ) : null}
 
           {endeksTip ? (
             <Suspense fallback={<div className="h-40 animate-pulse rounded-[var(--radius-panel)] bg-line" role="status" aria-label="EmlakFiyati endeksi yükleniyor" />}>

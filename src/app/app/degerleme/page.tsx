@@ -25,6 +25,7 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { getDistrictNameMap, provinceOptionsResult } from "@/lib/geo/reader";
+import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
 type ValuationSource = { name: string; weight: number; value: number; note: string };
 
 const nf0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
@@ -61,7 +62,7 @@ export default async function ValuationPage({
 }: {
   searchParams: Promise<{ property?: string }>;
 }) {
-  const { tenantId: gateTenantId } = await requireModulePage("valuation", "/app/degerleme");
+  const { tenantId: gateTenantId, perms: gatePerms } = await requireModulePage("valuation", "/app/degerleme");
   // Ada/Parsel sekmesi yalnız servis hazırsa görünür (hazır değilken ofis kullanıcısına çıkmaz sayfa gösterilmez).
   const parselReady = gateTenantId ? (await getEfFeatureState(gateTenantId)).ready : false;
   const { property: preselectedPropertyId } = await searchParams;
@@ -285,6 +286,11 @@ export default async function ValuationPage({
           ))}
         </div>
       </section>
+
+      {/* İlan analizi (1 kontör): portföy seçiliyse (?property=) fiyat konumu + kalite kontrol listesi */}
+      {gateTenantId && preselectedPropertyId && /^[0-9a-f-]{36}$/i.test(preselectedPropertyId) ? (
+        <ListingAnalysisCard propertyId={preselectedPropertyId} tenantId={gateTenantId} canRun={(gatePerms.valuation ?? []).includes("create")} />
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
         <ValuationForm properties={properties ?? []} provinces={provinces ?? []} defaultPropertyId={preselectedPropertyId} propertyTypes={(await getDefinitionsOrDefault("property_type")).map((d) => d.value)} />
