@@ -22,6 +22,11 @@ import { seatUtilization } from "@/lib/billing/seat-pricing";
 import { warnRatioOf } from "@/lib/billing/seat-settings";
 import { SeatLimitBanner } from "@/components/app/seat-limit-banner";
 import { SeatPanel } from "./seat-panel";
+import { PlanChangeCell, type PlanChangeQuoteView } from "./plan-change-cell";
+import { PausePanel } from "./pause-panel";
+import { evaluatePlanChange } from "@/lib/billing/plan-change-core";
+import { evaluatePause } from "@/lib/billing/pause-core";
+import { getPauseMaxDays, isPauseEnabled, isPlanChangeEnabled, loadPaidCapNetTry, loadPlanChangeState } from "@/lib/billing/plan-change";
 import { getPlanSupport } from "@/lib/billing/plan-support";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -172,6 +177,73 @@ export default async function BillingPage({
   };
   const isSeatOwner = auth.role === "owner" || auth.role === "gm";
 
+  // Oransal paket değişikliği + duraklatma (varsayılan KAPALI bayraklar; şema yoksa durum null ve bölümler hiç görünmez).
+  const [planChangeOn, pauseOn, pauseMaxDays] = await Promise.all([isPlanChangeEnabled(), isPauseEnabled(), getPauseMaxDays()]);
+  const changeState = tenantId && planSupport.pauseReady ? await loadPlanChangeState(supabase, tenantId) : null;
+  const subPaused = changeState?.pause.paused === true;
+  const fmtLongDate = (ms: number | null) =>
+    ms == null ? null : new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" }).format(new Date(ms));
+  const planChangeActive = Boolean(
+    planChangeOn && planSupport.upgradeReady && configured && changeState && changeState.status === "active" && !subPaused,
+  );
+  const changePlans = publicPlans.some((p) => p.id === currentPlanDef.id) ? publicPlans : [currentPlanDef, ...publicPlans];
+  const changePaidCap =
+    planChangeActive && tenantId && changeState ? await loadPaidCapNetTry(supabase, tenantId, changeState.subscriptionId) : null;
+  const planQuotes = new Map<string, PlanChangeQuoteView>();
+  if (planChangeActive && changeState) {
+    for (const target of changePlans) {
+      if (target.id === changeState.planId || target.hidden) continue;
+      const ev = evaluatePlanChange({
+        plans: changePlans,
+        fromPlanId: changeState.planId,
+        toPlanId: target.id,
+        cycle: changeState.cycle,
+        lockedMonthlyTry: changeState.lockedMonthlyTry,
+        paidCapNetTry: changePaidCap,
+        periodStartMs: changeState.periodStartMs,
+        periodEndMs: changeState.periodEndMs,
+        nowMs: now(),
+        usedSeats: memberCount ?? 0,
+        extraSeats,
+      });
+      if (ev.status === "upgrade" || ev.status === "downgrade" || ev.status === "over_capacity") {
+        planQuotes.set(target.id, {
+          planId: target.id,
+          planName: target.name,
+          fromName: currentPlanDef.name,
+          status: ev.status,
+          chargeNetTry: ev.chargeNetTry,
+          creditTry: ev.creditTry,
+          newCostTry: ev.newCostTry,
+          toPeriodTry: ev.toPeriodTry,
+          fromPeriodTry: ev.fromPeriodTry,
+          ratioPct: Math.round(ev.ratio * 100),
+          message: ev.message,
+          periodEndLabel: fmtLongDate(changeState.periodEndMs),
+          cycleWord: changeState.cycle === "yearly" ? "yıl" : "ay",
+        });
+      }
+    }
+  }
+  const pauseDecision =
+    changeState && auth.role === "owner"
+      ? evaluatePause({
+          enabled: pauseOn,
+          role: auth.role,
+          status: changeState.status,
+          periodEndMs: changeState.periodEndMs,
+          cancelAtPeriodEnd: changeState.cancelAtPeriodEnd,
+          pausedAtMs: changeState.pause.startedAtMs,
+          lastStartedMs: changeState.lastPauseStartedMs,
+          maxDays: pauseMaxDays,
+          days: 1,
+          nowMs: now(),
+        })
+      : null;
+  // Panel: duraklatılmışsa her zaman (devam ettirebilsin); değilse yalnız özellik açık ve şema hazırken.
+  const showPausePanel = Boolean(changeState && (subPaused || (pauseOn && planSupport.pauseReady)));
+  const pauseBlockedReason = pauseDecision && !pauseDecision.ok ? pauseDecision.message : null;
+
   // Kayıtlı kartlar: RLS'li okuma, yalnız güvenli sütunlar (sağlayıcı anahtarları istemciye çıkmaz). Tablo yoksa
   // (migration uygulanmadı) panel ve "kartımı sakla" kutusu hiç görünmez.
   const [cardsRes, cardProfileRes, autoRenewRaw] = tenantId
@@ -247,7 +319,7 @@ export default async function BillingPage({
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Mevcut paket</p>
             <p className="mt-1 font-display text-2xl font-extrabold">{planLabel(currentPlan)}</p>
             <p className="mt-1 text-xs text-mint-400">
-              {statusLabel[sub?.status ?? "trialing"] ?? sub?.status ?? "Deneme"}
+              {subPaused ? "Duraklatıldı (salt-okunur)" : statusLabel[sub?.status ?? "trialing"] ?? sub?.status ?? "Deneme"}
               {sub?.billing_cycle ? ` · ${sub.billing_cycle === "yearly" ? "Yıllık" : "Aylık"}` : ""}
             </p>
             {/* Plan tanımlarında yapısal kullanıcı limiti yok — yalnızca gerçek kullanım gösteriliyor */}
@@ -299,6 +371,16 @@ export default async function BillingPage({
         >
           Kayıtta {teamSizeLabel} kullanıcı seçtiniz; planınızda {seatLimit} koltuk var, en fazla {seatShortfall} ek koltuk gerekebilir. Koltukları görün.
         </Link>
+      ) : null}
+
+      {subPaused ? (
+        <a
+          href="#duraklatma"
+          className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-warning-strong"
+        >
+          Aboneliğiniz duraklatıldı: verileriniz salt-okunur
+          {changeState?.pause.endsAtMs ? `, ${fmtLongDate(changeState.pause.endsAtMs)} tarihinde otomatik devam eder` : ""}. Devam ettirmek için tıklayın.
+        </a>
       ) : null}
 
       {pendingCancel && cancelSupported ? (
@@ -447,6 +529,18 @@ export default async function BillingPage({
         </section>
       )}
 
+      {showPausePanel ? (
+        <PausePanel
+          paused={subPaused}
+          endsAtLabel={fmtLongDate(changeState?.pause.endsAtMs ?? null)}
+          periodEndLabel={fmtLongDate(changeState?.periodEndMs ?? null)}
+          canPause={auth.role === "owner"}
+          canResume={isSeatOwner}
+          maxDays={pauseMaxDays}
+          blockedReason={pauseBlockedReason}
+        />
+      ) : null}
+
       {cardsSupported && configured ? (
         <CardsPanel
           cards={savedCards}
@@ -516,7 +610,18 @@ export default async function BillingPage({
                 ))}
               </ul>
               <div className="mt-5">
-                {sellable ? (
+                {sellable && planQuotes.has(plan.id) ? (
+                  <PlanChangeCell
+                    quote={planQuotes.get(plan.id)!}
+                    canChange={isSeatOwner}
+                    scheduled={changeState?.pendingPlan === plan.id}
+                    wallet={walletCheckout}
+                  />
+                ) : sellable && subPaused ? (
+                  <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
+                    Aboneliğiniz duraklatıldı; paket işlemleri için önce devam ettirin.
+                  </p>
+                ) : sellable ? (
                   <CheckoutButton
                     plan={plan.id}
                     cycle={cycle}

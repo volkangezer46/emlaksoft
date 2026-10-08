@@ -573,8 +573,8 @@ export default async function AdminBillingPage({
       {/* Deneme ve yenileme ayarları: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
       <RegistrySettings
         title="Ayarlar"
-        description="Deneme süresi, deneme sonrası tolerans, otomatik yenileme ve TL kredinin fatura payı. Fiyatlar Plan editöründedir."
-        keys={["billing.default_trial_days", "billing.trial_grace_days", "billing.auto_renew_enabled", "try_credit.max_invoice_share"]}
+        description="Deneme süresi, deneme sonrası tolerans, otomatik yenileme, oransal paket yükseltme, abonelik duraklatma ve TL kredinin fatura payı. Fiyatlar Plan editöründedir."
+        keys={["billing.default_trial_days", "billing.trial_grace_days", "billing.auto_renew_enabled", "billing.plan_change_proration_enabled", "billing.pause_enabled", "billing.pause_max_days", "try_credit.max_invoice_share"]}
         canEdit={staff.role === "super_admin"}
       />
     </div>

@@ -310,6 +310,12 @@ export async function createCheckoutInvoice(input: {
   autoRenewAttemptKey?: string;
   /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
   walletCredit?: WalletCreditRequest | null;
+  /**
+   * Fatura türü + ek meta sözleşmesi (örn. oransal yükseltme: kind "plan_upgrade", fromPlan, chargeNetTry, newPeriodTry).
+   * Temel alanlar (conversationId, plan, cycle, source) ezilemez; fulfill SQL `kind`ı okur.
+   */
+  kind?: "plan_upgrade";
+  extraMeta?: Record<string, unknown>;
 }): Promise<CheckoutInvoiceResult> {
   const admin = createAdminClient();
   const amounts = invoiceAmountsTry(input.amountTry);
@@ -333,6 +339,8 @@ export async function createCheckoutInvoice(input: {
       period_end: null,
       due_at: null,
       meta: {
+        ...(input.extraMeta ?? {}),
+        ...(input.kind ? { kind: input.kind } : {}),
         conversationId: input.conversationId,
         plan: input.plan,
         cycle: input.cycle,

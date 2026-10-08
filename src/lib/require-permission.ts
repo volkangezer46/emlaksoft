@@ -5,6 +5,7 @@ import {
   immutableReadonlyPermissions,
 } from "@/lib/permissions-effective";
 import { moduleActionBlock } from "@/lib/modules/guard";
+import { pausedWriteBlock } from "@/lib/billing/pause-guard";
 import {
   requireActiveTenant,
   requireTenantForPayment,
@@ -41,6 +42,13 @@ export async function requirePermission(
   // Sıra: oturum -> yetki -> modül. Ofisin kapattığı modülün yazma eylemleri doğrudan POST ile de reddedilir.
   const moduleBlock = await moduleActionBlock(gate.tenantId, mod, action);
   if (moduleBlock) return { ok: false, error: moduleBlock };
+
+  // Duraklatılmış abonelik: veri salt-okunur (yazma eylemleri reddedilir; abonelik/ödeme modülü devam ettirmek için serbest).
+  // Destek oturumu zaten salt-okunur olduğundan atlanır.
+  if (!gate.impersonating) {
+    const pauseBlock = await pausedWriteBlock(gate.tenantId, mod, action);
+    if (pauseBlock) return { ok: false, error: pauseBlock };
+  }
 
   return {
     ok: true,

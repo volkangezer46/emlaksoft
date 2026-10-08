@@ -30,6 +30,11 @@ const h = vi.hoisted(() => ({
   efReady: true,
   pack: { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 } as Record<string, unknown> | null,
   packInvoice: vi.fn(),
+  // Oransal yukseltme / duraklatma kapilari (varsayilan KAPALI: eski akis aynen).
+  changeState: null as Record<string, unknown> | null,
+  changeEnabled: false,
+  upgradeReady: false,
+  plans: [] as Record<string, unknown>[],
 }));
 
 function chain(table: string) {
@@ -53,8 +58,13 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/billing/plan-definitions", () => ({
   getPlanDefinition: async () => ({ id: "office", monthlyTry: 2490, yearlyPaidMonths: 10, hidden: h.planHidden }),
-  getPlanDefinitions: async () => [],
+  getPlanDefinitions: async () => h.plans,
 }));
+vi.mock("@/lib/billing/plan-change", () => ({
+  isPlanChangeEnabled: async () => h.changeEnabled,
+  loadPlanChangeState: async () => h.changeState,
+}));
+vi.mock("@/lib/billing/plan-support", () => ({ getPlanSupport: async () => ({ upgradeReady: h.upgradeReady }) }));
 vi.mock("@/lib/billing/seat-purchase-core", () => ({ evaluateSeatChange: vi.fn() }));
 vi.mock("@/lib/billing/seat-purchase", () => ({ createSeatInvoice: vi.fn(), getSeatSupport: vi.fn(), loadSeatState: vi.fn() }));
 vi.mock("@/lib/activity", () => ({ logActivity: h.logActivity }));
@@ -118,6 +128,10 @@ beforeEach(() => {
   h.efPurchasable = true;
   h.efReady = true;
   h.pack = { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 };
+  h.changeState = null;
+  h.changeEnabled = false;
+  h.upgradeReady = false;
+  h.plans = [];
   h.preflight.mockResolvedValue(undefined);
   h.quoteCoupon.mockResolvedValue({ ok: true, code: "YAZ10", discountTry: 249 });
   h.redeemCoupon.mockResolvedValue({ ok: true, discountTry: 249 });
@@ -167,6 +181,69 @@ describe("startPlanCheckout — ön kapılar", () => {
     expect((await startPlanCheckout(form())).error).toMatch(/çevrimiçi satın alınamıyor/);
     expect(h.createInvoice).not.toHaveBeenCalled();
     expect(h.initCheckout).not.toHaveBeenCalled();
+  });
+});
+
+describe("startPlanCheckout — duraklatma ve oransal paket değişikliği kapıları", () => {
+  const DAY = 86_400_000;
+  const plans = [
+    { id: "office", name: "Ofis", monthlyTry: 2490, yearlyPaidMonths: 10, limits: { seats: 5 } },
+    { id: "professional", name: "Profesyonel", monthlyTry: 4990, yearlyPaidMonths: 10, limits: { seats: 15 } },
+    { id: "advisor", name: "Danışman", monthlyTry: 749, yearlyPaidMonths: 10, limits: { seats: 1 } },
+  ];
+  const active = (over: Record<string, unknown> = {}) => ({
+    status: "active",
+    planId: "office",
+    cycle: "monthly",
+    lockedMonthlyTry: null,
+    periodStartMs: Date.now() - 15 * DAY,
+    periodEndMs: Date.now() + 15 * DAY,
+    pause: { paused: false },
+    ...over,
+  });
+
+  it("duraklatılmış abonelikte ödeme/fatura AÇILMAZ", async () => {
+    h.changeState = active({ pause: { paused: true } });
+    expect((await startPlanCheckout(form())).error).toMatch(/duraklatıldı/);
+    expect(h.createInvoice).not.toHaveBeenCalled();
+    expect(h.initCheckout).not.toHaveBeenCalled();
+  });
+
+  it("bayrak KAPALI: aktif abonelikte paket değişimi eski akışla (tam fiyat) devam eder", async () => {
+    h.plans = plans;
+    h.changeState = active();
+    h.changeEnabled = false;
+    h.upgradeReady = true;
+    const r = await startPlanCheckout(form({ plan: "professional" }));
+    expect(r.checkoutUrl).toBe("https://iyzico.test/pay");
+    expect(h.createInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it("şema hazır değilken (upgradeReady=false) bayrak açık olsa da eski akış", async () => {
+    h.plans = plans;
+    h.changeState = active();
+    h.changeEnabled = true;
+    h.upgradeReady = false;
+    expect((await startPlanCheckout(form({ plan: "professional" }))).checkoutUrl).toBe("https://iyzico.test/pay");
+  });
+
+  it("bayrak + hazırlık açık: yükseltme oransal yola, düşürme planlı yola yönlendirilir; fatura AÇILMAZ", async () => {
+    h.plans = plans;
+    h.changeEnabled = true;
+    h.upgradeReady = true;
+    h.changeState = active({ periodStartMs: Date.now() - 15 * DAY, periodEndMs: Date.now() + 15 * DAY });
+    expect((await startPlanCheckout(form({ plan: "professional" }))).error).toMatch(/Oransal yükselt/);
+    expect((await startPlanCheckout(form({ plan: "advisor" }))).error).toMatch(/Dönem sonunda geç/);
+    expect(h.createInvoice).not.toHaveBeenCalled();
+    expect(h.initCheckout).not.toHaveBeenCalled();
+  });
+
+  it("aynı paketi yenileme (Yenile / öde) bayrak açıkken de serbest", async () => {
+    h.plans = plans;
+    h.changeEnabled = true;
+    h.upgradeReady = true;
+    h.changeState = active({ periodStartMs: Date.now() - 15 * DAY, periodEndMs: Date.now() + 15 * DAY });
+    expect((await startPlanCheckout(form({ plan: "office" }))).checkoutUrl).toBe("https://iyzico.test/pay");
   });
 });
 

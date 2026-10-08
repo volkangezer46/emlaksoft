@@ -193,6 +193,10 @@ const F = {
   // PB53 guvenlik/rapor turu (2026-10-07): properties fiyat dusurme DB kapisi + price_history salt-okunur; Giderler ornek veri kapsami.
   propertiesPriceDropGuard: "20261007000800_properties_price_drop_db_guard.sql",
   expenseSampleScope: "20261007000810_expense_aggregates_sample_scope.sql",
+  // PB53 oransal paket yukseltme + abonelik duraklatma (2026-10-08; her ikisi de VARSAYILAN KAPALI bayrakli).
+  subscriptionPause: "20261007001000_subscription_pause_and_plan_change.sql",
+  // PB53: fulfill + v2 TAM govde (000300 tabanindan; plan_upgrade faturasi). 001000 sutunlarina bakar.
+  planUpgradeFulfillment: "20261007001010_plan_upgrade_fulfillment.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -315,6 +319,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.expenseReceiptUploads]: "davranis", // direct_file_uploads kisitlari + claim/finalize/enqueue tam govde (3. tur expense_receipt), yeni expense_receipt_files + ozel kova expense-receipts, outbox kova izin listesi genisler
     [F.importRentalWithDeal]: "ek", // yeni authenticated DEFINER RPC import_rental_with_deal (yetki icerde; guard'lar yalniz kendi transaction'inda service_role kimligiyle gecilir)
     [F.proxyGateSnapshot]: "ek", // yeni salt-okunur SECURITY INVOKER RPC proxy_gate_snapshot (RLS eski okumalarla ayni; kod RPC yokken eski yola duser)
+    [F.subscriptionPause]: "ek", // subscriptions'a duraklatma/planli dusurme sutunlari + 4 authenticated JWT RPC + 2 service_role cron RPC + hazirlik yoklamasi; bayraklar SQL'de de kontrol edilir, mevcut davranis degismez (bayrak KAPALI)
+    [F.planUpgradeFulfillment]: "davranis", // fulfill + v2 tam govde yeniden tanimi: plan_upgrade faturasi islenir (taban 000300 govdesi bayt bayt korunur); bayrak kapaliyken kimse bu turde fatura kesmez
     [F.contractSignerReminder]: "ek", // contract_signers'a short_code/reminder_count/last_reminded_at + 2 DEFINER RPC (hatirlatma yuku: tam token donmez; kisa kod cozumu anon)
     [F.perfIndexesRpc]: "davranis", // current_session_two_factor_satisfied/is_platform_staff/support_is_ticket_staff dili sql->plpgsql (govde+ACL birebir; sorgu basi ~360us ayristirma biter) + idx_customer_demands_tenant_created
     [F.propertiesPriceDropGuard]: "siki", // properties BEFORE UPDATE OF list_price tetikleyicisi (kural acikken esik ustu dusus onay ister; yalniz authenticated) + property_price_history authenticated icin yalniz SELECT
@@ -439,11 +445,13 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB53-proxy-hiz", order: 29.999, title: "Hiz: proxy kapi okumalari tek INVOKER RPC (proxy_gate_snapshot)", files: [F.proxyGateSnapshot] },
     { id: "PB53-perf-rls-yardimcilari", order: 29.9995, title: "Perf turu 3: RLS yardimci fonksiyonlari plpgsql (tenant cozumu ~420->~60us/cagri) + customer_demands tenant/created_at indeksi", files: [F.perfIndexesRpc] },
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },
+    { id: "PB53-abonelik-duraklatma-yukseltme", order: 29.9992, title: "Abonelik duraklatma + planli dusurme (sutun + RPC) -> oransal paket yukseltme faturasi (fulfill/v2 tam govde)", files: [F.subscriptionPause, F.planUpgradeFulfillment] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 
   // (b) Birlikte uygulanmasi gerekenler (duzeltici ana'dan sonra numaralanmis ve ayni pencerede).
   pairGroups: [
+    { id: "abonelik-yukseltme", title: "Abonelik duraklatma/planli dusurme sutunlari + oransal yukseltme fulfill govdeleri", main: [F.subscriptionPause], fixes: [F.planUpgradeFulfillment], window: "PB53-abonelik-duraklatma-yukseltme", note: "001010 on-kosulu 001000 sutunlarini ve 20260826000300 canli govde md5 degerlerini (48be5cd7... / 47f246de...) arar; eksik/sapma = hicbir sey yazmadan durur. Bayraklar KAPALI birakilir; acmadan once sahip provasi." },
     { id: "onay-kapisi", title: "Ofis kontrol (oversight) + approval_requests RLS + onay kapisi", main: [F.oversight], fixes: [F.sec3Approval], window: "P10-ofis-kontrol" },
     { id: "ilan-havuzu", title: "Ilan havuzu + insert/claim korumasi", main: [F.listingPool], fixes: [F.sec3Pool], window: "P8-ilan-havuzu" },
     { id: "kvkk-talepleri", title: "kvkk_requests + rol kapisi", main: [F.k5Kvkk], fixes: [F.sec3Kvkk], window: "P6-k5-kvkk" },
@@ -514,6 +522,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efReports, F.efWallet],
     [F.efPack, F.efWallet],
     [F.efPack, F.seatFulfillment],
+    // Oransal yukseltme: fulfill/v2 gövdeleri EF paket (000300) gövdesinden turetilir ve 001000 sutunlarina bakar.
+    [F.subscriptionPause, F.billingAmount],
+    [F.planUpgradeFulfillment, F.efPack],
+    [F.planUpgradeFulfillment, F.subscriptionPause],
     [F.efPlanExpiry, F.efWallet],
     [F.efReconciliationRuns, F.efWallet],
     // TL kredi: defter source CHECK'inde refund/bonus + meta (000100) -> cuzdan (000400) -> fatura odeme (000500).

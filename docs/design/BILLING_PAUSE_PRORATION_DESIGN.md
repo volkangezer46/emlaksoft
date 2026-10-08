@@ -1,6 +1,6 @@
 # Abonelik duraklatma, oransal yukseltme, Business ve ek kullanici (TASLAK)
 
-Durum: tasarim notu. Migration taslagi `supabase/proposed/20261005000800_billing_pause_proration_business_seats.sql`
+Durum: tasarim notu. GUNCELLEME 2026-10-08: duraklatma + oransal yukseltme + planli dusurme KODLANDI (migration 20261007001000/001010, bayraklar KAPALI); gercek tasarim ve kararlar docs/HAFIZA.md §33. Asagidaki 60 gun / status=paused / yeni cron taslak kararlari TERK EDILDI (ayar `billing.pause_max_days` varsayilan 30, status active kalir, mevcut abonelik-kontrol cron'u). Migration taslagi `supabase/proposed/20261005000800_billing_pause_proration_business_seats.sql`
 (uygulanmadi, forward-only kurala uygun olarak tasinirken yeni zaman damgasi alir).
 
 ## Mevcut durumun tespitleri

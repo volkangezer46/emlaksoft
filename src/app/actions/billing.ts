@@ -7,6 +7,9 @@ import { requirePermission } from "@/lib/require-permission";
 import { PLANS, planAmountOf, type BillingCycle, type PlanId } from "@/lib/billing/plans";
 import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
+import { evaluatePlanChange } from "@/lib/billing/plan-change-core";
+import { isPlanChangeEnabled, loadPlanChangeState } from "@/lib/billing/plan-change";
+import { getPlanSupport } from "@/lib/billing/plan-support";
 import { createSeatInvoice, getSeatSupport, loadSeatState } from "@/lib/billing/seat-purchase";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
@@ -102,6 +105,31 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   ]);
 
   if (!tenant) return { error: "Ofis bulunamadı." };
+
+  // Duraklatma / oransal paket değişikliği (varsayılan KAPALI bayraklar; şema yoksa durum null ve davranış DEĞİŞMEZ).
+  const changeState = await loadPlanChangeState(supabase, gate.tenantId);
+  if (changeState?.pause.paused) {
+    return { error: "Aboneliğiniz duraklatıldı; ödeme yapmak için önce devam ettirin." };
+  }
+  if (changeState && changeState.status === "active" && changeState.planId !== plan && isIyzicoConfigured() && (await isPlanChangeEnabled()) && (await getPlanSupport()).upgradeReady) {
+    // Aktif ücretli abonelikte paket değişimi tam fiyatla dönem sıfırlamaz: yükseltme oransal, düşürme dönem sonunda.
+    const change = evaluatePlanChange({
+      plans: await getPlanDefinitions(),
+      fromPlanId: changeState.planId,
+      toPlanId: plan,
+      cycle: changeState.cycle,
+      lockedMonthlyTry: changeState.lockedMonthlyTry,
+      periodStartMs: changeState.periodStartMs,
+      periodEndMs: changeState.periodEndMs,
+      nowMs: now(),
+    });
+    if (change.status === "upgrade") {
+      return { error: "Aktif aboneliğinizde üst pakete geçiş kalan süre oranında faturalanır: Paket ve ödeme ekranında 'Oransal yükselt' seçeneğini kullanın." };
+    }
+    if (change.status === "downgrade") {
+      return { error: "Daha ucuz pakete geçiş dönem sonunda uygulanır: Paket ve ödeme ekranında 'Dönem sonunda geç' seçeneğini kullanın. İade yapılmaz." };
+    }
+  }
 
   try {
     await assertBillingPlanPreflight(gate.tenantId, plan);
@@ -318,6 +346,9 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
   if (!state) return { error: actionErrorMessage(null, "Abonelik bilgisi okunamadı.") };
   if (state.status !== "active") {
     return { error: "Koltuk eklemek için önce ücretli bir paket aktif olmalı (deneme veya gecikmiş abonelikte kapalı)." };
+  }
+  if ((await loadPlanChangeState(supabase, gate.tenantId))?.pause.paused) {
+    return { error: "Aboneliğiniz duraklatıldı; koltuk eklemek için önce devam ettirin." };
   }
 
   const [plans, { count: used }, { data: tenant }, { data: profile }] = await Promise.all([
