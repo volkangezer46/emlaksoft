@@ -407,11 +407,14 @@ export function BarCompare({
   hrefKey,
   hint,
   showValues,
+  colorKey,
 }: {
   data: Row[];
   xKey: string;
   series: SeriesDef[];
   format?: ChartValueFormat;
+  /** Satır başına çubuk rengi alanı (ör. "renk" = "var(--viz-pos)"); işaretli değerlerde (kâr/zarar) kullanılır. Yalnız tek seride. */
+  colorKey?: string;
   /** "vertical" = klasik dikey çubuk; "horizontal" = uzun etiketler için yatay. */
   layout?: "vertical" | "horizontal";
   /** Satırdaki hedef adres alanı (ör. "href"); verilirse çubuğa tıklayınca o filtreli sayfaya gidilir. */
@@ -481,6 +484,12 @@ export function BarCompare({
                       : undefined
                   }
                 >
+                  {colorKey && series.length === 1
+                    ? data.map((row, i) => {
+                        const c = row[colorKey];
+                        return <Cell key={`c-${i}`} fill={typeof c === "string" ? c : colorOf(s, index)} />;
+                      })
+                    : null}
                   {values ? (
                     <LabelList
                       dataKey={s.key}

@@ -22,20 +22,20 @@ import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformStaff } from "@/lib/platform";
 import { daysAgoIso, now, trMonthStartIso, trParts } from "@/lib/clock";
-import { fetchAllPaged } from "@/lib/cron-run";
+import { monthlyUsageFromSums, parseDashboardRollups } from "@/lib/admin/dashboard-rollups";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { PERIODS, computeTrend, parsePeriod, periodHref, type Period } from "@/components/ui/premium";
 import { KpiCard, KpiGrid, KpiGridSkeleton } from "@/components/ui/kpi-card";
 import { ChartCard } from "@/components/ui/chart-frame";
-import { AreaTrendChart, BarCompare } from "@/components/ui/lazy-charts";
+import { AreaTrend, AreaTrendChart, BarCompare } from "@/components/ui/lazy-charts";
 import { AttentionList } from "@/components/ui/attention-list";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { StatusTile } from "@/components/ui/status-tile";
 import { FadeSwap, Reveal } from "@/components/ui/motion";
-import { AreaChart, FunnelChart, SkeletonCard } from "@/components/ui/viz";
+import { SkeletonCard } from "@/components/ui/viz";
 import { StackedBar } from "@/components/admin/admin-bars";
 import { BillingHome } from "./_dashboards/billing-home";
 import { SupportHome } from "./_dashboards/support-home";
@@ -56,18 +56,7 @@ import {
   type ChurnSignal,
   type HomeSection,
 } from "@/lib/admin/dashboard-layout";
-import {
-  activationFunnel,
-  arpaSeries,
-  churnReasons,
-  embeddedCount,
-  linearForecast,
-  moduleAdoption,
-  monthlyUsage,
-  nextMonthLabels,
-  trialConversion,
-  type LedgerPoint,
-} from "@/lib/admin/platform-metrics";
+import { arpaSeries, linearForecast, moduleAdoption, nextMonthLabels } from "@/lib/admin/platform-metrics";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { formatTry } from "@/lib/format";
@@ -107,12 +96,7 @@ const getAdminDashboardData = unstable_cache(
       refundRes,
       manualRes,
       churnTenants,
-      activityRes,
-      funnelRes,
-      trialRes,
-      payingRes,
-      cancelRes,
-      ledgerRes,
+      rollupsRes,
     ] = await Promise.all([
       admin.rpc("platform_reporting_aggregates", { p_from: null, p_to: null, p_as_of: nowIso }),
       admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(5),
@@ -127,54 +111,22 @@ const getAdminDashboardData = unstable_cache(
       fetchAllRows((from, to) =>
         admin.from("tenants").select("id, name, status, trial_ends_at").in("status", ["active", "trial", "past_due", "suspended"]).order("id", { ascending: true }).range(from, to),
       ),
-      fetchAllRows(
-        (from, to) =>
-          admin.from("audit_logs").select("tenant_id, created_at").gte("created_at", daysAgoIso(14)).order("id", { ascending: true }).range(from, to),
-        1000,
-        50,
-      ),
-      // Aktivasyon: dönemde kayıt olan ofislerin GERÇEK (örnek veri hariç) portföy/anlaşma varlığı (gömülü sayım).
-      fetchAllRows((from, to) =>
-        admin
-          .from("tenants")
-          .select("id, properties!properties_tenant_id_fkey(count), deals!deals_tenant_id_fkey(count)")
-          .gte("created_at", fromIso)
-          .eq("properties.is_sample", false)
-          .eq("deals.is_sample", false)
-          .order("id", { ascending: true })
-          .range(from, to),
-      ),
-      // Deneme → ücretli: dönemde denemesi BİTEN ofisler + bugün ücretli aktif aboneliği olanlar.
-      fetchAllRows((from, to) =>
-        admin.from("tenants").select("id, status, trial_ends_at").gte("trial_ends_at", fromIso).lte("trial_ends_at", nowIso).order("id", { ascending: true }).range(from, to),
-      ),
-      fetchAllRows((from, to) =>
-        admin.from("subscriptions").select("tenant_id").eq("status", "active").gt("amount_try", 0).order("id", { ascending: true }).range(from, to),
-      ),
-      // Churn nedenleri (sütun yoksa hata → "okunamadı", uydurma yok).
-      admin.from("subscriptions").select("cancel_reason").not("cancel_requested_at", "is", null).order("cancel_requested_at", { ascending: false }).limit(500),
-      // Tüketim defteri: son 6 TR ayı, harcama kayıtları; sayfalı (PostgREST 1000 satır sınırı), en çok 10 sayfa.
-      fetchAllPaged<LedgerPoint>(
-        (from, to) =>
-          admin
-            .from("account_credit_ledger")
-            .select("unit, amount, available_at")
-            .eq("entry_type", "spend")
-            .in("unit", [...LEDGER_UNITS])
-            .gte("available_at", trMonthStartIso(now(), -5))
-            .order("id", { ascending: true })
-            .range(from, to),
-        1000,
-        10,
-      ),
+      // Etkinlik (14 gün), aktivasyon hunisi, deneme dönüşümü, iptal nedenleri ve 6 aylık defter toplamları:
+      // satır çekip JS'te saymak yerine tek SQL toplulaştırması (service_role RPC; hata → paneller "okunamadı").
+      admin.rpc("platform_dashboard_rollups", {
+        p_from: fromIso,
+        p_now: nowIso,
+        p_activity_from: daysAgoIso(14),
+        p_ledger_from: trMonthStartIso(now(), -5),
+        p_units: [...LEDGER_UNITS],
+      }),
     ]);
+    const rollups = rollupsRes.error ? null : parseDashboardRollups(rollupsRes.data);
     const activity: Record<string, number> = {};
     const lastActivity: Record<string, string> = {};
-    for (const row of activityRes.error ? [] : (activityRes.data ?? [])) {
-      const r = row as { tenant_id: string | null; created_at: string };
-      if (!r.tenant_id) continue;
-      activity[r.tenant_id] = (activity[r.tenant_id] ?? 0) + 1;
-      if (!lastActivity[r.tenant_id] || r.created_at > lastActivity[r.tenant_id]!) lastActivity[r.tenant_id] = r.created_at;
+    for (const a of rollups?.activity ?? []) {
+      activity[a.officeId] = a.events;
+      lastActivity[a.officeId] = a.lastAt;
     }
     return {
       aggregate: requireReportingData("platform-dashboard-aggregates", aggregateResult) as unknown as PlatformReportingAggregate,
@@ -189,20 +141,13 @@ const getAdminDashboardData = unstable_cache(
       churnTenants: churnTenants.error ? [] : (churnTenants.data ?? []),
       activity,
       lastActivity,
-      funnel: funnelRes.error
-        ? null
-        : (funnelRes.data ?? []).map((r) => ({
-            properties: embeddedCount((r as Record<string, unknown>).properties),
-            deals: embeddedCount((r as Record<string, unknown>).deals),
-          })),
-      trials: trialRes.error ? null : (trialRes.data ?? []),
-      payingTenantIds: payingRes.error ? null : [...new Set((payingRes.data ?? []).map((r) => String(r.tenant_id)))],
-      cancelReasons: cancelRes.error ? null : (cancelRes.data ?? []),
-      ledger: ledgerRes.error && ledgerRes.rows.length === 0 ? null : ledgerRes.rows,
-      ledgerTruncated: Boolean(ledgerRes.error) && ledgerRes.rows.length > 0,
+      funnel: rollups?.funnel ?? null,
+      trialConv: rollups?.trial ?? null,
+      cancelReasons: rollups ? rollups.cancelReasons : null,
+      ledger: rollups ? rollups.ledgerMonths : null,
     };
   },
-  ["admin-dashboard-v4"],
+  ["admin-dashboard-v5"],
   { revalidate: 60, tags: ["admin-dashboard"] },
 );
 
@@ -290,7 +235,7 @@ async function HeroSummary({ period, role }: { period: Period; role: PlatformRol
 async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }) {
   const data = await loadDashboard(period);
   const d = derive(data);
-  const conv = data.trials && data.payingTenantIds ? trialConversion(data.trials, new Set(data.payingTenantIds), now(), period) : null;
+  const conv = data.trialConv;
   const convText =
     conv === null ? "Dönüşüm okunamadı" : conv.rate === null ? "Biten deneme yok" : `Deneme dönüşümü %${conv.rate}`;
   return (
@@ -554,8 +499,8 @@ async function HealthSection({ role }: { role: PlatformRole }) {
 /** Aktivasyon hunisi (kayıt → ilk portföy → ilk anlaşma) + GERÇEK deneme → ücretli dönüşüm. */
 async function ActivationSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
-  const funnel = data.funnel ? activationFunnel(data.funnel) : null;
-  const conv = data.trials && data.payingTenantIds ? trialConversion(data.trials, new Set(data.payingTenantIds), now(), period) : null;
+  const funnel = data.funnel;
+  const conv = data.trialConv;
   const cohort = `/admin/tenants?yeni=${period}`;
   return (
     <ChartCard
@@ -572,16 +517,30 @@ async function ActivationSection({ period }: { period: Period }) {
       {funnel === null ? (
         <EmptyState variant="compact" illustration="hata" title="Aktivasyon verisi okunamadı" description="Gömülü sayım sorgusu yanıt vermedi; ofis listesinden kohortu inceleyebilirsiniz." action={{ href: "/admin/tenants", label: "Ofisleri gör" }} />
       ) : (
-        <FunnelChart
-          ardisik
-          ariaLabel={`Son ${period} gün aktivasyon hunisi`}
-          emptyText={`Son ${period} günde yeni kayıt yok`}
-          stages={[
-            { label: "Kayıt", value: funnel.registered, href: cohort },
-            { label: "İlk portföy", value: funnel.withProperty, href: cohort, sub: "En az bir gerçek portföy" },
-            { label: "İlk anlaşma", value: funnel.withDeal, href: cohort, sub: "Portföy + en az bir anlaşma" },
-          ]}
-        />
+        funnel.registered === 0 ? (
+          <p className="py-6 text-center text-sm text-text-muted">{`Son ${period} günde yeni kayıt yok`}</p>
+        ) : (
+          <>
+            <div className="h-36" role="group" aria-label={`Son ${period} gün aktivasyon hunisi`}>
+              <BarCompare
+                layout="horizontal"
+                hrefKey="href"
+                hint="Kohortu aç"
+                data={[
+                  { aşama: "Kayıt", ofis: funnel.registered, href: cohort },
+                  { aşama: "İlk portföy", ofis: funnel.withProperty, href: cohort },
+                  { aşama: "İlk anlaşma", ofis: funnel.withDeal, href: cohort },
+                ]}
+                xKey="aşama"
+                series={[{ key: "ofis", label: "Ofis", color: "var(--viz-1)" }]}
+              />
+            </div>
+            <p className="mt-2 text-xs tabular-nums text-text-muted">
+              Kayıttan ilk portföye %{Math.round((funnel.withProperty / funnel.registered) * 100)}
+              {funnel.withProperty > 0 ? ` · portföyden ilk anlaşmaya %${Math.round((funnel.withDeal / funnel.withProperty) * 100)}` : ""} · örnek veri hariç
+            </p>
+          </>
+        )
       )}
       <div className="mt-4 border-t border-hairline pt-3">
         {conv === null ? (
@@ -675,7 +634,7 @@ async function UnitEconomicsSection({ period }: { period: Period }) {
 /** AI kredisi, değerleme raporu ve EmlakFiyati kontörü tüketimi (son 6 TR ayı, harcama defteri). */
 async function UsageSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
-  const usage = data.ledger ? monthlyUsage(data.ledger, LEDGER_UNITS, now()) : null;
+  const usage = data.ledger ? monthlyUsageFromSums(data.ledger, LEDGER_UNITS, now()) : null;
   const rows = usage ? usage.months.map((m, i) => ({ ay: m.label, ai: usage.byUnit.ai![i]!, valuation: usage.byUnit.valuation![i]!, ef: usage.byUnit.ef![i]! })) : [];
   return (
     <ChartCard as="h2" title="AI ve kontör tüketimi" subtitle="Son 6 ay · harcanan birim" icon={BrainCircuit} tone="gold" href="/admin/ai-kullanim" hrefLabel="AI kullanımı" height={0} className="h-full">
@@ -696,7 +655,6 @@ async function UsageSection({ period }: { period: Period }) {
           />
         </div>
       )}
-      {data.ledgerTruncated ? <p className="mt-2 text-xs text-text-muted">Not: defter okumasının bir kısmı tamamlanamadı; değerler eksik olabilir.</p> : null}
     </ChartCard>
   );
 }
@@ -704,7 +662,7 @@ async function UsageSection({ period }: { period: Period }) {
 /** Abonelik iptal taleplerindeki gerekçeler (serbest metin, normalize edilip gruplanır). */
 async function ChurnReasonsSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
-  const reasons = data.cancelReasons ? churnReasons(data.cancelReasons) : null;
+  const reasons = data.cancelReasons ? data.cancelReasons.slice(0, 5) : null;
   const max = reasons && reasons.length ? Math.max(...reasons.map((r) => r.count)) : 1;
   return (
     <ChartCard
@@ -745,7 +703,7 @@ async function ChurnReasonsSection({ period }: { period: Period }) {
   );
 }
 
-/** Büyüme (ikincil): haftalık yeni ofis ve yeni aktif abonelik, ortak AreaChart (sunucu SVG). */
+/** Büyüme (ikincil): haftalık yeni ofis ve yeni aktif abonelik, canlı AreaTrend (ipucu, lejant, aralık). */
 async function GrowthSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const weekly = data.aggregate.weekly;
@@ -761,20 +719,20 @@ async function GrowthSection({ period }: { period: Period }) {
       tone="success"
       href="/admin/tenants?yeni=90"
       hrefLabel="Son 90 gün kayıtlar"
-      height={176}
+      height={260}
       empty={!hasData}
       emptyText="Yeni ofis ve abonelikler geldikçe eğri burada çizilir."
       className="h-full"
     >
-      <AreaChart
+      <AreaTrend
+        data={weekly.map((w, i) => ({ hafta: weekLabel(w.week_start), ofis: offices[i] ?? 0, abonelik: subs[i] ?? 0 }))}
+        xKey="hafta"
         series={[
-          { name: "Yeni ofis", values: offices, tone: "accent" },
-          { name: "Yeni aktif abonelik", values: subs, tone: "success" },
+          { key: "ofis", label: "Yeni ofis", color: "var(--viz-1)" },
+          { key: "abonelik", label: "Yeni aktif abonelik", color: "var(--viz-2)" },
         ]}
-        pointLabels={weekly.map((w) => weekLabel(w.week_start))}
-        height={150}
-        ariaLabel={`Son ${weekly.length} hafta yeni ofis ve yeni aktif abonelik`}
-        href="/admin/tenants?yeni=90"
+        granularity="week"
+        summary="total"
       />
     </ChartCard>
   );

@@ -2,7 +2,8 @@ import Link from "@/components/ui/smart-link";
 import { Handshake, Hourglass, Megaphone, ShieldAlert, Sprout, Users, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { FunnelChart, RadialGauge } from "@/components/ui/viz";
+import { RadialGauge } from "@/components/ui/viz";
+import { BarCompare } from "@/components/ui/lazy-charts";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { AdminEmpty, AdminFilterChip, AdminPanel, AdminScrollArea } from "@/components/admin/admin-table";
 import { describeRewardRule } from "@/lib/growth/settings";
@@ -182,11 +183,29 @@ export default async function AdminGrowthPage({
             <div className="grid gap-6 @3xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
               <div className="rounded-[var(--radius-card)] p-4" style={{ boxShadow: "var(--elev-3)" }}>
                 <h3 className="mb-2 text-sm font-bold text-ink-950">Referans hunisi</h3>
-                <FunnelChart
-                  stages={funnel}
-                  ariaLabel="Referans hunisi: tıklama, kayıt, ödeyen, ödül"
-                  emptyText="Henüz tıklama ya da kayıt yok"
-                />
+                {funnel.every((s) => s.value === 0) ? (
+                  <p className="py-6 text-center text-sm text-text-muted">Henüz tıklama ya da kayıt yok</p>
+                ) : (
+                  <>
+                    <div className="h-44" role="group" aria-label="Referans hunisi: tıklama, kayıt, ödeyen, ödül">
+                      <BarCompare
+                        layout="horizontal"
+                        hrefKey="href"
+                        hint="Süzgeci aç"
+                        data={funnel.map((s) => ({ aşama: s.label, adet: s.value, href: s.href ?? "/admin/growth" }))}
+                        xKey="aşama"
+                        series={[{ key: "adet", label: "Adet", color: "var(--viz-1)" }]}
+                      />
+                    </div>
+                    <ul className="mt-2 space-y-0.5 text-xs tabular-nums text-text-muted">
+                      {funnel.filter((s) => s.sub).map((s) => (
+                        <li key={s.label}>
+                          {s.label}: {s.sub}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">

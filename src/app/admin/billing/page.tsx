@@ -12,7 +12,7 @@ import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now as clockNow } from "@/lib/clock";
 import { planLabel } from "@/lib/billing/plans";
-import { AreaChart } from "@/components/ui/viz";
+import { AreaTrendChart } from "@/components/ui/lazy-charts";
 import { StackedBar } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { BillingNav } from "./billing-nav";
@@ -214,18 +214,7 @@ export default async function AdminBillingPage({
                     <span className="block text-xs text-text-muted">{k.label}</span>
                     <span className={`num block text-2xl font-semibold tabular-nums ${k.tone}`}>{k.value}</span>
                   </span>
-                  {k.key === "active" && hasCurve ? (
-                    <span className="hidden w-24 shrink-0 sm:block">
-                      <AreaChart
-                        series={[{ name: "Aylık gelir", values: trendVals, tone: "gold" }]}
-                        height={36}
-                        formatValue={money}
-                        ariaLabel="Aylık gelir eğrisi (özet)"
-                      />
-                    </span>
-                  ) : (
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-text-faint transition-colors group-hover:text-text" aria-hidden />
-                  )}
+                  <ArrowUpRight className="h-4 w-4 shrink-0 text-text-faint transition-colors group-hover:text-text" aria-hidden />
                 </Link>
               );
             })}
@@ -241,15 +230,15 @@ export default async function AdminBillingPage({
                 <TrendPill trend={mrrTrend} />
               </span>
             </div>
-            <div style={{ minHeight: 148 }}>
+            <div style={{ height: 280 }}>
               {hasCurve ? (
-                <AreaChart
-                  series={[{ name: "Aylık yinelenen gelir", values: trendVals, tone: "gold" }]}
-                  pointLabels={months.map((m) => m.label)}
+                <AreaTrendChart
+                  data={trendVals.map((v, i) => ({ label: months[i]?.label ?? "", value: v, href: "/admin/muhasebe" }))}
+                  tone="gold"
+                  format="money"
                   formatValue={money}
-                  height={132}
+                  name="Aylık yinelenen gelir"
                   ariaLabel="Son 8 ay aylık gelir trendi"
-                  href="/admin/muhasebe"
                 />
               ) : (
                 <p className="py-8 text-center text-sm text-text-muted">Aktif abonelik oluştukça gelir eğrisi burada çizilir.</p>
