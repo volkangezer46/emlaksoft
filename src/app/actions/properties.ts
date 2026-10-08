@@ -3,6 +3,7 @@
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
+import { parseVirtualTourUrl, withVirtualTour } from "@/lib/virtual-tour";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -620,6 +621,12 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     const d = parsePropertyDescription(formData.get("description"));
     if (!d.ok) return { error: d.error };
     mergedFeatures = withDescription(mergedFeatures, d.value);
+  }
+  // 360° tur / video bağlantısı: yalnız formda alan VARSA yazılır (https + izinli alan adı; lib/virtual-tour.ts).
+  if (formData.has("virtual_tour_url")) {
+    const t = parseVirtualTourUrl(formData.get("virtual_tour_url"));
+    if (!t.ok) return { error: t.error };
+    mergedFeatures = withVirtualTour(mergedFeatures, t.value ? t.value.url : null);
   }
 
   // Fiyat her güncellendiğinde sağlık ANINDA yeniden hesaplanır — önce emsal, yetersizse m² modeli.

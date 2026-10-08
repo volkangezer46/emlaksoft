@@ -42,6 +42,7 @@ import { VitrinChat } from "@/components/public/vitrin-chat";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { VITRIN_AI_CHAT_KEY } from "@/lib/settings/registry/tenant";
 import { normalizeExternalHref } from "@/lib/external-href";
+import { VirtualTourEmbed } from "@/components/public/virtual-tour-embed";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import {
   PUBLIC_COVER_COLUMNS,
@@ -612,6 +613,8 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text-muted">{description}</p>
               </div>
             ) : null}
+
+            <VirtualTourEmbed features={property.features} />
 
             {/* İlan bilgileri — yalnız dolu alanlar; fiyat/m² ve emsal yalnız gerçek veriden */}
             <section className="mt-5 rounded-[var(--radius-panel)] border border-line bg-surface p-5" aria-labelledby="ilan-bilgileri">

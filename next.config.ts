@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { assertProductionEnvironment } from "./src/lib/deployment-env";
+import { VIRTUAL_TOUR_FRAME_HOSTS } from "./src/lib/virtual-tour";
 
 // Config is loaded by both `next build` and `next start`; fail before the app
 // can be built or served with any production demo escape hatch enabled.
@@ -14,7 +15,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
   "media-src 'self' data: blob: https://*.supabase.co",
-  "frame-src 'self' https://www.openstreetmap.org",
+  `frame-src 'self' https://www.openstreetmap.org ${VIRTUAL_TOUR_FRAME_HOSTS.map((h) => `https://${h}`).join(" ")}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "object-src 'none'",
