@@ -4,7 +4,7 @@ import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import { RotateCcw, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
-import { bumpUsage, getHrefStore, getUsageStore, MAX_RECENT_SHOWN, pushRecent, togglePin, topUsed } from "@/lib/nav-memory";
+import { bumpUsage, getHrefStore, getUsageStore, pushRecent, togglePin, topUsed } from "@/lib/nav-memory";
 import { ShortcutHint } from "@/components/app/shortcut-hint";
 
 /**
@@ -16,6 +16,9 @@ import { ShortcutHint } from "@/components/app/shortcut-hint";
 export type QuickItem = { href: string; label: string; icon: LucideIcon; description?: string };
 
 /** Ana ekran her zaman menünün ilk satırıdır; "çok kullanılan" listesini boşuna doldurmasın. */
+/** Hızlı erişimde en çok kaç satır görünür (ana ilke: menü kısa kalsın). */
+export const MAX_QUICK_ROWS = 4;
+
 const HOME_HREFS = new Set(["/app", "/admin"]);
 
 export function useQuickAccess({
@@ -37,7 +40,7 @@ export function useQuickAccess({
   const recents = useSyncExternalStore(recentStore.subscribe, recentStore.read, recentStore.getServerSnapshot);
   const usage = useSyncExternalStore(usageStore.subscribe, usageStore.read, usageStore.getServerSnapshot);
 
-  // Ziyaret kaydı: yalnız sayfa yolu. Son açılanlar (soğuk başlangıç dolgusu) + kullanım sayacı.
+  // Ziyaret kaydı: yalnız sayfa yolu. Son ziyaretler (yalnız kayıt) + kullanım sayacı.
   useEffect(() => {
     if (!activeHref) return;
     const cur = recentStore.read();
@@ -46,22 +49,19 @@ export function useQuickAccess({
   }, [activeHref, recentStore, usageStore]);
 
   const byHref = useMemo(() => new Map(items.map((i) => [i.href, i])), [items]);
-  const pinned = pins.flatMap((h) => byHref.get(h) ?? []);
   const allowed = useMemo(() => new Set(items.map((i) => i.href)), [items]);
-  const top = topUsed(usage, { exclude: [...pins, ...HOME_HREFS], allowed }).flatMap((h) => byHref.get(h) ?? []);
-  // Soğuk başlangıç: henüz yeterli kullanım yoksa son açılan 2 sayfa dolgu olur (sabitlenen/aktif/ana ekran hariç).
-  const fill =
-    pinned.length + top.length >= 3
-      ? []
-      : recents
-          .filter((h) => !pins.includes(h) && !HOME_HREFS.has(h) && h !== activeHref && !top.some((t) => t.href === h))
-          .flatMap((h) => byHref.get(h) ?? [])
-          .slice(0, MAX_RECENT_SHOWN);
+  // Hızlı erişim bütçesi: sabitlenen + otomatik en çok MAX_QUICK_ROWS satır. son açılanlar ayrı grup/dolgu DEĞİLDİR;
+  // son açılan sayfalar yalnız yeterli kullanım sayacı oluşunca "çok kullanılan"a dönüşerek (veri kaynağı olarak) katılır.
+  const pinned = pins.flatMap((h) => byHref.get(h) ?? []).slice(0, MAX_QUICK_ROWS);
+  const top = topUsed(usage, { exclude: [...pins, ...HOME_HREFS], allowed, limit: MAX_QUICK_ROWS })
+    .flatMap((h) => byHref.get(h) ?? [])
+    .slice(0, Math.max(0, MAX_QUICK_ROWS - pinned.length));
+  void recents;
 
   return {
     pins,
     pinned,
-    auto: [...top, ...fill],
+    auto: top,
     hasUsage: Object.keys(usage).length > 0,
     togglePin: (href: string) => pinStore.write(togglePin(pinStore.read(), href)),
     resetUsage: () => {
@@ -84,7 +84,8 @@ export function QuickAccessSection({
   onReset: () => void;
   renderRow: (item: QuickItem, kind: "pin" | "auto") => ReactNode;
 }) {
-  const empty = pinned.length === 0 && auto.length === 0;
+  // Boşsa hiç görünmez (boş vaat/yer kaplayan ipucu yok).
+  if (pinned.length === 0 && auto.length === 0) return null;
   return (
     <section aria-label="Hızlı erişim" className="pb-1">
       <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-1.5 text-white/70">
@@ -102,19 +103,10 @@ export function QuickAccessSection({
           </button>
         ) : null}
       </div>
-      {empty ? (
-        <p className="px-3 py-1 text-xs leading-5 text-white/60">Sık açtığın sayfalar burada görünür. İğneyle sabitleyebilirsin.</p>
-      ) : (
-        <div className="space-y-0.5">
-          {pinned.map((i) => renderRow(i, "pin"))}
-          {auto.length > 0 ? (
-            <>
-              {pinned.length > 0 ? <p className="px-3 pb-0.5 pt-1.5 text-xs text-white/55">Sık kullandıkların</p> : null}
-              {auto.map((i) => renderRow(i, "auto"))}
-            </>
-          ) : null}
-        </div>
-      )}
+      <div className="space-y-0.5">
+        {pinned.map((i) => renderRow(i, "pin"))}
+        {auto.map((i) => renderRow(i, "auto"))}
+      </div>
     </section>
   );
 }
@@ -130,10 +122,10 @@ export function MenuSearchButton({ onActivate }: { onActivate?: () => void }) {
       }}
       aria-label="Menüde ara (komut paletini aç)"
       title="Menüde ara, sayfaya git"
-      className="sb-expanded focus-ring mx-3 mt-2 flex min-h-9 touch:min-h-11 w-[calc(100%-1.5rem)] items-center gap-2 rounded-[var(--radius-control)] bg-white/6 px-3 text-left text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+      className="sb-expanded focus-ring mx-3 mt-1 flex min-h-8 touch:min-h-11 w-[calc(100%-1.5rem)] items-center gap-2 rounded-[var(--radius-control)] bg-white/6 px-2.5 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
     >
-      <Search className="h-4 w-4 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">Menüde ara</span>
+      <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1 truncate">Ara</span>
       <ShortcutHint className="rounded border border-white/15 px-1.5 text-[0.6875rem] leading-5 text-white/65" />
     </button>
   );

@@ -7,7 +7,7 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff, X } from "lucide-react";
 import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
 import { activeTabHref, adminSidebarModel, isAdminNavActive, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
-import { getHrefStore, navStateId } from "@/lib/nav-memory";
+import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } from "@/components/ui/console/quick-access";
@@ -48,6 +48,11 @@ export function AdminSidebar({
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
 
+  // Çekirdek olmayan tüm öğeler tek, varsayılan kapalı "Diğer" grubunda (tam liste ayrıca ⌘K'da).
+  const other = useMemo(() => groups.flatMap((g) => g.folded), [groups]);
+  const otherHasActive = other.some((i) => isActive(pathname, i));
+  const otherOpen = otherHasActive || closed.includes("diger-acik");
+
   const quickItems = useMemo<QuickItem[]>(() => allItems.map((i) => ({ href: i.href, label: i.label, icon: i.icon, description: i.description })), [allItems]);
   const itemByHref = useMemo(() => new Map(allItems.map((i) => [i.href, i])), [allItems]);
   const quick = useQuickAccess({ scope: ADMIN_SCOPE, kind: "admin", items: quickItems, activeHref });
@@ -60,22 +65,17 @@ export function AdminSidebar({
     const badge = item.badgeKey ? badges?.[item.badgeKey] : undefined;
     const hasBadge = Boolean(badge && badge > 0);
     const pinned = quick.pins.includes(item.href);
-    const sub = !opts.flat && item.tabs && item.tabs.length > 1 ? item.tabs : null;
-    const subId = navStateId("alt", item.href);
-    const subOpen = Boolean(sub) && (active || closed.includes(subId));
-    const hasChevron = Boolean(sub) && !active;
-    const activeSub = sub && active ? activeTabHref(pathname, sub) : null;
-    const chevOffset = hasChevron ? 1.75 : 0;
-    const badgeRight = 0.5 + chevOffset;
-    const pinRight = (hasBadge ? 2.5 : 0.25) + chevOffset;
-    const padRight = hasBadge ? (hasChevron ? "pr-[5.5rem]" : "pr-16") : hasChevron ? "pr-16" : "pr-9";
+    // Ana ilke: yan menüde yalnız üst düzey sayfa; sekmeler sayfa içi şeritte (ikon modu flyout'u hariç).
+    const badgeRight = 0.5;
+    const pinRight = hasBadge ? 2.5 : 0.25;
+    const padRight = hasBadge ? "pr-16" : "pr-9";
     return (
       <div key={`${opts.group}-${item.href}`}>
         <div className="nav-item group relative">
           <Link
             href={item.href}
             data-nav-link
-            data-nav-active={active && !activeSub ? "true" : undefined}
+            data-nav-active={active ? "true" : undefined}
             aria-current={active ? "page" : undefined}
             title={`${item.label} · ${item.description}`}
             prefetch
@@ -109,60 +109,22 @@ export function AdminSidebar({
           >
             {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
           </button>
-          {hasChevron ? (
-            <button
-              type="button"
-              aria-expanded={subOpen}
-              aria-controls={`adm-${subId}`}
-              aria-label={`${item.label} alt sayfaları`}
-              title={subOpen ? "Alt sayfaları gizle" : "Alt sayfaları göster"}
-              onClick={() => toggle(subId)}
-              className="focus-ring absolute right-1 top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
-            >
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${subOpen ? "" : "-rotate-90"}`} aria-hidden />
-            </button>
-          ) : null}
         </div>
-        {sub && subOpen ? (
-          <ul id={`adm-${subId}`} aria-label={`${item.label} alt sayfaları`} className="ml-[1.375rem] space-y-0.5 border-l border-white/10 py-0.5 pl-2">
-            {sub.map((tab) => {
-              const tabActive = activeSub !== null && tab.href.split(/[?#]/)[0] === activeSub;
-              return (
-                <li key={tab.href}>
-                  <Link
-                    href={tab.href}
-                    data-nav-link
-                    data-nav-active={tabActive ? "true" : undefined}
-                    aria-current={tabActive ? "page" : undefined}
-                    title={tab.description}
-                    onClick={() => setOpen(false)}
-                    className={`focus-ring flex min-h-9 items-center rounded-[var(--radius-control)] px-2.5 text-[0.8125rem] transition-colors touch:min-h-11 ${
-                      tabActive ? "bg-white/10 font-semibold text-white" : "text-white/70 hover:bg-white/6 hover:text-white"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{tab.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
       </div>
     );
   };
 
-  const renderGroup = ({ section, items, folded }: AdminSidebarGroup) => {
-    const hasActive = [...items, ...folded].some((i) => isActive(pathname, i));
-    const expanded = !section.title || hasActive || !closed.includes(section.id);
-    const foldId = `fold-${section.id}`;
-    const foldOpen = folded.some((i) => isActive(pathname, i)) || closed.includes(foldId);
+  const renderGroup = ({ section, items }: AdminSidebarGroup) => {
+    const hasActive = items.some((i) => isActive(pathname, i));
+    // Akordeon: varsayılan yalnız etkin sayfanın grubu açık; kullanıcı tercihi ("o-<grup>" = açık) hatırlanır.
+    const expanded = !section.title || hasActive || closed.includes(`o-${section.id}`);
     return (
       <div key={section.id}>
         {section.title ? (
           <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
             <button
               type="button"
-              onClick={() => toggle(section.id)}
+              onClick={() => toggle(`o-${section.id}`)}
               disabled={hasActive}
               aria-expanded={expanded}
               aria-controls={`adm-${section.id}`}
@@ -180,25 +142,6 @@ export function AdminSidebar({
         {expanded ? (
           <div id={`adm-${section.id}`} className="space-y-0.5">
             {items.map((i) => renderItem(i, { group: section.id }))}
-            {folded.length > 0 ? (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => toggle(foldId)}
-                  aria-expanded={foldOpen}
-                  aria-controls={`adm-${foldId}`}
-                  className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] px-3 text-left text-xs font-medium text-white/60 transition-colors hover:bg-white/6 hover:text-white"
-                >
-                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${foldOpen ? "" : "-rotate-90"}`} aria-hidden />
-                  <span className="min-w-0 truncate">{foldOpen ? "Daha az göster" : `+${folded.length} daha`}</span>
-                </button>
-                {foldOpen ? (
-                  <div id={`adm-${foldId}`} className="space-y-0.5">
-                    {folded.map((i) => renderItem(i, { group: foldId }))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -241,6 +184,30 @@ export function AdminSidebar({
             }}
           />
           {groups.map(renderGroup)}
+          {other.length > 0 ? (
+            <div>
+              <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
+                <button
+                  type="button"
+                  onClick={() => toggle("diger-acik")}
+                  disabled={otherHasActive}
+                  aria-expanded={otherOpen}
+                  aria-controls="adm-diger"
+                  className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
+                >
+                  <span className="shrink-0">Diğer</span>
+                  <span className="h-px flex-1 bg-white/10" aria-hidden />
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${otherOpen ? "" : "-rotate-90"}`} aria-hidden />
+                  <span className="sr-only">{otherOpen ? "bölümü daralt" : "bölümü aç"}</span>
+                </button>
+              </div>
+              {otherOpen ? (
+                <div id="adm-diger" className="space-y-0.5">
+                  {other.map((i) => renderItem(i, { group: "diger" }))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {/* İkon modu: her öğe ikon + hover/odakta alt sayfalar ve ipucu (erişilebilir flyout) */}
