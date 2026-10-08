@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { notifyTenant } from "@/lib/notify";
@@ -68,6 +69,7 @@ export async function createVitrinPriceAlert(input: PriceAlertInput): Promise<Pr
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
     .is("deleted_at", null)
+    .or(OPEN_LISTING_OR_FILTER)
     .maybeSingle();
   if (!property) return { ok: false, error: "İlan bulunamadı." };
   const price = property.list_price != null ? Number(property.list_price) : null;

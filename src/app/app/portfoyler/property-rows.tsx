@@ -28,6 +28,8 @@ export type PropertyVM = {
   portalsTotal: number;
   createdLabel: string;
   isNew: boolean;
+  /** Kapalı (gizli) portföy: vitrin/portal yayınında yok, yalnız ofis içi. */
+  isClosed: boolean;
   compareItem: CompareItem;
 };
 
@@ -97,6 +99,7 @@ export function PropertyTable({
                       <p className="flex items-center gap-1.5 font-semibold text-text">
                         <span className="max-w-[16rem] truncate">{p.title}</span>
                         {p.isNew ? <StatusPill tone="success" dot={false}>Yeni</StatusPill> : null}
+                        {p.isClosed ? <StatusPill tone="warning" dot={false}>Kapalı portföy</StatusPill> : null}
                       </p>
                       <p className="mt-0.5 truncate text-xs text-text-muted">
                         <span className="numeric font-medium">{p.code}</span>

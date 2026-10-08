@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { publishBlockReason } from "@/lib/property-owner/server";
+import { closedListingBlock } from "@/lib/closed-listing-guard";
 import {
   publishToPortal,
   updateOnPortal,
@@ -182,6 +183,8 @@ export async function publishPropertyToPortal(
   if (!property) return { error: "Portföy bulunamadı." };
 
   // Yayın kapısı: havuzda bekleyen veya eksik ilan sahibi bilgisi olan ilan portala gönderilemez.
+  const closedBlock = await closedListingBlock(supabase, gate.tenantId, propertyId);
+  if (closedBlock) return { error: closedBlock };
   const blocked = await publishBlockReason(supabase, gate.tenantId, propertyId);
   if (blocked) return { error: blocked };
 

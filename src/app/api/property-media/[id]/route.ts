@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isClosedListing } from "@/lib/closed-listing";
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,19 +17,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     file_name: string | null;
     is_document?: boolean | null;
     property:
-      | { status: string | null; deleted_at: string | null; tenant_id: string }
-      | { status: string | null; deleted_at: string | null; tenant_id: string }[]
+      | { status: string | null; deleted_at: string | null; tenant_id: string; features?: unknown }
+      | { status: string | null; deleted_at: string | null; tenant_id: string; features?: unknown }[]
       | null;
   };
   // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
   const { data: media } = await selectWithDocumentFlag<MediaRow>(
-    "kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id)",
+    "kind, storage_path, file_type, file_name, property:properties!property_media_property_id_fkey(status, deleted_at, tenant_id, features)",
     (columns) => admin.from("property_media").select(columns).eq("id", id).eq("kind", "image").maybeSingle(),
   );
 
   // Yalnızca herkese açık listelenen (taslak/silinmiş olmayan) portföylerin görselleri servis edilir
   const prop = media && (Array.isArray(media.property) ? media.property[0] : media.property);
-  let isPublic = Boolean(prop && !prop.deleted_at && prop.status === "live");
+  // Kapalı portföyün görselleri public uçtan servis edilmez.
+  let isPublic = Boolean(prop && !prop.deleted_at && prop.status === "live" && !isClosedListing(prop.features));
   if (isPublic && prop) {
     const { data: tenant, error: tenantError } = await admin
       .from("tenants")
