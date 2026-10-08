@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { BudgetForm, BudgetRemoveButton } from "./budget-form";
+import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
 import { BUDGET_WARN_RATIO } from "@/lib/finance/expense-budget";
 import { RECURRENCE_LABEL, monthlyEquivalent, renewalInfo } from "@/lib/finance/recurring-expenses";
@@ -32,11 +33,14 @@ function PendingNote({ what }: { what: string }) {
  */
 export async function FinancePanel({
   tenantId,
+  userId,
   canEdit,
   categories,
   showEarnings,
 }: {
   tenantId: string;
+  /** Önbellek anahtarı (ofis + kullanıcı): RLS kapsamı başka kullanıcıya sızmaz. */
+  userId: string;
   canEdit: boolean;
   categories: readonly Category[];
   /** Komisyon tutarları ofis geneli kazançtır: yalnız tüm kazancı görenlere. */
@@ -47,7 +51,8 @@ export async function FinancePanel({
   const [budget, recurring, portal] = await Promise.all([
     loadBudgetContext(supabase, tenantId, nowMs).catch(() => null),
     loadRecurringSeries(supabase, tenantId, nowMs).catch(() => null),
-    loadPortalRoi(supabase, tenantId, nowMs).catch(() => null),
+    // Portal getirisi en ağır okuma (5 tablo, 13 ay): 2 dk önbellek; gider/anlaşma/portföy yazmaları etiketi düşürür.
+    cachedTenantAggregate("portal-roi", { tenantId, userId }, () => loadPortalRoi(supabase, tenantId, nowMs), 120).catch(() => null),
   ]);
   const catLabel = (v: string) => categories.find((c) => c.value === v)?.label ?? v;
   const monthLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(new Date(nowMs));

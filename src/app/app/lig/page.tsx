@@ -1,4 +1,5 @@
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle, Award, Building2, CalendarCheck2, CalendarClock, ChevronLeft, ChevronRight, Crown, Flame,
@@ -157,34 +158,37 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
 
   const supabase = await createClient();
 
-  // Şube kapsamı: ofiste birden çok şube varsa "kapsam" seçici görünür.
-  const { data: branchRows } = await supabase
-    .from("branches").select("id, name").eq("tenant_id", tenantId).eq("is_active", true).limit(50);
-  const branches = branchRows ?? [];
+  // Şube kapsamı: ofiste birden çok şube varsa "kapsam" seçici görünür. Şube listesi ile ayarlar bağımsız: tek turda.
+  const [branchRes, settings] = await Promise.all([
+    supabase.from("branches").select("id, name").eq("tenant_id", tenantId).eq("is_active", true).limit(50),
+    loadLeagueSettings(supabase, tenantId),
+  ]);
+  assertQueryBatchSucceeded([branchRes], ["lig-subeler"], "Lig");
+  const branches = branchRes.data ?? [];
   const branchId = branches.some((b) => String(b.id) === sp.kapsam) ? sp.kapsam! : null;
 
-  const settings = await loadLeagueSettings(supabase, tenantId);
-  const league = await loadLeagueData(supabase, { period, tenantId, branchId, todayIso, nowMs, settings });
+  const showAmounts = settings.showAmounts && !tvMode && range.kind === "month";
+  const wantsPrev = !tvMode && sekme === "siralama";
+  const badgeMonth = range.kind === "week" ? periodOf(new Date(nowMs)) : period;
 
   // Tutar sütunu (P12): YALNIZ ofis yöneticisi "tutar bazlı sıralamayı aç" dediyse sorgulanır. Kapalıyken ligde
   // hiçbir ciro/komisyon verisi okunmaz ve çizilmez. Açıkken de değerler kişinin kazanç görme yetkisine tabidir.
-  const showAmounts = settings.showAmounts && !tvMode && range.kind === "month";
-  const metricsById = new Map<string, { dealCount: number; revenue: number | null }>();
-  if (showAmounts) {
-    const [py, pm] = period.split("-").map(Number);
-    const metrics = await loadAdvisorMetrics(supabase, {
-      viewer: { userId, role, perms },
-      tenantId,
-      period: trMonthPeriod(py, pm - 1),
-      nowMs,
-    });
-    for (const m of metrics.rows) metricsById.set(m.id, { dealCount: m.dealCount, revenue: m.revenue });
-  }
+  const metricsP = (async () => {
+    if (showAmounts) {
+      const [py, pm] = period.split("-").map(Number);
+      return await loadAdvisorMetrics(supabase, {
+        viewer: { userId, role, perms },
+        tenantId,
+        period: trMonthPeriod(py, pm - 1),
+        nowMs,
+      });
+    }
+    return null;
+  })();
 
   // Kazanılmış rozetler (DB) — dönemsel rozetler AYA yazılır (haftalık görünümde içinde bulunulan ay),
   // ömür boyu rozetler period IS NULL satırına düşer. `or` ile tek sorguda.
-  const badgeMonth = range.kind === "week" ? periodOf(new Date(nowMs)) : period;
-  const { data: badgeRows } = await fetchAllRows((from, to) =>
+  const badgesP = fetchAllRows((from, to) =>
     supabase
       .from("agent_badges")
       .select("staff_id, badge_code, earned_at, period")
@@ -193,6 +197,55 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
       .order("id", { ascending: true })
       .range(from, to),
   );
+
+  // ── Önceki döneme göre sıra değişimi ────────────────────────────────────
+  // Aylıkta mühürlü `agent_score_snapshots` (cron lig-snapshot) kullanılır; mühür yoksa (hafta, ya da ay kapanışı
+  // henüz mühürlenmemiş, ya da şube kapsamı) önceki dönem aynı hesapla CANLI sıralanır.
+  const prevRankP = (async () => {
+    const out = new Map<string, number>();
+    if (!wantsPrev) return out;
+    if (range.kind === "month" && branchId === null) {
+      const { data: prevSnaps } = await supabase
+        .from("agent_score_snapshots")
+        .select("staff_id, rank")
+        .eq("tenant_id", tenantId)
+        .eq("period", previousPeriod(period));
+      for (const s of prevSnaps ?? []) {
+        if (s.rank != null) out.set(String(s.staff_id), Number(s.rank));
+      }
+    }
+    if (out.size === 0) {
+      const prev = await loadLeagueData(supabase, {
+        period: previousLeaguePeriod(period, nowMs), tenantId, branchId, todayIso, nowMs, settings,
+      });
+      for (const r of prev.ranked) if (r.total > 0) out.set(r.staffId, r.rank);
+    }
+    return out;
+  })();
+
+  // Bu dönemin lig verisi + yukarıdaki bağımsız okumalar BİRLİKTE (eskiden ~6 ardışık tur).
+  const [league, metrics, badgeRes, prevRankByStaff] = await Promise.all([
+    loadLeagueData(supabase, { period, tenantId, branchId, todayIso, nowMs, settings }),
+    metricsP,
+    badgesP,
+    prevRankP,
+  ]);
+
+  assertQueryBatchSucceeded([badgeRes], ["lig-rozetler"], "Lig");
+  const badgeRows = badgeRes.data;
+
+  const metricsById = new Map<string, { dealCount: number; revenue: number | null }>();
+  if (metrics) for (const m of metrics.rows) metricsById.set(m.id, { dealCount: m.dealCount, revenue: m.revenue });
+
+  // Meydan okuma panosu yalnız o sekmede ve (kısa şerit için) sıralama sekmesinde okunur. Avatarlar ve pano lig verisinden
+  // sonra gelir ama birbirinden bağımsız: birlikte.
+  const agentIds = new Set(league.agents.map((a) => a.id));
+  const [challengeCards, avatars] = await Promise.all([
+    sekme !== "kurallar"
+      ? loadChallengeBoard(supabase, { tenantId, agentIds, includeSample: league.includeSample, nowMs })
+      : Promise.resolve([]),
+    loadAvatarMap(league.ranked.map((r) => r.staffId)),
+  ]);
 
   /** staffId → (badgeCode → kazanma tarihi) */
   const earnedDb = new Map<string, Map<string, string>>();
@@ -203,28 +256,6 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
     earnedDb.set(sid, m);
   }
 
-  // ── Önceki döneme göre sıra değişimi ────────────────────────────────────
-  // Aylıkta mühürlü `agent_score_snapshots` (cron lig-snapshot) kullanılır; mühür yoksa (hafta, ya da ay kapanışı
-  // henüz mühürlenmemiş, ya da şube kapsamı) önceki dönem aynı hesapla CANLI sıralanır.
-  const prevRankByStaff = new Map<string, number>();
-  if (!tvMode && sekme === "siralama") {
-    if (range.kind === "month" && branchId === null) {
-      const { data: prevSnaps } = await supabase
-        .from("agent_score_snapshots")
-        .select("staff_id, rank")
-        .eq("tenant_id", tenantId)
-        .eq("period", previousPeriod(period));
-      for (const s of prevSnaps ?? []) {
-        if (s.rank != null) prevRankByStaff.set(String(s.staff_id), Number(s.rank));
-      }
-    }
-    if (prevRankByStaff.size === 0) {
-      const prev = await loadLeagueData(supabase, {
-        period: previousLeaguePeriod(period, nowMs), tenantId, branchId, todayIso, nowMs, settings,
-      });
-      for (const r of prev.ranked) if (r.total > 0) prevRankByStaff.set(r.staffId, r.rank);
-    }
-  }
   const hasPrevRanks = prevRankByStaff.size > 0;
 
   const agentById = new Map(league.agents.map((a) => [a.id, a]));
@@ -262,7 +293,6 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
     rows = [...rows].sort((a, b) => (metricsById.get(b.staffId)?.revenue ?? -1) - (metricsById.get(a.staffId)?.revenue ?? -1));
   }
   // Profil fotoğrafı / hazır avatar (ayrı, hata-toleranslı tek sorgu; yoksa baş harf).
-  const avatars = await loadAvatarMap(rows.map((r) => r.staffId));
   const hasActivity = rows.some((r) => r.total > 0);
   const podium = rows.filter((r) => r.total > 0 && !sortByAmount).slice(0, 3);
 
@@ -386,11 +416,6 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
     { value: "kurallar", label: "Puan kuralları", href: linkFor(period, "&sekme=kurallar") },
   ];
 
-  // Meydan okuma panosu yalnız o sekmede ve (kısa şerit için) sıralama sekmesinde okunur.
-  const agentIds = new Set(league.agents.map((a) => a.id));
-  const challengeCards = sekme !== "kurallar"
-    ? await loadChallengeBoard(supabase, { tenantId, agentIds, includeSample: league.includeSample, nowMs })
-    : [];
   const liveChallenges = challengeCards.filter((c) => c.state === "live");
   const nameById = new Map(league.agents.map((a) => [a.id, a.fullName]));
 

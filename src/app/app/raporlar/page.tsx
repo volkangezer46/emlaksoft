@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SkeletonCard } from "@/components/ui/viz";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import { ReportCenter } from "@/components/report-center/report-center";
@@ -85,7 +87,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     return (
       <div className="space-y-5">
         <ReportTabs scope="tenant" active="merkez" overviewLabel="Ofis sağlık & performans" />
-        <ReportCenter scope="tenant" params={sp} />
+        {/* Sekmeler anında gelir; katalog/önizleme akıtılır (sabit yükseklikli iskelet, düzen kaymaz). */}
+        <Suspense fallback={<SkeletonCard height={480} label="Rapor merkezi yükleniyor" />}>
+          <ReportCenter scope="tenant" params={sp} />
+        </Suspense>
       </div>
     );
   }

@@ -184,8 +184,9 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
   const startMs = Date.parse(`${windowStart}T00:00:00+03:00`);
   const startIso = new Date(startMs).toISOString();
 
+  // 2-4) Talepler, kazanılan anlaşmalar ve portal ilanları birbirinden bağımsız: TEK turda (eskiden art arda 3+ tur).
   // 2) Pencerede gelen talepler (müşteri kaydı; kaynak = portal_<anahtar>).
-  const leadRes = await fetchAllRowsKeepError<{ lead_source: string | null }, { message: string; code?: string }>((from, to) =>
+  const leadResP = fetchAllRowsKeepError<{ lead_source: string | null }, { message: string; code?: string }>((from, to) =>
     db
       .from("customers")
       .select("id, lead_source")
@@ -197,15 +198,8 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
       .order("id", { ascending: true })
       .range(from, to),
   );
-  if (leadRes.error) throw new Error(`customers(portal): ${leadRes.error.code ?? "hata"}`);
-  const leads: Partial<Record<PortalKey, number>> = {};
-  for (const l of leadRes.data) {
-    const key = portalKeyFromLeadSource(l.lead_source);
-    if (key) leads[key] = (leads[key] ?? 0) + 1;
-  }
-
   // 3) Pencerede kazanılan anlaşmalar (müşterisi portal kaynaklı) + komisyonları.
-  const dealRes = await fetchAllRowsKeepError<{ id: string; customer: Rel<{ lead_source: string | null }> }, { message: string; code?: string }>((from, to) =>
+  const dealResP = fetchAllRowsKeepError<{ id: string; customer: Rel<{ lead_source: string | null }> }, { message: string; code?: string }>((from, to) =>
     db
       .from("deals")
       .select("id, customer:customers!deals_customer_id_fkey!inner(lead_source)")
@@ -217,6 +211,27 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
       .order("id", { ascending: true })
       .range(from, to),
   );
+  // 4) Portal ilanları: şu an yayında olanlar ve pencerede yayına girenler.
+  const listingResP = fetchAllRowsKeepError<
+    { portal_name: string | null; status: string; published_at: string | null; created_at: string },
+    { message: string; code?: string }
+  >((from, to) =>
+    db
+      .from("portal_listings")
+      .select("id, portal_name, status, published_at, created_at")
+      .eq("tenant_id", tenantId)
+      .or(`status.eq.live,published_at.gte.${startIso},created_at.gte.${startIso}`)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  const [leadRes, dealRes, listingRes] = await Promise.all([leadResP, dealResP, listingResP]);
+  if (leadRes.error) throw new Error(`customers(portal): ${leadRes.error.code ?? "hata"}`);
+  const leads: Partial<Record<PortalKey, number>> = {};
+  for (const l of leadRes.data) {
+    const key = portalKeyFromLeadSource(l.lead_source);
+    if (key) leads[key] = (leads[key] ?? 0) + 1;
+  }
+
   if (dealRes.error) throw new Error(`deals(portal): ${dealRes.error.code ?? "hata"}`);
   const dealKey = new Map<string, PortalKey>();
   for (const d of dealRes.data) {
@@ -225,18 +240,23 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
   }
   const won: Partial<Record<PortalKey, { deals: number; commission: number }>> = {};
   const dealIds = [...dealKey.keys()];
-  for (let i = 0; i < dealIds.length; i += 200) {
-    const part = dealIds.slice(i, i + 200);
-    const commRes = await fetchAllRowsKeepError<{ deal_id: string; gross_amount: number | string; status: string }, { message: string; code?: string }>((from, to) =>
-      db
-        .from("commissions")
-        .select("id, deal_id, gross_amount, status")
-        .eq("tenant_id", tenantId)
-        .eq("is_sample", false)
-        .in("deal_id", part)
-        .order("id", { ascending: true })
-        .range(from, to),
-    );
+  const chunks: string[][] = [];
+  for (let i = 0; i < dealIds.length; i += 200) chunks.push(dealIds.slice(i, i + 200));
+  const commResults = await Promise.all(
+    chunks.map((part) =>
+      fetchAllRowsKeepError<{ deal_id: string; gross_amount: number | string; status: string }, { message: string; code?: string }>((from, to) =>
+        db
+          .from("commissions")
+          .select("id, deal_id, gross_amount, status")
+          .eq("tenant_id", tenantId)
+          .eq("is_sample", false)
+          .in("deal_id", part)
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
+    ),
+  );
+  for (const commRes of commResults) {
     if (commRes.error) throw new Error(`commissions(portal): ${commRes.error.code ?? "hata"}`);
     for (const c of commRes.data) {
       if (c.status === "cancelled") continue;
@@ -253,19 +273,6 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
     won[key] = cur;
   }
 
-  // 4) Portal ilanları: şu an yayında olanlar ve pencerede yayına girenler.
-  const listingRes = await fetchAllRowsKeepError<
-    { portal_name: string | null; status: string; published_at: string | null; created_at: string },
-    { message: string; code?: string }
-  >((from, to) =>
-    db
-      .from("portal_listings")
-      .select("id, portal_name, status, published_at, created_at")
-      .eq("tenant_id", tenantId)
-      .or(`status.eq.live,published_at.gte.${startIso},created_at.gte.${startIso}`)
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
   if (listingRes.error) throw new Error(`portal_listings(roi): ${listingRes.error.code ?? "hata"}`);
   const liveListings: Partial<Record<PortalKey, number>> = {};
   const listingsInWindow: Partial<Record<PortalKey, number>> = {};

@@ -1,80 +1,35 @@
 import Link from "@/components/ui/smart-link";
 import { Users } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { loadOfficeProfitData } from "@/lib/finance/office-profit-data";
 import { formatTry } from "@/lib/format";
 import { computeAdvisorProfitability, type AdvisorCommission, type AdvisorExpense, type AdvisorSplit } from "@/lib/finance/advisor-profitability";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
-type Rel<T> = T | T[] | null;
-const one = <T,>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
-
 /**
  * Danışman kârlılığı: danışman başına ofiste kalan komisyon (brüt − KDV − dış paylar) ↔ doğrudan maliyet (danışmanın
  * portföylerine bağlı giderler). YALNIZ ofis sahibi / genel müdür (kazanç gizliliği P12); çağıran sayfa rol kapısını uygular.
  * Veri yoksa kart yok. Yöntem: `src/lib/finance/advisor-profitability.ts`.
  */
-export async function AdvisorProfitCard({ tenantId, firstMonthKey }: { tenantId: string; firstMonthKey: string }) {
-  const supabase = await createClient();
-  const startIso = `${firstMonthKey}-01T00:00:00+03:00`;
-
-  const [commRes, expRes] = await Promise.all([
-    fetchAllRows<{ id: string; gross_amount: number | string; vat_amount: number | string | null; status: string; deal: Rel<{ assigned_to: string | null }> }>((from, to) =>
-      supabase
-        .from("commissions")
-        .select("id, gross_amount, vat_amount, status, deal:deals!commissions_deal_id_fkey(assigned_to)")
-        .eq("tenant_id", tenantId)
-        .eq("is_sample", false)
-        .gte("created_at", startIso)
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
-    fetchAllRows<{ amount: number | string; property: Rel<{ assigned_to: string | null }> }>((from, to) =>
-      supabase
-        .from("expenses")
-        .select("id, amount, property:properties!expenses_property_id_fkey(assigned_to)")
-        .eq("tenant_id", tenantId)
-        .eq("is_sample", false)
-        .gte("expense_date", `${firstMonthKey}-01`)
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
-  ]);
+export async function AdvisorProfitCard({ tenantId, userId, firstMonthKey }: { tenantId: string; userId: string; firstMonthKey: string }) {
+  // Sayfayla AYNI okuma (istek içi cache + kısa TTL ofis önbelleği): tablolar ikinci kez sorgulanmaz.
   // Eksik veriyle net hesaplanmaz: okuma hatasında kart gizlenir.
-  if (commRes.error || expRes.error) return null;
+  const data = await loadOfficeProfitData(tenantId, userId, firstMonthKey).catch(() => null);
+  if (!data) return null;
 
   const commissions: AdvisorCommission[] = [];
-  for (const c of commRes.data) {
-    const advisorId = one(c.deal)?.assigned_to;
-    if (!advisorId) continue;
-    commissions.push({ commissionId: c.id, advisorId, gross: Number(c.gross_amount) || 0, vat: Number(c.vat_amount) || 0, status: c.status });
+  for (const c of data.commissions) {
+    if (!c.advisorId) continue;
+    commissions.push({ commissionId: c.id, advisorId: c.advisorId, gross: c.gross, vat: c.vat, status: c.status });
   }
-
-  const splits: AdvisorSplit[] = [];
-  const ids = commissions.map((c) => c.commissionId);
-  for (let i = 0; i < ids.length; i += 200) {
-    const part = ids.slice(i, i + 200);
-    const res = await fetchAllRows<{ commission_id: string; kind: string; amount: number | string }>((from, to) =>
-      supabase
-        .from("commission_splits")
-        .select("id, commission_id, kind, amount")
-        .eq("tenant_id", tenantId)
-        .in("commission_id", part)
-        .order("id", { ascending: true })
-        .range(from, to),
-    );
-    if (res.error) return null;
-    for (const s of res.data) splits.push({ commissionId: s.commission_id, kind: s.kind, amount: Number(s.amount) || 0 });
-  }
-
-  const expenses: AdvisorExpense[] = expRes.data.map((e) => ({ advisorId: one(e.property)?.assigned_to ?? null, amount: Number(e.amount) || 0 }));
+  const advised = new Set(commissions.map((c) => c.commissionId));
+  const splits: AdvisorSplit[] = data.splits.filter((s) => advised.has(s.commissionId));
+  const expenses: AdvisorExpense[] = data.expenses.map((e) => ({ advisorId: e.advisorId, amount: e.amount }));
 
   const advisorIds = [...new Set([...commissions.map((c) => c.advisorId), ...expenses.map((e) => e.advisorId).filter((x): x is string => Boolean(x))])];
   if (advisorIds.length === 0) return null;
-  const { data: profiles } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", tenantId).in("id", advisorIds.slice(0, 200));
-  const names = new Map(((profiles ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name ?? "Danışman"]));
+  const names = new Map(Object.entries(data.advisorNames));
 
   const result = computeAdvisorProfitability(commissions, splits, expenses, names);
   if (result.rows.length === 0) return null;

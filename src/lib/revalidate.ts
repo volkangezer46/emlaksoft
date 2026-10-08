@@ -1,6 +1,7 @@
 import "server-only";
 import { revalidatePath, updateTag } from "next/cache";
 import { invalidateReportsCache, reportsCacheTag } from "@/lib/reporting/cache";
+import { invalidateTenantAggregates, tenantAggregateTag } from "@/lib/cache/tenant-aggregate";
 
 /**
  * Yazma action'ları için tek giriş: path'leri tazeler ve tenant'ın rapor cache'ini düşürür.
@@ -20,5 +21,11 @@ export function revalidateTenantData(tenantId: string | null | undefined, paths:
     updateTag(reportsCacheTag(tenantId));
   } catch {
     invalidateReportsCache(tenantId);
+  }
+  // Ofis agregaları (portal ROI, indirim analizi, ilan sağlığı, danışman kârlılığı...): aynı yazmada hemen düşer.
+  try {
+    updateTag(tenantAggregateTag(tenantId));
+  } catch {
+    invalidateTenantAggregates(tenantId);
   }
 }

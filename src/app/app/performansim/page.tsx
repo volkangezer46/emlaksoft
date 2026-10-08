@@ -81,7 +81,10 @@ export default async function PerformansimPage({
       <Suspense fallback={null}>
         <CoachInsightSlot tenantId={auth.tenantId} userId={auth.userId} role={auth.role} perms={auth.perms} />
       </Suspense>
-      <AdvisorDetailView memberId={auth.userId} basePath="/app/performansim" searchParams={sp ?? {}} auth={auth} headingAs="h2" />
+      {/* Danışman 360 gövdesi en ağır blok: kabuk + hero + hedef anında gelir, bu kısım akıtılır (sabit yükseklikli iskelet). */}
+      <Suspense fallback={<SkeletonCard height={520} label="Danışman karnesi yükleniyor" />}>
+        <AdvisorDetailView memberId={auth.userId} basePath="/app/performansim" searchParams={sp ?? {}} auth={auth} headingAs="h2" />
+      </Suspense>
     </div>
   );
 }

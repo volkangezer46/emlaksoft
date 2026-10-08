@@ -2,6 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { BadgePercent } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { getSettings } from "@/lib/settings/read";
 import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 import { loadApprovalRules } from "@/lib/oversight/store";
@@ -26,42 +27,55 @@ const one = <T,>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v)
  * ofis standart oranının altındaysa fark "indirimle kaçan gelir"dir. Danışman kırılımı yalnız ofis sahibi/genel müdüre görünür.
  * Yalnız tüm kazancı görenlere render edilir (çağıran sayfa kapıyı uygular). Yöntem: `src/lib/finance/commission-leakage.ts`.
  */
-export async function DiscountAnalysisCard({ tenantId, showAdvisors }: { tenantId: string; showAdvisors: boolean }) {
+export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: { tenantId: string; userId: string; showAdvisors: boolean }) {
   const supabase = await createClient();
   const nowMs = now();
   const months = lastMonthKeys(trMonthKey(nowMs), 6);
   const startIso = `${months[0]}-01T00:00:00+03:00`;
 
-  const [dealsRes, settings, rules] = await Promise.all([
-    fetchAllRows<{
-      id: string;
-      deal_value: number | string | null;
-      assigned_to: string | null;
-      updated_at: string;
-      property: Rel<{ id: string; property_code: string | null; title: string | null; commission_rate: number | string | null }>;
-    }>((from, to) =>
-      supabase
-        .from("deals")
-        .select("id, deal_value, assigned_to, updated_at, property:properties!deals_property_id_fkey(id, property_code, title, commission_rate)")
-        .eq("tenant_id", tenantId)
-        .eq("stage", "won")
-        .eq("deal_type", "sale")
-        .eq("is_sample", false)
-        .gte("updated_at", startIso)
-        .order("id", { ascending: true })
-        .range(from, to),
-    ),
+  // Ayar/kural okumaları oturum çerezi kullanır (önbelleğin DIŞINDA); ağır kısım (6 aylık satışlar + danışman adları) kısa
+  // TTL'li ofis önbelleğinde: anahtar ofis + kullanıcı + kırılım kapsamı, anlaşma yazmaları etiketi düşürür.
+  const [salesData, settings, rules] = await Promise.all([
+    cachedTenantAggregate(
+      "commission-discount",
+      { tenantId, userId, scope: showAdvisors ? "adv" : "all" },
+      async () => {
+        const dealsRes = await fetchAllRows<{
+          id: string;
+          deal_value: number | string | null;
+          assigned_to: string | null;
+          updated_at: string;
+          property: Rel<{ id: string; property_code: string | null; title: string | null; commission_rate: number | string | null }>;
+        }>((from, to) =>
+          supabase
+            .from("deals")
+            .select("id, deal_value, assigned_to, updated_at, property:properties!deals_property_id_fkey(id, property_code, title, commission_rate)")
+            .eq("tenant_id", tenantId)
+            .eq("stage", "won")
+            .eq("deal_type", "sale")
+            .eq("is_sample", false)
+            .gte("updated_at", startIso)
+            .order("id", { ascending: true })
+            .range(from, to),
+        );
+        // Hata önbelleğe yazılmasın: fırlat, aşağıda yakalanıp kart gizlenir.
+        if (dealsRes.error) throw new Error("commission-discount: deals");
+        const advisorIds = [...new Set(dealsRes.data.map((d) => d.assigned_to).filter((x): x is string => Boolean(x)))];
+        const names: Record<string, string> = {};
+        if (showAdvisors && advisorIds.length > 0) {
+          const { data } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", tenantId).in("id", advisorIds.slice(0, 200));
+          for (const p of (data ?? []) as { id: string; full_name: string | null }[]) names[p.id] = p.full_name ?? "Danışman";
+        }
+        return { deals: dealsRes.data, names };
+      },
+      120,
+    ).catch(() => null),
     getSettings(["office.commission.default_rate"], { tenantId }),
     loadApprovalRules(supabase, tenantId).catch(() => defaultApprovalRules()),
   ]);
-  if (dealsRes.error) return null;
-
-  const advisorIds = [...new Set(dealsRes.data.map((d) => d.assigned_to).filter((x): x is string => Boolean(x)))];
-  const names = new Map<string, string>();
-  if (showAdvisors && advisorIds.length > 0) {
-    const { data } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", tenantId).in("id", advisorIds.slice(0, 200));
-    for (const p of (data ?? []) as { id: string; full_name: string | null }[]) names.set(p.id, p.full_name ?? "Danışman");
-  }
+  if (!salesData) return null;
+  const names = new Map(Object.entries(salesData.names));
+  const dealsRes = { data: salesData.deals };
 
   const standardRate = Number(settings["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
   const sales: WonSaleFact[] = dealsRes.data.map((d) => {

@@ -29,6 +29,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/billing/plan-support.ts": { calls: 1, scope: "platform", why: "şema yetenek yoklaması" },
   "src/lib/billing/seat-purchase.ts": { calls: 1, scope: "platform", why: "şema yetenek yoklaması" },
   "src/lib/brand/store.ts": { calls: 2, scope: "platform", why: "platform markası" },
+  "src/lib/cache/tenant-aggregate.ts": { calls: 1, scope: "tenant", why: "ofis agregaları; anahtar tenantId + userId + kapsam, yük RLS'li oturum istemcisiyle kapanışta (admin client yok)" },
   "src/lib/definitions.ts": { calls: 1, scope: "tenant", why: "tanımlar; anahtar scope = tenantId ?? global" },
   "src/lib/ef-credits/credit-reader.ts": { calls: 2, scope: "platform", why: "EF hazır bayrağı + katalog" },
   "src/lib/ef-credits/public-state.ts": { calls: 1, scope: "platform", why: "EF genel durum" },

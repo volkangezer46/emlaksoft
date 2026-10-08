@@ -162,8 +162,10 @@ export default async function AdminTenantDetailPage({
 
   if (active === "yonetim") {
     const can = officeAdminCanMap(staff.role);
-    const mgmt = await loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note });
-    const moduleState = await loadTenantModuleState(admin, id);
+    const [mgmt, moduleState] = await Promise.all([
+      loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note }),
+      loadTenantModuleState(admin, id),
+    ]);
     content = (
       <>
       <OfficeManagement
@@ -244,7 +246,7 @@ export default async function AdminTenantDetailPage({
       );
     }
   } else if (active === "abonelik") {
-    const [{ data: invoices }, { data: captures }] = await Promise.all([
+    const [{ data: invoices }, { data: captures }, seatInfo, creditData] = await Promise.all([
       admin
         .from("invoices")
         .select("id, invoice_no, status, total_try, due_at, paid_at, created_at")
@@ -257,10 +259,11 @@ export default async function AdminTenantDetailPage({
         .eq("tenant_id", id)
         .order("captured_at", { ascending: false })
         .limit(60),
+      // Koltuk bilgisi ve (yalnız süper admin için) hesap kredisi faturalarla birlikte, tek turda.
+      loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats),
+      // Hesap kredisi yalnız süper admin: bakiye (RPC), son hareketler ve geri alma seçimi (aynı admin istemcisi).
+      staff.role === "super_admin" ? loadCreditData(admin, id) : Promise.resolve(null),
     ]);
-    const seatInfo = await loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats);
-    // Hesap kredisi yalnız süper admin: bakiye (RPC), son hareketler ve geri alma seçimi (aynı admin istemcisi).
-    const creditData = staff.role === "super_admin" ? await loadCreditData(admin, id) : null;
     content = (
       <div className="space-y-6">
         {access.billing ? (

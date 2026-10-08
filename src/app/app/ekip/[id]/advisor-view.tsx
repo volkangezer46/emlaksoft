@@ -81,22 +81,22 @@ export async function AdvisorDetailView({
   const showEarnings = canSeeEarningsOf(perms, userId, id);
   const supabase = await createClient();
 
-  const { data: member } = await supabase
-    .from("profiles")
-    .select("id, full_name, phone, title, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)")
-    .eq("id", id)
-    .maybeSingle();
-  if (!member) notFound();
-
-  const memberAvatar = (await loadAvatarMap([id], supabase)).get(id);
   const nowMs = now();
   const year = trMonthContext(nowMs).monthKey.slice(0, 4);
   const yearPeriod = trYearPeriod(Number(year));
   const viewer = { userId, role, perms };
 
+  // Tek tur: üye satırı, avatar, aylık sayılar + gelir, yıllık komisyon, çalışma profili ve şema yoklamaları birbirine
+  // bağlı DEĞİL (eskiden 4 ardışık tur). Üye görünmüyorsa (RLS/yanlış id) notFound() hiçbir şey çizmeden keser.
   // Aylık sayılar + gelir: tek kaynak. Yıllık komisyon satırları yalnız kazancı görme hakkı varsa çekilir
   // (başkasının kazancı sunucudan bile çıkmaz; kapı fetchCommissionRows içindedir).
-  const [month, commissionRes] = await Promise.all([
+  const [{ data: member }, avatarMap, month, commissionRes, workRes, specialtyReady, privateReady] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, phone, title, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)")
+      .eq("id", id)
+      .maybeSingle(),
+    loadAvatarMap([id], supabase),
     loadMemberMonth(supabase, { viewer, tenantId, id, nowMs }),
     showEarnings
       ? fetchCommissionRows<CommissionRow>(supabase, {
@@ -107,7 +107,13 @@ export async function AdvisorDetailView({
           endIso: yearPeriod.endIso,
         })
       : Promise.resolve({ rows: [] as CommissionRow[], error: false, partial: false }),
+    // Danışman profili (migration 20260816001300/001400) uygulanmamışsa ilgili sekmeler gizlenir (sıfır hata, mevcut sekmeler aynen).
+    tenantId ? loadWorkProfile(supabase, tenantId, id) : Promise.resolve({ available: false as const, data: null }),
+    tenantId ? probeAdvisorSpecialtySchema(supabase) : Promise.resolve(false),
+    tenantId ? probeAdvisorPrivateSchema(supabase) : Promise.resolve(false),
   ]);
+  if (!member) notFound();
+  const memberAvatar = avatarMap.get(id);
   const commissions = commissionRes.rows;
   const monthCollected = month.revenue.cur ?? 0;
 
@@ -118,13 +124,7 @@ export async function AdvisorDetailView({
     member.role !== "owner" &&
     canManageRole(role, member.role);
 
-  // Danışman profili (migration 20260816001300/001400) uygulanmamışsa ilgili sekmeler gizlenir (sıfır hata, mevcut sekmeler aynen).
   const todayKey = trDayKey(nowMs);
-  const [workRes, specialtyReady, privateReady] = await Promise.all([
-    tenantId ? loadWorkProfile(supabase, tenantId, id) : Promise.resolve({ available: false as const, data: null }),
-    tenantId ? probeAdvisorSpecialtySchema(supabase) : Promise.resolve(false),
-    tenantId ? probeAdvisorPrivateSchema(supabase) : Promise.resolve(false),
-  ]);
   const work = workRes.available ? workRes.data : null;
   const isManager = role === "owner" || role === "gm";
   const profileTabVisible = workRes.available || privateReady;

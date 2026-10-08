@@ -13,8 +13,9 @@ export default async function NewDealPage() {
   if (!(perms.commissions ?? []).includes("create")) redirect("/app/anlasmalar");
   const supabase = await createClient();
 
-  const stageNames = stageLabelMap(await getStageLabels());
-  const [{ data: properties }, { data: customers }] = await Promise.all([
+  // Aşama etiketleri, portföy/müşteri listeleri ve özel alanlar bağımsız: TEK turda.
+  const [stageLabels, { data: properties }, { data: customers }, customFields] = await Promise.all([
+    getStageLabels(),
     supabase
       .from("properties")
       .select("id, property_code, title, list_price, transaction_type")
@@ -27,8 +28,8 @@ export default async function NewDealPage() {
       .is("deleted_at", null)
       .order("full_name")
       .limit(200),
+    loadCustomFieldInputDefs(supabase, tenantId, "deal"),
   ]);
-
-  const customFields = await loadCustomFieldInputDefs(supabase, tenantId, "deal");
+  const stageNames = stageLabelMap(stageLabels);
   return <NewDealForm properties={properties ?? []} customers={customers ?? []} userId={userId} stageNames={stageNames} customFields={customFields} />;
 }
