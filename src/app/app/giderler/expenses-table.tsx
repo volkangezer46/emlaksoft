@@ -7,12 +7,15 @@ import { Building2, Paperclip, Receipt, SearchX, Trash2 } from "lucide-react";
 import { expenseReceiptHref } from "@/lib/expense-receipts";
 import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";
 import { ExpenseBulkBar } from "./expense-bulk-bar";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableEmptyRow, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components/ui/table";
 import { ExpenseEditDialog, type Expense } from "./expense-edit-dialog";
 import { deleteExpense } from "@/app/actions/expenses";
 import { useToast } from "@/components/app/toast-provider";
 import { formatDateTr } from "@/lib/format";
+import { PORTAL_LABEL, isPortalKey } from "@/lib/finance/portal-roi";
+import { RECURRENCE_LABEL, isRecurrence } from "@/lib/finance/recurring-expenses";
 
 /**
  * Gider listesi — satıra tıklayınca düzenleme diyaloğu açılır.
@@ -50,6 +53,7 @@ export function ExpensesTable({
   canEdit,
   canDelete,
   receiptUploads = false,
+  financeFields = false,
 }: {
   expenses: Expense[];
   categories: readonly Category[];
@@ -57,6 +61,8 @@ export function ExpensesTable({
   canDelete: boolean;
   /** Fiş dosyası yükleme etkin mi (düzenleme panelinde). */
   receiptUploads?: boolean;
+  /** Tekrar/portal alanları düzenleme panelinde gösterilsin mi. */
+  financeFields?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -165,6 +171,12 @@ export function ExpensesTable({
                     {e.notes ? (
                       <span className="mt-0.5 block text-xs font-normal text-text-faint">{e.notes}</span>
                     ) : null}
+                    {isRecurrence(e.recurrence) || isPortalKey(e.portal_key) ? (
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-normal">
+                        {isRecurrence(e.recurrence) ? <Badge variant="info" size="sm">{RECURRENCE_LABEL[e.recurrence]}</Badge> : null}
+                        {isPortalKey(e.portal_key) ? <Badge variant="outline" size="sm">{PORTAL_LABEL[e.portal_key]}</Badge> : null}
+                      </span>
+                    ) : null}
                     {e.property_id || e.receipt_url || e.receipt_file ? (
                       <span className="relative z-10 mt-1 flex flex-wrap items-center gap-3 text-xs font-normal">
                         {e.property_id ? (
@@ -242,6 +254,7 @@ export function ExpensesTable({
           expense={editing}
           categories={categories}
           receiptUploads={receiptUploads}
+          financeFields={financeFields}
           open
           onOpenChange={(open) => {
             if (!open) setEditing(null);

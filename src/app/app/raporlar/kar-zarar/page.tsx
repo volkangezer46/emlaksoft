@@ -10,6 +10,8 @@ import { formatTry } from "@/lib/format";
 import { now, trMonthKey } from "@/lib/clock";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
+import { Suspense } from "react";
+import { AdvisorProfitCard } from "./advisor-profit";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
 
 export const metadata = { title: "Kâr / zarar" };
@@ -28,7 +30,7 @@ function monthRange(key: string): { from: string; to: string } {
  * görebilenler (earnings_all). Her tutar ilgili filtreli listeye gider. Örnek veri hariç. Yöntem `src/lib/reporting/profit-loss.ts`.
  */
 export default async function ProfitLossPage() {
-  const { perms, tenantId } = await requireModulePage("reports", "/app/raporlar");
+  const { perms, tenantId, role } = await requireModulePage("reports", "/app/raporlar");
   const crumbs = [{ label: "Raporlar", href: "/app/raporlar" }, { label: "Kâr / zarar" }];
   if (!tenantId || !canSeeAllEarnings(perms)) {
     return (
@@ -185,6 +187,12 @@ export default async function ProfitLossPage() {
             Komisyon tahakkuk esasına göre (kayıt ayı) sayılır; tahsilat değildir. İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
             danışman/referans/franchise paylarıdır (ofis payı düşülmez). Gelir/kurumlar vergisi hesaplanmaz; mali müşavirinizle doğrulayın.
           </p>
+          {/* Danışman bazlı kırılım yalnız ofis sahibi / genel müdür (kazanç gizliliği P12). */}
+          {role === "owner" || role === "gm" ? (
+            <Suspense fallback={null}>
+              <AdvisorProfitCard tenantId={tenantId} firstMonthKey={keys[0]!} />
+            </Suspense>
+          ) : null}
         </>
       )}
     </div>

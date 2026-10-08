@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InsightDraft, InsightKind } from "@/lib/insights/types";
 import {
+  InsightFactsUnavailable,
   loadDeadlines,
   loadQuietCustomers,
   loadStaleListings,
@@ -15,6 +16,39 @@ import { DEADLINE_RULE_ID, evaluateDeadlines } from "@/lib/insights/rules/deadli
 import { ANOMALY_RULE_ID, evaluateAnomalies } from "@/lib/insights/rules/anomaly";
 import { LIFECYCLE_RULE_ID, evaluateLifecycle } from "@/lib/insights/rules/lifecycle";
 import { loadLifecycleFacts } from "@/lib/insights/lifecycle-facts";
+import {
+  AUTHORITY_RENEWAL_RULE_ID,
+  HOME_VALUE_RULE_ID,
+  PRICE_REVISION_RULE_ID,
+  REFERRAL_INVITE_RULE_ID,
+  UNSHOWN_MATCH_RULE_ID,
+  evaluateAuthorityRenewal,
+  evaluateHomeValue,
+  evaluatePriceRevision,
+  evaluateReferralInvites,
+  evaluateUnshownMatches,
+} from "@/lib/insights/rules/revenue";
+import {
+  loadAuthorityRenewals,
+  loadHomeValueFacts,
+  loadPriceRevisionFacts,
+  loadReferralInviteFacts,
+  loadUnshownMatches,
+} from "@/lib/insights/revenue-facts";
+import {
+  EXPENSE_BUDGET_RULE_ID,
+  PORTAL_ROI_RULE_ID,
+  SUBSCRIPTION_RULE_ID,
+  evaluateExpenseBudgets,
+  evaluatePortalRoi,
+  evaluateSubscriptions,
+} from "@/lib/insights/rules/finance";
+import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
+import { pickLeastEfficientPortal, unusedPortalSubscriptions } from "@/lib/finance/portal-roi";
+import { EXPENSE_CATEGORIES } from "@/lib/definition-defaults";
+import { trNextMonthStartMs } from "@/lib/clock";
+
+const categoryLabel = (value: string): string => EXPENSE_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 
 /**
  * KURAL KAYIT LİSTESİ (tek ortak dosya). Sonraki rol paketleri (danışman 5a, yönetim 5b, muhasebe 5c)
@@ -84,6 +118,71 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     id: LIFECYCLE_RULE_ID,
     kind: "match_suggestion",
     run: async (admin, tenantId, nowMs) => evaluateLifecycle(await loadLifecycleFacts(admin, tenantId, nowMs), nowMs),
+  },
+  // GELİR FIRSATLARI (saf kurallar: rules/revenue.ts; olgular: revenue-facts.ts). Her biri ofis ayarından ayrı kapatılabilir.
+  {
+    id: AUTHORITY_RENEWAL_RULE_ID,
+    kind: "deadline",
+    run: async (admin, tenantId, nowMs) => evaluateAuthorityRenewal(await loadAuthorityRenewals(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    id: UNSHOWN_MATCH_RULE_ID,
+    kind: "match_suggestion",
+    run: async (admin, tenantId, nowMs) => evaluateUnshownMatches(await loadUnshownMatches(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    id: HOME_VALUE_RULE_ID,
+    kind: "match_suggestion",
+    run: async (admin, tenantId, nowMs) => evaluateHomeValue(await loadHomeValueFacts(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    id: PRICE_REVISION_RULE_ID,
+    kind: "price_action",
+    run: async (admin, tenantId, nowMs) => evaluatePriceRevision(await loadPriceRevisionFacts(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    id: REFERRAL_INVITE_RULE_ID,
+    kind: "match_suggestion",
+    run: async (admin, tenantId, nowMs) => evaluateReferralInvites(await loadReferralInviteFacts(admin, tenantId, nowMs), nowMs),
+  },
+  // GİDER içgörüleri (alıcı: yönetim). Şema (20261008000700) yoksa kural "etkin değil" sayılır.
+  {
+    id: EXPENSE_BUDGET_RULE_ID,
+    kind: "anomaly",
+    run: async (admin, tenantId, nowMs) => {
+      const ctx = await loadBudgetContext(admin, tenantId, nowMs);
+      if (!ctx.available) throw new InsightFactsUnavailable("expense_budgets");
+      return evaluateExpenseBudgets(
+        { monthKey: ctx.monthKey, monthStart: ctx.monthStart, monthEnd: ctx.monthEnd, rows: ctx.rows.map((r) => ({ ...r, label: categoryLabel(r.category) })) },
+        nowMs,
+        trNextMonthStartMs(nowMs),
+      );
+    },
+  },
+  {
+    id: SUBSCRIPTION_RULE_ID,
+    kind: "deadline",
+    run: async (admin, tenantId, nowMs) => {
+      const [recurring, portal] = await Promise.all([loadRecurringSeries(admin, tenantId, nowMs), loadPortalRoi(admin, tenantId, nowMs)]);
+      if (!recurring.available) throw new InsightFactsUnavailable("expenses.recurrence");
+      return evaluateSubscriptions(
+        {
+          todayKey: recurring.todayKey,
+          series: recurring.series.map((s) => ({ ...s, categoryLabel: categoryLabel(s.category) })),
+          unusedPortals: portal.available ? unusedPortalSubscriptions(portal.rows) : [],
+        },
+        nowMs,
+      );
+    },
+  },
+  {
+    id: PORTAL_ROI_RULE_ID,
+    kind: "anomaly",
+    run: async (admin, tenantId, nowMs) => {
+      const portal = await loadPortalRoi(admin, tenantId, nowMs);
+      if (!portal.available) throw new InsightFactsUnavailable("expenses.portal_key");
+      return evaluatePortalRoi(pickLeastEfficientPortal(portal.rows), portal.rows, nowMs);
+    },
   },
 ];
 

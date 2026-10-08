@@ -40,6 +40,7 @@ import { shareOfMax } from "@/app/app/raporlar/report-math";
 import { statusShares } from "./commission-math";
 import { StatusStackBar } from "./status-stack-bar";
 import { PipelineForecastCard } from "./pipeline-forecast";
+import { DiscountAnalysisCard } from "./discount-analysis";
 import { Suspense } from "react";
 
 export const metadata = { title: "Komisyon" };
@@ -142,7 +143,7 @@ export default async function CommissionPage({
 }: {
   searchParams?: Promise<{ durum?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
-  const { perms, userId, tenantId } = await requireModulePage("commissions");
+  const { perms, userId, tenantId, role } = await requireModulePage("commissions");
   // Ofis Tanımları Merkezi: simülatör başlangıç oranı/payı (ayar yoksa kod varsayılanları 3 / 60).
   // Kayıtlı görünümlerle aynı turda beklenir (aşağıda).
   const simDefaultsPromise = tenantId
@@ -347,6 +348,12 @@ export default async function CommissionPage({
       {seeAllEarnings && tenantId ? (
         <Suspense fallback={null}>
           <PipelineForecastCard tenantId={tenantId} />
+        </Suspense>
+      ) : null}
+      {seeAllEarnings && tenantId ? (
+        <Suspense fallback={null}>
+          {/* Danışman bazlı kırılım yalnız ofis sahibi / genel müdür (kazanç gizliliği). */}
+          <DiscountAnalysisCard tenantId={tenantId} showAdvisors={role === "owner" || role === "gm"} />
         </Suspense>
       ) : null}
 <p className="text-xs font-semibold text-text-muted">{kpiScopeLabel}</p>
