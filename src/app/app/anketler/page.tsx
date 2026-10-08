@@ -1,3 +1,5 @@
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CheckCircle2, Clock, Gauge, Headphones, MessageSquareQuote, SearchX, Smile, TrendingDown } from "lucide-react";
@@ -154,21 +156,35 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
   const officeWide = hasOfficeWideDataScope(ctx.role);
   const settings = await loadSurveySettings(supabase, ctx.tenantId ?? "");
 
-  let taskQuery = supabase
-    .from("survey_tasks")
-    .select(
-      "id, event_type, audience, status, score, agent_id, assigned_to, deal_id, customer_id, property_id, contact_name, event_summary, completed_at, created_at, answered_via, due_at, next_attempt_at, low_score_handled, customer:customers!survey_tasks_customer_id_fkey(id, full_name)",
-    )
-    .neq("event_type", "advisor_pulse")
-    .order("created_at", { ascending: false })
-    .limit(2000);
-  if (!officeWide) taskQuery = taskQuery.or(`agent_id.eq.${ctx.userId},assigned_to.eq.${ctx.userId}`);
+  // PostgREST max_rows (1000) sınırı: gösterilen sayılar gerçek olsun diye sayfalı okunur (fetchAllRows).
+  const taskPage = (from: number, to: number) => {
+    let q = supabase
+      .from("survey_tasks")
+      .select(
+        "id, event_type, audience, status, score, agent_id, assigned_to, deal_id, customer_id, property_id, contact_name, event_summary, completed_at, created_at, answered_via, due_at, next_attempt_at, low_score_handled, customer:customers!survey_tasks_customer_id_fkey(id, full_name)",
+      )
+      .neq("event_type", "advisor_pulse")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true });
+    if (!officeWide) q = q.or(`agent_id.eq.${ctx.userId},assigned_to.eq.${ctx.userId}`);
+    return q.range(from, to);
+  };
 
-  const [{ data: taskData }, { data: answerData }, { data: profiles }] = await Promise.all([
-    taskQuery,
-    supabase.from("survey_answers").select("task_id, tag, value_text, value_num").in("tag", ["reason", "advisor"]).limit(8000),
+  const [taskRes, answerRes, { data: profiles }] = await Promise.all([
+    fetchAllRows(taskPage),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("survey_answers")
+        .select("task_id, tag, value_text, value_num")
+        .in("tag", ["reason", "advisor"])
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
     supabase.from("profiles").select("id, full_name").limit(500),
   ]);
+  assertQueryBatchSucceeded([taskRes, answerRes], ["survey-tasks", "survey-answers"], "Anketler");
+  const taskData = taskRes.data;
+  const answerData = answerRes.data;
   const tasks = (taskData ?? []) as unknown as TaskRow[];
   const taskIdSet = new Set(tasks.map((t) => t.id));
   const visibleAnswers = (answerData ?? []).filter((a) => taskIdSet.has(String(a.task_id)));

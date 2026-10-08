@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { daysAgoIso } from "@/lib/clock";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/lib/geo/reader";
 import { OPEN_DEMAND_STATUSES } from "@/lib/team/advisor-360";
 import { currentMonthPeriod, type MetricsViewer, loadAdvisorResponseTimes } from "@/lib/team/advisor-metrics";
@@ -17,11 +18,18 @@ import { rankAdvisorsForProperty, type SmartCandidate, type SmartSuggestion, typ
  */
 type Row = Record<string, unknown>;
 const s = (v: unknown): string => (typeof v === "string" ? v : "");
-const SCAN = 10_000;
 
 async function safeRows(q: PromiseLike<{ data: unknown; error: unknown }>): Promise<Row[]> {
   const { data, error } = await q;
   return error || !Array.isArray(data) ? [] : (data as Row[]);
+}
+
+/** PostgREST 1000 satır sınırını aşan sayımlar için sayfalı okuma; hata/üst sınır aşımında sessizce boş (safeRows ile aynı). */
+async function safePagedRows(
+  build: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+): Promise<Row[]> {
+  const { data, error } = await fetchAllRows<Row>(build);
+  return error ? [] : data;
 }
 
 export async function loadSmartWeights(tenantId: string): Promise<SmartWeights> {
@@ -51,18 +59,25 @@ export async function loadSmartCandidates(db: SupabaseClient, tenantId: string, 
     safeRows(db.from("profiles").select("id, branch_id, team_id").eq("tenant_id", tenantId).limit(500)).then(async (r) =>
       r.length ? r : safeRows(db.from("profiles").select("id, branch_id").eq("tenant_id", tenantId).limit(500)),
     ),
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("customer_demands")
         .select("id, customer:customers!customer_demands_customer_id_fkey!inner(assigned_to)")
         .eq("tenant_id", tenantId)
         .in("status", [...OPEN_DEMAND_STATUSES])
         .not("customer.assigned_to", "is", null)
-        .limit(SCAN),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    safeRows(db.from("calls").select("handled_by, started_at").eq("tenant_id", tenantId).gte("started_at", daysAgoIso(90)).not("handled_by", "is", null).order("started_at", { ascending: false }).limit(2000)),
-    safeRows(db.from("communications").select("created_by, created_at").eq("tenant_id", tenantId).gte("created_at", daysAgoIso(90)).not("created_by", "is", null).order("created_at", { ascending: false }).limit(2000)),
-    safeRows(db.from("properties").select("created_by, created_at").eq("tenant_id", tenantId).gte("created_at", daysAgoIso(90)).not("created_by", "is", null).order("created_at", { ascending: false }).limit(2000)),
+    safePagedRows((from, to) =>
+      db.from("calls").select("handled_by, started_at").eq("tenant_id", tenantId).gte("started_at", daysAgoIso(90)).not("handled_by", "is", null).order("started_at", { ascending: false }).order("id", { ascending: true }).range(from, to),
+    ),
+    safePagedRows((from, to) =>
+      db.from("communications").select("created_by, created_at").eq("tenant_id", tenantId).gte("created_at", daysAgoIso(90)).not("created_by", "is", null).order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to),
+    ),
+    safePagedRows((from, to) =>
+      db.from("properties").select("created_by, created_at").eq("tenant_id", tenantId).gte("created_at", daysAgoIso(90)).not("created_by", "is", null).order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to),
+    ),
     loadAdvisorResponseTimes(db, { viewer, tenantId, period: currentMonthPeriod(nowMs), nowMs }),
     loadSmartWeights(tenantId),
   ]);

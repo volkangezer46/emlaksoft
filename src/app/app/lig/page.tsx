@@ -1,3 +1,4 @@
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import Link from "@/components/ui/smart-link";
 import {
   Award, Building2, CalendarCheck2, CalendarClock, ChevronLeft, ChevronRight, Crown, Flame,
@@ -177,12 +178,15 @@ export default async function LigPage({
 
   // Kazanılmış rozetler (DB) — dönemsel rozetler bu döneme, ömür boyu
   // rozetler period IS NULL satırına düşer. `or` ile tek sorguda.
-  const { data: badgeRows } = await supabase
-    .from("agent_badges")
-    .select("staff_id, badge_code, earned_at, period")
-    .eq("tenant_id", tenantId)
-    .or(`period.eq.${period},period.is.null`)
-    .limit(2000);
+  const { data: badgeRows } = await fetchAllRows((from, to) =>
+    supabase
+      .from("agent_badges")
+      .select("staff_id, badge_code, earned_at, period")
+      .eq("tenant_id", tenantId)
+      .or(`period.eq.${period},period.is.null`)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   /** staffId → (badgeCode → kazanma tarihi) */
   const earnedDb = new Map<string, Map<string, string>>();

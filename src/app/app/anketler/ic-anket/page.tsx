@@ -1,3 +1,5 @@
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import type { ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { Gauge, HeartPulse, Lock, Smile, Users } from "lucide-react";
@@ -73,17 +75,25 @@ export default async function AdvisorPulsePage({ searchParams }: { searchParams:
   if (isManager) {
     const oldest = periods[periods.length - 1] ?? current;
     const fromIso = new Date(trMonthStartMsFromKey(oldest)).toISOString();
-    const [{ data: taskRows }, { data: headcountRows }, { data: pulseTemplates }] = await Promise.all([
-      supabase
-        .from("survey_tasks")
-        .select("id, score, event_summary")
-        .eq("event_type", "advisor_pulse")
-        .eq("status", "completed")
-        .gte("event_at", fromIso)
-        .limit(5000),
-      supabase.from("profiles").select("role").eq("tenant_id", tenantId).eq("is_active", true).limit(1000),
+    const [taskRes, headcountRes, { data: pulseTemplates }] = await Promise.all([
+      fetchAllRows((from, to) =>
+        supabase
+          .from("survey_tasks")
+          .select("id, score, event_summary")
+          .eq("event_type", "advisor_pulse")
+          .eq("status", "completed")
+          .gte("event_at", fromIso)
+          .order("id", { ascending: true })
+          .range(from, to),
+      ),
+      fetchAllRows((from, to) =>
+        supabase.from("profiles").select("id, role").eq("tenant_id", tenantId).eq("is_active", true).order("id", { ascending: true }).range(from, to),
+      ),
       supabase.from("survey_templates").select("id").eq("tenant_id", tenantId).eq("event_type", "advisor_pulse"),
     ]);
+    assertQueryBatchSucceeded([taskRes, headcountRes], ["pulse-tasks", "headcount"], "Ekip nabzı");
+    const taskRows = taskRes.data;
+    const headcountRows = headcountRes.data;
     // Dönem, satırın özetinden ("Ekip nabzı YYYY-MM") okunur: cevap satırında kişi/zaman bilgisi bilerek yoktur.
     const byPeriod = new Map<string, { id: string; score: number | null }[]>();
     for (const r of (taskRows ?? []) as { id: string; score: number | null; event_summary: string | null }[]) {
@@ -102,11 +112,17 @@ export default async function AdvisorPulsePage({ searchParams }: { searchParams:
         ? await supabase.from("survey_questions").select("id").in("template_id", templateIds).eq("kind", "text")
         : { data: [] as { id: string }[] };
       const textIds = new Set(((textQs ?? []) as { id: string }[]).map((q) => String(q.id)));
-      const { data: answerRows } = await supabase
-        .from("survey_answers")
-        .select("task_id, question_id, tag, value_text")
-        .in("task_id", selected.map((s) => s.id))
-        .limit(5000);
+      const selectedIds = selected.map((s) => s.id);
+      const answerRes = await fetchAllRows((from, to) =>
+        supabase
+          .from("survey_answers")
+          .select("task_id, question_id, tag, value_text")
+          .in("task_id", selectedIds)
+          .order("id", { ascending: true })
+          .range(from, to),
+      );
+      assertQueryBatchSucceeded([answerRes], ["pulse-answers"], "Ekip nabzı");
+      const answerRows = answerRes.data;
       const rows = (answerRows ?? []) as { task_id: string; question_id: string | null; tag: string | null; value_text: string | null }[];
       reasonAnswers = rows.filter((a) => a.tag === "reason").map((a) => ({ task_id: String(a.task_id), tag: a.tag, value_text: a.value_text }));
       comments = rows.filter((a) => a.question_id && textIds.has(String(a.question_id)) && a.value_text).map((a) => String(a.value_text));

@@ -1,3 +1,4 @@
+import { fetchAllRows, fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LeaseEndFact, LifecycleFacts, ResaleFact, SellerFact } from "@/lib/insights/rules/lifecycle";
 import { LEASE_END_WINDOW_DAYS, SELLER_RECENT_DAYS } from "@/lib/insights/rules/lifecycle";
@@ -20,27 +21,34 @@ export async function loadLifecycleFacts(admin: SupabaseClient, tenantId: string
   const sellers: SellerFact[] = [];
 
   // 1) Kazanılmış satışlar (alıcı = deals.customer_id). Yıldönümü penceresi uygulamada süzülür.
-  const { data: wonDeals, error: wonError } = await admin
-    .from("deals")
-    .select("id, customer_id, property_id, assigned_to, updated_at, customer:customers!deals_customer_id_fkey(full_name, assigned_to, is_sample, deleted_at), property:properties!deals_property_id_fkey(title, property_code, owner_customer_id, assigned_to)")
-    .eq("tenant_id", tenantId)
-    .eq("stage", "won")
-    .eq("deal_type", "sale")
-    .eq("is_sample", false)
-    .order("updated_at", { ascending: false })
-    .limit(2000);
-  if (wonError) {
-    if (isMissingSchemaError(wonError)) throw new InsightFactsUnavailable("deals(lifecycle)");
-    // owner_customer_id yoksa (eski şema) satıcı bilgisi olmadan tekrar dene
-    const retry = await admin
+  // PostgREST 1000 satır sınırı: tüm kazanılmış satışlar sayfalı okunur (kesilme yok).
+  const { data: wonDeals, error: wonError } = await fetchAllRowsKeepError((from, to) =>
+    admin
       .from("deals")
-      .select("id, customer_id, property_id, assigned_to, updated_at, customer:customers!deals_customer_id_fkey(full_name, assigned_to, is_sample, deleted_at), property:properties!deals_property_id_fkey(title, property_code, assigned_to)")
+      .select("id, customer_id, property_id, assigned_to, updated_at, customer:customers!deals_customer_id_fkey(full_name, assigned_to, is_sample, deleted_at), property:properties!deals_property_id_fkey(title, property_code, owner_customer_id, assigned_to)")
       .eq("tenant_id", tenantId)
       .eq("stage", "won")
       .eq("deal_type", "sale")
       .eq("is_sample", false)
       .order("updated_at", { ascending: false })
-      .limit(2000);
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  if (wonError) {
+    if (isMissingSchemaError(wonError)) throw new InsightFactsUnavailable("deals(lifecycle)");
+    // owner_customer_id yoksa (eski şema) satıcı bilgisi olmadan tekrar dene
+    const retry = await fetchAllRowsKeepError((from, to) =>
+      admin
+        .from("deals")
+        .select("id, customer_id, property_id, assigned_to, updated_at, customer:customers!deals_customer_id_fkey(full_name, assigned_to, is_sample, deleted_at), property:properties!deals_property_id_fkey(title, property_code, assigned_to)")
+        .eq("tenant_id", tenantId)
+        .eq("stage", "won")
+        .eq("deal_type", "sale")
+        .eq("is_sample", false)
+        .order("updated_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    );
     if (retry.error) throw new Error(`deals(lifecycle): ${retry.error.code ?? "hata"}`);
     return { resale: await toResale(admin, tenantId, retry.data ?? []), leaseEnd: await loadLeaseEnds(admin, tenantId, nowMs), sellers };
   }
@@ -57,7 +65,9 @@ export async function loadLifecycleFacts(admin: SupabaseClient, tenantId: string
     const ownerIds = [...new Set(sellerRows.map((x) => x.p!.owner_customer_id!))];
     const [{ data: owners }, { data: demands }] = await Promise.all([
       admin.from("customers").select("id, full_name, assigned_to").eq("tenant_id", tenantId).eq("is_sample", false).is("deleted_at", null).in("id", ownerIds),
-      admin.from("customer_demands").select("customer_id").eq("tenant_id", tenantId).in("customer_id", ownerIds).in("status", OPEN_DEMAND).limit(2000),
+      fetchAllRows((from, to) =>
+        admin.from("customer_demands").select("customer_id").eq("tenant_id", tenantId).in("customer_id", ownerIds).in("status", OPEN_DEMAND).order("id", { ascending: true }).range(from, to),
+      ),
     ]);
     const ownerById = new Map(((owners ?? []) as { id: string; full_name: string | null; assigned_to: string | null }[]).map((o) => [o.id, o]));
     const withDemand = new Set(((demands ?? []) as { customer_id: string }[]).map((d) => d.customer_id));
@@ -95,13 +105,17 @@ async function toResale(admin: SupabaseClient, tenantId: string, rows: readonly 
   const candidates = rows.filter((d) => d.customer_id);
   if (candidates.length === 0) return [];
   // Kapanış tarihi: ilk komisyon kaydı (kapanışta otomatik oluşur); yoksa anlaşmanın son güncellemesi.
-  const { data: comms } = await admin
-    .from("commissions")
-    .select("deal_id, created_at")
-    .eq("tenant_id", tenantId)
-    .in("deal_id", candidates.map((d) => d.id).slice(0, 1000))
-    .order("created_at", { ascending: true })
-    .limit(2000);
+  const dealIds = candidates.map((d) => d.id).slice(0, 1000);
+  const { data: comms } = await fetchAllRows((from, to) =>
+    admin
+      .from("commissions")
+      .select("deal_id, created_at")
+      .eq("tenant_id", tenantId)
+      .in("deal_id", dealIds)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   const firstComm = new Map<string, string>();
   for (const c of (comms ?? []) as { deal_id: string; created_at: string }[]) if (!firstComm.has(c.deal_id)) firstComm.set(c.deal_id, c.created_at);
   const out: ResaleFact[] = [];
@@ -129,26 +143,32 @@ async function toResale(admin: SupabaseClient, tenantId: string, rows: readonly 
 async function loadLeaseEnds(admin: SupabaseClient, tenantId: string, nowMs: number): Promise<LeaseEndFact[]> {
   const today = dayKey(nowMs + 3 * 3_600_000);
   const until = dayKey(nowMs + 3 * 3_600_000 + LEASE_END_WINDOW_DAYS * 86_400_000);
-  const { data, error } = await admin
-    .from("rentals")
-    .select("id, end_date, renter_customer_id, renter:customers!rentals_renter_customer_id_fkey(full_name, assigned_to, is_sample), property:properties!rentals_property_id_fkey(title, property_code, assigned_to, is_sample)")
-    .eq("tenant_id", tenantId)
-    .eq("status", "active")
-    .not("end_date", "is", null)
-    .gte("end_date", today)
-    .lte("end_date", until)
-    .limit(1000);
+  const { data, error } = await fetchAllRows((from, to) =>
+    admin
+      .from("rentals")
+      .select("id, end_date, renter_customer_id, renter:customers!rentals_renter_customer_id_fkey(full_name, assigned_to, is_sample), property:properties!rentals_property_id_fkey(title, property_code, assigned_to, is_sample)")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .not("end_date", "is", null)
+      .gte("end_date", today)
+      .lte("end_date", until)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   if (error) return [];
   const rows = (data ?? []) as { id: string; end_date: string; renter_customer_id: string; renter: unknown; property: unknown }[];
   if (rows.length === 0) return [];
   const renterIds = [...new Set(rows.map((r) => r.renter_customer_id))];
-  const { data: demands } = await admin
-    .from("customer_demands")
-    .select("customer_id, transaction_type")
-    .eq("tenant_id", tenantId)
-    .in("customer_id", renterIds)
-    .in("status", OPEN_DEMAND)
-    .limit(2000);
+  const { data: demands } = await fetchAllRows((from, to) =>
+    admin
+      .from("customer_demands")
+      .select("customer_id, transaction_type")
+      .eq("tenant_id", tenantId)
+      .in("customer_id", renterIds)
+      .in("status", OPEN_DEMAND)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   const buyers = new Set(
     ((demands ?? []) as { customer_id: string; transaction_type: string | null }[])
       .filter((d) => /sat|sale|buy|al/i.test(String(d.transaction_type ?? "")))

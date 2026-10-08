@@ -9,6 +9,7 @@
  */
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { computeLeadScore } from "@/lib/lead-score";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchLeadSignals } from "@/lib/lead-signals";
@@ -419,12 +420,17 @@ export const loadDemandCounts = cache(async (ctx: HomeCtx): Promise<DemandCounts
 export const loadDeals = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
   // Son 3 ay
-  const result = await ctx.sample.apply(supabase
-    .from("deals")
-    .select("stage, deal_value, assigned_to, updated_at"))
-    .gte("updated_at", daysAgoIso(90))
-    .order("updated_at", { ascending: false }) // kırpma belirleyici: en yeni anlaşmalar
-    .limit(1000);
+  const sinceIso = daysAgoIso(90);
+  // PostgREST 1000 satır sınırı: toplamlar kesilmesin diye sayfalı okunur (fetchAllRows).
+  const result = await fetchAllRows((from, to) =>
+    ctx.sample.apply(supabase
+      .from("deals")
+      .select("stage, deal_value, assigned_to, updated_at"))
+      .gte("updated_at", sinceIso)
+      .order("updated_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
   assertQueryBatchSucceeded([result], ["deals"], "Ana panel");
   return (result.data ?? []) as DealRow[];
 });
@@ -523,11 +529,14 @@ export const loadRentalsAndProjects = cache(async (ctx: HomeCtx) => {
       : Promise.resolve({ count: 0 }),
     // Bu ayın tahakkukları + (hangi aya ait olursa olsun) gecikmişler — tek sorgu
     ctx.canSeeRentals
-      ? supabase
-          .from("rent_charges")
-          .select("amount, status, period")
-          .or(`period.eq.${ctx.monthStartKey},status.eq.overdue`)
-          .limit(1000)
+      ? fetchAllRows((from, to) =>
+          supabase
+            .from("rent_charges")
+            .select("amount, status, period")
+            .or(`period.eq.${ctx.monthStartKey},status.eq.overdue`)
+            .order("id", { ascending: true })
+            .range(from, to),
+        )
       : Promise.resolve({ data: null }),
     // Proje + birim durumları tek gidiş-dönüşte (bkz. actions/projects.ts listProjects)
     ctx.canSeeProjects
@@ -554,13 +563,21 @@ export const loadRentalsAndProjects = cache(async (ctx: HomeCtx) => {
  * Müşteri kaynağı dağılımı: yalnız `source` kolonu. Satır sınırına çarparsa `null`
  * döner (kırpık dağılım çizilmez — uydurma yüzde yok).
  */
-const SOURCE_ROW_LIMIT = 2000;
+const SOURCE_ROW_LIMIT = 5000;
 export const loadCustomerSources = cache(async (ctx: HomeCtx) => {
   const supabase = await createClient();
-  const result = await ctx.sample.apply(supabase.from("customers").select("source").is("deleted_at", null)).limit(SOURCE_ROW_LIMIT);
+  // PostgREST 1000 satır sınırı: sayfalı okunur; üst sınırı (5 sayfa) aşan ofiste dağılım çizilmez.
+  const result = await fetchAllRows(
+    (from, to) =>
+      ctx.sample.apply(supabase.from("customers").select("source").is("deleted_at", null))
+        .order("id", { ascending: true })
+        .range(from, to),
+    1000,
+    SOURCE_ROW_LIMIT / 1000,
+  );
+  if (result.error && /üst sınırı/.test(result.error.message)) return null;
   assertQueryBatchSucceeded([result], ["customer-sources"], "Ana panel");
   const rows = (result.data ?? []) as { source: string | null }[];
-  if (rows.length >= SOURCE_ROW_LIMIT) return null;
   const counts = new Map<string, number>();
   for (const r of rows) {
     const key = r.source?.trim() || "";

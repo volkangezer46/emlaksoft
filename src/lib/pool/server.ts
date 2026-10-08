@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { availabilityAt, bulkPoolDecision, decidePoolAction, isPoolMode, type PoolDecision, type PoolMode } from "./modes";
@@ -95,6 +96,14 @@ async function safeRows(q: PromiseLike<{ data: unknown; error: { code?: string |
   return data as Row[];
 }
 
+/** `safeRows` ile aynı sessiz hata davranışı; PostgREST 1000 satır sınırını aşan sayım/toplamlar için sayfalı okur. */
+async function safePagedRows(
+  build: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+): Promise<Row[]> {
+  const { data, error } = await fetchAllRows<Row>(build);
+  return error ? [] : data;
+}
+
 /** Havuz adaylarını ve puanlama bağlamını tablolardan okur (uzmanlık/bölge verisi yalnız okunur). */
 export async function loadPoolCandidates(
   db: Db,
@@ -124,21 +133,23 @@ export async function loadPoolCandidates(
   const today = trDayKey(nowMs);
   const since90 = daysAgoIso(90);
   const [specRows, regionRows, leaveRows, openRows, memberRows, assignedRows, recentProps, recentDeals] = await Promise.all([
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("advisor_specialties")
         .select("profile_id, kind, value, transaction_type, price_min, price_max, level")
         .eq("tenant_id", tenantId)
-        .limit(5000),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("advisor_regions")
         .select("profile_id, province_id, district_id, neighborhood_id, weight")
         .eq("tenant_id", tenantId)
-        .limit(5000),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("staff_leaves")
         .select("staff_id")
@@ -146,9 +157,10 @@ export async function loadPoolCandidates(
         .eq("status", "onayli")
         .lte("starts_on", today)
         .gte("ends_on", today)
-        .limit(1000),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("properties")
         .select("assigned_to")
@@ -156,16 +168,18 @@ export async function loadPoolCandidates(
         .in("status", ACTIVE_LISTING_STATUSES)
         .is("deleted_at", null)
         .not("assigned_to", "is", null)
-        .limit(20000),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
     ruleId
-      ? safeRows(
+      ? safePagedRows((from, to) =>
           db
             .from("assignment_rule_members")
             .select("profile_id, weight, is_available, max_open")
             .eq("tenant_id", tenantId)
             .eq("rule_id", ruleId)
-            .limit(1000),
+            .order("id", { ascending: true })
+            .range(from, to),
         )
       : Promise.resolve([] as Row[]),
     safeRows(
@@ -178,7 +192,7 @@ export async function loadPoolCandidates(
         .order("assigned_at", { ascending: false })
         .limit(500),
     ),
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("properties")
         .select("assigned_to")
@@ -186,9 +200,10 @@ export async function loadPoolCandidates(
         .gte("created_at", since90)
         .is("deleted_at", null)
         .not("assigned_to", "is", null)
-        .limit(20000),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
-    safeRows(
+    safePagedRows((from, to) =>
       db
         .from("deals")
         .select("assigned_to")
@@ -196,7 +211,8 @@ export async function loadPoolCandidates(
         .eq("stage", "won")
         .gte("created_at", since90)
         .not("assigned_to", "is", null)
-        .limit(20000),
+        .order("id", { ascending: true })
+        .range(from, to),
     ),
   ]);
 
