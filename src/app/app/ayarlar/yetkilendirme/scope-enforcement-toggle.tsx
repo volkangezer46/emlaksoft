@@ -43,7 +43,7 @@ export function ScopeEnforcementToggle({ settingKey, enabled, canEdit }: { setti
             <ShieldCheck className="h-4 w-4 text-brand-600" /> Liste kapsamını uygula
           </h2>
           <p className="mt-1 max-w-2xl text-xs text-text-muted">
-            Açıkken talep, müşteri, portföy, anlaşma ve görev listeleri ile CSV&apos;leri kullanıcının kapsamıyla (kendi kayıtları / takım / şube)
+            Açıkken talep, müşteri, portföy, anlaşma ve görev listeleri ile raporları (Rapor merkezi) kullanıcının kapsamıyla (kendi kayıtları / takım / şube)
             sınırlanır. Ofis geneli kapsamdaki yöneticiler etkilenmez; kapsam yalnız daraltır, mevcut rol kuralını genişletmez. Kapatınca
             eski görünüm hemen geri gelir.
           </p>

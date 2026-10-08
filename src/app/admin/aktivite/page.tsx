@@ -1,4 +1,5 @@
 import { Button, ButtonLink } from "@/components/ui/button";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { Activity, ArrowUpRight, ChevronDown, Search, ShieldCheck, UserCog, X } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -14,7 +15,6 @@ import {
   resolveActorNames,
   type ActivityFilters,
 } from "@/lib/admin/activity-query";
-import { ActivityExportButton } from "./activity-export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Input } from "@/components/ui/input";
@@ -149,7 +149,11 @@ function ActivityFilterBar({ filters, total }: { filters: ActivityFilters; total
         ))}
         <span className="ml-auto flex items-center gap-3">
           <span className="text-xs text-text-faint">{total} kayıt eşleşiyor</span>
-          <ActivityExportButton params={{ ...filters }} />
+          <ReportOpenLink
+            scope="platform"
+            report={filters.kaynak === "tenant" ? "ofis-denetim-kayitlari" : "platform-denetim"}
+            filters={{ from: filters.baslangic, to: filters.bitis, q: filters.q }}
+          />
         </span>
       </div>
     </form>

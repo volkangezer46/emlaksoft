@@ -61,6 +61,7 @@ describe("external provider request contract", () => {
       "src/components/admin/command-palette.tsx",
       "src/components/admin/notification-bell.tsx",
       "src/components/public/vitrin-chat.tsx",
+      "src/components/report-center/download-buttons.tsx", // aynı kökene, rapor dosyası indirme
       "src/hooks/use-api.ts",
     ].sort();
 

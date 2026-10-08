@@ -1,4 +1,5 @@
 import { ListHero, ListPage } from "@/components/ui/list-page";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import {
@@ -21,8 +22,6 @@ import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/app/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportProjectsCsv } from "@/app/actions/export";
 import { PROJECT_STATUS_LABELS } from "@/lib/status-labels";
 
 export const metadata = { title: "Projeler" };
@@ -86,7 +85,7 @@ export default async function ProjelerPage({
         description="Müteahhit projelerinin daire stoğunu, rezervasyon ve satışlarını tek ekrandan yönetin."
         actions={
           <>
-            <ExportCsvButton label="Dışa aktar" action={exportProjectsCsv.bind(null, { durum: durum ?? "" })} />
+            <ReportOpenLink report="projeler" filters={{ durum: ["planning", "selling", "delivered"].includes(durum ?? "") ? durum : undefined }} />
             {canCreate ? <ButtonLink href="/app/projeler/yeni" icon={Plus}>Yeni proje</ButtonLink> : null}
           </>
         }

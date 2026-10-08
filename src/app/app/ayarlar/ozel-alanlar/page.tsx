@@ -17,7 +17,7 @@ export const metadata = { title: "Özel alanlar" };
 
 /**
  * Özel alanlar: ofisin kendi tanımladığı ek alanlar (müşteri, portföy, talep, anlaşma). Tanım yazma ayarlar:edit;
- * değerler kayıt detayındaki "Özel alanlar" bölümünden girilir ve ilgili listenin CSV'sine `ozel: <ad>` sütunu olarak eklenir.
+ * değerler kayıt detayındaki "Özel alanlar" bölümünden girilir ve ilgili raporun (Rapor merkezi) dosyalarına `Özel: <ad>` sütunu olarak eklenir.
  */
 export default async function CustomFieldsPage() {
   const { perms, tenantId } = await requireModulePage("settings", "/app/ayarlar/ozel-alanlar");

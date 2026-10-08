@@ -1,12 +1,11 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { Coins, TrendingUp, AlertTriangle, ArrowUpRight, CalendarRange, ChevronLeft, ChevronRight, Gauge, PieChart, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { msSince, now, DAY_MS } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportDuesCsv } from "@/app/actions/export";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 
@@ -199,7 +198,7 @@ export default async function AidatPage({
         art="aidat"
         title="Aidat takibi"
         description="Portföy bazlı aidat/ortak gider ve ödeme durumu tek yerde."
-        actions={filteredDues.length > 0 ? <ExportCsvButton action={exportDuesCsv} label="Dışa aktar" /> : undefined}
+        actions={<ReportOpenLink report="aidatlar" filters={{ durum: params.durum === "paid" || params.durum === "unpaid" ? params.durum : undefined }} />}
       />
 
       <KpiStrip items={kpis} />

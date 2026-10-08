@@ -361,7 +361,7 @@ export default async function CuzdanPage({
             <ListLimitNotice
               shown={listed.length}
               total={mine.length}
-              hint="Tam döküm için komisyon defterinden dışa aktarım kullanın."
+              hint="Tam döküm için Rapor merkezindeki Komisyonlar raporunu kullanın."
               href="/app/komisyon"
               hrefLabel="Komisyon defteri"
             />

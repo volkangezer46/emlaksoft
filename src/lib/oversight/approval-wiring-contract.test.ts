@@ -45,26 +45,16 @@ describe("onay kapisi baglantilari", () => {
     expect(fn).toContain("return { error: approval.message }");
   });
 
-  it("export.ts: tum CSV'ler exportResult tek cikisindan gecer; kapi csv uretmeden once, durumda hata doner", () => {
-    const s = src("src/app/actions/export.ts");
-    const fn = s.slice(s.indexOf("async function exportResult"), s.indexOf("export async function exportCustomersCsv"));
-    const gateAt = fn.indexOf('requestApprovalIfNeeded(gate.tenantId, gate.userId, "bulk_export"');
+  it("rapor merkezi indirme: onay kapisi dosya uretmeden once, durumda 403 doner", () => {
+    const s = src("src/lib/report-center/download.ts");
+    const gateAt = s.indexOf('requestApprovalIfNeeded(auth.tenantId, auth.actorId, "bulk_export"');
     expect(gateAt).toBeGreaterThan(-1);
-    expect(gateAt).toBeLessThan(fn.indexOf("toCsv(rows)"));
-    expect(fn).toMatch(STOP);
-    expect(fn).toContain("return { error: approval.message }");
-    // atlama yolu yok: csv donen baska yer exportResult disinda olamaz
-    expect(s.match(/return \{ csv/g)?.length).toBe(1);
-  });
-
-  it("tam akis /api/export/[entity]: kapi akis acilmadan once, 403 ile durur", () => {
-    const s = src("src/app/api/export/[entity]/route.ts");
-    const gateAt = s.indexOf('requestApprovalIfNeeded(gate.tenantId, gate.userId, "bulk_export"');
-    expect(gateAt).toBeGreaterThan(-1);
-    expect(gateAt).toBeGreaterThan(s.indexOf("requirePermission(def.module"));
-    expect(gateAt).toBeLessThan(s.indexOf("openFullCsvStream({"));
+    expect(gateAt).toBeGreaterThan(s.indexOf("authorizeTenantReport(id)"));
+    expect(gateAt).toBeLessThan(s.indexOf("await renderReport("));
     expect(s).toMatch(STOP);
-    expect(s).toContain("jsonError(approval.message, 403)");
+    expect(s).toContain("json(approval.message, 403)");
+    // eski hizli/tam export yollari kalmadi
+    expect(() => src("src/app/actions/export.ts")).toThrow();
   });
 
   it("ofis kontrol ayar ekraninda 'baglantisi yapilmamis' notu kalmadi", () => {

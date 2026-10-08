@@ -2,18 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, UserCheck, Workflow } from "lucide-react";
+import { UserCheck, Workflow } from "lucide-react";
 import { BulkBar } from "@/components/ui/list-kit";
 import { Button } from "@/components/ui/button";
 import { useBulkSelection } from "@/components/app/bulk-selection";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkAssignDeals, bulkUpdateDealStage } from "@/app/actions/deals";
-import { exportDealsCsv } from "@/app/actions/export";
-import { downloadCsv } from "@/lib/download-csv";
 
 /**
  * Anlaşma listesi toplu işlem çubuğu: açık aşamalar arası geçiş, danışman ataması (yönetim)
- * ve seçili satırların CSV'si. Kazanma/kayıp toplu yapılmaz (komisyon ve kayıp nedeni tekil).
+ * Kazanma/kayıp toplu yapılmaz (komisyon ve kayıp nedeni tekil).
  */
 export function DealBulkBar({
   stages,
@@ -95,24 +93,6 @@ export function DealBulkBar({
           </Button>
         </>
       ) : null}
-      <Button
-        size="sm"
-        variant="secondary"
-        loading={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const res = await exportDealsCsv(ids);
-            if (res.error || !res.csv) {
-              push(res.error ?? "İndirilecek kayıt yok", "err");
-              return;
-            }
-            downloadCsv(res.csv, res.filename ?? "anlasmalar.csv");
-            push(`${res.rowCount ?? 0} anlaşma CSV olarak indirildi`, "ok");
-          })
-        }
-      >
-        <Download className="h-3.5 w-3.5" /> CSV
-      </Button>
     </BulkBar>
   );
 }

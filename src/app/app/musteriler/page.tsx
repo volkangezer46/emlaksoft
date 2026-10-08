@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,10 +26,8 @@ import {
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { formatLeadSource } from "@/lib/lead-sources";
-import { exportCustomersCsv } from "@/app/actions/export";
-import { HEAT_POOL_LIMIT, hasCustomerFilters, normalizeCustomerFilters } from "@/lib/customer-list-filters";
+import { HEAT_POOL_LIMIT, normalizeCustomerFilters } from "@/lib/customer-list-filters";
 import { LEAD_CHANNEL_OPTIONS, leadChannelLabel } from "@/lib/lead-channel";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { SavedViews } from "@/components/app/saved-views";
 import { CustomerBulkBar, CustomerBulkProvider } from "./customer-bulk-actions";
 import { HEAT_SEGMENTS, type HeatSegment } from "@/lib/customer-heat";
@@ -123,7 +122,7 @@ export default async function CustomersPage({
   const sp = await searchParams;
   // Eski popup adresi (?yeni=1; komut paleti, kısayollar) → tam sayfa form.
   if (sp.yeni === "1") redirect("/app/musteriler/yeni");
-  // Filtre kontratı: ekran ve CSV aynı normalleştirici + kurucuyu kullanır (src/lib/customer-list-filters.ts).
+  // Filtre kontratı: ekran ve rapor aynı normalleştirici + kurucuyu kullanır (src/lib/customer-list-filters.ts).
   const filters = normalizeCustomerFilters(sp);
   const { q, type: typeF, source: sourceF, etiket: etiketF, from: fromF, to: toF, assigned: assignedF } = filters;
   const sortF    = sp.sort     ?? "";
@@ -329,11 +328,7 @@ export default async function CustomersPage({
                 İçe aktar
               </ButtonLink>
             ) : null}
-            <ExportCsvButton
-              action={exportCustomersCsv.bind(null, filters)}
-              fullQuery={new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString()}
-              label={hasCustomerFilters(filters) ? "Filtreyi dışa aktar" : "Dışa aktar"}
-            />
+            <ReportOpenLink report="musteriler" filters={{ q: filters.q, type: filters.type, source: filters.source, etiket: filters.etiket, assigned: filters.assigned, kanal: filters.kanal, from: filters.from, to: filters.to }} />
             {canCreate ? <ButtonLink href="/app/musteriler/yeni" icon={Plus}>Yeni müşteri</ButtonLink> : null}
           </>
         ),

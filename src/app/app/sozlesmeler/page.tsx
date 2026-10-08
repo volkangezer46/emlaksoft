@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { redirect } from "next/navigation";
 import { AlarmClock, BarChart3, CalendarX2, FileSignature, PenLine, PieChart, Plus, Search, Send } from "lucide-react";
 import { DAY_MS, daysFromNowIso, msSince, now } from "@/lib/clock";
@@ -8,8 +9,6 @@ import { batchAll } from "@/lib/supabase/query-batch";
 import { ButtonLink } from "@/components/ui/button";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportContractsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { relatedSearchClause } from "@/lib/list-search";
@@ -276,7 +275,7 @@ export default async function SozlesmelerPage({
         description="Kira, satış ve diğer sözleşme taslakları oluşturun. İmza linki ile dijital onay alın."
         actions={
           <>
-            {totalAll > 0 ? <ExportCsvButton action={exportContractsCsv} label="Dışa aktar" /> : null}
+            {totalAll > 0 ? <ReportOpenLink report="sozlesmeler" filters={{ durum: params.durum, tur: params.tur, from: params.from, to: params.to }} /> : null}
             {canCreate ? <ButtonLink href="/app/sozlesmeler/yeni" icon={Plus}>Yeni sözleşme</ButtonLink> : null}
           </>
         }

@@ -1,11 +1,10 @@
 import { BarChart3, Building2, UserCheck, UserMinus, Users } from "lucide-react";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { formatTurkishPhone } from "@/lib/phone";
 import { orIlike } from "@/lib/pgrst";
 import { formatDateTr } from "@/lib/format";
-import { exportMembersCsv } from "@/app/actions/platform-export";
-import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminActiveFilters, AdminChip, AdminInfo, AdminListCard, AdminListSearch } from "@/components/admin/admin-list";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
@@ -121,7 +120,7 @@ export default async function AdminMembersPage({
         title="Tüm platform kullanıcıları"
         art="users"
         description={filtered ? `${memberTotal ?? rows.length} sonuç · toplam ${totalMembers} profil içinde süzülüyor` : `${totalMembers} profil · ofis bazlı görünüm`}
-        actions={<ExportButton action={exportMembersCsv} label="Excel'e aktar" />}
+        actions={<ReportOpenLink scope="platform" report="uyeler" filters={{ q: f.q, durum: f.durum, rol: f.rol }} />}
       >
         <KpiGrid label="Kullanıcı göstergeleri">
           <KpiCard layout="inline" label="Toplam kullanıcı" value={totalMembers || "—"} href="/admin/members" icon={Users} tone="gold" tinted={!filtered} hint={totalMembers ? undefined : "Henüz kullanıcı yok"} />

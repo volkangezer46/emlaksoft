@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import {
   AlarmClock,
@@ -28,8 +29,6 @@ import type { BoardDeal } from "./deal-board";
 import { DealBoard } from "./deal-board-lazy";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ReferralNudge } from "@/components/app/referral-nudge";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportDealsCsv } from "@/app/actions/export";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
@@ -448,11 +447,7 @@ export default async function DealsPage({
         description={`${stageLabels.new.label} → ${stageLabels.qualified.label} → ${stageLabels.negotiation.label} → ${stageLabels.won.label}/${stageLabels.lost.label}. Kazanıldığında komisyon otomatik üretilir.`}
         actions={
           <>
-            <ExportCsvButton
-              label="Dışa aktar"
-              action={exportDealsCsv}
-              className="focus-ring press inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-4 text-sm font-semibold text-ink-950 transition hover:bg-canvas disabled:opacity-50"
-            />
+            <ReportOpenLink report="anlasmalar" filters={{ advisor: officeWide ? danismanF || undefined : undefined }} />
             {canCreate ? <ButtonLink href="/app/anlasmalar/yeni" icon={Plus}>Yeni anlaşma</ButtonLink> : null}
           </>
         }

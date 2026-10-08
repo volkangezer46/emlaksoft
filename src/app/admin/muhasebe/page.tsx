@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, Download, FileSpreadsheet, Info } from "lucide-react";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
+import { AlertTriangle, FileSpreadsheet, Info } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,7 +16,6 @@ import {
   isCollectedIn,
   summarizeLedger,
 } from "@/lib/accounting/ledger";
-import { ACCOUNTING_EXPORT_PATH } from "@/lib/accounting/csv";
 import { formatKurus, formatKurusShort } from "@/lib/accounting/format";
 import {
   EF_ITEM_LABELS,
@@ -199,12 +199,7 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
         title="Muhasebe"
         description="Tahsilat, KDV, iade, gelir türü ve ödeme yöntemi özeti. Her kart ilgili fatura defterine gider."
         actions={
-          <a
-            href={`${ACCOUNTING_EXPORT_PATH}?${exportQs}`}
-            className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 hover:border-brand-400 hover:text-brand-600"
-          >
-            <Download className="h-3.5 w-3.5" /> Muhasebeci CSV (bu dönem)
-          </a>
+          <ReportOpenLink scope="platform" report="muhasebe-fatura-defteri" filters={Object.fromEntries(new URLSearchParams(exportQs))} label="Raporlarda aç (muhasebe defteri)" />
         }
       />
 

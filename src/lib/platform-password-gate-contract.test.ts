@@ -49,7 +49,7 @@ describe("zorunlu parola değişimi kapısı", () => {
   });
 
   it("admin action'ları ortak kapıdan geçer", () => {
-    const files = ["platform-members", "platform-cron", "platform-messaging-keys", "platform-activity-export", "error-logs", "platform-staff"];
+    const files = ["platform-members", "platform-cron", "platform-messaging-keys", "error-logs", "platform-staff"];
     for (const name of files) {
       const src = read(`src/app/actions/${name}.ts`);
       expect(/guardPlatformAction\(|requirePlatformModule\(|requirePlatformStaff\(/.test(src), name).toBe(true);

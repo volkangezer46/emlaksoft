@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
@@ -16,10 +17,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { PAGE_SIZE, Pagination, pageRange } from "@/app/admin/_components/pagination";
 import { InteractiveChart } from "@/components/app/interactive-chart";
-import { ExportButton } from "@/components/admin/export-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { exportTicketsCsv } from "@/app/actions/platform-export";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import { cn } from "@/lib/utils";
 import type { TicketStatus } from "@/lib/support/ticket-contract";
@@ -495,7 +494,7 @@ export default async function AdminTicketsPage({
             <ButtonLink href={filters.tenant ? `/admin/tickets/yeni?tenant=${filters.tenant}` : "/admin/tickets/yeni"} size="lg" variant="primary" icon={LifeBuoy}>
               Yeni talep
             </ButtonLink>
-            <ExportButton action={exportTicketsCsv} label="CSV dışa aktar" />
+            <ReportOpenLink scope="platform" report="destek-talepleri" filters={{ durum: filters.durum ?? undefined, oncelik: filters.oncelik ?? undefined, kategori: filters.kategori ?? undefined }} />
             <ButtonLink href="/admin/tickets/makrolar" size="lg" variant="outline">
               Hazır yanıtlar
             </ButtonLink>

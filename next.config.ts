@@ -44,10 +44,13 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/*": ["node_modules/sharp/**", "node_modules/@img/**"],
   },
-  // Tarayıcı eklentisi paketi (build sırasında public/downloads'a yazılır): indirme ucu ve kurulum sayfası çalışma anında okur.
+  // Tarayıcı eklentisi paketi (build sırasında public/downloads'a yazılır) ve rapor merkezi PDF yazı tipi
+  // (src/assets/fonts) çalışma anında fs ile okunur; izleme dosyaları kendiliğinden bulamaz.
   outputFileTracingIncludes: {
     "/api/app/ilan-kontrol/eklenti.zip": ["./public/downloads/**/*"],
     "/app/ilan-kontrol/eklenti": ["./public/downloads/**/*"],
+    "/api/app/rapor/[id]": ["./src/assets/fonts/**"],
+    "/api/admin/rapor/[id]": ["./src/assets/fonts/**"],
   },
 
   images: {

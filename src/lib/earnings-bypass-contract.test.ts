@@ -34,13 +34,18 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
     expect(lib).toContain("const visible = t.profile_id ? seeAll || t.profile_id === viewer.userId : seeAll;");
   });
 
-  it("dışa aktarma: komisyon ve denetim earnings_all olmadan kendi kapsamı (hızlı + tam akış)", () => {
-    const quick = read("src/app/actions/export.ts");
-    const full = read("src/lib/export-full.ts");
-    expect(quick).toContain('!hasOfficeWideDataScope(gate.role) || !seeAll) q = q.eq("deal.assigned_to", gate.userId)');
-    expect(quick).toContain('!hasOfficeWideDataScope(gate.role) || !seeAll) q = q.eq("actor_id", gate.userId)');
-    expect(full).toContain('!hasOfficeWideDataScope(gate.role) || !gate.seeAllEarnings) q = q.eq("deal.assigned_to", gate.userId)');
-    expect(full).toContain('!hasOfficeWideDataScope(gate.role) || !gate.seeAllEarnings) q = q.eq("actor_id", gate.userId)');
+  it("dışa aktarma: komisyon, komisyon ödemesi ve denetim raporları earnings_all olmadan kendi kapsamı (rapor merkezi)", () => {
+    const sales = read("src/lib/report-center/catalog/tenant-sales.ts");
+    const team = read("src/lib/report-center/catalog/tenant-team.ts");
+    const helpers = read("src/lib/report-center/query-helpers.ts");
+    // Kazanç raporları kapsam yardımcısına `earnings: true` ile bağlıdır.
+    expect(sales).toContain('actorColumn: "deal.assigned_to", earnings: true');
+    expect(sales).toContain('actorColumn: "profile_id", earnings: true');
+    expect(team).toContain('actorColumn: "actor_id", earnings: true');
+    // Yardımcı: ofis geneli kapsam YA DA earnings_all yoksa yalnız kendi kayıtları.
+    expect(helpers).toContain("!ctx.officeWide || (opts.earnings && !ctx.seeAllEarnings)");
+    // Kâr/zarar yalnız earnings_all sahibine açılır.
+    expect(read("src/lib/report-center/registry.ts")).toContain("def.earningsAllOnly && !v.seeAllEarnings");
   });
 
   it("danisman-kpi: ciro sütunu showRevenue ile kapalı", () => {

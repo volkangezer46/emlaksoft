@@ -2,22 +2,20 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Undo2, X } from "lucide-react";
+import { Undo2, X } from "lucide-react";
 import { BulkBar } from "@/components/ui/list-kit";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBulkSelection } from "@/components/app/bulk-selection";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkUpdateOfferStatus } from "@/app/actions/offers";
-import { exportOffersCsv } from "@/app/actions/export";
-import { downloadCsv } from "@/lib/download-csv";
 
-/** Teklif listesi toplu işlemleri: reddet / geri çek (onaylı, tek tek atomik geçiş) ve seçili CSV. */
+/** Teklif listesi toplu işlemleri: reddet / geri çek (onaylı, tek tek atomik geçiş). */
 export function OfferBulkBar() {
   const { selected, clear } = useBulkSelection();
   const router = useRouter();
   const { push } = useToast();
-  const [pending, startTransition] = useTransition();
+  const [pending] = useTransition();
   if (selected.size === 0) return null;
   const ids = [...selected];
 
@@ -54,21 +52,6 @@ export function OfferBulkBar() {
           </Button>
         }
       />
-      <Button
-        size="sm"
-        variant="secondary"
-        loading={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const res = await exportOffersCsv(ids);
-            if (res.error || !res.csv) return push(res.error ?? "İndirilecek kayıt yok", "err");
-            downloadCsv(res.csv, res.filename ?? "teklifler.csv");
-            push(`${res.rowCount ?? 0} teklif CSV olarak indirildi`, "ok");
-          })
-        }
-      >
-        <Download className="h-3.5 w-3.5" /> CSV
-      </Button>
     </BulkBar>
   );
 }

@@ -22,11 +22,15 @@ describe("F1 yasal kayıt defteri sözleşmesi", () => {
   it("TC kimlik numarası kolonu yoktur", () => {
     expect(sql).not.toMatch(/\b(tc_?kimlik|tckn|national_id|identity_number|id_number)\b/i);
   });
-  it("action'lar kapılı; CSV yalnız owner/gm ve denetim logu yazar; log kişisel veri taşımaz", () => {
+  it("action'lar kapılı; dosya çıktısı Rapor merkezinde yalnız owner/gm'e açık ve denetim logu yazar; log kişisel veri taşımaz", () => {
     const src = read("src/app/actions/compliance-ledger.ts");
-    expect(src.match(/requirePermission\(/g)?.length).toBe(3);
+    expect(src.match(/requirePermission\(/g)?.length).toBe(2);
     expect(src).toContain('isOfficeLevel(gate.role)');
-    expect(src).toContain('action: "export.csv"');
+    expect(src).not.toContain("exportLedgerCsv");
+    const report = read("src/lib/report-center/catalog/tenant-finance.ts");
+    expect(report).toContain('rolesOnly: ["owner", "gm"]');
+    expect(report).toContain('module: "compliance"');
+    expect(read("src/lib/report-center/download.ts")).toContain('REPORT_EXPORT_ACTION = "export.report"');
     expect(src).not.toMatch(/newValue:\s*\{[^}]*party_name/);
     expect(src).not.toMatch(/\.(update|delete|upsert)\(\s*\{?[^)]*compliance_ledger_entries/);
     expect(src).not.toMatch(/from\("compliance_ledger_entries"\)\s*\.(update|delete)/);

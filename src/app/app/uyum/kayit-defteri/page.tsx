@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeft, BookLock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -9,8 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
-import { exportLedgerCsv } from "@/app/actions/compliance-ledger";
 import { trDayKey } from "@/lib/clock";
 import { formatDateTr, formatTryAmount } from "@/lib/format";
 import {
@@ -71,7 +70,7 @@ function href(params: { filtre?: string; tur?: string; sayfa?: number; duzelt?: 
 }
 
 /**
- * Yasal kayıt defteri: ekle-yalnız kayıt (düzeltme yeni kayıttır), ofis eşikleriyle işaretleme, CSV.
+ * Yasal kayıt defteri: ekle-yalnız kayıt (düzeltme yeni kayıttır), ofis eşikleriyle işaretleme; dosya çıktısı Rapor merkezinde.
  * Ofis sahibi / genel müdür tüm ofisi görür; diğer roller yalnız kendi kayıtlarını (RLS de zorlar).
  */
 export default async function LedgerPage({
@@ -242,7 +241,7 @@ export default async function LedgerPage({
                 ) : null}
               </CardDescription>
             </div>
-            {officeLevel ? <ExportCsvButton label="CSV indir" action={exportLedgerCsv} /> : null}
+            {officeLevel ? <ReportOpenLink report="uyum-kayit-defteri" /> : null}
           </div>
         </CardHeader>
         <CardContent>

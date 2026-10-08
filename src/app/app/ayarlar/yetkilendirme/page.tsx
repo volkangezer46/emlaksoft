@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import { ArrowLeft, ArrowUpRight, Fingerprint, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -14,10 +15,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageTabs, type PageTab } from "@/components/app/page-tabs";
 import { StatRow } from "@/components/ui/stat-row";
 import { Alert } from "@/components/ui/alert";
-import { ExportCsvButton } from "@/components/app/export-csv-button";
 import { FilterDate, FilterGrid, FilterSelect, ListPager, pageWindow, parsePage } from "@/components/ui/list-kit";
 import { MODULE_LABELS } from "../roller/role-permissions-matrix";
-import { exportAccessAuditCsv, listAccessAudit } from "@/app/actions/access-control";
+import { listAccessAudit } from "@/app/actions/access-control";
 import {
   AUDIT_CHANGE_LABELS,
   OVERRIDE_RESOURCE_LABELS,
@@ -321,7 +321,7 @@ async function PermissionExceptions({
   );
 }
 
-/** (d) Denetim günlüğü: URL filtre kontratı + gerçek sayfalama + CSV (aynı süzgeç). */
+/** (d) Denetim günlüğü: URL filtre kontratı + gerçek sayfalama; rapor için "Raporlarda aç" (aynı süzgeç). */
 async function AuditLog({
   sp,
   nameOf,
@@ -348,7 +348,7 @@ async function AuditLog({
           <p className="text-xs text-text-muted">Yalnız yetki DEĞİŞİKLİKLERİ yazılır (kim, kime, ne, önce/sonra, gerekçe). Okuma izi tutulmaz.</p>
         </div>
         {canExport ? (
-          <ExportCsvButton label={hasFilter ? "Filtreyi dışa aktar" : "Dışa aktar"} action={exportAccessAuditCsv.bind(null, filters)} />
+          <ReportOpenLink report="yetki-denetimi" filters={{ tur: filters.tur, kullanici: filters.kullanici, yapan: filters.yapan, from: filters.from, to: filters.to }} />
         ) : null}
       </div>
       <form method="get" action={PATH} className="border-b border-line bg-canvas/50 px-5 py-3">

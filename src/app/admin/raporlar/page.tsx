@@ -5,8 +5,8 @@ import { moduleAdoption } from "@/lib/admin/platform-metrics";
 import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
-import { exportPlatformReportCsv } from "@/app/actions/platform-export";
-import { ExportButton } from "@/components/admin/export-button";
+import { ReportCenter } from "@/components/report-center/report-center";
+import { ReportTabs } from "@/components/report-center/report-tabs";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
@@ -32,10 +32,20 @@ function parseDateParam(raw: string | undefined): string | undefined {
 export default async function AdminReportsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ from?: string; to?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requirePlatformModule("reports");
-  const sp = (await searchParams) ?? {};
+  const rawSp = (await searchParams) ?? {};
+  // Rapor merkezi sekmesi (?sekme=merkez): tüm dışa aktarma (Excel / PDF / CSV) burada; dashboard sorguları çalışmaz.
+  if ((Array.isArray(rawSp.sekme) ? rawSp.sekme[0] : rawSp.sekme) === "merkez") {
+    return (
+      <div className="space-y-5">
+        <ReportTabs scope="platform" active="merkez" overviewLabel="Platform analizi" />
+        <ReportCenter scope="platform" params={rawSp} />
+      </div>
+    );
+  }
+  const sp = { from: Array.isArray(rawSp.from) ? rawSp.from[0] : rawSp.from, to: Array.isArray(rawSp.to) ? rawSp.to[0] : rawSp.to };
   const from = parseDateParam(sp.from);
   const to = parseDateParam(sp.to);
   const dateFiltered = Boolean(from || to);
@@ -140,13 +150,13 @@ export default async function AdminReportsPage({
 
   return (
     <div className="space-y-5">
+      <ReportTabs scope="platform" active="ozet" overviewLabel="Platform analizi" />
       <AdminPageHeader
         eyebrow="Platform analizi"
         icon={BarChart3}
         title="Platform raporları"
         description="Gelir, büyüme, paket dağılımı ve destek performansı — tüm ofislerin toplu görünümü."
         glow="mint"
-        actions={<ExportButton action={exportPlatformReportCsv} label="Raporu indir" variant="light" />}
       >
         <KpiGrid label="Platform göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
           {kpis.map((k) => (

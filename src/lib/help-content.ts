@@ -432,15 +432,15 @@ export const GUIDES: readonly Guide[] = [
   },
   {
     slug: "komisyon-disa-aktar",
-    title: "Komisyon dışa aktarma",
-    intro: "Komisyon listesini muhasebeniz için CSV olarak indirin.",
+    title: "Komisyon raporu (Excel / PDF / CSV)",
+    intro: "Komisyon listesini muhasebeniz için Rapor merkezinden Excel, PDF ya da CSV olarak indirin.",
     steps: [
-      "Komisyon sayfasında listeyi istediğiniz filtreyle daraltın.",
-      "\"Dışa aktar\" düğmesine basın; CSV indirilir.",
-      "Dosyayı Excel'de açarken ayraç olarak noktalı virgül seçin.",
+      "Komisyon sayfasında \"Raporlarda aç\" bağlantısına basın; durum ve tarih filtreniz rapora taşınır.",
+      "Rapor merkezinde filtreyi gözden geçirin, önizlemeyi görün.",
+      "Excel (.xlsx), PDF ya da CSV düğmesine basın. CSV noktalı virgül ayraçlıdır; Excel Türkçe doğrudan açar.",
     ],
-    href: "/app/komisyon",
-    cta: "Komisyon sayfası",
+    href: "/app/raporlar?sekme=merkez&rapor=komisyonlar",
+    cta: "Komisyon raporu",
   },
   {
     slug: "giderler-aidat",

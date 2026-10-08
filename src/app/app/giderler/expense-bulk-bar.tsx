@@ -2,17 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Tags, Trash2 } from "lucide-react";
+import { Tags, Trash2 } from "lucide-react";
 import { BulkBar } from "@/components/ui/list-kit";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBulkSelection } from "@/components/app/bulk-selection";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkDeleteExpenses, bulkSetExpenseCategory } from "@/app/actions/expenses";
-import { exportExpensesCsv } from "@/app/actions/export";
-import { downloadCsv } from "@/lib/download-csv";
 
-/** Gider listesi toplu işlemleri: kategori değiştir, sil (onaylı), seçili satırların CSV'si. */
+/** Gider listesi toplu işlemleri: kategori değiştir, sil (onaylı). */
 export function ExpenseBulkBar({
   categories,
   canEdit,
@@ -65,21 +63,6 @@ export function ExpenseBulkBar({
           </Button>
         </>
       ) : null}
-      <Button
-        size="sm"
-        variant="secondary"
-        loading={pending}
-        onClick={() =>
-          startTransition(async () => {
-            const res = await exportExpensesCsv(ids);
-            if (res.error || !res.csv) return push(res.error ?? "İndirilecek kayıt yok", "err");
-            downloadCsv(res.csv, res.filename ?? "giderler.csv");
-            push(`${res.rowCount ?? 0} gider CSV olarak indirildi`, "ok");
-          })
-        }
-      >
-        <Download className="h-3.5 w-3.5" /> CSV
-      </Button>
       {canDelete ? (
         <ConfirmDialog
           title={`${ids.length} gider kalıcı silinsin mi?`}

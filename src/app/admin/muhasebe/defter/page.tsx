@@ -1,13 +1,14 @@
 import { Button } from "@/components/ui/button";
+import { ReportOpenLink } from "@/components/report-center/report-open-link";
 import Link from "@/components/ui/smart-link";
-import { AlertTriangle, Download, FileText, X } from "lucide-react";
+import { AlertTriangle, FileText, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { PageHeader } from "@/components/ui/page-header";
 import { AdminEmpty } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now as clockNow } from "@/lib/clock";
-import { ACCOUNTING_EXPORT_PATH, csvDate } from "@/lib/accounting/csv";
+import { csvDate } from "@/lib/accounting/csv";
 import { resolvePeriod, periodSearchParams } from "@/lib/accounting/period";
 import {
   INVOICE_KINDS,
@@ -56,7 +57,8 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
     for (const k of drop) delete merged[k];
     return `/admin/muhasebe/defter?${new URLSearchParams(merged).toString()}`;
   };
-  const exportHref = `${ACCOUNTING_EXPORT_PATH}?${new URLSearchParams({ ...periodQs, ...filterQs }).toString()}`;
+  // Rapor merkezi muhasebe defteri: dönem + rapordaki süzgeçler (ofis / kupon / tutar aralığı sayfaya özgüdür).
+  const exportFilters: Record<string, string | undefined> = { ...periodQs, durum: filterQs.durum, tur: filterQs.tur, yontem: filterQs.yontem, q: filterQs.q };
 
   const chips: { label: string; href: string }[] = [];
   if (filter.durum) chips.push({ label: `Durum: ${LEDGER_STATUS_FILTER_LABELS[filter.durum]}`, href: href({}, ["durum"]) });
@@ -81,12 +83,7 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
         description="Dönem ve süzgeçlere göre fatura listesi. Satıra tıklayınca fatura detayı ve işlemler açılır."
         breadcrumbs={[{ label: "Muhasebe", href: "/admin/muhasebe" }, { label: "Fatura defteri" }]}
         actions={
-          <a
-            href={exportHref}
-            className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 hover:border-brand-400 hover:text-brand-600"
-          >
-            <Download className="h-3.5 w-3.5" /> Bu liste için muhasebeci CSV
-          </a>
+          <ReportOpenLink scope="platform" report="muhasebe-fatura-defteri" filters={exportFilters} label="Raporlarda aç (bu liste)" />
         }
       />
 

@@ -358,7 +358,7 @@ npm run test:e2e -- access-control.spec.ts
 ## Bilinen Sorunlar & TODO
 
 - [ ] RLS politikaları mevcut tablolara eklenmesi (customer_demands, properties, deals, commissions) — bugün kontrol uygulama katmanında + tenant RLS
-- [ ] `/api/export/[entity]` tam akış ve ana ekran `scopeMine` kapsam bağlantısı
+- [ ] Rapor merkezi (`src/lib/report-center`) kapsamı bayrakla uygular; ana ekran `scopeMine` kapsam bağlantısı
 - [ ] E2E testler
 - [ ] Cron yetkilendirme kontrol
 

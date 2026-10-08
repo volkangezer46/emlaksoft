@@ -5,14 +5,12 @@ import {
   computeRetainUntil,
   isThresholdFlagged,
   isValidIsoDate,
-  mapLedgerCsvRow,
   parseAmountTry,
   parseLedgerFilters,
   parseLedgerForm,
   parseRetentionYears,
   parseThreshold,
 } from "./ledger";
-import { csvCell } from "@/lib/export-entities";
 
 function form(entries: Record<string, string>) {
   const fd = new FormData();
@@ -128,7 +126,7 @@ describe("parseLedgerForm", () => {
   });
 });
 
-describe("filtre ve CSV", () => {
+describe("filtre", () => {
   it("bilinmeyen filtre ve bozuk sayfa temizlenir", () => {
     expect(parseLedgerFilters({ filtre: "x", tur: "y", sayfa: "-3" })).toEqual({ filtre: "", tur: "", sayfa: 1 });
     expect(parseLedgerFilters({ filtre: "suredoldu", tur: "sale", sayfa: "4" })).toEqual({
@@ -136,27 +134,5 @@ describe("filtre ve CSV", () => {
       tur: "sale",
       sayfa: 4,
     });
-  });
-  it("CSV satırı Türkçe etiketli, TC kolonu yok ve formül enjeksiyonuna dayanıklı", () => {
-    const row = mapLedgerCsvRow({
-      created_at: "2026-10-01T10:00:00Z",
-      transaction_date: "2026-10-01",
-      kind: "correction",
-      transaction_type: "sale",
-      party_name: "=HYPERLINK(\"x\")",
-      party_role: "buyer",
-      counterparty_name: null,
-      identity_checked: false,
-      amount_try: 100,
-      payment_method: "cash",
-      flags: ["identity_not_checked"],
-      retain_until: "2031-10-01",
-      corrects_entry_id: null,
-      note: null,
-      creator: "Ofis Sahibi",
-    });
-    expect(Object.keys(row).join("|")).not.toMatch(/tc|kimlik no/i);
-    expect(row["Kayıt türü"]).toBe("Düzeltme");
-    expect(csvCell(row["Taraf"]).startsWith("\"'=") || csvCell(row["Taraf"]).startsWith("'=")).toBe(true);
   });
 });

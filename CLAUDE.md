@@ -44,6 +44,8 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   (2) `NAV_MODULES` (`src/app/app/layout.tsx`), (3) sidebar (`src/components/app/app-sidebar.tsx`),
   (4) roller ekranı MODULES listesi (`src/app/app/ayarlar/roller/`) + `permission_defaults`
   seed migration'ı. Birini atlarsan modül ya görünmez ya kapısızdır.
+- **Dışa aktarma = Rapor merkezi:** sayfalara indirme/CSV/Excel düğmesi KOYMA. Dosya çıktısı yalnız `src/lib/report-center/` (rapor tanımı `catalog/*`, `/app/raporlar?sekme=merkez` ve `/admin/raporlar?sekme=merkez`);
+  sayfada gerekiyorsa `<ReportOpenLink report="..." filters={{...}} />` ("Raporlarda aç") kullanılır. Her rapor kiracı sınırı + aktör kapsamı taşır (sözleşme testi gerçek sorguyu çalıştırır); XLSX/PDF üreticileri yalnız sunucuda.
 - **Sıfır çıkmaz metrik:** görünen her sayı/kart/satır tıklanabilir olmalı ve filtrelenmiş
   hedefe götürmeli (StatCard `href`). Sahte skor/boş vaat yasak.
 - **Filtre kontratı:** liste sayfaları searchParams'ı iki yönlü işler — URL'deki filtre

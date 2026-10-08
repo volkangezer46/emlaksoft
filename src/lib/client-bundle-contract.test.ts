@@ -146,3 +146,32 @@ describe("kabuk panelleri: lazyPanel + boşta ön yükleme", () => {
     expect(src).toMatch(/set\w+\(\(\) => \w+\.resolve\(\)\)/);
   });
 });
+
+describe("rapor merkezi: XLSX / PDF üreticileri istemci paketine girmez", () => {
+  // İstemci bileşenleri (use client) yalnız düz dize alır; katalog ve biçim yazıcıları sunucudadır.
+  const REPORT_CLIENT_ENTRIES = [
+    "src/components/report-center/download-buttons.tsx",
+    "src/components/report-center/report-tabs.tsx",
+    "src/components/report-center/report-open-link.tsx",
+    "src/components/ui/segmented-control.tsx",
+  ];
+  const HEAVY = ["pdf-lib", "@pdf-lib/fontkit", "node:zlib", "node:fs/promises"];
+  it.each(REPORT_CLIENT_ENTRIES)("%s → pdf-lib / fontkit / zlib zinciri yok", (entry) => {
+    expect(existsSync(join(ROOT, entry)), `${entry} yok`).toBe(true);
+    for (const pkg of HEAVY) expect(chainTo(entry, pkg), `${entry} → ${pkg}`).toBeNull();
+  });
+
+  it("indirme düğmesi istemci bileşeni katalog / yazıcı modüllerini içe aktarmaz", () => {
+    const src = read("src/components/report-center/download-buttons.tsx");
+    expect(src).toMatch(/^"use client";/);
+    expect(src).not.toMatch(/report-center\/(registry|catalog|format|engine|render|download|context)/);
+    expect(chainTo("src/components/report-center/download-buttons.tsx", "zod")).toBeNull();
+  });
+
+  it("yazıcı bağımlılıkları yalnız sunucu yazıcılarında; XLSX sıfır bağımlılık", () => {
+    expect(read("src/lib/report-center/format/pdf.ts")).toContain('from "pdf-lib"');
+    expect(read("src/lib/report-center/format/xlsx.ts")).not.toMatch(/from "(exceljs|xlsx)"/);
+    // Hiçbir "use client" dosyası format/ dizinini içe aktarmaz.
+    expect(read("src/components/report-center/download-buttons.tsx")).not.toContain("report-center/format");
+  });
+});
