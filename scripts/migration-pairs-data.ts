@@ -223,6 +223,10 @@ const F = {
   dealProcessSteps: "20261008001500_deal_process_steps.sql",
   // M2 Bina & site yonetimi (2026-10-08): bina/daire + donemlik toplu aidat tahakkuku + ortak gider paylastirma + tahsilat + daire cari.
   buildingManagement: "20261008001700_building_management.sql",
+  // Ilan analizi (2026-10-08): listing_analyses onbellek tablosu (yeni tablo + RLS; kod tablo yokken analizi "etkin degil" der, kontor dusmez).
+  listingAnalyses: "20261008001800_listing_analyses.sql",
+  // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
+  vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -357,6 +361,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.propertyManagementCore]: "davranis", // rent_charges durum CHECK'i 'partial' ile genisler + paid_amount; yeni tahsilat/sozlesme/odeme tablolari + 4 DEFINER RPC; eski 'odendi' tahakkuklar icin tek seferlik legacy tahsilat dolgusu
     [F.buildingManagement]: "davranis", // yeni bina/daire/tahakkuk/tahsilat tablolari + 5 DEFINER RPC + KPI RPC; owner_charge_links kind CHECK'i 'unit_charge' ile genisler, silme politikasi daralir (mahsup elle silinemez)
     [F.platformDashboardRollups]: "ek", // yeni salt-okunur service_role RPC platform_dashboard_rollups (tablo/politika/veri degismez; RPC yokken ilgili paneller "okunamadi" gosterir, uydurma sifir yok)
+    [F.listingAnalyses]: "ek", // yeni listing_analyses tablosu (RLS: okuma ofis, yazma valuation.create); mevcut tablo/politika degismez
+    [F.vitrinChatClosedListing]: "davranis", // vitrin_chat_context govdesi yeniden tanimi: kapali portfoy artik sohbet baglamina GIRMEZ (govde+ACL baska degismez)
     [F.dealProcessSteps]: "ek", // yeni deal_process_steps tablosu (RLS: okuma ofis, yazma commissions.edit); mevcut tablo/politika degismez
     [F.leagueV2]: "ek", // yeni tablolar league_settings + league_challenges (RLS: okuma ofis, yazma targets izni); mevcut tablo/politika degismez
     [F.planUpgradeFulfillment]: "davranis", // fulfill + v2 tam govde yeniden tanimi: plan_upgrade faturasi islenir (taban 000300 govdesi bayt bayt korunur); bayrak kapaliyken kimse bu turde fatura kesmez
@@ -495,6 +501,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "MOD1-kisisel-modul-gizleme", order: 29.99987, title: "Kisisel modul gizleme tablosu (yalniz gorunurluk; sira serbest, ek)", files: [F.userModulePrefs] },
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
     { id: "PB57-tapu-sureci", order: 29.999862, title: "Tapu sureci adim takibi: deal_process_steps tablosu (kod tablo yokken bolumu etkin degil der; sira serbest)", files: [F.dealProcessSteps] },
+    { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
+    { id: "PB58-vitrin-sohbet-kapali", order: 29.999866, title: "vitrin_chat_context: kapali portfoy sizintisi duzeltmesi (000330 govdesi + suzgec; sira serbest)", files: [F.vitrinChatClosedListing] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999863, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
     { id: "PB55-admin-panel-toplulastirma", order: 29.999864, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
@@ -532,6 +540,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
 
   // [bagimli, onkosul]: kaynak = dosya govdeleri + BIRLESIK_YOL_HARITASI §4.2.
   requires: [
+    [F.vitrinChatClosedListing, F.vitrinChatContext],
     [F.plans, F.splits],
     [F.payouts, F.splits],
     [F.earningsPrivacy, F.earningsPerm],

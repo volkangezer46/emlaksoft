@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { OPEN_LISTING_OR_FILTER, isClosedListing, withClosedFlag } from "./closed-listing";
 
@@ -42,6 +42,17 @@ describe("public yüzeyler kapalı portföyü süzer", () => {
       expect(src).toContain("OPEN_LISTING_OR_FILTER");
     });
   }
+  it("vitrin_chat_context RPC'sinin SON tanımı kapalı portföyü hariç tutar (sohbet baglamı sızıntısı)", () => {
+    const dir = "supabase/migrations";
+    const defs = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .filter((f) => /create or replace function public\.vitrin_chat_context/i.test(readFileSync(`${dir}/${f}`, "utf8")));
+    expect(defs.length).toBeGreaterThan(1);
+    const last = readFileSync(`${dir}/${defs[defs.length - 1]}`, "utf8");
+    expect(last).toContain("p.features->>'closed_listing'");
+    expect(last).toMatch(/is distinct from 'true'/);
+  });
   it("public görsel ucu kapalı portföy görselini servis etmez", () => {
     expect(readFileSync("src/app/api/property-media/[id]/route.ts", "utf8")).toContain("isClosedListing");
   });

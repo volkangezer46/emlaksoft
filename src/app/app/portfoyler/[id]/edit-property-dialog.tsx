@@ -40,6 +40,7 @@ type Props = {
       building_age?: number | string | null;
       facade?: string | null;
       description?: string | null;
+      virtual_tour_url?: string | null;
     };
   };
   provinces: Province[];
@@ -111,7 +112,7 @@ export function EditPropertyDialog({
         title: "Başlık", transaction_type: "İşlem", property_type: "Tür", list_price: "Liste fiyatı",
         min_price: "Min. fiyat", commission_rate: "Komisyon %", rooms: "Oda", sqm: "m²", floor: "Kat",
         heating: "Isınma", building_age: "Bina yaşı", facade: "Cephe", parcel_block: "Tapu ada",
-        parcel_lot: "Tapu parsel", address_line: "Adres", description: "İlan açıklaması",
+        parcel_lot: "Tapu parsel", address_line: "Adres", description: "İlan açıklaması", virtual_tour_url: "360° tur / video",
       }}
       trigger={({ onClick, ...aria }) => (
         <button
@@ -127,7 +128,7 @@ export function EditPropertyDialog({
         { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "min_price", "commission_rate"] },
         { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade"] },
         { id: "konum", label: "Konum ve tapu", icon: MapPin, fields: ["address_line", "parcel_block", "parcel_lot"] },
-        { id: "aciklama", label: "Açıklama", icon: FileText, fields: ["description"] },
+        { id: "aciklama", label: "Açıklama", icon: FileText, fields: ["description", "virtual_tour_url"] },
       ]}
       panels={{
         temel: (
@@ -226,6 +227,20 @@ export function EditPropertyDialog({
             <p className="mt-1 text-right text-xs text-text-faint">
               {description.length}/{PROPERTY_DESCRIPTION_MAX}
             </p>
+            <label htmlFor="property-virtual-tour" className="mt-3 block text-xs font-medium text-text-muted">
+              360° tur / video bağlantısı (vitrinde gömülü görünür)
+            </label>
+            <input
+              id="property-virtual-tour"
+              name="virtual_tour_url"
+              type="url"
+              inputMode="url"
+              maxLength={500}
+              defaultValue={property.features.virtual_tour_url ?? ""}
+              placeholder="https://my.matterport.com/show/?m=… · YouTube · Vimeo · Kuula"
+              className={field}
+            />
+            <p className="mt-1 text-xs text-text-faint">Yalnız https; Matterport, YouTube, Vimeo ve Kuula bağlantıları kabul edilir. Boş bırakırsanız kaldırılır.</p>
           </div>
         ),
         konum: (
