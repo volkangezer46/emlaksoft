@@ -165,8 +165,9 @@ describe("evaluateBadges", () => {
     expect(evaluateBadges(emptyAgentStats({ rank: 2, score: 500 }))).toContain("podyum");
   });
 
-  it("16) seri rozetleri kademelidir: 7 gün İstikrar, 30 gün Maratoncu", () => {
-    expect(evaluateBadges(emptyAgentStats({ streakDays: 6 }))).toEqual([]);
+  it("16) seri rozetleri kademelidir: 5 gün Beş Gün Seri, 7 gün İstikrar, 30 gün Maratoncu", () => {
+    expect(evaluateBadges(emptyAgentStats({ streakDays: 4 }))).toEqual([]);
+    expect(evaluateBadges(emptyAgentStats({ streakDays: 6 }))).toEqual(["seri_5"]);
     const yedi = evaluateBadges(emptyAgentStats({ streakDays: 7 }));
     expect(yedi).toContain("haftalik_seri");
     expect(yedi).not.toContain("maratoncu");

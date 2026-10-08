@@ -172,7 +172,7 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
   const admin = createAdminClient();
   const { data: existing, error: loadError } = await admin
     .from("deals")
-    .select("id, stage, property_id, customer_id, deal_type, deal_value")
+    .select("id, stage, property_id, customer_id, deal_type, deal_value, assigned_to")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -257,12 +257,23 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
 
   if (outcome === "applied" && stage === "won" && previousStage !== "won") {
     try {
+      // Kutlama (Lig 2.0): ofis geneline, kazanan danışman adıyla ve lig puanıyla; TUTAR/komisyon yazılmaz (P12).
+      // Puan krediyi alan danışman = anlaşmanın sorumlusu (lig `assigned_to` sayar), yoksa işlemi yapan.
+      const winnerId = typeof existing.assigned_to === "string" ? existing.assigned_to : gate.userId;
+      const { data: winner } = await admin
+        .from("profiles")
+        .select("full_name")
+        .eq("id", winnerId)
+        .eq("tenant_id", gate.tenantId)
+        .maybeSingle();
+      const winnerName = typeof winner?.full_name === "string" && winner.full_name.trim() ? winner.full_name.trim() : "Bir danışmanımız";
       await notifyTenant({
         tenantId: gate.tenantId,
-        title: "Anlaşma kazanıldı",
-        body: "Pipeline’da won · komisyon kontrol edin",
-        href: "/app/komisyon",
+        title: `Anlaşma kazanıldı: ${winnerName}`,
+        body: "Tebrikler! Kazanılan anlaşma ligde puan olarak yazıldı.",
+        href: "/app/lig",
         kind: "success",
+        dedupeKey: `deal-won:${id}`,
       });
     } catch (notificationError) {
       console.error("updateDealStage notification", notificationError);

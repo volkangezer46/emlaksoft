@@ -203,6 +203,8 @@ const F = {
   subscriptionPause: "20261007001000_subscription_pause_and_plan_change.sql",
   // PB53: fulfill + v2 TAM govde (000300 tabanindan; plan_upgrade faturasi). 001000 sutunlarina bakar.
   planUpgradeFulfillment: "20261007001010_plan_upgrade_fulfillment.sql",
+  // Lig 2.0 (2026-10-08): ofis ayarli puan kurallari + meydan okuma tablolari (yeni tablo, varsayilan davranis degismez).
+  leagueV2: "20261008000600_league_v2.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -329,6 +331,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.leadCaptureTokenDefault]: "davranis", // NULL tokenli ofislerde vitrin talep formu acilir (lead_capture_enabled degismez)
     [F.profileAvatar]: "ek", // profiles/platform_staff'a 2 nullable sutun + public avatars kovasi + sahip-yolu storage politikalari + kendi satirina yazan DEFINER RPC set_my_avatar; mevcut davranis degismez
     [F.subscriptionPause]: "ek", // subscriptions'a duraklatma/planli dusurme sutunlari + 4 authenticated JWT RPC + 2 service_role cron RPC + hazirlik yoklamasi; bayraklar SQL'de de kontrol edilir, mevcut davranis degismez (bayrak KAPALI)
+    [F.leagueV2]: "ek", // yeni tablolar league_settings + league_challenges (RLS: okuma ofis, yazma targets izni); mevcut tablo/politika degismez
     [F.planUpgradeFulfillment]: "davranis", // fulfill + v2 tam govde yeniden tanimi: plan_upgrade faturasi islenir (taban 000300 govdesi bayt bayt korunur); bayrak kapaliyken kimse bu turde fatura kesmez
     [F.contractSignerReminder]: "ek", // contract_signers'a short_code/reminder_count/last_reminded_at + 2 DEFINER RPC (hatirlatma yuku: tam token donmez; kisa kod cozumu anon)
     [F.perfIndexesRpc]: "davranis", // current_session_two_factor_satisfied/is_platform_staff/support_is_ticket_staff dili sql->plpgsql (govde+ACL birebir; sorgu basi ~360us ayristirma biter) + idx_customer_demands_tenant_created
@@ -458,6 +461,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },
     { id: "PB53-abonelik-duraklatma-yukseltme", order: 29.9992, title: "Abonelik duraklatma + planli dusurme (sutun + RPC) -> oransal paket yukseltme faturasi (fulfill/v2 tam govde)", files: [F.subscriptionPause, F.planUpgradeFulfillment] },
     { id: "PB55-profil-avatar", order: 29.9998, title: "Profil fotografi / hazir avatar (sutun + avatars kovasi + set_my_avatar RPC; sira serbest)", files: [F.profileAvatar] },
+    { id: "PB55-lig-2", order: 29.99985, title: "Lig 2.0: ofis ayarli puan kurallari + meydan okuma tablolari (kod tablo yokken varsayilan kurallara duser)", files: [F.leagueV2] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
   ],
 

@@ -160,13 +160,15 @@ export function resolveTvDark(theme: TvTheme, systemDark: boolean): boolean {
 /* Olay akışı (kişisel veri YOK)                                               */
 /* -------------------------------------------------------------------------- */
 
-export type TvEventKind = "customer" | "appointment" | "deal" | "property";
+export type TvEventKind = "customer" | "appointment" | "deal" | "property" | "badge";
 
 export const TV_EVENT_LABELS: Record<TvEventKind, string> = {
   customer: "Yeni müşteri eklendi",
   appointment: "Randevu tamamlandı",
   deal: "Teklif kabul edildi",
   property: "Yeni portföy eklendi",
+  // Lig 2.0 kutlaması: kişi adı yok (TV ziyaretçiye açık ekrandır), yalnız olay.
+  badge: "Yeni rozet kazanıldı",
 };
 
 export type TvEvent = { id: string; kind: TvEventKind; label: string; at: string };

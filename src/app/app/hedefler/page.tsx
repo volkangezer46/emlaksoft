@@ -157,7 +157,15 @@ export default async function HedeflerPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Hedefler & Kota" eyebrow="Performans hedefleri" description="Danışman ve ofis bazında satış hedeflerini takip edin." actions={
-canCreate ? <TargetCreateTrigger /> : null
+<div className="flex flex-wrap items-center gap-2">
+  <Link
+    href="/app/lig?sekme=meydan"
+    className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-text-muted transition hover:bg-surface-2 hover:text-text"
+  >
+    <Rocket className="h-3.5 w-3.5" aria-hidden="true" /> Meydan okumalar
+  </Link>
+  {canCreate ? <TargetCreateTrigger /> : null}
+</div>
 } />
 {canCreate ? <TargetCreatePanel members={memberList} /> : null}
 {targets.length > 0 ? (
