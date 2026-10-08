@@ -61,13 +61,14 @@ export async function GelirEgrisi({ ctx }: { ctx: HomeCtx }) {
           </Link>
         ) : null}
       </div>
-      <div className="mt-4 h-56">
+      <div className="mt-4 h-72">
         {series ? (
           <AreaTrendChart
             data={series}
             tone="gold"
             format="money"
             name="Komisyon tahakkuku"
+            summary="total"
             animationKey={ctx.scopeMine ? "ben" : "ofis"}
             ariaLabel="Son 6 ay aylık komisyon tahakkuku"
           />

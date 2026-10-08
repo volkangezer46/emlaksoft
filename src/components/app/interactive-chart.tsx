@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useId } from "react";
+import { ChartRangePanel, useChartRange } from "@/components/ui/chart-range";
+import type { Granularity, RangeSummaryMode } from "@/components/ui/chart-range-math";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 
 /**
@@ -62,7 +64,7 @@ const PAD_TOP = 10;
 const PAD_BOTTOM = 4;
 const PAD_X = 4;
 
-export function InteractiveChart({
+function InteractiveChartBase({
   data,
   color = "var(--viz-1)",
   color2 = "var(--viz-3)",
@@ -399,5 +401,46 @@ export function InteractiveChart({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * InteractiveChart — çizgi/alan grafiği + zaman aralığı katmanı. >= 6 noktada altta sürüklenebilir mini harita,
+ * hazır aralık hapları ve CANLI özet (aralık toplamı + önceki aynı süreye göre değişim %) çıkar; ana grafik sürüklerken
+ * anında güncellenir (animasyonsuz, rAF). Çift tık sıfırlar. Veri sunucudan geniş gelir, süzme istemcidedir.
+ */
+export function InteractiveChart(
+  props: Props & {
+    /** Aralık seçici (varsayılan: >= 6 noktada açık). */
+    rangeable?: boolean;
+    granularity?: Granularity;
+    /** "total": aralık toplamı (akış), "last": son değer (stok), "none". */
+    summary?: RangeSummaryMode;
+  },
+) {
+  const { rangeable, granularity = "month", summary = "total", data, ...rest } = props;
+  const n = data.length;
+  const canRange = (rangeable ?? n >= 6) && n >= 4;
+  const { range, setRange, reset } = useChartRange(n);
+  const rows = useMemo(() => (canRange ? data.slice(range[0], range[1] + 1) : data), [canRange, data, range]);
+  const labels = useMemo(() => data.map((d) => d.label), [data]);
+  const values = useMemo(() => data.map((d) => d.value), [data]);
+  if (!canRange) return <InteractiveChartBase {...rest} data={data} />;
+  return (
+    <ChartRangePanel
+      className={rest.className}
+      labels={labels}
+      values={values}
+      range={range}
+      onRangeChange={setRange}
+      onReset={reset}
+      summaryMode={summary}
+      formatValue={(v) => fmt(v, rest.format ?? "number")}
+      color={rest.color ?? "var(--viz-1)"}
+      granularity={granularity}
+      summaryLabel={rest.name}
+    >
+      <InteractiveChartBase {...rest} className={undefined} data={rows} />
+    </ChartRangePanel>
   );
 }

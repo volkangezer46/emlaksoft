@@ -630,6 +630,17 @@ Kod: `src/app/viz.css` + `ui/chart.tsx` + `ui/viz/*`. Token: `--viz-sheen` (üst
 Boş durum illüstrasyonları: `Illustration kind="funnel\|gauge\|heatmap"`.
 **Kural:** grafik yalnız gerçek veriyle çizilir; veri yoksa `null` döner ya da `ChartCard empty` gösterilir. Görünen her sayı/dilim/aşama mümkünse `href` ile filtrelenmiş hedefe gider (sıfır çıkmaz metrik).
 
+### Canlı grafik: zaman aralığı, lejant, ipucu
+
+- **Aralık katmanı** (`ui/chart-range.tsx` + saf `chart-range-math.ts`): `AreaTrendChart` (>= 6 gerçek nokta), `AreaTrend` (>= 8) ve `InteractiveChart` (>= 6)
+  altta sürüklenebilir mini harita (iki kenar + pencere, klavye ←/→, çift tık/Esc = sıfırla), hazır aralık hapları (7G/30G/3A/6A/1Y/Tümü; yalnız
+  veri yettiği kadar) ve CANLI özet (`summary`: `"last"` son değer, `"total"` aralık toplamı; değişim % yalnız tabanı olan durumda) gösterir. Veri sunucudan
+  geniş gelir, süzme istemcidedir; sürükleme rAF ile birleştirilir, aralık değişince yeniden çizim animasyonu yoktur. Gün bazlı seride `granularity="day"`.
+  Kapatmak: `rangeable={false}`. Yeni zaman serisi grafiği yazma; bu üçünü kullan.
+- **Lejant** (`ui/chart-legend.tsx`): tıklayınca seri/dilim gizlenir (en az biri açık), üzerine gelince vurgulanır; gizli öğe üstü çizili + `aria-pressed`.
+- **İpucu:** `ChartTooltip` önceki döneme göre fark satırı (`deltaRows`); nokta/çubuk/dilim `href` ile filtrelenmiş listeye gider.
+- Test: `ui/chart-ui.test.ts` (react-dom/server ile izole render; projede jsdom yok), `ui/chart-range-math.test.ts`.
+
 ### Palet (`--viz-*`, tokens.css + theme-dark.css)
 
 Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--viz-pos/neg/neutral`, `--viz-gold`; ızgara `--viz-grid`, ipucu metni `--viz-tooltip-text`. `chart-colors.ts`, `pm-chart-*`, `.pm-t-*` bunlara bağlıdır; grafik koduna ham hex yazılmaz.

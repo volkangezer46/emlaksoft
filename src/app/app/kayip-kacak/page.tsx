@@ -408,6 +408,7 @@ async function HeroTrend({ pending }: { pending: Pending }) {
               format="money"
               height={96}
               labelEvery={2}
+              rangeable={false}
             />
           </div>
   );

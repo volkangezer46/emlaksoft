@@ -49,12 +49,14 @@ export async function Son30Gun({ userId }: { userId: string }) {
           <p className="text-sm tabular-nums text-text-muted">
             <span className="ds-num text-lg text-text">{total.toLocaleString("tr-TR")}</span> kayıt · son 30 gün
           </p>
-          <div className="mt-3 h-44">
+          <div className="mt-3 h-64">
             <AreaTrendChart
               data={series.map((p) => ({ label: p.label, value: p.value }))}
               tone="brand"
               format="number"
               name="Aktivite"
+              granularity="day"
+              summary="total"
               ariaLabel="Son 30 gün günlük çağrı, randevu ve teklif toplamı"
             />
           </div>

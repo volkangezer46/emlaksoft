@@ -540,6 +540,7 @@ export default async function AdminTicketsPage({
               format="number"
               height={146}
               labelEvery={3}
+              granularity="day"
               showLegend={false}
             />
           </div>
