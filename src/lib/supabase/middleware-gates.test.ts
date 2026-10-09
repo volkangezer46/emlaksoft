@@ -24,7 +24,14 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: {
       getUser,
-      getClaims: async () => ({ data: { claims: db.claims }, error: null }),
+      // Proxy artık kimliği getClaims (yerel JWT) ile çözer; test kullanıcısı getUser sahtesinden claims'e çevrilir.
+      getClaims: async () => {
+        const {
+          data: { user },
+        } = await getUser();
+        if (!user) return { data: null, error: null };
+        return { data: { claims: { sub: user.id, app_metadata: user.app_metadata, ...db.claims } }, error: null };
+      },
       signOut: async () => ({}),
     },
     rpc: async (name: string, args: unknown) => {

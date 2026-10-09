@@ -6,7 +6,7 @@ import {
   twoFactorBindingFromClaims,
 } from "@/lib/two-factor";
 import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
-import { AUTH_VERIFIED_HEADER, claimsMatchLiveUser } from "@/lib/supabase/verified-request";
+import { AUTH_VERIFIED_HEADER, userFromClaims } from "@/lib/supabase/verified-request";
 import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform-flags-cache";
 import { readProxyGateData } from "@/lib/supabase/proxy-gates";
@@ -73,10 +73,12 @@ export async function updateSession(request: NextRequest) {
 
   const timing = process.env.EMLAKSOFT_SERVER_TIMING === "1";
   const tAuth0 = timing ? performance.now() : 0;
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  // getClaims: gerekirse oturumu yeniler (setAll ile çerez), sonra JWT'yi JWKS (ES256) ile YEREL doğrular — Auth
+  // sunucusuna ağ turu yok. Ödün: iptal edilmiş oturum JWT süresi dolana kadar geçer; pasif kullanıcı / askıdaki ofis
+  // kapı RPC'sinde (15 sn önbellekli) denetlenmeye devam eder. Simetrik anahtarda kütüphane getUser'a düşer.
+  const { data: claimsData, error: authError } = await supabase.auth.getClaims();
+  const claims = claimsData?.claims as Record<string, unknown> | undefined;
+  const user = claims ? userFromClaims(claims) : null;
   const tAuth = timing ? performance.now() - tAuth0 : 0;
   // Süresi dolmuş/iptal edilmiş yenileme anahtarı: oturum yok sayılır ve bozuk auth çerezleri temizlenir
   // (aksi halde her istekte aynı yenileme denenir ve hata günlüğü kirlenir).
@@ -110,12 +112,8 @@ export async function updateSession(request: NextRequest) {
       : "";
     const impersonating = user.app_metadata?.impersonating === true;
     // profil + personel + ofis durumu tek RPC'de (yoksa eski üç sorgu; bkz. proxy-gates.ts);
-    // getClaims yerel JWKS doğrulaması olduğundan onunla paralel.
     const tGates0 = timing ? performance.now() : 0;
-    const [gate, { data: claimsData, error: claimsError }] = await Promise.all([
-      readProxyGateData(supabase, user.id, tenantId),
-      supabase.auth.getClaims(),
-    ]);
+    const gate = await readProxyGateData(supabase, user.id, tenantId);
     const { profile, profileError } = gate;
     const staff = gate.staff ? { id: user.id } : null;
     const tenant = gate.tenantStatus === null ? null : { status: gate.tenantStatus };
@@ -135,7 +133,6 @@ export async function updateSession(request: NextRequest) {
       impersonating &&
       tenantId &&
       claimedRole === "readonly" &&
-      !claimsError &&
       typeof sessionId === "string" &&
       sessionId &&
       user.app_metadata?.impersonation_session_id === sessionId,
@@ -222,13 +219,11 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (profile?.is_active && profile.two_factor_sms) {
-      const binding = claimsError
-        ? null
-        : twoFactorBindingFromClaims(
-            user.id,
-            profile.two_factor_version,
-            claimsData?.claims,
-          );
+      const binding = twoFactorBindingFromClaims(
+        user.id,
+        profile.two_factor_version,
+        claimsData?.claims,
+      );
       const verified = binding
         ? await isTwoFactorCookieValid(
             request.cookies.get(TWO_FACTOR_COOKIE)?.value,
@@ -244,9 +239,8 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    // Ağ doğrulaması (getUser) + kimlik/askı/2FA kapıları geçti: sunucu bileşenleri ikinci ağ turu yerine
-    // JWKS ile yerel doğrulama yapabilir (auth-cache). Token canlı kullanıcıdan farklıysa işaret konmaz.
-    if (!claimsError && claimsMatchLiveUser(user, claimsData?.claims as Record<string, unknown> | undefined)) {
+    // JWT yerel doğrulandı + kimlik/askı/2FA kapıları geçti: sunucu bileşenleri aynı yerel doğrulamayı (auth-cache) kullanır.
+    {
       request.headers.set(AUTH_VERIFIED_HEADER, user.id);
       const verified = NextResponse.next({ request });
       for (const cookie of supabaseResponse.cookies.getAll()) verified.cookies.set(cookie);
