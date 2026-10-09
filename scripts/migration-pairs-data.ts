@@ -194,6 +194,8 @@ const F = {
   expenseTrendMonthAxis: "20261008001900_expense_trend_month_axis.sql",
   // Canli hata: 001500/001800 tablo yetkisi yok (tapu sureci adimi yazilamiyor, portal okuyamiyor).
   grantsDealStepsListingAnalyses: "20261009000300_grants_deal_steps_listing_analyses.sql",
+  // DB hiz turu (2026-10-09): RLS politikalarinda (select fn()) initplan sarmasi + 11 kopya indeks dususu + rental_kpi_snapshot RPC.
+  dbPerfRlsInitplanKpi: "20261009000400_db_perf_rls_initplan_kpi.sql",
   // Canli hata: {1,512} regex PostgreSQL tekrar siniri (255) asiyor -> esdeger gecerli ifade.
   fixRegexRepetitionLimit: "20261008000900_fix_regex_repetition_limit.sql",
   // Profil fotografi / hazir avatar: profiles + platform_staff sutunlari, avatars kovasi, set_my_avatar RPC.
@@ -356,6 +358,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcParserTelemetry]: "ek", // yeni tablo + yeni RPC; mevcut ilan kontrol govdeleri degismez
     [F.expenseBudgetsRecurring]: "ek", // yeni expense_budgets tablosu (RLS) + expenses.recurrence/portal_key null'lanabilir sutunlari; mevcut satirlar degismez
     [F.leadCaptureTokenDefault]: "davranis", // NULL tokenli ofislerde vitrin talep formu acilir (lead_capture_enabled degismez)
+    [F.dbPerfRlsInitplanKpi]: "davranis", // 57 RLS politikasinin ifade metni (select fn()) ile sarilir (anlam ayni, sorgu basina tek cagri) + 11 kopya indeks duser + yeni invoker KPI RPC; veri/sutun degismez
     [F.expenseTrendMonthAxis]: "davranis", // trend etiketleri ve ay toplamlari dogru aya yazilir
     [F.grantsDealStepsListingAnalyses]: "davranis", // RLS politikalariyla uyumlu tablo yetkileri; anon yetkisi kaldirilir
     [F.fixRegexRepetitionLimit]: "davranis", // kampanya kuyrugu ve WhatsApp sablonlu kayitlar yeniden calisir (anlam ayni)
@@ -499,6 +502,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB55-gider-butce-tekrar-portal", order: 29.99988, title: "Gider butcesi + tekrarlayan gider + portal gideri eslemesi (sira serbest, ek)", files: [F.expenseBudgetsRecurring] },
     { id: "PB54-vitrin-talep-tokeni", order: 29.9997, title: "Vitrin talep formu tokeni: varsayilan + NULL ofislere uretim (sira serbest)", files: [F.leadCaptureTokenDefault] },
     { id: "PB58-yetki-tapu-ilan-analizi", order: 29.9999855, title: "Tapu sureci adimlari + ilan analizi tablo yetkileri (sira serbest)", files: [F.grantsDealStepsListingAnalyses] },
+    { id: "PB59-db-hiz-rls-initplan", order: 29.999986, title: "DB hiz turu: RLS initplan sarmasi + kopya indeks temizligi + kiralama KPI RPC (sira serbest)", files: [F.dbPerfRlsInitplanKpi] },
     { id: "PB58-gider-trend-ay-ekseni", order: 29.999985, title: "Giderler aylik trend ay ekseni tarih (UTC kaymasi duzeltmesi; sira serbest)", files: [F.expenseTrendMonthAxis] },
     { id: "PB56-regex-tekrar-siniri", order: 29.99995, title: "Gecersiz {1,512} regex duzeltmesi (kampanya claim/onay/olusturma + 2 kisit; sira serbest)", files: [F.fixRegexRepetitionLimit] },
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },
