@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { guardedFetch } from "./fetch-guard";
 
 /** Prefer independently rotatable Supabase secret keys; legacy JWT is fallback only. */
 export function resolveSupabaseAdminKey(
@@ -16,6 +17,7 @@ export function createAdminClient() {
   }
 
   return createClient(url, key, {
+    global: { fetch: guardedFetch },
     auth: {
       autoRefreshToken: false,
       persistSession: false,

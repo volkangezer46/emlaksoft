@@ -3,7 +3,10 @@
  * Ad yalnız [a-z0-9-] (kullanıcı/kayıt kimliği, yol parametresi vb. GİREMEZ → PII yok).
  */
 export function sanitizeTimingName(name: string): string {
-  const s = name.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const s = name
+    .replace(/İ/g, "i")
+    .toLowerCase()
+    .replace(/[çğışöü]/g, (c) => ({ ç: "c", ğ: "g", ı: "i", ş: "s", ö: "o", ü: "u" })[c] ?? c).replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   return s.slice(0, 40) || "olcum";
 }
 

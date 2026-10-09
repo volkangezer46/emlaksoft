@@ -8,13 +8,15 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/ui/avatar";
-import { loadAvatarMap } from "@/lib/avatar-read";
 import { requireModulePage } from "@/lib/require-module-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { TvAutoRefresh, TvClock } from "@/app/app/tv-mode";
 import { now } from "@/lib/clock";
+import { measure } from "@/lib/server-timing";
+import { getSampleScope } from "@/lib/sample-scope";
+import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import {
   BADGES,
   BADGE_BY_CODE,
@@ -215,20 +217,41 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
       }
     }
     if (out.size === 0) {
-      const prev = await loadLeagueData(supabase, {
-        period: previousLeaguePeriod(period, nowMs), tenantId, branchId, todayIso, nowMs, settings,
-      });
-      for (const r of prev.ranked) if (r.total > 0) out.set(r.staffId, r.rank);
+      // Önceki dönemin canlı sıralaması 20+ sorgu: kısa süreli (tenant + kullanıcı + dönem + şube anahtarlı) önbellek.
+      // Yalnız [staffId, sıra] çiftleri saklanır (JSON); yazma action'ları etiketi düşürür.
+      const pairs = await measure("lig-onceki-donem", () =>
+        cachedTenantAggregate(
+          "lig-onceki-donem",
+          { tenantId, userId, scope: `${period}:${branchId ?? "-"}` },
+          async () => {
+            const prev = await loadLeagueData(supabase, {
+              period: previousLeaguePeriod(period, nowMs), tenantId, branchId, todayIso, nowMs, settings,
+            });
+            return prev.ranked.filter((r) => r.total > 0).map((r) => [r.staffId, r.rank] as [string, number]);
+          },
+          120,
+        ));
+      for (const [staffId, rank] of pairs) out.set(staffId, rank);
     }
     return out;
   })();
 
   // Bu dönemin lig verisi + yukarıdaki bağımsız okumalar BİRLİKTE (eskiden ~6 ardışık tur).
-  const [league, metrics, badgeRes, prevRankByStaff] = await Promise.all([
-    loadLeagueData(supabase, { period, tenantId, branchId, todayIso, nowMs, settings }),
+  // Meydan okuma panosu lig verisini BEKLEMEZ: örnek-veri kapsamı ortak tek okuma, danışman kümesi lig profil okumasından söz olarak
+  // gelir (etkinlik sorguları kümeyi en sonda bekler). Eskiden lig bitince ardışık başlıyordu (+~300 ms).
+  const sampleP = getSampleScope(supabase, tenantId);
+  const leagueP = measure("lig-veri", () => loadLeagueData(supabase, { period, tenantId, branchId, todayIso, nowMs, settings, sampleScope: sampleP }));
+  const agentIdsP = leagueP.then((l) => new Set(l.agents.map((a) => a.id)) as ReadonlySet<string>);
+  agentIdsP.catch(() => undefined);
+  const challengeP = sekme !== "kurallar"
+    ? measure("lig-meydan-okuma", () => loadChallengeBoard(supabase, { tenantId, agentIds: agentIdsP, includeSample: sampleP.then((s) => s.include), nowMs }))
+    : Promise.resolve([]);
+  const [league, metrics, badgeRes, prevRankByStaff, challengeCards] = await Promise.all([
+    leagueP,
     metricsP,
     badgesP,
     prevRankP,
+    challengeP,
   ]);
 
   assertQueryBatchSucceeded([badgeRes], ["lig-rozetler"], "Lig");
@@ -237,15 +260,8 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
   const metricsById = new Map<string, { dealCount: number; revenue: number | null }>();
   if (metrics) for (const m of metrics.rows) metricsById.set(m.id, { dealCount: m.dealCount, revenue: m.revenue });
 
-  // Meydan okuma panosu yalnız o sekmede ve (kısa şerit için) sıralama sekmesinde okunur. Avatarlar ve pano lig verisinden
-  // sonra gelir ama birbirinden bağımsız: birlikte.
-  const agentIds = new Set(league.agents.map((a) => a.id));
-  const [challengeCards, avatars] = await Promise.all([
-    sekme !== "kurallar"
-      ? loadChallengeBoard(supabase, { tenantId, agentIds, includeSample: league.includeSample, nowMs })
-      : Promise.resolve([]),
-    loadAvatarMap(league.ranked.map((r) => r.staffId)),
-  ]);
+  // Avatarlar lig profil okumasıyla birlikte gelir (ayrı sorgu yok).
+  const avatars = new Map(league.agents.map((a) => [a.id, { avatar_url: a.avatarUrl, avatar_preset: a.avatarPreset }]));
 
   /** staffId → (badgeCode → kazanma tarihi) */
   const earnedDb = new Map<string, Map<string, string>>();

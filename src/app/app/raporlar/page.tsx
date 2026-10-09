@@ -1,3 +1,4 @@
+import { measureAll } from "@/lib/server-timing";
 import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
@@ -99,7 +100,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
   // Ağır toplulaştırma: kısa TTL tenant-tag cache (src/lib/reporting/cache.ts).
   // Varsayılan komisyon oranı (kaçan komisyon tahmini) da aynı turda: eskiden sayfa ortasında ardışık bekleniyordu.
-  const [aggregateResult, sourceDefs, lossOptions, sample, lossRateSettings] = await Promise.all([
+  const [aggregateResult, sourceDefs, lossOptions, sample, lossRateSettings] = await measureAll("raporlar-veri", [
     getTenantReportingAggregates(supabase, tenantId, clockNow()),
     sourceDefsPromise,
     getLossReasonOptions(),

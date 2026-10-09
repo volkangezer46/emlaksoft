@@ -58,7 +58,13 @@ function progressFromResult(def: ChallengeDef, result: Partial<ChallengeResult> 
  */
 export async function loadChallengeBoard(
   client: SupabaseClient,
-  opts: { tenantId: string; agentIds: ReadonlySet<string>; includeSample: boolean; nowMs: number },
+  opts: {
+    tenantId: string;
+    /** Küme ya da (lig profil okuması bitince çözülen) söz: bu sorgular lig verisiyle PARALEL başlar */
+    agentIds: ReadonlySet<string> | Promise<ReadonlySet<string>>;
+    includeSample: boolean | Promise<boolean>;
+    nowMs: number;
+  },
 ): Promise<ChallengeCard[]> {
   let rows: Row[] = [];
   try {
@@ -75,6 +81,7 @@ export async function loadChallengeBoard(
     return [];
   }
 
+  const includeSample = await opts.includeSample;
   const defs = rows.map((r) => ({ row: r, def: toDef(r) })).filter((x): x is { row: Row; def: ChallengeDef } => x.def !== null);
   const live = defs.filter((x) => x.def.status === "active");
   let activity: Awaited<ReturnType<typeof loadLeagueActivity>> = [];
@@ -86,7 +93,7 @@ export async function loadChallengeBoard(
       startIso: new Date(Math.min(...starts)).toISOString(),
       endIso: new Date(Math.max(...ends)).toISOString(),
       agentIds: opts.agentIds,
-      sampleVals: sampleValues(opts.includeSample),
+      sampleVals: sampleValues(includeSample),
       nowMs: opts.nowMs,
     });
   }
@@ -95,7 +102,7 @@ export async function loadChallengeBoard(
     if (def.status === "finished") {
       return { def, state: "finished" as const, progress: progressFromResult(def, row.result as Partial<ChallengeResult> | null) };
     }
-    const counts = challengeCounts(def, activity, { includeSample: opts.includeSample });
+    const counts = challengeCounts(def, activity, { includeSample });
     return { def, state: challengeState(def, opts.nowMs), progress: challengeProgress(def, counts) };
   });
 }

@@ -15,3 +15,11 @@ export async function measure<T>(name: string, fn: () => Promise<T> | T): Promis
     console.info(`[server-timing] ${formatServerTiming(name, performance.now() - t0)}`);
   }
 }
+
+/** `Promise.all` ile aynı, tek bölüm adıyla ölçülür (`await measureAll("ad", [a, b])`). Sorgular çağrıdan önce başlamıştır. */
+export function measureAll<const T extends readonly unknown[]>(
+  name: string,
+  values: T,
+): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
+  return measure(name, () => Promise.all(values));
+}
