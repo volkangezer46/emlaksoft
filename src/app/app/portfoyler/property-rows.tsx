@@ -1,4 +1,3 @@
-import Link from "@/components/ui/smart-link";
 import { Building2, Eye } from "lucide-react";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";

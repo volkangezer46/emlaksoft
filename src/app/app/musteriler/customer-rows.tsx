@@ -1,4 +1,3 @@
-import Link from "@/components/ui/smart-link";
 import { Eye, MessageCircle, Phone } from "lucide-react";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";
