@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { isSoftNavigated } from "@/lib/soft-nav";
 
 /**
  * CountUp — değer ilk görünümde bir kez yukarı sayar (tek sayaç; admin ve odometer
@@ -78,6 +79,8 @@ export function CountUp({
       (entries) => {
         if (!entries.some((e) => e.isIntersecting)) return;
         io.disconnect();
+        // Menüden gezinirken sayaç oynamaz (sonuç değer zaten basılı): kare başı metin yazımı ana iş parçacığını tutar.
+        if (isSoftNavigated()) return;
         let start: number | null = null;
         const step = (t: number) => {
           if (start === null) start = t;

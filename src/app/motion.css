@@ -271,3 +271,12 @@ html[data-theme="dark"] .skeleton {
   --skeleton-shine: rgba(255, 255, 255, 0.08);
   background-color: rgba(255, 255, 255, 0.07);
 }
+
+/* ---- Yumuşak gezinmede (menü/sekme tıklaması) süslü hareket yok ----
+   Sayfa ilk açılışta oynar; sonraki gezinmelerde içerik anında oturur ve sonsuz süs döngüleri durur
+   (SVG dönüşümleri bileşik katmana alınmaz: her kare ana iş parçacığında stil+boyama). Taban stiller bitiş
+   durumudur; .dashboard-chart-line gibi ilk durumu gizli olanlar BİLEREK listede yok. */
+html[data-soft-nav] :is(
+  .list-stagger > *, .motion-progress-fill, .lp-col-bar, .pipeline-fill, .viz-bar-fill, .ill-grow-x, .ill-pop,
+  .ill-float, .ill-pulse, .ill-swing
+) { animation: none; }
