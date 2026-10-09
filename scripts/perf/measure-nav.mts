@@ -107,7 +107,7 @@ for (let round = 1; round <= ROUNDS; round++) {
   await page.waitForSelector("main h1, main h2", { timeout: 30000 });
   await page.waitForSelector("[role=dialog]", { timeout: 8000 }).catch(() => {});
   if (await page.locator("[role=dialog]").count()) await page.keyboard.press("Escape");
-  await page.evaluate(() => document.querySelectorAll<HTMLElement>("aside button[aria-expanded=false]").forEach((b) => b.click()));
+  await page.evaluate(() => document.querySelectorAll<HTMLElement>("aside button[aria-expanded=false]:not([aria-haspopup])").forEach((b) => b.click()));
   await page.waitForTimeout(3000); // boşta prefetch
   const hrefs = await page.$$eval("aside a[data-nav-link]", (as) => [...new Set(as.map((a) => a.getAttribute("href") ?? ""))].filter((h) => h && h !== "/app")).then((l) => l.slice(0, Number(process.env.PERF_MAX || 99)));
   console.log(`tur ${round}: ${hrefs.length} menü öğesi`);

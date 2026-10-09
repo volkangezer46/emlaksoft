@@ -28,7 +28,7 @@ await page.goto(BASE + "/app", { waitUntil: "load" });
 await page.waitForSelector("main h1, main h2");
 await page.waitForSelector("[role=dialog]", { timeout: 8000 }).catch(() => {});
 if (await page.locator("[role=dialog]").count()) await page.keyboard.press("Escape");
-await page.evaluate(() => document.querySelectorAll<HTMLElement>("aside button[aria-expanded=false]").forEach((b) => b.click()));
+await page.evaluate(() => document.querySelectorAll<HTMLElement>("aside button[aria-expanded=false]:not([aria-haspopup])").forEach((b) => b.click()));
 await page.waitForTimeout(3000);
 const cdp = await ctx.newCDPSession(page);
 await cdp.send("Profiler.enable");

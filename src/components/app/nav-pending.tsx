@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { markSoftNavigated } from "@/lib/soft-nav";
 
 /** Sunucu yanıtı gecikirse anında geri bildirim kalıcı takılı kalmasın (hata/iptal güvencesi). */
 const SAFETY_MS = 15_000;
@@ -37,6 +38,7 @@ function Inner() {
       const here = window.location.pathname + window.location.search;
       if (u.pathname + u.search === here) return;
       clearMarks();
+      markSoftNavigated();
       a.setAttribute("data-nav-pending", "true");
       document.documentElement.dataset.navBusy = "1";
       setFrom(keyRef.current);
@@ -47,8 +49,11 @@ function Inner() {
       }, SAFETY_MS);
     };
     document.addEventListener("click", onClick);
+    // Geri/ileri ve programatik gezinmeler de yumuşak gezinmedir (süslü giriş hareketleri oynamaz).
+    window.addEventListener("popstate", markSoftNavigated);
     return () => {
       document.removeEventListener("click", onClick);
+      window.removeEventListener("popstate", markSoftNavigated);
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);

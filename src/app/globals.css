@@ -895,14 +895,26 @@ p {
   animation: pipeline-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes status-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 163, 0.28); }
-  50% { box-shadow: 0 0 0 7px rgba(16, 185, 163, 0); }
+/* Halka kendi yarı saydam katmanında scale+opacity ile genişler (bileşik katman; box-shadow animasyonu her karede
+   ana iş parçacığında boyama yapıyordu). Nokta konumlu değilse relative olur (.absolute kullananlar korunur). */
+@keyframes status-pulse-ring {
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(3.2); opacity: 0; }
 }
 
 /* Yalnız GERÇEK "canlı" göstergede kullanılır (sonsuz döngü bütçesi). Süs için .status-pulse-static. */
-.status-pulse { animation: status-pulse 2.4s ease-in-out infinite; }
-.status-pulse-static { animation: none; }
+:where(.status-pulse:not(.absolute, .fixed, .sticky)) { position: relative; }
+.status-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(16 185 163);
+  opacity: 0;
+  pointer-events: none;
+  animation: status-pulse-ring 2.4s ease-out infinite;
+}
+.status-pulse-static::after { animation: none; }
 
 /* ============================================================
    Advanced live chart / data-viz animations
