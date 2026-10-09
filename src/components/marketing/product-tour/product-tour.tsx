@@ -8,11 +8,11 @@ import type { Heading, TourItem } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "../content-link";
 import { SectionHeading } from "../section-heading";
+import { LazyTourScreen } from "./lazy-screen";
 import { AutomationScreen, CommissionScreen, CustomersScreen, DealsScreen, PortfolioScreen, ReportsScreen, TodayScreen } from "./screens";
 
 /**
- * JS'siz ürün turu: radyo girdileri + kardeş seçiciler (marketing-sections.css). Tüm ekranlar DOM'dadır (SEO),
- * biri görünür. Oklar radyo grubunda yerel olarak gezinir. Metinler site içeriğinden (yönetim: /admin/site-icerik);
+ * Radyo girdili ürün turu (sekme seçimi JS'siz): radyo girdileri + kardeş seçiciler (marketing-sections.css). Tüm sekmelerin metni DOM'dadır (SEO); ilk ekranın çizimi sunucuda, kalanlar boşta yüklenir. Oklar radyo grubunda yerel olarak gezinir. Metinler site içeriğinden (yönetim: /admin/site-icerik);
  * ekran çizimi sekme kimliğinden seçilir, paket rozeti sayfa kilidinden (gateBadge) eklenir. Radyo/ekran sınıfı
  * SIRAYA göredir (tt1..tt7), böylece sıralama/gizleme CSS'i bozmaz.
  */
@@ -36,7 +36,8 @@ export async function ProductTour({ heading = defaultSiteContent().sections.tur,
       label: t.label,
       text: tx(t.text, ctx),
       points: t.points.filter((x) => !x.hidden).map((x) => withGateBadge(tx(x.text, ctx), x.gate, plans)).filter(Boolean),
-      screen: SCREENS[t.id](),
+      // Yalnız ilk (etkin) ekran sunucuda çizilir; diğerleri boşta ayrı parça olarak yüklenir (HTML/RSC yükü ~100 KB düşer).
+      screen: i === 0 ? SCREENS[t.id]() : <LazyTourScreen id={t.id} />,
     }));
   if (TABS.length === 0) return null;
   return (

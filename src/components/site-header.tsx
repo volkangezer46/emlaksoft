@@ -2,6 +2,7 @@ import { Brand } from "@/components/brand/brand";
 import { AnnouncementBar } from "@/components/site-menu/announcement-bar";
 import { toClientGroups } from "@/components/site-menu/client-groups";
 import { SiteHeaderClient } from "@/components/site-menu/mega-menu";
+import { SpeculationRules } from "@/components/marketing/speculation-rules";
 import { now } from "@/lib/clock";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
@@ -22,6 +23,8 @@ export async function SiteHeader() {
   const ann = menu.announcement;
 
   return (
+    <>
+    <SpeculationRules />
     <SiteHeaderClient
       groups={groups}
       logo={<Brand variant="horizontal" tone="light" height={34} alt="" />}
@@ -34,5 +37,6 @@ export async function SiteHeader() {
         ) : undefined
       }
     />
+    </>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { GOOGLE_CALLBACK_PATH, safeNextPath } from "@/lib/auth/google-auth";
 
 /** Google'ın resmi çok renkli "G" işareti (marka kılavuzu: değiştirilmez, 18 px). */
@@ -59,6 +58,8 @@ export function GoogleAuthButton({
     setPending(true);
     setError(null);
     try {
+      // Tarayıcı Supabase istemcisi (~58 KB brotli) yalnız tıklanınca yüklenir: giriş/kayıt ilk yüküne girmez.
+      const { createClient } = await import("@/lib/supabase/client");
       const { error: oauthError } = await createClient().auth.signInWithOAuth({
         provider: "google",
         options: {
