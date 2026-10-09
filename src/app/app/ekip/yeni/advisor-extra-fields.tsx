@@ -362,7 +362,7 @@ export function RegionsField({
     <div className="space-y-3 sm:col-span-2">
       <input type="hidden" name="regions_json" value={json} />
       <p className="text-xs text-text-muted">
-        İl, ilçe ve isteğe bağlı mahalle seçin (örn. Kahramanmaraş &gt; Onikişubat). Ağırlık 5 danışmanın ana bölgesi,
+        İl, ilçe ve isteğe bağlı mahalle seçin (örn. İstanbul &gt; Kadıköy). Ağırlık 5 danışmanın ana bölgesi,
         1 az bildiği bölgedir; ilan havuzu önerisi ağırlığı kullanır.
       </p>
       {rows.length === 0 ? (

@@ -98,7 +98,7 @@ export function CompanyForm({
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-tax-office">Vergi dairesi</label>
-          <input id="tenant-tax-office" name="tax_office" defaultValue={tenant.tax_office ?? ""} className={fieldClass} placeholder="Onikişubat VD" />
+          <input id="tenant-tax-office" name="tax_office" defaultValue={tenant.tax_office ?? ""} className={fieldClass} placeholder="Kadıköy VD" />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-tax-number">Vergi / TC no</label>

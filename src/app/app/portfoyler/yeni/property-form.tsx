@@ -143,7 +143,7 @@ export function PropertyForm({
     temel: (
       <>
         <FormField label="Portföy başlığı" htmlFor="property-title" required className="sm:col-span-2">
-          <FormInput name="title" required placeholder="Örn. Onikişubat Tekerek 4+1" />
+          <FormInput name="title" required placeholder="Örn. Kadıköy Moda 3+1" />
         </FormField>
         <SelectField id="transaction-type" name="transaction_type" label="İşlem türü" required defaultValue="Satılık">
           {transactionTypes.map((type) => <option key={type}>{type}</option>)}

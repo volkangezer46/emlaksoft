@@ -67,7 +67,7 @@ export default async function AdminGeoPage({
         <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
           <form className="relative flex-1 max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" />
-            <Input type="text" name="q" defaultValue={query} placeholder="İl ara (örn. İzmir)…" className="w-full pl-8" />
+            <Input type="text" name="q" defaultValue={query} placeholder="İl ara (örn. İstanbul)…" className="w-full pl-8" />
           </form>
           <p className="text-xs text-text-muted">Kaynakta bulunmayan mevcut kayıtlar silinmez; pasif kayıtlar otomatik açılmaz.</p>
         </div>

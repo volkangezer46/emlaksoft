@@ -628,7 +628,7 @@ export default async function RegionAnalysisPage({
               title="İlçeye göre medyan m² fiyatı"
               subtitle="En yüksek 8 ilçe · ikinci seri aktif portföy sayısı"
             >
-              {/* Yatay yerleşim: ilçe adları uzun ("Kahramanmaraş Onikişubat"),
+              {/* Yatay yerleşim: ilçe adları uzun ("İstanbul Küçükçekmece"),
                   dikey çubukta eksende üst üste biner. */}
               <BarCompare
                 data={chartData}

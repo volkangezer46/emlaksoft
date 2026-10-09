@@ -3,7 +3,7 @@ import { foldTr } from "@/lib/tr-text";
 /**
  * Doğal dilli arama ayrıştırıcısı (F2) — KURAL TABANLI, saf fonksiyon.
  *
- * "Onikişubat 3+1 satılık 2 milyon altı" gibi bir cümleyi yapılandırılmış filtreye çevirir.
+ * "Kadıköy 3+1 satılık 15 milyon altı" gibi bir cümleyi yapılandırılmış filtreye çevirir.
  * Yapay zekâ / OpenAI KULLANILMAZ (kişisel veri riski, maliyet); her çıkarım bir kurala dayanır ve
  * kullanıcıya çıplak olarak gösterilir. Anlaşılmayan sözcük uydurulmaz, "anlaşılamayan" listesine düşer.
  *

@@ -11,7 +11,7 @@ import { NL_TARGET_LABEL, nlTargetHref, parseExcludeParam } from "@/lib/nl-searc
  */
 
 const EXAMPLES = [
-  "Onikişubat 3+1 satılık 2 milyon altı",
+  "Kadıköy 3+1 satılık 15 milyon altı",
   "Kadıköy kiralık 2+1 30 bin altı",
   "Çankaya villa 5 milyon üstü",
   "İstanbul 100-150 m2 satılık daire",

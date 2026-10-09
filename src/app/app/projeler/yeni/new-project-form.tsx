@@ -67,7 +67,7 @@ export function NewProjectForm({ userId }: { userId: string }) {
     konum: (
       <>
         <FormField label="Konum" htmlFor="pr-loc">
-          <FormInput name="location" placeholder="Örn. Çankaya, Ankara" />
+          <FormInput name="location" placeholder="Örn. Ataşehir, İstanbul" />
         </FormField>
         <FormField label="Teslim tarihi" htmlFor="pr-delivery">
           <FormInput name="delivery_date" type="date" />

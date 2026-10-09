@@ -143,7 +143,7 @@ export function AppointmentForm({
         </FormField>
         <FormField label="Konum" htmlFor="appointment-location" inject={false} className="sm:col-span-2">
           <div className="relative">
-            <FormInput id="appointment-location" name="location" className="pr-9" placeholder="Onikişubat, Kahramanmaraş" />
+            <FormInput id="appointment-location" name="location" className="pr-9" placeholder="Kadıköy, İstanbul" />
             <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
           </div>
         </FormField>

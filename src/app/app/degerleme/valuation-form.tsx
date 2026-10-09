@@ -71,7 +71,7 @@ export function ValuationForm({
         </div>
         <div>
           <label htmlFor="valuation-title" className="mb-1.5 block text-sm text-text-muted">Başlık</label>
-          <input id="valuation-title" name="title" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="Onikişubat 3+1 değerleme" />
+          <input id="valuation-title" name="title" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm" placeholder="Kadıköy 3+1 değerleme" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
