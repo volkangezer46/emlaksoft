@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
 import { deleteSampleRecords, type SampleClearReport } from "@/lib/sample-clear";
+import { purgeSampleModuleData } from "@/lib/sample-data/purge-extras";
 
 /**
  * "Gerçek kullanıma geç" — örnek verileri kalıcı silme, TEK giriş noktası (sunucu).
@@ -48,6 +49,13 @@ export async function purgeSampleData(input: {
   /** RPC yoksa kullanılacak service_role istemcisi (çağıran kapıdan çıkarmış olmalı). */
   fallbackAdmin: SupabaseClient;
 }): Promise<PurgeResult> {
+  // RPC'nin bilmediği örnek kayıtlar (bina/site, meydan okuma, kira->anlaşma bağı) önce temizlenir. En iyi çaba: hata RPC'yi engellemez.
+  try {
+    await purgeSampleModuleData(input.fallbackAdmin, input.tenantId);
+  } catch (e) {
+    console.error("purgeSampleData extras", e);
+  }
+
   const { data, error } = await input.session.rpc(PURGE_RPC, { p_tenant_id: input.tenantId });
   if (!error) return { ok: true, via: "rpc", report: reportFromRpc(data) };
   if (!isRpcMissing(error)) {

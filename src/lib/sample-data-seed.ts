@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, now } from "@/lib/clock";
 import { resolveGeo } from "@/lib/geo/resolve";
+import { seedModuleData } from "@/lib/sample-data/modules-seed";
 
 /**
  * Örnek (demo) ofis veri seti — TEK kaynak. İki çağıranı vardır:
@@ -82,13 +83,16 @@ export async function insertSampleRecords(
   // Konum çeşitliliği best-effort: İstanbul + üç ilçe bulunursa bağlanır,
   // bulunamazsa null kalır (örnek set konumsuz da anlamlı).
   let istanbulId: string | null = null;
-  const geo: Record<"kadikoy" | "maltepe" | "besiktas", string | null> = {
+  const geo: Record<"kadikoy" | "maltepe" | "besiktas" | "atasehir" | "sisli" | "sariyer", string | null> = {
     kadikoy: null,
     maltepe: null,
     besiktas: null,
+    atasehir: null,
+    sisli: null,
+    sariyer: null,
   };
-  const [kadikoy, maltepe, besiktas] = await Promise.all(
-    ["Kadıköy", "Maltepe", "Beşiktaş"].map((district) => resolveGeo({ province: "İstanbul", district })),
+  const [kadikoy, maltepe, besiktas, atasehir, sisli, sariyer] = await Promise.all(
+    ["Kadıköy", "Maltepe", "Beşiktaş", "Ataşehir", "Şişli", "Sarıyer"].map((district) => resolveGeo({ province: "İstanbul", district })),
   );
   if (kadikoy.status === "ok") {
     istanbulId = kadikoy.geo.provinceId;
@@ -102,6 +106,9 @@ export async function insertSampleRecords(
     istanbulId = istanbulId ?? besiktas.geo.provinceId;
     geo.besiktas = besiktas.geo.districtId;
   }
+  if (atasehir.status === "ok") geo.atasehir = atasehir.geo.districtId;
+  if (sisli.status === "ok") geo.sisli = sisli.geo.districtId;
+  if (sariyer.status === "ok") geo.sariyer = sariyer.geo.districtId;
 
   // ---- 12 müşteri (tip/etiket/sıcaklık/kaynak çeşitli; telefonlar kurgusal 0532 000 xx xx) ----
   const CUSTOMERS = [
@@ -147,7 +154,7 @@ export async function insertSampleRecords(
     { code: "ORNEK-002", title: "Maltepe sahile yakın 2+1", tx: "Satılık", type: "Daire", price: 6750000, rooms: "2+1", sqm: 105, district: geo.maltepe, rate: 2 },
     { code: "ORNEK-003", title: "Beşiktaş'ta kiralık eşyalı 1+1", tx: "Kiralık", type: "Daire", price: 42000, rooms: "1+1", sqm: 70, district: geo.besiktas, rate: 10 },
     { code: "ORNEK-004", title: "Kadıköy'de yatırımlık müstakil ev", tx: "Satılık", type: "Müstakil ev", price: 19500000, rooms: "4+2", sqm: 260, district: geo.kadikoy, rate: 2 },
-    { code: "ORNEK-005", title: "Silivri'de imarlı 1.250 m² arsa", tx: "Satılık", type: "Arsa", price: 8900000, rooms: null, sqm: 1250, district: null, rate: 3 },
+    { code: "ORNEK-005", title: "Sarıyer'de imarlı 1.250 m² arsa", tx: "Satılık", type: "Arsa", price: 38500000, rooms: null, sqm: 1250, district: geo.sariyer, rate: 3 },
     { code: "ORNEK-006", title: "Beşiktaş'ta Boğaz manzaralı lüks villa", tx: "Satılık", type: "Villa", price: 85000000, rooms: "6+2", sqm: 520, district: geo.besiktas, rate: 2 },
     { code: "ORNEK-007", title: "Bağdat Caddesi'nde kiralık köşe dükkan", tx: "Kiralık", type: "Dükkan", price: 185000, rooms: null, sqm: 120, district: geo.kadikoy, rate: 10 },
     { code: "ORNEK-008", title: "Maltepe'de kiralık ferah 2+1", tx: "Kiralık", type: "Daire", price: 28000, rooms: "2+1", sqm: 95, district: geo.maltepe, rate: 10 },
@@ -253,7 +260,7 @@ export async function insertSampleRecords(
       assigned_to: userId, created_by: userId, is_sample: true,
     },
     {
-      tenant_id: tenantId, title: "Hakan Polat'a Silivri arsası için imar durumunu gönder", kind: "document",
+      tenant_id: tenantId, title: "Hakan Polat'a Sarıyer arsası için imar durumunu gönder", kind: "document",
       priority: "normal", status: "open", due_at: todayAtIso(16, 0, 2),
       customer_id: custId("Hakan Polat"), property_id: propId("ORNEK-005"),
       assigned_to: userId, created_by: userId, is_sample: true,
@@ -514,7 +521,7 @@ export async function insertSampleRecords(
   // Bildirimler (zil menüsü boş kalmasın; yalnız kurucuya)
   await group("notifications", ["notifications"], async () => {
     const rows = [
-      { title: "Yeni talep: Hakan Polat", body: "Silivri arsası için portal başvurusu geldi.", href: "/app/musteriler", kind: "info" },
+      { title: "Yeni talep: Hakan Polat", body: "Sarıyer arsası için portal başvurusu geldi.", href: "/app/musteriler", kind: "info" },
       { title: "Anlaşma kazanıldı", body: "ORNEK-010 satışı tamamlandı, komisyon hesaplandı.", href: "/app/komisyon", kind: "success" },
       { title: "Geciken görev", body: "Cem Yıldırım'ı arama görevi gecikti.", href: "/app/gorevler", kind: "warning" },
     ];
@@ -524,6 +531,38 @@ export async function insertSampleRecords(
     if (error) throw error;
     return rows.length;
   });
+
+  // Son eklenen modüller (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS, ilan analizi, tekrarlayan/portal gideri):
+  // tek kaynak `sample-data/modules-seed.ts` (demo-ofis seed'iyle ortak). Hata çekirdeği bozmaz; rapora yazılır.
+  try {
+    const modules = await seedModuleData({
+      db: extras,
+      tenantId,
+      ownerId: userId,
+      advisorId: userId,
+      sample: true,
+      place: {
+        provinceId: istanbulId,
+        districtId: geo.kadikoy,
+        city: "İstanbul",
+        district: "Kadıköy",
+        districts: { Kadıköy: geo.kadikoy, Beşiktaş: geo.besiktas, Ataşehir: geo.atasehir, Şişli: geo.sisli },
+      },
+      codePrefix: "ORNEK",
+      authorityPropertyCodes: ["ORNEK-001", "ORNEK-002", "ORNEK-003", "ORNEK-004", "ORNEK-005", "ORNEK-006"],
+      analysisPropertyCodes: ["ORNEK-001", "ORNEK-002"],
+      processDeals: [
+        { propertyCode: "ORNEK-010", profile: "in_transfer" },
+        { propertyCode: "ORNEK-002", profile: "delayed" },
+      ],
+    });
+    for (const [k, v] of Object.entries(modules.counts)) report.counts[k] = v;
+    report.skipped.push(...modules.skipped);
+    report.failed.push(...modules.failed);
+  } catch (e) {
+    console.error("insertSampleRecords:modules", e);
+    report.failed.push({ group: "modules", message: e instanceof Error ? e.message : "bilinmeyen hata" });
+  }
 
   // Şemada henüz is_sample taşımayan modüller: kampanya, kayıp-kaçak, anket, danışman profili.
   for (const g of ["campaigns", "leak", "surveys", "advisors"]) {
