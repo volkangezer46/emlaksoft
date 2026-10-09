@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { guardedFetch } from "./fetch-guard";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   isTwoFactorCookieValid,
@@ -57,6 +58,7 @@ export async function updateSession(request: NextRequest) {
   if (!url || !key) return supabaseResponse;
 
   const supabase = createServerClient(url, key, {
+    global: { fetch: guardedFetch },
     cookies: {
       getAll() {
         return request.cookies.getAll();

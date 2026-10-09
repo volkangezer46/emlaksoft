@@ -1,3 +1,5 @@
+import { measure } from "@/lib/server-timing";
+
 export type QueryBatchFailure = {
   index: number;
   label: string;
@@ -57,7 +59,8 @@ export async function batchAll<const T extends readonly unknown[]>(
   labels: readonly string[],
   values: T,
 ): Promise<{ -readonly [K in keyof T]: Awaited<T[K]> }> {
-  const results = await Promise.all(values);
+  // Bölüm ölçümü (EMLAKSOFT_SERVER_TIMING=1): liste/panel sayfasının toplu okuması `liste-<bağlam>` adıyla loglanır.
+  const results = await measure(`liste-${context}`, () => Promise.all(values));
   const isResult = (x: unknown): x is object =>
     typeof x === "object" && x !== null && !Array.isArray(x) && "error" in x;
   const failures: QueryBatchFailure[] = [];

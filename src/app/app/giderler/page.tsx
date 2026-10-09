@@ -1,3 +1,4 @@
+import { measureAll } from "@/lib/server-timing";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -85,7 +86,7 @@ export default async function GiderlerPage({
   const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
 
   const supabase = await createClient();
-  const [expenses, catDefs, aggregateResult, sample, financeProbe, pickedPropertyRes] = await Promise.all([
+  const [expenses, catDefs, aggregateResult, sample, financeProbe, pickedPropertyRes] = await measureAll("giderler-veri", [
     // Tablo listesi — ?from=&to= sunucu tarafında uygulanır (expense_date aralığı).
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu

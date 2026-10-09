@@ -68,6 +68,9 @@ export type LeagueAgent = {
   fullName: string;
   role: string;
   branchId: string | null;
+  /** Profil fotoğrafı / hazır avatar (ayrı sorgu yok: profil okumasıyla gelir) */
+  avatarUrl: string | null;
+  avatarPreset: string | null;
 };
 
 export type LeagueData = {
@@ -285,6 +288,8 @@ export async function loadLeagueData(
     nowMs?: number;
     /** Önceden yüklenmiş ayar (verilmezse okunur) */
     settings?: LeagueSettings;
+    /** Çağıranın zaten başlattığı örnek-veri kapsamı okuması (verilmezse burada okunur; aynı sorgu iki kez atılmaz) */
+    sampleScope?: Promise<{ include: boolean }>;
   },
 ): Promise<LeagueData> {
   const range = leaguePeriod(opts.period, opts.nowMs ?? now());
@@ -294,7 +299,7 @@ export async function loadLeagueData(
   // Demo kayıtlar yalnız ofiste gerçek kayıt eşiği altındayken lige girer (sample-scope). Ayar okuması ve örnek kapsamı
   // birbirinden bağımsız: birlikte başlar (eskiden art arda 2 tur).
   const [sampleScope, settings] = await Promise.all([
-    getSampleScope(client, tenantId),
+    opts.sampleScope ?? getSampleScope(client, tenantId),
     opts.settings ? Promise.resolve(opts.settings) : loadLeagueSettings(client, tenantId),
   ]);
   const includeSample = sampleScope.include;
@@ -305,7 +310,7 @@ export async function loadLeagueData(
 
   // Danışman listesi (profiller) yalnız SÜZME için gerekir; etkinlik/cevap sorguları ona bağlı değil. Hepsi tek turda başlar
   // (eskiden profiller -> cevap hızı -> etkinlik olarak 3 ardışık tur).
-  const profilesP = paged(client, "profiles", "id, full_name, role, branch_id", (q) => q.eq("tenant_id", tenantId).eq("is_active", true));
+  const profilesP = paged(client, "profiles", "id, full_name, role, branch_id, avatar_url, avatar_preset", (q) => q.eq("tenant_id", tenantId).eq("is_active", true));
   const agentIdsP = profilesP.then((ps) =>
     new Set(
       ps
@@ -357,6 +362,8 @@ export async function loadLeagueData(
       fullName: String(p.full_name ?? "—"),
       role: String(p.role ?? "advisor"),
       branchId: str(p.branch_id),
+      avatarUrl: str(p.avatar_url),
+      avatarPreset: str(p.avatar_preset),
     }));
   const agentIds = new Set(agents.map((a) => a.id));
 
