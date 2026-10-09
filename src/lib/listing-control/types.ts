@@ -162,13 +162,13 @@ export const KPI_KEYS = [
 export type KpiKey = (typeof KPI_KEYS)[number];
 
 export const KPI_LABELS: Record<KpiKey, string> = {
-  active: "Toplam aktif portföy",
+  active: "Aktif portföy",
   in_portals: "Portallarda aktif",
   awaiting_publish: "Yayın bekleyen",
   portal_missing: "Portal ilanı kayıp",
   price_mismatch: "Fiyat uyuşmazlığı",
-  in_review: "İnceleme (açıklama bekleyen)",
-  unverifiable: "Kontrol edilemeyen",
+  in_review: "İncelemede",
+  unverifiable: "Kontrol edilemedi",
   healthy: "Sağlıklı",
 };
 
