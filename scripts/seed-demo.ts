@@ -14,6 +14,7 @@
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { deriveDemoPassword } from "../src/lib/demo-credentials";
+import { seedModuleData } from "../src/lib/sample-data/modules-seed";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
@@ -200,27 +201,26 @@ async function ensureProfile(tenantId: string, persona: (typeof PERSONAS)[number
 }
 
 // ---------------------------------------------------------------------------
-// Coğrafya: İstanbul + Kahramanmaraş il/ilçe kayıtları
+// Coğrafya: yalnız İstanbul'un büyük ilçeleri (ürün kararı: küçük il/ilçe yok)
 // ---------------------------------------------------------------------------
 type Geo = {
   istanbulId: string;
-  marasId: string;
   kadikoyId: string;
   besiktasId: string;
   maltepeId: string;
-  onikisubatId: string;
-  dulkadirogluId: string;
+  atasehirId: string;
+  uskudarId: string;
+  sisliId: string;
 };
 
 async function ensureGeo(): Promise<Geo> {
   const { data: provinces, error } = await admin
     .from("geo_provinces")
     .select("id, plate_code")
-    .in("plate_code", [34, 46]);
+    .in("plate_code", [34]);
   if (error) throw new Error(`geo_provinces: ${error.message}`);
   const istanbulId = provinces?.find((p) => p.plate_code === 34)?.id;
-  const marasId = provinces?.find((p) => p.plate_code === 46)?.id;
-  if (!istanbulId || !marasId) throw new Error("İstanbul/Kahramanmaraş geo_provinces'te yok — geo seed migration'ı uygulanmamış");
+  if (!istanbulId) throw new Error("İstanbul geo_provinces'te yok — geo seed migration'ı uygulanmamış");
 
   async function ensureDistrict(provinceId: string, name: string, lat: number, lng: number): Promise<string> {
     const { data: existing } = await admin
@@ -241,13 +241,115 @@ async function ensureGeo(): Promise<Geo> {
 
   return {
     istanbulId,
-    marasId,
     kadikoyId: await ensureDistrict(istanbulId, "Kadıköy", 40.9917, 29.0273),
     besiktasId: await ensureDistrict(istanbulId, "Beşiktaş", 41.0430, 29.0075),
     maltepeId: await ensureDistrict(istanbulId, "Maltepe", 40.9357, 29.1310),
-    onikisubatId: await ensureDistrict(marasId, "Onikişubat", 37.5736, 36.9081),
-    dulkadirogluId: await ensureDistrict(marasId, "Dulkadiroğlu", 37.5861, 36.9530),
+    atasehirId: await ensureDistrict(istanbulId, "Ataşehir", 40.9923, 29.1244),
+    uskudarId: await ensureDistrict(istanbulId, "Üsküdar", 41.0227, 29.0153),
+    sisliId: await ensureDistrict(istanbulId, "Şişli", 41.0602, 28.9877),
   };
+}
+
+/**
+ * Ürün kararı: demo verisi yalnız İstanbul büyük ilçelerinde. Önceki sürümde Kahramanmaraş (Onikişubat/Dulkadiroğlu) ile
+ * yüklenmiş demo-ofis satırlarını İstanbul'a (Ataşehir/Üsküdar) taşır. İdempotent: eski ilçede satır kalmadıysa hiçbir şey yazmaz.
+ */
+async function normalizeDemoGeo(tenantId: string, geo: Geo): Promise<number> {
+  const { data: maras } = await admin.from("geo_provinces").select("id").eq("plate_code", 46).maybeSingle();
+  if (!maras) return 0;
+  const { data: olds } = await admin
+    .from("geo_districts")
+    .select("id, name")
+    .eq("province_id", maras.id)
+    .in("name", ["Onikişubat", "Dulkadiroğlu"]);
+  if (!olds?.length) return 0;
+  let moved = 0;
+  for (const old of olds) {
+    const target = old.name === "Onikişubat" ? geo.atasehirId : geo.uskudarId;
+    for (const table of ["customers", "properties", "customer_demands", "vitrin_saved_searches"]) {
+      const { data, error } = await admin
+        .from(table)
+        .update({ province_id: geo.istanbulId, district_id: target })
+        .eq("tenant_id", tenantId)
+        .eq("district_id", old.id)
+        .select("id");
+      if (error) console.warn(`  ! ${table} ilçe taşıma atlandı: ${error.message}`);
+      else moved += data?.length ?? 0;
+    }
+    // Bölge istatistiği (tenant, ilçe, dönem, tür) benzersiz: eski ilçe satırları silinir, yeni ilçe upsert ile dolar.
+    await admin.from("region_stats_history").delete().eq("tenant_id", tenantId).eq("district_id", old.id);
+  }
+  // Portföy başlık/fiyat/konum: yalnız hâlâ eski ilçedeyse yeniden yazılır (yukarıdaki taşıma sonrası kod ile eşlenir).
+  const FIX: Record<string, { title: string; price: number; lat: number; lng: number; district: "atasehir" | "uskudar" }> = {
+    "DEMO-008": { title: "Ataşehir'de yeni bina 3+1", price: 9800000, lat: 40.9923, lng: 29.1244, district: "atasehir" },
+    "DEMO-009": { title: "Ataşehir'de kiralık 2+1", price: 38000, lat: 40.9886, lng: 29.117, district: "atasehir" },
+    "DEMO-010": { title: "Üsküdar'da 4+1 geniş daire", price: 16500000, lat: 41.0235, lng: 29.0152, district: "uskudar" },
+    "DEMO-011": { title: "Üsküdar Beylerbeyi'nde imarlı arsa", price: 28000000, lat: 41.0425, lng: 29.042, district: "uskudar" },
+    "DEMO-012": { title: "Ataşehir'de işyeri — cadde üstü", price: 95000, lat: 40.993, lng: 29.128, district: "atasehir" },
+    "DEMO-018": { title: "Ataşehir'de satılan 4+1 (referans)", price: 14500000, lat: 40.9958, lng: 29.1202, district: "atasehir" },
+    "DEMO-019": { title: "Üsküdar'da satılan imarlı arsa (referans)", price: 31500000, lat: 41.029, lng: 29.021, district: "uskudar" },
+  };
+  for (const [code, f] of Object.entries(FIX)) {
+    const { data: row } = await admin
+      .from("properties")
+      .select("id, list_price, title")
+      .eq("tenant_id", tenantId)
+      .eq("property_code", code)
+      .maybeSingle();
+    if (!row || row.title === f.title) continue;
+    const { error } = await admin
+      .from("properties")
+      .update({
+        title: f.title,
+        list_price: f.price,
+        min_price: Math.round(f.price * 0.94),
+        lat: f.lat,
+        lng: f.lng,
+        address_line: `${f.title} — demo adres`,
+      })
+      .eq("id", row.id)
+      .eq("tenant_id", tenantId);
+    if (error) {
+      console.warn(`  ! ${code} güncellenemedi: ${error.message}`);
+      continue;
+    }
+    moved += 1;
+    // Bağlı kazanılmış anlaşma + komisyon aynı değere çekilir (demo değişmezi: anlaşma değeri = portföy fiyatı).
+    const { data: wonDeals } = await admin
+      .from("deals")
+      .select("id, deal_value, deal_type, property_id, stage")
+      .eq("tenant_id", tenantId)
+      .eq("property_id", row.id)
+      .eq("stage", "won");
+    for (const deal of wonDeals ?? []) {
+      await admin.from("deals").update({ deal_value: f.price }).eq("id", deal.id).eq("tenant_id", tenantId);
+      const c = buildDemoCommissionRow({
+        tenantId,
+        deal: { id: deal.id, stage: "won", deal_value: f.price, deal_type: deal.deal_type, property_id: deal.property_id },
+        property: { id: row.id, status: "sold", list_price: f.price, commission_rate: 2 },
+        status: "calculated",
+      });
+      await admin
+        .from("commissions")
+        .update({ gross_amount: c.gross_amount, vat_amount: c.vat_amount, splits: c.splits })
+        .eq("deal_id", deal.id)
+        .eq("tenant_id", tenantId);
+    }
+  }
+  // Kira: DEMO-009 aylık kira İstanbul düzeyine çekilir (tahakkuk tutarları dahil).
+  const { data: r9 } = await admin
+    .from("rentals")
+    .select("id, monthly_rent")
+    .eq("tenant_id", tenantId)
+    .eq("property_id", (await admin.from("properties").select("id").eq("tenant_id", tenantId).eq("property_code", "DEMO-009").maybeSingle()).data?.id ?? "")
+    .maybeSingle();
+  if (r9 && Number(r9.monthly_rent) === 12000) {
+    await admin.from("rentals").update({ monthly_rent: 38000, deposit: 76000, notes: "Demo kira sözleşmesi — Ataşehir 2+1" }).eq("id", r9.id);
+    await admin.from("rent_charges").update({ amount: 38000 }).eq("rental_id", r9.id).eq("tenant_id", tenantId);
+    moved += 1;
+  }
+  await admin.from("appointments").update({ location: "Ataşehir" }).eq("tenant_id", tenantId).eq("location", "Onikişubat");
+  return moved;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +365,7 @@ async function main() {
   console.log("✓ Profiller: sahip / müdür / danışman hazır");
 
   const geo = await ensureGeo();
-  console.log("✓ Coğrafya: İstanbul + Kahramanmaraş ilçeleri hazır");
+  console.log("✓ Coğrafya: İstanbul ilçeleri hazır");
 
   // ---------------- Müşteriler (~25) ----------------
   const CUSTOMERS: Array<Dict> = [
@@ -315,8 +417,8 @@ async function main() {
           birth_date: c.birth,
           tags: i % 5 === 0 ? ["vip"] : [],
           notes: i % 4 === 0 ? "Demo müşteri — hafta içi 18:00 sonrası aranmalı." : null,
-          province_id: inIstanbul ? geo.istanbulId : geo.marasId,
-          district_id: inIstanbul ? (i % 2 === 0 ? geo.kadikoyId : geo.maltepeId) : geo.onikisubatId,
+          province_id: geo.istanbulId,
+          district_id: inIstanbul ? (i % 2 === 0 ? geo.kadikoyId : geo.maltepeId) : geo.atasehirId,
           assigned_to: i % 2 === 0 ? advisorId : ownerId,
           created_by: ownerId,
         };
@@ -349,11 +451,11 @@ async function main() {
     { code: "DEMO-005", title: "Maltepe sahilde 3+1 ara kat", tx: "Satılık", type: "Daire", status: "live", price: 7250000, lat: 40.9219, lng: 29.1247, district: "maltepe", rooms: "3+1", m2: 130, walkPrices: [6950000], floor: 3, heating: "Kombi (Doğalgaz)", age: 15, health: "green" },
     { code: "DEMO-006", title: "Maltepe'de kiralık 2+1 eşyalı", tx: "Kiralık", type: "Daire", status: "live", price: 27500, lat: 40.9354, lng: 29.1512, district: "maltepe", rooms: "2+1", m2: 95, floor: 1, heating: "Kombi (Doğalgaz)", age: 10, health: "yellow" },
     { code: "DEMO-007", title: "Kadıköy Koşuyolu'nda müstakil ev", tx: "Satılık", type: "Müstakil ev", status: "live", price: 22000000, lat: 41.0034, lng: 29.0392, district: "kadikoy", rooms: "5+2", m2: 320, heating: "Yerden ısıtma", age: 25, health: "red" },
-    { code: "DEMO-008", title: "Onikişubat'ta yeni bina 3+1", tx: "Satılık", type: "Daire", status: "live", price: 3450000, lat: 37.5793, lng: 36.9012, district: "onikisubat", rooms: "3+1", m2: 150, walkPrices: [3350000, 3275000], floor: 5, heating: "Kombi (Doğalgaz)", age: 1, health: "green" },
-    { code: "DEMO-009", title: "Onikişubat'ta kiralık 2+1", tx: "Kiralık", type: "Daire", status: "live", price: 12000, lat: 37.5688, lng: 36.8934, district: "onikisubat", rooms: "2+1", m2: 115, floor: 2, heating: "Kombi (Doğalgaz)", age: 6, health: "green" },
-    { code: "DEMO-010", title: "Dulkadiroğlu'nda 4+1 geniş daire", tx: "Satılık", type: "Daire", status: "live", price: 2950000, lat: 37.5878, lng: 36.9571, district: "dulkadiroglu", rooms: "4+1", m2: 175, floor: 4, heating: "Soba", age: 20, health: "yellow" },
-    { code: "DEMO-011", title: "Dulkadiroğlu'nda imarlı arsa", tx: "Satılık", type: "Arsa", status: "live", price: 5600000, lat: 37.5912, lng: 36.9663, district: "dulkadiroglu", rooms: "-", m2: 540 },
-    { code: "DEMO-012", title: "Onikişubat'ta işyeri — cadde üstü", tx: "Kiralık", type: "İşyeri", status: "live", price: 35000, lat: 37.5761, lng: 36.9143, district: "onikisubat", rooms: "-", m2: 220, floor: 0, heating: "Klima", age: 10, health: "red" },
+    { code: "DEMO-008", title: "Ataşehir'de yeni bina 3+1", tx: "Satılık", type: "Daire", status: "live", price: 9800000, lat: 40.9923, lng: 29.1244, district: "atasehir", rooms: "3+1", m2: 150, walkPrices: [9600000, 9450000], floor: 5, heating: "Kombi (Doğalgaz)", age: 1, health: "green" },
+    { code: "DEMO-009", title: "Ataşehir'de kiralık 2+1", tx: "Kiralık", type: "Daire", status: "live", price: 38000, lat: 40.9886, lng: 29.1170, district: "atasehir", rooms: "2+1", m2: 115, floor: 2, heating: "Kombi (Doğalgaz)", age: 6, health: "green" },
+    { code: "DEMO-010", title: "Üsküdar'da 4+1 geniş daire", tx: "Satılık", type: "Daire", status: "live", price: 16500000, lat: 41.0235, lng: 29.0152, district: "uskudar", rooms: "4+1", m2: 175, floor: 4, heating: "Soba", age: 20, health: "yellow" },
+    { code: "DEMO-011", title: "Üsküdar Beylerbeyi'nde imarlı arsa", tx: "Satılık", type: "Arsa", status: "live", price: 28000000, lat: 41.0425, lng: 29.0420, district: "uskudar", rooms: "-", m2: 540 },
+    { code: "DEMO-012", title: "Ataşehir'de işyeri — cadde üstü", tx: "Kiralık", type: "İşyeri", status: "live", price: 95000, lat: 40.9930, lng: 29.1280, district: "atasehir", rooms: "-", m2: 220, floor: 0, heating: "Klima", age: 10, health: "red" },
     { code: "DEMO-013", title: "Kadıköy Caferağa'da satılık 1+1", tx: "Satılık", type: "Daire", status: "reserved", price: 6900000, lat: 40.9861, lng: 29.0228, district: "kadikoy", rooms: "1+1", m2: 68, floor: 1, heating: "Kombi (Doğalgaz)", age: 30, health: "yellow" },
     { code: "DEMO-014", title: "Maltepe'de satılan 2+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 6400000, lat: 40.9401, lng: 29.1385, district: "maltepe", rooms: "2+1", m2: 105, floor: 3, heating: "Kombi (Doğalgaz)", age: 18, health: "green" },
     { code: "DEMO-015", title: "Beşiktaş Ortaköy'de kiraya verilen 2+1", tx: "Kiralık", type: "Daire", status: "rented", price: 55000, lat: 41.0553, lng: 29.0268, district: "besiktas", rooms: "2+1", m2: 100, floor: 5, heating: "Merkezi", age: 7, health: "green" },
@@ -361,8 +463,8 @@ async function main() {
     // Aktif ilanları geçmiş satışlara bağlamak hem vitrini hem emsal verisini bozar.
     { code: "DEMO-016", title: "Fenerbahçe'de satılan yenilenmiş 2+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 9600000, lat: 40.9708, lng: 29.0470, district: "kadikoy", rooms: "2+1", m2: 108, floor: 3, heating: "Kombi (Doğalgaz)", age: 9, health: "green" },
     { code: "DEMO-017", title: "Maltepe sahilde satılan 3+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 7300000, lat: 40.9227, lng: 29.1262, district: "maltepe", rooms: "3+1", m2: 132, floor: 4, heating: "Kombi (Doğalgaz)", age: 14, health: "green" },
-    { code: "DEMO-018", title: "Onikişubat'ta satılan 4+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 5400000, lat: 37.5810, lng: 36.9045, district: "onikisubat", rooms: "4+1", m2: 180, floor: 6, heating: "Kombi (Doğalgaz)", age: 4, health: "green" },
-    { code: "DEMO-019", title: "Dulkadiroğlu'nda satılan imarlı arsa (referans)", tx: "Satılık", type: "Arsa", status: "sold", price: 11200000, lat: 37.5930, lng: 36.9690, district: "dulkadiroglu", rooms: "-", m2: 920, health: "green" },
+    { code: "DEMO-018", title: "Ataşehir'de satılan 4+1 (referans)", tx: "Satılık", type: "Daire", status: "sold", price: 14500000, lat: 40.9958, lng: 29.1202, district: "atasehir", rooms: "4+1", m2: 180, floor: 6, heating: "Kombi (Doğalgaz)", age: 4, health: "green" },
+    { code: "DEMO-019", title: "Üsküdar'da satılan imarlı arsa (referans)", tx: "Satılık", type: "Arsa", status: "sold", price: 31500000, lat: 41.0290, lng: 29.0210, district: "uskudar", rooms: "-", m2: 920, health: "green" },
   ];
   // Uygulamanın okuduğu KANONİK feature anahtarları (portal-publish/broşür/
   // property-health ile aynı): rooms, sqm, net_sqm, floor, heating, building_age.
@@ -376,8 +478,8 @@ async function main() {
     building_age: p.age ?? null,
   });
   const districtId = (k: string) =>
-    k === "kadikoy" ? geo.kadikoyId : k === "besiktas" ? geo.besiktasId : k === "maltepe" ? geo.maltepeId : k === "onikisubat" ? geo.onikisubatId : geo.dulkadirogluId;
-  const provinceOf = (k: string) => (k === "onikisubat" || k === "dulkadiroglu" ? geo.marasId : geo.istanbulId);
+    k === "kadikoy" ? geo.kadikoyId : k === "besiktas" ? geo.besiktasId : k === "maltepe" ? geo.maltepeId : k === "atasehir" ? geo.atasehirId : geo.uskudarId;
+  const provinceOf = (_k: string) => geo.istanbulId;
 
   {
     const { data: existing } = await admin.from("properties").select("property_code").eq("tenant_id", tenantId);
@@ -475,13 +577,13 @@ async function main() {
   const DEMANDS = [
     { name: "Ahmet Yılmaz", tx: "Satılık", type: "Daire", min: 8000000, max: 13000000, rooms: "3+1", district: geo.kadikoyId, province: geo.istanbulId, urgency: "yüksek" },
     { name: "Ayşe Kaya", tx: "Satılık", type: "Daire", min: 5000000, max: 8000000, rooms: "2+1", district: geo.maltepeId, province: geo.istanbulId, urgency: "orta" },
-    { name: "Mustafa Çelik", tx: "Satılık", type: "Arsa", min: 3000000, max: 7000000, rooms: null, district: geo.dulkadirogluId, province: geo.marasId, urgency: "düşük" },
+    { name: "Mustafa Çelik", tx: "Satılık", type: "Arsa", min: 20000000, max: 35000000, rooms: null, district: geo.uskudarId, province: geo.istanbulId, urgency: "düşük" },
     { name: "Emine Arslan", tx: "Kiralık", type: "Daire", min: 20000, max: 35000, rooms: "2+1", district: geo.maltepeId, province: geo.istanbulId, urgency: "yüksek" },
     { name: "Ali Koç", tx: "Satılık", type: "Daire", min: 15000000, max: 20000000, rooms: "4+1", district: geo.besiktasId, province: geo.istanbulId, urgency: "orta" },
-    { name: "Zeynep Aydın", tx: "Kiralık", type: "Daire", min: 10000, max: 15000, rooms: "2+1", district: geo.onikisubatId, province: geo.marasId, urgency: "yüksek" },
-    { name: "Hatice Yıldız", tx: "Satılık", type: "Daire", min: 2500000, max: 3600000, rooms: "3+1", district: geo.onikisubatId, province: geo.marasId, urgency: "orta" },
+    { name: "Zeynep Aydın", tx: "Kiralık", type: "Daire", min: 30000, max: 45000, rooms: "2+1", district: geo.atasehirId, province: geo.istanbulId, urgency: "yüksek" },
+    { name: "Hatice Yıldız", tx: "Satılık", type: "Daire", min: 8000000, max: 12000000, rooms: "3+1", district: geo.atasehirId, province: geo.istanbulId, urgency: "orta" },
     { name: "Elif Doğan", tx: "Satılık", type: "Daire", min: 6000000, max: 10000000, rooms: "2+1", district: geo.kadikoyId, province: geo.istanbulId, urgency: "düşük" },
-    { name: "Serkan Avcı", tx: "Kiralık", type: "İşyeri", min: 25000, max: 40000, rooms: null, district: geo.onikisubatId, province: geo.marasId, urgency: "orta" },
+    { name: "Serkan Avcı", tx: "Kiralık", type: "İşyeri", min: 70000, max: 110000, rooms: null, district: geo.atasehirId, province: geo.istanbulId, urgency: "orta" },
   ];
   await section("Talepler", "customer_demands", tenantId, DEMANDS.length, async () => {
     const rows = DEMANDS.map((d, i) => ({
@@ -566,8 +668,8 @@ async function main() {
     const extra = [
       { prop: "DEMO-016", cust: "Ayşe Kaya", value: 9_600_000, daysAgo: 135 },
       { prop: "DEMO-017", cust: "Ali Koç", value: 7_300_000, daysAgo: 100 },
-      { prop: "DEMO-018", cust: "Zeynep Aydın", value: 5_400_000, daysAgo: 70 },
-      { prop: "DEMO-019", cust: "Mustafa Çelik", value: 11_200_000, daysAgo: 45 },
+      { prop: "DEMO-018", cust: "Zeynep Aydın", value: 14_500_000, daysAgo: 70 },
+      { prop: "DEMO-019", cust: "Mustafa Çelik", value: 31_500_000, daysAgo: 45 },
     ];
     const { data: existingTrendWon, error: trendMarkerError } = await admin
       .from("deals")
@@ -832,7 +934,7 @@ async function main() {
       { type: "showing", at: daysFromNow(0, 17), cust: "Emine Arslan", prop: "DEMO-006", status: "pending", loc: "Maltepe" },
       { type: "showing", at: daysFromNow(1, 11), cust: "Ali Koç", prop: "DEMO-003", status: "confirmed", loc: "Levent" },
       { type: "office", at: daysFromNow(2, 10), cust: "Mehmet Demir", prop: null, status: "pending", loc: "Ofis" },
-      { type: "valuation", at: daysFromNow(3, 15), cust: "Kadir Polat", prop: null, status: "confirmed", loc: "Onikişubat" },
+      { type: "valuation", at: daysFromNow(3, 15), cust: "Kadir Polat", prop: null, status: "confirmed", loc: "Ataşehir" },
     ].map((a) => ({
       tenant_id: tenantId,
       appointment_type: a.type,
@@ -1043,15 +1145,15 @@ async function main() {
       },
       {
         tenant_id: tenantId, property_id: propByCode("DEMO-009"), renter_customer_id: custByName("Zeynep Aydın"),
-        monthly_rent: 12000, due_day: 10, start_date: monthStart(-2), deposit: 24000, status: "active",
-        notes: "Demo kira sözleşmesi — Onikişubat 2+1", created_by: ownerId,
+        monthly_rent: 38000, due_day: 10, start_date: monthStart(-2), deposit: 76000, status: "active",
+        notes: "Demo kira sözleşmesi — Ataşehir 2+1", created_by: ownerId,
       },
     ]);
     await insertRows("rent_charges", [
       { tenant_id: tenantId, rental_id: rentals[0].id, period: monthStart(-1), amount: 55000, status: "paid", paid_at: iso(daysFromNow(-25)) },
       { tenant_id: tenantId, rental_id: rentals[0].id, period: monthStart(0), amount: 55000, status: "pending" },
-      { tenant_id: tenantId, rental_id: rentals[1].id, period: monthStart(-1), amount: 12000, status: "overdue" },
-      { tenant_id: tenantId, rental_id: rentals[1].id, period: monthStart(0), amount: 12000, status: "pending" },
+      { tenant_id: tenantId, rental_id: rentals[1].id, period: monthStart(-1), amount: 38000, status: "overdue" },
+      { tenant_id: tenantId, rental_id: rentals[1].id, period: monthStart(0), amount: 38000, status: "pending" },
     ]);
     await insertRows("maintenance_requests", [
       {
@@ -1348,7 +1450,7 @@ async function main() {
       },
       {
         tenant_id: tenantId, name: "Canan Ergin", phone: "05335550102", tx_type: "kiralik",
-        province_id: geo.marasId, district_id: geo.onikisubatId, max_price: 15000, rooms: "2+1",
+        province_id: geo.istanbulId, district_id: geo.atasehirId, max_price: 45000, rooms: "2+1",
       },
     ];
     return (await insertRows("vitrin_saved_searches", rows)).length;
@@ -1364,8 +1466,8 @@ async function main() {
         median_sqm_price: 78000 + t * 2800, active_count: 6 + (t % 3), avg_days_listed: 48 - t * 3, closed_count: t % 2,
       });
       rows.push({
-        tenant_id: tenantId, district_id: geo.onikisubatId, period: monthStart(-m), tx_type: "Tümü",
-        median_sqm_price: 21500 + t * 900, active_count: 3 + (t % 2), avg_days_listed: 62 - t * 4, closed_count: (t + 1) % 2,
+        tenant_id: tenantId, district_id: geo.atasehirId, period: monthStart(-m), tx_type: "Tümü",
+        median_sqm_price: 98000 + t * 3200, active_count: 3 + (t % 2), avg_days_listed: 62 - t * 4, closed_count: (t + 1) % 2,
       });
     }
     const { error } = await admin
@@ -1590,6 +1692,46 @@ async function main() {
     }));
     return (await insertRows("valuations", rows)).length;
   });
+
+  // ---------------- İstanbul normalizasyonu (eski küçük-il satırları) ----------------
+  {
+    const moved = await normalizeDemoGeo(tenantId, geo);
+    console.log(moved > 0 ? `✓ Coğrafya normalizasyonu: ${moved} kayıt İstanbul'a taşındı` : "✓ Coğrafya: tüm kayıtlar İstanbul'da (atlandı)");
+  }
+
+  // ---------------- Son eklenen modüller (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS, ilan analizi, gider bütçesi, avatar) ----------------
+  {
+    const report = await seedModuleData({
+      db: admin,
+      tenantId,
+      ownerId,
+      advisorId,
+      sample: false,
+      place: {
+        provinceId: geo.istanbulId,
+        districtId: geo.kadikoyId,
+        city: "İstanbul",
+        district: "Kadıköy",
+        districts: { Kadıköy: geo.kadikoyId, Beşiktaş: geo.besiktasId, Ataşehir: geo.atasehirId, Şişli: geo.sisliId },
+      },
+      codePrefix: "DEMO",
+      authorityPropertyCodes: ["DEMO-001", "DEMO-002", "DEMO-003", "DEMO-004", "DEMO-005", "DEMO-007"],
+      analysisPropertyCodes: ["DEMO-001", "DEMO-002"],
+      processDeals: [
+        { propertyCode: "DEMO-014", profile: "in_transfer" },
+        { propertyCode: "DEMO-001", profile: "delayed" },
+      ],
+      avatarAssignments: [
+        { profileId: ownerId, preset: "bina" },
+        { profileId: gmId, preset: "pusula" },
+        { profileId: advisorId, preset: "anahtar" },
+      ],
+    });
+    for (const [group, n] of Object.entries(report.counts)) console.log(`✓ Modül verisi · ${group}: ${n} kayıt (0 = zaten yüklü)`);
+    for (const s of report.skipped) console.log(`- Modül verisi · ${s.group}: atlandı (${s.reason})`);
+    for (const f of report.failed) console.error(`! Modül verisi · ${f.group}: HATA ${f.message}`);
+    if (report.failed.length > 0) process.exitCode = 1;
+  }
 
   // ---------------- Bildirimler ----------------
   await section("Bildirimler", "notifications", tenantId, 3, async () => {

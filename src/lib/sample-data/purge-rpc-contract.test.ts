@@ -85,7 +85,8 @@ describe("purgeSampleData (TS sarmalayıcı)", () => {
     const admin = { from: () => ({ update: (p: unknown) => ({ eq: async () => (updates.push(p), { error: null }) }) }) };
     const res = await purgeSampleData({ session: { rpc } as never, tenantId: "t-1", fallbackAdmin: admin as never });
     expect(res).toMatchObject({ ok: true, via: "fallback" });
-    expect(updates[0]).toEqual({ sample_seeded_at: null });
+    // (Ön adım — purge-extras — bu sahte istemcide kendi güncellemesini de kaydeder; damga sıfırlaması yine de yapılmalı.)
+    expect(updates).toContainEqual({ sample_seeded_at: null });
   });
 
   it("isRpcMissing / reportFromRpc kenar durumları", () => {
