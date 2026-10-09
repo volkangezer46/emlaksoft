@@ -77,7 +77,7 @@ export async function updateSession(request: NextRequest) {
   const tAuth0 = timing ? performance.now() : 0;
   // getClaims: gerekirse oturumu yeniler (setAll ile çerez), sonra JWT'yi JWKS (ES256) ile YEREL doğrular — Auth
   // sunucusuna ağ turu yok. Ödün: iptal edilmiş oturum JWT süresi dolana kadar geçer; pasif kullanıcı / askıdaki ofis
-  // kapı RPC'sinde (15 sn önbellekli) denetlenmeye devam eder. Simetrik anahtarda kütüphane getUser'a düşer.
+  // kapı RPC'sinde her istekte (önbelleksiz) denetlenmeye devam eder. Simetrik anahtarda kütüphane getUser'a düşer.
   const { data: claimsData, error: authError } = await supabase.auth.getClaims();
   const claims = claimsData?.claims as Record<string, unknown> | undefined;
   const user = claims ? userFromClaims(claims) : null;
