@@ -19,7 +19,13 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({
     auth: {
       getUser,
-      getClaims: async () => ({ data: { claims: { session_id: "s1" } }, error: null }),
+      getClaims: async () => {
+        const {
+          data: { user },
+        } = await getUser();
+        if (!user) return { data: null, error: null };
+        return { data: { claims: { sub: user.id, app_metadata: user.app_metadata, session_id: "s1" } }, error: null };
+      },
       signOut: async () => ({}),
     },
     from: (table: string) => {
