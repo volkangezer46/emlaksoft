@@ -493,3 +493,6 @@ html[data-mk-ann-off] .mk-preview .mk-ann { display: flex; }
   .mk-foot-grid { gap: var(--mk-s-5); }
   .mk-foot { padding-top: 3rem; }
 }
+
+/* Ürün turu: ekranı henüz yüklenmemiş sekmenin yer tutucusu (aynı en-boy oranı: yerleşim kayması yok). */
+.mk-svg-ph { aspect-ratio: 1000 / 560; background: linear-gradient(135deg, #f5f7fc, #eaeff9); }
