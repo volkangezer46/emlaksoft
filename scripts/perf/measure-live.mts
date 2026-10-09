@@ -4,7 +4,8 @@ import { createServerClient } from "@supabase/ssr";
 import { deriveDemoPassword } from "../../src/lib/demo-credentials.ts";
 
 dotenv.config({ path: ".env.local", quiet: true });
-const BASE = "https://emlaksoft.vercel.app";
+const BASE = process.env.BASE || "https://emlaksoft.vercel.app";
+const REPS = Number(process.env.REPS || 3);
 const email = process.argv[2] || "sahip@demo.emlaksoft.test";
 const jar = new Map<string, string>();
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -30,7 +31,7 @@ for (const p of pages) {
   const tot: number[] = [];
   let st = "";
   let status = 0;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < REPS; i++) {
     const t0 = performance.now();
     const res = await fetch(BASE + p, { headers: { cookie, "user-agent": "emlaksoft-perf-probe" }, redirect: "manual" });
     const t1 = performance.now();
@@ -41,5 +42,7 @@ for (const p of pages) {
     tot.push(Math.round(t2 - t0));
     st = res.headers.get("server-timing") ?? "";
   }
-  console.log(`${p} | ${status} | ${ttfb.join("/")} | ${tot.join("/")} | ${st}`);
+  const sorted = [...tot].sort((a, b) => a - b);
+  const p95 = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)];
+  console.log(`${p} | ${status} | ttfb ${ttfb.join("/")} | toplam ${tot.join("/")} | p95 ${p95} max ${sorted[sorted.length - 1]} | ${st}`);
 }

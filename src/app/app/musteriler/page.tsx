@@ -1,3 +1,4 @@
+import { measure } from "@/lib/server-timing";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
@@ -174,7 +175,7 @@ export default async function CustomersPage({
     segmentCounts,
     poolLimited,
   weeklyBars,
-  } = await loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter, customIds: customFilter.ids });
+  } = await measure("musteriler-liste", () => loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter, customIds: customFilter.ids }));
 
   // ---- Link kurucu: filtreler sayfa/sıralama linklerinde korunur ----------
   const baseParams: Record<string, string> = {};

@@ -1,3 +1,4 @@
+import { measureAll } from "@/lib/server-timing";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -96,7 +97,7 @@ async function DashboardBody({ group, management }: { group: GroupParam; managem
     const briefs = await loadPropertyBriefs(db, rows.map((r) => r.property_id));
     return { rows, briefs };
   })();
-  const [tenantRes, anomalies, changes, publishStats, districts, overdue, advisorRes, groupRows, todayData] = await Promise.all([
+  const [tenantRes, anomalies, changes, publishStats, districts, overdue, advisorRes, groupRows, todayData] = await measureAll("ilan-kontrol-veri", [
     getControlSummary(db, "tenant"),
     countOpenAnomalies(db, nowIso),
     getChangesSince(db, daysAgoIso(1)),

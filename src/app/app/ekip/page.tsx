@@ -1,3 +1,4 @@
+import { measureAll } from "@/lib/server-timing";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import Link from "@/components/ui/smart-link";
@@ -125,7 +126,7 @@ export default async function TeamPage() {
     docAlerts,
     seatSummary,
     advisorList,
-  ] = await Promise.all([
+  ] = await measureAll("ekip-veri", [
     supabase.from("profiles").select("id, full_name, phone, role, is_active, created_at, branch_id, public_slug, is_public, branch:branches!profiles_branch_id_fkey(name)").order("created_at", { ascending: true }).limit(500),
     supabase.from("branches").select("id, name, is_active, province_id, province:geo_provinces(name)").order("created_at", { ascending: true }).limit(200),
     provinceOptionsResult(),
