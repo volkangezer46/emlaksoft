@@ -83,7 +83,7 @@ const nextConfig: NextConfig = {
     // önbellekten anında açılır (bu tamamen istemci tarafı, tek oturuma özel bellek
     // önbelleği — sunucudaki no-store Cache-Control başlıklarını etkilemez).
     // 180 sn: action'lar revalidatePath/router.refresh ile ilgili segmenti zaten tazeler; geri/ileri ve tekrar ziyaret anında açılır.
-    staleTimes: { dynamic: 180, static: 300 },
+    staleTimes: { dynamic: 30, static: 300 },
     // Barrel-import maliyetini düşür: yalnızca kullanılan alt modüller derlenir.
     // Buradaki her paket gerçekten kurulu olmalı — aksi halde satır ölü kalır.
     optimizePackageImports: [
