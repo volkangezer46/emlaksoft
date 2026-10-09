@@ -88,7 +88,6 @@ export default async function RootLayout({
     <html
       lang="tr"
       suppressHydrationWarning
-      data-scroll-behavior="smooth"
       className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>

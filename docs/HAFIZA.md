@@ -51,6 +51,7 @@ Kod yorumlarındaki `HAFIZA §N` eski numaradır: `§7` = aşağıdaki "Kalıcı
 - Onay kuralı muafiyeti yalnız owner/gm; ofis kapatma = arşivleme (veri SİLİNMEZ), sahibe CSV paketi (ZIP yok), paket yalnız platformun `completed` yaptığı talepte.
 - Anketör rol değil atanabilir görevdir; tetikleyiciler kapalı doğar, geriye dönük anket üretilmez. Kimlik/vergi no ilan sahibi tablosunda tutulmaz.
 - Hukuki metin sorumluluğu ofis/şirket sahibindedir ("avukat onayı bekliyor" işareti tutulmaz; 2026-10-06). Endeksa ve TapuSor KALDIRILDI (piyasa verisi yalnız EmlakFiyati).
+- Gezinme hızı (2026-10-09, istemci tarafı): React `<ViewTransition>`/View Transitions panel şablonlarından KALDIRILDI (gezinme başına ~530 ms zorunlu düzen; sayfa geçişi yalnız CSS `.motion-page`, geri GETİRME); tıklamada anında geri bildirim `NavPending` (menü/sekme "bekliyor" işareti + üst ilerleme çubuğu); liste hücrelerinde tanımsız öznitelik ve sprite ikon öznitelikleri RSC yükünden çıkarıldı. Ölçüm araçları `scripts/perf/measure-nav.mts` (Playwright, canlı), `profile-nav.mts` (CPU profili), `rsc-size.mts`.
 - Hesap kredisi nakde çevrilmez; ortak/nakit ödeme bayrakları (`growth_partner_enabled`, `growth_cash_payout_enabled`) KAPALI (vergi/stopaj + sözleşme metni mali müşavir onayı); kayıtlı kartla otomatik yenileme (`billing.auto_renew_enabled`) KAPALI.
 
 ## 4. Çalışma / doğrulama yöntemi (tekrar keşfetme) — eski §5

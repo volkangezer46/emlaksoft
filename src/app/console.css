@@ -229,3 +229,24 @@ html[data-font-size="lg"] :is(.ds-seg-opt, .scope-opt) { min-height: 44px; }
 html[data-font-size="lg"] .nav-pin { min-width: 44px; min-height: 44px; }
 html[data-font-size="lg"] .pm-seg a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
 html[data-font-size="lg"] :is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]) { min-height: 44px; }
+
+/* ---- Anında gezinme geri bildirimi (src/components/app/nav-pending.tsx) ----
+   Tıklanan bağlantı sunucu yanıtını beklemeden "bekliyor" işaretlenir; üstte ince ilerleme çubuğu. */
+.nav-progress {
+  position: fixed; inset: 0 0 auto 0; z-index: 200; height: 3px; pointer-events: none;
+  background: linear-gradient(90deg, var(--accent), var(--cyan-400));
+  transform-origin: left; transform: scaleX(0); opacity: 0;
+}
+.nav-progress[data-active="true"] { opacity: 1; animation: nav-progress-grow 9s cubic-bezier(0.1, 0.7, 0.2, 1) forwards; }
+@keyframes nav-progress-grow { from { transform: scaleX(0.02); } to { transform: scaleX(0.92); } }
+/* Yan menü: bekleyen öğe hemen etkin hap olur, önceki etkin hap söner (çift hap yok). */
+.nav-scroll .nav-row[data-nav-pending="true"] {
+  background: var(--accent); color: #fff; font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 10px 22px -12px color-mix(in srgb, var(--accent) 90%, transparent);
+}
+html[data-nav-busy] .nav-scroll .nav-row.nav-pill:not([data-nav-pending="true"]) { background: transparent; box-shadow: none; font-weight: 500; }
+/* Sekmeler (MorphNav / PageTabs): bekleyen sekme hemen vurgulanır. */
+.mt-tab[data-nav-pending="true"] { color: var(--ink-950); font-weight: 600; }
+.mt-tab[data-nav-pending="true"]::after { opacity: 1; transform: scaleX(1); }
+a[data-nav-pending="true"]:not(.nav-row) { cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .nav-progress[data-active="true"] { animation: none; transform: scaleX(0.6); } }

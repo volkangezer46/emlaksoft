@@ -135,17 +135,8 @@ export function IconSprite() {
 /** Sprite'tan ikon: lucide ile ayni cizgi stili (24 viewBox, 2px, yuvarlak uc), currentColor. */
 export function SpriteIcon({ name, className }: { name: SpriteIconName; className?: string }) {
   return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
+    // Çizgi stili (fill/stroke/uç) `.sprite-ic` CSS'indedir (globals.css): 50 satırlık listede her ikonun RSC yükü ~170 bayt azalır.
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className ? `sprite-ic ${className}` : "sprite-ic"}>
       <use href={`#i-${name}`} />
     </svg>
   );

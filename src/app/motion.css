@@ -123,14 +123,14 @@
   @keyframes tick-draw { from { stroke-dashoffset: 40; } to { stroke-dashoffset: 0; } }
   .tick-draw { stroke-dasharray: 40; animation: tick-draw var(--motion-slow) var(--ease-out) 80ms both; }
 
-  /* ---- Sayfa geçişi: view transitions yoksa hafif fade + 4px yükselme
-          (VT destekli tarayıcıda geçişi globals.css ::view-transition kuralları yürütür) ---- */
+  /* ---- Sayfa geçişi: hafif opacity girişi (aşağıda) + liste/filtre değişiminde fade + 4px yükselme ---- */
   @keyframes motion-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   /* URL filtresi/dönem değişiminde içerik girişi (ui/motion FadeSwap; ilk boyamada uygulanmaz). */
   .motion-swap { animation: motion-fade var(--motion-base) var(--ease-out) backwards; }
-  @supports not (view-transition-name: root) {
-    .motion-page { animation: motion-fade var(--motion-nav) var(--ease-out) backwards; }
-  }
+  /* Sayfa geçişi (app/admin template.tsx, her gezinmede yeniden bağlanır): yalnız opacity; transform YOK
+     (fixed torunlar için kapsayıcı blok oluşturmasın). View Transitions kaldırıldı (zorunlu düzen maliyeti). */
+  @keyframes motion-page-in { from { opacity: 0.35; } to { opacity: 1; } }
+  .motion-page { animation: motion-page-in var(--motion-nav) var(--ease-out) backwards; }
 
   /* ---- Açılır panel / satır içi onay girişi: DOM'a girdiği anda yumuşak belirir.
           `@starting-style` yoksa öğe bugünkü gibi anında görünür. ---- */

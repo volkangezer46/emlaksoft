@@ -199,10 +199,11 @@ export function TD({
   return (
     <td
       {...props}
-      data-label={label}
-      data-actions={actions ? "" : undefined}
-      data-primary={primary ? "" : undefined}
-      title={title}
+      // Tanımsız öznitelikler RSC yüküne "$undefined" olarak yazılırdı (satır başına hücre başına ~100 bayt): koşullu yayılır.
+      {...(label !== undefined ? { "data-label": label } : null)}
+      {...(actions ? { "data-actions": "" } : null)}
+      {...(primary ? { "data-primary": "" } : null)}
+      {...(title !== undefined ? { title } : null)}
       className={cn(
         "px-4 py-3",
         truncate && "td-truncate",

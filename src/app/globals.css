@@ -10,6 +10,9 @@
 @import "./list-page.css";
 @import "./kit.css";
 
+/* Sprite ikon çizgi stili (lucide ile aynı): özniteliklerden CSS'e taşındı, RSC yükünü küçültür. */
+.sprite-ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-14px); }
@@ -976,7 +979,7 @@ p {
   .bar-live, .bar-rise { animation: none !important; transform: none !important; }
 }
 
-/* Panel sayfa geçişi: /app ve /admin template.tsx ortak <ViewTransition> + motion.css `.motion-page` (aşağıda ::view-transition kuralları). */
+/* Panel sayfa geçişi: /app ve /admin template.tsx + motion.css `.motion-page` (yalnız CSS). */
 
 /* ============================================================================
    YAZDIRMA / PDF
@@ -1116,38 +1119,8 @@ p {
    Desteklemeyen tarayıcıda bu bloklar yok sayılır; görünüm bugünkü ile aynı.
    ============================================================ */
 
-/* ---- 1) VIEW TRANSITIONS (React <ViewTransition>, app/template.tsx) ----
-   Root snapshot'ın varsayılan cross-fade'i ve panel içeriği (React
-   <ViewTransition default="page-fade">) aynı sürede: --motion-nav (150 ms; gezinme hızlı
-   hissedilsin). Eski/yeni süreleri EŞİT tutulur; aksi halde cross-fade'de zemin sızar.
-   VT desteklemeyen tarayıcıda yedek: motion.css `.motion-page` (fade + 4px). */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: var(--motion-nav);
-  animation-timing-function: ease;
-}
-::view-transition-group(.page-fade),
-::view-transition-old(.page-fade),
-::view-transition-new(.page-fade) {
-  animation-duration: var(--motion-nav);
-  animation-timing-function: ease;
-}
-/* Geçiş sürerken canlı sayfa tıklanabilir kalır (Next docs: view-transitions,
-   "Keeping the page interactive"). */
-::view-transition {
-  pointer-events: none;
-}
-
-/* Reduced-motion: ::view-transition pseudo'larına global `*` kuralı ulaşmaz,
-   ayrıca sıfırlanmaları gerekir. */
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation-duration: 0s !important;
-    animation-delay: 0s !important;
-  }
-}
+/* ---- 1) Sayfa geçişi: View Transitions KALDIRILDI (zorunlu düzen maliyeti, bkz. app/template.tsx);
+   yerine motion.css `.motion-page` (opacity, --motion-nav). ---- */
 
 /* ---- 2) @starting-style — yalnız .reveal / .reveal-scale ----
    Eleman DOM'a girdiği anda (ilk stil karesi) buradaki değerlerden mevcut

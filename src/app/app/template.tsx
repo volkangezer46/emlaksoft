@@ -1,27 +1,11 @@
 /**
- * Panel sayfa geçişi — iki katmanlı progressive enhancement:
+ * Panel sayfa geçişi — yalnız CSS (motion.css `.motion-page`, --motion-nav 150 ms, yalnız opacity).
  *
- * 1) View Transitions destekleyen tarayıcı: React <ViewTransition> (Next 16.3+, yapılandırma gerekmez)
- *    navigasyonda tarayıcının native cross-fade'ini tetikler; süre/easing
- *    globals.css'te ::view-transition-*(root) ve .page-fade sınıfında (--motion-nav, 150ms).
- *    Bu durumda .motion-page animasyonu hiç tanımlanmaz (motion.css: `@supports not
- *    (view-transition-name: root)`) — çift animasyon olmaz.
- * 2) Desteklemeyen tarayıcı: .motion-page ile aynı sürede hafif fade + 4px yükselme (yedek).
- *
- * Not: canary TİP augmentasyonu triple-slash ile yüklenir (runtime importu Turbopack'te
- * çözülemiyor); çalışma zamanında App Router'ın React sürümü ViewTransition'ı export ediyor.
+ * React <ViewTransition> / View Transitions API KALDIRILDI (2026-10 hız ölçümü): her gezinmede tarayıcı sayfayı
+ * anlık görüntüye alıp `documentElement.clientHeight` + `getBoundingClientRect` ile zorunlu düzen hesaplatıyordu
+ * (canlı profilde gezinme başına ~530 ms ana iş parçacığı, tıklama geri bildirimi ve içerik gecikiyordu).
+ * Şablon her gezinmede yeniden bağlandığı için CSS animasyonu her sayfada çalışır; hareket azaltmada kapalıdır.
  */
-/// <reference types="react/canary" />
-import { ViewTransition } from "react";
-import { ViewTransitionGuard } from "@/components/app/view-transition-guard";
-
 export default function AppTemplate({ children }: { children: React.ReactNode }) {
-  return (
-    <ViewTransition default="page-fade">
-      <div className="motion-page">
-        <ViewTransitionGuard />
-        {children}
-      </div>
-    </ViewTransition>
-  );
+  return <div className="motion-page">{children}</div>;
 }

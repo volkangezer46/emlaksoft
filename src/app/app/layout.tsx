@@ -3,6 +3,7 @@ import Link from "@/components/ui/smart-link";
 import { Shield } from "lucide-react";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
+import { NavPending } from "@/components/app/nav-pending";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
@@ -358,6 +359,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <IconSprite />
       <ThemeController />
       <SidebarBoot />
+      <NavPending />
       <ErrorBoundary>
         <div className="app-frame flex min-h-screen bg-canvas">
           <Suspense fallback={null}>

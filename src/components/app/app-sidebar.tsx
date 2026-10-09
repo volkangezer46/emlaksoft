@@ -117,10 +117,15 @@ export function AppSidebar({
   const quick = useQuickAccess({ scope: storageScope, kind: "app", items: quickItems, activeHref });
   // Hızlı erişim (sabitlenen + en çok kullanılan) hedefleri boşta ısıtılır: tıklayınca kabuk anında açılır. Bağlantı tasarrufta
   // (saveData/2g) yapılmaz; etkin sayfa ve kilitli (yükseltme) sayfalar atlanır. Sunucu turu/ düzen kayması yok.
-  useIdlePrefetch(
-    [...quick.pinned, ...quick.auto].map((i) => i.href).filter((h) => h !== activeHref && !isLocked(h, lockedHrefs)),
-    4,
-  );
+  // Bütçe: en çok 8 hedef (önce sabit/çok kullanılan, sonra görünür çekirdek menü sırası), 600 ms arayla; her biri yalnız
+  // loading.tsx sınırına kadar iner. Sonraki tıklamada iskelet ve etkin vurgu anında gelir.
+  const idleTargets = [
+    ...new Set([
+      ...[...quick.pinned, ...quick.auto].map((i) => i.href),
+      ...model.groups.flatMap((g) => g.items.map((i) => i.href)),
+    ]),
+  ].filter((h) => h !== activeHref && !isLocked(h, lockedHrefs));
+  useIdlePrefetch(idleTargets, 8);
 
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (section: VisibleSection) => {
