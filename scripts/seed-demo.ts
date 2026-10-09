@@ -673,7 +673,7 @@ async function main() {
     ];
     const { data: existingTrendWon, error: trendMarkerError } = await admin
       .from("deals")
-      .select("id, property_id, deal_value")
+      .select("id, property_id, deal_value, closure_active")
       .eq("tenant_id", tenantId)
       .eq("stage", "won")
       .in("deal_value", extra.map((deal) => deal.value));
@@ -681,8 +681,13 @@ async function main() {
     const byValue = new Map<number, NonNullable<typeof existingTrendWon>[number]>();
     for (const deal of existingTrendWon ?? []) {
       const value = Number(deal.deal_value);
-      if (byValue.has(value)) {
-        throw new Error(`Trend anlaşma marker'ı tekil değil: ${value}`);
+      const prev = byValue.get(value);
+      if (prev) {
+        // Eski seed sürümünün aynı portföyde bıraktığı yinelenen kapanış: aktif olan esas alınır.
+        if (prev.property_id !== deal.property_id) {
+          throw new Error(`Trend anlaşma marker'ı tekil değil: ${value}`);
+        }
+        if (prev.closure_active || !deal.closure_active) continue;
       }
       byValue.set(value, deal);
     }
@@ -1239,12 +1244,17 @@ async function main() {
       console.warn("  Core workflow uzlaştırması atlandı: önce 20260812000000 scaffold uygulanmalı.");
     } else {
       const { data: currentWon, error: wonError } = await admin.from("deals")
-        .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at")
+        .select("id, stage, deal_value, deal_type, property_id, project_unit_id, customer_id, created_at, updated_at, closure_active")
         .eq("tenant_id", tenantId)
         .eq("stage", "won")
         .not("property_id", "is", null);
       if (wonError) throw new Error(`Demo won uzlaştırma sorgusu: ${wonError.message}`);
+      // Aynı portföyde birden çok kazanılmış anlaşma (eski çalıştırmalardan kalma) varsa yalnız biri kapanış-aktif olabilir
+      // (uq_deals_tenant_property_won): aktif olan varsa diğerleri atlanır.
+      const closureActiveProps = new Set((currentWon ?? []).filter((d) => d.closure_active).map((d) => d.property_id));
       for (const deal of currentWon ?? []) {
+        if (!deal.closure_active && closureActiveProps.has(deal.property_id)) continue;
+        if (!deal.closure_active) closureActiveProps.add(deal.property_id);
         const property = propsData.find((row) => row.id === deal.property_id);
         if (!property) throw new Error("Demo won anlaşmanın portföyü bulunamadı");
         const expected = deal.deal_type === "rent" ? "rented" : "sold";
