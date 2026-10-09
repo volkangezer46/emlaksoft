@@ -196,3 +196,31 @@ describe("(c) istemci bileşenleri ağır kütüphaneyi statik içe aktarmaz", (
     }
   });
 });
+
+describe("(d) sunucu Supabase istemcileri takılma korumasından (guardedFetch) geçer", () => {
+  // Zaman aşımsız tek bir istek tüm sayfayı 40-80 sn bekletiyordu (2026-10-09). Yeni sunucu istemcisi yalnız bu dosyalarda kurulur.
+  const GUARDED = ["src/lib/supabase/server.ts", "src/lib/supabase/middleware.ts", "src/lib/supabase/admin.ts"];
+  // Gerekçeli istisna: parola yeniden doğrulama için tek seferlik, oturumsuz istemci (sayfa yolunda değil, yalnız action).
+  const EXEMPT = new Set(["src/app/actions/account.ts", "src/app/actions/ownership-transfer.ts", "src/lib/supabase/client.ts"]);
+  it("kurucu çağrıları yalnız korumalı dosyalarda", () => {
+    const offenders = SRC_FILES.map(rel).filter((f) => {
+      if (GUARDED.includes(f) || EXEMPT.has(f)) return false;
+      const s = readFileSync(join(ROOT, f), "utf8");
+      return /\b(createServerClient|createBrowserClient)\(/.test(s) || /import\s*\{[^}]*\bcreateClient\b[^}]*\}\s*from\s*"@supabase\/supabase-js"/.test(s);
+    });
+    expect(offenders).toEqual([]);
+  });
+  it("korumalı dosyalar guardedFetch kullanır", () => {
+    for (const f of GUARDED) expect(readFileSync(join(ROOT, f), "utf8"), f).toMatch(/global:\s*\{\s*fetch:\s*guardedFetch\s*\}/);
+  });
+});
+
+describe("(e) istemci router önbelleği: tekrar ziyaret anında, veri en çok 30 sn bayat", () => {
+  it("next.config staleTimes.dynamic 1..30", () => {
+    const m = readFileSync(join(ROOT, "next.config.ts"), "utf8").match(/staleTimes:\s*\{\s*dynamic:\s*(\d+)/);
+    expect(m, "staleTimes.dynamic tanımlı olmalı").not.toBeNull();
+    const v = Number(m![1]);
+    expect(v).toBeGreaterThanOrEqual(1);
+    expect(v).toBeLessThanOrEqual(30);
+  });
+});

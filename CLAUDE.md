@@ -55,6 +55,12 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **UI:** tamamen Türkçe ("lead" değil "talep/başvuru"); **koyu tema yalnız /app ve /admin'de** (`html[data-theme="dark"]`, `src/app/theme-dark.css`, tercih: sistem/açık/koyu; public vitrin ve portallar her zaman açık kalır);
   ultra premium standart (animasyon, anlamlı boş durum).
 - **Menü ANA İLKESİ:** YENİ ÖZELLİK = yeni menü öğesi DEĞİL; önce mevcut sayfaya sekme/kart; yan menü görünür satır bütçesi: danışman ≤8, ofis ≤10, admin ≤8 (nav-budget-contract). Yan menüde yalnız üst düzey sayfa; alt sekmeler sayfa içi şeritte, çekirdek dışı öğeler kapalı "Diğer" grubunda.
+- **HIZ ANA İLKESİ (mevcut ve YENİ her sayfa/işlem):** tıklama→görsel tepki tek karede (~16 ms), gezinmede long task >50 ms yok,
+  veri akışla gelir. Kurallar: her `/app`/`/admin` `page.tsx` yanında `loading.tsx`; bağımsız sorgular `Promise.all` (waterfall yok);
+  ağır istemci kütüphanesi yalnız `next/dynamic`; sunucu Supabase istemcisi yalnız `src/lib/supabase/{server,middleware,admin}.ts`
+  (zaman aşımı + yineleme: `fetch-guard.ts`); proxy oturumu `getClaims` (yerel JWT), kapı tek RPC turu ve ÖNBELLEKSİZ (pasif/askı anında);
+  istemci router önbelleği `staleTimes.dynamic` ≤30 sn; menü tıklaması `NavPending` ile anında vurgulanır; yeni ağır sorgu önce ölçülür
+  (`scripts/perf/measure-live.mts`, `profile-nav.mts`). Sözleşme: `src/lib/perf-budget-contract.test.ts`. Ayrıntı `docs/design/HIZ_MIMARI_ARASTIRMA_2026-10.md`.
 - **Menü ve paketler:** /app menüsü 9 iş başlığıdır, tek kaynak `src/lib/nav-config.ts` (sayfa yolları değişmez,
   yeni sayfa buraya eklenir). Paket kilidi sayfa bazlıdır: `src/lib/billing/page-gates.ts` +
   `requireModulePage(mod, href)`; yeni/değişen paket kuralı orada ve `src/lib/billing/plans.ts`'te yapılır.
