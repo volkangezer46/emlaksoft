@@ -75,8 +75,16 @@ export async function updateSession(request: NextRequest) {
   const tAuth0 = timing ? performance.now() : 0;
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
   const tAuth = timing ? performance.now() - tAuth0 : 0;
+  // Süresi dolmuş/iptal edilmiş yenileme anahtarı: oturum yok sayılır ve bozuk auth çerezleri temizlenir
+  // (aksi halde her istekte aynı yenileme denenir ve hata günlüğü kirlenir).
+  if (!user && authError && /refresh[_ ]token/i.test(`${authError.code ?? ""} ${authError.message ?? ""}`)) {
+    for (const c of request.cookies.getAll()) {
+      if (c.name.startsWith("sb-") && c.name.includes("auth-token")) supabaseResponse.cookies.delete(c.name);
+    }
+  }
   let tGates = 0;
 
   const path = request.nextUrl.pathname;
