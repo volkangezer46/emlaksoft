@@ -35,6 +35,7 @@ import { ReminderSettingsCard } from "./reminder-settings-card";
 import { LateFeeCard } from "./late-fee-card";
 import { loadLateFeeSettings, loadManagementFeeIncome, loadOwnerBalances } from "@/lib/property-management/load";
 import { remainingAmount } from "@/lib/property-management/payments";
+import { recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
 import { normalizeReminderSettings } from "@/lib/rent-reminders/logic";
 import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import {
@@ -87,6 +88,33 @@ const PAGE_SIZE = 50;
 /** Kira kaydı tarama sınırı; aşılırsa ListLimitNotice açıkça söyler, evre sayaçları gizlenir. */
 const RENTAL_LIMIT = 300;
 const CHARGE_LIMIT = 2000;
+
+type RentalKpiSnapshot = { periodPaid: number; periodPending: number; overdueCount: number; overdueSum: number; activeRentals: number };
+
+/** `rental_kpi_snapshot` RPC'si (20261009000400); yoksa 60 sn atlanır, hata/geçersiz çıktı null → eski sorgular. */
+async function loadRentalKpiSnapshot(
+  supabase: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string | null; message?: string | null } | null }> },
+  periodPrefix: string,
+): Promise<RentalKpiSnapshot | null> {
+  const name = "rental_kpi_snapshot";
+  if (rpcKnownMissing(name)) return null;
+  try {
+    const res = await supabase.rpc(name, { p_period: periodPrefix });
+    recordRpcOutcome(name, res.error);
+    const d = res.data as Record<string, unknown> | null;
+    if (res.error || !d || typeof d !== "object") return null;
+    const out = {
+      periodPaid: Number(d.period_paid),
+      periodPending: Number(d.period_pending),
+      overdueCount: Number(d.overdue_count),
+      overdueSum: Number(d.overdue_sum),
+      activeRentals: Number(d.active_rentals),
+    };
+    return Object.values(out).some((v) => !Number.isFinite(v)) ? null : out;
+  } catch {
+    return null;
+  }
+}
 
 export default async function KiralamaPage({
   searchParams,
@@ -157,6 +185,8 @@ export default async function KiralamaPage({
   const reminderSettings = normalizeReminderSettings(reminderRes.error ? null : (reminderRes.data as Record<string, unknown> | null));
   const smsAvailable = tenantId ? await isTenantSmsAvailable(tenantId).catch(() => false) : false;
   const savedViewsPromise = listSavedViews(PATH);
+  // KPI toplamları: tek turluk RPC (CHARGE_LIMIT kesilmesi yok); yoksa/hata verirse aşağıdaki sorgulardan hesaplanır.
+  const kpiSnapshotPromise = pmReady ? loadRentalKpiSnapshot(supabase, curPeriodPrefix) : Promise.resolve(null);
   const [rentalRes, curChargeRes, overdueChargeRes, overdueHead, maintRes, activeHead, savedViews] = await batchAll("Kiralama", [
     "rentals", "charges-current", "charges-overdue", "charges-overdue-count", "maintenance", "rentals-active", "saved-views",
   ], [
@@ -182,7 +212,8 @@ export default async function KiralamaPage({
   const rentalTotal = rentalRes.count ?? rentals.length;
   const truncated = rentalTotal > rentals.length;
   const curCharges = (curChargeRes.data ?? []) as unknown as { rental_id: string; amount: number | string; status: string; paid_amount?: number | string }[];
-  const sumsReliable = curCharges.length < CHARGE_LIMIT;
+  const kpiSnap = await kpiSnapshotPromise;
+  const sumsReliable = kpiSnap !== null || curCharges.length < CHARGE_LIMIT;
 
   const curMonthByRental = new Map<string, string>();
   let paidSum = 0;
@@ -195,10 +226,16 @@ export default async function KiralamaPage({
     paidSum += paidPart;
     if (c.status === "pending" || c.status === "partial") pendingSum += remainingAmount(amount, paidPart);
   }
+  if (kpiSnap) {
+    paidSum = kpiSnap.periodPaid;
+    pendingSum = kpiSnap.periodPending;
+  }
   const overdueRows = (overdueChargeRes.data ?? []) as unknown as { rental_id: string; amount: number | string; paid_amount?: number | string }[];
   const overdueRentals = new Set(overdueRows.map((c) => String(c.rental_id)));
-  const overdueSum = overdueRows.reduce((s, c) => s + remainingAmount(Number(c.amount), pmReady ? Number(c.paid_amount ?? 0) : 0), 0);
-  const overdueCount = overdueHead.count ?? 0;
+  const overdueSum = kpiSnap
+    ? kpiSnap.overdueSum
+    : overdueRows.reduce((s, c) => s + remainingAmount(Number(c.amount), pmReady ? Number(c.paid_amount ?? 0) : 0), 0);
+  const overdueCount = kpiSnap ? kpiSnap.overdueCount : (overdueHead.count ?? 0);
 
   // Mülk sahibi finansı (yalnız rentals:edit): ödenecek bakiyeler + bu ay yönetim ücreti geliri.
   const monthEndExclusive = `${nextMonthOf(curMonth)}-01`;
@@ -214,7 +251,7 @@ export default async function KiralamaPage({
   const feeRentals = new Set(feeIncome ? [...feeIncome.byRental.keys()] : []);
   const openMaintRentals = new Set((maintRes.data ?? []).map((m) => String(m.rental_id)));
   const openMaint = (maintRes.data ?? []).length;
-  const activeCount = activeHead.count ?? 0;
+  const activeCount = kpiSnap ? kpiSnap.activeRentals : (activeHead.count ?? 0);
 
   // ---- Yenileme radarı: yıldönümü YA DA sözleşme bitişi 60 gün içinde ----
   // TÜFE: yönetimin /admin/ayarlar/tufe tablosu (yoksa gömülü, doğrulanmamış tablo); yasal artış işlemiyle (rentals.ts) aynı kaynak.
