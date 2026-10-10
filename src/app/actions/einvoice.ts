@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { actionErrorMessage } from "@/lib/action-errors";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { platformSecretsEnabled } from "@/lib/platform-secrets";
@@ -41,6 +42,12 @@ const NOT_READY = "e-Fatura henüz etkin değil (veritabanı güncellemesi bekle
 
 function text(formData: FormData, key: string, max = 500): string {
   return String(formData.get(key) ?? "").trim().slice(0, max);
+}
+
+/** Adaptör hataları Türkçe ve gövdesiz yazılmıştır (anahtar/sağlayıcı ham metni içermez); doğrudan gösterilebilir. */
+function adapterMessage(e: { message: string }): string {
+  const { message } = e;
+  return message;
 }
 
 function nowIso(): string {
@@ -87,12 +94,12 @@ export async function saveEInvoiceConnection(_prev: EInvoiceActionResult, formDa
     const parsed = parseParasutInput(input);
     if (!parsed.ok) return { error: parsed.error };
     const auth = await parasutAuthorizeWithPassword(input);
-    if (!auth.ok) return { error: auth.error.message };
+    if (!auth.ok) return { error: adapterMessage(auth.error) };
     creds = { provider: "parasut", clientId: input.clientId, clientSecret: input.clientSecret, companyId: input.companyId, refreshToken: auth.value.refreshToken };
   }
 
   const test = await createEInvoiceAdapter(creds, mode).testConnection();
-  if (!test.ok) return { error: `Bağlantı kurulamadı. ${test.error.message}` };
+  if (!test.ok) return { error: `Bağlantı kurulamadı. ${adapterMessage(test.error)}` };
 
   const sealed = sealEInvoiceCredentials(gate.tenantId, creds);
   if (!sealed) return { error: "Anahtarlar güvenle saklanamıyor (şifreleme anahtarı tanımlı değil)." };
@@ -118,8 +125,7 @@ export async function saveEInvoiceConnection(_prev: EInvoiceActionResult, formDa
   );
   if (error) {
     if (isMissingEInvoiceTable(error)) return { error: NOT_READY };
-    console.error("saveEInvoiceConnection", error.code);
-    return { error: "Bağlantı kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Bağlantı kaydedilemedi.") };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -138,7 +144,7 @@ export async function testEInvoiceConnection(): Promise<EInvoiceActionResult> {
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: loaded.error.message };
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
   const test = await loaded.value.adapter.testConnection();
   const stamp = nowIso();
   await supabase
@@ -146,11 +152,11 @@ export async function testEInvoiceConnection(): Promise<EInvoiceActionResult> {
     .update(
       test.ok
         ? { status: "active", last_test_at: stamp, last_test_ok: true, last_error: null, company_name: test.value.company.slice(0, 200), updated_at: stamp }
-        : { status: "error", last_test_at: stamp, last_test_ok: false, last_error: test.error.message.slice(0, 500), updated_at: stamp },
+        : { status: "error", last_test_at: stamp, last_test_ok: false, last_error: adapterMessage(test.error).slice(0, 500), updated_at: stamp },
     )
     .eq("tenant_id", gate.tenantId);
   refresh();
-  if (!test.ok) return { error: test.error.message };
+  if (!test.ok) return { error: adapterMessage(test.error) };
   return { ok: true, message: `Bağlantı çalışıyor: ${test.value.company}` };
 }
 
@@ -162,8 +168,7 @@ export async function removeEInvoiceConnection(): Promise<EInvoiceActionResult> 
   const { error } = await supabase.from("einvoice_connections").delete().eq("tenant_id", gate.tenantId);
   if (error) {
     if (isMissingEInvoiceTable(error)) return { error: NOT_READY };
-    console.error("removeEInvoiceConnection", error.code);
-    return { error: "Bağlantı kaldırılamadı." };
+    return { error: actionErrorMessage(error, "Bağlantı kaldırılamadı.") };
   }
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "einvoice.disconnect", entityType: "einvoice_connection" });
   refresh();
@@ -189,9 +194,9 @@ export async function lookupInvoiceBuyer(taxId: string): Promise<BuyerLookupResu
   if (!/^\d{10,11}$/.test(id)) return { error: "Vergi kimlik no (10 hane) ya da TC kimlik no (11 hane) girin." };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: loaded.error.message };
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
   const res = await loaded.value.adapter.lookupTaxpayer(id);
-  if (!res.ok) return { error: res.error.message };
+  if (!res.ok) return { error: adapterMessage(res.error) };
   return { ok: true, isEInvoiceUser: res.value.isEInvoiceUser, docType: res.value.isEInvoiceUser ? "e-fatura" : "e-arsiv" };
 }
 
@@ -231,7 +236,7 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
   if (existingId && !UUID_RE.test(existingId)) return { error: "Taslak bulunamadı." };
 
   const lines = parseLines(String(formData.get("lines") ?? "[]"));
-  if (!lines) return { error: "Fatura kalemleri okunamadı." };
+  if (!lines) return { error: "Fatura kalemleri okunamadı; sayfayı yenileyip kalemleri yeniden girin." };
   const buyer = {
     name: text(formData, "buyer_name", 300),
     taxId: text(formData, "buyer_tax_id", 11).replace(/\s+/g, ""),
@@ -247,7 +252,7 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
 
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: loaded.error.message };
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
   const { adapter, connection } = loaded.value;
 
   // Kaynak doğrulaması (RLS): göremediği kayıttan fatura kesilemez; etiket kayıttan gelir.
@@ -270,7 +275,7 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
   }
 
   const taxpayer = await adapter.lookupTaxpayer(buyer.taxId);
-  if (!taxpayer.ok) return { error: `Alıcı sorgulanamadı. ${taxpayer.error.message}` };
+  if (!taxpayer.ok) return { error: `Alıcı sorgulanamadı. ${adapterMessage(taxpayer.error)}` };
   const docType = decideDocType(taxpayer.value.isEInvoiceUser);
   const totals = computeTotals(lines);
   const key = existing ? existing.idempotency_key : idempotencyKey(sourceType, sourceId, crypto.randomUUID());
@@ -306,8 +311,7 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
   if (existing) {
     const { error } = await supabase.from("einvoices").update(payload).eq("id", existing.id).eq("status", "draft");
     if (error) {
-      console.error("saveInvoiceDraft update", error.code);
-      return { error: "Taslak kaydedilemedi." };
+      return { error: actionErrorMessage(error, "Taslak kaydedilemedi.") };
     }
     refresh();
     return { ok: true, id: existing.id, message: "Taslak güncellendi." };
@@ -321,8 +325,7 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
   if (error) {
     if (isMissingEInvoiceTable(error)) return { error: NOT_READY };
     if (error.code === "23505") return { error: "Bu kaynak için zaten bir fatura var. Faturalar sekmesinden açın." };
-    console.error("saveInvoiceDraft insert", error.code);
-    return { error: "Taslak kaydedilemedi." };
+    return { error: actionErrorMessage(error, "Taslak kaydedilemedi.") };
   }
   refresh();
   return { ok: true, id: (data as { id: string }).id, message: "Taslak kaydedildi. Kontrol edip resmileştirebilirsiniz." };
@@ -335,8 +338,7 @@ export async function deleteInvoiceDraft(id: string): Promise<EInvoiceActionResu
   const supabase = await createClient();
   const { error } = await supabase.from("einvoices").delete().eq("id", id).eq("tenant_id", gate.tenantId).eq("status", "draft");
   if (error) {
-    console.error("deleteInvoiceDraft", error.code);
-    return { error: "Taslak silinemedi." };
+    return { error: actionErrorMessage(error, "Taslak silinemedi.") };
   }
   refresh();
   return { ok: true, message: "Taslak silindi." };
@@ -365,7 +367,7 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
 
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: loaded.error.message };
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
   const { adapter, connection } = loaded.value;
   if (connection.provider !== row.provider) {
     return { error: "Bağlantı sağlayıcısı değişmiş. Taslağı yeniden kaydedin." };
@@ -381,8 +383,8 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
   if (!ref) {
     const created = await adapter.createDraft(rowToDraft(row));
     if (!created.ok) {
-      await recordError(created.error.message);
-      return { error: created.error.message };
+      await recordError(adapterMessage(created.error));
+      return { error: adapterMessage(created.error) };
     }
     ref = created.value.ref;
     number = created.value.number ?? number;
@@ -391,8 +393,8 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
   // 2) Resmileştir
   const issued = await adapter.issue(ref);
   if (!issued.ok) {
-    await recordError(issued.error.message);
-    return { error: issued.error.message };
+    await recordError(adapterMessage(issued.error));
+    return { error: adapterMessage(issued.error) };
   }
   const { error } = await supabase
     .from("einvoices")
@@ -433,10 +435,10 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
   if (row.status === "draft" || !ref) return { error: "Bu fatura henüz resmileştirilmedi." };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: loaded.error.message };
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
   if (loaded.value.connection.provider !== row.provider) return { error: "Bu fatura başka bir sağlayıcıyla kesilmiş; durum sorgulanamaz." };
   const res = await loaded.value.adapter.getStatus(ref);
-  if (!res.ok) return { error: res.error.message };
+  if (!res.ok) return { error: adapterMessage(res.error) };
   const patch = applyRemoteStatus(
     { status: row.status, provider_state: row.provider_state, number: row.number, error: row.error },
     res.value,
@@ -488,13 +490,13 @@ export async function cancelInvoice(id: string, reason: string): Promise<EInvoic
   if (row.status !== "issued" || !ref) return { error: "Yalnız resmileşmiş fatura iptal edilebilir." };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: loaded.error.message };
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
   const { adapter } = loaded.value;
   if (!adapter.cancel || !adapter.capabilities.cancelDocTypes.includes(row.doc_type)) {
     return { error: "Bu sağlayıcıda bu belge türü API ile iptal edilemiyor. İptal/iade işlemini sağlayıcı panelinden yapın." };
   }
   const res = await adapter.cancel(ref, cleanReason);
-  if (!res.ok) return { error: res.error.message };
+  if (!res.ok) return { error: adapterMessage(res.error) };
   await supabase.from("einvoices").update({ status: "cancelled", error: null }).eq("id", row.id);
   await logActivity({
     tenantId: gate.tenantId,
