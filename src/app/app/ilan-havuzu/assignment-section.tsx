@@ -66,7 +66,7 @@ export async function AssignmentSection({ ctx }: { ctx: AssignCtx }) {
   return (
     <div className="space-y-5">
       <nav aria-label="Atama görünümü" className="flex flex-wrap gap-1">
-        {ASSIGN_VIEWS.map(({ id: v, label }) => (
+        {ASSIGN_VIEWS.filter((v) => v.id !== "bekleyen" && v.id !== "gecikmis").map(({ id: v, label }) => (
           <Link
             key={v}
             href={assignHref(v)}
@@ -94,7 +94,7 @@ export async function AssignmentSection({ ctx }: { ctx: AssignCtx }) {
           <EmptyState
             illustration="portfoy"
             icon={CheckCircle2}
-            title={durum === "gecikmis" ? "SLA'sını aşan danışmansız ilan yok" : "Her ilanın danışmanı var"}
+            title={durum === "gecikmis" ? "Geciken danışmansız ilan yok" : "Her ilanın danışmanı var"}
             description={durum === "gecikmis" ? `Tüm danışmansız ilanlar ${slaHours} saatlik sınırın içinde.` : "Yeni ilan danışmansız kalınca burada akıllı öneriyle listelenir."}
             tone="brand"
             action={{ href: "/app/portfoyler", label: "Portföylere git" }}
@@ -116,7 +116,7 @@ export async function AssignmentSection({ ctx }: { ctx: AssignCtx }) {
                       <Clock className="h-3 w-3" aria-hidden="true" /> {p.poolSince ? "havuzda" : "danışmansız"} {dtf.format(Date.parse(p.poolSince ?? p.createdAt))}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 font-semibold ${p.slaState === "breached" ? "bg-danger-500/10 text-danger-600" : p.slaState === "due_soon" ? "bg-amber-500/10 text-amber-700" : "bg-mint-500/10 text-mint-700"}`}>
-                      {p.slaState === "breached" ? "SLA aşıldı" : p.slaState === "due_soon" ? "SLA yaklaşıyor" : "SLA içinde"}
+                      {p.slaState === "breached" ? "Gecikti" : p.slaState === "due_soon" ? "Gecikmek üzere" : "Zamanında"}
                     </span>
                     {p.poolEntryId ? (
                       <Link href="/app/ilan-havuzu" className="font-semibold text-brand-600 hover:underline">

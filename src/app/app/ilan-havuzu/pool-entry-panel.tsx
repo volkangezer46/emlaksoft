@@ -56,15 +56,15 @@ export function PoolEntryPanel({
       {claimOpen ? (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
           <Hand className="h-4 w-4" />
-          <span className="font-semibold">Sahiplenmeye açık:</span>
-          <span>İlk sahiplenen danışman ilanı alır.</span>
+          <span className="font-semibold">Kendine almaya açık:</span>
+          <span>İlk alan danışmanın olur.</span>
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => claimPoolEntry(entryId), "İlanı sahiplendin.")}
+            onClick={() => run(() => claimPoolEntry(entryId), "İlanı kendine aldın.")}
             className={`${BTN} ml-auto bg-brand-600 text-white hover:bg-brand-700`}
           >
-            <Hand className="h-3.5 w-3.5" /> Sahiplen
+            <Hand className="h-3.5 w-3.5" /> Kendine al
           </button>
         </div>
       ) : null}
@@ -135,8 +135,8 @@ export function PoolEntryPanel({
               <RefreshCw className="h-3.5 w-3.5" /> Önerileri yenile
             </button>
             {!claimOpen ? (
-              <button type="button" disabled={pending} onClick={() => run(() => openPoolClaimWindow(entryId), "Sahiplenme süresi açıldı.")} className={`${BTN} border border-line bg-surface text-ink-950 hover:bg-canvas`}>
-                <Timer className="h-3.5 w-3.5" /> Sahiplenmeye aç
+              <button type="button" disabled={pending} onClick={() => run(() => openPoolClaimWindow(entryId), "Kendine alma süresi açıldı.")} className={`${BTN} border border-line bg-surface text-ink-950 hover:bg-canvas`}>
+                <Timer className="h-3.5 w-3.5" /> Kendine almaya aç
               </button>
             ) : null}
             <button type="button" disabled={pending} onClick={() => setSkipOpen((v) => !v)} className={`${BTN} border border-line bg-surface text-text-muted hover:bg-canvas`}>
@@ -173,7 +173,7 @@ export function PoolEntryPanel({
         </>
       ) : !claimOpen ? (
         <p className="text-xs text-text-muted">
-          {assignedName ? `Atanan: ${assignedName}` : "Atamayı ofis yönetimi yapar; sahiplenme açılırsa buradan alabilirsin."}
+          {assignedName ? `Atanan: ${assignedName}` : "Atamayı ofis yönetimi yapar; kendine alma açılırsa buradan alabilirsin."}
         </p>
       ) : null}
     </div>

@@ -80,7 +80,7 @@ export function PoolSettingsForm({
           <input name="min_score" inputMode="numeric" defaultValue={minScore ?? ""} placeholder="Örn. 60" disabled={selected !== "auto"} className={`${FIELD} mt-1 disabled:opacity-50`} />
         </label>
         <label className="text-xs font-semibold text-ink-950">
-          SLA / sahiplenme süresi (dakika)
+          Gecikme ve kendine alma süresi (dakika)
           <input name="sla_minutes" inputMode="numeric" defaultValue={slaMinutes ?? ""} placeholder="Örn. 30" className={`${FIELD} mt-1`} />
         </label>
       </div>
