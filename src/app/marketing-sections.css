@@ -338,7 +338,11 @@ html:has(.mk-nav[data-menu]) .mk-demo, html:has(.mk-nav[data-menu]) .mk-demo * {
 .mk-prev { position: absolute; inset: 0; display: block; }
 .mk-prev svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .mk-prev-cap { position: absolute; left: 0.45rem; bottom: 0.35rem; max-width: calc(100% - 6.5rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0.0625rem 0.45rem; border-radius: 999px; background: rgba(5, 15, 36, 0.62); font-size: 0.6875rem; font-weight: 700; color: #ffffff; }
-.mk-mp-x, .mk-mp-b, .mk-mp-p, .mk-mp-r, .mk-mp-spin { transform-box: fill-box; }
+.mk-mp-x, .mk-mp-b, .mk-mp-p, .mk-mp-r, .mk-mp-spin, .mk-mp-ring, .mk-mp-slide, .mk-mp-th { transform-box: fill-box; }
+.mk-mp-ring { transform-origin: 50% 50%; opacity: 0; }
+.mk-prev text { font-family: inherit; }
+.mk-mega-feat b { min-height: 2.5em; }
+.mk-mega-feat small { min-height: 4.5em; }
 .mk-mp-x { transform-origin: 0 50%; }
 .mk-mp-b { transform-origin: 50% 100%; }
 .mk-mp-p, .mk-mp-spin { transform-origin: 50% 50%; }
@@ -350,6 +354,10 @@ html:has(.mk-nav[data-menu]) .mk-demo, html:has(.mk-nav[data-menu]) .mk-demo * {
   @keyframes mk-mp-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
   @keyframes mk-mp-rise { from { opacity: 0; transform: translateY(6px); } }
   @keyframes mk-mp-fade { from { opacity: 0; } }
+  @keyframes mk-mp-slide { from { opacity: 0; transform: translateX(-12px); } }
+  @keyframes mk-mp-thumb { from { transform: translateX(-9px); } }
+  @keyframes mk-mp-ring { 0% { opacity: 0.8; transform: scale(0.7); } 100% { opacity: 0; transform: scale(1.5); } }
+  @keyframes mk-feat-swap { from { opacity: 0; transform: translateY(5px); } }
   @keyframes mk-mp-turn { from { transform: rotate(-200deg); } }
   @keyframes mk-mp-sweep { 0% { opacity: 0; transform: translateY(0); } 15% { opacity: 0.9; } 85% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(74px); } }
   /* Yalnız ETKİN katman ve açık panel; katman her etkinleştiğinde bir kez oynar (sonsuz döngü yok). */
@@ -361,6 +369,10 @@ html:has(.mk-nav[data-menu]) .mk-demo, html:has(.mk-nav[data-menu]) .mk-demo * {
   .mk-dd[data-open="true"] [data-on="true"] .mk-mp-f { animation: mk-mp-fade var(--motion-draw) var(--ease-out) 300ms both; }
   .mk-dd[data-open="true"] [data-on="true"] .mk-mp-spin { animation: mk-mp-turn 1100ms var(--ease-out-expo) 120ms both; }
   .mk-dd[data-open="true"] [data-on="true"] .mk-mp-scan { animation: mk-mp-sweep 1100ms var(--ease-out) 200ms both; }
+  .mk-dd[data-open="true"] [data-on="true"] .mk-mp-slide { animation: mk-mp-slide var(--motion-slow) var(--ease-out) both; animation-delay: calc(160ms + var(--i, 0) * 120ms); }
+  .mk-dd[data-open="true"] [data-on="true"] .mk-mp-th { animation: mk-mp-thumb var(--motion-base) var(--ease-out) both; animation-delay: calc(300ms + var(--i, 0) * 120ms); }
+  .mk-dd[data-open="true"] [data-on="true"] .mk-mp-ring { animation: mk-mp-ring 1800ms var(--ease-out) 600ms 2; }
+  .mk-mega-feat .mk-feat-sw { animation: mk-feat-swap 260ms var(--ease-out) both; }
 }
 /* Mobil panel: alt başlık + öne çıkan kart */
 .mk-sheet-sub { margin: 0.25rem 0 0.25rem 0.5rem; font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mk-muted); }
