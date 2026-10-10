@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { workerClaim, workerComplete, workerRegister, workerReportParser, workerRelease } from "@/app/actions/listing-control-worker";
 import { isSameOriginBridgeRequest } from "@/lib/listing-control/worker/bridge-request";
 import { CHECK_RESULTS, type CheckResultKind } from "@/lib/listing-control/types";
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
   if (!isSameOriginBridgeRequest(request)) return NextResponse.json({ ok: false, error: "origin" }, { status: 403, headers: NO_STORE });
   const user = await getRequestUser();
   if (!user) return NextResponse.json({ ok: false, error: "session" }, { status: 401, headers: NO_STORE });
+  // Kullanıcı başına dakikada 120 işçi çağrısı (kayıt/al/tamamla/bırak); altyapı hatasında reddedilir (deny).
+  const limit = await checkRateLimit(`lc-isci:${user.id}`, { limit: 120, windowSec: 60, failurePolicy: "deny" });
+  if (!limit.allowed) return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429, headers: { ...NO_STORE, "Retry-After": "60" } });
 
   let body: Record<string, unknown>;
   try {
