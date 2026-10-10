@@ -38,11 +38,20 @@ describe("purgeSampleModuleData (RPC'nin bilmediği örnek kayıtlar)", () => {
     const { db, calls } = recordingDb();
     const rep = await purgeSampleModuleData(db, "t-1");
     expect(rep.failed).toEqual([]);
-    expect(calls.map((c) => `${c.op}:${c.table}`)).toEqual(["update:rentals", "delete:buildings", "delete:league_challenges"]);
+    expect(calls.map((c) => `${c.op}:${c.table}`)).toEqual([
+      "update:rentals",
+      "delete:buildings",
+      "delete:league_challenges",
+      "delete:advisor_specialties",
+      "delete:advisor_regions",
+    ]);
     for (const c of calls) {
       expect(c.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["tenant_id", "t-1"]))).toBe(true);
     }
-    const [rentals, buildings, league] = calls;
+    const [rentals, buildings, league, specialties, regions] = calls;
+    for (const c of [specialties!, regions!]) {
+      expect(c.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["is_sample", true]))).toBe(true);
+    }
     expect(rentals!.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["is_sample", true]))).toBe(true);
     expect(buildings!.filters.some(([k, a]) => k === "like" && JSON.stringify(a) === JSON.stringify(["notes", `${SAMPLE_MARKER}%`]))).toBe(true);
     expect(league!.filters.some(([k, a]) => k === "like" && JSON.stringify(a) === JSON.stringify(["description", `${SAMPLE_MARKER}%`]))).toBe(true);
@@ -90,6 +99,15 @@ describe("temizlik kapsamı — kaskat zinciri (SQL sözleşmesi)", () => {
     expect(scaffold).toMatch(/rentals_deal_tenant_fkey[\s\S]*?on delete restrict/);
     const rpc = sqlOf("20261006000600_");
     expect(rpc.indexOf("delete from public.deals")).toBeLessThan(rpc.indexOf("delete from public.rentals where is_sample"));
+  });
+
+  it("havuz kayıtları ve olayları örnek portföy silinince kaskatlanır; uzmanlık/bölge is_sample taşır ve ön adım siler", () => {
+    const pool = sqlOf("20260816001500_");
+    expect(pool).toMatch(/listing_pool_entries_property_tenant_fkey\s+foreign key \(property_id, tenant_id\) references public\.properties \(id, tenant_id\) on delete cascade/);
+    expect(pool).toMatch(/entry_id uuid not null references public\.listing_pool_entries\(id\) on delete cascade/);
+    const mig = sqlOf("20261010000800_");
+    expect(mig).toMatch(/alter table public\.advisor_specialties add column if not exists is_sample boolean not null default false/);
+    expect(mig).toMatch(/alter table public\.advisor_regions add column if not exists is_sample boolean not null default false/);
   });
 
   it("purgeSampleData RPC'den ÖNCE ön adımı çağırır", () => {

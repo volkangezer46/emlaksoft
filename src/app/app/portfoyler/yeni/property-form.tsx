@@ -79,6 +79,7 @@ export function PropertyForm({
   transactionTypes,
   userId,
   poolEnabled = false,
+  poolSource,
   customFields = [],
 }: {
   /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
@@ -89,6 +90,8 @@ export function PropertyForm({
   transactionTypes: string[];
   userId: string;
   poolEnabled?: boolean;
+  /** Dış kaynaktan gelen ilan (?kaynak=eklenti vb.): havuz kaydına kaynak olarak yazılır. */
+  poolSource?: string;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -99,6 +102,7 @@ export function PropertyForm({
     setPending(true);
     setError(null);
     const intent = takeSubmitIntent();
+    if (poolSource) formData.set("pool_source", poolSource);
     const result = await createProperty(formData);
     if (result.ok) {
       clearFormDraft(userId, PROPERTY_FORM_ID);

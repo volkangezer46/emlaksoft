@@ -1725,6 +1725,7 @@ async function main() {
         districts: { Kadıköy: geo.kadikoyId, Beşiktaş: geo.besiktasId, Ataşehir: geo.atasehirId, Şişli: geo.sisliId },
       },
       codePrefix: "DEMO",
+      poolProfileIds: [advisorId, gmId, ownerId],
       authorityPropertyCodes: ["DEMO-001", "DEMO-002", "DEMO-003", "DEMO-004", "DEMO-005", "DEMO-007"],
       analysisPropertyCodes: ["DEMO-001", "DEMO-002"],
       processDeals: [
