@@ -8,7 +8,6 @@ import {
   Folder,
   Handshake,
   History,
-  MessageSquare,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -157,7 +156,6 @@ export function Customer360Tabs({
   canCreateComm = false,
   active,
   counts,
-  showTasks = true,
   ozetSlot,
   tasksSlot,
   preferencesSlot,
@@ -193,7 +191,6 @@ export function Customer360Tabs({
   /** Seçili sekme (sunucuda çözülür); yalnız bu sekmenin içeriği çizilir. */
   active: string;
   counts: { demands: number; comms: number; tasks: number | null; deals: number; offers: number; appts: number; files: number; contracts: number; consents: number };
-  showTasks?: boolean;
   /** Özet sekmesinin akan bölümleri (portföy önerileri + memnuniyet) — yalnız aktifken çizilir. */
   ozetSlot?: ReactNode;
   tasksSlot?: ReactNode;

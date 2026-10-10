@@ -679,7 +679,6 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
             communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
             canCreateComm={(perms.customers ?? []).includes("create")}
             active={tab}
-            showTasks={canTaskView}
             counts={{
               demands: demands.length,
               comms: commsList.length,
