@@ -4,7 +4,7 @@ import { trParts } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { Widget } from "../dashboard-widgets";
 import { kpiColumns } from "@/components/ui/dashboard-grid";
-import { loadPropertyStrip, type HomeCtx, type StripProperty } from "./data";
+import { afterFirstScreen, loadPropertyStrip, type HomeCtx, type StripProperty } from "./data";
 import { SekmeSerit } from "./sekme-serit";
 
 function formatTrDate(iso: string): string {
@@ -49,6 +49,7 @@ function Card({ p, tone }: { p: StripProperty; tone: "new" | "drop" }) {
  */
 export async function PortfoySeridi({ ctx }: { ctx: HomeCtx }) {
   if (!ctx.canSeeProperties) return null;
+  await afterFirstScreen(ctx);
   const { recent, drops } = await loadPropertyStrip();
   const tabs = [
     recent.length > 0 && { id: "yeni", label: "Son eklenenler", count: recent.length, items: recent, tone: "new" as const },

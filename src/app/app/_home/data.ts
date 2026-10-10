@@ -25,9 +25,10 @@ import {
   type ListingRow,
   lastSixMonthKeys,
 } from "./helpers";
-import { EMPTY_SNAPSHOT, loadDashboardSnapshot, type DashboardSnapshot } from "./data-batch";
-import { periodStatsFromSnapshot, type TaskOpenRow } from "./snapshot-core";
+import { EMPTY_SNAPSHOT, loadDashboardSnapshot, loadHomeScopeSnapshot, type DashboardSnapshot } from "./data-batch";
+import { periodStatsFromSnapshot, type HomeScopeSnapshot, type TaskOpenRow, type TodayAppointmentRow } from "./snapshot-core";
 import { getSetting } from "@/lib/settings/read";
+import { loadInsightBundle } from "./insight-veri";
 import { moneyTry } from "@/lib/leak-shield";
 import { STALE_DAYS as DEFAULT_STALE_DAYS } from "../anlasmalar/deal-list-logic";
 import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
@@ -52,6 +53,24 @@ const snapshotFor = cache(async (ctx: HomeCtx): Promise<DashboardSnapshot> => {
     metrics: snap.metrics && snap.metrics.sampleIncluded === ctx.sample.include ? snap.metrics : null,
     tasks: snap.tasks && snap.tasks.sampleIncluded === ctx.sample.include ? snap.tasks : null,
   };
+});
+
+/**
+ * Kapsama (ben/ofis) özgü ilk ekran okumaları — `home_snapshot` RPC'si, TEK tur (bugünün randevuları, hareketsiz anlaşma
+ * sayısı, bu ayın hedefleri, bos-ofis sayaçları). Eşik varsayılanı platform ayarından (süreç içi 30 sn önbellek, DB turu yok);
+ * ofis ayarı SQL'de çözülür. Örnek-veri kararı kodla uyuşmazsa ya da RPC yoksa/hata verirse null → eski sorgular.
+ */
+const homeScopeFor = cache(async (ctx: HomeCtx): Promise<HomeScopeSnapshot | null> => {
+  if (!ctx.tenantId) return null;
+  let staleDefault = DEFAULT_STALE_DAYS;
+  try {
+    const v = await getSetting<number>("office.alert.deal_stale_days");
+    if (typeof v === "number" && Number.isFinite(v)) staleDefault = v;
+  } catch {
+    // varsayılan
+  }
+  const snap = await loadHomeScopeSnapshot(ctx.tenantId, ctx.scopeMine ? "ben" : "ofis", staleDefault);
+  return snap && snap.sampleIncluded === ctx.sample.include ? snap : null;
 });
 
 export type HomeCtx = {
@@ -211,7 +230,9 @@ export const loadTaskSummary = cache(async (ctx: HomeCtx) => {
   };
 });
 
-export const loadTodayAppointments = cache(async (ctx: HomeCtx) => {
+export const loadTodayAppointments = cache(async (ctx: HomeCtx): Promise<{ rows: TodayAppointmentRow[]; total: number }> => {
+  const home = await homeScopeFor(ctx);
+  if (home) return { rows: home.appointments.rows, total: home.appointments.total };
   const supabase = await createClient();
   // count: brifingde gerçek toplam gerekir. Açık ilişki adı ipucu korunur.
   let apptQ = ctx.sample.apply(supabase
@@ -222,7 +243,7 @@ export const loadTodayAppointments = cache(async (ctx: HomeCtx) => {
   if (ctx.scopeMine) apptQ = apptQ.eq("assigned_to", ctx.userId);
   const result = await apptQ;
   assertQueryBatchSucceeded([result], ["today-appointments"], "Ana panel");
-  return { rows: result.data ?? [], total: result.count ?? 0 };
+  return { rows: (result.data ?? []) as unknown as TodayAppointmentRow[], total: result.count ?? 0 };
 });
 
 /** `reasons`: lead-skoru bileşenlerinden NEDEN etiketleri ("Bugün ara" tablosu skor yerine gerekçe gösterir). */
@@ -472,6 +493,8 @@ export const loadKpiCounts = cache(async (ctx: HomeCtx) => {
 });
 
 export const loadOfficeTarget = cache(async (ctx: HomeCtx) => {
+  const home = await homeScopeFor(ctx);
+  if (home) return home.officeTarget;
   const supabase = await createClient();
   // Bu ayın OFİS GENELİ hedefi (profile_id null) — yoksa hedef kartı gizli
   const result = await supabase
@@ -487,6 +510,8 @@ export const loadOfficeTarget = cache(async (ctx: HomeCtx) => {
 
 /** Kişisel aylık hedef (targets.profile_id = ben) — yoksa kişisel hedef kartı "hedef belirle" önerir. */
 export const loadMyTarget = cache(async (ctx: HomeCtx) => {
+  const home = await homeScopeFor(ctx);
+  if (home) return home.myTarget;
   const supabase = await createClient();
   const result = await supabase
     .from("targets")
@@ -662,6 +687,8 @@ export const loadTenantRow = cache(async (ctx: HomeCtx) => {
 /** Boş ofis ayrımı: müşteri ve portföy sayısı (iki hafif sayım). Hata varsa null — sahte "boş" üretilmez. */
 export const loadEmptyProbe = cache(async (ctx: HomeCtx) => {
   if (!ctx.tenantId) return null as { customers: number; properties: number } | null;
+  const home = await homeScopeFor(ctx);
+  if (home) return home.probe;
   const supabase = await createClient();
   const results = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -736,6 +763,70 @@ export const loadDecisions = cache(async (ctx: HomeCtx) => {
   };
 });
 
+/* ------------------------- İlk ekran ısıtma + ağır blokları geciktirme ------------------------- */
+
+const firstScreenDone = new WeakMap<HomeCtx, Promise<void>>();
+
+/**
+ * İLK EKRAN (hero, dikkat/brifing, KPI şeridi, sıradaki eylem, bugün ara) yükleyicilerini TEK anda, bloklar çizilmeye
+ * başlamadan ve boş-ofis kapısı beklenmeden başlatır. Yükleyiciler `cache()`'lidir: blok aynı `ctx` ile çağırdığında
+ * yoldaki sözü alır — bağımlı tur zinciri (kapı → blok → alt sorgu) yatay turlara iner. İstek içi önbellek; süreçler arası
+ * YOK. Hata blokların kendi sınırında görünür (burada yutulur). Aynı `ctx` için bir kez çalışır.
+ */
+export function warmHomeFirstScreen(ctx: HomeCtx, layout: { variant: string; metrics: readonly string[] }): void {
+  if (firstScreenDone.has(ctx) || ctx.tvMode || !ctx.tenantId) return;
+  const jobs: Promise<unknown>[] = [];
+  const run = (p: Promise<unknown>) => void jobs.push(p.catch(() => undefined));
+  run(loadEmptyProbe(ctx));
+  run(loadAttention(ctx));
+  const { variant } = layout;
+  if (variant === "management" || variant === "advisor" || variant === "team_lead") run(loadInsightBundle(ctx));
+  if (variant === "advisor" || variant === "team_lead") {
+    run(loadTodayAppointments(ctx));
+    run(loadHotLeads(ctx));
+    run(loadLiveListings(ctx));
+    run(loadExpiringAuthority(ctx));
+    run(loadOnboardingState(ctx));
+  }
+  if (variant === "call_center") run(loadHotLeads(ctx));
+  for (const key of layout.metrics) {
+    switch (key) {
+      case "ciro":
+      case "komisyon-bu-ay":
+      case "bekleyen-komisyon":
+      case "tahsil-edilen":
+        if (ctx.canSeeCommissions) run(loadCommissionSummary(ctx));
+        break;
+      case "aktif-anlasma":
+        run(loadDeals(ctx));
+        break;
+      case "yeni-talep":
+      case "yeni-musteri":
+        run(loadPeriodStats(ctx));
+        break;
+      case "arama":
+        run(loadKpiCounts(ctx));
+        break;
+      case "gorev":
+        run(loadTaskSummary(ctx));
+        break;
+      case "geciken-kira":
+        if (ctx.canSeeRentals) run(loadRentalsAndProjects(ctx));
+        break;
+    }
+  }
+  firstScreenDone.set(ctx, Promise.all(jobs).then(() => undefined));
+}
+
+/**
+ * Ağır ve ilk ekranda gerekmeyen bloklar (ekip performansı, huni, ilan sağlığı, canlı akış, kaynak dağılımı, portföy şeridi...)
+ * sorgularını ilk ekran yükleyicileri bitince başlatır: aynı anda onlarca istek, ilk ekranın bağlantı/yürütme payını yemesin.
+ * Isıtma yapılmadıysa (TV, başka sayfa) beklemez.
+ */
+export function afterFirstScreen(ctx: HomeCtx): Promise<void> {
+  return firstScreenDone.get(ctx) ?? Promise.resolve();
+}
+
 /* ------------------------- Dikkat gerektirenler (tek yükleyici) ------------------------- */
 
 /** Yükleyicinin tavanı (`loadExpiringAuthority` limit 12): tavana ulaşan sayı kesin değildir (İlan sağlığı bloğu kullanır). */
@@ -746,6 +837,8 @@ export const EXPIRING_CAP = 12;
  * /app/anlasmalar?bayat=1 süzgeciyle AYNI koşul (head count, kırpılmaz). Hata → null (sahte sıfır yok).
  */
 export const loadStaleDeals = cache(async (ctx: HomeCtx) => {
+  const home = await homeScopeFor(ctx);
+  if (home && home.staleDeals.days > 0) return { count: home.staleDeals.count as number | null, days: home.staleDeals.days };
   const days = ctx.tenantId ? await getSetting<number>("office.alert.deal_stale_days", { tenantId: ctx.tenantId }) : DEFAULT_STALE_DAYS;
   const supabase = await createClient();
   let q = ctx.sample

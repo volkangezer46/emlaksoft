@@ -3,7 +3,7 @@ import { Megaphone } from "lucide-react";
 import { EmptyArt } from "@/components/ui/premium";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { Widget } from "../dashboard-widgets";
-import { loadCustomerSources, type HomeCtx } from "./data";
+import { afterFirstScreen, loadCustomerSources, type HomeCtx } from "./data";
 import { sourceShares } from "./helpers";
 import { PanelLink } from "./ortak";
 
@@ -13,6 +13,7 @@ import { PanelLink } from "./ortak";
  * sınırını aşarsa (kırpık dağılım) kart hiç çizilmez.
  */
 export async function KaynakDagilimi({ ctx }: { ctx: HomeCtx }) {
+  await afterFirstScreen(ctx);
   const [data, defs] = await Promise.all([loadCustomerSources(ctx), getDefinitionsOrDefault("customer_source")]);
   if (!data) return null;
   const labels = new Map(defs.map((d) => [d.value, d.label] as const));

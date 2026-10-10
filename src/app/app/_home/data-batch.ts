@@ -12,9 +12,11 @@ import { createClient } from "@/lib/supabase/server";
 import { recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
 import { measure } from "@/lib/server-timing";
 import {
+  parseHomeScopeSnapshot,
   parseInsightsSnapshot,
   parseMetricsSnapshot,
   parseTasksSnapshot,
+  type HomeScopeSnapshot,
   type InsightsSnapshot,
   type MetricsSnapshot,
   type TasksSnapshot,
@@ -73,6 +75,26 @@ export const loadDashboardSnapshot = cache(async (tenantId: string, userId: stri
     return EMPTY_SNAPSHOT;
   }
 });
+
+/**
+ * Kapsama özgü ilk ekran okumaları (bugünün randevuları, hareketsiz anlaşma sayısı, bu ayın hedefleri, bos-ofis sayaçları)
+ * TEK RPC turunda: `home_snapshot(p_scope, p_stale_days_default)` (migration 20261011000200). RPC yok/hata → null:
+ * yükleyiciler kendi sorgularına düşer. Anahtar ilkel değerler → `cache()` aynı istekte tekilleştirir; kullanıcıya özgü
+ * veri süreçler arası ÖNBELLEĞE alınmaz.
+ */
+export const loadHomeScopeSnapshot = cache(
+  async (tenantId: string, scope: "ben" | "ofis", staleDaysDefault: number): Promise<HomeScopeSnapshot | null> => {
+    if (!tenantId) return null;
+    try {
+      const supabase = await createClient();
+      return await measure("home-scope-snapshot", () =>
+        callRpc(supabase, "home_snapshot", { p_scope: scope, p_stale_days_default: staleDaysDefault }, parseHomeScopeSnapshot),
+      );
+    } catch {
+      return null;
+    }
+  },
+);
 
 /** Ön yükleme (await etmeden): sayfa, blokları çizmeye başlamadan RPC turunu başlatır. */
 export function preloadDashboardSnapshot(tenantId: string | null, userId: string): void {

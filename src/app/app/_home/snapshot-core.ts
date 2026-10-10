@@ -170,3 +170,73 @@ export function parseInsightsSnapshot(raw: unknown): InsightsSnapshot | null {
   const counts = Object.fromEntries(INSIGHT_STATES.map((s) => [s, count(rawCounts[s])])) as InsightStateCounts;
   return { rows, counts };
 }
+
+/* ------------------------------ Ana ekran (kapsamlı) görüntü ------------------------------ */
+
+export type TodayAppointmentRow = {
+  id: string;
+  appointment_type: string | null;
+  scheduled_at: string;
+  status: string | null;
+  duration_min: number | null;
+  location: string | null;
+  customer: { full_name: string | null; phone: string | null } | null;
+  property: { lat: number | null; lng: number | null } | null;
+};
+export type TargetSnapshotRow = { target_deals: number | null; target_revenue: number | null };
+
+/** `home_snapshot(p_scope, p_stale_days_default)` çıktısı: seçili kapsam (ben/ofis) için ilk ekran okumaları. */
+export type HomeScopeSnapshot = {
+  scope: "ben" | "ofis";
+  sampleIncluded: boolean;
+  appointments: { total: number; rows: TodayAppointmentRow[] };
+  staleDeals: { days: number; count: number };
+  officeTarget: TargetSnapshotRow | null;
+  myTarget: TargetSnapshotRow | null;
+  probe: { customers: number; properties: number };
+};
+
+const numOrNull = (v: unknown): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : Number.NaN;
+  return Number.isFinite(n) ? n : null;
+};
+
+function parseTarget(raw: unknown): TargetSnapshotRow | null {
+  if (!isObj(raw)) return null;
+  return { target_deals: numOrNull(raw.target_deals), target_revenue: numOrNull(raw.target_revenue) };
+}
+
+function parseAppointmentRows(raw: unknown): TodayAppointmentRow[] {
+  const out: TodayAppointmentRow[] = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObj(r) || typeof r.id !== "string" || typeof r.scheduled_at !== "string") continue;
+    out.push({
+      id: r.id,
+      appointment_type: strOrNull(r.appointment_type),
+      scheduled_at: r.scheduled_at,
+      status: strOrNull(r.status),
+      duration_min: numOrNull(r.duration_min),
+      location: strOrNull(r.location),
+      customer: isObj(r.customer) ? { full_name: strOrNull(r.customer.full_name), phone: strOrNull(r.customer.phone) } : null,
+      property: isObj(r.property) ? { lat: numOrNull(r.property.lat), lng: numOrNull(r.property.lng) } : null,
+    });
+  }
+  return out;
+}
+
+export function parseHomeScopeSnapshot(raw: unknown): HomeScopeSnapshot | null {
+  if (!isObj(raw) || typeof raw.sample_included !== "boolean") return null;
+  if (raw.scope !== "ben" && raw.scope !== "ofis") return null;
+  const { appointments, stale_deals: stale, probe } = raw;
+  if (!isObj(appointments) || !isObj(stale) || !isObj(probe)) return null;
+  const rows = parseAppointmentRows(appointments.rows);
+  return {
+    scope: raw.scope,
+    sampleIncluded: raw.sample_included,
+    appointments: { total: Math.max(count(appointments.total), rows.length), rows },
+    staleDeals: { days: count(stale.days), count: count(stale.count) },
+    officeTarget: parseTarget(raw.office_target),
+    myTarget: parseTarget(raw.my_target),
+    probe: { customers: count(probe.customers), properties: count(probe.properties) },
+  };
+}

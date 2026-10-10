@@ -4,7 +4,7 @@ import { Gift } from "lucide-react";
 import { readTryOverview } from "@/lib/try-credits/reader";
 import { readMyDashboard } from "@/lib/growth/engine";
 import { createClient } from "@/lib/supabase/server";
-import type { HomeCtx } from "./data";
+import { afterFirstScreen, type HomeCtx } from "./data";
 
 /**
  * Hoş geldin kredisi duyurusu: YALNIZ ofisin kullanılabilir hesap kredisi varsa gösterilir; tutar
@@ -13,6 +13,7 @@ import type { HomeCtx } from "./data";
  */
 export async function HosgeldinKredisi({ ctx }: { ctx: HomeCtx }) {
   if (!ctx.tenantId) return null;
+  await afterFirstScreen(ctx); // ikincil bant: sorguları ilk ekran bitince başlar
   const supabase = await createClient();
   const [overview, dash] = await Promise.all([
     readTryOverview(supabase),

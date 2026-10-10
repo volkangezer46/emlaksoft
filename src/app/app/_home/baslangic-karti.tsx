@@ -7,7 +7,7 @@ import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { OrnekVeriYenile } from "./ornek-veri-yenile";
 import { SampleSeedButton } from "./sample-seed-button";
-import { loadEmptyProbe, type HomeCtx } from "./data";
+import { afterFirstScreen, loadEmptyProbe, type HomeCtx } from "./data";
 
 const R = 26;
 const C = 2 * Math.PI * R;
@@ -24,7 +24,10 @@ const MAX_TASKS = 3;
  */
 export async function BaslangicKarti({ ctx }: { ctx: HomeCtx }) {
   if (ctx.tvMode || !ctx.tenantId) return null;
-  const [snap, probe, jar] = await Promise.all([loadOnboardingSnapshot(ctx.tenantId), loadEmptyProbe(ctx), cookies()]);
+  // Önce sayım (ısıtılmış, tek tur): dolu ofiste kurulum özeti ikincil kalır ve ilk ekran bitince okunur; boş ofiste hemen.
+  const [probe, jar] = await Promise.all([loadEmptyProbe(ctx), cookies()]);
+  if (probe && (probe.customers > 0 || probe.properties > 0)) await afterFirstScreen(ctx);
+  const snap = await loadOnboardingSnapshot(ctx.tenantId);
   if (!snap) return null;
 
   const canSettings = (ctx.perms.settings ?? []).includes("edit");
