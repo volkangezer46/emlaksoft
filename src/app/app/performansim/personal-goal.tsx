@@ -23,24 +23,24 @@ export async function PersonalGoal({
   role,
   tenantId,
   perms,
+  fullName,
 }: {
   userId: string;
   role: string;
   tenantId: string | null;
   perms: EffectivePermissions;
+  /** Profil adı (sayfa bir kez okur; kart ayrıca sorgulamaz) */
+  fullName: Promise<string | null>;
 }) {
   if (!effectiveCanAccessModule(perms, "targets")) return null;
   const supabase = await createClient();
   const nowMs = now();
-  const [{ data }, { data: me }] = await Promise.all([
-    supabase
-      .from("targets")
-      .select("id, period, period_start, target_deals, target_revenue, profile_id")
-      .eq("profile_id", userId)
-      .order("period_start", { ascending: false })
-      .limit(24),
-    supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
-  ]);
+  const { data } = await supabase
+    .from("targets")
+    .select("id, period, period_start, target_deals, target_revenue, profile_id")
+    .eq("profile_id", userId)
+    .order("period_start", { ascending: false })
+    .limit(24);
   const targets = ((data ?? []) as { id: string; period: string; period_start: string; target_deals: number; target_revenue: number; profile_id: string | null }[]).filter((t) => {
     const r = targetPeriodRange(t.period_start, t.period);
     return nowMs >= r.start && nowMs < r.end;
@@ -52,7 +52,7 @@ export async function PersonalGoal({
     viewer: { userId, role, perms },
     tenantId,
     targets: [t],
-    names: new Map([[userId, (me?.full_name as string | undefined) ?? ""]]),
+    names: new Map([[userId, (await fullName) ?? ""]]),
   });
   const a = live.get(t.id) ?? { deals: 0, revenue: 0 };
   const tDeals = Number(t.target_deals) || 0;

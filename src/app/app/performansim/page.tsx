@@ -15,6 +15,7 @@ import { PersonalGoal } from "./personal-goal";
 import { Son30Gun } from "./son-30-gun";
 import { Komisyonum } from "./komisyonum";
 import { LigKocu } from "./lig-kocu";
+import { createClient } from "@/lib/supabase/server";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 
 export const metadata = { title: "Performansım" };
@@ -37,6 +38,10 @@ export default async function PerformansimPage({
   const p = trParts(nowMs);
   const firstName = ((user?.user_metadata?.full_name as string | undefined) ?? "").trim().split(/\s+/)[0] ?? "";
   const canTargets = effectiveCanAccessModule(auth.perms, "targets");
+  // Profil adı TEK okuma: Hedef ve Komisyonum kartları aynı sözü bekler (her biri ayrı sorgu atmaz; sayfa kabuğunu bloklamaz).
+  const fullNameP: Promise<string | null> = createClient()
+    .then((c) => c.from("profiles").select("full_name").eq("id", auth.userId).maybeSingle())
+    .then(({ data }) => (data?.full_name as string | undefined) ?? null, () => null);
   return (
     <div className="space-y-5">
       <DashboardHero
@@ -59,7 +64,7 @@ export default async function PerformansimPage({
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="min-w-0 empty:hidden lg:w-5/12 lg:shrink-0">
           <Suspense fallback={<SkeletonCard height={168} label="Hedef yükleniyor" />}>
-            <PersonalGoal userId={auth.userId} role={auth.role} tenantId={auth.tenantId} perms={auth.perms} />
+            <PersonalGoal userId={auth.userId} role={auth.role} tenantId={auth.tenantId} perms={auth.perms} fullName={fullNameP} />
           </Suspense>
         </div>
         <div className="min-w-0 flex-1">
@@ -71,7 +76,7 @@ export default async function PerformansimPage({
       {/* Komisyonum: yalnız kendi payı (kazanç gizliliği); Komisyon modülü yetkisi yoksa çizilmez. */}
       {effectiveCanAccessModule(auth.perms, "commissions") ? (
         <Suspense fallback={<SkeletonCard height={150} label="Komisyon yükleniyor" />}>
-          <Komisyonum userId={auth.userId} tenantId={auth.tenantId} officeWide={hasOfficeWideDataScope(auth.role)} />
+          <Komisyonum userId={auth.userId} tenantId={auth.tenantId} officeWide={hasOfficeWideDataScope(auth.role)} fullName={fullNameP} />
         </Suspense>
       ) : null}
       {/* Lig koçu: haftalık sıraya göre liderliğe kalan puan + en çok 3 gerçek bekleyen eylem (veri yoksa çizilmez). */}

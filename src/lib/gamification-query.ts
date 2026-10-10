@@ -309,6 +309,12 @@ export async function loadLeagueData(
     settings?: LeagueSettings;
     /** Çağıranın zaten başlattığı örnek-veri kapsamı okuması (verilmezse burada okunur; aynı sorgu iki kez atılmaz) */
     sampleScope?: Promise<{ include: boolean }>;
+    /**
+     * Yalnız sıralama gerekiyorsa (ör. lig koçu): ömür boyu rozet sayaçları ve 400 günlük seri taramaları ATLANIR
+     * (7 sayfalı okuma az). `ranked`/`agents`/`activity` tam sürümle BİREBİR aynıdır; `statsById` yalnız dönem sayaçlarını,
+     * `streakById` 0 değerlerini taşır (rozet/seri okuyan çağıranlar bu seçeneği KULLANMAZ).
+     */
+    rankingOnly?: boolean;
   },
 ): Promise<LeagueData> {
   const range = leaguePeriod(opts.period, opts.nowMs ?? now());
@@ -349,24 +355,26 @@ export async function loadLeagueData(
     responses: responsesP,
   });
 
+  const rankingOnly = opts.rankingOnly === true;
+  const skip = (): Promise<Row[]> => Promise.resolve([]);
   const [profiles, dealsAll, propsAll, networkAll, streakDeals, streakAppts, streakTasks, streakProps, activity] = await Promise.all([
     profilesP,
 
     // ── Ömür boyu rozet sayaçları ────────────────────────────────────────
-    paged(client, "deals", "id, assigned_to", (q) =>
+    rankingOnly ? skip() : paged(client, "deals", "id, assigned_to", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won").not("assigned_to", "is", null)),
-    paged(client, "properties", "id, assigned_to", (q) =>
+    rankingOnly ? skip() : paged(client, "properties", "id, assigned_to", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).not("assigned_to", "is", null)),
-    paged(client, "network_listings", "id, created_by", (q) => q.eq("tenant_id", tenantId).not("created_by", "is", null)),
+    rankingOnly ? skip() : paged(client, "network_listings", "id, created_by", (q) => q.eq("tenant_id", tenantId).not("created_by", "is", null)),
 
     // ── Seri (streak) pencereleri: yalnız tarih kolonları ────────────────
-    paged(client, "deals", "id, assigned_to, updated_at", (q) =>
+    rankingOnly ? skip() : paged(client, "deals", "id, assigned_to, updated_at", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("stage", "won").gte("updated_at", streakSince).not("assigned_to", "is", null)),
-    paged(client, "appointments", "id, assigned_to, scheduled_at", (q) =>
+    rankingOnly ? skip() : paged(client, "appointments", "id, assigned_to, scheduled_at", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "completed").gte("scheduled_at", streakSince).not("assigned_to", "is", null)),
-    paged(client, "tasks", "id, assigned_to, completed_at", (q) =>
+    rankingOnly ? skip() : paged(client, "tasks", "id, assigned_to, completed_at", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).eq("status", "done").gte("completed_at", streakSince).not("assigned_to", "is", null)),
-    paged(client, "properties", "id, assigned_to, created_at", (q) =>
+    rankingOnly ? skip() : paged(client, "properties", "id, assigned_to, created_at", (q) =>
       q.eq("tenant_id", tenantId).in("is_sample", sampleVals).is("deleted_at", null).gte("created_at", streakSince).not("assigned_to", "is", null)),
     activityP,
   ]);
