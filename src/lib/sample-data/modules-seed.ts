@@ -5,6 +5,7 @@ import { buildDemoCommissionRow } from "@/lib/demo-seed-invariants";
 import { analysisInputKey, computeListingAnalysis, type AnalysisConfidence, type AnalysisInput } from "@/lib/listing-analysis";
 import { isMissingSampleSchema } from "@/lib/sample-clear";
 import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
+import { seedListingPool } from "@/lib/sample-data/pool-seed";
 
 /**
  * Son eklenen modüllerin (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS durumu, ilan analizi, gider bütçesi/tekrarlayan/
@@ -46,6 +47,8 @@ export type ModuleSeedContext = {
   processDeals: { propertyCode: string; profile: "in_transfer" | "delayed" }[];
   /** Hazır avatar atanacak profiller (yalnız avatarı boş olanlara). Örnek modda verilmez. */
   avatarAssignments?: { profileId: string; preset: string }[];
+  /** İlan havuzu örneği için uzmanlık/bölge verilecek MEVCUT profiller (hesap açılmaz); verilmezse yalnız advisorId. */
+  poolProfileIds?: string[];
 };
 
 export type ModuleSeedReport = {
@@ -956,6 +959,7 @@ export async function seedModuleData(ctx: ModuleSeedContext): Promise<ModuleSeed
   await run("authority", () => seedAuthority(ctx));
   await run("listing_analyses", () => seedListingAnalyses(ctx));
   await run("finance", () => seedFinance(ctx));
+  await run("listing_pool", () => seedListingPool(ctx));
   if (!ctx.sample) await run("avatars", () => seedAvatars(ctx));
   else report.skipped.push({ group: "avatars", reason: "gerçek kullanıcı profiline hazır avatar yazılmaz: etkin değil" });
   if (ctx.sample) report.skipped.push({ group: "expense_budgets", reason: "bütçe tablosunda is_sample yok: örnek modda yazılmaz" });
