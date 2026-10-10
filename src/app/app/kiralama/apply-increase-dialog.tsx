@@ -17,8 +17,8 @@ const fieldClass =
 /**
  * Yenileme radarındaki "Artışı uygula" akışı — popup yok, sayfa içi panel.
  *
- * Önerilen yeni kira TÜFE tavanından gelir (düzenlenebilir); tavan aşımında
- * uygulama engellenir. Action tarafı (applyRentIncrease) tavanı sunucuda da doğrular.
+ * Önerilen yeni kira TÜFE tavanından gelir (düzenlenebilir); tavan aşımı
+ * ENGELLENMEZ, yalnız sarı uyarı gösterilir (mevzuat bilgilendirir; işyeri kiralarında üst sınır yoktur).
  */
 export function ApplyIncreaseDialog({
   rentalId,
@@ -47,10 +47,6 @@ export function ApplyIncreaseDialog({
     const date = String(fd.get("effective_date") ?? "").trim();
     if (!Number.isFinite(rentNum) || rentNum <= currentRent) {
       setError("Yeni kira mevcut kiradan yüksek olmalı.");
-      return;
-    }
-    if (rentNum > suggestedRent) {
-      setError(`Girilen tutar yasal tavanı aşıyor — TÜFE %${appliedRate.toFixed(2)} ile en fazla ${money(suggestedRent)} uygulanabilir.`);
       return;
     }
     if (!date) {
@@ -102,14 +98,16 @@ export function ApplyIncreaseDialog({
                 name="new_rent"
                 type="number"
                 min={currentRent + 1}
-                max={suggestedRent}
                 step="1"
                 required
                 defaultValue={suggestedRent}
                 className={`mt-1 ${fieldClass}`}
               />
               <span className="mt-1 block font-normal text-text-faint">
-                TÜFE tavanlı öneri: {money(suggestedRent)} — daha düşük girilebilir, tavan aşılamaz.
+                TÜFE tavanlı öneri: {money(suggestedRent)} — farklı tutar girilebilir.
+              </span>
+              <span className="mt-1 block rounded-[var(--radius-control)] border border-amber-300/50 bg-amber-50 px-2 py-1 font-normal text-amber-700">
+                Konut kiralarında yasal üst sınır 12 aylık TÜFE ortalamasıdır (%{appliedRate.toFixed(2)}); bunu aşan tutar yalnız iş yeri kiralarında geçerlidir.
               </span>
             </label>
             <label className="text-xs font-semibold text-text-muted">

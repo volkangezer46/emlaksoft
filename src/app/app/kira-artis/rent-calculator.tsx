@@ -20,6 +20,8 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
   const [month, setMonth] = useState<string>(latestMonth);
   const [manualRate, setManualRate] = useState<string>("");
   const [useManual, setUseManual] = useState(false);
+  // Tür: yasal üst sınır uyarısı yalnız konut kiralarında gösterilir (işyerinde sözleşme serbestisi).
+  const [kind, setKind] = useState<"konut" | "isyeri">("konut");
 
   // 2026 gibi resmi 12 aylık ort. TÜFE'si henüz açıklanmamış aylarda otomatik oran
   // UYGULAMAYIZ (Aralık 2025'e düşen fallback 2026 yenilemesi için yanlış yasal
@@ -40,8 +42,10 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
   const hasRateInput = manualActive ? Number(manualRate) > 0 : legalCap != null;
   const result =
     rentNum > 0 && hasRateInput
-      ? computeRentIncrease(rentNum, appliedRate, manualActive ? (legalCap ?? undefined) : undefined)
+      ? computeRentIncrease(rentNum, appliedRate)
       : null;
+  // Mevzuat engellemez, bilgilendirir: kullanıcının girdiği yüksek oran kesilmez, yalnız sarı uyarı çıkar.
+  const overCap = kind === "konut" && legalCap != null && manualActive && Number(manualRate) > legalCap;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -68,6 +72,19 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
           </div>
 
           <div>
+            <label className="mb-1.5 block text-sm text-text-muted" htmlFor="kind">Kira türü</label>
+            <select
+              id="kind"
+              value={kind}
+              onChange={(e) => setKind(e.target.value === "isyeri" ? "isyeri" : "konut")}
+              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
+            >
+              <option value="konut">Konut</option>
+              <option value="isyeri">İş yeri</option>
+            </select>
+          </div>
+
+          <div>
             <label className="mb-1.5 block text-sm text-text-muted" htmlFor="month">Yenileme ayı</label>
             <select
               id="month"
@@ -87,6 +104,14 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
               ))}
             </select>
             {warning ? <p className="mt-1 text-xs text-amber-600">{warning} Güncel resmi oranı aşağıya girin.</p> : null}
+            {table.verifiedAt ? (
+              <p className="mt-1 text-xs text-text-faint">
+                TÜFE tablosu son güncelleme: {table.verifiedAt.split("-").reverse().join(".")}
+                {table.source ? ` · ${table.source}` : ""}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-text-faint">TÜFE oranı henüz girilmedi veya doğrulanmadı.</p>
+            )}
           </div>
 
           {/* Resmi oranı olan aylarda opsiyonel manuel giriş; olmayan (2026) aylarda
@@ -94,7 +119,7 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
           {!forceManual ? (
             <label className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm">
               <input type="checkbox" checked={useManual} onChange={(e) => setUseManual(e.target.checked)} className="h-4 w-4 accent-brand-600" />
-              <span>Kendi oranımı gir (yasal tavan yine uygulanır)</span>
+              <span>Kendi oranımı gir (yasal üst sınırı aşarsa uyarılırsınız)</span>
             </label>
           ) : null}
 
@@ -161,9 +186,9 @@ export function RentCalculator({ months, latestMonth, table }: { months: string[
               </div>
             </div>
 
-            {result.capApplied ? (
-              <p className="rounded-[var(--radius-control)] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                Girdiğiniz oran (%{result.ratePct.toFixed(2)}) yasal tavanı aşıyor; hesaplama %{result.cappedRatePct.toFixed(2)} ile sınırlandı.
+            {overCap && legalCap != null ? (
+              <p role="status" className="rounded-[var(--radius-control)] border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                Konut kiralarında yasal üst sınır 12 aylık TÜFE ortalamasıdır (%{legalCap.toFixed(2)}). Girdiğiniz oran %{result.ratePct.toFixed(2)}; hesap girdiğiniz oranla yapıldı.
               </p>
             ) : null}
           </div>

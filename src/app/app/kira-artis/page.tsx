@@ -19,11 +19,11 @@ export default async function KiraArtisPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’ye göre yasal tavanı otomatik uygular; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={<><Badge variant="outline">TBK m.344 · Yasal tavan uyumlu</Badge></>} />
+      <PageHeader title="Kira artış hesaplama" eyebrow="TÜFE kira artışı" description="12 aylık ortalama TÜFE’yi varsayılan oran olarak doldurur, daha yüksek oranı engellemez ama uyarır; yeni kirayı, aylık ve yıllık farkı anında gösterir." actions={<><Badge variant="outline">TBK m.344 · Yasal tavan uyumlu</Badge></>} />
 
       {!hasAnyOfficial ? (
         <p role="status" className="rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-          Güncel, resmi olarak doğrulanmış TÜFE oranı tabloda yok. {TUFE_UNVERIFIED_NOTICE} Hesaplamada resmi 12 aylık ortalama TÜFE oranını
+          TÜFE oranı henüz girilmedi (resmi olarak doğrulanmış oran tabloda yok). {TUFE_UNVERIFIED_NOTICE} Hesaplamada resmi 12 aylık ortalama TÜFE oranını
           elle girin; tablodaki değerler yalnız referanstır ve yasal tavan olarak uygulanmaz.
         </p>
       ) : null}
