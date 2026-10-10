@@ -5,11 +5,11 @@ import {
 
 /**
  * Ekip büyüklüğü bandı = ÖDEME PLANININ TABANI (kayıt RPC'si ve DB CHECK'i bu dört değeri sabitler; değerler değişmez).
- * Bant paketin ÜST sınırı değildir: Danışman/Ofis/Profesyonel ek kullanıcıyla 500'e kadar büyür (plans.ts maxSeats);
+ * Bant paketin ÜST sınırı değildir: paketler ek kullanıcıyla kendi tavanına kadar büyür (plans.ts PLAN_USER_CAPS: 3/15/50/500);
  * bu yüzden kayıt eylemi seçilen planı yalnız bandın tabanının ALTINA düşürmez, üstünü korur.
  *   "1"     -> Danışman (1 kullanıcı dahil)
- *   "2-10"  -> Ofis (5 dahil, ek kullanıcıyla büyür)
- *   "10-50" -> Profesyonel (15 dahil, 500'e kadar); hesaplayıcı 50'ye yaklaşınca Kurumsal'ı (50 dahil) daha ucuzsa önerir
+ *   "2-10"  -> Ofis (5 dahil, en fazla 15)
+ *   "10-50" -> Profesyonel (15 dahil, en fazla 50); hesaplayıcı 50'ye yaklaşınca Kurumsal'ı (50 dahil) daha ucuzsa önerir
  *   "50+"   -> Kurumsal Operasyon (50 kullanıcı dahil taban, 500'e kadar)
  * Hesaplayıcı önerisi (seat-calculator-model.computeSeatCalc) her zaman bandın tabanından düşük olmayan plandır.
  */

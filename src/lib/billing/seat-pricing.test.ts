@@ -85,10 +85,14 @@ describe("quoteSeats: kademeli marjinal fiyat", () => {
   });
 
   it("azami koltuk aşımı işaretlenir ve zorunlu yükseltme önerilir", () => {
-    expect(quoteSeats(catalog, "office", 500, "monthly").maxSeatsExceeded).toBe(false);
-    const q = quoteSeats(catalog, "office", 501, "monthly");
+    // Paket kullanıcı tavanı (2026-10-10): Danışman 3 · Ofis 15 · Profesyonel 50 · Kurumsal 500.
+    expect(quoteSeats(catalog, "office", 15, "monthly").maxSeatsExceeded).toBe(false);
+    const q = quoteSeats(catalog, "office", 16, "monthly");
     expect(q.maxSeatsExceeded).toBe(true);
-    expect(q.recommendation).toBeNull();
+    expect(quoteSeats(catalog, "enterprise", 500, "monthly").maxSeatsExceeded).toBe(false);
+    const top = quoteSeats(catalog, "enterprise", 501, "monthly");
+    expect(top.maxSeatsExceeded).toBe(true);
+    expect(top.recommendation).toBeNull();
   });
 
   it("kapalı son kademe: ötesi son birim fiyatla uzatılır ama aşım işaretlenir", () => {
@@ -169,7 +173,8 @@ describe("çapraz nokta ve öneri", () => {
   it("findSeatCrossovers ardışık planları listeler", () => {
     const list = findSeatCrossovers(catalog);
     expect(list.map((c) => `${c.fromPlanId}>${c.toPlanId}`)).toEqual(["advisor>office", "office>professional", "professional>enterprise"]);
-    expect(list[0]!.seat).toBe(5);
+    // Danışman tavanı 3: 4. kullanıcıda Ofis'e geçiş zorunlu olur.
+    expect(list[0]!.seat).toBe(4);
   });
 });
 
@@ -330,11 +335,12 @@ describe("validateSeatTiers / validateSeatCatalog", () => {
   });
 
   it("katalog: üst paketin ek kullanıcıyla yeniden pahalılaşması uyarılır", () => {
+    // Ofis tavanı 15 olduğundan senaryo için Ofis'in tavanı yalnız bu testte açılır.
     const dear = withPlan("professional", {
       extraSeatTiers: [{ fromSeat: 1, toSeat: null, monthlyTry: 999 }],
       seatRounding: "x9",
       maxSeats: 40,
-    });
+    }).map((p) => (p.id === "office" ? { ...p, maxSeats: 500 } : p));
     const rep = validateSeatCatalog(dear);
     expect(rep.warnings.join(" ")).toContain("yeniden");
   });

@@ -77,7 +77,7 @@ export const PLANS: readonly PlanDef[] = [
     blurb: "Bağımsız danışman",
     eyebrow: "BAŞLANGIÇ",
     features: [
-      "1 kullanıcı · 1 şube",
+      "1 kullanıcı dahil · en fazla 3 kullanıcı · 1 şube",
       "1.000 müşteri · 150 aktif portföy",
       "Talep ve portföy eşleştirme",
       "Randevu, görev ve gelen kutusu",
@@ -86,7 +86,7 @@ export const PLANS: readonly PlanDef[] = [
     limits: { seats: 1, customers: 1_000, activeProperties: 150, branches: 1 },
     // Ek kullanıcı: 5 kullanıcıda 749 + 4 x 559 = 2.985 TL > Ofis 2.790 TL: Ofis 5. kullanıcıdan itibaren hem ucuz hem kapsamlı (4 kullanıcıda 2.426 TL, Danışman daha ucuz). 559 > Ofis kişi başı 558: doğrulayıcı teşvik uyarısı çıkmaz.
     extraSeatMonthlyTry: 559,
-    maxSeats: 500,
+    maxSeats: 3,
     seatRounding: "x9",
     efCreditsMonthly: 100,
     efCreditsPerExtraSeat: 50,
@@ -99,7 +99,7 @@ export const PLANS: readonly PlanDef[] = [
     eyebrow: "EN ÇOK TERCİH",
     popular: true,
     features: [
-      "5 kullanıcı · 3 şubeye kadar",
+      "5 kullanıcı dahil · en fazla 15 kullanıcı · 3 şube",
       "Sınırsız müşteri ve portföy",
       "Ekip yönetimi ve komisyon paylaşımı",
       "Teklif, sözleşme ve SMS onaylı dijital imza",
@@ -113,7 +113,7 @@ export const PLANS: readonly PlanDef[] = [
       { fromSeat: 6, toSeat: 15, monthlyTry: 449 },
       { fromSeat: 16, toSeat: null, monthlyTry: 399 },
     ],
-    maxSeats: 500,
+    maxSeats: 15,
     seatRounding: "x9",
     efCreditsMonthly: 700,
     efCreditsPerExtraSeat: 50,
@@ -125,7 +125,7 @@ export const PLANS: readonly PlanDef[] = [
     blurb: "Büyük ofis ve çok şube",
     eyebrow: "ÖLÇEKLENEN EKİP",
     features: [
-      "15 kullanıcıya kadar · 10 şube",
+      "15 kullanıcı dahil · en fazla 50 kullanıcı · 10 şube",
       "Kayıp-kaçak komisyon motoru",
       "Danışman KPI, lig ve hedefler",
       "Otomasyon, iş akışı ve onay akışları",
@@ -137,7 +137,7 @@ export const PLANS: readonly PlanDef[] = [
       { fromSeat: 1, toSeat: 10, monthlyTry: 449 },
       { fromSeat: 11, toSeat: null, monthlyTry: 399 },
     ],
-    maxSeats: 500,
+    maxSeats: 50,
     seatRounding: "x9",
     efCreditsMonthly: 2100,
     efCreditsPerExtraSeat: 50,
@@ -149,7 +149,7 @@ export const PLANS: readonly PlanDef[] = [
     blurb: "Franchise ve proje satış ekipleri",
     eyebrow: "KURUMSAL OPERASYON",
     features: [
-      "50 kullanıcı dahil · 500 kullanıcıya kadar",
+      "50 kullanıcı dahil · en fazla 500 kullanıcı",
       "Sınırsız şube",
       "Proje satışı ve franchise BI",
       "Merkezi rol ve denetim yönetimi",
@@ -168,6 +168,19 @@ export const PLANS: readonly PlanDef[] = [
     efCreditsPerExtraSeat: 50,
   },
 ] as const;
+
+/**
+ * PAKET KULLANICI TAVANI (ürün sahibi kararı, 2026-10-10): paket dahil kullanıcı + satın alınan ek kullanıcı
+ * toplamı bu sayıyı aşamaz. Tek kaynak burasıdır; admin panelindeki kayıt (`maxSeats`) bunu YÜKSELTEMEZ
+ * (applyPlanOverrides sınırlar). Daha fazlası için bir üst pakete geçilir.
+ */
+export const PLAN_USER_CAPS: Readonly<Record<PlanId, number>> = {
+  advisor: 3,
+  office: 15,
+  professional: 50,
+  business: 100,
+  enterprise: 500,
+};
 
 const PLAN_IDS = new Set<PlanId>([...PLANS.map((plan) => plan.id), "business"]);
 
@@ -242,8 +255,9 @@ export const BUSINESS_PLAN_TEMPLATE: PlanDef = {
   monthlyTry: 8990,
   blurb: "Çok şubeli büyük ofis",
   eyebrow: "BÜYÜME",
-  features: ["40 kullanıcıya kadar", "Profesyonel paketin tüm özellikleri"],
+  features: ["40 kullanıcı dahil · en fazla 100 kullanıcı", "Profesyonel paketin tüm özellikleri"],
   limits: { seats: 40, customers: null, activeProperties: null, branches: 20 },
+  maxSeats: 100,
   hidden: true,
   order: 35,
   efCreditsMonthly: 3500,

@@ -6,6 +6,7 @@ import {
   type PlanLimits,
   type SeatRounding,
   type SeatTier,
+  PLAN_USER_CAPS,
 } from "@/lib/billing/plans";
 
 /**
@@ -286,7 +287,11 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
     .sort((a, b) => a.key - b.key || a.i - b.i)
     .map(({ plan }) => plan);
   let seen = false;
-  return sorted.map((plan) => {
+  return sorted.map((plan0) => {
+    // Paket kullanıcı tavanı (plans.ts PLAN_USER_CAPS): panel kaydı tavanı yükseltemez.
+    const cap = PLAN_USER_CAPS[plan0.id];
+    const plan: PlanDef =
+      cap && (!plan0.maxSeats || plan0.maxSeats > cap) ? { ...plan0, maxSeats: Math.max(cap, plan0.limits.seats) } : plan0;
     if (!plan.popular) return plan;
     if (seen) {
       const rest: PlanDef = { ...plan };
@@ -340,7 +345,7 @@ export function diffAgainstDefault(plan: PlanDef, edited: PlanDef): PlanOverride
  * Not: veritabanı sınırları (plan_entitlements) paneldeki kayıt sırasında senkronlanır.
  */
 export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
-  advisor: { monthlyTry: 749, efCreditsMonthly: 100, efCreditsPerExtraSeat: 50, extraSeatMonthlyTry: 559, maxSeats: 500, seatRounding: "x9" },
+  advisor: { monthlyTry: 749, efCreditsMonthly: 100, efCreditsPerExtraSeat: 50, extraSeatMonthlyTry: 559, maxSeats: 3, seatRounding: "x9" },
   office: {
     monthlyTry: 2790,
     efCreditsMonthly: 700,
@@ -351,7 +356,7 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       { fromSeat: 6, toSeat: 15, monthlyTry: 449 },
       { fromSeat: 16, toSeat: null, monthlyTry: 399 },
     ],
-    maxSeats: 500,
+    maxSeats: 15,
     seatRounding: "x9",
   },
   professional: {
@@ -361,20 +366,20 @@ export const RECOMMENDED_CATALOG_OVERRIDES: PlanOverrides = {
       { fromSeat: 1, toSeat: 10, monthlyTry: 449 },
       { fromSeat: 11, toSeat: null, monthlyTry: 399 },
     ],
-    maxSeats: 500,
+    maxSeats: 50,
     seatRounding: "x9",
     efCreditsMonthly: 2100,
     efCreditsPerExtraSeat: 50,
     limits: { seats: 15 },
     features: [
-      "15 kullanıcıya kadar · 10 şube",
+      "15 kullanıcı dahil · en fazla 50 kullanıcı · 10 şube",
       "Kayıp-kaçak komisyon motoru",
       "Danışman KPI, lig ve hedefler",
       "Otomasyon, iş akışı ve onay akışları",
       "KVKK uyum ve ofisler arası ağ",
     ],
   },
-  business: { monthlyTry: 8990, limits: { seats: 40 }, efCreditsMonthly: 3500 },
+  business: { monthlyTry: 8990, limits: { seats: 40 }, efCreditsMonthly: 3500, maxSeats: 100 },
   enterprise: {
     monthlyTry: 14900,
     efCreditsMonthly: 7000,
