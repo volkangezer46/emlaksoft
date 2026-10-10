@@ -25,6 +25,14 @@ if (error) {
 }
 const cookie = [...jar].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("; ");
 const pages = (process.argv[3] || "/app,/app/musteriler,/app/portfoyler,/app/talepler,/app/anlasmalar,/app/randevular,/app/gorevler,/app/komisyon,/app/raporlar,/app/lig,/app/giderler,/app/kiralama,/app/aidat,/app/ilan-kontrol,/app/performansim,/app/ekip").split(",");
+// "@ilk:/app/portfoyler" gibi girdi: liste sayfasındaki İLK kaydın detay yolu (kimlik gerektiren detay sayfaları için).
+for (let i = 0; i < pages.length; i++) {
+  const m = /^@ilk:(\/app\/[a-z-]+)$/.exec(pages[i]);
+  if (!m) continue;
+  const html = await (await fetch(BASE + m[1], { headers: { cookie, "user-agent": "emlaksoft-perf-probe" }, redirect: "manual" })).text();
+  const hit = new RegExp(`${m[1]}/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`).exec(html);
+  pages[i] = hit ? `${m[1]}/${hit[1]}` : m[1];
+}
 console.log("sayfa | durum | ttfb ms (3 tur) | toplam ms | server-timing (son tur)");
 for (const p of pages) {
   const ttfb: number[] = [];

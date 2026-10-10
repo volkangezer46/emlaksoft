@@ -234,8 +234,37 @@ export async function setCoverPropertyMedia(formData: FormData): Promise<void> {
         .maybeSingle(),
   );
   if (!target || !isPublicListingImage(target)) return;
-  await supabase.from("property_media").update({ is_cover: false }).eq("property_id", propertyId).eq("tenant_id", gate.tenantId);
-  await supabase.from("property_media").update({ is_cover: true }).eq("id", id).eq("tenant_id", gate.tenantId);
+  // Migration olmadan tek ifade (is_cover = (id = $id)) PostgREST'te yazılamaz; sıra "önce yeni kapak, sonra
+  // diğerlerini kapat" olarak çevrildi: kısmi hatada portföy KAPAKSIZ değil, en kötü iki kapaklı kalır. Hatalar kontrol edilir.
+  const { error: setError } = await supabase
+    .from("property_media")
+    .update({ is_cover: true })
+    .eq("id", id)
+    .eq("property_id", propertyId)
+    .eq("tenant_id", gate.tenantId);
+  if (setError) {
+    console.error("setCoverPropertyMedia set", { code: setError.code });
+    return;
+  }
+  const { error: clearError } = await supabase
+    .from("property_media")
+    .update({ is_cover: false })
+    .eq("property_id", propertyId)
+    .eq("tenant_id", gate.tenantId)
+    .neq("id", id)
+    .eq("is_cover", true);
+  if (clearError) {
+    console.error("setCoverPropertyMedia clear", { code: clearError.code });
+    // Telafi: diğerlerini kapatan tek UPDATE ifadesi atomiktir (ya hepsi ya hiçbiri); yeni kapağı geri alınca eski
+    // tek-kapak durumu aynen döner, portföy iki kapaklı kalmaz.
+    const { error: revertError } = await supabase
+      .from("property_media")
+      .update({ is_cover: false })
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId);
+    if (revertError) console.error("setCoverPropertyMedia revert", { code: revertError.code });
+    return;
+  }
   revalidatePath(`/app/portfoyler/${propertyId}`);
 }
 

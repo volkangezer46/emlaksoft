@@ -6,6 +6,7 @@ import { parsePropertyDescription, withDescription } from "@/lib/property-descri
 import { parseVirtualTourUrl, withVirtualTour } from "@/lib/virtual-tour";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
+import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -426,26 +427,32 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
           reason: "Puan eşiği aşıldı; otomatik atandı.",
         });
         if (res.ok) {
-          await notifyPoolAssigned(supabase, {
-            tenantId: gate.tenantId,
-            actorId: gate.userId,
-            assigneeId: queued.decision.profileId,
-            propertyId: data.id,
-            label: poolLabel,
-            method: "auto",
-          });
+          const assigneeId = queued.decision.profileId;
+          afterSafe(() =>
+            notifyPoolAssigned(supabase, {
+              tenantId: gate.tenantId,
+              actorId: gate.userId,
+              assigneeId,
+              propertyId: data.id,
+              label: poolLabel,
+              method: "auto",
+            }),
+          );
         } else {
           finalDecision = { kind: "await_owner", reason: "below_threshold" };
         }
       }
       if (finalDecision.kind !== "auto_assign") {
-        await notifyPoolEntry(supabase, {
-          tenantId: gate.tenantId,
-          actorId: gate.userId,
-          propertyId: data.id,
-          label: poolLabel,
-          decision: finalDecision,
-        });
+        const awaitingDecision = finalDecision;
+        afterSafe(() =>
+          notifyPoolEntry(supabase, {
+            tenantId: gate.tenantId,
+            actorId: gate.userId,
+            propertyId: data.id,
+            label: poolLabel,
+            decision: awaitingDecision,
+          }),
+        );
       }
     } else {
       // Havuz kaydı açılamadı: ilan sahipsiz kalmasın, ekleyen danışmana verilir.
@@ -455,24 +462,26 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
 
   // Ofis sahibine bildirim/görev: yeni ilan + (varsa) eksik ilan sahibi bilgisi.
   if (!pooled) {
-    await notifyNewListing(supabase, {
-      tenantId: gate.tenantId,
-      actorId: gate.userId,
-      propertyId: data.id,
-      label: title || propertyCode,
-      ownerInfoScore: ownerInfoScore ?? null,
-      missing: ownerMissing ?? [],
-    });
+    afterSafe(() =>
+      notifyNewListing(supabase, {
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        propertyId: data.id,
+        label: title || propertyCode,
+        ownerInfoScore: ownerInfoScore ?? null,
+        missing: ownerMissing ?? [],
+      }),
+    );
   }
 
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.create",
     entityType: "property",
     entityId: data.id,
     newValue: { property_code: propertyCode, title },
-  });
+  }));
 
   // Otomatik eşleştirme bildirimi — yeni portföyü aktif taleplerle skorla, güçlü eşleşme varsa danışmanı uyar
   const matchedDemands = await notifyMatchingDemandsForProperty(gate.tenantId, gate.userId, {
@@ -492,21 +501,21 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   });
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  try {
-    await dispatchAutomationEvent(gate.tenantId, "new_property", {
+  afterSafe(() =>
+    Promise.resolve()
+      .then(() => dispatchAutomationEvent(gate.tenantId, "new_property", {
       entityType: "property",
       entityId: data.id,
       propertyId: data.id,
       label: [propertyCode, title].filter(Boolean).join(" · "),
       assignedTo: gate.userId,
       fields: { transaction_type: transactionType, property_type: propertyType, list_price: priceValue },
-    });
-  } catch (e) {
-    console.error("automation new_property", e);
-  }
+    }))
+      .catch((e) => console.error("automation new_property", e)),
+    );
 
   // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  await triggerPlaybooks({
+  afterSafe(() => triggerPlaybooks({
     tenantId: gate.tenantId,
     event: "yeni_portfoy",
     actorId: gate.userId,
@@ -518,7 +527,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       propertyId: data.id,
       fields: { transaction_type: transactionType, property_type: propertyType },
     },
-  });
+  }));
 
   emitWebhook("property.created", "property", data.id);
   revalidatePath("/app/portfoyler");
@@ -682,14 +691,14 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     return { error: actionErrorMessage(error, "Portföy güncellenemedi.") };
   }
 
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.update",
     entityType: "property",
     entityId: id,
     newValue: { title, list_price: priceValue },
-  });
+  }));
 
   // Fiyat DÜŞTÜYSE eşleşen taleplerin danışmanlarını uyar; artışta hiçbir şey yapma.
   if (oldPrice != null && Number.isFinite(oldPrice) && priceValue < oldPrice) {
@@ -794,13 +803,13 @@ export async function deleteProperty(formData: FormData): Promise<{ error?: stri
     console.error("deleteProperty", error);
     return { error: "Portföy arşivlenemedi." };
   }
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.delete",
     entityType: "property",
     entityId: id,
-  });
+  }));
   revalidatePath("/app/portfoyler");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
@@ -847,7 +856,7 @@ export async function reassignProperty(formData: FormData): Promise<void> {
     console.error("reassignProperty", error);
     return;
   }
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.reassign",
@@ -855,7 +864,7 @@ export async function reassignProperty(formData: FormData): Promise<void> {
     entityId: id,
     oldValue: { assigned_to: previous },
     newValue: { assigned_to: assignedTo || null },
-  });
+  }));
   if (assignedTo && assignedTo !== gate.userId) {
     const label = [current.property_code, current.title].filter(Boolean).join(" ") || "Portföy";
     await notifyAssignment({

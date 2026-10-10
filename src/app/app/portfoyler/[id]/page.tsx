@@ -164,6 +164,37 @@ export default async function PropertyDetailPage({
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
   const supabase = await createClient();
 
+  // Portföy satırı: bölge istatistiği ve atanan danışman adı bu söze ZİNCİRLENİR (sayfa onları ayrıca beklemez; ana batch ile aynı turda biter).
+  const propertyP = Promise.resolve(
+    supabase
+      .from("properties")
+      .select(
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+      )
+      .eq("id", id)
+      .is("deleted_at", null)
+      .maybeSingle(),
+  );
+  const regionP = propertyP.then(async ({ data: prop }): Promise<{ data: { avg_days_listed: number | null } | null }> => {
+    if (!prop || !isDiagnosable(prop.status) || !prop.district_id) return { data: null };
+    // Bölge (ilçe) satış hızı — region_stats_history'nin en güncel dönemi.
+    const txTypeStat = /kira/i.test(prop.transaction_type ?? "") ? "Kiralık" : /sat/i.test(prop.transaction_type ?? "") ? "Satılık" : "Tümü";
+    const res = await supabase
+      .from("region_stats_history")
+      .select("avg_days_listed")
+      .eq("district_id", prop.district_id)
+      .eq("tx_type", txTypeStat)
+      .order("period", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return { data: (res.data as { avg_days_listed: number | null } | null) ?? null };
+  });
+  const assigneeP = propertyP.then(async ({ data: prop }): Promise<{ data: { full_name: string | null } | null }> => {
+    if (!prop?.assigned_to) return { data: null };
+    const res = await supabase.from("profiles").select("full_name").eq("id", prop.assigned_to).maybeSingle();
+    return { data: (res.data as { full_name: string | null } | null) ?? null };
+  });
+
   // KÜNYE BATCH'İ — yalnız hero + üst kartların ihtiyacı. Hepsi `id`'ye bağlı,
   // tam paralel. Zaman tüneli / fiyat geçmişi / bölge RPC'leri artık BURADA DEĞİL.
   const [
@@ -179,15 +210,11 @@ export default async function PropertyDetailPage({
     { data: tenantRow },
     configuredPortals,
     { count: mediaCount },
+    { data: regionStat },
+    { data: assigneeProfile },
+    eidsRes,
   ] = await Promise.all([
-    supabase
-      .from("properties")
-      .select(
-        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
-      )
-      .eq("id", id)
-      .is("deleted_at", null)
-      .maybeSingle(),
+    propertyP,
     supabase
       .from("portal_listings")
       .select("id, portal_name, portal_listing_id, portal_url, status, last_confirmed_at, removed_at, removal_reason")
@@ -214,14 +241,13 @@ export default async function PropertyDetailPage({
     getConfiguredPortals(),
     // Satış teşhisi için fotoğraf/medya sayısı
     supabase.from("property_media").select("id", { count: "exact", head: true }).eq("property_id", id),
+    regionP,
+    assigneeP,
+    // EİDS taşınmaz no ayrı, hataya dayanıklı okunur: sütun henüz yoksa (migration uygulanmamış) sayfa düşmez.
+    supabase.from("properties").select("eids_property_no").eq("id", id).maybeSingle(),
   ]);
 
   if (!property) notFound();
-
-  // Atanan danışman adı — `property.assigned_to` bilinmeden sorulamıyor.
-  const { data: assigneeProfile } = property.assigned_to
-    ? await supabase.from("profiles").select("full_name").eq("id", property.assigned_to).maybeSingle()
-    : { data: null };
 
   // Fiyatın altındaki "≈ $X · €Y" satırı; kur tarihi title ipucunda.
   const fxLine = fxApproxLine(property.list_price != null ? Number(property.list_price) : null, fxRates);
@@ -303,22 +329,6 @@ export default async function PropertyDetailPage({
 
   // "Neden satmıyor?" teşhisi — yalnızca aktif pazarlamadaki ilanlar için.
   const daysOnMarket = daysSince(property.published_at ?? property.created_at);
-  // Bölge (ilçe) satış hızı — region_stats_history'nin en güncel dönemi.
-  const txTypeStat = /kira/i.test(property.transaction_type ?? "")
-    ? "Kiralık"
-    : /sat/i.test(property.transaction_type ?? "")
-      ? "Satılık"
-      : "Tümü";
-  const { data: regionStat } = isDiagnosable(property.status) && property.district_id
-    ? await supabase
-        .from("region_stats_history")
-        .select("avg_days_listed")
-        .eq("district_id", property.district_id)
-        .eq("tx_type", txTypeStat)
-        .order("period", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
   const regionAvgDaysListed =
     (regionStat as { avg_days_listed?: number | null } | null)?.avg_days_listed != null
       ? Number((regionStat as { avg_days_listed: number }).avg_days_listed)
@@ -341,8 +351,6 @@ export default async function PropertyDetailPage({
   // Kayıp toplamı kapanış kayıtlarından gelir; o bölüm akarak geldiği için
   // künyedeki rozet de kendi sınırında bekler.
   const propertyRaw = property as unknown as Record<string, string | null>;
-  // EİDS taşınmaz no ayrı, hataya dayanıklı okunur: sütun henüz yoksa (migration uygulanmamış) sayfa düşmez.
-  const eidsRes = await supabase.from("properties").select("eids_property_no").eq("id", id).maybeSingle();
   const eidsNo = eidsRes.error ? null : ((eidsRes.data as { eids_property_no?: string | null } | null)?.eids_property_no ?? null);
 
   // Sağ sütun "sonraki en iyi eylem": teşhisin en öncelikli engeli → ilgili sekme

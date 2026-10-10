@@ -20,7 +20,9 @@ import { actionErrorMessage } from "@/lib/action-errors";
  *  2. logActivity (audit_logs — denetim izi)
  */
 
-export type KeyResult = { error?: string; ok?: boolean };
+export type KeyResult = { error?: string; ok?: boolean; warning?: string };
+
+const KEY_EVENT_WARNING = "İşlem kaydedildi ancak hareket geçmişine yazılamadı.";
 
 export type PropertyKeyRow = {
   id: string;
@@ -97,6 +99,18 @@ export async function getPropertyKeys(propertyId: string): Promise<{
   return { keys, events };
 }
 
+type KeyEventClient = Awaited<ReturnType<typeof createClient>>;
+
+/** Anahtar hareket satırını yazar; hata sessizce yutulmaz (loglanır, çağıran uyarı döner). */
+async function insertKeyEvent(supabase: KeyEventClient, row: Record<string, unknown>): Promise<boolean> {
+  const { error } = await supabase.from("property_key_events").insert(row);
+  if (error) {
+    console.error("property_key_events insert", { code: error.code, action: row.action });
+    return false;
+  }
+  return true;
+}
+
 /** Portföyün bu tenant'a ait olduğunu doğrular — tüm mutasyonların ön koşulu. */
 async function verifyProperty(propertyId: string, tenantId: string) {
   const supabase = await createClient();
@@ -169,7 +183,7 @@ export async function addPropertyKey(_prev: KeyResult, fd: FormData): Promise<Ke
     return { error: actionErrorMessage(error, "Anahtar eklenemedi.") };
   }
 
-  await supabase.from("property_key_events").insert({
+  const eventOk = await insertKeyEvent(supabase, {
     tenant_id: gate.tenantId,
     key_id: inserted.id,
     action: "olusturma",
@@ -188,7 +202,7 @@ export async function addPropertyKey(_prev: KeyResult, fd: FormData): Promise<Ke
   });
 
   revalidateKeyViews(propertyId);
-  return { ok: true };
+  return eventOk ? { ok: true } : { ok: true, warning: KEY_EVENT_WARNING };
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +294,7 @@ export async function checkoutPropertyKey(_prev: KeyResult, fd: FormData): Promi
     return { error: actionErrorMessage(error, "Çıkış kaydedilemedi.") };
   }
 
-  await supabase.from("property_key_events").insert({
+  const eventOk = await insertKeyEvent(supabase, {
     tenant_id: gate.tenantId,
     key_id: keyId,
     action: "cikis",
@@ -302,7 +316,7 @@ export async function checkoutPropertyKey(_prev: KeyResult, fd: FormData): Promi
   });
 
   revalidateKeyViews(key.property_id);
-  return { ok: true };
+  return eventOk ? { ok: true } : { ok: true, warning: KEY_EVENT_WARNING };
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +352,7 @@ export async function returnPropertyKey(fd: FormData): Promise<void> {
     return;
   }
 
-  await supabase.from("property_key_events").insert({
+  await insertKeyEvent(supabase, {
     tenant_id: gate.tenantId,
     key_id: keyId,
     action: "iade",
@@ -386,7 +400,7 @@ export async function reportPropertyKeyLost(fd: FormData): Promise<void> {
     return;
   }
 
-  await supabase.from("property_key_events").insert({
+  await insertKeyEvent(supabase, {
     tenant_id: gate.tenantId,
     key_id: keyId,
     action: "kayip",

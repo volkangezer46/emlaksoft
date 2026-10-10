@@ -38,6 +38,8 @@ export type InventoryImportResult =
       applied: number;
       registered: number;
       opened: number;
+      /** Danışman dosyasında "var" görünen ama açık kayıp sinyali taşıyan ilanlar: uygulanmadı, yönetici onayı bekliyor. */
+      held: number;
       invalidTokens: string[];
       complete: boolean;
     }
@@ -208,6 +210,7 @@ export async function importPortalInventory(input: {
   if (!gate.ok) return { ok: false, error: gate.error };
   const portal = String(input.portal ?? "").trim().toLowerCase();
   if (!getAdapter(portal)) return { ok: false, error: "Portal seçin." };
+  // Danışman (mine) dosya/yapıştırması RPC'de "assisted" sayılır; açık kayıp sinyalini "var" ile kapatamaz (yönetici onayına düşer).
   const scope = input.scope === "office" || (input.scope === "auto" && MANAGER_ROLES.has(gate.role)) ? "office" : "mine";
   if (scope === "office" && !MANAGER_ROLES.has(gate.role)) return { ok: false, error: "Ofis geneli karşılaştırma yalnız yönetim kademesine açıktır." };
   const source = input.source === "csv" || input.source === "extension" ? input.source : "paste";
@@ -230,9 +233,15 @@ export async function importPortalInventory(input: {
   }
   // Eklentiyle okunan liste ancak bütün sayfalar okunduysa tam sayılır; dosya/yapıştırmada kullanıcı onayı gerekir.
   // Eklenti listesi için tamlık kanıtı zorunlu: portalın gösterdiği toplam okunmadıysa/ulaşılmadıysa "tam" sayılmaz (sunucu RPC'si de doğrular).
-  const expected = Number.isFinite(input.expectedCount) ? Number(input.expectedCount) : null;
+  // Dosya/yapıştırmada da sayı kanıtı aranır (sunucu RPC'si aynı kuralı TÜM kaynaklarda uygular): beklenen = verilen toplam ya da
+  // dosyadaki tanınan satır + tanınmayan parça; okunan = tanınan satır. Tanınmayan parça varsa liste "tam" sayılmaz.
+  const expected = Number.isFinite(input.expectedCount)
+    ? Number(input.expectedCount)
+    : source === "extension"
+      ? null
+      : rows.length + invalidTokens.length;
   const read = Number.isFinite(input.readCount) ? Number(input.readCount) : rows.length;
-  const complete = source === "extension" ? Boolean(input.complete) && expected !== null && expected > 0 && read >= expected : Boolean(input.complete);
+  const complete = Boolean(input.complete) && expected !== null && expected > 0 && read >= expected;
 
   const db = (await createClient()) as unknown as Db;
   const crm = await loadCrm(db, portal, scope, gate.userId);
@@ -248,7 +257,7 @@ export async function importPortalInventory(input: {
   const observations = toObservations(breakdown, complete);
   const candidates = breakdown.unregistered.length ? rankUnregistered(breakdown.unregistered, await loadMatchPool(db, scope, gate.userId)) : [];
   const summary = toSummary(breakdown);
-  const summaryForRpc = source === "extension" ? { ...summary, expected_count: expected, read_count: read } : summary;
+  const summaryForRpc = { ...summary, expected_count: expected, read_count: read };
 
   const obsParts = chunk(observations, 2000);
   const candParts = chunk(candidates, 1000);
@@ -256,6 +265,7 @@ export async function importPortalInventory(input: {
   let applied = 0;
   let registered = 0;
   let opened = 0;
+  let held = 0;
   for (let i = 0; i < calls; i += 1) {
     const { data, error } = await db.rpc("lc_inventory_import", {
       p_portal: portal,
@@ -270,17 +280,18 @@ export async function importPortalInventory(input: {
       console.error("lc_inventory_import", { code: error.code });
       return { ok: false, error: isMissingSchema(error) ? "Envanter içe aktarma için sistem güncellemesi bekleniyor." : actionErrorMessage(error, "Karşılaştırma kaydedilemedi.") };
     }
-    const r = (data ?? {}) as { outcome?: string; observations_applied?: number; candidates_registered?: number; anomalies_opened?: number };
+    const r = (data ?? {}) as { outcome?: string; observations_applied?: number; candidates_registered?: number; anomalies_opened?: number; observations_held?: number };
     if (r.outcome === "forbidden") return { ok: false, error: "Bu işlem için yetkiniz yok." };
     if (r.outcome !== "ok") return { ok: false, error: actionErrorMessage(null, "Karşılaştırma kaydedilemedi.") };
     applied += Number(r.observations_applied ?? 0);
     registered += Number(r.candidates_registered ?? 0);
     opened += Number(r.anomalies_opened ?? 0);
+    held += Number(r.observations_held ?? 0);
   }
   revalidatePath("/app/ilan-kontrol");
   revalidatePath("/app/ilan-kontrol/envanter");
   revalidatePath("/app/ilan-kontrol/eslesme");
-  return { ok: true, summary, applied, registered, opened, invalidTokens, complete };
+  return { ok: true, summary, applied, registered, opened, held, invalidTokens, complete };
 }
 
 export type MatchDecisionResult = { ok?: boolean; error?: string };

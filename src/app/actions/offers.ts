@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { afterSafe } from "@/lib/after-safe";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -65,18 +66,18 @@ export async function createOffer(
   const offerId = transition.offer_id;
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  try {
-    await dispatchAutomationEvent(gate.tenantId, "offer_received", {
-      entityType: "offer",
-      entityId: offerId,
-      propertyId,
-      customerId,
-      assignedTo: gate.userId,
-      fields: { amount },
-    });
-  } catch (e) {
-    console.error("automation offer_received", e);
-  }
+  afterSafe(() =>
+    Promise.resolve()
+      .then(() => dispatchAutomationEvent(gate.tenantId, "offer_received", {
+    entityType: "offer",
+    entityId: offerId,
+    propertyId,
+    customerId,
+    assignedTo: gate.userId,
+    fields: { amount },
+    }))
+      .catch((e) => console.error("automation offer_received", e)),
+  );
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/portfoyler/${propertyId}`);

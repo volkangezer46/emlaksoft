@@ -32,23 +32,22 @@ export async function requirePermission(
   if (!gate.ok) return gate;
 
   const role = gate.role;
-  const perms = gate.impersonating
-    ? immutableReadonlyPermissions()
-    : await getEffectivePermissions(gate.tenantId, role, gate.userId);
+  // Yetki, modül ve duraklatma kontrolleri bağımsızdır: paralel çalışır (önbellek yok), hata önceliği
+  // aşağıda korunur: yetki -> modül -> duraklatma. Destek oturumu salt-okunur olduğundan duraklatma atlanır.
+  const [perms, moduleBlock, pauseBlock] = await Promise.all([
+    gate.impersonating
+      ? Promise.resolve(immutableReadonlyPermissions())
+      : getEffectivePermissions(gate.tenantId, role, gate.userId),
+    moduleActionBlock(gate.tenantId, mod, action),
+    gate.impersonating ? Promise.resolve(null) : pausedWriteBlock(gate.tenantId, mod, action),
+  ]);
   if (!effectiveHasPermission(perms, mod, action)) {
     return { ok: false, error: "Bu işlem için yetkiniz yok." };
   }
-
-  // Sıra: oturum -> yetki -> modül. Ofisin kapattığı modülün yazma eylemleri doğrudan POST ile de reddedilir.
-  const moduleBlock = await moduleActionBlock(gate.tenantId, mod, action);
+  // Ofisin kapattığı modülün yazma eylemleri doğrudan POST ile de reddedilir.
   if (moduleBlock) return { ok: false, error: moduleBlock };
-
-  // Duraklatılmış abonelik: veri salt-okunur (yazma eylemleri reddedilir; abonelik/ödeme modülü devam ettirmek için serbest).
-  // Destek oturumu zaten salt-okunur olduğundan atlanır.
-  if (!gate.impersonating) {
-    const pauseBlock = await pausedWriteBlock(gate.tenantId, mod, action);
-    if (pauseBlock) return { ok: false, error: pauseBlock };
-  }
+  // Duraklatılmış abonelik: veri salt-okunur (abonelik/ödeme modülü devam ettirmek için serbest).
+  if (pauseBlock) return { ok: false, error: pauseBlock };
 
   return {
     ok: true,

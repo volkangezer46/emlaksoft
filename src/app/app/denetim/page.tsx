@@ -23,6 +23,15 @@ import {
   normalizeAuditFilters,
 } from "@/lib/audit-filters";
 import { daysAgoIso, now } from "@/lib/clock";
+import {
+  ACCESS_TUR,
+  accessToAuditRow,
+  applyAccessFilters,
+  isAccessCode,
+  type AccessRow,
+  type AuditRow,
+} from "@/lib/access-control/audit";
+import { actionCodesMatching } from "@/lib/audit-filters";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -45,6 +54,7 @@ const riskChip: Record<Exclude<RiskLevel, "dusuk">, { label: string; cls: string
  * linklenir; bilinmeyen tip linksiz kalır (yanlış yere götürmekten iyidir).
  */
 const ENTITY_ROUTES: Record<string, string> = {
+  team_member: "/app/ekip",
   customer: "/app/musteriler",
   property: "/app/portfoyler",
   deal: "/app/anlasmalar",
@@ -72,7 +82,7 @@ export default async function AuditPage({
 }: {
   searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string; tur?: string; ara?: string }>;
 }) {
-  await requireModulePage("settings", "/app/denetim");
+  const { role } = await requireModulePage("settings", "/app/denetim");
   const params = (await searchParams) ?? {};
   const filters = normalizeAuditFilters(params);
   const { from: fromF, to: toF, aktor: aktorF, risk: riskF, tur: turF, ara: araF } = filters;
@@ -85,6 +95,22 @@ export default async function AuditPage({
   // Denetim kaydında sessiz kırpma özellikle sakıncalı: "kayıt yok"
   // ile "kayıt var ama listede değil" arasındaki fark, denetimin
   // anlamını belirliyor — `count: "exact"` gerçek toplamı verir.
+  // Yetki değişiklikleri (access_audit_log; yalnız owner/gm okur) aynı akışta tarihe göre birleşir:
+  // "yetki.*" kodlarıyla, yüksek risk olarak. İki kaynak paralel çekilir, birleşik sıradan sayfa dilimlenir.
+  const includeAudit = filters.tur !== ACCESS_TUR && !isAccessCode(filters.tur);
+  const accessCodes = filters.ara ? actionCodesMatching(filters.ara).filter(isAccessCode) : null;
+  // access_audit_log'u RLS gereği yalnız owner/gm okur; diğer roller için yetki satırları sessizce 0 görünmesin diye
+  // kaynak hiç sorgulanmaz ve birleşime katılmaz (sayılar yalnız okunabilen kayıtlardan gelir).
+  const canReadAccess = role === "owner" || role === "gm";
+  const includeAccess =
+    canReadAccess &&
+    filters.risk !== "orta" &&
+    (!filters.tur || filters.tur === ACCESS_TUR || isAccessCode(filters.tur)) &&
+    (accessCodes === null || accessCodes.length > 0);
+  // Birleşik sayfalama ödünleşimi: iki kaynak tek tarih sırasında kesilebilsin diye her biri 0..offset+PAGE_SIZE çekilir
+  // (yalnız id/özet sütunları; derin sayfada sorgu büyür). Yetki satırı hacmi düşüktür, audit_logs aralığı tarih/aktör
+  // süzgeciyle daraltılır.
+  const windowEnd = offset + PAGE_SIZE - 1;
   let logQuery = supabase
     .from("audit_logs")
     .select(
@@ -94,18 +120,38 @@ export default async function AuditPage({
     .order("created_at", { ascending: false });
   // Tarih, aktör, risk, işlem türü ve metin araması sunucu tarafında (Rapor merkezi aynı süzgeci kullanır).
   logQuery = applyAuditFilters(logQuery, filters);
-  const [{ data: logs, count: logTotal }, { count: highCount }, { count: last24Count }] = await batchAll("Denetim günlüğü", [], [
-    logQuery.range(offset, offset + PAGE_SIZE - 1),
+  const accessQuery = applyAccessFilters(
+    supabase
+      .from("access_audit_log")
+      .select("id, user_id, change_type, details, reason, created_by, created_at", { count: "exact" })
+      .order("created_at", { ascending: false }),
+    filters,
+    accessCodes ? accessCodes.map((c) => c.slice("yetki.".length)) : null,
+  );
+  const [auditRes, accessRes, { count: highCount }, { count: last24Count }, { count: accessAll }, { count: accessLast24 }] = await batchAll("Denetim günlüğü", [], [
+    // Birleşik sıralama için her kaynaktan 0..offset+PAGE_SIZE kayıt alınır; dilim birleşimden kesilir.
+    includeAudit ? logQuery.range(0, windowEnd) : Promise.resolve({ data: [] as AuditRow[], count: 0, error: null }),
+    includeAccess ? accessQuery.range(0, windowEnd) : Promise.resolve({ data: [] as AccessRow[], count: 0, error: null }),
     // KPI'lar gerçek sayım: sayfadaki 60 kayıt değil, tüm günlük.
     supabase.from("audit_logs").select("id", { count: "exact", head: true }).in("action", [...HIGH_RISK_ACTIONS]),
     supabase.from("audit_logs").select("id", { count: "exact", head: true }).gte("created_at", daysAgoIso(1)),
+    supabase.from("access_audit_log").select("id", { count: "exact", head: true }),
+    supabase.from("access_audit_log").select("id", { count: "exact", head: true }).gte("created_at", daysAgoIso(1)),
   ]);
+  const merged: AuditRow[] = [
+    ...((auditRes.data ?? []) as AuditRow[]),
+    ...((accessRes.data ?? []) as AccessRow[]).map(accessToAuditRow),
+  ].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+  const logs = merged.slice(offset, offset + PAGE_SIZE);
+  const logTotal = (auditRes.count ?? 0) + (accessRes.count ?? 0);
+  const highTotal = (highCount ?? 0) + (accessAll ?? 0);
+  const last24Total = (last24Count ?? 0) + (accessLast24 ?? 0);
 
-  const total = logTotal ?? 0;
+  const total = logTotal;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageParam, totalPages);
 
-  const rows = logs ?? [];
+  const rows = logs;
   // Seçili aktör sayfada geçmese bile adı çözülsün diye listeye eklenir.
   const actorIds = [...new Set([...rows.map((r) => r.actor_id), aktorF || null].filter(Boolean))] as string[];
   const actorNames = new Map<string, string>();
@@ -184,8 +230,8 @@ export default async function AuditPage({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },
-            { label: "Son 24 saat", value: last24Count ?? 0, icon: Activity, href: `/app/denetim?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
-            { label: "Yüksek riskli", value: highCount ?? 0, icon: ShieldAlert, href: "/app/denetim?risk=yuksek", tone: "text-danger-300" },
+            { label: "Son 24 saat", value: last24Total, icon: Activity, href: `/app/denetim?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
+            { label: "Yüksek riskli", value: highTotal, icon: ShieldAlert, href: "/app/denetim?risk=yuksek", tone: "text-danger-300" },
             { label: "Aktör", value: actorOptions.length, icon: Fingerprint, href: "#akis", tone: "text-cyan-400" },
           ].map((k) => (
             <a
@@ -261,6 +307,7 @@ export default async function AuditPage({
             className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           >
             <option value="">Tüm işlemler</option>
+            <option value={ACCESS_TUR}>Yetki değişiklikleri</option>
             {Object.entries(actionLabel)
               .sort((a, b) => a[1].localeCompare(b[1], "tr-TR"))
               .map(([code, label]) => (

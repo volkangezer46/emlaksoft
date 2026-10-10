@@ -16,13 +16,23 @@ import { summarizeAdvisorEarning } from "@/lib/team/advisor-share";
  * çekilmez). Pay hesabı Cüzdan ile aynı (`advisorShare`). Tahmin `buildPipelineForecast` ile, yalnız kendi anlaşmalarından;
  * son 12 ayda en az 10 kapanış yoksa sayı gösterilmez ("tahmin" etiketli, paylaşım öncesi BRÜT).
  */
-export async function Komisyonum({ userId, tenantId, officeWide }: { userId: string; tenantId: string | null; officeWide: boolean }) {
+export async function Komisyonum({
+  userId,
+  tenantId,
+  officeWide,
+  fullName,
+}: {
+  userId: string;
+  tenantId: string | null;
+  officeWide: boolean;
+  /** Profil adı (sayfa bir kez okur; kart ayrıca sorgulamaz) */
+  fullName: Promise<string | null>;
+}) {
   if (!tenantId) return null;
   const supabase = await createClient();
   const nowMs = now();
   const sinceIso = daysAgoIso(LOOKBACK_DAYS * 2);
-  const [{ data: profile }, commission, dealsRes, settings] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
+  const [commission, dealsRes, settings, name] = await Promise.all([
     fetchCommissionRows(supabase, { tenantId, viewerId: userId, seeAll: false, limit: 1000 }),
     // max_rows (1000) sınırı: sayfalı okuma; eksikse (error) tahmin gösterilmez.
     fetchAllRows<{ deal_type: string; stage: string; deal_value: number | string | null; created_at: string; updated_at: string }>((from, to) =>
@@ -37,11 +47,11 @@ export async function Komisyonum({ userId, tenantId, officeWide }: { userId: str
         .range(from, to),
     ),
     getSettings(["office.commission.default_rate"], { tenantId }),
+    fullName,
   ]);
   if (commission.error) return null;
-  const fullName = (profile?.full_name as string | undefined) ?? null;
-  const all = summarizeAdvisorEarning(commission.rows, fullName, userId);
-  const year = earningInRange(commission.rows, trYearPeriod(trParts(nowMs).year), fullName, userId);
+  const all = summarizeAdvisorEarning(commission.rows, name, userId);
+  const year = earningInRange(commission.rows, trYearPeriod(trParts(nowMs).year), name, userId);
   const ratePct = Number(settings["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
   const forecast = dealsRes.error
     ? null

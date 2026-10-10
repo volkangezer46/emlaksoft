@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { afterSafe } from "@/lib/after-safe";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -121,31 +122,33 @@ export async function createDemand(
   });
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  try {
-    await dispatchAutomationEvent(gate.tenantId, "new_demand", {
-      entityType: "demand",
-      entityId: data.id,
-      customerId,
-      assignedTo: gate.userId,
-      fields: { transaction_type: transactionType, property_type: propertyType || null },
-    });
-  } catch (e) {
-    console.error("automation new_demand", e);
-  }
+  afterSafe(() =>
+    Promise.resolve()
+      .then(() => dispatchAutomationEvent(gate.tenantId, "new_demand", {
+    entityType: "demand",
+    entityId: data.id,
+    customerId,
+    assignedTo: gate.userId,
+    fields: { transaction_type: transactionType, property_type: propertyType || null },
+    }))
+      .catch((e) => console.error("automation new_demand", e)),
+  );
 
   // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  await triggerPlaybooks({
-    tenantId: gate.tenantId,
-    event: "talep_olusturuldu",
-    actorId: gate.userId,
-    entity: {
-      type: "demand",
-      id: data.id,
-      ownerId: gate.userId,
-      customerId,
-      fields: { transaction_type: transactionType, property_type: propertyType || null },
-    },
-  });
+  afterSafe(() =>
+    triggerPlaybooks({
+      tenantId: gate.tenantId,
+      event: "talep_olusturuldu",
+      actorId: gate.userId,
+      entity: {
+        type: "demand",
+        id: data.id,
+        ownerId: gate.userId,
+        customerId,
+        fields: { transaction_type: transactionType, property_type: propertyType || null },
+      },
+    }),
+  );
 
   revalidateDemandPaths(gate.tenantId, customerId);
   return { ok: true, id: data.id };

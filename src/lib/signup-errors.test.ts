@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
-import { SIGNUP_EMAIL_EXISTS_MESSAGE, SIGNUP_FIELD_STEP, signupErrorTarget, signupFieldInputId, signupPhoneClientError } from "./signup-errors";
+import { SIGNUP_FIELD_STEP, signupErrorTarget, signupFieldInputId, signupPhoneClientError } from "./signup-errors";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
@@ -68,9 +68,11 @@ describe("kayıt sözleşmesi: sunucu alan hatası döner, form sıfırlanmaz", 
     expect(fn).toMatch(/PHONE_ERROR_MESSAGE, field: "phone"/);
     expect(fn).toMatch(/TR_MOBILE_ERROR_MESSAGE, field: "phone"/);
     expect(fn).toMatch(/EMAIL_ERROR_MESSAGE, field: "email"/);
-    expect(fn).toMatch(/zaten kayıtlı\.", field: "email"/);
-    // Formdaki "giriş yap / şifremi unuttum" bağlantısı bu metne bağlıdır.
-    expect(SIGNUP_EMAIL_EXISTS_MESSAGE).toBe("Bu e-posta zaten kayıtlı.");
+    // Hesap sayımı (enumeration) kapalı: kayıtlı e-posta için özel mesaj/alan YOK (konsey #54); createUser hataları genel metin.
+    expect(fn).not.toMatch(/zaten kayıtlı/);
+    expect(fn).toMatch(/error: SIGNUP_GENERIC_ERROR/);
+    // Ölü dal temizliği: istemci artık "zaten kayıtlı" metnine bağlanmaz.
+    expect(read("src/app/kayit/register-form.tsx")).not.toContain("SIGNUP_EMAIL_EXISTS_MESSAGE");
   });
   it("form action'ı otomatik sıfırlamasız gönderilir ve eski metin-tarama eşlemesi yok", () => {
     const form = read("src/app/kayit/register-form.tsx");

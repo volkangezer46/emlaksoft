@@ -2,6 +2,7 @@
 
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
+import { afterSafe } from "@/lib/after-safe";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -113,14 +114,14 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   }
   await writeCustomFieldInputs(supabase, { tenantId: gate.tenantId, userId: gate.userId, recordId: deal.id }, customFields.value);
 
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.create",
     entityType: "deal",
     entityId: deal.id,
     newValue: { stage, deal_type: dealType },
-  });
+  }));
 
   // EİDS yumuşak uyarısı: işlemi engellemez; ofise TEK KEZ bildirim düşer (portföy sayfasına gider).
   if (shieldNotes.length > 0 && propertyId) {
@@ -147,10 +148,25 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   return { ok: true, dealId: deal.id };
 }
 
+type StageGate = Extract<Awaited<ReturnType<typeof requirePermission>>, { ok: true }>;
+type StageInnerResult = DealResult & { propertyId?: string | null };
+
 export async function updateDealStage(formData: FormData): Promise<DealResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  const res = await updateDealStageWithGate(gate, formData, { revalidate: true });
+  return res.error ? { error: res.error } : { ok: true, dealId: res.dealId };
+}
 
+/**
+ * Kapısız iç gövde: çağıran requirePermission("commissions","edit") yapmış olmalıdır.
+ * Toplu işlem kapıyı bir kez alıp bunu çağırır; revalidate döngü sonunda tek sefer yapılır.
+ */
+async function updateDealStageWithGate(
+  gate: StageGate,
+  formData: FormData,
+  opts: { revalidate: boolean },
+): Promise<StageInnerResult> {
   const id = String(formData.get("deal_id") ?? "").trim();
   const stageRaw = String(formData.get("stage") ?? "").trim();
   if (!id || !(DEAL_STAGES as readonly string[]).includes(stageRaw)) {
@@ -240,8 +256,9 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
   if (outcome === "applied" && stage === "lost" && previousStage !== "lost") {
-    try {
-      await dispatchAutomationEvent(gate.tenantId, "deal_lost", {
+    afterSafe(() =>
+      Promise.resolve()
+        .then(() => dispatchAutomationEvent(gate.tenantId, "deal_lost", {
         entityType: "deal",
         entityId: id,
         dealId: id,
@@ -249,10 +266,9 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
         propertyId,
         assignedTo: gate.userId,
         fields: { loss_reason: lossReason, deal_type: dealType, deal_value: dealValue },
-      });
-    } catch (e) {
-      console.error("automation deal_lost", e);
-    }
+      }))
+        .catch((e) => console.error("automation deal_lost", e)),
+      );
   }
 
   if (outcome === "applied" && stage === "won" && previousStage !== "won") {
@@ -280,8 +296,9 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
     }
 
     // Otomasyon tetikle — hata ana işlemi asla bozmasın
-    try {
-      await dispatchAutomationEvent(gate.tenantId, "deal_won", {
+    afterSafe(() =>
+      Promise.resolve()
+        .then(() => dispatchAutomationEvent(gate.tenantId, "deal_won", {
         entityType: "deal",
         entityId: id,
         dealId: id,
@@ -289,13 +306,12 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
         propertyId,
         assignedTo: gate.userId,
         fields: { deal_type: dealType, deal_value: dealValue },
-      });
-    } catch (e) {
-      console.error("automation deal_won", e);
-    }
+      }))
+        .catch((e) => console.error("automation deal_won", e)),
+      );
 
     // İş akışı (playbook) tetikle — kapanış sonrası görev paketi
-    await triggerPlaybooks({
+    afterSafe(() => triggerPlaybooks({
       tenantId: gate.tenantId,
       event: "anlasma_kazanildi",
       actorId: gate.userId,
@@ -308,17 +324,19 @@ export async function updateDealStage(formData: FormData): Promise<DealResult> {
         propertyId,
         fields: { deal_type: dealType },
       },
-    });
+    }));
   }
 
-  revalidatePath("/app/anlasmalar");
-  revalidatePath("/app/komisyon");
-  revalidatePath("/app/portfoyler");
-  if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
-  revalidatePath("/app");
-  revalidateTenantData(gate.tenantId);
+  if (opts.revalidate) {
+    revalidatePath("/app/anlasmalar");
+    revalidatePath("/app/komisyon");
+    revalidatePath("/app/portfoyler");
+    if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
+    revalidatePath("/app");
+    revalidateTenantData(gate.tenantId);
+  }
   emitWebhook("deal.updated", "deal", id);
-  return { ok: true, dealId: id };
+  return { ok: true, dealId: id, propertyId };
 }
 
 export async function updateDeal(formData: FormData): Promise<DealResult> {
@@ -380,14 +398,14 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   }
   if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.update",
     entityType: "deal",
     entityId: id,
     newValue: patch,
-  });
+  }));
 
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");
@@ -458,7 +476,7 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
   }
   if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.update_links",
@@ -466,7 +484,7 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
     entityId: id,
     oldValue: { property_id: current.property_id, customer_id: current.customer_id },
     newValue: patch,
-  });
+  }));
 
   revalidatePath("/app/anlasmalar");
   revalidatePath(`/app/anlasmalar/${id}`);
@@ -538,14 +556,14 @@ export async function addDealCost(_prev: DealResult, fd: FormData): Promise<Deal
 
   // Kapora anlaşmanın kilit anıdır — zaman çizgisine/aktiviteye düşsün
   if (kind === "kapora") {
-    await logActivity({
+    afterSafe(() => logActivity({
       tenantId: gate.tenantId,
       actorId: gate.userId,
       action: "deal.kapora",
       entityType: "deal",
       entityId: dealId,
       newValue: { amount, label },
-    });
+    }));
   }
 
   revalidatePath(`/app/anlasmalar/${dealId}`);
@@ -700,6 +718,8 @@ function cleanIds(ids: unknown): string[] {
  * atomik RPC, otomasyon ve webhook aynı kalır; kısayol yok). Kazanılmış anlaşma geri açılmaz
  * (komisyon kapısı tekil ekranda).
  */
+const BULK_STAGE_CONCURRENCY = 6;
+
 export async function bulkUpdateDealStage(ids: string[], stage: string): Promise<BulkDealResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -710,25 +730,46 @@ export async function bulkUpdateDealStage(ids: string[], stage: string): Promise
   if (list.length === 0) return { error: "Anlaşma seçin." };
   let updated = 0;
   let failed = 0;
-  let firstError: string | undefined;
-  for (const id of list) {
-    const fd = new FormData();
-    fd.set("deal_id", id);
-    fd.set("stage", stage);
-    const res = await updateDealStage(fd);
-    if (res.ok) updated += 1;
-    else {
-      failed += 1;
-      firstError ??= res.error;
+  const errorsByIndex = new Map<number, string>();
+  const touchedProperties = new Set<string>();
+  // Kapı bir kez alındı; kayıtlar 6'lı sınırlı eşzamanlılıkla işlenir (kayıp nedeni bu aşamalarda gerekmez).
+  // Kimlikler cleanIds ile tekilleştirilmiştir (aynı anlaşma iki işçiye düşmez). İlk hata, işçi sırasına değil
+  // liste sırasına göre seçilir (belirlenimli).
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < list.length) {
+      const index = cursor++;
+      const id = list[index];
+      const fd = new FormData();
+      fd.set("deal_id", id);
+      fd.set("stage", stage);
+      const res = await updateDealStageWithGate(gate, fd, { revalidate: false });
+      if (res.ok) {
+        updated += 1;
+        if (res.propertyId) touchedProperties.add(res.propertyId);
+      } else {
+        failed += 1;
+        if (res.error) errorsByIndex.set(index, res.error);
+      }
     }
+  };
+  await Promise.all(Array.from({ length: Math.min(BULK_STAGE_CONCURRENCY, list.length) }, worker));
+  const firstError = errorsByIndex.size > 0 ? errorsByIndex.get(Math.min(...errorsByIndex.keys())) : undefined;
+  if (updated > 0) {
+    revalidatePath("/app/anlasmalar");
+    revalidatePath("/app/komisyon");
+    revalidatePath("/app/portfoyler");
+    for (const pid of touchedProperties) revalidatePath(`/app/portfoyler/${pid}`);
+    revalidatePath("/app");
+    revalidateTenantData(gate.tenantId);
   }
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.bulk_stage",
     entityType: "deal",
     newValue: { stage, count: list.length, updated, failed },
-  });
+  }));
   return { updated, failed, firstError };
 }
 
@@ -760,13 +801,13 @@ export async function bulkAssignDeals(ids: string[], assignedTo: string): Promis
     return { error: actionErrorMessage(error, "Atama yapılamadı.") };
   }
   const changed = (data ?? []).map((r) => r.id as string);
-  await logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.bulk_assign",
     entityType: "deal",
     newValue: { assigned_to: profileId, count: changed.length },
-  });
+  }));
   for (const id of changed) emitWebhook("deal.updated", "deal", id);
   revalidatePath("/app/anlasmalar");
   revalidatePath("/app/komisyon");

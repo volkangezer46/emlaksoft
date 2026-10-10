@@ -198,6 +198,8 @@ const F = {
   dbPerfRlsInitplanKpi: "20261009000400_db_perf_rls_initplan_kpi.sql",
   // Ilan kontrol gunluk eklenti taramasi (2026-10-10): tam liste kaniti (expected/read) + aday detayi + lc_inventory_import 12 saat kurali.
   lcDailySync: "20261010000500_listing_control_daily_sync.sql",
+  // Konsey #53 (2026-10-11): danisman csv/paste kaynagi assisted, acik kacak sinyali present ile kapanmaz, tam liste kaniti her kaynakta.
+  lcInventorySourceHardening: "20261011000700_lc_inventory_import_source_hardening.sql",
   // Hiz turu 2 (2026-10-10): kabuk RPC kisisel gizli modulleri tasir (bir sunucu turu az) + arama icin pg_trgm GIN indeksleri.
   appShellHiddenModules: "20261010000100_app_shell_hidden_modules.sql",
   searchTrgmIndexes: "20261010000200_search_trgm_indexes.sql",
@@ -386,6 +388,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.securityCalendarTokenAuditLogs]: "davranis", // B2-B5: calendar_token ayri tabloya (profiles sutunu kalkar), audit_logs/error_logs okuma sinirlari, public tablolarda TRUNCATE/TRIGGER/REFERENCES geri alinir
     [F.dbPerfRlsInitplanKpi]: "davranis", // 57 RLS politikasinin ifade metni (select fn()) ile sarilir (anlam ayni, sorgu basina tek cagri) + 11 kopya indeks duser + yeni invoker KPI RPC; veri/sutun degismez
     [F.lcDailySync]: "davranis", // lc_inventory_import govdesi degisir (eklenti tam liste kaniti + "ilan kalkti" icin 12 saat araligi) + 3 nullable/default kolon; yeni tablo ve anomali turu yok
+    [F.lcInventorySourceHardening]: "siki", // lc_inventory_import govdesi: scope=mine csv/paste assisted sayilir, acik kayip sinyali present ile kapanmaz (yonetici onayi), tam liste kaniti her kaynakta; imza/ACL ayni
     [F.expenseTrendMonthAxis]: "davranis", // trend etiketleri ve ay toplamlari dogru aya yazilir
     [F.grantsDealStepsListingAnalyses]: "davranis", // RLS politikalariyla uyumlu tablo yetkileri; anon yetkisi kaldirilir
     [F.fixRegexRepetitionLimit]: "davranis", // kampanya kuyrugu ve WhatsApp sablonlu kayitlar yeniden calisir (anlam ayni)
@@ -542,6 +545,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "SEC-rol-duman-2026-10", order: 29.999989, title: "Rol duman testi guvenlik duzeltmeleri: takvim token tablosu, audit_logs/error_logs okuma siniri, gereksiz tablo yetkileri (sira serbest)", files: [F.securityCalendarTokenAuditLogs] },
     { id: "PB59-db-hiz-rls-initplan", order: 29.999986, title: "DB hiz turu: RLS initplan sarmasi + kopya indeks temizligi + kiralama KPI RPC (sira serbest)", files: [F.dbPerfRlsInitplanKpi] },
     { id: "PB60-ilan-kontrol-gunluk-tarama", order: 29.9999875, title: "Ilan kontrol gunluk eklenti taramasi: tam liste kaniti + aday detayi + lc_inventory_import (000210 sonrasi)", files: [F.lcDailySync] },
+    { id: "PB62-ilan-kontrol-kaynak-sertlestirme", order: 29.9999876, title: "Ilan kontrol envanter kaynak sertlestirme: danisman csv/paste assisted + acik kayip sinyali yonetici onayi (000500 sonrasi)", files: [F.lcInventorySourceHardening] },
     { id: "PB58-gider-trend-ay-ekseni", order: 29.999985, title: "Giderler aylik trend ay ekseni tarih (UTC kaymasi duzeltmesi; sira serbest)", files: [F.expenseTrendMonthAxis] },
     { id: "PB56-regex-tekrar-siniri", order: 29.99995, title: "Gecersiz {1,512} regex duzeltmesi (kampanya claim/onay/olusturma + 2 kisit; sira serbest)", files: [F.fixRegexRepetitionLimit] },
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },
@@ -700,6 +704,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.lcInventoryMatching, F.lcAnomalyRpcs],
     [F.lcInventoryMatching, F.lcQueueRpcs],
     [F.lcDailySync, F.lcInventoryMatching],
+    [F.lcInventorySourceHardening, F.lcDailySync],
     [F.lcDistrictSlaReset, F.lcControlState],
     [F.lcDistrictSlaReset, F.lcAnomalyTables],
     // PB49: anket genisletmesi anket modulu tablolarina ve survey_is_manager'a dayanir.
