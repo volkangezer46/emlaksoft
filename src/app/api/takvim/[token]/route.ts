@@ -8,8 +8,8 @@ import { getBaseUrl } from "@/lib/base-url";
  *
  * Token'ı bilen takvim uygulaması (Google/Apple/Outlook) kullanıcının
  * randevularını `text/calendar` olarak çeker; uygulama düzenli aralıklarla
- * yeniden isteyip takvimi güncel tutar (abonelik). Auth YOK — profiles
- * tablosundaki `calendar_token` yeterli (randevu-teyit confirm_token deseni):
+ * yeniden isteyip takvimi güncel tutar (abonelik). Auth YOK — `user_calendar_tokens`
+ * tablosundaki token yeterli (randevu-teyit confirm_token deseni):
  * RLS anon'a açılmaz, sorgular service role ile yapılır.
  *
  * Kapsam: token sahibinin (assigned_to) iptal edilmemiş randevuları,
@@ -34,6 +34,8 @@ function icsDate(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
+type OwnerRel = { id?: string; full_name?: string | null; is_active?: boolean; tenant_id?: string | null };
+
 type Rel = { full_name?: string; title?: string; property_code?: string; address_line?: string } | null;
 
 function rel<T>(value: T | T[] | null): T | null {
@@ -57,15 +59,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   }
 
   const admin = createAdminClient();
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("id, tenant_id, full_name")
-    .eq("calendar_token", token)
+  // Token ayrı tabloda (user_calendar_tokens); sahibi aktif kullanıcı ve ofis askıda/iptal değilse akış açılır.
+  const { data: row } = await admin
+    .from("user_calendar_tokens")
+    .select(
+      "user_id, tenant_id, profile:profiles!user_calendar_tokens_user_id_fkey(id, full_name, is_active, tenant_id), tenant:tenants!user_calendar_tokens_tenant_id_fkey(status)",
+    )
+    .eq("token", token)
     .maybeSingle();
 
-  if (!profile) {
+  const owner = rel(row?.profile as OwnerRel | OwnerRel[] | null | undefined);
+  const tenant = rel(row?.tenant as { status?: string } | { status?: string }[] | null | undefined);
+  if (
+    !row ||
+    !owner ||
+    owner.is_active !== true ||
+    owner.tenant_id !== row.tenant_id ||
+    !tenant ||
+    tenant.status === "suspended" ||
+    tenant.status === "cancelled"
+  ) {
     return new Response("Not found", { status: 404 });
   }
+  const profile = { id: row.user_id as string, tenant_id: row.tenant_id as string, full_name: owner.full_name ?? null };
 
   const nowMs = Date.now();
   const windowStart = new Date(nowMs - 7 * 86_400_000).toISOString();
