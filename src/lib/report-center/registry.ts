@@ -28,7 +28,7 @@ export const PLATFORM_CATEGORIES: readonly ReportCategory[] = [
   { id: "platform", label: "Ofisler ve kullanıcılar", description: "Ofis, üye ve denetim kayıtları" },
   { id: "gelir", label: "Gelir ve abonelik", description: "Abonelik, fatura, tahsilat, kupon ve kredi hareketleri" },
   { id: "satis", label: "Satış ve büyüme", description: "Demo talepleri ve kayıt kaynakları" },
-  { id: "destek", label: "Destek", description: "Destek talepleri ve SLA" },
+  { id: "destek", label: "Destek", description: "Destek talepleri ve gecikmeler" },
 ];
 
 export const TENANT_REPORT_LIST: readonly ReportDef[] = [...CRM_REPORTS, ...SALES_REPORTS, ...FINANCE_REPORTS, ...TEAM_REPORTS, ...ANALYSIS_REPORTS];

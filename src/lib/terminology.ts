@@ -63,6 +63,45 @@ export const TERMS = {
     definition: "Ofisin başka ofisleri davet edip hesap kredisi kazandığı program (/app/buyume). Eski adlar kullanıcıya görünmez.",
     forbidden: [/arkadaşını getir/i, /tavsiye ödül/i],
   },
+  satisHatti: {
+    canonical: "Satış hattı",
+    definition: "Anlaşmaların aşama aşama ilerleyişi (eski adı 'pipeline'); basit kullanıcıya İngilizce terim gösterilmez.",
+    forbidden: [/\bpipeline\b(?!-)/i],
+  },
+  gecikme: {
+    canonical: "Gecikme",
+    definition: "Bir işin söz verilen sürede yapılmaması (eski adı 'SLA'). Süre ayarı 'yanıt süresi' diye anılır.",
+    forbidden: [/\bSLA\b/],
+  },
+  karsilastir: {
+    canonical: "Karşılaştır",
+    definition: "İki dönemi ya da kişiyi yan yana koymak (eski adı 'Kıyas').",
+    forbidden: [/\bKıyas\b/],
+  },
+  erkenIsaretler: {
+    canonical: "Erken işaretler",
+    definition: "Sonuçtan önce görünen davranış göstergeleri (eski adı 'öncül göstergeler').",
+    forbidden: [/öncül gösterge/i],
+  },
+  gelisimOnerileri: {
+    canonical: "Gelişim önerileri",
+    definition: "Danışmana verilen somut gelişim adımları (eski adı 'koçluk').",
+    forbidden: [/\bkoçluk\b/i],
+  },
+  yanitHizi: {
+    canonical: "Yanıt hızı",
+    definition: "Yeni gelen talebe ilk dönüşün ne kadar sürdüğü (eski adı 'aday hızı').",
+    forbidden: [/aday hızı/i],
+  },
+  akilliEslestirme: {
+    canonical: "Akıllı eşleştirme",
+    definition: "Talebe uygun portföyleri bulan eşleştirme (eski adı 'eşleştirme motoru').",
+    forbidden: [/eşleştirme motoru/i],
+  },
+  yetkiBelgesi: {
+    canonical: "Yetki belgesi",
+    definition: "Gayrimenkul satış yetki belgesi numarası (EİDS kısaltması yalnız 'Yetki belgesi' açıklamasıyla birlikte yazılır).",
+  },
 } as const satisfies Record<string, Term>;
 
 /**

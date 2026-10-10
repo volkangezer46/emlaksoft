@@ -448,7 +448,7 @@ export async function saveSLADefinition(input: unknown): Promise<OfficeCenterRes
   if (!gate.ok) return { error: gate.error };
   const parsed = slaDefinitionSchema.safeParse(input);
   if (!parsed.success) return { error: firstIssue(parsed.error) };
-  return writeMany(gate, toWrites(SLA_KEYS, parsed.data), "Ofis Merkezi > Tanımlamalar > SLA");
+  return writeMany(gate, toWrites(SLA_KEYS, parsed.data), "Ofis Merkezi > Tanımlamalar > Yanıt süreleri");
 }
 
 export async function saveCommissionDefinition(input: unknown): Promise<OfficeCenterResult> {

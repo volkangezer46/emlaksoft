@@ -368,7 +368,7 @@ export const ilanAnomalileri = defineReport({
     { key: "danisman", label: "Danışman", type: "text", width: 20, get: (r, c) => nameOf(c, r.advisor_id) },
     { key: "ilk", label: "İlk görülme", type: "datetime", get: (r) => r.first_seen_at },
     { key: "son", label: "Son görülme", type: "datetime", get: (r) => r.last_seen_at },
-    { key: "sla", label: "SLA bitişi", type: "datetime", get: (r) => r.sla_due_at },
+    { key: "sla", label: "Süre bitişi", type: "datetime", get: (r) => r.sla_due_at },
     { key: "cozum", label: "Çözüm tarihi", type: "datetime", get: (r) => r.resolved_at },
     { key: "aciklama", label: "Açıklama", type: "text", width: 30, get: (r) => r.explained_note },
   ],

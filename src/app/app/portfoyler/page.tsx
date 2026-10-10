@@ -629,7 +629,7 @@ export default async function PropertiesPage({
     { key: "ilce", label: "İlçe", format: () => "seçili" },
     { key: "mahalle", label: "Mahalle", format: () => "seçili" },
     { key: "foto", label: "Fotoğraf", format: () => "eksik" },
-    { key: "yetki", label: "EİDS / yetki", format: (v) => (isEidsFilter(v) ? EIDS_FILTER_LABELS[v] : v) },
+    { key: "yetki", label: "Yetki belgesi (EİDS)", format: (v) => (isEidsFilter(v) ? EIDS_FILTER_LABELS[v] : v) },
   ]);
   const anyFilter = chips.length > 0;
 
@@ -670,7 +670,7 @@ export default async function PropertiesPage({
           variant={eidsFilter === "eids_eksik" ? "secondary" : "ghost"}
           size="sm"
         >
-          EİDS no eksik{eidsFilter === "eids_eksik" && eidsLoad?.enabled ? ` (${eidsTotal})` : ""}
+          Yetki belgesi no eksik (EİDS){eidsFilter === "eids_eksik" && eidsLoad?.enabled ? ` (${eidsTotal})` : ""}
         </ButtonLink>
         <ButtonLink href="/app/mahalle-notlari" variant="ghost" size="sm">Mahalle notları</ButtonLink>
       </div>

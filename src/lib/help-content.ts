@@ -178,7 +178,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   },
   {
     slug: "pipeline",
-    term: "Satış aşamaları (Pipeline)",
+    term: "Satış aşamaları (satış hattı)",
     short:
       "Bir anlaşmanın yolu: Yeni, Nitelikli, Müzakere, sonunda Kazanıldı veya Kaybedildi (adlarını Tanımlar'dan değiştirebilirsiniz). Anlaşmalar sayfasında kartları aşamadan aşamaya taşırsınız.",
     href: "/app/anlasmalar",

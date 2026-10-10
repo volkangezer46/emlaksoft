@@ -15,7 +15,7 @@ export const maxDuration = 300;
  * auto modda eşiği geçen ilanı atar, SLA'sı geçeni uyarır. Havuz tabloları yoksa (migration uygulanmamış) sessizce 0 işler.
  *
  * EK ADIM (ilan kontrol, yeni cron YOK): atanmış portföylerin değerlendirme taraması (yayınlanmayan portföy 24/48 saat,
- * yetki bitişi, portal kaybı anomalileri), anomali SLA yükseltmesi (danışman → takım lideri → şube müdürü → ofis sahibi),
+ * yetki bitişi, portal kaybı anomalileri), anomali gecikme yükseltmesi (danışman → takım lideri → şube müdürü → ofis sahibi),
  * kontrol işi hasat/planlama. En iyi çaba: bu adımın hatası havuz süpürmesinin sonucunu etkilemez.
  *
  * EK ADIM 2 (talep dağıtımı, yeni cron YOK): "mesai başında dağıt" açık ofislerde bekleyen talepleri atar; "SLA aşımında
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     await recordHeartbeat(
       "havuz-atama",
       control.ok ? "ok" : "error",
-      `${summary.examined} kayıt, ${summary.autoAssigned} otomatik, ${summary.fallbackAssigned} yedek, ${summary.escalated} yükseltme, ${summary.slaBreached} SLA · ${control.text} · ${leadText}`,
+      `${summary.examined} kayıt, ${summary.autoAssigned} otomatik, ${summary.fallbackAssigned} yedek, ${summary.escalated} yükseltme, ${summary.slaBreached} gecikme · ${control.text} · ${leadText}`,
     );
     return NextResponse.json({ ok: true, ...summary, control: control.text, lead: leadText });
   } catch (err) {

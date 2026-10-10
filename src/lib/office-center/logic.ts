@@ -118,7 +118,7 @@ export function computeTeamHealth(input: {
     alerts.push({ text: `${input.stats.unassignedProperties} ilan danışmansız (eşik ${input.unassignedThreshold})`, href: assignHref() });
   }
   if (input.breachedUnassigned > 0) {
-    alerts.push({ text: `${input.breachedUnassigned} ilan atama SLA'sını aştı`, href: assignHref("gecikmis") });
+    alerts.push({ text: `${input.breachedUnassigned} ilan atama süre sınırını aştı`, href: assignHref("gecikmis") });
   }
   if (input.advisorsWithoutActivity30d > 0) {
     alerts.push({ text: `${input.advisorsWithoutActivity30d} aktif danışmanın 30 gündür aktivitesi yok`, href: tabHref("danismanlar", { sirala: "aktivite", yon: "asc", durum: "aktif" }) });

@@ -164,7 +164,7 @@ export function buildCoachActions(s: CoachInput): CoachAction[] {
         priority: 7,
         kind: "improve",
         title: "Bu ay hiç anlaşma kapanmadı",
-        detail: `Ekip ortalaması ${s.teamAvgDeals.toFixed(1)}. Pipeline'da müzakere aşamasındaki anlaşmalara odaklanın.`,
+        detail: `Ekip ortalaması ${s.teamAvgDeals.toFixed(1)}. Satış hattında müzakere aşamasındaki anlaşmalara odaklanın.`,
       });
     } else if (s.dealCount > s.teamAvgDeals * 1.3) {
       out.push({

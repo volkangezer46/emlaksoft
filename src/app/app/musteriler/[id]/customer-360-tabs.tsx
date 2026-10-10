@@ -71,21 +71,17 @@ function dateTime(iso: string) {
  * Sekme kimlikleri (URL: ?sekme=). Eski `?tab=` linkleri de çalışır:
  * Eski kimlikler (ozet/aktivite/gecmis/gorevler/dosyalar) takma adla yeni sekmelere gider.
  */
-export const CUSTOMER_TAB_IDS = [
-  "zaman",
-  "talepler",
-  "anlasmalar",
-  "randevu",
-  "belgeler",
-  "izinler",
-  "iletisim",
-  "notlar",
-] as const;
+export const CUSTOMER_TAB_IDS = ["ozet", "talepler", "gecmis", "belgeler"] as const;
+/** 8 sekme 4'e indi: anlaşma/teklif, randevu/görev, notlar ve iletişim tercihleri "Özet" içinde bölüm; zaman çizelgesi + iletişim kayıtları "Geçmiş". */
 export const CUSTOMER_TAB_ALIASES: Record<string, string> = {
-  aktivite: "zaman",
-  ozet: "zaman",
-  gecmis: "zaman",
-  gorevler: "randevu",
+  aktivite: "gecmis",
+  zaman: "gecmis",
+  iletisim: "gecmis",
+  anlasmalar: "ozet",
+  randevu: "ozet",
+  gorevler: "ozet",
+  izinler: "ozet",
+  notlar: "ozet",
   dosyalar: "belgeler",
 };
 
@@ -215,27 +211,23 @@ export function Customer360Tabs({
   };
 
   const tabDefs: DetailTabDef[] = [
-    { id: "zaman", label: "Zaman çizelgesi", icon: History },
+    { id: "ozet", label: "Özet", icon: Sparkles },
     { id: "talepler", label: "Talepler ve eşleşmeler", icon: Target, count: counts.demands },
-    { id: "anlasmalar", label: "Teklifler ve anlaşmalar", icon: Handshake, count: counts.deals + counts.offers },
-    { id: "randevu", label: "Randevu ve görevler", icon: CalendarDays, count: counts.appts + (showTasks ? counts.tasks ?? 0 : 0) },
-    { id: "belgeler", label: "Belgeler ve imza", icon: Folder, count: counts.files + counts.contracts },
-    { id: "izinler", label: "İletişim tercihleri", icon: ShieldCheck, count: counts.consents },
-    { id: "iletisim", label: "İletişim kayıtları", icon: MessageSquare, count: counts.comms },
-    { id: "notlar", label: "Notlar", icon: Sparkles },
+    { id: "gecmis", label: "Geçmiş", icon: History, count: counts.comms },
+    { id: "belgeler", label: "Belgeler", icon: Folder, count: counts.files + counts.contracts },
   ];
 
   return (
     <div className="space-y-4">
       <DetailTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
 
-      <Pane id="zaman" active={active}>
+      <Pane id="gecmis" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <ActivityTimeline
             events={events}
             categories={timelineCategories}
             activeCategory={activeCategory}
-            hrefForCategory={(k) => `/app/musteriler/${customerId}?sekme=zaman${k ? `&kategori=${k}` : ""}`}
+            hrefForCategory={(k) => `/app/musteriler/${customerId}?sekme=gecmis${k ? `&kategori=${k}` : ""}`}
             pageSize={timelineLimit}
             loadMoreHref={timelineLoadMoreHref}
             emptyTitle={activeCategory ? "Bu kategoride kayıt yok." : "Bu müşteri için henüz olay kaydı yok."}
@@ -287,14 +279,14 @@ export function Customer360Tabs({
         {ozetSlot}
       </Pane>
 
-      <Pane id="anlasmalar" active={active}>
+      <Pane id="ozet" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Handshake className="h-4 w-4 text-amber-500" /> Anlaşmalar
             </h2>
             <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600 hover:underline">
-              Pipeline →
+              Satış hattı →
             </Link>
           </div>
           {deals.length === 0 ? (
@@ -353,7 +345,7 @@ export function Customer360Tabs({
         </section>
       </Pane>
 
-      <Pane id="iletisim" active={active}>
+      <Pane id="gecmis" active={active}>
         <CommunicationTimeline
           customerId={customerId}
           initialItems={communications}
@@ -394,7 +386,76 @@ export function Customer360Tabs({
         <CustomerFilesTab customerId={customerId} files={files ?? []} />
       </Pane>
 
-      <Pane id="izinler" active={active}>
+
+      <Pane id="ozet" active={active}>
+        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <CalendarDays className="h-4 w-4 text-mint-600" /> Randevular
+            </h2>
+            <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink>
+          </div>
+          {appts.length === 0 ? (
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={{ href: `/app/randevular/yeni?customer=${customerId}`, label: "Randevu ver" }} />
+          ) : (
+            <div className="mt-4 space-y-2">
+              {appts.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/app/randevular?customer=${customerId}`}
+                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-ink-950">
+                      {APPT_TYPE_LABEL[a.appointment_type] ?? "Randevu"} · {APPT_STATUS_LABEL[a.status] ?? a.status}
+                    </p>
+                    <p className="truncate text-xs text-text-muted">{dateTime(a.scheduled_at)}{a.location ? ` · ${a.location}` : ""}</p>
+                  </div>
+                  <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+        {tasksSlot}
+      </Pane>
+
+      <Pane id="ozet" active={active}>
+        <div className="space-y-4">
+          {tags.length > 0 ? (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <Tag className="h-4 w-4 text-cyan-500" /> Etiketler
+              </h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {tags.map((t) => (
+                  <span key={t} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-medium text-text-muted">{t}</span>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+              <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
+            </h2>
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes || "Not eklenmedi."}</p>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint">
+              <span>
+                Kaynak: {formatLeadSource(source) ?? "belirtilmedi"}
+                {sourceDetail ? (
+                  <span className="ml-1 rounded-full bg-brand-600/10 px-1.5 py-0.5 font-semibold text-brand-700">
+                    {sourceDetail}
+                  </span>
+                ) : null}
+              </span>
+              <span>·</span>
+              <span>Kayıt: {dateTime(createdAt)}</span>
+            </div>
+          </section>
+        </div>
+      </Pane>
+
+      <Pane id="ozet" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
@@ -431,74 +492,6 @@ export function Customer360Tabs({
           )}
         </section>
         {preferencesSlot}
-      </Pane>
-
-      <Pane id="randevu" active={active}>
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <CalendarDays className="h-4 w-4 text-mint-600" /> Randevular
-            </h2>
-            <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink>
-          </div>
-          {appts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={{ href: `/app/randevular/yeni?customer=${customerId}`, label: "Randevu ver" }} />
-          ) : (
-            <div className="mt-4 space-y-2">
-              {appts.map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/app/randevular?customer=${customerId}`}
-                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink-950">
-                      {APPT_TYPE_LABEL[a.appointment_type] ?? "Randevu"} · {APPT_STATUS_LABEL[a.status] ?? a.status}
-                    </p>
-                    <p className="truncate text-xs text-text-muted">{dateTime(a.scheduled_at)}{a.location ? ` · ${a.location}` : ""}</p>
-                  </div>
-                  <ArrowUpRight className="hover-action h-4 w-4 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-        {tasksSlot}
-      </Pane>
-
-      <Pane id="notlar" active={active}>
-        <div className="space-y-4">
-          {tags.length > 0 ? (
-            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-                <Tag className="h-4 w-4 text-cyan-500" /> Etiketler
-              </h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {tags.map((t) => (
-                  <span key={t} className="rounded-full border border-line bg-canvas px-3 py-1 text-xs font-medium text-text-muted">{t}</span>
-                ))}
-              </div>
-            </section>
-          ) : null}
-          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
-            </h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes || "Not eklenmedi."}</p>
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint">
-              <span>
-                Kaynak: {formatLeadSource(source) ?? "belirtilmedi"}
-                {sourceDetail ? (
-                  <span className="ml-1 rounded-full bg-brand-600/10 px-1.5 py-0.5 font-semibold text-brand-700">
-                    {sourceDetail}
-                  </span>
-                ) : null}
-              </span>
-              <span>·</span>
-              <span>Kayıt: {dateTime(createdAt)}</span>
-            </div>
-          </section>
-        </div>
       </Pane>
 
     </div>

@@ -120,7 +120,7 @@ export default async function CustomerDetailPage({
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir (eski ?tab= linkleri de çalışır)
   const sp = await searchParams;
-  const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "zaman", CUSTOMER_TAB_ALIASES);
+  const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "ozet", CUSTOMER_TAB_ALIASES);
   const activeCategory = resolveCategory(sp.kategori, CUSTOMER_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
@@ -352,7 +352,7 @@ export default async function CustomerDetailPage({
 
   // Kira hatırlatması tercihi (H3 sütunları): yalnız "İletişim tercihleri" sekmesinde; sütun yoksa kart çizilmez.
   let rentPref: { optOut: boolean; atLabel: string | null } | null = null;
-  if (tab === "izinler") {
+  if (tab === "ozet") {
     const prefRes = await supabase
       .from("customers")
       .select("rent_reminder_opt_out, rent_reminder_opt_out_at")
@@ -372,7 +372,7 @@ export default async function CustomerDetailPage({
   // Zaman çizelgesi — yalnız o sekme açıkken derlenir; kategori süzgeci sunucuda uygulanır.
   let events: Awaited<ReturnType<typeof buildCustomerEvents>> = [];
   let allEvents: typeof events = [];
-  if (tab === "zaman") {
+  if (tab === "gecmis") {
     allEvents = await buildCustomerEvents(supabase, customer.id, customer.created_at as string, {
       calls,
       appts,
@@ -388,9 +388,9 @@ export default async function CustomerDetailPage({
   const timelineCategories = CUSTOMER_TIMELINE_CATEGORIES.map((c) => ({
     key: c.key,
     label: c.label,
-    count: tab === "zaman" ? (catCounts[c.key] ?? 0) : undefined,
+    count: tab === "gecmis" ? (catCounts[c.key] ?? 0) : undefined,
   }));
-  const timelineLoadMoreHref = `/app/musteriler/${customer.id}?sekme=zaman${activeCategory ? `&kategori=${activeCategory}` : ""}&adet=${timelineLimit + 40}`;
+  const timelineLoadMoreHref = `/app/musteriler/${customer.id}?sekme=gecmis${activeCategory ? `&kategori=${activeCategory}` : ""}&adet=${timelineLimit + 40}`;
 
   // KPI şeridi — yalnız gerçek veri; veri yoksa kart gösterilmez. Her kart ilgili sekmeye gider.
   const base = `/app/musteriler/${customer.id}`;
@@ -402,11 +402,11 @@ export default async function CustomerDetailPage({
   const tlFmt = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
   const amountKpi: { label: string; value: string; hint: string; href: string } | null =
     openDealSum > 0
-      ? { label: "Açık anlaşma tutarı", value: tlFmt(openDealSum), hint: `${openDeals.length} açık anlaşma`, href: `${base}?sekme=anlasmalar` }
+      ? { label: "Açık anlaşma tutarı", value: tlFmt(openDealSum), hint: `${openDeals.length} açık anlaşma`, href: `${base}?sekme=ozet` }
       : wonDealSum > 0
-        ? { label: "Kazanılan tutar", value: tlFmt(wonDealSum), hint: "kapanan anlaşmalar", href: `${base}?sekme=anlasmalar` }
+        ? { label: "Kazanılan tutar", value: tlFmt(wonDealSum), hint: "kapanan anlaşmalar", href: `${base}?sekme=ozet` }
         : lastOffer && lastOffer.amount != null
-          ? { label: "Son teklif", value: tlFmt(Number(lastOffer.amount)), hint: `${(offersData ?? []).length} teklif`, href: `${base}?sekme=anlasmalar` }
+          ? { label: "Son teklif", value: tlFmt(Number(lastOffer.amount)), hint: `${(offersData ?? []).length} teklif`, href: `${base}?sekme=ozet` }
           : null;
   const lastDays = lastActivityAt ? Math.floor(msSince(lastActivityAt) / DAY_MS) : null;
   const kpis: KpiItem[] = [
@@ -415,11 +415,11 @@ export default async function CustomerDetailPage({
       ? [{ label: "Eşleşme adayı portföy", value: matchCandidateCount, href: `/app/eslestirme?customer=${customer.id}`, icon: <Sparkles />, tone: "success" as const, hint: "aktif portföy havuzu" }]
       : []),
     ...(appts.length > 0
-      ? [{ label: "Yapılan randevu", value: completedAppts, href: `${base}?sekme=randevu`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
+      ? [{ label: "Yapılan randevu", value: completedAppts, href: `${base}?sekme=ozet`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
       : []),
     ...(amountKpi ? [{ label: amountKpi.label, value: amountKpi.value, href: amountKpi.href, icon: <Wallet />, tone: "warning" as const, hint: amountKpi.hint }] : []),
     ...(lastDays != null
-      ? [{ label: "Son temas", value: lastDays === 0 ? "Bugün" : `${lastDays} gün önce`, href: `${base}?sekme=zaman&kategori=gorusme`, icon: <PhoneCall />, tone: (lastDays > 14 ? "danger" : "neutral") as "danger" | "neutral", hint: "çağrı, randevu ve iletişim kaydı" }]
+      ? [{ label: "Son temas", value: lastDays === 0 ? "Bugün" : `${lastDays} gün önce`, href: `${base}?sekme=gecmis&kategori=gorusme`, icon: <PhoneCall />, tone: (lastDays > 14 ? "danger" : "neutral") as "danger" | "neutral", hint: "çağrı, randevu ve iletişim kaydı" }]
       : []),
   ];
 
@@ -469,6 +469,25 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
                   </Link>
                 ) : null}
               </div>
+              {customer.blacklist ? null : (
+                /* Rozet/skor tek cümleyle açıklanır + tek eylem (lib/customer-state nedenleri; sahte/açıklamasız sayı yok). */
+                <p className="mt-2 max-w-xl text-sm text-white/75">
+                  {TEMPERATURE_LABELS[state.temperature]}:{" "}
+                  {state.reasons[0]
+                    ? `${state.reasons[0].label} (${state.reasons[0].evidence}).`
+                    : state.daysSinceContact !== null
+                      ? `son temas ${state.daysSinceContact} gün önce.`
+                      : "henüz temas kaydı yok."}
+                  {state.nextBestAction ? (
+                    <>
+                      {" "}
+                      <Link href={state.nextBestAction.href} className="focus-ring rounded font-semibold text-white underline underline-offset-2 hover:text-mint-300">
+                        {state.nextBestAction.text}
+                      </Link>
+                    </>
+                  ) : null}
+                </p>
+              )}
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {types.length > 0 ? (
                   types.map((t) => (
@@ -544,7 +563,7 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
                 <Link href={`/app/arama?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
                 </Link>
-                <Link href={`/app/musteriler/${customer.id}?sekme=iletisim`} scroll={false} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/musteriler/${customer.id}?sekme=gecmis`} scroll={false} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <MessageSquare className="h-4 w-4" /> Not ekle
                 </Link>
                 <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
@@ -601,7 +620,7 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
               />
               <div className="absolute text-center">
                 <p className="font-display text-2xl font-extrabold text-white">{score}</p>
-                <p className="text-xs text-white/55">Müşteri skoru</p>
+                <p className="text-xs text-white/55" title="Alıcı adayının ne kadar ciddi göründüğü (0-100); iletişim, talep ve randevu hareketlerinden hesaplanır.">Aday puanı</p>
               </div>
             </div>
           </div>
@@ -686,7 +705,7 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
               </>
             }
             preferencesSlot={
-              tab === "izinler" && rentPref ? (
+              tab === "ozet" && rentPref ? (
                 <RentReminderPref
                   customerId={customer.id}
                   optOut={rentPref.optOut}

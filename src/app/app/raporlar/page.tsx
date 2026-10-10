@@ -323,7 +323,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           seriesLabel="Son 6 ay gelir"
         />
         <KpiCard
-          label="Kaçan komisyon (tahmini)"
+          label="Kaçan komisyon"
+          title="Kaçırılmış komisyonların tahmini toplamı"
           value={money(lost)}
           icon={ICONS.alarm}
           tone="danger"
@@ -340,7 +341,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           tone="warn"
           href="/app/portallar?durum=teyit"
           attention={overdue > 0}
-          hint="Anlık durum · dönem kıyası yok"
+          hint="Anlık durum · dönem karşılaştırması yok"
         />
         <KpiCard
           label="Açık talep"
@@ -523,7 +524,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         {[
           { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-Arz Haritası", sub: "İlçe bazlı talep-arz dengesi" },
           { href: "/app/raporlar/memnuniyet", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
-          { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Aday Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
+          { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
           { href: "/app/kayip-kacak", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
           { href: "/app/eslestirme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
           { href: "/app/degerleme", icon: Gauge, title: "Değerleme", sub: "Emsal · EmlakFiyati endeksi" },

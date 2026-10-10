@@ -413,12 +413,12 @@ export async function DemandsView({
         eyebrow="Talep yönetimi"
         art="talep"
         title="Talepler"
-        description="Açık talepleri yönetin, bütçe ve konum kriterlerini eşleştirme motoruna bağlayın."
+        description="Açık talepleri yönetin, bütçe ve konum kriterlerini akıllı eşleştirmeye bağlayın."
         meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
             <ButtonLink href="/app/eslestirme" variant="secondary" size="sm" icon={Crosshair}>
-              Eşleştirme motoru
+              Akıllı eşleştirme
             </ButtonLink>
             {canCreate ? <ButtonLink href="/app/talepler/yeni" size="sm" icon={Plus}>Yeni talep</ButtonLink> : null}
           </>

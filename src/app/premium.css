@@ -677,3 +677,22 @@ html[data-theme="dark"] .ds-hero {
 }
 .pm-card-inline:has(.pm-card-bars) .pm-sub { -webkit-line-clamp: 2; line-clamp: 2; }
 .pm-card-inline:has(.pm-card-bars) .pm-card-title { white-space: normal; }
+
+/* ---- Mobil liste sayfaları: KPI'lar tek satır yatay kaydırmalı küçük çip (KpiStrip → .kpi-compact), sıfır değerli olanlar gizli.
+   Liste (asıl iş) ilk ekranda başlasın diye hero + KPI bloğu kompakt tutulur; masaüstü ızgara aynen kalır. */
+@media (max-width: 639px) {
+  .kpi-flow.kpi-compact {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: var(--space-2);
+    scroll-snap-type: x proximity;
+    padding-bottom: 2px;
+  }
+  .kpi-flow.kpi-compact > * { flex: 0 0 auto; min-width: 8.5rem; max-width: 12rem; scroll-snap-align: start; }
+  .kpi-flow.kpi-compact > .kpi-zero { display: none; }
+  .kpi-compact .pm-card { padding: 0.5rem 0.75rem; }
+  .kpi-compact .pm-ico, .kpi-compact .pm-card-bars, .kpi-compact .pm-chart, .kpi-compact .pm-card-arrow { display: none; }
+  .kpi-compact .pm-sub { display: none; }
+  .kpi-compact .pm-card-title { -webkit-line-clamp: 1; line-clamp: 1; }
+  .kpi-compact .pm-value { font-size: 1.125rem; }
+}

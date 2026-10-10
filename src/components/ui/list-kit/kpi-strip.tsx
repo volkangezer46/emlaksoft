@@ -56,7 +56,7 @@ function toTrend(t: { dir: "up" | "down" | "flat"; pct: number | null; label: st
 
 export function KpiStrip({ items, label = "Özet göstergeler", className }: { items: readonly KpiItem[]; label?: string; className?: string }) {
   return (
-    <KpiGrid count={items.length} label={label} className={cn(className)}>
+    <KpiGrid count={items.length} label={label} className={cn("kpi-compact", className)}>
       {items.map((it) => {
         const zero = it.value === 0 || it.value === "0";
         const shown = typeof it.value === "number" ? formatCount(it.value) : it.value;
@@ -76,6 +76,7 @@ export function KpiStrip({ items, label = "Özet göstergeler", className }: { i
             hint={t ? undefined : it.hint}
             attention={Boolean(it.attention) && !zero}
             dim={zero && !it.attention}
+            className={zero && !it.attention ? "kpi-zero" : undefined}
             series={series ?? undefined}
             chart="bars"
             seriesUnit={it.seriesLabel}

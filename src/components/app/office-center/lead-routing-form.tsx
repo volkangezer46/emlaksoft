@@ -89,7 +89,7 @@ export function LeadRoutingForm({ initial, canEdit }: { initial: LeadRoutingConf
               ))}
             </FormSelect>
           </FormField>
-          <FormField label="İlk dönüş süresi (SLA)" htmlFor="lr-sla" hint="Aday hızı raporu ve yeniden atama aynı süreyi kullanır (çalışma saati: Pzt-Cmt 09:00-19:00).">
+          <FormField label="İlk dönüş süresi" htmlFor="lr-sla" hint="Yanıt hızı raporu ve yeniden atama aynı süreyi kullanır (çalışma saati: Pzt-Cmt 09:00-19:00).">
             <FormSelect id="lr-sla" value={String(sla)} onChange={(e) => setSla(Number(e.target.value))}>
               {SLA_OPTIONS_MIN.map((m) => (
                 <option key={m} value={m}>
@@ -109,7 +109,7 @@ export function LeadRoutingForm({ initial, canEdit }: { initial: LeadRoutingConf
             <span>
               <span className="block font-semibold text-ink-950">İlk dönüş süresi dolunca yeniden ata</span>
               <span className="block text-xs text-text-muted">
-                Talebe SLA süresi içinde dönülmezse başka uygun danışmana devredilir; eski ve yeni sorumluya bildirim gider. Üst sınır dolunca yöneticiler uyarılır.
+                Talebe süre sınırı içinde dönülmezse başka uygun danışmana devredilir; eski ve yeni sorumluya bildirim gider. Üst sınır dolunca yöneticiler uyarılır.
               </span>
             </span>
             <Switch checked={reassign} onCheckedChange={setReassign} aria-label="İlk dönüş süresi dolunca yeniden ata" />

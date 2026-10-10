@@ -94,7 +94,7 @@ const HEALTH_CHECKS: ((p: PropertyInput) => HealthCheckItem)[] = [
     label:  "İl seçildi",
     passed: Boolean(p.province_id),
     weight: 3,
-    tip:    "Konum bilgisi eşleştirme motorunun çalışması için zorunludur.",
+    tip:    "Konum bilgisi akıllı eşleştirmenin çalışması için zorunludur.",
   }),
   (p) => ({
     key:    "address",

@@ -31,9 +31,9 @@ const sla: AnySettingDef[] = [
     group: "sla",
     default: String(DEFAULT_SLA_MIN),
     options: SLA_OPTIONS_MIN.map((m) => ({ value: String(m), label: m >= 60 ? `${m / 60} saat` : `${m} dakika` })),
-    label: "İlk yanıt SLA süresi",
-    description: "Yeni gelen talep/başvuruya ilk dönüşün yapılması gerektiği süre. Aday hızı raporu bu süreye göre \"zamanında\" sayar.",
-    impact: "Aday hızı raporunun varsayılan eşiği değişir; raporda eşik seçicisi yine kullanılabilir. Geçmiş veri silinmez, yalnız zamanında/geç sınıflaması yeniden hesaplanır.",
+    label: "İlk yanıt süresi",
+    description: "Yeni gelen talep/başvuruya ilk dönüşün yapılması gerektiği süre. Yanıt hızı raporu bu süreye göre \"zamanında\" sayar.",
+    impact: "Yanıt hızı raporunun varsayılan eşiği değişir; raporda eşik seçicisi yine kullanılabilir. Geçmiş veri silinmez, yalnız zamanında/geç sınıflaması yeniden hesaplanır.",
     unit: "dakika",
   }),
 ];
@@ -239,7 +239,7 @@ const ASSIGN_WEIGHT_DEFAULTS: Record<keyof typeof ASSIGN_WEIGHT_KEYS, { def: num
   workload: { def: 25, label: "Ağırlık: iş yükü", description: "Açık portföy + açık talep sayısı ofis ortalamasının altındaki danışman daha yüksek puan alır." },
   specialty: { def: 20, label: "Ağırlık: uzmanlık", description: "İlanın türü (konut/ticari/arsa) ve işlem türü (satılık/kiralık) danışmanın uzmanlık kaydıyla eşleşirse puan verir." },
   region: { def: 25, label: "Ağırlık: bölge", description: "İlanın il/ilçe/mahallesi danışmanın bölge kaydıyla eşleşirse puan verir (mahalle > ilçe > il)." },
-  performance: { def: 15, label: "Ağırlık: son 90 gün performansı", description: "Son 90 gün kapanış oranı ve ilk yanıt SLA uyumu; veri yetersizse nötr puan." },
+  performance: { def: 15, label: "Ağırlık: son 90 gün performansı", description: "Son 90 gün kapanış oranı ve ilk yanıt uyumu; veri yetersizse nötr puan." },
   availability: { def: 15, label: "Ağırlık: müsaitlik", description: "Mesai içi/dışı ve son aktivite yakınlığı; izinli veya pasif danışman zaten elenir." },
 };
 
@@ -265,9 +265,9 @@ const assign: AnySettingDef[] = [
     default: 24,
     min: 1,
     max: 168,
-    label: "Atanmamış ilan SLA süresi",
-    description: "Danışmanı olmayan bir ilan kaç saatten uzun beklerse Ofis Merkezi'nde \"SLA aşıldı\" sayılsın.",
-    impact: "Ofis Merkezi > Atamalar'daki \"SLA'sı geçen\" sayacı ve satır işareti değişir. Düşürürseniz daha çok ilan uyarı alır; bildirim üretmez.",
+    label: "Atanmamış ilan süre sınırı",
+    description: "Danışmanı olmayan bir ilan kaç saatten uzun beklerse Ofis Merkezi'nde \"Gecikti\" sayılsın.",
+    impact: "Ofis Merkezi > Atamalar'daki \"Gecikenler\" sayacı ve satır işareti değişir. Düşürürseniz daha çok ilan uyarı alır; bildirim üretmez.",
     unit: "saat",
   }),
   defineInt({
@@ -390,8 +390,8 @@ const compliance: AnySettingDef[] = [
 
 /**
  * Talep dağıtımı (lead routing; Ofis Merkezi > Talep dağıtımı sekmesi). Hepsi varsayılan = BUGÜNKÜ davranış:
- * en az yüklü danışman, mesai kuralı yok, SLA aşımında yeniden atama yok. Motor: `src/lib/lead-routing/*` (uzmanlık/bölge/yük
- * puanı ilan havuzu ve akıllı atama ile AYNI kod). Okuyucular: `lead-intake.ts` (yeni talep), havuz-atama cron adımı (SLA).
+ * en az yüklü danışman, mesai kuralı yok, gecikmenda yeniden atama yok. Motor: `src/lib/lead-routing/*` (uzmanlık/bölge/yük
+ * puanı ilan havuzu ve akıllı atama ile AYNI kod). Okuyucular: `lead-intake.ts` (yeni talep), havuz-atama cron adımı.
  */
 export const LEAD_ROUTING_KEYS = {
   strategy: "office.lead_routing.strategy",
@@ -422,7 +422,7 @@ const leadRouting: AnySettingDef[] = [
     group: "dagitim",
     default: false,
     label: "Mesai dışı talebi mesai başında dağıt",
-    description: "Açıkken Pazar günü ve 09:00-19:00 dışında gelen talep atanmadan bekler; mesai başlayınca dağıtılır (aday hızı raporundaki çalışma saati tanımıyla aynı).",
+    description: "Açıkken Pazar günü ve 09:00-19:00 dışında gelen talep atanmadan bekler; mesai başlayınca dağıtılır (yanıt hızı raporundaki çalışma saati tanımıyla aynı).",
     impact: "Mesai dışı talepler sabaha kadar sorumlusuz görünür. Kapalıyken talep anında atanır.",
   }),
   defineBool({
@@ -431,7 +431,7 @@ const leadRouting: AnySettingDef[] = [
     group: "dagitim",
     default: false,
     label: "İlk dönüş süresi dolunca yeniden ata",
-    description: "Talebe İlk yanıt SLA süresi içinde dönülmezse (çalışma saatiyle) talep başka uygun danışmana devredilir; eski ve yeni sorumluya bildirim gider.",
+    description: "Talebe İlk yanıt süresi içinde dönülmezse (çalışma saatiyle) talep başka uygun danışmana devredilir; eski ve yeni sorumluya bildirim gider.",
     impact: "Açılırsa her 10 dakikada bir kontrol edilir; bir talep en çok aşağıdaki sayıda yeniden atanır, sonrasında yöneticiye uyarı düşer. Kapalıyken hiçbir talep otomatik devredilmez.",
   }),
   defineInt({
@@ -442,7 +442,7 @@ const leadRouting: AnySettingDef[] = [
     min: 1,
     max: 5,
     label: "En çok yeniden atama sayısı",
-    description: "Bir talep SLA aşımı yüzünden en fazla kaç kez başka danışmana devredilsin.",
+    description: "Bir talep gecikme yüzünden en fazla kaç kez başka danışmana devredilsin.",
     impact: "Sınır dolunca talep yeniden atanmaz; ofis sahibi ve genel müdüre bir kez uyarı gider.",
     unit: "kez",
   }),

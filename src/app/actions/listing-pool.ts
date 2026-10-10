@@ -256,7 +256,7 @@ export async function saveListingPoolSettings(formData: FormData): Promise<PoolA
   const minScore = minRaw ? Number(minRaw) : null;
   const sla = slaRaw ? Number(slaRaw) : null;
   if (minScore != null && (!Number.isInteger(minScore) || minScore < 0 || minScore > 100)) return { error: "Asgari puan 0-100 arasında tam sayı olmalı." };
-  if (sla != null && (!Number.isInteger(sla) || sla < 1 || sla > 10080)) return { error: "SLA süresi 1-10080 dakika arasında olmalı." };
+  if (sla != null && (!Number.isInteger(sla) || sla < 1 || sla > 10080)) return { error: "süre sınırı 1-10080 dakika arasında olmalı." };
   if (modeRaw === "claim" && sla == null) return { error: "Sahiplenme modu için süre (dakika) gerekli." };
   if (modeRaw === "auto" && minScore == null) return { error: "Otomatik mod için asgari puan gerekli." };
 

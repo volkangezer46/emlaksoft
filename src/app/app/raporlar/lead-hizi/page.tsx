@@ -24,7 +24,7 @@ import {
 } from "@/lib/response-time/core";
 import { loadLeadResponses } from "@/lib/response-time/load";
 
-export const metadata = { title: "Aday Hızı" };
+export const metadata = { title: "Yanıt Hızı" };
 
 /** ?donem= kontratı — kayıt açılış penceresi (gün). */
 const DONEM_FILTERS = [
@@ -117,7 +117,7 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
           </span>
         }
         eyebrow="Raporlar"
-        title="Aday Hızı"
+        title="Yanıt Hızı"
         description={`Yeni müşteri kaydından ilk temasa geçen süre. Yalnız çalışma saatleri sayılır (Pzt-Cmt ${String(WORK_START_HOUR).padStart(2, "0")}:00-${WORK_END_HOUR}:00); gece ve pazar gelen talep sabah saatinde başlar. Not kayıtları temas sayılmaz.`}
       />
 

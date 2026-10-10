@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     await recordHeartbeat("ticket-sla", "ok", JSON.stringify(summary));
     return NextResponse.json({ ok: true, summary });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "Ticket SLA escalation failed.";
+    const detail = error instanceof Error ? error.message : "Ticket gecikme escalation failed.";
     console.error("ticket-sla cron", detail);
     await recordHeartbeat("ticket-sla", "error", detail);
     return NextResponse.json({ ok: false, error: "ticket_sla_failed" }, { status: 500 });

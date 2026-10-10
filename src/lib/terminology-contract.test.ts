@@ -18,6 +18,13 @@ const ALLOW: Record<string, string> = {
   // Sözlük ve test dosyaları yasaklı terimi tanımlamak/anlatmak için anar.
   "src/lib/terminology.ts": "sözlük tanımı",
   "src/lib/terminology-contract.test.ts": "sözleşme testi",
+  // Platform destek kuyruğu ve platform raporları: "SLA" yalnız /admin personelinin gördüğü destek süre hedefidir.
+  "src/app/admin/tickets": "platform destek kuyruğu (yalnız /admin personeli)",
+  "src/lib/report-center/catalog/platform.ts": "platform raporları (yalnız /admin personeli)",
+  // Havuz besleme/bildirim metinleri başka ajanın kapsamında (UX-3); sonraki dalgada "Gecikti/süre" diline çekilecek.
+  "src/lib/pool": "havuz besleme ajanı kapsamı (UX-3): SLA metinleri sonraki dalgada düzeltilecek",
+  // Gezinme kaydı UX-1 ajanında: "Aday hızı" menü etiketi sonraki dalgada "Yanıt hızı" olacak.
+  "src/lib/nav-config.ts": "menü kaydı UX-1 kapsamı: 'Aday hızı' etiketi sonraki dalgada düzeltilecek",
   // Platform migration prova aracı (yalnız /admin): teknik tablo adlarını ("kontör cüzdanı") anlatır.
   "src/lib/migration-rehearsal": "yalnız /admin migration provası",
 };

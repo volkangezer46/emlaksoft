@@ -491,7 +491,7 @@ export default async function PropertyDetailPage({
                 Eşleştir
               </Link>
               <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
-                Pipeline{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
+                Satış hattı{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
               </Link>
               <WhatsAppLink share label="Müşteriye WhatsApp ile gönder" message={listingText.description ? `${listingText.title}\n\n${listingText.description}` : null} />
               {canDelete ? <DeletePropertyButton propertyId={property.id} /> : null}

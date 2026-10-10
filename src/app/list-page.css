@@ -103,3 +103,10 @@
   .tbl-stack td[data-actions] { flex-basis: 100%; }
   .tbl-stack td[data-actions] > * { justify-content: flex-start; }
 }
+
+/* Mobil: hero kompakt (özet cümlesi gizli) — liste ilk ekranda başlasın. */
+@media (max-width: 639px) {
+  .lp-hero { padding-block: 0.625rem; }
+  .lp-hero-summary { display: none; }
+  .lp-eyebrow { display: none; }
+}

@@ -3,7 +3,7 @@ import { SkeletonFilterBar, SkeletonKpiStrip, SkeletonPage, SkeletonPageHeader, 
 /** Danışman kıyası: başlık → KPI → filtre → tablo. */
 export default function Loading() {
   return (
-    <SkeletonPage label="Danışman kıyası yükleniyor">
+    <SkeletonPage label="Danışman karşılaştırma yükleniyor">
       <SkeletonPageHeader actions={1} />
       <SkeletonKpiStrip cols={4} />
       <SkeletonFilterBar />

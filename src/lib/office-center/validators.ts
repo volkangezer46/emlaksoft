@@ -64,7 +64,7 @@ export const reassignSchema = z.object({
 
 /** Tanımlamalar sekmesi — her alan registry sınırlarıyla aynı (definitions.ts eşlemesi). */
 export const slaDefinitionSchema = z.object({
-  leadFirstResponseMin: z.number().int().refine((m) => (SLA_OPTIONS_MIN as readonly number[]).includes(m), "Geçersiz SLA seçeneği."),
+  leadFirstResponseMin: z.number().int().refine((m) => (SLA_OPTIONS_MIN as readonly number[]).includes(m), "Geçersiz süre seçeneği."),
   unassignedSlaHours: z.number().int().min(1).max(168),
 });
 

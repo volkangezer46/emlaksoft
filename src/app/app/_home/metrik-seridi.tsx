@@ -204,7 +204,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         value: Math.round(mine.avgFirstResponseMin),
         suffix: " dk",
         tone: mine.withinSlaPct != null && mine.withinSlaPct < 70 ? "warn" : "success",
-        context: `${mine.respondedCount} yanıtlandı${mine.withinSlaPct != null ? ` · SLA içinde %${Math.round(mine.withinSlaPct)}` : ""}${mine.waitingCount > 0 ? ` · ${mine.waitingCount} bekliyor` : ""}`,
+        context: `${mine.respondedCount} yanıtlandı${mine.withinSlaPct != null ? ` · süre içinde %${Math.round(mine.withinSlaPct)}` : ""}${mine.waitingCount > 0 ? ` · ${mine.waitingCount} bekliyor` : ""}`,
         href: "/app/gelen-kutusu",
         seriesLabel: "",
       });

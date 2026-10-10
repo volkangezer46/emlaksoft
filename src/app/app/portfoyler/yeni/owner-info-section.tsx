@@ -123,7 +123,7 @@ export function OwnerInfoSection({ poolEnabled }: { poolEnabled: boolean }) {
           <FormField label="Yetki bitişi" htmlFor="authorization-end" hint="Tek yetkide zorunlu.">
             <FormInput id="authorization-end" name="authorization_end" type="date" />
           </FormField>
-          <FormField label="EİDS taşınmaz numarası" htmlFor="eids-property-no" hint="Mal sahibi e-Devlet EİDS’te yetkiyi onaylayınca üretilir; portal ilanı bu numarayla yayınlanır. Yetki en az 3 ay olmalıdır. Resmî doğrulama değildir." className="sm:col-span-2">
+          <FormField label="Yetki belgesi no (EİDS taşınmaz numarası)" htmlFor="eids-property-no" hint="Mal sahibi e-Devlet EİDS’te yetkiyi onaylayınca üretilir; portal ilanı bu numarayla yayınlanır. Yetki en az 3 ay olmalıdır. Resmî doğrulama değildir." className="sm:col-span-2">
             <FormInput id="eids-property-no" name="eids_property_no" maxLength={40} autoComplete="off" placeholder="Numara (isteğe bağlı)" />
           </FormField>
           <FormField label="Minimum fiyat" htmlFor="min-price" hint="Sahibin kabul edeceği en düşük fiyat; liste fiyatını aşamaz.">

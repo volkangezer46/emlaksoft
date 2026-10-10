@@ -919,3 +919,29 @@ html.tv-active body {
   width: calc(var(--u) * 4.6) !important;
   object-fit: contain;
 }
+
+/* ---- Telefon / dar dikey ekran: tek sütun, en küçük yazı ≥ 12 px, sayfa kaydırılır ----
+   TV modu büyük ekran içindir; telefonda yine okunur kalsın diye ölçek tabanı 11 px'e (1.1 × 11 = 12.1 px) sabitlenir,
+   kartlar alt alta dizilir ve katman dikeyde kayar (kartlar sıkışıp küçülmez). */
+@media (max-width: 700px) and (max-aspect-ratio: 1/1) {
+  .tv-root {
+    --u: max(min(0.9cqw, 1.6cqh), 11px);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .tv-shift {
+    height: auto;
+    min-height: 100%;
+  }
+  .tv-grid {
+    flex: none;
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .tv-span2 {
+    grid-row: auto;
+  }
+  .tv-card {
+    min-height: calc(var(--u) * 14);
+  }
+}

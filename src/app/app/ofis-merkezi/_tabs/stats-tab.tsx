@@ -65,7 +65,7 @@ export async function StatsTab({ ctx }: { ctx: TabContext }) {
           </span>
         </div>
         {health.alerts.length === 0 ? (
-          <p className="mt-3 text-sm text-text-muted">{"Eşik aşımı yok: danışmansız ilan, atama SLA'sı, aktivitesiz danışman ve iptal oranı sınırların içinde. Eşikler: Tanımlamalar sekmesi."}</p>
+          <p className="mt-3 text-sm text-text-muted">{"Eşik aşımı yok: danışmansız ilan, atama süre sınırı, aktivitesiz danışman ve iptal oranı sınırların içinde. Eşikler: Tanımlamalar sekmesi."}</p>
         ) : (
           <ul className="mt-3 space-y-1.5">
             {health.alerts.map((a) => (

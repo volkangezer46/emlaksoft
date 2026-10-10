@@ -305,9 +305,9 @@ export async function LeadTab({ ctx }: { ctx: Ctx }) {
 
   return (
     <div className="space-y-6">
-      <StatRow label="Öncül göstergeler" items={items} />
+      <StatRow label="Erken işaretler" items={items} />
       <p className="text-xs text-text-faint">
-        Öncül göstergeler sonucu (anlaşma, kazanç) beklemeden ritmi gösterir. İlk yanıt süresi için müşteri bazında güvenilir bir kayıt bulunmadığından gösterilmez.
+        Erken işaretler sonucu (anlaşma, kazanç) beklemeden ritmi gösterir. İlk yanıt süresi için müşteri bazında güvenilir bir kayıt bulunmadığından gösterilmez.
       </p>
       <div className="grid gap-6 lg:grid-cols-2">
         {taskList("Gecikmiş görevler", "gecikmis", lead.overdueSample)}
@@ -550,7 +550,7 @@ export async function CoachTab({ ctx }: { ctx: Ctx }) {
 function coachHref(title: string, id: string, isSelf: boolean): { href?: string; hrefLabel?: string } {
   const t = title.toLocaleLowerCase("tr");
   if (t.includes("yetki")) return { href: `/app/portfoyler?danisman=${id}`, hrefLabel: "Portföyler" };
-  if (t.includes("görev")) return isSelf ? { href: "/app/gorevler?filter=overdue&mine=1", hrefLabel: "Gecikmiş görevler" } : { href: `/app/ekip/${id}?sekme=oncul`, hrefLabel: "Öncül göstergeler" };
+  if (t.includes("görev")) return isSelf ? { href: "/app/gorevler?filter=overdue&mine=1", hrefLabel: "Gecikmiş görevler" } : { href: `/app/ekip/${id}?sekme=oncul`, hrefLabel: "Erken işaretler" };
   if (t.includes("randevu")) return { href: `/app/randevular?danisman=${id}`, hrefLabel: "Randevular" };
   if (t.includes("teklif")) return { href: `/app/teklifler?danisman=${id}`, hrefLabel: "Teklifler" };
   if (t.includes("anlaşma")) return { href: `/app/anlasmalar?danisman=${id}`, hrefLabel: "Anlaşmalar" };

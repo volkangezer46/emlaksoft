@@ -105,16 +105,16 @@ export function DefinitionsForm({ initial, canEdit, notifyLabels }: { initial: D
       ) : null}
 
       <Group
-        title="SLA süreleri"
+        title="Yanıt süreleri"
         description="Müşteriye dönüş ve danışmansız ilan için süre sınırları."
         usedIn={[
-          { label: "Aday hızı raporu", href: "/app/raporlar/lead-hizi" },
-          { label: "İlan Havuzu > SLA'sı geçen", href: "/app/ilan-havuzu?atama=gecikmis" },
+          { label: "Yanıt hızı raporu", href: "/app/raporlar/lead-hizi" },
+          { label: "İlan Havuzu > Gecikenler", href: "/app/ilan-havuzu?atama=gecikmis" },
         ]}
         pending={pending && busy === "sla"}
         onSave={() => run("sla", () => saveSLADefinition(sla))}
       >
-        <FormField label="İlk yanıt SLA süresi" htmlFor="oc-sla-lead" hint="Yeni talebe ilk dönüş için süre.">
+        <FormField label="İlk yanıt süresi" htmlFor="oc-sla-lead" hint="Yeni talebe ilk dönüş için süre.">
           <FormSelect id="oc-sla-lead" value={String(sla.leadFirstResponseMin)} onChange={(e) => setSla({ ...sla, leadFirstResponseMin: Number(e.target.value) })}>
             {SLA_OPTIONS_MIN.map((m) => (
               <option key={m} value={m}>
@@ -123,7 +123,7 @@ export function DefinitionsForm({ initial, canEdit, notifyLabels }: { initial: D
             ))}
           </FormSelect>
         </FormField>
-        <Num id="oc-sla-unassigned" label="Atanmamış ilan SLA süresi" value={sla.unassignedSlaHours} min={1} max={168} unit="saat" onChange={(n) => setSla({ ...sla, unassignedSlaHours: n })} />
+        <Num id="oc-sla-unassigned" label="Atanmamış ilan süre sınırı" value={sla.unassignedSlaHours} min={1} max={168} unit="saat" onChange={(n) => setSla({ ...sla, unassignedSlaHours: n })} />
       </Group>
 
       <Group

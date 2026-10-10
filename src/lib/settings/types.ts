@@ -33,11 +33,11 @@ export type SettingCategoryId = (typeof SETTING_CATEGORIES)[number]["id"];
 
 /** Ofis Tanimlari Merkezi gruplari (yalniz scope=tenant ayarlarda; ekran sirasidir). */
 export const OFFICE_SETTING_GROUPS = [
-  { id: "sla", label: "SLA süreleri", description: "Müşteriye ne kadar sürede dönüş yapılması gerektiği." },
+  { id: "sla", label: "Yanıt süreleri", description: "Müşteriye ne kadar sürede dönüş yapılması gerektiği." },
   { id: "esik", label: "Uyarı eşikleri", description: "Hareketsiz anlaşma ve bekleyen talep gibi uyarıların kaç günde başlayacağı." },
   { id: "komisyon", label: "Komisyon varsayılanları", description: "Komisyon hesaplayıcı ve bölüşüm ekranlarının başlangıç oran ve payları." },
   { id: "bildirim", label: "Bildirim varsayılanları", description: "Kendi tercihini kaydetmemiş kullanıcıların bildirim tercihleri." },
-  { id: "atama", label: "Akıllı atama", description: "Ofis Merkezi'nde havuzdan danışman önerisinin ölçüt ağırlıkları ve atanmamış ilan SLA'sı." },
+  { id: "atama", label: "Akıllı atama", description: "Ofis Merkezi'nde havuzdan danışman önerisinin ölçüt ağırlıkları ve atanmamış ilan süre sınırı." },
   { id: "dagitim", label: "Talep dağıtımı", description: "Yeni talebin hangi danışmana gideceği, mesai kuralı ve ilk dönüş süresi dolunca yeniden atama." },
   { id: "ai", label: "Yapay zekâ özellikleri", description: "AI ilan metni/çeviri ve sesli not özeti (hepsi varsayılan kapalı; kişisel veri maskelenir)." },
   { id: "erisim", label: "Erişim kapsamı", description: "Liste ekranlarının kullanıcı kapsamıyla (kendi / takım / şube) daraltılması." },

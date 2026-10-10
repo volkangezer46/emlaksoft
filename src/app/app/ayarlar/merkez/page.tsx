@@ -25,7 +25,7 @@ const PATH = "/app/ayarlar/merkez";
 
 /** Ayarın etkisini gösterdiği ekran (sıfır çıkmaz: her ayarın gerçek bir hedefi var). */
 const USED_IN: Record<string, { label: string; href: string }> = {
-  "office.sla.lead_first_response_min": { label: "Aday hızı raporu", href: "/app/raporlar/lead-hizi" },
+  "office.sla.lead_first_response_min": { label: "Yanıt hızı raporu", href: "/app/raporlar/lead-hizi" },
   "office.alert.deal_stale_days": { label: "Hareketsiz anlaşmalar", href: "/app/anlasmalar?gorunum=liste&bayat=1" },
   "office.alert.demand_aging_days": { label: "Bekleyen talepler", href: "/app/talepler" },
   "office.commission.simulator_rate": { label: "Komisyon hesaplayıcı", href: "/app/komisyon" },
@@ -42,7 +42,7 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.assign.weight_region": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
   "office.assign.weight_performance": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
   "office.assign.weight_availability": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
-  "office.assign.unassigned_sla_hours": { label: "İlan Havuzu > SLA'sı geçen", href: "/app/ilan-havuzu?atama=gecikmis" },
+  "office.assign.unassigned_sla_hours": { label: "İlan Havuzu > Gecikenler", href: "/app/ilan-havuzu?atama=gecikmis" },
   "office.alert.unassigned_pool_count": { label: "Ofis Merkezi > İstatistikler", href: "/app/ekip?sekme=istatistikler" },
 };
 const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };
@@ -100,7 +100,7 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
         eyebrow="Ayarlar"
         icon={<SlidersHorizontal className="h-6 w-6 text-accent" aria-hidden="true" />}
         title="Tanımlar merkezi"
-        description="Ofisinize özel SLA süreleri, uyarı eşikleri, komisyon ve bildirim varsayılanları. Değişiklikler doğrulanır, geçmişe yazılır ve istediğiniz an varsayılana döndürülebilir."
+        description="Ofisinize özel Yanıt süreleri, uyarı eşikleri, komisyon ve bildirim varsayılanları. Değişiklikler doğrulanır, geçmişe yazılır ve istediğiniz an varsayılana döndürülebilir."
       />
 
       <StatRow
@@ -123,7 +123,7 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
           <input
             name="ara"
             defaultValue={q}
-            placeholder="Tanım ara (ör. hareketsiz, SLA, komisyon)"
+            placeholder="Tanım ara (ör. hareketsiz, yanıt süresi, komisyon)"
             className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-9 pr-3 text-sm outline-none focus:border-brand-400 focus:bg-surface"
           />
         </label>

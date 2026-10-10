@@ -54,7 +54,7 @@ export type ScoreRuleKey =
  *    açıp kapatmak istismara en açık kalem.
  *  - NPS 9-10 (destekleyen) 30: müşteri memnuniyeti gecikmeli gelir ama
  *    tavsiye üretir. Anlaşmanın üçte biri kadar değerli sayıldı.
- *  - Kayıp-kaçak SLA içinde yanıt 15: ilana zamanında müdahale kaçan
+ *  - Kayıp-kaçak süre içinde yanıt 15: ilana zamanında müdahale kaçan
  *    komisyonu önler — "yapılmayan hata" da ödüllendirilir.
  */
 export const SCORE_RULES: Readonly<Record<ScoreRuleKey, number>> = {
@@ -78,7 +78,7 @@ export const SCORE_RULES: Readonly<Record<ScoreRuleKey, number>> = {
   offer_made: 15,
   /** Tek yetkili (authorization_type='exclusive') portföy alma — `property_new` puanının ÜSTÜNE bonus */
   listing_authorized: 25,
-  /** Yeni müşteriye çalışma saati SLA'sı içinde ilk dönüş (Aday Hızı ile aynı ölçüm) */
+  /** Yeni müşteriye çalışma saati süre sınırı içinde ilk dönüş (Aday Hızı ile aynı ölçüm) */
   fast_response: 8,
   /** Yayındaki ilanın bu dönemde teyit edilmesi (ilan başına dönemde en çok 1) */
   listing_confirmed: 3,
@@ -91,7 +91,7 @@ export const SCORE_RULE_LABELS: Readonly<Record<ScoreRuleKey, string>> = {
   appointment_done: "Randevu",
   task_done: "Görev",
   nps_promoter: "NPS 9-10",
-  leak_sla_response: "SLA yanıtı",
+  leak_sla_response: "Süre içinde yanıt",
   customer_new: "Yeni müşteri",
   showing_done: "Gösterim",
   offer_made: "Teklif",
@@ -107,12 +107,12 @@ export const SCORE_RULE_HINTS: Readonly<Record<ScoreRuleKey, string>> = {
   appointment_done: "Tamamlanan randevu (gösterim hariç)",
   task_done: "Tamamlanan görev",
   nps_promoter: "Müşteriden 9-10 anket puanı",
-  leak_sla_response: "Kayıp-kaçak SLA içinde yanıt",
+  leak_sla_response: "Kayıp-kaçak süre içinde yanıt",
   customer_new: "Yeni müşteri kaydı",
   showing_done: "Tamamlanan yer gösterme",
   offer_made: "İletilen teklif",
   listing_authorized: "Tek yetkili portföy alma (bonus)",
-  fast_response: "Yeni müşteriye SLA içinde ilk dönüş",
+  fast_response: "Yeni müşteriye süre içinde ilk dönüş",
   listing_confirmed: "Yayındaki ilanı teyit etme",
 };
 

@@ -209,7 +209,7 @@ export const DEFAULT_TEMPLATES: readonly DefaultTemplate[] = [
       plainScore("Yönetimden aldığınız desteği 0-10 arası puanlar mısınız?"),
       choice(
         "Şu an en çok neye ihtiyaç duyuyorsunuz?",
-        ["Eğitim ve koçluk", "Daha fazla portföy / talep", "Pazarlama ve ilan desteği", "Teknoloji ve araçlar", "Yönetimle iletişim", "Komisyon / prim yapısı", "Diğer"],
+        ["Eğitim ve gelişim desteği", "Daha fazla portföy / talep", "Pazarlama ve ilan desteği", "Teknoloji ve araçlar", "Yönetimle iletişim", "Komisyon / prim yapısı", "Diğer"],
         "reason",
         true,
       ),

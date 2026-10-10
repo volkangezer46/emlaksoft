@@ -162,7 +162,7 @@ export function PropertyAuthorizationPanel({
           {initial.authEnd   && <p>Bitiş:     <span className="font-semibold text-ink-950">{new Date(initial.authEnd).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}</span></p>}
           {initial.authType  && <p>Tür:       <span className="font-semibold text-ink-950">{initial.authType === "exclusive" ? "Tek Yetkili" : initial.authType === "open" ? "Açık Yetki" : "Sınırlı Yetki"}</span></p>}
           {initial.authNotes && <p className="mt-1 text-xs">{initial.authNotes}</p>}
-          <p>EİDS no: {hasValidEidsNo(initial.eidsNo) ? <span className="font-semibold text-ink-950">{initial.eidsNo}</span> : <span className="font-semibold text-amber-700">girilmemiş</span>}</p>
+          <p>Yetki belgesi no (EİDS): {hasValidEidsNo(initial.eidsNo) ? <span className="font-semibold text-ink-950">{initial.eidsNo}</span> : <span className="font-semibold text-amber-700">girilmemiş</span>}</p>
           {result?.ok && result.warning ? <p role="status" className="mt-1 text-xs font-medium text-amber-700">{result.warning}</p> : null}
           {term.message && term.state !== "expiring" ? <p role="status" className="mt-1 rounded-[var(--radius-control)] bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700">{term.message}</p> : null}
           {!initial.authStart && !initial.authEnd && (
@@ -191,7 +191,7 @@ export function PropertyAuthorizationPanel({
             </div>
           </div>
           <div>
-            <label htmlFor="pe-eids-no" className="mb-1 block text-xs font-semibold text-ink-950">EİDS taşınmaz numarası</label>
+            <label htmlFor="pe-eids-no" className="mb-1 block text-xs font-semibold text-ink-950">Yetki belgesi no (EİDS taşınmaz numarası)</label>
             <input id="pe-eids-no" name="eids_no" type="text" maxLength={40} autoComplete="off" defaultValue={initial.eidsNo ?? ""} placeholder="e-Devlet EİDS Yetki İşlemleri’nde üretilen numara" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
             <p className="mt-1 text-xs text-text-muted">Yetki en az 3 ay olmalıdır. Numara elle girilir; resmî doğrulama değildir.</p>
           </div>

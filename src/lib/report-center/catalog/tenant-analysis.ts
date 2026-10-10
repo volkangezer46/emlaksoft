@@ -16,7 +16,7 @@ import { defineReport, tid } from "./define";
 
 export const adayHizi = defineReport({
   id: "aday-hizi",
-  title: "Aday hızı (ilk yanıt süresi)",
+  title: "Yanıt hızı (ilk yanıt süresi)",
   description: "Yeni müşteri kaydından ilk temasa geçen süre: danışman bazında kayıt, yanıtlanan, bekleyen, ortalama / medyan süre ve hedef içi oran.",
   category: "ekip",
   scope: "tenant",
@@ -51,7 +51,7 @@ export const adayHizi = defineReport({
         slaMin: esik,
         nowMs,
       });
-      if (res.failed) throw new Error("aday hızı okunamadı");
+      if (res.failed) throw new Error("yanıt hızı okunamadı");
       const by = summarizeByAdvisor(res.rows);
       await fillNames(ctx, "profiles", "full_name", by.map((a) => a.advisorId));
       const overall = summarizeResponses(res.rows);

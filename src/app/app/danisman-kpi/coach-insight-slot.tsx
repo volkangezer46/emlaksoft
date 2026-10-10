@@ -39,7 +39,7 @@ export async function CoachInsightSlot({
           <h2 id="kocluk-baslik" className="ds-title">
             Sıradaki en iyi eylem
           </h2>
-          <p className="ds-sub mt-0.5">Verinizden çıkan, kanıtlı koçluk önerileri</p>
+          <p className="ds-sub mt-0.5">Verinizden çıkan, kanıtlı gelişim önerileri</p>
         </div>
       </header>
       <div className="flex flex-col gap-2">

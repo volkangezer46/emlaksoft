@@ -374,11 +374,11 @@ export default async function DealDetailPage({
         href="/app/anlasmalar"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
       >
-        <ArrowLeft className="h-4 w-4" /> Pipeline&apos;a dön
+        <ArrowLeft className="h-4 w-4" /> Satış hattına dön
       </Link>
 
       <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${deal.deal_type === "rent" ? "Kiralama" : "Satış"} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`} />
-<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Pipeline şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
+<section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
           <ol className="relative mt-6 flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
             {STAGES.map((s, i) => {
               const gecildi = !kayip && stageIdx >= 0 && i <= stageIdx && s.key !== "lost";

@@ -172,7 +172,7 @@ export default async function CompliancePage({
       {/* EİDS / yetki durumu — her sayaç filtrelenmiş portföy listesine gider. Resmî doğrulama DEĞİL: ofisin kendi kaydı ölçülür. */}
       <section aria-labelledby="eids-baslik" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
         <p className="flex items-center gap-2 text-xs font-semibold text-amber-700">
-          <FileCheck2 className="h-4 w-4" /> EİDS ve yetki durumu
+          <FileCheck2 className="h-4 w-4" /> Yetki belgesi (EİDS) durumu
         </p>
         <h2 id="eids-baslik" className="mt-1 font-display font-bold text-ink-950">Portföy yetki ve taşınmaz numarası</h2>
         <p className="mt-0.5 text-xs text-text-muted">

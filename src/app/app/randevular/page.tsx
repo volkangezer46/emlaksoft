@@ -28,7 +28,6 @@ import { AppointmentWeekView, type WeekViewAppointment } from "./appointment-wee
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
 import { buildRoutePlan, type RoutePlanStop, directionsHref as directionsHrefFor } from "@/lib/route-plan";
-import { ExportIcsButton } from "./export-ics-button";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { CalendarSubscribeCard } from "./calendar-subscribe-card";
@@ -683,22 +682,7 @@ export default async function AppointmentsPage({
         description="Yer gösterme, görüşme ve tur planını tek akışta yönetin."
         actions={
           <>
-            {/* Mevcut filtre kapsamındaki randevular tek .ics olarak (maks. 500) */}
-            <ExportIcsButton
-              events={rows.map((r) => {
-                const c = rel(r.customer);
-                const p = rel(r.property);
-                const propertyName = p?.title || p?.property_code || "Portföy bağlanmadı";
-                return {
-                  uid: r.id,
-                  title: `${typeLabel[r.appointment_type] ?? r.appointment_type} — ${c?.full_name ?? "Belirtilmemiş"}`,
-                  description: `${propertyName}${r.notes ? `\n${r.notes}` : ""}`,
-                  location: r.location ?? undefined,
-                  startAt: r.scheduled_at,
-                  durationMin: r.duration_min,
-                };
-              })}
-            />
+            {/* Takvime aktarma düğmesi yok: dışa aktarma Rapor merkezi'ndedir; takvim aboneliği kartı aşağıda. */}
             {canCreateAppt ? <ButtonLink href={newApptHref} icon={Plus}>Yeni randevu</ButtonLink> : null}
           </>
         }

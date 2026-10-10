@@ -419,7 +419,7 @@ async function SlaSection({ pending }: { pending: Pending }) {
   const nowMs = now();
   const overdue = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) >= 7);
   // ── Teyit SLA şeridi: canlı ilanların son teyit yaşına göre dağılımı ──────
-  // Taze ≤ 3 gün · Yaklaşan 4–6 gün · Gecikmiş ≥ 7 gün (portal teyit SLA'sı).
+  // Taze ≤ 3 gün · Yaklaşan 4–6 gün · Gecikmiş ≥ 7 gün (portal teyit süre sınırı).
   const slaFresh = live.filter((r) => daysSince(r.last_confirmed_at, nowMs) <= 3).length;
   const slaDue = live.filter((r) => {
     const d = daysSince(r.last_confirmed_at, nowMs);
@@ -434,7 +434,7 @@ async function SlaSection({ pending }: { pending: Pending }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-                <ShieldAlert className="h-4 w-4" /> Teyit SLA durumu
+                <ShieldAlert className="h-4 w-4" /> Teyit süresi durumu
               </p>
               <h2 className="mt-1 font-display font-bold text-ink-950">
                 {slaTotal} canlı ilan
@@ -442,12 +442,12 @@ async function SlaSection({ pending }: { pending: Pending }) {
                   <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
                     slaHealth >= 85 ? "bg-mint-500/12 text-mint-600" : slaHealth >= 60 ? "bg-amber-400/15 text-amber-600" : "bg-danger-500/10 text-danger-500"
                   }`}>
-                    %{slaHealth} SLA içinde
+                    %{slaHealth} süre içinde
                   </span>
                 ) : null}
               </h2>
             </div>
-            <p className="text-xs text-text-faint">SLA: her ilan en geç 7 günde bir teyit edilir</p>
+            <p className="text-xs text-text-faint">Süre: her ilan en geç 7 günde bir teyit edilir</p>
           </div>
 
           {/* Oransal şerit — segmentler tıklanabilir chips ile eşleşir */}

@@ -82,7 +82,7 @@ export default async function KarnePage() {
       <PageHeader
         eyebrow="Ofis Kontrol Merkezi"
         title="Danışman karnesi"
-        description="Her danışman için tek bakışta iş yükü ve düzen göstergeleri. Sayılar Kıyas ve Performans ekranlarıyla aynı kaynaktan gelir; her sayı ilgili listeye götürür."
+        description="Her danışman için tek bakışta iş yükü ve düzen göstergeleri. Sayılar Karşılaştırma ve Performans ekranlarıyla aynı kaynaktan gelir; her sayı ilgili listeye götürür."
       />
       <OversightNav active="karne" office openAlerts={alerts.open.length} />
 

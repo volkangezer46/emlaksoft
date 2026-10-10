@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   const sla7 = new Date(now - 7 * 86_400_000).toISOString();
 
-  // İlan Kontrol SLA yükseltmesi (en iyi çaba; hata kapanış SLA işini bozmaz).
+  // İlan Kontrol gecikme yükseltmesi (en iyi çaba; hata kapanış SLA işini bozmaz).
   let escalated = 0;
   let escalationTasks = 0;
   let escalationFailed = false;
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     escalationTasks = esc.tasksCreated;
   } catch (e) {
     escalationFailed = true;
-    console.error("leak-sla anomali SLA yükseltme", e);
+    console.error("leak-sla anomali gecikme yükseltme", e);
   }
 
   const { data: closures, error } = await admin
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest) {
   // Modül kapısı: "Kaçan komisyonlar" (ya da bağlı olduğu Portal Kontrol) kapalı ofis için uyarı üretilmez.
   const disabledModules = await getDisabledModulesByTenant(admin);
   // Çoğaltma yok: aynı portföy için ilan kontrol sisteminde AÇIK "potansiyel kayıp işlem" anomalisi varsa (kendi SLA
-  // zinciri bildirim yapıyor) bu cron ek "SLA uyarısı" üretmez; yalnız işaretler. Tablo yoksa eski davranış.
+  // zinciri bildirim yapıyor) bu cron ek "gecikme uyarısı" üretmez; yalnız işaretler. Tablo yoksa eski davranış.
   const covered = await propertiesWithOpenLostDealAnomaly(
     admin,
     ((closures ?? []) as ClosureRow[]).map((c) => propertyOf(c)?.id).filter((x): x is string => !!x),
@@ -156,7 +156,7 @@ export async function GET(req: NextRequest) {
     const ins = await insertNotificationsDetailed(admin, [
       {
         tenant_id: c.tenant_id,
-        title: "Kayıp-kaçak SLA uyarısı",
+        title: "Kayıp-kaçak gecikme uyarısı",
         body,
         href: "/app/kayip-kacak",
         kind: severity === "critical" ? "danger" : severity === "high" ? "warning" : "info",
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
     processed: processed,
     failed: failed + (escalationFailed ? 1 : 0),
     timedOut,
-    summary: `${sent} SLA uyarısı · ${escalated} anomali SLA aşaması · ${escalationTasks} danışman görevi${skippedTenantsNote(disabledModules, "leak")}`,
+    summary: `${sent} gecikme uyarısı · ${escalated} anomali gecikme aşaması · ${escalationTasks} danışman görevi${skippedTenantsNote(disabledModules, "leak")}`,
   });
   await recordHeartbeat("leak-sla", hb.status, hb.detail);
 

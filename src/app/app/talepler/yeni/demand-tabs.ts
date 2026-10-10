@@ -22,7 +22,7 @@ export const DEMAND_TABS = [
   {
     id: "kriter",
     label: "Bütçe ve kriter",
-    description: "Eşleştirme motoru bu değerlerle portföyleri önerir; işaretlediğiniz kriterler olmazsa olmaz sayılır.",
+    description: "Akıllı eşleştirme bu değerlerle portföyleri önerir; işaretlediğiniz kriterler olmazsa olmaz sayılır.",
     fields: [...DEMAND_FIELD_GROUPS.kriter],
     required: [],
   },
