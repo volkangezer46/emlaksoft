@@ -27,7 +27,8 @@ const REQUIRED: [file: string, needles: string[]][] = [
   ["src/components/ui/list-kit/list-pager.tsx", ["touch:min-h-11"]],
   ["src/components/ui/list-kit/view-switcher.tsx", ["touch:h-11"]],
   ["src/components/ui/route-error.tsx", ["touch:min-h-11"]],
-  ["src/components/app/app-sidebar.tsx", ["lg:min-h-9 touch:min-h-11", "h-7 w-7 touch:h-11 touch:w-11", "min-h-8 touch:min-h-11"]],
+  // Yan menü (2026-10 merkez yapısı): sabitleme düğmesi ve daraltılabilir başlık kalktı; kalan denetimler: satır, vitrin düğmesi, 56 px mobil alt çubuk.
+  ["src/components/app/app-sidebar.tsx", ["lg:min-h-9 touch:min-h-11", "touch:h-11 touch:w-11", "min-h-14", "h-11 w-11"]],
 ];
 
 describe("dokunma hedefi sözleşmesi", () => {

@@ -519,7 +519,7 @@ async function ShellTabs() {
   const m = await loadShellModel();
   return (
     <ClosedModulesProvider closed={m.closedModules}>
-      <SectionTabs accessibleModules={m.accessibleModules} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
+      <SectionTabs accessibleModules={m.accessibleModules} role={m.platformStaffFullAccess ? "owner" : m.effectiveRole} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
     </ClosedModulesProvider>
   );
 }

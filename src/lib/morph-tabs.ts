@@ -91,11 +91,11 @@ export function centerScrollLeft(tabLeft: number, tabWidth: number, viewWidth: n
   return Math.max(0, Math.round(tabLeft + tabWidth / 2 - viewWidth / 2));
 }
 
-/** Sekme şeridinde "Daha fazla" menüsüne geçmeden gösterilen en çok sekme. */
-export const MAX_VISIBLE_TABS = 6;
+/** Sekme şeridinde "Diğer" menüsüne geçmeden gösterilen en çok sekme. */
+export const MAX_VISIBLE_TABS = 5;
 
 /**
- * Çok sekmeli şeritte ilk `max` sekme görünür, kalanı "Daha fazla" menüsüne iner. Etkin sekme taşmaya düşerse görünür
+ * Çok sekmeli şeritte ilk `max` sekme görünür, kalanı "Diğer" menüsüne iner. Etkin sekme taşmaya düşerse görünür
  * kümenin SON yerine alınır (kullanıcı nerede olduğunu hep şeritte görür); sıra bozulmaz.
  */
 export function splitNavTabs<T extends { id: string }>(items: readonly T[], activeId: string | null, max = MAX_VISIBLE_TABS): { shown: T[]; more: T[] } {

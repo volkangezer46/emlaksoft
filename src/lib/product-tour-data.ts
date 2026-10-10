@@ -230,7 +230,7 @@ export function resolveTourSteps(
 ): TourStepDef[] {
   const tour = getTour(id);
   if (!tour) return [];
-  const sections = visibleSections(ctx.accessible, { mode: "full", role: ctx.role, closed: ctx.closed });
+  const sections = visibleSections(ctx.accessible, { closed: ctx.closed });
   const allowed = new Set<string>(["/app"]);
   for (const section of sections)
     for (const item of section.items) {

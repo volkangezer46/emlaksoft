@@ -59,6 +59,37 @@ export function DialogDrawerContent({
   );
 }
 
+/**
+ * Alttan açılan eylem sayfası (mobil "+ Yeni" gibi): Radix erişilebilirlik davranışları korunur
+ * (focus trap, Esc, odak dönüşü). Yalnız küçük ekranda görünür; `responsiveClassName` ile değiştirilebilir.
+ */
+export function DialogSheetContent({
+  children,
+  className,
+  responsiveClassName = "lg:hidden",
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  responsiveClassName?: string;
+}) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay
+        className={cn("dialog-overlay fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-sm", responsiveClassName)}
+      />
+      <DialogPrimitive.Content
+        {...props}
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[var(--radius-panel)] border-t border-line bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] outline-none",
+          responsiveClassName,
+          className,
+        )}
+      >
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  );
+}
+
 const sizeClass = {
   sm: "max-w-md",
   md: "max-w-lg",
