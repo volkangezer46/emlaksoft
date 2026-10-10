@@ -44,7 +44,7 @@ export function HeroDashboard() {
       <KpiV4 x={728} w={160} label="Randevu" value="3" sub="İlki 10:00" tone="amber" icon={4} />
 
       <Card x={194} y={190} w={398} h={350} title="Aylık komisyon" right="Ayrıntı ↗">
-        <text x={18} y={50} fontSize="12" fill={C.mute}>Son 12 ay · örnek veri</text>
+        <text x={18} y={50} fontSize="12" fill={C.mute}>Son 12 ay</text>
         <text x={18} y={86} fontSize="26" fontWeight="800" fill={C.ink}>₺ 184 bin</text>
         <g transform="translate(150 68)">
           <rect width={56} height={22} rx={11} fill={TONES.green.bg} />

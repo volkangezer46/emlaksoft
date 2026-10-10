@@ -36,7 +36,6 @@ export function HeroScene() {
         <span><b>Randevu hatırlatma</b><small>14:30 · yer gösterme</small></span>
       </div>
 
-      <span className="mk-tag mk-example mk-scene-tag">Örnek ekran · örnek veri</span>
     </div>
   );
 }

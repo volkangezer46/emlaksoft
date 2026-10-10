@@ -212,7 +212,6 @@ export function HeroPhoneScene() {
         <MoneySpark />
       </div>
 
-      <p className="mk-mnote">Örnek ekran · örnek veri</p>
     </div>
   );
 }

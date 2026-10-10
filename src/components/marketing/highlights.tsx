@@ -75,7 +75,7 @@ export async function Highlights({
                 </div>
                 <h3 className="mk-h3">{it.title}</h3>
                 <p>{it.text}</p>
-                {it.visual ? <div className="mk-hl-visual">{it.visual}<span className="mk-tag mk-example">Örnek görünüm</span></div> : null}
+                {it.visual ? <div className="mk-hl-visual">{it.visual}</div> : null}
               </li>
             );
           })}
