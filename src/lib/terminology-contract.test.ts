@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { memo, readCached, walkSource } from "./test-support/src-tree";
 import { LOSS_TERMS, TERMINOLOGY_FORBIDDEN, TERMS } from "./terminology";
 
 /**
@@ -28,16 +29,6 @@ const ALLOW: Record<string, string> = {
   // Platform migration prova aracı (yalnız /admin): teknik tablo adlarını ("kontör cüzdanı") anlatır.
   "src/lib/migration-rehearsal": "yalnız /admin migration provası",
 };
-
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    const st = statSync(p);
-    if (st.isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(name) && !/\.test\.(ts|tsx)$/.test(name)) out.push(p);
-  }
-  return out;
-}
 
 /** Tek satırlık string literal ve JSX metin parçalarını çıkarır (yorum satırları atlanır). */
 function visibleTexts(src: string): { line: number; text: string }[] {
@@ -81,18 +72,23 @@ describe("kazanç sayfası 'cüzdan' demez", () => {
 });
 
 describe("yasaklı terim sözleşmesi (kullanıcıya görünen metin)", () => {
-  const files = walk(ROOT);
+  // Dosya başına görünür metinler TEK sefer çıkarılır (her yasaklı terim için yeniden taranmaz).
+  const scanned = () =>
+    memo("terminology.visibleTexts", () =>
+      walkSource(ROOT)
+        .map((f) => ({ f, rel: relative(process.cwd(), f).replace(/\\/g, "/") }))
+        .filter(({ rel }) => !Object.keys(ALLOW).some((a) => rel === a || rel.startsWith(`${a}/`)))
+        .map(({ f, rel }) => ({ rel, texts: visibleTexts(readCached(f)) })),
+    );
   for (const { term, pattern, use } of TERMINOLOGY_FORBIDDEN) {
     it(`"${term}" yasaklı varyantı görünür metinde geçmez (kullan: ${use})`, () => {
       const hits: string[] = [];
-      for (const f of files) {
-        const rel = relative(process.cwd(), f).replace(/\\/g, "/");
-        if (Object.keys(ALLOW).some((a) => rel === a || rel.startsWith(`${a}/`))) continue;
-        for (const { line, text } of visibleTexts(readFileSync(f, "utf8"))) {
+      for (const { rel, texts } of scanned()) {
+        for (const { line, text } of texts) {
           if (pattern.test(text)) hits.push(`${rel}:${line}  ${text.slice(0, 90)}`);
         }
       }
       expect(hits, `Yasaklı terim "${term}" bulundu:\n${hits.join("\n")}`).toEqual([]);
-    }, 60_000);
+    }, 30_000);
   }
 });

@@ -20,6 +20,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // src/ metin dosyaları koşu başına bir kez okunur (sözleşme testleri paylaşır): test-support/src-tree.ts.
+    globalSetup: ["./vitest.global-setup.ts"],
     // pglite'lı SQL testlerinin beforeAll kurulumu tam koşu yükünde 10 sn varsayılanı aşıyor.
     hookTimeout: 60_000,
     // Testler .env.local'a bağımlı olmamalı; DB'ye giden hiçbir test yok.

@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { readCached, walkSource } from "./test-support/src-tree";
 import { describe, expect, it } from "vitest";
 import { DEFINITION_CATEGORIES, SYSTEM_DEFINITION_VALUES, isSystemDefinitionValue } from "@/lib/definition-defaults";
 import { defaultStageLabels, resolveStageLabels, stageLabelMap, stageName } from "@/lib/deal-stage-labels";
@@ -56,14 +56,6 @@ describe("aşama etiketi çözümleyici", () => {
 
 // Sabit-metin tarama: aşama adı basan yerler tek yardımcıdan okumalı (ham `label: "Müzakere"` gibi sabitler yasak).
 const SRC = join(process.cwd(), "src");
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
-    else if (/\.(ts|tsx)$/.test(name) && !/\.test\.(ts|tsx)$/.test(name)) out.push(full);
-  }
-  return out;
-}
 
 describe("aşama adı sabit metin sözleşmesi", () => {
   it("anlaşma aşaması adları yalnız definition-defaults.ts içinde sabit yazılır", () => {
@@ -71,10 +63,10 @@ describe("aşama adı sabit metin sözleşmesi", () => {
     const allowed = [/^lib\/definition-defaults\.ts$/, /^app\/admin\//];
     const patterns = [/qualified:\s*"Nitelikli"/, /negotiation:\s*"Müzakere"/, /\{\s*key:\s*"negotiation",\s*label:/, /value:\s*"negotiation",\s*label:/];
     const offenders: string[] = [];
-    for (const f of walk(SRC)) {
+    for (const f of walkSource(SRC)) {
       const rel = relative(SRC, f).split(sep).join("/");
       if (allowed.some((a) => a.test(rel))) continue;
-      const text = readFileSync(f, "utf8");
+      const text = readCached(f);
       for (const re of patterns) if (re.test(text)) offenders.push(`${rel}: ${re}`);
     }
     expect(offenders).toEqual([]);
