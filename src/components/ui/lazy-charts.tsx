@@ -12,6 +12,8 @@
  * Sunucu bileşeninden doğrudan `dynamic()` kod bölmediği için kapı bir istemci modülüdür.
  */
 import dynamic from "next/dynamic";
+import { useEffect, useState, type ComponentType } from "react";
+import { isSoftNavigated } from "@/lib/soft-nav";
 import { SkeletonCard } from "@/components/ui/viz/skeleton-card";
 
 export { ChartFrame, ChartCard } from "@/components/ui/chart-frame";
@@ -26,7 +28,39 @@ function ChartSkeleton() {
   return <SkeletonCard height="100%" label="Grafik yükleniyor" />;
 }
 
-export const AreaTrend = dynamic(() => chartModule().then((m) => m.AreaTrend), { loading: ChartSkeleton });
-export const BarCompare = dynamic(() => chartModule().then((m) => m.BarCompare), { loading: ChartSkeleton });
-export const DonutSplit = dynamic(() => chartModule().then((m) => m.DonutSplit), { loading: ChartSkeleton });
-export const AreaTrendChart = dynamic(() => chartModule().then((m) => m.AreaTrendChart), { loading: ChartSkeleton });
+const AreaTrendLazy = dynamic(() => chartModule().then((m) => m.AreaTrend), { loading: ChartSkeleton });
+const BarCompareLazy = dynamic(() => chartModule().then((m) => m.BarCompare), { loading: ChartSkeleton });
+const DonutSplitLazy = dynamic(() => chartModule().then((m) => m.DonutSplit), { loading: ChartSkeleton });
+const AreaTrendChartLazy = dynamic(() => chartModule().then((m) => m.AreaTrendChart), { loading: ChartSkeleton });
+
+/**
+ * Yumuşak gezinmede (menüden sayfa geçişi) Recharts'ın ilk ölçüm+çizimi 200-300 ms'lik tek bir uzun görev
+ * yaratıyordu. Bu kapı, gezinmeyle gelen grafikleri önce iskeletle boyar; Recharts'ı ilk boyamadan SONRA
+ * (requestIdleCallback, yoksa kısa zamanlayıcı) kurar. Sayfa ilk açıldığında (sunucu HTML'i + hidrasyon) davranış
+ * değişmez: grafik hemen çizilir. Hidrasyonda `data-soft-nav` yoktur, bu yüzden uyuşmazlık oluşmaz.
+ */
+function withIdleGate<P extends object>(Chart: ComponentType<P>): ComponentType<P> {
+  function IdleGated(props: P) {
+    const [ready, setReady] = useState(() => !isSoftNavigated());
+    useEffect(() => {
+      if (ready) return;
+      const w = window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      };
+      if (w.requestIdleCallback) {
+        const id = w.requestIdleCallback(() => setReady(true), { timeout: 400 });
+        return () => w.cancelIdleCallback?.(id);
+      }
+      const t = setTimeout(() => setReady(true), 80);
+      return () => clearTimeout(t);
+    }, [ready]);
+    return ready ? <Chart {...props} /> : <ChartSkeleton />;
+  }
+  return IdleGated;
+}
+
+export const AreaTrend = withIdleGate(AreaTrendLazy);
+export const BarCompare = withIdleGate(BarCompareLazy);
+export const DonutSplit = withIdleGate(DonutSplitLazy);
+export const AreaTrendChart = withIdleGate(AreaTrendChartLazy);
