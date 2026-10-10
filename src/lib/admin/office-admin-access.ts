@@ -17,7 +17,6 @@ export const OFFICE_ADMIN_ACTIONS = [
   "edit_billing_profile",
   "change_slug",
   "plan_status",
-  "extend_trial",
   "suspend",
   "reactivate",
   "resend_access",
@@ -58,7 +57,6 @@ export function officeAdminCan(role: PlatformRole, action: OfficeAdminAction): b
       return role === "ops" || role === "support";
     case "edit_billing_profile":
     case "plan_status":
-    case "extend_trial":
     case "reactivate":
       return platformCanAccess(role, "billing");
     case "add_user":

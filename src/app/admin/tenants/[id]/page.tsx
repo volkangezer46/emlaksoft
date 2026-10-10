@@ -24,7 +24,7 @@ import { tryBalance } from "@/lib/try-credits/wallet";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
 import { getPlan, planLabel, PLANS } from "@/lib/billing/plans";
-import { DAY_MS, daysAgoIso, daysFromNowIso, now } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, now } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
@@ -194,7 +194,6 @@ export default async function AdminTenantDetailPage({
         notes={mgmt.notes.map((n) => ({ ...n, createdLabel: relativeTimeTR(n.createdAt) }))}
         provinces={mgmt.provinces}
         plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
-        minTrialDate={daysFromNowIso(1).slice(0, 10)}
         legalHref={tabHref("yasal")}
         closureRequests={mgmt.closureRequests.map((r) => ({ ...r, dueLabel: r.dueAt.slice(0, 10) }))}
       />

@@ -78,7 +78,6 @@ export type OfficeUserResult = OfficeActionResult & {
 type Admin = ReturnType<typeof createAdminClient>;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DAY_MS = 86_400_000;
 const NOT_FOUND = "Ofis bulunamadı.";
 const RATE_LIMITED = "Çok sık işlem yapıldı. Lütfen biraz sonra tekrar deneyin.";
 
@@ -580,78 +579,8 @@ export async function changeTenantSlugByAdmin(formData: FormData): Promise<Offic
 }
 
 // ---------------------------------------------------------------------------
-// DENEME SÜRESİ + YAŞAM DÖNGÜSÜ (askıya alma / etkinleştirme / arşiv / geri yükleme)
+// YAŞAM DÖNGÜSÜ (askıya alma / etkinleştirme / arşiv / geri yükleme)
 // ---------------------------------------------------------------------------
-
-export async function extendTenantTrialByAdmin(formData: FormData): Promise<OfficeActionResult> {
-  const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "extend_trial")) return { error: OFFICE_ADMIN_DENIED };
-
-  const tenantId = uuidField(formData, "id");
-  if (!tenantId) return { error: NOT_FOUND };
-  const dateRaw = field(formData, "trial_ends_on");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) return { error: "Geçerli bir bitiş tarihi seçin." };
-  // Seçilen günün sonu, Türkiye saatiyle.
-  const endMs = Date.parse(`${dateRaw}T23:59:59+03:00`);
-  const nowMs = Date.now();
-  if (!Number.isFinite(endMs) || endMs <= nowMs) return { error: "Deneme bitişi bugünden sonraki bir tarih olmalı." };
-  if (endMs > nowMs + 365 * DAY_MS) return { error: "Deneme bitişi en çok bir yıl sonrası olabilir." };
-  if (await rateLimited("trial", staff.id, 20, 600)) return { error: RATE_LIMITED };
-
-  const admin = createAdminClient();
-  const { data: tenant, error: readError } = await admin
-    .from("tenants")
-    .select("id, status, trial_ends_at")
-    .eq("id", tenantId)
-    .maybeSingle();
-  if (readError || !tenant) return { error: NOT_FOUND };
-  if (tenant.status !== "trial" && tenant.status !== "past_due") {
-    return { error: "Deneme süresi yalnız denemedeki ya da süresi dolmuş (ödeme gecikmiş) ofiste uzatılır." };
-  }
-
-  // Süresi dolmuş ofis: önce deneme durumuna geri alınır (atomik RPC; denetim kaydını kendisi yazar).
-  const reopened = tenant.status === "past_due";
-  if (reopened) {
-    const statusForm = new FormData();
-    statusForm.set("id", tenantId);
-    statusForm.set("status", "trial");
-    const statusResult = await updateTenantPlanStatus(statusForm);
-    if (!statusResult.ok) return { error: statusResult.error ?? actionErrorMessage(null, "Ofis deneme durumuna alınamadı.") };
-  }
-
-  const endsAt = new Date(endMs).toISOString();
-  const nowIso = new Date(nowMs).toISOString();
-  // Deneme bitişini cron `subscriptions.trial_ends_at` üzerinden okur: önce abonelik.
-  const { data: subRows, error: subError } = await admin
-    .from("subscriptions")
-    .update({ trial_ends_at: endsAt, current_period_end: endsAt, updated_at: nowIso })
-    .eq("tenant_id", tenantId)
-    .select("id");
-  if (subError || (subRows?.length ?? 0) !== 1) {
-    console.error("extendTenantTrialByAdmin:subscription", subError);
-    return { error: "Abonelik kaydı güncellenemedi; deneme süresi değişmedi." };
-  }
-  const { error: tenantError } = await admin
-    .from("tenants")
-    .update({ trial_ends_at: endsAt, updated_at: nowIso })
-    .eq("id", tenantId);
-  if (tenantError) {
-    console.error("extendTenantTrialByAdmin:tenant", tenantError);
-    return { error: "Deneme süresi abonelikte uzatıldı ancak ofis kaydına yazılamadı. İşlemi tekrar deneyin." };
-  }
-
-  await logPlatformActivity({
-    actorId: staff.id,
-    action: "tenant.trial_extend",
-    entityType: "tenant",
-    entityId: tenantId,
-    meta: { old_trial_ends_at: tenant.trial_ends_at ?? null, new_trial_ends_at: endsAt, reopened },
-  });
-
-  revalidateOffice(tenantId);
-  revalidatePath("/admin/billing");
-  return { ok: true, message: reopened ? "Ofis yeniden denemeye alındı ve süre uzatıldı." : "Deneme süresi uzatıldı." };
-}
 
 const LIFECYCLE = {
   suspend: { gate: "suspend", status: "suspended", audit: "tenant.suspend", needsName: true, needsReason: true },

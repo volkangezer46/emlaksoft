@@ -39,6 +39,7 @@ Kod yorumlarındaki `HAFIZA §N` eski numaradır: `§7` = aşağıdaki "Kalıcı
 
 ## 3. Kalıcı kararlar (değişmez, tekrar sorulmaz) — eski §7
 
+- Deneme süresi uzatılmaz; deneme bitince paket satın alınır (2026-10-10).
 - Yanıtlar Türkçe. Popup yok, sekme/panel. Kararları sormadan ver (sert güvenlik hariç: zorunlu 2FA/TOTP vb. onaysız eklenmez; `PLATFORM_MFA_ENFORCEMENT=on` yayın öncesi açılacak, şu an kapalı). Özet panelinde maskeleme yok.
 - Fiyat kataloğu (kullanıcı onaylı): Danışman 749 · Ofis 2.490 (ek kullanıcı 399) · Profesyonel 4.990 (15 kullanıcı, ek 349) · Business 8.990 (varsayılan gizli) · Kurumsal 12.900 (50 kullanıcı dahil, ek 249/199/149 kademeli, en fazla 500; "özel teklif" YOK, `customPricing` kaldırıldı); yıllık "10 öde 12"; ücretsiz paket YOK; deneme süresi tek kaynak (`getEffectiveTrialDays`; `platform_settings.default_trial_days`, yoksa 14 gün); Founders admin düzenlenebilir; ödül/ortak oranları kodda sabit DEĞİL. Mekanizması olmayan hizmet vaatleri (öncelikli destek/SLA...) kataloglardan çıkarıldı.
 - Aylık kontör hakkı (`efCreditsMonthly`): Danışman 10 · Ofis 40 · Profesyonel 120 · Business 240 (gizli) · Kurumsal 400; ek kullanıcı başı Danışman 5 · Ofis/Profesyonel/Kurumsal 6 (cron `ef-kontor-hak`). Ek rapor paketi = admin kontör kataloğu (`ef.packs`).

@@ -9,7 +9,6 @@ import {
   Archive,
   Ban,
   Building2,
-  CalendarClock,
   Check,
   Copy,
   CreditCard,
@@ -39,7 +38,6 @@ import {
   changeTenantOwnerEmailByAdmin,
   changeTenantSlugByAdmin,
   checkOfficeSlugAvailability,
-  extendTenantTrialByAdmin,
   resendTenantOwnerAccessLink,
   setTenantLifecycleByAdmin,
   setTenantUserActiveByAdmin,
@@ -104,8 +102,6 @@ export type OfficeManagementProps = {
   notes: (ManagementNote & { createdLabel: string })[];
   provinces: { id: string; name: string }[];
   plans: PlanOption[];
-  /** Deneme uzatma tarih alanının en küçük değeri (yarın, TR; YYYY-AA-GG). */
-  minTrialDate: string;
   legalHref: string;
   closureRequests: { id: string; type: "account_closure" | "data_export"; status: string; dueLabel: string; note: string | null; requestedBy: ClosureRequestRow["requestedBy"] }[];
 };
@@ -266,7 +262,7 @@ export function OfficeManagement(props: OfficeManagementProps) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {can.edit_profile || can.edit_billing_profile ? <ProfileSection {...props} /> : null}
-      {can.plan_status || can.extend_trial ? <PlanSection {...props} /> : null}
+      {can.plan_status ? <PlanSection {...props} /> : null}
       {can.change_slug ? <SlugSection tenant={tenant} /> : null}
       <OwnerSection {...props} />
       {showUsers ? <UsersSection {...props} /> : null}
@@ -406,8 +402,8 @@ function ProfileSection({ tenant, can, provinces }: OfficeManagementProps) {
 
 const SAFE_STATUSES = ["trial", "active", "past_due"] as const;
 
-function PlanSection({ tenant, can, plans, minTrialDate }: OfficeManagementProps) {
-  const [mode, setMode] = useState<"none" | "plan" | "trial">("none");
+function PlanSection({ tenant, can, plans }: OfficeManagementProps) {
+  const [mode, setMode] = useState<"none" | "plan">("none");
   const planAct = useOfficeAction(
     async (fd: FormData): Promise<OfficeActionResult> => {
       const res = await updateTenantPlanStatus(fd);
@@ -415,10 +411,8 @@ function PlanSection({ tenant, can, plans, minTrialDate }: OfficeManagementProps
     },
     () => setMode("none"),
   );
-  const trialAct = useOfficeAction(extendTenantTrialByAdmin, () => setMode("none"));
   const [plan, setPlan] = useState(tenant.plan);
   const selected = plans.find((p) => p.id === plan);
-  const trialEligible = tenant.status === "trial" || tenant.status === "past_due";
   const locked = tenant.status === "suspended" || tenant.status === "cancelled";
 
   return (
@@ -446,21 +440,6 @@ function PlanSection({ tenant, can, plans, minTrialDate }: OfficeManagementProps
             }}
           >
             <CreditCard className="h-3.5 w-3.5" aria-hidden /> Paketi / durumu değiştir
-          </button>
-        ) : null}
-        {can.extend_trial ? (
-          <button
-            type="button"
-            className={btn}
-            aria-expanded={mode === "trial"}
-            disabled={!trialEligible}
-            title={trialEligible ? undefined : "Deneme yalnız denemedeki ya da süresi dolmuş ofiste uzatılır"}
-            onClick={() => {
-              trialAct.clear();
-              setMode(mode === "trial" ? "none" : "trial");
-            }}
-          >
-            <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Deneme süresini uzat
           </button>
         ) : null}
       </div>
@@ -505,28 +484,7 @@ function PlanSection({ tenant, can, plans, minTrialDate }: OfficeManagementProps
         </InlineArea>
       ) : null}
 
-      {mode === "trial" ? (
-        <InlineArea title="Deneme süresini uzat" tone={tenant.status === "past_due" ? "warn" : "default"}>
-          <form onSubmit={(e) => trialAct.run(formDataOf(e, tenant.id))} className="grid gap-3 sm:grid-cols-2">
-            <FormField label="Yeni deneme bitişi" htmlFor="mgmt-trial" required hint="Seçilen günün sonuna kadar geçerlidir.">
-              <FormInput id="mgmt-trial" name="trial_ends_on" type="date" required min={minTrialDate} />
-            </FormField>
-            {tenant.status === "past_due" ? (
-              <p className="self-end text-xs font-semibold text-amber-700">
-                Ofisin süresi dolmuş. Onaylarsanız ofis yeniden «Deneme» durumuna alınır ve süre uzatılır.
-              </p>
-            ) : null}
-            <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button type="submit" className={btnPrimary} disabled={trialAct.pending}>
-                {trialAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />} Süreyi uzat
-              </button>
-              <button type="button" className={btn} onClick={() => setMode("none")}>Vazgeç</button>
-            </div>
-          </form>
-        </InlineArea>
-      ) : null}
-
-      <Feedback state={mode === "trial" ? trialAct.state : mode === "plan" ? planAct.state : (trialAct.state ?? planAct.state)} />
+      <Feedback state={planAct.state} />
     </Section>
   );
 }

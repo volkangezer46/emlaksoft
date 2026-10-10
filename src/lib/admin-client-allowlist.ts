@@ -135,7 +135,6 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/platform-tenants.ts", fn: "changeTenantSlugByAdmin", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/platform-tenants.ts", fn: "checkOfficeSlugAvailability", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/platform-tenants.ts", fn: "createTenantByAdmin", calls: 1, tenantFilter: "var" },
-  { file: "src/app/actions/platform-tenants.ts", fn: "extendTenantTrialByAdmin", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/platform-tenants.ts", fn: "resendTenantOwnerAccessLink", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/platform-tenants.ts", fn: "setTenantLifecycleByAdmin", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/platform-tenants.ts", fn: "setTenantUserActiveByAdmin", calls: 1, tenantFilter: "var" },

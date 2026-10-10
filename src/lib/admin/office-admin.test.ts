@@ -71,7 +71,6 @@ describe("ofis yönetimi rol kapısı", () => {
   it("paket/deneme eylemleri faturalama yetkisi ister", () => {
     expect(officeAdminCan("billing", "plan_status")).toBe(true);
     expect(officeAdminCan("ops", "plan_status")).toBe(false);
-    expect(officeAdminCan("billing", "extend_trial")).toBe(true);
   });
   it("süper admin her eylemi yapar", () => {
     for (const a of OFFICE_ADMIN_ACTIONS) expect(officeAdminCan("super_admin", a)).toBe(true);
