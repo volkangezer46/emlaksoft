@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";
 import { getChangesSince } from "@/lib/listing-control/server/readers";
 import { buildChangeLines } from "@/components/listing-control/helpers";
-import { loadStaleDeals, type HomeCtx } from "./data";
+import { afterFirstScreen, loadStaleDeals, type HomeCtx } from "./data";
 import { buildAdvisorWarnings, crmChangeItems, nonZero, type ChangeItem } from "./ofis-nabzi-core";
 
 /** Danışman sinyallerinde okunan en çok satır (PostgREST 1000 sınırının altında; tavana ulaşılırsa not düşülür). */
@@ -19,6 +19,7 @@ type Ids = { ids: (string | null)[]; capped: boolean } | null;
  */
 export async function OfisNabzi({ ctx }: { ctx: HomeCtx }) {
   if (!ctx.isManagement || ctx.scopeMine || !ctx.tenantId) return null;
+  await afterFirstScreen(ctx);
   const supabase = await createClient();
   const since = daysAgoIso(1);
   const nowIso = daysAgoIso(0);

@@ -8,7 +8,7 @@ import { trDayKey } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { createClient } from "@/lib/supabase/server";
-import type { HomeCtx } from "./data";
+import { afterFirstScreen, type HomeCtx } from "./data";
 
 type ExpenseRow = { id: string; title: string | null; amount: number | string | null; expense_date: string };
 
@@ -39,6 +39,7 @@ export function splitExpenses(rows: readonly ExpenseRow[], monthStartKey: string
  * görebilen role çizilir (sayfa `canSeeExpenses` ile kapıyı kurar). Satır sayısı kırpılırsa toplam gösterilmez.
  */
 export async function GiderOzeti({ ctx }: { ctx: HomeCtx }) {
+  await afterFirstScreen(ctx);
   const { rows, truncated } = await loadExpenses(ctx);
   const s = splitExpenses(rows, ctx.monthStartKey);
   return (

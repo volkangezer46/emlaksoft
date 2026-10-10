@@ -2,7 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { MessageCircle, Phone, Zap } from "lucide-react";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { Widget } from "../dashboard-widgets";
-import { loadActivityFeed, type HomeCtx } from "./data";
+import { afterFirstScreen, loadActivityFeed, type HomeCtx } from "./data";
 import { formatTrTime } from "@/lib/clock";
 import { PanelLink } from "./ortak";
 
@@ -14,6 +14,7 @@ const actionBtn =
 
 /** Son 24s birleşik aktivite akışı — tip bazlı hızlı aksiyonlarla. Denetim bağlantısı yalnız yönetimde (`layout.auditLink`). */
 export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; auditLink?: boolean }) {
+  await afterFirstScreen(ctx);
   const feed = await loadActivityFeed(ctx);
   const items: FeedItem[] = [
     ...feed.customers.map((c) => ({

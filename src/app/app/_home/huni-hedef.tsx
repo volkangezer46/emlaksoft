@@ -5,7 +5,7 @@ import { FunnelChart } from "@/components/ui/viz";
 import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/lib/clock";
 import { moneyTry } from "@/lib/leak-shield";
-import { loadCommissionSummary, loadDeals, loadDemandCounts, loadMyTarget, loadOfficeTarget, type HomeCtx } from "./data";
+import { afterFirstScreen, loadCommissionSummary, loadDeals, loadDemandCounts, loadMyTarget, loadOfficeTarget, type HomeCtx } from "./data";
 import { pipelineStats } from "./helpers";
 import { FUNNEL_SEQUENTIAL, funnelRows, monthProgress, targetPace, type TargetPace } from "./home-metrics";
 
@@ -135,6 +135,7 @@ function targetBars(args: { target: TargetRow; revenueActual: number | null; dea
  * kapalı, yerine aşama payı). Altında ofis hedefi: çubuk + gerçekleşme + "gerekli hız".
  */
 export async function HuniHedef({ ctx }: { ctx: HomeCtx }) {
+  await afterFirstScreen(ctx);
   const [demand, deals, target, commission] = await Promise.all([
     loadDemandCounts(ctx),
     loadDeals(ctx),
@@ -180,6 +181,7 @@ export async function HuniHedef({ ctx }: { ctx: HomeCtx }) {
 
 /** KİŞİSEL HEDEF (danışman/takım lideri): yalnız kendi hedefi, kendi komisyonu ve kendi kazanılan anlaşmaları. */
 export async function KisiselHedef({ ctx }: { ctx: HomeCtx }) {
+  await afterFirstScreen(ctx);
   const [target, commission, deals] = await Promise.all([loadMyTarget(ctx), loadCommissionSummary(ctx), loadDeals(ctx)]);
   const mine = deals.filter((d) => d.assigned_to === ctx.userId && d.stage === "won" && (d.updated_at ?? "") >= ctx.monthStartIso).length;
   return (

@@ -8,7 +8,7 @@ import { ScopeSwitch } from "@/components/ui/scope-switch";
 import { PERIODS } from "@/components/ui/premium";
 import { now, trParts } from "@/lib/clock";
 import { WidgetEditToggle } from "../dashboard-widgets";
-import { loadAttention, type HomeCtx } from "./data";
+import { loadAttention, warmHomeFirstScreen, type HomeCtx } from "./data";
 import { greetingFor } from "./helpers";
 import { heroContextLabel, type HomeLayout } from "./home-layout";
 import { heroFocus } from "./home-metrics";
@@ -60,6 +60,8 @@ const iconBtn =
  * altında hızlı eylemler. Komut araması üst çubukta (Ctrl K) olduğu için burada yok.
  */
 export function AnaHero({ ctx, layout, params, officeView, hasName }: { ctx: HomeCtx; layout: HomeLayout; params: HomeParams; officeView: boolean; hasName: boolean }) {
+  // Ağaçta İLK çizilen sunucu bileşeni: ilk ekran yükleyicilerini burada başlat (boş-ofis kapısı ve durum bandı beklenmeden).
+  warmHomeFirstScreen(ctx, layout);
   const nowMs = now();
   const quick = QUICK[layout.variant];
   return (

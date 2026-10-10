@@ -10,7 +10,7 @@ import { healthyPercent, kpiHref, sumSummaryRows, type GroupParam } from "@/comp
 import { KpiCard } from "@/components/ui/kpi-card";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EXPIRING_CAP, loadClosures, loadExpiringAuthority, loadLiveListings, type HomeCtx } from "./data";
+import { afterFirstScreen, EXPIRING_CAP, loadClosures, loadExpiringAuthority, loadLiveListings, type HomeCtx } from "./data";
 import { overdueListingsOf, portalHealth } from "./helpers";
 
 /**
@@ -53,6 +53,7 @@ function Satir({ href, tone, icon, title, sub }: { href: string; tone: "danger" 
 }
 
 async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSagligiClosed }) {
+  await afterFirstScreen(ctx); // ağır blok: sorguları ilk ekran bitince başlar
   const canPortals = !closed.portals && (ctx.perms.portals ?? []).includes("view");
   const ownRow = ctx.isManagement && ctx.scopeMine;
   const officeClosures = !closed.leak && ctx.isManagement && !ctx.scopeMine;

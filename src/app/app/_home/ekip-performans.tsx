@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { now, trDayKey } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
-import type { HomeCtx } from "./data";
+import { afterFirstScreen, type HomeCtx } from "./data";
 import { monthProgress, rankTeam, teamStatus, TEAM_STATUS_LABEL, type TeamStatus } from "./home-metrics";
 
 const MAX_ROWS = 8;
@@ -43,6 +43,7 @@ function CellLink({ href, label, children }: { href: string; label: string; chil
  * Satır 38px, sütunlar hizalı (tabular-nums); ad kişi sayfasına, her sayı danışman + metrik süzgeçli listeye gider.
  */
 export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
+  await afterFirstScreen(ctx); // ağır blok: sorguları ilk ekran bitince başlar
   const nowMs = now();
   const supabase = await createClient();
   const res = await loadAdvisorMetrics(supabase, {

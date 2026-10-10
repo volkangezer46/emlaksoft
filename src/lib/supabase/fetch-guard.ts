@@ -59,7 +59,8 @@ function hedgeDelay(path: string): number {
 function logTiming(path: string, ms: number) {
   if (!serverTimingEnabled()) return;
   const m = /\/(?:rest\/v1\/(?:rpc\/)?|auth\/v1\/)([a-z0-9_]+)/i.exec(path);
-  console.info(`[server-timing] ${formatServerTiming(`db-${m?.[1] ?? "diger"}`, ms)}`);
+  // bitis= süreç başlangıcından ms: aynı istekteki turların art arda mı yan yana mı gittiğini gösterir.
+  console.info(`[server-timing] ${formatServerTiming(`db-${m?.[1] ?? "diger"}`, ms)} bitis=${performance.now().toFixed(0)}`);
 }
 
 function logSlow(path: string, ms: number, hedged: boolean, outcome: string) {

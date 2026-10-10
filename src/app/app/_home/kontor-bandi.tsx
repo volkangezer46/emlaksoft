@@ -3,7 +3,7 @@ import { getEfCatalog, readEfBalance } from "@/lib/ef-credits/credit-reader";
 import { getEfPublicState } from "@/lib/ef-credits/public-state";
 import { canManageEfCredits, shouldShowLowBalanceBanner } from "@/lib/ef-credits/visibility";
 import { KontorBandiKutu } from "./kontor-bandi-client";
-import type { HomeCtx } from "./data";
+import { afterFirstScreen, type HomeCtx } from "./data";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 
@@ -14,6 +14,7 @@ const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 export async function KontorBandi({ ctx, valuationClosed }: { ctx: HomeCtx; valuationClosed: boolean }) {
   if (!ctx.tenantId || ctx.tvMode || !canManageEfCredits(ctx.role) || valuationClosed) return null;
   let data: { state: "low" | "empty"; available: number } | null = null;
+  await afterFirstScreen(ctx); // ikincil bant: sorguları ilk ekran bitince başlar
   try {
     const efState = await getEfPublicState();
     if (!efState.live) return null;

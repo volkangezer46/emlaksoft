@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { KeyRound, Layers } from "lucide-react";
 import { moneyTry } from "@/lib/leak-shield";
-import { loadRentalsAndProjects, type HomeCtx } from "./data";
+import { afterFirstScreen, loadRentalsAndProjects, type HomeCtx } from "./data";
 
 const cell =
   "focus-ring group block rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition hover:border-brand-300 hover:bg-surface";
@@ -13,6 +13,7 @@ const cell =
  */
 export async function KiralamaProje({ ctx }: { ctx: HomeCtx }) {
   if (!ctx.canSeeRentals && !ctx.canSeeProjects) return null;
+  await afterFirstScreen(ctx);
   const { activeRentals, rentCharges, projects } = await loadRentalsAndProjects(ctx);
 
   const rentPendingThisMonth = rentCharges
