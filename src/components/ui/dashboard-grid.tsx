@@ -92,7 +92,16 @@ function isCell(node: unknown): node is CellElement {
   return isValidElement(node) && node.type === DashCell;
 }
 
-export function DashboardGrid({ className, children, ...props }: ComponentProps<"div">) {
+export function DashboardGrid({
+  className,
+  children,
+  stagger = true,
+  ...props
+}: ComponentProps<"div"> & {
+  /** İlk giriş stagger'ı (varsayılan açık). İskelet ızgarasında ve iskeletin yerine geçen içerikte kapatın:
+   *  yoksa iskelet "belirir", yerini alan içerik de sıfır opaklıktan tekrar "belirir" (çift yükleme hissi). */
+  stagger?: boolean;
+}) {
   // Yalnız doğrudan DashCell çocukları hesaba girer; başka düğüm varsa (elle yerleşim) dokunulmaz.
   const items = Children.toArray(children);
   const cells = items.length > 0 && items.every(isCell) ? (items as CellElement[]) : null;
@@ -107,7 +116,7 @@ export function DashboardGrid({ className, children, ...props }: ComponentProps<
     );
   }
   return (
-    <div className={cn("list-stagger grid grid-cols-1 items-stretch gap-4 md:grid-cols-6 xl:grid-cols-12", className)} {...props}>
+    <div className={cn(stagger && "list-stagger", "grid grid-cols-1 items-stretch gap-4 md:grid-cols-6 xl:grid-cols-12", className)} {...props}>
       {content}
     </div>
   );
