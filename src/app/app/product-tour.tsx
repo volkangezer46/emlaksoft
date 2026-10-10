@@ -268,8 +268,9 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
   let cardTop: number;
   let cardLeft: number;
   if (mobile) {
-    // Telefon: balon ekranın altına sabit, tam genişlik
-    cardTop = Math.max(16, vh - CARD_H - 16);
+    // Telefon: balon alt sekme çubuğunun (~72 px) ÜSTÜNE oturur, tam genişlik
+    // (çubuğa binip dokunmayı engellemesin)
+    cardTop = Math.max(16, vh - CARD_H - 88);
     cardLeft = 16;
   } else if (vh - holeBottom >= CARD_H + GAP + 8) {
     cardTop = holeBottom + GAP;

@@ -18,10 +18,13 @@ import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboa
 import { DeferredSection } from "@/components/ui/deferred-section";
 // Doğrudan dosyadan: `ui/motion` barrel'ı Reveal/MotionProvider (motion çekirdeği ~19 KB) ile birlikte gelir; FadeSwap 0 KB CSS.
 import { FadeSwap } from "@/components/ui/motion/fade-swap";
-import { parsePeriod } from "@/components/ui/premium";
+import { NeYapmak } from "./_home/ne-yapmak";
+import { neYapmakChips } from "./_home/ne-yapmak-chips";
+import { BugunKisayol, BugunKisayolIskelet } from "./_home/bugun-kisayol";
+import { BugunOfiste } from "./_home/bugun-ofiste";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
 import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
-import { buildHomeBounds, type HomeCtx } from "./_home/data";
+import { buildHomeBounds, parseHomePeriod, type HomeCtx } from "./_home/data";
 import { preloadDashboardSnapshot } from "./_home/data-batch";
 import { BlokIskelet, PanelIskelet } from "./_home/ortak";
 import { HosgeldinKredisi } from "./_home/hosgeldin-kredisi";
@@ -70,11 +73,11 @@ export const metadata = { title: "Ana ekran" };
 export default async function AppHomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tv?: string; donem?: string; kapsam?: string; daha?: string; icgoru?: string }>;
+  searchParams?: Promise<{ tv?: string; donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string }>;
 }) {
   // searchParams ile oturum/yetki kapısı birbirinden bağımsız: aynı turda.
   const [sp, gate] = await Promise.all([searchParams, measure("home-gate", () => requireModulePage("dashboard"))]);
-  const { tv = "", donem, kapsam, daha, icgoru } = sp ?? {};
+  const { tv = "", donem, kapsam, daha, icgoru, ozet } = sp ?? {};
   // Eski `/app?tv=1` bağlantıları tek TV rotasına gider (kabuksuz, canlı, tam ekran).
   if (tv === "1") redirect("/app/pano-tv");
 
@@ -99,7 +102,13 @@ export default async function AppHomePage({
   const isManagement = hasOfficeWideDataScope(role);
   const layout = homeLayoutFor(role);
   // Kapsam: URL (?kapsam=) > son seçim çerezi > "ben"; yalnız yönetim rolleri ofis geneline açabilir (lib/ui/scope).
-  const { scope, explicit: kapsamParam } = resolveScope({ canSwitch: isManagement, param: kapsam, cookie: (await cookies()).get(SCOPE_COOKIE)?.value });
+  // Sahip/genel müdür için varsayılan "Ofis geneli" (seçim çerezi yoksa); diğer roller "Benim işlerim".
+  const scopeCookie = (await cookies()).get(SCOPE_COOKIE)?.value;
+  const { scope, explicit: kapsamParam } = resolveScope({
+    canSwitch: isManagement,
+    param: kapsam,
+    cookie: scopeCookie ?? (role === "owner" || role === "gm" ? "ofis" : undefined),
+  });
   const officeView = scope === "ofis";
 
   const ctx: HomeCtx = {
@@ -118,19 +127,23 @@ export default async function AppHomePage({
     canSeeProjects: (perms.projects ?? []).includes("view") && !off("projects"),
     canSeeProperties: (perms.properties ?? []).includes("view"),
     sample,
-    period: parsePeriod(donem),
+    period: parseHomePeriod(donem),
     fullName,
     firstName: fullName.split(" ")[0] || "hoş geldiniz",
     ...buildHomeBounds(),
   };
 
   const params: HomeParams = {
-    donem: donem && donem !== "30" ? donem : undefined,
+    donem: ctx.period !== 30 ? String(ctx.period) : undefined,
     kapsam: kapsamParam ?? undefined,
     daha: daha === "1" ? "1" : undefined,
     icgoru: icgoru === "tum" ? "tum" : undefined,
+    ozet: ozet === "1" ? "1" : undefined,
   };
   const moreOpen = daha === "1";
+  // "Ofis özeti" bölümü: ?ozet=1 ya da "Daha fazla" açıksa (içinde olduğu için) açık.
+  const ozetOpen = ozet === "1" || moreOpen;
+  const ozetTitle = isManagement ? "Ofis özeti" : "Özetim";
   // En olası sonraki hedefler (yalnız görme yetkisi olunanlar; kapalı modül atlanır). Boşta ısıtılır, en çok 4.
   const prefetchTargets = (
     [
@@ -172,7 +185,7 @@ export default async function AppHomePage({
     <div data-tour="brifing" className="h-full">
       <Suspense fallback={<DikkatIskelet />}>
         <FadeSwap swapKey={swapKey} className="h-full">
-          <Dikkat ctx={ctx} params={params} />
+          <Dikkat ctx={ctx} params={params} maxItems={5} />
         </FadeSwap>
       </Suspense>
     </div>
@@ -272,33 +285,53 @@ export default async function AppHomePage({
     );
   };
   const widgetWrap = (id: string | undefined, node: ReactNode) => (id ? <Widget id={id} className="h-full">{node}</Widget> : node);
-  const bottomItems = (span: 4 | 6 | 12): DeferredItem[] =>
+
+  /** "Bugün" yüzeyinde kalan alt bloklar (program, görevler); kişisel hedef ve gider özeti "Ofis özeti"ne gider. */
+  const TODAY_BOTTOM = new Set<string>(["program", "gorevler"]);
+  const bottomItemsBy = (span: 4 | 6 | 12, today: boolean): DeferredItem[] =>
     layout.bottom.flatMap((k) => {
+      if (TODAY_BOTTOM.has(k) !== today) return [];
       const node = bottomNode(k);
       return node ? [{ span, node: widgetWrap(BOTTOM_WIDGET[k], node) }] : [];
     });
+  /** Sağ sütun: büyük kısayol kartları (+ yönetimde "Bugün ofiste olanlar"). */
+  const side = (
+    <div className="flex h-full flex-col gap-4">
+      <div data-tour="kisayollar">
+        <Suspense fallback={<BugunKisayolIskelet />}>
+          <BugunKisayol ctx={ctx} />
+        </Suspense>
+      </div>
+      {layout.variant === "management" ? (
+        <Suspense fallback={<PanelIskelet rows={3} className="min-h-[10rem]" />}>
+          <BugunOfiste ctx={ctx} params={params} />
+        </Suspense>
+      ) : null}
+    </div>
+  );
+  // "Ofis özeti" (varsayılan kapalı): KPI, gelir eğrisi, ekip, huni, ilan sağlığı ve "Daha fazla" blokları.
+  const ozetRows: ReactNode[] = [];
 
   switch (layout.variant) {
     case "management":
-      rows.push(
-        grid("r1", gelir ? [cell(7, dikkat, "dikkat"), cell(5, gelir, "gelir", { widget: "gelir" })] : [cell(12, dikkat, "dikkat")]),
+      rows.push(grid("r1", [cell(7, dikkat, "dikkat"), cell(5, side, "side")]), deferredGrid("r2", bottomItemsBy(6, true)));
+      ozetRows.push(
         <Suspense key="nabiz" fallback={null}><OfisNabzi ctx={ctx} /></Suspense>,
-        deferredGrid("r2", [
+        gelir ? grid("o1", [cell(12, gelir, "gelir", { widget: "gelir" })]) : null,
+        deferredGrid("o2", [
           ...(layout.team && !off("team_perf") ? [{ span: 7 as const, node: widgetWrap("ekip-perf", ekip) }] : []),
           ...(layout.funnelTarget && !off("team_perf") ? [{ span: 5 as const, node: widgetWrap("huni-hedef", huniHedef) }] : []),
         ]),
-        deferredGrid("r3", bottomItems(4)),
+        deferredGrid("o3", bottomItemsBy(4, false)),
       );
       break;
     case "advisor":
     case "team_lead":
-      rows.push(
-        grid("r1", [
-          cell(7, brifing("Sıradaki eylem", 2), "brifing"),
-          ...(layout.callList ? [cell(5, ara, "ara", { widget: "ara" })] : []),
-        ]),
-        ...(layout.team && !off("team_perf") ? [deferredGrid("rt", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
-        deferredGrid("r2", bottomItems(4)),
+      rows.push(grid("r1", [cell(7, brifing("Sıradaki eylem", 2), "brifing"), cell(5, side, "side")]), deferredGrid("r2", bottomItemsBy(6, true)));
+      ozetRows.push(
+        layout.callList ? grid("o1", [cell(12, ara, "ara", { widget: "ara" })]) : null,
+        ...(layout.team && !off("team_perf") ? [deferredGrid("ot", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
+        deferredGrid("o2", bottomItemsBy(4, false)),
       );
       break;
     case "accounting":
@@ -312,11 +345,12 @@ export default async function AppHomePage({
             "tahsilat",
           ),
         ]),
-        deferredGrid("r2", bottomItems(12)),
       );
+      ozetRows.push(deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
     case "call_center":
-      rows.push(grid("r1", [cell(12, ara, "ara", { widget: "ara" })]), deferredGrid("r2", bottomItems(12)));
+      rows.push(grid("r1", [cell(12, ara, "ara", { widget: "ara" })]));
+      ozetRows.push(deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
   }
 
@@ -349,6 +383,7 @@ export default async function AppHomePage({
       <DashboardStack>
         <div className="flex flex-col gap-3">
           <AnaHero ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
+          <NeYapmak chips={neYapmakChips(layout.variant, role === "owner")} />
           {layout.statusBar ? (
             <DurumCubugu>
               {/* En çok 2 bant, öncelik sırasıyla: kontör (para/engel) > hoş geldin kredisi. Kurulum, profil, örnek veri ve duyurular
@@ -371,11 +406,32 @@ export default async function AppHomePage({
         <Suspense fallback={<PanelIskelet rows={2} />}>
           <BosOfisKapisi ctx={ctx}>
             <div className="flex min-w-0 flex-col gap-5">
-              {kpis}
-              {rows}
-              {layout.listingHealth ? <Widget id="ilan-sagligi"><IlanSagligi ctx={ctx} closed={{ portals: off("portals"), leak: off("leak") }} /></Widget> : null}
+              <section aria-label="Bugün" className="flex flex-col gap-3">
+                <h2 className="font-display text-lg font-bold text-text">Bugün</h2>
+                {rows}
+              </section>
 
-              {moreCells.length > 0 ? (
+              {/* Ofis özeti: KPI, gelir eğrisi, ekip, huni — varsayılan kapalı (yalnız açılınca sunucuda çizilir). */}
+              <section aria-label={ozetTitle} className="flex flex-col gap-4">
+                <Link
+                  href={homeHref(params, { ozet: ozetOpen ? undefined : "1", daha: ozetOpen ? undefined : params.daha })}
+                  scroll={false}
+                  aria-expanded={ozetOpen}
+                  className="focus-ring press inline-flex h-11 items-center gap-2 self-start rounded-full border border-hairline bg-surface-raised px-5 text-sm font-semibold text-text shadow-[var(--elev-1)] transition hover:bg-surface-hover"
+                >
+                  {ozetOpen ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+                  {ozetOpen ? `${ozetTitle} bölümünü kapat` : `${ozetTitle} (rakamlar, gelir, ekip)`}
+                </Link>
+                {ozetOpen ? (
+                  <div className="flex min-w-0 flex-col gap-5">
+                    {kpis}
+                    {ozetRows}
+                    {layout.listingHealth ? <Widget id="ilan-sagligi"><IlanSagligi ctx={ctx} closed={{ portals: off("portals"), leak: off("leak") }} /></Widget> : null}
+                  </div>
+                ) : null}
+              </section>
+
+              {ozetOpen && moreCells.length > 0 ? (
                 <section aria-label="Daha fazla" className="flex flex-col gap-4">
                   <Link
                     href={homeHref(params, { daha: moreOpen ? undefined : "1" })}

@@ -42,6 +42,7 @@ export function AttentionList({
   items,
   emptyTitle = "Şu an bekleyen iş yok",
   emptyDescription = "Yeni bir durum oluşunca burada önem sırasıyla listelenir.",
+  maxItems,
   className,
   children,
 }: {
@@ -50,6 +51,8 @@ export function AttentionList({
   items: readonly AttentionItem[];
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Verilirse en çok bu kadar satır gösterilir (sıra korunur; "Bugün" gibi sade yüzeyler için). */
+  maxItems?: number;
   className?: string;
   children?: ReactNode;
 }) {
@@ -66,7 +69,7 @@ export function AttentionList({
       </header>
       {items.length > 0 ? (
         <ul className="ds-sep -mx-1.5">
-          {items.map((it) => {
+          {(maxItems ? items.slice(0, maxItems) : items).map((it) => {
             const lv = LEVEL[it.level];
             return (
               <li key={it.id}>

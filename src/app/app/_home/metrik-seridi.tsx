@@ -17,6 +17,14 @@ import {
   type HomeCtx,
 } from "./data";
 import { weekBuckets } from "./helpers";
+import type { HomePeriod } from "./data";
+
+/** "bugün" | "30 gün" — KPI etiketi. */
+const periodText = (p: HomePeriod) => (p === 1 ? "bugün" : `${p} gün`);
+/** "Bugünkü" | "Son 30 gün" — seri açıklaması. */
+const periodSpan = (p: HomePeriod) => (p === 1 ? "Bugün" : `Son ${p} gün`);
+/** Bugün için 6 (4 saatlik) dilim; diğer dönemler ortak kural. */
+const bucketCountOf = (p: HomePeriod) => (p === 1 ? 6 : bucketCountFor(p));
 import type { MetricKey } from "./home-layout";
 import { comparedMetric, contextMetric, dedupeMetrics, hasContext, type MetricSpec } from "./home-metrics";
 
@@ -96,29 +104,29 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
       const p = await loadPeriodStats(ctx);
       return comparedMetric({
         key,
-        label: `Yeni talep · ${ctx.period} gün`,
+        label: `Yeni talep · ${periodText(ctx.period)}`,
         value: p.demands,
         previous: p.demandsPrev,
         previousText: p.demandsPrev > 0 ? `Geçen dönem ${p.demandsPrev}` : "Geçen dönem —",
         tone: "success",
         // Dönemde açılan TÜM talepler (kapalılar dahil) — sayımla aynı koşul.
         href: `/app/talepler?status=all&eklenen=${ctx.period}`,
-        series: p.demandDates ? bucketDates(p.demandDates, nowMs, ctx.period, bucketCountFor(ctx.period)) : null,
-        seriesLabel: `Son ${ctx.period} gün yeni talep dağılımı`,
+        series: p.demandDates ? bucketDates(p.demandDates, nowMs, ctx.period, bucketCountOf(ctx.period)) : null,
+        seriesLabel: `${periodSpan(ctx.period)} yeni talep dağılımı`,
       });
     }
     case "yeni-musteri": {
       const p = await loadPeriodStats(ctx);
       return comparedMetric({
         key,
-        label: `Yeni müşteri · ${ctx.period} gün`,
+        label: `Yeni müşteri · ${periodText(ctx.period)}`,
         value: p.customers,
         previous: p.customersPrev,
         previousText: p.customersPrev > 0 ? `Geçen dönem ${p.customersPrev}` : "Geçen dönem —",
         tone: "brand",
         href: `/app/musteriler?from=${trDayKey(daysAgoIso(ctx.period))}&to=${trDayKey(nowMs)}`,
-        series: p.customerDates ? bucketDates(p.customerDates, nowMs, ctx.period, bucketCountFor(ctx.period)) : null,
-        seriesLabel: `Son ${ctx.period} gün yeni müşteri dağılımı`,
+        series: p.customerDates ? bucketDates(p.customerDates, nowMs, ctx.period, bucketCountOf(ctx.period)) : null,
+        seriesLabel: `${periodSpan(ctx.period)} yeni müşteri dağılımı`,
       });
     }
     case "arama": {

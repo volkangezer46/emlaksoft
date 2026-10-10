@@ -13,7 +13,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { loadCustomerStates } from "@/lib/customer-state/load";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from "@/lib/clock";
-import type { Period } from "@/components/ui/premium";
+import { PERIODS, parsePeriod as parsePeriodBase, type Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import type { SampleKpiScope } from "@/lib/sample-scope";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
@@ -31,6 +31,13 @@ import { getSetting } from "@/lib/settings/read";
 import { moneyTry } from "@/lib/leak-shield";
 import { STALE_DAYS as DEFAULT_STALE_DAYS } from "../anlasmalar/deal-list-logic";
 import { buildAttentionItems, type HomeAttentionItem } from "./home-metrics";
+
+/** Ana ekran dönemi: "Bugün" (1) + ortak 7/30/90. */
+export type HomePeriod = 1 | Period;
+export const HOME_PERIODS: readonly HomePeriod[] = [1, ...PERIODS];
+export function parseHomePeriod(raw: string | undefined): HomePeriod {
+  return raw === "1" ? 1 : parsePeriodBase(raw);
+}
 
 /**
  * Anlık görüntü RPC'leri (tek tur) — yükleyiciler ÖNCE buna bakar. Örnek-veri kararı (`sample_included`) kodun
@@ -70,8 +77,8 @@ export type HomeCtx = {
   sample: SampleKpiScope;
   fullName: string;
   firstName: string;
-  /** Dönem seçici (?donem=7|30|90): yalnız dönem-duyarlı hero özeti ve kartlar kullanır. */
-  period: Period;
+  /** Dönem seçici (?donem=1|7|30|90; 1 = Bugün): yalnız dönem-duyarlı hero özeti ve kartlar kullanır. */
+  period: HomePeriod;
   /** targets.period_start date kolonu "YYYY-AA-01" tutar */
   monthStartKey: string;
   monthStartIso: string;
@@ -134,7 +141,8 @@ export const loadPeriodStats = cache(async (ctx: HomeCtx) => {
   // Anlık görüntü: sayaçlar + 90 günlük seriden türetilen dönem serisi. Seri TAM değilse (tavan) eski sorgu
   // çalışır ki 7/30 günlük kısa seri yine çizilebilsin (kural değişmez: kırpık seri çizilmez).
   const snapMetrics = (await snapshotFor(ctx)).metrics;
-  if (snapMetrics) {
+  // "Bugün" (1 gün) anlık görüntüde yok (p7/p30/p90): doğrudan sayım sorgusu.
+  if (snapMetrics && days !== 1) {
     const s = periodStatsFromSnapshot(snapMetrics, days, curStart);
     if (s.customerDates !== null && s.demandDates !== null) return s;
   }

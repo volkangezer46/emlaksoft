@@ -39,7 +39,7 @@ export function DikkatIskelet() {
  * Altında içgörü motorunun GERÇEK içgörüleri (`insights` okuyucusu; yoksa bölüm çizilmez, içgörü UYDURULMAZ) ve
  * opsiyonel AI özet satırı. Eski "Karar bekleyenler", "Bugün kuyruğu" ve brifing odak kartı burada birleşti.
  */
-export async function Dikkat({ ctx, params }: { ctx: HomeCtx; params: HomeParams }) {
+export async function Dikkat({ ctx, params, maxItems }: { ctx: HomeCtx; params: HomeParams; maxItems?: number }) {
   const [items, bundle] = await Promise.all([loadAttention(ctx), loadInsightBundle(ctx)]);
   const brief = pickBriefing(bundle.insights, bundle.total, INSIGHT_PREVIEW);
   const showAll = params.icgoru === "tum";
@@ -51,6 +51,7 @@ export async function Dikkat({ ctx, params }: { ctx: HomeCtx; params: HomeParams
 
   return (
     <AttentionList
+      maxItems={maxItems}
       items={items.map((i) => ({ id: i.id, label: i.label, hint: i.hint, href: i.href, level: i.level, count: i.count }))}
       emptyTitle="Şu an dikkat bekleyen iş yok"
       emptyDescription="Geciken görev, onay ya da riskli anlaşma oluşunca burada önem sırasıyla listelenir. İlan sorunları İlan sağlığı bloğundadır."
