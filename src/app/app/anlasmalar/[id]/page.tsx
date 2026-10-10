@@ -28,6 +28,8 @@ import { now } from "@/lib/clock";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { Badge } from "@/components/ui/badge";
+import { loadInvoiceButtonContext } from "@/lib/integrations/einvoice/service";
+import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
 import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/customer-state/deal";
@@ -274,6 +276,13 @@ export default async function DealDetailPage({
       : null;
 
   const canSeeCommission = (perms.commissions ?? []).includes("view") && earningsVisible;
+  // e-Fatura (Paket D): komisyon satırlarında "Fatura kes" (yetki: commissions.create + kazanç görünürlüğü; bağlantı yoksa "e-Fatura'yı bağla").
+  const invoiceCtx = await loadInvoiceButtonContext(
+    supabase,
+    canSeeCommission && (perms.commissions ?? []).includes("create"),
+    "commission",
+    komisyonlar.map((c) => c.id as string),
+  );
 
   /*
    * Memnuniyet anketi kutusu — createSurveyForDeal action'ı reports.view VE
@@ -754,7 +763,7 @@ export default async function DealDetailPage({
                             </div>
                           ))}
                         </div>
-                        <TableFrame className="mt-3" minWidth={480}>
+                        <TableFrame className="mt-3" minWidth={invoiceCtx.canInvoice ? 620 : 480}>
                           <Table>
                             <THead>
                               <TR>
@@ -762,6 +771,7 @@ export default async function DealDetailPage({
                                 <TH align="right">Brüt</TH>
                                 <TH align="right">KDV</TH>
                                 <TH>Durum</TH>
+                                {invoiceCtx.canInvoice ? <TH>Fatura</TH> : null}
                               </TR>
                             </THead>
                             <TBody>
@@ -783,6 +793,11 @@ export default async function DealDetailPage({
                                     <TD>
                                       <Badge variant={tahsil ? "success" : "warning"}>{c.status ?? "—"}</Badge>
                                     </TD>
+                                    {invoiceCtx.canInvoice ? (
+                                      <TD>
+                                        <InvoiceCutButton ctx={invoiceCtx} sourceId={c.id as string} />
+                                      </TD>
+                                    ) : null}
                                   </TR>
                                 );
                               })}

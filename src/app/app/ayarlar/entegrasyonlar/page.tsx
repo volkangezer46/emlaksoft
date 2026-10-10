@@ -4,6 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { listIntegrations, type IntegrationCategory } from "@/lib/integrations/registry";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { EInvoiceCard } from "./einvoice-card";
 export const metadata = { title: "Entegrasyonlar" };
 
 const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; sub: string }[] = [
@@ -15,7 +16,8 @@ const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; su
 ];
 
 export default async function EntegrasyonlarPage() {
-  const { tenantId } = await requireModulePage("settings");
+  const { tenantId, perms } = await requireModulePage("settings");
+  const canEditSettings = perms.settings?.includes("edit") ?? false;
   const integrations = await listIntegrations(tenantId);
   const configured = integrations.filter((i) => i.status === "configured").length;
 
@@ -93,6 +95,8 @@ export default async function EntegrasyonlarPage() {
           </section>
         );
       })}
+
+      <EInvoiceCard canEdit={canEditSettings} />
 
       <p className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 text-xs text-text-muted">
         Kurulum gerekli durumundaki bağlantılar için kimlik bilgileri ve sağlayıcı doğrulaması tamamlanmalıdır. “Planlandı”

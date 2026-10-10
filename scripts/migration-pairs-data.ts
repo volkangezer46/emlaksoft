@@ -231,6 +231,8 @@ const F = {
   buildingManagement: "20261008001700_building_management.sql",
   // Ilan analizi (2026-10-08): listing_analyses onbellek tablosu (yeni tablo + RLS; kod tablo yokken analizi "etkin degil" der, kontor dusmez).
   listingAnalyses: "20261008001800_listing_analyses.sql",
+  // e-Fatura (2026-10-10, Paket D): einvoice_connections (sifreli kimlik, sutun bazli SELECT) + einvoices + 2 DEFINER RPC; kod tablo yokken bolumu "etkin degil" der.
+  einvoice: "20261010000700_einvoice.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
 } as const;
@@ -370,6 +372,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.propertyManagementCore]: "davranis", // rent_charges durum CHECK'i 'partial' ile genisler + paid_amount; yeni tahsilat/sozlesme/odeme tablolari + 4 DEFINER RPC; eski 'odendi' tahakkuklar icin tek seferlik legacy tahsilat dolgusu
     [F.buildingManagement]: "davranis", // yeni bina/daire/tahakkuk/tahsilat tablolari + 5 DEFINER RPC + KPI RPC; owner_charge_links kind CHECK'i 'unit_charge' ile genisler, silme politikasi daralir (mahsup elle silinemez)
     [F.platformDashboardRollups]: "ek", // yeni salt-okunur service_role RPC platform_dashboard_rollups (tablo/politika/veri degismez; RPC yokken ilgili paneller "okunamadi" gosterir, uydurma sifir yok)
+    [F.einvoice]: "ek", // yeni einvoice_connections + einvoices tablolari (RLS ofis kapsamli, yazma commissions.create/settings.edit) + 2 DEFINER RPC; mevcut tablo/politika degismez
     [F.listingAnalyses]: "ek", // yeni listing_analyses tablosu (RLS: okuma ofis, yazma valuation.create); mevcut tablo/politika degismez
     [F.vitrinChatClosedListing]: "davranis", // vitrin_chat_context govdesi yeniden tanimi: kapali portfoy artik sohbet baglamina GIRMEZ (govde+ACL baska degismez)
     [F.dealProcessSteps]: "ek", // yeni deal_process_steps tablosu (RLS: okuma ofis, yazma commissions.edit); mevcut tablo/politika degismez
@@ -513,6 +516,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "MOD1-kisisel-modul-gizleme", order: 29.99987, title: "Kisisel modul gizleme tablosu (yalniz gorunurluk; sira serbest, ek)", files: [F.userModulePrefs] },
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
     { id: "PB57-tapu-sureci", order: 29.999862, title: "Tapu sureci adim takibi: deal_process_steps tablosu (kod tablo yokken bolumu etkin degil der; sira serbest)", files: [F.dealProcessSteps] },
+    { id: "PB60-e-fatura", order: 29.9998671, title: "e-Fatura entegrasyonu: baglanti (sifreli kimlik) + fatura tablolari (kod tablo yokken bolumu etkin degil der; sira serbest, ek)", files: [F.einvoice] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
     { id: "PB58-vitrin-sohbet-kapali", order: 29.999866, title: "vitrin_chat_context: kapali portfoy sizintisi duzeltmesi (000330 govdesi + suzgec; sira serbest)", files: [F.vitrinChatClosedListing] },
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
