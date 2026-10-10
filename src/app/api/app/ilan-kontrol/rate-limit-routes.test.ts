@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const checkRateLimit = vi.fn();
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: (...a: unknown[]) => checkRateLimit(...a) }));
 vi.mock("@/lib/supabase/auth-cache", () => ({ getRequestUser: async () => ({ id: "u1" }) }));
-const importPortalInventory = vi.fn(async () => ({ ok: true }));
+const importPortalInventory = vi.fn(async (..._a: unknown[]) => ({ ok: true }));
 vi.mock("@/app/actions/listing-control-inventory", () => ({ importPortalInventory: (...a: unknown[]) => importPortalInventory(...a) }));
-const workerClaim = vi.fn(async () => ({ ok: true }));
+const workerClaim = vi.fn(async (..._a: unknown[]) => ({ ok: true }));
 vi.mock("@/app/actions/listing-control-worker", () => ({
   workerClaim: (...a: unknown[]) => workerClaim(...a),
   workerComplete: vi.fn(), workerRegister: vi.fn(), workerRelease: vi.fn(), workerReportParser: vi.fn(async () => null),

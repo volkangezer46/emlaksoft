@@ -76,16 +76,21 @@ describe("bulkUpdateDealStage davranışı", () => {
   it("100 kayıt: kapı bir kez, eşzamanlılık <= 6, sıralı işlemden belirgin hızlı, hepsi güncellenir", async () => {
     const { bulkUpdateDealStage } = await import("./deals");
     const list = ids(100);
-    const t0 = performance.now();
-    const res = await bulkUpdateDealStage(list, "qualified");
-    const elapsed = performance.now() - t0;
+    // Sanal saat: yük altında bile belirlenimli (gerçek zamanlayıcıya bağlı değil).
+    vi.useFakeTimers();
+    const t0 = Date.now();
+    const pending = bulkUpdateDealStage(list, "qualified");
+    await vi.runAllTimersAsync();
+    const res = await pending;
+    const elapsed = Date.now() - t0;
+    vi.useRealTimers();
     expect(res).toMatchObject({ updated: 100, failed: 0 });
     expect(requirePermission).toHaveBeenCalledTimes(1);
     expect(rpcCalls).toHaveLength(100);
     expect(maxInFlight).toBeLessThanOrEqual(6);
     expect(maxInFlight).toBeGreaterThan(1);
     // Sıralı: 100 x 2 tur x 15 ms = 3000 ms; 6'lı: ~17 dalga x 30 ms = ~510 ms. Bol payla yarının altı.
-    expect(elapsed).toBeLessThan(1500);
+    expect(elapsed).toBeLessThan(1000);
     expect(logActivity).toHaveBeenCalledTimes(1);
   });
 

@@ -302,6 +302,10 @@ export function RegisterForm({
             <Link href="/giris" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">
               Giriş yap
             </Link>
+            {" · "}
+            <Link href="/sifre-sifirla" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">
+              Şifremi unuttum
+            </Link>
           </p>
         )}
       </div>

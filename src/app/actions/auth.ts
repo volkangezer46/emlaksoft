@@ -468,7 +468,7 @@ export async function signUp(
   }
   const tenantId = result.tenantId;
   // Başarılı provizyon: global tavan sayacı artar (en iyi çaba; kayıt zaten tamamlandı, sayaç hatası kaydı bozmaz).
-  await checkRateLimit(SIGNUP_GLOBAL_KEY, { limit: SIGNUP_GLOBAL_LIMIT, windowSec: 3600, failurePolicy: "allow" });
+  await checkRateLimit(SIGNUP_GLOBAL_KEY, { limit: SIGNUP_GLOBAL_LIMIT, windowSec: 3600, failurePolicy: "deny" }); // sonuç yok sayılır (yalnız sayaç artar); politika sözleşme gereği deny
 
   if (oauthUserId) {
     // Profil tetikleyicisi app_metadata'ya tenant_id/role yazdı; mevcut JWT'yi yenile ki proxy kapısı geçsin.
