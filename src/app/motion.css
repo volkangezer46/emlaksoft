@@ -276,7 +276,13 @@ html[data-theme="dark"] .skeleton {
    Sayfa ilk açılışta oynar; sonraki gezinmelerde içerik anında oturur ve sonsuz süs döngüleri durur
    (SVG dönüşümleri bileşik katmana alınmaz: her kare ana iş parçacığında stil+boyama). Taban stiller bitiş
    durumudur; .dashboard-chart-line gibi ilk durumu gizli olanlar BİLEREK listede yok. */
-html[data-soft-nav] :is(
-  .list-stagger > *, .motion-progress-fill, .lp-col-bar, .pipeline-fill, .viz-bar-fill, .ill-grow-x, .ill-pop,
-  .ill-float, .ill-pulse, .ill-swing
-) { animation: none; }
+html[data-soft-nav] .list-stagger > *,
+html[data-soft-nav] .motion-progress-fill,
+html[data-soft-nav] .lp-col-bar,
+html[data-soft-nav] .pipeline-fill,
+html[data-soft-nav] .viz-bar-fill,
+html[data-soft-nav] .ill-grow-x,
+html[data-soft-nav] .ill-pop,
+html[data-soft-nav] .ill-float,
+html[data-soft-nav] .ill-pulse,
+html[data-soft-nav] .ill-swing { animation: none; }
