@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
  *     Bağımlı zincirler (ikinci sorgu birinciyi kullanır) ihlal değildir. Aşağıdaki liste yalnız GEREKÇELİ istisnadır.
  * (c) "use client" bileşenleri ağır kütüphaneyi (recharts, pdf-lib, fontkit, read-excel-file ...) STATİK içe aktarmaz,
  *     ne doğrudan ne de içe aktarma zinciriyle; yalnız `next/dynamic` / dinamik `import()` (istemci paketi bölünür).
+ * (e) İstemci önbelleği: staleTimes.dynamic ≤300 + arka plan tazeleme + tam önceden yükleme + realtime + temizlik sözleşmesi.
  *     `client-bundle-contract.test.ts` (zod / kabuk panelleri) ile birlikte çalışır.
  */
 const ROOT = process.cwd();
@@ -215,12 +216,44 @@ describe("(d) sunucu Supabase istemcileri takılma korumasından (guardedFetch) 
   });
 });
 
-describe("(e) istemci router önbelleği: tekrar ziyaret anında, veri en çok 30 sn bayat", () => {
-  it("next.config staleTimes.dynamic 1..30", () => {
-    const m = readFileSync(join(ROOT, "next.config.ts"), "utf8").match(/staleTimes:\s*\{\s*dynamic:\s*(\d+)/);
+describe("(e) istemci router önbelleği: 300 sn + arka plan tazeleme + tam önceden yükleme + realtime", () => {
+  const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
+  it("next.config staleTimes.dynamic 1..300", () => {
+    const m = read("next.config.ts").match(/staleTimes:\s*\{\s*dynamic:\s*(\d+)/);
     expect(m, "staleTimes.dynamic tanımlı olmalı").not.toBeNull();
     const v = Number(m![1]);
     expect(v).toBeGreaterThanOrEqual(1);
-    expect(v).toBeLessThanOrEqual(30);
+    expect(v).toBeLessThanOrEqual(300);
+  });
+  it("staleTimes.dynamic > 30 ise arka plan tazeleme bileşeni /app ve /admin layout'unda bağlıdır", () => {
+    const v = Number(read("next.config.ts").match(/staleTimes:\s*\{\s*dynamic:\s*(\d+)/)![1]);
+    if (v <= 30) return;
+    for (const f of ["src/app/app/layout.tsx", "src/app/admin/layout.tsx"]) {
+      expect(read(f), `${f} <ClientCacheSync> bağlamalı`).toMatch(/<ClientCacheSync\b/);
+    }
+    const c = read("src/components/app/client-cache-sync.tsx");
+    expect(c).toMatch(/router\.refresh\(\)/);
+    expect(c).toMatch(/startTransition/);
+    expect(c).toMatch(/SCOPE_CHANGE_EVENT/); // kapsam değişiminde temizlik
+    expect(c).toMatch(/isGateRedirectAfterRefresh/); // kapı reddinde tam yükleme
+    expect(c).toMatch(/window\.location\.replace/);
+    expect(c).toMatch(/clearClientCacheState/); // çıkış / kimlik değişiminde temizlik
+  });
+  it("realtime: ana tablolar tenant filtreli dinlenir", () => {
+    const t = read("src/lib/realtime-throttle.ts");
+    for (const table of ["customers", "properties", "customer_demands", "appointments", "tasks", "deals", "commissions", "listing_pool_entries", "cash_entries"]) {
+      expect(t, `${table} realtime listesinde olmalı`).toContain(`"${table}"`);
+    }
+    expect(read("src/hooks/use-realtime-refresh.ts")).toMatch(/filter:\s*`tenant_id=eq\.\$\{tenantId\}`/);
+    expect(read("src/components/app/realtime-refresh.tsx")).toMatch(/REALTIME_EXTENDED_TABLES/);
+  });
+  it("tam önceden yükleme: kind full, kuyruk, ağ kapısı; menü + sekme şeridi + satır bağlantıları bağlı", () => {
+    const p = read("src/lib/client-prefetch.ts");
+    expect(p).toMatch(/"full"/);
+    expect(p).toMatch(/canPrefetchOnThisConnection/);
+    expect(read("src/lib/client-cache-policy.ts")).toMatch(/PREFETCH_CONCURRENCY\s*=\s*2/);
+    expect(read("src/components/app/app-sidebar.tsx")).toMatch(/useIdlePrefetch\(/);
+    expect(read("src/components/app/section-tabs.tsx")).toMatch(/useIdlePrefetch\(/);
+    expect(read("src/components/app/intent-link.tsx")).toMatch(/takeViewportBudget/);
   });
 });

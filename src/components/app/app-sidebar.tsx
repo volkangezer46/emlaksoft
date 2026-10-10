@@ -123,9 +123,9 @@ export function AppSidebar({
   };
   const toolsOpen = active.inTools || (!simple !== stateIds.includes("araclar-degisti"));
 
-  // Boşta ısıtılan hedefler: merkez girişleri ve alt sabit satırlar (en çok 8); etkin sayfa ve kilitliler atlanır.
+  // Boşta TAM veriyle ısıtılan hedefler: rolün tüm menü merkezleri ve alt sabit satırlar (sırayla, en çok 2 eşzamanlı); etkin sayfa ve kilitliler atlanır.
   const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
-  useIdlePrefetch(idleTargets, 8);
+  useIdlePrefetch(idleTargets, 14);
 
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (hub: NavHub) => {
