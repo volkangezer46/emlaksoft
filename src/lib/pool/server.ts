@@ -1,7 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/lib/geo/reader";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { daysAgoIso, now, trDayKey } from "@/lib/clock";
+import type { PoolSourceKey } from "./sources";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { availabilityAt, bulkPoolDecision, decidePoolAction, isPoolMode, type PoolDecision, type PoolMode } from "./modes";
 import {
@@ -17,7 +19,7 @@ import {
 /** Hem oturumlu (RLS) hem service_role istemcisiyle çalışır; tenant süzgeci HER sorguda açıktır. */
 export type Db = SupabaseClient;
 
-export type PoolSource = "manual" | "import" | "portal_form" | "network" | "api" | "transfer";
+export type PoolSource = PoolSourceKey;
 
 export type PoolRule = {
   id: string | null;
@@ -315,8 +317,26 @@ export async function computeSuggestions(
   ruleId: string | null,
   labels?: { neighborhood?: string; district?: string; province?: string },
 ): Promise<PoolSuggestion[]> {
-  const { candidates, officeAvgOpen } = await loadPoolCandidates(db, tenantId, nowMs, ruleId);
-  return rankCandidates(candidates, property, { nowMs, officeAvgOpen, labels });
+  const [{ candidates, officeAvgOpen }, resolved] = await Promise.all([
+    loadPoolCandidates(db, tenantId, nowMs, ruleId),
+    labels ? Promise.resolve(labels) : loadGeoLabels(property),
+  ]);
+  return rankCandidates(candidates, property, { nowMs, officeAvgOpen, labels: resolved });
+}
+
+/** Gerekçe cümlesi için il/ilçe/mahalle adları (sabit referans verisi, önbellekli okuyucu); hata cümleyi bozmaz. */
+async function loadGeoLabels(p: PoolProperty): Promise<{ neighborhood?: string; district?: string; province?: string }> {
+  try {
+    const first = (list: unknown) => ((list ?? []) as Row[])[0]?.name as string | undefined;
+    const [nb, ds, pv] = await Promise.all([
+      p.neighborhoodId ? getNeighborhoodsByIds([p.neighborhoodId]) : Promise.resolve([]),
+      p.districtId ? getDistrictsByIds([p.districtId]) : Promise.resolve([]),
+      p.provinceId ? getProvincesByIds([p.provinceId]) : Promise.resolve([]),
+    ]);
+    return { neighborhood: first(nb), district: first(ds), province: first(pv) };
+  } catch {
+    return {};
+  }
 }
 
 export type EnqueueInput = {
