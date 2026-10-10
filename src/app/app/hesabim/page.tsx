@@ -280,8 +280,8 @@ export default async function AccountPage({
             <div>
               <CardTitle>Görünüm: modüller</CardTitle>
               <CardDescription>
-                Kullanmadığınız modülleri kendi menünüzden, ana ekranınızdan ve aramanızdan gizleyin. Yetkinizi ve ofis
-                ayarlarını değiştirmez; verileriniz silinmez.
+                Kullanmadığınız modülü anahtarla kapatın; yalnız sizin menünüzden, ana ekranınızdan ve aramanızdan
+                kalkar. Diğer kullanıcıları etkilemez, verileriniz silinmez.
               </CardDescription>
             </div>
           </CardHeader>

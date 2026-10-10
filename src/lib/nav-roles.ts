@@ -54,7 +54,7 @@ export const NAV_CORE_BY_ROLE: Readonly<Record<AppRole, readonly string[]>> = {
   branch_manager: MANAGER_CORE,
   team_lead: ADVISOR_CORE,
   advisor: ADVISOR_CORE,
-  accounting: [HOME, "/app/giderler", "/app/aidat", "/app/komisyon", "/app/abonelik", "/app/raporlar"],
+  accounting: [HOME, "/app/giderler", "/app/kiralama", "/app/komisyon", "/app/abonelik", "/app/raporlar"],
   call_center: [HOME, "/app/gelen-kutusu", "/app/musteriler", "/app/randevular", "/app/gorevler"],
   readonly: [HOME, "/app/musteriler", "/app/talepler", "/app/portfoyler", "/app/randevular", "/app/raporlar"],
 };
