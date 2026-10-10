@@ -31,8 +31,8 @@ const full: OnboardingFacts = {
 };
 
 describe("onboarding-steps kaydı", () => {
-  it("adım sırası: ofis, sen, ekip, havuz, portallar, paket", () => {
-    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "you", "team", "pool", "portals", "plan"]);
+  it("adım sırası: ofis, sen, ekip, havuz, portallar, giderler ve kasa, paket", () => {
+    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "you", "team", "pool", "portals", "giderler-kasa", "plan"]);
     expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_DEFS.length);
   });
 
@@ -52,7 +52,7 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    expect(s.total).toBe(6);
+    expect(s.total).toBe(7);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
@@ -73,7 +73,7 @@ describe("onboarding-checklist", () => {
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
     const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(50);
+    expect(s.percent).toBe(43);
     expect(s.nextId).toBe("team");
   });
 
@@ -92,7 +92,7 @@ describe("onboarding-checklist", () => {
   });
 
   it("tüm adımlar dolu: complete", () => {
-    const s = buildOnboarding(full);
+    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true } });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(resolveWizardStep(undefined, s)).toBe("bitis");
@@ -115,8 +115,16 @@ describe("onboarding-checklist", () => {
   it("geri/ileri komşuları", () => {
     expect(wizardNeighbors("team")).toEqual({ prev: "you", next: "pool" });
     expect(wizardNeighbors("office")).toEqual({ prev: null, next: "you" });
-    expect(wizardNeighbors("plan")).toEqual({ prev: "portals", next: "bitis" });
+    expect(wizardNeighbors("plan")).toEqual({ prev: "giderler-kasa", next: "bitis" });
     expect(wizardNeighbors("bitis")).toEqual({ prev: "plan", next: null });
+  });
+});
+
+describe("giderler-kasa adımı", () => {
+  it("ofis hesabı ya da düzenli ödeme olgusundan tamamlanır", () => {
+    const done = (extra: Record<string, boolean>) => buildOnboarding({ ...empty, extra }).steps.find((x) => x.id === "giderler-kasa")?.done;
+    expect(done({})).toBe(false);
+    expect(done({ "giderler-kasa": true })).toBe(true);
   });
 });
 

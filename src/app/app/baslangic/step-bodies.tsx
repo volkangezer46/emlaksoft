@@ -17,6 +17,7 @@ import { PlanStep } from "./plan-step";
 import { PoolStep } from "./pool-step";
 import { TeamStep } from "./team-step";
 import { TitleForm } from "./you-step";
+import { GiderlerKasaStep } from "./steps/giderler-kasa-step";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
 export type StepBodyProps = {
@@ -143,6 +144,12 @@ function PortalsBody(p: StepBodyProps) {
   );
 }
 
+function GiderlerKasaBody(p: StepBodyProps) {
+  // Gider yazma yetkisi sunucuda saklanan rolden türetilir; asıl kapı action'da (expenses:create). Maaş yalnız owner/gm.
+  const canEdit = ["owner", "gm", "branch_manager", "accounting"].includes(p.role);
+  return <GiderlerKasaStep canEdit={canEdit} canSalary={p.role === "owner" || p.role === "gm"} nextHref={p.nextHref} />;
+}
+
 async function PlanBody(p: StepBodyProps) {
   const { plans, offers, trialDays, efValuationCost, efLive } = await getPublicPricing();
   return (
@@ -169,6 +176,7 @@ export const STEP_BODIES: Partial<Record<OnboardingStepId, StepBody>> = {
   team: TeamBody,
   pool: PoolBody,
   portals: PortalsBody,
+  "giderler-kasa": GiderlerKasaBody,
   plan: PlanBody,
 };
 
