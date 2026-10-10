@@ -229,6 +229,8 @@ const F = {
   dealProcessSteps: "20261008001500_deal_process_steps.sql",
   // M2 Bina & site yonetimi (2026-10-08): bina/daire + donemlik toplu aidat tahakkuku + ortak gider paylastirma + tahsilat + daire cari.
   buildingManagement: "20261008001700_building_management.sql",
+  // Finans Paket A (2026-10-10): finance_accounts + cash_entries (kasa/banka/kisisel hesap + para hareket defteri, yazma yalniz RPC).
+  financeAccountsCashEntries: "20261010000600_finance_accounts_cash_entries.sql",
   // Ilan analizi (2026-10-08): listing_analyses onbellek tablosu (yeni tablo + RLS; kod tablo yokken analizi "etkin degil" der, kontor dusmez).
   listingAnalyses: "20261008001800_listing_analyses.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
@@ -368,6 +370,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.planPricesEfTariff]: "davranis", // yeni abonelik/yenileme liste fiyati (SQL yedek) + yalniz dokunulmamis ef.* seed ayarlari; abonelik/fatura satiri ve plan override'i degismez
     [F.propertyAuthorityStatus]: "ek", // properties'e 6 nullable/varsayilanli yetki durumu sutunu + kisit + kismi indeks; mevcut satir/RLS degismez
     [F.propertyManagementCore]: "davranis", // rent_charges durum CHECK'i 'partial' ile genisler + paid_amount; yeni tahsilat/sozlesme/odeme tablolari + 4 DEFINER RPC; eski 'odendi' tahakkuklar icin tek seferlik legacy tahsilat dolgusu
+    [F.financeAccountsCashEntries]: "ek", // yeni finance_accounts/cash_entries tablolari (RLS: kisisel hesap yalniz sahibine) + 12 finance_* RPC; mevcut tablo/davranis degismez, kod tablolar yokken eski Giderler akisina duser
     [F.buildingManagement]: "davranis", // yeni bina/daire/tahakkuk/tahsilat tablolari + 5 DEFINER RPC + KPI RPC; owner_charge_links kind CHECK'i 'unit_charge' ile genisler, silme politikasi daralir (mahsup elle silinemez)
     [F.platformDashboardRollups]: "ek", // yeni salt-okunur service_role RPC platform_dashboard_rollups (tablo/politika/veri degismez; RPC yokken ilgili paneller "okunamadi" gosterir, uydurma sifir yok)
     [F.listingAnalyses]: "ek", // yeni listing_analyses tablosu (RLS: okuma ofis, yazma valuation.create); mevcut tablo/politika degismez
@@ -518,6 +521,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P12-kazanc-gizliligi", order: 30, title: "AYRI PENCERE (EN SON): kazanc gizliligi RLS", files: [F.earningsPrivacy], separate: true },
     { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999863, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
     { id: "PB55-admin-panel-toplulastirma", order: 29.999864, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
+    { id: "FIN-A-kasa-banka-hareket-defteri", order: 29.999868, title: "Finans: kasa/banka/kisisel hesap + para hareket defteri (komisyon/kira/aidat tahsilat baglari; kod tablolar yokken eski Giderler akisina duser; 001100 ve 001700'den SONRA)", files: [F.financeAccountsCashEntries] },
     { id: "PB57-bina-site-yonetimi", order: 29.999867, title: "Bina & site yonetimi: bina/daire modeli, donemlik toplu aidat tahakkuku, ortak gider paylastirma, tahsilat ve daire cari (M1 omurgasina baglanir; kod tablolar yokken sekmeyi gizler)", files: [F.buildingManagement] },
   ],
 

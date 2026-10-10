@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { now, trDayKey } from "@/lib/clock";
+import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
 
 export type CommissionSplitInput = { label: string; rate: number };
-export type CommissionResult = { ok?: boolean; error?: string };
+export type CommissionResult = { ok?: boolean; error?: string; info?: string };
 
 /**
  * Komisyon paylaşımını (çok taraflı split) günceller. Oranlar (%) verilir,
@@ -69,6 +71,7 @@ export async function updateCommissionSplits(
  */
 export async function markCommissionsPaidBulk(
   ids: string[],
+  accountId?: string | null,
 ): Promise<CommissionResult & { updated?: number }> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -85,7 +88,7 @@ export async function markCommissionsPaidBulk(
     .in("id", clean)
     .eq("tenant_id", gate.tenantId)
     .not("status", "in", "(paid,collected)")
-    .select("id");
+    .select("id, gross_amount");
 
   if (error) {
     console.error("markCommissionsPaidBulk", error);
@@ -93,6 +96,17 @@ export async function markCommissionsPaidBulk(
   }
 
   const updatedIds = (data ?? []).map((r) => r.id as string);
+  // Istege bagli "Hangi hesaba girdi?": secildiyse her tahsilat icin ofis hesabina bir hareket (ayni komisyon iki kez yazilmaz).
+  let info: string | undefined;
+  if (accountId) {
+    const today = trDayKey(now());
+    for (const row of data ?? []) {
+      const warn = await recordCollectionCash(supabase, {
+        accountId, sourceType: "commission", sourceId: row.id as string, amount: Number(row.gross_amount), date: today, title: "Komisyon tahsilatı",
+      });
+      if (warn) info = warn;
+    }
+  }
   if (updatedIds.length > 0) {
     await logActivity({
       tenantId: gate.tenantId,
@@ -106,7 +120,7 @@ export async function markCommissionsPaidBulk(
 
   revalidatePath("/app/komisyon");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, updated: updatedIds.length };
+  return { ok: true, updated: updatedIds.length, info };
 }
 
 /**
@@ -159,6 +173,9 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
   if (!updated || updated.length === 0) {
     return { error: "Kayıt bu sırada değişti. Sayfayı yenileyip tekrar deneyin." };
   }
+
+  // Bu tahsilat bir hesaba hareket olarak yazildiysa o hareket de iptal olur (bakiye/ozet tutarli kalir).
+  await voidCollectionCash(supabase, "commission", id, "Komisyon tahsilatı geri alındı");
 
   await logActivity({
     tenantId: gate.tenantId,

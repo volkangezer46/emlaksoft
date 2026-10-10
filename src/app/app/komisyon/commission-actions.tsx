@@ -9,6 +9,7 @@ import { convertWorkflow } from "@/app/actions/workflow";
 import { revertCommissionPayment } from "@/app/actions/commissions";
 import { createPaymentLink } from "@/app/actions/payment-links";
 import { useToast } from "@/components/app/toast-provider";
+import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function CommissionActions({
@@ -23,6 +24,7 @@ export function CommissionActions({
   const { push } = useToast();
   const router = useRouter();
   const [busy, setBusy] = useState<"paid" | "link" | "revert" | null>(null);
+  const [accountId, setAccountId] = useState("");
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   // Satır içi "Ödeme linkleri" paneli (popup yok): liste, iptal, süre uzatma.
   const [linksOpen, setLinksOpen] = useState(false);
@@ -71,11 +73,13 @@ export function CommissionActions({
     const fd = new FormData();
     fd.set("action", "mark_commission_paid");
     fd.set("commission_id", commissionId);
+    if (accountId) fd.set("account_id", accountId);
     const res = await convertWorkflow(fd);
     setBusy(null);
     if (res.error) push(res.error, "err");
     else {
       push("Komisyon tahsil edildi olarak işaretlendi", "ok");
+      if (res.info) push(res.info, "err");
       router.refresh();
     }
   }
@@ -118,6 +122,7 @@ export function CommissionActions({
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex flex-wrap items-center justify-end gap-2">
+        {!paid ? <FinanceAccountPicker value={accountId} onChange={setAccountId} /> : null}
         {!paid ? (
           <button
             type="button"

@@ -13,6 +13,7 @@ import { formatIban, isValidTrIban, normalizeIban } from "@/lib/property-managem
 import { exceedsBalance } from "@/lib/property-management/ledger";
 import { loadOwnerFinance } from "@/lib/property-management/load";
 import { isPaymentMethod, isPayoutMethod } from "@/lib/property-management/payments";
+import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
 
 /**
  * Mülk yönetimi (M1) server action'ları. Tümü `rentals` modülü kapısında; yazma yolları veritabanı RPC'leridir
@@ -64,6 +65,8 @@ export async function recordRentPayment(input: {
   paidOn: string;
   method: string;
   bankNote?: string;
+  /** Istege bagli "Hangi hesaba girdi?" (ofis hesabi); bossa davranis ayni. */
+  accountId?: string | null;
 }): Promise<PmResult> {
   const gate = await requirePermission("rentals", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -97,8 +100,12 @@ export async function recordRentPayment(input: {
   const outcome = typeof res.outcome === "string" ? res.outcome : "invalid_result";
   if (outcome !== "recorded") return { error: outcomeError(outcome, { remaining: typeof res.remaining === "number" ? res.remaining : undefined }) };
 
+  const paymentId = String(res.payment_id ?? "");
+  const info = paymentId
+    ? await recordCollectionCash(supabase, { accountId: input.accountId, sourceType: "rent", sourceId: paymentId, amount: amount.value, date: input.paidOn, title: "Kira tahsilatı" })
+    : null;
   refresh(gate.tenantId, input.rentalId);
-  return { ok: true, id: String(res.payment_id ?? ""), receiptNo: Number(res.receipt_no) || undefined };
+  return { ok: true, id: paymentId, receiptNo: Number(res.receipt_no) || undefined, info: info ?? undefined };
 }
 
 /** Tahsilat iptali (geri alma): silinmez; neden zorunlu, durum yeniden türetilir, denetim kaydı yazılır. */
@@ -119,6 +126,7 @@ export async function voidRentPayment(input: { paymentId: string; rentalId: stri
   }
   const outcome = typeof asObject(data).outcome === "string" ? String(asObject(data).outcome) : "invalid_result";
   if (outcome !== "voided") return { error: outcomeError(outcome) };
+  await voidCollectionCash(supabase, "rent", input.paymentId, "Kira tahsilatı iptal edildi");
 
   refresh(gate.tenantId, input.rentalId);
   return { ok: true };

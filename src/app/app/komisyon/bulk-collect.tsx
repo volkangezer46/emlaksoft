@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, X } from "lucide-react";
 import { markCommissionsPaidBulk } from "@/app/actions/commissions";
 import { useToast } from "@/components/app/toast-provider";
+import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 
 /**
  * Toplu tahsilat seçimi — sunucu tarafında render edilen defter satırlarına
@@ -60,6 +61,7 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
   const { push } = useToast();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [accountId, setAccountId] = useState("");
   if (!ctx || allIds.length === 0) return null;
 
   const count = ctx.selected.size;
@@ -68,11 +70,12 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
   async function collect() {
     if (!ctx || ctx.selected.size === 0) return;
     setBusy(true);
-    const res = await markCommissionsPaidBulk(Array.from(ctx.selected));
+    const res = await markCommissionsPaidBulk(Array.from(ctx.selected), accountId || null);
     setBusy(false);
     if (res.error) push(res.error, "err");
     else {
       push(`${res.updated ?? 0} komisyon tahsil edildi olarak işaretlendi`, "ok");
+      if (res.info) push(res.info, "err");
       ctx.clear();
       router.refresh();
     }
@@ -95,6 +98,7 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
           <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-xs font-bold text-accent-text">
             {count} seçili
           </span>
+          <FinanceAccountPicker value={accountId} onChange={setAccountId} />
           <button
             type="button"
             onClick={collect}

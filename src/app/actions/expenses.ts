@@ -11,10 +11,11 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { parseExpenseFinanceFields } from "@/lib/finance/expense-finance-input";
 import { isMissingFinanceSchema } from "@/lib/finance/load";
+import { cashCategoryForExpense } from "@/lib/finance/cash/categories";
 
 const FINANCE_MISSING = "Tekrarlayan gider / portal eşlemesi için veritabanı güncellemesi bekleniyor. Bu alanları boş bırakıp kaydedin.";
 
-export type ExpenseResult = { ok?: boolean; error?: string; id?: string };
+export type ExpenseResult = { ok?: boolean; error?: string; id?: string; info?: string };
 
 type PropertyRef = { property_code: string | null; title: string | null };
 
@@ -73,10 +74,33 @@ export async function createExpense(
 
   if (error || !data) return { error: isMissingFinanceSchema(error) ? FINANCE_MISSING : actionErrorMessage(error, "Gider kaydedilemedi.") };
 
+  // İsteğe bağlı "Hangi hesaptan çıktı?": seçildiyse aynı gider için ofis hesabına çıkış hareketi (gider kaydı tek gerçek kalır).
+  let info: string | undefined;
+  const accountId = String(fd.get("account_id") ?? "").trim();
+  if (accountId) {
+    const { data: moved, error: moveError } = await supabase.rpc("finance_record_entry", {
+      p_account_id: accountId,
+      p_direction: "out",
+      p_amount: amount,
+      p_entry_date: expenseDate,
+      p_category: cashCategoryForExpense(category),
+      p_title: title,
+      p_note: notes,
+      p_document_url: receiptUrl,
+      p_source_type: "manual",
+      p_source_id: null,
+      p_expense_id: data.id,
+    });
+    const outcome = (moved as { outcome?: string } | null)?.outcome;
+    if (moveError || outcome !== "recorded") {
+      info = "Gider kaydedildi ancak seçilen hesaba hareket yazılamadı. Finans > Hareketler'den ekleyebilirsiniz.";
+    }
+  }
+
   revalidatePath("/app/giderler");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
   revalidateTenantData(gate.tenantId);
-  return { ok: true, id: data.id };
+  return { ok: true, id: data.id, info };
 }
 
 export async function updateExpense(
