@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { createContext, useContext, useState, useSyncExternalStore } from "react";
-import { cn } from "@/lib/utils";
+// cn() (tailwind-merge, ~9 KB gz) bilerek kullanılmaz: public ana sayfa paketine girmesin.
 import { formatAnimatedNumber, type AnimatedNumberFormat } from "./animated-number-format";
 
 /**
@@ -72,7 +72,7 @@ export function AnimatedNumber({
   const text = formatAnimatedNumber(value, format);
 
   return (
-    <span className={cn("tabular-nums", className)}>
+    <span className={className ? `tabular-nums ${className}` : "tabular-nums"}>
       {reduce ? (
         text
       ) : (

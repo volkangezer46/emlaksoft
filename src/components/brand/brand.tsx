@@ -35,13 +35,15 @@ type BrandProps = {
   height?: number;
   className?: string;
   alt?: string;
+  /** Ekran altı logo (ör. alt bilgi): tembel yüklenir ve React'ın otomatik önyükleme (preload) ipucu üretilmez. */
+  lazy?: boolean;
   /** Verilirse bileşen yerine bu meta kullanılır (önizleme/test). */
   metaOverride?: BrandMeta;
 };
 
 const MARK_ASPECT = 1;
 
-export function Brand({ variant = "horizontal", tone = "light", height = 32, className, alt = "EmlakSoft", metaOverride }: BrandProps) {
+export function Brand({ variant = "horizontal", tone = "light", height = 32, className, alt = "EmlakSoft", lazy = false, metaOverride }: BrandProps) {
   const ctx = useBrandMeta();
   const meta = metaOverride ?? ctx;
   const style = { height, width: "auto", aspectRatio: variant === "mark" ? String(MARK_ASPECT) : undefined } as const;
@@ -75,6 +77,7 @@ export function Brand({ variant = "horizontal", tone = "light", height = 32, cla
       className={`block shrink-0 ${className ?? ""}`}
       data-brand={variant}
       decoding="async"
+      loading={lazy ? "lazy" : undefined}
     />
   );
 }
