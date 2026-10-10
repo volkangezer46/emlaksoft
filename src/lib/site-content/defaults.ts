@@ -171,7 +171,7 @@ export function defaultSiteContent(): SiteContent {
         { id: "vitrin", eyebrow: "Vitrin", title: "Kendi adresinizde ofis vitrini", text: "Portföyleriniz, favoriler ve değerleme formuyla herkese açık sayfa.", points: [], hidden: false },
         { id: "performans", eyebrow: "Ekip ve performans", title: "Karne, lig ve hedefler", text: "Danışman KPI, ekip ligi ve hedefler tek yerde; ekibi sayılarla yönetin.", points: [], hidden: false },
       ],
-      note: "İllüstrasyonlardaki isim ve sayılar örnek veridir. Özelliklerin kapsamı pakete göre değişir; deneme boyunca hepsi açıktır.",
+      note: "Özelliklerin kapsamı pakete göre değişir; deneme boyunca hepsi açıktır.",
     },
     why: {
       oldLabel: "Excel + WhatsApp + defter",
