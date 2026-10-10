@@ -85,7 +85,6 @@ export default async function ParselValuationPage({ searchParams }: { searchPara
         balance={state.balance?.available ?? 0}
         unitsArsa={state.tariff.valuationArsa}
         unitsKonut={state.tariff.valuationKonut}
-        unitsPdf={state.tariff.pdfFirst}
       />
 
       <ReportArchive reports={reports} params={archiveParams} canSeeAll={canSeeAll} userNames={userNames} />

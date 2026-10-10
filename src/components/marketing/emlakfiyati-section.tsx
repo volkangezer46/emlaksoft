@@ -68,11 +68,12 @@ export function EfPackTiersTable({ packs, tariff, live }: { packs: EfPack[]; tar
   return (
     <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
       <table className="w-full min-w-[34rem] border-collapse">
-        <caption className="sr-only">Ek kontör paketleri ve kontör başı net fiyat</caption>
+        <caption className="sr-only">Süreli ek kontör paketleri ve kontör başı net fiyat</caption>
         <thead className="border-b border-line bg-surface-2">
           <tr>
             <th scope="col" className={TH}>Paket</th>
             <th scope="col" className={TH}>Kontör</th>
+            <th scope="col" className={TH}>Süre</th>
             <th scope="col" className={TH}>Net fiyat</th>
             <th scope="col" className={TH}>Kontör başı net</th>
             <th scope="col" className={TH}>Yaklaşık değerleme</th>
@@ -86,6 +87,7 @@ export function EfPackTiersTable({ packs, tariff, live }: { packs: EfPack[]; tar
               <tr key={pack.id}>
                 <th scope="row" className="px-3 py-2.5 text-left text-sm font-semibold text-ink-950">{pack.name}</th>
                 <td className={TD}>{formatNumberTr(pack.units)}</td>
+                <td className={TD}>{pack.months} ay</td>
                 <td className={TD}>{formatNumberTr(q.netTry)} ₺ + KDV</td>
                 <td className={TD}>{formatNumberTr(q.unitNetTry)} ₺</td>
                 <td className={TD}>{m > 0 ? `yaklaşık ${formatNumberTr(m)}` : "-"}</td>

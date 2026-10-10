@@ -7,10 +7,7 @@ import {
   efCreditsLine,
   monthlyUnitsOf,
   monthlyUnitsWithSeats,
-  planCarryCap,
   planDeltaIdempotencyKey,
-  planExpireIdempotencyKey,
-  planExpiryAmount,
   planMonthlyIdempotencyKey,
   welcomeEligible,
   welcomeIdempotencyKey,
@@ -236,29 +233,5 @@ describe("plan yükseltme farkı (aynı ay)", () => {
   it("monthGranted yoksa (okunamadı) eski ön eleme: fark verilmez", () => {
     const d = decideGrants({ ...base, planMonthly: { office: 120 }, candidates: [cand()], monthlyGranted: new Set(["plan:t1:2026-10"]) });
     expect(d.grants).toEqual([]);
-  });
-});
-
-describe("plan kontörü devir tavanı (saf hesap = SQL ef_credit_expire_plan)", () => {
-  it("tavan = 3 aylık hak; hak yoksa 0", () => {
-    expect(planCarryCap(40)).toBe(120);
-    expect(planCarryCap(1000)).toBe(3000);
-    expect(planCarryCap(0)).toBe(0);
-    expect(planExpireIdempotencyKey("2026-10")).toBe("plan-expire:2026-10");
-  });
-  it("fazla düşer; tavan altında düşmez", () => {
-    // 5 ay biriktirmiş (200 verilmiş, 0 harcanmış): 120 kalır, 80 düşer.
-    expect(planExpiryAmount({ available: 200, planGranted: 200, usageSpent: 0, expired: 0, keep: 120 })).toBe(80);
-    expect(planExpiryAmount({ available: 100, planGranted: 100, usageSpent: 0, expired: 0, keep: 120 })).toBe(0);
-  });
-  it("harcama önce plan kontöründen sayılır; paket kontörü (available - planKalan) düşmez", () => {
-    // plan 200, 50 harcama -> plan kalan 150; paket 500 ayrıca: available 650. keep 120 -> 30 düşer, paket 500 korunur.
-    expect(planExpiryAmount({ available: 650, planGranted: 200, usageSpent: 50, expired: 0, keep: 120 })).toBe(30);
-  });
-  it("daha önce düşülen sayılır (ikinci hesap 0); available planKalan'ı aşamaz (açık rezerv)", () => {
-    expect(planExpiryAmount({ available: 120, planGranted: 200, usageSpent: 0, expired: 80, keep: 120 })).toBe(0);
-    // 100 kontör rezervde: available 50 -> planKalan 50 (negatif bakiye yok), tavan 120 altında.
-    expect(planExpiryAmount({ available: 50, planGranted: 150, usageSpent: 0, expired: 0, keep: 120 })).toBe(0);
-    expect(planExpiryAmount({ available: -5, planGranted: 150, usageSpent: 0, expired: 0, keep: 0 })).toBe(0);
   });
 });

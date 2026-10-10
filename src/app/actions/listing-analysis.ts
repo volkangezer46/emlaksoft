@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { runListingAnalysis, type ListingAnalysisOutcome } from "@/lib/ef-credits/listing-analysis";
 
 /**
- * İlan analizi (1 kontör). Yetki: valuation.create (kontör düşüren işlem); hız sınırı; ücretlendirme ve 24 saat önbellek
+ * İlan analizi (KONTÖRSÜZ). Yetki: valuation.create; hız sınırı; 24 saat önbellek
  * `src/lib/ef-credits/listing-analysis.ts`tedir. Kullanıcıya EmlakFiyati anahtarı/URL'si ASLA dönmez.
  */
 

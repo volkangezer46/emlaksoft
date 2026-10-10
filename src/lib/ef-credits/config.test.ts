@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   EF_DEFAULT_PACKS,
   EF_DEFAULT_TARIFF,
+  EF_PACK_MONTHS,
   EF_WELCOME_DEFAULT_UNITS,
+  EF_WELCOME_VALID_DAYS,
+  buildDefaultEfPacks,
+  efPackMonthlyUnits,
   efEntryValuationUnits,
   efPacksSchema,
   parseEfWelcomeUnits,
@@ -22,6 +26,7 @@ const pack = (over: Partial<EfPack>): EfPack => ({
   id: "baslangic",
   name: "Başlangıç",
   units: 10,
+  months: 1,
   priceNetTry: 100,
   active: true,
   order: 1,
@@ -33,37 +38,33 @@ describe("ef-credits config: tarife", () => {
     expect(parseEfTariff(null)).toEqual(EF_DEFAULT_TARIFF);
     expect(parseEfTariff("{")).toEqual(EF_DEFAULT_TARIFF);
     expect(parseEfTariff(JSON.stringify({ valuationArsa: -1 }))).toEqual(EF_DEFAULT_TARIFF);
-    expect(parseEfTariff(JSON.stringify({ ...EF_DEFAULT_TARIFF, pdfFirst: 1.5 }))).toEqual(EF_DEFAULT_TARIFF);
+    expect(parseEfTariff(JSON.stringify({ ...EF_DEFAULT_TARIFF, valuationTicari: 1.5 }))).toEqual(EF_DEFAULT_TARIFF);
   });
-  it("varsayılan tarife (1 kontör = 1 TL): konut 700, arsa 850, ticari 1.050, ilan analizi 1, ilk PDF rapora dahil (0)", () => {
+  it("varsayılan tarife (1 kontör = 1 TL): konut 700, arsa 850, ticari 1.050; kontör YALNIZ değerleme için (başka kalem yok)", () => {
     expect(EF_DEFAULT_TARIFF).toEqual({
       valuationArsa: 850,
       valuationKonut: 700,
       valuationTicari: 1050,
-      listingAnalysis: 1,
-      pdfFirst: 0,
-      reportDetail: 0,
     });
+    expect(Object.keys(EF_DEFAULT_TARIFF).every((k) => k.startsWith("valuation"))).toBe(true);
     expect(efUnitsFor("valuation_ticari")).toBe(1050);
-    expect(efUnitsFor("listing_analysis")).toBe(1);
     expect(efEntryValuationUnits(EF_DEFAULT_TARIFF)).toBe(700);
     expect(efEntryValuationUnits({ valuationArsa: 0, valuationKonut: 0, valuationTicari: 0 })).toBe(0);
   });
-  it("eski (4 alanlı) kayıt geçerli kalır: eksik alanlar yeni varsayılanla tamamlanır, kayıtlı değerler korunur", () => {
-    const old = parseEfTariff(JSON.stringify({ valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0 }));
-    expect(old).toEqual({ valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0, valuationTicari: 1050, listingAnalysis: 1 });
+  it("eski (pdfFirst/reportDetail/listingAnalysis içeren) kayıt geçerli kalır: kontörsüz kalemler yok sayılır, değerleme değerleri korunur", () => {
+    const old = parseEfTariff(JSON.stringify({ valuationArsa: 5, valuationKonut: 5, pdfFirst: 2, reportDetail: 0, listingAnalysis: 1 }));
+    expect(old).toEqual({ valuationArsa: 5, valuationKonut: 5, valuationTicari: 1050 });
   });
   it("tek işlem 10.000 kontöre kadar girilebilir; üstü reddedilir", () => {
     expect(parseEfTariff(JSON.stringify({ ...EF_DEFAULT_TARIFF, valuationTicari: 10000 })).valuationTicari).toBe(10000);
     expect(parseEfTariff(JSON.stringify({ ...EF_DEFAULT_TARIFF, valuationTicari: 10001 }))).toEqual(EF_DEFAULT_TARIFF);
   });
   it("gidiş-dönüş ve kalem eşleme", () => {
-    const t = { valuationArsa: 7, valuationKonut: 9, pdfFirst: 2, reportDetail: 0, valuationTicari: 11, listingAnalysis: 1 };
+    const t = { valuationArsa: 7, valuationKonut: 9, valuationTicari: 11 };
     expect(parseEfTariff(serializeEfTariff(t))).toEqual(t);
     expect(efUnitsFor("valuation_arsa", t)).toBe(7);
     expect(efUnitsFor("valuation_konut", t)).toBe(9);
-    expect(efUnitsFor("pdf_first", t)).toBe(2);
-    expect(efUnitsFor("report_detail", t)).toBe(0);
+    expect(efUnitsFor("valuation_ticari", t)).toBe(11);
   });
 });
 
@@ -75,12 +76,25 @@ describe("ef-credits config: paketler", () => {
     expect(parseEfPacks("[")).toEqual([]);
     expect(parseEfPacks(JSON.stringify([{ id: "X", name: "a", units: 0 }]))).toEqual([]);
   });
-  it("varsayılan paketler: 100→100, 500→475, 1.000→900, 2.500→2.125, 5.000→4.000 TL; birim fiyat azalır, uyarı yok", () => {
-    expect(EF_DEFAULT_PACKS.map((p) => [p.units, p.priceNetTry])).toEqual([[100, 100], [500, 475], [1000, 900], [2500, 2125], [5000, 4000]]);
-    expect(EF_DEFAULT_PACKS.map((p) => efPackUnitPriceTry(p))).toEqual([1, 0.95, 0.9, 0.85, 0.8]);
+  it("varsayılan katalog (2026-10-10): aylık 1.000/2.500/5.000 kontör x 1/3/6/12 ay = 12 paket; uzun süreye %0/%5/%10/%15 indirim; uyarı yok", () => {
+    expect(EF_DEFAULT_PACKS).toHaveLength(12);
+    expect(EF_DEFAULT_PACKS.map((p) => [efPackMonthlyUnits(p), p.months, p.units, p.priceNetTry])).toEqual([
+      [1000, 1, 1000, 1000], [1000, 3, 3000, 2850], [1000, 6, 6000, 5400], [1000, 12, 12000, 10200],
+      [2500, 1, 2500, 2500], [2500, 3, 7500, 7125], [2500, 6, 15000, 13500], [2500, 12, 30000, 25500],
+      [5000, 1, 5000, 5000], [5000, 3, 15000, 14250], [5000, 6, 30000, 27000], [5000, 12, 60000, 51000],
+    ]);
+    expect(new Set(EF_DEFAULT_PACKS.map((p) => p.months))).toEqual(new Set(EF_PACK_MONTHS));
+    expect(EF_DEFAULT_PACKS.filter((p) => p.months === 12).map((p) => efPackUnitPriceTry(p))).toEqual([0.85, 0.85, 0.85]);
     expect(efPackWarnings([...EF_DEFAULT_PACKS])).toEqual([]);
     expect(efPacksSchema.safeParse(EF_DEFAULT_PACKS).success).toBe(true);
+    expect(new Set(EF_DEFAULT_PACKS.map((p) => p.id)).size).toBe(12);
     expect(EF_DEFAULT_PACKS.filter((p) => p.popular)).toHaveLength(1);
+    expect(buildDefaultEfPacks()).toEqual([...EF_DEFAULT_PACKS]);
+  });
+  it("süre alanı olmayan eski kayıt 12 ay sayılır; geçersiz süre reddedilir", () => {
+    const legacy = parseEfPacks(JSON.stringify([{ id: "eski", name: "Eski paket", units: 25, priceNetTry: 299, active: true, order: 1 }]));
+    expect(legacy[0]?.months).toBe(12);
+    expect(parseEfPacks(JSON.stringify([{ id: "eski", name: "Eski paket", units: 25, months: 2, priceNetTry: 299, active: true, order: 1 }]))).toEqual([]);
   });
   it("sıralar, yinelenen kimliği atar, gidiş-dönüş çalışır", () => {
     const list = [pack({ id: "buyuk", units: 100, priceNetTry: 800, order: 2 }), pack({}), pack({ id: "buyuk", units: 5 })];
@@ -92,6 +106,9 @@ describe("ef-credits config: paketler", () => {
     expect(efPackUnitPriceTry(pack({ units: 10, priceNetTry: 100 }))).toBe(10);
     const warn = efPackWarnings([pack({}), pack({ id: "buyuk", name: "Büyük", units: 100, priceNetTry: 2000, order: 2 })]);
     expect(warn.join(" ")).toContain("mantıksız");
+    // Aynı aylık kontörde uzun süre kısadan pahalı olamaz.
+    const longer = efPackWarnings([pack({ units: 1000, months: 1, priceNetTry: 1000 }), pack({ id: "uzun", name: "Uzun", units: 3000, months: 3, priceNetTry: 3600, order: 2 })]);
+    expect(longer.join(" ")).toContain("indirimli olmalı");
     expect(efPackWarnings([pack({ active: false })]).join(" ")).toContain("Aktif paket yok");
     expect(efPackWarnings([])).toEqual([]);
   });
@@ -127,8 +144,8 @@ describe("ef-credits config: hoş geldin kontörü", () => {
     expect(parseEfWelcomeUnits("abc")).toBe(100);
     expect(parseEfWelcomeUnits("5000")).toBe(100);
   });
-  it("hoş geldin kontörü ilan analizini (1 kontör) karşılar ama tek başına değerleme raporunu karşılamaz", () => {
-    expect(EF_WELCOME_DEFAULT_UNITS / EF_DEFAULT_TARIFF.listingAnalysis).toBe(100);
+  it("hoş geldin kontörü tek başına değerleme raporunu karşılamaz ve 30 gün sonra yanar", () => {
     expect(EF_WELCOME_DEFAULT_UNITS).toBeLessThan(efEntryValuationUnits(EF_DEFAULT_TARIFF));
+    expect(EF_WELCOME_VALID_DAYS).toBe(30);
   });
 });

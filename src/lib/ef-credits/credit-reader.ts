@@ -23,33 +23,48 @@ import { normalizeLedgerRow, parseEfBalance, type EfMovement } from "@/lib/ef-cr
 
 /** Cüzdan hazır mı? SQL tarafındaki `ef_credit_ready()` (true = RPC'ler + fulfill credit_pack dalı hazır). */
 export const EF_READY_RPC = "ef_credit_ready";
+/** Süreli kontör partileri hazır mı (20261010000300)? false iken paket SATIŞI kapalı kalır; bakiye/harcama eski akışla sürer. */
+export const EF_LOTS_READY_RPC = "ef_credit_lots_ready";
 export const EF_CONFIG_CACHE_TAG = "ef-credit-config";
 const HISTORY_FETCH_LIMIT = 1000;
 
 const cachedReady = () =>
   unstable_cache(
-    async (): Promise<boolean> => {
+    async (): Promise<{ wallet: boolean; lots: boolean }> => {
       try {
         const admin = createAdminClient();
         const { data, error } = await admin.rpc(EF_READY_RPC);
-        return !error && data === true;
+        const wallet = !error && data === true;
+        if (!wallet) return { wallet: false, lots: false };
+        // Süreli parti şeması yoksa (RPC yok/hata) lots=false: paket satışı kapalı, geri kalanı eski akışla çalışır.
+        const lots = await admin.rpc(EF_LOTS_READY_RPC);
+        return { wallet, lots: !lots.error && lots.data === true };
       } catch (e) {
         console.error("getEfCreditReady", e);
-        return false;
+        return { wallet: false, lots: false };
       }
     },
-    ["ef-credit-ready-v1"],
+    ["ef-credit-ready-v2"],
     { revalidate: 60 },
   );
 
-/** Hata/şema yok = false (para tahsil eden yollar kapalı kalır). */
-export async function getEfCreditReady(): Promise<boolean> {
+async function readReadiness(): Promise<{ wallet: boolean; lots: boolean }> {
   try {
     return await cachedReady()();
   } catch (e) {
     console.error("getEfCreditReady cache", e);
-    return false;
+    return { wallet: false, lots: false };
   }
+}
+
+/** Hata/şema yok = false (para tahsil eden yollar kapalı kalır). */
+export async function getEfCreditReady(): Promise<boolean> {
+  return (await readReadiness()).wallet;
+}
+
+/** Süreli kontör partileri (20261010000300) hazır mı? Paket satışı bunu bekler; hata/şema yok = false. */
+export async function getEfLotsReady(): Promise<boolean> {
+  return (await readReadiness()).lots;
 }
 
 export type EfCatalog = { tariff: EfTariff; packs: EfPack[] };
@@ -75,13 +90,41 @@ export async function getEfCatalog(): Promise<EfCatalog> {
   }
 }
 
-/** Ofisin kontör bakiyesi; cüzdan yoksa null. */
-export async function readEfBalance(tenantId: string): Promise<EfBalance | null> {
+/** Süresi dolmamış kontör partisi (görünüm; kişisel veri yok). */
+export type EfLot = { id: string; kind: string; units: number; remaining: number; expiresAt: string };
+/** Bakiye + (şema varsa) süreli partiler. `lots` null = partiler şeması yok/okunamadı (eski akış; son kullanma gösterilmez). */
+export type EfBalanceWithLots = EfBalance & { lots: EfLot[] | null };
+
+/** Ofisin kontör bakiyesi ve süreli partileri; cüzdan yoksa null. */
+export async function readEfBalance(tenantId: string): Promise<EfBalanceWithLots | null> {
   try {
     const admin = createAdminClient();
     const { data, error } = await admin.rpc(EF_RPC.balance, { p_tenant: tenantId });
     if (error) return null;
-    return parseEfBalance(data);
+    const balance = parseEfBalance(data);
+    if (!balance) return null;
+    let lots: EfLot[] | null = null;
+    try {
+      const res = await admin
+        .from("ef_credit_lots")
+        .select("id, kind, units, remaining, expires_at")
+        .eq("tenant_id", tenantId)
+        .gt("remaining", 0)
+        .order("expires_at", { ascending: true })
+        .limit(50);
+      if (!res.error) {
+        lots = ((res.data ?? []) as { id: string; kind: string; units: number; remaining: number; expires_at: string }[]).map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          units: Number(r.units),
+          remaining: Number(r.remaining),
+          expiresAt: r.expires_at,
+        }));
+      }
+    } catch {
+      lots = null;
+    }
+    return { ...balance, lots };
   } catch (e) {
     console.error("readEfBalance", e);
     return null;

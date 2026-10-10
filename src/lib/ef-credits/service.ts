@@ -20,7 +20,7 @@ import {
   efUnitsFor,
   parseEfTariff,
   type EfBalance,
-  type EfItem,
+  type EfBillableItem,
   type EfTariff,
 } from "./config";
 import {
@@ -167,7 +167,7 @@ async function commitSafely(tenantId: string, reservationId: string, ref: Record
 
 type Hold = { kind: "none" } | { kind: "held"; reservationId: string } | { kind: "no_credit"; available: number } | { kind: "wallet_error" };
 
-async function holdUnits(a: EfActor, units: number, item: EfItem): Promise<Hold> {
+async function holdUnits(a: EfActor, units: number, item: EfBillableItem): Promise<Hold> {
   if (units <= 0) return { kind: "none" };
   const r = await efReserve({ tenantId: a.tenantId, userId: a.userId, units, idem: randomUUID(), item });
   if (!r) return { kind: "wallet_error" };
@@ -191,7 +191,7 @@ export async function runParcelValuation(p: EfActor & { input: OrtakValuationInp
   const state = await getEfFeatureState(p.tenantId);
   if (!state.ready) return { status: "disabled", message: EF_NOT_ENABLED_MESSAGE, missing: [] };
 
-  const item: EfItem = input.tip === "konut" ? "valuation_konut" : "valuation_arsa";
+  const item: EfBillableItem = input.tip === "konut" ? "valuation_konut" : "valuation_arsa";
   const units = efUnitsFor(item, state.tariff);
 
   const hold = await holdUnits(p, units, item);
@@ -224,7 +224,7 @@ async function settleValuation(
   c: {
     out: Extract<OrtakOutcome<OrtakValuationResult>, { ok: true }>;
     result: OrtakValuationOk;
-    item: EfItem;
+    item: EfBillableItem;
     units: number;
     reservationId: string | null;
     idempotencyKey: string;
@@ -300,42 +300,29 @@ export async function getOwnedReport(tenantId: string, raporId: string, viewer?:
   return { ok: true, row };
 }
 
-/** Rapor detayı (JSON). Tarife `reportDetail` (varsayılan 0) kadar kontör: 0 ise rezerve açılmaz. */
+/** Rapor detayı (JSON). KONTÖRSÜZ (sahip kararı 2026-10-10: kontör yalnız değerleme için harcanır). */
 export async function getReportDetail(p: EfActor & { raporId: string; role?: string | null }): Promise<ReportDetailResult> {
   const owned = await getOwnedReport(p.tenantId, p.raporId, p.role === undefined ? undefined : { userId: p.userId, role: p.role });
   if (!owned.ok) return { status: owned.status, message: efFailureMessage("not_found", "rapor_yok") };
   const state = await getEfFeatureState(p.tenantId);
   if (!state.ready) return { status: "disabled", message: EF_NOT_ENABLED_MESSAGE, missing: [] };
 
-  const units = efUnitsFor("report_detail", state.tariff);
-  const hold = await holdUnits(p, units, "report_detail");
-  if (hold.kind === "wallet_error") return { status: "error", kind: "disabled", code: "wallet", message: WALLET_ERROR_MESSAGE, requestId: null };
-  if (hold.kind === "no_credit") return { status: "no_credit", available: hold.available, needed: units };
-  const reservationId = hold.kind === "held" ? hold.reservationId : null;
-
   const out = await ortakRapor({ tenantId: p.tenantId, userId: p.userId, raporId: owned.row.rapor_id });
   if (!out.ok) {
-    await releaseSafely(p.tenantId, reservationId, `detail_${out.kind}`);
     await audit(p, "ef.report_detail", owned.row.rapor_id, { outcome: "error", kind: out.kind, code: out.code, request_id: out.requestId });
     return { status: "error", kind: out.kind, code: out.code, message: efFailureMessage(out.kind, out.code), requestId: out.requestId };
   }
-  let charged = 0;
-  if (reservationId) {
-    const ok = await commitSafely(p.tenantId, reservationId, { rapor_id: owned.row.rapor_id, request_id: out.requestId, item: "report_detail" });
-    if (ok) charged = units;
-  }
-  await audit(p, "ef.report_detail", owned.row.rapor_id, { outcome: "ok", units_charged: charged, request_id: out.requestId });
-  return { status: "ok", result: out.data, row: owned.row, requestId: out.requestId, unitsCharged: charged };
+  await audit(p, "ef.report_detail", owned.row.rapor_id, { outcome: "ok", units_charged: 0, request_id: out.requestId });
+  return { status: "ok", result: out.data, row: owned.row, requestId: out.requestId, unitsCharged: 0 };
 }
 
 // ---------------------------------------------------------------------------
-// PDF (ilk indirme ücretli, tekrarlar ücretsiz)
+// PDF (KONTÖRSÜZ: ilk indirme dahil)
 // ---------------------------------------------------------------------------
 
 export type ReportPdfResult =
   | { status: "ok"; bytes: Uint8Array; filename: string; unitsCharged: number; requestId: string | null }
   | { status: "not_found" | "expired"; message: string }
-  | { status: "no_credit"; available: number; needed: number }
   | { status: "busy"; message: string }
   | { status: "disabled"; message: string; missing: string[] }
   | { status: "error"; kind: OrtakErrorKind; code: string | null; message: string; requestId: string | null };
@@ -354,30 +341,15 @@ export async function getReportPdf(p: EfActor & { raporId: string; role?: string
   if (pdfInflight.has(lockKey)) return { status: "busy", message: "Bu raporun PDF'i hazırlanıyor; birkaç saniye sonra tekrar deneyin." };
   pdfInflight.add(lockKey);
   try {
-    // pdf_charged → UCRETSİZ yeniden indirme. Değilse tarife pdfFirst kadar rezerve.
-    const units = row.pdf_charged ? 0 : efUnitsFor("pdf_first", state.tariff);
-    const hold = await holdUnits(p, units, "pdf_first");
-    if (hold.kind === "wallet_error") return { status: "error", kind: "disabled", code: "wallet", message: WALLET_ERROR_MESSAGE, requestId: null };
-    if (hold.kind === "no_credit") return { status: "no_credit", available: hold.available, needed: units };
-    const reservationId = hold.kind === "held" ? hold.reservationId : null;
-
     const out = await ortakRaporPdf({ tenantId: p.tenantId, userId: p.userId, raporId: row.rapor_id });
     if (!out.ok) {
-      await releaseSafely(p.tenantId, reservationId, `pdf_${out.kind}`);
       await audit(p, "ef.report_pdf", row.rapor_id, { outcome: "error", kind: out.kind, code: out.code, request_id: out.requestId, attempts: out.attempts });
       return { status: "error", kind: out.kind, code: out.code, message: efFailureMessage(out.kind, out.code), requestId: out.requestId };
     }
 
-    let charged = 0;
-    if (reservationId) {
-      const ok = await commitSafely(p.tenantId, reservationId, { rapor_id: row.rapor_id, request_id: out.requestId, item: "pdf_first" });
-      if (ok) {
-        charged = units;
-        await markEfPdfCharged(p.tenantId, row.rapor_id, reservationId);
-      }
-    }
-    await audit(p, "ef.report_pdf", row.rapor_id, { outcome: "ok", units_charged: charged, repeat: row.pdf_charged, request_id: out.requestId, size: out.data.bytes.byteLength });
-    return { status: "ok", bytes: out.data.bytes, filename: `degerleme-raporu-${row.rapor_id.slice(0, 8)}.pdf`, unitsCharged: charged, requestId: out.requestId };
+    if (!row.pdf_charged) await markEfPdfCharged(p.tenantId, row.rapor_id, null);
+    await audit(p, "ef.report_pdf", row.rapor_id, { outcome: "ok", units_charged: 0, repeat: row.pdf_charged, request_id: out.requestId, size: out.data.bytes.byteLength });
+    return { status: "ok", bytes: out.data.bytes, filename: `degerleme-raporu-${row.rapor_id.slice(0, 8)}.pdf`, unitsCharged: 0, requestId: out.requestId };
   } finally {
     pdfInflight.delete(lockKey);
   }

@@ -1,5 +1,5 @@
 import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
-import { efPackUnitPriceTry, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
+import { EF_PACK_MONTHS_LABEL, efPackMonthlyUnits, efPackUnitPriceTry, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
 
 /**
  * KONTÖR PAKETİ SATIN ALMA: SAF ÇEKİRDEK (I/O yok).
@@ -10,6 +10,8 @@ import { efPackUnitPriceTry, type EfPack, type EfTariff } from "@/lib/ef-credits
 export type CreditPackQuote = {
   packId: string;
   units: number;
+  /** Geçerlilik (ay): süre sonunda kullanılmayan kontör yanar. */
+  months: number;
   netTry: number;
   taxTry: number;
   totalTry: number;
@@ -18,11 +20,12 @@ export type CreditPackQuote = {
   unitGrossTry: number;
 };
 
-export function quoteCreditPack(pack: Pick<EfPack, "id" | "units" | "priceNetTry">): CreditPackQuote {
+export function quoteCreditPack(pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">): CreditPackQuote {
   const a = invoiceAmountsTry(pack.priceNetTry);
   return {
     packId: pack.id,
     units: pack.units,
+    months: pack.months,
     netTry: a.amountTry,
     taxTry: a.taxTry,
     totalTry: a.totalTry,
@@ -36,18 +39,21 @@ export function findPurchasablePack(packs: EfPack[], packId: string): EfPack | n
   return packs.find((p) => p.id === packId && p.active) ?? null;
 }
 
-/** Fatura meta sözleşmesi (fulfill SQL'i okur): { kind, packId, units, priceNetTry }. */
-export function buildCreditPackMeta(pack: Pick<EfPack, "id" | "units" | "priceNetTry">) {
-  return { kind: "credit_pack" as const, packId: pack.id, units: pack.units, priceNetTry: pack.priceNetTry };
+/**
+ * Fatura meta sözleşmesi: fulfill SQL'i { kind, packId, units, priceNetTry } okur; `validityMonths` ise ef_credit_grant
+ * tarafından faturadan okunur ve kontörün son kullanma tarihini belirler (20261010000300).
+ */
+export function buildCreditPackMeta(pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">) {
+  return { kind: "credit_pack" as const, packId: pack.id, units: pack.units, priceNetTry: pack.priceNetTry, validityMonths: pack.months };
 }
 
 export function activePacks(packs: EfPack[]): EfPack[] {
   return packs.filter((p) => p.active);
 }
 
-/** Tarifedeki en ucuz ÜCRETLİ (>0) işlemin kontörü; hiç ücretli kalem yoksa null. */
+/** Tarifedeki en ucuz ÜCRETLİ (>0) işlemin kontörü (yalnız değerleme kalemleri); hiç ücretli kalem yoksa null. */
 export function cheapestPaidUnits(tariff: EfTariff): number | null {
-  const paid = [tariff.valuationArsa, tariff.valuationKonut, tariff.pdfFirst, tariff.reportDetail].filter((n) => n > 0);
+  const paid = [tariff.valuationArsa, tariff.valuationKonut].filter((n) => n > 0);
   return paid.length > 0 ? Math.min(...paid) : null;
 }
 
@@ -62,9 +68,9 @@ export function lowBalanceState(available: number, tariff: EfTariff): { state: L
   return { state: "ok", threshold };
 }
 
-/** Paket önerisi: işaretli "popüler" aktif paket; yoksa eşiği en az 5 kez karşılayan en küçük paket; yoksa en büyük. */
+/** Paket önerisi: işaretli "popüler" aktif paket; yoksa eşiği en az 5 kez karşılayan en küçük paket; yoksa en büyük. Aynı toplam kontörde kısa süre önce gelir. */
 export function suggestPack(packs: EfPack[], tariff: EfTariff): EfPack | null {
-  const act = activePacks(packs).sort((a, b) => a.units - b.units);
+  const act = activePacks(packs).sort((a, b) => a.units - b.units || a.months - b.months);
   if (act.length === 0) return null;
   const popular = act.find((p) => p.popular);
   if (popular) return popular;
@@ -72,6 +78,12 @@ export function suggestPack(packs: EfPack[], tariff: EfTariff): EfPack | null {
   return act.find((p) => p.units >= need) ?? act[act.length - 1]!;
 }
 
-export function creditPackBasketName(pack: Pick<EfPack, "name" | "units">): string {
-  return `EmlakSoft kontör paketi: ${pack.name} (${pack.units} kontör)`;
+export function creditPackBasketName(pack: Pick<EfPack, "name" | "units" | "months">): string {
+  return `EmlakSoft kontör paketi: ${pack.name} (${pack.units} kontör, ${pack.months} ay geçerli)`;
+}
+
+/** Ekran özeti: "3 aylık · aylık ~1.000 kontör · toplam 3.000 kontör, 3 ay içinde kullanılmazsa yanar". */
+export function creditPackValidityLine(pack: Pick<EfPack, "units" | "months">): string {
+  const label = EF_PACK_MONTHS_LABEL[pack.months] ?? `${pack.months} aylık`;
+  return `${label} · toplam ${pack.units.toLocaleString("tr-TR")} kontör (aylık ~${efPackMonthlyUnits(pack).toLocaleString("tr-TR")}); süre sonunda kullanılmayan kontör yanar`;
 }

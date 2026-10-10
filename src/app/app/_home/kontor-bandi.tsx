@@ -35,7 +35,7 @@ export async function KontorBandi({ ctx, valuationClosed }: { ctx: HomeCtx; valu
     >
       {empty ? (
         <>
-          <span className="font-bold">Kontörünüz bitti.</span> Ada/parsel değerleme ve PDF rapor için kontör gerekir.
+          <span className="font-bold">Kontörünüz bitti.</span> Ada/parsel değerleme için kontör gerekir.
         </>
       ) : (
         <>

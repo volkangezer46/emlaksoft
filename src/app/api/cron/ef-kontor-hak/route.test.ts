@@ -12,8 +12,11 @@ const state = {
   /** Defter satırları (grant RPC'si ekler; ön eleme ve ay toplamı buradan okunur). */
   ledger: [] as { tenant_id: string; amount: number; idempotency_key: string }[],
   grants: [] as { p_tenant: string; p_units: number; p_kind: string; p_idem: string }[],
-  expires: [] as { p_tenant: string; p_keep: number; p_idem: string }[],
-  expireResult: { ok: true, already: false, expired: 0, available: 0 } as { ok: boolean; already: boolean; expired: number; available: number } | "error",
+  /** ef_credit_burn_expired çağrıları (argümanlar) ve sonucu; "missing" = fonksiyon yok (eski şema), "error" = DB hatası. */
+  burns: [] as { p_limit?: number }[],
+  burnResult: { ok: true, burned_lots: 0, burned_units: 0 } as { ok: boolean; burned_lots: number; burned_units: number } | "missing" | "error",
+  /** Eski devir tavanı RPC'si: ARTIK ÇAĞRILMAMALI. */
+  expireCalls: 0,
   statusFilter: [] as string[],
   heartbeat: [] as { status: string; detail?: string }[],
 };
@@ -46,10 +49,16 @@ vi.mock("@/lib/supabase/admin", () => ({
         }
         return { data: { ok: true, already, available: 0 }, error: null };
       }
-      if (name === "ef_credit_expire_plan" && args) {
-        state.expires.push(args as unknown as { p_tenant: string; p_keep: number; p_idem: string });
-        if (state.expireResult === "error") return { data: null, error: { message: "function does not exist" } };
-        return { data: state.expireResult, error: null };
+      if (name === "ef_credit_expire_plan") {
+        state.expireCalls += 1;
+        return { data: { ok: true, already: false, expired: 0, available: 0 }, error: null };
+      }
+      if (name === "ef_credit_lots_ready") return { data: true, error: null };
+      if (name === "ef_credit_burn_expired") {
+        state.burns.push((args ?? {}) as { p_limit?: number });
+        if (state.burnResult === "missing") return { data: null, error: { code: "PGRST202", message: "Could not find the function" } };
+        if (state.burnResult === "error") return { data: null, error: { code: "XX000", message: "boom" } };
+        return { data: state.burnResult, error: null };
       }
       return { data: null, error: { message: "unknown rpc" } };
     },
@@ -96,9 +105,9 @@ beforeEach(() => {
   state.created = {};
   state.ledger = [];
   state.grants = [];
-  state.expires = [];
-  state.expireResult = { ok: true, already: false, expired: 0, available: 0 };
-  // Ayın 10'u (devir tavanı penceresi dışı); tavan testleri tarihi 2'ye çeker.
+  state.burns = [];
+  state.burnResult = { ok: true, burned_lots: 0, burned_units: 0 };
+  state.expireCalls = 0;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-10T09:00:00Z"));
   state.statusFilter = [];
@@ -228,33 +237,39 @@ describe("cron ef-kontor-hak", () => {
     expect(state.grants).toEqual([]);
   });
 
-  it("devir tavanı: ayın ilk günlerinde active ofis için 3 aylık hak ile çağrılır; deneme/ay ortası çağrılmaz; hata cron'u düşürmez", async () => {
-    state.subs = [
-      { tenant_id: "t1", plan: "office", status: "active" },
-      { tenant_id: "t2", plan: "office", status: "trialing" },
-    ];
-    state.tenants = { t1: "active", t2: "trial" };
-    await GET(req("Bearer s3cret"));
-    expect(state.expires).toEqual([]); // 10. gün: pencere dışı
-
-    vi.setSystemTime(new Date("2026-10-02T09:00:00Z"));
-    state.expireResult = "error";
-    const res = await GET(req("Bearer s3cret"));
-    expect(res.status).toBe(200);
-    expect(state.expires).toEqual([{ p_tenant: "t1", p_keep: 2100, p_idem: "plan-expire:2026-10" }]);
-    expect(await res.json()).toMatchObject({ ok: true, expireFailed: 1, expiredUnits: 0 });
-
-    state.expireResult = { ok: true, already: false, expired: 80, available: 120 };
-    const ok = await GET(req("Bearer s3cret"));
-    expect(await ok.json()).toMatchObject({ expiredUnits: 80, expireFailed: 0 });
-  });
-
-  it("devir tavanı: defterde ay anahtarı varsa RPC çağrılmaz", async () => {
-    vi.setSystemTime(new Date("2026-10-02T09:00:00Z"));
+  it("SÜRELİ KONTÖR: koşu sonunda süresi dolan partileri yakar (ef_credit_burn_expired); eski devir tavanı RPC'si çağrılmaz", async () => {
     state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
     state.tenants = { t1: "active" };
-    state.ledger = [{ tenant_id: "t1", amount: -80, idempotency_key: "ef:expire:t1:plan-expire:2026-10" }];
+    state.burnResult = { ok: true, burned_lots: 2, burned_units: 130 };
+    // Ayın hangi günü olursa olsun yakma çalışır (eskiden yalnız ayın ilk 3 günü tavan denenirdi).
+    for (const day of ["2026-10-02T09:00:00Z", "2026-10-10T09:00:00Z", "2026-10-31T21:30:00Z"]) {
+      vi.setSystemTime(new Date(day));
+      state.burns = [];
+      const res = await GET(req("Bearer s3cret"));
+      expect(res.status).toBe(200);
+      expect(state.burns).toHaveLength(1);
+      expect(await res.json()).toMatchObject({ ok: true, burnedUnits: 130, burnedLots: 2, burnFailed: 0 });
+    }
+    expect(state.expireCalls).toBe(0);
+    expect(state.heartbeat.at(-1)?.detail).toContain("130 kontör süresi dolduğu için yandı (2 parti)");
+  });
+
+  it("yakma: şema yoksa (fonksiyon yok) sessizce atlanır; DB hatası sayılır ama cron düşmez", async () => {
+    state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
+    state.tenants = { t1: "active" };
+    state.burnResult = "missing";
+    const missing = await GET(req("Bearer s3cret"));
+    expect(missing.status).toBe(200);
+    expect(await missing.json()).toMatchObject({ ok: true, burnFailed: 0, burnedUnits: 0 });
+    state.burnResult = "error";
+    const failed = await GET(req("Bearer s3cret"));
+    expect(failed.status).toBe(200);
+    expect(await failed.json()).toMatchObject({ burnFailed: 1, burnedUnits: 0 });
+  });
+
+  it("cüzdan hazır değilse yakma da çalışmaz", async () => {
+    state.ready = false;
     await GET(req("Bearer s3cret"));
-    expect(state.expires).toEqual([]);
+    expect(state.burns).toEqual([]);
   });
 });

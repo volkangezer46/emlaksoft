@@ -15,6 +15,8 @@ export type KontorPackCard = {
   id: string;
   name: string;
   units: number;
+  /** Geçerlilik (ay): süre sonunda kullanılmayan kontör yanar. */
+  months: number;
   netTry: number;
   taxTry: number;
   totalTry: number;
@@ -102,6 +104,9 @@ export function KontorPanel({
               <p className="numeric font-display text-2xl font-extrabold text-text">
                 {fmt.format(p.units)} <span className="text-sm font-semibold text-text-faint">kontör</span>
               </p>
+              <p className="mt-1 text-xs font-semibold text-accent-text">
+                {p.months} ay geçerli · aylık ~{fmt.format(Math.round(p.units / p.months))} kontör
+              </p>
               <p className="numeric mt-1 text-sm font-bold text-text">
                 {tl(p.netTry)} <span className="text-xs font-semibold text-text-faint">+ KDV</span>
               </p>
@@ -115,7 +120,7 @@ export function KontorPanel({
                   </p>
                   <p className="text-text-muted">
                     Net {tl2(p.netTry)} + KDV {tl2(p.taxTry)}. Ödeme iyzico güvenli sayfasında alınır; ödeme onaylanınca kontör
-                    bakiyenize eklenir.
+                    bakiyenize eklenir ve {p.months} ay sonra kullanılmayan kısmı yanar (devretmez).
                   </p>
                   <WalletCreditToggle
                     wallet={wallet}

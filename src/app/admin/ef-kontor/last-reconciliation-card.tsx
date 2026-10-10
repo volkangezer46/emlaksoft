@@ -41,7 +41,7 @@ export async function LastReconciliationCard() {
             <dd>Değerleme</dd>
             <dd>{last.efDegerleme ?? "—"} / {last.ledgerDegerleme}</dd>
             <dd className={last.diffDegerleme ? "font-bold text-[color:var(--viz-neg)]" : ""}>{signed(last.diffDegerleme)}</dd>
-            <dd>İlk PDF</dd>
+            <dd>PDF (bilgi; kontörsüz)</dd>
             <dd>{last.efPdf ?? "—"} / {last.ledgerPdf}</dd>
             <dd className={last.diffPdf ? "font-bold text-[color:var(--viz-neg)]" : ""}>{signed(last.diffPdf)}</dd>
           </dl>

@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableEmptyRow, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ListPager } from "@/components/ui/list-kit/list-pager";
 import { pageWindow } from "@/components/ui/list-kit/list-logic";
-import { getEfCatalog, getEfCreditReady, readEfBalance, readEfHistory } from "@/lib/ef-credits/credit-reader";
+import { getEfCatalog, getEfCreditReady, getEfLotsReady, readEfBalance, readEfHistory } from "@/lib/ef-credits/credit-reader";
 import {
   EF_CATEGORY_LABEL,
   EF_HISTORY_PAGE_SIZE,
@@ -13,8 +13,8 @@ import {
   filterAndPage,
   type EfMovementCategory,
 } from "@/lib/ef-credits/credit-view";
-import { efEntryValuationUnits, efUnitsFor } from "@/lib/ef-credits/config";
-import { now, trNextMonthStartMs } from "@/lib/clock";
+import { EF_WELCOME_VALID_DAYS, efEntryValuationUnits, efUnitsFor } from "@/lib/ef-credits/config";
+import { DAY_MS, now, trNextMonthStartMs } from "@/lib/clock";
 import { monthlyAllowanceView } from "@/lib/ef-credits/visibility";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
 import {
@@ -44,6 +44,16 @@ const shortDay = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "shor
 const renewalFmt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" });
 const BASE = "/app/abonelik";
 
+const LOT_KIND_LABEL: Record<string, string> = {
+  purchase: "Satın alınan paket",
+  plan_monthly: "Aylık plan hakkı",
+  bonus: "Bonus / hoş geldin",
+  admin: "Yönetici yüklemesi",
+  refund: "İade",
+  legacy: "Önceki bakiye",
+};
+const lotKindLabel = (k: string) => LOT_KIND_LABEL[k] ?? "Kontör";
+
 function hrefOf(params: Record<string, string | undefined>, hash = "gecmis"): string {
   const sp = new URLSearchParams({ sekme: "kontor" });
   for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
@@ -71,7 +81,7 @@ export type KontorSectionProps = {
 
 export async function KontorSection(props: KontorSectionProps & { tenantId: string }) {
   const { tenantId, canBuy, iyzicoConfigured, latestInvoice, invoiceIsRecent, allowance } = props;
-  const [ready, catalog, efState] = await Promise.all([getEfCreditReady(), getEfCatalog(), getEfPublicState()]);
+  const [ready, lotsReady, catalog, efState] = await Promise.all([getEfCreditReady(), getEfLotsReady(), getEfCatalog(), getEfPublicState()]);
   const [balance, history] = ready
     ? await Promise.all([readEfBalance(tenantId), readEfHistory(tenantId)])
     : [null, null];
@@ -86,6 +96,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
       id: p.id,
       name: p.name,
       units: p.units,
+      months: p.months,
       netTry: q.netTry,
       taxTry: q.taxTry,
       totalTry: q.totalTry,
@@ -99,6 +110,8 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
     ? `${EF_PURCHASE_CLOSED_MESSAGE} Paketleri şimdiden inceleyebilirsiniz.`
     : !ready
       ? "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor. Paketleri şimdiden inceleyebilirsiniz."
+      : !lotsReady
+      ? "Süreli kontör paketleri hazırlanıyor; satın alma kısa süre içinde açılır. Paketleri şimdiden inceleyebilirsiniz."
       : !iyzicoConfigured
       ? "Ödeme altyapısı yapılandırılmamış; lütfen yönetici ile iletişime geçin."
       : null;
@@ -109,6 +122,16 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
       ? monthlyAllowanceView({ entitlement: allowance.units, rows: history.rows, available: balance?.available ?? null, nowMs: now() })
       : null;
   const stacked = balance ? stackedBalance({ available: balance.available, reserved: balance.reserved, spent: balance.committed_total }) : null;
+  // Süresi dolmamış partiler (clock.ts); süresi dolup henüz yanmamış kalan "kullanılabilir" sayılmaz, listelenmez.
+  const nowMs = now();
+  const liveLots = (balance?.lots ?? []).filter((l) => Date.parse(l.expiresAt) > nowMs);
+  const expiredTotal = balance?.expired_total ?? 0;
+  // Yakında yanacak kontör (7 gün): ofis sahibi/GM fark etsin diye uyarı bandı (sıfır çıkmaz: partiler listesine bağlanır).
+  const nextExpiryMs = balance?.next_expiry_at ? Date.parse(balance.next_expiry_at) : Number.NaN;
+  const expiringSoon =
+    Number.isFinite(nextExpiryMs) && nextExpiryMs - nowMs <= 7 * DAY_MS && (balance?.next_expiry_units ?? 0) > 0
+      ? { units: balance!.next_expiry_units as number, atMs: nextExpiryMs }
+      : null;
   const stackedLabels = { available: "Kullanılabilir", reserved: "İşlemde (rezerve)", spent: "Toplam harcanan" } as const;
   const stackedColors = { available: "var(--viz-1)", reserved: "var(--viz-5)", spent: "var(--viz-neutral)" } as const;
   const stackedHrefs = { available: hrefOf({}), reserved: hrefOf({}), spent: hrefOf({ kalem: "degerleme" }) } as const;
@@ -116,7 +139,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
   const thresholdTop =
     low && low.threshold > 0 && series.values.length >= 2 ? thresholdTopPct(low.threshold, Math.max(...series.values)) : null;
   const forecast = balance && history?.enabled ? forecastDepletion(history.rows, balance.available, now()) : null;
-  const canOneClick = canBuy && efState.purchasable && ready && iyzicoConfigured && suggested !== null && sellable.length > 0;
+  const canOneClick = canBuy && efState.purchasable && ready && lotsReady && iyzicoConfigured && suggested !== null && sellable.length > 0;
   const oneClickHref = `${BASE}?sekme=kontor&onerilen=1#paketler`;
 
   const category: EfMovementCategory | null = categoryOf(props.kalem);
@@ -130,9 +153,9 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
   const pagerParams = { sekme: "kontor", kalem: category ?? undefined, kullanici: props.kullanici || undefined };
 
   const tariffItems = [
-    { label: "Arsa değerlemesi", units: efUnitsFor("valuation_arsa", tariff), kalem: "degerleme" },
     { label: "Konut değerlemesi", units: efUnitsFor("valuation_konut", tariff), kalem: "degerleme" },
-    { label: "PDF rapor (ilk indirme)", units: efUnitsFor("pdf_first", tariff), kalem: "pdf" },
+    { label: "Arsa değerlemesi", units: efUnitsFor("valuation_arsa", tariff), kalem: "degerleme" },
+    { label: "Ticari değerleme", units: efUnitsFor("valuation_ticari", tariff), kalem: "degerleme" },
   ];
 
   return (
@@ -163,6 +186,20 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         </Alert>
       ) : null}
 
+      {expiringSoon ? (
+        <Alert
+          tone="warning"
+          title="Kontörünüzün bir kısmı yakında yanacak"
+          action={
+            <Link href={`${BASE}?sekme=kontor#bakiye`} className="text-xs font-bold underline">
+              Partileri gör
+            </Link>
+          }
+        >
+          {fmt.format(expiringSoon.units)} kontör {dt.format(expiringSoon.atMs)} tarihinde sona erer; kullanılmazsa yanar ve devretmez.
+        </Alert>
+      ) : null}
+
       {low && low.state !== "ok" ? (
         <Alert
           tone={low.state === "empty" ? "danger" : "warning"}
@@ -176,7 +213,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
           }
         >
           {low.state === "empty"
-            ? "Değerleme ve PDF rapor için kontör gerekir."
+            ? "Değerleme için kontör gerekir."
             : `Kalan ${fmt.format(balance!.available)} kontör, en ucuz işlemin iki katı (${fmt.format(low.threshold)}) ve altında.`}
         </Alert>
       ) : null}
@@ -191,7 +228,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <p className="text-xs font-semibold text-text-muted">Kullanılabilir kontör</p>
                 <p className="numeric font-display text-4xl font-extrabold text-text">{fmt.format(balance.available)}</p>
                 <p className="mt-1 text-xs text-text-muted">
-                  Defter bakiyesi (yüklenen − harcanan): <span className="numeric font-semibold">{fmt.format(balance.granted_total - balance.committed_total)}</span>
+                  Defter bakiyesi (yüklenen − harcanan − süresi dolan): <span className="numeric font-semibold">{fmt.format(balance.granted_total - balance.committed_total - expiredTotal)}</span>
                 </p>
               </Link>
               {stacked ? (
@@ -254,6 +291,36 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         ) : (
           <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Kontör bakiyesi etkinleşince bakiyeniz burada görünür."}</p>
         )}
+        {balance && balance.lots ? (
+          <div className="mt-5 rounded-[var(--radius-control)] bg-[var(--surface-sunken)] p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold text-text">Kontör partileri ve son kullanma</h3>
+              <Link href={hrefOf({ kalem: "sona-erme" })} className="text-xs font-semibold text-accent-text hover:underline">
+                Süresi dolan kontör: {fmt.format(expiredTotal)}
+              </Link>
+            </div>
+            {liveLots.length === 0 ? (
+              <p className="mt-2 text-sm text-text-muted">Süresi dolmamış kontör partisi yok. Kontör paketleri süreli satılır; süre sonunda kullanılmayan kontör yanar.</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-line text-sm">
+                {liveLots.map((l) => (
+                  <li key={l.id}>
+                    <Link href={hrefOf({ kalem: "satin-alma" })} className="focus-ring flex flex-wrap items-center justify-between gap-2 py-2 hover:text-accent-text">
+                      <span className="font-semibold text-text">{lotKindLabel(l.kind)}</span>
+                      <span className="numeric text-text-muted">
+                        {fmt.format(l.remaining)} / {fmt.format(l.units)} kontör · {dt.format(Date.parse(l.expiresAt))} tarihine kadar
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-text-muted">
+              Harcama önce en yakın tarihte sona erecek partiden düşer. Hoş geldin kontörü {EF_WELCOME_VALID_DAYS} gün, aylık plan hakkı ay sonuna kadar,
+              satın alınan paket seçtiğiniz süre kadar geçerlidir.
+            </p>
+          </div>
+        ) : null}
         {allowance && allowance.units > 0 ? (
           <Link
             href={hrefOf({ kalem: "satin-alma" })}
@@ -279,7 +346,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                   {efEntryValuationUnits(tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efEntryValuationUnits(tariff)))} değerleme)` : ""}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
-                  Otomatik yüklenir, kullanılmayan kontör devreder.
+                  Otomatik yüklenir; o ayın sonunda kullanılmayan kontör yanar, sonraki aya devretmez.
                   {allowance.perExtraSeat > 0
                     ? ` Hak, her ek kullanıcı için ${fmt.format(allowance.perExtraSeat)} kontör artar (şu an ${fmt.format(allowance.extraSeats)} ek kullanıcı).`
                     : ""}
@@ -311,9 +378,6 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             ) : (
               <p className="mt-2 text-xs font-semibold text-text-muted">Sonraki yenileme: {renewalFmt.format(trNextMonthStartMs(now()))}</p>
             )}
-            <p className="mt-2 text-xs text-text-muted">
-              Plan kontörü en çok 3 aylık birikir ({fmt.format(allowance.units * 3)} kontör); üstü yüklenmez.
-            </p>
           </Link>
         ) : null}
         {suggested && sellable.length > 0 && canBuy ? (
@@ -356,14 +420,14 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-accent-text" />
               </div>
               <p className="numeric mt-1 font-display text-xl font-extrabold text-text">
-                {t.units > 0 ? `${fmt.format(t.units)} kontör` : t.kalem === "pdf" ? "Rapora dahil" : "Ücretsiz"}
+                {t.units > 0 ? `${fmt.format(t.units)} kontör` : "Ücretsiz"}
               </p>
             </Link>
           ))}
         </div>
         <p className="mt-3 text-xs text-text-muted">
-          Aynı raporun PDF&apos;ini tekrar indirmek ücretsizdir. Sonuç üretilemezse (yetersiz veri veya hata) kontör düşmez.
-          Değerler ilan fiyatlarına dayanır; kesin satış değeri değildir.
+          Kontör yalnız değerleme için harcanır; PDF indirme, rapor detayı ve ilan analizi kontör düşmez. Sonuç üretilemezse (yetersiz veri
+          veya hata) kontör düşmez. Değerler ilan fiyatlarına dayanır; kesin satış değeri değildir.
         </p>
       </section>
 
@@ -393,7 +457,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             <h2 className="mt-1 font-display font-bold text-text">Kontör kullanım geçmişi</h2>
           </div>
           <nav aria-label="Kalem süzgeci" className="flex flex-wrap gap-1.5">
-            {([null, "degerleme", "pdf", "satin-alma", "iade"] as const).map((k) => (
+            {([null, "degerleme", "satin-alma", "sona-erme", "iade"] as const).map((k) => (
               <Link
                 key={k ?? "hepsi"}
                 href={hrefOf({ kalem: k ?? undefined, kullanici: props.kullanici })}
