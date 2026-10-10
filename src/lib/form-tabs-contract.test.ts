@@ -163,10 +163,8 @@ const FORMS = [
   {
     name: "danışman",
     source: "src/app/app/ekip/yeni/advisor-form.tsx",
-    // Kimlik / istihdam / uzmanlık / bölge sekmelerinin alanları ortak bileşendedir (360 düzenleyicileri de kullanır).
+    // Uzmanlık / bölge adımının alanları ortak bileşendedir (360 düzenleyicileri de kullanır).
     extraSources: ["src/app/app/ekip/yeni/advisor-extra-fields.tsx"],
-    // Danışman formu 4 profil sekmesi eklendiği için 9 sekmeye kadar izinli (diğer formlar 5).
-    maxTabs: 9,
     tabs: ADVISOR_TABS as readonly TabLike[],
     draft: ADVISOR_DRAFT_FIELDS as readonly string[],
   },
@@ -211,7 +209,7 @@ describe.each(FORMS)("sekme sözleşmesi: $name formu", (form) => {
   const src = [source, ...extraSources].map(read).join("\n");
   const declared = tabs.flatMap((t) => t.fields);
 
-  it("sekme sayısı 2-5 (danışman formu 9), id'ler benzersiz", () => {
+  it("sekme sayısı 2-5, id'ler benzersiz", () => {
     expect(tabs.length).toBeGreaterThanOrEqual(2);
     expect(tabs.length).toBeLessThanOrEqual((form as { maxTabs?: number }).maxTabs ?? 5);
     expect(new Set(tabs.map((t) => t.id)).size).toBe(tabs.length);

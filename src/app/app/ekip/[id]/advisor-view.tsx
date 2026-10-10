@@ -3,7 +3,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { loadAvatarMap } from "@/lib/avatar-read";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
-import { Activity, ArrowLeft, BadgeCheck, MapPinned, UserCog, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
+import { Activity, ArrowLeft, BadgeCheck, MapPinned, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, Phone, Sparkles, Target, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
 import { now, trDayKey } from "@/lib/clock";
@@ -138,17 +138,18 @@ export async function AdvisorDetailView({
   const tabs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },
     { id: "aktivite", label: "Aktivite", icon: Activity },
-    { id: "oncul", label: "Öncül göstergeler", icon: Gauge },
-    { id: "pipeline", label: "Pipeline", icon: GitBranch },
+    { id: "oncul", label: "Erken işaretler", icon: Gauge },
+    { id: "pipeline", label: "Satış hattı", icon: GitBranch },
     { id: "hedef", label: "Hedef", icon: Target, hidden: !effectiveCanAccessModule(perms, "targets") },
     { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings },
-    { id: "kosluk", label: "Koçluk", icon: Sparkles },
-    { id: "profil", label: "Profil ve belgeler", icon: BadgeCheck, hidden: !profileTabVisible || !tenantId },
+    { id: "kosluk", label: "Gelişim önerileri", icon: Sparkles },
+    // Aynı veriye üç ad (Kimlik ve kişisel / Profil ve belgeler / Bilgiler) TEK sekmede: "Kişisel bilgiler".
+    { id: "profil", label: "Kişisel bilgiler", icon: BadgeCheck, hidden: (!profileTabVisible || !tenantId) && !canEditInfo },
     { id: "uzmanlik", label: "Uzmanlık ve bölgeler", icon: MapPinned, hidden: !specialtyReady || !tenantId },
-    { id: "bilgi", label: "Bilgiler", icon: UserCog, hidden: !canEditInfo },
   ];
   const visible = tabs.filter((t) => !t.hidden).map((t) => t.id);
-  const active = resolveTab(searchParams, visible, "ozet");
+  // Eski `?sekme=bilgi` bağlantıları (Daveti yinele vb.) "Kişisel bilgiler" sekmesine düşer (alias).
+  const active = resolveTab(searchParams, visible, "ozet", { bilgi: "profil" });
 
   const ctx: Ctx = {
     supabase,
@@ -162,7 +163,7 @@ export async function AdvisorDetailView({
     month,
   };
   const branch = relName(member.branch);
-  const access = active === "bilgi" && canEditInfo && tenantId ? await loadMemberAccess(tenantId, id) : null;
+  const access = active === "profil" && canEditInfo && tenantId ? await loadMemberAccess(tenantId, id) : null;
 
   return (
     <div className="space-y-6">
@@ -250,7 +251,19 @@ export async function AdvisorDetailView({
       {active === "hedef" ? <TargetTab ctx={ctx} /> : null}
       {active === "kazanc" ? <EarningsTab ctx={ctx} year={year} /> : null}
       {active === "kosluk" ? <CoachTab ctx={ctx} /> : null}
-      {active === "profil" && tenantId ? (
+      {active === "profil" && canEditInfo ? (
+        <MemberInfoPanel
+          memberId={id}
+          fullName={member.full_name}
+          phone={member.phone}
+          title={member.title}
+          isActive={member.is_active}
+          email={access?.email ?? null}
+          lastSignInAt={access?.lastSignInAt ?? null}
+          neverSignedIn={access?.neverSignedIn ?? false}
+        />
+      ) : null}
+      {active === "profil" && tenantId && profileTabVisible ? (
         <ProfileTab
           supabase={supabase}
           tenantId={tenantId}
@@ -263,18 +276,6 @@ export async function AdvisorDetailView({
         />
       ) : null}
       {active === "uzmanlik" && tenantId ? <SpecialtyTab supabase={supabase} tenantId={tenantId} memberId={id} viewerRole={role} /> : null}
-      {active === "bilgi" && canEditInfo ? (
-        <MemberInfoPanel
-          memberId={id}
-          fullName={member.full_name}
-          phone={member.phone}
-          title={member.title}
-          isActive={member.is_active}
-          email={access?.email ?? null}
-          lastSignInAt={access?.lastSignInAt ?? null}
-          neverSignedIn={access?.neverSignedIn ?? false}
-        />
-      ) : null}
     </div>
   );
 }

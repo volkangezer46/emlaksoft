@@ -149,7 +149,7 @@ export function DefinitionsForm({ initial, canEdit, notifyLabels }: { initial: D
           { label: "Hareketsiz anlaşmalar", href: "/app/anlasmalar?gorunum=liste&bayat=1" },
           { label: "Bekleyen talepler", href: "/app/talepler" },
           { label: "Uykuda müşteriler", href: "/app/musteriler?segment=uykuda" },
-          { label: "Ofis Merkezi > İstatistikler", href: "/app/ofis-merkezi?sekme=istatistikler" },
+          { label: "Ofis Merkezi > İstatistikler", href: "/app/ekip?sekme=istatistikler" },
         ]}
         pending={pending && busy === "thr"}
         onSave={() => run("thr", () => saveAlertThresholds(thr))}

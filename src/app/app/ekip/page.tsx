@@ -38,7 +38,14 @@ import { Avatar } from "@/components/ui/avatar";
 import { loadAvatarMap } from "@/lib/avatar-read";
 import { AdvisorTable } from "@/components/app/office-center/advisor-table";
 import { loadOfficeAdvisors } from "@/lib/office-center/store";
-import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { effectiveCanAccessModule, getEffectivePermissions } from "@/lib/permissions-effective";
+import { parseTab, tabHref } from "@/lib/office-center/logic";
+import { OFFICE_CENTER_TABS } from "@/lib/office-center/types";
+import { AdvisorsTab } from "../ofis-merkezi/_tabs/advisors-tab";
+import { DefinitionsTab } from "../ofis-merkezi/_tabs/definitions-tab";
+import { RoutingTab } from "../ofis-merkezi/_tabs/routing-tab";
+import { StatsTab } from "../ofis-merkezi/_tabs/stats-tab";
+import type { TabContext } from "../ofis-merkezi/_tabs/context";
 
 export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
@@ -80,8 +87,61 @@ function relName(value: Rel) {
 const ADVISOR_LIKE = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 
 
-export default async function TeamPage() {
+/** URL filtre kontratı: sekme (`?sekme=`) + danışman listesi filtreleri (sunucu sorgusu aynı değerleri okur). */
+type Sp = { sekme?: string; durum?: string; q?: string; rol?: string; sube?: string; sirala?: string; yon?: string };
+
+/**
+ * EKİP MERKEZİ — tek hub. Sekmeler: Ekip (danışman listesi, şubeler, rol karışımı) · Talep dağıtımı · Tanımlar ·
+ * İstatistikler. Eski "Ofis Merkezi" içeriği buraya taşındı (`/app/ofis-merkezi` bu hub'a yönlenir); son üç sekme
+ * `office_center` iznini ister, izni olmayan yalnız Ekip sekmesini görür.
+ */
+export default async function TeamPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { perms, tenantId, role: viewerRole, userId } = await requireModulePage("team", "/app/ekip");
+  const sp = await searchParams;
+  const canOfficeCenterTabs = effectiveCanAccessModule(perms, "office_center");
+  const tab = canOfficeCenterTabs ? parseTab(sp.sekme) : "danismanlar";
+  const tabNav = canOfficeCenterTabs ? (
+    <nav aria-label="Ekip Merkezi sekmeleri" className="flex gap-1 overflow-x-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1">
+      {OFFICE_CENTER_TABS.map((t) => (
+        <Link
+          key={t.id}
+          href={tabHref(t.id)}
+          aria-current={tab === t.id ? "page" : undefined}
+          className={`focus-ring inline-flex min-h-11 shrink-0 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"}`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  ) : null;
+
+  if (tab !== "danismanlar" && tenantId) {
+    // Eski Ofis Merkezi sekmeleri: bu sekmelerin sorguları Ekip sekmesinin ağır yüklerini beklemez.
+    const effective = await getEffectivePermissions(tenantId, viewerRole, userId);
+    const tabSupabase = await createClient();
+    const tabCtx: TabContext = {
+      tenantId,
+      userId,
+      role: viewerRole,
+      perms: effective,
+      canEdit: (perms.office_center ?? []).includes("edit"),
+      canCreate: (perms.office_center ?? []).includes("create"),
+      canEditSettings: (perms.settings ?? []).includes("edit"),
+      sp: { sekme: sp.sekme, durum: sp.durum, q: sp.q, rol: sp.rol, sube: sp.sube, sirala: sp.sirala, yon: sp.yon },
+      nowMs: now(),
+      supabase: tabSupabase,
+    };
+    return (
+      <ListPage>
+        <ListHero eyebrow="Ekip & yetkiler" art="ekip" title="Ekip Merkezi" description="Danışmanlarınızı, talep dağıtımını, ofis tanımlarını ve ekip istatistiklerini tek yerden yönetin." />
+        {tabNav}
+        {tab === "dagitim" ? <RoutingTab ctx={tabCtx} /> : null}
+        {tab === "tanimlar" ? <DefinitionsTab ctx={tabCtx} /> : null}
+        {tab === "istatistikler" ? <StatsTab ctx={tabCtx} /> : null}
+      </ListPage>
+    );
+  }
+
   const assignableRoles = assignableRolesFor(viewerRole);
   const canManage = (perms.team ?? []).includes("create");
   const supabase = await createClient();
@@ -149,7 +209,7 @@ export default async function TeamPage() {
           .then(({ data }) => loadSeatUsageSummary(supabase, tenantId, String(data?.plan ?? "office")))
       : Promise.resolve(null),
     // Danışman listesi: Ofis Merkezi > Danışmanlar ile TEK kaynak + TEK bileşen (AdvisorTable).
-    tenantId ? loadOfficeAdvisors(supabase, tenantId, { userId, role: viewerRole, perms }, now()) : Promise.resolve(null),
+    tenantId && !canOfficeCenterTabs ? loadOfficeAdvisors(supabase, tenantId, { userId, role: viewerRole, perms }, now()) : Promise.resolve(null),
   ]);
 
   assertQueryBatchSucceeded([membersRes, branchesRes], ["members", "branches"], "Ekip");
@@ -202,8 +262,22 @@ export default async function TeamPage() {
   const maxLoad = Math.max(1, ...loadRows.map((r) => r.count));
   const loadAvatars = await loadAvatarMap(loadRows.map((r) => r.id), supabase);
 
-  const canOfficeCenter = effectiveCanAccessModule(perms, "office_center");
   const canOfficeCenterEdit = (perms.office_center ?? []).includes("edit");
+  const officeTabCtx: TabContext | null =
+    canOfficeCenterTabs && tenantId
+      ? {
+          tenantId,
+          userId,
+          role: viewerRole,
+          perms: await getEffectivePermissions(tenantId, viewerRole, userId),
+          canEdit: canOfficeCenterEdit,
+          canCreate: (perms.office_center ?? []).includes("create"),
+          canEditSettings: (perms.settings ?? []).includes("edit"),
+          sp: { durum: sp.durum, q: sp.q, rol: sp.rol, sube: sp.sube, sirala: sp.sirala, yon: sp.yon },
+          nowMs: now(),
+          supabase,
+        }
+      : null;
   // Sayfaya özgü satır rozeti: son giriş / hiç girmedi (+ daveti yinele) ve yayındaki kartvizit.
   const memberExtras = new Map(
     members.map((m) => [
@@ -263,7 +337,7 @@ export default async function TeamPage() {
       <ListHero
         eyebrow="Ekip & yetkiler"
         art="ekip"
-        title="Çalışan yönetimi"
+        title="Ekip Merkezi"
         description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür."
         actions={
           <>
@@ -284,6 +358,7 @@ export default async function TeamPage() {
           </>
         }
       />
+      {tabNav}
       <SeatLimitBanner summary={seatSummary} />
       <ReferralNudge moment="team_grew" show={activeCount >= 3} />
 <KpiGrid count={kpis.length}>
@@ -395,13 +470,10 @@ export default async function TeamPage() {
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Users className="h-4 w-4 text-brand-600" /> Ekip üyeleri</h2>
             <p className="text-xs text-text-muted">{members.length} kişi · {activeCount} aktif</p>
           </div>
-          {canOfficeCenter ? (
-            <Link href="/app/ofis-merkezi?sekme=danismanlar" className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
-              Filtrele ve sırala <ArrowUpRight className="h-3 w-3" />
-            </Link>
-          ) : null}
         </div>
-        {advisorList ? (
+        {officeTabCtx ? (
+          <AdvisorsTab ctx={officeTabCtx} extra={memberExtras} />
+        ) : advisorList ? (
           <AdvisorTable
             rows={advisorList.rows}
             extra={memberExtras}

@@ -7,15 +7,16 @@
  * Sekmeler: "Ayarlar" ve "Tanımlamalar" AYNI ayar anahtarlarına yazıyordu → tek "Tanımlar" sekmesi (tüm ayarlar,
  * geçmiş ve geri alma Ayarlar > Tanımlar merkezinde). "Atamalar" yalnız özet + İlan Havuzu bağlantısıdır (atama tek ekranda).
  */
-export type OfficeCenterTab = "danismanlar" | "atamalar" | "dagitim" | "tanimlar" | "istatistikler";
+export type OfficeCenterTab = "danismanlar" | "dagitim" | "tanimlar" | "istatistikler";
 export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }[] = [
-  { id: "danismanlar", label: "Danışmanlar" },
-  { id: "atamalar", label: "Atamalar" },
+  { id: "danismanlar", label: "Ekip" },
   { id: "dagitim", label: "Talep dağıtımı" },
   { id: "tanimlar", label: "Tanımlar" },
   { id: "istatistikler", label: "İstatistikler" },
 ];
 export const OFFICE_CENTER_PATH = "/app/ofis-merkezi";
+/** Ofis Merkezi içeriğinin yaşadığı tek ekip merkezi (/app/ofis-merkezi buraya yönlenir). */
+export const TEAM_HUB_PATH = "/app/ekip";
 
 /** Danışmanlar sekmesi satırı: her sayı filtreli hedefe gider (sıfır çıkmaz metrik). */
 export type OfficeAdvisorRow = {
@@ -40,6 +41,10 @@ export type OfficeAdvisorRow = {
   /** Son aktivite (arama/iletişim/portföy kaydı), ISO; 90 günde yoksa null. */
   lastActivityAt: string | null;
   onLeaveToday: boolean;
+  /** Uzmanlık özeti (mülk türü / segment; en çok 3). Tanım yoksa boş. */
+  specialties: string[];
+  /** Bölge özeti (ilçe, yoksa il; ağırlığa göre en çok 3). Tanım yoksa boş. */
+  regions: string[];
 };
 
 export type AdvisorSortKey = "ad" | "portfoy" | "talep" | "kapanis" | "sla" | "aktivite";

@@ -29,7 +29,7 @@ import {
   ADVISOR_TABS,
   type InviteMode,
 } from "./advisor-tabs";
-import { EmploymentFields, PersonalFields, RegionsField, SpecialtiesField } from "./advisor-extra-fields";
+import { RegionsField, SpecialtiesField } from "./advisor-extra-fields";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
 export type RolePermissionSummary = {
@@ -45,10 +45,7 @@ type Branch = { id: string; name: string };
  * genel müdür değilse ilgili sekmeler gizlenir ve `notice` açıklar; mevcut form aynen çalışır.
  */
 export type AdvisorExtras = {
-  private: boolean;
-  work: boolean;
   specialty: boolean;
-  piiEnabled: boolean;
   provinces: { id: string; name: string }[];
   options: SpecialtyOptions;
   notice: string | null;
@@ -56,13 +53,7 @@ export type AdvisorExtras = {
 
 const TAB_ICONS = {
   kimlik: TI.kisi,
-  yetki: TI.yetki,
-  atama: TI.taraflar,
-  hedef: TI.hedef,
-  kisisel: TI.guvenlik,
-  istihdam: TI.sozlesme,
-  uzmanlik: TI.rol,
-  bolge: TI.bolge,
+  uzmanlik: TI.bolge,
   davet: TI.kanal,
 } as const;
 
@@ -95,7 +86,6 @@ export function AdvisorForm({
   branches,
   rolePermissions,
   seats,
-  canSetTargets,
   extras,
 }: {
   userId: string;
@@ -103,7 +93,6 @@ export function AdvisorForm({
   branches: Branch[];
   rolePermissions: RolePermissionSummary[];
   seats: { used: number; limit: number } | null;
-  canSetTargets: boolean;
   extras: AdvisorExtras;
 }) {
   const roles = rolePermissions.map((r) => r.role);
@@ -120,7 +109,7 @@ export function AdvisorForm({
   const seatsFull = seats !== null && seats.used >= seats.limit;
   const selected = rolePermissions.find((r) => r.role === role) ?? null;
 
-  const extrasOn = extras.private || extras.work || extras.specialty;
+  const extrasOn = extras.specialty;
   const tabs: FormTab[] = useMemo(
     () =>
       ADVISOR_TABS.filter((t) => {
@@ -246,10 +235,6 @@ export function AdvisorForm({
         <FormField label="Unvan" htmlFor="adv-title" required className="sm:col-span-2" hint="Kartvizit ve ekip listesinde görünür (örn. Gayrimenkul Danışmanı).">
           <FormInput name="title" required maxLength={80} placeholder="Gayrimenkul Danışmanı" />
         </FormField>
-      </>
-    ),
-    yetki: (
-      <>
         <fieldset className="sm:col-span-2">
           <legend className="mb-2 text-sm font-medium text-ink-950">Rol</legend>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -285,10 +270,6 @@ export function AdvisorForm({
           </p>
         </fieldset>
         {selected ? <RoleMatrix summary={selected} /> : null}
-      </>
-    ),
-    atama: (
-      <>
         <FormField label="Şube" htmlFor="adv-branch" className="sm:col-span-2">
           <FormSelect name="branch_id" defaultValue="">
             <option value="">Şube atanmadı</option>
@@ -314,29 +295,20 @@ export function AdvisorForm({
         </div>
       </>
     ),
-    hedef: (
+    uzmanlik: (
       <>
-        {canSetTargets ? null : (
-          <div className="sm:col-span-2">
-            <Alert tone="info">Hedef atamak için hedefler modülünde ekleme yetkisi gerekir; bu alanlar boş bırakılmalıdır.</Alert>
-          </div>
-        )}
-        <FormField label="Aylık anlaşma hedefi" htmlFor="adv-deals" hint="Adet; boş bırakırsanız hedef oluşturulmaz.">
-          <FormInput name="target_deals" type="number" min={0} max={10000} step={1} inputMode="numeric" placeholder="Örn. 3" disabled={!canSetTargets} />
-        </FormField>
-        <FormField label="Aylık ciro hedefi (₺)" htmlFor="adv-revenue" hint="Brüt komisyon cirosu.">
-          <FormInput name="target_revenue" type="number" min={0} step={1000} inputMode="decimal" placeholder="Örn. 250000" disabled={!canSetTargets} />
-        </FormField>
         <p className="text-xs text-text-muted sm:col-span-2">
-          Hedef bu ayın başından geçerli aylık hedef olarak kaydedilir; gerçekleşme canlı veriden hesaplanır ve{" "}
-          <Link href="/app/hedefler" className="font-semibold text-brand-600 hover:underline">Hedefler</Link> sayfasında izlenir.
+          Bu adım isteğe bağlıdır; boş bırakıp daha sonra danışman detayından da doldurabilirsiniz. TC kimlik, adres, banka, işe giriş, belge ve hedef
+          bilgileri de danışman detayındaki &quot;Kişisel bilgiler&quot; bölümünde sonra doldurulur.
         </p>
+        <div className="sm:col-span-2">
+          <SpecialtiesField options={extras.options} />
+        </div>
+        <div className="sm:col-span-2">
+          <RegionsField provinces={extras.provinces} />
+        </div>
       </>
     ),
-    kisisel: <PersonalFields provinces={extras.provinces} piiEnabled={extras.piiEnabled} />,
-    istihdam: <EmploymentFields />,
-    uzmanlik: <SpecialtiesField options={extras.options} />,
-    bolge: <RegionsField provinces={extras.provinces} />,
     davet: (
       <>
         <fieldset className="sm:col-span-2">
@@ -435,27 +407,27 @@ export function AdvisorForm({
           <SummaryRow label="Telefon" value={display.phone ?? "Girilmedi"} muted={!display.phone} tab="kimlik" field="phone" />
           <SummaryRow label="E-posta" value={display.email ?? "Zorunlu"} muted={!display.email} tab="kimlik" field="email" />
           <SummaryRow label="Unvan" value={title || "Zorunlu"} muted={!title} tab="kimlik" field="title" />
-          <SummaryRow label="Şube" value={display.branch_id ?? "Atanmadı"} muted={!display.branch_id} tab="atama" field="branch_id" />
+          <SummaryRow label="Şube" value={display.branch_id ?? "Atanmadı"} muted={!display.branch_id} tab="kimlik" field="branch_id" />
         </SummaryGroup>
         <SummaryGroup title="Rol ve kapsam">
-          <SummaryRow label="Rol" value={meta?.label ?? "Seçilmedi"} muted={!meta} tab="yetki" field="role" />
+          <SummaryRow label="Rol" value={meta?.label ?? "Seçilmedi"} muted={!meta} tab="kimlik" field="role" />
           <SummaryRow
             label="Görünürlük"
             value={hasOfficeWideDataScope(currentRole) ? "Ofis geneli" : "Yalnız kendi kayıtları"}
-            tab="atama"
+            tab="kimlik"
             field="branch_id"
           />
           <SummaryRow
             label="Otomatik atama"
             value={poolInfo(currentRole).included ? "Havuzda" : "Havuz dışı"}
             muted={!poolInfo(currentRole).included}
-            tab="atama"
+            tab="kimlik"
           />
           <SummaryRow
             label="Başkasının kazancı"
             value={rolePermissions.find((r) => r.role === currentRole)?.seesAllEarnings ? "Görür" : "Görmez"}
             muted={!rolePermissions.find((r) => r.role === currentRole)?.seesAllEarnings}
-            tab="yetki"
+            tab="kimlik"
           />
         </SummaryGroup>
       </>
@@ -465,7 +437,7 @@ export function AdvisorForm({
   return (
     <TabbedFormShell
       title="Yeni danışman"
-      description="Kimlik, rol, atama, hedef ve davet adımlarını tek yerden tamamlayın."
+      description="Üç kısa adım: kimlik ve rol, uzmanlık ve bölge, davet. Diğer bilgiler sonra doldurulur."
       eyebrow="Ekip & yetkiler"
       breadcrumbs={[{ label: "Ekip Merkezi", href: "/app/ekip" }, { label: "Yeni danışman" }]}
       cancelHref="/app/ekip"

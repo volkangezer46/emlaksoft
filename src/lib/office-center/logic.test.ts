@@ -24,6 +24,8 @@ function row(over: Partial<OfficeAdvisorRow>): OfficeAdvisorRow {
     slaWithinPct: null,
     lastActivityAt: null,
     onLeaveToday: false,
+    specialties: [],
+    regions: [],
     ...over,
   };
 }
@@ -31,7 +33,8 @@ function row(over: Partial<OfficeAdvisorRow>): OfficeAdvisorRow {
 describe("URL filtre kontratı", () => {
   it("bozuk sekme/filtre varsayılana düşer, geçerli olanlar korunur", () => {
     expect(parseTab("yok")).toBe("danismanlar");
-    expect(parseTab(["atamalar"])).toBe("atamalar");
+    // "Atamalar" sekmesi kalktı (atama İlan Havuzu'nda); eski yer imi varsayılana düşer.
+    expect(parseTab(["atamalar"])).toBe("danismanlar");
     // Birleşen sekmeler: eski yer imleri tek "Tanımlar" sekmesine düşer.
     expect(parseTab("ayarlar")).toBe("tanimlar");
     expect(parseTab("tanimlamalar")).toBe("tanimlar");
@@ -41,8 +44,8 @@ describe("URL filtre kontratı", () => {
   });
 
   it("tabHref yalnız dolu parametreleri yazar", () => {
-    expect(tabHref("danismanlar")).toBe("/app/ofis-merkezi");
-    expect(tabHref("atamalar", { durum: "gecikmis", bos: undefined })).toBe("/app/ofis-merkezi?sekme=atamalar&durum=gecikmis");
+    expect(tabHref("danismanlar")).toBe("/app/ekip");
+    expect(tabHref("istatistikler", { durum: "gecikmis", bos: undefined })).toBe("/app/ekip?sekme=istatistikler&durum=gecikmis");
   });
 
   it("atama TEK ekranda: İlan Havuzu ?atama= (bozuk görünüm varsayılana düşer)", () => {

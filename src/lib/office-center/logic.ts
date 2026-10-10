@@ -3,7 +3,7 @@
  * atanmamış ilan SLA durumu, ekip sağlığı uyarıları, danışman ligi (kazanç gizliliği korunur).
  */
 import type { AdvisorMetricRow } from "@/lib/team/advisor-metrics";
-import { OFFICE_CENTER_PATH, OFFICE_CENTER_TABS, type AdvisorListFilters, type AdvisorSortKey, type OfficeAdvisorRow, type OfficeCenterTab, type OfficeStatistics, type TeamHealth } from "./types";
+import { OFFICE_CENTER_TABS, TEAM_HUB_PATH, type AdvisorListFilters, type AdvisorSortKey, type OfficeAdvisorRow, type OfficeCenterTab, type OfficeStatistics, type TeamHealth } from "./types";
 
 type Sp = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? v[0] ?? "" : v ?? "");
@@ -22,9 +22,9 @@ export function parseTab(raw: string | string[] | undefined): OfficeCenterTab {
 /** TEK atama ekranı: İlan Havuzu (`?atama=`). Ofis Merkezi ve uyarılar buraya bağlanır. */
 export const LISTING_POOL_PATH = "/app/ilan-havuzu";
 export const ASSIGN_VIEWS = [
-  { id: "bekleyen", label: "Danışmansız ilanlar" },
-  { id: "gecikmis", label: "SLA'sı geçen" },
-  { id: "gecmis", label: "Atama geçmişi" },
+  { id: "bekleyen", label: "Bekleyen ilanlar" },
+  { id: "gecikmis", label: "Gecikenler" },
+  { id: "gecmis", label: "Geçmiş" },
   { id: "aktif", label: "Aktif atamalar" },
   { id: "iptal", label: "İptaller" },
   { id: "yeniden", label: "Yeniden atananlar" },
@@ -60,7 +60,7 @@ export function tabHref(tab: OfficeCenterTab, extra?: Record<string, string | un
   if (tab !== "danismanlar") p.set("sekme", tab);
   for (const [k, v] of Object.entries(extra ?? {})) if (v) p.set(k, v);
   const s = p.toString();
-  return s ? `${OFFICE_CENTER_PATH}?${s}` : OFFICE_CENTER_PATH;
+  return s ? `${TEAM_HUB_PATH}?${s}` : TEAM_HUB_PATH;
 }
 
 const norm = (s: string) => s.toLocaleLowerCase("tr-TR");

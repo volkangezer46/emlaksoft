@@ -8,13 +8,7 @@ import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import type { AppRole } from "@/lib/permissions";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { getProvinceOptions } from "@/lib/geo/reader";
-import {
-  loadSpecialtyOptions,
-  probeAdvisorPrivateSchema,
-  probeAdvisorSpecialtySchema,
-  probeAdvisorWorkSchema,
-} from "@/lib/advisor/advisor-store";
-import { piiEnabled } from "@/lib/advisor/pii-crypto";
+import { loadSpecialtyOptions, probeAdvisorSpecialtySchema } from "@/lib/advisor/advisor-store";
 import { AdvisorForm, type AdvisorExtras, type RolePermissionSummary } from "./advisor-form";
 
 export const metadata = { title: "Yeni danışman" };
@@ -57,40 +51,30 @@ export default async function NewAdvisorPage() {
       branches={(branches ?? []).map((b) => ({ id: b.id as string, name: b.name as string }))}
       rolePermissions={rolePermissions}
       seats={seats ? { used: seats.used, limit: seats.limit } : null}
-      canSetTargets={(ctx.perms.targets ?? []).includes("create")}
       extras={extras}
     />
   );
 }
 
 /**
- * Kimlik, istihdam, uzmanlık ve bölge sekmeleri yalnız ofis sahibi / genel müdür içindir (RLS yazmayı böyle sınırlar)
- * ve ilgili tablolar uygulanmışsa açılır; aksi halde sekme gizlenir ve nedeni bir not olarak gösterilir.
+ * "Uzmanlık ve bölge" adımı yalnız ofis sahibi / genel müdür içindir (RLS yazmayı böyle sınırlar) ve ilgili tablolar
+ * uygulanmışsa açılır; aksi halde adım gizlenir ve nedeni bir not olarak gösterilir. Kimlik/belge/hedef alanları
+ * danışman detayında sonra doldurulur.
  */
 async function loadExtras(supabase: Awaited<ReturnType<typeof createClient>>, role: string): Promise<AdvisorExtras> {
   const empty: AdvisorExtras = {
-    private: false,
-    work: false,
     specialty: false,
-    piiEnabled: false,
     provinces: [],
     options: { propertyTypes: [], segments: [] },
     notice: null,
   };
   if (role !== "owner" && role !== "gm") {
-    return { ...empty, notice: "Kimlik, belge, uzmanlık ve bölge alanlarını yalnız ofis sahibi veya genel müdür doldurur; danışman profilinden sonradan eklenebilir." };
+    return { ...empty, notice: "Uzmanlık ve bölge alanlarını yalnız ofis sahibi veya genel müdür doldurur; danışman detayından sonradan eklenebilir." };
   }
-  const [work, priv, specialty] = await Promise.all([
-    probeAdvisorWorkSchema(supabase),
-    probeAdvisorPrivateSchema(supabase),
-    probeAdvisorSpecialtySchema(supabase),
-  ]);
-  if (!work && !priv && !specialty) {
-    return { ...empty, notice: "Kimlik, belge, uzmanlık ve bölge alanları bu ortamda henüz etkin değil." };
+  const specialty = await probeAdvisorSpecialtySchema(supabase);
+  if (!specialty) {
+    return { ...empty, notice: "Uzmanlık ve bölge alanları bu ortamda henüz etkin değil." };
   }
-  const [provinces, options] = await Promise.all([
-    priv || specialty ? getProvinceOptions() : Promise.resolve([]),
-    specialty ? loadSpecialtyOptions() : Promise.resolve(empty.options),
-  ]);
-  return { private: priv, work, specialty, piiEnabled: piiEnabled(), provinces, options, notice: null };
+  const [provinces, options] = await Promise.all([getProvinceOptions(), loadSpecialtyOptions()]);
+  return { specialty, provinces, options, notice: null };
 }

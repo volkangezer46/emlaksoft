@@ -43,7 +43,7 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.assign.weight_performance": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
   "office.assign.weight_availability": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
   "office.assign.unassigned_sla_hours": { label: "İlan Havuzu > SLA'sı geçen", href: "/app/ilan-havuzu?atama=gecikmis" },
-  "office.alert.unassigned_pool_count": { label: "Ofis Merkezi > İstatistikler", href: "/app/ofis-merkezi?sekme=istatistikler" },
+  "office.alert.unassigned_pool_count": { label: "Ofis Merkezi > İstatistikler", href: "/app/ekip?sekme=istatistikler" },
 };
 const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };
 

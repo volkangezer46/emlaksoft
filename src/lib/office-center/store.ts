@@ -58,7 +58,7 @@ export async function loadOfficeAdvisors(db: Db, tenantId: string, viewer: Metri
   const today = trDayKey(nowMs);
   const period = currentMonthPeriod(nowMs);
 
-  const [profilesRes, branchesRes, teamsRes, openProps, demands, won, leaves, calls, comms, createdProps, sla] = await Promise.all([
+  const [profilesRes, branchesRes, teamsRes, openProps, demands, won, leaves, calls, comms, createdProps, sla, specialtiesRes, regionsRes] = await Promise.all([
     rows(db.from("profiles").select("id, full_name, role, title, is_active, branch_id, team_id, created_at").eq("tenant_id", tenantId).order("full_name").limit(500)),
     rows(db.from("branches").select("id, name").eq("tenant_id", tenantId).limit(200)),
     rows(db.from("teams").select("id, name").eq("tenant_id", tenantId).limit(200)),
@@ -78,6 +78,9 @@ export async function loadOfficeAdvisors(db: Db, tenantId: string, viewer: Metri
     rows(db.from("communications").select("created_by, created_at").eq("tenant_id", tenantId).gte("created_at", since90).not("created_by", "is", null).order("created_at", { ascending: false }).limit(ACTIVITY_SCAN)),
     rows(db.from("properties").select("created_by, created_at").eq("tenant_id", tenantId).gte("created_at", since90).not("created_by", "is", null).order("created_at", { ascending: false }).limit(ACTIVITY_SCAN)),
     loadAdvisorResponseTimes(db, { viewer, tenantId, period, nowMs }),
+    // Uzmanlık / bölge sütunları: tablo yoksa (migration uygulanmadı) boş döner, liste bozulmaz.
+    rows(db.from("advisor_specialties").select("profile_id, value, level").eq("tenant_id", tenantId).order("level", { ascending: false }).limit(2000)),
+    rows(db.from("advisor_regions").select("profile_id, province_id, district_id, weight").eq("tenant_id", tenantId).order("weight", { ascending: false }).limit(2000)),
   ]);
 
   // profiles.team_id / title sütunu yoksa (takım migration'ı uygulanmamış) sade sorguya düş.
@@ -112,6 +115,33 @@ export async function loadOfficeAdvisors(db: Db, tenantId: string, viewer: Metri
   note(comms.rows, "created_by", "created_at");
   note(createdProps.rows, "created_by", "created_at");
 
+  // Uzmanlık (ilk 3 değer) ve bölge (ilk 3 ilçe/il adı; ağırlığa göre) — danışman başına kısa özet.
+  const specialtiesBy = new Map<string, string[]>();
+  for (const r of specialtiesRes.rows) {
+    const id = s(r.profile_id);
+    const v = s(r.value);
+    if (!id || !v) continue;
+    const cur = specialtiesBy.get(id) ?? [];
+    if (!cur.includes(v)) cur.push(v);
+    specialtiesBy.set(id, cur);
+  }
+  const regionIds = (col: string) => [...new Set(regionsRes.rows.map((r) => s(r[col])).filter(Boolean))];
+  const [regionDistricts, regionProvinces] = regionsRes.rows.length
+    ? await Promise.all([getDistrictsByIds(regionIds("district_id")), getProvincesByIds(regionIds("province_id"))])
+    : [[], []];
+  const geoName = (list: unknown) => new Map(((list ?? []) as Row[]).map((g) => [s(g.id), s(g.name)]));
+  const districtName = geoName(regionDistricts);
+  const provinceName = geoName(regionProvinces);
+  const regionsBy = new Map<string, string[]>();
+  for (const r of regionsRes.rows) {
+    const id = s(r.profile_id);
+    const name = (s(r.district_id) ? districtName.get(s(r.district_id)) : undefined) ?? provinceName.get(s(r.province_id));
+    if (!id || !name) continue;
+    const cur = regionsBy.get(id) ?? [];
+    if (!cur.includes(name)) cur.push(name);
+    regionsBy.set(id, cur);
+  }
+
   const list: OfficeAdvisorRow[] = profiles.map((p) => {
     const id = s(p.id);
     const branchId = s(p.branch_id) || null;
@@ -134,6 +164,8 @@ export async function loadOfficeAdvisors(db: Db, tenantId: string, viewer: Metri
       slaWithinPct: sla.byAdvisor.get(id)?.withinSlaPct ?? null,
       lastActivityAt: act ? new Date(act).toISOString() : null,
       onLeaveToday: onLeave.has(id),
+      specialties: (specialtiesBy.get(id) ?? []).slice(0, 3),
+      regions: (regionsBy.get(id) ?? []).slice(0, 3),
     };
   });
 

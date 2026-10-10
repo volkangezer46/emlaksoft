@@ -17,14 +17,14 @@ export async function RoutingTab({ ctx }: { ctx: TabContext }) {
   return (
     <div className="space-y-4">
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-text-muted">
-        <span>Yeni talepler ve ilk dönüş süresi aşımları tek motorla dağıtılır; ayarlar kapalıyken bugünkü &quot;en az yüklü&quot; davranışı sürer.</span>
+        <span>Yeni talepler ve ilk dönüş süresi aşımları otomatik olarak dağıtılır; ayarlar kapalıyken bugünkü &quot;en az yüklü&quot; davranışı sürer.</span>
         <Link href="/app/raporlar/lead-hizi" className="inline-flex items-center gap-0.5 font-semibold text-brand-600 hover:underline">
-          Aday hızı raporu <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+          Yanıt hızı raporu <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
         </Link>
-        <Link href="/app/ofis-merkezi?sekme=tanimlar" className="inline-flex items-center gap-0.5 font-semibold text-brand-600 hover:underline">
+        <Link href="/app/ekip?sekme=tanimlar" className="inline-flex items-center gap-0.5 font-semibold text-brand-600 hover:underline">
           Akıllı atama ağırlıkları <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
         </Link>
-        <Link href="/app/ofis-merkezi?sekme=danismanlar" className="inline-flex items-center gap-0.5 font-semibold text-brand-600 hover:underline">
+        <Link href="/app/ekip" className="inline-flex items-center gap-0.5 font-semibold text-brand-600 hover:underline">
           Danışman uzmanlık/bölge kayıtları <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
         </Link>
       </p>

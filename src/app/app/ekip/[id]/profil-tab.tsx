@@ -99,7 +99,7 @@ function ReadOnlySummary({ work }: { work: WorkProfileRow | null }) {
 }
 
 /**
- * "Profil ve belgeler" sekmesi: belge bitiş kartları (30/7 gün uyarısı), iş profili (ofis sahibi / GM düzenler,
+ * "Kişisel bilgiler" sekmesi: belge bitiş kartları (30/7 gün uyarısı), iş profili (ofis sahibi / GM düzenler,
  * diğerleri salt okunur) ve kimlik bölümü (yalnız ofis sahibi, GM ve kişinin kendisi; TC/IBAN maskeli, "Göster" denetimli).
  * Şema uygulanmamışsa sekme hiç çizilmez (çağıran `work.available` ile gizler); bu bileşen yine de zarif boş durum verir.
  */
@@ -134,7 +134,7 @@ export async function ProfileTab({
   if (!workAvailable && !(priv?.available ?? false)) {
     return (
       <EmptyStateV3
-        title="Profil ve belgeler bu ortamda henüz etkin değil"
+        title="Kişisel bilgiler bu ortamda henüz etkin değil"
         description="Danışman iş profili ve belge takibi veritabanı güncellemesi uygulandığında açılır."
       />
     );

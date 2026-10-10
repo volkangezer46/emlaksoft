@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Users } from "lucide-react";
 import { AdvisorTable } from "@/components/app/office-center/advisor-table";
 import { QuickInvitePanel } from "@/components/app/office-center/quick-invite-panel";
@@ -8,16 +9,16 @@ import { FormSelect } from "@/components/ui/form-controls";
 import { StatRow } from "@/components/ui/stat-row";
 import { filterAdvisors, parseAdvisorFilters, sortAdvisors, tabHref } from "@/lib/office-center/logic";
 import { loadOfficeAdvisors } from "@/lib/office-center/store";
-import type { AdvisorSortKey } from "@/lib/office-center/types";
+import { TEAM_HUB_PATH, type AdvisorSortKey } from "@/lib/office-center/types";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import { buildHref, mergeParams } from "@/lib/ui/filter-params";
 import type { TabContext } from "./context";
 
-const PATH = "/app/ofis-merkezi";
+const PATH = TEAM_HUB_PATH;
 const ADVISOR_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 
-export async function AdvisorsTab({ ctx }: { ctx: TabContext }) {
+export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: ReadonlyMap<string, ReactNode> }) {
   const f = parseAdvisorFilters(ctx.sp);
   const data = await loadOfficeAdvisors(ctx.supabase, ctx.tenantId, { userId: ctx.userId, role: ctx.role, perms: ctx.perms }, ctx.nowMs);
   const all = data.rows;
@@ -105,6 +106,7 @@ export async function AdvisorsTab({ ctx }: { ctx: TabContext }) {
       ) : (
         <AdvisorTable
           rows={rows}
+          extra={extra}
           sort={{ key: f.sirala, dir: f.yon, href: sortHref }}
           actions={
             ctx.canEdit

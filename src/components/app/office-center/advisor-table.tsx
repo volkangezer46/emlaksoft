@@ -19,7 +19,7 @@ export const ADVISOR_SORTS: { key: AdvisorSortKey; label: string; align?: "right
   { key: "portfoy", label: "Açık portföy", align: "right" },
   { key: "talep", label: "Açık talep", align: "right" },
   { key: "kapanis", label: "Bu ay kapanış", align: "right" },
-  { key: "sla", label: "SLA uyumu", align: "right" },
+  { key: "sla", label: "Yanıt uyumu", align: "right" },
   { key: "aktivite", label: "Son aktivite" },
 ];
 
@@ -54,7 +54,7 @@ export async function AdvisorTable({
   // Avatarlar ayrı, hata-toleranslı tek IN sorgusu (satır yükleyicisini ve kolon yokken sayfayı bozmaz).
   const avatars = await loadAvatarMap(rows.map((r) => r.id));
   return (
-    <TableFrame stickyFirst minWidth={960}>
+    <TableFrame stickyFirst minWidth={1120}>
       <Table>
         <THead>
           <TR>
@@ -70,6 +70,8 @@ export async function AdvisorTable({
                 )}
               </TH>
             ))}
+            <TH>Uzmanlık</TH>
+            <TH>Bölge</TH>
             <TH>Rol · takım/şube</TH>
             {actions ? <TH>İşlem</TH> : null}
           </TR>
@@ -111,6 +113,12 @@ export async function AdvisorTable({
               </TD>
               <TD>
                 <span className="text-xs text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "90+ gün / kayıt yok"}</span>
+              </TD>
+              <TD>
+                <span className="text-xs text-text-muted">{r.specialties.length ? r.specialties.join(", ") : "—"}</span>
+              </TD>
+              <TD>
+                <span className="text-xs text-text-muted">{r.regions.length ? r.regions.join(", ") : "—"}</span>
               </TD>
               <TD>
                 <span className="text-xs font-semibold text-ink-950">{ROLE_LABELS[r.role] ?? r.role}</span>
