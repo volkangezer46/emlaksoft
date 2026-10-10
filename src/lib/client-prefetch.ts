@@ -1,19 +1,22 @@
 import type { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 import { now } from "@/lib/clock";
 import { runWhenIdle } from "@/lib/idle";
+import { markFetched } from "@/lib/client-cache-state";
 import {
   networkAllowsPrefetch,
   PREFETCH_CONCURRENCY,
   PREFETCH_MIN_REPEAT_MS,
   PREFETCH_SLOT_MS,
+  REWARM_DELAY_MS,
+  REWARM_MIN_GAP_MS,
 } from "@/lib/client-cache-policy";
 
 /**
  * TAM önceden yükleme (full prefetch): router.prefetch(href, { kind: "full" }) sayfanın TÜM veriyle çizilmiş
  * RSC yanıtını istemci önbelleğine indirir; tıklamada ağ turu yoktur (Next 16.3: PrefetchKind.FULL, `static`
  * staleTimes süresi = 300 sn). Sunucu yükü: tek kuyruk, aynı anda en çok 2 istek, 700 ms aralık, aynı adres
- * 30 sn içinde tekrarlanmaz; önbellek geçersiz kılınınca (router.refresh / mutasyon) `onInvalidate` ile aynı
- * kuyruğa gecikmeli geri alınır.
+ * 30 sn içinde tekrarlanmaz; önbellek geçersiz kılınınca (router.refresh / mutasyon) `onInvalidate` ile istenen
+ * hedefler 1,5 sn sonra, en sık 10 sn'de bir, aynı kuyruğa toplu geri alınır (sunucu yükü sınırlı).
  */
 
 export type PrefetchRouter = {
@@ -37,18 +40,39 @@ function isLocalPath(href: string): boolean {
   return href.startsWith("/") && !href.startsWith("//");
 }
 
+function keyOf(href: string): string {
+  const [path, query = ""] = href.split("#", 1)[0].split("?");
+  return `${path}?${query}`;
+}
+
+let latestRouter: PrefetchRouter | null = null;
+let rewarmTimer: ReturnType<typeof setTimeout> | null = null;
+let lastRewarmAt: number | null = null;
+
+/**
+ * Önbellek geçersiz kılındı (router.refresh / mutasyon / realtime tazeleme TÜM segment önbelleğini düşürür):
+ * istenen hedefler, açık sayfa hariç, tek bir gecikmeli ve aralık sınırlı (≥10 sn) toplu yeniden ısıtmayla geri alınır.
+ */
+function scheduleRewarm(): void {
+  if (rewarmTimer || !latestRouter) return;
+  const gapLeft = lastRewarmAt === null ? 0 : lastRewarmAt + REWARM_MIN_GAP_MS - now();
+  rewarmTimer = setTimeout(() => {
+    rewarmTimer = null;
+    const router = latestRouter;
+    if (!router) return;
+    lastRewarmAt = now();
+    const here = typeof window === "undefined" ? "" : `${window.location.pathname}${window.location.search}`;
+    lastAt.clear();
+    const hrefs = [...wanted].filter((h) => h !== here);
+    enqueueFullPrefetch(router, hrefs);
+  }, Math.max(REWARM_DELAY_MS, gapLeft));
+}
+
 function fire(router: PrefetchRouter, href: string): void {
   lastAt.set(href, now());
-  wanted.add(href);
+  markFetched(keyOf(href));
   try {
-    router.prefetch(href, {
-      kind: FULL,
-      onInvalidate: () => {
-        // Önbellek düştü: hâlâ isteniyorsa gecikmeli ve kuyruktan yeniden yükle (fırtına olmasın).
-        if (!wanted.has(href)) return;
-        setTimeout(() => enqueueFullPrefetch(router, [href]), PREFETCH_MIN_REPEAT_MS);
-      },
-    });
+    router.prefetch(href, { kind: FULL, onInvalidate: scheduleRewarm });
   } catch {
     /* önceden yükleme en iyi çabadır; hata gezinmeyi etkilemez */
   }
@@ -75,6 +99,7 @@ function pump(): void {
 /** Boşta, sırayla, aralıklı tam önceden yükleme. Veri tasarrufu / yavaş ağda hiçbir şey yapmaz. */
 export function enqueueFullPrefetch(router: PrefetchRouter, hrefs: readonly string[]): () => void {
   if (!canPrefetchOnThisConnection()) return () => {};
+  latestRouter = router;
   const added: Item[] = [];
   for (const href of hrefs) {
     if (!isLocalPath(href)) continue;
@@ -99,6 +124,7 @@ export function enqueueFullPrefetch(router: PrefetchRouter, hrefs: readonly stri
 /** Niyet (hover / odak / dokunma / görünür alan): kuyruğu beklemeden, ama aynı adres 30 sn'de bir. */
 export function prefetchFullNow(router: PrefetchRouter | null | undefined, href: string): void {
   if (!router || !isLocalPath(href) || !canPrefetchOnThisConnection()) return;
+  latestRouter = router;
   const last = lastAt.get(href);
   if (last !== undefined && now() - last < PREFETCH_MIN_REPEAT_MS) return;
   fire(router, href);
@@ -110,7 +136,11 @@ export function resetPrefetchState(): void {
   lastAt.clear();
   wanted.clear();
   if (timer) clearTimeout(timer);
+  if (rewarmTimer) clearTimeout(rewarmTimer);
   timer = null;
+  rewarmTimer = null;
+  lastRewarmAt = null;
+  latestRouter = null;
 }
 
 // --- Liste satırı görünür-alan bütçesi (ilk 5 detay bağlantısı) ---

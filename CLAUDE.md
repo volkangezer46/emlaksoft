@@ -59,7 +59,7 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   veri akışla gelir. Kurallar: her `/app`/`/admin` `page.tsx` yanında `loading.tsx`; bağımsız sorgular `Promise.all` (waterfall yok);
   ağır istemci kütüphanesi yalnız `next/dynamic`; sunucu Supabase istemcisi yalnız `src/lib/supabase/{server,middleware,admin}.ts`
   (zaman aşımı + yineleme: `fetch-guard.ts`); proxy oturumu `getClaims` (yerel JWT), kapı tek RPC turu ve ÖNBELLEKSİZ (pasif/askı anında);
-  istemci router önbelleği: `staleTimes.dynamic` ≤300 sn + ÖNCE GÖSTER SONRA TAZELE (`ClientCacheSync` /app ve /admin layout'unda: önbellekten gösterilen >5 sn eski sayfa sessiz `router.refresh()` ile tazelenir, kapı reddinde tam yükleme, kimlik/kapsam değişiminde önbellek temizlenir) +
+  istemci router önbelleği: `staleTimes.dynamic` ≤300 sn + ÖNCE GÖSTER SONRA TAZELE (`ClientCacheSync` /app ve /admin layout'unda: önbellekten gösterilen >20 sn eski sayfa sessiz `router.refresh()` ile tazelenir, kapı reddinde tam yükleme, kimlik/kapsam değişiminde önbellek temizlenir) +
   TAM önceden yükleme (`src/lib/client-prefetch.ts`: boşta, rolün menü merkezleri + sekme şeridi, ≤2 eşzamanlı, saveData/2g-3g'de kapalı; hover/ilk 5 satır `prefetchFullNow`) + realtime (`realtime-throttle.ts` tablo listesi, tenant filtreli); mutasyon = `revalidatePath`/`router.refresh`;
   menü tıklaması `NavPending` ile anında vurgulanır; yeni ağır sorgu önce ölçülür
   (`scripts/perf/measure-live.mts`, `profile-nav.mts`). Sözleşme: `src/lib/perf-budget-contract.test.ts`. Ayrıntı `docs/design/HIZ_MIMARI_ARASTIRMA_2026-10.md`.

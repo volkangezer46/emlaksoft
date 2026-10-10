@@ -20,7 +20,7 @@ import { SCOPE_CHANGE_EVENT } from "@/lib/ui/use-nav-role";
  *
  * staleTimes.dynamic=300 sayesinde tıklanan sayfa istemci önbelleğinden ANINDA açılır. Bu bileşen güvenliği ve
  * tazeliği sağlar:
- *  (a) önbellekten gösterilen ve >5 sn eski sayfa için sessiz arka plan tazelemesi (`router.refresh()`,
+ *  (a) önbellekten gösterilen ve >20 sn eski sayfa için sessiz arka plan tazelemesi (`router.refresh()`,
  *      startTransition içinde: etkileşimi bloklamaz, kaydırma/form durumu korunur); iki tazeleme arası ≥15 sn,
  *      sekme arkadayken yapılmaz;
  *  (b) kapı reddi: tazeleme proxy kapısından geçemezse (askı / giriş / 2FA) tam sayfa yüklemesi yapılır → bellek

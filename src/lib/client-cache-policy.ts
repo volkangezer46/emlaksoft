@@ -7,8 +7,13 @@
  * kapıdan reddedilirse (askı / giriş / 2FA) tam sayfa yönlendirmesi yapılır (bellek önbelleği sıfırlanır).
  */
 
-/** Önbellekten gösterilen sayfa bu süreden eskiyse arkadan tazelenir. */
-export const REVALIDATE_AFTER_MS = 5_000;
+/**
+ * Önbellekten gösterilen sayfa bu süreden eskiyse arkadan tazelenir. 5 sn DENENDİ ve REDDEDİLDİ: router.refresh() TÜM
+ * segment önbelleğini düşürür; her tıklamada tazeleme komşu sayfaları da düşürüp sonraki tıklamayı ağa çıkarıyordu
+ * (ölçüm). 20 sn: sık gezinmede anında, durup beklenen sayfada tazeleme; dış değişiklikleri realtime, kendi
+ * değişikliklerini mutasyon revalidate eder.
+ */
+export const REVALIDATE_AFTER_MS = 20_000;
 /** İki arka plan tazelemesi arası en az süre (tazeleme TÜM segment önbelleğini geçersiz kılar). */
 export const BG_REFRESH_MIN_GAP_MS = 15_000;
 /** Arka plan tazelemesinden sonra kapı yönlendirmesi sayılan pencere. */
@@ -18,6 +23,9 @@ export const PREFETCH_MIN_REPEAT_MS = 30_000;
 /** Aynı anda en çok bu kadar önceden yükleme isteği (sırayla, aralıklı). */
 export const PREFETCH_CONCURRENCY = 2;
 export const PREFETCH_SLOT_MS = 700;
+/** Önbellek düştükten sonra toplu yeniden ısıtma: gecikme ve iki ısıtma arası en az süre. */
+export const REWARM_DELAY_MS = 1_500;
+export const REWARM_MIN_GAP_MS = 10_000;
 /** Liste satırlarında görünür alanda tam önceden yüklenen ilk detay bağlantısı sayısı. */
 export const VIEWPORT_PREFETCH_BUDGET = 5;
 
