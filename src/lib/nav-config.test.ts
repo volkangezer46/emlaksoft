@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_NAV_HREFS,
   HIDDEN_APP_PAGES,
-  MOBILE_TAB_SECTIONS,
   NAV_SECTIONS,
   NAV_SHORTCUTS,
   PALETTE_ONLY_PAGES,
   resolveActiveNav,
+  hubNav,
   visibleSections,
 } from "./nav-config";
 import type { AppModule } from "./permissions";
@@ -131,12 +131,29 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
     expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/kayip-satis", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
   });
-  it("Ofis başlığında çekirdek görünür, 7 yönetim öğesi 'Yönetim' alt grubundadır", () => {
+  it("Ofis kataloğu 10 sayfa tutar (yan menüde görünürlük rol bazlı merkezlerle belirlenir, bkz. nav-roles)", () => {
     const ofis = NAV_SECTIONS.find((s) => s.id === "ofis")!;
-    expect(ofis.items.filter((i) => !i.group).map((i) => i.href)).toEqual(["/app/ekip", "/app/abonelik", "/app/yardim"]);
-    expect(ofis.items.filter((i) => i.group === "yonetim").map((i) => i.href).sort()).toEqual(
-      ["/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/denetim", "/app/ofis-merkezi", "/app/otomasyonlar", "/app/uyum"].sort(),
+    expect(ofis.items.map((i) => i.href).sort()).toEqual(
+      ["/app/abonelik", "/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/denetim", "/app/ekip", "/app/ofis-merkezi", "/app/otomasyonlar", "/app/uyum", "/app/yardim"].sort(),
     );
+  });
+  it("'Ayarlar' adlı ilgisiz sekme kalmadı: sekmeler gerçek adlarıyla anılır", () => {
+    const tabLabels = Object.fromEntries(
+      NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => (i.tabs ?? []).map((t) => [t.href, t.label] as const))),
+    );
+    expect(tabLabels["/app/ayarlar/etiketler"]).toBe("Etiketler");
+    expect(tabLabels["/app/ayarlar/filigran"]).toBe("Filigran");
+    expect(tabLabels["/app/ayarlar/sozlesme-sablonlari"]).toBe("Sözleşme şablonları");
+    expect(tabLabels["/app/ayarlar/mesaj-sablonlari"]).toBe("Mesaj şablonları");
+    expect(tabLabels["/app/ayarlar/ai-kullanim"]).toBe("AI kullanımı");
+    for (const [href, label] of Object.entries(tabLabels)) if (href !== "/app/ayarlar") expect(label, href).not.toBe("Ayarlar");
+    expect(tabLabels["/app/ilan-havuzu"]).toBe("Havuz ve Atama");
+  });
+  it("'tv' arama sözcüğü Ekip karnesi'nde değil; TV modu palet sayfasıdır (/app/pano-tv)", () => {
+    const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Ekip karnesi")!;
+    expect(perf.keywords).not.toContain("tv");
+    const tv = PALETTE_ONLY_PAGES.find((p) => p.href === "/app/pano-tv");
+    expect(tv?.keywords).toEqual(expect.arrayContaining(["tv", "pano", "ekran"]));
   });
   it("teklif izni olan ama anlaşma izni olmayan rol Teklifler'e Anlaşmalar öğesinden ulaşır", () => {
     const it = visibleSections(["offers"]).flatMap((s) => s.items).find((i) => i.label === "Anlaşmalar");
@@ -277,20 +294,11 @@ describe("bilgi mimarisi 2026-10 (docs/design/MENU_IA_2026_10.md)", () => {
     expect(byHref["/app"]).toBe("g h");
   });
 
-  it("ileri düzey öğeler ayracın altında: her başlıkta en az bir temel öğe kalır", () => {
-    for (const s of NAV_SECTIONS) {
-      expect(s.items.some((i) => !i.advanced), s.id).toBe(true);
-      // Çekirdek (sade görünüm) öğe ileri düzey olamaz: ikisi birbirini dışlar.
-      for (const i of s.items) if (i.advanced) expect(i.tier, i.href).toBe("more");
-    }
-  });
-
-  it("mobil alt sekmeler var olan başlıklara bağlıdır ve ofis sahibinde dördü de görünür", () => {
-    const ids = new Set(NAV_SECTIONS.map((s) => s.id));
-    for (const t of MOBILE_TAB_SECTIONS) expect(ids.has(t.id), t.id).toBe(true);
-    const visible = new Set(sections.map((s) => s.id));
-    for (const t of MOBILE_TAB_SECTIONS) expect(visible.has(t.id), t.id).toBe(true);
-    expect(MOBILE_TAB_SECTIONS).toHaveLength(4);
+  it("mobil alt çubuk rol bazlıdır: ofis sahibinde 5 yuva (Bugün | Müşteriler | + Yeni | İlanlar | Menü)", () => {
+    const owner = hubNav(ALL_MODULES, { role: "owner" });
+    expect(owner.mobile).toEqual(["bugun", "musteriler", "new", "ilanlar", "menu"]);
+    const hubIds = new Set(owner.hubs.map((h) => h.id));
+    for (const slot of owner.mobile) expect(slot === "new" || slot === "menu" || hubIds.has(slot), slot).toBe(true);
   });
 
   it("gizli sayfa listesi menüyle çakışmaz", () => {

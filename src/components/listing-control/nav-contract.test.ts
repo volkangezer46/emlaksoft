@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ALL_NAV_HREFS, NAV_SECTIONS, moreSections, sidebarModel, visibleSections } from "@/lib/nav-config";
-import { NAV_CORE_BY_ROLE } from "@/lib/nav-roles";
+import { ALL_NAV_HREFS, NAV_SECTIONS, hubNav, visibleSections } from "@/lib/nav-config";
 import { DEFAULT_MATRIX, canAccessModule, type AppModule, type AppRole } from "@/lib/permissions";
 import { findGate } from "@/lib/billing/page-gates";
 
@@ -21,25 +20,21 @@ describe("İlan Kontrol kayıtları", () => {
     expect(ALL_NAV_HREFS.filter((h) => h === HREF)).toHaveLength(1);
   });
 
-  it("yönetim kademesinin çekirdek menüsünde görünür; danışman konsolunda Portföy başlığı içinde katlı ulaşılır", () => {
-    for (const role of ["owner", "gm", "branch_manager"] as const) {
-      expect(NAV_CORE_BY_ROLE[role], role).toContain(HREF);
+  it("yönetim kademesi ve danışman: İlan Kontrol 'İlanlar' merkezinin sekmesidir (ayrı satır değil)", () => {
+    for (const role of ["owner", "gm", "branch_manager", "team_lead", "advisor"] as const) {
       expect(canAccessModule(role, "portals"), role).toBe(true);
-      expect(hrefs(visibleSections(accessibleOf(role), { mode: "simple", role })), role).toContain(HREF);
-    }
-    // Danışman/takım lideri çekirdeği 8 satırla sınırlıdır (menü bütçesi); İlan Kontrol "Diğer" grubundadır, kaybolmaz.
-    for (const role of ["team_lead", "advisor"] as const) {
-      expect(canAccessModule(role, "portals"), role).toBe(true);
-      expect(hrefs(visibleSections(accessibleOf(role), { mode: "simple", role })), role).not.toContain(HREF);
-      const m = sidebarModel(accessibleOf(role), { simple: true, role });
-      expect(m.rest.flatMap((s) => s.items).map((i) => i.href), role).toContain(HREF);
+      const nav = hubNav(accessibleOf(role), { role });
+      const hub = nav.hubs.find((h) => h.pages.some((p) => p.href === HREF));
+      expect(hub?.id, role).toBe("ilanlar");
+      expect(nav.hubs.map((h) => h.href), role).not.toContain(HREF);
     }
   });
 
   it("portals izni olmayan rol menüde görmez (muhasebe, çağrı merkezi)", () => {
     for (const role of ["accounting", "call_center"] as const) {
-      const all = [...hrefs(visibleSections(accessibleOf(role))), ...hrefs(moreSections(accessibleOf(role), { role }))];
-      expect(all, role).not.toContain(HREF);
+      const nav = hubNav(accessibleOf(role), { role });
+      const all = [...nav.hubs, ...nav.dock].flatMap((h) => h.pages.map((p) => p.href));
+      expect([...all, ...hrefs(visibleSections(accessibleOf(role)))], role).not.toContain(HREF);
     }
   });
 

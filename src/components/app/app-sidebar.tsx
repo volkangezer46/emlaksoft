@@ -4,46 +4,53 @@ import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname } from "next/navigation";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, Ellipsis, Lock, Menu, Pin, PinOff, X } from "lucide-react";
+import { ChevronDown, Lock, Menu, Plus, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
-import { itemSubTabs, MOBILE_TAB_SECTIONS, resolveActiveNav, sidebarModel, visibleSections, type NavItem, type SidebarGroup, type VisibleSection } from "@/lib/nav-config";
+import { hubNav, resolveActiveHub, type HubPage, type NavHub } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore } from "@/lib/nav-memory";
-import { findActiveNavigationHref } from "@/lib/navigation";
 import { getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { useClosedModules } from "@/components/app/closed-modules-context";
+import { MobileNewSheet, mobileNewActions } from "@/components/app/mobile-new-sheet";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
-import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } from "@/components/ui/console/quick-access";
+import { MenuSearchButton } from "@/components/ui/console/quick-access";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 
 const VitrinIcon = ICONS.portal;
+const ToolsIcon = ICONS.baslikArac;
 
 function isLocked(href: string, lockedHrefs: readonly string[]) {
   return lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
 }
 
-function badgeFor(item: NavItem, badges: readonly NavBadge[]): NavBadge | null {
-  return badges.find((b) => item.href === b.itemHref || item.tabs?.some((t) => t.href === b.itemHref)) ?? null;
-}
-
-/** Bir başlıktaki öğelerin toplam rozet sayısı: başlık kapalıyken bekleyen iş gözden kaçmaz. */
-function groupBadgeCount(items: readonly NavItem[], badges: readonly NavBadge[]) {
-  return items.reduce((n, i) => n + (badgeFor(i, badges)?.count ?? 0), 0);
+/** Bir merkezdeki bekleyen işler (geciken görev, bekleyen onay): merkez kapalıyken de gözden kaçmaz. */
+function hubBadge(hub: NavHub, badges: readonly NavBadge[]): { count: number; href: string; label: string; tone: NavBadge["tone"] } | null {
+  const own = badges.filter((b) => hub.pages.some((p) => p.href === b.itemHref || p.itemHref === b.itemHref));
+  const first = own[0];
+  if (!first) return null;
+  const count = own.reduce((n, b) => n + b.count, 0);
+  // Tek rozet kendi süzgeçli hedefine (ör. geciken görevler), birden çoksa merkezin girişine gider.
+  return {
+    count,
+    href: own.length === 1 ? first.href : hub.href,
+    label: own.map((b) => `${b.count} ${b.label}`).join(", "),
+    tone: own.some((b) => b.tone === "danger") ? "danger" : "warn",
+  };
 }
 
 /**
- * Akordeon varsayılanı: YALNIZ etkin sayfanın başlığı açık (danışmanda günlük "Bugün" başlığı da açık kalır);
- * kullanıcının değiştirdikleri hatırlanır.
+ * Yan menü (masaüstü kenar çubuğu + mobil çekmece) ve mobil alt çubuk.
+ *
+ * Yapı (2026-10, "Google sadeliği"): menü ROL BAZLI MERKEZLERDEN oluşur (ofis 6, danışman 5, muhasebe 4, çağrı 4 satır;
+ * bkz. src/lib/nav-roles.ts). Merkezin sayfaları sayfanın üstündeki TEK sekme şeridindedir (SectionTabs), yan menüde
+ * alt liste yoktur. Altta sabit: Ayarlar, Abonelik, Yardım, "Araçlar" (kapalı grup) ve "Menüyü düzenle".
+ * Mobil alt çubuk rol bazlıdır (en çok 5 yuva, "+ Yeni" eylem sayfası, "Menü" çekmecesi).
  */
-function defaultOpenGroups(role: string | null): readonly string[] {
-  return role === "advisor" || role === "team_lead" ? ["bugun"] : [];
-}
-
 export function AppSidebar({
   officeName,
   plan,
@@ -77,189 +84,107 @@ export function AppSidebar({
   usage?: PlanUsageRow[];
   canUpgrade?: boolean;
   vitrinHref?: string | null;
-  /** `${tenantId}:${userId}` — sabitlenen/kullanım/kapalı bölüm tercihlerinin yerel anahtarı. */
+  /** `${tenantId}:${userId}` — menü durum tercihlerinin yerel anahtarı. */
   storageScope?: string;
-  /** Etkin rol: sade görünümde rol çekirdek menüsünü belirler (yetkiyi değiştirmez). */
+  /** Etkin rol: merkez yapısını ve mobil alt çubuğu belirler (yetkiyi değiştirmez). */
   role?: string | null;
-  /** Sade görünüm: her başlıkta yalnız rol çekirdeği (bütçe: danışman <= 8, ofis <= 10), gerisi en alttaki kapalı "Diğer" grubunda. */
+  /** Sade görünüm (varsayılan): "Araçlar" kapalı gelir; kapalıysa (Tüm sayfalar görünür) açık gelir. */
   simple?: boolean;
 }) {
   const pathname = usePathname();
   // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
   const [open, setOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
 
-  // Menü 9 iş başlığıdır (bkz. src/lib/nav-config.ts). Başlıkta izinli hiçbir sayfa yoksa gizlenir.
-  // Tam liste: etkin sayfa tespiti ve Hızlı erişim için (hiçbir sayfa kaybolmaz).
-  // Ofisin kapattığı modüller menüden ve "Diğer" listesinden çıkar (veri silinmez).
+  // Ofisin kapattığı modüller menüden çıkar (veri silinmez).
   const closedModules = useClosedModules();
-  const allSections = useMemo(() => visibleSections(accessibleModules, { closed: closedModules }), [accessibleModules, closedModules]);
-  const model = useMemo(
-    () => sidebarModel(accessibleModules, { simple, role, closed: closedModules }),
-    [simple, accessibleModules, role, closedModules],
-  );
-  const { section: activeSection, href: activeHref } = resolveActiveNav(pathname, allSections);
-  const activeId = activeSection?.id ?? null;
-  const activeInRest = model.rest.some((s) => s.items.some((i) => i.href === activeHref));
+  const nav = useMemo(() => hubNav(accessibleModules, { role, closed: closedModules }), [accessibleModules, role, closedModules]);
+  const active = resolveActiveHub(pathname, nav);
+  const activeHubId = active.hub?.id ?? null;
 
   const closedStore = getHrefStore("closed", storageScope);
-  // "closed" deposu menü DURUM kimliklerini tutar: t-<başlık> (varsayılandan ayrılan başlık), daha-fazla-acik (açık "Diğer").
+  // "closed" deposu menü DURUM kimliklerini tutar: araclar-degisti (Araçlar grubunun varsayılandan ters durumu).
   const stateIds = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
   const toggleState = (id: string) => {
     const cur = closedStore.read();
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
+  const toolsOpen = active.inTools || (!simple !== stateIds.includes("araclar-degisti"));
 
-  const quickItems = useMemo<QuickItem[]>(
-    () => allSections.flatMap((s) => s.items).map((i) => ({ href: i.href, label: i.label, icon: i.icon, description: i.description })),
-    [allSections],
-  );
-  const itemByHref = useMemo(() => new Map(allSections.flatMap((s) => s.items).map((i) => [i.href, i])), [allSections]);
-  const quick = useQuickAccess({ scope: storageScope, kind: "app", items: quickItems, activeHref });
-  // Hızlı erişim (sabitlenen + en çok kullanılan) hedefleri boşta ısıtılır: tıklayınca kabuk anında açılır. Bağlantı tasarrufta
-  // (saveData/2g) yapılmaz; etkin sayfa ve kilitli (yükseltme) sayfalar atlanır. Sunucu turu/ düzen kayması yok.
-  // Bütçe: en çok 8 hedef (önce sabit/çok kullanılan, sonra görünür çekirdek menü sırası), 600 ms arayla; her biri yalnız
-  // loading.tsx sınırına kadar iner. Sonraki tıklamada iskelet ve etkin vurgu anında gelir.
-  const idleTargets = [
-    ...new Set([
-      ...[...quick.pinned, ...quick.auto].map((i) => i.href),
-      ...model.groups.flatMap((g) => g.items.map((i) => i.href)),
-    ]),
-  ].filter((h) => h !== activeHref && !isLocked(h, lockedHrefs));
+  // Boşta ısıtılan hedefler: merkez girişleri ve alt sabit satırlar (en çok 8); etkin sayfa ve kilitliler atlanır.
+  const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
   useIdlePrefetch(idleTargets, 8);
 
   const creatable = creatableModules ?? accessibleModules;
-  const actionsFor = (section: VisibleSection) => {
-    const owned = section.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? [])]).filter((h) => h !== "/app");
+  const actionsFor = (hub: NavHub) => {
+    const owned = hub.pages.map((p) => p.href).filter((h) => h !== "/app");
     return getAppActions(creatable, "", lockedHrefs, closedModules).filter((a) => owned.some((h) => a.href === h || a.href.startsWith(`${h}/`)));
   };
 
-  const openByDefault = defaultOpenGroups(role);
-  const totalBadges = badges.reduce((n, b) => n + b.count, 0);
-  const moreOpen = activeInRest || stateIds.includes("daha-fazla-acik");
+  const rowClass = (isActive: boolean, pad: string) =>
+    `nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 touch:min-h-11 ${pad} ${
+      isActive ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"
+    }`;
 
-  const renderItem = (item: NavItem, opts: { group: string; pinnable?: boolean }) => {
-    const active = item.href === activeHref;
-    const badge = badgeFor(item, badges);
-    const pinned = quick.pins.includes(item.href);
-    const locked = isLocked(item.href, lockedHrefs);
-    // Ana ilke: yan menüde YALNIZ üst düzey sayfa; alt sayfalar/sekmeler sayfa içi şeritte (ikon modu flyout'u hariç).
-    const padRight = badge ? "pr-16" : "pr-9";
-    const badgeRight = 0.5;
-    const pinRight = badge ? 2.25 : 0.25;
-    const tip = [item.description ? `${item.label} — ${item.description}` : item.label, item.shortcut ? `(kısayol: ${item.shortcut})` : ""].filter(Boolean).join(" ");
+  /** Ana satır / alt sabit satır: tek bağlantı, ikon + ad (+ rozet). */
+  const renderHub = (hub: NavHub, opts: { dock?: boolean }) => {
+    const isActive = hub.id === activeHubId && active.inDock === Boolean(opts.dock);
+    const badge = hubBadge(hub, badges);
+    const locked = isLocked(hub.href, lockedHrefs);
+    const tip = hub.pages.length > 1 ? `${hub.label}: ${hub.pages.slice(0, 5).map((p) => p.label).join(", ")}` : (hub.pages[0]?.description ?? hub.label);
     return (
-      <div key={`${opts.group}-${item.href}`}>
-        <div className="nav-item group relative">
-          <Link
-            href={item.href}
-            data-nav-link
-            data-nav-active={active ? "true" : undefined}
-            aria-current={active ? "page" : undefined}
-            title={tip}
-            onClick={() => setOpen(false)}
-            className={`nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm transition-colors lg:min-h-9 touch:min-h-11 ${padRight} ${
-              active ? "nav-pill font-semibold text-white" : "text-white/80 hover:bg-white/6 hover:text-white"
-            }`}
-          >
-            <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
-            {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
-          </Link>
-          {badge ? (
-            <Link
-              href={badge.href}
-              onClick={() => setOpen(false)}
-              aria-label={`${badge.count} ${badge.label}`}
-              title={`${badge.count} ${badge.label}`}
-              style={{ right: `${badgeRight}rem` }}
-              className={`nav-badge absolute top-1/2 -translate-y-1/2 ${badge.tone === "danger" ? "is-danger" : "is-warn"}`}
-            >
-              {badge.count > 99 ? "99+" : badge.count}
-            </Link>
-          ) : null}
-          {opts.pinnable || pinned ? (
-            <button
-              type="button"
-              aria-pressed={pinned}
-              aria-label={pinned ? `${item.label} sabitlemesini kaldır` : `${item.label} sayfasını sabitle`}
-              title={pinned ? "Sabitlemeyi kaldır" : "Menüye sabitle"}
-              onClick={() => quick.togglePin(item.href)}
-              style={{ right: `${pinRight}rem` }}
-              className="nav-pin focus-ring absolute top-1/2 grid h-7 w-7 touch:h-11 touch:w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-white/60 hover:bg-white/10 hover:text-white"
-            >
-              {pinned ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    );
-  };
-
-  /** Bir başlığın öğeleri: düz liste (alt grup, ayraç ve alt sayfa yok). */
-  const renderItems = (items: readonly NavItem[], group: string) => items.map((i) => renderItem(i, { group, pinnable: true }));
-
-  const groupHeader = (id: string, title: string, opts?: { collapsible?: boolean; expanded?: boolean; badgeCount?: number }) => (
-    <div className="sb-eyebrow flex items-center gap-2 px-3 pb-0.5 pt-1.5 text-white/70">
-      {opts?.collapsible ? (
-        <button
-          type="button"
-          onClick={() => toggleState(`t-${id}`)}
-          aria-expanded={opts.expanded}
-          aria-controls={`sb-${id}`}
-          title={title}
-          className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
+      <div key={`${opts.dock ? "dock" : "hub"}-${hub.id}`} className="nav-item group relative">
+        <Link
+          href={hub.href}
+          data-nav-link
+          data-nav-active={isActive ? "true" : undefined}
+          aria-current={isActive ? "page" : undefined}
+          title={tip}
+          onClick={() => setOpen(false)}
+          className={rowClass(isActive, badge ? "pr-12" : "pr-3")}
         >
-          <span className="min-w-0 truncate">{title}</span>
-          {!opts.expanded && opts.badgeCount ? (
-            <span className="nav-badge is-warn" aria-label={`${opts.badgeCount} bekleyen iş`}>{opts.badgeCount > 99 ? "99+" : opts.badgeCount}</span>
-          ) : null}
-          <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />
-          <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${opts.expanded ? "" : "-rotate-90"}`} aria-hidden />
-          <span className="sr-only">{opts.expanded ? "bölümü daralt" : "bölümü aç"}</span>
-        </button>
-      ) : (
-        <>
-          <span className="min-w-0 truncate uppercase" title={title}>{title}</span>
-          <span className="h-px min-w-2 flex-1 bg-white/10" aria-hidden />
-        </>
-      )}
-    </div>
-  );
-
-  const renderGroup = (group: SidebarGroup) => {
-    const { section, items } = group;
-    const isActiveGroup = section.id === activeId;
-    // Etkin başlık hep açık; diğerleri varsayılana göre, kullanıcı değiştirdiyse tersine.
-    const expanded = isActiveGroup || openByDefault.includes(section.id) !== stateIds.includes(`t-${section.id}`);
-    return (
-      <div key={section.id}>
-        {groupHeader(section.id, section.title, {
-          collapsible: !isActiveGroup,
-          expanded,
-          badgeCount: groupBadgeCount(items, badges),
-        })}
-        {expanded ? (
-          <div id={`sb-${section.id}`} className="space-y-0.5">
-            {renderItems(items, section.id)}
-          </div>
+          <hub.icon className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-white" : "text-white/65 group-hover:text-white"}`} aria-hidden />
+          <span className="min-w-0 flex-1 truncate">{hub.label}</span>
+          {locked ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
+        </Link>
+        {badge ? (
+          <Link
+            href={badge.href}
+            onClick={() => setOpen(false)}
+            aria-label={badge.label}
+            title={badge.label}
+            style={{ right: "0.5rem" }}
+            className={`nav-badge absolute top-1/2 -translate-y-1/2 ${badge.tone === "danger" ? "is-danger" : "is-warn"}`}
+          >
+            {badge.count > 99 ? "99+" : badge.count}
+          </Link>
         ) : null}
       </div>
     );
   };
 
-  const railItems = (items: readonly NavItem[]) =>
-    items.map((i) => {
-      const sub = itemSubTabs(i);
-      const activeSub = sub && i.href === activeHref ? findActiveNavigationHref(pathname, sub.map((t) => t.href), "/app") : null;
-      return {
-        href: i.href,
-        label: i.label,
-        icon: i.icon,
-        active: i.href === activeHref,
-        badge: badgeFor(i, badges),
-        children: sub?.map((t) => ({ href: t.href, label: t.label, active: t.href === activeSub })),
-      };
-    });
+  const renderTool = (page: HubPage) => {
+    const isActive = active.inTools && active.pageHref === page.href;
+    return (
+      <Link
+        key={page.href}
+        href={page.href}
+        data-nav-link
+        data-nav-active={isActive ? "true" : undefined}
+        aria-current={isActive ? "page" : undefined}
+        title={page.description ? `${page.label} — ${page.description}` : page.label}
+        onClick={() => setOpen(false)}
+        className={rowClass(isActive, "pr-3")}
+      >
+        <page.icon className={`h-[18px] w-[18px] shrink-0 ${isActive ? "text-white" : "text-white/65"}`} aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{page.label}</span>
+        {isLocked(page.href, lockedHrefs) ? <Lock className="h-3 w-3 shrink-0 text-amber-400/80" aria-label="Paketinize dahil değil" /> : null}
+      </Link>
+    );
+  };
+
+  const hubFlyoutItems = (hub: NavHub) =>
+    hub.pages.map((p) => ({ href: p.href, label: p.label, icon: p.icon, active: p.href === active.pageHref && hub.id === activeHubId }));
 
   const renderContent = (variant: "desktop" | "drawer") => (
     <>
@@ -276,105 +201,113 @@ export function AppSidebar({
 
       <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
         <div className="sb-expanded">
-          <QuickAccessSection
-            pinned={quick.pinned}
-            auto={quick.auto}
-            hasUsage={quick.hasUsage}
-            onReset={quick.resetUsage}
-            renderRow={(q, kind) => {
-              const item = itemByHref.get(q.href);
-              return item ? renderItem(item, { group: kind, pinnable: true }) : null;
-            }}
-          />
-          {model.groups.map(renderGroup)}
-          {model.rest.length > 0 ? (
-            <>
-              <div className="sb-eyebrow sticky bottom-0 z-[1] bg-[var(--sb-bg-bottom)] px-3 pb-0.5 pt-1 text-white/70 shadow-[0_-8px_12px_-8px_rgba(0,0,0,.6)]">
+          <div className="space-y-0.5 pt-1">{nav.hubs.map((hub) => renderHub(hub, {}))}</div>
+
+          {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle. */}
+          <div className="mt-3 space-y-0.5 border-t border-white/10 pt-3">
+            {nav.dock.map((hub) => renderHub(hub, { dock: true }))}
+            {nav.tools.length > 0 ? (
+              <>
                 <button
                   type="button"
-                  onClick={() => toggleState("daha-fazla-acik")}
-                  aria-expanded={moreOpen}
-                  aria-controls="sb-daha-fazla"
-                  className="focus-ring flex min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white"
+                  onClick={() => toggleState("araclar-degisti")}
+                  aria-expanded={toolsOpen}
+                  aria-controls="sb-araclar"
+                  title="Değerleme, hesaplayıcı, AI asistan ve diğer yardımcı araçlar"
+                  className="focus-ring flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white lg:min-h-9 touch:min-h-11"
                 >
-                  <span className="shrink-0">Diğer</span>
-                  <span className="h-px flex-1 bg-white/10" aria-hidden />
-                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${moreOpen ? "" : "-rotate-90"}`} aria-hidden />
+                  <ToolsIcon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">Araçlar</span>
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${toolsOpen ? "" : "-rotate-90"}`} aria-hidden />
                 </button>
-              </div>
-              {moreOpen ? (
-                <div id="sb-daha-fazla" className="space-y-0.5">
-                  {model.rest.map((section) => (
-                    <div key={section.id}>
-                      <p className="px-3 pb-0.5 pt-2 text-xs font-semibold uppercase tracking-wide text-white/55">{section.title}</p>
-                      {renderItems(section.items, `more-${section.id}`)}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </>
-          ) : null}
-          {/* Menüyü düzenle: kullanılmayan modülleri tek tıkla aç/kapat. Ofis sahibi/genel müdür ofis genelini, diğerleri
-              yalnız kendi menüsünü düzenler (yeni sayfa yok; mevcut ayar ekranlarına gider). */}
-          <Link
-            href={role === "owner" || role === "gm" ? "/app/ayarlar/moduller" : "/app/hesabim?sekme=gorunum"}
-            onClick={() => setOpen(false)}
-            title="Kullanmadığınız modülleri tek tıkla gizleyin veya açın"
-            className="focus-ring mt-1 flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm text-white/65 transition-colors hover:bg-white/8 hover:text-white"
-          >
-            <ICONS.moduller className="h-4 w-4 shrink-0" aria-hidden />
-            <span>Menüyü düzenle</span>
-          </Link>
+                {toolsOpen ? (
+                  <div id="sb-araclar" className="space-y-0.5 border-l border-white/10 pl-2 ml-4">
+                    {nav.tools.map(renderTool)}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+            {/* Menüyü düzenle: kullanılmayan modülleri tek tıkla aç/kapat. Ofis sahibi/genel müdür ofis genelini, diğerleri
+                yalnız kendi menüsünü düzenler (yeni sayfa yok; mevcut ayar ekranlarına gider). */}
+            <Link
+              href={role === "owner" || role === "gm" ? "/app/ayarlar/moduller" : "/app/hesabim?sekme=gorunum"}
+              onClick={() => setOpen(false)}
+              title="Kullanmadığınız modülleri tek tıkla gizleyin veya açın"
+              className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/65 transition-colors hover:bg-white/8 hover:text-white lg:min-h-9"
+            >
+              <ICONS.moduller className="h-[18px] w-[18px] shrink-0" aria-hidden />
+              <span>Menüyü düzenle</span>
+            </Link>
+          </div>
         </div>
 
-        {/* İkon modu (64px): başlık başına tek ikon; hover/odakta sağda alt menü (alt sayfalar dahil) + hızlı eylemler. */}
+        {/* İkon modu (64px): merkez başına tek ikon; hover/odakta sağda sayfa listesi + hızlı eylemler. */}
         <div className="sb-rail space-y-1 pt-3">
-          {model.groups.map(({ section, items }) => {
-            const active = section.id === activeId;
-            const all = items;
-            const sectionBadge = groupBadgeCount(all, badges);
+          {nav.hubs.map((hub) => {
+            const isActive = hub.id === activeHubId && !active.inDock;
+            const badge = hubBadge(hub, badges);
             return (
               <NavFlyout
-                key={section.id}
+                key={hub.id}
                 enabled={variant === "desktop"}
-                title={section.title}
-                href={section.href}
-                items={railItems(all)}
-                actions={actionsFor({ ...section, items: all })}
+                title={hub.label}
+                href={hub.href}
+                items={hub.pages.length > 1 ? hubFlyoutItems(hub) : []}
+                actions={actionsFor(hub)}
               >
                 <Link
-                  href={section.href}
+                  href={hub.href}
                   data-nav-link
-                  data-nav-active={active ? "true" : undefined}
-                  aria-current={active ? "true" : undefined}
-                  aria-label={section.title}
+                  data-nav-active={isActive ? "true" : undefined}
+                  aria-current={isActive ? "true" : undefined}
+                  aria-label={hub.label}
                   className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
-                    active ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
+                    isActive ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}
                 >
-                  <section.icon className="h-[18px] w-[18px]" aria-hidden />
-                  {sectionBadge > 0 ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-400" aria-hidden /> : null}
+                  <hub.icon className="h-[18px] w-[18px]" aria-hidden />
+                  {badge ? <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-400" aria-hidden /> : null}
                 </Link>
               </NavFlyout>
             );
           })}
-          {model.rest.length > 0 ? (
+          <div className="my-1 border-t border-white/10" aria-hidden />
+          {nav.dock.map((hub) => {
+            const isActive = hub.id === activeHubId && active.inDock;
+            return (
+              <NavFlyout key={hub.id} enabled={variant === "desktop"} title={hub.label} href={hub.href} items={hub.pages.length > 1 ? hubFlyoutItems(hub) : []}>
+                <Link
+                  href={hub.href}
+                  data-nav-link
+                  data-nav-active={isActive ? "true" : undefined}
+                  aria-current={isActive ? "true" : undefined}
+                  aria-label={hub.label}
+                  className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
+                    isActive ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
+                  }`}
+                >
+                  <hub.icon className="h-[18px] w-[18px]" aria-hidden />
+                </Link>
+              </NavFlyout>
+            );
+          })}
+          {nav.tools.length > 0 ? (
             <NavFlyout
               enabled={variant === "desktop"}
-              title="Diğer"
-              items={railItems(model.rest.flatMap((s) => s.items))}
+              title="Araçlar"
+              items={nav.tools.map((t) => ({ href: t.href, label: t.label, icon: t.icon, active: active.inTools && active.pageHref === t.href }))}
             >
               <Link
-                href={model.rest[0]!.href}
+                href={nav.tools[0]!.href}
                 data-nav-link
-                data-nav-active={activeInRest ? "true" : undefined}
-                aria-current={activeInRest ? "true" : undefined}
-                aria-label="Diğer"
+                data-nav-active={active.inTools ? "true" : undefined}
+                aria-current={active.inTools ? "true" : undefined}
+                aria-label="Araçlar"
                 className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
-                  activeInRest ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
+                  active.inTools ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
                 }`}
               >
-                <Ellipsis className="h-[18px] w-[18px]" aria-hidden />
+                <ToolsIcon className="h-[18px] w-[18px]" aria-hidden />
               </Link>
             </NavFlyout>
           ) : null}
@@ -411,15 +344,21 @@ export function AppSidebar({
     </>
   );
 
-  // Mobil alt gezinme: 4 ana iş başlığı (Bugün, Müşteriler, Portföy, Anlaşmalar) + "Daha fazla" çekmecesi.
-  // Tek kaynak nav-config `MOBILE_TAB_SECTIONS`; sekme başlığın ilk görünen sayfasına gider ve
-  // izin/kapalı-modül süzgeci menüyle aynıdır (başlık görünmüyorsa sekme de çıkmaz).
-  // Çekmece masaüstüyle AYNI içeriktir (Hızlı erişim en üstte). Hızlı kayıt ("Yeni") üst çubuktaki
-  // Yeni menüsünde ve komut paletinde kalır.
-  const tabItems = MOBILE_TAB_SECTIONS.flatMap((t) => {
-    const section = allSections.find((s) => s.id === t.id);
-    return section ? [{ id: t.id, href: section.href, label: t.label, icon: section.icon }] : [];
+  // Mobil alt çubuk: rol bazlı en çok 5 yuva (nav-roles `mobile`): merkez bağlantıları, "+ Yeni" eylem sayfası, "Menü"
+  // çekmecesi. Çekmece masaüstüyle AYNI yapıdır (6 satırlık merkez listesi). Yetkisiz/kapalı merkez yuvası çıkmaz.
+  const newActions = useMemo(
+    () => mobileNewActions(role, creatable, lockedHrefs, closedModules),
+    [role, creatable, lockedHrefs, closedModules],
+  );
+  const totalBadges = badges.reduce((n, b) => n + b.count, 0);
+  type Slot = { kind: "hub"; hub: NavHub } | { kind: "new" } | { kind: "menu" };
+  const slots = nav.mobile.flatMap<Slot>((slot) => {
+    if (slot === "menu") return [{ kind: "menu" }];
+    if (slot === "new") return newActions.length > 0 ? [{ kind: "new" }] : [];
+    const hub = nav.hubs.find((h) => h.id === slot);
+    return hub ? [{ kind: "hub", hub }] : [];
   });
+  const slotClass = "focus-ring flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-xs font-semibold leading-tight transition";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -440,49 +379,70 @@ export function AppSidebar({
           {renderContent("drawer")}
         </aside>
       </DialogDrawerContent>
+      <MobileNewSheet open={newOpen} onOpenChange={setNewOpen} actions={newActions} />
       <nav
         aria-label="Mobil hızlı gezinme"
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta; mobil kaydırmada bulanıklık pahalı).
         className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
-          {tabItems.map((tab) => {
-            // Etkin sekme = etkin iş başlığı (alt sayfalar dahil; nav-config ile aynı çözümleme).
-            const active = tab.id === activeId && !activeInRest;
+        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${slots.length}, minmax(0, 1fr))` }}>
+          {slots.map((slot) => {
+            if (slot.kind === "new") {
+              return (
+                <button
+                  key="new"
+                  type="button"
+                  onClick={() => setNewOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label="Yeni kayıt ekle"
+                  className={`${slotClass} text-brand-700`}
+                >
+                  <span className="grid h-7 w-11 place-items-center rounded-full bg-brand-600 text-white">
+                    <Plus className="h-[18px] w-[18px]" aria-hidden />
+                  </span>
+                  Yeni
+                </button>
+              );
+            }
+            if (slot.kind === "menu") {
+              return (
+                <DialogTrigger asChild key="menu">
+                  <button
+                    type="button"
+                    aria-label={totalBadges > 0 ? `Menü: tüm sayfalar, ${totalBadges} bekleyen iş` : "Menü: tüm sayfalar"}
+                    className={`${slotClass} text-text-faint hover:text-ink-950`}
+                  >
+                    <span className="relative grid h-7 w-11 place-items-center rounded-full">
+                      <Menu className="h-[18px] w-[18px]" aria-hidden />
+                      {totalBadges > 0 ? (
+                        <span className="nav-badge is-danger absolute -right-0.5 -top-1" aria-hidden>
+                          {totalBadges > 99 ? "99+" : totalBadges}
+                        </span>
+                      ) : null}
+                    </span>
+                    Menü
+                  </button>
+                </DialogTrigger>
+              );
+            }
+            const { hub } = slot;
+            // Etkin sekme = etkin merkez (alt sayfalar dahil; nav-config ile aynı çözümleme).
+            const isActive = hub.id === activeHubId && !active.inDock;
             return (
               <Link
-                key={tab.id}
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
+                key={hub.id}
+                href={hub.href}
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={`focus-ring flex min-h-14 flex-col items-center justify-center gap-1 whitespace-nowrap py-2 text-xs font-semibold transition ${
-                  active ? "text-brand-600" : "text-text-faint hover:text-ink-950"
-                }`}
+                className={`${slotClass} ${isActive ? "text-brand-600" : "text-text-faint hover:text-ink-950"}`}
               >
-                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-brand-600/12" : ""}`}>
-                  <tab.icon className="h-[18px] w-[18px]" aria-hidden />
+                <span className={`grid h-7 w-11 place-items-center rounded-full transition ${isActive ? "bg-brand-600/12" : ""}`}>
+                  <hub.icon className="h-[18px] w-[18px]" aria-hidden />
                 </span>
-                {tab.label}
+                {hub.label}
               </Link>
             );
           })}
-          <DialogTrigger asChild>
-            <button
-              type="button"
-              aria-label={totalBadges > 0 ? `Daha fazla: tüm menü, ${totalBadges} bekleyen iş` : "Daha fazla: tüm menü"}
-              className="focus-ring flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-text-faint transition hover:text-ink-950"
-            >
-              <span className="relative grid h-7 w-11 place-items-center rounded-full">
-                <Menu className="h-[18px] w-[18px]" aria-hidden />
-                {totalBadges > 0 ? (
-                  <span className="nav-badge is-danger absolute -right-0.5 -top-1" aria-hidden>
-                    {totalBadges > 99 ? "99+" : totalBadges}
-                  </span>
-                ) : null}
-              </span>
-              Daha fazla
-            </button>
-          </DialogTrigger>
         </div>
       </nav>
     </Dialog>
