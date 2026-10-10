@@ -5,32 +5,49 @@ import { PLANS } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan, registrationPlanForTeamSize } from "@/lib/billing/registration-plan";
 import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { registrationQuote, registrationSelection } from "@/lib/billing/seat-calculator-model";
-import { PROFILE_STEPS } from "@/lib/profile-completion";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
-describe("kısa kayıt (2 adım) sözleşmesi", () => {
+describe("kısa kayıt (TEK ekran, 4 alan) sözleşmesi", () => {
   const form = read("src/app/kayit/register-form.tsx");
 
-  it("kayıttan çıkan alanlar formda yok; uygulama içi sihirbaza taşındı", () => {
+  it("kayıttan çıkan alanlar formda yok; ofis adı, plan ve onay kutusu sorulmaz", () => {
     for (const gone of ["GeoSelect", "FIELD.provinceId", "FIELD.licenseNo", "FIELD.officePhone", "FIELD.logo", "FIELD.inviteEmails", "FIELD.workDistricts"]) {
       expect(form, gone).not.toContain(gone);
     }
-    expect(form).toContain("Ofis profilini tamamla");
-    expect(form).toMatch(/const LAST = STEPS\.length/);
-    expect(form.match(/no: \d,/g)).toHaveLength(2);
+    expect(form).not.toContain('name="company"');
+    expect(form).not.toContain('name="legal_consent"');
+    expect(form).not.toContain("PlanPicker");
+    expect(form).not.toContain("const STEPS");
   });
 
-  it("paket seçimi gizli plan/cycle/agents alanlarıyla gider; seçici dinamik yüklenir", () => {
-    expect(form).toContain('name="plan" value={selectedPlanId}');
-    expect(form).toContain('name="cycle" value={cycle}');
-    expect(form).toContain('name="agents" value={agentsBucket}');
-    expect(form).toContain('import("./plan-picker")');
-    expect(form).toContain("wide={step === LAST}");
+  it("dört alan: ad soyad, cep telefonu (PhoneInput), e-posta (EmailInput), şifre (göster/gizle + güç göstergesi)", () => {
+    expect(form).toContain('id="name"');
+    expect(form).toContain("<PhoneInput");
+    expect(form).toContain("<EmailInput");
+    expect(form).toContain('autoComplete="new-password"');
+    expect(form).toContain("<PasswordStrengthMeter");
+    expect(form).toContain("Şifreyi göster");
+    expect(form).toContain("Ücretsiz başla");
+    expect(form).toContain("Giriş yap");
+    expect(form).toContain("/sifre-sifirla");
+  });
+
+  it("plan yalnız fiyat sayfasından açık seçimle taşınır (gizli alan); varsayılan plan sunucudadır", () => {
+    expect(form).toContain('name="plan" value={initialPlan}');
+    expect(form).toContain("{initialPlan ? (");
+    const page = read("src/app/kayit/_lib/register-page-data.tsx");
+    expect(page).toContain("params.plan ? normalizePlanId(params.plan) : undefined");
+  });
+
+  it("paket seçici kayıttan çıktı: ortak bileşen olarak kurulum sihirbazında ve /app/abonelik'te", () => {
+    expect(read("src/app/app/baslangic/plan-step.tsx")).toContain("PlanExplorer");
+    expect(read("src/app/app/abonelik/plan-advisor-panel.tsx")).toContain("PlanExplorer");
+    expect(read("src/components/billing/plan-explorer.tsx")).toContain('import("./plan-picker")');
   });
 
   it("paket seçici: LazyMotion m.*, reduced-motion, sahte rakam yok (tutar motordan)", () => {
-    const picker = read("src/app/kayit/plan-picker.tsx");
+    const picker = read("src/components/billing/plan-picker.tsx");
     // Hareket katmanı kuralı: motion yalnız src/components/ui/motion altında (RiseIn/GrowBar = LazyMotion m.*).
     expect(picker).toContain('from "@/components/ui/motion/grow"');
     expect(read("src/components/ui/motion/grow.tsx")).toContain("MotionProvider");
@@ -42,11 +59,13 @@ describe("kısa kayıt (2 adım) sözleşmesi", () => {
     expect(picker).toContain("ödeme anında değiştirebilirsin");
   });
 
-  it("sunucu sözleşmesi geriye uyumlu: sihirbaz alanları opsiyonel okunur", () => {
+  it("sunucu sözleşmesi: sihirbaz alanları opsiyonel okunur, ofis adı varsayılanı '<Ad Soyad> Emlak', cep zorunlu", () => {
     const core = read("src/lib/registration/provision-office.ts");
     expect(core).toContain("readWizardOfficeProfile(formData");
     const auth = read("src/app/actions/auth.ts");
-    expect(auth).toContain("Ad, e-posta, şifre ve firma adı zorunlu.");
+    expect(auth).toContain("`${fullName} Emlak`");
+    expect(auth).toContain('"Cep telefonu zorunlu."');
+    expect(auth).not.toContain("legal_consent");
   });
 });
 
@@ -72,35 +91,46 @@ describe("paket seçimi: kullanıcı seçimine saygı, kapasite kuralı", () => 
   });
 });
 
-describe("ofis profili sihirbazı sözleşmesi", () => {
-  it("yeni action'lar requirePermission ile başlar; telefon/logo/ekip mevcut yoldan", () => {
-    const a = read("src/app/actions/profile-complete.ts");
-    expect((a.match(/requirePermission\("settings", "edit"\)/g) ?? []).length).toBe(2);
-    const w = read("src/app/app/ayarlar/profil-tamamla/profil-sihirbaz.tsx");
-    expect(w).toContain("saveOfficeProfile"); // parsePhoneStrict orada
-    expect(w).toContain("uploadTenantLogo");
-    expect(w).toContain("TeamStep"); // createAdvisor -> provisionTeamMember
-    expect(w).toContain("PhoneInput");
-    expect(read("src/app/actions/onboarding-setup.ts")).toContain("parsePhoneStrict");
+describe("tek Kurulum sihirbazı sözleşmesi", () => {
+  it("eski profil-tamamla adresi sihirbaza yönlenir, eski ?adim= değerleri eşlenir", () => {
+    const page = read("src/app/app/ayarlar/profil-tamamla/page.tsx");
+    expect(page).toContain('requireModulePage("dashboard")');
+    expect(page).toContain("resolveLegacyStep(adim)");
+    expect(page).toContain("/app/baslangic");
   });
 
-  it("sayfa yetki kapısı; ana ekranda TEK Başlangıç kartı profil ilerlemesini taşır, kurulum ofis adımı aynı modeli kullanır", () => {
-    expect(read("src/app/app/ayarlar/profil-tamamla/page.tsx")).toContain('requireModulePage("settings"');
+  it("ofis adımı telefon/logo/geo mevcut yoldan; profil action'ları yetki kapılı", () => {
+    const a = read("src/app/actions/profile-complete.ts");
+    expect((a.match(/requirePermission\("settings", "edit"\)/g) ?? []).length).toBe(2);
+    const office = read("src/app/app/baslangic/office-step.tsx");
+    expect(office).toContain("saveOfficeProfile");
+    expect(office).toContain("uploadTenantLogo");
+    expect(office).toContain("GeoSelect");
+    expect(read("src/app/actions/onboarding-setup.ts")).toContain("parsePhoneStrict");
+    expect(read("src/app/app/baslangic/team-step.tsx")).toContain("PhoneInput"); // davet: createAdvisor -> parsePhoneStrict
+    const wiz = read("src/app/actions/onboarding-wizard.ts");
+    expect((wiz.match(/requirePermission\(/g) ?? []).length).toBe(2);
+  });
+
+  it("ana ekranda TEK Başlangıç kartı, tek ilerleme halkası; şirket/profil ayrıntısı göstermez", () => {
     const page = read("src/app/app/page.tsx");
     expect(page).toContain("<BaslangicKarti ctx={ctx} />");
     expect(page).not.toMatch(/ProfilTamamla|KurulumSeridi|DuyuruSatiri|OrnekVeriYenileBandi|HizliAksiyonlar/);
     const card = read("src/app/app/_home/baslangic-karti.tsx");
-    expect(card).toContain("profileStepHref");
-    expect(card).toContain("snap.profile.completion");
-    // Kurulum sihirbazı ofis adımı alanları yeniden sormaz: ilerleme ve form tek kaynak (profil-tamamla).
-    const office = read("src/app/app/baslangic/office-step.tsx");
-    expect(office).toContain("PROFILE_WIZARD_HREF");
-    expect(office).not.toMatch(/saveOfficeProfile|PhoneInput|GeoSelect/);
-    expect(read("src/lib/onboarding-state.ts")).toContain("isOfficeProfileDone");
+    expect(card).toContain("state.percent");
+    expect(card).toContain("snap.firstTasks");
+    expect(card).not.toContain("profile.completion");
+    expect(card).not.toContain("profileStepHref");
   });
 
-  it("her adımın sihirbazda gövdesi var", () => {
-    const w = read("src/app/app/ayarlar/profil-tamamla/profil-sihirbaz.tsx");
-    for (const s of PROFILE_STEPS) expect(w, s.key).toContain(`case "${s.key}"`.replace('case "ekip"', 'props.step === "ekip"'));
+  it("adım listesi tek kayıtta; her kayıtlı adımın gövdesi var ya da href'i var", () => {
+    const steps = read("src/lib/onboarding-steps.ts");
+    expect(steps).toContain("ONBOARDING_STEP_DEFS");
+    const bodies = read("src/app/app/baslangic/step-bodies.tsx");
+    for (const id of ["office", "you", "team", "pool", "portals", "plan"]) {
+      expect(steps, id).toContain(`id: "${id}"`);
+      expect(bodies, id).toContain(`${id}:`);
+    }
+    expect(bodies).toContain("FallbackBody");
   });
 });

@@ -28,6 +28,7 @@ import { saveOwnerInfo } from "@/lib/property-owner/persist";
 import { publishBlockReason } from "@/lib/property-owner/server";
 import { enqueueListingPool, isPoolEnabled, toPoolProperty } from "@/lib/pool/server";
 import { assignPoolEntryAsSystem } from "@/lib/pool/system-assign";
+import { isIncomingPoolSource, parseIncomingPoolSource } from "@/lib/pool/sources";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { notifyNewListing, notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
 import { shortAuthorityWarning } from "@/lib/eids/authority-term";
@@ -267,7 +268,9 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   }
 
   // Havuz yönlendirmesi: havuz açıksa ve (danışman istediyse ya da ilanı kendi adına açamayacak bir rolse) ilan atanmamış açılır.
-  const wantsPool = formData.get("send_to_pool") === "1" || !LISTING_OWNER_ROLES.includes(gate.role);
+  // Dış kaynaktan gelen ilan (portal/form, ağ, API, eklenti) danışmansız açılır ve havuza düşer; kaynak havuz kaydına yazılır.
+  const poolSource = parseIncomingPoolSource(formData.get("pool_source"));
+  const wantsPool = isIncomingPoolSource(poolSource) || formData.get("send_to_pool") === "1" || !LISTING_OWNER_ROLES.includes(gate.role);
   const routeToPool = wantsPool ? await isPoolEnabled(supabase, gate.tenantId) : false;
 
   // Giriş anı mükerrer kontrolü: aynı ada/parsel, adres ya da başlık+mahalle varsa kasıtlı onay (allow_duplicate=1) gerekir.
@@ -399,7 +402,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       tenantId: gate.tenantId,
       propertyId: data.id,
       actorId: gate.userId,
-      source: "manual",
+      source: poolSource,
       property: toPoolProperty({
         property_type: propertyType,
         transaction_type: transactionType,

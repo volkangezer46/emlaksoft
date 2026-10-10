@@ -7,6 +7,7 @@ import { Check, CalendarPlus, Printer, Receipt, Undo2, Wallet } from "lucide-rea
 import { createRentCharge, toggleChargePaid } from "@/app/actions/rentals";
 import { recordRentPayment, voidRentPayment } from "@/app/actions/rental-finance";
 import { useToast } from "@/components/app/toast-provider";
+import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormError, FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
@@ -102,6 +103,7 @@ export function ChargesPanel({
   const [payFor, setPayFor] = useState<string | null>(null);
   const [voidFor, setVoidFor] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState("");
 
   function createCharge() {
     setBusy("create");
@@ -137,6 +139,7 @@ export function ChargesPanel({
         paidOn: String(fd.get("paid_on") ?? ""),
         method: String(fd.get("method") ?? ""),
         bankNote: String(fd.get("bank_note") ?? ""),
+        accountId: accountId || null,
       });
       setBusy(null);
       if (res.error) {
@@ -144,6 +147,7 @@ export function ChargesPanel({
         return;
       }
       push(res.receiptNo ? `Tahsilat kaydedildi · ${formatReceiptNo(res.receiptNo)}` : "Tahsilat kaydedildi", "ok");
+      if (res.info) push(res.info, "err");
       setPayFor(null);
       router.refresh();
     });
@@ -259,6 +263,9 @@ export function ChargesPanel({
                           </FormField>
                           <FormField label="Banka / açıklama" htmlFor={`note-${c.id}`} hint="Dekont no, banka adı veya çek bilgisi (isteğe bağlı).">
                             <FormInput id={`note-${c.id}`} name="bank_note" maxLength={300} />
+                          </FormField>
+                          <FormField label="Hangi hesaba girdi?" htmlFor={`acc-${c.id}`} hint="İsteğe bağlı: seçerseniz kasa/banka hareketi otomatik yazılır.">
+                            <FinanceAccountPicker value={accountId} onChange={setAccountId} />
                           </FormField>
                         </div>
                         <FormError error={formError} />

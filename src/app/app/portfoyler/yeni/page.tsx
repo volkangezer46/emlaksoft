@@ -5,11 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { isPoolEnabled } from "@/lib/pool/server";
+import { parseIncomingPoolSource } from "@/lib/pool/sources";
 import { PropertyForm } from "./property-form";
 
 export const metadata = { title: "Yeni portföy" };
 
-export default async function NewPropertyPage() {
+export default async function NewPropertyPage({ searchParams }: { searchParams: Promise<{ kaynak?: string }> }) {
+  const { kaynak } = await searchParams;
+  const poolSource = parseIncomingPoolSource(kaynak);
   const { perms, userId, tenantId } = await requireModulePage("properties", "/app/portfoyler");
   if (!(perms.properties ?? []).includes("create")) redirect("/app/portfoyler");
 
@@ -32,6 +35,7 @@ export default async function NewPropertyPage() {
       transactionTypes={transactionTypes.map((d) => d.value)}
       userId={userId}
       poolEnabled={poolEnabled}
+      poolSource={poolSource === "manual" ? undefined : poolSource}
     />
   );
 }

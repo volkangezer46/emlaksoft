@@ -30,15 +30,15 @@ function startTour() {
  * Kurulum bitince kutlamanın altında: rolün tanıtım turu birkaç saniye sonra kendiliğinden başlar
  * (yalnız ilk kez; "Şimdi değil" ile durdurulur). Sayaç temizlenir; ekran okuyucuya sakin duyurulur.
  */
-export function FinishTourStarter() {
+export function FinishTourStarter({ auto = true }: { auto?: boolean }) {
   const [left, setLeft] = useState<number | null>(null);
   const [stopped, setStopped] = useState(false);
 
   useEffect(() => {
-    if (alreadyAutoStarted()) return;
+    if (!auto || alreadyAutoStarted()) return;
     const arm = window.setTimeout(() => setLeft(COUNTDOWN_SEC), 0);
     return () => window.clearTimeout(arm);
-  }, []);
+  }, [auto]);
 
   useEffect(() => {
     if (left === null || stopped) return;

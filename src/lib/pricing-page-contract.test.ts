@@ -71,7 +71,7 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
       expect(sql).not.toContain("convert_demo_request_to_tenant");
     }
     const kayit = read("src/app/kayit/register-form.tsx");
-    expect(kayit).toContain("Kredi kartı gerekmez");
+    expect(kayit).toContain("kart gerekmez");
     expect(kayit).not.toContain("14 gün");
     expect(kayit).toContain("trialDays");
     expect(read("src/components/pricing.tsx")).toContain("KDV hariç");

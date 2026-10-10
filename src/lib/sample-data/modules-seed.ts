@@ -5,6 +5,7 @@ import { buildDemoCommissionRow } from "@/lib/demo-seed-invariants";
 import { analysisInputKey, computeListingAnalysis, type AnalysisConfidence, type AnalysisInput } from "@/lib/listing-analysis";
 import { isMissingSampleSchema } from "@/lib/sample-clear";
 import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
+import { seedListingPool } from "@/lib/sample-data/pool-seed";
 
 /**
  * Son eklenen modüllerin (mülk yönetimi, bina/site, Lig 2.0, tapu süreci, EİDS durumu, ilan analizi, gider bütçesi/tekrarlayan/
@@ -46,6 +47,8 @@ export type ModuleSeedContext = {
   processDeals: { propertyCode: string; profile: "in_transfer" | "delayed" }[];
   /** Hazır avatar atanacak profiller (yalnız avatarı boş olanlara). Örnek modda verilmez. */
   avatarAssignments?: { profileId: string; preset: string }[];
+  /** İlan havuzu örneği için uzmanlık/bölge verilecek MEVCUT profiller (hesap açılmaz); verilmezse yalnız advisorId. */
+  poolProfileIds?: string[];
 };
 
 export type ModuleSeedReport = {
@@ -907,6 +910,57 @@ async function seedFinance(ctx: ModuleSeedContext): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// 7b) Kasa / banka (Finans Paket A): ofis kasası + banka hesabı + birkaç hareket (İstanbul örnekleri)
+// ---------------------------------------------------------------------------
+const CASH_ACCOUNTS = [
+  { kind: "cash", name: "Ofis kasası", iban_last4: null, opening: 15000, openingDays: -90 },
+  { kind: "bank", name: "İş Bankası Kadıköy", iban_last4: "4821", opening: 240000, openingDays: -90 },
+] as const;
+
+const CASH_ENTRIES: { account: string; direction: "in" | "out"; amount: number; category: string; title: string; counterparty: string; day: number }[] = [
+  { account: "İş Bankası Kadıköy", direction: "in", amount: 85000, category: "komisyon", title: "Moda 3+1 satış komisyonu", counterparty: "Kadıköy / Moda alıcısı", day: -21 },
+  { account: "İş Bankası Kadıköy", direction: "in", amount: 18500, category: "hizmet_bedeli", title: "Beşiktaş değerleme raporu bedeli", counterparty: "Beşiktaş mülk sahibi", day: -14 },
+  { account: "İş Bankası Kadıköy", direction: "out", amount: 32000, category: "kira", title: "Ofis kirası (Kadıköy)", counterparty: "Mülk sahibi", day: -10 },
+  { account: "Ofis kasası", direction: "out", amount: 1850, category: "ofis", title: "Kırtasiye ve ikram", counterparty: "Çarşı Kırtasiye", day: -8 },
+  { account: "Ofis kasası", direction: "out", amount: 640, category: "ulasim", title: "Şişli yer gösterme yol gideri", counterparty: "", day: -5 },
+  { account: "Ofis kasası", direction: "in", amount: 6500, category: "diger_gelir", title: "Üsküdar kapora nakit teslimi", counterparty: "Üsküdar müşterisi", day: -3 },
+];
+
+async function seedCash(ctx: ModuleSeedContext): Promise<number> {
+  // Hesap/hareket tablolarında is_sample YOK: örnek modda yazılmaz (temizlikte kalıcı artık bırakmasın).
+  if (ctx.sample) return 0;
+  const { db, tenantId } = ctx;
+  const today = todayKey();
+  let n = 0;
+  const existing = must("finance_accounts", await db.from("finance_accounts").select("id, name").eq("tenant_id", tenantId).eq("owner_scope", "office")) as { id: string; name: string }[];
+  const byName = new Map(existing.map((a) => [a.name, a.id]));
+  for (const a of CASH_ACCOUNTS) {
+    if (byName.has(a.name)) continue;
+    const [row] = await insertRows(db, "finance_accounts", [{
+      tenant_id: tenantId, owner_scope: "office", kind: a.kind, name: a.name, iban_last4: a.iban_last4, currency: "TRY",
+      opening_balance: a.opening, opening_date: addDays(today, a.openingDays), created_by: ctx.ownerId,
+    }]);
+    byName.set(a.name, row!.id as string);
+    n += 1;
+  }
+  const have = must("cash_entries", await db.from("cash_entries").select("title, entry_date, account_id").eq("tenant_id", tenantId)) as { title: string; entry_date: string; account_id: string }[];
+  const seen = new Set(have.map((e) => `${e.account_id}|${e.title}|${e.entry_date}`));
+  const rows: Dict[] = [];
+  for (const e of CASH_ENTRIES) {
+    const accountId = byName.get(e.account);
+    const date = addDays(today, e.day);
+    if (!accountId || seen.has(`${accountId}|${e.title}|${date}`)) continue;
+    rows.push({
+      tenant_id: tenantId, account_id: accountId, direction: e.direction, amount: e.amount, currency: "TRY", entry_date: date,
+      kind: e.direction === "in" ? "income" : "expense", category: e.category, title: e.title, counterparty: e.counterparty || null,
+      source_type: "manual", created_by: ctx.ownerId,
+    });
+  }
+  n += (await insertRows(db, "cash_entries", rows)).length;
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // 8) Hazır avatar
 // ---------------------------------------------------------------------------
 async function seedAvatars(ctx: ModuleSeedContext): Promise<number> {
@@ -956,8 +1010,11 @@ export async function seedModuleData(ctx: ModuleSeedContext): Promise<ModuleSeed
   await run("authority", () => seedAuthority(ctx));
   await run("listing_analyses", () => seedListingAnalyses(ctx));
   await run("finance", () => seedFinance(ctx));
+  await run("cash", () => seedCash(ctx));
+  await run("listing_pool", () => seedListingPool(ctx));
   if (!ctx.sample) await run("avatars", () => seedAvatars(ctx));
   else report.skipped.push({ group: "avatars", reason: "gerçek kullanıcı profiline hazır avatar yazılmaz: etkin değil" });
+  if (ctx.sample) report.skipped.push({ group: "cash", reason: "hesap/hareket tablolarında is_sample yok: örnek modda yazılmaz" });
   if (ctx.sample) report.skipped.push({ group: "expense_budgets", reason: "bütçe tablosunda is_sample yok: örnek modda yazılmaz" });
   return report;
 }

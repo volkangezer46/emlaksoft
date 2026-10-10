@@ -78,7 +78,7 @@ export type PoolCandidate = {
   ruleWeight: number;
 };
 
-export type ScoreReason = { key: string; label: string; points: number; max: number; detail?: string };
+export type ScoreReason = { key: string; label: string; points: number; max: number; detail?: string; where?: string };
 
 /**
  * Motor adayı: havuz adayı + (varsa) Ofis Merkezi ek sinyalleri. Alan `undefined` ise o sinyal hesaba GİRMEZ (havuz
@@ -95,6 +95,8 @@ export type PoolSuggestion = {
   name: string;
   score: number;
   reasons: ScoreReason[];
+  /** Tek cümle Türkçe gerekçe: "Kadıköy'de uzman · konut · şu an 3 aktif iş". Elenmişse elenme nedeni. */
+  summary?: string;
   excluded?: { reason: string };
 };
 
@@ -127,6 +129,7 @@ export function exclusionReason(c: PoolCandidate, ctx: ScoreContext): string | n
 export function regionPoints(c: PoolCandidate, p: PoolProperty, ctx: ScoreContext): ScoreReason {
   let best = 0;
   let detail = "Bölge uzmanlığı eşleşmedi";
+  let bestWhere: string | undefined;
   for (const r of c.regions) {
     if (!p.provinceId || r.provinceId !== p.provinceId) continue;
     const w = clamp(r.weight, 1, 5) / 5;
@@ -149,10 +152,11 @@ export function regionPoints(c: PoolCandidate, p: PoolProperty, ctx: ScoreContex
     const pts = Math.round(base * w);
     if (pts > best) {
       best = pts;
+      bestWhere = where;
       detail = `${where} bölgesi (ağırlık ${r.weight}/5)`;
     }
   }
-  return { key: "region", label: "Bölge", points: best, max: POOL_MAX.region, detail };
+  return { key: "region", label: "Bölge", points: best, max: POOL_MAX.region, detail, where: bestWhere };
 }
 
 const LEVEL_POINTS: Record<number, number> = { 1: 12, 2: 16, 3: 20 };
@@ -289,7 +293,7 @@ export function factorReason(key: string, label: string, f: Factor, max: number)
 /** Tek danışmanı puanlar; elenmişse puan 0 ve `excluded` dolu döner. */
 export function scoreCandidate(c: PoolCandidate, p: PoolProperty, ctx: ScoreContext): PoolSuggestion {
   const why = exclusionReason(c, ctx);
-  if (why) return { profileId: c.profileId, name: c.name, score: 0, reasons: [], excluded: { reason: why } };
+  if (why) return { profileId: c.profileId, name: c.name, score: 0, reasons: [], summary: `Elendi: ${why}`, excluded: { reason: why } };
   const reasons = [
     regionPoints(c, p, ctx),
     ...specialtyReasons(c, p),
@@ -302,7 +306,36 @@ export function scoreCandidate(c: PoolCandidate, p: PoolProperty, ctx: ScoreCont
     0,
     100,
   );
-  return { profileId: c.profileId, name: c.name, score, reasons };
+  return { profileId: c.profileId, name: c.name, score, reasons, summary: suggestionSentence(reasons, p, c.openListings) };
+}
+
+const TR_BACK = "aıouâ";
+const TR_VOICELESS = "çfhkpsşt";
+
+/** Türkçe bulunma eki: "Kadıköy" -> "Kadıköy'de", "Beşiktaş" -> "Beşiktaş'ta" (ünlü uyumu + sert ünsüz). */
+export function trLocative(name: string): string {
+  const n = name.trim();
+  const w = n.toLocaleLowerCase("tr-TR");
+  const vowels = [...w].filter((ch) => "aeıioöuüâî".includes(ch));
+  const last = vowels[vowels.length - 1] ?? "e";
+  const back = TR_BACK.includes(last);
+  const t = TR_VOICELESS.includes(w[w.length - 1] ?? "") ? "t" : "d";
+  return `${n}'${t}${back ? "a" : "e"}`;
+}
+
+/** Tek cümle gerekçe: bölge uzmanlığı · tür · iş yükü. Puan vermeyen bileşen cümleye girmez; uzmanlık yoksa bunu söyler. */
+export function suggestionSentence(reasons: readonly ScoreReason[], p: PoolProperty, openListings: number): string {
+  const parts: string[] = [];
+  const region = reasons.find((r) => r.key === "region");
+  if (region && region.points > 0) {
+    const hasName = region.where && !["İl", "İlçe", "Mahalle"].includes(region.where);
+    parts.push(hasName ? `${trLocative(region.where as string)} uzman` : "Bölgede uzman");
+  }
+  const type = reasons.find((r) => r.key === "type");
+  if (type && type.points > 0 && p.propertyType) parts.push(p.propertyType.toLocaleLowerCase("tr-TR"));
+  if (!parts.length) parts.push("Uzmanlık eşleşmesi yok");
+  parts.push(openListings > 0 ? `şu an ${openListings} aktif iş` : "şu an aktif işi yok");
+  return parts.join(" · ");
 }
 
 type Scored = { profileId: string; name: string; score: number; excluded?: { reason: string } };
@@ -367,6 +400,7 @@ export function toStoredSuggestions(list: PoolSuggestion[], limit = 5) {
     .map((s) => ({
       profile_id: s.profileId,
       score: s.score,
+      summary: s.summary,
       reasons: s.reasons.map((r) => ({ key: r.key, label: r.label, points: r.points, max: r.max })),
     }));
 }

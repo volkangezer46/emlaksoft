@@ -5,10 +5,11 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { resolveWizardStep } from "@/lib/onboarding-checklist";
-import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
+import { resolveLegacyStep } from "@/lib/onboarding-steps";
+import { createClient } from "@/lib/supabase/server";
 import { SetupWizard } from "./setup-wizard";
 
-export const metadata = { title: "Ofis kurulumu" };
+export const metadata = { title: "Kurulum" };
 
 /** Kurulum sihirbazı: durum gerçek veriden hesaplanır (lib/onboarding-state), ana ekran şeridiyle aynı kaynak. */
 export default async function OnboardingPage({
@@ -16,34 +17,34 @@ export default async function OnboardingPage({
 }: {
   searchParams: Promise<{ adim?: string }>;
 }) {
-  const { tenantId, perms } = await requireModulePage("dashboard");
+  const { tenantId, perms, userId, role } = await requireModulePage("dashboard");
   const crumbs = [{ label: "Ana ekran", href: "/app" }, { label: "Kurulum" }];
   if (!tenantId) {
     return (
       <div className="mx-auto w-full max-w-3xl">
-        <PageHeader title="Ofis kurulumu" breadcrumbs={crumbs} />
-        <StaffNoTenantNotice feature="Ofis kurulumu" />
+        <PageHeader title="Kurulum" breadcrumbs={crumbs} />
+        <StaffNoTenantNotice feature="Kurulum" />
       </div>
     );
   }
 
-  const [snap, { adim }, lossReasons, stageLabels] = await Promise.all([
+  const [snap, { adim }, { data: ownRow }] = await Promise.all([
     loadOnboardingSnapshot(tenantId),
     searchParams,
-    getLossReasonOptions(),
-    getStageLabels(),
+    (await createClient()).from("profiles").select("title").eq("id", userId).maybeSingle(),
   ]);
   if (!snap) {
     return (
       <div className="mx-auto w-full max-w-3xl">
-        <PageHeader title="Ofis kurulumu" breadcrumbs={crumbs} />
+        <PageHeader title="Kurulum" breadcrumbs={crumbs} />
         <Alert tone="danger">Kurulum durumu okunamadı. Sayfayı yenileyip tekrar deneyin.</Alert>
       </div>
     );
   }
 
   const { state, skipped, tenant, counts } = snap;
-  const current = resolveWizardStep(adim, state);
+  // Eski bağlantılar (profil-tamamla adımları, kaldırılan sihirbaz adımları) yeni adıma eşlenir.
+  const current = resolveWizardStep(resolveLegacyStep(adim) ?? undefined, state);
   const showSampleData =
     counts.customers === 0 && counts.properties === 0 && !tenant?.sample_seeded_at && counts.sampleCustomers === 0;
   // Demo yükleme yetkisi: seedSampleData ile aynı altı modülde oluşturma (actions/sample-data.ts).
@@ -51,14 +52,14 @@ export default async function OnboardingPage({
     effectiveHasPermission(perms, m, "create"),
   );
   // Başlangıç tercihi paneli: yalnız boş ofiste ve henüz ofis tipi/tanım girilmemişken.
-  const showStartChoice = showSampleData && !state.steps.find((st) => st.id === "defs")?.done;
+  const showStartChoice = showSampleData && !snap.firstTasks.find((t) => t.id === "defs")?.done;
 
   return (
     <div className="mx-auto w-full max-w-3xl">
       <PageHeader
         eyebrow="Başlangıç"
-        title="Ofis kurulumu"
-        description="Önce ofis tipinizi seçip örnek veriyle ya da boş başlayın; sonra sekiz kısa adımda ofisinizi çalışır hale getirin. Her adımı atlayabilir, istediğiniz zaman geri dönebilirsiniz."
+        title="Kurulum"
+        description="Üyeliğin hazır; ayrıntıları buradan tamamla. Her adımı atlayabilir, istediğin an çıkıp sonra kaldığın yerden devam edebilirsin."
         breadcrumbs={crumbs}
       />
       <SetupWizard
@@ -66,16 +67,22 @@ export default async function OnboardingPage({
         skipped={skipped}
         current={current}
         canEditSettings={effectiveHasPermission(perms, "settings", "edit")}
-        canInvite={effectiveHasPermission(perms, "team", "create")}
         showSampleData={showSampleData}
         showStartChoice={showStartChoice}
         canSeedSample={canSeedSample}
-        profile={snap.profile.completion}
-        lossReasons={lossReasons.map((r) => ({ value: r.value, label: r.label }))}
-        stageLabels={Object.entries(stageLabels).map(([key, v]) => ({ key, label: v.label }))}
-        customers={counts.customers}
-        properties={counts.properties}
-        vitrinHref={tenant?.slug ? `/vitrin/${tenant.slug}` : null}
+        firstTasks={snap.firstTasks}
+        sampleCustomers={counts.sampleCustomers}
+        body={{
+          tenantId,
+          userId,
+          role,
+          canEditSettings: effectiveHasPermission(perms, "settings", "edit"),
+          canInvite: effectiveHasPermission(perms, "team", "create"),
+          canManageBilling: effectiveHasPermission(perms, "billing", "view"),
+          profile: snap.profile,
+          vitrinHref: tenant?.slug ? `/vitrin/${tenant.slug}` : null,
+          ownTitle: String((ownRow as { title?: string | null } | null)?.title ?? ""),
+        }}
       />
     </div>
   );

@@ -22,6 +22,7 @@ export function ExpenseCreateForm({
   defaultProperty = null,
   receiptUploads = false,
   financeFields = false,
+  accounts = [],
 }: {
   categories: readonly Category[];
   defaultDate: string;
@@ -31,6 +32,8 @@ export function ExpenseCreateForm({
   receiptUploads?: boolean;
   /** Tekrarlayan gider + portal eşlemesi alanları (migration 20261008000700 uygulanmışsa). */
   financeFields?: boolean;
+  /** Ofis hesapları (kasa/banka): seçilirse gider aynı anda o hesaptan çıkış hareketi üretir. Boşsa alan görünmez. */
+  accounts?: readonly { id: string; name: string; currency: string }[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -69,6 +72,7 @@ export function ExpenseCreateForm({
         } else {
           push("Gider kaydedildi", "ok");
         }
+        if (result.info) push(result.info, "err");
         formRef.current?.reset();
         clearReceipt();
         router.refresh();
@@ -109,6 +113,15 @@ export function ExpenseCreateForm({
         <option value="">Portal gideri değil</option>
         {PORTAL_KEYS.map((k) => <option key={k} value={k}>{PORTAL_LABEL[k]} gideri</option>)}
       </select>
+        </>
+      ) : null}
+      {accounts.length > 0 ? (
+        <>
+          <label htmlFor="expense-account" className="sr-only">Hangi hesaptan çıktı (opsiyonel)</label>
+          <select id="expense-account" name="account_id" defaultValue="" className={inputClass}>
+            <option value="">Hesaba işleme (yalnız gider kaydı)</option>
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency}) hesabından çıktı</option>)}
+          </select>
         </>
       ) : null}
       <Combobox

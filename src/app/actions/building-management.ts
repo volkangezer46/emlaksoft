@@ -14,6 +14,7 @@ import { isPaymentMethod } from "@/lib/property-management/payments";
 import { buildingDueDate, periodStart } from "@/lib/building-management/charges";
 import { compareUnits, distributeAmount, isDistributionMethod, unitLabel } from "@/lib/building-management/distribution";
 import { isUuid, parseBuildingInput, parseUnitInput, parseUnitRange } from "@/lib/building-management/input";
+import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
 
 /**
  * Bina & site yönetimi (M2) server action'ları. Tümü `expenses` modülü (Aidat sayfasının modülü) kapısındadır;
@@ -413,6 +414,7 @@ export async function recordBuildingPayment(input: {
   paidOn: string;
   method: string;
   bankNote?: string;
+  accountId?: string | null;
 }): Promise<BmResult> {
   const gate = await requirePermission("expenses", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -441,8 +443,12 @@ export async function recordBuildingPayment(input: {
   const res = asObject(data);
   const outcome = typeof res.outcome === "string" ? res.outcome : "invalid_result";
   if (outcome !== "recorded") return { error: outcomeError(outcome, { remaining: typeof res.remaining === "number" ? res.remaining : undefined }) };
+  const paymentId = String(res.payment_id ?? "");
+  const info = paymentId
+    ? await recordCollectionCash(supabase, { accountId: input.accountId, sourceType: "building", sourceId: paymentId, amount: amount.value, date: input.paidOn, title: "Aidat tahsilatı" })
+    : null;
   revalidateTenantData(gate.tenantId, PATHS);
-  return { ok: true, id: String(res.payment_id ?? ""), receiptNo: Number(res.receipt_no) || undefined };
+  return { ok: true, id: paymentId, receiptNo: Number(res.receipt_no) || undefined, info: info ?? undefined };
 }
 
 /** Tahsilat iptali: silinmez; neden zorunlu, durum yeniden türetilir, denetim kaydı yazılır. */
@@ -462,6 +468,7 @@ export async function voidBuildingPayment(input: { paymentId: string; reason: st
   }
   const outcome = typeof asObject(data).outcome === "string" ? String(asObject(data).outcome) : "invalid_result";
   if (outcome !== "voided") return { error: outcomeError(outcome) };
+  await voidCollectionCash(supabase, "building", input.paymentId, "Aidat tahsilatı iptal edildi");
   revalidateTenantData(gate.tenantId, [...PATHS, "/app/kiralama"]);
   return { ok: true };
 }

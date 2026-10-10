@@ -3,7 +3,7 @@ import { nextDelayMs, replyToReport, type StepOutcome } from "@/lib/listing-cont
 import { BRIDGE_ENDPOINT, BRIDGE_HEADER, BRIDGE_INVENTORY_ENDPOINT } from "@/lib/listing-control/worker/bridge-request";
 import type { ScanUpload } from "@/lib/listing-control/worker/extension-scan";
 import { sendVerdict, type OutboxEntry } from "@/lib/listing-control/worker/extension-outbox";
-import { isTrustedConnectRequest } from "@/lib/listing-control/worker/extension-pairing";
+import { isTrustedConnectRequest, isTrustedScanRequest } from "@/lib/listing-control/worker/extension-pairing";
 import { buildTelemetry } from "@/lib/listing-control/worker/extension-telemetry";
 import { STORAGE_KEYS, type BgRequest } from "./messages";
 
@@ -101,6 +101,23 @@ window.addEventListener("message", (event: MessageEvent) => {
     void send<{ connected?: boolean }>({ kind: "setConnected", connected: true }).then((status) => {
       reply({ type: "connect-response", nonce, ok: status?.connected === true });
     });
+    return;
+  }
+
+  if (d.type === "scan-request") {
+    const nonce = typeof d.nonce === "string" ? d.nonce.slice(0, 64) : "";
+    const trusted = isTrustedScanRequest({
+      fromSameWindow: event.source === window,
+      eventOrigin: event.origin,
+      locationOrigin: window.location.origin,
+      allowedOrigins: __EMLAKSOFT_APP_ORIGINS__,
+      data: d,
+    });
+    if (!trusted || !connected || paused) {
+      reply({ type: "scan-response", nonce, ok: false });
+      return;
+    }
+    void send({ kind: "scanNow" }).then((status) => reply({ type: "scan-response", nonce, ok: status !== null }));
     return;
   }
 

@@ -95,14 +95,14 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
     expect(read("src/lib/billing/public-pricing.ts")).toContain("getEfPublicState");
   });
   it("fiyat yüzeyleri live değilse kontör satırını '(planlanan)' yazar; satın alma cümlesi yalnız live'da", () => {
-    for (const f of ["src/components/pricing.tsx", "src/app/kayit/register-form.tsx"]) {
+    for (const f of ["src/components/pricing.tsx", "src/components/billing/plan-explorer.tsx"]) {
       const s = read(f);
       expect(s, f).toContain("efPlannedLine(");
       expect(s, f).toContain("efLive");
     }
     expect(read("src/lib/pricing-page-model.ts")).toContain("EF_PLANNED_SUFFIX");
     expect(read("src/lib/site-content/tokens.ts")).toContain("EF_PLANNED_SUFFIX");
-    const reg = read("src/app/kayit/register-form.tsx");
+    const reg = read("src/components/billing/plan-explorer.tsx");
     expect(reg).toMatch(/efLive \? "; kontör ile ek sorgu satın alınabilir\."/);
   });
   it("sağlık cron'u: Bearer + heartbeat + ortak probe, service_role istemcisi yok", () => {

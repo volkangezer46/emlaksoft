@@ -99,7 +99,10 @@ export async function updateSession(request: NextRequest) {
   if ((isApp || isAdmin) && !user) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/giris";
-    redirect.searchParams.set("next", path);
+    // Eklenti kurulum karşılaması (?bagla=1) giriş sonrası aynı adrese döner; başka sorgu dizesi next'e taşınmaz.
+    const bindLanding = path === "/app/ilan-kontrol" && request.nextUrl.searchParams.get("bagla") === "1";
+    redirect.searchParams.delete("bagla");
+    redirect.searchParams.set("next", bindLanding ? `${path}?bagla=1` : path);
     return NextResponse.redirect(redirect);
   }
 

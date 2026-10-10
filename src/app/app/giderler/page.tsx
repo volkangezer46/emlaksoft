@@ -1,8 +1,8 @@
 import { measureAll } from "@/lib/server-timing";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, CalendarRange, FileText, Plus, Receipt, Wallet, X } from "lucide-react";
+import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { now as nowMs } from "@/lib/clock";
+import { now as nowMs, trDayKey } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { listExpenses } from "@/app/actions/expenses";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
@@ -27,6 +27,13 @@ import { ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { ButtonLink } from "@/components/ui/button";
 import { FaturalarTab, FATURALAR_SEKME, type FaturalarParams } from "./faturalar/faturalar-tab";
+import { FINANCE_HERO_TEXT, FinanceActions, FinanceTabs, financeTabOf } from "./_tabs/finance-shell";
+import { HareketlerTab } from "./_tabs/hareketler";
+import { KasaBankaTab } from "./_tabs/kasa-banka";
+import { canHandleSalary } from "@/lib/finance/cash/categories";
+import { loadAccountsWithBalances, loadCashSummary } from "@/lib/finance/cash/load";
+import { CashOverview } from "./_tabs/cash-overview";
+import type { AccountOption } from "./quick-entry";
 // Inline server action wrappers — void return için form action uyumlu
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -72,9 +79,9 @@ function tarihKisa(iso: string) {
 export default async function GiderlerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string } & FaturalarParams>;
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string; hesap?: string; tur?: string; q?: string; sayfa?: string } & FaturalarParams>;
 }) {
-  const { perms, tenantId, userId } = await requireModulePage("expenses", "/app/giderler");
+  const { perms, tenantId, userId, role } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
   // Faturalar sekmesi (e-Fatura, Paket D): ayrı bileşen; sekme şeridine tek satır (FATURALAR_SEKME) eklenir.
   if (params.sekme === FATURALAR_SEKME.key) return <FaturalarTab perms={perms} params={params} />;
@@ -89,7 +96,54 @@ export default async function GiderlerPage({
   const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
 
   const supabase = await createClient();
-  const [expenses, catDefs, aggregateResult, sample, financeProbe, pickedPropertyRes] = await measureAll("giderler-veri", [
+  const canCreate = perms.expenses?.includes("create") ?? false;
+  const canEdit = perms.expenses?.includes("edit") ?? false;
+  const canDelete = perms.expenses?.includes("delete") ?? false;
+  const canSalary = canHandleSalary(role);
+  const today = trDayKey(nowMs());
+
+  // Kasa / banka (Paket A): şema yoksa available=false -> sayfa eski Giderler akışıyla aynen çalışır.
+  const cash = await loadAccountsWithBalances(supabase);
+  const sekme = cash.available ? financeTabOf(params.sekme) : "ozet";
+  const quickAccounts: AccountOption[] = cash.accounts
+    .filter((a) => !a.archived_at && (a.owner_scope === "user" || canCreate))
+    .map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
+  const legacyCreate = canCreate ? (
+    <ButtonLink href="#gider-ekle" icon={Plus}>
+      Yeni gider
+    </ButtonLink>
+  ) : null;
+
+  if (sekme !== "ozet") {
+    return (
+      <ListPage>
+        <ListHero
+          eyebrow={FINANCE_HERO_TEXT.cash.eyebrow}
+          art="gider"
+          title="Finans"
+          description={FINANCE_HERO_TEXT.cash.description}
+          actions={<FinanceActions cashAvailable quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={null} />}
+        />
+        <FinanceTabs cashAvailable active={sekme} />
+        {sekme === "hareketler" ? (
+          <HareketlerTab
+            supabase={supabase}
+            params={params as Record<string, string | undefined>}
+            accounts={cash.accounts}
+            today={today}
+            canCreate={canCreate}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            canSalary={canSalary}
+          />
+        ) : (
+          <KasaBankaTab supabase={supabase} accounts={cash.accounts} today={today} canOffice={canCreate} />
+        )}
+      </ListPage>
+    );
+  }
+
+  const [expenses, catDefs, aggregateResult, sample, financeProbe, pickedPropertyRes, cashSummary] = await measureAll("giderler-veri", [
     // Tablo listesi — ?from=&to= sunucu tarafında uygulanır (expense_date aralığı).
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
@@ -104,6 +158,8 @@ export default async function GiderlerPage({
     portfoyF
       ? supabase.from("properties").select("id, property_code, title").eq("id", portfoyF).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Kasa girişi/çıkışı bu ay (yalnız şema varsa).
+    cash.available ? loadCashSummary(supabase, { from: `${today.slice(0, 8)}01`, to: today }) : Promise.resolve([]),
   ]);
   const financeFields = !financeProbe.error;
   const aggregate = requireReportingData("tenant-expense-aggregates", aggregateResult) as unknown as {
@@ -115,9 +171,6 @@ export default async function GiderlerPage({
   };
   // Örnek veri eşik kararını RPC verir (20261007000810, `sample_included`); migration yoksa yüklü örnek veri etiketlenir.
   const sampleLabel = aggregateSampleLabel(sample.seeded, aggregate.sample_included);
-  const canCreate = perms.expenses?.includes("create") ?? false;
-  const canEdit = perms.expenses?.includes("edit") ?? false;
-  const canDelete = perms.expenses?.includes("delete") ?? false;
 
   // DB-driven gider kategorileri (boşsa definition-defaults.ts yedeği)
   const categories = catDefs.map((c) => ({ value: c.value, label: c.label }));
@@ -216,24 +269,16 @@ export default async function GiderlerPage({
   return (
     <ListPage>
       <ListHero
-        eyebrow="Gider takibi"
+        eyebrow={cash.available ? FINANCE_HERO_TEXT.cash.eyebrow : FINANCE_HERO_TEXT.legacy.eyebrow}
         art="gider"
-        title="Masraf & Giderler"
+        title="Finans"
         meta={<SampleDataBadge label={sampleLabel} />}
-        description="Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
-        actions={
-          <>
-            <ButtonLink href={`/app/giderler?sekme=${FATURALAR_SEKME.key}`} variant="secondary" icon={FileText}>
-              {FATURALAR_SEKME.label}
-            </ButtonLink>
-            {canCreate ? (
-              <ButtonLink href="#gider-ekle" icon={Plus}>
-                Yeni gider
-              </ButtonLink>
-            ) : null}
-          </>
-        }
+        description={cash.available ? FINANCE_HERO_TEXT.cash.description : FINANCE_HERO_TEXT.legacy.description}
+        actions={<FinanceActions cashAvailable={cash.available} quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={legacyCreate} />}
       />
+      <FinanceTabs cashAvailable={cash.available} active="ozet" />
+
+      {cash.available ? <CashOverview accounts={cash.accounts} summary={cashSummary} today={today} /> : null}
 
       <KpiStrip items={kpis} />
 
@@ -403,12 +448,34 @@ export default async function GiderlerPage({
       ) : null}
 
       {/* Yeni gider formu */}
-      {canCreate && (
+      {canCreate && cash.available ? (
+        // Hızlı "Gider ekle" üstte; portföy / tekrar / portal / fiş dosyası gibi ayrıntılar bu açılır bölümde kalır.
+        <details
+          id="gider-ekle"
+          open={expenses.length === 0 || Boolean(pickedProperty)}
+          className="group scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5"
+        >
+          <summary className="cursor-pointer list-none font-display font-bold text-text [&::-webkit-details-marker]:hidden">
+            Ayrıntılı gider kaydı <span className="text-xs font-normal text-text-muted">(portföy, tekrar, portal, fiş dosyası)</span>
+          </summary>
+          <div className="mt-4">
+            <ExpenseCreateForm
+              categories={categories}
+              defaultDate={today}
+              defaultProperty={pickedProperty && portfoyLabel ? { value: pickedProperty.id as string, label: portfoyLabel } : null}
+              receiptUploads={receiptUploads}
+              financeFields={financeFields}
+              accounts={quickAccounts.filter((a) => a.scope === "office")}
+            />
+          </div>
+        </details>
+      ) : null}
+      {canCreate && !cash.available && (
         <section id="gider-ekle" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <h2 className="mb-4 font-display font-bold text-text">Yeni gider ekle</h2>
           <ExpenseCreateForm
             categories={categories}
-            defaultDate={new Date(nowMs()).toISOString().slice(0, 10)}
+            defaultDate={today}
             defaultProperty={pickedProperty && portfoyLabel ? { value: pickedProperty.id as string, label: portfoyLabel } : null}
             receiptUploads={receiptUploads}
             financeFields={financeFields}

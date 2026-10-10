@@ -34,6 +34,7 @@ const SOURCE_LABELS: Record<string, string> = {
   network: "Ağ / MLS",
   api: "API",
   transfer: "Devir",
+  extension: "Eklenti",
 };
 const EVENT_LABELS: Record<string, string> = {
   created: "Havuza düştü",

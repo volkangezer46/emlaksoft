@@ -32,6 +32,7 @@ const ALLOWLIST: Record<string, string> = {
   // Hesaplayıcı sayfası searchParams'ı calculator-view / investment-view bileşenlerine geçirir;
   // ?portfoy= o alt görünümlerde okunur (sayfa dosyasında literal olarak geçmez).
   "/app/hesaplayici::portfoy": "param page.tsx'ten alt görünüm bileşenlerine iletilir ve orada okunur",
+  "/app/giderler::duzenle": "param page.tsx'ten Faturalar sekmesine (faturalar-tab.tsx) iletilir ve orada okunur",
 };
 
 // ---------------------------------------------------------------------------

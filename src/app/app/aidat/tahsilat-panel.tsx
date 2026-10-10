@@ -6,6 +6,7 @@ import Link from "@/components/ui/smart-link";
 import { ArrowLeftRight, Printer, Wallet } from "lucide-react";
 import { offsetChargeToOwner, recordBuildingPayment, voidBuildingPayment } from "@/app/actions/building-management";
 import { useToast } from "@/components/app/toast-provider";
+import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormError, FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
@@ -76,6 +77,7 @@ export function CollectionPanel({
   const [voidFor, setVoidFor] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState("");
 
   const groups = useMemo(() => {
     const byUnit = new Map<string, { unitId: string; unitLabel: string; items: CollectionCharge[] }>();
@@ -106,8 +108,10 @@ export function CollectionPanel({
         paidOn: String(fd.get("paid_on") ?? ""),
         method: String(fd.get("method") ?? ""),
         bankNote: String(fd.get("bank_note") ?? ""),
+        accountId: accountId || null,
       });
       setBusy(null);
+      if (res.info) push(res.info, "err");
       if (res.error) setFormError(res.error);
       else done(res.receiptNo ? `Tahsilat kaydedildi · ${formatReceiptNo(res.receiptNo)}` : "Tahsilat kaydedildi");
     });
@@ -203,6 +207,9 @@ export function CollectionPanel({
                               </FormField>
                               <FormField label="Banka / açıklama" htmlFor={`note-${c.id}`} hint="Dekont no, banka adı veya çek bilgisi (isteğe bağlı).">
                                 <FormInput id={`note-${c.id}`} name="bank_note" maxLength={300} />
+                              </FormField>
+                              <FormField label="Hangi hesaba girdi?" htmlFor={`acc-${c.id}`} hint="İsteğe bağlı: seçerseniz kasa/banka hareketi otomatik yazılır.">
+                                <FinanceAccountPicker value={accountId} onChange={setAccountId} />
                               </FormField>
                             </div>
                             <FormError error={formError} />
