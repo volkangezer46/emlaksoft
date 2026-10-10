@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   applyProfile: vi.fn(),
   getUser: vi.fn(),
   refreshSession: vi.fn(),
+  globalBucket: null as null | { hits: number; window_end: string },
   profileRow: null as null | { id: string },
   staffRow: null as null | { id: string },
 }));
@@ -67,7 +68,10 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: table === "profiles" ? h.profileRow : h.staffRow, error: null }),
+          maybeSingle: async () => ({
+            data: table === "rate_limits" ? h.globalBucket : table === "profiles" ? h.profileRow : h.staffRow,
+            error: null,
+          }),
         }),
       }),
     }),
@@ -145,6 +149,7 @@ beforeEach(() => {
   h.applyProfile.mockResolvedValue({ warnings: [], invited: 0 });
   h.profileRow = null;
   h.staffRow = null;
+  h.globalBucket = null;
   h.getUser.mockResolvedValue({ data: { user: googleUser() } });
   h.refreshSession.mockResolvedValue({ error: null });
   process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED = "true";
@@ -174,8 +179,14 @@ describe("signUp — ön kapılar (hiçbir kaynak oluşmaz)", () => {
 describe("signUp — e-posta ve global hız sınırı", () => {
   it("IP + normalize e-posta + global anahtarlarıyla sınırlar; hiçbiri reddederse hesap oluşmaz", async () => {
     await signUp({}, form({ email: "  Ayse@Example.COM " })).catch(() => {}); // başarıda /app'e yönlenir
-    expect(h.rateKeys).toEqual(["signup:203.0.113.7", "signup:email:ayse@example.com", "signup:global"]);
-    for (const prefix of ["signup:email:", "signup:global"]) {
+    // Global sayaç YALNIZ başarılı provizyondan sonra artar (signup:global:ok); önce yalnız okunur.
+    expect(h.rateKeys).toEqual(["signup:203.0.113.7", "signup:email:ayse@example.com", "signup:global:ok"]);
+    h.globalBucket = { hits: 300, window_end: new Date(Date.now() + 600_000).toISOString() };
+    h.createUser.mockClear();
+    expect((await signUp({}, form())).error).toMatch(/yoğun/);
+    expect(h.createUser).not.toHaveBeenCalled();
+    h.globalBucket = null;
+    for (const prefix of ["signup:email:"]) {
       h.createUser.mockClear();
       h.rateDenyPrefix = prefix;
       const res = await signUp({}, form());
@@ -186,10 +197,13 @@ describe("signUp — e-posta ve global hız sınırı", () => {
 });
 
 describe("signUp — auth kullanıcısı oluşturma hatası", () => {
-  it("'already' hatası: 'Bu e-posta zaten kayıtlı.'; RPC ve telafi çağrılmaz", async () => {
+  it("'already' hatası: kayıtlı e-postaya özel mesaj yok (genel metin); RPC, telafi ve global sayaç çağrılmaz", async () => {
     h.createUser.mockResolvedValue({ data: { user: null }, error: { message: "User already registered" } });
     const r = await signUp({}, form());
-    expect(r.error).toBe("Bu e-posta zaten kayıtlı.");
+    expect(r.error).toMatch(/^Hesap oluşturulamadı: /);
+    expect(r.error).not.toMatch(/zaten kayıtlı/);
+    expect(r).not.toHaveProperty("field");
+    expect(h.rateKeys).not.toContain("signup:global:ok");
     expect(h.rpc).not.toHaveBeenCalled();
     expect(h.deleteUser).not.toHaveBeenCalled();
   });

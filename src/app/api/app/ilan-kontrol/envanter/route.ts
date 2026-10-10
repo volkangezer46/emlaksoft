@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { importPortalInventory } from "@/app/actions/listing-control-inventory";
 import { workerReportParser } from "@/app/actions/listing-control-worker";
 import { isSameOriginBridgeRequest } from "@/lib/listing-control/worker/bridge-request";
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
   if (!isSameOriginBridgeRequest(request)) return NextResponse.json({ ok: false, error: "origin" }, { status: 403, headers: NO_STORE });
   const user = await getRequestUser();
   if (!user) return NextResponse.json({ ok: false, error: "session" }, { status: 401, headers: NO_STORE });
+  // Kullanıcı başına dakikada 20 yükleme; sayaç altyapısı yanıt vermezse reddedilir (deny).
+  const limit = await checkRateLimit(`lc-inv:${user.id}`, { limit: 20, windowSec: 60, failurePolicy: "deny" });
+  if (!limit.allowed) return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429, headers: { ...NO_STORE, "Retry-After": "60" } });
 
   let up: ValidUpload | null;
   try {

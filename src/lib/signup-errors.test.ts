@@ -68,8 +68,9 @@ describe("kayıt sözleşmesi: sunucu alan hatası döner, form sıfırlanmaz", 
     expect(fn).toMatch(/PHONE_ERROR_MESSAGE, field: "phone"/);
     expect(fn).toMatch(/TR_MOBILE_ERROR_MESSAGE, field: "phone"/);
     expect(fn).toMatch(/EMAIL_ERROR_MESSAGE, field: "email"/);
-    expect(fn).toMatch(/zaten kayıtlı\.", field: "email"/);
-    // Formdaki "giriş yap / şifremi unuttum" bağlantısı bu metne bağlıdır.
+    // Hesap sayımı (enumeration) kapalı: kayıtlı e-posta için özel mesaj/alan YOK (konsey #54); createUser hataları genel metin.
+    expect(fn).not.toMatch(/zaten kayıtlı/);
+    expect(fn).toMatch(/error: SIGNUP_GENERIC_ERROR/);
     expect(SIGNUP_EMAIL_EXISTS_MESSAGE).toBe("Bu e-posta zaten kayıtlı.");
   });
   it("form action'ı otomatik sıfırlamasız gönderilir ve eski metin-tarama eşlemesi yok", () => {
