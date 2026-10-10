@@ -64,6 +64,14 @@ export const actionLabel: Record<string, string> = {
   "export.report": "Rapor indirildi (Rapor merkezi)",
   "kvkk.request_created": "KVKK talebi açıldı",
   "kvkk.request_status": "KVKK talep durumu değişti",
+  "yetki.scope_created": "Yetki kapsamı eklendi",
+  "yetki.scope_updated": "Yetki kapsamı güncellendi",
+  "yetki.scope_deleted": "Yetki kapsamı kaldırıldı",
+  "yetki.override_created": "Kullanıcı yetki istisnası eklendi",
+  "yetki.override_updated": "Kullanıcı yetki istisnası güncellendi",
+  "yetki.override_deleted": "Kullanıcı yetki istisnası kaldırıldı",
+  "yetki.permission_granted": "Yetki verildi",
+  "yetki.permission_revoked": "Yetki geri alındı",
 };
 export const HIGH_RISK_ACTIONS = [
   "customer.delete",
@@ -75,6 +83,15 @@ export const HIGH_RISK_ACTIONS = [
   "ops.impersonate.stop",
   "platform_staff.role_change",
   "platform_staff.deactivate",
+  // Yetki değişiklikleri (access_audit_log): hepsi yüksek risk.
+  "yetki.scope_created",
+  "yetki.scope_updated",
+  "yetki.scope_deleted",
+  "yetki.override_created",
+  "yetki.override_updated",
+  "yetki.override_deleted",
+  "yetki.permission_granted",
+  "yetki.permission_revoked",
 ] as const;
 export const MED_RISK_ACTIONS = [
   "settings.update",
