@@ -28,6 +28,12 @@ for (const path of paths) {
     }).observe({ type: "largest-contentful-paint", buffered: true });
   });
   await page.goto(base + path, { waitUntil: "networkidle" });
+  // ekran alti (tembel) kaynaklar da yuklensin: sayfayi sonuna kadar kaydir (Pingdom tam sayfa gibi)
+  const full = await page.evaluate(() => document.documentElement.scrollHeight);
+  for (let y = 0; y < full; y += 600) {
+    await page.evaluate((yy) => window.scrollTo(0, yy), y);
+    await page.waitForTimeout(80);
+  }
   await page.waitForTimeout(1000);
   const lcp = await page.evaluate(() => (window as unknown as { __l: number }).__l);
   const cov = await page.coverage.stopCSSCoverage();
