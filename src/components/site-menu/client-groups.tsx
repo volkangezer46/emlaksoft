@@ -1,7 +1,6 @@
 import { renderMenuIcon } from "@/lib/site-menu/icon-node";
-import { PREVIEW_LABELS, previewForHref, sectionIconName } from "@/lib/site-menu/previews";
+import { SCENE_LABELS, previewForHref, sectionIconName, type SceneKind } from "@/lib/site-menu/previews";
 import type { PublicSiteMenu } from "@/lib/site-menu/public";
-import type { FeaturedPreviewKind } from "@/lib/site-menu/schema";
 import type { ClientGroup, ClientPreview } from "./mega-menu";
 
 /**
@@ -29,14 +28,14 @@ export function toClientGroups(menu: PublicSiteMenu, assetBase?: (id: string) =>
     const f = g.featured;
     let previews: ClientPreview[] | undefined;
     if (f && !f.media) {
-      const labels = new Map<FeaturedPreviewKind, string>();
+      const labels = new Map<SceneKind, string>();
       for (const c of columns) for (const it of c.items) if (it.pv && !labels.has(it.pv)) labels.set(it.pv, it.label);
-      const def = f.preview ?? [...labels.keys()][0] ?? null;
+      const def: SceneKind | null = f.preview ?? previewForHref(f.href) ?? [...labels.keys()][0] ?? null;
       if (def) {
         const kinds = [def, ...[...labels.keys()].filter((k) => k !== def)];
         previews = kinds.map((kind) => ({
           kind,
-          label: kind === def && f.preview ? PREVIEW_LABELS[kind] : (labels.get(kind) ?? PREVIEW_LABELS[kind]),
+          label: labels.get(kind) ?? SCENE_LABELS[kind],
         }));
       }
     }

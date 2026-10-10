@@ -12,23 +12,23 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 describe("mega menü canlı önizleme eşlemesi", () => {
   it("bilinen hedefler doğru sahneye gider; ilk eşleşen kazanır", () => {
     expect(previewForHref("/#kayip-kacak")).toBe("leak");
-    expect(previewForHref("/fiyatlar#kacan-komisyon")).toBe("leak");
+    expect(previewForHref("/fiyatlar#kacan-komisyon")).toBe("calc");
     expect(previewForHref("/#emsal-degerleme")).toBe("valuation");
-    expect(previewForHref("/#degerleme")).toBe("valuation");
+    expect(previewForHref("/#degerleme")).toBe("parcel");
     expect(previewForHref("/#imza")).toBe("signature");
     expect(previewForHref("/#ai-asistan")).toBe("assistant");
     expect(previewForHref("/#portal-kontrol")).toBe("listing");
     expect(previewForHref("/#guvenlik")).toBe("security");
-    expect(previewForHref("/kvkk-aydinlatma")).toBe("security");
+    expect(previewForHref("/kvkk-aydinlatma")).toBe("legal");
     expect(previewForHref("/#otomasyon")).toBe("automation");
     expect(previewForHref("/#tur")).toBe("dashboard");
     expect(previewForHref("/fiyatlar")).toBe("plans");
-    expect(previewForHref("/kayit?plan=office")).toBe("plans");
+    expect(previewForHref("/kayit?plan=office")).toBe("plan-office");
   });
 
   it("eşleşmeyen ve iletişim bağlantıları önizleme üretmez (varsayılan katman kalır)", () => {
-    expect(previewForHref("mailto:destek@emlaksoft.com.tr")).toBeNull();
-    expect(previewForHref("/#vitrin")).toBeNull();
+    expect(previewForHref("mailto:bilgi@ornek.com")).toBeNull();
+    expect(previewForHref("/#bilinmeyen")).toBeNull();
     expect(previewForHref("")).toBeNull();
   });
 
@@ -58,5 +58,33 @@ describe("mega menü canlı önizleme eşlemesi", () => {
     // site üst barı ve admin önizlemesi aynı dönüştürücüyü kullanır (kopya eşleme yok)
     expect(read("src/components/site-header.tsx")).toContain("toClientGroups(menu)");
     expect(read("src/app/admin/site-menu/menu-preview.tsx")).toContain("toClientGroups(menu)");
+  });
+});
+
+describe("her alt menü öğesine özel sahne", () => {
+  it("varsayılan menüde her panelde her öğenin sahnesi vardır ve panel içinde tekrar etmez", () => {
+    const menu = toPublicMenu(defaultSiteMenu(), 0);
+    for (const g of menu.groups.filter((x) => x.kind === "menu")) {
+      const kinds = g.columns.flatMap((c) => c.items.map((it) => previewForHref(it.href)));
+      expect(kinds.every(Boolean), `${g.id}: eşleşmeyen öğe`).toBe(true);
+      expect(new Set(kinds).size, `${g.id}: tekrar eden sahne`).toBe(kinds.length);
+    }
+  });
+
+  it("tüm sahnelerin etiketi, kart metni ve çizimi vardır; 'örnek' yazısı yok", async () => {
+    const { EXTRA_SCENES, SCENE_LABELS } = await import("./previews");
+    const { SCENE_COPY } = await import("@/components/site-menu/scene-copy");
+    const { FeaturedPreview } = await import("@/components/site-menu/featured-preview");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    for (const k of [...FEATURED_PREVIEWS, ...EXTRA_SCENES]) {
+      expect(SCENE_LABELS[k], k).toBeTruthy();
+      const c = SCENE_COPY[k];
+      expect(c.title && c.text && c.cta && c.eyebrow, k).toBeTruthy();
+      expect(`${c.title} ${c.text}`, k).not.toMatch(/örnek/i);
+      const html = renderToStaticMarkup(createElement(FeaturedPreview, { kind: k }));
+      expect(html, k).toContain("<svg");
+      expect(html, k).not.toMatch(/örnek/i);
+    }
   });
 });

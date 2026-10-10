@@ -5,7 +5,8 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSPrope
 import { ArrowRight, ChevronDown, ExternalLink, Menu, X } from "lucide-react";
 import { FeaturedMedia } from "./featured-media";
 import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
-import type { FeaturedPreviewKind } from "@/lib/site-menu/schema";
+import type { SceneKind } from "@/lib/site-menu/previews";
+import type { SceneCopy } from "./scene-copy";
 
 /** Önizleme sahneleri (SVG) tembel parça: ilk HTML'de ve ilk JS'te yoktur; menüye ilk yaklaşmada yüklenir. */
 const FeaturedPreview = lazy(() => import("./featured-preview").then((m) => ({ default: m.FeaturedPreview })));
@@ -30,7 +31,9 @@ const FeaturedPreview = lazy(() => import("./featured-preview").then((m) => ({ d
 export type ClientItem = Omit<PublicItem, "icon"> & { iconNode: ReactNode; /** Canlı önizleme türü (client-groups). */ pv?: string | null };
 export type ClientFeatured = Omit<PublicFeatured, "icon"> & { iconNode: ReactNode };
 /** Sunucuda çizilmiş önizleme katmanı; dizideki ilk öğe varsayılandır. */
-export type ClientPreview = { kind: FeaturedPreviewKind; label?: string };
+export type ClientPreview = { kind: SceneKind; label?: string };
+/** Üzerine gelinen / odaklanılan alt menü öğesi: sahne türü + öğenin bağlantısı (kart metni ve bağlantısı buna göre değişir). */
+type PreviewHover = { kind: string; href: string; external: boolean; label: string; iconNode?: ReactNode };
 export type ClientGroup = Omit<PublicGroup, "columns" | "featured"> & {
   columns: Array<{ title: string; iconNode?: ReactNode; items: ClientItem[] }>;
   featured: ClientFeatured | null;
@@ -70,10 +73,19 @@ function NavAnchor({ href, external, onClick, className, style, children }: { hr
   );
 }
 
-function Featured({ f, onClick, active, index, withMedia, previews, pv, armed }: { f: ClientFeatured; onClick: () => void; active: boolean; index: number; withMedia: boolean; previews?: ClientPreview[]; pv?: string | null; armed?: boolean }) {
+function Featured({ f, onClick, active, index, withMedia, previews, hover, copy, armed }: { f: ClientFeatured; onClick: () => void; active: boolean; index: number; withMedia: boolean; previews?: ClientPreview[]; hover?: PreviewHover | null; copy?: Record<string, SceneCopy> | null; armed?: boolean }) {
+  const pv = hover?.kind;
   const on = previews?.some((p) => p.kind === pv) ? pv : previews?.[0]?.kind;
+  // Üzerine gelinen öğeye göre başlık/açıklama/bağlantı; metin tembel parçadan gelir (yüklenmediyse öğenin kendi etiketi).
+  const live = withMedia && !f.media && hover && previews?.some((p) => p.kind === hover.kind) ? hover : null;
+  const c = live ? copy?.[live.kind] : undefined;
+  const eyebrow = live ? (c?.eyebrow ?? live.label) : f.eyebrow;
+  const title = live ? (c?.title ?? live.label) : f.title;
+  const text = live ? (c?.text ?? "") : f.text;
+  const cta = live ? (c?.cta ?? f.ctaLabel) : f.ctaLabel;
+  const swap = live ? "mk-feat-sw" : undefined;
   return (
-    <NavAnchor href={f.href} external={f.external} onClick={onClick} className="mk-mega-feat" style={{ "--i": index } as CSSProperties}>
+    <NavAnchor href={live ? live.href : f.href} external={live ? live.external : f.external} onClick={onClick} className="mk-mega-feat" style={{ "--i": index } as CSSProperties}>
       <>
         {withMedia && f.media ? (
           <FeaturedMedia media={f.media} active={active} />
@@ -90,14 +102,14 @@ function Featured({ f, onClick, active, index, withMedia, previews, pv, armed }:
             ))}
           </span>
         ) : null}
-        {f.iconNode ? <span className="mk-mega-feat-ico">{f.iconNode}</span> : null}
-        {f.eyebrow ? <span className="mk-mega-feat-eyebrow">{f.eyebrow}</span> : null}
-        <b>{f.title}</b>
-        {f.text ? <small>{f.text}</small> : null}
+        {(live?.iconNode ?? f.iconNode) ? <span className="mk-mega-feat-ico">{live?.iconNode ?? f.iconNode}</span> : null}
+        {eyebrow ? <span key={`e${live?.kind}`} className={`mk-mega-feat-eyebrow ${swap ?? ""}`}>{eyebrow}</span> : null}
+        <b key={`t${live?.kind}`} className={swap}>{title}</b>
+        {text ? <small key={`x${live?.kind}`} className={swap}>{text}</small> : null}
         <span className="mk-mega-feat-cta">
-          {f.ctaLabel}
+          {cta}
           <ArrowRight size={16} aria-hidden="true" />
-          {f.external ? <span className="sr-only"> (yeni sekmede açılır)</span> : null}
+          {(live ? live.external : f.external) ? <span className="sr-only"> (yeni sekmede açılır)</span> : null}
         </span>
       </>
     </NavAnchor>
@@ -111,7 +123,9 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   // Önizleme sahneleri menüye ilk yaklaşmada (fare/odak/açılış) yüklenir.
   const [armed, setArmed] = useState(false);
   // Canlı önizleme: üzerine gelinen / odaklanılan bağlantının önizleme türü (grup kimliğiyle; başka panelde geçersiz).
-  const [pv, setPv] = useState<{ g: string; k: string } | null>(null);
+  const [pv, setPv] = useState<(PreviewHover & { g: string }) | null>(null);
+  // Kart metinleri (tembel parçadan; sahnelerle aynı parça): yüklenene dek öğenin kendi etiketi gösterilir.
+  const [copy, setCopy] = useState<Record<string, SceneCopy> | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const burgerRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -173,6 +187,18 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   useEffect(() => () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
   }, []);
+
+  // Sahneler ve kart metinleri aynı tembel parçadır: menüye ilk yaklaşmada bir kez yüklenir.
+  useEffect(() => {
+    if (!armed && !menu) return;
+    let live = true;
+    void import("./featured-preview").then((m) => {
+      if (live) setCopy(m.SCENE_COPY);
+    });
+    return () => {
+      live = false;
+    };
+  }, [armed, menu]);
 
   // Mobil sheet modal: arka plan (sayfa gövdesi, alt bilgi) inert; odak sheet + kapat düğmesi içinde döner.
   useEffect(() => {
@@ -243,8 +269,12 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
 
   // Fare ve klavye odağı aynı yoldan: en yakın [data-pv] öğesi kartın etkin katmanını seçer (imleç konumu izlenmez).
   const pickPreview = (target: EventTarget, g: ClientGroup) => {
-    const k = (target as Element).closest?.<HTMLElement>("[data-pv]")?.dataset.pv;
-    if (k) setPv((cur) => (cur?.g === g.id && cur.k === k ? cur : { g: g.id, k }));
+    const li = (target as Element).closest?.<HTMLElement>("[data-pv]");
+    const a = li?.querySelector<HTMLAnchorElement>("a[href]");
+    const k = li?.dataset.pv;
+    if (!k || !a) return;
+    const href = a.getAttribute("href") ?? "";
+    setPv((cur) => (cur?.g === g.id && cur.kind === k && cur.href === href ? cur : { g: g.id, kind: k, href, external: a.target === "_blank", label: a.querySelector("b")?.firstChild?.textContent ?? "", iconNode: g.columns.flatMap((c) => c.items).find((i) => i.href === href)?.iconNode }));
   };
 
   return (
@@ -280,6 +310,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                   onPointerEnter={(e) => {
                     if (e.pointerType !== "mouse") return;
                     clearHover();
+                    if (menu !== g.id) setPv(null);
                     hoverTimer.current = setTimeout(() => setMenu(g.id), menu ? 0 : 90);
                   }}
                   onPointerLeave={(e) => {
@@ -347,7 +378,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                           </div>
                         ))}
                       </div>
-                      {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia previews={g.previews} armed={armed || isOpen} pv={isOpen && pv?.g === g.id ? pv.k : null} /> : null}
+                      {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia previews={g.previews} armed={armed || isOpen} hover={isOpen && pv?.g === g.id ? pv : null} copy={copy} /> : null}
                       <div className="mk-mega-bar">
                         <ul className="mk-mega-trust" aria-label="Deneme koşulları">
                           <li>Kartsız deneme</li>
