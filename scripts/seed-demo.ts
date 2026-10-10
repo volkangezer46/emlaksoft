@@ -1121,6 +1121,73 @@ async function main() {
     return (await insertRows("expenses", rows)).length;
   });
 
+  // ---------------- Düzenli ödemeler (Finans Paket B; tablolar yoksa atlanır) ----------------
+  try {
+    const probe = await admin.from("recurring_rules").select("id", { head: true, count: "exact" }).limit(1);
+    if (probe.error) {
+      console.log("✓ Düzenli ödemeler: migration uygulanmamış (atlandı)");
+    } else {
+      await section("Düzenli ödemeler", "recurring_rules", tenantId, 3, async () => {
+        const todayKey = dateOnly(new Date());
+        let accId: string | null = null;
+        const acc = await admin.from("finance_accounts").select("id").eq("tenant_id", tenantId).eq("owner_scope", "office").is("archived_at", null).limit(1);
+        if (acc.error) return 0;
+        accId = (acc.data?.[0]?.id as string | undefined) ?? null;
+        if (!accId) {
+          const made = await insertRows("finance_accounts", [
+            { tenant_id: tenantId, owner_scope: "office", kind: "bank", name: "Kadıköy ofis bankası", currency: "TRY", opening_balance: 250000, opening_date: todayKey, created_by: ownerId },
+          ]);
+          accId = (made[0]?.id as string | undefined) ?? null;
+        }
+        if (!accId) return 0;
+        const monthStart = `${todayKey.slice(0, 7)}-01`;
+        const dueOf = (period: string, day: number) => {
+          const y = Number(period.slice(0, 4));
+          const m = Number(period.slice(5, 7));
+          const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+          return `${y}-${String(m).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
+        };
+        const nextMonth = (period: string) => {
+          const y = Number(period.slice(0, 4));
+          const m = Number(period.slice(5, 7));
+          return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+        };
+        const rows = [
+          { category: "kira", title: "Kadıköy ofis kirası", amount: 45000, day: 1, mode: "auto", expense_category: "ofis", portal_key: null },
+          { category: "portal", title: "Sahibinden.com üyeliği", amount: 3200, day: 5, mode: "auto", expense_category: "reklam", portal_key: "sahibinden" },
+          { category: "muhasebe", title: "Muhasebe ücreti", amount: 3500, day: 31, mode: "approve", expense_category: "ofis", portal_key: null },
+        ].map((r) => {
+          // Geçmişe dönük kayıt yok: ilk vade bugünden ileri.
+          let period = monthStart;
+          if (dueOf(period, r.day) < todayKey) period = nextMonth(period);
+          return {
+            tenant_id: tenantId,
+            scope: "office",
+            direction: "out",
+            category: r.category,
+            title: r.title,
+            amount: r.amount,
+            account_id: accId,
+            frequency: "monthly",
+            pay_day: r.day,
+            start_date: todayKey,
+            anchor: monthStart,
+            mode: r.mode,
+            portal_key: r.portal_key,
+            expense_category: r.expense_category,
+            create_expense: true,
+            next_period: period,
+            next_due: dueOf(period, r.day),
+            created_by: ownerId,
+          };
+        });
+        return (await insertRows("recurring_rules", rows)).length;
+      });
+    }
+  } catch (e) {
+    console.log(`✓ Düzenli ödemeler: atlandı (${e instanceof Error ? e.message : "hata"})`);
+  }
+
   await section("Aidatlar", "property_dues", tenantId, 3, async () => {
     const rows = [
       { prop: "DEMO-004", title: "Rezidans aidatı", amount: 8500, status: "paid", period: monthStart(0) },

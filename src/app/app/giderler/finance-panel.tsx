@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { BudgetForm, BudgetRemoveButton } from "./budget-form";
+import { ConvertSeriesButton } from "./recurring-panel";
+import type { AccountOption } from "./quick-entry";
 import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
 import { BUDGET_WARN_RATIO } from "@/lib/finance/expense-budget";
@@ -37,6 +39,7 @@ export async function FinancePanel({
   canEdit,
   categories,
   showEarnings,
+  convertAccounts = [],
 }: {
   tenantId: string;
   /** Önbellek anahtarı (ofis + kullanıcı): RLS kapsamı başka kullanıcıya sızmaz. */
@@ -45,6 +48,8 @@ export async function FinancePanel({
   categories: readonly Category[];
   /** Komisyon tutarları ofis geneli kazançtır: yalnız tüm kazancı görenlere. */
   showEarnings: boolean;
+  /** "Kurala çevir" için yazılabilir ofis hesapları (boşsa düğme görünmez). */
+  convertAccounts?: readonly AccountOption[];
 }) {
   const supabase = await createClient();
   const nowMs = now();
@@ -170,6 +175,7 @@ export async function FinancePanel({
                       <TH className="hidden sm:table-cell">Dönem</TH>
                       <TH align="right">Son ödeme</TH>
                       <TH align="right">Sonraki yenileme</TH>
+                      {convertAccounts.length > 0 ? <TH align="right"><span className="sr-only">Düzenli ödemeye çevir</span></TH> : null}
                     </TR>
                   </THead>
                   <TBody>
@@ -202,6 +208,11 @@ export async function FinancePanel({
                               ) : null}
                             </span>
                           </TD>
+                          {convertAccounts.length > 0 ? (
+                            <TD align="right">
+                              <ConvertSeriesButton expenseId={s.lastId} title={s.title} officeAccounts={convertAccounts} />
+                            </TD>
+                          ) : null}
                         </TR>
                       );
                     })}

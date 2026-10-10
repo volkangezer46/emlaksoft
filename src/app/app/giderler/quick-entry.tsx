@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { FormField, FormInput, FormSelect, FormError, FormTextarea } from "@/components/ui/form-controls";
 import Link from "@/components/ui/smart-link";
+import { Switch } from "@/components/ui/switch";
 import { categoriesFor, type CashDirection } from "@/lib/finance/cash/categories";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +77,8 @@ function EntryDialog({
   const [showDate, setShowDate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [repeat, setRepeat] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<"auto" | "approve">("auto");
   const office = accounts.filter((a) => a.scope === "office");
   const personal = accounts.filter((a) => a.scope === "user");
   const chosen = accounts.find((a) => a.id === accountId);
@@ -94,6 +97,9 @@ function EntryDialog({
       counterparty: String(fd.get("counterparty") ?? ""),
       documentUrl: String(fd.get("documentUrl") ?? ""),
       note: String(fd.get("note") ?? ""),
+      repeatMonthly: repeat,
+      repeatDay: String(fd.get("repeatDay") ?? ""),
+      repeatMode,
     });
     setBusy(false);
     if (res.error) {
@@ -106,6 +112,8 @@ function EntryDialog({
       /* tercih saklanamadı: sorun değil */
     }
     push(income ? "Gelir kaydedildi" : "Gider kaydedildi", "ok");
+    if (res.info) push(res.info, "err");
+    else if (repeat) push("Gelecek aydan itibaren her ay tekrarlanacak", "ok");
     onClose();
     router.refresh();
   }
@@ -185,6 +193,29 @@ function EntryDialog({
                   </button>
                 </p>
               )}
+
+              <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="qe-repeat" className="text-sm font-semibold text-text">
+                    Her ay tekrarla
+                    <span className="block text-xs font-normal text-text-muted">Gelecek aydan itibaren aynı tutar kendiliğinden işlenir.</span>
+                  </label>
+                  <Switch id="qe-repeat" checked={repeat} onCheckedChange={setRepeat} aria-label="Her ay tekrarla" />
+                </div>
+                {repeat ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <FormField label="Ayın kaçıncı günü?" htmlFor="qe-repeat-day" hint="31 = ayın son günü">
+                      <FormInput id="qe-repeat-day" name="repeatDay" type="number" min={1} max={31} defaultValue={Number(defaultDate.slice(8, 10))} />
+                    </FormField>
+                    <FormField label="Nasıl işlensin?" htmlFor="qe-repeat-mode">
+                      <FormSelect id="qe-repeat-mode" value={repeatMode} onChange={(e) => setRepeatMode(e.target.value as "auto" | "approve")}>
+                        <option value="auto">Otomatik kaydet</option>
+                        <option value="approve">Bana sor</option>
+                      </FormSelect>
+                    </FormField>
+                  </div>
+                ) : null}
+              </div>
 
               <details className="group rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
                 <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-text-muted [&::-webkit-details-marker]:hidden">

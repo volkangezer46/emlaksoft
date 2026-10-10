@@ -106,6 +106,8 @@ export async function loadAccountsWithBalances(
 
 export type EntryFilters = {
   accountId?: string | null;
+  /** Birden çok hesapla sınırla (Kasam: yalnız kişisel hesaplar). */
+  accountIds?: readonly string[] | null;
   /** gelir | gider | transfer */
   tur?: "gelir" | "gider" | "transfer" | null;
   category?: string | null;
@@ -131,6 +133,7 @@ export async function loadCashEntries(
     .range((page - 1) * ENTRY_PAGE_SIZE, page * ENTRY_PAGE_SIZE - 1);
   if (!filters.includeVoided) q = q.is("voided_at", null);
   if (filters.accountId) q = q.eq("account_id", filters.accountId);
+  else if (filters.accountIds) q = q.in("account_id", filters.accountIds as string[]);
   if (filters.tur === "gelir") q = q.eq("kind", "income");
   else if (filters.tur === "gider") q = q.eq("kind", "expense");
   else if (filters.tur === "transfer") q = q.eq("kind", "transfer");

@@ -145,7 +145,7 @@ describe.skipIf(!mod)("recurring_rules + recurring_occurrences (pglite)", () => 
     await db.exec(`reset role`);
     const exps = await q(`select title, category, portal_key, amount::float8 as a from public.expenses where tenant_id = $1 and notes = 'Düzenli ödeme' order by title`, [T]);
     expect(exps.map((e) => e.title)).toEqual(["Kadıköy ofis kirası", "sahibinden.com üyeliği"]);
-    expect(exps.find((e) => e.title.startsWith("sahibinden"))).toMatchObject({ category: "reklam", portal_key: "sahibinden", a: 3200 });
+    expect(exps.find((e) => String(e.title).startsWith("sahibinden"))).toMatchObject({ category: "reklam", portal_key: "sahibinden", a: 3200 });
     const linked = await q(`select count(*)::int as c from public.cash_entries where source_type = 'recurring' and expense_id is not null and created_expense`);
     expect(Number(linked[0]!.c)).toBe(2);
   });

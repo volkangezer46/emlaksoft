@@ -30,6 +30,8 @@ import { FaturalarTab, FATURALAR_SEKME, type FaturalarParams } from "./faturalar
 import { FINANCE_HERO_TEXT, FinanceActions, FinanceTabs, financeTabOf } from "./_tabs/finance-shell";
 import { HareketlerTab } from "./_tabs/hareketler";
 import { KasaBankaTab } from "./_tabs/kasa-banka";
+import { DuzenliTab } from "./_tabs/duzenli";
+import { PendingApprovalsCard } from "./_tabs/pending-card";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
 import { loadAccountsWithBalances, loadCashSummary } from "@/lib/finance/cash/load";
 import { CashOverview } from "./_tabs/cash-overview";
@@ -79,7 +81,7 @@ function tarihKisa(iso: string) {
 export default async function GiderlerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string; hesap?: string; tur?: string; q?: string; sayfa?: string } & FaturalarParams>;
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string; hesap?: string; tur?: string; q?: string; sayfa?: string; durum?: string } & FaturalarParams>;
 }) {
   const { perms, tenantId, userId, role } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
@@ -135,6 +137,19 @@ export default async function GiderlerPage({
             canEdit={canEdit}
             canDelete={canDelete}
             canSalary={canSalary}
+          />
+        ) : sekme === "duzenli" ? (
+          <DuzenliTab
+            supabase={supabase}
+            accounts={cash.accounts}
+            scope="office"
+            today={today}
+            canCreate={canCreate}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            canSalary={canSalary}
+            entriesHref={(id) => `/app/giderler?sekme=hareketler&hesap=${id}`}
+            onlyPending={params.durum === "bekleyen"}
           />
         ) : (
           <KasaBankaTab supabase={supabase} accounts={cash.accounts} today={today} canOffice={canCreate} />
@@ -279,6 +294,11 @@ export default async function GiderlerPage({
       <FinanceTabs cashAvailable={cash.available} active="ozet" />
 
       {cash.available ? <CashOverview accounts={cash.accounts} summary={cashSummary} today={today} /> : null}
+      {cash.available ? (
+        <Suspense fallback={null}>
+          <PendingApprovalsCard supabase={supabase} />
+        </Suspense>
+      ) : null}
 
       <KpiStrip items={kpis} />
 
@@ -443,7 +463,7 @@ export default async function GiderlerPage({
       {/* Bütçe, tekrarlayan giderler ve portal getirisi (gider düşür / gelir artır) */}
       {tenantId ? (
         <Suspense fallback={<SkeletonCard height={360} label="Bütçe ve verimlilik yükleniyor" />}>
-          <FinancePanel tenantId={tenantId} userId={userId} canEdit={canEdit} categories={categories} showEarnings={canSeeAllEarnings(perms)} />
+          <FinancePanel tenantId={tenantId} userId={userId} canEdit={canEdit} categories={categories} showEarnings={canSeeAllEarnings(perms)} convertAccounts={cash.available && canCreate ? quickAccounts.filter((a) => a.scope === "office") : []} />
         </Suspense>
       ) : null}
 
