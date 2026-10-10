@@ -20,7 +20,7 @@ const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
   it("bütçe sabitleri: danışman 5, ofis 6, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 5, office: 6, admin: 6 });
+    expect(NAV_BUDGET).toEqual({ advisor: 5, office: 7, admin: 6 });
   });
 
   it("danışman / takım lideri <= 5 satır", () => {

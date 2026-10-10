@@ -13,7 +13,7 @@ import type { AppRole } from "@/lib/permissions";
  * Bütçeyi `nav-budget-contract.test.ts` korur (gevşetme değil, öğeyi bir merkeze taşı).
  */
 
-export const NAV_BUDGET = { advisor: 5, office: 6, admin: 6 } as const;
+export const NAV_BUDGET = { advisor: 5, office: 7, admin: 6 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 
@@ -234,8 +234,17 @@ const TOOLS_COMMON = [
 
 /* ------------------------------- Rol düzenleri ------------------------------- */
 
+/** Yönetim: havuz ve atama ofisin günlük iş akışının merkezi — kendi menü satırı (kullanıcı kararı 2026-10-11). */
+const HAVUZ_ATAMA: HubDef = {
+  id: "havuz",
+  label: "Havuz ve Atama",
+  icon: "ilanHavuzu",
+  pages: [p("/app/ilan-havuzu", "Bekleyen ilanlar")],
+};
+const ILANLAR_YONETIM: HubDef = { ...ILANLAR, pages: ILANLAR.pages.filter((pg) => pg.href !== "/app/ilan-havuzu") };
+
 const MANAGER: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_PARA, EKIBIM, RAPORLAR],
+  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SATIS_PARA, EKIBIM, RAPORLAR],
   dock: [AYARLAR, ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],
   mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],

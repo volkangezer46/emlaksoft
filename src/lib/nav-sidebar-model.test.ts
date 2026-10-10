@@ -13,9 +13,9 @@ const labels = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs.map(
 const pagesOf = (role: AppRole, hubId: string) => hubNav(accessibleOf(role), { role }).hubs.find((h) => h.id === hubId)?.pages ?? [];
 
 describe("yan menü görünür yüzeyi (hubNav)", () => {
-  it("ofis sahibi / genel müdür / şube müdürü: 6 satır", () => {
+  it("ofis sahibi / genel müdür / şube müdürü: 7 satır (Havuz ve Atama kendi satırı)", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) {
-      expect(labels(role), role).toEqual(["Bugün", "Müşteriler", "İlanlar", "Satış ve Para", "Ekibim", "Raporlar"]);
+      expect(labels(role), role).toEqual(["Bugün", "Müşteriler", "İlanlar", "Havuz ve Atama", "Satış ve Para", "Ekibim", "Raporlar"]);
       // Alt sabit satırlar rolün varsayılan yetkisine göre süzülür (şube müdüründe ayar/abonelik izni yoktur).
       const dock = hubNav(accessibleOf(role), { role }).dock.map((h) => h.label);
       expect(dock, role).toContain("Yardım");
@@ -38,10 +38,10 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(pagesOf("accounting", "para").map((p) => p.label)).toContain("Finans");
   });
 
-  it("bulunabilirlik: Havuz ve Atama İlanlar'da, Finans Satış ve Para'da, TV modu ve Ekip karnesi Ekibim'de", () => {
+  it("bulunabilirlik: Havuz ve Atama kendi satırında, Finans Satış ve Para'da, TV modu ve Ekip karnesi Ekibim'de", () => {
     const o = (id: string) => pagesOf("owner", id);
     expect(o("ilanlar").map((p) => [p.href, p.label])).toEqual(
-      expect.arrayContaining([["/app/ilan-havuzu", "Havuz ve Atama"], ["/app/ilan-kontrol", "İlan Kontrol"], ["/app/portallar", "Portal ilanları"]]),
+      expect.arrayContaining([["/app/ilan-kontrol", "İlan Kontrol"], ["/app/portallar", "Portal ilanları"]]),
     );
     expect(o("satis-para").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/giderler", "Finans"], ["/app/kiralama", "Kiralama"], ["/app/cuzdan", "Kazanç"]]));
     expect(o("ekibim").map((p) => [p.href, p.label])).toEqual(
@@ -84,7 +84,7 @@ describe("etkin merkez çözümü ve tek sekme şeridi", () => {
     expect(resolveActiveHub("/app", owner).hub?.id).toBe("bugun");
     expect(resolveActiveHub("/app/musteriler/abc", owner).hub?.id).toBe("musteriler");
     expect(resolveActiveHub("/app/akilli-listeler", owner).hub?.id).toBe("musteriler");
-    expect(resolveActiveHub("/app/ilan-havuzu", owner).hub?.id).toBe("ilanlar");
+    expect(resolveActiveHub("/app/ilan-havuzu", owner).hub?.id).toBe("havuz");
     expect(resolveActiveHub("/app/portfoyler/42", owner).pageHref).toBe("/app/portfoyler");
     expect(resolveActiveHub("/app/pano-tv", owner)).toMatchObject({ pageHref: "/app/pano-tv" });
     expect(resolveActiveHub("/app/pano-tv", owner).hub?.id).toBe("ekibim");
