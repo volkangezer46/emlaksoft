@@ -47,6 +47,9 @@ export function ScopeEnforcementToggle({ settingKey, enabled, canEdit }: { setti
             sınırlanır. Ofis geneli kapsamdaki yöneticiler etkilenmez; kapsam yalnız daraltır, mevcut rol kuralını genişletmez. Kapatınca
             eski görünüm hemen geri gelir.
           </p>
+          <p className="mt-1 max-w-2xl text-xs text-text-muted">
+            Not: Kapsam veritabanı düzeyinde değil, arayüz ve rapor düzeyinde uygulanır.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold ${enabled ? "text-mint-600" : "text-text-muted"}`}>{enabled ? "Açık" : "Kapalı"}</span>
