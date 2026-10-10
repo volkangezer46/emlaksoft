@@ -1,6 +1,5 @@
 import {
   Activity,
-  BarChart3,
   Building2,
   CreditCard,
   Coins,
@@ -16,7 +15,6 @@ import {
   ShieldCheck,
   Sparkles,
   Sprout,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
@@ -60,9 +58,20 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     id: "genel",
     title: "Genel bakış",
     items: [
-      { href: "/admin", core: true, label: "Kontrol paneli", description: "Canlı metrikler, dikkat kuyruğu, öneriler", icon: LayoutDashboard, modules: ["dashboard"] },
-      { href: "/admin/raporlar", core: true, label: "Raporlar", description: "Platform analizi: gelir, aktivasyon, modül kullanımı", icon: BarChart3, modules: ["reports"] },
-      { href: "/admin/danisman", label: "AI danışmanı", description: "Platform verisinden içgörü ve soru-cevap", icon: Sparkles, modules: ["advisor"] },
+      {
+        // Raporlar ve AI danışmanı ayrı menü satırı değil, Kontrol panelinin sekmesidir (menü bütçesi: admin <= 6).
+        href: "/admin", core: true,
+        label: "Kontrol paneli",
+        description: "Canlı metrikler, dikkat kuyruğu, raporlar ve AI danışmanı",
+        icon: LayoutDashboard,
+        modules: ["dashboard", "reports", "advisor"],
+        match: ["/admin/raporlar", "/admin/danisman"],
+        tabs: [
+          L("/admin", "Kontrol paneli", "Canlı metrikler, dikkat kuyruğu, öneriler", ["dashboard"]),
+          L("/admin/raporlar", "Raporlar", "Platform analizi: gelir, aktivasyon, modül kullanımı", ["reports"]),
+          L("/admin/danisman", "AI danışmanı", "Platform verisinden içgörü ve soru-cevap", ["advisor"]),
+        ],
+      },
     ],
   },
   {
@@ -72,13 +81,18 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/tenants", core: true,
         label: "Ofisler",
-        description: "Ofis envanteri, deneme, risk ve abonelik durumu",
+        description: "Ofis envanteri, deneme, risk, abonelik durumu ve üyeler",
         icon: Building2,
-        modules: ["tenants"],
+        modules: ["tenants", "members"],
+        // Üyeler ayrı menü satırı değil, Ofisler bölümünün sekmesidir (menü bütçesi: admin <= 6).
+        match: ["/admin/members"],
+        tabs: [
+          L("/admin/tenants", "Ofisler", "Ofis envanteri, deneme, risk ve abonelik durumu", ["tenants"]),
+          L("/admin/members", "Üyeler", "Ofis kullanıcıları ve hesap durumu", ["members"]),
+        ],
         badgeKey: "risk",
         palette: [L("/admin/tenants/yeni", "Yeni ofis aç", "Ofis aç ve sahibine erişim ver", ["sales"]), L("/admin/tenants?durum=trial", "Denemedeki ofisler", "Self-servis deneme hunisi", ["tenants"]), L("/admin/tenants?deneme=bitiyor", "Denemesi bitmek üzere olan ofisler", "7 gün içinde biten denemeler", ["tenants"])],
       },
-      { href: "/admin/members", core: true, label: "Üyeler", description: "Ofis kullanıcıları ve hesap durumu", icon: Users, modules: ["members"] },
     ],
   },
   {
@@ -202,7 +216,8 @@ const under = (pathname: string, prefix: string) => pathname === prefix || pathn
 
 /** Öğe aktif mi: kendi yolu ya da `match` önekleri (kök /admin yalnız tam eşleşir). */
 export function isAdminNavActive(pathname: string, item: Pick<AdminNavItem, "href" | "match" | "exclude">): boolean {
-  if (item.href === "/admin") return pathname === "/admin";
+  // Kök /admin yalnız tam eşleşir; ama sekmeleri (Raporlar, AI danışmanı) `match` önekleriyle Kontrol panelini etkin yapar.
+  if (item.href === "/admin") return pathname === "/admin" || (item.match ?? []).some((p) => under(pathname, p));
   if (item.exclude?.some((e) => under(pathname, e))) return false;
   return [pathOf(item.href), ...(item.match ?? [])].some((p) => under(pathname, p));
 }
