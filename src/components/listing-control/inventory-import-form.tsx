@@ -284,6 +284,12 @@ export function InventoryResultCard({ result }: { result: Extract<InventoryImpor
         Portal listesinde {s.total_rows} ilan · {result.applied} kontrol kaydı işlendi · {result.registered} kayıtsız ilan eşleşme kuyruğunda · {result.opened} yeni uyarı
         {result.complete ? "" : " · liste tam olmadığı için kayıp sayılmadı"}
       </p>
+      {result.held > 0 ? (
+        <p role="status" className="mt-3 rounded-[var(--radius-card)] border border-line bg-surface-raised px-3 py-2 text-sm text-text">
+          {result.held} ilan için &quot;portalda görüldü&quot; bilgisi uygulanmadı: bu ilanlarda açık bir kayıp uyarısı var. Danışman kendi
+          yüklediği dosyayla kayıp uyarısını kapatamaz; uyarıya &quot;yönetici onayı bekliyor&quot; adımı düşüldü, yönetici inceleyip kapatır.
+        </p>
+      ) : null}
       <ul className="mt-3 grid gap-2 sm:grid-cols-2">
         <Bucket label="Eşleşen (portalda yayında)" count={s.matched} href={kpiHref("in_portals")} hrefLabel="Yayındaki portföyler" />
         <Bucket label="Kaldırılmış (CRM'de canlı, listede yok/pasif)" count={s.removed} codes={d.removed} href={`${CONTROL_BASE}/anomaliler?tur=portal_missing`} hrefLabel="Kayıp uyarıları" />

@@ -6,8 +6,8 @@
 -- AMAC (konsey #53): danisman kendi ilanlari icin yukledigi dosya/yapistirma ile kacak sinyalini KAPATAMASIN.
 --   * scope='mine' iken csv/paste kaynagi 'assisted' sayilir (3 gozlem, guven 0.70); 'csv' (otoriter, 0.85) yalniz ofis geneli.
 --   * 'assisted' kaynakli 'yok' gozlemi icin 12 saat araligi artik yalniz eklentiye degil tum 'assisted' gozlemlere uygulanir.
---   * scope='mine' + csv/paste + 'present' + ilan acik kayip durumunda (suspect/probable_missing/confirmed_missing): gozlem
---     UYGULANMAZ, portal_missing anomalisine 'escalated' (yonetici onayi bekliyor) adimi dusulur; donusde observations_held.
+--   * scope='mine' + 'present' (csv/paste/extension, tutarli) + ilan acik kayip durumunda (suspect/probable_missing/confirmed_missing)
+--     VEYA acik portal_missing anomalisi varsa (durum unverifiable/paused olsa da): gozlem UYGULANMAZ, portal_missing anomalisine 'escalated' (yonetici onayi bekliyor) adimi dusulur; donusde observations_held.
 --   * "liste tam" (complete=true) icin expected/read sayisi TUM kaynaklarda aranir (read >= expected > 0), aksi halde 'absent' yazilmaz.
 -- Imza, yetki ve RLS degismez (create or replace; security definer + search_path='').
 
@@ -135,18 +135,21 @@ begin
         continue;
       end if;
     end if;
-    -- Danisman dosya/yapistirmasi kendi ilaninda ACIK kacak sinyalini (supheli/olasi/onayli kayip) 'var' ile KAPATAMAZ:
-    -- gozlem uygulanmaz, ilgili anomaliye "yonetici onayi bekliyor" adimi dusulur (yonetici kapatir).
-    if j ->> 'result' = 'present' and p_scope = 'mine' and p_source in ('csv', 'paste') then
+    -- Danisman (scope='mine') kendi ilaninda ACIK kacak sinyalini 'var' gozlemiyle KAPATAMAZ. Tutma kosulu iki kaynaklidir:
+    -- (1) saglik durumu supheli/olasi/onayli kayip, VEYA (2) ilanin acik/ustlenilmis/aciklanmis 'portal_missing' anomalisi var
+    -- (durum unverifiable/paused olsa bile). Kaynak ne olursa olsun (csv/paste/extension) ayni kural: scope='mine' tum
+    -- 'assisted' gozlemler icin tutulur -- eklenti de danismanin kendi tarayicisindan gelir, ilan sahibi kendi kaydinin kaniti olamaz.
+    -- Gozlem uygulanmaz; anomaliye "yonetici onayi bekliyor" adimi dusulur (yonetici kapatir). Ofis geneli (yonetim) etkilenmez.
+    if j ->> 'result' = 'present' and p_scope = 'mine' then
       select h.check_state into v_state from public.portal_listing_health h
        where h.portal_listing_id = v_pl.id and h.tenant_id = v_tenant;
-      if v_state in ('suspect', 'probable_missing', 'confirmed_missing') then
+      v_open_anomaly := null;
+      select a.id into v_open_anomaly from public.listing_anomalies a
+       where a.tenant_id = v_tenant and a.type = 'portal_missing' and a.status in ('open', 'acknowledged', 'explained')
+         and (a.portal_listing_id = v_pl.id or a.property_id = v_pl.property_id)
+       order by a.last_seen_at desc limit 1;
+      if v_state in ('suspect', 'probable_missing', 'confirmed_missing') or v_open_anomaly is not null then
         v_held := v_held + 1;
-        v_open_anomaly := null;
-        select a.id into v_open_anomaly from public.listing_anomalies a
-         where a.tenant_id = v_tenant and a.type = 'portal_missing' and a.status in ('open', 'acknowledged', 'explained')
-           and (a.portal_listing_id = v_pl.id or a.property_id = v_pl.property_id)
-         order by a.last_seen_at desc limit 1;
         if v_open_anomaly is not null and not exists (
              select 1 from public.listing_anomaly_actions x
               where x.anomaly_id = v_open_anomaly and x.tenant_id = v_tenant and x.action = 'escalated'
