@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { NAV_SECTIONS, visibleSections, moreSections } from "@/lib/nav-config";
+import { NAV_SECTIONS, visibleSections, hubNav } from "@/lib/nav-config";
 import { getAppActions, getAppGoItems } from "@/lib/palette-core";
 import { MODULES as PERMISSION_MODULES_SOURCE } from "@/lib/modules/registry";
 import {
@@ -259,7 +259,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     for (const core of ["/app", "/app/musteriler", "/app/portfoyler", "/app/anlasmalar", "/app/gelen-kutusu", "/app/ayarlar"]) {
       expect(shut).toContain(core);
     }
-    const more = allHrefs(moreSections(ALL_MODULES, { role: "owner", closed }));
+    const more = hubNav(ALL_MODULES, { role: "owner", closed }).hubs.flatMap((h) => h.pages.map((p) => p.href)).concat(hubNav(ALL_MODULES, { role: "owner", closed }).tools.map((t) => t.href));
     for (const href of ["/app/kiralama", "/app/projeler", "/app/kampanyalar"]) expect(more).not.toContain(href);
   });
 

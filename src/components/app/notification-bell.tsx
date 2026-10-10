@@ -24,7 +24,7 @@ function Trigger({ unread, shake, onShakeEnd, onOpen, onWarm }: { unread: number
       onFocus={onWarm}
       aria-haspopup="dialog"
       aria-expanded={false}
-      className="focus-ring relative grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+      className="focus-ring relative grid h-11 w-11 place-items-center sm:h-10 sm:w-10 rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
       aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
     >
       <Bell className={`h-4 w-4${shake ? " es-bell-shake" : ""}`} onAnimationEnd={onShakeEnd} />

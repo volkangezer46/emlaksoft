@@ -1,84 +1,86 @@
 import { describe, expect, it } from "vitest";
-import { NAV_SECTIONS, moreSections, visibleSections } from "./nav-config";
-import { NAV_CORE_BY_ROLE, coreHrefsFor, isHiddenInSimple } from "./nav-roles";
+import { ALL_NAV_HREFS, hubNav, PALETTE_ONLY_PAGES } from "./nav-config";
+import { NAV_BUDGET, NAV_BY_ROLE, layoutHrefs, navLayoutFor } from "./nav-roles";
 import { DEFAULT_MATRIX, canAccessModule, type AppModule, type AppRole } from "./permissions";
 
-const ROLES = Object.keys(NAV_CORE_BY_ROLE) as AppRole[];
-const ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
+const ROLES = Object.keys(NAV_BY_ROLE) as AppRole[];
 const accessibleOf = (role: AppRole) =>
   (Object.keys(DEFAULT_MATRIX[role]) as AppModule[]).filter((m) => canAccessModule(role, m));
-const hrefs = (sections: { items: { href: string }[] }[]) => sections.flatMap((s) => s.items.map((i) => i.href));
+const KNOWN = new Set([...ALL_NAV_HREFS, ...PALETTE_ONLY_PAGES.map((p) => p.href)]);
 
-describe("sade görünüm: rol çekirdek eşlemesi", () => {
-  it("çekirdek yolların hepsi menüde tanımlı bir öğedir", () => {
-    const defined = new Set(ITEMS.map((i) => i.href));
-    for (const role of ROLES) for (const h of NAV_CORE_BY_ROLE[role]) expect(defined.has(h), `${role} ${h}`).toBe(true);
+describe("rol bazlı merkez yapısı (nav-roles)", () => {
+  it("merkez sayfalarının hepsi katalogda tanımlı bir sayfadır", () => {
+    for (const role of ROLES) for (const h of layoutHrefs(NAV_BY_ROLE[role])) expect(KNOWN.has(h), `${role} ${h}`).toBe(true);
   });
 
-  it("tier: 'core' tam olarak en az bir rolün çekirdeğindeki öğelerdir", () => {
-    const union = new Set(ROLES.flatMap((r) => [...NAV_CORE_BY_ROLE[r]]));
-    for (const item of ITEMS) expect(item.tier === "core", item.href).toBe(union.has(item.href));
-  });
-
-  it("çekirdek öğe yalnız rolün gerçekten yetkili olduğu modüllerden gelir (yetki matrisi değişmedi)", () => {
+  it("bir rolün menüsünde aynı sayfa iki kez yoktur (merkez, alt sabit, araç)", () => {
     for (const role of ROLES) {
-      const accessible = accessibleOf(role);
-      const shown = visibleSections(accessible, { mode: "simple", role });
-      const full = new Set(hrefs(visibleSections(accessible)));
-      for (const h of hrefs(shown)) expect(full.has(h), `${role} ${h}`).toBe(true);
+      const all = layoutHrefs(NAV_BY_ROLE[role]);
+      expect(new Set(all).size, role).toBe(all.length);
     }
   });
 
-  it("sade + daha fazla = tam görünümden yönetim-gizlileri çıkarılmış hali; hiçbir sayfa kaybolmaz", () => {
+  it("satır sayıları: ofis yönetimi 6, danışman 5, muhasebe 4, çağrı 4; bütçeyi aşmaz", () => {
+    expect(NAV_BY_ROLE.owner.hubs).toHaveLength(6);
+    expect(NAV_BY_ROLE.gm.hubs).toHaveLength(6);
+    expect(NAV_BY_ROLE.branch_manager.hubs).toHaveLength(6);
+    expect(NAV_BY_ROLE.advisor.hubs).toHaveLength(5);
+    expect(NAV_BY_ROLE.team_lead.hubs).toHaveLength(5);
+    expect(NAV_BY_ROLE.accounting.hubs).toHaveLength(4);
+    expect(NAV_BY_ROLE.call_center.hubs).toHaveLength(4);
+    for (const role of ["advisor", "team_lead"] as const) expect(NAV_BY_ROLE[role].hubs.length).toBeLessThanOrEqual(NAV_BUDGET.advisor);
+    for (const role of ROLES) expect(NAV_BY_ROLE[role].hubs.length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
+  });
+
+  it("her satır varsayılan yetkiyle en az bir görünür sayfa içerir (ölü satır yok)", () => {
     for (const role of ROLES) {
-      const accessible = accessibleOf(role);
-      const full = hrefs(visibleSections(accessible));
-      const simple = hrefs(visibleSections(accessible, { mode: "simple", role }));
-      const more = hrefs(moreSections(accessible, { role }));
-      // Sekmeli öğenin tam görünümdeki yolu ilk yetkili sekmedir: sekme yolları da öğeyle birlikte sayılır.
-      const hidden = ITEMS.filter((i) => isHiddenInSimple(role, i.href)).flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? [])]);
-      expect(new Set(simple).size + new Set(more).size).toBe(simple.length + more.length);
-      for (const h of full) expect(simple.includes(h) || more.includes(h) || hidden.includes(h), `${role} ${h}`).toBe(true);
+      const live = new Set(hubNav(accessibleOf(role), { role }).hubs.map((h) => h.id));
+      for (const hub of NAV_BY_ROLE[role].hubs) expect(live.has(hub.id), `${role} ${hub.id}`).toBe(true);
     }
   });
 
-  it("danışman: settings=VIEW yüzünden görünen yönetim sayfaları sade görünümde yok, tam görünümde var", () => {
-    const accessible = accessibleOf("advisor");
-    const adminPages = ["/app/otomasyonlar", "/app/ayarlar/is-akislari", "/app/belgeler", "/app/denetim", "/app/ayarlar"];
-    const full = hrefs(visibleSections(accessible));
-    const simple = [...hrefs(visibleSections(accessible, { mode: "simple", role: "advisor" })), ...hrefs(moreSections(accessible, { role: "advisor" }))];
-    for (const h of adminPages) {
-      if (!full.includes(h)) continue;
-      expect(simple, h).not.toContain(h);
-    }
-  });
-
-  it("ofis sahibi çekirdeği 10 sayfa (İlan Kontrol dahil), muhasebe/sekreter kendi çekirdeğini görür", () => {
-    expect(coreHrefsFor("owner").size).toBe(10);
-    const acc = hrefs(visibleSections(accessibleOf("accounting"), { mode: "simple", role: "accounting" }));
-    expect(acc).toEqual(expect.arrayContaining(["/app/komisyon", "/app/abonelik", "/app/raporlar"]));
-    const cc = hrefs(visibleSections(accessibleOf("call_center"), { mode: "simple", role: "call_center" }));
-    expect(cc).toEqual(expect.arrayContaining(["/app/gelen-kutusu", "/app/musteriler", "/app/randevular", "/app/gorevler"]));
-  });
-
-  // Çekirdek listede olup rolün VARSAYILAN matrisinde modülü bulunmayan öğeler (ofis tenant override'ı
-  // ile yetki verilirse görünür; matris bilinçli değiştirilmedi). Yeni boşluk bu testi kırar.
-  it("çekirdek öğe ile varsayılan yetki arasında boşluk yok", () => {
-    const gaps: string[] = [];
+  it("mobil alt çubuk: en çok 5 yuva, yalnız o rolün merkezleri + Yeni + Menü; Yeni ve Menü birer kez", () => {
     for (const role of ROLES) {
-      const accessible = new Set(accessibleOf(role));
-      for (const item of ITEMS) {
-        if (!NAV_CORE_BY_ROLE[role].includes(item.href)) continue;
-        const mods = [item.module, ...(item.tabs?.map((t) => t.module) ?? [])];
-        if (!mods.some((m) => accessible.has(m))) gaps.push(`${role}:${item.href}`);
-      }
+      const layout = NAV_BY_ROLE[role];
+      expect(layout.mobile.length, role).toBeLessThanOrEqual(5);
+      const hubIds = new Set(layout.hubs.map((h) => h.id));
+      for (const slot of layout.mobile) expect(slot === "new" || slot === "menu" || hubIds.has(slot), `${role} ${slot}`).toBe(true);
+      expect(layout.mobile.filter((s) => s === "new").length).toBeLessThanOrEqual(1);
+      expect(layout.mobile.filter((s) => s === "menu").length).toBeLessThanOrEqual(1);
     }
-    // Muhasebe artık "expenses" VIEW alır (20260826001700): önceki iki boşluk kapandı.
-    expect(gaps.sort()).toEqual([]);
+    expect(NAV_BY_ROLE.owner.mobile).toEqual(["bugun", "musteriler", "new", "ilanlar", "menu"]);
+    expect(NAV_BY_ROLE.advisor.mobile).toEqual(["bugun", "musteriler", "new", "ilanlar", "ben"]);
+    expect(NAV_BY_ROLE.accounting.mobile).toEqual(["bugun", "para", "raporlar", "menu"]);
+    expect(NAV_BY_ROLE.call_center.mobile).toEqual(["bugun", "gelen-kutusu", "musteriler", "new", "menu"]);
   });
 
-  it("tam görünüm (varsayılan) değişmedi", () => {
-    const all = Object.keys(DEFAULT_MATRIX.owner) as AppModule[];
-    expect(hrefs(visibleSections(all))).toEqual(hrefs(visibleSections(all, { mode: "full", role: "owner" })));
+  it("Ayarlar yalnız yönetim rollerinde alt sabittir; Abonelik muhasebede satırdır, diğerlerinde alt sabit", () => {
+    for (const role of ["owner", "gm", "branch_manager"] as const) expect(NAV_BY_ROLE[role].dock.map((h) => h.id)).toEqual(["ayarlar", "abonelik", "yardim"]);
+    for (const role of ["advisor", "team_lead", "call_center"] as const) expect(NAV_BY_ROLE[role].dock.map((h) => h.id)).not.toContain("ayarlar");
+    expect(NAV_BY_ROLE.accounting.hubs.map((h) => h.id)).toContain("abonelik");
+    expect(NAV_BY_ROLE.accounting.dock.map((h) => h.id)).not.toContain("abonelik");
+  });
+
+  it("araçlar menü satırı değildir; Davet et yalnız yönetimde", () => {
+    const tools = NAV_BY_ROLE.owner.tools;
+    expect(tools).toEqual(expect.arrayContaining(["/app/degerleme", "/app/hesaplayici", "/app/asistan", "/app/mahalle-notlari", "/app/yabanci-satis", "/app/ag", "/app/acik-ev", "/app/projeler", "/app/buyume"]));
+    for (const role of ROLES) {
+      const rows = NAV_BY_ROLE[role].hubs.flatMap((h) => h.pages.map((p) => p.href));
+      for (const t of tools) expect(rows, `${role} ${t}`).not.toContain(t);
+    }
+    expect(NAV_BY_ROLE.advisor.tools).not.toContain("/app/buyume");
+  });
+
+  it("bilinmeyen rolde en kısıtlı düzen (salt okunur) kullanılır", () => {
+    expect(navLayoutFor("yok-boyle-rol")).toBe(NAV_BY_ROLE.readonly);
+    expect(navLayoutFor(null)).toBe(NAV_BY_ROLE.readonly);
+  });
+
+  it("katalogdaki hiçbir sayfa hiçbir rolün menüsünde kaybolmaz: roller birleşimi tüm sayfaları kapsar (eski yollar ve ek yollar hariç)", () => {
+    const union = new Set(ROLES.flatMap((r) => layoutHrefs(NAV_BY_ROLE[r])));
+    // Eski (yönlendirmeli) yollar ve sekme çizilmeyen ek yollar sayfa değil, takma addır.
+    const aliasLike = new Set(["/app/yatirim", "/app/arama", "/app/eslestirme", "/app/kayip-kacak"]);
+    const missing = ALL_NAV_HREFS.filter((h) => !union.has(h) && !aliasLike.has(h));
+    expect(missing).toEqual([]);
   });
 });
