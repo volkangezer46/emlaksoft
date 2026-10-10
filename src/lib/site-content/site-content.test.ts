@@ -188,7 +188,7 @@ describe("EmlakFiyati değerleme bölümü", () => {
     expect(out).toMatch(/Ofisini ücretsiz kur/);
     expect(out).toContain('href="/kayit"');
     expect(out).not.toContain("Hemen deneyin");
-    expect(out).toContain("ÖRNEK");
+    expect(out).not.toContain("ÖRNEK"); // public yüzeyde "örnek" damgası görünmez (2026-10-10)
   });
 
   it("canlıyken 'Hemen deneyin' + kayıt CTA'sı; 'Yakında' rozeti yok", () => {

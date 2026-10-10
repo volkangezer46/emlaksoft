@@ -122,8 +122,8 @@ describe("liste sayfaları sözleşmesi", () => {
     for (const f of LIST_PAGES) expect(readFileSync(f, "utf8"), f).not.toContain("bg-[image:var(--grad-ink)]");
   });
 
-  it("list-page.css globals'tan yüklenir; ham renk yok", () => {
-    expect(readFileSync("src/app/globals.css", "utf8")).toContain('@import "./list-page.css"');
+  it("list-page.css console-base.css (konsol paketi)'ten yüklenir; ham renk yok", () => {
+    expect(readFileSync("src/app/console-base.css", "utf8")).toContain('@import "./list-page.css"');
     expect(readFileSync("src/app/list-page.css", "utf8").replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
   });
 

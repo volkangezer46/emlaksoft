@@ -2,7 +2,6 @@ import { renderMenuIcon } from "@/lib/site-menu/icon-node";
 import { PREVIEW_LABELS, previewForHref, sectionIconName } from "@/lib/site-menu/previews";
 import type { PublicSiteMenu } from "@/lib/site-menu/public";
 import type { FeaturedPreviewKind } from "@/lib/site-menu/schema";
-import { FeaturedPreview } from "./featured-preview";
 import type { ClientGroup, ClientPreview } from "./mega-menu";
 
 /**
@@ -12,7 +11,8 @@ import type { ClientGroup, ClientPreview } from "./mega-menu";
  *
  * Canlı önizleme: her bağlantının hedefinden önizleme türü türetilir (`previewForHref`); öne çıkan kartın admin'de seçilen
  * önizlemesi VARSAYILAN katmandır (seçilmemişse ilk eşleşen bağlantınınki). Medya yüklenmişse medya önceliklidir ve
- * canlı katman çizilmez. Yalnız bu panelde kullanılan türler çizilir.
+ * canlı katman çizilmez. Yalnız bu panelde kullanılan türler listelenir. SAHNE SVG'leri ilk HTML'e GİRMEZ (ana sayfa DOM/RSC
+ * bütçesi): istemci ilk fare/odak/açılışta `featured-preview` parçasını tembel yükleyip çizer; bağlantılar HTML'de kalır.
  */
 export function toClientGroups(menu: PublicSiteMenu, assetBase?: (id: string) => string): ClientGroup[] {
   return menu.groups.map((g) => {
@@ -36,7 +36,7 @@ export function toClientGroups(menu: PublicSiteMenu, assetBase?: (id: string) =>
         const kinds = [def, ...[...labels.keys()].filter((k) => k !== def)];
         previews = kinds.map((kind) => ({
           kind,
-          node: <FeaturedPreview kind={kind} label={kind === def && f.preview ? PREVIEW_LABELS[kind] : (labels.get(kind) ?? PREVIEW_LABELS[kind])} />,
+          label: kind === def && f.preview ? PREVIEW_LABELS[kind] : (labels.get(kind) ?? PREVIEW_LABELS[kind]),
         }));
       }
     }

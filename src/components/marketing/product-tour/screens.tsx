@@ -126,7 +126,7 @@ export function PortfolioScreen() {
               <text x="55" y="35" textAnchor="middle" fontSize="11" fontWeight="800" fill={TONES[tone].fg}>{st}</text>
             </g>
             <text x="16" y="146" fontSize="14" fontWeight="800" fill={C.ink}>{t}</text>
-            <text x="16" y="166" fontSize="12.5" fill={C.mute}>{loc} · örnek ilan</text>
+            <text x="16" y="166" fontSize="12.5" fill={C.mute}>{loc}</text>
             <text x="16" y="188" fontSize="13" fontWeight="800" fill={C.blue}>{["₺ 38.000 / ay", "₺ 12.400.000", "₺ 3.850.000", "₺ 2.100.000", "₺ 65.000 / ay", "₺ 24.000 / ay"][i]}</text>
           </g>
         );

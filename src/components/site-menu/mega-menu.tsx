@@ -1,10 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronDown, ExternalLink, Menu, X } from "lucide-react";
 import { FeaturedMedia } from "./featured-media";
 import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
+import type { FeaturedPreviewKind } from "@/lib/site-menu/schema";
+
+/** Önizleme sahneleri (SVG) tembel parça: ilk HTML'de ve ilk JS'te yoktur; menüye ilk yaklaşmada yüklenir. */
+const FeaturedPreview = lazy(() => import("./featured-preview").then((m) => ({ default: m.FeaturedPreview })));
 
 /**
  * Herkese açık üst bar + MEGA MENÜ (istemci). İçerik admin'den (/admin/site-menu) gelir; varsayılan içerik
@@ -26,7 +30,7 @@ import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/pu
 export type ClientItem = Omit<PublicItem, "icon"> & { iconNode: ReactNode; /** Canlı önizleme türü (client-groups). */ pv?: string | null };
 export type ClientFeatured = Omit<PublicFeatured, "icon"> & { iconNode: ReactNode };
 /** Sunucuda çizilmiş önizleme katmanı; dizideki ilk öğe varsayılandır. */
-export type ClientPreview = { kind: string; node: ReactNode };
+export type ClientPreview = { kind: FeaturedPreviewKind; label?: string };
 export type ClientGroup = Omit<PublicGroup, "columns" | "featured"> & {
   columns: Array<{ title: string; iconNode?: ReactNode; items: ClientItem[] }>;
   featured: ClientFeatured | null;
@@ -66,7 +70,7 @@ function NavAnchor({ href, external, onClick, className, style, children }: { hr
   );
 }
 
-function Featured({ f, onClick, active, index, withMedia, previews, pv }: { f: ClientFeatured; onClick: () => void; active: boolean; index: number; withMedia: boolean; previews?: ClientPreview[]; pv?: string | null }) {
+function Featured({ f, onClick, active, index, withMedia, previews, pv, armed }: { f: ClientFeatured; onClick: () => void; active: boolean; index: number; withMedia: boolean; previews?: ClientPreview[]; pv?: string | null; armed?: boolean }) {
   const on = previews?.some((p) => p.kind === pv) ? pv : previews?.[0]?.kind;
   return (
     <NavAnchor href={f.href} external={f.external} onClick={onClick} className="mk-mega-feat" style={{ "--i": index } as CSSProperties}>
@@ -77,7 +81,11 @@ function Featured({ f, onClick, active, index, withMedia, previews, pv }: { f: C
           <span className="mk-prev-stack" aria-hidden="true">
             {previews.map((p) => (
               <span key={p.kind} className="mk-prev-layer" data-on={p.kind === on}>
-                {p.node}
+                {armed ? (
+                  <Suspense fallback={null}>
+                    <FeaturedPreview kind={p.kind} label={p.label} />
+                  </Suspense>
+                ) : null}
               </span>
             ))}
           </span>
@@ -100,6 +108,8 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  // Önizleme sahneleri menüye ilk yaklaşmada (fare/odak/açılış) yüklenir.
+  const [armed, setArmed] = useState(false);
   // Canlı önizleme: üzerine gelinen / odaklanılan bağlantının önizleme türü (grup kimliğiyle; başka panelde geçersiz).
   const [pv, setPv] = useState<{ g: string; k: string } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -245,7 +255,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
           <Link href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa" onClick={close}>
             {logo}
           </Link>
-          <nav aria-label="Ana site navigasyonu" className="mk-nav-links">
+          <nav aria-label="Ana site navigasyonu" className="mk-nav-links" onPointerEnter={() => setArmed(true)} onFocus={() => setArmed(true)}>
             {groups.map((g) => {
               if (g.kind === "link") {
                 return (
@@ -337,7 +347,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                           </div>
                         ))}
                       </div>
-                      {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia previews={g.previews} pv={isOpen && pv?.g === g.id ? pv.k : null} /> : null}
+                      {g.featured ? <Featured f={g.featured} onClick={close} active={isOpen} index={total} withMedia previews={g.previews} armed={armed || isOpen} pv={isOpen && pv?.g === g.id ? pv.k : null} /> : null}
                       <div className="mk-mega-bar">
                         <ul className="mk-mega-trust" aria-label="Deneme koşulları">
                           <li>Kartsız deneme</li>

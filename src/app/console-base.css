@@ -1,0 +1,7 @@
+/* Yalnız /app ve /admin layout'larından yüklenir (public sayfa CSS bütçesi; kök globals.css'ten ayrıldı). */
+@import "./theme-dark.css";
+@import "./themes.css";
+@import "./premium.css";
+@import "./viz.css";
+@import "./list-page.css";
+@import "./console-kit.css";

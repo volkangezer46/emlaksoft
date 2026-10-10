@@ -26,7 +26,7 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
         <div className="mk-foot-grid" style={{ "--mk-foot-cols": Math.min(Math.max(columns.length, 1), 5) } as React.CSSProperties}>
           <div className="mk-foot-brand">
             <Link href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
-              <Brand variant="horizontal" tone="dark" height={36} alt="" />
+              <Brand variant="horizontal" tone="dark" height={36} alt="" lazy />
             </Link>
             <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
               Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.

@@ -87,8 +87,8 @@ describe("grafik derinlik token'ları", () => {
     }
   });
 
-  it("viz.css globals.css'ten yüklenir ve token kullanır (ham renk yok)", () => {
-    expect(read("src/app/globals.css")).toContain('@import "./viz.css"');
+  it("viz.css console-base.css (konsol paketi)'nden yüklenir ve token kullanır (ham renk yok)", () => {
+    expect(read("src/app/console-base.css")).toContain('@import "./viz.css"');
     const viz = strip(read("src/app/viz.css"));
     expect(viz).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
     for (const t of ["--viz-sheen", "--viz-shade", "--viz-shadow", "--viz-glow"]) expect(viz).toContain(t);

@@ -199,7 +199,6 @@ export function FeaturedPreview({ kind, label }: { kind: FeaturedPreviewKind; la
   return (
     <span className="mk-prev" data-kind={kind} aria-hidden="true">
       <Scene kind={kind} />
-      <em className="mk-prev-tag">Örnek veri</em>
       {label ? <span className="mk-prev-cap">{label}</span> : null}
     </span>
   );

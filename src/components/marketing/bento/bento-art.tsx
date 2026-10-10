@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import Image from "next/image";
 import { Check, Clock, FileSignature, Sparkles, Trophy } from "lucide-react";
 
 /* Bento kartlarının illüstrasyonları. Sunucu bileşenleri; tüm içerik ÖRNEKTİR (sayı/isim uydurma yok). */
@@ -102,12 +101,23 @@ export function SignatureArt() {
 export function ShowcaseArt() {
   return (
     <div className="mk-showcase">
-      <Image src="/listing-bosphorus-villa.webp" alt="" fill sizes="(min-width: 1024px) 380px, 90vw" className="mk-showcase-img" />
+      {/* Dekoratif, ekran altı görsel: next/image istemci kodu (≈9 KB gz) yerine hazır iki boyutlu düz <img> (480/800 px, q72). */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/listing-bosphorus-villa-800.webp"
+        srcSet="/listing-bosphorus-villa-480.webp 480w, /listing-bosphorus-villa-800.webp 800w"
+        sizes="(min-width: 1024px) 380px, 90vw"
+        width={800}
+        height={533}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="mk-showcase-img"
+      />
       <div className="mk-showcase-card mk-a-rise" aria-hidden="true">
         <b>Ofis vitrini</b>
         <small>Portföyleriniz kendi adresinizde</small>
       </div>
-      <span className="mk-tag mk-example mk-showcase-tag">Dekoratif örnek görsel</span>
     </div>
   );
 }

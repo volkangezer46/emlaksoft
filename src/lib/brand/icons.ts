@@ -6,9 +6,9 @@ export function brandIcons(meta: BrandMeta): NonNullable<Metadata["icons"]> {
   const fav = meta.slots.favicon;
   if (!fav) {
     return {
+      // Yalnız gerekli bağlantılar (istek bütçesi): SVG (modern tarayıcı) + ICO (eski tarayıcı/bot) + Apple; 32 px PNG kaldırıldı.
       icon: [
         { url: DEFAULT_BRAND_ASSETS.favicon, type: "image/svg+xml" },
-        { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
         { url: DEFAULT_BRAND_ASSETS.faviconIco, sizes: "48x48" },
       ],
       shortcut: DEFAULT_BRAND_ASSETS.faviconIco,

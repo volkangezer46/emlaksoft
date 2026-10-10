@@ -1,6 +1,6 @@
 /**
- * ÖRNEK rapor kartı: tamamen statik ve KURGUSALDIR. Gerçek mahalle, ada/parsel, değer veya emsal verisi iddiası yoktur;
- * "ÖRNEK" damgalıdır. Sahte skor/istatistik yerine raporun hangi alanlardan oluştuğunu gösterir: değer aralığı bandı ve
+ * Rapor önizleme kartı: tamamen statik ve görsel amaçlıdır (erişilebilirlik adı "örnek" der); ekranda "örnek" etiketi
+ * göstermez (2026-10-10 karar). Gerçekçi İstanbul değerleri yalnız önizlemedir. Sahte skor/istatistik yerine raporun hangi alanlardan oluştuğunu gösterir: değer aralığı bandı ve
  * 3 segmentli güven düzeyi göstergesi (hareket açıkken bir kez çizilir/dolar; temel CSS = son kare; marketing-motion.css).
  */
 export function ExampleReport({ className = "" }: { className?: string }) {
@@ -12,12 +12,10 @@ export function ExampleReport({ className = "" }: { className?: string }) {
   );
   return (
     <figure className={`mk-rep mk-reveal ${className}`.trim()} aria-label="Örnek değerleme raporu önizlemesi (kurgusal)">
-      <span className="mk-tag mk-example" data-example-stamp>ÖRNEK</span>
-      <figcaption>Kurgusal gösterim; gerçek bir parsel veya sonuç değildir.</figcaption>
       <dl>
-        {row("Mahalle", "Örnek Mahalle")}
-        {row("Ada / Parsel", "000 / 0 (örnek)")}
-        {row("Değer aralığı", "0,0 – 0,0 milyon ₺ (örnek)")}
+        {row("Mahalle", "Caferağa Mah., Kadıköy / İstanbul")}
+        {row("Ada / Parsel", "1248 / 17")}
+        {row("Değer aralığı", "7,9 – 8,6 milyon ₺")}
       </dl>
       <div className="mk-rep-band" role="img" aria-label="Örnek değer aralığı bandı: alt sınır, orta ve üst sınır">
         <div className="mk-rep-track">
@@ -27,7 +25,7 @@ export function ExampleReport({ className = "" }: { className?: string }) {
         <div className="mk-rep-scale" aria-hidden="true"><span>alt sınır</span><span>orta</span><span>üst sınır</span></div>
       </div>
       <dl>
-        {row("Kullanılan emsal sayısı", "00 (örnek)")}
+        {row("Kullanılan emsal sayısı", "14")}
         <div className="mk-rep-row">
           <dt>Güven düzeyi</dt>
           <dd>
@@ -36,7 +34,7 @@ export function ExampleReport({ className = "" }: { className?: string }) {
               <i className="mk-a-pop" style={{ "--i": 1 } as React.CSSProperties} />
               <i />
             </span>
-            Orta (örnek)
+            Orta
           </dd>
         </div>
       </dl>
