@@ -241,6 +241,8 @@ const F = {
   listingAnalyses: "20261008001800_listing_analyses.sql",
   // e-Fatura (2026-10-10, Paket D): einvoice_connections (sifreli kimlik, sutun bazli SELECT) + einvoices + 2 DEFINER RPC; kod tablo yokken bolumu "etkin degil" der.
   einvoice: "20261010000700_einvoice.sql",
+  // Finans Paket B (2026-10-10): recurring_rules + recurring_occurrences (duzenli odeme/gelir, idempotent uretim) + recurring_* RPC; kira-tahakkuk cron adimi recurring_run_due'yu cagirir (kod sema yokken adimi atlar).
+  recurringRules: "20261010000900_recurring_rules.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
@@ -389,6 +391,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financeAccountsCashEntries]: "ek", // yeni finance_accounts/cash_entries tablolari (RLS: kisisel hesap yalniz sahibine) + 12 finance_* RPC; mevcut tablo/davranis degismez, kod tablolar yokken eski Giderler akisina duser
     [F.buildingManagement]: "davranis", // yeni bina/daire/tahakkuk/tahsilat tablolari + 5 DEFINER RPC + KPI RPC; owner_charge_links kind CHECK'i 'unit_charge' ile genisler, silme politikasi daralir (mahsup elle silinemez)
     [F.platformDashboardRollups]: "ek", // yeni salt-okunur service_role RPC platform_dashboard_rollups (tablo/politika/veri degismez; RPC yokken ilgili paneller "okunamadi" gosterir, uydurma sifir yok)
+    [F.recurringRules]: "ek", // yeni recurring_rules/recurring_occurrences tablolari (RLS: kisisel kural yalniz sahibine, maas kurali yalniz owner/gm) + recurring_* RPC; mevcut tablo/davranis degismez (kurala cevir yalniz expenses.recurrence'i bosaltir, kullanici eylemiyle)
     [F.einvoice]: "ek", // yeni einvoice_connections + einvoices tablolari (RLS ofis kapsamli, yazma commissions.create/settings.edit) + 2 DEFINER RPC; mevcut tablo/politika degismez
     [F.listingAnalyses]: "ek", // yeni listing_analyses tablosu (RLS: okuma ofis, yazma valuation.create); mevcut tablo/politika degismez
     [F.vitrinChatClosedListing]: "davranis", // vitrin_chat_context govdesi yeniden tanimi: kapali portfoy artik sohbet baglamina GIRMEZ (govde+ACL baska degismez)
@@ -538,6 +541,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB60-sureli-kontor", order: 29.9999868, title: "Sureli kontor: ef_credit_lots (parti) + FIFO harcama + yanma RPC'si + eski bakiyeler 12 aylik partiye; 20261008001000 (tarife/katalog seed) ONCE; kod sema yokken paket satisini kapali tutar", files: [F.efCreditLots] },
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
     { id: "PB57-tapu-sureci", order: 29.999862, title: "Tapu sureci adim takibi: deal_process_steps tablosu (kod tablo yokken bolumu etkin degil der; sira serbest)", files: [F.dealProcessSteps] },
+    { id: "FIN-B-duzenli-odemeler", order: 29.9998685, title: "Finans: duzenli odemeler/gelirler (recurring_rules + donem basina tek uretim; kira-tahakkuk cron adimi; 000600'den SONRA; kod sema yokken sekmeyi gizler)", files: [F.recurringRules] },
     { id: "PB60-e-fatura", order: 29.9998671, title: "e-Fatura entegrasyonu: baglanti (sifreli kimlik) + fatura tablolari (kod tablo yokken bolumu etkin degil der; sira serbest, ek)", files: [F.einvoice] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
     { id: "PB58-vitrin-sohbet-kapali", order: 29.999866, title: "vitrin_chat_context: kapali portfoy sizintisi duzeltmesi (000330 govdesi + suzgec; sira serbest)", files: [F.vitrinChatClosedListing] },
