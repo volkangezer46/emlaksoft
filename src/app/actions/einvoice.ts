@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { platformSecretsEnabled } from "@/lib/platform-secrets";
 import {
   credentialFingerprint,
@@ -52,6 +53,19 @@ function adapterMessage(e: { message: string }): string {
 
 function nowIso(): string {
   return new Date(now()).toISOString();
+}
+
+const BUSY = "İşlem sürüyor, birazdan Durumu yenile ile bakın.";
+const RATE_MSG = "Çok sık deneme yapıldı. Birkaç saniye bekleyip yeniden deneyin.";
+
+type RpcErr = { code?: string; message?: string };
+
+/** RPC hatasını Türkçe mesaja çevirir (tablo/RPC yok, kilit, izin). */
+function rpcFailure(error: RpcErr, fallback: string): string {
+  if (error.code === "PGRST202" || isMissingEInvoiceTable(error)) return NOT_READY;
+  if (error.code === "55P03") return BUSY;
+  if (error.code === "42501") return "Bu işlem için yetkiniz yok.";
+  return actionErrorMessage(error, fallback);
 }
 
 function refresh(): void {
@@ -191,6 +205,8 @@ export async function lookupInvoiceBuyer(taxId: string): Promise<BuyerLookupResu
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
   const id = String(taxId ?? "").trim();
+  const rlLookup = await checkRateLimit(`einvoice-lookup:${gate.tenantId}`, { limit: 60, windowSec: 60, failurePolicy: "deny" });
+  if (!rlLookup.allowed) return { error: RATE_MSG };
   if (!/^\d{10,11}$/.test(id)) return { error: "Vergi kimlik no (10 hane) ya da TC kimlik no (11 hane) girin." };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
@@ -226,6 +242,8 @@ function parseLines(raw: string): EInvoiceLine[] | null {
 export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: FormData): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
   if (!gate.ok) return { error: gate.error };
+  const rlDraft = await checkRateLimit(`einvoice-draft:${gate.tenantId}`, { limit: 30, windowSec: 60, failurePolicy: "deny" });
+  if (!rlDraft.allowed) return { error: RATE_MSG };
 
   const sourceTypeRaw = text(formData, "source_type", 30);
   if (!(EINVOICE_SOURCE_TYPES as readonly string[]).includes(sourceTypeRaw)) return { error: "Fatura kaynağı geçerli değil." };
@@ -281,7 +299,6 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
   const key = existing ? existing.idempotency_key : idempotencyKey(sourceType, sourceId, crypto.randomUUID());
 
   const payload = {
-    tenant_id: gate.tenantId,
     connection_id: connection.id,
     provider: connection.provider,
     mode: connection.mode,
@@ -302,33 +319,19 @@ export async function saveInvoiceDraft(_prev: EInvoiceActionResult, formData: Fo
     gross_total: totals.gross,
     issue_date: issueDate,
     note,
-    error: null,
-    // Taslak değişti: sağlayıcıdaki eski taslak geçersiz (yeniden oluşturulur).
-    provider_ref: {},
     idempotency_key: key,
   };
 
-  if (existing) {
-    const { error } = await supabase.from("einvoices").update(payload).eq("id", existing.id).eq("status", "draft");
-    if (error) {
-      return { error: actionErrorMessage(error, "Taslak kaydedilemedi.") };
-    }
-    refresh();
-    return { ok: true, id: existing.id, message: "Taslak güncellendi." };
-  }
-
-  const { data, error } = await supabase
-    .from("einvoices")
-    .insert({ ...payload, created_by: gate.userId })
-    .select("id")
-    .single();
+  // Yazma yalnız DEFINER RPC (durum makinesi + kilit + audit): taslak değişince sağlayıcı kimliği sıfırlanır.
+  const { data, error } = await supabase.rpc("einvoice_save_draft", { p_id: existing ? existing.id : null, p: payload });
   if (error) {
-    if (isMissingEInvoiceTable(error)) return { error: NOT_READY };
     if (error.code === "23505") return { error: "Bu kaynak için zaten bir fatura var. Faturalar sekmesinden açın." };
-    return { error: actionErrorMessage(error, "Taslak kaydedilemedi.") };
+    return { error: rpcFailure(error, "Taslak kaydedilemedi.") };
   }
+  const savedId = typeof data === "string" ? data : (existing?.id ?? "");
   refresh();
-  return { ok: true, id: (data as { id: string }).id, message: "Taslak kaydedildi. Kontrol edip resmileştirebilirsiniz." };
+  if (existing) return { ok: true, id: savedId, message: "Taslak güncellendi." };
+  return { ok: true, id: savedId, message: "Taslak kaydedildi. Kontrol edip resmileştirebilirsiniz." };
 }
 
 export async function deleteInvoiceDraft(id: string): Promise<EInvoiceActionResult> {
@@ -336,10 +339,9 @@ export async function deleteInvoiceDraft(id: string): Promise<EInvoiceActionResu
   if (!gate.ok) return { error: gate.error };
   if (!UUID_RE.test(id)) return { error: "Taslak bulunamadı." };
   const supabase = await createClient();
-  const { error } = await supabase.from("einvoices").delete().eq("id", id).eq("tenant_id", gate.tenantId).eq("status", "draft");
-  if (error) {
-    return { error: actionErrorMessage(error, "Taslak silinemedi.") };
-  }
+  const { data, error } = await supabase.rpc("einvoice_delete_draft", { p_id: id });
+  if (error) return { error: rpcFailure(error, "Taslak silinemedi.") };
+  if (data !== true) return { error: "Yalnız sağlayıcıya hiç gönderilmemiş taslak silinebilir." };
   refresh();
   return { ok: true, message: "Taslak silindi." };
 }
@@ -361,21 +363,36 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
   if (!UUID_RE.test(id)) return { error: "Fatura bulunamadı." };
   if (confirmed !== true) return { error: "Resmileştirmek için onay gerekli." };
 
-  const row = await loadRow(id, gate.tenantId);
-  if (!row) return { error: "Fatura bulunamadı." };
-  if (row.status !== "draft") return { error: "Yalnız taslak fatura resmileştirilebilir." };
-
   const supabase = await createClient();
+
+  // 0) ATOMİK TALEP: sağlayıcı çağrısından ÖNCE. Satır dönmezse taslak değil ya da başka bir istek sürdürmektedir.
+  const claim = await supabase.rpc("einvoice_claim_issue", { p_id: id });
+  if (claim.error) return { error: rpcFailure(claim.error, "Resmileştirme başlatılamadı.") };
+  const claimed = (Array.isArray(claim.data) ? claim.data[0] : claim.data) as EInvoiceRow | null | undefined;
+  if (!claimed) {
+    const existing = await loadRow(id, gate.tenantId);
+    if (!existing) return { error: "Fatura bulunamadı." };
+    if (existing.status !== "draft") return { error: "Yalnız taslak fatura resmileştirilebilir." };
+    return { error: BUSY };
+  }
+  const row = claimed;
+
+  const release = async (message: string) => {
+    const { error: e } = await supabase.rpc("einvoice_record_progress", { p_id: row.id, p_error: message.slice(0, 500), p_release: true });
+    if (e) console.error("issueInvoice release", e.code);
+  };
+
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
-  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
+  if (!loaded.ok) {
+    await release(adapterMessage(loaded.error));
+    return { error: adapterMessage(loaded.error) };
+  }
   const { adapter, connection } = loaded.value;
   if (connection.provider !== row.provider) {
-    return { error: "Bağlantı sağlayıcısı değişmiş. Taslağı yeniden kaydedin." };
+    const msg = "Bağlantı sağlayıcısı değişmiş. Taslağı yeniden kaydedin.";
+    await release(msg);
+    return { error: msg };
   }
-
-  const recordError = async (message: string) => {
-    await supabase.from("einvoices").update({ error: message.slice(0, 500) }).eq("id", row.id).eq("status", "draft");
-  };
 
   // 1) Sağlayıcıda taslak (daha önce oluşturulduysa atlanır; aynı UUID ile güvenli yeniden deneme)
   let ref = rowToRef(row);
@@ -383,34 +400,28 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
   if (!ref) {
     const created = await adapter.createDraft(rowToDraft(row));
     if (!created.ok) {
-      await recordError(adapterMessage(created.error));
+      await release(adapterMessage(created.error));
       return { error: adapterMessage(created.error) };
     }
     ref = created.value.ref;
     number = created.value.number ?? number;
-    await supabase.from("einvoices").update({ provider_ref: ref, number }).eq("id", row.id).eq("status", "draft");
+    const saved = await supabase.rpc("einvoice_record_progress", { p_id: row.id, p_ref: ref, p_number: number });
+    if (saved.error || saved.data !== true) {
+      console.error("issueInvoice provider_ref", saved.error?.code);
+      await release("Sağlayıcı kimliği kaydedilemedi, birazdan yeniden deneyin.");
+      return { error: "Sağlayıcıda taslak oluştu ancak kayıt güncellenemedi. Birazdan yeniden deneyin." };
+    }
   }
   // 2) Resmileştir
   const issued = await adapter.issue(ref);
   if (!issued.ok) {
-    await recordError(adapterMessage(issued.error));
+    await release(adapterMessage(issued.error));
     return { error: adapterMessage(issued.error) };
   }
-  const { error } = await supabase
-    .from("einvoices")
-    .update({
-      status: "issued",
-      provider_state: "waiting",
-      provider_ref: issued.value.ref,
-      number: issued.value.number ?? number,
-      error: null,
-      issued_at: nowIso(),
-    })
-    .eq("id", row.id)
-    .eq("status", "draft");
-  if (error) {
-    console.error("issueInvoice update", error.code);
-    return { error: "Fatura sağlayıcıya gönderildi ancak kayıt güncellenemedi. Sayfayı yenileyip durumu sorgulayın." };
+  const marked = await supabase.rpc("einvoice_mark_issued", { p_id: row.id, p_ref: issued.value.ref, p_number: issued.value.number ?? number });
+  if (marked.error || marked.data !== true) {
+    console.error("issueInvoice mark_issued", marked.error?.code);
+    return { error: "Fatura sağlayıcıya gönderildi ancak kayıt güncellenemedi. Sayfayı yenileyip Durumu yenile ile sorgulayın." };
   }
   await logActivity({
     tenantId: gate.tenantId,
@@ -421,7 +432,7 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
     newValue: { provider: row.provider, mode: row.mode, doc_type: row.doc_type, gross_total: Number(row.gross_total), source_type: row.source_type },
   });
   refresh();
-  return { ok: true, id: row.id, message: "Fatura resmileştirme için sağlayıcıya gönderildi. Sonuç birkaç dakika içinde görünür." };
+  return { ok: true, id: row.id, message: "Fatura resmileştirme için sağlayıcıya gönderildi. Sonucu Durumu yenile ile sorgulayın." };
 }
 
 /** Tek faturanın durumunu sağlayıcıdan sorar. */
@@ -433,6 +444,7 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
   if (!row) return { error: "Fatura bulunamadı." };
   const ref = rowToRef(row);
   if (row.status === "draft" || !ref) return { error: "Bu fatura henüz resmileştirilmedi." };
+  if (row.status !== "issued") return { error: "Bu fatura için durum sorgulanamaz. Hatalıysa Taslağa çevirip yeniden deneyin." };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, gate.tenantId);
   if (!loaded.ok) return { error: adapterMessage(loaded.error) };
@@ -443,10 +455,15 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
     { status: row.status, provider_state: row.provider_state, number: row.number, error: row.error },
     res.value,
   );
-  await supabase
-    .from("einvoices")
-    .update({ ...patch, last_checked_at: nowIso() })
-    .eq("id", row.id);
+  const saved = await supabase.rpc("einvoice_record_status", {
+    p_id: row.id,
+    p_status: patch.status,
+    p_provider_state: patch.provider_state,
+    p_number: patch.number,
+    p_error: patch.error,
+    p_ref: patch.provider_ref,
+  });
+  if (saved.error) return { error: rpcFailure(saved.error, "Durum kaydedilemedi.") };
   refresh();
   return { ok: true, message: "Durum güncellendi." };
 }
@@ -457,22 +474,9 @@ export async function reopenInvoice(id: string): Promise<EInvoiceActionResult> {
   if (!gate.ok) return { error: gate.error };
   if (!UUID_RE.test(id)) return { error: "Fatura bulunamadı." };
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("einvoices")
-    .update({
-      status: "draft",
-      provider_state: "none",
-      provider_ref: {},
-      external_id: crypto.randomUUID(),
-      error: null,
-      issued_at: null,
-    })
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId)
-    .eq("status", "error")
-    .select("id")
-    .maybeSingle();
-  if (error || !data) return { error: "Fatura taslağa çevrilemedi." };
+  const { data, error } = await supabase.rpc("einvoice_reopen", { p_id: id });
+  if (error) return { error: rpcFailure(error, "Fatura taslağa çevrilemedi.") };
+  if (data !== true) return { error: "Fatura taslağa çevrilemedi." };
   refresh();
   return { ok: true, id, message: "Taslağa çevrildi. Düzeltip yeniden resmileştirebilirsiniz." };
 }
@@ -497,7 +501,11 @@ export async function cancelInvoice(id: string, reason: string): Promise<EInvoic
   }
   const res = await adapter.cancel(ref, cleanReason);
   if (!res.ok) return { error: adapterMessage(res.error) };
-  await supabase.from("einvoices").update({ status: "cancelled", error: null }).eq("id", row.id);
+  const marked = await supabase.rpc("einvoice_mark_cancelled", { p_id: row.id, p_reason: cleanReason });
+  if (marked.error || marked.data !== true) {
+    console.error("cancelInvoice mark_cancelled", marked.error?.code);
+    return { error: "İptal sağlayıcıda yapıldı ancak kayıt güncellenemedi. Durumu yenile ile sorgulayın." };
+  }
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
