@@ -25,6 +25,7 @@
  * döner. Ofis komisyonu (brüt) yalnız `earnings_all` ile hesaplanır.
  * KAPSAM: ofis geneli rol (`hasOfficeWideDataScope`) tüm ekibi, diğerleri yalnız kendini görür.
  */
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TR_OFFSET_MS, trParts } from "@/lib/clock";
 import { loadSampleKpiScope, type SampleKpiScope } from "@/lib/sample-scope";
@@ -217,7 +218,22 @@ type Builder = {
  * yalnız kendi anlaşmasına (deal.assigned_to) ait satırlar ve `splits` içinde kendi `profile_id`si
  * bulunan satırlar. En yeni önce; tavan aşılırsa `partial`.
  */
-export async function fetchCommissionRows<T extends ShareRow & { created_at: string; id?: string }>(
+export function fetchCommissionRows<T extends ShareRow & { created_at: string; id?: string }>(
+  supabase: SupabaseClient,
+  opts: CommissionFetchOptions,
+): Promise<{ rows: T[]; error: boolean; partial: boolean }> {
+  // İstek kapsamlı tekilleştirme: aynı sayfada (Performansım: Komisyonum + Danışman 360) aynı tenant/kullanıcı/kapsam/aralık için
+  // ikinci kez veritabanına gidilmez. Anahtar yalnız ilkel alanlar; `sample` (işlev taşır) ya da özel kolon varsa atlanır.
+  if (opts.sample || opts.dealSelect || opts.extraColumns) return fetchCommissionRowsRaw<T>(supabase, opts);
+  const key = [opts.tenantId ?? "-", opts.viewerId, opts.seeAll ? 1 : 0, opts.startIso ?? "", opts.endIso ?? "", opts.limit ?? ""].join("|");
+  const slot = commissionSlot(key);
+  slot.p ??= fetchCommissionRowsRaw<T>(supabase, opts);
+  return slot.p as Promise<{ rows: T[]; error: boolean; partial: boolean }>;
+}
+
+const commissionSlot = cache((_key: string): { p: Promise<unknown> | null } => ({ p: null }));
+
+async function fetchCommissionRowsRaw<T extends ShareRow & { created_at: string; id?: string }>(
   supabase: SupabaseClient,
   opts: CommissionFetchOptions,
 ): Promise<{ rows: T[]; error: boolean; partial: boolean }> {

@@ -128,17 +128,26 @@ export async function DemandsView({
     yogunluk?: string;
   }>;
 }) {
-  const { perms, tenantId, userId, role } = await requireModulePage("demands");
-  // Ofis Tanımları Merkezi: bekleyen talep eşiği (ayar yoksa kod varsayılanı 30 gün).
-  const AGING_DAYS = tenantId ? await getSetting<number>("office.alert.demand_aging_days", { tenantId }) : DEFAULT_AGING_DAYS;
-  // Kullanıcı kapsamı (ofis bayrağı açıksa): talep sahipliği müşteri üzerinden (customers.assigned_to), yalnız daraltır.
-  const listScope = await getListScope({ userId, tenantId, role });
+  // Oturum kapısı + URL + sunucu istemcisi birlikte; ardından ayar / liste kapsamı / özel alan / arama okumaları TEK turda
+  // (Anlaşmalar deseni: eskiden art arda 4 tur).
+  const [{ perms, tenantId, userId, role }, sp, supabase] = await Promise.all([requireModulePage("demands"), searchParams, createClient()]);
+  const savedViewsPromise = listSavedViews(PATH);
+  const q = (sp.q ?? "").trim().slice(0, 80);
+  const [AGING_DAYS, listScope, customFilter, search] = await Promise.all([
+    // Ofis Tanımları Merkezi: bekleyen talep eşiği (ayar yoksa kod varsayılanı 30 gün).
+    tenantId ? getSetting<number>("office.alert.demand_aging_days", { tenantId }) : Promise.resolve(DEFAULT_AGING_DAYS),
+    // Kullanıcı kapsamı (ofis bayrağı açıksa): talep sahipliği müşteri üzerinden (customers.assigned_to), yalnız daraltır.
+    getListScope({ userId, tenantId, role }),
+    // Özel alan filtresi (?ozel=anahtar:değer): liste sorgusuna eşleşen kimliklerle iner.
+    resolveCustomFieldFilter(supabase, tenantId, "demand", customFilterRaw(sp as Record<string, string | undefined>)),
+    relatedSearchClause(supabase, q, {
+      customerColumn: "customer_id",
+      extraColumns: ["property_type", "rooms"],
+    }),
+  ]);
   const canCreate = (perms.demands ?? []).includes("create");
   const canEdit = (perms.demands ?? []).includes("edit");
   const canDelete = (perms.demands ?? []).includes("delete");
-  const sp = await searchParams;
-  const supabase = await createClient();
-  const savedViewsPromise = listSavedViews(PATH);
 
   // ?aciliyet= virgülle birden çok değer alır (örn. "Acil / yüksek" KPI'sı high,urgent gönderir).
   const aciliyetValues = parseUrgencyParam(sp.aciliyet);
@@ -154,7 +163,6 @@ export async function DemandsView({
   // ?from=&to= (YYYY-MM-DD, UTC gün sınırı): "Yeni talep" haftalık grafiğinin sütunları buraya iner (sayımla aynı koşul).
   const fromF = isoDateParam(sp.from);
   const toF = isoDateParam(sp.to);
-  const q = (sp.q ?? "").trim().slice(0, 80);
   const statusF = sp.status === "all" || (sp.status && DEMAND_STATUS_LABELS[sp.status]) ? sp.status : "";
   const density = densityOf(sp.yogunluk);
   const page = parsePage(sp.sayfa);
@@ -173,16 +181,9 @@ export async function DemandsView({
   if (fromF) urlParams.from = fromF;
   if (toF) urlParams.to = toF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
-  // Özel alan filtresi (?ozel=anahtar:değer): liste sorgusuna eşleşen kimliklerle iner.
-  const customFilter = await resolveCustomFieldFilter(supabase, tenantId, "demand", customFilterRaw(sp as Record<string, string | undefined>));
   if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
-
-  const search = await relatedSearchClause(supabase, q, {
-    customerColumn: "customer_id",
-    extraColumns: ["property_type", "rooms"],
-  });
 
   // Danışman filtresi / kullanıcı kapsamı müşteri üzerinden: inner gömme + embed alanı filtresi (FK adıyla).
   const CUSTOMER_FK = "customers!customer_demands_customer_id_fkey";
