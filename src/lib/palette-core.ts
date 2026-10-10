@@ -16,7 +16,10 @@ import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
 /** Komut paleti "Ayarlar" grubu: ayar arama sonuçlarının grup adı (sonuçlar sunucudan, registry indeksinden ve rol filtreli gelir). */
 export const PALETTE_SETTINGS_GROUP = "Ayarlar";
 
-/** Yan menüdeki arama düğmesi komut paletini bu olayla açar (ikinci bir arama kutusu YOK). */
+/**
+ * Komut paletini açan olay (ikinci bir arama kutusu YOK): yan menüdeki arama düğmesi ve ana ekran kutusu gönderir.
+ * İsteğe bağlı `detail: { q?: string }` başlangıç metnidir (bkz. `openPalette`).
+ */
 export const OPEN_PALETTE_EVENT = "es-open-palette";
 
 export type PaletteEntry = {
@@ -129,6 +132,161 @@ export function getAppGoItems(accessible: readonly AppModule[], q = "", closed: 
     )
     .filter((e) => matchesQuery(navSearchText(e), q))
     .map(({ label, href, icon, description, shortcut }) => ({ label, href, icon, description, shortcut }));
+}
+
+/* ------------------------------ Niyet sözcük tablosu ------------------------------ */
+
+/**
+ * "Google kutusu" niyet tablosu: kullanıcı menü adını bilmeden günlük sözcükle yazar ("ata", "tv", "demo sil",
+ * "kasa"), palet doğru sayfayı önerir. TEK kaynak burasıdır; eşleşme yoksa palet "AI Asistan'a sor" satırını gösterir.
+ * Sözcükler aksan ve büyük/küçük harften bağımsız karşılaştırılır (`foldTr`): "danışman" = "danisman".
+ * Yetki ve kapalı modül süzgeci menüyle aynıdır; yetkisiz/kapalı hedef önerilmez.
+ */
+type PaletteIntent = {
+  id: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: NavIcon;
+  /** `access`: sayfayı görebilmek yeter; `create`: oluşturma yetkisi gerekir (ör. yeni danışman). */
+  needs: "access" | "create";
+  module: AppModule;
+  /** Tetikleyiciler: her biri bir sözcük dizisidir; dizinin TÜM sözcükleri sorguda geçmeli. */
+  triggers: readonly (readonly string[])[];
+};
+
+export const PALETTE_INTENTS: readonly PaletteIntent[] = [
+  {
+    id: "havuz",
+    label: "Havuz ve Atama",
+    description: "Atanmamış ilanları danışmanlara dağıt",
+    href: "/app/ilan-havuzu",
+    icon: ICONS.ilanHavuzu,
+    needs: "access",
+    module: "properties",
+    triggers: [["ata"], ["atama"], ["havuz"], ["ilan", "ata"], ["dagit"]],
+  },
+  {
+    id: "tv",
+    label: "TV modu",
+    description: "Ofis panosunu büyük ekranda göster",
+    href: "/app/pano-tv",
+    icon: ICONS.panoTv,
+    needs: "access",
+    module: "reports",
+    triggers: [["tv"], ["pano"], ["ekran"], ["televizyon"]],
+  },
+  {
+    id: "gercek-kullanim",
+    label: "Gerçek kullanıma geç",
+    description: "Örnek (demo) verileri sil, kendi verinle başla",
+    href: "/app/ayarlar/gercek-kullanim",
+    icon: ICONS.ayar,
+    needs: "access",
+    module: "settings",
+    triggers: [["demo", "sil"], ["demo"], ["gercek", "kullanim"], ["ornek", "veri"], ["verileri", "sil"]],
+  },
+  {
+    id: "komisyonum",
+    label: "Komisyonum",
+    description: "Komisyon defteri, tahsilat ve kazanç",
+    href: "/app/komisyon",
+    icon: ICONS.komisyon,
+    needs: "access",
+    module: "commissions",
+    triggers: [["komisyonum"], ["komisyon"], ["kazancim"], ["primim"], ["hakedis"]],
+  },
+  {
+    id: "faturalar",
+    label: "Faturalar",
+    description: "Kestiğin ve aldığın faturalar (e-Fatura)",
+    href: "/app/giderler?sekme=faturalar",
+    icon: ICONS.gider,
+    needs: "access",
+    module: "expenses",
+    triggers: [["fatura"], ["faturalar"], ["efatura"], ["e", "fatura"]],
+  },
+  {
+    id: "finans",
+    label: "Finans",
+    description: "Gelir, gider, kasa ve banka hareketleri",
+    href: "/app/giderler",
+    icon: ICONS.gider,
+    needs: "access",
+    module: "expenses",
+    triggers: [["kasa"], ["banka"], ["gelir"], ["gider"], ["masraf"], ["finans"], ["muhasebe"]],
+  },
+  {
+    id: "yeni-danisman",
+    label: "Yeni danışman ekle",
+    description: "Ekibe yeni bir danışman davet et",
+    href: "/app/ekip/yeni",
+    icon: ICONS.ekip,
+    needs: "create",
+    module: "team",
+    triggers: [["danisman", "ekle"], ["danisman", "yeni"], ["personel", "ekle"], ["calisan", "ekle"], ["ekip", "ekle"]],
+  },
+];
+
+/** Aksan ve büyük/küçük harften bağımsız karşılaştırma için sadeleştirir ("Danışman" -> "danisman"). */
+export function foldTr(input: string): string {
+  return input
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ç/g, "c")
+    .replace(/ğ/g, "g")
+    .replace(/ı/g, "i")
+    .replace(/ö/g, "o")
+    .replace(/ş/g, "s")
+    .replace(/ü/g, "u")
+    .replace(/[^a-z0-9\s]/g, " ");
+}
+
+/** Sorgu sözcüğü tetikleyici sözcükle eşleşir: eşit, ya da (≥3 harf) tetikleyicinin başı, ya da tetikleyici (≥4 harf) sorgunun başı. */
+function wordMatches(token: string, trigger: string): boolean {
+  if (token === trigger) return true;
+  if (token.length >= 3 && trigger.startsWith(token)) return true;
+  return trigger.length >= 4 && token.startsWith(trigger);
+}
+
+/**
+ * Niyet önerileri: sorgudaki sözcükler bir niyetin tetikleyicisiyle eşleşirse hedef sayfa önerilir.
+ * En az 2 karakter ister. `creatable` verilmezse erişilebilir modüller kullanılır.
+ */
+export function getAppIntents(
+  accessible: readonly AppModule[],
+  q: string,
+  opts: { creatable?: readonly AppModule[]; locked?: readonly string[]; closed?: readonly string[] } = {},
+): PaletteEntry[] {
+  const tokens = foldTr(q).split(/\s+/).filter(Boolean);
+  if (q.trim().length < 2 || tokens.length === 0) return [];
+  const { creatable = accessible, locked = [], closed = [] } = opts;
+  return PALETTE_INTENTS.filter((intent) => {
+    const pool = intent.needs === "create" ? creatable : accessible;
+    const path = intent.href.split("?")[0]!;
+    if (!pool.includes(intent.module)) return false;
+    if (isClosedFeatureHref(path, closed)) return false;
+    if (locked.some((l) => path === l || path.startsWith(`${l}/`))) return false;
+    return intent.triggers.some((words) => words.every((w) => tokens.some((t) => wordMatches(t, w))));
+  }).map(({ label, href, icon, description }) => ({ label, href, icon, description }));
+}
+
+/**
+ * Palete DIŞARIDAN erişim (ana ekrandaki "Ne yapmak istiyorsun?" kutusu vb.): `OPEN_PALETTE_EVENT` olayı.
+ * `detail.q` verilirse palet bu başlangıç metniyle açılır ve arama hemen çalışır; verilmezse boş açılır.
+ * Kullanım: `openPalette("havuz")` ya da elle
+ * `window.dispatchEvent(new CustomEvent(OPEN_PALETTE_EVENT, { detail: { q: "havuz" } }))`.
+ */
+export type OpenPaletteDetail = { q?: string };
+
+export function openPalette(q?: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<OpenPaletteDetail>(OPEN_PALETTE_EVENT, { detail: q ? { q } : {} }));
+}
+
+/** Olay gövdesinden başlangıç metni (olay düz `Event` ise ya da detail yoksa boş). */
+export function paletteQueryFromEvent(e: Event): string {
+  const detail = (e as CustomEvent<OpenPaletteDetail | undefined>).detail;
+  return typeof detail?.q === "string" ? detail.q.slice(0, 200) : "";
 }
 
 /* ------------------------------ Görünüm komutları ------------------------------ */

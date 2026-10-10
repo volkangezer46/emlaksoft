@@ -4,6 +4,9 @@ import {
   APP_ACTIONS,
   APPEARANCE_COMMANDS,
   getAppActions,
+  getAppIntents,
+  OPEN_PALETTE_EVENT,
+  paletteQueryFromEvent,
   getAppearanceCommands,
   getAppGoItems,
   matchesQuery,
@@ -115,5 +118,43 @@ describe("palette-core: yeni eylemleri", () => {
       expect(nextUiPrefs(cur, { kind: "simple", value: false })).toEqual({ simple: false });
       expect(nextUiPrefs(cur, { kind: "theme", value: "dark" })).toEqual(cur);
     });
+  });
+});
+
+describe("niyet sözcük tablosu (Google kutusu)", () => {
+  const ALL = ["dashboard", "customers", "properties", "reports", "settings", "commissions", "expenses", "team", "targets"] as const;
+  const to = (q: string, extra: Parameters<typeof getAppIntents>[2] = {}) => getAppIntents(ALL, q, extra).map((e) => e.href);
+
+  it("ata / atama / havuz -> Havuz ve Atama", () => {
+    for (const q of ["ata", "atama", "havuz", "İlan ata", "ilanları dağıt"]) expect(to(q), q).toContain("/app/ilan-havuzu");
+  });
+  it("tv / pano / ekran -> TV modu", () => {
+    for (const q of ["tv", "pano", "ekran", "TV modu"]) expect(to(q), q).toContain("/app/pano-tv");
+  });
+  it("demo sil / gerçek kullanım -> Gerçek kullanıma geç (aksansız da çalışır)", () => {
+    for (const q of ["demo sil", "gerçek kullanım", "gercek kullanim", "örnek veri"]) expect(to(q), q).toContain("/app/ayarlar/gercek-kullanim");
+  });
+  it("komisyonum, kasa/banka/gelir/gider, fatura, danışman ekle", () => {
+    expect(to("komisyonum")).toContain("/app/komisyon");
+    for (const q of ["kasa", "banka", "gelir", "gider"]) expect(to(q), q).toContain("/app/giderler");
+    expect(to("fatura")).toContain("/app/giderler?sekme=faturalar");
+    expect(to("danışman ekle")).toContain("/app/ekip/yeni");
+    expect(to("danisman ekle")).toContain("/app/ekip/yeni");
+  });
+  it("eşleşme yoksa öneri yok (palet AI Asistan'a sor satırını gösterir); müşteri adı yanlış tetiklemez", () => {
+    expect(to("xyz")).toEqual([]);
+    expect(to("a")).toEqual([]);
+    expect(to("Atakan Yılmaz")).toEqual([]);
+  });
+  it("yetki ve paket kilidi süzgeci: hedef yetkisizse önerilmez", () => {
+    expect(getAppIntents(["dashboard"], "havuz")).toEqual([]);
+    expect(to("havuz", { locked: ["/app/ilan-havuzu"] })).not.toContain("/app/ilan-havuzu");
+    // Oluşturma yetkisi gereken niyet: erişim var ama create yoksa önerilmez.
+    expect(getAppIntents(ALL, "danışman ekle", { creatable: ["customers"] })).toEqual([]);
+  });
+  it("dışarıdan açma olayı: paletteQueryFromEvent detail.q okur", () => {
+    expect(paletteQueryFromEvent(new Event("x"))).toBe("");
+    expect(paletteQueryFromEvent(new CustomEvent(OPEN_PALETTE_EVENT, { detail: { q: "havuz" } }))).toBe("havuz");
+    expect(paletteQueryFromEvent(new CustomEvent(OPEN_PALETTE_EVENT, { detail: {} }))).toBe("");
   });
 });

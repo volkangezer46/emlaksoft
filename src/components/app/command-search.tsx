@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { ShortcutHint } from "./shortcut-hint";
 import type { AppModule } from "@/lib/permissions";
-import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { OPEN_PALETTE_EVENT, paletteQueryFromEvent } from "@/lib/palette-core";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
 
@@ -29,7 +29,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
         aria-haspopup="listbox"
         aria-controls="app-command-results"
         aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"
-        className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-10 w-10 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
+        className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-11 w-11 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
         <span className="hidden truncate sm:inline">Ad, telefon veya ilan no yazın…</span>
@@ -55,6 +55,8 @@ export function CommandSearch({
   const [Panel, setPanel] = useState<ReturnType<typeof panel.resolve> | null>(null);
   const mounted = Panel !== null;
   const [openOnMount, setOpenOnMount] = useState(false);
+  // Dışarıdan (ana ekran kutusu) gelen başlangıç metni: palet parçası inince panele iletilir.
+  const [initialQuery, setInitialQuery] = useState("");
 
   // Sayfa boşalınca palet parçasını arka planda indir: ilk Ctrl+K / tık beklemesin.
   useEffect(() => runWhenIdle(panel.preload), []);
@@ -68,7 +70,8 @@ export function CommandSearch({
         setPanel(() => panel.resolve());
       }
     };
-    const onOpen = () => {
+    const onOpen = (e: Event) => {
+      setInitialQuery(paletteQueryFromEvent(e));
       setOpenOnMount(true);
       setPanel(() => panel.resolve());
     };
@@ -93,7 +96,7 @@ export function CommandSearch({
   }
   return (
     <Suspense fallback={<Trigger />}>
-      <Panel accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedHrefs} initialOpen={openOnMount} storageScope={storageScope} uiPrefCookie={uiPrefCookie} />
+      <Panel accessibleModules={accessibleModules} creatableModules={creatableModules} lockedHrefs={lockedHrefs} initialOpen={openOnMount} initialQuery={initialQuery} storageScope={storageScope} uiPrefCookie={uiPrefCookie} />
     </Suspense>
   );
 }
