@@ -24,7 +24,6 @@ type Props = {
   balance: number;
   unitsArsa: number;
   unitsKonut: number;
-  unitsPdf: number;
 };
 
 type Tri = "" | "1" | "0";
@@ -49,7 +48,7 @@ function TriSelect({ name, text, value, onChange }: { name: string; text: string
   );
 }
 
-export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut, unitsPdf }: Props) {
+export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [ilId, setIlId] = useState("");
@@ -351,8 +350,7 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
                 Bu işlem <span className="numeric">{units}</span> kontör{units === 0 ? " (ücretsiz)" : ""}.
               </p>
               <p className="mt-1 text-xs text-text-muted">
-                Kalan kontör: <span className="numeric">{balance}</span>. Sonuç üretilemezse (yetersiz veri) veya hata olursa kontör düşmez. Rapor PDF&apos;inin ilk indirmesi{" "}
-                <span className="numeric">{unitsPdf}</span> kontördür; tekrar indirmeler ücretsizdir.
+                Kalan kontör: <span className="numeric">{balance}</span>. Sonuç üretilemezse (yetersiz veri) veya hata olursa kontör düşmez. Rapor PDF&apos;i ve rapor detayı kontör düşürmez.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={onConfirm} disabled={pending} className={`${btn} bg-ink-950 text-white`}>

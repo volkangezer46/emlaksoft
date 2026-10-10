@@ -55,7 +55,7 @@ describe("admin kontör action'ları", () => {
   it("ops YAZAMAZ (tarife, katalog, yükleme)", async () => {
     staffRef.role = "ops";
     const r = [
-      await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "5", pdfFirst: "2", reportDetail: "0" })),
+      await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "5" })),
       await saveEfPacks(fd({ packs: goodPacks })),
       await grantEfCreditAction(fd(grantForm)),
     ];
@@ -66,12 +66,14 @@ describe("admin kontör action'ları", () => {
   });
 
   it("tarife: doğrulama, yazma, denetim, updateTag", async () => {
-    expect((await saveEfTariff(fd({ valuationArsa: "-1", valuationKonut: "5", pdfFirst: "2", reportDetail: "0" }))).error).toBeTruthy();
-    expect((await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "x", pdfFirst: "2", reportDetail: "0" }))).error).toBeTruthy();
+    expect((await saveEfTariff(fd({ valuationArsa: "-1", valuationKonut: "5" }))).error).toBeTruthy();
+    expect((await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "x" }))).error).toBeTruthy();
     expect(store.size).toBe(0);
-    const r = await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "6", pdfFirst: "2", reportDetail: "0" }));
+    // Eski formdan gelen pdfFirst/reportDetail/listingAnalysis alanları YAZILMAZ (kontör yalnız değerleme için).
+    const r = await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "6", valuationTicari: "9", pdfFirst: "2", reportDetail: "1", listingAnalysis: "1" }));
     expect(r.ok).toBe(true);
-    expect(JSON.parse(store.get(EF_TARIFF_SETTING_KEY)!)).toMatchObject({ valuationKonut: 6, pdfFirst: 2 });
+    const saved = JSON.parse(store.get(EF_TARIFF_SETTING_KEY)!);
+    expect(saved).toEqual({ valuationArsa: 5, valuationKonut: 6, valuationTicari: 9 });
     expect(audit).toHaveBeenCalledTimes(1);
     expect(tag).toHaveBeenCalledWith("ef-credit-config");
   });
@@ -80,8 +82,8 @@ describe("admin kontör action'ları", () => {
     expect((await saveEfPacks(fd({ packs: "{bozuk" }))).error).toBeTruthy();
     expect((await saveEfPacks(fd({ packs: JSON.stringify([{ id: "A", name: "x", units: 1, priceNetTry: 1, active: true, order: 1 }]) }))).error).toBeTruthy();
     const dup = JSON.stringify([
-      { id: "mini", name: "Mini", units: 10, priceNetTry: 175, active: true, order: 10 },
-      { id: "mini", name: "Mini 2", units: 20, priceNetTry: 300, active: true, order: 20 },
+      { id: "mini", name: "Mini", units: 10, months: 1, priceNetTry: 175, active: true, order: 10 },
+      { id: "mini", name: "Mini 2", units: 20, months: 3, priceNetTry: 300, active: true, order: 20 },
     ]);
     expect((await saveEfPacks(fd({ packs: dup }))).error).toBeTruthy();
     expect(store.has(EF_PACKS_SETTING_KEY)).toBe(false);

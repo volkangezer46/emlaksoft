@@ -708,7 +708,7 @@ export default async function PropertyDetailPage({
             </Suspense>
           </div>
 
-          {/* İlan analizi (1 kontör, 24 saat önbellek): emsal + EmlakFiyati + kalite kontrol listesi */}
+          {/* İlan analizi (kontörsüz, 24 saat önbellek): emsal + EmlakFiyati + kalite kontrol listesi */}
           {tenantId ? (
             <Suspense fallback={<div className="h-40 animate-pulse rounded-[var(--radius-panel)] bg-line" role="status" aria-label="İlan analizi yükleniyor" />}>
               <ListingAnalysisCard propertyId={property.id} tenantId={tenantId} canRun={(perms.valuation ?? []).includes("create")} />

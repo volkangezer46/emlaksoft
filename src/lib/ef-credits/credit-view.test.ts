@@ -13,12 +13,20 @@ describe("kontör defter satırı", () => {
     expect(normalizeLedgerRow({ id: "6", kind: "release", units: 5 })).toBeNull();
     expect(normalizeLedgerRow({ id: "7", kind: "commit", units: 0 })).toBeNull();
   });
+  it("süre dolumu (yanma) satırı kullanım değil, 'Süresi dolan' kategorisinde; eski devir tavanı satırı da", () => {
+    expect(normalizeLedgerRow({ id: "8", entry_type: "spend", amount: -80, source: "expire", feature: "ef_expire_lot" })).toMatchObject({
+      category: "sona-erme",
+      units: -80,
+    });
+    expect(normalizeLedgerRow({ id: "9", entry_type: "spend", amount: -5, feature: "ef_expire_plan" })).toMatchObject({ category: "sona-erme", units: -5 });
+  });
   it("kişisel veri alanları çıktıya taşınmaz", () => {
     const m = normalizeLedgerRow({ id: "1", kind: "commit", units: 5, item: "valuation_arsa", meta: { phone: "05551112233" }, request_ref: "x" })!;
     expect(JSON.stringify(m)).not.toContain("0555");
   });
   it("bakiye ayrıştırma", () => {
     expect(parseEfBalance({ available: 5, reserved: 0, granted_total: 10, committed_total: 5 })?.available).toBe(5);
+    expect(parseEfBalance({ available: 5, reserved: 0, granted_total: 10, committed_total: 3, expired_total: 2 })?.expired_total).toBe(2);
     expect(parseEfBalance(null)).toBeNull();
     expect(parseEfBalance({ available: "x" })).toBeNull();
   });
@@ -36,6 +44,11 @@ describe("kontör defter satırı", () => {
 describe("admin manuel yükleme doğrulaması", () => {
   const ok = { tenantId: "3f1c9c2e-1f43-4b0e-9a3c-0d2b5c7e8f10", units: 10, kind: "admin", reason: "Müşteri şikayeti telafisi", idemKey: "11111111-2222-3333-4444-555555555555" };
   it("geçerli", () => expect(efAdminGrantSchema.safeParse(ok).success).toBe(true));
+  it("geçerlilik süresi 1/3/6/12 ay; verilmezse 12; diğer değerler reddedilir", () => {
+    expect(efAdminGrantSchema.parse(ok).validityMonths).toBe(12);
+    for (const m of [1, 3, 6, 12, "6"]) expect(efAdminGrantSchema.safeParse({ ...ok, validityMonths: m }).success).toBe(true);
+    for (const m of [0, 2, 24, -1, 1.5]) expect(efAdminGrantSchema.safeParse({ ...ok, validityMonths: m }).success).toBe(false);
+  });
   it("gerekçesiz/kısa gerekçe reddedilir", () => {
     expect(efAdminGrantSchema.safeParse({ ...ok, reason: "" }).success).toBe(false);
     expect(efAdminGrantSchema.safeParse({ ...ok, reason: "kısa" }).success).toBe(false);
@@ -47,12 +60,12 @@ describe("admin manuel yükleme doğrulaması", () => {
 });
 
 describe("örnek ön ayar", () => {
-  it("önerilen katalog: 5 paket, geçerli şema, azalan kontör başı fiyat, uyarısız", () => {
+  it("önerilen katalog: 12 süreli paket (1/3/6/12 ay), geçerli şema, uyarısız, tek popüler", () => {
     const p = examplePackPreset();
-    expect(p).toHaveLength(5);
+    expect(p).toHaveLength(12);
     expect(efPacksSchema.safeParse(p).success).toBe(true);
     expect(efPackWarnings(p)).toEqual([]);
-    expect(p.filter((x) => x.popular).map((x) => x.id)).toEqual(["ef-1000"]);
+    expect(p.filter((x) => x.popular).map((x) => x.id)).toEqual(["ef-2500-6a"]);
   });
   it("paket kimliği", () => {
     expect(packIdFromName("Çok Büyük Paket!")).toBe("cok-buyuk-paket");

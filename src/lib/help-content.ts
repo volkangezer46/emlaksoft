@@ -462,10 +462,10 @@ export const GUIDES: readonly Guide[] = [
     intro: "Değerleme sayfasında iki araç vardır: değerleme motoru ve Ada/Parsel değerleme (EmlakFiyati).",
     steps: [
       "Değerleme motoru: emsallere dayalı kaba bir fiyat aralığı üretir; ekspertiz yerine geçmez.",
-      "Ada/Parsel değerleme: ada ve parsel bilgisiyle rapor üretir; bu işlem kontör harcar.",
+      "Ada/Parsel değerleme: ada ve parsel bilgisiyle rapor üretir; kontör yalnız bu değerleme için harcanır.",
       "Harcanacak kontör işlem öncesi ekranda gösterilir; tarife burada sabit yazılmaz. Sonuç üretilemezse veya hata olursa kontör düşmez.",
-      "Rapor PDF'inin ilk indirmesi kontör harcar, tekrar indirmeler ücretsizdir.",
-      "Kontör yetmezse Abonelik > Kontör sekmesinden paket alınır (satın alma ofis sahibi ve genel müdür içindir).",
+      "Rapor PDF'i, rapor detayı ve ilan analizi kontör harcamaz.",
+      "Kontör yetmezse Abonelik > Kontör sekmesinden 1, 3, 6 veya 12 aylık paket alınır (satın alma ofis sahibi ve genel müdür içindir). Kontör süreli geçerlidir: süre sonunda kullanılmayan kısmı yanar.",
     ],
     href: "/app/degerleme",
     cta: "Değerleme",
@@ -541,7 +541,7 @@ export const GUIDES: readonly Guide[] = [
     intro: "Üç ayrı bakiye vardır; her biri farklı yerde harcanır ve birbirine dönüşmez.",
     steps: [
       "Hesap kredisi (TL): davet ödülü, kampanya ve iadelerden yüklenir; paket, ek kullanıcı ve kontör faturalarınızdan düşer. Ödeme adımında \"Hesap kredimi kullan\" kutusunu işaretlersiniz.",
-      "Kontör bakiyesi: Ada/parsel değerleme ve PDF rapor gibi işlemlerde harcanır. Paketinizle her ay yüklenir; yetmezse Abonelik sayfasının Kontör sekmesinden ek paket alırsınız.",
+      "Kontör bakiyesi: yalnız Ada/parsel değerlemede harcanır. Paketinizle her ay yüklenir ve ay sonunda yanar (devretmez); yetmezse Abonelik sayfasının Kontör sekmesinden süreli ek paket alırsınız.",
       "AI kullanımı: yapay zeka asistanı ve AI özellikleri ölçülür ve paketinizin aylık AI kotasına göre izlenir; kotası tanımlı olmayan pakette sınırsız görünür. AI kullanımı kontör bakiyenizden veya hesap kredinizden düşmez.",
       "Bakiyeleri görmek için Abonelik sayfasını açın. Hesap kredisi sekmesini yalnız ofis sahibi ve genel müdür görür.",
     ],

@@ -109,7 +109,7 @@ export async function grantEfCredit(
       p_units: input.units,
       p_kind: input.kind,
       p_idem: `admin:${staffId}:${input.idemKey}`,
-      p_meta: { reason: input.reason, staff_id: staffId, source: "admin_manual" },
+      p_meta: { reason: input.reason, staff_id: staffId, source: "admin_manual", validityMonths: input.validityMonths },
     });
     if (error) {
       console.error("grantEfCredit", error.code, error.message);

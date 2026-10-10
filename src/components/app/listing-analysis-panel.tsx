@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, CircleDashed, ScanSearch } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { Alert } from "@/components/ui/alert";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { analyzeListing } from "@/app/actions/listing-analysis";
 import { formatDateTimeTr } from "@/lib/format";
@@ -22,20 +22,18 @@ const VERDICT_TONE: Record<ListingAnalysisResult["position"]["verdict"], string>
   "piyasa altı": "text-brand-600",
 };
 
-type Notice = { tone: "info" | "warning" | "danger" | "success"; text: string; buyHref?: boolean };
+type Notice = { tone: "info" | "warning" | "danger" | "success"; text: string };
 
 /**
- * İlan analizi kartı (istemci kısmı): sonucu gösterir, "Analiz et" düğmesi kontör düşen action'ı çağırır.
- * Düğme etiketi kontör bedelini açıkça söyler; aynı girdiyle 24 saat içinde tekrar ücret alınmaz. Her sayı bir hedefe bağlıdır.
+ * İlan analizi kartı (istemci kısmı): sonucu gösterir, "Analiz et" düğmesi action'ı çağırır. Kontör düşmez (yalnız
+ * değerleme kontör harcar); aynı girdiyle 24 saat içinde kayıtlı sonuç gösterilir. Her sayı bir hedefe bağlıdır.
  */
 export function ListingAnalysisPanel({
   propertyId,
-  units,
   canRun,
   initial,
 }: {
   propertyId: string;
-  units: number;
   canRun: boolean;
   initial: StoredAnalysis | null;
 }) {
@@ -46,7 +44,6 @@ export function ListingAnalysisPanel({
 
   const fiyatHref = `/app/portfoyler/${propertyId}?sekme=fiyat`;
   const medyaHref = `/app/portfoyler/${propertyId}?sekme=medya`;
-  const costLabel = units > 0 ? `${units} kontör` : "ücretsiz";
 
   function run() {
     setNotice(null);
@@ -62,16 +59,13 @@ export function ListingAnalysisPanel({
           setStored({ result: o.result, createdAt: o.createdAt, unitsCharged: o.unitsCharged });
           setNotice(
             o.cached
-              ? { tone: "info", text: "Bu ilan için son 24 saatte aynı veriyle analiz yapılmıştı; kontör düşülmedi." }
-              : { tone: "success", text: o.unitsCharged > 0 ? `Analiz hazır. ${o.unitsCharged} kontör düşüldü.` : "Analiz hazır." },
+              ? { tone: "info", text: "Bu ilan için son 24 saatte aynı veriyle analiz yapılmıştı; kayıtlı sonuç gösteriliyor." }
+              : { tone: "success", text: "Analiz hazır." },
           );
           router.refresh();
           break;
         case "no_comps":
           setNotice({ tone: "warning", text: o.message });
-          break;
-        case "no_credit":
-          setNotice({ tone: "warning", text: `Kontör bakiyeniz yetersiz (bakiye ${o.available}, gereken ${o.needed}).`, buyHref: true });
           break;
         case "disabled":
           setNotice({ tone: "info", text: o.message });
@@ -96,28 +90,23 @@ export function ListingAnalysisPanel({
             <ScanSearch className="h-4 w-4 text-brand-600" aria-hidden /> İlan analizi
           </CardTitle>
           <CardDescription>
-            Emsal motoru ve (varsa) EmlakFiyati bölge verisiyle fiyat konumu. Her analiz {costLabel}; aynı veriyle 24 saat içinde tekrar ücret alınmaz.
+            Emsal motoru ve (varsa) EmlakFiyati bölge verisiyle fiyat konumu. Kontör gerektirmez; aynı veriyle 24 saat içinde kayıtlı sonuç gösterilir.
           </CardDescription>
         </div>
         {canRun ? (
           <Button size="sm" onClick={run} loading={pending} disabled={pending} icon={ScanSearch}>
-            {r ? "Yeniden analiz et" : "Analiz et"} ({costLabel})
+            {r ? "Yeniden analiz et" : "Analiz et"}
           </Button>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {notice ? (
-          <Alert
-            tone={notice.tone}
-            action={notice.buyHref ? <ButtonLink href="/app/abonelik?sekme=kontor" size="xs" variant="outline">Kontör satın al</ButtonLink> : undefined}
-          >
-            {notice.text}
-          </Alert>
+          <Alert tone={notice.tone}>{notice.text}</Alert>
         ) : null}
 
         {!r ? (
           <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center text-sm text-text-muted">
-            {canRun ? "Henüz analiz yapılmadı. Emsal yoksa kontör düşmez." : "Henüz analiz yapılmadı. Analiz için değerleme oluşturma yetkisi gerekir."}
+            {canRun ? "Henüz analiz yapılmadı." : "Henüz analiz yapılmadı. Analiz için değerleme oluşturma yetkisi gerekir."}
           </p>
         ) : (
           <>
