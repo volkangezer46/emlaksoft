@@ -12,6 +12,7 @@ import { loadStaffAvatar } from "@/lib/avatar-read";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
+import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { ThemeController } from "@/components/theme-controller";
 import { IconSprite } from "@/components/ui/icon-sprite";
 import { PLATFORM_MFA_DB_SETTING_KEY, isPlatformMfaRequired, platformMfaSyncIssue } from "@/lib/platform-mfa";
@@ -81,6 +82,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <FontScaleBoot scale={fontScale} />
       <SidebarBoot />
       <NavPending />
+      <ClientCacheSync identity={`admin:${staff.id}`} />
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} modules={modules} fontScale={fontScale} health={health} />

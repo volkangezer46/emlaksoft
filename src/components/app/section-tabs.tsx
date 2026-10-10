@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { useClosedModules } from "@/components/app/closed-modules-context";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
+import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 import { resolveStripHub } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { useNavRole } from "@/lib/ui/use-nav-role";
@@ -61,9 +62,11 @@ export function SectionTabs({
     () => resolveStripHub(pathname, accessibleModules, { role: navRole, closed: closedModules }),
     [pathname, accessibleModules, navRole, closedModules],
   );
-  if (!hub || hub.pages.length < 2) return null;
-
   const isLocked = (href: string) => lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
+  // Mevcut merkezin kardeş sayfaları boşta TAM veriyle önceden yüklenir (sekme tıklaması ağ turu beklemez).
+  const siblingTargets = hub ? hub.pages.map((p) => p.href).filter((h) => h !== pageHref && !isLocked(h)) : [];
+  useIdlePrefetch(siblingTargets, 8);
+  if (!hub || hub.pages.length < 2) return null;
 
   return (
     <div className="mb-4 flex items-start gap-2">

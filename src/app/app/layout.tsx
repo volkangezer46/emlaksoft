@@ -4,6 +4,7 @@ import { Shield } from "lucide-react";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
+import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
@@ -423,6 +424,7 @@ async function ShellBoot() {
       {/* Rol bazlı ürün turları: sayfalar arasında gezdiği için layout'ta bir kez bağlanır (kod yalnız gerekince iner). */}
       <ProductTourLazy role={m.platformStaffFullAccess || m.impersonating ? "" : m.effectiveRole} accessible={m.accessibleModules} />
       <RealtimeRefresh tenantId={m.tenantId} />
+      <ClientCacheSync identity={`app:${m.userId ?? "-"}:${m.tenantId ?? "-"}:${m.impersonating ? "imp" : "std"}`} />
       {/* Klavye kisayollari: komut paleti (Ctrl+K) zaten vardi ama tek
           kisayol oydu. "g" onekli iki tusluk dizi bilincli — tek harf,
           bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
