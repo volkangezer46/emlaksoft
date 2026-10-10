@@ -1,98 +1,312 @@
+import type { ICONS } from "@/lib/icons";
 import type { AppRole } from "@/lib/permissions";
 
 /**
- * Sade görünümün rol -> ÇEKİRDEK menü eşlemesi (TEK yer). Yalnız GÖRÜNÜRLÜKTÜR:
- * yetki matrisi (`permissions.ts`) değişmez, hiçbir sayfa silinmez; doğrudan adresler
- * ve ⌘K araması tüm yetkili sayfalara ulaşmaya devam eder. Anahtarlar menü öğesinin
- * TANIMLI yoludur (`nav-config.ts` öğe `href`'i; sekmeli öğelerde öğenin kendi yolu).
- * Rolün erişemediği modülün öğesi zaten `visibleSections` içinde elenir.
+ * Yan menünün rol -> ÇEKİRDEK yapısı (TEK yer). Yalnız GÖRÜNÜRLÜK ve GRUPLAMADIR: yetki matrisi
+ * (`permissions.ts`) değişmez, hiçbir sayfa silinmez, sayfa yolları sabittir; doğrudan adresler ve
+ * Ctrl+K araması tüm yetkili sayfalara ulaşmaya devam eder.
+ *
+ * Menü ANA İLKESİ (2026-10, "Google sadeliği"): yan menüde SAYI az, ad anlaşılır olmalıdır. Her satır bir
+ * "merkez"dir (hub): satırın altındaki sayfalar o sayfaların üstündeki TEK sekme şeridinde durur. Rol başına:
+ * ofis yönetimi 6, danışman 5, muhasebe 4, çağrı merkezi 4 satır. Alt sabit satırlar (Ayarlar, Abonelik, Yardım,
+ * Menüyü düzenle) ve "Araçlar" satır bütçesine sayılmaz. Yeni özellik = yeni satır DEĞİL: mevcut merkeze sekme.
+ * Bütçeyi `nav-budget-contract.test.ts` korur (gevşetme değil, öğeyi bir merkeze taşı).
  */
 
-const HOME = "/app";
+export const NAV_BUDGET = { advisor: 5, office: 6, admin: 6 } as const;
 
-/**
- * ANA İLKE (menü bütçesi, 2026-10): yan menüde görünür satır sayısı SINIRLIDIR; kullanım zorluğu yaşatmamak ana ilkedir.
- * Yeni özellik = yeni menü öğesi DEĞİL: önce mevcut sayfaya sekme/kart. Bütçe: danışman <= 8, ofis yönetimi <= 10, admin <= 8
- * (`nav-budget-contract.test.ts`). Çekirdek olmayan öğeler menünün en altındaki kapalı "Diğer" grubundadır.
- */
-export const NAV_BUDGET = { advisor: 8, office: 10, admin: 8 } as const;
+export type HubIconKey = keyof typeof ICONS;
 
-/** Ofis sahibi / genel müdür / şube müdürü: 10 çekirdek sayfa. Ekip Merkezi, Gelen Kutusu, Ekip karnesi, Ayarlar, Abonelik "Diğer"de / kullanıcı menüsünde / ⌘K'dadır. */
-const MANAGER_CORE = [
-  HOME,
-  "/app/randevular",
-  "/app/gorevler",
-  "/app/musteriler",
-  "/app/talepler",
-  "/app/portfoyler",
-  "/app/ilan-kontrol",
-  "/app/anlasmalar",
-  "/app/komisyon",
-  "/app/raporlar",
-] as const;
-
-/**
- * Danışman (ve takım lideri) konsolu: 8 satır. Günlük döngü = Bugün (Ana ekran, Randevular, Görevler) -> Müşteriler
- * (Müşteriler, Talepler) -> Portföyler -> Anlaşmalar -> Performansım. Gelen Kutusu, Komisyon/Kazanç, İlan Kontrol, Değerleme
- * ve Yardım "Diğer" altında; sık kullanılıyorsa otomatik "Hızlı erişim"e çıkar, ⌘K ve g-kısayolları çalışır.
- * Yalnız görünürlük: yetki matrisi ve sayfa yolları değişmez.
- */
-const ADVISOR_CORE = [
-  HOME,
-  "/app/randevular",
-  "/app/gorevler",
-  "/app/musteriler",
-  "/app/talepler",
-  "/app/portfoyler",
-  "/app/anlasmalar",
-  "/app/performansim",
-] as const;
-
-export const NAV_CORE_BY_ROLE: Readonly<Record<AppRole, readonly string[]>> = {
-  owner: MANAGER_CORE,
-  gm: MANAGER_CORE,
-  branch_manager: MANAGER_CORE,
-  team_lead: ADVISOR_CORE,
-  advisor: ADVISOR_CORE,
-  accounting: [HOME, "/app/giderler", "/app/kiralama", "/app/komisyon", "/app/abonelik", "/app/raporlar"],
-  call_center: [HOME, "/app/gelen-kutusu", "/app/musteriler", "/app/randevular", "/app/gorevler"],
-  readonly: [HOME, "/app/musteriler", "/app/talepler", "/app/portfoyler", "/app/randevular", "/app/raporlar"],
+/** Merkez içi sayfa: yol (nav-config kataloğundaki öğe/sekme yolu) + merkez içinde gösterilecek ad (verilmezse katalog adı). */
+export type HubPageRef = {
+  href: string;
+  label?: string;
+  /** true: yalnız sayfanın KENDİ modül izni aranır (sahibi öğenin ek koşulu `needsItemModule` yok sayılır; ör. danışmanın Hedefim sayfası). */
+  ownModule?: boolean;
 };
 
-/** Yönetim rolleri: yönetim sayfaları (Ayarlar, Otomasyon…) yalnız bunlara "Daha fazla"da görünür. */
+export type HubDef = {
+  id: string;
+  label: string;
+  icon: HubIconKey;
+  /** Şeritteki sıra = dizi sırası. İlk 5 sayfa görünür, kalanı "Diğer" menüsündedir. */
+  pages: readonly HubPageRef[];
+};
+
+/** Mobil alt çubuk yuvası: bir merkez kimliği, "new" (+ Yeni eylem sayfası) ya da "menu" (tam menü çekmecesi). */
+export type MobileSlot = string;
+
+export type RoleNav = {
+  /** Yan menünün ana satırları (bütçe sayılan). */
+  hubs: readonly HubDef[];
+  /** Menünün altındaki sabit merkezler (Ayarlar, Abonelik, Yardım): satır bütçesine sayılmaz. */
+  dock: readonly HubDef[];
+  /** "Araçlar" listesi: menü satırı DEĞİL; yol kataloğu. Modül kapalı/yetkisizse görünmez. */
+  tools: readonly string[];
+  /** Mobil alt çubuk (en çok 5 yuva). */
+  mobile: readonly MobileSlot[];
+};
+
+const p = (href: string, label?: string, ownModule?: boolean): HubPageRef => ({ href, ...(label ? { label } : {}), ...(ownModule ? { ownModule } : {}) });
+
+/* ------------------------------- Ortak merkezler ------------------------------- */
+
+const BUGUN: HubDef = {
+  id: "bugun",
+  label: "Bugün",
+  icon: "baslikBugun",
+  pages: [p("/app", "Ana ekran"), p("/app/randevular"), p("/app/gorevler")],
+};
+
+const MUSTERILER: HubDef = {
+  id: "musteriler",
+  label: "Müşteriler",
+  icon: "baslikMusteri",
+  pages: [
+    p("/app/musteriler"),
+    p("/app/talepler"),
+    p("/app/gelen-kutusu", "Gelen kutusu"),
+    p("/app/akilli-listeler"),
+    p("/app/kayip-satis"),
+    p("/app/tavsiyeler"),
+    p("/app/kampanyalar"),
+    p("/app/ayarlar/etiketler"),
+    p("/app/ayarlar/mesaj-sablonlari"),
+  ],
+};
+
+const ILANLAR: HubDef = {
+  id: "ilanlar",
+  label: "İlanlar",
+  icon: "baslikPortfoy",
+  pages: [
+    p("/app/portfoyler"),
+    p("/app/ilan-havuzu", "Havuz ve Atama"),
+    p("/app/ilan-kontrol"),
+    p("/app/portallar"),
+    p("/app/portfoyler/anahtarlar", "Anahtar"),
+    p("/app/portfoyler/sunumlar"),
+    p("/app/ayarlar/filigran"),
+  ],
+};
+
+const SATIS_PARA: HubDef = {
+  id: "satis-para",
+  label: "Satış ve Para",
+  icon: "baslikAnlasma",
+  pages: [
+    p("/app/anlasmalar"),
+    p("/app/teklifler"),
+    p("/app/komisyon"),
+    p("/app/giderler", "Finans"),
+    p("/app/kiralama"),
+    p("/app/sozlesmeler"),
+    p("/app/cuzdan", "Kazanç"),
+    p("/app/onaylar"),
+    p("/app/kira-artis"),
+    p("/app/aidat"),
+    p("/app/ayarlar/sozlesme-sablonlari"),
+  ],
+};
+
+const EKIBIM: HubDef = {
+  id: "ekibim",
+  label: "Ekibim",
+  icon: "ekip",
+  pages: [
+    p("/app/ekip", "Danışmanlar"),
+    p("/app/hedefler"),
+    p("/app/danisman-kpi", "Ekip karnesi"),
+    p("/app/pano-tv", "TV modu"),
+    p("/app/ofis-kontrol"),
+    p("/app/ekip/takimlar"),
+    p("/app/ekip/subeler"),
+    p("/app/ekip/devir"),
+    p("/app/lig"),
+    p("/app/ekip/kiyas", "Karşılaştır"),
+    p("/app/denetim"),
+    p("/app/ofis-merkezi"),
+  ],
+};
+
+const RAPORLAR: HubDef = {
+  id: "raporlar",
+  label: "Raporlar",
+  icon: "baslikPerformans",
+  pages: [
+    p("/app/raporlar", "Ofis"),
+    p("/app/bolge-analizi"),
+    p("/app/raporlar/talep-arz"),
+    p("/app/raporlar/memnuniyet"),
+    p("/app/raporlar/kar-zarar"),
+    p("/app/anketler"),
+    p("/app/raporlar/lead-hizi"),
+    p("/app/franchise"),
+  ],
+};
+
+/* ------------------------------- Danışman merkezleri ------------------------------- */
+
+const SATIS_DANISMAN: HubDef = {
+  id: "satis",
+  label: "Satış",
+  icon: "baslikAnlasma",
+  pages: [
+    p("/app/anlasmalar"),
+    p("/app/teklifler"),
+    p("/app/komisyon", "Komisyonum"),
+    p("/app/cuzdan", "Kazanç"),
+    p("/app/onaylar"),
+    p("/app/sozlesmeler"),
+    p("/app/kiralama"),
+  ],
+};
+
+const BEN: HubDef = {
+  id: "ben",
+  label: "Ben",
+  icon: "rozet",
+  pages: [p("/app/performansim"), p("/app/hedefler", "Hedefim", true), p("/app/hesabim", "Profilim")],
+};
+
+/* ------------------------------- Muhasebe / çağrı / salt okunur ------------------------------- */
+
+const PARA: HubDef = {
+  id: "para",
+  label: "Para",
+  icon: "baslikFinans",
+  pages: [
+    p("/app/giderler", "Finans"),
+    p("/app/komisyon"),
+    p("/app/cuzdan", "Kazanç"),
+    p("/app/onaylar"),
+    p("/app/kiralama"),
+    p("/app/kira-artis"),
+    p("/app/aidat"),
+  ],
+};
+
+const ABONELIK_SATIRI: HubDef = { id: "abonelik", label: "Abonelik", icon: "abonelik", pages: [p("/app/abonelik")] };
+const GELEN_KUTUSU: HubDef = { id: "gelen-kutusu", label: "Gelen kutusu", icon: "gelenKutusu", pages: [p("/app/gelen-kutusu", "Gelen kutusu")] };
+const RANDEVU_GOREV: HubDef = {
+  id: "randevu-gorev",
+  label: "Randevu ve Görev",
+  icon: "randevu",
+  pages: [p("/app/randevular"), p("/app/gorevler")],
+};
+
+/* ------------------------------- Alt sabit merkezler ------------------------------- */
+
+const AYARLAR: HubDef = {
+  id: "ayarlar",
+  label: "Ayarlar",
+  icon: "ayar",
+  pages: [
+    p("/app/ayarlar", "Genel"),
+    p("/app/ayarlar/roller"),
+    p("/app/ayarlar/yetkilendirme"),
+    p("/app/ayarlar/moduller"),
+    p("/app/ayarlar/ozel-alanlar"),
+    p("/app/ayarlar/api-webhook"),
+    p("/app/otomasyonlar"),
+    p("/app/ayarlar/is-akislari"),
+    p("/app/uyum"),
+    p("/app/belgeler"),
+    p("/app/ayarlar/ai-kullanim"),
+    p("/app/ayarlar/sahiplik-devri"),
+  ],
+};
+const ABONELIK: HubDef = { id: "abonelik", label: "Abonelik", icon: "abonelik", pages: [p("/app/abonelik")] };
+const YARDIM: HubDef = { id: "yardim", label: "Yardım", icon: "destek", pages: [p("/app/yardim"), p("/app/destek")] };
+
+/* ------------------------------- Araçlar ------------------------------- */
+
+const TOOLS_COMMON = [
+  "/app/degerleme",
+  "/app/hesaplayici",
+  "/app/asistan",
+  "/app/mahalle-notlari",
+  "/app/yabanci-satis",
+  "/app/ag",
+  "/app/acik-ev",
+  "/app/projeler",
+] as const;
+
+/* ------------------------------- Rol düzenleri ------------------------------- */
+
+const MANAGER: RoleNav = {
+  hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_PARA, EKIBIM, RAPORLAR],
+  dock: [AYARLAR, ABONELIK, YARDIM],
+  tools: [...TOOLS_COMMON, "/app/buyume"],
+  mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
+};
+
+const ADVISOR: RoleNav = {
+  hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_DANISMAN, BEN],
+  dock: [ABONELIK, YARDIM],
+  tools: TOOLS_COMMON,
+  mobile: ["bugun", "musteriler", "new", "ilanlar", "ben"],
+};
+
+const ACCOUNTING: RoleNav = {
+  hubs: [BUGUN, PARA, RAPORLAR, ABONELIK_SATIRI],
+  dock: [YARDIM],
+  tools: TOOLS_COMMON,
+  mobile: ["bugun", "para", "raporlar", "menu"],
+};
+
+const CALL_CENTER: RoleNav = {
+  hubs: [
+    { id: "bugun", label: "Bugün", icon: "baslikBugun", pages: [p("/app", "Ana ekran")] },
+    GELEN_KUTUSU,
+    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler")] },
+    RANDEVU_GOREV,
+  ],
+  dock: [ABONELIK, YARDIM],
+  tools: TOOLS_COMMON,
+  mobile: ["bugun", "gelen-kutusu", "musteriler", "new", "menu"],
+};
+
+const READONLY: RoleNav = {
+  hubs: [
+    BUGUN,
+    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler")] },
+    { id: "ilanlar", label: "İlanlar", icon: "baslikPortfoy", pages: [p("/app/portfoyler")] },
+    RAPORLAR,
+  ],
+  dock: [YARDIM],
+  tools: TOOLS_COMMON,
+  mobile: ["bugun", "musteriler", "ilanlar", "raporlar", "menu"],
+};
+
+export const NAV_BY_ROLE: Readonly<Record<AppRole, RoleNav>> = {
+  owner: MANAGER,
+  gm: MANAGER,
+  branch_manager: MANAGER,
+  team_lead: ADVISOR,
+  advisor: ADVISOR,
+  accounting: ACCOUNTING,
+  call_center: CALL_CENTER,
+  readonly: READONLY,
+};
+
+/** Yönetim rolleri. */
 export const MANAGEMENT_ROLES: readonly string[] = ["owner", "gm", "branch_manager"];
 
-/**
- * `settings` GÖRÜNTÜLEME izni "yönetir" demek değildir (ör. `advisor.settings = VIEW`).
- * Bu sayfalar yönetici olmayan rollerin SADE menüsünden tamamen çıkar (çekirdekte olanlar
- * hariç); tam görünümde ve doğrudan adreste durur.
- */
-export const MANAGEMENT_ONLY_HREFS: readonly string[] = [
-  "/app/otomasyonlar",
-  "/app/uyum",
-  "/app/belgeler",
-  "/app/denetim",
-  "/app/buyume",
-  "/app/ayarlar",
-  "/app/ekip",
-];
-
 function isAppRole(role: string | null | undefined): role is AppRole {
-  return typeof role === "string" && Object.hasOwn(NAV_CORE_BY_ROLE, role);
+  return typeof role === "string" && Object.hasOwn(NAV_BY_ROLE, role);
 }
 
-/** Bilinmeyen rolde en kısıtlı çekirdek (readonly) kullanılır; yetki zaten ayrıca süzer. */
-export function coreHrefsFor(role: string | null | undefined): ReadonlySet<string> {
-  return new Set(NAV_CORE_BY_ROLE[isAppRole(role) ? role : "readonly"]);
+/** Bilinmeyen rolde en kısıtlı düzen (readonly) kullanılır; yetki zaten ayrıca süzer. */
+export function navLayoutFor(role: string | null | undefined): RoleNav {
+  return NAV_BY_ROLE[isAppRole(role) ? role : "readonly"];
 }
 
 export function isManagementRole(role: string | null | undefined): boolean {
   return typeof role === "string" && MANAGEMENT_ROLES.includes(role);
 }
 
-/** Sade görünümde bu rol için hiç gösterilmeyen (ne çekirdek ne "Daha fazla") öğe mi? */
-export function isHiddenInSimple(role: string | null | undefined, href: string): boolean {
-  if (isManagementRole(role)) return false;
-  if (coreHrefsFor(role).has(href)) return false;
-  return MANAGEMENT_ONLY_HREFS.includes(href);
+/** Her rolün düzeninde geçen yollar (test ve yetim denetimi için). */
+export function layoutHrefs(layout: RoleNav): string[] {
+  return [...layout.hubs, ...layout.dock].flatMap((h) => h.pages.map((pg) => pg.href)).concat(layout.tools);
 }

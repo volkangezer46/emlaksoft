@@ -2,6 +2,7 @@ import Link from "@/components/ui/smart-link";
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { Check, Lock } from "lucide-react";
 import { MorphNavMore } from "@/components/ui/morph-nav-more";
+import { MorphNavScrollActive } from "@/components/ui/morph-nav-scroll";
 import { formatBadgeCount, MAX_VISIBLE_TABS, ringPercent, splitNavTabs, tabDensity, type MorphBadge, type MorphDensity } from "@/lib/morph-tabs";
 import { cn } from "@/lib/utils";
 
@@ -118,8 +119,9 @@ export type MorphNavItem = {
 };
 
 /**
- * Bağlantı tabanlı (sayfa/`?sekme=` gezinmesi) MorphTabs şeridi: aktif genişler, pasifler ikona küçülür;
- * `inactive="auto"` geniş şeritte pasif etiketleri de gösterir. Durumsuzdur (sunucuda çizilebilir),
+ * Bağlantı tabanlı (sayfa/`?sekme=` gezinmesi) MorphTabs şeridi: tek satır, yatay kaydırmalı; etiketler HER ZAMAN
+ * görünür (mobilde yalnız-ikon sekme yok), etkin sekme görünür alana kaydırılır, 5'ten fazlası "Diğer" menüsüne iner.
+ * Durumsuzdur (sunucuda çizilebilir),
  * erişilebilirlik: `nav` + `aria-current`. Form sekmeleri için `MorphTabs` (ARIA tablist) kullanılır.
  */
 export function MorphNav({
@@ -159,7 +161,8 @@ export function MorphNav({
       >
         {shown.map((item) => {
           const active = item.id === activeId;
-          const density: MorphDensity = tabDensity({ active, orientation: "horizontal", inactive: item.icon ? "icon" : "label" });
+          // Etiket HER ZAMAN görünür (mobilde yalnız-ikon sekme yok): pasifler ikon + etiket, etkin tam yoğunluk.
+          const density: MorphDensity = tabDensity({ active, orientation: "horizontal", inactive: "label" });
           return (
             <li key={item.id} className="shrink-0">
               <Link
@@ -195,6 +198,7 @@ export function MorphNav({
           </li>
         ) : null}
         {children}
+        <MorphNavScrollActive activeId={activeId} />
       </ul>
     </nav>
   );

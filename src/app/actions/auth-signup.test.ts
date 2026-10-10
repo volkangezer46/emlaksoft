@@ -159,9 +159,9 @@ describe("signUp — ön kapılar (hiçbir kaynak oluşmaz)", () => {
   });
 
   it("eksik alan, kısa şifre, yasal onay yok, hız sınırı, geçersiz e-posta/telefon", async () => {
-    expect((await signUp({}, form({ company: "" }))).error).toMatch(/zorunlu/);
+    expect(await signUp({}, form({ name: "" }))).toMatchObject({ field: "name" });
+    expect(await signUp({}, form({ phone: "" }))).toMatchObject({ field: "phone" });
     expect((await signUp({}, form({ password: "kisa" }))).error).toMatch(/8 karakter/);
-    expect((await signUp({}, form({ legal_consent: "" }))).error).toMatch(/onay/i);
     expect((await signUp({}, form({ email: "gecersiz" }))).error).toBeTruthy();
     expect((await signUp({}, form({ phone: "123" }))).error).toBeTruthy();
     h.rateAllowed = false;
@@ -257,6 +257,15 @@ describe("signUp — başarılı akış", () => {
     expect(h.loginEvent).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", tenantId: "tenant-1", result: "success" }));
   });
 
+  it("yeni 4 alanlı kayıt: ofis adı ve onay kutusu gelmese de '<Ad Soyad> Emlak' ile kurulur", async () => {
+    const f = form();
+    f.delete("company");
+    f.delete("legal_consent");
+    await expect(signUp({}, f)).rejects.toMatchObject({ to: "/app" });
+    const [, args] = h.rpc.mock.calls[0]!;
+    expect(args).toMatchObject({ p_company: "Ayşe Yılmaz Emlak", p_terms_version: "kullanim-sartlari-2026-07-31" });
+  });
+
   it("kayıt başarılı, oturum açma başarısız: hesap SİLİNMEZ, kullanıcıya giriş sayfası yönlendirmesi döner", async () => {
     h.signInWithPassword.mockResolvedValue({ error: { message: "x" } });
     const r = await signUp({}, form());
@@ -307,10 +316,9 @@ describe("signUp — Google ile tamamlama (auth_mode=google)", () => {
     expect(h.loginEvent).toHaveBeenCalledWith(expect.objectContaining({ userId: "google-user-1", tenantId: "tenant-1", result: "success" }));
   });
 
-  it("telefon zorunlu ve TR cep olmalı; rıza zorunlu", async () => {
+  it("telefon zorunlu ve TR cep olmalı", async () => {
     expect(await signUp({}, googleForm({ phone: "" }))).toMatchObject({ field: "phone" });
     expect(await signUp({}, googleForm({ phone: "+4915123456789" }))).toMatchObject({ field: "phone" });
-    expect(await signUp({}, googleForm({ legal_consent: "" }))).toMatchObject({ field: "legal_consent" });
     expect(h.rpc).not.toHaveBeenCalled();
   });
 

@@ -169,7 +169,9 @@ describe("identity and session hardening contract", () => {
     expect(auth).not.toContain('.from("subscriptions").insert');
     expect(core).not.toContain('.from("subscriptions").insert');
     expect(migration).toContain("sync_inserted_profile_auth_identity");
-    expect(registrationForm).toContain('name="legal_consent"');
+    // Onay kutusu yok (mevzuat engellemez, uyarır): koşullar ve KVKK metni formda bilgi satırı, sürümler yine rıza tablosuna yazılır.
+    expect(registrationForm).toContain("/kullanim-sartlari");
+    expect(registrationForm).toContain("/kvkk-aydinlatma");
     expect(auth).toContain("bootstrapPlatformStaffIfAllowed");
     expect(auth).toMatch(/checkRateLimit\([\s\S]*?`signin:[\s\S]*?failurePolicy: "deny"/);
     expect(auth).toMatch(/checkRateLimit\(`2fa-send:[\s\S]*?failurePolicy: "deny"/);

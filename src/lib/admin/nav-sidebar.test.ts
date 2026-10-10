@@ -11,12 +11,12 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     }
   });
 
-  it("süper yöneticide 8 çekirdek öğe görünür, nadir araçlar grup içinde katlanır", () => {
+  it("süper yöneticide 6 çekirdek öğe görünür (Raporlar/AI danışmanı Kontrol paneli, Üyeler Ofisler sekmesi), nadir araçlar grup içinde katlanır", () => {
     const groups = adminSidebarModel(PLATFORM_ROLE_MODULES.super_admin);
     const visible = groups.flatMap((g) => g.items.map((i) => i.href));
-    expect(visible).toEqual(["/admin", "/admin/raporlar", "/admin/tenants", "/admin/members", "/admin/billing", "/admin/site", "/admin/tickets", "/admin/sistem"]);
+    expect(visible).toEqual(["/admin", "/admin/tenants", "/admin/billing", "/admin/site", "/admin/tickets", "/admin/sistem"]);
     const folded = groups.flatMap((g) => g.folded.map((i) => i.href));
-    expect(folded).toEqual(expect.arrayContaining(["/admin/danisman", "/admin/ayarlar", "/admin/personel", "/admin/geo"]));
+    expect(folded).toEqual(expect.arrayContaining(["/admin/ayarlar", "/admin/personel", "/admin/geo"]));
   });
 
   it("çekirdeği olmayan grup (rol süzgeci sonrası) tam gösterilir; boş grup yoktur", () => {
@@ -28,7 +28,7 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     }
   });
 
-  it("çekirdek bayrağı yalnız 8 tanımlı menü öğesinde", () => {
-    expect(ADMIN_NAV.flatMap((s) => s.items).filter((i) => i.core).length).toBe(8);
+  it("çekirdek bayrağı yalnız 6 tanımlı menü öğesinde", () => {
+    expect(ADMIN_NAV.flatMap((s) => s.items).filter((i) => i.core).length).toBe(6);
   });
 });

@@ -11,6 +11,7 @@ import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
  *  2. Örnek bina/site (notu `[Örnek veri]` ile başlar; `buildings`'te is_sample yok): silme daire, tahakkuk ve tahsilatı kaskatlar.
  *     Mahsup bağlantıları (`owner_charge_links.unit_charge`) kira silinirken kaskatlanır.
  *  3. Örnek meydan okumalar (açıklaması `[Örnek veri]` ile başlar; `league_challenges`'ta is_sample yok).
+ *  4. Örnek danışman uzmanlık/bölge satırları (`is_sample`; profiller silinmez). Havuz kayıtları örnek portföyle kaskatlanır.
  *
  * Kendiliğinden temizlenenler (ekstra adım gerekmez): kira tahsilat/sözleşme/hakediş/yansıtma (rentals kaskatı), tapu süreci adımları
  * (deals kaskatı), ilan analizi (properties kaskatı), örnek giderler (is_sample).
@@ -38,5 +39,8 @@ export async function purgeSampleModuleData(db: SupabaseClient, tenantId: string
   );
   await step("buildings", () => db.from("buildings").delete({ count: "exact" }).eq("tenant_id", tenantId).like("notes", like));
   await step("league_challenges", () => db.from("league_challenges").delete({ count: "exact" }).eq("tenant_id", tenantId).like("description", like));
+  // Örnek danışman uzmanlık/bölge satırları (20261010000800 is_sample). Havuz kayıtları ve olayları örnek portföyle birlikte kaskatlanır.
+  await step("advisor_specialties", () => db.from("advisor_specialties").delete({ count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true));
+  await step("advisor_regions", () => db.from("advisor_regions").delete({ count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true));
   return report;
 }

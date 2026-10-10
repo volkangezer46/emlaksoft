@@ -316,8 +316,9 @@ export async function signUp(
   const googleMode = String(formData.get("auth_mode") ?? "") === "google";
   const fullName = String(formData.get("name") ?? "").trim();
   const rawPhone = String(formData.get("phone") ?? "").trim();
-  const company = String(formData.get("company") ?? "").trim();
-  const legalConsent = String(formData.get("legal_consent") ?? "");
+  // Kayıtta ofis adı SORULMAZ: varsayılan "<Ad Soyad> Emlak" ile kurulur, Kurulum sihirbazının ilk adımında düzenlenir.
+  // (Eski istemciler `company` gönderirse o kullanılır.)
+  const company = (String(formData.get("company") ?? "").trim() || (fullName ? `${fullName} Emlak` : "")).slice(0, 120);
   const publicClient = await createClient();
 
   // Google yolu: kimlik oturumdan (OAuth), e-posta formdan DEĞİL.
@@ -340,25 +341,25 @@ export async function signUp(
     }
     oauthUserId = oauthUser.id;
     email = normalizeEmail(oauthUser.email);
-    if (!fullName || !company) {
-      return { error: "Ad soyad ve firma adı zorunlu." };
-    }
-    if (!rawPhone) {
-      return { error: "Telefon numarası zorunlu (cep).", field: "phone" };
+    if (!fullName) {
+      return { error: "Ad soyad zorunlu.", field: "name" };
     }
   } else {
     email = normalizeEmail(String(formData.get("email") ?? ""));
     password = String(formData.get("password") ?? "");
-    if (!fullName || !email || !password || !company) {
-      return { error: "Ad, e-posta, şifre ve firma adı zorunlu." };
-    }
+    if (!fullName) return { error: "Ad soyad zorunlu.", field: "name" };
+    if (!email) return { error: "E-posta zorunlu.", field: "email" };
+    if (!password) return { error: "Şifre zorunlu.", field: "password" };
     if (password.length < 8) {
       return { error: "Şifre en az 8 karakter olmalı.", field: "password" };
     }
   }
-  if (legalConsent !== "accepted") {
-    return { error: "Kullanım şartları ve KVKK aydınlatma metni onayı zorunlu.", field: "legal_consent" };
+  // Cep telefonu iki yolda da zorunlu (güvenlik doğrulaması ve bildirimler); TR cep kuralı aşağıda parsePhoneStrict ile.
+  if (!rawPhone) {
+    return { error: "Cep telefonu zorunlu.", field: "phone" };
   }
+  // Kullanım koşulları ve KVKK metni formda bilgi satırı olarak gösterilir (onay kutusu yok); kayıtla birlikte
+  // sürümler registration_consents'a yazılır (provision_registration).
 
   const ip = await clientIp();
   const { allowed } = await checkRateLimit(`signup:${ip}`, {

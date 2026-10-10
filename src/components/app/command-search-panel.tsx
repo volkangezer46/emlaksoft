@@ -39,8 +39,10 @@ import {
   createRecentsStore,
   getAppActions,
   getAppGoItems,
+  getAppIntents,
   getAppearanceCommands,
   OPEN_PALETTE_EVENT,
+  paletteQueryFromEvent,
   runAppearanceCommand,
   type AppearanceEntry,
   type PaletteEntry,
@@ -91,6 +93,7 @@ export function CommandSearchPanel({
   creatableModules,
   lockedHrefs,
   initialOpen = false,
+  initialQuery = "",
   storageScope,
   uiPrefCookie,
 }: {
@@ -100,6 +103,8 @@ export function CommandSearchPanel({
   /** Pakete dahil olmayan sayfalar: Eylemler'de gösterilmez. */
   lockedHrefs?: string[];
   initialOpen?: boolean;
+  /** Dışarıdan (ana ekran kutusu) gelen başlangıç metni; verilirse arama hemen çalışır. */
+  initialQuery?: string;
   /** `${tenantId}:${userId}` — son görülenlerin yerel depolama anahtarı. */
   storageScope?: string;
   /** Yazı boyutu / sade görünüm çerezinin adı; yoksa bu iki komut paletten gizlenir. */
@@ -109,7 +114,7 @@ export function CommandSearchPanel({
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(initialOpen);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [pending, setPending] = useState(false);
   const [active, setActive] = useState(0);
@@ -202,6 +207,13 @@ export function CommandSearchPanel({
     if (initialOpen) inputRef.current?.focus();
   }, [initialOpen]);
 
+  // Dışarıdan başlangıç metniyle açıldıysa (ana ekran kutusu) kayıt araması hemen çalışır.
+  useEffect(() => {
+    if (!initialQuery) return;
+    const t = setTimeout(() => runSearch(initialQuery), 0);
+    return () => clearTimeout(t);
+  }, [initialQuery, runSearch]);
+
   // Eski sürüm "son görülenler"i kapsamsız anahtarda (başka kullanıcıya görünebilir) tutuyordu: bir kez sil.
   useEffect(() => {
     try {
@@ -221,9 +233,15 @@ export function CommandSearchPanel({
       }
       if (e.key === "Escape") setOpen(false);
     };
-    const onOpen = () => {
+    const onOpen = (e: Event) => {
       setOpen(true);
       setActive(0);
+      // `detail.q` varsa palet o metinle açılır (ana ekran "Ne yapmak istiyorsun?" kutusu).
+      const startQuery = paletteQueryFromEvent(e);
+      if (startQuery) {
+        setQ(startQuery);
+        runSearch(startQuery);
+      }
       queueMicrotask(() => inputRef.current?.focus());
     };
     window.addEventListener("keydown", onKey);
@@ -232,7 +250,18 @@ export function CommandSearchPanel({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(OPEN_PALETTE_EVENT, onOpen);
     };
-  }, []);
+  }, [runSearch]);
+
+  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Havuz ve Atama), sonra eşleşen eylemler ve
+  // sayfalar. Eşleşme yoksa liste boş kalır ve "AI Asistan'a sor" satırı görünür.
+  const pageRows = useMemo<PaletteEntry[]>(() => {
+    if (q.trim().length < 2) return [];
+    const intents = getAppIntents(accessibleModules, q, { creatable: creatableModules, locked: lockedHrefs, closed: closedModules });
+    const seen = new Set<string>();
+    return [...intents, ...quickActions, ...goItems]
+      .filter((e) => (seen.has(e.href) ? false : (seen.add(e.href), true)))
+      .slice(0, 6);
+  }, [q, accessibleModules, creatableModules, lockedHrefs, closedModules, quickActions, goItems]);
 
   // Hesap makinesi: girdi matematiksel ifadeyse sonuç en üstte "= X" satırı.
   const calc = evaluatePaletteInput(q);
@@ -253,7 +282,7 @@ export function CommandSearchPanel({
   const allHref = `/app/arama-sonuclari?q=${encodeURIComponent(trimmed)}`;
 
   // Gezinilebilir satır sırası: [hesap] → [son kullanılanlar → hızlı eylemler | sonuçlar] → [tüm sonuçlar] → [AI]
-  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length + goItems.length : hits.length + appearance.length;
+  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length + goItems.length : pageRows.length + hits.length + appearance.length;
   const allIndex = baseCount;
   const askIndex = baseCount + (allVisible ? 1 : 0);
   const maxIndex = baseCount + (allVisible ? 1 : 0) + (askVisible ? 1 : 0) - 1;
@@ -315,13 +344,21 @@ export function CommandSearchPanel({
         return;
       }
     }
-    if (!calcVisible && !showQuick && hits[i]) {
-      go(hits[i]!);
-      return;
-    }
-    if (!calcVisible && !showQuick && i >= hits.length && appearance[i - hits.length]) {
-      runAppearance(appearance[i - hits.length]!);
-      return;
+    if (!calcVisible && !showQuick) {
+      const page = pageRows[i];
+      if (page) {
+        goRecent({ label: page.label, href: page.href, kind: "page" });
+        return;
+      }
+      const j = i - pageRows.length;
+      if (hits[j]) {
+        go(hits[j]!);
+        return;
+      }
+      if (j >= hits.length && appearance[j - hits.length]) {
+        runAppearance(appearance[j - hits.length]!);
+        return;
+      }
     }
     if (allVisible && i === allIndex) {
       goHref(allHref);
@@ -426,7 +463,7 @@ export function CommandSearchPanel({
         aria-haspopup="listbox"
         aria-controls="app-command-results"
         aria-label="Müşteri, portföy, anlaşma, görev veya ilan ara"
-        className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-10 w-10 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
+        className="focus-ring relative flex shrink-0 items-center rounded-[var(--radius-control)] border border-hairline bg-canvas h-11 w-11 justify-center text-left text-sm text-text-faint shadow-[var(--elev-1)] transition hover:border-brand-300 hover:bg-surface hover:shadow-[var(--elev-2)] sm:h-auto sm:w-full sm:justify-start sm:py-2.5 sm:pl-10 sm:pr-20"
       >
         <Search className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 text-text-faint sm:left-3 sm:translate-x-0" aria-hidden />
         <span className="hidden truncate sm:inline">Ad, telefon veya ilan no yazın…</span>
@@ -584,16 +621,54 @@ export function CommandSearchPanel({
                     Kayıt aramak için en az 2 karakter yazın: müşteri, portföy, talep, anlaşma, görev, destek.
                   </p>
                 </div>
-              ) : hits.length === 0 && appearance.length === 0 && !pending ? (
+              ) : pageRows.length === 0 && hits.length === 0 && appearance.length === 0 && !pending ? (
                 <div>
                   <p className="px-3 py-8 text-center text-sm text-text-muted">Sonuç bulunamadı.</p>
                   {askRow ? <div className="border-t border-line pt-1">{askRow}</div> : null}
                 </div>
               ) : (
                 <ul className="space-y-1">
-                  {hits.map((hit, i) => {
+                  {pageRows.length > 0 ? (
+                    <li role="group" aria-label="Git">
+                      <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Git</p>
+                      <ul className="space-y-1">
+                        {pageRows.map((row, i) => {
+                          const Icon = row.icon;
+                          return (
+                            <li key={row.href}>
+                              <button
+                                id={`app-command-option-${i}`}
+                                role="option"
+                                aria-selected={i === active}
+                                type="button"
+                                onClick={() => goRecent({ label: row.label, href: row.href, kind: "page" })}
+                                onMouseEnter={() => setActive(i)}
+                                className={`flex w-full items-center gap-3 rounded-[var(--radius-card)] px-3 py-2.5 text-left transition ${
+                                  i === active ? "bg-brand-600/8" : "hover:bg-canvas"
+                                }`}
+                              >
+                                <span
+                                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
+                                    i === active ? "bg-brand-600/10 text-brand-600" : "bg-canvas text-text-muted"
+                                  }`}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-semibold text-ink-950">{row.label}</span>
+                                  {row.description ? <span className="block truncate text-xs text-text-muted">{row.description}</span> : null}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </li>
+                  ) : null}
+                  {hits.map((hit, hi) => {
                     const meta = kindMeta[hit.kind];
                     const Icon = meta.icon;
+                    const i = pageRows.length + hi;
                     return (
                       <li key={`${hit.kind}-${hit.id}`}>
                         <button
@@ -627,7 +702,7 @@ export function CommandSearchPanel({
                       <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Görünüm</p>
                       <ul className="space-y-1">
                         {appearance.map((entry, i) => {
-                          const idx = hits.length + i;
+                          const idx = pageRows.length + hits.length + i;
                           return (
                             <li key={entry.id}>
                               <button

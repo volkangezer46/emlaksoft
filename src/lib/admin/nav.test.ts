@@ -42,6 +42,10 @@ describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
 
   it("aktif vurgu: alt sayfa ve sekmeler kendi öğesini vurgular; Yeni ofis sayfasında Ofisler aktif", () => {
     expect(activeAdminItem("/admin/tenants/yeni")?.href).toBe("/admin/tenants");
+    // Raporlar / AI danışmanı Kontrol panelinin, Üyeler Ofisler bölümünün sekmesidir (menü bütçesi).
+    expect(activeAdminItem("/admin/raporlar")?.href).toBe("/admin");
+    expect(activeAdminItem("/admin/danisman")?.href).toBe("/admin");
+    expect(activeAdminItem("/admin/members/abc")?.href).toBe("/admin/tenants");
     expect(activeAdminItem("/admin/seo")?.href).toBe("/admin/site");
     expect(activeAdminItem("/admin/muhasebe/defter")?.href).toBe("/admin/billing");
     expect(activeAdminItem("/admin/aktivite")?.href).toBe("/admin/sistem");

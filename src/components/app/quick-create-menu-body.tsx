@@ -43,7 +43,7 @@ export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatab
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
+          className="focus-ring press inline-flex h-11 min-w-11 items-center justify-center gap-1.5 sm:h-10 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
           aria-label="Hızlı yeni kayıt menüsü"
         >
           <Plus className="h-4 w-4" />

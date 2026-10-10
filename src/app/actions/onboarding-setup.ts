@@ -10,7 +10,7 @@ import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { normalizeBuyerIdentityNumber } from "@/lib/billing/buyer";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { resolveOfficeGeo } from "@/lib/geo/resolve";
-import { isOnboardingStepId } from "@/lib/onboarding-checklist";
+import { isOnboardingStepId } from "@/lib/onboarding-steps";
 import { getOfficeTemplate, isOfficeTemplateKey } from "@/lib/onboarding-templates";
 import { normalizeLicenseNo } from "@/lib/license";
 import {

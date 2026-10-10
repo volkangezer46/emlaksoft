@@ -166,6 +166,8 @@ async function QueueBody({ type, advisorId, propertyId, page, canEdit, tenantId 
                         {unregDetail.portal ?? "Portal"} ilan no <span className="font-mono">{unregDetail.externalId}</span> CRM&apos;de kayıtlı değil
                         {typeof unregDetail.score === "number" ? ` · bu portföy olma olasılığı %${Math.round(unregDetail.score)}` : ""} ·{" "}
                         <Link href={`/app/portfoyler/${r.property_id}?sekme=portallar#portal-bagla`} className="focus-ring rounded font-semibold text-accent-text hover:underline">Bu portföye bağla</Link>
+                        {" · "}
+                        <Link href="/app/portfoyler/yeni?kaynak=extension" className="focus-ring rounded font-semibold text-accent-text hover:underline">Yeni portföy olarak ekle</Link>
                       </p>
                     ) : null}
                     {r.explained_reason_code ? (
