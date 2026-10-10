@@ -233,6 +233,9 @@ const F = {
   listingAnalyses: "20261008001800_listing_analyses.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
+  // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
+  // eski suresiz bakiyeler 12 aylik partiye doner. fulfill govdelerine DOKUNMAZ (sure fatura meta'sindan okunur). Kod sema yokken eski akisa duser; paket satisi kapali kalir.
+  efCreditLots: "20261010000300_ef_credit_lots_expiry.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -365,6 +368,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.profileAvatar]: "ek", // profiles/platform_staff'a 2 nullable sutun + public avatars kovasi + sahip-yolu storage politikalari + kendi satirina yazan DEFINER RPC set_my_avatar; mevcut davranis degismez
     [F.subscriptionPause]: "ek", // subscriptions'a duraklatma/planli dusurme sutunlari + 4 authenticated JWT RPC + 2 service_role cron RPC + hazirlik yoklamasi; bayraklar SQL'de de kontrol edilir, mevcut davranis degismez (bayrak KAPALI)
     [F.userModulePrefs]: "ek", // yeni tablo user_module_prefs (RLS: yalniz kendi satiri); kod tablo yokken hicbir sey gizlemez
+    [F.efCreditLots]: "davranis", // kontor partileri: bakiye/harcama/yukleme RPC govdeleri degisir + eski bakiyeler 12 aylik partiye doner + yeni tablo
     [F.planPricesEfTariff]: "davranis", // yeni abonelik/yenileme liste fiyati (SQL yedek) + yalniz dokunulmamis ef.* seed ayarlari; abonelik/fatura satiri ve plan override'i degismez
     [F.propertyAuthorityStatus]: "ek", // properties'e 6 nullable/varsayilanli yetki durumu sutunu + kisit + kismi indeks; mevcut satir/RLS degismez
     [F.propertyManagementCore]: "davranis", // rent_charges durum CHECK'i 'partial' ile genisler + paid_amount; yeni tahsilat/sozlesme/odeme tablolari + 4 DEFINER RPC; eski 'odendi' tahakkuklar icin tek seferlik legacy tahsilat dolgusu
@@ -511,6 +515,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "TR1-yetki-durumu", order: 29.99986, title: "Portfoy yetki (EIDS) durumu sutunlari (kod sutun yokken kuyrugu 'olculemedi' gosterir; sira serbest, ek)", files: [F.propertyAuthorityStatus] },
     { id: "PB55-lig-2", order: 29.99985, title: "Lig 2.0: ofis ayarli puan kurallari + meydan okuma tablolari (kod tablo yokken varsayilan kurallara duser)", files: [F.leagueV2] },
     { id: "MOD1-kisisel-modul-gizleme", order: 29.99987, title: "Kisisel modul gizleme tablosu (yalniz gorunurluk; sira serbest, ek)", files: [F.userModulePrefs] },
+    { id: "PB60-sureli-kontor", order: 29.9999868, title: "Sureli kontor: ef_credit_lots (parti) + FIFO harcama + yanma RPC'si + eski bakiyeler 12 aylik partiye; 20261008001000 (tarife/katalog seed) ONCE; kod sema yokken paket satisini kapali tutar", files: [F.efCreditLots] },
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
     { id: "PB57-tapu-sureci", order: 29.999862, title: "Tapu sureci adim takibi: deal_process_steps tablosu (kod tablo yokken bolumu etkin degil der; sira serbest)", files: [F.dealProcessSteps] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
@@ -598,6 +603,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // Oransal yukseltme: fulfill/v2 gövdeleri EF paket (000300) gövdesinden turetilir ve 001000 sutunlarina bakar.
     [F.subscriptionPause, F.billingAmount],
     [F.planUpgradeFulfillment, F.efPack],
+    // Sureli kontor: cuzdan RPC'leri (000100) + devir tavani RPC'si (001200; no-op'a cevrilir) uzerine yazar.
+    [F.efCreditLots, F.efWallet],
+    [F.efCreditLots, F.efPlanExpiry],
+    // Katalog/tarife seed'i (suresiz -> sureli) lot sisteminden ONCE uygulanir (dosya adi sirasi ile de ayni).
+    [F.efCreditLots, F.planPricesEfTariff],
     [F.planUpgradeFulfillment, F.subscriptionPause],
     [F.efPlanExpiry, F.efWallet],
     [F.efReconciliationRuns, F.efWallet],
