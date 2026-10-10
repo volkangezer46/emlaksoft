@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
+import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { collectFor } from "@/lib/surveys/collect";
 import { isOverdue } from "@/lib/surveys/logic";
@@ -51,14 +53,24 @@ export async function GET(req: NextRequest) {
     const nowMs = Date.now();
     const todayDate = new Date(nowMs).toISOString().slice(0, 10);
 
-    const { data: triggerRows, error } = await admin
-      .from("survey_triggers")
-      .select("tenant_id, event_type, enabled, delay_days, max_attempts, enabled_since")
-      .eq("enabled", true)
-      .limit(5000);
+    type TriggerDbRow = { tenant_id: string; event_type: string; enabled: boolean; delay_days: number; max_attempts: number; enabled_since: string | null };
+    const triggerRes = await readAllPaged<TriggerDbRow>(
+      (from, to) =>
+        admin
+          .from("survey_triggers")
+          .select("tenant_id, event_type, enabled, delay_days, max_attempts, enabled_since")
+          .eq("enabled", true)
+          .order("tenant_id", { ascending: true })
+          .order("event_type", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: TriggerDbRow[] | null; error: { message: string; code?: string } | null }>,
+    );
+    const triggerRows = triggerRes.rows;
+    let truncated = triggerRes.truncated;
+    let failed = 0;
+    const error = triggerRes.error ? { message: triggerRes.error } : null;
     if (error) {
       if (isSurveySchemaMissing(error)) {
-        await recordHeartbeat("anket-gorevleri", "ok", "anket tabloları henüz yok (migration bekleniyor)");
+        await recordHeartbeat("anket-gorevleri", "ok", "atlandı: anket tabloları henüz yok (migration bekleniyor)");
         return NextResponse.json({ ok: true, skipped: "schema" });
       }
       console.error("cron anket-gorevleri tetikleyiciler", error);
@@ -117,15 +129,19 @@ export async function GET(req: NextRequest) {
         }
       } catch (e) {
         console.error("cron anket-gorevleri ofis", tenantId, e);
+        failed += 1;
       }
     }
 
-    const reminded = await remindOverdue(admin, nowMs, disabled);
+    const remind = await remindOverdue(admin, nowMs, disabled);
+    const reminded = remind.notified;
+    failed += remind.failed;
+    if (remind.truncated) truncated = true;
 
     await recordHeartbeat(
       "anket-gorevleri",
-      "ok",
-      `${byTenant.size} ofis, ${created} yeni görev, ${sent} bağlantı gönderildi${sendFailed ? ` (${sendFailed} başarısız)` : ""}, ${pulseInvites} ekip nabzı daveti, ${reminded} gecikme bildirimi${skippedTenantsNote(disabled, "surveys")}`,
+      heartbeatFor({ failed: failed + sendFailed, truncated }),
+      `${byTenant.size} ofis, ${created} yeni görev, ${sent} bağlantı gönderildi${sendFailed ? ` (${sendFailed} başarısız)` : ""}, ${pulseInvites} ekip nabzı daveti, ${reminded} gecikme bildirimi${skippedTenantsNote(disabled, "surveys")}${failureNote({ failed, truncated })}`,
     );
     return NextResponse.json({ ok: true, tenants: byTenant.size, created, sent, sendFailed, pulseInvites, reminded });
   } catch (e) {
@@ -139,18 +155,26 @@ async function remindOverdue(
   admin: ReturnType<typeof createAdminClient>,
   nowMs: number,
   disabled: Awaited<ReturnType<typeof getDisabledModulesByTenant>>,
-): Promise<number> {
+): Promise<{ notified: number; failed: number; truncated: boolean }> {
   // En geç eşik 30 gün: daha eski bekleyenler de listelenir; eşik ofis ayarından uygulanır.
-  const { data: pending, error } = await admin
-    .from("survey_tasks")
-    .select("tenant_id, assigned_to, due_at, next_attempt_at, status")
-    .eq("status", "pending")
-    .lt("due_at", new Date(nowMs - 3_600_000).toISOString())
-    .limit(5000);
-  if (error || !pending || pending.length === 0) return 0;
+  type PendingRow = { id: string; tenant_id: string; assigned_to: string | null; due_at: string; next_attempt_at: string | null; status: string };
+  const pendingRes = await readAllPaged<PendingRow>(
+    (from, to) =>
+      admin
+        .from("survey_tasks")
+        .select("id, tenant_id, assigned_to, due_at, next_attempt_at, status")
+        .eq("status", "pending")
+        .lt("due_at", new Date(nowMs - 3_600_000).toISOString())
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: PendingRow[] | null; error: { message: string } | null }>,
+  );
+  const pending = pendingRes.rows;
+  const baseFailed = pendingRes.error ? 1 : 0;
+  const truncated = pendingRes.truncated;
+  if (pending.length === 0) return { notified: 0, failed: baseFailed, truncated };
 
   const tenantIds = [...new Set(pending.map((p) => String(p.tenant_id)))].filter((id) => !isDisabledFor(disabled, id, "surveys"));
-  if (tenantIds.length === 0) return 0;
+  if (tenantIds.length === 0) return { notified: 0, failed: baseFailed, truncated };
 
   const [{ data: settingRows }, { data: owners }] = await Promise.all([
     admin.from("survey_settings").select("tenant_id, overdue_hours").in("tenant_id", tenantIds),
@@ -177,7 +201,7 @@ async function remindOverdue(
     perUser.set(userId, (perUser.get(userId) ?? 0) + 1);
     counts.set(tenantId, perUser);
   }
-  if (counts.size === 0) return 0;
+  if (counts.size === 0) return { notified: 0, failed: baseFailed, truncated };
 
   const notified = await findNotifiedIds(admin, {
     href: OVERDUE_HREF,
@@ -200,5 +224,6 @@ async function remindOverdue(
       });
     }
   }
-  return insertNotifications(admin, rows);
+  const ins = await insertNotificationsDetailed(admin, rows);
+  return { notified: ins.written, failed: baseFailed + ins.failed, truncated };
 }

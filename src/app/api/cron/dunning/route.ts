@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
 import { runAutoRenewPass } from "@/lib/billing/auto-renew";
 import { authorizeCron } from "@/lib/cron-auth";
 
@@ -164,17 +165,21 @@ export async function GET(req: NextRequest) {
   // ---- 3) Otomatik yenileme (KAPALI bayrak: billing.auto_renew_enabled; kapalıyken ödeme kod yolu çalışmaz) ----
   // Bildirimler yukarıda her zamanki gibi gider; tahsilat başarısızsa bu akış değişmez (ek bildirim eklenir).
   let autoRenew: Awaited<ReturnType<typeof runAutoRenewPass>> = { enabled: false, attempted: 0, charged: 0, failed: 0, skipped: 0 };
+  let renewThrew = 0;
   try {
     autoRenew = await runAutoRenewPass(admin, now);
   } catch (e) {
     console.error("dunning auto-renew", e instanceof Error ? e.message : "error");
+    renewThrew = 1;
   }
+  const failed = autoRenew.failed + renewThrew;
 
   await recordHeartbeat(
     "dunning",
-    "ok",
+    heartbeatFor({ failed }),
     `${invoiceNotified} fatura hatırlatması, ${subNotified} abonelik hatırlatması, ${suspensionCandidates} askıya alma adayı` +
-      (autoRenew.enabled ? `, otomatik yenileme ${autoRenew.charged}/${autoRenew.attempted}` : ""),
+      (autoRenew.enabled ? `, otomatik yenileme ${autoRenew.charged}/${autoRenew.attempted}` : "") +
+      failureNote({ failed }),
   );
 
   return NextResponse.json({

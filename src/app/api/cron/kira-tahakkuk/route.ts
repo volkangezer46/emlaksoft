@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
@@ -82,12 +84,20 @@ export async function GET(req: NextRequest) {
   // ---- 1) Bu ayın eksik tahakkuklarını oluştur ----
   // Modül kapısı: "Kiralama" kapalı ofislerde tahakkuk/gecikme/yenileme üretilmez (veri silinmez).
   const disabledModules = await getDisabledModulesByTenant(admin);
-  const { data: allRentals, error: rentalsErr } = await admin
-    .from("rentals")
-    .select("id, tenant_id, monthly_rent, due_day, start_date, end_date, property:properties!rentals_property_id_fkey(property_code, title)")
-    .eq("status", "active")
-    .limit(2000);
-  const rentals = (allRentals ?? []).filter((r) => !isDisabledFor(disabledModules, String(r.tenant_id), "rentals"));
+  let failed = 0;
+  let truncated = false;
+  const rentalsRes = await readAllPaged<RentalRow>(
+    (from, to) =>
+      admin
+        .from("rentals")
+        .select("id, tenant_id, monthly_rent, due_day, start_date, end_date, property:properties!rentals_property_id_fkey(property_code, title)")
+        .eq("status", "active")
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: RentalRow[] | null; error: { message: string } | null }>,
+  );
+  const rentalsErr = rentalsRes.error;
+  if (rentalsRes.truncated) truncated = true;
+  const rentals = rentalsRes.rows.filter((r) => !isDisabledFor(disabledModules, String(r.tenant_id), "rentals"));
 
   if (rentalsErr) {
     console.error("kira-tahakkuk cron rentals", rentalsErr);
@@ -95,11 +105,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
 
-  const { data: existing, error: existingErr } = await admin
-    .from("rent_charges")
-    .select("rental_id")
-    .eq("period", period)
-    .limit(5000);
+  const existingRes = await readAllPaged<{ rental_id: string }>(
+    (from, to) =>
+      admin
+        .from("rent_charges")
+        .select("rental_id")
+        .eq("period", period)
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: { rental_id: string }[] | null; error: { message: string } | null }>,
+  );
+  const existing = existingRes.rows;
+  const existingErr = existingRes.error;
+  if (existingRes.truncated) truncated = true;
 
   if (existingErr) {
     console.error("kira-tahakkuk cron charges", existingErr);
@@ -133,19 +150,29 @@ export async function GET(req: NextRequest) {
       .from("rent_charges")
       .upsert(toInsert, { onConflict: "rental_id,period", ignoreDuplicates: true })
       .select("id");
-    if (insErr) console.error("kira-tahakkuk cron insert", insErr);
-    else created = (inserted ?? []).length;
+    if (insErr) {
+      console.error("kira-tahakkuk cron insert", insErr);
+      failed += 1;
+    } else created = (inserted ?? []).length;
   }
 
   // ---- 2) Vadesi 7+ gün geçmiş pending → overdue + bildirim ----
-  const { data: pending, error: pendingErr } = await admin
-    .from("rent_charges")
-    .select("id, tenant_id, rental_id, period, amount, rental:rentals!rent_charges_rental_id_fkey(due_day, property:properties!rentals_property_id_fkey(property_code, title))")
-    .in("status", ["pending", "partial"])
-    .lte("period", period)
-    .limit(2000);
-
-  if (pendingErr) console.error("kira-tahakkuk cron pending", pendingErr);
+  const pendingRes = await readAllPaged<ChargeRow>(
+    (from, to) =>
+      admin
+        .from("rent_charges")
+        .select("id, tenant_id, rental_id, period, amount, rental:rentals!rent_charges_rental_id_fkey(due_day, property:properties!rentals_property_id_fkey(property_code, title))")
+        .in("status", ["pending", "partial"])
+        .lte("period", period)
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: ChargeRow[] | null; error: { message: string } | null }>,
+  );
+  const pending = pendingRes.rows;
+  if (pendingRes.truncated) truncated = true;
+  if (pendingRes.error) {
+    console.error("kira-tahakkuk cron pending", pendingRes.error);
+    failed += 1;
+  }
 
   const limitDate = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
   let overdueCount = 0;
@@ -160,6 +187,7 @@ export async function GET(req: NextRequest) {
     const { error: updErr } = await admin.from("rent_charges").update({ status: "overdue" }).eq("id", c.id);
     if (updErr) {
       console.error("kira-tahakkuk cron overdue", updErr);
+      failed += 1;
       continue;
     }
 
@@ -230,8 +258,10 @@ export async function GET(req: NextRequest) {
         href,
         kind: "info",
       });
-      if (insNotifErr) console.error("kira-tahakkuk cron yenileme bildirimi", insNotifErr);
-      else renewalNotified += 1;
+      if (insNotifErr) {
+        console.error("kira-tahakkuk cron yenileme bildirimi", insNotifErr);
+        failed += 1;
+      } else renewalNotified += 1;
     }
   }
 
@@ -251,6 +281,7 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("kira-tahakkuk cron hatirlatma", e);
     reminderNote = ", hatırlatma atlandı (hata)";
+    failed += 1;
   }
 
   // ---- 4b) Mülk sahibine ödeme günü hatırlatması (yönetilen kiralar; hata asıl işi bozmaz) ----
@@ -313,8 +344,8 @@ export async function GET(req: NextRequest) {
 
   await recordHeartbeat(
     "kira-tahakkuk",
-    "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
+    heartbeatFor({ failed, truncated }),
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}${failureNote({ failed, truncated })}`,
   );
 
   return NextResponse.json({

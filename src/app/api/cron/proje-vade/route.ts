@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { logActivity } from "@/lib/activity";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
@@ -47,11 +49,19 @@ export async function GET(req: NextRequest) {
   const overdueFlipped = (flipped ?? []).length;
 
   // ---- 2) Tenant başına toplu gecikme bildirimi (günde tek) ----
-  const { data: overdueRows, error: overdueErr } = await admin
-    .from("unit_payments")
-    .select("tenant_id, amount")
-    .eq("status", "overdue")
-    .limit(5000);
+  const overdueRes = await readAllPaged<{ tenant_id: string; amount: number }>(
+    (from, to) =>
+      admin
+        .from("unit_payments")
+        .select("tenant_id, amount")
+        .eq("status", "overdue")
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: { tenant_id: string; amount: number }[] | null; error: { message: string } | null }>,
+  );
+  const overdueRows = overdueRes.rows;
+  const overdueErr = overdueRes.error;
+  const truncated = overdueRes.truncated;
+  let failed = 0;
 
   if (overdueErr) {
     console.error("proje-vade cron query", overdueErr);
@@ -98,7 +108,9 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const notified = await insertNotifications(admin, toInsert);
+  const ins1 = await insertNotificationsDetailed(admin, toInsert);
+  const notified = ins1.written;
+  failed += ins1.failed;
 
   // ---- 3) Süresi dolan rezervasyonları serbest bırak ('deposit'e DOKUNMA) ----
   const nowIso = new Date().toISOString();
@@ -151,12 +163,14 @@ export async function GET(req: NextRequest) {
       kind: "info",
     });
   }
-  const releaseNotifCount = await insertNotifications(admin, releaseInserts);
+  const ins2 = await insertNotificationsDetailed(admin, releaseInserts);
+  const releaseNotifCount = ins2.written;
+  failed += ins2.failed;
 
   await recordHeartbeat(
     "proje-vade",
-    "ok",
-    `${overdueFlipped} satır gecikmeye alındı, ${notified} bildirim, ${releasedCount} rezervasyon serbest${skippedTenantsNote(disabledModules, "projects")}`,
+    heartbeatFor({ failed, truncated }),
+    `${overdueFlipped} satır gecikmeye alındı, ${notified} bildirim, ${releasedCount} rezervasyon serbest${skippedTenantsNote(disabledModules, "projects")}${failureNote({ failed, truncated })}`,
   );
 
   return NextResponse.json({
