@@ -51,7 +51,7 @@ async function entryScope(entryId: string): Promise<"office" | "user" | null> {
   return acc?.owner_scope ?? null;
 }
 
-function failure(error: { code?: string | null; message?: string | null } | null, fallback: string): FinanceResult {
+function rpcFailure(error: { code?: string | null; message?: string | null } | null, fallback: string): FinanceResult {
   if (isMissingCashSchema(error)) return { error: MISSING_MSG };
   console.error("finance-accounts", { code: error?.code });
   return { error: actionErrorMessage(error, fallback) };
@@ -79,7 +79,7 @@ export async function createFinanceAccount(input: Record<string, unknown>): Prom
     p_opening_balance: a.openingBalance,
     p_opening_date: a.openingDate,
   });
-  if (error) return failure(error, "Hesap açılamadı.");
+  if (error) return rpcFailure(error, "Hesap açılamadı.");
   const res = asObject(data);
   if (res.outcome !== "created") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
   revalidateTenantData(gate.tenantId, PATHS);
@@ -105,7 +105,7 @@ export async function updateFinanceAccount(accountId: string, input: Record<stri
     p_opening_balance: a.openingBalance,
     p_opening_date: a.openingDate,
   });
-  if (error) return failure(error, "Hesap güncellenemedi.");
+  if (error) return rpcFailure(error, "Hesap güncellenemedi.");
   const res = asObject(data);
   if (res.outcome !== "updated") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
   revalidateTenantData(gate.tenantId, PATHS);
@@ -120,7 +120,7 @@ export async function archiveFinanceAccount(accountId: string, archived: boolean
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("finance_account_set_archived", { p_account_id: accountId, p_archived: archived });
-  if (error) return failure(error, "Hesap güncellenemedi.");
+  if (error) return rpcFailure(error, "Hesap güncellenemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "archived" && outcome !== "unarchived") return { error: financeOutcomeMessage(outcome) };
   revalidateTenantData(gate.tenantId, PATHS);
@@ -187,7 +187,7 @@ export async function recordCashEntry(direction: CashDirection, input: Record<st
     p_create_expense: createExpense,
     p_expense_category: expenseCategory,
   });
-  if (error) return failure(error, "Hareket kaydedilemedi.");
+  if (error) return rpcFailure(error, "Hareket kaydedilemedi.");
   const res = asObject(data);
   if (res.outcome !== "recorded") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
   revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
@@ -217,7 +217,7 @@ export async function updateCashEntry(entryId: string, input: Record<string, unk
     p_note: e.note,
     p_expense_category: expenseCategoryFor(e.category),
   });
-  if (error) return failure(error, "Hareket güncellenemedi.");
+  if (error) return rpcFailure(error, "Hareket güncellenemedi.");
   const res = asObject(data);
   if (res.outcome !== "updated") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
   revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
@@ -237,7 +237,7 @@ export async function voidCashEntry(entryId: string, reason: string): Promise<Fi
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("finance_void_entry", { p_entry_id: entryId, p_reason: text });
-  if (error) return failure(error, "Hareket iptal edilemedi.");
+  if (error) return rpcFailure(error, "Hareket iptal edilemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "voided") return { error: financeOutcomeMessage(outcome) };
   revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
@@ -276,7 +276,7 @@ export async function transferBetweenAccounts(input: {
     p_entry_date: date,
     p_note: note || null,
   });
-  if (error) return failure(error, "Transfer yapılamadı.");
+  if (error) return rpcFailure(error, "Transfer yapılamadı.");
   const res = asObject(data);
   if (res.outcome !== "transferred") return { error: financeOutcomeMessage(String(res.outcome ?? "")) };
   revalidateTenantData(gate.tenantId, PATHS);

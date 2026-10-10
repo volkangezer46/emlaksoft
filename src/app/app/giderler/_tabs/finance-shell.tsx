@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeftRight, Landmark, LayoutDashboard } from "lucide-react";
 import { PageTabs, type PageTab } from "@/components/app/page-tabs";
-import { ListHero } from "@/components/ui/list-page";
 import { QuickEntryButtons, type AccountOption } from "../quick-entry";
 
 /**
@@ -23,39 +22,29 @@ export function financeTabOf(value: string | string[] | undefined): FinanceTab {
   return v === "hareketler" || v === "kasa-banka" ? v : "ozet";
 }
 
-export function FinanceHero({
+/** Hero eylemleri: şema varsa "Gelir ekle / Gider ekle", yoksa eski "Yeni gider" bağlantısı. */
+export function FinanceActions({
   cashAvailable,
-  active,
-  meta,
   quickAccounts,
   defaultDate,
   canSalary,
   legacyCreate,
 }: {
   cashAvailable: boolean;
-  active: FinanceTab;
-  meta?: ReactNode;
   quickAccounts: readonly AccountOption[];
   defaultDate: string;
   canSalary: boolean;
-  /** Şema yokken eski "Yeni gider" bağlantısı (yetki varsa). */
   legacyCreate: ReactNode;
 }) {
-  return (
-    <>
-      <ListHero
-        eyebrow={cashAvailable ? "Kasa, banka ve giderler" : "Gider takibi"}
-        art="gider"
-        title="Finans"
-        meta={meta}
-        description={
-          cashAvailable
-            ? "Paranın hangi kasadan ve bankadan girip çıktığını, ofis giderlerini ve bakiyelerinizi tek yerden takip edin."
-            : "Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
-        }
-        actions={cashAvailable ? <QuickEntryButtons accounts={quickAccounts} defaultDate={defaultDate} canSalary={canSalary} /> : legacyCreate}
-      />
-      {cashAvailable ? <PageTabs base={FINANCE_BASE} label="Finans sekmeleri" tabs={FINANCE_TABS} active={active} /> : null}
-    </>
-  );
+  return cashAvailable ? <QuickEntryButtons accounts={quickAccounts} defaultDate={defaultDate} canSalary={canSalary} /> : <>{legacyCreate}</>;
+}
+
+export const FINANCE_HERO_TEXT = {
+  cash: { eyebrow: "Kasa, banka ve giderler", description: "Paranın hangi kasadan ve bankadan girip çıktığını, ofis giderlerini ve bakiyelerinizi tek yerden takip edin." },
+  legacy: { eyebrow: "Gider takibi", description: "Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın." },
+} as const;
+
+/** Sekme şeridi; şema (kasa/banka) yokken görünmez. */
+export function FinanceTabs({ cashAvailable, active }: { cashAvailable: boolean; active: FinanceTab }) {
+  return cashAvailable ? <PageTabs base={FINANCE_BASE} label="Finans sekmeleri" tabs={FINANCE_TABS} active={active} /> : null;
 }

@@ -414,7 +414,6 @@ export async function recordBuildingPayment(input: {
   paidOn: string;
   method: string;
   bankNote?: string;
-  /** Istege bagli "Hangi hesaba girdi?" (ofis hesabi); bossa davranis ayni. */
   accountId?: string | null;
 }): Promise<BmResult> {
   const gate = await requirePermission("expenses", "edit");

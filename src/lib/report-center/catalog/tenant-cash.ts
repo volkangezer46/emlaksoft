@@ -30,6 +30,7 @@ export const hesapEkstresi = defineReport({
   category: "finans",
   scope: "tenant",
   module: "reports",
+  personalData: true,
   keywords: ["kasa", "banka", "ekstre", "hareket", "bakiye"],
   filters: [
     { kind: "text", key: "hesap", label: "Hesap adı", placeholder: "ör. Ofis kasası" },
@@ -68,6 +69,7 @@ export const gelirGiderDokumu = defineReport({
   category: "finans",
   scope: "tenant",
   module: "reports",
+  personalData: true,
   keywords: ["gelir", "gider", "kasa", "nakit"],
   filters: [
     { kind: "select", key: "kapsam", label: "Hesap kapsamı", options: opts({ ofis: "Ofis hesapları", kisisel: "Kişisel hesaplarım" }) },

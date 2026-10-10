@@ -65,7 +65,6 @@ export async function recordRentPayment(input: {
   paidOn: string;
   method: string;
   bankNote?: string;
-  /** Istege bagli "Hangi hesaba girdi?" (ofis hesabi); bossa davranis ayni. */
   accountId?: string | null;
 }): Promise<PmResult> {
   const gate = await requirePermission("rentals", "edit");

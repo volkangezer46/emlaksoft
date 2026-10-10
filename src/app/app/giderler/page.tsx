@@ -26,7 +26,7 @@ import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-rece
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { ButtonLink } from "@/components/ui/button";
-import { FinanceHero, financeTabOf } from "./_tabs/finance-shell";
+import { FINANCE_HERO_TEXT, FinanceActions, FinanceTabs, financeTabOf } from "./_tabs/finance-shell";
 import { HareketlerTab } from "./_tabs/hareketler";
 import { KasaBankaTab } from "./_tabs/kasa-banka";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
@@ -114,7 +114,14 @@ export default async function GiderlerPage({
   if (sekme !== "ozet") {
     return (
       <ListPage>
-        <FinanceHero cashAvailable active={sekme} quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={null} />
+        <ListHero
+          eyebrow={FINANCE_HERO_TEXT.cash.eyebrow}
+          art="gider"
+          title="Finans"
+          description={FINANCE_HERO_TEXT.cash.description}
+          actions={<FinanceActions cashAvailable quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={null} />}
+        />
+        <FinanceTabs cashAvailable active={sekme} />
         {sekme === "hareketler" ? (
           <HareketlerTab
             supabase={supabase}
@@ -258,15 +265,15 @@ export default async function GiderlerPage({
 
   return (
     <ListPage>
-      <FinanceHero
-        cashAvailable={cash.available}
-        active="ozet"
+      <ListHero
+        eyebrow={cash.available ? FINANCE_HERO_TEXT.cash.eyebrow : FINANCE_HERO_TEXT.legacy.eyebrow}
+        art="gider"
+        title="Finans"
         meta={<SampleDataBadge label={sampleLabel} />}
-        quickAccounts={quickAccounts}
-        defaultDate={today}
-        canSalary={canSalary}
-        legacyCreate={legacyCreate}
+        description={cash.available ? FINANCE_HERO_TEXT.cash.description : FINANCE_HERO_TEXT.legacy.description}
+        actions={<FinanceActions cashAvailable={cash.available} quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={legacyCreate} />}
       />
+      <FinanceTabs cashAvailable={cash.available} active="ozet" />
 
       {cash.available ? <CashOverview accounts={cash.accounts} summary={cashSummary} today={today} /> : null}
 
