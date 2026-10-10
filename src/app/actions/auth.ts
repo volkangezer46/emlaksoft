@@ -16,6 +16,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isRegistrationOpen } from "@/lib/platform-flags";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { opaqueRateLimitPart } from "@/lib/public-request-security";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -296,6 +297,11 @@ export async function signIn(
   redirect(target);
 }
 
+const SIGNUP_GLOBAL_KEY = "signup:global:ok";
+const SIGNUP_GLOBAL_LIMIT = 300;
+const SIGNUP_GENERIC_ERROR =
+  "Hesap oluşturulamadı: bilgilerinizi kontrol edip tekrar deneyin. Daha önce kayıt olduysanız giriş sayfasını kullanın.";
+
 /**
  * Kayıt — iki giriş yolu, TEK provizyon çekirdeği (`provisionOfficeForUser`):
  * - e-posta/şifre: auth kullanıcısı burada oluşur; provizyon başarısızsa tek telafi hedefi odur (silinir).
@@ -378,10 +384,6 @@ export async function signUp(
   if (!emailLimit.allowed) {
     return { error: "Çok fazla kayıt denemesi. Lütfen bir süre sonra tekrar deneyin." };
   }
-  const globalLimit = await checkRateLimit("signup:global", { limit: 300, windowSec: 3600, failurePolicy: "deny" });
-  if (!globalLimit.allowed) {
-    return { error: "Kayıt şu anda yoğun. Lütfen biraz sonra tekrar deneyin." };
-  }
   // profiles.phone şu an DB'de yalnız TR cep (05XXXXXXXXX) kabul eder (profiles_phone_tr_format);
   // 2FA SMS'i de Netgsm (yalnız TR) ile gider. Yabancı numara için migration gerekir.
   let phone = "";
@@ -393,6 +395,22 @@ export async function signUp(
   }
   const userAgent = ((await headers()).get("user-agent") ?? "").slice(0, 512);
   const admin = createAdminClient();
+
+  // Global saatlik tavan YALNIZ başarılı provizyonları sayar (aşağıda, provizyon sonrası artar). Burada sadece
+  // sayaca bakılır (tüketmez): başarısız/geçersiz denemeler (ör. kayıtlı e-posta, hatalı alan) global tavanı doldurup
+  // gerçek kayıtları engelleyemez. Okuma hatasında güvenli tarafta kalınır (reddet).
+  {
+    const { data: bucket, error: bucketError } = await admin
+      .from("rate_limits")
+      .select("hits, window_end")
+      .eq("bucket", `v1:${opaqueRateLimitPart(SIGNUP_GLOBAL_KEY)}`)
+      .maybeSingle();
+    const hits = Number((bucket as { hits?: number } | null)?.hits ?? 0);
+    const windowEnd = Date.parse(String((bucket as { window_end?: string } | null)?.window_end ?? ""));
+    if (bucketError || (hits >= SIGNUP_GLOBAL_LIMIT && Number.isFinite(windowEnd) && windowEnd > Date.now())) {
+      return { error: "Kayıt şu anda yoğun. Lütfen biraz sonra tekrar deneyin." };
+    }
+  }
 
   let userId: string;
   if (oauthUserId) {
@@ -420,9 +438,8 @@ export async function signUp(
     });
     if (createError || !created.user) {
       console.error("signUp auth", createError);
-      return createError?.message?.includes("already")
-        ? { error: "Bu e-posta zaten kayıtlı.", field: "email" }
-        : { error: actionErrorMessage(createError, "Hesap oluşturulamadı.") };
+      // Hesap sayımı (enumeration) yok: kayıtlı e-posta için özel mesaj/alan işareti dönmez; her hata aynı genel metni alır.
+      return { error: SIGNUP_GENERIC_ERROR };
     }
     userId = created.user.id;
   }
@@ -447,6 +464,8 @@ export async function signUp(
     return { error: actionErrorMessage(result.error, "Ofis hesabı güvenli şekilde oluşturulamadı. Lütfen tekrar deneyin.") };
   }
   const tenantId = result.tenantId;
+  // Başarılı provizyon: global tavan sayacı artar (en iyi çaba; kayıt zaten tamamlandı, sayaç hatası kaydı bozmaz).
+  await checkRateLimit(SIGNUP_GLOBAL_KEY, { limit: SIGNUP_GLOBAL_LIMIT, windowSec: 3600, failurePolicy: "allow" });
 
   if (oauthUserId) {
     // Profil tetikleyicisi app_metadata'ya tenant_id/role yazdı; mevcut JWT'yi yenile ki proxy kapısı geçsin.
