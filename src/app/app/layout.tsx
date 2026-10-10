@@ -23,6 +23,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
 import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
+import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
+import { isEmailVerified } from "@/lib/auth/email-verification";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
 import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
@@ -347,6 +349,7 @@ async function buildShellModel() {
     uiPrefs,
     fontScale,
     impName,
+    emailUnverified: Boolean(user) && !impersonating && !isEmailVerified(user),
     trialDaysLeft,
     storageScope: user && tenantId ? `${tenantId}:${user.id}` : undefined,
   };
@@ -477,6 +480,7 @@ async function ShellHeader() {
       {!m.platformStaffFullAccess && m.tenantId ? (
         <DemoTrialStrip sampleActive={Boolean(m.office?.sample_seeded_at)} trialDaysLeft={m.trialDaysLeft} canSwitch={!m.impersonating && canSwitchToRealUse(m.effectiveRole)} />
       ) : null}
+      {m.emailUnverified && !m.platformStaffFullAccess && m.tenantId ? <EmailVerifyStrip /> : null}
       <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
         <AppBreadcrumb accessibleModules={m.accessibleModules} />
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
