@@ -19,6 +19,25 @@ const vercel = JSON.parse(readFileSync(join(root, "vercel.json"), "utf8")) as Ve
 const configured = vercel.crons ?? [];
 const issues: string[] = [];
 
+/** Sabit "ok" yazan ESKİ cronlar (taşındıkça buradan silinir; yeni giriş eklemek yasak). */
+const LEGACY_CONSTANT_OK = new Set<string>([
+  "billing-reconciliation",
+  "direct-file-upload-cleanup",
+  "dogum-gunu",
+  "ef-kontor-sweep",
+  "geo-sync",
+  "growth-claims",
+  "insight-engine",
+  "operational-retention",
+  "public-mutation-outbox",
+  "seo-robot",
+  "tcmb-kur",
+  "ticket-attachment-cleanup",
+  "ticket-sla",
+  "vitrin-alarm",
+  "vitrin-eslesme",
+]);
+
 function duplicates(values: string[]): string[] {
   return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))];
 }
@@ -78,6 +97,18 @@ for (const definition of CRON_JOBS) {
   const escapedJob = definition.job.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (!new RegExp(`recordHeartbeat\\(\\s*["']${escapedJob}["']`).test(source)) {
     issues.push(`${definition.path}: recordHeartbeat iş adı eşleşmiyor`);
+  }
+
+  // Sabit "ok" yasak: durum hata sayacından hesaplanır (heartbeatFor). Yalnız "atlandı" dalı (iş bilerek atlandı) istisnadır.
+  // Eski (henüz taşınmamış) cronlar LEGACY_CONSTANT_OK ile ratchet altındadır: liste yalnız KÜÇÜLEBİLİR.
+  if (!LEGACY_CONSTANT_OK.has(definition.job)) {
+    for (const m of source.matchAll(/recordHeartbeat\(\s*["'][^"']+["']\s*,\s*["']ok["']\s*[,)]/g)) {
+      const tail = source.slice(m.index ?? 0, (m.index ?? 0) + 240);
+      if (!/atland[ıi]/.test(tail)) {
+        issues.push(`${definition.path}: recordHeartbeat ikinci argümanı sabit "ok" (heartbeatFor({ failed }) kullan; yalnız "atlandı" dalı istisna)`);
+        break;
+      }
+    }
   }
 }
 

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { keyOverdueDays } from "@/lib/key-overdue";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
@@ -55,16 +57,23 @@ export async function GET(req: NextRequest) {
     const nowMs = Date.now();
     const nowIso = new Date(nowMs).toISOString();
 
-    const { data, error } = await admin
-      .from("property_keys")
-      .select(
-        "id, tenant_id, property_id, label, status, holder_staff_id, holder_name, due_at, returned_at, property:properties!property_keys_property_id_fkey(property_code, title, assigned_to), holder:profiles!property_keys_holder_staff_id_fkey(full_name)",
-      )
-      .in("status", ["danisanda", "musteride"])
-      .is("returned_at", null)
-      .not("due_at", "is", null)
-      .lt("due_at", nowIso)
-      .limit(2000);
+    const keysRes = await readAllPaged<OverdueKey>(
+      (from, to) =>
+        admin
+          .from("property_keys")
+          .select(
+            "id, tenant_id, property_id, label, status, holder_staff_id, holder_name, due_at, returned_at, property:properties!property_keys_property_id_fkey(property_code, title, assigned_to), holder:profiles!property_keys_holder_staff_id_fkey(full_name)",
+          )
+          .in("status", ["danisanda", "musteride"])
+          .is("returned_at", null)
+          .not("due_at", "is", null)
+          .lt("due_at", nowIso)
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: OverdueKey[] | null; error: { message: string } | null }>,
+    );
+    const data = keysRes.rows;
+    const error = keysRes.error;
+    const truncated = keysRes.truncated;
 
     if (error) {
       console.error("cron anahtar-gecikme query", error);
@@ -74,9 +83,9 @@ export async function GET(req: NextRequest) {
 
     // Modül kapısı: "Anahtar Takibi" kapalı ofislere uyarı yazılmaz (kayıtlar silinmez).
     const disabledModules = await getDisabledModulesByTenant(admin);
-    const rows = ((data ?? []) as unknown as OverdueKey[]).filter((r) => !isDisabledFor(disabledModules, r.tenant_id, "keys"));
+    const rows = data.filter((r) => !isDisabledFor(disabledModules, r.tenant_id, "keys"));
     if (rows.length === 0) {
-      await recordHeartbeat("anahtar-gecikme", "ok", "geciken anahtar yok" + skippedTenantsNote(disabledModules, "keys"));
+      await recordHeartbeat("anahtar-gecikme", heartbeatFor({ truncated }), "geciken anahtar yok" + skippedTenantsNote(disabledModules, "keys") + failureNote({ truncated }));
       return NextResponse.json({ ok: true, overdue: 0, notified: 0 });
     }
 
@@ -131,12 +140,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const notified = await insertNotifications(admin, toInsert);
+    const ins = await insertNotificationsDetailed(admin, toInsert);
+    const notified = ins.written;
+    const failed = ins.failed;
 
     await recordHeartbeat(
       "anahtar-gecikme",
-      "ok",
-      `${overdue} geciken anahtar, ${notified} bildirim${skippedTenantsNote(disabledModules, "keys")}`,
+      heartbeatFor({ failed, truncated }),
+      `${overdue} geciken anahtar, ${notified} bildirim${skippedTenantsNote(disabledModules, "keys")}${failureNote({ failed, truncated })}`,
     );
     return NextResponse.json({ ok: true, overdue, notified });
   } catch (e) {
