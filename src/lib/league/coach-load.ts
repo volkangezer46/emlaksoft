@@ -1,14 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, trDayKey } from "@/lib/clock";
 import { loadLeagueData, periodOf } from "@/lib/gamification-query";
-import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
-import type { ScoreRuleset } from "@/lib/gamification";
 import { loadLeadResponses } from "@/lib/response-time/load";
 import { buildCoachPlan, type CoachFacts, type CoachItem, type CoachPlan } from "@/lib/league/coach";
 
 type Row = Record<string, unknown>;
-
-type WeeklyRanking = { ruleset: ScoreRuleset; ranked: Array<{ staffId: string; total: number; rank: number }> };
 
 const LOOKBACK_DAYS = 14;
 const LIST_LIMIT = 20;
@@ -34,20 +30,10 @@ export async function loadCoachPlan(
   const week = periodOf(new Date(nowMs), "week");
 
   const [league, overdue, past, listings, responses] = await Promise.all([
-    // Yalnız haftalık sıra (rankingOnly: ömür boyu/seri taramaları yok) + ofis ayarı AYNI turda; 120 sn önbellekli.
-    // Önbellek JSON'dur (Map yok): yalnız sıra özeti + kural puanları. Lig sayfasıyla aynı kaynak/aynı sıra.
-    cachedTenantAggregate(
-      "lig-hafta",
-      { tenantId, userId, scope: week },
-      async (): Promise<WeeklyRanking> => {
-        const data = await loadLeagueData(client, { period: week, tenantId, todayIso: trDayKey(nowMs), nowMs, rankingOnly: true });
-        return {
-          ruleset: data.settings.ruleset,
-          ranked: data.ranked.map((r) => ({ staffId: r.staffId, total: r.total, rank: r.rank })),
-        };
-      },
-      120,
-    ),
+    // Yalnız haftalık sıra (rankingOnly: ömür boyu/seri taramaları yok); ofis ayarı loadLeagueData içinde AYNI turda okunur.
+    // ÖNBELLEKSİZ ve lig sayfasıyla aynı yükleyici: koçtaki sıra ile /app/lig sırası aynı anda aynıdır (120 sn sapma yok);
+    // `ranked` tam sürümle birebir aynıdır (bkz. coach-load.test.ts davranış testi).
+    loadLeagueData(client, { period: week, tenantId, todayIso: trDayKey(nowMs), nowMs, rankingOnly: true }),
     rows(
       client
         .from("tasks")
@@ -85,7 +71,7 @@ export async function loadCoachPlan(
     loadLeadResponses(client, { tenantId, startIso: sinceIso, endIso: nowIso, assignedToIn: [userId], nowMs }),
   ]);
 
-  const settings = { ruleset: league.ruleset };
+  const settings = { ruleset: league.settings.ruleset };
   const me = league.ranked.find((r) => r.staffId === userId) ?? null;
   const leaderTotal = league.ranked[0]?.total ?? 0;
   const runnerUp = league.ranked.find((r) => r.rank > 1)?.total ?? null;

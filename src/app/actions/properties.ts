@@ -6,7 +6,7 @@ import { parsePropertyDescription, withDescription } from "@/lib/property-descri
 import { parseVirtualTourUrl, withVirtualTour } from "@/lib/virtual-tour";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -428,7 +428,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
         });
         if (res.ok) {
           const assigneeId = queued.decision.profileId;
-          after(() =>
+          afterSafe(() =>
             notifyPoolAssigned(supabase, {
               tenantId: gate.tenantId,
               actorId: gate.userId,
@@ -444,7 +444,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
       }
       if (finalDecision.kind !== "auto_assign") {
         const awaitingDecision = finalDecision;
-        after(() =>
+        afterSafe(() =>
           notifyPoolEntry(supabase, {
             tenantId: gate.tenantId,
             actorId: gate.userId,
@@ -462,7 +462,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
 
   // Ofis sahibine bildirim/görev: yeni ilan + (varsa) eksik ilan sahibi bilgisi.
   if (!pooled) {
-    after(() =>
+    afterSafe(() =>
       notifyNewListing(supabase, {
         tenantId: gate.tenantId,
         actorId: gate.userId,
@@ -474,7 +474,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     );
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.create",
@@ -501,7 +501,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   });
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  after(() =>
+  afterSafe(() =>
     Promise.resolve()
       .then(() => dispatchAutomationEvent(gate.tenantId, "new_property", {
       entityType: "property",
@@ -515,7 +515,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     );
 
   // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  after(() => triggerPlaybooks({
+  afterSafe(() => triggerPlaybooks({
     tenantId: gate.tenantId,
     event: "yeni_portfoy",
     actorId: gate.userId,
@@ -691,7 +691,7 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     return { error: actionErrorMessage(error, "Portföy güncellenemedi.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.update",
@@ -803,7 +803,7 @@ export async function deleteProperty(formData: FormData): Promise<{ error?: stri
     console.error("deleteProperty", error);
     return { error: "Portföy arşivlenemedi." };
   }
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.delete",
@@ -856,7 +856,7 @@ export async function reassignProperty(formData: FormData): Promise<void> {
     console.error("reassignProperty", error);
     return;
   }
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "property.reassign",

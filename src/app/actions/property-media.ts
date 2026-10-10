@@ -255,6 +255,14 @@ export async function setCoverPropertyMedia(formData: FormData): Promise<void> {
     .eq("is_cover", true);
   if (clearError) {
     console.error("setCoverPropertyMedia clear", { code: clearError.code });
+    // Telafi: diğerlerini kapatan tek UPDATE ifadesi atomiktir (ya hepsi ya hiçbiri); yeni kapağı geri alınca eski
+    // tek-kapak durumu aynen döner, portföy iki kapaklı kalmaz.
+    const { error: revertError } = await supabase
+      .from("property_media")
+      .update({ is_cover: false })
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId);
+    if (revertError) console.error("setCoverPropertyMedia revert", { code: revertError.code });
     return;
   }
   revalidatePath(`/app/portfoyler/${propertyId}`);

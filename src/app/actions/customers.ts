@@ -4,7 +4,7 @@ import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -88,7 +88,7 @@ export async function createCustomer(
     return { error: planLimitErrorMessage(error) ?? actionErrorMessage(error, "Müşteri eklenemedi. Lütfen tekrar deneyin.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId,
     actorId: gate.userId,
     action: "customer.create",
@@ -98,7 +98,7 @@ export async function createCustomer(
   }));
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  after(() =>
+  afterSafe(() =>
     Promise.resolve()
       .then(() => dispatchAutomationEvent(tenantId, "new_customer", {
       entityType: "customer",
@@ -112,7 +112,7 @@ export async function createCustomer(
     );
 
   // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  after(() => triggerPlaybooks({
+  afterSafe(() => triggerPlaybooks({
     tenantId,
     event: "yeni_musteri",
     actorId: user.id,
@@ -192,7 +192,7 @@ export async function updateCustomer(
     return { error: actionErrorMessage(error, "Müşteri güncellenemedi.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.update",
@@ -277,7 +277,7 @@ export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok
     console.error("deleteCustomer", error);
     return { error: actionErrorMessage(error, "Müşteri silinemedi.") };
   }
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.delete",
@@ -362,7 +362,7 @@ export async function bulkAssignCustomers(
   }
 
   // Audit log (tek kayıt, toplu temsil — bkz. bulkUpdatePropertyStatus deseni)
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_assign",
@@ -397,7 +397,7 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkCustomerRe
     return { error: actionErrorMessage(error, "Müşteriler silinemedi.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_delete",
@@ -405,7 +405,7 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkCustomerRe
     newValue: { ids: validIds, count: validIds.length },
   }));
   // Çöp kutusunda "Silen" görünsün: her müşteri için kayıt kimlikli denetim satırı (özet satırı korunur)
-  after(() =>
+  afterSafe(() =>
     Promise.all(
       validIds.map((cid) =>
         logActivity({
@@ -491,7 +491,7 @@ export async function bulkReheatCustomers(ids: string[]): Promise<BulkCustomerRe
     return { error: actionErrorMessage(error, "Görevler oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_reheat",
@@ -588,7 +588,7 @@ export async function addCustomerTag(
     return { error: actionErrorMessage(error, "Etiket eklenemedi. Lütfen tekrar deneyin.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.tag_add",
@@ -632,7 +632,7 @@ export async function removeCustomerTag(
     return { error: actionErrorMessage(error, "Etiket kaldırılamadı. Lütfen tekrar deneyin.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.tag_remove",
@@ -698,7 +698,7 @@ export async function bulkAddTag(ids: string[], tag: string): Promise<BulkCustom
     return { error: "Seçili müşterilerin tümünde bu etiket zaten var (veya etiket sınırı dolu)." };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_tag",
@@ -1007,7 +1007,7 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
     console.error("reassignCustomer", error);
     return;
   }
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.reassign",
@@ -1069,7 +1069,7 @@ export async function appendCustomerNote(customerId: string, text: string): Prom
     return { error: actionErrorMessage(error, "Not eklenemedi. Lütfen tekrar deneyin.") };
   }
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.note_append",

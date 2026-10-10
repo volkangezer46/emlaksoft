@@ -2,7 +2,7 @@
 
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -114,7 +114,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   }
   await writeCustomFieldInputs(supabase, { tenantId: gate.tenantId, userId: gate.userId, recordId: deal.id }, customFields.value);
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.create",
@@ -256,7 +256,7 @@ async function updateDealStageWithGate(
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
   if (outcome === "applied" && stage === "lost" && previousStage !== "lost") {
-    after(() =>
+    afterSafe(() =>
       Promise.resolve()
         .then(() => dispatchAutomationEvent(gate.tenantId, "deal_lost", {
         entityType: "deal",
@@ -296,7 +296,7 @@ async function updateDealStageWithGate(
     }
 
     // Otomasyon tetikle — hata ana işlemi asla bozmasın
-    after(() =>
+    afterSafe(() =>
       Promise.resolve()
         .then(() => dispatchAutomationEvent(gate.tenantId, "deal_won", {
         entityType: "deal",
@@ -311,7 +311,7 @@ async function updateDealStageWithGate(
       );
 
     // İş akışı (playbook) tetikle — kapanış sonrası görev paketi
-    after(() => triggerPlaybooks({
+    afterSafe(() => triggerPlaybooks({
       tenantId: gate.tenantId,
       event: "anlasma_kazanildi",
       actorId: gate.userId,
@@ -398,7 +398,7 @@ export async function updateDeal(formData: FormData): Promise<DealResult> {
   }
   if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.update",
@@ -476,7 +476,7 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
   }
   if (!updated) return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
 
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.update_links",
@@ -556,7 +556,7 @@ export async function addDealCost(_prev: DealResult, fd: FormData): Promise<Deal
 
   // Kapora anlaşmanın kilit anıdır — zaman çizgisine/aktiviteye düşsün
   if (kind === "kapora") {
-    after(() => logActivity({
+    afterSafe(() => logActivity({
       tenantId: gate.tenantId,
       actorId: gate.userId,
       action: "deal.kapora",
@@ -730,13 +730,16 @@ export async function bulkUpdateDealStage(ids: string[], stage: string): Promise
   if (list.length === 0) return { error: "Anlaşma seçin." };
   let updated = 0;
   let failed = 0;
-  let firstError: string | undefined;
+  const errorsByIndex = new Map<number, string>();
   const touchedProperties = new Set<string>();
   // Kapı bir kez alındı; kayıtlar 6'lı sınırlı eşzamanlılıkla işlenir (kayıp nedeni bu aşamalarda gerekmez).
+  // Kimlikler cleanIds ile tekilleştirilmiştir (aynı anlaşma iki işçiye düşmez). İlk hata, işçi sırasına değil
+  // liste sırasına göre seçilir (belirlenimli).
   let cursor = 0;
   const worker = async () => {
     while (cursor < list.length) {
-      const id = list[cursor++];
+      const index = cursor++;
+      const id = list[index];
       const fd = new FormData();
       fd.set("deal_id", id);
       fd.set("stage", stage);
@@ -746,11 +749,12 @@ export async function bulkUpdateDealStage(ids: string[], stage: string): Promise
         if (res.propertyId) touchedProperties.add(res.propertyId);
       } else {
         failed += 1;
-        firstError ??= res.error;
+        if (res.error) errorsByIndex.set(index, res.error);
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(BULK_STAGE_CONCURRENCY, list.length) }, worker));
+  const firstError = errorsByIndex.size > 0 ? errorsByIndex.get(Math.min(...errorsByIndex.keys())) : undefined;
   if (updated > 0) {
     revalidatePath("/app/anlasmalar");
     revalidatePath("/app/komisyon");
@@ -759,7 +763,7 @@ export async function bulkUpdateDealStage(ids: string[], stage: string): Promise
     revalidatePath("/app");
     revalidateTenantData(gate.tenantId);
   }
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.bulk_stage",
@@ -797,7 +801,7 @@ export async function bulkAssignDeals(ids: string[], assignedTo: string): Promis
     return { error: actionErrorMessage(error, "Atama yapılamadı.") };
   }
   const changed = (data ?? []).map((r) => r.id as string);
-  after(() => logActivity({
+  afterSafe(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "deal.bulk_assign",

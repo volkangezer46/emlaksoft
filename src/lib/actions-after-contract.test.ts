@@ -24,8 +24,18 @@ describe("server action yan etkileri yanıtı bekletmez", () => {
       const src = readFileSync(join(ACTIONS_DIR, f), "utf8");
       expect(src, f).not.toMatch(/await\s+logActivity\(/);
       expect(src, f).not.toMatch(/await\s+triggerPlaybooks\(/);
-      expect(src, f).toMatch(/from "next\/server"/);
+      expect(src, f).toMatch(/from "@\/lib\/after-safe"/);
     }
+  });
+
+  it("yan etkiler afterSafe ile sarılır: ham after() yok (hata yakalama + günlük tek yerde)", () => {
+    const offenders: string[] = [];
+    for (const f of actionFiles()) {
+      const src = readFileSync(join(ACTIONS_DIR, f), "utf8");
+      if (/(^|[^a-zA-Z.])after\(/m.test(src)) offenders.push(f);
+    }
+    expect(offenders).toEqual([]);
+    // Davranış (hata yakalama, yanıtı bekletmeme) src/lib/after-safe.test.ts içinde.
   });
 
   it("toplu aşama değişimi kapıyı bir kez alır, kapısız iç gövdeyi çağırır", () => {

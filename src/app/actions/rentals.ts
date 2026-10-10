@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -89,7 +89,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   const rentalId = transition.rental_id;
 
   // İş akışı (playbook) tetikle — sözleşme/depozito/anahtar teslim paketi
-  after(() =>
+  afterSafe(() =>
     triggerPlaybooks({
       tenantId: gate.tenantId,
       event: "kira_sozlesmesi",

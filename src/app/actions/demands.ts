@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -122,7 +122,7 @@ export async function createDemand(
   });
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  after(() =>
+  afterSafe(() =>
     Promise.resolve()
       .then(() => dispatchAutomationEvent(gate.tenantId, "new_demand", {
     entityType: "demand",
@@ -135,7 +135,7 @@ export async function createDemand(
   );
 
   // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  after(() =>
+  afterSafe(() =>
     triggerPlaybooks({
       tenantId: gate.tenantId,
       event: "talep_olusturuldu",
