@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     processed: summary.automationsEvaluated,
     failed: summary.automationsFailed,
     timedOut: summary.timedOut,
-    summary: `${summary.actionsExecuted} aksiyon çalıştı`,
+    summary: `${summary.actionsExecuted} aksiyon çalıştı${summary.einvoice ? `, e-Fatura ${summary.einvoice.checked} sorgu/${summary.einvoice.updated} güncel` : ""}`,
   });
   await recordHeartbeat("otomasyon", hb.status, hb.detail);
 
@@ -31,5 +31,6 @@ export async function GET(req: NextRequest) {
     matched: summary.entitiesMatched,
     actions: summary.actionsExecuted,
     skipped: summary.skippedDuplicates,
+    einvoice: summary.einvoice ?? null,
   });
 }

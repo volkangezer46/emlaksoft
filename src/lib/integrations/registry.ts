@@ -9,6 +9,7 @@
  */
 
 import { isEmlakFiyatiConfigured } from "./emlakfiyati/client";
+import { isTenantEInvoiceConnected } from "./einvoice/service";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { isPortalConfigured } from "@/lib/integrations/portals";
 import { getNetgsmConfig, getWhatsAppConfig } from "@/lib/messaging/netgsm";
@@ -44,6 +45,8 @@ export type Integration = {
 /** Tüm entegrasyonları CANLI durumlarıyla döndürür (yalnız sunucuda çağır). */
 export async function listIntegrations(tenantId: string | null = null): Promise<Integration[]> {
   const emlakFiyatiConfigured = await isEmlakFiyatiConfigured();
+  // Oturumlu sayfa bağlamında ofisin e-Fatura bağlantısı (tenantId yoksa platform görünümü: bağlı sayılmaz).
+  const einvoiceConnected = tenantId ? await isTenantEInvoiceConnected() : false;
   const [
     netgsmConfigured,
     whatsappConfigured,
@@ -115,12 +118,12 @@ export async function listIntegrations(tenantId: string | null = null): Promise<
     },
     {
       key: "efatura",
-      name: "E-Fatura / E-Arşiv",
+      name: "e-Fatura / e-Arşiv (Nilvera, Paraşüt)",
       category: "operasyon",
-      description: "Sağlayıcı adaptörleri mevcut; faturalama yaşam döngüsüne uçtan uca bağlama ve mali kabul süreci henüz tamamlanmadı.",
-      unlocks: "Tahsilat sonrası mevzuata uygun belgenin otomatik oluşturulması ve kalıcı sağlayıcı makbuzu.",
-      status: "planned",
-      requires: "Uyumlu sağlayıcı sözleşmesi + uçtan uca mali kabul ve iptal/iade senaryoları",
+      description: "Komisyon ve hizmet bedeli için ofisin kendi sağlayıcı hesabından e-Fatura / e-Arşiv keser, durumunu izler. Tüm paketlerde, ek ücretsiz.",
+      unlocks: "Anlaşma/komisyondan önceden doldurulmuş taslak, onaylı resmileştirme, durum ve PDF takibi (Finans > Faturalar).",
+      status: einvoiceConnected ? "configured" : "setup_required",
+      requires: "Aşağıdaki e-Fatura kartından Nilvera API anahtarı ya da Paraşüt hesabı bağlantısı",
       turkish: true,
     },
     {

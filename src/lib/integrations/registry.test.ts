@@ -10,6 +10,7 @@ const providerMocks = vi.hoisted(() => ({
   platformWhatsApp: vi.fn(),
   iyzico: vi.fn(),
   portal: vi.fn(),
+  einvoice: vi.fn(),
 }));
 
 vi.mock("./emlakfiyati/client", () => ({
@@ -28,6 +29,10 @@ vi.mock("@/lib/billing/iyzico", () => ({
 }));
 vi.mock("@/lib/integrations/portals", () => ({
   isPortalConfigured: providerMocks.portal,
+}));
+
+vi.mock("./einvoice/service", () => ({
+  isTenantEInvoiceConnected: providerMocks.einvoice,
 }));
 
 import { listIntegrations } from "./registry";
@@ -52,6 +57,7 @@ describe("integration readiness registry", () => {
     providerMocks.platformWhatsApp.mockResolvedValue(null);
     providerMocks.iyzico.mockReturnValue(false);
     providerMocks.portal.mockResolvedValue(false);
+    providerMocks.einvoice.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -109,7 +115,10 @@ describe("integration readiness registry", () => {
 
     expect(statusOf(integrations, "iyzico")).toBe("configured");
     expect(statusOf(integrations, "property_portals")).toBe("configured");
-    expect(statusOf(integrations, "efatura")).toBe("planned");
+    // e-Fatura artık yazılı ve testli: bağlantı yoksa kurulum gerekli, bağlıysa yapılandırıldı.
+    expect(statusOf(integrations, "efatura")).toBe("setup_required");
+    providerMocks.einvoice.mockResolvedValue(true);
+    expect(statusOf(await listIntegrations("tenant-3"), "efatura")).toBe("configured");
   });
 
   it("reports EmlakFiyati from the API key readiness and no longer lists removed providers", async () => {

@@ -1,6 +1,6 @@
 import { measureAll } from "@/lib/server-timing";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
+import { ArrowUpRight, CalendarRange, FileText, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now as nowMs } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
@@ -26,6 +26,7 @@ import { loadExpenseReceipts, type ExpenseReceiptFile } from "@/lib/expense-rece
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { ButtonLink } from "@/components/ui/button";
+import { FaturalarTab, FATURALAR_SEKME, type FaturalarParams } from "./faturalar/faturalar-tab";
 // Inline server action wrappers — void return için form action uyumlu
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -71,10 +72,12 @@ function tarihKisa(iso: string) {
 export default async function GiderlerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string }>;
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string } & FaturalarParams>;
 }) {
   const { perms, tenantId, userId } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
+  // Faturalar sekmesi (e-Fatura, Paket D): ayrı bileşen; sekme şeridine tek satır (FATURALAR_SEKME) eklenir.
+  if (params.sekme === FATURALAR_SEKME.key) return <FaturalarTab perms={perms} params={params} />;
   const fromF = ISO_DATE.test(params.from ?? "") ? params.from! : null;
   const toF = ISO_DATE.test(params.to ?? "") ? params.to! : null;
   // ?portfoy= portföy detayındaki "Giderler" bağlantısı: liste yalnız o portföyün giderleri.
@@ -220,6 +223,9 @@ export default async function GiderlerPage({
         description="Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın."
         actions={
           <>
+            <ButtonLink href={`/app/giderler?sekme=${FATURALAR_SEKME.key}`} variant="secondary" icon={FileText}>
+              {FATURALAR_SEKME.label}
+            </ButtonLink>
             {canCreate ? (
               <ButtonLink href="#gider-ekle" icon={Plus}>
                 Yeni gider

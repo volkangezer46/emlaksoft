@@ -647,4 +647,49 @@ export const daireCariEkstresi = defineReport({
   },
 });
 
-export const FINANCE_REPORTS = [giderler, karZarar, kiralamalar, kiraTahakkuklari, mulkSahibiEkstresi, aidatlar, binaAidatTahsilat, daireCariEkstresi, giderPaylastirmaDokumu, sozlesmeler, uyumKayitDefteri, ofisFaturalari];
+const EINVOICE_STATUS_LABEL: Record<string, string> = { draft: "Taslak", issued: "Resmileşti", error: "Hata", cancelled: "İptal" };
+const EINVOICE_DOC_LABEL: Record<string, string> = { "e-fatura": "e-Fatura", "e-arsiv": "e-Arşiv", "e-smm": "e-SMM" };
+
+export const eFaturaListesi = defineReport({
+  id: "e-fatura-listesi",
+  title: "e-Fatura listesi",
+  description: "Kesilen e-Fatura / e-Arşiv belgeleri: tarih, alıcı, tür, tutar, KDV, durum ve belge numarası. Yalnız tüm kazancı görme yetkisi olanlara açıktır.",
+  category: "finans",
+  scope: "tenant",
+  module: "commissions",
+  earningsAllOnly: true,
+  officeWideOnly: true,
+  keywords: ["fatura", "e-arşiv", "efatura", "nilvera", "paraşüt"],
+  filters: [
+    { kind: "select", key: "durum", label: "Durum", options: Object.entries(EINVOICE_STATUS_LABEL).map(([value, text]) => ({ value, label: text })) },
+    ...DATE_RANGE_FIELDS("Fatura başlangıcı", "Fatura bitişi"),
+  ],
+  columns: [
+    { key: "tarih", label: "Fatura tarihi", type: "date", get: (r) => r.issue_date },
+    { key: "alici", label: "Alıcı", type: "text", width: 32, get: (r) => r.buyer_name },
+    { key: "vkn", label: "Vergi / TC kimlik no", type: "text", width: 16, get: (r) => r.buyer_tax_id },
+    { key: "tur", label: "Tür", type: "text", width: 12, get: (r) => EINVOICE_DOC_LABEL[String(r.doc_type)] ?? r.doc_type },
+    { key: "kaynak", label: "Kaynak", type: "text", width: 28, get: (r) => r.source_label },
+    { key: "net", label: "Ara toplam", type: "money", total: true, get: (r) => r.net_total },
+    { key: "kdv", label: "KDV", type: "money", total: true, get: (r) => r.vat_total },
+    { key: "tutar", label: "Genel toplam", type: "money", total: true, get: (r) => r.gross_total },
+    { key: "durum", label: "Durum", type: "text", width: 14, get: (r) => EINVOICE_STATUS_LABEL[String(r.status)] ?? r.status },
+    { key: "no", label: "Belge no", type: "text", width: 20, get: (r) => r.number },
+    { key: "saglayici", label: "Sağlayıcı", type: "text", width: 12, get: (r) => r.provider },
+    { key: "ortam", label: "Ortam", type: "text", width: 10, get: (r) => (r.mode === "sandbox" ? "Test" : "Canlı") },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase
+        .from("einvoices")
+        .select("id, issue_date, buyer_name, buyer_tax_id, doc_type, source_label, net_total, vat_total, gross_total, status, number, provider, mode", { count: "exact" })
+        .eq("tenant_id", tid(ctx));
+      if (f.durum) q = q.eq("status", f.durum);
+      q = applyDateRange(q, "issue_date", f);
+      return q.order("issue_date", { ascending: false }).order("id", { ascending: true });
+    },
+  },
+});
+
+export const FINANCE_REPORTS = [giderler, eFaturaListesi, karZarar, kiralamalar, kiraTahakkuklari, mulkSahibiEkstresi, aidatlar, binaAidatTahsilat, daireCariEkstresi, giderPaylastirmaDokumu, sozlesmeler, uyumKayitDefteri, ofisFaturalari];

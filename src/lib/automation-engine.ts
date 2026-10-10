@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { syncPendingEInvoices } from "@/lib/integrations/einvoice/service";
 import { notifyTenant } from "@/lib/notify";
 import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 import { gateIysRecipient } from "@/lib/iys/gate";
@@ -105,6 +106,8 @@ export type ScheduledRunSummary = {
   automationsFailed: number;
   /** Zaman bütçesi dolduğu için kalan iş bırakıldı mı. */
   timedOut: boolean;
+  /** e-Fatura durum sorgu adımı (Paket D): bağlı ofislerde sağlayıcıda sonuçlanmamış belgeler. */
+  einvoice?: { checked: number; updated: number; failed: number };
 };
 
 const SCHEDULED_TRIGGERS: AutomationScheduledTrigger[] = [
@@ -742,6 +745,13 @@ export async function runScheduledAutomations(options: { deadlineMs?: number } =
     timedOut: false,
   };
   const overDeadline = () => options.deadlineMs !== undefined && Date.now() >= options.deadlineMs;
+
+  // Adım 0 (YENİ CRON YOK): resmileştirilmiş e-Fatura belgelerinin sağlayıcı durumunu sorgula (sınırlı parti, hata otomasyonları durdurmaz).
+  try {
+    summary.einvoice = await syncPendingEInvoices(admin, { deadlineMs: options.deadlineMs });
+  } catch (e) {
+    console.error("runScheduledAutomations einvoice", e instanceof Error ? e.message : "hata");
+  }
 
   // Aktif otomasyon listesi: order(id) + range sayfalama (sırasız .limit(500) yok).
   const all: AutomationRow[] = [];
