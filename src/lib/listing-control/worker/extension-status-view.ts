@@ -38,6 +38,10 @@ export type ScanStatusView = {
   lastFullAt: number | null;
   active: boolean;
   activePortal: string | null;
+  /** Süren taramada okunan sayfa / ilan sayısı ve portalın bildirdiği toplam (yoksa null). Eski sürümlerde yok. */
+  activePages?: number;
+  activeRead?: number;
+  activeExpected?: number | null;
   pendingUploads: number;
   portals: { id: string; lastFullAt: number | null; lastTryAt: number | null; lastResult: ScanResultKind | null; lastRead: number; lastExpected: number | null }[];
 };
@@ -168,6 +172,9 @@ export function buildScanView(i: Pick<StatusInput, "scan" | "portalIds">): ScanS
     lastFullAt: fulls.length > 0 ? Math.max(...fulls) : null,
     active: !!i.scan?.progress,
     activePortal: i.scan?.progress?.portal ?? null,
+    activePages: i.scan?.progress?.pages ?? 0,
+    activeRead: i.scan?.progress?.items.length ?? 0,
+    activeExpected: i.scan?.progress?.totalCount ?? null,
     pendingUploads: i.scan?.pendingUploads ?? 0,
     portals: list,
   };

@@ -27,9 +27,18 @@ npm run build:extension      # tip denetimi + derleme + sürüm numaralı ZIP
 - İkonlar marka işaretinden üretilir: `npx tsx scripts/generate-extension-icons.ts` (16/32/48/128 PNG, depoya girer).
 - Ayrıştırıcı kuralları: `src/lib/listing-control/adapters/html/portal-rules.json` (sürümlü). Motor sürümü `PARSER_ENGINE_VERSION`
   (`create.ts`). Sonuçla birlikte `parserVersion = motor@kural` gider.
-- Mağaza adresleri (yayından sonra, Vercel ortam değişkeni, **redeploy gerekir**): `NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL`
-  (Chrome) ve isteğe bağlı `NEXT_PUBLIC_LISTING_EXTENSION_EDGE_STORE_URL`. Değişkenler tanımlanınca kurulum sayfasında "Chrome'a ekle" /
-  "Edge'e ekle" tek tık düğmeleri görünür; tanımsızsa ZIP yolu gösterilir. Yalnız resmi mağaza adresleri kabul edilir.
+- Ortam değişkenleri (yayından sonra, Vercel, hepsi `NEXT_PUBLIC_` olduğundan **redeploy gerekir**):
+  - `NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL`: Chrome Web Store adresi (`https://chromewebstore.google.com/detail/...`).
+  - `NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL`: Edge Add-ons adresi (`https://microsoftedge.microsoft.com/addons/detail/...`); yoksa Edge'e Chrome adresi verilir.
+  - `NEXT_PUBLIC_LISTING_EXTENSION_ID`: mağazadaki eklenti kimliği (32 harf, a-p); sitenin eklentiyi `ping` ile algılaması için.
+  - Eski adlar `..._STORE_URL` / `..._EDGE_STORE_URL` yedek olarak hâlâ okunur.
+  Kurulum kartı tarayıcıyı algılar: Chrome/Brave/Arc/Opera/Vivaldi → "Chrome'a ekle", Edge → "Edge'e ekle", Safari/Firefox/mobil → "Bu özellik
+  bilgisayarda Chrome veya Edge ile çalışır" + sayfa bağlantısını kopyala. Adres tanımsızsa ZIP + yerel kurulum yönergesine düşer. Yalnız resmi mağaza adresleri kabul edilir.
+- **0.3.1 kurulum akışı (sertifika/exe yok):** mağazadan kurulum → `chrome.runtime.onInstalled` (yalnız `install`) EmlakSoft'u yeni sekmede
+  `/app/ilan-kontrol?bagla=1` ile açar (köken: derleme zamanındaki birincil EmlakSoft kökeni; `tabs` izni gerekmez). Sayfa eklentiyi algılar ve tek
+  "Bağla" düğmesini öne çıkarır; bağlama yine kullanıcı tıklamasıyla olur (otomatik bağlama/token YOK, `externally_connectable` yalnız `ping`).
+  Oturum yoksa `/giris?next=/app/ilan-kontrol?bagla=1`. Bağlanınca içerik betiği köprüsünden `scan-request` gider ("şimdi tara"); sayfa ilerlemeyi
+  ("İlanların okunuyor… 3/5 sayfa") ve sonucu (bulunan / eşleşen / onay bekleyen, hepsi bağlantılı) gösterir. Portal oturumu kapalıysa açık yönlendirme, okunamazsa "kontrol edilemedi" (asla "ilan yok").
 - Ayrıştırıcı sağlığı için migration `20261008000400_lc_parser_telemetry.sql` (+ rollback) **sahibin yedek/PITR doğrulaması sonrası**
   `npm run db:migrate -- --only 20261008000400_lc_parser_telemetry.sql` ile uygulanır. Uygulanmadan eklenti ve sayfa çalışır; telemetri atlanır.
 
@@ -64,7 +73,7 @@ npm run build:extension      # tip denetimi + derleme + sürüm numaralı ZIP
 5. "Gizlilik uygulamaları" sekmesi: tek amaç beyanı, izin gerekçeleri (§4), veri kullanımı beyanı (§5), gizlilik politikası URL'si (§5 metni yayımlanmış sayfa).
 6. Dağıtım: önce "Gizli (yalnız belirli kullanıcılar)" ya da "Listelenmemiş" ile ofislerde dene; sonra "Herkese açık".
 7. İnceleme sonucu (genelde birkaç gün; geniş host izni olmadığı için hızlı olması beklenir) sonrası mağaza adresini Vercel'e
-   `NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL` olarak yaz ve redeploy et: kurulum sayfası "Chrome'a ekle" düğmesini gösterir.
+   `NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL` olarak yaz ve redeploy et: kurulum sayfası "Chrome'a ekle" düğmesini gösterir.
 
 ## 4. İzin gerekçeleri (mağaza formu için)
 
@@ -139,7 +148,7 @@ farklı olabilir. Güvenli düşüş: tutmayan kalıp "kontrol edilemedi" üreti
 
 1. Partner Center: <https://partner.microsoft.com/dashboard/microsoftedge> hesabı aç (ücretsiz).
 2. Aynı ZIP'i yükle (Manifest V3, Chromium ≥ 116 uyumlu; değişiklik gerekmez). Listeleme metni, ikon, ekran görüntüleri §3/§6 ile aynıdır; gizlilik politikası URL'si zorunlu.
-3. Yayın sonrası adresi `NEXT_PUBLIC_LISTING_EXTENSION_EDGE_STORE_URL` olarak Vercel'e yaz ve redeploy et.
+3. Yayın sonrası adresi `NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL` olarak Vercel'e yaz ve redeploy et.
 
 ## 10. Sorun giderme
 

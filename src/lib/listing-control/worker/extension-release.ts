@@ -3,7 +3,7 @@
  * adını ve uygulama içi "güncel mi" denetimini buradan alır (`manifest.base.json` ile eşitliği test kilitler).
  */
 
-export const EXTENSION_VERSION = "0.3.0";
+export const EXTENSION_VERSION = "0.3.1";
 export const EXTENSION_ZIP_PREFIX = "emlaksoft-ilan-kontrol";
 /** Derleme çıktısı ZIP'in kopyalandığı klasör (depoya girmez; indirme ucu buradan okur). */
 export const EXTENSION_PACKAGE_DIR = "public/downloads";
@@ -40,4 +40,16 @@ export function extensionStoreLinks(env: { chrome?: string | null; edge?: string
   const c = (env.chrome ?? "").trim();
   const e = (env.edge ?? "").trim();
   return { chrome: CHROME_STORE.test(c) ? c : null, edge: EDGE_STORE.test(e) ? e : null };
+}
+
+/**
+ * Mağaza adresleri ortam değişkenlerinden (her biri DOĞRUDAN yazılır ki derleme satır içine alsın):
+ * `NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL` (Chrome Web Store) ve `NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL` (Edge Add-ons).
+ * Eski adlar (`..._STORE_URL`, `..._EDGE_STORE_URL`) geriye uyumluluk için yedek okunur.
+ */
+export function extensionStoreEnv(): { chrome: string | null; edge: string | null } {
+  return extensionStoreLinks({
+    chrome: process.env.NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL || process.env.NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL,
+    edge: process.env.NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL || process.env.NEXT_PUBLIC_LISTING_EXTENSION_EDGE_STORE_URL,
+  });
 }

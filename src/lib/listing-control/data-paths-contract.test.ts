@@ -105,8 +105,11 @@ describe("tarayıcı eklentisi", () => {
     expect(bg).toContain('credentials: "include"');
     for (const s of [content, bg]) {
       expect(s).not.toMatch(/user-agent|User-Agent|captcha.?solv|2captcha|anticaptcha|proxy/i);
-      expect(s).not.toMatch(/chrome\.tabs\.create|chrome\.windows/); // sekme/pencere açmadan
+      expect(s).not.toMatch(/chrome\.windows/);
     }
+    // Portal için sekme/pencere AÇILMAZ. Tek istisna (0.3.1): ilk kurulumda EmlakSoft'un kendi karşılama sayfası (onInstalled).
+    expect(content).not.toMatch(/chrome\.tabs/);
+    expect(bg.replace("chrome.tabs.create({ url: landing })", "")).not.toMatch(/chrome\.tabs/);
     expect(bg).toContain("pacingDecision(");
     expect(bg).toContain("applyBlockCooldown(");
   });

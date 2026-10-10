@@ -5,7 +5,7 @@ import { daysAgoIso } from "@/lib/clock";
 import { allPortalHosts, PARSER_VERSION } from "@/lib/listing-control/adapters/html";
 import { EXTENSION_LIMITS } from "@/lib/listing-control/worker/extension-pacing";
 import { EXTENSION_LEGAL_NOTE } from "@/lib/listing-control/worker/extension-copy";
-import { EXTENSION_DOWNLOAD_PATH, EXTENSION_VERSION, extensionStoreLinks } from "@/lib/listing-control/worker/extension-release";
+import { EXTENSION_DOWNLOAD_PATH, EXTENSION_VERSION, extensionStoreEnv } from "@/lib/listing-control/worker/extension-release";
 import { summarizeParserTelemetry, type TelemetryRow } from "@/lib/listing-control/worker/extension-telemetry";
 import { PORTAL_LABEL } from "@/lib/listing-control/worker/extension-labels";
 import { getExtensionPackageInfo } from "@/lib/listing-control/server/extension-package";
@@ -42,10 +42,7 @@ export default async function EklentiPage() {
   await requireModulePage("portals", "/app/ilan-kontrol");
   const hosts = allPortalHosts();
   const [pkg, health] = await Promise.all([getExtensionPackageInfo(), loadParserHealth()]);
-  const stores = extensionStoreLinks({
-    chrome: process.env.NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL,
-    edge: process.env.NEXT_PUBLIC_LISTING_EXTENSION_EDGE_STORE_URL,
-  });
+  const stores = extensionStoreEnv();
   return (
     <>
       <PageHeader

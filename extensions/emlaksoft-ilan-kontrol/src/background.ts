@@ -33,6 +33,7 @@ import {
   type ScanUpload,
 } from "@/lib/listing-control/worker/extension-scan";
 import { isAllowedAppOrigin } from "@/lib/listing-control/worker/extension-pairing";
+import { installLandingUrl, shouldOpenInstallLanding } from "@/lib/listing-control/worker/extension-install";
 import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequest } from "./messages";
 
 /**
@@ -485,9 +486,13 @@ function ensureAlarm() {
   void chrome.alarms.create(ALARM_SCAN, { periodInMinutes: 60, delayInMinutes: 1 });
 }
 ensureAlarm();
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   ensureAlarm();
   void refresh();
+  // İlk kurulumda EmlakSoft'u "Bağla" onayı için aç (yalnız izinli EmlakSoft kökeni; bağlama yine kullanıcı tıklamasıyla olur).
+  if (!shouldOpenInstallLanding(details.reason)) return;
+  const landing = installLandingUrl(__EMLAKSOFT_APP_ORIGINS__);
+  if (landing) void chrome.tabs.create({ url: landing });
 });
 chrome.runtime.onStartup.addListener(() => {
   ensureAlarm();
