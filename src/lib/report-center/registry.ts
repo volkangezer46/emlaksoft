@@ -10,6 +10,7 @@ import { muhasebeFaturaDefteri } from "./catalog/platform-accounting";
 import { ANALYSIS_REPORTS } from "./catalog/tenant-analysis";
 import { CRM_REPORTS } from "./catalog/tenant-crm";
 import { FINANCE_REPORTS } from "./catalog/tenant-finance";
+import { CASH_REPORTS } from "./catalog/tenant-cash";
 import { SALES_REPORTS } from "./catalog/tenant-sales";
 import { TEAM_REPORTS } from "./catalog/tenant-team";
 import type { ReportCategory, ReportDef, ReportScope } from "./types";
@@ -31,7 +32,7 @@ export const PLATFORM_CATEGORIES: readonly ReportCategory[] = [
   { id: "destek", label: "Destek", description: "Destek talepleri ve SLA" },
 ];
 
-export const TENANT_REPORT_LIST: readonly ReportDef[] = [...CRM_REPORTS, ...SALES_REPORTS, ...FINANCE_REPORTS, ...TEAM_REPORTS, ...ANALYSIS_REPORTS];
+export const TENANT_REPORT_LIST: readonly ReportDef[] = [...CRM_REPORTS, ...SALES_REPORTS, ...FINANCE_REPORTS, ...CASH_REPORTS, ...TEAM_REPORTS, ...ANALYSIS_REPORTS];
 export const PLATFORM_REPORT_LIST: readonly ReportDef[] = [...PLATFORM_REPORTS, muhasebeFaturaDefteri];
 
 export const ALL_REPORTS: readonly ReportDef[] = [...TENANT_REPORT_LIST, ...PLATFORM_REPORT_LIST];

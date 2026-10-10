@@ -11,8 +11,10 @@ import { notifyTenant } from "@/lib/notify";
 import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { now, trDayKey } from "@/lib/clock";
+import { recordCollectionCash } from "@/lib/finance/cash/collection-link";
 
-export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string };
+export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string; info?: string };
 
 /**
  * Kapanış / satış → deal + commission omurgası (HGDekor convert benzeri).
@@ -128,10 +130,15 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       .eq("id", id)
       .eq("tenant_id", gate.tenantId)
       .not("status", "in", "(paid,collected)")
-      .select("id")
+      .select("id, gross_amount")
       .maybeSingle();
     if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
     if (!updated) return { error: "Komisyon bulunamadı veya zaten tahsil edilmiş." };
+    // Istege bagli "Hangi hesaba girdi?": secilmediyse davranis degismez.
+    const info = await recordCollectionCash(supabase, {
+      accountId: String(formData.get("account_id") ?? ""), sourceType: "commission", sourceId: id,
+      amount: Number(updated.gross_amount), date: trDayKey(now()), title: "Komisyon tahsilatı",
+    });
     await logActivity({
       tenantId: gate.tenantId,
       actorId: gate.userId,
@@ -141,7 +148,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     });
     revalidatePath("/app/komisyon");
     revalidateTenantData(gate.tenantId);
-    return { ok: true, commissionId: id };
+    return { ok: true, commissionId: id, info: info ?? undefined };
   }
 
   return { error: "Bilinmeyen iş akışı." };
