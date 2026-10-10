@@ -66,7 +66,7 @@ export default async function IlanKontrolPage({ searchParams }: { searchParams: 
       <ControlSubNav active="genel" closures={effectiveCanAccessModule(perms, "leak")} />
       <div className="mb-6">
         <Suspense fallback={<SkeletonCard height={150} label="Günlük kontrol yükleniyor" />}>
-          <DailySyncSection canDecide={management && ["owner", "gm", "branch_manager"].includes(role ?? "")} />
+          <DailySyncSection bind={sp.bagla === "1"} canDecide={management && ["owner", "gm", "branch_manager"].includes(role ?? "")} />
         </Suspense>
       </div>
       <Suspense fallback={<DashboardSkeleton />}>

@@ -73,7 +73,10 @@ describe("ilkeler: kaynak kodu kilidi", () => {
     for (const s of [bg, content, popup]) {
       expect(s).not.toMatch(/user-agent|User-Agent|captcha.?solv|2captcha|anticaptcha|proxy|\beval\(|new Function\(|innerHTML|document\.write/i);
     }
-    for (const s of [bg, content]) expect(s).not.toMatch(/chrome\.tabs|chrome\.windows|chrome\.cookies/);
+    for (const s of [bg, content]) expect(s).not.toMatch(/chrome\.windows|chrome\.cookies/);
+    // Portal sayfası sekmesi AÇILMAZ. Tek istisna (0.3.1): ilk kurulumda EmlakSoft'un kendi karşılama sayfası (onInstalled, install landing).
+    expect(content).not.toMatch(/chrome\.tabs/);
+    expect(bg.replace("chrome.tabs.create({ url: landing })", "")).not.toMatch(/chrome\.tabs/);
     expect(popup).not.toMatch(/https?:\/\/(?!\$\{)/); // popup'ta sabit dış adres yok
   });
   it("sunucu portala bağlanmaz; kişisel veri en az: telemetri yalnız sayaç", () => {
@@ -160,7 +163,8 @@ describe("uygulama içi sayfa /app/ilan-kontrol/eklenti", () => {
     expect(wizard).toMatch(/Eklentiyi indir \(ZIP/);
     expect(wizard).toMatch(/Chrome&apos;a ekle/);
     expect(page).toContain("requireModulePage(\"portals\"");
-    expect(page).toContain("NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL");
+    expect(page).toContain("extensionStoreEnv()");
+    expect(src("src/lib/listing-control/worker/extension-release.ts")).toContain("NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL");
     expect(page).toContain("EXTENSION_DOWNLOAD_PATH");
   });
   it("indirme ucu: oturum + portals/view; paket yoksa 404; izleme dosyaları yapılandırılmış", () => {
@@ -170,7 +174,8 @@ describe("uygulama içi sayfa /app/ilan-kontrol/eklenti", () => {
     expect(route).toContain("status: 404");
     expect(route).toContain("application/zip");
     expect(src("next.config.ts")).toContain("/api/app/ilan-kontrol/eklenti.zip");
-    expect(src(".env.example")).toContain("NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL");
+    expect(src(".env.example")).toContain("NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL");
+    expect(src(".env.example")).toContain("NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL");
   });
 });
 
@@ -193,5 +198,51 @@ describe("migration (telemetri) ve yayın belgesi", () => {
     for (const h of ["Chrome Web Store", "Edge Add-ons", "Gizlilik politikası", "Ekran görüntüsü", "Sürüm yükseltme", "İzin gerekçeleri", "Gerçek portal sayfasına karşı doğrulama"]) {
       expect(doc, h).toContain(h);
     }
+  });
+  it("yayın runbook'u yeni ortam değişkenlerini anlatır", () => {
+    const doc = src("docs/runbooks/ILAN_KONTROL_EKLENTI_YAYIN.md");
+    for (const v of ["NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL", "NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL", "NEXT_PUBLIC_LISTING_EXTENSION_ID"]) {
+      expect(doc, v).toContain(v);
+    }
+  });
+});
+
+describe("kurulum sonrası otomatik bağlama ve anında kanıt (0.3.1)", () => {
+  const bg = src(`${EXT}/src/background.ts`);
+  const content = src(`${EXT}/src/content.ts`);
+  const setup = src("src/components/listing-control/sync-setup.tsx");
+  it("sürüm 0.3.1; manifest izinleri genişlemedi (tabs izni gerekmez)", () => {
+    const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as { version: string; permissions: string[] };
+    expect(EXTENSION_VERSION).toBe("0.3.1");
+    expect(manifest.version).toBe("0.3.1");
+    expect(manifest.permissions).toEqual(["storage", "alarms"]);
+  });
+  it("onInstalled: yalnız ilk kurulumda, yalnız derleme kökeniyle EmlakSoft sekmesi açar; bağlamaz", () => {
+    const block = bg.slice(bg.indexOf("chrome.runtime.onInstalled.addListener"), bg.indexOf("chrome.runtime.onStartup"));
+    expect(block).toContain("shouldOpenInstallLanding(details.reason)");
+    expect(block).toContain("installLandingUrl(__EMLAKSOFT_APP_ORIGINS__)");
+    expect(block).toContain("chrome.tabs.create({ url: landing })");
+    expect(block).not.toMatch(/setConnected|STORAGE_KEYS\.pairing|scanNow/);
+    expect(bg.match(/tabs\.create/g)?.length).toBe(1);
+  });
+  it("dış kanal hâlâ yalnız ping: tarama/bağlama yalnız içerik betiği köprüsünden", () => {
+    const ext = bg.slice(bg.indexOf("onMessageExternal.addListener"));
+    expect(ext).toContain('m.kind !== "ping"');
+    expect(ext).not.toMatch(/scan|setConnected|tabs\.create/);
+    expect(content).toContain("isTrustedScanRequest(");
+    expect(content).toContain("isTrustedConnectRequest(");
+  });
+  it("sayfa: ?bagla=1 yalnız düğmeyi öne çıkarır; bağlama tıklamayla, ardından şimdi-tara; URL temizlenir", () => {
+    expect(setup).toContain("requestConnect()");
+    expect(setup).toContain("requestScanNow()");
+    expect(setup).toContain("router.replace(pathname)");
+    expect(src("src/app/app/ilan-kontrol/page.tsx")).toContain('sp.bagla === "1"');
+    expect(src("src/lib/supabase/middleware.ts")).toContain("?bagla=1");
+  });
+  it("saat/Date.now yok: algılama ve tarama görünümü saf modüller", () => {
+    for (const f of ["browser-detect.ts", "extension-install.ts", "scan-run-view.ts"]) {
+      expect(src(`src/lib/listing-control/worker/${f}`), f).not.toMatch(/Date\.now|new Date\(/);
+    }
+    expect(src("src/components/listing-control/sync-install-step.tsx")).not.toMatch(/Date\.now|new Date\(/);
   });
 });

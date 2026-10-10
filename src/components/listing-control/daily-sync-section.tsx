@@ -3,7 +3,7 @@ import { CheckCheck, Clock3, FileQuestion, GitMerge } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { formatTry } from "@/lib/format";
 import { getControlSummary } from "@/lib/listing-control/server/readers";
-import { EXTENSION_DOWNLOAD_PATH, EXTENSION_VERSION, extensionStoreLinks } from "@/lib/listing-control/worker/extension-release";
+import { EXTENSION_DOWNLOAD_PATH, EXTENSION_VERSION, extensionStoreEnv } from "@/lib/listing-control/worker/extension-release";
 import { getExtensionPackageInfo } from "@/lib/listing-control/server/extension-package";
 import { CONTROL_BASE, anomalyTypeLabel, kpiHref } from "./helpers";
 import { getDb, loadPropertyBriefs } from "./readers";
@@ -16,7 +16,7 @@ import { Panel, VisualChip } from "./ui-parts";
  * GÜNLÜK İLAN KONTROLÜ (Özet'in üstü): durum şeridi + 3 adım, 4 tıklanabilir sayı, onay kartları, fark listesi.
  * Her sayı filtreli hedefe gider (sıfır çıkmaz metrik); veri yoksa kart uydurulmaz.
  */
-export async function DailySyncSection({ canDecide }: { canDecide: boolean }) {
+export async function DailySyncSection({ canDecide, bind = false }: { canDecide: boolean; bind?: boolean }) {
   const db = await getDb();
   const [overview, summary, suggestions, diffs, pkg] = await Promise.all([
     loadSyncOverview(db),
@@ -25,10 +25,7 @@ export async function DailySyncSection({ canDecide }: { canDecide: boolean }) {
     listDiffs(db, 8),
     getExtensionPackageInfo(),
   ]);
-  const stores = extensionStoreLinks({
-    chrome: process.env.NEXT_PUBLIC_LISTING_EXTENSION_STORE_URL,
-    edge: process.env.NEXT_PUBLIC_LISTING_EXTENSION_EDGE_STORE_URL,
-  });
+  const stores = extensionStoreEnv();
   const inPortals = summary.available ? summary.rows.reduce((s, r) => s + r.in_portals, 0) : 0;
   const awaiting = summary.available ? summary.rows.reduce((s, r) => s + r.awaiting_publish, 0) : 0;
   const pending = overview.suggested + overview.unsure;
@@ -42,7 +39,18 @@ export async function DailySyncSection({ canDecide }: { canDecide: boolean }) {
         edgeStoreUrl={stores.edge}
         downloadHref={pkg ? EXTENSION_DOWNLOAD_PATH : null}
         extensionId={process.env.NEXT_PUBLIC_LISTING_EXTENSION_ID ?? null}
-        lastServerScan={overview.lastImport ? { at: overview.lastImport.at, complete: overview.lastImport.complete } : null}
+        lastServerScan={overview.lastImport ? { at: overview.lastImport.at, complete: overview.lastImport.complete, read: overview.lastImport.read } : null}
+        bind={bind}
+        summary={{
+          found: overview.lastImport?.read ?? null,
+          matched: inPortals,
+          pending,
+          links: {
+            found: `${CONTROL_BASE}/envanter`,
+            matched: kpiHref("in_portals"),
+            pending: `${CONTROL_BASE}/eslesme?grup=${overview.suggested > 0 ? "onay" : "emin"}`,
+          },
+        }}
       />
       <nav aria-label="Günlük eşleştirme göstergeleri" className="grid grid-cols-1 gap-3 min-[460px]:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Eşleşen ilan" value={inPortals} icon={CheckCheck} tone="success" href={kpiHref("in_portals")} />

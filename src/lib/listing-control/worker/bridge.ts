@@ -14,6 +14,8 @@
  * (v2, tek tuş) Bağlantı ve durum:
  *   sayfa → eklenti : { source, type: "connect-request", nonce }   (YALNIZ kullanıcı tıklamasıyla; eklenti köken + kullanıcı etkinliği doğrular)
  *   eklenti → sayfa : { source: BRIDGE, type: "connect-response", nonce, ok }
+ *   sayfa → eklenti : { source, type: "scan-request", nonce }   (0.3.1: "şimdi tara"; yalnız bağlıysa çalışır)
+ *   eklenti → sayfa : { source: BRIDGE, type: "scan-response", nonce, ok }
  *   sayfa → eklenti : { source, type: "status-request", id }
  *   eklenti → sayfa : { source: BRIDGE, type: "status-response", id, status: ExtensionStatusView }
  *
@@ -40,6 +42,7 @@ export type BridgeMessage =
   | { type: "verify-response"; id: string; reply: unknown }
   | { type: "inventory-response"; id: string; reply: unknown }
   | { type: "connect-response"; nonce: string; ok: boolean }
+  | { type: "scan-response"; nonce: string; ok: boolean }
   | { type: "status-response"; id: string; status: unknown };
 
 /** Eklentinin "şimdi yapamadım / duraklatıldı" yanıtları: gözlem değildir, iş bırakılır. */
@@ -56,6 +59,9 @@ export function parseBridgeMessage(data: unknown): BridgeMessage | null {
   }
   if (d.type === "connect-response" && typeof d.nonce === "string" && d.nonce.length > 0 && d.nonce.length <= 64) {
     return { type: "connect-response", nonce: d.nonce, ok: d.ok === true };
+  }
+  if (d.type === "scan-response" && typeof d.nonce === "string" && d.nonce.length > 0 && d.nonce.length <= 64) {
+    return { type: "scan-response", nonce: d.nonce, ok: d.ok === true };
   }
   if (d.type === "status-response" && typeof d.id === "string" && d.id.length > 0 && d.id.length <= 64) {
     return { type: "status-response", id: d.id, status: d.status };
@@ -168,6 +174,15 @@ export async function requestConnect(timeoutMs = 4_000): Promise<boolean> {
   const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   const msg = await postAndWait({ type: "connect-request", nonce }, (m) => m.type === "connect-response" && m.nonce === nonce, timeoutMs);
   return msg?.type === "connect-response" && msg.ok;
+}
+
+/** Eklentiye "şimdi tara" der (bağlı olmak şart; ilerleme `requestStatus` ile izlenir). Kullanıcı etkinliği gerekmez, salt-okunur iştir. */
+export async function requestScanNow(timeoutMs = 4_000): Promise<boolean> {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  const msg = await postAndWait({ type: "scan-request", nonce }, (m) => m.type === "scan-response" && m.nonce === nonce, timeoutMs);
+  return msg?.type === "scan-response" && msg.ok;
 }
 
 export type ExtensionPing = { version: string; connected: boolean; paused: boolean };

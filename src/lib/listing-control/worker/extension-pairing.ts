@@ -47,6 +47,19 @@ export type ConnectRequestInput = {
   data: unknown;
 };
 
+export const SCAN_REQUEST_TYPE = "scan-request";
+
+/**
+ * Sayfanın "şimdi tara" isteği güvenilir mi: aynı pencere + aynı köken + izinli EmlakSoft kökeni + biçim. Kullanıcı etkinliği
+ * ARANMAZ (bağlama onayından hemen sonra otomatik gider); iş yalnız bağlı eklentide, hız kuralı içinde çalışır ve salt-okunurdur.
+ */
+export function isTrustedScanRequest(i: Omit<ConnectRequestInput, "userActive">): boolean {
+  if (!i.fromSameWindow || i.eventOrigin !== i.locationOrigin) return false;
+  if (!isAllowedAppOrigin(i.locationOrigin, i.allowedOrigins)) return false;
+  const d = i.data as { type?: unknown; nonce?: unknown } | null;
+  return !!d && d.type === SCAN_REQUEST_TYPE && typeof d.nonce === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(d.nonce);
+}
+
 export const CONNECT_REQUEST_TYPE = "connect-request";
 
 /** Sayfanın "bağlan" isteği güvenilir mi: aynı pencere + aynı köken + izinli EmlakSoft kökeni + kullanıcı etkinliği + biçim. */
