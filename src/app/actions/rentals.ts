@@ -418,23 +418,16 @@ export async function applyRentIncrease(
   const currentRent = Number(rental.monthly_rent);
   if (validatedNewRent <= currentRent) return { error: "Yeni kira mevcut kiradan yüksek olmalı." };
 
-  // Yasal tavan (TBK m.344): uygulama ayının 12 aylık ort. TÜFE'si — sunucu tarafında da kesilir.
-  // ANCAK yalnız RESMİ veri olan aylarda: resmi olmayan (ör. 2026) ayda oran
-  // eski aya düşen tahmindir; onu "yasal tavan" diye dayatmak yasal-üstü bir
-  // artışa izin verir (gerçek 2026 tavanı daha düşük olabilir). Bu aylarda tavan
-  // KESİLMEZ — sorumluluk, resmi oranı bilen kullanıcıdadır; denetim kaydına da
-  // uydurma "TÜFE %X" yazılmaz.
+  // Yasal üst sınır (TBK m.344, konut): uygulama ayının 12 aylık ort. TÜFE'si. Mevzuat ENGELLEMEZ, bilgilendirir:
+  // tutar tavanı aşsa da kaydedilir (iş yeri kiralarında üst sınır yoktur); aşım iz satırına işlenir.
+  // Resmi olmayan ayda tavan bilinmez; denetim kaydına uydurma "TÜFE %X" yazılmaz.
   const legal = computeLegalIncreaseIn(await loadTufeTable(), currentRent, effectiveDate.slice(0, 7));
-  if (legal.official && validatedNewRent > legal.newRent) {
-    return {
-      error: `Yeni kira yasal tavanı aşıyor — TÜFE %${legal.appliedRate.toFixed(2)} ile en fazla ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(legal.newRent)} olabilir.`,
-    };
-  }
+  const overCap = legal.official && validatedNewRent > legal.newRent;
 
   const para = (n: number) =>
     new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
   const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${effectiveDate}T00:00:00`));
-  const oranNotu = legal.official ? `TÜFE %${legal.appliedRate.toFixed(2)}` : "manuel oran (resmi TÜFE bekleniyor)";
+  const oranNotu = legal.official ? `TÜFE %${legal.appliedRate.toFixed(2)}${overCap ? " (tavan aşıldı, bilgi)" : ""}` : "manuel oran (resmi TÜFE bekleniyor)";
   const izSatiri = `Kira artışı: ${para(currentRent)} → ${para(validatedNewRent)}, ${oranNotu}, ${tarih}`;
   const notes = rental.notes ? `${rental.notes}\n${izSatiri}` : izSatiri;
 

@@ -109,7 +109,8 @@ export function evaluateSeatChange(input: SeatChangeInput): SeatChangeEval {
   if (tiers.length === 0 && target > included) {
     return { ...base, status: "not_sold", message: `${def.name} paketinde ek kullanıcı satılmıyor; daha fazla kullanıcı için paketinizi yükseltin.` };
   }
-  if (target > maxTotal) {
+  // Tavanı aşmış eski ofis kilitlenmez: yalnız ARTIŞ engellenir, azaltma serbesttir.
+  if (target > maxTotal && target > current) {
     return {
       ...base,
       status: "over_max",

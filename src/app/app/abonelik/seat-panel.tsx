@@ -5,6 +5,7 @@ import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Loader2, Minus, Plus, ShieldAlert, Users2 } from "lucide-react";
 import { startSeatPurchase } from "@/app/actions/billing";
 import { BILLING_VAT_RATE, type PlanDef, type SeatTier } from "@/lib/billing/plans";
+import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
 import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
@@ -73,6 +74,11 @@ export function SeatPanel(props: SeatPanelProps) {
     Math.min(Number.isFinite(ev.maxTotalSeats) ? ev.maxTotalSeats : includedSeats + UI_EXTRA_CAP, includedSeats + UI_EXTRA_CAP),
   );
   const notSold = ev.status === "not_sold" || sliderMax <= includedSeats;
+
+  const capFinite = Number.isFinite(ev.maxTotalSeats);
+  const atCap = capFinite && currentTotal >= ev.maxTotalSeats;
+  const overCap = capFinite && currentTotal > ev.maxTotalSeats;
+  const hasHigherPlan = plans.some((p) => !p.hidden && p.id !== planId && maxTotalSeats(p) > ev.maxTotalSeats);
 
   const q = ev.toQuote;
   const reco = q.recommendation;
@@ -148,6 +154,24 @@ export function SeatPanel(props: SeatPanelProps) {
           </p>
         </div>
       </div>
+
+      {atCap ? (
+        <div className="mt-4 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-700" role="status">
+          <p className="font-semibold">
+            {overCap
+              ? `Ofisiniz ${planName} paketinin kullanıcı tavanını (${ev.maxTotalSeats}) aşıyor.`
+              : `${planName} paketinde en fazla ${ev.maxTotalSeats} kullanıcı olabilir; tavana ulaştınız.`}
+          </p>
+          <p className="mt-1 text-xs">
+            {overCap ? "Mevcut kullanıcılarınız etkilenmez; yalnız yeni kullanıcı eklenemez." : "Yeni kullanıcı eklemek için paketinizi yükseltin."}
+          </p>
+          {hasHigherPlan ? (
+            <Link href="/app/abonelik#paketler" className="focus-ring mt-2 inline-flex items-center gap-1 text-xs font-bold underline">
+              <ArrowUpRight className="h-4 w-4" /> Bir üst pakete geç
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {notSold ? (
         <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-3 text-sm text-text-muted">

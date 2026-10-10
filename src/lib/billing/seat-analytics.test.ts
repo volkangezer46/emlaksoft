@@ -172,7 +172,7 @@ describe("katalog kalıcılığı: kademe alanları", () => {
     const raw = serializePlanCatalogSettings({ overrides: RECOMMENDED_CATALOG_OVERRIDES, campaign: parsePlanCatalogSettings(null).campaign });
     const back = parsePlanCatalogSettings(raw);
     expect(back.overrides.office?.extraSeatTiers).toHaveLength(3);
-    expect(back.overrides.professional?.maxSeats).toBe(500);
+    expect(back.overrides.professional?.maxSeats).toBe(50);
     const legacy = parsePlanCatalogSettings(JSON.stringify({ v: 2, plans: { office: { extraSeatMonthlyTry: 399 } } }));
     expect(legacy.overrides.office).toEqual({ extraSeatMonthlyTry: 399 });
   });

@@ -63,9 +63,18 @@ export async function ensureSeatAvailable(
   }
 
   // Etkin limit = plan limiti + satın alınmış ek kullanıcı (sütun yoksa ek = 0, eski davranış).
-  const includedSeats = (await getPlanDefinition(String(tenant.plan))).limits.seats;
+  const def = await getPlanDefinition(String(tenant.plan));
   const extraSeats = await getExtraSeats(admin as SupabaseClient, tenantId);
-  const limit = includedSeats + extraSeats;
+  // Paket kullanıcı tavanı (plans.ts PLAN_USER_CAPS): dahil + ek toplamı tavanı aşamaz. Tavanı zaten aşmış
+  // eski ofis kilitlenmez; yalnız YENİ ekleme engellenir.
+  const cap = def.maxSeats && def.maxSeats > 0 ? Math.max(def.maxSeats, def.limits.seats) : Number.POSITIVE_INFINITY;
+  const limit = Math.min(def.limits.seats + extraSeats, cap);
+  if (Number.isFinite(cap) && (count ?? 0) >= cap) {
+    return {
+      ok: false,
+      error: `${def.name} paketinde en fazla ${cap} kullanıcı olabilir; tavana ulaştınız. Daha fazla kullanıcı için bir üst pakete geçin (/app/abonelik#paketler) veya bir üyeyi pasife alın.`,
+    };
+  }
   if ((count ?? 0) >= limit) {
     return {
       ok: false,
