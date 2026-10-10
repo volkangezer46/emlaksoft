@@ -19,8 +19,9 @@ const TUR_OPTIONS = [
   { value: "transfer", label: "Transfer" },
 ] as const;
 
-const hrefWith = (params: ParamRecord, patch: Record<string, string>) =>
-  buildHref(FINANCE_BASE, mergeParams({ ...params, sekme: "hareketler" }, patch));
+/** Hareketler listesinin adres kökü: Finans'ta `/app/giderler?sekme=hareketler`, Kasam'da `/app/hesabim?sekme=kasam`. */
+export type EntriesNav = { base: string; sekme: string };
+const FINANCE_NAV: EntriesNav = { base: FINANCE_BASE, sekme: "hareketler" };
 
 /**
  * Hareketler sekmesi: gelir/gider/transfer defteri. Filtre kontratı: hesap, tür, kategori, tarih aralığı, arama ve sayfa
@@ -36,7 +37,11 @@ export async function HareketlerTab({
   canEdit,
   canDelete,
   canSalary,
+  nav = FINANCE_NAV,
+  limitToAccounts = false,
 }: {
+  /** Kasam: liste yalnız verilen hesapların hareketlerini içerir (ofis hareketi asla sorgulanmaz). */
+  limitToAccounts?: boolean;
   supabase: SupabaseClient;
   params: ParamRecord;
   accounts: readonly AccountWithBalance[];
@@ -45,7 +50,9 @@ export async function HareketlerTab({
   canEdit: boolean;
   canDelete: boolean;
   canSalary: boolean;
+  nav?: EntriesNav;
 }) {
+  const hrefWith = (p: ParamRecord, patch: Record<string, string>) => buildHref(nav.base, mergeParams({ ...p, sekme: nav.sekme }, patch));
   const val = (k: string) => (typeof params[k] === "string" ? (params[k] as string) : "");
   const hesap = uuidParam(params.hesap);
   const accountId = accounts.some((a) => a.id === hesap) ? hesap : "";
@@ -59,12 +66,12 @@ export async function HareketlerTab({
   const page = parsePage(params.sayfa);
 
   const [{ entries, total }, summary] = await Promise.all([
-    loadCashEntries(supabase, { accountId: accountId || null, tur: tur || null, category: kategori || null, from: from || null, to: to || null, q: q || null, page }),
+    loadCashEntries(supabase, { accountId: accountId || null, accountIds: limitToAccounts && !accountId ? accounts.map((a) => a.id) : null, tur: tur || null, category: kategori || null, from: from || null, to: to || null, q: q || null, page }),
     loadCashSummary(supabase, { from: from || null, to: to || null }),
   ]);
 
   const accountById = new Map(accounts.map((a) => [a.id, a]));
-  const inScope = summary.filter((s) => !accountId || s.account_id === accountId).filter((s) => !kategori || s.category === kategori);
+  const inScope = summary.filter((s) => accountById.has(s.account_id)).filter((s) => !accountId || s.account_id === accountId).filter((s) => !kategori || s.category === kategori);
   const sumOf = (dir: "in" | "out") =>
     sumByCurrency(inScope.filter((s) => s.direction === dir).map((s) => ({ currency: accountById.get(s.account_id)?.currency ?? "TRY", amount: s.total })));
   const incomes = sumOf("in");
@@ -78,8 +85,8 @@ export async function HareketlerTab({
     { label: "Net", value: money(net), icon: <Scale />, tone: "info", href: hrefWith(params, { tur: "", sayfa: "" }), hint: "gelir - gider (transfer hariç)" },
   ];
 
-  const pathParams: ParamRecord = { ...params, sekme: "hareketler" };
-  const chips = buildActiveChips(FINANCE_BASE, pathParams, [
+  const pathParams: ParamRecord = { ...params, sekme: nav.sekme };
+  const chips = buildActiveChips(nav.base, pathParams, [
     { key: "hesap", label: "Hesap", format: () => accountById.get(accountId)?.name ?? "Seçili hesap" },
     { key: "tur", label: "Tür", format: (v) => TUR_OPTIONS.find((o) => o.value === v)?.label ?? v },
     { key: "kategori", label: "Kategori", format: (v) => cashCategoryLabel(v) },
@@ -99,7 +106,7 @@ export async function HareketlerTab({
       <KpiStrip items={kpis} />
 
       <ListToolbar
-        pathname={FINANCE_BASE}
+        pathname={nav.base}
         params={pathParams}
         searchPlaceholder="Açıklama veya karşı taraf ara…"
         searchLabel="Hareketlerde ara"
@@ -123,7 +130,7 @@ export async function HareketlerTab({
         chips.length > 0 ? (
           <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
             <h2 className="font-display text-lg font-bold text-text">Bu filtreyle hareket yok</h2>
-            <Link href={`${FINANCE_BASE}?sekme=hareketler`} className="mt-2 text-sm font-semibold text-accent-text hover:underline">
+            <Link href={`${nav.base}?sekme=${nav.sekme}`} className="mt-2 text-sm font-semibold text-accent-text hover:underline">
               Filtreleri temizle
             </Link>
           </div>
@@ -133,7 +140,7 @@ export async function HareketlerTab({
             title="Henüz hareket yok"
             description={accounts.length === 0 ? "Önce bir hesap açın (ör. ofis kasası), sonra gelir ve giderlerinizi ekleyin." : "Sayfanın üstündeki Gelir ekle veya Gider ekle düğmesiyle ilk hareketi girin."}
             tone="amber"
-            action={accounts.length === 0 ? { href: `${FINANCE_BASE}?sekme=kasa-banka`, label: "İlk hesabı aç" } : undefined}
+            action={accounts.length === 0 ? { href: `${nav.base}?sekme=${nav.base === FINANCE_BASE ? "kasa-banka" : nav.sekme}`, label: "İlk hesabı aç" } : undefined}
           />
         )
       ) : (
@@ -151,14 +158,14 @@ export async function HareketlerTab({
             </thead>
             <tbody>
               {entries.map((e) => (
-                <EntryRow key={e.id} entry={e} account={accountById.get(e.account_id)} today={today} canEdit={canEdit} canDelete={canDelete} canSalary={canSalary} />
+                <EntryRow key={e.id} entry={e} account={accountById.get(e.account_id)} nav={nav} today={today} canEdit={canEdit} canDelete={canDelete} canSalary={canSalary} />
               ))}
             </tbody>
           </table>
         </div>
       )}
 
-      <ListPager pathname={FINANCE_BASE} params={pathParams} window={w} total={total} />
+      <ListPager pathname={nav.base} params={pathParams} window={w} total={total} />
       {!canCreate && accounts.length > 0 ? <p className="text-xs text-text-faint">Bu ekranda yalnız görüntüleme yetkiniz var.</p> : null}
     </div>
   );
@@ -171,7 +178,9 @@ function EntryRow({
   canEdit,
   canDelete,
   canSalary,
+  nav,
 }: {
+  nav: EntriesNav;
   entry: CashEntry;
   account: AccountWithBalance | undefined;
   today: string;
@@ -202,7 +211,7 @@ function EntryRow({
       </td>
       <td className="px-4 py-3">
         {account ? (
-          <Link href={`${FINANCE_BASE}?sekme=hareketler&hesap=${account.id}`} className="font-medium text-accent-text hover:underline">
+          <Link href={`${nav.base}?sekme=${nav.sekme}&hesap=${account.id}`} className="font-medium text-accent-text hover:underline">
             {account.name}
           </Link>
         ) : (

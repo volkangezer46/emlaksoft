@@ -11,6 +11,8 @@ import { checkTransfer } from "@/lib/finance/cash/balance";
 import { canHandleSalary, expenseCategoryFor, SALARY_CATEGORY, type CashDirection } from "@/lib/finance/cash/categories";
 import { financeOutcomeMessage, isUuid, parseAccountInput, parseEntryInput } from "@/lib/finance/cash/input";
 import { isMissingCashSchema, type FinanceAccount } from "@/lib/finance/cash/load";
+import { createRecurringRule } from "@/app/actions/recurring-rules";
+import { nextMonthStartKey } from "@/lib/finance/recurring/rules";
 
 /**
  * Finans hesapları + para hareket defteri server action'ları (Paket A).
@@ -24,7 +26,7 @@ export type FinanceResult = { ok?: boolean; error?: string; id?: string; info?: 
 export type PostableAccount = { id: string; name: string; kind: string; currency: string; scope: "office" | "user" };
 
 const MISSING_MSG = "Kasa ve banka için veritabanı güncellemesi henüz uygulanmamış.";
-const PATHS = ["/app/giderler"] as const;
+const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 
 function asObject(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -191,7 +193,23 @@ export async function recordCashEntry(direction: CashDirection, input: Record<st
   const res = asObject(data);
   if (res.outcome !== "recorded") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
   revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
-  return { ok: true, id: String(res.entry_id ?? "") };
+  // "Her ay tekrarla": kayıt bugün girildi; kural gelecek aydan başlar (aynı ay iki kez yazılmaz).
+  let info: string | undefined;
+  if (input.repeatMonthly === true || input.repeatMonthly === "1") {
+    const payDay = Number(input.repeatDay) || Number(e.date.slice(8, 10));
+    const rule = await createRecurringRule({
+      accountId: e.accountId,
+      direction,
+      category: e.category,
+      title: e.title,
+      amount: e.amount,
+      payDay,
+      mode: input.repeatMode === "approve" ? "approve" : "auto",
+      startDate: nextMonthStartKey(today),
+    });
+    if (rule.error) info = `Kayıt yapıldı ama her ay tekrarı kurulamadı: ${rule.error}`;
+  }
+  return { ok: true, id: String(res.entry_id ?? ""), info };
 }
 
 export async function updateCashEntry(entryId: string, input: Record<string, unknown>): Promise<FinanceResult> {

@@ -24,7 +24,10 @@ export async function KasaBankaTab({
   accounts,
   today,
   canOffice,
+  entriesHref = hareketlerHref,
 }: {
+  /** Hesap -> hareketler adresi (Kasam kendi sayfasına yönlendirir). */
+  entriesHref?: (accountId: string) => string;
   supabase: SupabaseClient;
   accounts: readonly AccountWithBalance[];
   today: string;
@@ -59,7 +62,7 @@ export async function KasaBankaTab({
       {office.length > 0 ? (
         <Section title="Ofis hesapları" hint="Ofis kasası ve bankaları. Gelir ve giderleri ofis kâr-zararına yansır.">
           {office.map((a) => (
-            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage={canOffice} canOffice={canOffice} />
+            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage={canOffice} canOffice={canOffice} entriesHref={entriesHref} />
           ))}
         </Section>
       ) : null}
@@ -67,7 +70,7 @@ export async function KasaBankaTab({
       {personal.length > 0 ? (
         <Section title="Kişisel hesaplarım" hint="Yalnız siz görürsünüz; ofis sahibi dahil kimse göremez ve ofis kâr-zararına girmez." icon={<Lock className="h-3.5 w-3.5" aria-hidden="true" />}>
           {personal.map((a) => (
-            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage canOffice={canOffice} />
+            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage canOffice={canOffice} entriesHref={entriesHref} />
           ))}
         </Section>
       ) : null}
@@ -78,7 +81,7 @@ export async function KasaBankaTab({
           <ul className="mt-3 grid gap-2">
             {archived.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-sm">
-                <Link href={hareketlerHref(a.id)} className="font-semibold text-accent-text hover:underline">{a.name}</Link>
+                <Link href={entriesHref(a.id)} className="font-semibold text-accent-text hover:underline">{a.name}</Link>
                 <span className="numeric text-text-muted">{formatAccountMoney(a.balance, a.currency)}</span>
                 {a.owner_scope === "user" || canOffice ? <ArchiveAccountButton accountId={a.id} name={a.name} archived /> : null}
               </li>
@@ -106,7 +109,9 @@ function AccountCard({
   today,
   canManage,
   canOffice,
+  entriesHref,
 }: {
+  entriesHref: (accountId: string) => string;
   account: AccountWithBalance;
   recent: CashEntry[];
   today: string;
@@ -131,17 +136,17 @@ function AccountCard({
         {a.owner_scope === "user" ? <StatusPill tone="neutral" dot={false}>Kişisel</StatusPill> : null}
       </header>
 
-      <Link href={hareketlerHref(a.id)} className="focus-ring group rounded-[var(--radius-control)] -mx-1 px-1" aria-label={`${a.name} hareketlerini gör`}>
+      <Link href={entriesHref(a.id)} className="focus-ring group rounded-[var(--radius-control)] -mx-1 px-1" aria-label={`${a.name} hareketlerini gör`}>
         <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Bakiye</p>
         <p className={`numeric font-display text-2xl font-extrabold ${negative ? "text-danger-strong" : "text-text"}`}>{formatAccountMoney(a.balance, a.currency)}</p>
       </Link>
 
       <dl className="grid grid-cols-2 gap-2 text-xs">
-        <Link href={`${hareketlerHref(a.id)}&tur=gelir`} className="focus-ring rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 hover:bg-surface-hover">
+        <Link href={`${entriesHref(a.id)}&tur=gelir`} className="focus-ring rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 hover:bg-surface-hover">
           <dt className="flex items-center gap-1 text-text-muted"><ArrowDownCircle className="h-3 w-3 text-success-strong" aria-hidden="true" /> Giriş</dt>
           <dd className="numeric font-semibold text-text">{formatAccountMoney(a.total_in, a.currency)}</dd>
         </Link>
-        <Link href={`${hareketlerHref(a.id)}&tur=gider`} className="focus-ring rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 hover:bg-surface-hover">
+        <Link href={`${entriesHref(a.id)}&tur=gider`} className="focus-ring rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 hover:bg-surface-hover">
           <dt className="flex items-center gap-1 text-text-muted"><ArrowUpCircle className="h-3 w-3 text-danger-strong" aria-hidden="true" /> Çıkış</dt>
           <dd className="numeric font-semibold text-text">{formatAccountMoney(a.total_out, a.currency)}</dd>
         </Link>
@@ -155,7 +160,7 @@ function AccountCard({
           <ul className="grid gap-1">
             {recent.map((e) => (
               <li key={e.id}>
-                <Link href={hareketlerHref(a.id)} className="focus-ring flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-1.5 py-1 text-xs hover:bg-surface-hover">
+                <Link href={entriesHref(a.id)} className="focus-ring flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-1.5 py-1 text-xs hover:bg-surface-hover">
                   <span className="min-w-0 truncate text-text">{e.title} <span className="text-text-faint">· {cashCategoryLabel(e.category)} · {formatDateTr(e.entry_date)}</span></span>
                   <span className={`numeric shrink-0 font-semibold ${e.direction === "in" ? "text-success-strong" : "text-danger-strong"}`}>
                     {e.direction === "in" ? "+" : "−"}{formatAccountMoney(e.amount, e.currency)}

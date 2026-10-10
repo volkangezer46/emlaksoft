@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeftRight, FileText, Landmark, LayoutDashboard } from "lucide-react";
+import { ArrowLeftRight, FileText, Landmark, LayoutDashboard, Repeat } from "lucide-react";
 import { PageTabs, type PageTab } from "@/components/app/page-tabs";
 import { QuickEntryButtons, type AccountOption } from "../quick-entry";
 
@@ -13,14 +13,15 @@ export const FINANCE_TABS: readonly PageTab[] = [
   { id: "ozet", label: "Özet", icon: LayoutDashboard },
   { id: "hareketler", label: "Hareketler", icon: ArrowLeftRight },
   { id: "kasa-banka", label: "Kasa ve banka", icon: Landmark },
+  { id: "duzenli", label: "Düzenli ödemeler", icon: Repeat },
   { id: "faturalar", label: "Faturalar", icon: FileText },
 ];
 
-export type FinanceTab = "ozet" | "hareketler" | "kasa-banka" | "faturalar";
+export type FinanceTab = "ozet" | "hareketler" | "kasa-banka" | "duzenli" | "faturalar";
 
 export function financeTabOf(value: string | string[] | undefined): FinanceTab {
   const v = Array.isArray(value) ? value[0] : value;
-  return v === "hareketler" || v === "kasa-banka" ? v : "ozet";
+  return v === "hareketler" || v === "kasa-banka" || v === "duzenli" ? v : "ozet";
 }
 
 /** Hero eylemleri: şema varsa "Gelir ekle / Gider ekle", yoksa eski "Yeni gider" bağlantısı. */

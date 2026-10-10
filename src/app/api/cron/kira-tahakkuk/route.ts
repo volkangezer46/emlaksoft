@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
-import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
+import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
 import { trDayKey } from "@/lib/clock";
@@ -64,6 +64,8 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
  *
  *  5. Bina aidat vade hatırlatması (M2): vadesi 3 gün içinde / geçmiş açık bina aidatları için ofise bina başına özet bildirim
  *     (mükerrer korumalı, yalnız ofis içi; ayrıntı: src/lib/building-management/reminders.ts).
+ *
+ *  6. Düzenli ödemeler (Finans Paket B): `recurring_run_due` RPC — vadesi gelen kural için hareket/taslak, vade -3 gün hatırlatma.
  *
  * NOT: vercel.json'a bilerek DOKUNULMADI — cron path: /api/cron/kira-tahakkuk
  * (CRON_SECRET Bearer başlığıyla çağrılır).
@@ -311,10 +313,30 @@ export async function GET(req: NextRequest) {
     console.error("kira-tahakkuk cron beyan hatirlatma", e instanceof Error ? e.message : "hata");
   }
 
+  // ---- 6) Düzenli ödemeler (Finans Paket B): vadesi gelen kural için hareket (+ ofis gideri) ya da onay taslağı, vade -3 gün hatırlatma.
+  //   Dönem başına tek üretim SQL'de garantilidir (unique(rule_id, period)); migration yoksa adım sessizce atlanır; hata asıl işi bozmaz.
+  let recurringNote = "";
+  try {
+    const { data: rec, error: recErr } = await admin.rpc("recurring_run_due", {
+      p_today: trDayKey(Date.now()),
+      p_skip_tenants: tenantsDisabledFor(disabledModules, "expenses"),
+    });
+    if (recErr) {
+      if (recErr.code !== "PGRST202" && recErr.code !== "42883") console.error("kira-tahakkuk cron duzenli odeme", recErr.code);
+    } else {
+      const r = (rec ?? {}) as { posted?: number; drafts?: number; reminded?: number; failed?: number };
+      if ((r.posted ?? 0) + (r.drafts ?? 0) + (r.reminded ?? 0) + (r.failed ?? 0) > 0) {
+        recurringNote = `, düzenli ödeme: ${r.posted ?? 0} kayıt / ${r.drafts ?? 0} taslak / ${r.reminded ?? 0} hatırlatma${r.failed ? ` (${r.failed} hata)` : ""}`;
+      }
+    }
+  } catch (e) {
+    console.error("kira-tahakkuk cron duzenli odeme", e instanceof Error ? e.message : "hata");
+  }
+
   await recordHeartbeat(
     "kira-tahakkuk",
     "ok",
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${recurringNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}`,
   );
 
   return NextResponse.json({
