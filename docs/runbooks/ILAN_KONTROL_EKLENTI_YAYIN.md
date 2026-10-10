@@ -41,7 +41,11 @@ npm run build:extension      # tip denetimi + derleme + sürüm numaralı ZIP
   "kontrol edilemedi" (`blocked`/`error`) olur. "Yok" yalnız 404/410 ya da portalın açık "yayından kaldırıldı" ibaresi/durumuyla ve sunucuda
   bağımsız kontrollerle teyit edilir.
 - Sunucu portala hiç bağlanmaz. Eklentiye oturum anahtarı verilmez: içerik betiği yalnız EmlakSoft kökenlerinde çalışır ve aynı kökenli, özel başlıklı
-  isteklerle açık oturumu kullanır. `externally_connectable` ilan edilmez.
+  isteklerle açık oturumu kullanır. `externally_connectable` (0.3.0) yalnız EmlakSoft kökenleri için ilan edilir ve yalnız salt-okunur `ping` yanıtlar
+  (kurulu mu, sürüm, bağlı mı); bağlama ve veri yolu değişmedi. **Günlük tarama (0.3.0):** `chrome.alarms` saatte bir uyanır; son TAM taramadan 20 saat geçtiyse
+  ofisin kendi "ilanlarım" listesini (sayfalama dahil, aynı hız kuralı) okur, sonucu bir EmlakSoft sekmesi açıkken yükler. Tarayıcı kapalıyken çalışmaz;
+  kaçırılan gün ilk açılışta telafi edilir. Liste ancak portalın gösterdiği toplam ilan sayısına ulaşıldıysa "tam" sayılır; "ilan kalktı" en az 12 saat arayla
+  iki tam taramada görülmeyince. `portal-rules.json` içindeki `storeStartUrls`/`storeTotal` kalıpları gerçek portalda **doğrulanmadı**.
 - **Tek tuş / bağlama:** kullanıcı "Bağlan" (açılır pencere) ya da "Eklentiyi bağla" (uygulama içi sayfa) demeden HİÇBİR kontrol yapılmaz. Sayfadan gelen
   bağlan isteği: aynı pencere + aynı köken + izinli EmlakSoft kökeni + gerçek kullanıcı etkinliği + tek kullanımlık nonce doğrulanır. Bağlantı, EmlakSoft oturumu
   30 gün görülmezse düşer.

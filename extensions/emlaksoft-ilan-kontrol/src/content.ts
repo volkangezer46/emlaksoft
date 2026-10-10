@@ -1,6 +1,7 @@
 import { BRIDGE_REQUEST_SOURCE, BRIDGE_RESPONSE_SOURCE } from "@/lib/listing-control/worker/bridge";
 import { nextDelayMs, replyToReport, type StepOutcome } from "@/lib/listing-control/worker/core";
-import { BRIDGE_ENDPOINT, BRIDGE_HEADER } from "@/lib/listing-control/worker/bridge-request";
+import { BRIDGE_ENDPOINT, BRIDGE_HEADER, BRIDGE_INVENTORY_ENDPOINT } from "@/lib/listing-control/worker/bridge-request";
+import type { ScanUpload } from "@/lib/listing-control/worker/extension-scan";
 import { sendVerdict, type OutboxEntry } from "@/lib/listing-control/worker/extension-outbox";
 import { isTrustedConnectRequest } from "@/lib/listing-control/worker/extension-pairing";
 import { buildTelemetry } from "@/lib/listing-control/worker/extension-telemetry";
@@ -142,9 +143,9 @@ let running = false;
 let errors = 0;
 let stopped = false;
 
-async function api(body: Record<string, unknown>): Promise<{ status: number; data: ApiReply }> {
+async function api(body: Record<string, unknown>, endpoint: string = BRIDGE_ENDPOINT): Promise<{ status: number; data: ApiReply }> {
   try {
-    const res = await fetch(BRIDGE_ENDPOINT, {
+    const res = await fetch(endpoint, {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json", [BRIDGE_HEADER]: "1" },
@@ -174,12 +175,30 @@ async function flushOutbox(): Promise<void> {
   }
 }
 
+/**
+ * Günlük mağaza taramasının sonucunu EmlakSoft'a yükler (kullanıcının açık oturumuyla, aynı kökenli uca). Başarısızsa
+ * (ağ/5xx/oturum) service worker kuyruğunda kalır ve üstel geri çekilmeyle yeniden denenir; tarama TEKRARLANMAZ.
+ */
+async function flushScans(): Promise<void> {
+  const due = await send<{ entries?: ScanUpload[] }>({ kind: "scanPendingDue" });
+  for (const u of due?.entries ?? []) {
+    const r = await api(
+      { portal: u.portal, kind: u.kind, complete: u.complete, expected: u.expected, read: u.read, reason: u.reason, items: u.items, parserVersion: u.parserVersion },
+      BRIDGE_INVENTORY_ENDPOINT,
+    );
+    const verdict = sendVerdict(r.status, r.data);
+    await send({ kind: verdict === "retry" ? "scanPendingFail" : "scanPendingDone", id: u.id });
+    if (verdict === "retry") break;
+  }
+}
+
 async function step(): Promise<StepOutcome | "wait"> {
   if (paused || !connected) return "idle";
   if (!navigator.onLine) return "busy";
   const lease = await send<{ granted: boolean }>({ kind: "lease", token: TAB_TOKEN });
   if (!lease?.granted) return "wait";
   await flushOutbox();
+  await flushScans();
   const gate = await send<{ ok: boolean; waitMs?: number }>({ kind: "canFetch" });
   if (!gate?.ok) return "busy";
 

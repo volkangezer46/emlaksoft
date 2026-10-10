@@ -1,7 +1,7 @@
 {
-  "version": "2026-10-08.1",
+  "version": "2026-10-10.1",
   "verified": false,
-  "note": "Tum kaliplar SENTETIK ornek sayfalara gore yazildi; gercek portal sayfasina karsi DOGRULANMADI. Kalip tutmazsa sonuc 'kontrol edilemedi' olur, ASLA 'ilan yok' olmaz. Guncelleme: surumu artir, eklentiyi yeniden paketle.",
+  "note": "Tum kaliplar SENTETIK ornek sayfalara gore yazildi; gercek portal sayfasina karsi DOGRULANMADI (storeStartUrls ve storeTotal dahil: adresler tahmindir, 404/oturum yoksa sonuc kontrol edilemedi olur). Kalip tutmazsa sonuc kontrol edilemedi olur, ASLA ilan yok olmaz; toplam ilan sayisi okunamazsa liste TAM sayilmaz. Guncelleme: surumu artir, eklentiyi yeniden paketle.",
   "portals": {
     "sahibinden": {
       "label": "Sahibinden",
@@ -53,7 +53,17 @@
       ],
       "status": [],
       "storeItem": "href=\"((?:https://(?:www\\.)?sahibinden\\.com)?/ilan/[^\"?#]*-(\\d{6,12})/detay)\"",
-      "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|title=\"Sonraki\")"
+      "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|title=\"Sonraki\")",
+      "storeStartUrls": [
+        "https://banaozel.sahibinden.com/ilanlarim"
+      ],
+      "storeTotal": [
+        "\"totalCount\"\\s*:\\s*(\\d+)",
+        "\"totalResults?\"\\s*:\\s*(\\d+)",
+        "\"resultCount\"\\s*:\\s*(\\d+)",
+        "([\\d.]+)\\s+ilan\\s+(?:bulundu|listeleniyor)",
+        "class=\"[^\"]*(?:result-count|total-count|resultText)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([\\d.]+)"
+      ]
     },
     "hepsiemlak": {
       "label": "Hepsiemlak",
@@ -101,7 +111,17 @@
       ],
       "status": [],
       "storeItem": "href=\"((?:https://(?:www\\.)?hepsiemlak\\.com)?/[^\"?#]*?(\\d{6,12})(?:-detay)?)\"",
-      "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|aria-label=\"Sonraki\")"
+      "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|aria-label=\"Sonraki\")",
+      "storeStartUrls": [
+        "https://www.hepsiemlak.com/ilanlarim"
+      ],
+      "storeTotal": [
+        "\"totalCount\"\\s*:\\s*(\\d+)",
+        "\"totalResults?\"\\s*:\\s*(\\d+)",
+        "\"resultCount\"\\s*:\\s*(\\d+)",
+        "([\\d.]+)\\s+ilan\\s+(?:bulundu|listeleniyor)",
+        "class=\"[^\"]*(?:result-count|total-count|resultText)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([\\d.]+)"
+      ]
     },
     "emlakjet": {
       "label": "Emlakjet",
@@ -149,7 +169,17 @@
       ],
       "status": [],
       "storeItem": "href=\"((?:https://(?:www\\.)?emlakjet\\.com)?/ilan/[^\"?#]*-(\\d{6,12}))/?\"",
-      "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|aria-label=\"Sonraki\")"
+      "nextPage": "<a[^>]*href=\"([^\"]+)\"[^>]*(?:rel=\"next\"|aria-label=\"Sonraki\")",
+      "storeStartUrls": [
+        "https://www.emlakjet.com/hesabim/ilanlarim"
+      ],
+      "storeTotal": [
+        "\"totalCount\"\\s*:\\s*(\\d+)",
+        "\"totalResults?\"\\s*:\\s*(\\d+)",
+        "\"resultCount\"\\s*:\\s*(\\d+)",
+        "([\\d.]+)\\s+ilan\\s+(?:bulundu|listeleniyor)",
+        "class=\"[^\"]*(?:result-count|total-count|resultText)[^\"]*\"[^>]*>\\s*(?:<[^>]*>\\s*)*([\\d.]+)"
+      ]
     }
   }
 }

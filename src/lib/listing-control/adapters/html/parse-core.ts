@@ -51,12 +51,35 @@ export type PortalHtmlRules = {
   status: readonly string[];
   storeItem: string;
   nextPage: string;
+  /** "İlanlarım" (kendi ilan listesi) başlangıç adresleri; DOĞRULANMADI (portal-rules.json notu). Yalnız portal alanında olabilir. */
+  storeStartUrls?: readonly string[];
+  /** Listenin gösterdiği TOPLAM ilan sayısı kalıpları (ilk grup = sayı). Yoksa/bulunamazsa liste "tam" sayılmaz. */
+  storeTotal?: readonly string[];
+  /** Kart içi konum metni kalıbı (ilk grup). */
+  storeLocation?: string;
 };
 
 export type FetchedPage = { status: number; finalUrl: string; html: string };
 
-export type StoreItem = { externalId: string; url: string };
-export type StoreListResult = { items: StoreItem[]; nextUrl: string | null; error: string | null };
+/** Mağaza/ilanlarım kartından okunabilen alanlar (hepsi savunmacı; okunamayan null kalır, ASLA uydurulmaz). */
+export type StoreItem = {
+  externalId: string;
+  url: string;
+  title?: string | null;
+  price?: number | null;
+  sqm?: number | null;
+  rooms?: string | null;
+  location?: string | null;
+  thumbUrl?: string | null;
+  status?: "active" | "passive";
+};
+export type StoreListResult = {
+  items: StoreItem[];
+  nextUrl: string | null;
+  error: string | null;
+  /** Portalın listede gösterdiği toplam ilan sayısı (okunamazsa null: liste tam sayılamaz). */
+  totalCount?: number | null;
+};
 
 /** Ayrıştırılan en fazla HTML boyutu (bellek/yavaş regex koruması). */
 export const MAX_HTML_CHARS = 1_500_000;
@@ -234,7 +257,67 @@ function absolute(href: string, base: string): string | null {
   }
 }
 
-/** Ofis/danışman "mağaza" (ilan listesi) sayfası → ilan no + URL listesi ve sonraki sayfa. Tanınmayan yapı = hata. */
+/** Kart penceresi (bir ilan bağlantısından sonrakine kadar) en çok bu kadar karakter taranır. */
+const CARD_WINDOW = 3_500;
+const PRICE_TL_RE = /(\d{1,3}(?:\.\d{3})+|\d{4,})(?:,\d{1,2})?\s*(?:TL|₺)/i;
+const SQM_RE = /(\d{2,4})(?:[.,]\d+)?\s*(?:m²|m2|m²|metrekare)/i;
+const ROOMS_RE = /\b(\d{1,2}\s*\+\s*\d{1,2})\b/;
+const IMG_RE = /<img\b[^>]*?\s(?:data-src|data-lazy-src|src)="(https:\/\/[^"\s]+)"/i;
+const PASSIVE_PHRASES = ["pasif", "yayında değil", "yayinda degil", "süresi doldu", "onay bekliyor", "yayından kaldırıldı"];
+
+function readCard(rules: PortalHtmlRules, card: string, baseUrl: string): Omit<StoreItem, "externalId" | "url"> {
+  const out: Omit<StoreItem, "externalId" | "url"> = {};
+  // Pencere ilan bağlantısının `href`inden başlar (etiketin ortasındadır): önce title özniteliği, yoksa bağlantı metni.
+  const titleAttr = /\btitle="([^"]{4,300})"/i.exec(card)?.[1];
+  const anchorText = /^[^>]*>([\s\S]{4,400}?)<\/a>/i.exec(card)?.[1];
+  const title = cleanText(titleAttr ?? anchorText ?? null, 300);
+  if (title && !/^(sonraki|önceki|detay|incele)$/i.test(title)) out.title = title;
+  const text = visibleText(card);
+  const price = PRICE_TL_RE.exec(text);
+  // Başka para birimi görünüyorsa fiyat yazılmaz (yanlış TL fiyatı uyuşmazlık alarmı doğurur).
+  const foreign = /(?:\$|€|£|\busd\b|\beur\b|\bgbp\b)/i.test(text);
+  if (price && !foreign) {
+    const n = normalizeTlPrice(price[0], "TRY").price;
+    if (n !== null) out.price = n;
+  }
+  const sqm = SQM_RE.exec(text);
+  if (sqm) {
+    const v = Number(sqm[1]);
+    if (v >= 10 && v <= 20_000) out.sqm = v;
+  }
+  const rooms = ROOMS_RE.exec(title ?? text);
+  if (rooms) out.rooms = rooms[1].replace(/\s+/g, "");
+  const locRe = rules.storeLocation ? compile(rules.storeLocation, "i") : null;
+  const loc = cleanText(
+    (locRe ? locRe.exec(card)?.[1] : null) ?? /class="[^"]*(?:location|konum|adres)[^"]*"[^>]*>\s*(?:<[^>]*>\s*)*([^<]{3,160})</i.exec(card)?.[1] ?? null,
+    160,
+  );
+  if (loc) out.location = loc;
+  const img = IMG_RE.exec(card)?.[1];
+  if (img) {
+    try {
+      const u = new URL(img, baseUrl);
+      if (u.protocol === "https:") out.thumbUrl = u.toString().slice(0, 600);
+    } catch {
+      /* geçersiz görsel adresi: atlanır */
+    }
+  }
+  out.status = hasAnyNorm(text, PASSIVE_PHRASES) ? "passive" : "active";
+  return out;
+}
+
+function readTotal(rules: PortalHtmlRules, html: string): number | null {
+  const patterns = rules.storeTotal ?? [];
+  const hit = firstHit(html, patterns);
+  if (!hit) return null;
+  const n = Number(hit.value.replace(/[^\d]/g, ""));
+  return Number.isFinite(n) && n > 0 && n <= 100_000 ? n : null;
+}
+
+/**
+ * Ofis/danışman "mağaza" ya da "ilanlarım" sayfası → ilan no + URL + (okunabilirse) başlık/fiyat/m²/oda/konum/küçük resim,
+ * toplam ilan sayısı ve sonraki sayfa. Tanınmayan yapı = hata (`no_items`); alanlar okunamazsa null kalır, ASLA uydurulmaz.
+ */
 export function parseStoreListPage(rules: PortalHtmlRules, page: FetchedPage, maxItems = 200): StoreListResult {
   if (page.status === 404 || page.status === 410) return { items: [], nextUrl: null, error: `http_${page.status}` };
   const tErr = transportError(rules, page);
@@ -245,8 +328,9 @@ export function parseStoreListPage(rules: PortalHtmlRules, page: FetchedPage, ma
   const seen = new Set<string>();
   if (itemRe) {
     itemRe.lastIndex = 0;
+    const hits: { index: number; id: string; url: string }[] = [];
     let m: RegExpExecArray | null;
-    while ((m = itemRe.exec(html)) && items.length < maxItems) {
+    while ((m = itemRe.exec(html)) && hits.length < maxItems * 4) {
       const id = m[2];
       const url = m[1] ? absolute(m[1], page.finalUrl) : null;
       if (!id || !url || seen.has(id)) continue;
@@ -256,7 +340,11 @@ export function parseStoreListPage(rules: PortalHtmlRules, page: FetchedPage, ma
         continue;
       }
       seen.add(id);
-      items.push({ externalId: id, url });
+      hits.push({ index: m.index, id, url });
+    }
+    for (let i = 0; i < hits.length && items.length < maxItems; i += 1) {
+      const end = Math.min(hits[i + 1]?.index ?? html.length, hits[i].index + CARD_WINDOW);
+      items.push({ externalId: hits[i].id, url: hits[i].url, ...readCard(rules, html.slice(hits[i].index, end), page.finalUrl) });
     }
   }
   const nextHref = firstHit(html, [rules.nextPage])?.value ?? null;
@@ -268,7 +356,7 @@ export function parseStoreListPage(rules: PortalHtmlRules, page: FetchedPage, ma
   }
   if (items.length === 0) {
     const captcha = hasAnyNorm(visibleText(html), rules.captchaMarkers) || hasAnyNorm(html, rules.captchaMarkers);
-    return { items, nextUrl: null, error: captcha ? "captcha" : "no_items" };
+    return { items, nextUrl: null, error: captcha ? "captcha" : "no_items", totalCount: null };
   }
-  return { items, nextUrl, error: null };
+  return { items, nextUrl, error: null, totalCount: readTotal(rules, html) };
 }

@@ -8,7 +8,8 @@
  *
  * - `host_permissions` YALNIZ portal adaptör kayıt defterinden (`allPortalHosts()`): sahibinden/hepsiemlak/emlakjet.
  * - İçerik betiği YALNIZ EmlakSoft alanında: `emlaksoft.vercel.app` + `NEXT_PUBLIC_APP_URL` host'u (varsa).
- * - İzinler yalnız `storage` + `alarms`. `externally_connectable` YOK.
+ * - İzinler yalnız `storage` + `alarms`. `externally_connectable` YALNIZ EmlakSoft kökenleri için (siteden salt-okunur `ping`;
+ *   bağlama ve veri yolu değişmedi: içerik betiği köprüsü + kullanıcı etkinliği).
  * - Sürüm tek kaynak: `src/lib/listing-control/worker/extension-release.ts` (manifest.base.json ile eşitliği test kilitler).
  * - Köprü sözleşmesi, hız kuralı ve ayrıştırıcılar uygulamanın `src/lib/listing-control/**` dosyalarından DOĞRUDAN derlenir.
  */
@@ -85,6 +86,7 @@ async function main() {
 
   const manifest = { ...baseManifest, version: EXTENSION_VERSION } as Record<string, unknown>;
   manifest.host_permissions = allPortalHosts().map((h) => `https://*.${h}/*`);
+  manifest.externally_connectable = { matches: origins.map((o) => `${o}/*`) };
   manifest.content_scripts = [{ matches: origins.map((o) => `${o}/*`), js: ["content.js"], run_at: "document_start", all_frames: false }];
   writeFileSync(join(DIST, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 

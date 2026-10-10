@@ -105,6 +105,47 @@ function renderSettings(s: StatusReply) {
   $<HTMLInputElement>("dailyCap").value = String(s.settings.dailyCap);
 }
 
+const SCAN_RESULT: Record<string, string> = {
+  complete: "Tam liste okundu",
+  partial: "Liste eksik kaldı",
+  unreadable: "Sayfa ayrıştırılamadı",
+  blocked: "Portal engelledi, durdu",
+};
+
+function dayTime(ms: number, now: number): string {
+  const d = new Date(ms);
+  const same = d.toDateString() === new Date(now).toDateString();
+  return `${same ? "bugün" : d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })} ${clock(ms)}`;
+}
+
+/** Günlük mağaza taraması: portal başına son tam tarama, okunan/beklenen ilan sayısı ve sonuç (dürüst durum). */
+function renderScan(s: StatusReply, now: number) {
+  const scan = s.scan;
+  const list = $("scan");
+  list.replaceChildren();
+  const btn = $<HTMLButtonElement>("scanNow");
+  btn.disabled = !s.connected || s.paused || scan?.active === true;
+  btn.textContent = scan?.active ? "Taranıyor…" : "Şimdi tara";
+  $("scanHint").textContent = !scan
+    ? "Bu sürüm günlük tarama bilgisi vermiyor."
+    : scan.pendingUploads > 0
+      ? `${scan.pendingUploads} sonuç EmlakSoft’a gönderilmeyi bekliyor (bir EmlakSoft sekmesi açın).`
+      : "Tarayıcı açıldıktan sonra günde en az bir kez ofisinizin kendi ilan listesi okunur.";
+  for (const p of scan?.portals ?? []) {
+    const li = el("li", "row");
+    const name = el("div", "name");
+    name.append(el("span", "", PORTAL_LABEL[p.id] ?? p.id));
+    const parts: string[] = [];
+    if (p.lastFullAt) parts.push(`Son tam tarama ${dayTime(p.lastFullAt, now)} · ${p.lastRead} ilan`);
+    else if (p.lastTryAt) parts.push(`Son deneme ${dayTime(p.lastTryAt, now)}: ${SCAN_RESULT[p.lastResult ?? ""] ?? "-"}`);
+    else parts.push("Henüz taranmadı");
+    if (p.lastFullAt && p.lastResult && p.lastResult !== "complete") parts.push(SCAN_RESULT[p.lastResult] ?? "");
+    name.append(el("small", "", parts.join(" · ")));
+    li.append(name);
+    list.append(li);
+  }
+}
+
 function render(s: StatusReply) {
   const now = Date.now();
   $("version").textContent = `Sürüm ${s.version}`;
@@ -141,6 +182,8 @@ function render(s: StatusReply) {
   $("next").textContent = nextLabel(s, now);
   meter("hourBar", "hourLbl", s.hourUsed, s.hourCap, "kontrol / saat");
   meter("dayBar", "dayLbl", s.today, s.dayCap, "kontrol / gün");
+
+  renderScan(s, now);
 
   const portals = $("portals");
   portals.replaceChildren();
@@ -220,6 +263,11 @@ $("save").addEventListener("click", async () => {
   });
   settingsDirty = false;
   const s = await call({ kind: "saveSettings", settings });
+  if (s) render(s);
+});
+
+$("scanNow").addEventListener("click", async () => {
+  const s = await call({ kind: "scanNow" });
   if (s) render(s);
 });
 

@@ -6,8 +6,9 @@
  * yoktur; "eşleştirme" kullanıcının açık onayıdır: "Bağlan" tıklanana kadar eklenti HİÇBİR kontrol yapmaz. Bağlantı
  * kullanıcı eylemiyle (popup düğmesi ya da uygulama içi sayfadaki "Eklentiyi bağla" düğmesi) kurulur ve kısa ömürlüdür:
  * EmlakSoft oturumu `PAIRING_TTL_MS` boyunca hiç görülmezse bağlantı düşer, yeniden onay istenir.
- * Eklenti `externally_connectable` ilan ETMEZ: web sayfaları eklentiye doğrudan ileti gönderemez; tek kanal içerik betiğinin
- * `window.postMessage` köprüsüdür ve her iletide köken + pencere + kullanıcı etkinliği doğrulanır.
+ * `externally_connectable` (0.3.0) YALNIZ EmlakSoft kökenleri için ve YALNIZ salt-okunur `ping` (kurulu mu, sürüm, bağlı mı) içindir;
+ * bağlama/ayar/veri bu kanaldan yapılmaz. Bağlama kanalı içerik betiğinin `window.postMessage` köprüsüdür ve her iletide
+ * köken + pencere + kullanıcı etkinliği doğrulanır.
  */
 
 export const PAIRING_TTL_MS = 30 * 24 * 3_600_000;

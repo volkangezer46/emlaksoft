@@ -170,6 +170,35 @@ export async function requestConnect(timeoutMs = 4_000): Promise<boolean> {
   return msg?.type === "connect-response" && msg.ok;
 }
 
+export type ExtensionPing = { version: string; connected: boolean; paused: boolean };
+
+type ChromeExternal = { runtime?: { sendMessage?: (id: string, msg: unknown, cb: (r: unknown) => void) => void; lastError?: unknown } };
+
+/**
+ * Siteden algılama (externally_connectable): içerik betiği henüz yüklenmemişken bile (eklenti az önce kurulduysa açık sekmelere
+ * betik girmez) eklentinin kurulu olduğunu söyler. YALNIZ salt-okunur `ping`; eklenti kimliği (`NEXT_PUBLIC_LISTING_EXTENSION_ID`)
+ * mağaza yayınından sonra bilinir, yoksa/yanlışsa null döner. Chrome dışı tarayıcılarda `chrome.runtime` yoktur: null.
+ */
+export function pingExtension(extensionId: string | null | undefined, timeoutMs = 1_500): Promise<ExtensionPing | null> {
+  return new Promise((resolve) => {
+    const id = (extensionId ?? "").trim();
+    const c = (globalThis as { chrome?: ChromeExternal }).chrome;
+    if (!/^[a-p]{32}$/.test(id) || typeof c?.runtime?.sendMessage !== "function") return resolve(null);
+    const timer = window.setTimeout(() => resolve(null), timeoutMs);
+    try {
+      c.runtime.sendMessage(id, { kind: "ping" }, (r) => {
+        window.clearTimeout(timer);
+        void c.runtime?.lastError; // yanıt yoksa (kurulu değil) lastError okunur, hata sessizce yutulur
+        const o = (typeof r === "object" && r !== null ? r : {}) as Record<string, unknown>;
+        resolve(o.ok === true && typeof o.version === "string" ? { version: o.version.slice(0, 20), connected: o.connected === true, paused: o.paused === true } : null);
+      });
+    } catch {
+      window.clearTimeout(timer);
+      resolve(null);
+    }
+  });
+}
+
 /** Eklentinin durum görünümünü ister (yanıt yoksa null). Doğrulama: `parseStatusView`. */
 export async function requestStatus(timeoutMs = 2_500): Promise<unknown> {
   const id = `st-${Math.random().toString(36).slice(2, 10)}`;

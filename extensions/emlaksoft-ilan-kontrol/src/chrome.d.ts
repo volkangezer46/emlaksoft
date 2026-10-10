@@ -4,8 +4,14 @@
  */
 declare namespace chrome {
   namespace runtime {
-    type MessageSender = { tab?: { id?: number; url?: string }; url?: string; id?: string };
+    type MessageSender = { tab?: { id?: number; url?: string }; url?: string; id?: string; origin?: string };
     const id: string;
+    /** Service worker'ı uyanık tutma yoklaması (uzun sayfalı tarama sırasında; her çağrı boşta sayacını sıfırlar). */
+    function getPlatformInfo(): Promise<unknown>;
+    /** Yalnız manifest `externally_connectable` ile izinli EmlakSoft kökenlerinden gelir (salt okunur yoklama). */
+    const onMessageExternal: {
+      addListener(cb: (message: unknown, sender: MessageSender, sendResponse: (response?: unknown) => void) => boolean | void): void;
+    };
     const lastError: { message?: string } | undefined;
     function getManifest(): { version: string; name: string };
     function getURL(path: string): string;

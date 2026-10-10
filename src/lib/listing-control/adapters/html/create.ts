@@ -23,6 +23,8 @@ export type HtmlAdapter = {
   hosts: readonly string[];
   rulesVersion: string;
   rulesVerified: boolean;
+  /** "İlanlarım" başlangıç adresleri (yalnız portal alanındaki https adresler; DOĞRULANMADI). */
+  storeStartUrls: readonly string[];
   /** URL bu portalın alanında mı (https + izinli host; mağaza/liste sayfası için). */
   isPortalUrl(url: string): boolean;
   /** URL bu portalın ilan sayfası mı (https + izinli host + ilan yolu kalıbı). */
@@ -55,6 +57,7 @@ export function createHtmlAdapter(id: string, rules: PortalHtmlRules | undefined
     hosts: rules.hosts,
     rulesVersion: PORTAL_RULES.version,
     rulesVerified: PORTAL_RULES.verified === true,
+    storeStartUrls: (rules.storeStartUrls ?? []).filter((u) => portalUrl(u) !== null),
     isPortalUrl: (url: string) => portalUrl(url) !== null,
     isListingUrl(url: string) {
       const u = portalUrl(url);

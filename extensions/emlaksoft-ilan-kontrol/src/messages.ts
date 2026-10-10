@@ -33,7 +33,16 @@ export type BgRequest =
   | { kind: "outboxPut"; entry: OutboxPut }
   | { kind: "outboxDue" }
   | { kind: "outboxDone"; jobId: string }
-  | { kind: "outboxFail"; jobId: string };
+  | { kind: "outboxFail"; jobId: string }
+  /** Günlük mağaza taraması: şimdi başlat (açılır pencere / sayfadaki "Şimdi tara"; bağlı olmak şart). */
+  | { kind: "scanNow" }
+  /** İçerik betiği: EmlakSoft'a yüklenmeyi bekleyen tarama sonucu (en çok 1) ve sonucu. */
+  | { kind: "scanPendingDue" }
+  | { kind: "scanPendingDone"; id: string }
+  | { kind: "scanPendingFail"; id: string };
+
+/** Sayfadan (externally_connectable) gelen TEK ileti türü: salt okunur yoklama. Bağlama ve veri okuma bu kanaldan YAPILMAZ. */
+export type ExternalRequest = { kind: "ping" };
 
 export type StatusReply = ExtensionStatusView;
 
@@ -52,6 +61,13 @@ export const STORAGE_KEYS = {
   outbox: "es_outbox",
   /** Türetilmiş bayraklar ({connected, paused}); içerik betiği belge köküne yansıtır. */
   flags: "es_flags",
+  /** Süren günlük tarama ilerlemesi (MV3 service worker kapanırsa dakikalık alarm kaldığı yerden sürdürür). */
+  scan: "es_scan",
+  scanStates: "es_scan_states",
+  /** EmlakSoft'a yüklenmeyi bekleyen tarama sonuçları. */
+  scanUploads: "es_scan_uploads",
 } as const;
 
 export const ALARM_TICK = "es-tick";
+/** Saatte bir uyanır; son tam taramadan 20 saat geçtiyse günlük taramayı başlatır (kaçırılan gün ilk açılışta telafi edilir). */
+export const ALARM_SCAN = "es-scan";

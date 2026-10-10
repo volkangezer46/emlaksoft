@@ -52,13 +52,29 @@ export type MatchCandidateRow = {
 };
 
 /** Açık eşleşme adayları (en güçlü aday en üstte; adaysızlar en sonda). Sunucu sayfalama. */
-export async function listMatchCandidates(db: Db, page: number, pageSize = 20): Promise<{ available: boolean; rows: MatchCandidateRow[]; total: number }> {
+/**
+ * Eşleşme grupları (güven bantları `matching.ts` MATCH_BANDS ile aynı): `onay` ≥85 tek tık önerilen, `emin` 60-84 "emin değilim",
+ * `yok` <60 ya da hiç aday yok (portföyde olmayan ilan). Grup yoksa hepsi.
+ */
+export type MatchGroup = "onay" | "emin" | "yok";
+export const MATCH_GROUPS: readonly MatchGroup[] = ["onay", "emin", "yok"];
+
+export function parseMatchGroup(raw: string | string[] | undefined): MatchGroup | null {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return (MATCH_GROUPS as readonly string[]).includes(v ?? "") ? (v as MatchGroup) : null;
+}
+
+export async function listMatchCandidates(db: Db, page: number, pageSize = 20, group: MatchGroup | null = null): Promise<{ available: boolean; rows: MatchCandidateRow[]; total: number }> {
   const size = Math.min(Math.max(pageSize, 1), 50);
   const p = Math.max(page, 1);
-  const { data, error, count } = await db
+  let q = db
     .from("listing_matching_candidates")
     .select("id, portal, external_id, url, title, price, source_kind, candidates, top_score, first_seen_at, last_seen_at", { count: "exact" })
-    .eq("status", "open")
+    .eq("status", "open");
+  if (group === "onay") q = q.gte("top_score", 85);
+  else if (group === "emin") q = q.gte("top_score", 60).lt("top_score", 85);
+  else if (group === "yok") q = q.or("top_score.is.null,top_score.lt.60");
+  const { data, error, count } = await q
     .order("top_score", { ascending: false, nullsFirst: false })
     .order("last_seen_at", { ascending: false })
     .range((p - 1) * size, p * size - 1);

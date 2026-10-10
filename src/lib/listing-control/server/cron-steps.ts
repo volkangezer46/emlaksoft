@@ -4,6 +4,7 @@ import { consumeControlEvents } from "./events";
 import { planVerificationJobs, reapJobs } from "./queue";
 import { runControlSweep } from "./sweep";
 import { runDuplicateScan } from "./duplicates";
+import { runDailyMatch } from "./daily-match";
 
 /**
  * Mevcut cron'lara EKLENEN ilan kontrol adımları (yeni cron YOK; sayı değişmez). Her adım en iyi çabadır: hata mevcut
@@ -11,7 +12,7 @@ import { runDuplicateScan } from "./duplicates";
  *  - havuz-atama (10 dk): olay tüketimi (tarayıcı işçisi sonuçları), değerlendirme taraması (yayınlanmayan portföy, yetki), lease hasadı, iş planlama.
  *    SLA YÜKSELTME burada DEĞİL: tek SLA zinciri `leak-sla` cron'unda (saatlik; kapanış SLA'sı ile aynı yerde).
  *  - portal-teyit (6 saat): geniş iş planlama + hasat (aynı iş idempotent; açık iş tekil) + GÜNLÜK kopya portföy
- *    taraması (yalnız UTC 00-06 turunda; `server/duplicates.ts`).
+ *    taraması + GÜNLÜK EŞLEŞTİRME (eklenti envanteri ↔ portföy; aynı gece turu; `server/duplicates.ts`, `server/daily-match.ts`).
  */
 
 export type ControlStepSummary = { text: string; ok: boolean };
@@ -73,6 +74,22 @@ export async function runControlStepBroad(db: Db, opts: { disabledTenantIds?: Re
       dupText = dup.schemaMissing
         ? " · kopya taraması: şema yok"
         : ` · kopya taraması: ${dup.tenants} ofis, ${dup.pairs} çift, ${dup.opened} açıldı, ${dup.closed} kapandı${dup.timedOut ? " (süre doldu, kalan yarın)" : ""}`;
+    }
+    // Günlük eşleştirme (eklentinin yüklediği envanter ↔ güncel portföy): kopya taramasıyla aynı gece penceresi, ayrı zaman bütçesi.
+    if (isDailyDuplicateWindow(startedAt)) {
+      try {
+        const dm = await runDailyMatch(db, {
+          deadlineMs: Math.min(now() + 60_000, startedAt + 240_000),
+          disabledTenantIds: opts.disabledTenantIds,
+          rotateSeed: Math.floor(startedAt / 86_400_000),
+        });
+        dupText += dm.schemaMissing
+          ? " · günlük eşleştirme: şema yok"
+          : ` · günlük eşleştirme: ${dm.tenants} ofis, ${dm.candidates} aday, ${dm.linked} bağlandı, ${dm.closed} kapandı, ${dm.reranked} güncellendi, ${dm.anomaliesOpened} uyarı${dm.timedOut ? " (süre doldu, kalan yarın)" : ""}`;
+      } catch (err) {
+        console.error("runDailyMatch", err);
+        dupText += " · günlük eşleştirme başarısız";
+      }
     }
     return { ok: true, text: `${plan.enqueued} kontrol işi planlandı (${plan.tenantsWithClients} cihazlı ofis), ${reaped.requeued} hasat${dupText}` };
   } catch (err) {

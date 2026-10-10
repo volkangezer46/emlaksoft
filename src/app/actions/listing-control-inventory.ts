@@ -153,36 +153,62 @@ async function loadMatchPool(db: Db, scope: "mine" | "office", userId: string): 
   return out;
 }
 
+export type ExtensionItem = {
+  externalId: string;
+  url: string | null;
+  title?: string | null;
+  price?: number | null;
+  sqm?: number | null;
+  rooms?: string | null;
+  location?: string | null;
+  status?: "active" | "passive";
+};
+
 function rowsFromExtension(portal: string, items: unknown): InventoryRow[] {
   const adapter = getAdapter(portal);
   if (!Array.isArray(items) || !adapter) return [];
   const out: InventoryRow[] = [];
   const seen = new Set<string>();
   for (const raw of items.slice(0, INVENTORY_LIMITS.maxRows)) {
-    const it = (raw ?? {}) as { externalId?: unknown; url?: unknown };
+    const it = (raw ?? {}) as Partial<Record<keyof ExtensionItem, unknown>>;
     const id = typeof it.externalId === "string" ? it.externalId.trim() : "";
-    const url = typeof it.url === "string" ? it.url : null;
+    const url = typeof it.url === "string" && it.url ? it.url : null;
     const n = adapter.normalize({ url, externalId: id });
     if (!n || seen.has(n.externalId)) continue;
     seen.add(n.externalId);
-    out.push({ externalId: n.externalId, url: n.url, title: null, price: null, advisorName: null, status: "active" });
+    const num = (v: unknown, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : null);
+    out.push({
+      externalId: n.externalId,
+      url: n.url,
+      title: typeof it.title === "string" && it.title.trim() ? it.title.trim().slice(0, 300) : null,
+      price: num(it.price, 1, 1e12),
+      advisorName: null,
+      status: it.status === "passive" ? "passive" : "active",
+      sqm: num(it.sqm, 10, 20_000),
+      rooms: typeof it.rooms === "string" && /^\d{1,2}\+\d{1,2}$/.test(it.rooms) ? it.rooms : null,
+      location: typeof it.location === "string" && it.location.trim() ? it.location.trim().slice(0, 160) : null,
+    });
   }
   return out;
 }
 
 export async function importPortalInventory(input: {
   portal: string;
-  scope: "mine" | "office";
+  /** "auto": yönetim kademesi ofis geneli, diğerleri yalnız kendi portföyü (eklentinin günlük taraması). */
+  scope: "mine" | "office" | "auto";
   source: "csv" | "paste" | "extension";
   complete: boolean;
   text?: string;
-  items?: { externalId: string; url: string | null }[];
+  items?: ExtensionItem[];
+  /** Eklenti taraması: portalın gösterdiği toplam ve okunan ilan sayısı (tam liste kanıtı). */
+  expectedCount?: number | null;
+  readCount?: number | null;
 }): Promise<InventoryImportResult> {
   const gate = await requirePermission("portals", "edit");
   if (!gate.ok) return { ok: false, error: gate.error };
   const portal = String(input.portal ?? "").trim().toLowerCase();
   if (!getAdapter(portal)) return { ok: false, error: "Portal seçin." };
-  const scope = input.scope === "office" ? "office" : "mine";
+  const scope = input.scope === "office" || (input.scope === "auto" && MANAGER_ROLES.has(gate.role)) ? "office" : "mine";
   if (scope === "office" && !MANAGER_ROLES.has(gate.role)) return { ok: false, error: "Ofis geneli karşılaştırma yalnız yönetim kademesine açıktır." };
   const source = input.source === "csv" || input.source === "extension" ? input.source : "paste";
   const text = typeof input.text === "string" ? input.text : "";
@@ -203,7 +229,10 @@ export async function importPortalInventory(input: {
     if (rows.length === 0) return { ok: false, error: "Eklenti listeden ilan okuyamadı." };
   }
   // Eklentiyle okunan liste ancak bütün sayfalar okunduysa tam sayılır; dosya/yapıştırmada kullanıcı onayı gerekir.
-  const complete = Boolean(input.complete);
+  // Eklenti listesi için tamlık kanıtı zorunlu: portalın gösterdiği toplam okunmadıysa/ulaşılmadıysa "tam" sayılmaz (sunucu RPC'si de doğrular).
+  const expected = Number.isFinite(input.expectedCount) ? Number(input.expectedCount) : null;
+  const read = Number.isFinite(input.readCount) ? Number(input.readCount) : rows.length;
+  const complete = source === "extension" ? Boolean(input.complete) && expected !== null && expected > 0 && read >= expected : Boolean(input.complete);
 
   const db = (await createClient()) as unknown as Db;
   const crm = await loadCrm(db, portal, scope, gate.userId);
@@ -219,6 +248,7 @@ export async function importPortalInventory(input: {
   const observations = toObservations(breakdown, complete);
   const candidates = breakdown.unregistered.length ? rankUnregistered(breakdown.unregistered, await loadMatchPool(db, scope, gate.userId)) : [];
   const summary = toSummary(breakdown);
+  const summaryForRpc = source === "extension" ? { ...summary, expected_count: expected, read_count: read } : summary;
 
   const obsParts = chunk(observations, 2000);
   const candParts = chunk(candidates, 1000);
@@ -234,7 +264,7 @@ export async function importPortalInventory(input: {
       p_complete: complete,
       p_observations: obsParts[i] ?? [],
       p_candidates: candParts[i] ?? [],
-      p_summary: i === calls - 1 ? summary : null,
+      p_summary: i === calls - 1 ? summaryForRpc : null,
     });
     if (error) {
       console.error("lc_inventory_import", { code: error.code });

@@ -10,6 +10,7 @@ import {
 } from "./extension-health";
 import { isPairingActive, type Pairing } from "./extension-pairing";
 import { EXTENSION_LIMITS, pacingDecision, todayCount, type PacingState } from "./extension-pacing";
+import { SCAN_LIMITS, type ScanProgress, type ScanResultKind, type ScanStates } from "./extension-scan";
 import { hoursLabel, msUntilWindowOpens, portalEnabled, withinWorkingHours, type ExtensionSettings } from "./extension-settings";
 
 /**
@@ -29,6 +30,16 @@ export type PortalHealthView = {
   blocked: number;
   partial: number;
   lastAt: number | null;
+};
+
+/** Günlük mağaza taraması özeti (sayaç ve zaman; ilan içeriği YOK). */
+export type ScanStatusView = {
+  /** En son TAM tarama (herhangi bir portal). */
+  lastFullAt: number | null;
+  active: boolean;
+  activePortal: string | null;
+  pendingUploads: number;
+  portals: { id: string; lastFullAt: number | null; lastTryAt: number | null; lastResult: ScanResultKind | null; lastRead: number; lastExpected: number | null }[];
 };
 
 export type ExtensionStatusView = {
@@ -57,6 +68,8 @@ export type ExtensionStatusView = {
   settings: ExtensionSettings;
   workingHours: string;
   warnPortals: number;
+  /** Eski eklenti sürümlerinde yok. */
+  scan?: ScanStatusView;
 };
 
 export type StatusInput = {
@@ -81,6 +94,7 @@ export type StatusInput = {
   nowMs: number;
   dayKey: string;
   tzOffsetMinutes: number;
+  scan?: { states: ScanStates; progress: ScanProgress | null; pendingUploads: number };
 };
 
 /** Çalışma durumu — öncelik sırası: bağlı değil → duraklatıldı → oturum → engel → saat → sınırlar → sekme → çalışıyor. */
@@ -135,7 +149,33 @@ export function buildStatusView(i: StatusInput): ExtensionStatusView {
     settings: i.settings,
     workingHours: hoursLabel(i.settings),
     warnPortals: portals.filter((p) => p.enabled && (p.level === "red" || p.level === "yellow")).length,
+    scan: buildScanView(i),
   };
+}
+
+export function buildScanView(i: Pick<StatusInput, "scan" | "portalIds">): ScanStatusView {
+  const st = i.scan?.states ?? {};
+  const list = i.portalIds.map((id) => ({
+    id,
+    lastFullAt: st[id]?.lastFullAt ?? null,
+    lastTryAt: st[id]?.lastTryAt ?? null,
+    lastResult: st[id]?.lastResult ?? null,
+    lastRead: st[id]?.lastRead ?? 0,
+    lastExpected: st[id]?.lastExpected ?? null,
+  }));
+  const fulls = list.map((p) => p.lastFullAt).filter((x): x is number => x !== null);
+  return {
+    lastFullAt: fulls.length > 0 ? Math.max(...fulls) : null,
+    active: !!i.scan?.progress,
+    activePortal: i.scan?.progress?.portal ?? null,
+    pendingUploads: i.scan?.pendingUploads ?? 0,
+    portals: list,
+  };
+}
+
+/** Sıradaki günlük taramanın en erken zamanı; hiç tam tarama yoksa null (tarayıcı/EmlakSoft bağlanır bağlanmaz başlar). */
+export function nextScanAt(lastFullAt: number | null): number | null {
+  return lastFullAt === null ? null : lastFullAt + SCAN_LIMITS.dueAfterMs;
 }
 
 /** Sayfaya (köprü) giden görünümü doğrular: geçersizse null. Sayfa yalnız bilinen alanları gösterir. */

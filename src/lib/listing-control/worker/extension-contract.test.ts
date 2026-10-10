@@ -20,7 +20,7 @@ describe("manifest ve paketleme (mağazaya hazırlık)", () => {
   it("MV3, en az izin: yalnız storage + alarms; gereksiz izin/erişim yok", () => {
     expect(m.manifest_version).toBe(3);
     expect(m.permissions).toEqual(["storage", "alarms"]);
-    expect(m.externally_connectable).toBeUndefined(); // web sayfaları eklentiye doğrudan ileti gönderemez
+    expect(m.externally_connectable).toBeUndefined(); // taban manifest'te yok; derleme betiği YALNIZ EmlakSoft kökenleri için yazar (aşağıdaki test)
     expect(m.web_accessible_resources).toBeUndefined();
     expect(m.optional_permissions).toBeUndefined();
     expect(JSON.stringify(m)).not.toMatch(/<all_urls>|"tabs"|"cookies"|"webRequest"|"scripting"|"activeTab"|"declarativeNetRequest"/);
@@ -108,6 +108,36 @@ describe("ilkeler: kaynak kodu kilidi", () => {
     expect(route).toContain('done.outcome === "applied"');
     expect(route).toContain("workerReportParser(");
     expect(src("src/app/actions/listing-control-worker.ts")).toContain('rpc("lc_parser_report"');
+  });
+});
+
+describe("günlük tarama ve siteden algılama (0.3.0)", () => {
+  const bg = src(`${EXT}/src/background.ts`);
+  const content = src(`${EXT}/src/content.ts`);
+  it("externally_connectable yalnız EmlakSoft kökenleri; dış kanalda yalnız salt-okunur ping", () => {
+    const b = src("scripts/build-extension.ts");
+    expect(b).toContain("manifest.externally_connectable = { matches: origins.map((o) => `${o}/*`) }");
+    const ext = bg.slice(bg.indexOf("onMessageExternal.addListener"));
+    expect(ext).toContain("isAllowedAppOrigin(sender.origin");
+    expect(ext).toContain('m.kind !== "ping"');
+    expect(ext).not.toMatch(/setConnected|saveSettings|probe|inventory|scanNow|outbox/);
+  });
+  it("tarama: alarm saatte bir, süren tarama sürdürülür, hız kuralı paced() içinden, yükleme yalnız EmlakSoft sekmesinden", () => {
+    expect(bg).toContain("ALARM_SCAN");
+    expect(bg).toContain("periodInMinutes: 60");
+    expect(bg).toContain("runScanCycle(");
+    expect(bg).toContain("applyPage(");
+    expect(bg).toContain("getPlatformInfo");
+    expect(content).toContain("flushScans");
+    expect(content).toContain("BRIDGE_INVENTORY_ENDPOINT");
+    expect(bg.match(/\bfetch\(/g)?.length).toBe(1); // tarama da tek geçitten (fetchPage) gider
+  });
+  it("yükleme ucu: aynı köken + oturum + portals/edit; tamlık sunucuda yeniden hesaplanır; sunucu portala bağlanmaz", () => {
+    const route = src("src/app/api/app/ilan-kontrol/envanter/route.ts");
+    expect(route).toContain("isSameOriginBridgeRequest(");
+    expect(route).toContain("sanitizeUpload(");
+    expect(route).not.toMatch(/sahibinden\.com|hepsiemlak\.com|emlakjet\.com/);
+    expect(src("src/app/actions/listing-control-inventory.ts")).toContain('requirePermission("portals", "edit")');
   });
 });
 

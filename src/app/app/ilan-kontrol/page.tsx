@@ -33,6 +33,7 @@ import {
   type GroupRowView,
   type TodayCheckView,
 } from "@/components/listing-control/dashboard-sections";
+import { DailySyncSection } from "@/components/listing-control/daily-sync-section";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { countOpenAnomalies, getDb, loadPropertyBriefs, resolveGroupNames, loadPublishLeadTimes } from "@/components/listing-control/readers";
@@ -63,6 +64,11 @@ export default async function IlanKontrolPage({ searchParams }: { searchParams: 
         }
       />
       <ControlSubNav active="genel" closures={effectiveCanAccessModule(perms, "leak")} />
+      <div className="mb-6">
+        <Suspense fallback={<SkeletonCard height={150} label="Günlük kontrol yükleniyor" />}>
+          <DailySyncSection canDecide={management && ["owner", "gm", "branch_manager"].includes(role ?? "")} />
+        </Suspense>
+      </div>
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardBody group={group} management={management} />
       </Suspense>

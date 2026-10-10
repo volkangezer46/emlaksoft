@@ -1,4 +1,5 @@
 import { tokenSimilarity } from "@/lib/duplicate-match";
+import { photoHashSimilarity } from "./photo-hash";
 
 /**
  * Eşleştirme güveni (SAF): (a) kayıtsız portal ilanı ↔ portföy, (b) portföy ↔ portföy mükerrer (benzerlik %).
@@ -24,6 +25,8 @@ export type MatchProbe = {
   /** Konum (portföy haritası). İki tarafta da varsa "Konum yakın" sinyali ölçülür. */
   lat?: number | null;
   lng?: number | null;
+  /** Fotoğraf dHash'leri (16 hane hex, 64 bit). İki tarafta da en az bir hash varsa "Fotoğraf benzerliği" ölçülür. */
+  photoHashes?: readonly string[] | null;
 };
 
 /** İki koordinat arası yaklaşık mesafe (metre; küçük mesafelerde eşdikdörtgen yaklaşımı yeterli). */
@@ -78,7 +81,37 @@ function ratioClose(a: number | null | undefined, b: number | null | undefined, 
   return 1 - (d - tol) / (tol * 3);
 }
 
-export function scoreMatch(a: MatchProbe, b: MatchProbe, extra?: SimilarityProvider): MatchScore {
+/**
+ * Ağırlık profilleri (ölçülemeyen sinyal paydadan çıkar). `default`: portföy↔portföy kopya taraması (değişmedi).
+ * `portal`: portal ilanı ↔ portföy (tasarım 2026-10): konum ≤30 m 20 · adres 15 · m² ±%3 15 · oda 10 · fiyat ±%5 15 ·
+ * fotoğraf 15 · başlık 5 · danışman 5 (+ ada/parsel 30, açıklama 5). İlan no/URL birebir her profilde 100'dür.
+ */
+export type MatchProfile = "default" | "portal";
+const WEIGHTS: Record<MatchProfile, { parcel: number; address: number; geo: number; title: number; price: number; priceTol: number; sqm: number; rooms: number; advisor: number; photo: number }> = {
+  default: { parcel: 30, address: 25, geo: 15, title: 10, price: 15, priceTol: 0.03, sqm: 10, rooms: 5, advisor: 5, photo: 15 },
+  portal: { parcel: 30, address: 15, geo: 20, title: 5, price: 15, priceTol: 0.05, sqm: 15, rooms: 10, advisor: 5, photo: 15 },
+};
+
+/** Güven bantları: ≥85 "Önerilen eşleşme" (tek tık onay), 60-84 "Emin değilim", <60 gösterilmez. */
+export const MATCH_BANDS = { suggested: 85, unsure: 60 } as const;
+export type MatchBand = "suggested" | "unsure" | "none";
+
+export function bandOf(score: number): MatchBand {
+  return score >= MATCH_BANDS.suggested ? "suggested" : score >= MATCH_BANDS.unsure ? "unsure" : "none";
+}
+
+/**
+ * Bir portal ilanının aday listesinden karar bandı. Aynı ilan birden çok portföye ≥85 verirse OTOMATİK/tek tık önerilmez:
+ * `ambiguous` olur ve "hangisi?" diye sorulur (bant "unsure" sayılır).
+ */
+export function resolveBand(candidates: readonly { score: number }[]): { band: MatchBand; ambiguous: boolean } {
+  const top = candidates.reduce((m, c) => Math.max(m, c.score), 0);
+  const strong = candidates.filter((c) => c.score >= MATCH_BANDS.suggested).length;
+  if (strong >= 2) return { band: "unsure", ambiguous: true };
+  return { band: bandOf(top), ambiguous: false };
+}
+
+export function scoreMatch(a: MatchProbe, b: MatchProbe, extra?: SimilarityProvider, profile: MatchProfile = "default"): MatchScore {
   const aId = normalizeExternalId(a.externalId);
   const bId = normalizeExternalId(b.externalId);
   const samePortal = !a.portal || !b.portal || a.portal.toLowerCase() === b.portal.toLowerCase();
@@ -107,15 +140,17 @@ export function scoreMatch(a: MatchProbe, b: MatchProbe, extra?: SimilarityProvi
         ? 1
         : 0
       : null;
-  push("parcel", "Ada/parsel aynı", 30, parcel);
-  push("address", "Adres benzerliği", 25, a.address && b.address ? tokenSimilarity(a.address, b.address) : null);
-  push("geo", "Konum yakın", 15, geoCloseness(a, b));
-  push("title", "Başlık benzerliği", 10, a.title && b.title ? tokenSimilarity(a.title, b.title) : null);
-  push("price", "Fiyat yakın", 15, ratioClose(a.price, b.price, 0.03));
-  push("sqm", "m² yakın", 10, ratioClose(a.sqm, b.sqm, 0.03));
-  push("rooms", "Oda sayısı aynı", 5, a.rooms && b.rooms ? (a.rooms.trim() === b.rooms.trim() ? 1 : 0) : null);
-  push("advisor", "Danışman adı benzer", 5, a.advisorName && b.advisorName ? tokenSimilarity(a.advisorName, b.advisorName) : null);
-  push("photo", "Fotoğraf benzerliği", 15, extra?.photoSimilarity?.(a, b) ?? null);
+  const w = WEIGHTS[profile];
+  push("parcel", "Ada/parsel aynı", w.parcel, parcel);
+  push("address", "Adres benzerliği", w.address, a.address && b.address ? tokenSimilarity(a.address, b.address) : null);
+  push("geo", "Konum yakın", w.geo, geoCloseness(a, b));
+  push("title", "Başlık benzerliği", w.title, a.title && b.title ? tokenSimilarity(a.title, b.title) : null);
+  push("price", "Fiyat yakın", w.price, ratioClose(a.price, b.price, w.priceTol));
+  push("sqm", "m² yakın", w.sqm, ratioClose(a.sqm, b.sqm, 0.03));
+  push("rooms", "Oda sayısı aynı", w.rooms, a.rooms && b.rooms ? (a.rooms.trim() === b.rooms.trim() ? 1 : 0) : null);
+  push("advisor", "Danışman adı benzer", w.advisor, a.advisorName && b.advisorName ? tokenSimilarity(a.advisorName, b.advisorName) : null);
+  // Fotoğraf: önce takılı sağlayıcı, yoksa iki tarafta da dHash varsa Hamming benzerliği (ölçülemezse paydadan çıkar).
+  push("photo", "Fotoğraf benzerliği", w.photo, extra?.photoSimilarity?.(a, b) ?? photoHashSimilarity(a.photoHashes, b.photoHashes));
   push("description", "Açıklama benzerliği", 5, extra?.descriptionSimilarity?.(a, b) ?? null);
 
   const max = signals.reduce((s, x) => s + x.max, 0);
@@ -134,9 +169,10 @@ export function rankCandidates<T extends { probe: MatchProbe }>(
   minScore = 50,
   extra?: SimilarityProvider,
   limit = 5,
+  profile: MatchProfile = "default",
 ): RankedCandidate<T>[] {
   return candidates
-    .map((candidate) => ({ candidate, match: scoreMatch(subject, candidate.probe, extra) }))
+    .map((candidate) => ({ candidate, match: scoreMatch(subject, candidate.probe, extra, profile) }))
     .filter((r) => r.match.score >= minScore)
     .sort((x, y) => y.match.score - x.match.score)
     .slice(0, limit);

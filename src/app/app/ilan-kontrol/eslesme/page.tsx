@@ -12,7 +12,8 @@ import { CONTROL_BASE } from "@/components/listing-control/helpers";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { VisualChip } from "@/components/listing-control/ui-parts";
 import { MatchActions } from "@/components/listing-control/match-actions";
-import { listMatchCandidates } from "@/components/listing-control/ops-readers";
+import { listMatchCandidates, parseMatchGroup, type MatchGroup } from "@/components/listing-control/ops-readers";
+import { MATCH_BANDS, resolveBand } from "@/lib/listing-control/matching";
 import { getDb, loadPropertyBriefs } from "@/components/listing-control/readers";
 
 export const metadata = { title: "İlan eşleşme kuyruğu" };
@@ -31,6 +32,7 @@ export default async function EslesmePage({ searchParams }: { searchParams: Sear
   const sp = await searchParams;
   const page = Math.max(1, Math.floor(Number(Array.isArray(sp.sayfa) ? sp.sayfa[0] : sp.sayfa) || 1));
   const canDecide = MANAGER_ROLES.has(role ?? "") && effectiveHasPermission(perms, "portals", "edit");
+  const group = parseMatchGroup(sp.grup);
   return (
     <>
       <PageHeader
@@ -42,7 +44,8 @@ export default async function EslesmePage({ searchParams }: { searchParams: Sear
       <ControlSubNav active="eslesme" closures={effectiveCanAccessModule(perms, "leak")} />
       {MANAGER_ROLES.has(role ?? "") ? (
         <Suspense fallback={<SkeletonCard height={420} label="Eşleşme adayları yükleniyor" />}>
-          <QueueBody page={page} canDecide={canDecide} />
+          <GroupTabs active={group} />
+          <QueueBody page={page} canDecide={canDecide} group={group} />
         </Suspense>
       ) : (
         <EmptyState
@@ -57,9 +60,35 @@ export default async function EslesmePage({ searchParams }: { searchParams: Sear
   );
 }
 
-async function QueueBody({ page, canDecide }: { page: number; canDecide: boolean }) {
+const GROUP_TABS: { id: MatchGroup | null; label: string; hint: string }[] = [
+  { id: null, label: "Hepsi", hint: "Bekleyen tüm ilanlar" },
+  { id: "onay", label: "Önerilen", hint: "%85 ve üstü: tek tıkla onaylanır" },
+  { id: "emin", label: "Emin değilim", hint: "%60-84: bakıp karar verin" },
+  { id: "yok", label: "Portföyde olmayan", hint: "Uygun portföy bulunamadı" },
+];
+
+/** Güven grubu süzgeci (URL ile iki yönlü: `?grup=onay|emin|yok`). */
+function GroupTabs({ active }: { active: MatchGroup | null }) {
+  return (
+    <nav aria-label="Eşleşme grupları" className="mb-3 flex flex-wrap gap-2">
+      {GROUP_TABS.map((t) => (
+        <Link
+          key={t.label}
+          href={t.id ? `${CONTROL_BASE}/eslesme?grup=${t.id}` : `${CONTROL_BASE}/eslesme`}
+          title={t.hint}
+          aria-current={t.id === active ? "page" : undefined}
+          className={`focus-ring inline-flex min-h-9 items-center rounded-full border px-3 text-sm font-semibold transition ${t.id === active ? "border-brand-600 bg-brand-50 text-text" : "border-line text-text-muted hover:text-text"}`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+async function QueueBody({ page, canDecide, group }: { page: number; canDecide: boolean; group: MatchGroup | null }) {
   const db = await getDb();
-  const res = await listMatchCandidates(db, page, PAGE_SIZE);
+  const res = await listMatchCandidates(db, page, PAGE_SIZE, group);
   if (!res.available) {
     return (
       <EmptyState
@@ -83,13 +112,17 @@ async function QueueBody({ page, canDecide }: { page: number; canDecide: boolean
       />
     );
   }
-  const briefs = await loadPropertyBriefs(db, res.rows.flatMap((r) => r.candidates.map((c) => c.property_id)));
+  // 60 altı eşleşme önerisi GÖSTERİLMEZ (zayıf tahmin yanıltır); yalnız "portföyde olmayan ilan" olarak kalır.
+  const rows = res.rows.map((r) => ({ ...r, candidates: r.candidates.filter((c) => c.score >= MATCH_BANDS.unsure) }));
+  const briefs = await loadPropertyBriefs(db, rows.flatMap((r) => r.candidates.map((c) => c.property_id)));
   const totalPages = Math.max(1, Math.ceil(res.total / PAGE_SIZE));
+  const q = group ? `&grup=${group}` : "";
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-muted">{res.total} kayıtsız ilan</p>
       <ul className="space-y-2.5">
-        {res.rows.map((r) => {
+        {rows.map((r) => {
+          const decision = resolveBand(r.candidates);
           const adapter = getHtmlAdapter(r.portal);
           const safeUrl = r.url && adapter?.isPortalUrl(r.url) ? r.url : null;
           const options = r.candidates
@@ -117,6 +150,8 @@ async function QueueBody({ page, canDecide }: { page: number; canDecide: boolean
                   {r.candidates.length === 0 ? (
                     <VisualChip visual="critical" label="Eşleşen portföy yok: CRM'e girilmemiş olabilir" />
                   ) : (
+                    <>
+                      {decision.ambiguous ? <VisualChip visual="pending" label="Birden çok portföye benziyor: hangisi?" /> : null}
                     <ul className="space-y-1">
                       {r.candidates.map((c) => {
                         const b = briefs.get(c.property_id);
@@ -133,6 +168,7 @@ async function QueueBody({ page, canDecide }: { page: number; canDecide: boolean
                         );
                       })}
                     </ul>
+                    </>
                   )}
                 </div>
                 {canDecide ? <MatchActions candidateId={r.id} options={options} /> : null}
@@ -143,9 +179,9 @@ async function QueueBody({ page, canDecide }: { page: number; canDecide: boolean
       </ul>
       {totalPages > 1 ? (
         <nav aria-label="Sayfalama" className="flex items-center justify-between text-sm">
-          {page > 1 ? <Link href={`${CONTROL_BASE}/eslesme?sayfa=${page - 1}`} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">← Önceki</Link> : <span />}
+          {page > 1 ? <Link href={`${CONTROL_BASE}/eslesme?sayfa=${page - 1}${q}`} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">← Önceki</Link> : <span />}
           <span className="text-text-muted">Sayfa {page} / {totalPages}</span>
-          {page < totalPages ? <Link href={`${CONTROL_BASE}/eslesme?sayfa=${page + 1}`} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">Sonraki →</Link> : <span />}
+          {page < totalPages ? <Link href={`${CONTROL_BASE}/eslesme?sayfa=${page + 1}${q}`} className="focus-ring rounded px-2 py-1 font-semibold text-accent-text hover:underline">Sonraki →</Link> : <span />}
         </nav>
       ) : null}
     </div>

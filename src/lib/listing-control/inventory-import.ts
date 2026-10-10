@@ -18,8 +18,8 @@ export const INVENTORY_LIMITS = {
   maxRows: 5000,
   maxPasteChars: 400_000,
   maxCandidates: 1000,
-  /** Eşleşme kuyruğuna aday olarak yazılacak asgari güven. */
-  candidateMinScore: 50,
+  /** Eşleşme kuyruğuna aday olarak yazılacak asgari güven (60 altı "gösterme"; `matching.ts` MATCH_BANDS ile aynı). */
+  candidateMinScore: 60,
   /** Bu güven ve üstünde aday portföyde "kayıtsız ilan" uyarısı açılır (SQL ile aynı eşik). */
   anomalyMinScore: 60,
   /** Fiyat farkı toleransı (oran). */
@@ -33,6 +33,10 @@ export type InventoryRow = {
   price: number | null;
   advisorName: string | null;
   status: ObservedListing["status"];
+  /** Eklentinin ilanlarım kartından okuduğu ek alanlar (yoksa undefined/null; eşleştirme ölçemediğini paydadan çıkarır). */
+  sqm?: number | null;
+  rooms?: string | null;
+  location?: string | null;
 };
 
 export type CrmListing = {
@@ -277,7 +281,29 @@ export type CandidatePayload = {
   price: number | null;
   candidates: { property_id: string; code: string | null; score: number; signals: MatchSignal[] }[];
   top_score: number | null;
+  /** Günlük yeniden sıralama için ilanın ölçülebilen alanları (m², oda, konum metni, danışman). Kişisel veri yok. */
+  detail: { sqm?: number; rooms?: string; location?: string; advisor?: string };
 };
+
+/** Aday satırından MatchProbe'a dönüş kolaylığı: başlıktan çıkarılan m²/oda, kartta okunan değerlerin yerini ALMAZ (kart önceliklidir). */
+export function probeFromInventoryRow(row: {
+  title?: string | null;
+  price?: number | null;
+  sqm?: number | null;
+  rooms?: string | null;
+  location?: string | null;
+  advisorName?: string | null;
+}): MatchProbe {
+  const t = probeFromListingTitle(row.title ?? null);
+  return {
+    title: row.title ?? null,
+    price: row.price ?? null,
+    sqm: row.sqm ?? t.sqm,
+    rooms: row.rooms ?? t.rooms,
+    address: row.location ?? null,
+    advisorName: row.advisorName ?? null,
+  };
+}
 
 /** Kayıtsız satırlar için en iyi 3 portföy adayı (güven ve sinyallerle). Aday yoksa boş liste (kuyrukta "eşleşen yok"). */
 export function rankUnregistered(rows: readonly InventoryRow[], props: readonly PropertyForMatch[]): CandidatePayload[] {
@@ -299,12 +325,11 @@ export function rankUnregistered(rows: readonly InventoryRow[], props: readonly 
     } satisfies MatchProbe,
   }));
   return rows.slice(0, INVENTORY_LIMITS.maxCandidates).map((row) => {
-    const t = probeFromListingTitle(row.title);
-    const subject: MatchProbe = { title: row.title, price: row.price, sqm: t.sqm, rooms: t.rooms, advisorName: row.advisorName };
+    const subject: MatchProbe = probeFromInventoryRow(row);
     const near = row.price
       ? pool.filter((p) => !p.probe.price || Math.abs(p.probe.price - (row.price as number)) / Math.max(p.probe.price, row.price as number) <= 0.25)
       : pool;
-    const ranked = rankCandidates(subject, near, INVENTORY_LIMITS.candidateMinScore, undefined, 3);
+    const ranked = rankCandidates(subject, near, INVENTORY_LIMITS.candidateMinScore, undefined, 3, "portal");
     const candidates = ranked.map((r) => ({ property_id: r.candidate.id, code: r.candidate.code, score: r.match.score, signals: r.match.signals }));
     return {
       external_id: row.externalId,
@@ -313,6 +338,12 @@ export function rankUnregistered(rows: readonly InventoryRow[], props: readonly 
       price: row.price,
       candidates,
       top_score: candidates[0]?.score ?? null,
+      detail: {
+        ...(subject.sqm ? { sqm: subject.sqm } : {}),
+        ...(subject.rooms ? { rooms: subject.rooms } : {}),
+        ...(row.location ? { location: row.location.slice(0, 160) } : {}),
+        ...(row.advisorName ? { advisor: row.advisorName.slice(0, 120) } : {}),
+      },
     };
   });
 }

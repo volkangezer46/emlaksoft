@@ -17,7 +17,23 @@ import { dueEntries, enqueue, markDone, markFailed, prune, type OutboxEntry } fr
 import { isPairingActive, isTrustedSender, type Pairing } from "@/lib/listing-control/worker/extension-pairing";
 import { DEFAULT_SETTINGS, portalEnabled, sanitizeSettings, withinWorkingHours, type ExtensionSettings } from "@/lib/listing-control/worker/extension-settings";
 import { buildStatusView, type AppSession, type ExtensionStatusView, type StatusInput } from "@/lib/listing-control/worker/extension-status-view";
-import { ALARM_TICK, STORAGE_KEYS, type BgRequest } from "./messages";
+import {
+  applyPage,
+  buildUpload,
+  dueUploads,
+  duePortals,
+  enqueueUpload,
+  markUploadDone,
+  markUploadFailed,
+  nextPortalState,
+  startScan,
+  type ScanOutcome,
+  type ScanProgress,
+  type ScanStates,
+  type ScanUpload,
+} from "@/lib/listing-control/worker/extension-scan";
+import { isAllowedAppOrigin } from "@/lib/listing-control/worker/extension-pairing";
+import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequest } from "./messages";
 
 /**
  * SERVICE WORKER: bütün portal isteklerinin TEK geçidi. Yalnız manifest'teki portal alanlarına, kullanıcının kendi
@@ -90,7 +106,7 @@ async function isConnected(): Promise<boolean> {
 // ---------------------------------------------------------------- durum görünümü, rozet, bayraklar
 
 async function loadInput(): Promise<StatusInput> {
-  const [paused, pacing, pairing, app, settings, health, history, recent, stats, outbox, lease] = await Promise.all([
+  const [paused, pacing, pairing, app, settings, health, history, recent, stats, outbox, lease, scanStates, scanProgress, scanUploads] = await Promise.all([
     isPaused(),
     getPacing(),
     getPairing(),
@@ -102,6 +118,9 @@ async function loadInput(): Promise<StatusInput> {
     getLocal<Stats>(STORAGE_KEYS.stats, { lastAt: null, lastKind: null, lastError: null }),
     getLocal<OutboxEntry[]>(STORAGE_KEYS.outbox, []),
     getLease(),
+    getLocal<ScanStates>(STORAGE_KEYS.scanStates, {}),
+    getLocal<ScanProgress | null>(STORAGE_KEYS.scan, null),
+    getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []),
   ]);
   const nowMs = Date.now();
   return {
@@ -126,6 +145,7 @@ async function loadInput(): Promise<StatusInput> {
     nowMs,
     dayKey: dayKey(),
     tzOffsetMinutes: tz(),
+    scan: { states: scanStates, progress: scanProgress, pendingUploads: scanUploads.length },
   };
 }
 
@@ -244,6 +264,97 @@ async function inventory(job: { portal: string; url: string }) {
   return "items" in r ? r : { items: [], nextUrl: null, error: r.error };
 }
 
+// ---------------------------------------------------------------- günlük mağaza taraması
+
+const DEFER_ERRORS = new Set(["busy", "paused", "not_connected", "portal_disabled"]);
+const TRANSPORT_ERRORS = new Set(["timeout", "network_error"]);
+let scanning = false;
+
+/** Uzun taramada service worker'ı uyanık tutar (her çağrı boşta sayacını sıfırlar). */
+function keepAlive(): () => void {
+  const t = setInterval(() => void chrome.runtime.getPlatformInfo().catch(() => undefined), 20_000);
+  return () => clearInterval(t);
+}
+
+async function finishScan(outcome: ScanOutcome): Promise<void> {
+  const now = Date.now();
+  await locked(async () => {
+    const states = await getLocal<ScanStates>(STORAGE_KEYS.scanStates, {});
+    states[outcome.portal] = nextPortalState(states[outcome.portal], outcome, now);
+    await setLocal(STORAGE_KEYS.scanStates, states);
+    // Engelde ya da hiç ilan okunmadan ağ hatasında yükleme yok; okunamayan yapı ("ayrıştırılamadı") telemetri için yüklenir.
+    if (outcome.kind !== "blocked" && !(outcome.read === 0 && outcome.reason !== null && TRANSPORT_ERRORS.has(outcome.reason))) {
+      const list = await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []);
+      await setLocal(STORAGE_KEYS.scanUploads, enqueueUpload(list, buildUpload(outcome, PARSER_VERSION, now), now));
+    }
+    await chrome.storage.local.remove(STORAGE_KEYS.scan);
+  });
+}
+
+/**
+ * Ofisin kendi "ilanlarım" listesini sayfa sayfa okur (aynı hız kuralı: `paced`). Süren tarama `chrome.storage`'da saklanır;
+ * service worker kapanırsa ya da hız sınırına takılırsa dakikalık alarm KALDIĞI YERDEN sürdürür. Bağlı değilken, duraklatılmışken
+ * ya da çalışma saati dışında hiçbir şey yapılmaz (paced bunları zaten uygular).
+ */
+async function runScanCycle(force = false): Promise<void> {
+  if (scanning) return;
+  scanning = true;
+  const stop = keepAlive();
+  try {
+    for (let guard = 0; guard < PORTAL_IDS.length + 1; guard += 1) {
+      if (!(await isConnected()) || (await isPaused())) return;
+      const settings = await getSettings();
+      let progress = await getLocal<ScanProgress | null>(STORAGE_KEYS.scan, null);
+      // Kapatılan portalın ya da 6 saatten eski yarım taramanın ilerlemesi atılır (takılı kalmasın).
+      if (progress && (!portalEnabled(settings, progress.portal) || Date.now() - progress.startedAt > 6 * 3_600_000)) {
+        await chrome.storage.local.remove(STORAGE_KEYS.scan);
+        progress = null;
+      }
+      if (!progress) {
+        const states = await getLocal<ScanStates>(STORAGE_KEYS.scanStates, {});
+        const enabled = (id: string) => portalEnabled(settings, id);
+        const due = force ? PORTAL_IDS.filter(enabled) : duePortals(states, PORTAL_IDS, enabled, Date.now());
+        const id = due.find((p) => (getHtmlAdapter(p)?.storeStartUrls.length ?? 0) > 0);
+        if (!id) return;
+        progress = startScan(id, getHtmlAdapter(id)!.storeStartUrls[0], Date.now());
+        await setLocal(STORAGE_KEYS.scan, progress);
+      }
+      while (progress) {
+        const page = await inventory({ portal: progress.portal, url: progress.nextUrl });
+        if (page.error && DEFER_ERRORS.has(page.error)) return; // sonraki uyanışta sürer
+        if (page.error && TRANSPORT_ERRORS.has(page.error)) {
+          await finishScan({
+            portal: progress.portal,
+            startedAt: progress.startedAt,
+            kind: "partial",
+            complete: false,
+            expected: progress.totalCount,
+            read: progress.items.length,
+            pages: progress.pages,
+            items: progress.items,
+            reason: page.error,
+          });
+          progress = null;
+          break;
+        }
+        const step = applyPage(progress, { items: page.items, nextUrl: page.nextUrl, error: page.error, totalCount: "totalCount" in page ? page.totalCount : null });
+        if (step.kind === "continue") {
+          progress = step.progress;
+          await setLocal(STORAGE_KEYS.scan, progress);
+        } else {
+          await finishScan(step.outcome);
+          progress = null;
+        }
+        await refresh();
+      }
+    }
+  } finally {
+    scanning = false;
+    stop();
+    await refresh();
+  }
+}
+
 // ---------------------------------------------------------------- ileti işleyici
 
 async function canFetch() {
@@ -270,6 +381,7 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
           /* varsayılan köken */
         }
         await setLocal(STORAGE_KEYS.pairing, { at: Date.now(), origin } satisfies NonNullable<Pairing>);
+        void runScanCycle(); // bağlanır bağlanmaz ilk tarama (3. adım: gerisi otomatik)
       } else {
         await chrome.storage.local.remove(STORAGE_KEYS.pairing);
         await chrome.storage.session.remove(STORAGE_KEYS.lease);
@@ -312,6 +424,23 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
       return probe(msg.job, msg.wait === true);
     case "inventory":
       return inventory(msg.job);
+    case "scanNow":
+      void runScanCycle(true); // uzun sürer: yanıt beklenmez, durum görünümü ilerlemeyi gösterir
+      return refresh();
+    case "scanPendingDue": {
+      const list = await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []);
+      return { entries: dueUploads(list, Date.now()).slice(0, 1) };
+    }
+    case "scanPendingDone":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.scanUploads, markUploadDone(await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []), String(msg.id)));
+        return { ok: true };
+      });
+    case "scanPendingFail":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.scanUploads, markUploadFailed(await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []), String(msg.id), Date.now()));
+        return { ok: true };
+      });
     case "outboxPut":
       return locked(async () => {
         const list = await getLocal<OutboxEntry[]>(STORAGE_KEYS.outbox, []);
@@ -352,6 +481,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 /** Dakikada bir: rozet/bayrak tazele (engel beklemesi bitti mi, çalışma saati açıldı mı) ve süresi dolan kuyruk kayıtlarını ayıkla. */
 function ensureAlarm() {
   void chrome.alarms.create(ALARM_TICK, { periodInMinutes: 1 });
+  // Günlük tarama: saatte bir uyanır; ilk uyanış 1 dk sonra (tarayıcı açıldığında kaçırılan gün telafi edilir).
+  void chrome.alarms.create(ALARM_SCAN, { periodInMinutes: 60, delayInMinutes: 1 });
 }
 ensureAlarm();
 chrome.runtime.onInstalled.addListener(() => {
@@ -360,13 +491,39 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 chrome.runtime.onStartup.addListener(() => {
   ensureAlarm();
-  void refresh();
+  void refresh().then(() => runScanCycle());
 });
 chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === ALARM_SCAN) {
+    void runScanCycle();
+    return;
+  }
   if (alarm.name !== ALARM_TICK) return;
   void locked(async () => {
     const list = await getLocal<OutboxEntry[]>(STORAGE_KEYS.outbox, []);
     const pruned = prune(list, Date.now());
     if (pruned.length !== list.length) await setLocal(STORAGE_KEYS.outbox, pruned);
-  }).then(() => refresh());
+  })
+    .then(() => refresh())
+    // Yarım kalan tarama (service worker kapandı ya da hız sınırı bekledi) dakikalık uyanışta sürdürülür.
+    .then(() => getLocal<ScanProgress | null>(STORAGE_KEYS.scan, null))
+    .then((p) => (p ? runScanCycle() : undefined));
+});
+
+// ---------------------------------------------------------------- site tarafından algılama (externally_connectable)
+
+/**
+ * Yalnız manifest'te izinli EmlakSoft kökenleri bu kanalı kullanabilir (Chrome + ayrıca burada köken denetimi). Tek ileti:
+ * `ping` → kurulu mu, sürüm, bağlı mı, duraklatıldı mı. BAĞLAMA, ayar, veri okuma ve portal isteği bu kanaldan YAPILMAZ:
+ * bağlama yalnız içerik betiğinin kullanıcı etkinliği doğrulayan köprüsünden (tek tık) gider.
+ */
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (!isAllowedAppOrigin(sender.origin ?? null, __EMLAKSOFT_APP_ORIGINS__)) return false;
+  const m = message as Partial<ExternalRequest> | null;
+  if (!m || typeof m !== "object" || m.kind !== "ping") return false;
+  void Promise.all([isConnected(), isPaused()]).then(
+    ([connected, paused]) => sendResponse({ ok: true, version: chrome.runtime.getManifest().version, connected, paused }),
+    () => sendResponse({ ok: false }),
+  );
+  return true;
 });
