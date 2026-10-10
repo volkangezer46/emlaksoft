@@ -14,31 +14,14 @@ export const EF_GRANT_SUBSCRIPTION_STATUSES = ["trialing", "active"] as const;
 /** AYLIK plan hakkı (ve ek kullanıcı kontörü) yalnız ilk gerçek ödemeden sonra: deneme (trialing) almaz. */
 export const EF_MONTHLY_SUBSCRIPTION_STATUSES = ["active"] as const;
 
-/** Plan kontörü devir tavanı: en çok bu kadar AYLIK hak birikir (satın alınan paket/hoş geldin/admin kontörü hariç, süresiz). */
-export const EF_PLAN_CARRY_MONTHS = 3;
-
-/** Devir tavanı (kontör): aylık hak x EF_PLAN_CARRY_MONTHS; hak yoksa 0. */
-export function planCarryCap(monthlyUnits: number): number {
-  return monthlyUnitsOf(monthlyUnits) * EF_PLAN_CARRY_MONTHS;
-}
-
 /**
- * `ef_credit_expire_plan` SQL hesabının SAF karşılığı (sözleşme testi için): plan grantları ilk tüketilir varsayımı.
- * planKalan = min(max(available,0), max(planGrant - usageSpend - expired, 0)); düşülecek = max(planKalan - keep, 0).
+ * SÜRELİ KONTÖR (20261010000300): aylık plan hakkı TR ay sonunda yanar (devretmez; eski "3 aylık devir tavanı" kaldırıldı).
+ * Son kullanma tarihini SQL `ef_credit_grant` verir: plan_monthly = İstanbul ayı sonu, bonus = 30 gün, paket = faturadaki ay.
  */
-export function planExpiryAmount(input: { available: number; planGranted: number; usageSpent: number; expired: number; keep: number }): number {
-  const left = Math.min(Math.max(input.available, 0), Math.max(input.planGranted - input.usageSpent - input.expired, 0));
-  return Math.max(left - Math.max(input.keep, 0), 0);
-}
 
 /** Aynı ay içinde plan yükseltmesi (ya da ek kullanıcı) farkı: `plan:<tenant>:<YYYY-MM>:delta:<yeniHak>`. */
 export function planDeltaIdempotencyKey(tenantId: string, monthKey: string, newMonthlyUnits: number): string {
   return `${planMonthlyIdempotencyKey(tenantId, monthKey)}:delta:${newMonthlyUnits}`;
-}
-
-/** Ay devir tavanı çağrısı anahtarı (ledger: `ef:expire:<tenant>:<bu>`). */
-export function planExpireIdempotencyKey(monthKey: string): string {
-  return `plan-expire:${monthKey}`;
 }
 
 /** Ledger'a yazılan gerçek hibe anahtarı (`ef_credit_grant` tenant önekler) — ön eleme sorguları için. */

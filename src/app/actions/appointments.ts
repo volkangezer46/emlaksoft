@@ -1,10 +1,8 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isAppointmentOutcome } from "@/lib/appointment-outcome";
@@ -216,20 +214,16 @@ export async function createAppointment(formData: FormData): Promise<Appointment
 }
 
 /**
- * Takvim aboneliği linkini yeniler — profiline yeni calendar_token yazar,
- * eski ICS linki anında ölür. Kullanıcı yalnız KENDİ token'ını yenileyebilir;
- * bu yüzden "view" izni yeter. profiles üzerinde self-update RLS'e
- * güvenmemek için service role ile, id filtresi gate.userId'ye sabit.
+ * Takvim aboneliği linkini yeniler — yeni token üretir (ilk kez
+ * ise oluşturur), eski ICS linki anında ölür. Kullanıcı yalnız KENDİ token'ını yenileyebilir;
+ * bu yüzden "view" izni yeter. Yazma `rotate_my_calendar_token()` RPC'siyle (auth.uid() sabit).
  */
 export async function regenerateCalendarToken(): Promise<AppointmentResult> {
   const gate = await requirePermission("appointments", "view");
   if (!gate.ok) return { error: gate.error };
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("profiles")
-    .update({ calendar_token: randomUUID() })
-    .eq("id", gate.userId);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("rotate_my_calendar_token");
 
   if (error) {
     console.error("regenerateCalendarToken", error);

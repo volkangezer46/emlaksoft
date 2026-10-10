@@ -374,7 +374,7 @@ export const FAQ: readonly FaqItem[] = [
     id: "kontor",
     category: "ai",
     q: "Kontör nedir, ne zaman harcanır?",
-    a: "Ada/Parsel değerleme ve PDF rapor gibi işlemlerde harcanan bakiyedir. Harcanacak miktar işlem öncesi ekranda gösterilir; sonuç üretilemezse veya hata olursa düşmez. Yetmezse Abonelik > Kontör sekmesinden paket alınır. " + PRICE_NOTE,
+    a: "Yalnız Ada/Parsel değerlemede harcanan bakiyedir; PDF indirme, rapor detayı ve ilan analizi kontör düşürmez. Harcanacak miktar işlem öncesi ekranda gösterilir; sonuç üretilemezse veya hata olursa düşmez. Kontör süreli geçerlidir (aylık hak ay sonunda, paket seçtiğiniz 1/3/6/12 ay sonunda yanar). Yetmezse Abonelik > Kontör sekmesinden paket alınır. " + PRICE_NOTE,
     href: "/app/abonelik?sekme=kontor",
     hrefLabel: "Kontör",
   },

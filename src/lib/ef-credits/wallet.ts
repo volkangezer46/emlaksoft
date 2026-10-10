@@ -183,8 +183,11 @@ export async function listEfReports(tenantId: string, limit = 30, onlyUserId?: s
   }
 }
 
-/** PDF ücretlendirildi işareti (yalnız henüz işaretlenmemişse). */
-export async function markEfPdfCharged(tenantId: string, raporId: string, pdfReservationId: string): Promise<boolean> {
+/**
+ * PDF "alındı" işareti (yalnız henüz işaretlenmemişse). PDF artık KONTÖRSÜZDÜR (2026-10-10): `pdf_charged` sütunu "PDF
+ * indirildi" anlamına gelir; `pdfReservationId` yalnız eski (ücretli) kayıtlar için dolu olur.
+ */
+export async function markEfPdfCharged(tenantId: string, raporId: string, pdfReservationId: string | null): Promise<boolean> {
   try {
     const { error } = await createAdminClient()
       .from("ef_reports")

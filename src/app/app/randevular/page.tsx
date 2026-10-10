@@ -357,7 +357,7 @@ export default async function AppointmentsPage({
       return w.limit(1000);
     })(),
     // Takvim aboneliği (ICS) için kullanıcının gizli token'ı — diğerlerinden bağımsız.
-    supabase.from("profiles").select("calendar_token").eq("id", gate.userId).maybeSingle(),
+    supabase.from("user_calendar_tokens").select("token").eq("user_id", gate.userId).maybeSingle(),
     leavesP,
     // Danışman listesi (yönetici filtresi + rota seçicisi)
     isYonetici
@@ -382,7 +382,7 @@ export default async function AppointmentsPage({
   const totalAppointments = sumCounts(typeCounts);
 
   // Takvim aboneliği (ICS) linki — ownProfile yukarıdaki toplu turda gelir.
-  const calendarToken = (ownProfile?.calendar_token as string | null) ?? null;
+  const calendarToken = (ownProfile?.token as string | null) ?? null;
   const appointmentTypeOptions = apptTypeDefs.length > 0 ? apptTypeDefs.map((t) => ({ value: t.value, label: t.label })) : undefined;
 
   const rows = (appts ?? []) as unknown as AppointmentRow[];
@@ -890,7 +890,7 @@ export default async function AppointmentsPage({
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* Kişisel ICS abonelik linki — Google/Apple/Outlook otomatik senkron */}
-        {calendarToken ? <CalendarSubscribeCard token={calendarToken} /> : null}
+        <CalendarSubscribeCard token={calendarToken} />
 
         {/* Müşterinin kendi randevusunu aldığı public link (/randevu-al/[token]) */}
         <BookingLinkCard userId={gate.userId} />

@@ -27,6 +27,12 @@ describe("parseShellBootstrap", () => {
     expect(b!.badges).toEqual({ overdueTasks: 2, pendingApprovals: 0 });
   });
 
+  it("hidden_modules: dizi varsa metinleri alır; alan yoksa null (eski okuma yolu)", () => {
+    expect(parseShellBootstrap(sample)!.hiddenModules).toBeNull();
+    expect(parseShellBootstrap({ ...sample, hidden_modules: ["projects", 3, "network"] })!.hiddenModules).toEqual(["projects", "network"]);
+    expect(parseShellBootstrap({ ...sample, hidden_modules: [] })!.hiddenModules).toEqual([]);
+  });
+
   it("profil/tenant kimliği eksikse null (yarım veri kullanılmaz)", () => {
     expect(parseShellBootstrap(null)).toBeNull();
     expect(parseShellBootstrap({ profile: { id: "u1", role: "advisor" }, usage: {}, badges: {} })).toBeNull();

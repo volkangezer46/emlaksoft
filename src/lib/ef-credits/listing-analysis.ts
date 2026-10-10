@@ -6,20 +6,16 @@ import { now } from "@/lib/clock";
 import { estimateFromComparables } from "@/lib/comparables";
 import { getEndeksForPlace } from "@/lib/integrations/emlakfiyati/client";
 import { mapPropertyTypeToTip, isRentTransaction } from "@/lib/integrations/emlakfiyati/contract";
-import { computeListingAnalysis, analysisIdempotencyKey, analysisInputKey, isAnalysisFresh, type AnalysisInput, type ListingAnalysisResult } from "@/lib/listing-analysis";
+import { computeListingAnalysis, analysisInputKey, isAnalysisFresh, type AnalysisInput, type ListingAnalysisResult } from "@/lib/listing-analysis";
 import { loadPhotoQuality } from "@/lib/photo-quality/load";
-import { getPlatformSetting } from "@/lib/platform-settings";
 import { readVirtualTour } from "@/lib/virtual-tour";
-import { EF_TARIFF_SETTING_KEY, efUnitsFor, parseEfTariff } from "./config";
-import { efCommit, efCreditReady, efRelease, efReserve } from "./wallet";
 
 /**
- * İLAN ANALİZİ — kontör orkestrasyonu (tarife kalemi `listing_analysis`, varsayılan 1 kontör).
+ * İLAN ANALİZİ — orkestrasyon. KONTÖRSÜZ (sahip kararı 2026-10-10: kontör yalnız değerleme için harcanır).
  *
- * Akış (FAIL-CLOSED): cüzdan hazır mı → portföy (RLS + tenant) → 24 saatlik önbellek (aynı girdi = ücretsiz) → hesap
- * (emsal yoksa DUR, kontör düşmez) → rezerve (idempotent: aynı ilan+girdi+pencere tek düşüm) → sonucu yaz → kesinleştir.
- * Yazma başarısızsa rezerv iade edilir. Hesap saf (`src/lib/listing-analysis.ts`); burada yalnız veri toplanır.
- * Yetki/hız sınırı çağıran action'dadır (`actions/listing-analysis.ts`). Kişisel veri yazılmaz (malik/telefon yok).
+ * Akış: portföy (RLS + tenant) → 24 saatlik önbellek (aynı girdi = aynı sonuç) → hesap (emsal yoksa DUR) → sonucu yaz.
+ * Hesap saf (`src/lib/listing-analysis.ts`); burada yalnız veri toplanır. Yetki/hız sınırı çağıran action'dadır
+ * (`actions/listing-analysis.ts`). Kişisel veri yazılmaz (malik/telefon yok). Tablo yoksa (şema) özellik kapalı kalır.
  */
 
 export type ListingAnalysisStored = { result: ListingAnalysisResult; createdAt: string; unitsCharged: number };
@@ -27,14 +23,13 @@ export type ListingAnalysisStored = { result: ListingAnalysisResult; createdAt: 
 export type ListingAnalysisOutcome =
   | ({ status: "ok"; cached: boolean; settlementPending: boolean } & ListingAnalysisStored)
   | { status: "no_comps"; message: string }
-  | { status: "no_credit"; available: number; needed: number }
   | { status: "disabled"; message: string }
   | { status: "not_found" }
   | { status: "error"; message: string };
 
 export const LISTING_ANALYSIS_NOT_ENABLED = "İlan analizi henüz etkinleştirilmedi.";
-export const LISTING_ANALYSIS_NO_COMPS = "Yeterli emsal yok: bu ilan için güvenilir bir karşılaştırma kurulamadı. Kontörünüz düşülmedi.";
-const RETRY_MESSAGE = "Analiz şu an kaydedilemedi; kontörünüz düşülmedi. Lütfen tekrar deneyin.";
+export const LISTING_ANALYSIS_NO_COMPS = "Yeterli emsal yok: bu ilan için güvenilir bir karşılaştırma kurulamadı.";
+const RETRY_MESSAGE = "Analiz şu an kaydedilemedi. Lütfen tekrar deneyin.";
 
 type Row = { id: string; result: unknown; units_charged: number; input_key: string; created_at: string };
 
@@ -96,8 +91,6 @@ export async function runListingAnalysis(p: {
   propertyId: string;
 }): Promise<ListingAnalysisOutcome> {
   const { supabase, tenantId, userId, propertyId } = p;
-  if (!(await efCreditReady())) return { status: "disabled", message: LISTING_ANALYSIS_NOT_ENABLED };
-
   const { data: propData, error: propErr } = await supabase
     .from("properties")
     .select(
@@ -115,7 +108,7 @@ export async function runListingAnalysis(p: {
   const sqm = num(features.sqm);
   const inputKey = analysisInputKey({ listPrice, sqm, districtId: prop.district_id, propertyType: prop.property_type, transactionType: prop.transaction_type });
 
-  // 24 saat önbellek: tablo okunamıyorsa (şema yok) HİÇBİR ŞEY düşülmez.
+  // 24 saat önbellek: tablo okunamıyorsa (şema yok) özellik kapalı.
   const probe = await supabase.from("listing_analyses").select("id", { head: true, count: "exact" }).eq("tenant_id", tenantId).eq("property_id", propertyId);
   if (probe.error) return { status: "disabled", message: LISTING_ANALYSIS_NOT_ENABLED };
   const cached = await readLatestListingAnalysis(supabase, tenantId, propertyId);
@@ -126,65 +119,22 @@ export async function runListingAnalysis(p: {
   const computed = await buildAnalysis(supabase, tenantId, prop, { listPrice, sqm, features });
   if (!computed) return { status: "no_comps", message: LISTING_ANALYSIS_NO_COMPS };
 
-  const tariff = parseEfTariff(await getPlatformSetting(EF_TARIFF_SETTING_KEY));
-  const units = efUnitsFor("listing_analysis", tariff);
-  const idem = analysisIdempotencyKey(propertyId, inputKey, now());
-
-  let reservationId: string | null = null;
-  if (units > 0) {
-    const r = await efReserve({ tenantId, userId, units, idem, item: "listing_analysis" });
-    if (!r) return { status: "error", message: RETRY_MESSAGE };
-    if (!r.ok) return { status: "no_credit", available: r.available, needed: units };
-    if (r.code === "duplicate") {
-      // Aynı pencerede başka istek zaten ödedi/ödüyor: kaydı bekleyip aynı sonucu ücretsiz dön.
-      const again = await readLatestListingAnalysis(supabase, tenantId, propertyId);
-      if (again && again.inputKey === inputKey) {
-        return { status: "ok", cached: true, settlementPending: false, result: again.result, createdAt: again.createdAt, unitsCharged: 0 };
-      }
-      if (r.state === "released") return { status: "error", message: RETRY_MESSAGE };
-    }
-    reservationId = r.reservation_id;
-  }
-
   const { data: ins, error: insErr } = await supabase
     .from("listing_analyses")
-    .insert({ tenant_id: tenantId, property_id: propertyId, user_id: userId, input_key: inputKey, result: computed, units_charged: units, reservation_id: reservationId })
+    .insert({ tenant_id: tenantId, property_id: propertyId, user_id: userId, input_key: inputKey, result: computed, units_charged: 0, reservation_id: null })
     .select("created_at")
     .single();
-  if (insErr || !ins) {
-    await releaseSafely(tenantId, reservationId, "listing_analysis_store_failed");
-    return { status: "error", message: RETRY_MESSAGE };
-  }
+  if (insErr || !ins) return { status: "error", message: RETRY_MESSAGE };
 
-  let settlementPending = false;
-  if (reservationId) {
-    settlementPending = !(await commitSafely(tenantId, reservationId, { item: "listing_analysis", property_id: propertyId, idem }));
-  }
   await logActivity({
     tenantId,
     actorId: userId,
     action: "ef.listing_analysis",
     entityType: "property",
     entityId: propertyId,
-    newValue: { item: "listing_analysis", units, units_charged: settlementPending ? 0 : units, verdict: computed.position.verdict, confidence: computed.comps.confidence, settlement_pending: settlementPending, idem },
+    newValue: { item: "listing_analysis", verdict: computed.position.verdict, confidence: computed.comps.confidence },
   });
-  return { status: "ok", cached: false, settlementPending, result: computed, createdAt: (ins as { created_at: string }).created_at, unitsCharged: units };
-}
-
-async function releaseSafely(tenantId: string, reservationId: string | null, reason: string): Promise<void> {
-  if (!reservationId) return;
-  for (let i = 0; i < 2; i += 1) {
-    const r = await efRelease(tenantId, reservationId, reason);
-    if (r && r.ok) return;
-  }
-}
-
-async function commitSafely(tenantId: string, reservationId: string, ref: Record<string, string | number | boolean | null>): Promise<boolean> {
-  for (let i = 0; i < 2; i += 1) {
-    const r = await efCommit(tenantId, reservationId, ref);
-    if (r && r.ok) return true;
-  }
-  return false;
+  return { status: "ok", cached: false, settlementPending: false, result: computed, createdAt: (ins as { created_at: string }).created_at, unitsCharged: 0 };
 }
 
 /** Veri toplama + saf hesap. Emsal yoksa null (ücretlendirme yapılmaz). */

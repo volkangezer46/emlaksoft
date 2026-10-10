@@ -246,8 +246,8 @@ export function Pricing({
       {anyCredits ? (
         <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-text-muted">
           {efLive
-            ? "Kontör, EmlakFiyati değerleme ve PDF rapor sorguları içindir. Paket kontörü bittiğinde kontör ile ek sorgu satın alınabilir."
-            : "Kontör, EmlakFiyati değerleme ve PDF rapor sorguları içindir. EmlakFiyati değerleme henüz etkinleştirilmedi; kontör satırları planlanan değerlerdir."}
+            ? "Kontör yalnız EmlakFiyati değerleme içindir ve ay sonunda yanar. Paket kontörü bittiğinde süreli ek kontör paketi satın alınabilir."
+            : "Kontör yalnız EmlakFiyati değerleme içindir. EmlakFiyati değerleme henüz etkinleştirilmedi; kontör satırları planlanan değerlerdir."}
         </p>
       ) : null}
     </div>

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const gateRef = vi.hoisted(() => ({
   value: { ok: true, userId: "u1", tenantId: "11111111-2222-3333-4444-555555555555", role: "owner", impersonating: false } as Record<string, unknown>,
 }));
-const ready = vi.hoisted(() => ({ ok: true }));
+const ready = vi.hoisted(() => ({ ok: true, lots: true }));
 const efState = vi.hoisted(() => ({ purchasable: true }));
 const iyz = vi.hoisted(() => ({ configured: true }));
 const rate = vi.hoisted(() => ({ allowed: true }));
@@ -13,8 +13,8 @@ const createInvoice = vi.hoisted(() => vi.fn(async (i: { pack: { units: number; 
 const initCheckout = vi.hoisted(() => vi.fn(async () => ({ status: "success", paymentPageUrl: "https://pay.example/x" })));
 const packs = vi.hoisted(() => ({
   list: [
-    { id: "mini", name: "Mini", units: 10, priceNetTry: 175, active: true, order: 10 },
-    { id: "eski", name: "Eski", units: 5, priceNetTry: 90, active: false, order: 20 },
+    { id: "mini", name: "Mini", units: 10, months: 3, priceNetTry: 175, active: true, order: 10 },
+    { id: "eski", name: "Eski", units: 5, months: 1, priceNetTry: 90, active: false, order: 20 },
   ],
 }));
 
@@ -24,6 +24,7 @@ vi.mock("@/lib/require-permission", () => ({ requirePermission: async () => gate
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => ({ allowed: rate.allowed }), clientIp: async () => "1.2.3.4" }));
 vi.mock("@/lib/ef-credits/credit-reader", () => ({
   getEfCreditReady: async () => ready.ok,
+  getEfLotsReady: async () => ready.lots,
   getEfCatalog: async () => ({ tariff: {}, packs: packs.list }),
 }));
 vi.mock("@/lib/ef-credits/public-state", () => ({
@@ -69,6 +70,7 @@ describe("startCreditPackPurchase kapıları", () => {
   beforeEach(() => {
     gateRef.value = { ...OWNER };
     ready.ok = true;
+    ready.lots = true;
     efState.purchasable = true;
     iyz.configured = true;
     rate.allowed = true;
@@ -110,6 +112,12 @@ describe("startCreditPackPurchase kapıları", () => {
     expect(createInvoice).not.toHaveBeenCalled();
     expect(initCheckout).not.toHaveBeenCalled();
   });
+  it("süreli parti şeması hazır değilken (ef_credit_lots_ready) para tahsil yolu AÇILMAZ", async () => {
+    ready.lots = false;
+    expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toMatch(/Süreli kontör paketleri hazırlanıyor/);
+    expect(createInvoice).not.toHaveBeenCalled();
+    expect(initCheckout).not.toHaveBeenCalled();
+  });
   it("iyzico yoksa demo yok: reddeder", async () => {
     iyz.configured = false;
     expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toMatch(/yapılandırılmamış/);
@@ -129,7 +137,7 @@ describe("startCreditPackPurchase kapıları", () => {
     const r = await startCreditPackPurchase(fd({ pack_id: "mini", units: "9999", amount: "1", price: "1", priceNetTry: "1" }));
     expect(r.checkoutUrl).toBe("https://pay.example/x");
     const arg = createInvoice.mock.calls[0]![0] as { pack: { id: string; units: number; priceNetTry: number } };
-    expect(arg.pack).toMatchObject({ id: "mini", units: 10, priceNetTry: 175 });
+    expect(arg.pack).toMatchObject({ id: "mini", units: 10, months: 3, priceNetTry: 175 });
     expect(initCheckout).toHaveBeenCalledWith(expect.objectContaining({ price: 210, paidPrice: 210 }));
   });
   it("ekrandaki tutar değiştiyse yeniden onay ister, fatura açmaz", async () => {
@@ -153,6 +161,7 @@ describe("kontör satın alma kaynak sözleşmesi", () => {
       "checkRateLimit(`efpack:",
       "getEfPublicState()",
       "getEfCreditReady()",
+      "getEfLotsReady()",
       "isIyzicoConfigured()",
       "findPurchasablePack(",
       "createCreditPackInvoice(",

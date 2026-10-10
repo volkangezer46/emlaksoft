@@ -33,7 +33,6 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/ai-advisor.ts", fn: "loadAdvisorSession", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/appointments-confirm.ts", fn: "respondToAppointmentByToken", calls: 1, tenantFilter: "yok" },
   { file: "src/app/actions/appointments-suggest.ts", fn: "suggestAlternativeTimesByToken", calls: 1, tenantFilter: "var" },
-  { file: "src/app/actions/appointments.ts", fn: "regenerateCalendarToken", calls: 1, tenantFilter: "yok" },
   { file: "src/app/actions/auth.ts", fn: "signIn", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/auth.ts", fn: "signOut", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/auth.ts", fn: "signUp", calls: 1, tenantFilter: "var" },

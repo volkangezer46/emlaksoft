@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
-import { trDayKey, trMonthKey } from "@/lib/clock";
+import { trMonthKey } from "@/lib/clock";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { PLAN_DEFINITIONS_SETTING_KEY, applyPlanOverrides, resolveCatalogSettings } from "@/lib/billing/plan-overrides";
 import {
   EF_RPC,
-  EF_RPC_EXPIRE_PLAN,
+  EF_RPC_BURN_EXPIRED,
   EF_UNIT,
   EF_WELCOME_SETTING_KEY,
   EF_WELCOME_SINCE_SETTING_KEY,
   parseEfWelcomeSince,
   parseEfWelcomeUnits,
-  type EfExpireResult,
+  type EfBurnResult,
   type EfGrantResult,
 } from "@/lib/ef-credits/config";
 import {
@@ -21,9 +21,6 @@ import {
   decideGrants,
   ledgerGrantKey,
   monthlyUnitsOf,
-  monthlyUnitsWithSeats,
-  planCarryCap,
-  planExpireIdempotencyKey,
   planMonthlyIdempotencyKey,
   welcomeIdempotencyKey,
   type EfGrantCandidate,
@@ -37,8 +34,8 @@ export const maxDuration = 300;
 const PAGE = 1000;
 const CHUNK = 200;
 const CONCURRENCY = 8;
-/** Devir tavanı yalnız TR ayının ilk bu kadar gününde denenir (başarısız koşuya yeniden deneme payı; idempotent). */
-const EXPIRE_WINDOW_DAYS = 3;
+/** Tek koşuda yakılacak en çok parti sayısı (kalan sonraki günkü koşuya). */
+const BURN_LIMIT = 2000;
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -56,8 +53,10 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
  *   Aynı ay yükseltmede güncel hak ile o ay verilen toplam arasındaki pozitif fark `plan:<t>:<ay>:delta:<yeniHak>` ile verilir.
  * - Hoş geldin (ayar `ef.welcome_units`, 0 = kapalı): `welcome:<tenant>` anahtarıyla TEK SEFER `bonus`; yalnız
  *   `tenants.created_at >= ef.welcome_since` ofislere (geriye dönük dağıtım yok; ayar yoksa kimse almaz).
- * - Devir tavanı: ayın ilk günlerinde active ofiste plan kontörü en çok 3 aylık hakka indirilir (`ef_credit_expire_plan`);
- *   hata cron'u düşürmez. Paket/hoş geldin/admin kontörü süresiz, dokunulmaz.
+ * - SÜRELİ KONTÖR (20261010000300): her hibe bir parti (lot) olur. Aylık plan hakkı TR ay sonunda, hoş geldin
+ *   kontörü 30 gün sonra (EF_WELCOME_VALID_DAYS), paket seçilen süre sonunda yanar (devretmez). Cron'un son adımı
+ *   `ef_credit_burn_expired` suresi dolmuş partileri defterde "expire" satırıyla yakar (idempotent; şema yoksa atlanır,
+ *   hata cron'u düşürmez). Eski "3 aylık devir tavanı" kaldırıldı.
  * - Kontör cüzdanı (`ef_credit_ready()`) hazır değilse HİÇ hibe yapılmaz ("atlandı"), hata verilmez.
  */
 export async function GET(req: NextRequest) {
@@ -202,51 +201,29 @@ export async function GET(req: NextRequest) {
 
     for (const batch of chunks(decision.grants, CONCURRENCY)) await Promise.all(batch.map(run));
 
-    // Plan kontörü DEVİR TAVANI (en çok 3 aylık hak): ayın ilk günlerinde (idempotent, ay başına bir kez), yalnız active
-    // abonelik. Hibelerden SONRA çalışır; hata cron'u düşürmez (yalnız sayılır). Paket/hoş geldin/admin kontörü dokunulmaz.
-    let expiredUnits = 0;
-    let expireFailed = 0;
-    if (Number(trDayKey().slice(8, 10)) <= EXPIRE_WINDOW_DAYS) {
-      const expireIdem = planExpireIdempotencyKey(monthKey);
-      const toExpire = candidates
-        .filter(
-          (c) =>
-            (EF_MONTHLY_SUBSCRIPTION_STATUSES as readonly string[]).includes(c.subscriptionStatus) &&
-            (c.tenantStatus === null || c.tenantStatus === "trial" || c.tenantStatus === "active") &&
-            !c.valuationClosed,
-        )
-        .map((c) => ({ tenantId: c.tenantId, keep: planCarryCap(monthlyUnitsWithSeats(planMonthly[c.plan], planPerExtraSeat[c.plan], c.extraSeats)) }))
-        .filter((e) => e.keep > 0);
-      const doneKeys = new Set<string>();
-      for (const part of chunks(toExpire.map((e) => `ef:expire:${e.tenantId}:${expireIdem}`), CHUNK)) {
-        const { data, error } = await admin.from("account_credit_ledger").select("idempotency_key").in("idempotency_key", part);
-        if (error) break;
-        for (const r of (data ?? []) as { idempotency_key: string }[]) doneKeys.add(r.idempotency_key);
+    // SÜRESİ DOLAN PARTİLERİ YAK (ay sonu plan hakkı, 30 günlük hoş geldin, süresi bitmiş paketler). Hibelerden SONRA çalışır;
+    // şema/RPC yoksa (20261010000300 uygulanmamış) sessizce atlanır, hata cron'u düşürmez.
+    let burnedUnits = 0;
+    let burnedLots = 0;
+    let burnFailed = 0;
+    try {
+      const res = await admin.rpc(EF_RPC_BURN_EXPIRED, { p_limit: BURN_LIMIT });
+      const out = (res.data ?? null) as EfBurnResult | null;
+      if (res.error) {
+        // PGRST202 / 42883: fonksiyon yok = eski şema. Diğer hatalar sayılır.
+        const missing = res.error.code === "PGRST202" || res.error.code === "42883";
+        if (!missing) burnFailed += 1;
+      } else if (out && out.ok === true) {
+        burnedUnits = Math.max(0, Number(out.burned_units) || 0);
+        burnedLots = Math.max(0, Number(out.burned_lots) || 0);
       }
-      const runExpire = async (e: { tenantId: string; keep: number }) => {
-        if (doneKeys.has(`ef:expire:${e.tenantId}:${expireIdem}`)) return;
-        try {
-          const { data, error } = await admin.rpc(EF_RPC_EXPIRE_PLAN, {
-            p_tenant: e.tenantId,
-            p_keep: e.keep,
-            p_idem: expireIdem,
-          });
-          const result = (data ?? null) as EfExpireResult | null;
-          if (error || !result || result.ok !== true) {
-            expireFailed += 1;
-            return;
-          }
-          if (!result.already) expiredUnits += Math.max(0, Number(result.expired) || 0);
-        } catch {
-          expireFailed += 1;
-        }
-      };
-      for (const batch of chunks(toExpire, CONCURRENCY)) await Promise.all(batch.map(runExpire));
+    } catch {
+      burnFailed += 1;
     }
 
     const skippedModule = decision.skipped.filter((s) => s.reason === "modul_kapali").length;
     const skippedOther = decision.skipped.length - skippedModule;
-    const detail = `${grantedTenants.size} ofis, ${units} kontör, ${granted} hibe, ${already + alreadyKeys.size} zaten verilmiş, ${skippedModule + skippedOther} atlandı (${skippedModule} modül kapalı), ${failed} hata, ${expiredUnits} kontör devir tavanıyla düşüldü${expireFailed > 0 ? ` (${expireFailed} tavan hatası)` : ""}`;
+    const detail = `${grantedTenants.size} ofis, ${units} kontör, ${granted} hibe, ${already + alreadyKeys.size} zaten verilmiş, ${skippedModule + skippedOther} atlandı (${skippedModule} modül kapalı), ${failed} hata, ${burnedUnits} kontör süresi dolduğu için yandı (${burnedLots} parti)${burnFailed > 0 ? `, ${burnFailed} yakma hatası` : ""}`;
     await recordHeartbeat("ef-kontor-hak", failed > 0 ? "error" : "ok", detail);
     return NextResponse.json({
       ok: failed === 0,
@@ -258,8 +235,9 @@ export async function GET(req: NextRequest) {
       skipped: decision.skipped.length,
       skippedModuleClosed: skippedModule,
       failed,
-      expiredUnits,
-      expireFailed,
+      burnedUnits,
+      burnedLots,
+      burnFailed,
     });
   } catch (err) {
     console.error("cron ef-kontor-hak", err);

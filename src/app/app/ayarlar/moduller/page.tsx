@@ -58,7 +58,7 @@ export default async function ModulesPage() {
       <PageHeader
         eyebrow="Ofis yapılandırması"
         title="Modüller"
-        description="Kullanmadığınız alanları kapatın, menü sadeleşsin. Verileriniz silinmez; istediğiniz zaman yeniden açabilirsiniz."
+        description="Kullanmadığınız alanı kapatın, menü sadeleşsin. Bu ayar tüm ofis içindir; verileriniz silinmez, istediğiniz an yeniden açarsınız. Yalnız kendi menünüzü sadeleştirmek için Hesabım > Görünüm'ü kullanın."
         breadcrumbs={[{ label: "Ana ekran", href: "/app" }, { label: "Ayarlar", href: "/app/ayarlar" }, { label: "Modüller" }]}
       />
 

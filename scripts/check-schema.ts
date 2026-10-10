@@ -32,7 +32,7 @@ const TABLES: { table: string; migration: string }[] = [
 /** Beklenen kolonlar */
 const COLUMNS: { table: string; column: string; migration: string }[] = [
   { table: "open_houses", column: "public_token", migration: "20260726000098_open_house_public.sql" },
-  { table: "profiles", column: "calendar_token", migration: "20260726000099_calendar_token.sql" },
+  { table: "user_calendar_tokens", column: "token", migration: "20261010000400_security_calendar_token_audit_logs.sql" },
 ];
 
 /** Beklenen fonksiyonlar */

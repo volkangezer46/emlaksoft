@@ -93,15 +93,15 @@ export default async function FiyatlarPage() {
         title="EmlakFiyati kontörü"
         lead={
           efLive
-            ? "Ada/parsel değerleme ve PDF rapor sorguları kontörle çalışır. Paketinizdeki aylık kontör her ay yüklenir; yetmezse ek paket alırsınız."
+            ? "Kontör yalnız ada/parsel değerleme için harcanır (PDF, rapor detayı ve ilan analizi kontörsüzdür). Paketinizdeki aylık kontör her ay yüklenir ve ay sonunda yanar; yetmezse süreli ek paket alırsınız."
             : "Değerleme henüz herkese açık değil; aşağıdaki kontör hakları planlanan değerlerdir ve değerleme açılınca geçerli olur."
         }
       >
         <EfPlanCreditsTable plans={plans} tariff={efCatalog.tariff} live={efLive} />
-        <p className="mt-2 text-xs text-text-muted">Plan kontörü en çok 3 aylık birikir. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.</p>
+        <p className="mt-2 text-xs text-text-muted">Aylık kontör o ayın sonunda yanar, devretmez. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.</p>
         <div className="mt-6">
           <EfPackTiersTable packs={efCatalog.packs} tariff={efCatalog.tariff} live={efLive} />
-          <p className="mt-2 text-xs text-text-muted">Satın alınan ek paketin kontörü süresiz geçerlidir. Tutarlar KDV hariçtir.</p>
+          <p className="mt-2 text-xs text-text-muted">Ek paketler 1, 3, 6 ve 12 aylık satılır; süre sonunda kullanılmayan kontör yanar. Tutarlar KDV hariçtir.</p>
           {efLive ? (
             <p className="mt-2 text-sm">
               <Link href={EF_PACKS_APP_HREF} className="font-semibold text-brand-700 hover:underline">Ofis panelinde kontör satın al</Link>

@@ -134,7 +134,6 @@ describe("aylık hak sayacı", () => {
     expect(v.grantedThisMonth).toBe(40);
     expect(v.spentThisMonth).toBe(7);
     expect(v.remainingOfMonthly).toBe(25); // 33 hak kalanı, bakiye 25 ile sınırlı
-    expect(v.rolloverCap).toBe(120);
     expect(v.nextRenewalMs).toBe(Date.parse("2026-10-31T21:00:00.000Z")); // 1 Kasım 00:00 TR
   });
   it("bakiye bilinmiyorsa hak farkı gösterilir; satır yoksa sıfır", () => {

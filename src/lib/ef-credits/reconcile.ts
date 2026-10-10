@@ -1,8 +1,9 @@
 /**
  * EmlakFiyati kontor MUTABAKATI (saf mantik; ag/DB yok). EF `GET /kullanim` `toplam.degerleme` / `toplam.pdf`
  * (son 31 gun, EF sunucu saati; bkz. EF_RECONCILE_FIELDS) ile Emlaksoft defteri (`ef_credit_reservations` state='committed')
- * karsilastirilir. Kalem esleme: degerleme = item `valuation_*`, pdf = item `pdf_first` (tekrar indirmeler ve `report_detail`
- * sayilmaz). Drift esigi = tolerans (varsayilan 2): |fark| <= tolerans ok, aksi halde drift.
+ * karsilastirilir. Kalem esleme: degerleme = item `valuation_*`. PDF artik KONTORSUZDUR (2026-10-10): `pdf` yalniz BILGI
+ * amaclidir (eski `pdf_first` kesinlesmis kayitlari + EF toplami gosterilir), durumu (ok/drift) BELIRLEMEZ.
+ * Drift esigi = tolerans (varsayilan 2): degerleme |fark| <= tolerans ok, aksi halde drift.
  */
 
 export const EF_RECONCILE_WINDOW_DAYS = 31;
@@ -55,12 +56,11 @@ export function compareReconciliation(
   const diffDegerleme = diff(ef.degerleme, ledger.degerleme);
   const diffPdf = diff(ef.pdf, ledger.pdf);
   let status: EfReconcileStatus = "ok";
-  if (diffDegerleme === null || diffPdf === null) {
+  if (diffDegerleme === null) {
     status = "error";
     reasons.push("EmlakFiyati toplamlari eksik");
   } else {
     if (Math.abs(diffDegerleme) > tol) reasons.push(`degerleme farki ${diffDegerleme > 0 ? "+" : ""}${diffDegerleme}`);
-    if (Math.abs(diffPdf) > tol) reasons.push(`pdf farki ${diffPdf > 0 ? "+" : ""}${diffPdf}`);
     if (reasons.length) status = "drift";
   }
   return {
