@@ -53,11 +53,10 @@ describe("kayıt demo veri sözleşmesi", () => {
     expect(core).toContain("wantsDemoData(formData)");
   });
 
-  it("kayıt sihirbazında 'Demo veriyle başla' kutusu varsayılan açıktır ve açıklaması tek tuşla temizlemeyi söyler", () => {
+  it("kayıt formu demo verili ofis açar (gizli demo_data=on); silme bilgisi kurulum sihirbazının bitiş ekranındadır", () => {
     const src = read("src/app/kayit/register-form.tsx");
-    expect(src).toMatch(/name="demo_data"[\s\S]{0,200}defaultChecked/);
-    expect(src).toContain("Demo veriyle başla");
-    expect(src).toContain("tek tuşla");
+    expect(src).toMatch(/name="demo_data" value="on"/);
+    expect(read("src/app/app/baslangic/setup-wizard.tsx")).toContain("örnek verileri tek tuşla sil, gerçek kullanıma geç");
   });
 
   it("temizleme: RPC öncelikli, geri dönüş yalnız is_sample + tenant_id ile; eylem owner/gm kapılı", () => {

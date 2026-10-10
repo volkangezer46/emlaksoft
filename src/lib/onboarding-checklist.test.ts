@@ -1,108 +1,131 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildFirstTasks,
   buildOnboarding,
   resolveWizardStep,
   wizardNeighbors,
-  type OnboardingCounts,
+  type OnboardingFacts,
 } from "./onboarding-checklist";
-import { computeProfileCompletion, isOfficeProfileDone, type ProfileFacts } from "./profile-completion";
+import { ONBOARDING_STEP_DEFS, ONBOARDING_STEP_IDS, resolveLegacyStep } from "./onboarding-steps";
+import { computeProfileCompletion, isOfficeLocationDone, type ProfileFacts } from "./profile-completion";
 
-const empty: OnboardingCounts = {
-  officeProfileDone: false,
-  customers: 0,
-  properties: 0,
+const empty: OnboardingFacts = {
+  officeLocationDone: false,
+  youDone: false,
   members: 1,
-  activeIntegrations: 0,
-  customDefinitions: 0,
+  poolEnabled: false,
   publishedProperties: 0,
-  demands: 0,
-  appointments: 0,
+  activeIntegrations: 0,
+  planPaid: false,
+  extra: {},
 };
+const full: OnboardingFacts = {
+  officeLocationDone: true,
+  youDone: true,
+  members: 2,
+  poolEnabled: true,
+  publishedProperties: 1,
+  activeIntegrations: 0,
+  planPaid: true,
+  extra: {},
+};
+
+describe("onboarding-steps kaydı", () => {
+  it("adım sırası: ofis, sen, ekip, havuz, portallar, paket", () => {
+    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "you", "team", "pool", "portals", "plan"]);
+    expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_DEFS.length);
+  });
+
+  it("eski bağlantılar yeni adıma eşlenir; bilinmeyen null", () => {
+    expect(resolveLegacyStep("konum")).toBe("office");
+    expect(resolveLegacyStep("odak")).toBe("you");
+    expect(resolveLegacyStep("ekip")).toBe("team");
+    expect(resolveLegacyStep("data")).toBe("bitis");
+    expect(resolveLegacyStep("portals")).toBe("portals");
+    expect(resolveLegacyStep("yok")).toBeNull();
+    expect(resolveLegacyStep(undefined)).toBeNull();
+  });
+});
 
 describe("onboarding-checklist", () => {
   it("boş ofis: %0, ilk adım ofis bilgileri", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    expect(s.total).toBe(8);
+    expect(s.total).toBe(6);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
 
-  it("ofis adımı TEK ilerleme modelinden türer: profil-tamamlama (ekip hariç) tamamsa adım tamam", () => {
+  it("ofis adımı yalnız konum maddelerinden (il/ilçe + adres) türer; telefon/belge/vergi bloklamaz", () => {
     const facts: ProfileFacts = {
-      provinceId: "p", districtId: "d", addressLine: "Bağdat Cad. No:42 Kadıköy", phone: "05321234567", licenseNo: "L-1",
-      taxNumber: "1234567890", logoUrl: "x", brandColor: "#123456", extAvailable: true, officeType: "ofis",
-      focusSegments: ["konut"], workDistrictIds: ["d"], memberCount: 1,
+      provinceId: "p", districtId: "d", addressLine: "Bağdat Cad. No:42 Kadıköy", phone: null, licenseNo: null,
+      taxNumber: null, logoUrl: null, brandColor: null, extAvailable: true, officeType: null,
+      focusSegments: null, workDistrictIds: null, memberCount: 1,
     };
-    // Ekip daveti eksik olsa da (kurulumda ayrı adım) ofis adımı tamam sayılır.
-    expect(isOfficeProfileDone(computeProfileCompletion(facts))).toBe(true);
-    expect(isOfficeProfileDone(computeProfileCompletion({ ...facts, phone: null }))).toBe(false);
-    expect(buildOnboarding({ ...empty, officeProfileDone: true }).steps[0].done).toBe(true);
+    expect(isOfficeLocationDone(computeProfileCompletion(facts))).toBe(true);
+    expect(isOfficeLocationDone(computeProfileCompletion({ ...facts, addressLine: "kısa" }))).toBe(false);
+    expect(isOfficeLocationDone(computeProfileCompletion({ ...facts, districtId: null }))).toBe(false);
+    expect(buildOnboarding({ ...empty, officeLocationDone: true }).steps[0].done).toBe(true);
     expect(buildOnboarding(empty).steps[0].done).toBe(false);
   });
 
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
-    const s = buildOnboarding({
-      ...empty,
-      customers: 3,
-      properties: 1,
-      officeProfileDone: true,
-    });
+    const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(38);
+    expect(s.percent).toBe(50);
     expect(s.nextId).toBe("team");
   });
 
   it("atlanan adım sonraki adım seçilmez ama tamamlanmış sayılmaz", () => {
     const s = buildOnboarding(empty, ["office"]);
-    expect(s.nextId).toBe("team");
+    expect(s.nextId).toBe("you");
     expect(s.steps[0].done).toBe(false);
     expect(s.doneCount).toBe(0);
   });
 
   it("hepsi atlanınca settled, complete değil", () => {
-    const s = buildOnboarding(empty, ["office", "team", "data", "property", "demand", "appointment", "defs", "portals"]);
+    const s = buildOnboarding(empty, [...ONBOARDING_STEP_IDS]);
     expect(s.nextId).toBeNull();
     expect(s.settled).toBe(true);
     expect(s.complete).toBe(false);
   });
 
   it("tüm adımlar dolu: complete", () => {
-    const s = buildOnboarding({
-      officeProfileDone: true,
-      customers: 1,
-      properties: 1,
-      members: 2,
-      activeIntegrations: 0,
-      customDefinitions: 2,
-      publishedProperties: 1,
-      demands: 1,
-      appointments: 1,
-    });
+    const s = buildOnboarding(full);
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(resolveWizardStep(undefined, s)).toBe("bitis");
   });
 
+  it("havuz ve paket adımları gerçek olgudan tamamlanır; portallar yayın ya da entegrasyondan", () => {
+    expect(buildOnboarding({ ...empty, poolEnabled: true }).steps.find((x) => x.id === "pool")?.done).toBe(true);
+    expect(buildOnboarding({ ...empty, planPaid: true }).steps.find((x) => x.id === "plan")?.done).toBe(true);
+    expect(buildOnboarding({ ...empty, activeIntegrations: 1 }).steps.find((x) => x.id === "portals")?.done).toBe(true);
+    expect(buildOnboarding({ ...empty, publishedProperties: 2 }).steps.find((x) => x.id === "portals")?.done).toBe(true);
+  });
+
   it("adım çözümü: geçerli istek kazanır, geçersiz sıradakine düşer", () => {
     const s = buildOnboarding(empty);
-    expect(resolveWizardStep("data", s)).toBe("data");
+    expect(resolveWizardStep("team", s)).toBe("team");
     expect(resolveWizardStep("bitis", s)).toBe("bitis");
     expect(resolveWizardStep("yok", s)).toBe("office");
   });
 
-  it("ilk talep ve ilk randevu adımları gerçek sayıdan tamamlanır", () => {
-    const s = buildOnboarding({ ...empty, demands: 2 });
-    expect(s.steps.find((x) => x.id === "demand")?.done).toBe(true);
-    expect(s.steps.find((x) => x.id === "appointment")?.done).toBe(false);
-    expect(buildOnboarding({ ...empty, appointments: 1 }).steps.find((x) => x.id === "appointment")?.done).toBe(true);
-  });
-
   it("geri/ileri komşuları", () => {
-    expect(wizardNeighbors("property")).toEqual({ prev: "data", next: "demand" });
-    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "team" });
-    expect(wizardNeighbors("portals")).toEqual({ prev: "defs", next: "bitis" });
-    expect(wizardNeighbors("bitis")).toEqual({ prev: "portals", next: null });
+    expect(wizardNeighbors("team")).toEqual({ prev: "you", next: "pool" });
+    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "you" });
+    expect(wizardNeighbors("plan")).toEqual({ prev: "portals", next: "bitis" });
+    expect(wizardNeighbors("bitis")).toEqual({ prev: "plan", next: null });
+  });
+});
+
+describe("ilk işler kontrol listesi (sihirbaz adımı değil)", () => {
+  it("beş iş gerçek sayımdan tamamlanır", () => {
+    const none = buildFirstTasks({ customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 });
+    expect(none.map((t) => t.id)).toEqual(["data", "property", "demand", "appointment", "defs"]);
+    expect(none.every((t) => !t.done && t.href.startsWith("/app/"))).toBe(true);
+    const some = buildFirstTasks({ customers: 3, properties: 0, demands: 1, appointments: 0, customDefinitions: 2 });
+    expect(some.filter((t) => t.done).map((t) => t.id)).toEqual(["data", "demand", "defs"]);
   });
 });

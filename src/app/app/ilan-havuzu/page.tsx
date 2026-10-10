@@ -209,6 +209,8 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
         }
       />
 
+      {/* Ürün turu hedefi: havuz sayaçları (data-tour="ilan-havuzu") */}
+      <div data-tour="ilan-havuzu">
       <KpiGrid>
         <StatCard label="Bekleyen ilan" value={pendingRes.count ?? 0} icon={Inbox} tone="brand" href={href("bekleyen")} />
         <StatCard label="SLA'sı geçen" value={lateRes.count ?? 0} icon={AlertTriangle} tone={(lateRes.count ?? 0) > 0 ? "danger" : "warning"} href={href("gecikmis")} />
@@ -218,6 +220,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
           <StatCard label="Danışmansız ilan" value={unassignedRes.total} icon={UserX} tone={unassignedRes.total > 0 ? "warning" : "neutral"} href={assignHref()} />
         ) : null}
       </KpiGrid>
+      </div>
 
       {canConfigure ? (
         <details className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]" open={!enabled}>

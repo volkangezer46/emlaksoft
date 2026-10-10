@@ -1,4 +1,4 @@
-import { isOnboardingStepId, type OnboardingStepId } from "@/lib/onboarding-checklist";
+import { isOnboardingStepId, type OnboardingStepId } from "@/lib/onboarding-steps";
 
 /**
  * Kurulum sihirbazında "sonra yaparım" denen adımlar — kullanıcı tercihi çerezi (yeni şema yok).

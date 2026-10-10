@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
-import { SIGNUP_FIELD_STEP, signupErrorTarget, signupFieldInputId, signupPhoneClientError } from "./signup-errors";
+import { SIGNUP_EMAIL_EXISTS_MESSAGE, SIGNUP_FIELD_STEP, signupErrorTarget, signupFieldInputId, signupPhoneClientError } from "./signup-errors";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
@@ -13,7 +13,7 @@ describe("kayıt sihirbazı: hata -> adım eşlemesi", () => {
     expect(signupErrorTarget({ error: "  " })).toEqual({ kind: "none" });
   });
 
-  it("telefon/e-posta/şifre hatası 1. adıma, ofis adı ve onay (kısa kayıt) 2. adıma döner", () => {
+  it("kayıt tek ekrandır: dört alan da 1. adımdadır; eski ofis adı/onay alanları artık alan hatası değildir", () => {
     expect(signupErrorTarget({ error: TR_MOBILE_ERROR_MESSAGE, field: "phone" })).toEqual({
       kind: "field",
       field: "phone",
@@ -22,8 +22,10 @@ describe("kayıt sihirbazı: hata -> adım eşlemesi", () => {
     });
     expect(signupErrorTarget({ error: "Bu e-posta zaten kayıtlı.", field: "email" })).toMatchObject({ step: 1, field: "email" });
     expect(signupErrorTarget({ error: "x", field: "password" })).toMatchObject({ step: 1 });
-    expect(signupErrorTarget({ error: "x", field: "company" })).toMatchObject({ step: 2 });
-    expect(signupErrorTarget({ error: "x", field: "legal_consent" })).toMatchObject({ step: 2 });
+    expect(signupErrorTarget({ error: "x", field: "name" })).toMatchObject({ step: 1 });
+    expect(Object.keys(SIGNUP_FIELD_STEP).sort()).toEqual(["email", "name", "password", "phone"]);
+    expect(signupErrorTarget({ error: "x", field: "company" }).kind).toBe("general");
+    expect(signupErrorTarget({ error: "x", field: "legal_consent" }).kind).toBe("general");
   });
 
   it("alanla eşleşmeyen hata genel banda gider (metin taranmaz)", () => {
@@ -43,9 +45,9 @@ describe("kayıt sihirbazı: hata -> adım eşlemesi", () => {
 });
 
 describe("kayıt sihirbazı: istemci telefon ön doğrulaması", () => {
-  it("boş telefon serbest (opsiyonel)", () => {
-    expect(signupPhoneClientError("")).toBeNull();
-    expect(signupPhoneClientError(undefined)).toBeNull();
+  it("cep telefonu zorunlu: boş telefon uyarı alır", () => {
+    expect(signupPhoneClientError("")).toBeTruthy();
+    expect(signupPhoneClientError(undefined)).toBeTruthy();
   });
   it("TR cep geçer", () => {
     expect(signupPhoneClientError("05321234567")).toBeNull();
@@ -67,6 +69,8 @@ describe("kayıt sözleşmesi: sunucu alan hatası döner, form sıfırlanmaz", 
     expect(fn).toMatch(/TR_MOBILE_ERROR_MESSAGE, field: "phone"/);
     expect(fn).toMatch(/EMAIL_ERROR_MESSAGE, field: "email"/);
     expect(fn).toMatch(/zaten kayıtlı\.", field: "email"/);
+    // Formdaki "giriş yap / şifremi unuttum" bağlantısı bu metne bağlıdır.
+    expect(SIGNUP_EMAIL_EXISTS_MESSAGE).toBe("Bu e-posta zaten kayıtlı.");
   });
   it("form action'ı otomatik sıfırlamasız gönderilir ve eski metin-tarama eşlemesi yok", () => {
     const form = read("src/app/kayit/register-form.tsx");
