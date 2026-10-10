@@ -3,7 +3,10 @@
  * platformda `platform_audit_logs`. Filtre değerleri denetim kaydında yalnız ham olmayan alanlar için saklıdır
  * (serbest metin "(metin)" olarak maskelidir); yeniden açarken bu alanlar atlanır.
  */
-import { PLATFORM_REPORT_EXPORT_ACTION, REPORT_EXPORT_ACTION } from "./download";
+import {
+  PLATFORM_REPORT_EXPORT_ACTION_NAME as PLATFORM_REPORT_EXPORT_ACTION,
+  REPORT_EXPORT_ACTION_NAME as REPORT_EXPORT_ACTION,
+} from "./export-actions";
 import { getReport } from "./registry";
 import type { ReportContext, Row } from "./types";
 

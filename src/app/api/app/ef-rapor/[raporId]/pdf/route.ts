@@ -13,7 +13,7 @@ function jsonError(error: string, status: number, headers?: Record<string, strin
 
 /**
  * GET /api/app/ef-rapor/[raporId]/pdf — kendi sunucumuz üzerinden PDF (kullanıcıya EmlakFiyati anahtarı/URL'si ASLA gitmez).
- * Kimlik: oturum çerezi; yetki: valuation/create (ilk indirme kontör düşer; tekrarlar ücretsiz). rapor_id bir ERİŞİM ANAHTARIDIR:
+ * Kimlik: oturum çerezi; yetki: valuation/create (PDF indirme KONTÖRSÜZ; sahip kararı 2026-10-10). rapor_id bir ERİŞİM ANAHTARIDIR:
  * rapor BU ofise ait değilse 404. Yanıt önbelleğe ALINMAZ.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ raporId: string }> }) {
@@ -42,8 +42,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ raporId
     case "not_found":
     case "expired":
       return jsonError(res.message, 404);
-    case "no_credit":
-      return jsonError(`Yetersiz kontör: bu işlem ${res.needed} kontör, kalan ${res.available}.`, 402);
     case "busy":
       return jsonError(res.message, 409, { "Retry-After": "5" });
     case "disabled":

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getClosedFeatures } from "@/lib/modules/state";
+import { loadShellBootstrap } from "@/lib/app-shell/bootstrap";
 import { isFeatureKey, mergeHidden, type FeatureKey } from "@/lib/modules/registry";
 
 /**
@@ -24,12 +25,24 @@ export const getUserHiddenModules = cache(async (userId: string, tenantId: strin
   }
 });
 
+/**
+ * /app sayfaları: kabuk RPC'si (layout, istek başına önbellekli) `hidden_modules` döndürdüyse onu kullanır
+ * (ek tur yok); alan/RPC yoksa eski okuma. Kimlik/ofis kabuk profiliyle birebir eşleşmezse de eski okuma.
+ */
+async function hiddenFromShellOrDb(userId: string, tenantId: string): Promise<FeatureKey[]> {
+  const boot = await loadShellBootstrap();
+  if (boot?.hiddenModules && boot.profile.id === userId && boot.profile.tenantId === tenantId) {
+    return boot.hiddenModules.filter(isFeatureKey);
+  }
+  return getUserHiddenModules(userId, tenantId);
+}
+
 /** Menü/palet/ana ekran için görünmez modüller: ofis kapalıları ∪ kullanıcının gizledikleri. */
 export async function getInvisibleFeatures(tenantId: string | null | undefined, userId: string | null | undefined): Promise<FeatureKey[]> {
   if (!tenantId) return [];
   const [closed, hidden] = await Promise.all([
     getClosedFeatures(tenantId),
-    userId ? getUserHiddenModules(userId, tenantId) : Promise.resolve([] as FeatureKey[]),
+    userId ? hiddenFromShellOrDb(userId, tenantId) : Promise.resolve([] as FeatureKey[]),
   ]);
   return mergeHidden(closed, hidden);
 }

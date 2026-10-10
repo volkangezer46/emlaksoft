@@ -24,7 +24,8 @@ describe("şema/RPC yokken zarif düşüş", () => {
   });
   it("ayar yokken varsayılan paket kataloğu ve varsayılan tarife", async () => {
     const c = await getEfCatalog();
-    expect(c.packs.map((p) => p.units)).toEqual([100, 500, 1000, 2500, 5000]);
+    expect(c.packs).toHaveLength(12);
+    expect(new Set(c.packs.map((p) => p.months))).toEqual(new Set([1, 3, 6, 12]));
     expect(c.tariff.valuationArsa).toBeGreaterThan(0);
   });
 });

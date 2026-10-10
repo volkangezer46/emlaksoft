@@ -21,7 +21,7 @@ import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCredit
 /** Kontör paketi faturası taslağı; tutar/kontör SUNUCU kataloğundan gelen pakettir (istemciden değil). */
 export async function createCreditPackInvoice(input: {
   tenantId: string;
-  pack: Pick<EfPack, "id" | "units" | "priceNetTry">;
+  pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">;
   conversationId: string;
   /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
   walletCredit?: WalletCreditRequest | null;

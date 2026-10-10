@@ -9,7 +9,7 @@ import { EF_GRANT_KINDS, type EfBalance } from "@/lib/ef-credits/config";
 
 export const EF_HISTORY_PAGE_SIZE = 20;
 
-export type EfMovementCategory = "degerleme" | "pdf" | "satin-alma" | "iade" | "diger";
+export type EfMovementCategory = "degerleme" | "pdf" | "satin-alma" | "iade" | "sona-erme" | "diger";
 
 export type EfMovement = {
   id: string;
@@ -27,6 +27,7 @@ export const EF_CATEGORY_LABEL: Record<EfMovementCategory, string> = {
   pdf: "PDF rapor",
   "satin-alma": "Satın alma / yükleme",
   iade: "İade",
+  "sona-erme": "Süresi dolan",
   diger: "Diğer",
 };
 
@@ -38,6 +39,10 @@ export function parseEfBalance(data: unknown): EfBalance | null {
     reserved: z.coerce.number(),
     granted_total: z.coerce.number(),
     committed_total: z.coerce.number(),
+    // Süreli parti şeması (20261010000300) sonrası gelir; eski şemada yok.
+    expired_total: z.coerce.number().optional(),
+    next_expiry_at: z.string().nullable().optional(),
+    next_expiry_units: z.coerce.number().optional(),
   }).safeParse(r);
   return s.success ? s.data : null;
 }
@@ -73,11 +78,15 @@ export function normalizeLedgerRow(raw: Record<string, unknown>): EfMovement | n
     return { ...base, category: "iade", label: "İade", units: Math.abs(amount) };
   }
   if (kindRaw === "commit" || kindRaw === "spend") {
+    // Süre dolumu (yanma): kullanım değil. Yeni (ef_expire_lot, source expire) ve eski devir tavanı (ef_expire_plan) satırları.
+    if (str(raw.source) === "expire" || item.startsWith("ef_expire")) {
+      return { ...base, category: "sona-erme", label: "Süresi doldu (yandı)", units: -Math.abs(amount) };
+    }
     if (item.startsWith("valuation")) return { ...base, category: "degerleme", label: "Değerleme", units: -Math.abs(amount) };
     if (item.startsWith("pdf")) return { ...base, category: "pdf", label: "PDF rapor", units: -Math.abs(amount) };
     return { ...base, category: "diger", label: "Kullanım", units: -Math.abs(amount) };
   }
-  return null; // reserve / release / expire: ofis geçmişinde gösterilmez
+  return null; // reserve / release: ofis geçmişinde gösterilmez
 }
 
 export function categoryOf(raw: string | null | undefined): EfMovementCategory | null {

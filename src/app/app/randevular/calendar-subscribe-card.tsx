@@ -14,10 +14,10 @@ function subscribeNoop() {
 /**
  * "Takvime abone ol" kartı — kullanıcının kişisel ICS feed linkini gösterir.
  * Google/Apple/Outlook bu linke abone olup randevuları otomatik senkronlar.
- * Link kişiye özeldir (calendar_token); "Linki yenile" yeni token üretir ve
+ * Link kişiye özeldir (kişisel token); "Linki yenile" yeni token üretir ve
  * eski abonelikler anında geçersiz olur.
  */
-export function CalendarSubscribeCard({ token }: { token: string }) {
+export function CalendarSubscribeCard({ token }: { token: string | null }) {
   const { push } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -30,7 +30,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
     () => null,
   );
 
-  const httpsUrl = origin ? `${origin}/api/takvim/${token}` : null;
+  const httpsUrl = origin && token ? `${origin}/api/takvim/${token}` : null;
   const webcalUrl = httpsUrl ? httpsUrl.replace(/^https?:\/\//, "webcal://") : null;
   const googleUrl = webcalUrl
     ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`
@@ -51,7 +51,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
     startTransition(async () => {
       const res = await regenerateCalendarToken();
       if (res.ok) {
-        push("Takvim linki yenilendi — eski link artık çalışmaz", "ok");
+        push(token ? "Takvim linki yenilendi — eski link artık çalışmaz" : "Takvim linki oluşturuldu", "ok");
         router.refresh();
       } else {
         push(res.error ?? "Link yenilenemedi", "err");
@@ -78,7 +78,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
       {/* ICS linki + kopyala */}
       <div className="mt-4 flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2">
         <code className="min-w-0 flex-1 truncate text-xs text-text-muted" title={httpsUrl ?? undefined}>
-          {httpsUrl ?? "…"}
+          {httpsUrl ?? (token ? "…" : "Henüz link oluşturulmadı")}
         </code>
         <button
           type="button"
@@ -122,7 +122,7 @@ export function CalendarSubscribeCard({ token }: { token: string }) {
         >
           <RefreshCw className={`h-3 w-3 ${pending ? "animate-spin" : ""}`} />
           {/* Aynı sayfada rezervasyon kartının da yenileme butonu var — isim ayırt edici olmalı */}
-          {pending ? "Yenileniyor…" : "Takvim linkini yenile"}
+          {pending ? (token ? "Yenileniyor…" : "Oluşturuluyor…") : token ? "Takvim linkini yenile" : "Takvim linki oluştur"}
         </button>
       </div>
     </section>

@@ -314,6 +314,17 @@ export function AppSidebar({
               ) : null}
             </>
           ) : null}
+          {/* Menüyü düzenle: kullanılmayan modülleri tek tıkla aç/kapat. Ofis sahibi/genel müdür ofis genelini, diğerleri
+              yalnız kendi menüsünü düzenler (yeni sayfa yok; mevcut ayar ekranlarına gider). */}
+          <Link
+            href={role === "owner" || role === "gm" ? "/app/ayarlar/moduller" : "/app/hesabim?sekme=gorunum"}
+            onClick={() => setOpen(false)}
+            title="Kullanmadığınız modülleri tek tıkla gizleyin veya açın"
+            className="focus-ring mt-1 flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm text-white/65 transition-colors hover:bg-white/8 hover:text-white"
+          >
+            <ICONS.moduller className="h-4 w-4 shrink-0" aria-hidden />
+            <span>Menüyü düzenle</span>
+          </Link>
         </div>
 
         {/* İkon modu (64px): başlık başına tek ikon; hover/odakta sağda alt menü (alt sayfalar dahil) + hızlı eylemler. */}

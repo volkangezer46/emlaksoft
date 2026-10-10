@@ -92,10 +92,10 @@ export default async function AidatPage({
     return (
       <ListPage>
         <ListHero
-          eyebrow="Aidat & bina yönetimi"
+          eyebrow="Kiralama · Aidat & site"
           art="aidat"
-          title="Bina & site yönetimi"
-          description="Apartman ve siteleri komple yönetin: dairelere dönem aidatı, ortak gider paylaştırma, tahsilat ve daire cari tek yerde."
+          title="Aidat & site"
+          description="Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin. Binalar: site/apartman tanımı ve ortak gider paylaştırma; Daire cari: dairenin borç-alacak dökümü."
         />
         {tabStrip}
         {tab === "binalar" ? (
@@ -282,10 +282,10 @@ export default async function AidatPage({
   return (
     <ListPage>
       <ListHero
-        eyebrow="Aidat & bina yönetimi"
+        eyebrow="Kiralama · Aidat & site"
         art="aidat"
-        title="Bina & site yönetimi"
-        description="Portföy aidatları ile yönettiğiniz bina/sitelerin aidat, gider paylaştırma ve tahsilat durumu tek yerde."
+        title="Aidat & site"
+        description="Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin. Tek tek daire aidatı burada, site/apartman yönetimi Binalar sekmesinde."
       />
       {tabStrip}
 

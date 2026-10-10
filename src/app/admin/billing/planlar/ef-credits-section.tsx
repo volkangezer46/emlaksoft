@@ -52,7 +52,7 @@ export function EfCreditsSection({
         <h2 className="font-display font-bold text-ink-950">Kontör hakları</h2>
         <p className="text-xs text-text-muted">
           Paket başına aylık EmlakFiyati kontörü plan düzenleyicisinden girilir; günlük çalışma, trialing/active aboneliği olan ofislere ayı için tek sefer verir.
-          Kullanılmayan kontör süresiz devreder. Plan yükseltmede ara hak verilmez; yeni paketin hakkı sonraki ay başlar.
+          Aylık hak o ayın sonunda yanar, devretmez (süreli kontör, 2026-10-10 kararı). Plan yükseltmede ara hak verilmez; yeni paketin hakkı sonraki ay başlar.
           Ek kullanıcı başı kontör, plan düzenleyicisindeki &quot;ek kullanıcı başı kontör&quot; alanından girilir ve satırlarda hakka eklenir.
         </p>
         <p className="mt-1 text-xs text-text-muted">

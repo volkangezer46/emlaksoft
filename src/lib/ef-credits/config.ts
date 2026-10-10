@@ -18,11 +18,16 @@ export const EF_ORTAK_PROBE_OK_SETTING_KEY = "emlakfiyati_ortak_probe_ok_at";
 export const EF_UNIT = "ef" as const;
 
 /**
- * Yeni ofise TEK SEFER verilen hoş geldin kontörü; 0 = kapalı. 1 kontör = 1 TL (2026-10-08 fiyat kararı): 100 kontör,
- * 100 TL değerinde ilan analizi (1 kontör) denemesi sağlar; değerleme raporu (700+) için plan hakkı/paket gerekir.
+ * Yeni ofise TEK SEFER verilen hoş geldin kontörü; 0 = kapalı. 1 kontör = 1 TL (2026-10-08 fiyat kararı): 100 kontör;
+ * değerleme raporu (700+) için plan hakkı/paket gerekir. Kontör YALNIZ değerleme için harcanır (2026-10-10 kararı).
+ * SÜRELİDİR: hoş geldin kontörü `EF_WELCOME_VALID_DAYS` gün sonra yanar (SQL `ef_credit_grant` aynı sabiti kullanır).
  */
 export const EF_WELCOME_SETTING_KEY = "ef.welcome_units";
 export const EF_WELCOME_DEFAULT_UNITS = 100;
+/** Hoş geldin kontörünün geçerlilik süresi (gün; deneme süresiyle uyumlu). SQL `ef_credit_grant` bonus dalı ile AYNI. */
+export const EF_WELCOME_VALID_DAYS = 30;
+/** Admin/iade yüklemesinde ay seçilmezse geçerlilik (ay). SQL `ef_credit_grant` varsayılanı ile AYNI. */
+export const EF_DEFAULT_GRANT_VALID_MONTHS = 12;
 
 /**
  * Hoş geldin kontörünün başlangıç anı (ISO; migration 20260826001200 uygulama zamanı yazar): yalnız `tenants.created_at`
@@ -49,38 +54,36 @@ export function parseEfWelcomeUnits(raw: string | null | undefined): number {
 const EF_TARIFF_MAX = 10_000;
 const tariffUnits = (fallback: number) => z.number().int().min(0).max(EF_TARIFF_MAX).default(fallback);
 
+/**
+ * Tarife: KONTÖR YALNIZ DEĞERLEME İÇİN harcanır (sahip kararı 2026-10-10). İlan analizi, PDF, rapor detayı vb. kontörsüzdür;
+ * eski kayıtlardaki `pdfFirst`/`reportDetail`/`listingAnalysis` alanları okunurken yok sayılır (zod fazlalığı atar).
+ */
 export const efTariffSchema = z.object({
   /** Ada/parsel ARSA değerlemesi (başarılı ve ücretlendirilen sonuç). */
   valuationArsa: z.number().int().min(0).max(EF_TARIFF_MAX),
   /** Ada/parsel KONUT değerlemesi. */
   valuationKonut: z.number().int().min(0).max(EF_TARIFF_MAX),
-  /** Bir raporun İLK PDF indirmesi; varsayılan 0 (rapor bedeline dahil). Aynı raporun tekrar indirmeleri HER ZAMAN 0. */
-  pdfFirst: z.number().int().min(0).max(EF_TARIFF_MAX),
-  /** Rapor detayı (JSON) çağrısı; ürün kararı: varsayılan 0. */
-  reportDetail: z.number().int().min(0).max(EF_TARIFF_MAX),
   /** TİCARİ değerleme bedeli. Eski kayıtta alan yoksa varsayılan (1.050) uygulanır. */
   valuationTicari: tariffUnits(1050),
-  /** İlan analizi / hızlı tahmin bedeli. Eski kayıtta alan yoksa varsayılan (1) uygulanır. */
-  listingAnalysis: tariffUnits(1),
 });
 export type EfTariff = z.infer<typeof efTariffSchema>;
 
 /**
  * Varsayılan tarife (2026-10-08 fiyat kararı; 1 kontör = 1 TL; admin /admin/ef-kontor'dan değiştirir).
- * Konut raporu 700, arsa 850, ticari 1.050 kontör; ilk PDF indirme rapor bedeline dahil (0); ilan analizi 1 kontör.
+ * Konut raporu 700, arsa 850, ticari 1.050 kontör. Başka hiçbir özellik kontör düşmez.
  */
 export const EF_DEFAULT_TARIFF: EfTariff = {
   valuationArsa: 850,
   valuationKonut: 700,
-  pdfFirst: 0,
-  reportDetail: 0,
   valuationTicari: 1050,
-  listingAnalysis: 1,
 };
 
-export type EfItem = "valuation_arsa" | "valuation_konut" | "valuation_ticari" | "listing_analysis" | "pdf_first" | "report_detail";
+/** Kontör düşen (ücretlendirilen) kalemler: yalnız değerleme. */
+export type EfBillableItem = "valuation_arsa" | "valuation_konut" | "valuation_ticari";
+/** Geçmiş kayıtlarda görülebilen tüm kalemler (eski `listing_analysis`/`pdf_first`/`report_detail` artık ücretlendirilmez). */
+export type EfItem = EfBillableItem | "listing_analysis" | "pdf_first" | "report_detail";
 
-export function efUnitsFor(item: EfItem, tariff: EfTariff = EF_DEFAULT_TARIFF): number {
+export function efUnitsFor(item: EfBillableItem, tariff: EfTariff = EF_DEFAULT_TARIFF): number {
   switch (item) {
     case "valuation_arsa":
       return tariff.valuationArsa;
@@ -88,12 +91,6 @@ export function efUnitsFor(item: EfItem, tariff: EfTariff = EF_DEFAULT_TARIFF): 
       return tariff.valuationKonut;
     case "valuation_ticari":
       return tariff.valuationTicari;
-    case "listing_analysis":
-      return tariff.listingAnalysis;
-    case "pdf_first":
-      return tariff.pdfFirst;
-    case "report_detail":
-      return tariff.reportDetail;
   }
 }
 
@@ -120,12 +117,21 @@ export function serializeEfTariff(tariff: EfTariff): string {
 // ---------------------------------------------------------------------------
 // Kontör paketleri (satış kataloğu; admin düzenler; varsayılan BOŞ)
 // ---------------------------------------------------------------------------
+/** Paket süreleri (ay): satın alınan kontör bu süre sonunda yanar, devretmez. */
+export const EF_PACK_MONTHS = [1, 3, 6, 12] as const;
+export type EfPackMonths = (typeof EF_PACK_MONTHS)[number];
+export const EF_PACK_MONTHS_LABEL: Record<EfPackMonths, string> = { 1: "1 aylık", 3: "3 aylık", 6: "6 aylık", 12: "12 aylık" };
+
+const packMonthsSchema = z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12)]);
+
 export const efPackSchema = z.object({
   /** Kararlı kimlik (a-z0-9-), faturada `meta.packId` olarak gider. */
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{1,31}$/),
   name: z.string().trim().min(2).max(60),
-  /** Satın alınınca eklenen kontör (bonus dahil toplam). */
+  /** Satın alınınca eklenen TOPLAM kontör (aylık hak x süre; bonus dahil). Süre sonunda kullanılmayan kısmı yanar. */
   units: z.number().int().min(1).max(100000),
+  /** Geçerlilik süresi (ay): 1 | 3 | 6 | 12. Eski kayıtta alan yoksa 12 (süresiz satış kalmasın). */
+  months: packMonthsSchema.default(12),
   /** KDV HARİÇ net tutar (TRY). Fatura toplamı = net × (1 + KDV); mevcut ödeme akışındaki KDV kuralı geçerlidir. */
   priceNetTry: z.number().min(1).max(10_000_000),
   active: z.boolean(),
@@ -136,17 +142,40 @@ export type EfPack = z.infer<typeof efPackSchema>;
 
 export const efPacksSchema = z.array(efPackSchema).max(12);
 
+/** Varsayılan katalog: aylık kontör seçenekleri (1 kontör = 1 TL tabanı). */
+export const EF_DEFAULT_PACK_MONTHLY_TIERS = [1000, 2500, 5000] as const;
+/** Uzun süreye indirim (%), süre bazında: 1 ay yok, 3 ay %5, 6 ay %10, 12 ay %15. Admin paket fiyatını düzenleyerek değiştirir. */
+export const EF_DEFAULT_PACK_DISCOUNT_PCT: Record<EfPackMonths, number> = { 1: 0, 3: 5, 6: 10, 12: 15 };
+
+const trNum = (n: number) => n.toLocaleString("tr-TR");
+
+/** Varsayılan paket kataloğu (2026-10-10 kararı): 3 aylık-kontör kademesi x 4 süre = 12 paket. SQL seed'i (20261008001000) birebir bunu yazar. */
+export function buildDefaultEfPacks(): EfPack[] {
+  const out: EfPack[] = [];
+  EF_DEFAULT_PACK_MONTHLY_TIERS.forEach((monthly, ti) => {
+    EF_PACK_MONTHS.forEach((months, mi) => {
+      const units = monthly * months;
+      const price = Math.round((units * (100 - EF_DEFAULT_PACK_DISCOUNT_PCT[months])) / 100);
+      out.push({
+        id: `ef-${monthly}-${months}a`,
+        name: `${EF_PACK_MONTHS_LABEL[months]} · aylık ${trNum(monthly)} kontör`,
+        units,
+        months,
+        priceNetTry: price,
+        active: true,
+        ...(monthly === 2500 && months === 6 ? { popular: true } : {}),
+        order: (ti * EF_PACK_MONTHS.length + mi + 1) * 10,
+      });
+    });
+  });
+  return out;
+}
+
 /**
- * Varsayılan kontör paketleri (2026-10-08 fiyat kararı; 1 kontör = 1 TL, KDV hariç; birim fiyat 1,00 -> 0,80 azalır).
- * Ayar (`ef.packs`) hiç yoksa/boşsa bunlar geçerlidir; admin /admin/ef-kontor'dan düzenler (kayıt varsa yalnız o geçerli).
+ * Varsayılan kontör paketleri. Ayar (`ef.packs`) hiç yoksa/boşsa bunlar geçerlidir; admin /admin/ef-kontor'dan düzenler
+ * (kayıt varsa yalnız o geçerli).
  */
-export const EF_DEFAULT_PACKS: readonly EfPack[] = [
-  { id: "ef-100", name: "100 Kontör", units: 100, priceNetTry: 100, active: true, order: 10 },
-  { id: "ef-500", name: "500 Kontör", units: 500, priceNetTry: 475, active: true, order: 20 },
-  { id: "ef-1000", name: "1.000 Kontör", units: 1000, priceNetTry: 900, active: true, popular: true, order: 30 },
-  { id: "ef-2500", name: "2.500 Kontör", units: 2500, priceNetTry: 2125, active: true, order: 40 },
-  { id: "ef-5000", name: "5.000 Kontör", units: 5000, priceNetTry: 4000, active: true, order: 50 },
-];
+export const EF_DEFAULT_PACKS: readonly EfPack[] = buildDefaultEfPacks();
 
 export function parseEfPacks(raw: string | null | undefined): EfPack[] {
   if (!raw || raw.trim() === "") return EF_DEFAULT_PACKS.map((p) => ({ ...p }));
@@ -170,6 +199,11 @@ export function serializeEfPacks(packs: EfPack[]): string {
   return JSON.stringify(efPacksSchema.parse(packs));
 }
 
+/** Paketin AYLIK ortalama kontörü (toplam / süre; gösterim). */
+export function efPackMonthlyUnits(pack: Pick<EfPack, "units" | "months">): number {
+  return pack.months > 0 ? Math.round(pack.units / pack.months) : pack.units;
+}
+
 /** Kontör başına net birim fiyat (gösterim/doğrulama). */
 export function efPackUnitPriceTry(pack: Pick<EfPack, "units" | "priceNetTry">): number {
   return pack.units > 0 ? Math.round((pack.priceNetTry / pack.units) * 100) / 100 : 0;
@@ -178,11 +212,26 @@ export function efPackUnitPriceTry(pack: Pick<EfPack, "units" | "priceNetTry">):
 /** Katalog doğrulama uyarıları (kaydı ENGELLEMEZ; hatalar şema ile engellenir). */
 export function efPackWarnings(packs: EfPack[]): string[] {
   const out: string[] = [];
-  const active = packs.filter((p) => p.active).sort((a, b) => a.units - b.units);
-  for (let i = 1; i < active.length; i++) {
-    const prev = efPackUnitPriceTry(active[i - 1]!);
-    const cur = efPackUnitPriceTry(active[i]!);
-    if (cur > prev) out.push(`"${active[i]!.name}" paketinin kontör başı fiyatı (${cur}) daha küçük paketten (${prev}) pahalı: büyük paket mantıksız.`);
+  const active = packs.filter((p) => p.active);
+  // Aynı sürede büyük paket küçükten pahalı olmamalı.
+  for (const months of EF_PACK_MONTHS) {
+    const same = active.filter((p) => p.months === months).sort((a, b) => a.units - b.units);
+    for (let i = 1; i < same.length; i++) {
+      const prev = efPackUnitPriceTry(same[i - 1]!);
+      const cur = efPackUnitPriceTry(same[i]!);
+      if (cur > prev) out.push(`"${same[i]!.name}" paketinin kontör başı fiyatı (${cur}) aynı süreli daha küçük paketten (${prev}) pahalı: büyük paket mantıksız.`);
+    }
+  }
+  // Aynı aylık kontörde uzun süre kısadan pahalı olmamalı.
+  const byMonthly = new Map<number, EfPack[]>();
+  for (const p of active) byMonthly.set(efPackMonthlyUnits(p), [...(byMonthly.get(efPackMonthlyUnits(p)) ?? []), p]);
+  for (const group of byMonthly.values()) {
+    const sorted = [...group].sort((a, b) => a.months - b.months);
+    for (let i = 1; i < sorted.length; i++) {
+      if (efPackUnitPriceTry(sorted[i]!) > efPackUnitPriceTry(sorted[i - 1]!)) {
+        out.push(`"${sorted[i]!.name}" daha uzun süreli ama kontör başı fiyatı "${sorted[i - 1]!.name}" paketinden yüksek: uzun süre indirimli olmalı.`);
+      }
+    }
   }
   if (packs.length > 0 && active.length === 0) out.push("Aktif paket yok: ofisler kontör satın alamaz.");
   return out;
@@ -192,10 +241,18 @@ export function efPackWarnings(packs: EfPack[]): string[] {
 // Cüzdan RPC sözleşmesi (SQL tarafı yazılırken ve TS çağrılarında AYNEN uyulur; hepsi service_role-only)
 // ---------------------------------------------------------------------------
 export type EfBalance = {
+  /** Kullanılabilir = SÜRESİ DOLMAMIŞ partilerin kalanı - açık rezerv. */
   available: number;
   reserved: number;
+  /** Defterde yüklenen toplam (süresi dolan dahil; geçmiş). */
   granted_total: number;
+  /** Harcanan (yalnız kullanım; süre dolumu `expired_total`). */
   committed_total: number;
+  /** Süresi dolup yanan toplam (partiler şeması 20261010000300 sonrası; eski şemada yok). */
+  expired_total?: number;
+  /** Sonraki yanma: süresi dolmamış en yakın partinin son kullanma anı (ISO) ve o anda yanacak kontör; yoksa null/0. */
+  next_expiry_at?: string | null;
+  next_expiry_units?: number;
 };
 export type EfReserveResult =
   | { ok: true; code: "ok" | "duplicate"; reservation_id: string; state: "reserved" | "committed" | "released"; available: number }
@@ -203,10 +260,10 @@ export type EfReserveResult =
 export type EfSettleResult = { ok: boolean; state: "reserved" | "committed" | "released" | "unknown"; already: boolean };
 export type EfGrantResult = { ok: boolean; already: boolean; available: number };
 
-/** `ef_credit_expire_plan` (20260826001200): plan kontörü devir tavanı; `expired` = bu çağrıda düşülen kontör. */
-export type EfExpireResult = { ok: boolean; already: boolean; expired: number; available: number };
-/** (p_tenant uuid, p_keep int, p_idem text) -> jsonb EfExpireResult; service_role-only. Cüzdan 000100 `EF_RPC` kümesinden AYRIDIR. */
-export const EF_RPC_EXPIRE_PLAN = "ef_credit_expire_plan" as const;
+/** `ef_credit_burn_expired` (20261010000300): süresi dolan partileri yakar; günlük `ef-kontor-hak` cron adımı. */
+export type EfBurnResult = { ok: boolean; burned_lots: number; burned_units: number; skipped?: boolean };
+/** (p_limit int default 500, p_grace interval default '1 hour') -> jsonb EfBurnResult; service_role-only. Cüzdan 000100 `EF_RPC` kümesinden AYRIDIR. */
+export const EF_RPC_BURN_EXPIRED = "ef_credit_burn_expired" as const;
 
 export const EF_GRANT_KINDS = ["purchase", "plan_monthly", "bonus", "admin", "refund"] as const;
 export type EfGrantKind = (typeof EF_GRANT_KINDS)[number];
