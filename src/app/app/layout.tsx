@@ -1,6 +1,7 @@
 import { Suspense, cache } from "react";
 import Link from "@/components/ui/smart-link";
 import { Shield } from "lucide-react";
+import "@/app/console-base.css";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";

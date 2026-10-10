@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ACCENTS, THEME_BOOT_SCRIPT } from "./theme";
@@ -53,17 +53,30 @@ describe("tasarım token sözleşmesi", () => {
     const layout = readFileSync("src/app/layout.tsx", "utf8");
     expect(layout).toContain("THEME_BOOT_SCRIPT");
     expect(layout).toContain("suppressHydrationWarning");
-    const css = readFileSync("src/app/globals.css", "utf8");
+    // Koyu tema yalnız konsol (/app, /admin) CSS paketindedir; public sayfalara yüklenmez (console-base.css).
+    const css = readFileSync("src/app/console-base.css", "utf8");
     expect(css).toContain('@import "./theme-dark.css"');
+    expect(readFileSync("src/app/globals.css", "utf8")).not.toContain("theme-dark.css");
   });
 
-  it("Türkçe karakterler için fontlar latin-ext alt kümesiyle yüklenir", () => {
-    const layout = readFileSync("src/app/layout.tsx", "utf8");
-    const subsets = layout.match(/subsets:\s*\[[^\]]*\]/g) ?? [];
-    const fontSubsets = subsets.filter((s) => s.includes('"latin"'));
-    expect(fontSubsets.length).toBeGreaterThanOrEqual(2);
-    // Geist Mono yalnız kod/sayı için; Manrope ve Inter latin-ext içermeli.
-    expect(fontSubsets.filter((s) => s.includes("latin-ext")).length).toBeGreaterThanOrEqual(2);
+  it("Türkçe karakterler için Inter ve Manrope kendi sunucumuzdan, Ğ ğ İ Ş ş alt kümesiyle yüklenir", () => {
+    // Eski yol next/font latin-ext (Inter 84 KB) idi; bütçe için latin + yalnız Türkçe'ye özgü harflerin alt kümesi (src/app/fonts).
+    const css = readFileSync("src/app/globals.css", "utf8");
+    for (const family of ["Inter", "Manrope"]) {
+      const lower = family.toLowerCase();
+      const faces = css.match(new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*"${family}"[^}]*\\}`, "g")) ?? [];
+      expect(faces.length, family).toBeGreaterThanOrEqual(2);
+      const latin = faces.find((f) => f.includes(`${lower}-latin.woff2`));
+      const tr = faces.find((f) => f.includes(`${lower}-tr.woff2`));
+      expect(latin, `${family} latin`).toBeTruthy();
+      expect(tr, `${family} tr`).toBeTruthy();
+      // ç ö ü ı latin aralığında; Ğ ğ İ Ş ş (U+011E-011F, U+0130, U+015E-015F) tr alt kümesinde.
+      expect(latin).toContain("U+0000-00FF");
+      expect(latin).toContain("U+0131");
+      expect(tr).toMatch(/U\+011E-011F,\s*U\+0130,\s*U\+015E-015F,\s*U\+20BA/); // + ₺ (latin-ext aralığındaydı)
+      expect(existsSync(`src/app/fonts/${lower}-latin.woff2`)).toBe(true);
+      expect(existsSync(`src/app/fonts/${lower}-tr.woff2`)).toBe(true);
+    }
   });
 });
 
@@ -209,8 +222,8 @@ describe("premium konsol paleti", () => {
   const premiumCss = read("src/app/premium.css");
   const NAVY = ["#0a2247", "#071a38", "#050f24"];
 
-  it("premium.css globals.css'e bağlı ve hareket azaltmaya saygılı", () => {
-    expect(read("src/app/globals.css")).toContain('@import "./premium.css"');
+  it("premium.css console-base.css (konsol paketi)'e bağlı ve hareket azaltmaya saygılı", () => {
+    expect(read("src/app/console-base.css")).toContain('@import "./premium.css"');
     expect(premiumCss).toContain("prefers-reduced-motion: no-preference");
   });
 

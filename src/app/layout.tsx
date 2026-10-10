@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter, Manrope } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -9,22 +9,8 @@ import { brandIcons } from "@/lib/brand/icons";
 import { buildRootMetadata } from "@/lib/seo/store";
 import "./globals.css";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin", "latin-ext"],
-  display: "swap",
-  preload: false,
-  fallback: ["system-ui", "sans-serif"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin", "latin-ext"],
-  display: "swap",
-  preload: false,
-  fallback: ["system-ui", "sans-serif"],
-});
-
+// Inter ve Manrope kendi sunucumuzdan (src/app/fonts + globals.css @font-face; Türkçe harfler küçük alt küme).
+// Yalnız Geist Mono (kod/sayı; public sayfalarda yüklenmez) next/font ile gelir.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -88,7 +74,7 @@ export default async function RootLayout({
     <html
       lang="tr"
       suppressHydrationWarning
-      className={`${manrope.variable} ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />

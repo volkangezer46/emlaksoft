@@ -1,14 +1,22 @@
 @import "tailwindcss";
 @source not "../../.claude";
 @import "./tokens.css";
-@import "./theme-dark.css";
-@import "./themes.css";
-@import "./premium.css";
 @import "./a11y.css";
 @import "./motion.css";
-@import "./viz.css";
-@import "./list-page.css";
 @import "./kit.css";
+@import "./shared-ui.css";
+
+/* ---- Yazı tipleri: kendi sunucumuzdan (istek ve bayt bütçesi) -----------------------------------------------
+   Inter ve Manrope değişken yazı tipinin Google "latin" dosyası (wght ekseni 300-800'e kırpılmış) + yalnız Türkçe'ye özgü beş harf (Ğ ğ İ Ş ş) ve ₺ için
+   küçük "tr" alt kümesi (kaynak: latin-ext dosyasından pyftsubset; ~3 KB). Eski next/font latin-ext dosyaları
+   Inter için 84 KB, Manrope için 16 KB idi. unicode-range: tarayıcı yalnız ekranda geçen aralıkları indirir.
+   Dosyalar derlemede içerik özetli adla ve değişmez önbellekle servis edilir. Geist Mono hâlâ next/font (layout.tsx). */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/inter-latin.woff2") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/inter-tr.woff2") format("woff2"); unicode-range: U+011E-011F,U+0130,U+015E-015F,U+20BA; }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/manrope-latin.woff2") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/manrope-tr.woff2") format("woff2"); unicode-range: U+011E-011F,U+0130,U+015E-015F,U+20BA; }
+:root { --font-manrope: "Manrope", system-ui, sans-serif; --font-inter: "Inter", system-ui, sans-serif; }
+/* Konsol (/app, /admin) stilleri console-base.css içinde: public sayfalara yüklenmez. */
 
 /* Sprite ikon çizgi stili (lucide ile aynı): özniteliklerden CSS'e taşındı, RSC yükünü küçültür. */
 .sprite-ic { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

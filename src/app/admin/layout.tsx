@@ -9,6 +9,7 @@ import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platfo
 import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
 import { loadStaffAvatar } from "@/lib/avatar-read";
+import "@/app/console-base.css";
 import "@/app/console.css";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
