@@ -102,7 +102,16 @@ export function isOfficeProfileDone(c: ProfileCompletion): boolean {
   return c.missing.every((m) => m.step === "ekip");
 }
 
-export const PROFILE_WIZARD_HREF ="/app/ayarlar/profil-tamamla";
+/**
+ * Kurulum sihirbazının "Ofis" adımı yalnız konum maddelerine (il/ilçe + açık adres) bağlıdır; telefon, yetki belgesi,
+ * vergi, marka ve odak ayrıntıları isteğe bağlıdır (Ayarlar > Marka ve kimlik) ve ilerlemeyi bloklamaz.
+ */
+export function isOfficeLocationDone(c: ProfileCompletion): boolean {
+  return c.items.filter((i) => i.step === "konum").every((i) => i.done);
+}
+
+/** Eski "Ofis profilini tamamla" adresi: artık Kurulum sihirbazına yönlenir (eski bağlantılar kırılmaz). */
+export const PROFILE_WIZARD_HREF = "/app/ayarlar/profil-tamamla";
 
 export function profileStepHref(step: ProfileStepKey): string {
   return `${PROFILE_WIZARD_HREF}?adim=${step}`;

@@ -1,38 +1,26 @@
 /**
- * Ofis kurulum sihirbazı — saf mantık. Salt sayımlardan adım listesi ve ilerleme
- * yüzdesi üretir; veritabanı/IO yok (sayfa sayıları toplar, burası yorumlar).
+ * Ofis kurulum sihirbazı — saf mantık. Gerçek veri özetinden (`OnboardingFacts`) adım listesi ve ilerleme
+ * yüzdesi üretir; veritabanı/IO yok (`onboarding-state.ts` verileri toplar, burası yorumlar).
  *
- * Tek kaynak: hem /app/baslangic sihirbazı hem ana ekrandaki kurulum şeridi bu modülü
- * kullanır. "Tamamlandı" bilgisi gerçek veriden çıkar (müşteri sayısı > 0 vb.); yeni şema
- * yoktur. Yalnız "sonra yaparım" tercihi kullanıcı çerezinde tutulur (bkz. setup-skip.ts).
+ * Adım listesinin TEK kaynağı `onboarding-steps.ts` kaydıdır. "Tamamlandı" bilgisi gerçek veriden çıkar; yalnız
+ * "sonra yaparım" tercihi kullanıcı çerezinde tutulur (bkz. setup-skip.ts).
+ *
+ * "İlk işler" (veri getir, ilk portföy, talep, randevu, tanımlar) sihirbaz adımı DEĞİLDİR: ana ekrandaki Başlangıç
+ * kartında kontrol listesi olarak durur (`buildFirstTasks`).
  */
+import {
+  FINISH_STEP,
+  ONBOARDING_STEP_DEFS,
+  ONBOARDING_STEP_IDS,
+  isOnboardingStepId,
+  isWizardStepKey,
+  type OnboardingFacts,
+  type OnboardingStepId,
+  type WizardStepKey,
+} from "@/lib/onboarding-steps";
 
-export type OnboardingCounts = {
-  /** Ofis profili tamam mı? TEK kaynak: `profile-completion` (ekip daveti ayrı "Ekip" adımıdır; bkz. `isOfficeProfileDone`). */
-  officeProfileDone: boolean;
-  /** Örnek (is_sample) olmayan müşteri sayısı. */
-  customers: number;
-  /** Örnek olmayan portföy sayısı. */
-  properties: number;
-  /** Ofisteki toplam kullanıcı (profil) sayısı. */
-  members: number;
-  /** Aktif mesajlaşma entegrasyonu (netgsm/whatsapp) sayısı. */
-  activeIntegrations: number;
-  /** Ofise özel (tenant_id dolu) tanım sayısı: kayıp nedeni, kaynak vb. */
-  customDefinitions: number;
-  /** Yayın tarihi (published_at) dolu, örnek olmayan portföy sayısı. */
-  publishedProperties: number;
-  /** Örnek (is_sample) olmayan müşteri talebi sayısı. */
-  demands: number;
-  /** Örnek olmayan randevu sayısı. */
-  appointments: number;
-};
-
-export type OnboardingStepId = "office" | "team" | "data" | "property" | "demand" | "appointment" | "defs" | "portals";
-
-/** Sihirbazın son (özet) adımı; ilerlemeye sayılmaz. */
-export const FINISH_STEP = "bitis" as const;
-export type WizardStepKey = OnboardingStepId | typeof FINISH_STEP;
+export { FINISH_STEP, ONBOARDING_STEP_IDS, isOnboardingStepId, isWizardStepKey };
+export type { OnboardingFacts, OnboardingStepId, WizardStepKey };
 
 export type OnboardingStep = {
   id: OnboardingStepId;
@@ -40,6 +28,8 @@ export type OnboardingStep = {
   description: string;
   /** Adımın kısa adı (ilerleme çubuğu etiketi). */
   short: string;
+  /** Özel gövdesi olmayan adımın götürdüğü sayfa. */
+  href?: string;
   done: boolean;
 };
 
@@ -55,78 +45,15 @@ export type OnboardingState = {
   complete: boolean;
 };
 
-export const ONBOARDING_STEP_IDS: readonly OnboardingStepId[] = ["office", "team", "data", "property", "demand", "appointment", "defs", "portals"];
-
-export function isOnboardingStepId(v: unknown): v is OnboardingStepId {
-  return typeof v === "string" && (ONBOARDING_STEP_IDS as readonly string[]).includes(v);
-}
-
-export function isWizardStepKey(v: unknown): v is WizardStepKey {
-  return v === FINISH_STEP || isOnboardingStepId(v);
-}
-
-export function buildOnboarding(
-  counts: OnboardingCounts,
-  skipped: readonly OnboardingStepId[] = [],
-): OnboardingState {
-  const steps: OnboardingStep[] = [
-    {
-      id: "office",
-      short: "Ofis",
-      title: "Ofis bilgileriniz",
-      description: "Konum, iletişim, vergi ve marka bilgileri sözleşme, portal ve vitrinde görünür.",
-      done: counts.officeProfileDone,
-    },
-    {
-      id: "team",
-      short: "Ekip",
-      title: "Ekibinizi davet edin",
-      description: "Danışmanlarınızı ekleyin; görev ve müşteri paylaşımı başlasın.",
-      done: counts.members > 1,
-    },
-    {
-      id: "data",
-      short: "Veriler",
-      title: "Verilerinizi getirin",
-      description: "Mevcut müşteri listenizi içe aktarın ya da ilk müşterinizi ekleyin.",
-      done: counts.customers > 0,
-    },
-    {
-      id: "property",
-      short: "Portföy",
-      title: "İlk portföyünüzü girin",
-      description: "Portföy eklenince eşleştirme ve vitrin çalışmaya başlar.",
-      done: counts.properties > 0,
-    },
-    {
-      id: "demand",
-      short: "Talep",
-      title: "İlk talebi kaydedin",
-      description: "Müşterinin aradığı evi (bütçe, bölge, oda) girin; uygun portföyler kendiliğinden eşleşir.",
-      done: counts.demands > 0,
-    },
-    {
-      id: "appointment",
-      short: "Randevu",
-      title: "İlk randevuyu planlayın",
-      description: "Yer gösterme veya görüşmeyi takvime yazın; bugünkü randevular ana ekranda görünür.",
-      done: counts.appointments > 0,
-    },
-    {
-      id: "defs",
-      short: "Tanımlar",
-      title: "Tanımlarınızı gözden geçirin",
-      description: "Kayıp nedenleri, aşama adları ve komisyon oranı ofisinizin diline uysun.",
-      done: counts.customDefinitions > 0,
-    },
-    {
-      id: "portals",
-      short: "Vitrin",
-      title: "Vitrin ve portallar",
-      description: "İlanlarınız vitrininizde ve portallarda yayınlansın, talepler size düşsün.",
-      done: counts.publishedProperties > 0 || counts.activeIntegrations > 0,
-    },
-  ];
+export function buildOnboarding(facts: OnboardingFacts, skipped: readonly OnboardingStepId[] = []): OnboardingState {
+  const steps: OnboardingStep[] = ONBOARDING_STEP_DEFS.map((d) => ({
+    id: d.id,
+    short: d.short,
+    title: d.title,
+    description: d.description,
+    ...("href" in d && typeof d.href === "string" ? { href: d.href } : {}),
+    done: d.isDone(facts),
+  }));
 
   const total = steps.length;
   const doneCount = steps.filter((s) => s.done).length;
@@ -135,7 +62,7 @@ export function buildOnboarding(
     steps,
     doneCount,
     total,
-    percent: Math.round((doneCount / total) * 100),
+    percent: total === 0 ? 100 : Math.round((doneCount / total) * 100),
     nextId: next?.id ?? null,
     settled: next === null,
     complete: doneCount === total,
@@ -153,4 +80,32 @@ export function wizardNeighbors(current: WizardStepKey): { prev: WizardStepKey |
   const order: WizardStepKey[] = [...ONBOARDING_STEP_IDS, FINISH_STEP];
   const i = order.indexOf(current);
   return { prev: i > 0 ? order[i - 1] : null, next: i >= 0 && i < order.length - 1 ? order[i + 1] : null };
+}
+
+/* ------------------------------- İlk işler ------------------------------- */
+
+export type FirstTaskCounts = {
+  /** Örnek (is_sample) olmayan müşteri sayısı. */
+  customers: number;
+  /** Örnek olmayan portföy sayısı. */
+  properties: number;
+  /** Örnek olmayan müşteri talebi sayısı. */
+  demands: number;
+  /** Örnek olmayan randevu sayısı. */
+  appointments: number;
+  /** Ofise özel (tenant_id dolu) tanım sayısı: kayıp nedeni, kaynak vb. */
+  customDefinitions: number;
+};
+
+export type FirstTask = { id: "data" | "property" | "demand" | "appointment" | "defs"; title: string; description: string; href: string; done: boolean };
+
+/** Ana ekrandaki Başlangıç kartının "ilk işler" kontrol listesi (sihirbaz adımı değil). */
+export function buildFirstTasks(c: FirstTaskCounts): FirstTask[] {
+  return [
+    { id: "data", title: "Verilerini getir", description: "Müşteri listeni içe aktar ya da ilk müşterini ekle.", href: "/app/ice-aktarma", done: c.customers > 0 },
+    { id: "property", title: "İlk portföyünü gir", description: "Başlık, fiyat ve konum yeterli.", href: "/app/portfoyler/yeni", done: c.properties > 0 },
+    { id: "demand", title: "İlk talebi kaydet", description: "Bütçe ve bölgeyi gir; uygun portföyler eşleşir.", href: "/app/talepler/yeni", done: c.demands > 0 },
+    { id: "appointment", title: "İlk randevuyu planla", description: "Yer gösterme ya da görüşmeyi takvime yaz.", href: "/app/randevular/yeni", done: c.appointments > 0 },
+    { id: "defs", title: "Tanımlarını gözden geçir", description: "Kayıp nedenleri ve aşama adları ofisinin diline uysun.", href: "/app/ayarlar/tanimlar", done: c.customDefinitions > 0 },
+  ];
 }
