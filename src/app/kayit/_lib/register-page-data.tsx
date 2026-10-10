@@ -29,7 +29,7 @@ type RegisterFormProps = ComponentProps<typeof RegisterForm>;
  * Google ile tamamlama (`/kayit/tamamla`) AYNI kaynaktan beslenir.
  */
 export async function loadRegisterFormProps(params: RegisterSearchParams): Promise<RegisterFormProps> {
-  const [{ plans, trialDays, offers, efValuationCost, efLive }, content] = await Promise.all([
+  const [{ plans, trialDays, efLive }, content] = await Promise.all([
     getPublicPricing(),
     getLiveSiteContent(),
   ]);
@@ -49,14 +49,10 @@ export async function loadRegisterFormProps(params: RegisterSearchParams): Promi
       text: tx(content.register.text, tokenCtx),
       panelText: tx(content.register.panelText, tokenCtx),
     },
-    plans,
     trialDays,
-    offers,
-    efValuationCost,
-    efLive,
-    initialPlan: normalizePlanId(params.plan),
-    initialCycle: normalizeBillingCycle(params.cycle),
-    initialSeats: /^\d{1,3}$/.test(params.seats ?? "") && Number(params.seats) > 0 ? Number(params.seats) : undefined,
+    // Plan kayıtta sorulmaz: yalnız fiyat sayfasındaki açık seçim (?plan=) taşınır; yoksa sunucu varsayılan planı kullanır.
+    initialPlan: params.plan ? normalizePlanId(params.plan) : undefined,
+    initialCycle: params.plan ? normalizeBillingCycle(params.cycle) : undefined,
     invite: preview ? { officeName: preview.office_name, welcomeCreditTry: preview.welcome_credit_try } : null,
     attribution: {
       ref: params.ref,

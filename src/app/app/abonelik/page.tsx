@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowLeft,
@@ -31,6 +32,7 @@ import { getPlanSupport } from "@/lib/billing/plan-support";
 import { isIyzicoConfigured } from "@/lib/billing/iyzico";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
+import { PlanAdvisor } from "./plan-advisor";
 import { CancelPanel } from "./cancel-panel";
 import { CardsPanel } from "./cards-panel";
 import { getPlatformSetting } from "@/lib/platform-settings";
@@ -571,6 +573,10 @@ export default async function BillingPage({
           {configured ? "Güvenli ödeme" : "Demo mod"}
         </span>
       </div>
+
+      <Suspense fallback={null}>
+        <PlanAdvisor />
+      </Suspense>
 
       <div id="paketler" className="grid scroll-mt-24 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {listedPlans.map((plan) => {
