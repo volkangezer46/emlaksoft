@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSampleScope, sampleValues } from "@/lib/sample-scope";
 import { now } from "@/lib/clock";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { loadLeadResponses, type LeadResponsesResult } from "@/lib/response-time/load";
 import {
   computeAgentScores,
@@ -121,23 +120,43 @@ type Builder = {
   not: (c: string, op: string, v: unknown) => Builder;
   neq: (c: string, v: unknown) => Builder;
   gte: (c: string, v: unknown) => Builder;
+  gt: (c: string, v: unknown) => Builder;
   lt: (c: string, v: unknown) => Builder;
   order: (c: string, o: { ascending: boolean }) => Builder;
-  range: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+  limit: (n: number) => PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
 };
 
-async function paged(
+/** Keyset sayfa boyutu (PostgREST varsayılan üst sınırı 1000) ve en çok sayfa (eski sayfalamayla aynı: 100). */
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 100;
+
+/**
+ * Keyset (`id > son id`) sayfalama: `order id` + OFFSET derin sayfalarda her sayfada önceki satırları yeniden taradığından
+ * (tenant başına on binlerce satırda 10 paralel okuma) `id` birincil anahtar dizinini izleyerek sabit maliyetle ilerler.
+ * Davranış eski sayfalamayla BİREBİR: `id` artan sırada, sayfa dolu değilse biter, hata ya da sayfa üst sınırı = boş dizi.
+ * Seçilen kolonlar `id` içermek ZORUNDA (son kimlik oradan okunur); yoksa güvenli tarafta boş dizi döner.
+ */
+export async function paged(
   client: SupabaseClient,
   table: string,
   columns: string,
   apply: (q: Builder) => Builder,
 ): Promise<Row[]> {
-  const res = await fetchAllRows<Row>((from, to) =>
-    apply(client.from(table).select(columns) as unknown as Builder)
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
-  return res.error ? [] : res.data;
+  const rows: Row[] = [];
+  let lastId: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    let q = apply(client.from(table).select(columns) as unknown as Builder);
+    if (lastId !== null) q = q.gt("id", lastId);
+    const res = await q.order("id", { ascending: true }).limit(PAGE_SIZE);
+    if (res.error) return [];
+    const got = res.data ?? [];
+    rows.push(...got);
+    if (got.length < PAGE_SIZE) return rows;
+    const next = got[got.length - 1]?.id;
+    if (typeof next !== "string" || next.length === 0) return [];
+    lastId = next;
+  }
+  return [];
 }
 
 function sampleFlag(r: Row): boolean {

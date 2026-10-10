@@ -35,6 +35,8 @@ export type ShellBootstrap = {
   roleOverrides: RoleOverrideRow[];
   userOverrides: UserOverrideRow[];
   modules: ModuleRow[];
+  /** Kişisel gizli modüller (user_module_prefs). `null` = RPC bu alanı henüz döndürmüyor (migration yok) → eski okuma. */
+  hiddenModules: string[] | null;
   usage: ShellUsageCounts;
   badges: ShellBadgeCounts;
 };
@@ -98,12 +100,17 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
     modules.push({ module_key: key, enabled: r.enabled, locked_by_platform: r.locked_by_platform === true });
   }
 
+  const hiddenModules: string[] | null = Array.isArray(raw.hidden_modules)
+    ? raw.hidden_modules.filter((k): k is string => typeof k === "string")
+    : null;
+
   return {
     profile: { id, fullName: str(raw.profile.full_name) ?? "", role, tenantId },
     office,
     roleOverrides,
     userOverrides,
     modules,
+    hiddenModules,
     usage: {
       seats: count(raw.usage.seats),
       activeProperties: count(raw.usage.active_properties),
