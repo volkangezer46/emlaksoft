@@ -51,11 +51,8 @@ export async function saveEfTariff(formData: FormData): Promise<EfKontorResult> 
   const parsed = efTariffSchema.safeParse({
     valuationArsa: num("valuationArsa"),
     valuationKonut: num("valuationKonut"),
-    pdfFirst: num("pdfFirst"),
-    reportDetail: num("reportDetail"),
     // Eski formlarda alan yoksa NaN gitmesin: undefined -> şema varsayılanı.
     valuationTicari: Number.isNaN(num("valuationTicari")) && !formData.has("valuationTicari") ? undefined : num("valuationTicari"),
-    listingAnalysis: Number.isNaN(num("listingAnalysis")) && !formData.has("listingAnalysis") ? undefined : num("listingAnalysis"),
   });
   if (!parsed.success) return { error: "Tarife değerleri 0-10.000 arası tam sayı olmalı." };
   const ok = await setPlatformSetting(EF_TARIFF_SETTING_KEY, serializeEfTariff(parsed.data), w.staff.id);
@@ -106,6 +103,7 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
     units: String(formData.get("units") ?? "").trim(),
     kind: String(formData.get("kind") ?? "").trim(),
     reason: String(formData.get("reason") ?? ""),
+    validityMonths: String(formData.get("validityMonths") ?? "").trim() || undefined,
     idemKey: String(formData.get("idemKey") ?? "").trim(),
   });
   if (!parsed.success) return { error: firstIssue(parsed.error) };
@@ -119,7 +117,7 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
     action: "ef_credits.manual_grant",
     entityType: "tenant",
     entityId: parsed.data.tenantId,
-    meta: { units: parsed.data.units, kind: parsed.data.kind, reason: parsed.data.reason },
+    meta: { units: parsed.data.units, kind: parsed.data.kind, validity_months: parsed.data.validityMonths, reason: parsed.data.reason },
   });
   revalidatePath("/admin/ef-kontor");
   return { ok: true, message: `${parsed.data.units} kontör yüklendi. Yeni bakiye: ${r.available ?? "-"}.` };

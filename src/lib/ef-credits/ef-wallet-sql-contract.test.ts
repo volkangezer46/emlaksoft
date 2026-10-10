@@ -3,13 +3,15 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bodyMd5FromFile, extractFunctionBodies } from "@/lib/migration-rehearsal/core";
 import {
+  EF_DEFAULT_GRANT_VALID_MONTHS,
   EF_GRANT_KINDS,
   EF_RPC,
-  EF_RPC_EXPIRE_PLAN,
+  EF_RPC_BURN_EXPIRED,
+  EF_WELCOME_VALID_DAYS,
   efIdempotencyKey,
   efPackSchema,
   type EfBalance,
-  type EfExpireResult,
+  type EfBurnResult,
   type EfGrantResult,
   type EfSettleResult,
 } from "./config";
@@ -25,6 +27,8 @@ const PACK = read("supabase/migrations/20260826000300_ef_credit_pack_fulfillment
 const SEAT = read("supabase/migrations/20260825000600_seat_purchase_fulfillment.sql");
 const EXPIRE = read("supabase/migrations/20260826001200_ef_plan_credit_expiry.sql");
 const EXPIRE_RB = read("supabase/rollbacks/20260826001200_ef_plan_credit_expiry.rollback.sql");
+const LOTS = read("supabase/migrations/20261010000300_ef_credit_lots_expiry.sql");
+const LOTS_RB = read("supabase/rollbacks/20261010000300_ef_credit_lots_expiry.rollback.sql");
 const PACK_RB = read("supabase/rollbacks/20260826000300_ef_credit_pack_fulfillment.rollback.sql");
 
 /** `create or replace function public.<name>(<params>)` başlığındaki parametre adları (sıra korunur). */
@@ -52,7 +56,7 @@ function bodyOf(sql: string, name: string): string {
 }
 
 /** Derleme zamanı tamlık: tipe anahtar eklenirse bu nesneler kırılır. */
-const BALANCE_KEYS: Record<keyof EfBalance, true> = { available: true, reserved: true, granted_total: true, committed_total: true };
+const BALANCE_KEYS: Record<keyof EfBalance, true> = { available: true, reserved: true, granted_total: true, committed_total: true, expired_total: true, next_expiry_at: true, next_expiry_units: true };
 const SETTLE_KEYS: Record<keyof EfSettleResult, true> = { ok: true, state: true, already: true };
 const GRANT_KEYS: Record<keyof EfGrantResult, true> = { ok: true, already: true, available: true };
 
@@ -72,7 +76,7 @@ describe("EF cüzdan RPC'leri = config.ts EF_RPC sözleşmesi", () => {
 
   it("dönüş JSON anahtarları tiplerle aynı", () => {
     const balance = bodyOf(WALLET, EF_RPC.balance);
-    for (const k of Object.keys(BALANCE_KEYS)) expect(balance, k).toContain(`'${k}'`);
+    for (const k of Object.keys(BALANCE_KEYS).filter((k) => !["expired_total", "next_expiry_at", "next_expiry_units"].includes(k))) expect(balance, k).toContain(`'${k}'`);
     for (const fn of [EF_RPC.commit, EF_RPC.release]) {
       const b = bodyOf(WALLET, fn);
       for (const k of Object.keys(SETTLE_KEYS)) expect(b, `${fn}.${k}`).toContain(`'${k}'`);
@@ -211,11 +215,12 @@ describe("kontör paketi faturası (20260826000300): taban 20260825000600 bayt b
   });
 });
 
-const EXPIRE_KEYS: Record<keyof EfExpireResult, true> = { ok: true, already: true, expired: true, available: true };
+/** TARİHSEL dosya: devir tavanı 20261010000300 ile kaldırıldı (RPC no-op); 20260826001200 olduğu gibi kalır (forward-only). */
+const EF_RPC_EXPIRE_PLAN = "ef_credit_expire_plan";
+const EXPIRE_KEYS = { ok: true, already: true, expired: true, available: true } as const;
 
-describe("plan kontörü devir tavanı (20260826001200) = config.ts EF_RPC_EXPIRE_PLAN", () => {
+describe("TARİHSEL plan kontörü devir tavanı (20260826001200; 20261010000300 no-op yapar)", () => {
   it("ad, parametreler ve dönüş anahtarları birebir", () => {
-    expect(EF_RPC_EXPIRE_PLAN).toBe("ef_credit_expire_plan");
     expect(paramNames(EXPIRE, EF_RPC_EXPIRE_PLAN)).toEqual(["p_tenant", "p_keep", "p_idem"]);
     const b = bodyOf(EXPIRE, EF_RPC_EXPIRE_PLAN);
     for (const k of Object.keys(EXPIRE_KEYS)) expect(b, k).toContain(`'${k}'`);
@@ -242,5 +247,84 @@ describe("plan kontörü devir tavanı (20260826001200) = config.ts EF_RPC_EXPIR
     expect(EXPIRE).toContain("insert into public.platform_settings (key, value) values ('ef.welcome_units', '10')");
     expect(EXPIRE).toMatch(/'ef\.welcome_since'[\s\S]*on conflict \(key\) do nothing/);
     expect(EXPIRE_RB).toContain("drop function if exists public.ef_credit_expire_plan(uuid, integer, text);");
+  });
+});
+const BURN_KEYS: Record<keyof EfBurnResult, true> = { ok: true, burned_lots: true, burned_units: true, skipped: true };
+
+describe("süreli kontör partileri (20261010000300) = config.ts sözleşmesi", () => {
+  it("yanma RPC'si: ad, parametreler, dönüş anahtarları, service_role-only SECURITY DEFINER", () => {
+    expect(EF_RPC_BURN_EXPIRED).toBe("ef_credit_burn_expired");
+    expect(paramNames(LOTS, EF_RPC_BURN_EXPIRED)).toEqual(["p_limit", "p_grace"]);
+    const stmt = statementOf(LOTS, EF_RPC_BURN_EXPIRED);
+    expect(stmt).toMatch(/security definer/);
+    expect(stmt).toMatch(/set search_path = ''/);
+    const b = bodyOf(LOTS, EF_RPC_BURN_EXPIRED);
+    for (const k of Object.keys(BURN_KEYS)) expect(b, k).toContain(`'${k}'`);
+    expect(b).toMatch(/auth\.role\(\) is distinct from 'service_role'/);
+    // Kilit sırası commit ile aynı (tenant kilidi -> parti satırı); idempotent yanma anahtarı.
+    expect(b).toContain("pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('ef-credit:' || v_row.tenant_id::text, 0))");
+    expect(b).toContain("'ef:burn:' || v_lot.id::text");
+    expect(b).toContain("'expire'");
+    expect(LOTS).toMatch(/revoke all on function public\.ef_credit_burn_expired\(integer, interval\) from public, anon, authenticated;/);
+    expect(LOTS).toMatch(/grant execute on function public\.ef_credit_burn_expired\(integer, interval\) to service_role;/);
+  });
+
+  it("parametre adları/sırası değişmeyen RPC'lerde (balance, commit, grant) korunur", () => {
+    expect(paramNames(LOTS, EF_RPC.balance)).toEqual(paramNames(WALLET, EF_RPC.balance));
+    expect(paramNames(LOTS, EF_RPC.commit)).toEqual(paramNames(WALLET, EF_RPC.commit));
+    expect(paramNames(LOTS, EF_RPC.grant)).toEqual(paramNames(WALLET, EF_RPC.grant));
+    for (const k of ["available", "reserved", "granted_total", "committed_total", "expired_total", "next_expiry_at", "next_expiry_units"]) expect(bodyOf(LOTS, EF_RPC.balance), k).toContain(`'${k}'`);
+    const grant = bodyOf(LOTS, EF_RPC.grant);
+    for (const k of Object.keys({ ok: 1, already: 1, available: 1 } satisfies Record<keyof EfGrantResult, number>)) expect(grant, k).toContain(`'${k}'`);
+  });
+
+  it("süre kuralları TS sabitleriyle aynı: bonus 30 gün, varsayılan 12 ay, aylık hak Istanbul ay sonu, paket faturadaki ay", () => {
+    const grant = bodyOf(LOTS, EF_RPC.grant);
+    expect(EF_WELCOME_VALID_DAYS).toBe(30);
+    expect(EF_DEFAULT_GRANT_VALID_MONTHS).toBe(12);
+    expect(grant).toContain(`now() + interval '${EF_WELCOME_VALID_DAYS} days'`);
+    expect(grant).toContain(`now() + interval '${EF_DEFAULT_GRANT_VALID_MONTHS} months'`);
+    expect(grant).toContain("date_trunc('month', now() at time zone 'Europe/Istanbul') + interval '1 month'");
+    expect(grant).toContain("i.meta ->> 'validityMonths'");
+    expect(grant).toContain("lots:v1");
+    // Defterde ef grant expires_at YAZILMAZ (ef_entry_check ve account_credit_ledger gorunumu degismez); sure lotta.
+    expect(grant).not.toMatch(/insert into public\.account_credit_ledger[^;]*expires_at/);
+    expect(LOTS).not.toMatch(/alter table public\.account_credit_ledger/i);
+  });
+
+  it("harcama FIFO (süresi dolmamış önce, en yakın son kullanma önce); yakma yumuşama payı 1 saat; fulfill DEĞİŞMEZ", () => {
+    const commit = bodyOf(LOTS, EF_RPC.commit);
+    expect(commit).toContain("order by (o.expires_at <= now()), o.expires_at, o.created_at, o.id");
+    expect(commit).toContain("for update");
+    expect(LOTS).toContain("p_grace interval default interval '1 hour'");
+    expect(LOTS).not.toMatch(/create or replace function public\.fulfill_billing_payment/);
+  });
+
+  it("legacy parti: net defter bakiyesi > 0 olan ofis için 12 aylık, idempotent (grant_key tekil)", () => {
+    expect(LOTS).toContain("'legacy'");
+    expect(LOTS).toContain("now() + interval '12 months', 'ef:legacy:' || t.tenant_id::text");
+    expect(LOTS).toContain("on conflict (grant_key) do nothing");
+    expect(LOTS).toMatch(/having sum\(l\.amount\) > 0/);
+  });
+
+  it("tablo güvenliği: RLS açık, yalnız owner/gm select, anon/authenticated yazma yok, kalan yalnız azalır", () => {
+    expect(LOTS).toContain("alter table public.ef_credit_lots enable row level security;");
+    expect(LOTS).toMatch(/\(select public\.current_profile_role\(\)\) in \('owner', 'gm'\)/);
+    expect(LOTS).toContain("revoke all privileges on table public.ef_credit_lots from public, anon, authenticated;");
+    expect(LOTS).toContain("grant select on table public.ef_credit_lots to authenticated;");
+    expect(LOTS).toContain("ef_credit_lots: kalan artirilamaz.");
+  });
+
+  it("rollback: tabloyu ve yeni RPC'leri kaldırır, balance/commit/grant/expire_plan eski gövdeye döner", () => {
+    expect(LOTS_RB).toContain("drop table if exists public.ef_credit_lots;");
+    expect(LOTS_RB).toContain("drop function if exists public.ef_credit_burn_expired(integer, interval);");
+    expect(LOTS_RB).toContain("drop function if exists public.ef_credit_lots_ready();");
+    // Eski gövdeler: 000100 balance/commit/grant ile aynı mantık (sureli parti yok).
+    for (const fn of [EF_RPC.balance, EF_RPC.commit, EF_RPC.grant]) {
+      const b = bodyOf(LOTS_RB, fn);
+      expect(b, fn).not.toContain("ef_credit_lots");
+    }
+    expect(bodyOf(LOTS_RB, EF_RPC.grant)).toContain("(p_tenant, 'ef', 'grant', p_units, v_source, v_key, 'ef_grant:' || p_kind, p_meta)");
+    expect(bodyOf(LOTS_RB, EF_RPC_EXPIRE_PLAN)).toContain("'ef:expire:' || p_tenant::text || ':' || p_idem");
   });
 });

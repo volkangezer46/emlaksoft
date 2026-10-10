@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **420** (221 dosya) — risk: P0=12, P1=38, P2=370
-- Tenant filtresi: var=250, uygulanamaz=93, yok=54, param=15, devir=8
-- Kapı türü: public-token=35, dosya-duzeyi=95, platform=73, oturum-izin=79, belirsiz=98, elle-dogrulandi=13, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **62**; RLS'li client'a taşıma adayı: **65**
+- Toplam birim: **419** (220 dosya) — risk: P0=12, P1=37, P2=370
+- Tenant filtresi: var=250, uygulanamaz=93, yok=53, param=15, devir=8
+- Kapı türü: public-token=35, dosya-duzeyi=95, platform=73, belirsiz=98, elle-dogrulandi=13, oturum-izin=78, cron=24, webhook-imza=3
+- Filtresiz (yok+devir): **61**; RLS'li client'a taşıma adayı: **64**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -42,7 +42,6 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/agent-profile.ts:106` | `saveAgentProfile` | Gerekçe doğrulanmadı. | dosya-duzeyi | param (yazma) | P1 |
 | `src/app/actions/agent-profile.ts:177` | `uploadAgentPhoto` | Gerekçe doğrulanmadı. | dosya-duzeyi | param (yazma) | P1 |
 | `src/app/actions/appointments-confirm.ts:35` | `respondToAppointmentByToken` | Oturumsuz token'lı public yüzey. | public-token | yok | P1 |
-| `src/app/actions/appointments.ts:228` | `regenerateCalendarToken` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | yok (yazma) | P1 |
 | `src/app/actions/contracts.ts:541` | `verifySignatureOtp` | Oturumsuz token'lı public yüzey. | public-token | yok (yazma) | P1 |
 | `src/app/actions/geo-admin.ts:119` | `enqueueProvinceGeoSync` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/app/actions/growth.ts:191` | `createPartner` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
@@ -304,7 +303,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/iyzico/webhook/route.ts:89` | `POST` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var (yazma) | P2 |
 | `src/app/api/property-media/[id]/download/route.ts:60` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/property-media/[id]/route.ts:11` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/api/takvim/[token]/route.ts:59` | `GET` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/api/takvim/[token]/route.ts:61` | `GET` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/api/ticket-attachments/[id]/route.ts:42` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/ticket-attachments/finalize/route.ts:54` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/api/ticket-attachments/route.ts:88` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |

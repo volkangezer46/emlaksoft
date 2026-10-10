@@ -11,10 +11,15 @@ import {
   type EfKontorResult,
 } from "./actions";
 import {
+  EF_DEFAULT_GRANT_VALID_MONTHS,
+  EF_PACK_MONTHS,
+  EF_PACK_MONTHS_LABEL,
+  efPackMonthlyUnits,
   efPackSchema,
   efPackUnitPriceTry,
   efPackWarnings,
   type EfPack,
+  type EfPackMonths,
   type EfTariff,
 } from "@/lib/ef-credits/config";
 import {
@@ -101,22 +106,19 @@ export function TariffForm({ tariff, canWrite }: { tariff: EfTariff; canWrite: b
   const [v, setV] = useState({
     valuationArsa: String(tariff.valuationArsa),
     valuationKonut: String(tariff.valuationKonut),
-    pdfFirst: String(tariff.pdfFirst),
-    reportDetail: String(tariff.reportDetail),
     valuationTicari: String(tariff.valuationTicari),
-    listingAnalysis: String(tariff.listingAnalysis),
   });
   const items: { k: keyof typeof v; label: string; hint?: string }[] = [
     { k: "valuationArsa", label: "Arsa değerlemesi" },
     { k: "valuationKonut", label: "Konut değerlemesi" },
     { k: "valuationTicari", label: "Ticari değerlemesi" },
-    { k: "listingAnalysis", label: "İlan analizi", hint: "Hızlı tahmin; varsayılan 1 kontör." },
-    { k: "pdfFirst", label: "PDF (ilk indirme)", hint: "Varsayılan 0: rapor bedeline dahil. Tekrar indirme her zaman 0." },
-    { k: "reportDetail", label: "Rapor detayı (JSON)", hint: "Ürün kararı: varsayılan 0." },
   ];
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <p className="text-xs text-text-muted">
+        Kontör yalnız değerleme için harcanır. İlan analizi, PDF indirme ve rapor detayı kontör düşmez (sahip kararı 2026-10-10).
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
         {items.map((i) => (
           <label key={i.k} className="space-y-1">
             <span className={lbl}>{i.label} (kontör)</span>
@@ -171,13 +173,14 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
     setRows((r) => {
       let n = r.length + 1;
       while (r.some((x) => x.id === `paket-${n}`)) n++;
-      return [...r, { id: `paket-${n}`, name: `Paket ${n}`, units: 10, priceNetTry: 100, active: false, order: (r.length + 1) * 10, isNew: true }];
+      return [...r, { id: `paket-${n}`, name: `Paket ${n}`, units: 1000, months: 1, priceNetTry: 1000, active: false, order: (r.length + 1) * 10, isNew: true }];
     });
   }
   const clean: EfPack[] = rows.map((r) => ({
     id: r.id,
     name: r.name.trim(),
     units: Number(r.units),
+    months: r.months,
     priceNetTry: Number(r.priceNetTry),
     active: r.active,
     popular: r.popular ? true : undefined,
@@ -199,7 +202,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
               setPresetNote(true);
             }}
           >
-            <Sparkles className="h-4 w-4" /> Önerilen kataloğu uygula (5 paket)
+            <Sparkles className="h-4 w-4" /> Önerilen kataloğu uygula (12 paket)
           </button>
           <button type="button" className={ghost} onClick={add} disabled={rows.length >= 12}>
             <Plus className="h-4 w-4" /> Paket ekle
@@ -221,7 +224,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
             const unit = efPackUnitPriceTry({ units: Number(r.units), priceNetTry: Number(r.priceNetTry) });
             return (
               <li key={r.id} className={`rounded-[var(--radius-card)] border p-3 ${r.active ? "border-line bg-canvas/50" : "border-line bg-canvas/20 opacity-80"}`}>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_auto]">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_auto]">
                   <label className="space-y-1">
                     <span className={lbl}>Ad ({r.id})</span>
                     <input
@@ -238,7 +241,20 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className={lbl}>Kontör</span>
+                    <span className={lbl}>Süre (kullanılmayan kontör yanar)</span>
+                    <select
+                      disabled={!canWrite}
+                      value={r.months}
+                      onChange={(e) => update(i, { months: Number(e.target.value) as EfPackMonths })}
+                      className={field}
+                    >
+                      {EF_PACK_MONTHS.map((m) => (
+                        <option key={m} value={m}>{EF_PACK_MONTHS_LABEL[m]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className={lbl}>Toplam kontör</span>
                     <input type="number" min={1} max={100000} disabled={!canWrite} value={r.units} onChange={(e) => update(i, { units: Number(e.target.value) })} className={field} />
                   </label>
                   <label className="space-y-1">
@@ -267,6 +283,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     />{" "}
                     Popüler
                   </label>
+                  <span className="numeric">Aylık ~{efPackMonthlyUnits({ units: Number(r.units), months: r.months })} kontör</span>
                   <span className="numeric">Kontör başı net: {fmt2.format(unit)} ₺</span>
                   <span>
                     1 değerleme = {retailUnits} kontör ≈ {fmt2.format(unit * retailUnits)} ₺ net (bu paketten). Karşılaştırma için EmlakFiyati perakende fiyatına bakın; bilgi amaçlıdır.
@@ -311,6 +328,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
   const [units, setUnits] = useState("");
   const [kind, setKind] = useState<(typeof ADMIN_GRANT_KINDS)[number]>("admin");
   const [reason, setReason] = useState("");
+  const [validity, setValidity] = useState<string>(String(EF_DEFAULT_GRANT_VALID_MONTHS));
   // Tek kullanımlık idempotency anahtarı: girdi değişince ve başarılı yüklemeden sonra yenilenir; aynı gönderim tekrarında aynı kalır.
   const [idemKey, setIdemKey] = useState(() => crypto.randomUUID());
   const [confirming, setConfirming] = useState(false);
@@ -333,6 +351,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
         fd.set("units", units);
         fd.set("kind", kind);
         fd.set("reason", reason);
+        fd.set("validityMonths", validity);
         fd.set("idemKey", idemKey);
         start(async () => {
           const r = await grantEfCreditAction(fd);
@@ -348,7 +367,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
       }}
     >
       {disabledReason ? <p className="text-xs font-semibold text-amber-700">{disabledReason}</p> : null}
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_2fr]">
         <label className="space-y-1">
           <span className={lbl}>Tür</span>
           <select disabled={off} value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setIdemKey(crypto.randomUUID()); }} className={field}>
@@ -362,6 +381,14 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
           <input type="number" min={1} max={100000} step={1} disabled={off} value={units} onChange={(e) => { setUnits(e.target.value); setIdemKey(crypto.randomUUID()); setConfirming(false); }} className={field} required />
         </label>
         <label className="space-y-1">
+          <span className={lbl}>Geçerlilik</span>
+          <select disabled={off} value={validity} onChange={(e) => { setValidity(e.target.value); setIdemKey(crypto.randomUUID()); }} className={field}>
+            {EF_PACK_MONTHS.map((m) => (
+              <option key={m} value={m}>{EF_PACK_MONTHS_LABEL[m]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
           <span className={lbl}>Gerekçe (zorunlu, denetim kaydına yazılır)</span>
           <input disabled={off} value={reason} maxLength={300} onChange={(e) => { setReason(e.target.value); setIdemKey(crypto.randomUUID()); setConfirming(false); }} className={field} required minLength={10} />
         </label>
@@ -369,7 +396,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
       <div className="flex flex-wrap items-center gap-2">
         {confirming ? (
           <>
-            <p className="text-xs font-semibold text-ink-950">{tenantName} ofisine {units} kontör ({ADMIN_GRANT_KIND_LABEL[kind]}) yüklensin mi?</p>
+            <p className="text-xs font-semibold text-ink-950">{tenantName} ofisine {units} kontör ({ADMIN_GRANT_KIND_LABEL[kind]}, {validity} ay geçerli) yüklensin mi?</p>
             <button type="submit" disabled={pending} className={primary}>Onayla</button>
             <button type="button" disabled={pending} className={ghost} onClick={() => setConfirming(false)}>Vazgeç</button>
           </>

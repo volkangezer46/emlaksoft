@@ -468,7 +468,7 @@ export const hesapKredisi = ledgerReport({
 export const efKontor = ledgerReport({
   id: "ef-kontor",
   title: "EmlakFiyati kontör hareketleri",
-  description: "Değerleme / parsel raporu kontör defteri: plan kontörü, satın alma, bonus, harcama ve iadeler.",
+  description: "Değerleme / parsel raporu kontör defteri: plan kontörü, satın alma, bonus, harcama, iade ve süresi dolup yanan kontör.",
   unit: "ef",
   unitLabel: "Kontör",
   keywords: ["kontör", "emlakfiyati", "değerleme", "parsel"],

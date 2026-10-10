@@ -48,6 +48,5 @@ export type RunValuationResult =
 export type ReportDetailResult =
   | { status: "ok"; result: OrtakValuationResult; row: EfReportRow; requestId: string | null; unitsCharged: number }
   | { status: "not_found" | "expired"; message: string }
-  | { status: "no_credit"; available: number; needed: number }
   | { status: "disabled"; message: string; missing: string[] }
   | { status: "error"; kind: OrtakErrorKind; code: string | null; message: string; requestId: string | null };

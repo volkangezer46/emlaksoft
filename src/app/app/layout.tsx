@@ -50,7 +50,7 @@ import { getAppActions } from "@/lib/palette-core";
 import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
 import { getClosedFeatures } from "@/lib/modules/state";
 import { getUserHiddenModules } from "@/lib/modules/prefs";
-import { mergeHidden } from "@/lib/modules/registry";
+import { isFeatureKey, mergeHidden } from "@/lib/modules/registry";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRequestIdentity } from "@/lib/cache/request";
 import { measure } from "@/lib/server-timing";
@@ -265,8 +265,13 @@ async function buildShellModel() {
         : getClosedFeatures(tenantId).catch(() => [])
       : Promise.resolve([]);
   // Kişisel gizleme (user_module_prefs): yalnız görünürlük; ofis kapalılarıyla birleşir.
+  // Kabuk RPC `hidden_modules` alanını döndürüyorsa ayrı tur atılmaz; alan yoksa (migration yok) eski okuma.
   const hiddenModulesPromise: Promise<string[]> =
-    tenantId && user && !impersonating && !platformStaffFullAccess ? getUserHiddenModules(user.id, tenantId) : Promise.resolve([]);
+    tenantId && user && !impersonating && !platformStaffFullAccess
+      ? bootUsable && boot?.hiddenModules
+        ? Promise.resolve(boot.hiddenModules.filter(isFeatureKey))
+        : getUserHiddenModules(user.id, tenantId)
+      : Promise.resolve([]);
   const [effectivePerms, planUsage, specBadges, officeClosedModules, hiddenModules, jar] = await Promise.all([
     effectivePermsPromise,
     usagePromise,

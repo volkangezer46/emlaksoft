@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EF_DEFAULT_PACKS, type EfPack } from "@/lib/ef-credits/config";
+import { EF_DEFAULT_GRANT_VALID_MONTHS, EF_DEFAULT_PACKS, type EfPack } from "@/lib/ef-credits/config";
 
 /**
  * Admin kontör yönetimi: SAF doğrulama ve ön ayar (I/O yok; istemci/sunucu güvenli).
@@ -23,17 +23,19 @@ export const efAdminGrantSchema = z.object({
     .max(100000, "Tek seferde en çok 100.000 kontör."),
   kind: z.enum(ADMIN_GRANT_KINDS),
   reason: z.string().trim().min(10, "Gerekçe zorunlu (en az 10 karakter).").max(300, "Gerekçe en çok 300 karakter."),
+  /** Yükleme geçerliliği (ay): 1 | 3 | 6 | 12; kontör süre sonunda yanar. Verilmezse 12. */
+  validityMonths: z.coerce.number().int().refine((m) => [1, 3, 6, 12].includes(m), "Geçerlilik 1, 3, 6 veya 12 ay olmalı.").default(EF_DEFAULT_GRANT_VALID_MONTHS),
   /** Formdan gelen TEK KULLANIMLIK anahtar (çift tıklama/yeniden gönderim aynı yüklemeyi bir kez yapar). */
   idemKey: z.string().trim().regex(/^[A-Za-z0-9_-]{16,64}$/, "Geçersiz işlem anahtarı; sayfayı yenileyin."),
 });
 export type EfAdminGrantInput = z.infer<typeof efAdminGrantSchema>;
 
 /**
- * "Önerilen ön ayar": 2026-10-08 fiyat kararı paketleri (1 kontör = 1 TL; KDV hariç net; birim fiyat 1,00 -> 0,80).
+ * "Önerilen ön ayar": 2026-10-10 süreli paket kataloğu (aylık 1.000/2.500/5.000 kontör x 1/3/6/12 ay; 1 kontör = 1 TL, uzun süreye %5/%10/%15 indirim).
  * Admin'e taslak olarak sunulur, KAYDEDİLMEDEN uygulanmaz.
  */
 export const EF_PACK_PRESET_NOTE =
-  "Önerilen katalog (1 kontör = 1 TL, KDV hariç net; büyük pakette kontör başı fiyat düşer). Düzenleyebilirsiniz.";
+  "Önerilen katalog (1 kontör = 1 TL, KDV hariç net; uzun süreli pakette kontör başı fiyat düşer, süre sonunda kullanılmayan kontör yanar). Düzenleyebilirsiniz.";
 
 export function examplePackPreset(): EfPack[] {
   return EF_DEFAULT_PACKS.map((p) => ({ ...p }));

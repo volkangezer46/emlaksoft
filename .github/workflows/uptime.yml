@@ -52,3 +52,12 @@ jobs:
           echo "cron health -> $code"
           head -c 2000 cron.json || true
           [ "$code" = "200" ]
+      - name: Proxy ısıtma (oturumsuz, salt-okunur)
+        # Oturumsuz /app isteği proxy'de /giris'e 307 döner: bu YALNIZ proxy fonksiyonunu (her /app ve /admin
+        # isteğinin ilk halkası; soğukken ~1 sn ekler) ısıtır. Sayfa fonksiyonlarını ısıtmaz (oturum gerekir).
+        # Sonuç hiçbir zaman koşuyu başarısız yapmaz.
+        run: |
+          for path in /app /app/musteriler /app/portfoyler /app/gorevler /admin; do
+            curl -s -o /dev/null -I -w "$path -> %{http_code} %{time_starttransfer}s\n" --max-time 20 "$APP_URL$path" || true
+          done
+          exit 0

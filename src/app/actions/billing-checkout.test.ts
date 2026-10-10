@@ -28,6 +28,7 @@ const h = vi.hoisted(() => ({
   cardKey: vi.fn(),
   efPurchasable: true,
   efReady: true,
+  efLotsReady: true,
   pack: { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 } as Record<string, unknown> | null,
   packInvoice: vi.fn(),
   // Oransal yukseltme / duraklatma kapilari (varsayilan KAPALI: eski akis aynen).
@@ -99,6 +100,7 @@ vi.mock("@/lib/billing/credit-pack-purchase-core", () => ({
 vi.mock("@/lib/ef-credits/credit-reader", () => ({
   getEfCatalog: async () => ({ packs: [h.pack] }),
   getEfCreditReady: async () => h.efReady,
+  getEfLotsReady: async () => h.efLotsReady,
 }));
 vi.mock("@/lib/ef-credits/public-state", () => ({
   EF_PURCHASE_CLOSED_MESSAGE: "EF satışı kapalı.",
@@ -127,6 +129,7 @@ beforeEach(() => {
   h.planHidden = false;
   h.efPurchasable = true;
   h.efReady = true;
+  h.efLotsReady = true;
   h.pack = { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 };
   h.changeState = null;
   h.changeEnabled = false;
@@ -387,6 +390,10 @@ describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
     h.efReady = false;
     expect((await startCreditPackPurchase(pform())).error).toMatch(/henüz etkin değil/);
     h.efReady = true;
+    // Süreli parti şeması (20261010000300) yokken paket SATILMAZ: kontör süresiz kalırdı.
+    h.efLotsReady = false;
+    expect((await startCreditPackPurchase(pform())).error).toMatch(/Süreli kontör paketleri hazırlanıyor/);
+    h.efLotsReady = true;
     h.configured = false;
     expect((await startCreditPackPurchase(pform())).error).toMatch(/yapılandırılmamış/);
     expect(h.packInvoice).not.toHaveBeenCalled();

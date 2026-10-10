@@ -8,6 +8,28 @@ EmlakSoft'ta yetkilendirme, rol × modül × aksiyon matrisi (var olan `permissi
 
 ---
 
+## GERÇEK DURUM (2026-10-10 rol duman testi, bulgu B1) — ÖNCE BUNU OKU
+
+Bu belgenin aşağıdaki "DB RLS" / "SQL RLS" bölümleri **hedef tasarımdır; veritabanında UYGULANMAMIŞTIR**. Bugünkü davranış:
+
+- **Kayıt kapsamı (kendi / takım / şube) yalnız UYGULAMA katmanında** uygulanır: liste sayfaları ve Rapor merkezi
+  `getListScope` + `applyScopeFilter` (`list-scope.ts`) ile sorguya `assigned_to` vb. süzgeç ekler.
+- **Bayrak:** `office.access.scope_enforcement` varsayılan KAPALI (hiçbir ofiste açık değil); kapalıyken
+  danışman rolünün listeleri eski kurala (`mineOnly`) göre davranır.
+- **RLS tarafı** (`identity_*_select`, `20260802000300_identity_session_authorization_hardening.sql`) yalnız
+  `tenant_id` eşitliği + `has_effective_permission(modül, 'view')` denetler. Yani bayrak AÇIK olsa bile modül
+  izni olan bir kullanıcı PostgREST ile (arayüzü atlayarak) ofisinin tüm müşteri/talep/portföy/anlaşma
+  satırlarını okuyabilir. Kapsam bir **gizlilik sınırı değil, arayüz/rapor daraltmasıdır**.
+- `scope_overrides` ve `has_permission_with_scope` RPC'si vardır (20261006000101/103) ama tabloların RLS
+  politikalarına bağlı DEĞİLDİR.
+- Kayıt düzeyinde gerçek DB zorlaması gerekirse: bayrak kapalıyken `true` dönen SECURITY DEFINER bir
+  `scope_allows(tenant_id, assigned_to, team_id, branch_id)` yüklemi RLS'e eklenmeli (performans ve kapsam büyük;
+  ayrı iş). O zamana dek "DB RLS" satırlarını güvence olarak okuma.
+- DB'de fiilen uygulanan sınırlar: tenant izolasyonu, modül izni, komisyon kazanç gizliliği (P12),
+  `audit_logs`/`error_logs`/takvim token'ı (20261010000400).
+
+---
+
 ## Kapsam Türleri
 
 | Scope | Rol | Erişim | Örnek |

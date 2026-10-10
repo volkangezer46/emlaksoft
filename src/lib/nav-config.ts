@@ -226,10 +226,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         tabs: [
           { href: "/app/kiralama", label: "Kiralama", icon: ICONS.anahtar, module: "rentals" },
           { href: "/app/kira-artis", label: "Kira artışı", icon: ICONS.oran, module: "valuation", description: "TÜFE'ye göre yasal kira artışı hesabı", keywords: ["tüfe", "zam", "artış"] },
+          // Aidat ayrı menü öğesi değildir: yönettiğiniz kiralık daire/sitelerin aidatı Kiralama'nın sekmesidir (yol sabit; kendi modülü expenses).
+          { href: "/app/aidat", label: "Aidat & site", icon: ICONS.aidat, module: "expenses", description: "Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin", keywords: ["aidat", "ortak gider", "apartman", "site", "bina", "daire cari", "borç"] },
         ],
-        tier: "more",
-        description: "Kira sözleşmeleri, aylık tahakkuk ve kira artışı",
-        keywords: ["kira", "kiracı", "tahakkuk", "depozito"],
+        tier: "core",
+        description: "Kira sözleşmeleri, aylık tahakkuk, kira artışı ve site aidatları",
+        keywords: ["kira", "kiracı", "tahakkuk", "depozito", "aidat", "site", "apartman"],
       },
       {
         href: "/app/projeler",
@@ -322,7 +324,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     id: "finans",
     title: "Finans",
     icon: ICONS.baslikFinans,
-    description: "Komisyon defteri, kazanç, onaylar, gider ve aidat.",
+    description: "Komisyon defteri, kazanç, onaylar ve giderler.",
     items: [
       {
         href: "/app/komisyon",
@@ -347,15 +349,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         tier: "core",
         description: "Ofis giderleri ve kâr-zarar",
         keywords: ["masraf", "harcama", "fiş", "kar zarar"],
-      },
-      {
-        href: "/app/aidat",
-        label: "Aidat",
-        icon: ICONS.aidat,
-        module: "expenses",
-        tier: "core",
-        description: "Portföy aidat ve ortak gider takibi",
-        keywords: ["ortak gider", "apartman", "site"],
       },
     ],
   },

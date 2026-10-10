@@ -8,8 +8,6 @@ import type { EfReportRow } from "@/lib/ef-credits/types";
 
 /** EmlakFiyati rapor geçerliliği (gün); expires_at gelmezse created_at + bu süre varsayılır. */
 export const EF_REPORT_VALID_DAYS = 30;
-/** Plan kontörü birikim sınırı: aylık hakkın bu katı (ay). */
-export const EF_PLAN_ROLLOVER_MONTHS = 3;
 /** Rapor listesi: görünürlük sonrası en çok bu kadar satır çekilir. */
 export const EF_REPORT_FETCH_LIMIT = 200;
 
@@ -105,13 +103,11 @@ export type MonthlyAllowanceView = {
   spentThisMonth: number;
   /** Bu ayın hakkından henüz kullanılmayan (en çok bakiye kadar). */
   remainingOfMonthly: number;
-  /** Plan kontörü birikim üst sınırı (3 aylık). */
-  rolloverCap: number;
   /** Sonraki yenileme (TR ay başı, epoch ms). */
   nextRenewalMs: number;
 };
 
-type MovementLike = { at: string | null; label: string; units: number };
+type MovementLike = { at: string | null; label: string; units: number; category?: string };
 
 /** Defter satırlarından aylık hak sayacı. Plan kontörü satırı = etiketi "Plan kontörü" olan yükleme. */
 export function monthlyAllowanceView(p: {
@@ -128,7 +124,8 @@ export function monthlyAllowanceView(p: {
     const at = r.at ? Date.parse(r.at) : Number.NaN;
     if (!Number.isFinite(at) || at < start || at >= end) continue;
     if (r.units > 0 && r.label === "Plan kontörü") granted += r.units;
-    if (r.units < 0) spent += -r.units;
+    // Süre dolumu (yanma) harcama sayılmaz.
+    if (r.units < 0 && r.category !== "sona-erme") spent += -r.units;
   }
   const base = Math.max(0, granted - spent);
   const remaining = p.available === null ? base : Math.min(base, Math.max(0, p.available));
@@ -137,7 +134,6 @@ export function monthlyAllowanceView(p: {
     grantedThisMonth: granted,
     spentThisMonth: spent,
     remainingOfMonthly: remaining,
-    rolloverCap: p.entitlement * EF_PLAN_ROLLOVER_MONTHS,
     nextRenewalMs: end,
   };
 }

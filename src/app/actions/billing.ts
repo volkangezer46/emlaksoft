@@ -34,7 +34,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { getTenantCardUserKey } from "@/lib/billing/card-store";
 import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
 import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
-import { getEfCatalog, getEfCreditReady } from "@/lib/ef-credits/credit-reader";
+import { getEfCatalog, getEfCreditReady, getEfLotsReady } from "@/lib/ef-credits/credit-reader";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
 import { getTryMaxShare } from "@/lib/try-credits/settings";
 import type { AppliedWalletCredit } from "@/lib/try-credits/checkout";
@@ -518,6 +518,10 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
   if (!(await getEfPublicState()).purchasable) return { error: EF_PURCHASE_CLOSED_MESSAGE };
   if (!(await getEfCreditReady())) {
     return { error: "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor." };
+  }
+  // Paketler SÜRELİ satılır: süreli parti şeması (20261010000300) yokken satılsa kontör süresiz kalırdı -> satış kapalı.
+  if (!(await getEfLotsReady())) {
+    return { error: "Süreli kontör paketleri hazırlanıyor; satın alma kısa süre içinde açılır." };
   }
   if (!isIyzicoConfigured()) {
     return { error: "Ödeme altyapısı yapılandırılmamış. Lütfen yönetici ile iletişime geçin." };

@@ -20,11 +20,19 @@ describe("ef reconcile", () => {
     expect(r.diffDegerleme).toBe(1);
   });
 
-  it("tolerans asilinca drift ve isaretli fark", () => {
-    const r = compareReconciliation({ degerleme: 10, pdf: 1 }, { degerleme: 10, pdf: 5 });
+  it("tolerans asilinca drift ve isaretli fark (degerleme)", () => {
+    const r = compareReconciliation({ degerleme: 10, pdf: 1 }, { degerleme: 14, pdf: 1 });
     expect(r.status).toBe("drift");
+    expect(r.diffDegerleme).toBe(-4);
+    expect(describeReconciliation(r)).toContain("degerleme farki -4");
+  });
+
+  it("PDF kontorsuz (2026-10-10): pdf farki yalniz bilgi, durumu belirlemez; EF pdf toplami yoksa da error degil", () => {
+    const r = compareReconciliation({ degerleme: 10, pdf: 1 }, { degerleme: 10, pdf: 5 });
+    expect(r.status).toBe("ok");
     expect(r.diffPdf).toBe(-4);
-    expect(describeReconciliation(r)).toContain("pdf farki -4");
+    expect(r.reasons).toEqual([]);
+    expect(compareReconciliation({ degerleme: 10, pdf: null }, { degerleme: 10, pdf: 0 }).status).toBe("ok");
   });
 
   it("ozel tolerans uygulanir; gecersiz tolerans varsayilana duser", () => {
