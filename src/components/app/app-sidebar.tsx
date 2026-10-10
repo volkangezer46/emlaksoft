@@ -2,7 +2,7 @@
 
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, Lock, Menu, Plus, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
@@ -20,6 +20,8 @@ import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { MenuSearchButton } from "@/components/ui/console/quick-access";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
+import { announceScope, useNavRole } from "@/lib/ui/use-nav-role";
+import { SCOPE_COOKIE, SCOPE_COOKIE_MAX_AGE } from "@/lib/ui/scope";
 
 const VitrinIcon = ICONS.portal;
 const ToolsIcon = ICONS.baslikArac;
@@ -66,6 +68,7 @@ export function AppSidebar({
   storageScope,
   role = null,
   simple = false,
+  scopeCookie = null,
 }: {
   officeName: string;
   plan: string;
@@ -90,15 +93,24 @@ export function AppSidebar({
   role?: string | null;
   /** Sade görünüm (varsayılan): "Araçlar" kapalı gelir; kapalıysa (Tüm sayfalar görünür) açık gelir. */
   simple?: boolean;
+  /** Kapsam çerezi (es_scope): yönetim rolü "Benim işlerim" seçtiyse menü kişisel düzene geçer (yalnız görünüm). */
+  scopeCookie?: string | null;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { navRole, personal } = useNavRole(role, scopeCookie);
+  const backToOffice = () => {
+    document.cookie = `${SCOPE_COOKIE}=ofis; path=/app; max-age=${SCOPE_COOKIE_MAX_AGE}; samesite=lax`;
+    announceScope("ofis");
+    router.push("/app?kapsam=ofis");
+  };
   // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
   const [open, setOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
 
   // Ofisin kapattığı modüller menüden çıkar (veri silinmez).
   const closedModules = useClosedModules();
-  const nav = useMemo(() => hubNav(accessibleModules, { role, closed: closedModules }), [accessibleModules, role, closedModules]);
+  const nav = useMemo(() => hubNav(accessibleModules, { role: navRole, closed: closedModules }), [accessibleModules, navRole, closedModules]);
   const active = resolveActiveHub(pathname, nav);
   const activeHubId = active.hub?.id ?? null;
 
@@ -192,10 +204,19 @@ export function AppSidebar({
         <Brand variant="mark" tone="dark" height={32} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
           <p className="font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{role === "advisor" || role === "team_lead" ? "Danışman konsolu" : "Ofis konsolu"}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-300)]">{navRole === "advisor" || navRole === "team_lead" ? "Danışman konsolu" : "Ofis konsolu"}</p>
         </div>
         <SidebarCollapseButton />
       </div>
+      {personal ? (
+        <button
+          type="button"
+          onClick={backToOffice}
+          className="focus-ring sb-label mx-3 mt-2 min-h-11 rounded-[var(--radius-control)] border border-white/15 px-3 text-left text-xs font-semibold text-white/80 transition hover:bg-white/10"
+        >
+          Ofis görünümüne dön
+        </button>
+      ) : null}
 
       <MenuSearchButton onActivate={() => setOpen(false)} />
 
@@ -347,8 +368,8 @@ export function AppSidebar({
   // Mobil alt çubuk: rol bazlı en çok 5 yuva (nav-roles `mobile`): merkez bağlantıları, "+ Yeni" eylem sayfası, "Menü"
   // çekmecesi. Çekmece masaüstüyle AYNI yapıdır (6 satırlık merkez listesi). Yetkisiz/kapalı merkez yuvası çıkmaz.
   const newActions = useMemo(
-    () => mobileNewActions(role, creatable, lockedHrefs, closedModules),
-    [role, creatable, lockedHrefs, closedModules],
+    () => mobileNewActions(navRole, creatable, lockedHrefs, closedModules),
+    [navRole, creatable, lockedHrefs, closedModules],
   );
   const totalBadges = badges.reduce((n, b) => n + b.count, 0);
   type Slot = { kind: "hub"; hub: NavHub } | { kind: "new" } | { kind: "menu" };

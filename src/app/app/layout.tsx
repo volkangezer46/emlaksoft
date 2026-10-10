@@ -21,6 +21,7 @@ import { ThemeController } from "@/components/theme-controller";
 import { IconSprite } from "@/components/ui/icon-sprite";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
+import { SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
@@ -345,6 +346,7 @@ async function buildShellModel() {
     vitrinHref,
     uiPrefCookie,
     uiPrefs,
+    scopeCookie: jar.get(SCOPE_COOKIE)?.value ?? null,
     fontScale,
     impName,
     trialDaysLeft,
@@ -450,6 +452,7 @@ async function ShellSidebar() {
         storageScope={m.storageScope}
         role={m.platformStaffFullAccess ? "owner" : m.effectiveRole}
         simple={m.uiPrefs.simple}
+        scopeCookie={m.scopeCookie}
       />
     </ClosedModulesProvider>
   );
@@ -519,7 +522,7 @@ async function ShellTabs() {
   const m = await loadShellModel();
   return (
     <ClosedModulesProvider closed={m.closedModules}>
-      <SectionTabs accessibleModules={m.accessibleModules} role={m.platformStaffFullAccess ? "owner" : m.effectiveRole} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
+      <SectionTabs accessibleModules={m.accessibleModules} scopeCookie={m.scopeCookie} role={m.platformStaffFullAccess ? "owner" : m.effectiveRole} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
     </ClosedModulesProvider>
   );
 }

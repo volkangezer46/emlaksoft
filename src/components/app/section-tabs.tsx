@@ -7,6 +7,7 @@ import { useClosedModules } from "@/components/app/closed-modules-context";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
 import { resolveStripHub } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
+import { useNavRole } from "@/lib/ui/use-nav-role";
 
 /**
  * Sayfanın üstündeki TEK sekme şeridi: etkin menü merkezinin (Müşteriler, İlanlar, Satış ve Para, Ekibim…) kardeş
@@ -21,6 +22,7 @@ import type { AppModule } from "@/lib/permissions";
  * içeriyorsa şerit yüksekliği kadar yer ayrılır (içerik geldiğinde sayfa aşağı kaymasın). Link çizmez
  * (yetkisiz sekme bir an bile görünmez).
  */
+
 export function SectionTabsPlaceholder({ allModules }: { allModules: AppModule[] }) {
   const pathname = usePathname();
   const { hub } = useMemo(() => resolveStripHub(pathname, allModules, { role: "owner" }), [pathname, allModules]);
@@ -35,10 +37,13 @@ export function SectionTabsPlaceholder({ allModules }: { allModules: AppModule[]
 export function SectionTabs({
   accessibleModules,
   role = null,
+  scopeCookie = null,
   lockedHrefs = [],
   counts,
   actions,
 }: {
+  /** Kapsam çerezi (es_scope): yönetim rolünde "Benim işlerim" kişisel menü düzenine geçirir. */
+  scopeCookie?: string | null;
   accessibleModules: AppModule[];
   /** Etkin rol: merkez yapısını belirler (yetkiyi değiştirmez). */
   role?: string | null;
@@ -51,9 +56,10 @@ export function SectionTabs({
 }) {
   const pathname = usePathname();
   const closedModules = useClosedModules();
+  const { navRole } = useNavRole(role, scopeCookie);
   const { hub, pageHref } = useMemo(
-    () => resolveStripHub(pathname, accessibleModules, { role, closed: closedModules }),
-    [pathname, accessibleModules, role, closedModules],
+    () => resolveStripHub(pathname, accessibleModules, { role: navRole, closed: closedModules }),
+    [pathname, accessibleModules, navRole, closedModules],
   );
   if (!hub || hub.pages.length < 2) return null;
 

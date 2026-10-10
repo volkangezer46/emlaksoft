@@ -174,7 +174,7 @@ export default async function AppHomePage({
   const kpis =
     layout.metrics.length === 0 ? null : (
       <div data-tour="kpi">
-        <Suspense fallback={<MetrikSeridiIskelet rows={layout.metrics.length} caption={isManagement} />}>
+        <Suspense key={swapKey} fallback={<MetrikSeridiIskelet rows={layout.metrics.length} caption={isManagement} />}>
           <FadeSwap swapKey={swapKey}>
             <MetrikSeridi ctx={ctx} keys={layout.metrics} />
           </FadeSwap>
@@ -183,7 +183,7 @@ export default async function AppHomePage({
     );
   const dikkat = (
     <div data-tour="brifing" className="h-full">
-      <Suspense fallback={<DikkatIskelet />}>
+      <Suspense key={swapKey} fallback={<DikkatIskelet />}>
         <FadeSwap swapKey={swapKey} className="h-full">
           <Dikkat ctx={ctx} params={params} maxItems={5} />
         </FadeSwap>

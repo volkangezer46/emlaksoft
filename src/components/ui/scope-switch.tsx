@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { Building2, User } from "lucide-react";
 import { SCOPE_COOKIE, SCOPE_COOKIE_MAX_AGE, type ScopeValue } from "@/lib/ui/scope";
+import { announceScope } from "@/lib/ui/use-nav-role";
 
 /**
  * ScopeSwitch — "Ofis geneli | Benim işlerim" kapsam geçişi (tasarım sistemi v4; `SegmentedControl` ile aynı aile:
@@ -56,6 +57,7 @@ export function ScopeSwitch({
 
   const choose = (o: ScopeSwitchOption) => {
     remember(o.value);
+    announceScope(o.value); // menü (yan menü + alt çubuk) anında kişisel/ofis düzenine geçer
     setPicked({ value: o.value, from: value });
   };
 
