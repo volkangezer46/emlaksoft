@@ -241,6 +241,8 @@ const F = {
   listingAnalyses: "20261008001800_listing_analyses.sql",
   // e-Fatura (2026-10-10, Paket D): einvoice_connections (sifreli kimlik, sutun bazli SELECT) + einvoices + 2 DEFINER RPC; kod tablo yokken bolumu "etkin degil" der.
   einvoice: "20261010000700_einvoice.sql",
+  // e-Fatura butunlugu (2026-10-11, Konsey P2): durum makinesi + atomik talep RPC'leri; dogrudan yazma yetkisi kapanir.
+  einvoiceStateMachine: "20261011000600_einvoice_state_machine.sql",
   // Finans Paket B (2026-10-10): recurring_rules + recurring_occurrences (duzenli odeme/gelir, idempotent uretim) + recurring_* RPC; kira-tahakkuk cron adimi recurring_run_due'yu cagirir (kod sema yokken adimi atlar).
   recurringRules: "20261010000900_recurring_rules.sql",
   // Ilan havuzu yeni ofiste varsayilan ACIK + kaynak extension (2026-10-10).
@@ -399,6 +401,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.poolDefaultOn]: "davranis", // tenants.listing_pool_enabled sutun varsayilani true (yalniz YENI ofisler; mevcut satirlar degismez) + havuz kaynak CHECK genisler
     [F.homeSnapshotRpc]: "ek", // yalniz 1 yeni invoker RPC (home_snapshot); RLS cagiranin yetkisiyle, tablo/politika/veri degismez
     [F.einvoice]: "ek", // yeni einvoice_connections + einvoices tablolari (RLS ofis kapsamli, yazma commissions.create/settings.edit) + 2 DEFINER RPC; mevcut tablo/politika degismez
+    [F.einvoiceStateMachine]: "davranis", // einvoices'te authenticated INSERT/UPDATE/DELETE kapanir (yazma yalniz DEFINER RPC); guard durum matrisi eklenir; veri degismez
     [F.listingAnalyses]: "ek", // yeni listing_analyses tablosu (RLS: okuma ofis, yazma valuation.create); mevcut tablo/politika degismez
     [F.vitrinChatClosedListing]: "davranis", // vitrin_chat_context govdesi yeniden tanimi: kapali portfoy artik sohbet baglamina GIRMEZ (govde+ACL baska degismez)
     [F.dealProcessSteps]: "ek", // yeni deal_process_steps tablosu (RLS: okuma ofis, yazma commissions.edit); mevcut tablo/politika degismez
@@ -549,6 +552,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB57-tapu-sureci", order: 29.999862, title: "Tapu sureci adim takibi: deal_process_steps tablosu (kod tablo yokken bolumu etkin degil der; sira serbest)", files: [F.dealProcessSteps] },
     { id: "FIN-B-duzenli-odemeler", order: 29.9998685, title: "Finans: duzenli odemeler/gelirler (recurring_rules + donem basina tek uretim; kira-tahakkuk cron adimi; 000600'den SONRA; kod sema yokken sekmeyi gizler)", files: [F.recurringRules] },
     { id: "PB60-e-fatura", order: 29.9998671, title: "e-Fatura entegrasyonu: baglanti (sifreli kimlik) + fatura tablolari (kod tablo yokken bolumu etkin degil der; sira serbest, ek)", files: [F.einvoice] },
+    { id: "PB62-e-fatura-durum-makinesi", order: 29.9998674, title: "e-Fatura durum makinesi + atomik resmilestirme talebi (000700'den SONRA; yazma yalniz RPC; sira serbest)", files: [F.einvoiceStateMachine] },
     { id: "PB60-havuz-varsayilan-acik", order: 29.9998672, title: "Ilan havuzu yeni ofiste varsayilan acik + kaynak CHECK genislemesi (listing_pool 001500 sonrasi; sira serbest)", files: [F.poolDefaultOn] },
     { id: "PB61-ana-ekran-home-snapshot", order: 29.9998673, title: "Ana ekran home_snapshot RPC'si (ben/ofis ilk ekran okumalari tek tur; kod RPC yokken eski sorgulara duser; sira serbest, ek)", files: [F.homeSnapshotRpc] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
