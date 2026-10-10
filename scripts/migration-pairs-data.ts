@@ -520,7 +520,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB61-arama-trigram", order: 29.999988, title: "Musteri/portfoy ilike aramasi icin pg_trgm GIN indeksleri (sira serbest, ek)", files: [F.searchTrgmIndexes] },
     { id: "SEC-rol-duman-2026-10", order: 29.999989, title: "Rol duman testi guvenlik duzeltmeleri: takvim token tablosu, audit_logs/error_logs okuma siniri, gereksiz tablo yetkileri (sira serbest)", files: [F.securityCalendarTokenAuditLogs] },
     { id: "PB59-db-hiz-rls-initplan", order: 29.999986, title: "DB hiz turu: RLS initplan sarmasi + kopya indeks temizligi + kiralama KPI RPC (sira serbest)", files: [F.dbPerfRlsInitplanKpi] },
-    { id: "PB60-ilan-kontrol-gunluk-tarama", order: 29.999987, title: "Ilan kontrol gunluk eklenti taramasi: tam liste kaniti + aday detayi + lc_inventory_import (000210 sonrasi)", files: [F.lcDailySync] },
+    { id: "PB60-ilan-kontrol-gunluk-tarama", order: 29.9999875, title: "Ilan kontrol gunluk eklenti taramasi: tam liste kaniti + aday detayi + lc_inventory_import (000210 sonrasi)", files: [F.lcDailySync] },
     { id: "PB58-gider-trend-ay-ekseni", order: 29.999985, title: "Giderler aylik trend ay ekseni tarih (UTC kaymasi duzeltmesi; sira serbest)", files: [F.expenseTrendMonthAxis] },
     { id: "PB56-regex-tekrar-siniri", order: 29.99995, title: "Gecersiz {1,512} regex duzeltmesi (kampanya claim/onay/olusturma + 2 kisit; sira serbest)", files: [F.fixRegexRepetitionLimit] },
     { id: "PB53-guvenlik-gider-ornek", order: 29.9985, title: "Guvenlik/rapor turu: properties fiyat dusurme DB kapisi + fiyat tarihcesi salt-okunur -> Giderler ornek veri kapsami", files: [F.propertiesPriceDropGuard, F.expenseSampleScope] },

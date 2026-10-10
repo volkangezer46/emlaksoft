@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "@/components/ui/smart-link";
 import { CheckCircle2, Circle, Download, PlugZap, Puzzle, RefreshCw } from "lucide-react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { now } from "@/lib/clock";
 import {
-  BRIDGE_RESPONSE_SOURCE,
   bridgeConnected,
   bridgeInstalled,
   bridgePaused,
@@ -133,7 +133,7 @@ export function SyncSetup({ latestVersion, chromeStoreUrl, edgeStoreUrl, downloa
                   {downloadHref ? <ButtonLink href={downloadHref} icon={Download} className="w-full" prefetch={false}>Eklentiyi indir</ButtonLink> : null}
                   <p className="text-xs text-text-muted">
                     Mağaza adresi henüz tanımlı değil. İndirip adres çubuğuna <code className="font-mono">chrome://extensions</code> yazın, &quot;Geliştirici modu&quot;nu açın, &quot;Paketlenmemiş öğe yükle&quot; ile klasörü seçin.{" "}
-                    <a href="/app/ilan-kontrol/eklenti" className="focus-ring rounded text-accent-text hover:underline">Ayrıntılı yönerge</a>
+                    <Link href="/app/ilan-kontrol/eklenti" className="focus-ring rounded text-accent-text hover:underline">Ayrıntılı yönerge</Link>
                   </p>
                 </>
               ) : null}
