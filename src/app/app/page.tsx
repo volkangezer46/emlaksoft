@@ -257,7 +257,7 @@ export default async function AppHomePage({
   const rows: ReactNode[] = [];
   const grid = (key: string, cells: ReactNode[], cls?: string) =>
     cells.length === 0 ? null : (
-      <DashboardGrid key={key} className={cls}>
+      <DashboardGrid key={key} className={cls} stagger={false}>
         {cells}
       </DashboardGrid>
     );
@@ -275,12 +275,13 @@ export default async function AppHomePage({
         key={key}
         label="Ek bloklar"
         fallback={
-          <DashboardGrid className={cls}>
+          <DashboardGrid className={cls} stagger={false}>
             {live.map((it, i) => cell(it.span, <PanelIskelet rows={3} className="min-h-[15rem]" />, `${key}-sk-${i}`))}
           </DashboardGrid>
         }
       >
-        <DashboardGrid className={cls}>{live.map((it, i) => cell(it.span, it.node, `${key}-${i}`))}</DashboardGrid>
+        {/* stagger kapalı: iskelet yerini alan içerik sıfır opaklıktan tekrar belirmez (çift yükleme hissi). */}
+        <DashboardGrid className={cls} stagger={false}>{live.map((it, i) => cell(it.span, it.node, `${key}-${i}`))}</DashboardGrid>
       </DeferredSection>
     );
   };
@@ -403,7 +404,7 @@ export default async function AppHomePage({
           <BaslangicKarti ctx={ctx} />
         </Suspense>
         {/* Müşteri + portföy yokken tüm dolu bloklar gizlenir; yerinde Başlangıç kartı ilk adımları gösterir */}
-        <Suspense fallback={<PanelIskelet rows={2} />}>
+        <Suspense fallback={<PanelIskelet rows={2} className="min-h-[24rem]" />}>
           <BosOfisKapisi ctx={ctx}>
             <div className="flex min-w-0 flex-col gap-5">
               <section aria-label="Bugün" className="flex flex-col gap-3">
@@ -446,12 +447,12 @@ export default async function AppHomePage({
                     <DeferredSection
                       label="Daha fazla"
                       fallback={
-                        <DashboardGrid>
+                        <DashboardGrid stagger={false}>
                           {layout.more.map((k) => cell(MORE_SPAN[k], <PanelIskelet rows={3} className="min-h-[15rem]" />, `m-sk-${k}`))}
                         </DashboardGrid>
                       }
                     >
-                      <DashboardGrid>{moreCells}</DashboardGrid>
+                      <DashboardGrid stagger={false}>{moreCells}</DashboardGrid>
                     </DeferredSection>
                   ) : null}
                 </section>
