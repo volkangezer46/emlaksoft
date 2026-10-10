@@ -82,7 +82,7 @@ export default async function AuditPage({
 }: {
   searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string; tur?: string; ara?: string }>;
 }) {
-  await requireModulePage("settings", "/app/denetim");
+  const { role } = await requireModulePage("settings", "/app/denetim");
   const params = (await searchParams) ?? {};
   const filters = normalizeAuditFilters(params);
   const { from: fromF, to: toF, aktor: aktorF, risk: riskF, tur: turF, ara: araF } = filters;
@@ -99,10 +99,17 @@ export default async function AuditPage({
   // "yetki.*" kodlarıyla, yüksek risk olarak. İki kaynak paralel çekilir, birleşik sıradan sayfa dilimlenir.
   const includeAudit = filters.tur !== ACCESS_TUR && !isAccessCode(filters.tur);
   const accessCodes = filters.ara ? actionCodesMatching(filters.ara).filter(isAccessCode) : null;
+  // access_audit_log'u RLS gereği yalnız owner/gm okur; diğer roller için yetki satırları sessizce 0 görünmesin diye
+  // kaynak hiç sorgulanmaz ve birleşime katılmaz (sayılar yalnız okunabilen kayıtlardan gelir).
+  const canReadAccess = role === "owner" || role === "gm";
   const includeAccess =
+    canReadAccess &&
     filters.risk !== "orta" &&
     (!filters.tur || filters.tur === ACCESS_TUR || isAccessCode(filters.tur)) &&
     (accessCodes === null || accessCodes.length > 0);
+  // Birleşik sayfalama ödünleşimi: iki kaynak tek tarih sırasında kesilebilsin diye her biri 0..offset+PAGE_SIZE çekilir
+  // (yalnız id/özet sütunları; derin sayfada sorgu büyür). Yetki satırı hacmi düşüktür, audit_logs aralığı tarih/aktör
+  // süzgeciyle daraltılır.
   const windowEnd = offset + PAGE_SIZE - 1;
   let logQuery = supabase
     .from("audit_logs")

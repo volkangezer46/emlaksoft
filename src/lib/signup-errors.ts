@@ -12,9 +12,6 @@ import { parsePhone, PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/
 
 export type SignupField = "name" | "email" | "phone" | "password";
 
-/** Sunucunun "e-posta zaten kayıtlı" mesajı (action ile aynı metin); formda giriş / şifremi unuttum bağlantıları buna bağlanır. */
-export const SIGNUP_EMAIL_EXISTS_MESSAGE = "Bu e-posta zaten kayıtlı.";
-
 /** Alan -> adım (tek ekran: hepsi 1). */
 export const SIGNUP_FIELD_STEP: Record<SignupField, number> = {
   name: 1,

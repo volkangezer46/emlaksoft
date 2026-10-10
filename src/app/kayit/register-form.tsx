@@ -10,7 +10,6 @@ import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
 import {
-  SIGNUP_EMAIL_EXISTS_MESSAGE,
   signupErrorTarget,
   signupFieldInputId,
   signupPhoneClientError,
@@ -132,18 +131,6 @@ export function RegisterForm({
     return (
       <p id={`${field}-error`} role="alert" className="mt-1 text-xs font-medium text-danger-strong">
         {msg}
-        {field === "email" && msg === SIGNUP_EMAIL_EXISTS_MESSAGE ? (
-          <>
-            {" "}
-            <Link href="/giris" className="font-semibold underline">
-              Giriş yap
-            </Link>
-            {" · "}
-            <Link href="/sifre-sifirla" className="font-semibold underline">
-              Şifremi unuttum
-            </Link>
-          </>
-        ) : null}
       </p>
     );
   }

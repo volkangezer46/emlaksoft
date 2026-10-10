@@ -396,6 +396,9 @@ export async function signUp(
   const userAgent = ((await headers()).get("user-agent") ?? "").slice(0, 512);
   const admin = createAdminClient();
 
+  // Bilinçli ödünleşim: bu okuma ile aşağıdaki artış atomik DEĞİL; eşzamanlı kayıtlar tavanı (300/saat) birkaç kayıt
+  // aşabilir. Tavan hassas bir kota değil, toplu kötüye kullanıma karşı kaba sigortadır; hassas koruma IP/e-posta
+  // sınırlarıdır (üstte, atomik RPC). Başarısız denemelerin gerçek kayıtları engellememesi bu payın karşılığıdır.
   // Global saatlik tavan YALNIZ başarılı provizyonları sayar (aşağıda, provizyon sonrası artar). Burada sadece
   // sayaca bakılır (tüketmez): başarısız/geçersiz denemeler (ör. kayıtlı e-posta, hatalı alan) global tavanı doldurup
   // gerçek kayıtları engelleyemez. Okuma hatasında güvenli tarafta kalınır (reddet).
