@@ -4,6 +4,7 @@ import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -87,31 +88,31 @@ export async function createCustomer(
     return { error: planLimitErrorMessage(error) ?? actionErrorMessage(error, "Müşteri eklenemedi. Lütfen tekrar deneyin.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId,
     actorId: gate.userId,
     action: "customer.create",
     entityType: "customer",
     entityId: data.id,
     newValue: { full_name: fullName },
-  });
+  }));
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  try {
-    await dispatchAutomationEvent(tenantId, "new_customer", {
+  after(() =>
+    Promise.resolve()
+      .then(() => dispatchAutomationEvent(tenantId, "new_customer", {
       entityType: "customer",
       entityId: data.id,
       customerId: data.id,
       label: fullName,
       phone: normalizedPhone || null,
       assignedTo: user.id,
-    });
-  } catch (e) {
-    console.error("automation new_customer", e);
-  }
+    }))
+      .catch((e) => console.error("automation new_customer", e)),
+    );
 
   // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  await triggerPlaybooks({
+  after(() => triggerPlaybooks({
     tenantId,
     event: "yeni_musteri",
     actorId: user.id,
@@ -123,7 +124,7 @@ export async function createCustomer(
       customerId: data.id,
       fields: { customer_type: type || null },
     },
-  });
+  }));
 
   emitWebhook("customer.created", "customer", data.id);
   revalidatePath("/app/musteriler");
@@ -191,14 +192,14 @@ export async function updateCustomer(
     return { error: actionErrorMessage(error, "Müşteri güncellenemedi.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.update",
     entityType: "customer",
     entityId: id,
     newValue: { full_name: fullName },
-  });
+  }));
 
   emitWebhook("customer.updated", "customer", id);
   revalidatePath("/app/musteriler");
@@ -276,13 +277,13 @@ export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok
     console.error("deleteCustomer", error);
     return { error: actionErrorMessage(error, "Müşteri silinemedi.") };
   }
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.delete",
     entityType: "customer",
     entityId: id,
-  });
+  }));
   revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
   return { ok: true };
@@ -361,13 +362,13 @@ export async function bulkAssignCustomers(
   }
 
   // Audit log (tek kayıt, toplu temsil — bkz. bulkUpdatePropertyStatus deseni)
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_assign",
     entityType: "customer",
     newValue: { ids: validIds, assigned_to: assignedTo || null, count: validIds.length },
-  });
+  }));
 
   revalidatePath("/app/musteriler");
   for (const id of validIds) revalidatePath(`/app/musteriler/${id}`);
@@ -396,24 +397,26 @@ export async function bulkDeleteCustomers(ids: string[]): Promise<BulkCustomerRe
     return { error: actionErrorMessage(error, "Müşteriler silinemedi.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_delete",
     entityType: "customer",
     newValue: { ids: validIds, count: validIds.length },
-  });
+  }));
   // Çöp kutusunda "Silen" görünsün: her müşteri için kayıt kimlikli denetim satırı (özet satırı korunur)
-  await Promise.all(
-    validIds.map((cid) =>
-      logActivity({
-        tenantId: gate.tenantId,
-        actorId: gate.userId,
-        action: "customer.delete",
-        entityType: "customer",
-        entityId: cid,
-        newValue: { bulk: true },
-      }),
+  after(() =>
+    Promise.all(
+      validIds.map((cid) =>
+        logActivity({
+          tenantId: gate.tenantId,
+          actorId: gate.userId,
+          action: "customer.delete",
+          entityType: "customer",
+          entityId: cid,
+          newValue: { bulk: true },
+        }),
+      ),
     ),
   );
 
@@ -488,13 +491,13 @@ export async function bulkReheatCustomers(ids: string[]): Promise<BulkCustomerRe
     return { error: actionErrorMessage(error, "Görevler oluşturulamadı. Lütfen tekrar deneyin.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_reheat",
     entityType: "customer",
     newValue: { ids: fresh.map((c) => c.id), count: fresh.length },
-  });
+  }));
 
   revalidatePath("/app/musteriler");
   revalidatePath("/app/gorevler");
@@ -585,14 +588,14 @@ export async function addCustomerTag(
     return { error: actionErrorMessage(error, "Etiket eklenemedi. Lütfen tekrar deneyin.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.tag_add",
     entityType: "customer",
     entityId: id,
     newValue: { tag: clean, tags: nextTags },
-  });
+  }));
 
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
@@ -629,14 +632,14 @@ export async function removeCustomerTag(
     return { error: actionErrorMessage(error, "Etiket kaldırılamadı. Lütfen tekrar deneyin.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.tag_remove",
     entityType: "customer",
     entityId: id,
     newValue: { tag: clean, tags: nextTags },
-  });
+  }));
 
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
@@ -695,13 +698,13 @@ export async function bulkAddTag(ids: string[], tag: string): Promise<BulkCustom
     return { error: "Seçili müşterilerin tümünde bu etiket zaten var (veya etiket sınırı dolu)." };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.bulk_tag",
     entityType: "customer",
     newValue: { tag: clean, ids: updatedIds, count: updatedCount },
-  });
+  }));
 
   revalidatePath("/app/musteriler");
   for (const id of updatedIds) revalidatePath(`/app/musteriler/${id}`);
@@ -1004,7 +1007,7 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
     console.error("reassignCustomer", error);
     return;
   }
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.reassign",
@@ -1012,7 +1015,7 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
     entityId: id,
     oldValue: { assigned_to: previous },
     newValue: { assigned_to: assignedTo || null },
-  });
+  }));
   if (assignedTo && assignedTo !== gate.userId) {
     await notifyAssignment({
       tenantId: gate.tenantId,
@@ -1066,14 +1069,14 @@ export async function appendCustomerNote(customerId: string, text: string): Prom
     return { error: actionErrorMessage(error, "Not eklenemedi. Lütfen tekrar deneyin.") };
   }
 
-  await logActivity({
+  after(() => logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "customer.note_append",
     entityType: "customer",
     entityId: id,
     newValue: { appended: trail },
-  });
+  }));
 
   revalidatePath(`/app/musteriler/${id}`);
   return { ok: true, id };

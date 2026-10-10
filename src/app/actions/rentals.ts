@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -88,19 +89,21 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   const rentalId = transition.rental_id;
 
   // İş akışı (playbook) tetikle — sözleşme/depozito/anahtar teslim paketi
-  await triggerPlaybooks({
-    tenantId: gate.tenantId,
-    event: "kira_sozlesmesi",
-    actorId: gate.userId,
-    entity: {
-      type: "contract",
-      id: rentalId,
-      ownerId: gate.userId,
-      customerId: renterId,
-      propertyId,
-      fields: {},
-    },
-  });
+  after(() =>
+    triggerPlaybooks({
+      tenantId: gate.tenantId,
+      event: "kira_sozlesmesi",
+      actorId: gate.userId,
+      entity: {
+        type: "contract",
+        id: rentalId,
+        ownerId: gate.userId,
+        customerId: renterId,
+        propertyId,
+        fields: {},
+      },
+    }),
+  );
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/portfoyler/${propertyId}`);

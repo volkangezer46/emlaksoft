@@ -96,7 +96,8 @@ export function PropertyKeysSection({
       if (result.ok) {
         addFormRef.current?.reset();
         setAdding(false);
-        push("Anahtar eklendi", "ok");
+        if (result.warning) push(result.warning, "info");
+        else push("Anahtar eklendi", "ok");
         router.refresh();
       }
       return result;
@@ -109,7 +110,8 @@ export function PropertyKeysSection({
       const result = await checkoutPropertyKey(prev, fd);
       if (result.ok) {
         setCheckoutFor(null);
-        push("Anahtar çıkışı kaydedildi", "ok");
+        if (result.warning) push(result.warning, "info");
+        else push("Anahtar çıkışı kaydedildi", "ok");
         router.refresh();
       }
       return result;
