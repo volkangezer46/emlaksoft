@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { loadPglite, type Db } from "@/lib/test-support/pglite";
 
 /**
- * İŞLEVSEL SQL TESTİ (pglite): 20261012000800 rent_notice_receipt — token çözücü RPC (oturumsuz): geçersiz/süresi dolmuş token,
+ * İŞLEVSEL SQL TESTİ (pglite): 20261012000900 rent_notice_receipt — token çözücü RPC (oturumsuz): geçersiz/süresi dolmuş token,
  * başka kiracının tahakkuku, bekleyen bildirim yokken; dekont yolu CHECK'i ofis/kiracı/bildirim biçimini zorlar.
  */
 const mod = await loadPglite();
@@ -70,7 +70,7 @@ describe.skipIf(!mod)("kira dekontu token çözücü (pglite)", () => {
     CH_NONOTICE = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2026-11-01', 25000) returning id`, [T, RENT]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261007000620_customer_portal_requests.sql"));
     await db.exec(read("supabase/migrations/20261012000200_portal_requests_v2.sql"));
-    await db.exec(read("supabase/migrations/20261012000800_rent_notice_receipt.sql"));
+    await db.exec(read("supabase/migrations/20261012000900_rent_notice_receipt.sql"));
     const r = (await q(`select public.portal_customer_request($1, 'rent_paid', $2::jsonb) as r`, [TOKEN, JSON.stringify({ charge_id: CH })]))[0]!.r as { ok: boolean };
     expect(r.ok).toBe(true);
     NOTICE = (await q(`select id from public.rent_payment_notices`))[0]!.id as string;

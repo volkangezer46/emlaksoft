@@ -102,14 +102,17 @@ export default async function AdminTenantDetailPage({
   const active = resolveOfficeTab(sp.sekme, tabs);
   const admin = createAdminClient();
 
-  const { data: tenant } = await admin
-    .from("tenants")
-    .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
-    .eq("id", id)
-    .maybeSingle();
+  // Ofis satırı ve KPI okumaları yalnız `id`'ye bağlı → tek tur (önceden ardışık iki tur; ofis yoksa notFound yine kesinti).
+  const [{ data: tenant }, kpiData] = await Promise.all([
+    admin
+      .from("tenants")
+      .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
+      .eq("id", id)
+      .maybeSingle(),
+    loadOfficeKpis(admin, id, access),
+  ]);
   if (!tenant) notFound();
 
-  const kpiData = await loadOfficeKpis(admin, id, access);
   const base = `/admin/tenants/${id}`;
   const tabHref = (t: OfficeTab) => `${base}?sekme=${t}`;
   const plan = getPlan(tenant.plan ?? "office");

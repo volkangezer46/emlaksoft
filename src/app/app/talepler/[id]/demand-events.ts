@@ -63,10 +63,10 @@ function cut(s: string | null | undefined, n = 160): string | undefined {
 export async function buildDemandEvents(
   supabase: SupabaseClient,
   demand: { id: string; created_at: string; customerId: string | null },
-  pre: { tasks: DemandTaskRow[]; appts: DemandApptRow[] },
+  preInput: { tasks: DemandTaskRow[]; appts: DemandApptRow[] } | Promise<{ tasks: DemandTaskRow[]; appts: DemandApptRow[] }>,
 ): Promise<TimelineEvent[]> {
   const customerId = demand.customerId;
-  const [{ data: audit }, { data: comms }, { data: offers }] = await Promise.all([
+  const [{ data: audit }, { data: comms }, { data: offers }, pre] = await Promise.all([
     supabase
       .from("audit_logs")
       .select("id, action, actor_id, created_at")
@@ -89,6 +89,7 @@ export async function buildDemandEvents(
           .order("created_at", { ascending: false })
           .limit(PER_SOURCE)
       : Promise.resolve({ data: [] }),
+    preInput,
   ]);
 
   const auditRows = (audit ?? []) as { id: string; action: string; actor_id: string | null; created_at: string }[];

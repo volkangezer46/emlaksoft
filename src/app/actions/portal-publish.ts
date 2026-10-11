@@ -15,6 +15,7 @@ import {
   updateOnPortal,
   unpublishFromPortal,
   isPortalConfigured,
+  getPortalConfigs,
   isPortalSupported,
   SUPPORTED_PORTALS,
   type PortalName,
@@ -363,6 +364,7 @@ export async function unpublishPropertyFromPortal(
 
 export async function getConfiguredPortals(): Promise<PortalName[]> {
   // Yalnızca yayın adaptörü OLAN portalları değerlendir (UI tutarlılığı)
-  const results = await Promise.all(SUPPORTED_PORTALS.map((p) => isPortalConfigured(p)));
-  return SUPPORTED_PORTALS.filter((_, i) => results[i]);
+  // 4 portal x 4 ayar = 16 ayrı tur yerine TEK sorgu.
+  const configs = await getPortalConfigs(SUPPORTED_PORTALS);
+  return SUPPORTED_PORTALS.filter((p) => configs[p] !== null);
 }

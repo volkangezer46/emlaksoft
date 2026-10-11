@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Pricing } from "@/components/pricing";
+import { PricingDeferred } from "./pricing-deferred";
 import { SeatCalculatorLazy } from "@/components/pricing-page/seat-calculator-lazy";
 import { extraSeatTexts } from "@/lib/billing/seat-calculator-model";
 import type { PublicPricing } from "@/lib/billing/public-pricing";
@@ -24,8 +24,8 @@ export function PricingSection({ pricing, heading = defaultSiteContent().section
         <div className="mx-auto mt-8 max-w-5xl">
           <SeatCalculatorLazy plans={plans} offers={offers} trialDays={trialDays} />
         </div>
-        <div className="mk-price-wrap mk-reveal">
-          <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} efLive={efLive} />
+        <div id="mk-price-hydrate" className="mk-price-wrap mk-reveal">
+          <PricingDeferred plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} efLive={efLive} />
         </div>
         <p className="mk-fine">
           Paketleri özellik özellik karşılaştırmak ve kaçan komisyonu kendi sayılarınızla hesaplamak için <Link href="/fiyatlar">Fiyatlar sayfasına</Link> gidin.

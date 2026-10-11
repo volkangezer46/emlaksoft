@@ -72,20 +72,19 @@ export default async function ContractDetailPage({
   const { perms, tenantId } = await requireModulePage("contracts", "/app/sozlesmeler");
   const canEdit = perms.contracts?.includes("edit") ?? false;
   // Sunucudan SMS hatırlatması yalnız ofiste SMS sağlayıcısı hazırsa (yoksa WhatsApp/kopyala).
-  const smsReminder = canEdit && tenantId ? await isTenantSmsAvailable(tenantId) : false;
+  // Bağımsız okumalarla AYNI turda başlar (sıralı bekleme yok); aşağıdaki Promise.all'da toplanır.
+  const smsReminderP = canEdit && tenantId ? isTenantSmsAvailable(tenantId) : Promise.resolve(false);
   const canCreate = perms.contracts?.includes("create") ?? false;
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; sürüm geçmişi yalnız o sekmede sorgulanır
   const tab = resolveTab(await searchParams, CONTRACT_TAB_IDS, "icerik", { ozet: "icerik", imzalayanlar: "imza" });
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const contractP = supabase
     .from("contracts")
     .select("id, title, contract_type, body, status, signed_at, expires_at, cancelled_at, created_at, updated_at, property:properties!contracts_property_id_fkey(id,property_code,title,commission_rate,address_line,list_price), customer:customers!contracts_customer_id_fkey(id,full_name,phone,email)")
     .eq("id", id)
     .maybeSingle();
-
-  if (!data) notFound();
 
   // Sign links are bearer credentials. Only an editor receives them, after
   // the page/module authorization above; ordinary contract viewers never get
@@ -98,13 +97,22 @@ export default async function ContractDetailPage({
     : admin
         .from("contract_signers")
         .select("id,full_name,email,phone,status,signed_at,verified_at,ip_address");
-  const { data: signerRows, error: signerError } = await signerQuery
-    .eq("contract_id", id)
-    .order("created_at", { ascending: true });
-  if (signerError) throw new Error("Sözleşme imzalayanları okunamadı.");
+  const signersP = Promise.resolve(signerQuery.eq("contract_id", id).order("created_at", { ascending: true }));
+  // Bağlı kira kaydı (H6, iki yönlü bağ): ayrı ve hataya dayanıklı okunur; sütun yoksa (migration uygulanmamış) chip gizlenir.
+  const rentalLinkP = Promise.resolve(supabase.from("contracts").select("rental_id, rent_increase_basis").eq("id", id).maybeSingle());
+  // Sürüm geçmişi — içerik düzenlendikçe önceki haller burada listelenir (yalnız o sekmede)
+  const versionsP = tab === "surum" ? listContractVersions(id) : Promise.resolve([]);
 
-  // Sürüm geçmişi — içerik düzenlendikçe önceki haller burada listelenir
-  const versions = tab === "surum" ? await listContractVersions(id) : [];
+  // Dört bağımsız okuma tek turda (önceden 4 sıralı tur).
+  const [{ data }, { data: signerRows, error: signerError }, rentalLinkRes, versions, smsReminder] = await Promise.all([
+    contractP,
+    signersP,
+    rentalLinkP,
+    versionsP,
+    smsReminderP,
+  ]);
+  if (!data) notFound();
+  if (signerError) throw new Error("Sözleşme imzalayanları okunamadı.");
 
   const contract = data;
   const statusInfo = STATUS_STYLES[contract.status] ?? STATUS_STYLES.draft;
@@ -112,8 +120,6 @@ export default async function ContractDetailPage({
   const propertyName = entityName(contract.property as Parameters<typeof entityName>[0]);
   const customerName = entityName(contract.customer as Parameters<typeof entityName>[0]);
 
-  // Bağlı kira kaydı (H6, iki yönlü bağ): ayrı ve hataya dayanıklı okunur; sütun yoksa (migration uygulanmamış) chip gizlenir.
-  const rentalLinkRes = await supabase.from("contracts").select("rental_id, rent_increase_basis").eq("id", id).maybeSingle();
   const rentalLink = rentalLinkRes.error ? null : (rentalLinkRes.data as { rental_id?: string | null; rent_increase_basis?: string | null } | null);
   const linkedRentalId = rentalLink?.rental_id ?? null;
   const INCREASE_LABELS: Record<string, string> = { tufe: "TÜFE (TBK m.344)", sabit: "Sabit yüzde", yok: "Artış maddesi yok" };

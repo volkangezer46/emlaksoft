@@ -1,4 +1,4 @@
--- 20261012000800 geri alma. ON KOSUL: rent-receipts kovasindaki nesneler once Storage panelinden/API'den silinmeli
+-- 20261012000900 geri alma. ON KOSUL: rent-receipts kovasindaki nesneler once Storage panelinden/API'den silinmeli
 -- (kova satiri, icinde nesne varken silinemez).
 drop function if exists public.portal_rent_receipt_target(text, uuid);
 alter table public.rent_payment_notices drop constraint if exists rent_payment_notices_receipt_check;

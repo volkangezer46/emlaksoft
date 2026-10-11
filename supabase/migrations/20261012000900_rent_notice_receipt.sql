@@ -8,7 +8,7 @@ do $$
 begin
   if pg_catalog.to_regclass('public.rent_payment_notices') is null
      or pg_catalog.to_regclass('public.customer_portal_tokens') is null then
-    raise exception '20261012000800: taban sema eksik (rent_payment_notices / customer_portal_tokens).';
+    raise exception '20261012000900: taban sema eksik (rent_payment_notices / customer_portal_tokens).';
   end if;
 end $$;
 

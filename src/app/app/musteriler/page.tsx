@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { measure } from "@/lib/server-timing";
+import { SkeletonCard } from "@/components/ui/viz";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
@@ -48,7 +50,7 @@ import {
 import { CustomerPortalPanel } from "./customer-portal-panel";
 import { CustomerTable } from "./customer-rows";
 import { heatTone } from "./customer-list-logic";
-import { HEAT_SEGMENT_KEYS, PAGE_SIZE, WINDOW_DAYS, loadCustomersData } from "./data";
+import { HEAT_SEGMENT_KEYS, PAGE_SIZE, WINDOW_DAYS, loadCustomersData, type CustomersSummary } from "./data";
 import { getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { createClient } from "@/lib/supabase/server";
@@ -91,6 +93,202 @@ const PAGER_BTN =
   "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
   "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+
+type BaseParams = Record<string, string>;
+type CustomerTypeDefs = Awaited<ReturnType<typeof loadCustomersData>>["customerTypes"];
+
+/** Filtre parametreleri korunarak liste adresi kurar (sayfa ve akış bileşenleri ortak). */
+function customersHref(baseParams: BaseParams, overrides: Record<string, string | undefined>) {
+  const merged: Record<string, string | undefined> = { ...baseParams, ...overrides };
+  const usp = new URLSearchParams();
+  for (const [key, value] of Object.entries(merged)) if (value) usp.set(key, value);
+  const qs = usp.toString();
+  return qs ? `/app/musteriler?${qs}` : "/app/musteriler";
+}
+
+const SEGMENT_CARDS = [
+  { key: "sicak" as const, icon: Flame },
+  { key: "ilgili" as const, icon: Sparkles },
+  { key: "soguk" as const, icon: Snowflake },
+  { key: "uykuda" as const, icon: Moon },
+];
+
+/** KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden. Liste beklemeden akar. */
+async function KpisStream({ summary, totalAll, baseParams }: { summary: Promise<CustomersSummary>; totalAll: number; baseParams: BaseParams }) {
+  const s = await summary;
+  const kpis: KpiItem[] = [
+    { label: "Toplam kayıt", value: totalAll, icon: <ICONS.musteri />, tone: "info", href: "/app/musteriler", hint: "kayıtlı müşteri" },
+    {
+      label: "Aktif alıcı",
+      value: s.buyerCount,
+      icon: <UserCheck />,
+      tone: "success",
+      href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}`,
+      hint: "alıcı tipinde",
+    },
+    {
+      label: "Mülk sahibi",
+      value: s.ownerCount,
+      icon: <ICONS.portfoy />,
+      tone: "neutral",
+      href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}`,
+      hint: "portföy kaynağı",
+    },
+    {
+      label: "Yeni · son 8 hafta",
+      value: s.growthTotal,
+      icon: <TrendingUp />,
+      tone: "info",
+      href: `/app/musteriler?from=${s.growthFromDate}`,
+      series: s.weeklySeries,
+      showTrend: true,
+      seriesLabel: "önceki 4 haftaya göre",
+      hint: s.growthTotal === 0 ? "yeni müşteri eklenmedi" : undefined,
+    },
+    {
+      label: "Sıcak müşteri",
+      value: s.segmentCounts.sicak,
+      icon: <Flame />,
+      tone: "warning",
+      href: customersHref(baseParams, { segment: "sicak", sayfa: undefined }),
+      hint: s.poolLimited ? `yaklaşık (ilk ${HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kayıt)` : "şu an en canlı",
+    },
+  ];
+  return <KpiStrip items={kpis} />;
+}
+
+/** Grafikler: yalnız güvenilir sayım varsa (tarama kesilmediyse); her sütun filtreli listeye gider. */
+async function ChartsStream({ summary, customerTypes }: { summary: Promise<CustomersSummary>; customerTypes: CustomerTypeDefs }) {
+  const { typeCounts, weeklyBars, growthFromDate } = await summary;
+  const typeBars = typeCounts
+    ? customerTypes.map((t) => ({
+        label: t.label,
+        value: typeCounts[t.value] ?? 0,
+        href: `/app/musteriler?type=${encodeURIComponent(t.value)}`,
+      }))
+    : [];
+  return (
+    <>
+      <ColumnChartCard
+        title="Müşteri tipleri"
+        subtitle="Bir müşteri birden çok tipte olabilir"
+        icon={ICONS.musteri}
+        bars={typeBars}
+        href="/app/musteriler"
+      />
+      {weeklyBars ? (
+        <ColumnChartCard
+          title="Yeni müşteri"
+          subtitle="Son 8 hafta · haftalık kayıt"
+          icon={TrendingUp}
+          tone="success"
+          barTone="success"
+          highlight={weeklyBars.length - 1}
+          bars={weeklyBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `/app/musteriler?from=${w.from}&to=${w.to}` }))}
+          href={`/app/musteriler?from=${growthFromDate}`}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** Yaklaşan doğum günü / yıldönümü hatırlatması. */
+async function OccasionsStream({ summary }: { summary: Promise<CustomersSummary> }) {
+  const { occasions } = await summary;
+  if (occasions.length === 0) return null;
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-2">
+        <Gift aria-hidden="true" className="h-4 w-4 text-text-muted" />
+        <p className="text-sm font-semibold text-ink-950">
+          Yaklaşan özel günler
+          <span className="ml-1.5 font-normal text-text-muted">· önümüzdeki {WINDOW_DAYS} gün</span>
+        </p>
+      </div>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {occasions.slice(0, 12).map((o) => (
+          <li key={`${o.id}-${o.kind}`}>
+            <Link
+              href={`/app/musteriler/${o.id}`}
+              className="focus-ring group inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
+              title={o.note ?? undefined}
+            >
+              {o.kind === "birthday" ? (
+                <Cake aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
+              ) : (
+                <Gift aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
+              )}
+              <span>{o.name}</span>
+              <StatusPill tone={o.days === 0 ? "warning" : "neutral"} dot={false}>
+                {o.kind === "birthday" ? "Doğum günü" : "Yıldönümü"} · {occasionLabel(o.days)}
+              </StatusPill>
+            </Link>
+          </li>
+        ))}
+        {occasions.length > 12 ? (
+          <li className="self-center text-xs font-medium text-text-muted">+{occasions.length - 12} daha</li>
+        ) : null}
+      </ul>
+    </Card>
+  );
+}
+
+type FilterChipsProps = {
+  totalAll: number;
+  customerTypes: CustomerTypeDefs;
+  typeF: string;
+  segmentF: HeatSegment | "";
+  baseParams: BaseParams;
+};
+
+/** Tip çipleri + sıcaklık segmentleri. `summary` null iken (akış beklerken) sayaçsız, ama tıklanabilir görünür. */
+function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, baseParams }: FilterChipsProps & { summary: CustomersSummary | null }) {
+  return (
+    <div className="space-y-2">
+      {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
+      <CategoryChips
+        options={customerTypes.map((t) => ({ value: t.value, label: t.label }))}
+        counts={summary?.typeCounts ?? null}
+        total={totalAll}
+        active={typeF}
+        pathname="/app/musteriler"
+        params={baseParams}
+        paramName="type"
+        label="Müşteri tipi"
+      />
+
+      {/* Sıcaklık segmentleri — akıllı listeler (çip = filtre; aktifken tekrar tıklamak kaldırır) */}
+      <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
+        {SEGMENT_CARDS.map((card) => {
+          const on = segmentF === card.key;
+          return (
+            <Link
+              key={card.key}
+              href={on ? customersHref(baseParams, { segment: undefined, sayfa: undefined }) : customersHref(baseParams, { segment: card.key, sayfa: undefined })}
+              aria-current={on ? "true" : undefined}
+              title={on ? "Filtre aktif — kaldır" : `${HEAT_SEGMENTS[card.key].label} müşterileri göster`}
+              className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "opacity-85 hover:opacity-100"} touch:min-h-11`}
+            >
+              <card.icon aria-hidden="true" className="h-3.5 w-3.5" />
+              {HEAT_SEGMENTS[card.key].label}
+              {summary ? <span className="numeric">{summary.segmentCounts[card.key]}</span> : null}
+            </Link>
+          );
+        })}
+        {summary?.poolLimited ? (
+          <span className="text-xs text-text-faint">
+            Sayılar filtrelenmiş listenin ilk {HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır (yaklaşık).
+          </span>
+        ) : null}
+      </nav>
+    </div>
+  );
+}
+
+async function FilterChipsStream({ summary, ...rest }: FilterChipsProps & { summary: Promise<CustomersSummary> }) {
+  return <FilterChipsView summary={await summary} {...rest} />;
+}
 
 export default async function CustomersPage({
   searchParams,
@@ -142,9 +340,13 @@ export default async function CustomersPage({
   const offset = (page - 1) * PAGE_SIZE;
   // Özel alan filtresi (?ozel=anahtar:değer): eşleşen kimlikler liste + havuz sorgusuna uygulanır.
   // Kapsam ve özel alan süzgeci birbirinden bağımsız: TEK turda (eskiden ardışık).
-  const [listScope, customFilter] = await Promise.all([
+  // Süzgeç YOKSA kimlikler beklenmez (customIds=null): tanım okuması yalnız filtre çubuğunu besler ve liste turuyla
+  // paralel koşar (eskiden her açılışta listeden ÖNCE ayrı bir gidiş-dönüş).
+  const customRaw = customFilterRaw(sp as Record<string, string | undefined>);
+  const customFilterP = createClient().then((c) => resolveCustomFieldFilter(c, tenantId, "customer", customRaw));
+  const [listScope, customIds] = await Promise.all([
     listScopeP,
-    createClient().then((c) => resolveCustomFieldFilter(c, tenantId, "customer", customFilterRaw(sp as Record<string, string | undefined>))),
+    customRaw ? customFilterP.then((f) => f.ids) : Promise.resolve(null),
   ]);
 
   // Tüm sorgular + skorlama data.ts'te (T1); burada yalnız görünüm.
@@ -153,8 +355,6 @@ export default async function CustomersPage({
     pageIds,
     rowCount,
     totalAll,
-    buyerCount,
-    ownerCount,
     totalFiltered,
     totalPages,
     rangeStart,
@@ -162,20 +362,14 @@ export default async function CustomersPage({
     hotCount,
     advisorList,
     advisorName,
-    occasions,
-    growthTotal,
-    growthFromDate,
-    weeklySeries,
-    typeCounts,
     tenantTags,
     customerTypes,
     sourceEntries,
     sourceLabel,
     savedViews,
-    segmentCounts,
-    poolLimited,
-  weeklyBars,
-  } = await measure("musteriler-liste", () => loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter, customIds: customFilter.ids }));
+    summary,
+  } = await measure("musteriler-liste", () => loadCustomersData({ tenantId, filters, segmentF, sortF, sortKey, sortDir, offset, scopeFilter: listScope.filter, customIds }));
+  const customFilter = await customFilterP;
 
   // ---- Link kurucu: filtreler sayfa/sıralama linklerinde korunur ----------
   const baseParams: Record<string, string> = {};
@@ -213,45 +407,6 @@ export default async function CustomersPage({
     return hrefWith({ sirala: key, yon: nextDir, sort: undefined, sayfa: undefined });
   };
 
-  // ---- KPI şeridi: yalnız gerçekten hesaplanan sayılar -----------------------
-  const kpis: KpiItem[] = [
-    { label: "Toplam kayıt", value: totalAll, icon: <ICONS.musteri />, tone: "info", href: "/app/musteriler", hint: "kayıtlı müşteri" },
-    {
-      label: "Aktif alıcı",
-      value: buyerCount,
-      icon: <UserCheck />,
-      tone: "success",
-      href: `/app/musteriler?type=${encodeURIComponent("Alıcı")}`,
-      hint: "alıcı tipinde",
-    },
-    {
-      label: "Mülk sahibi",
-      value: ownerCount,
-      icon: <ICONS.portfoy />,
-      tone: "neutral",
-      href: `/app/musteriler?type=${encodeURIComponent("Mülk sahibi")}`,
-      hint: "portföy kaynağı",
-    },
-    {
-      label: "Yeni · son 8 hafta",
-      value: growthTotal,
-      icon: <TrendingUp />,
-      tone: "info",
-      href: `/app/musteriler?from=${growthFromDate}`,
-      series: weeklySeries,
-      showTrend: true,
-      seriesLabel: "önceki 4 haftaya göre",
-      hint: growthTotal === 0 ? "yeni müşteri eklenmedi" : undefined,
-    },
-    {
-      label: "Sıcak müşteri",
-      value: segmentCounts.sicak,
-      icon: <Flame />,
-      tone: "warning",
-      href: hrefWith({ segment: "sicak", sayfa: undefined }),
-      hint: poolLimited ? `yaklaşık (ilk ${HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kayıt)` : "şu an en canlı",
-    },
-  ];
 
   const chips = buildActiveChips("/app/musteriler", baseParams, [
     { key: "q", label: "Arama" },
@@ -266,44 +421,7 @@ export default async function CustomersPage({
     { key: "sort", label: "Sıralama", format: (v) => (v === "hot" ? "Sıcak önce" : v) },
   ]);
   const savedViewParams = Object.fromEntries(Object.entries(baseParams).filter(([k]) => k !== "yogunluk"));
-  const segmentCards = [
-    { key: "sicak" as const, icon: Flame },
-    { key: "ilgili" as const, icon: Sparkles },
-    { key: "soguk" as const, icon: Snowflake },
-    { key: "uykuda" as const, icon: Moon },
-  ];
 
-  // ---- Grafikler: yalnız güvenilir sayım varsa (tarama kesilmediyse); her sütun filtreli listeye gider ----
-  const typeBars = typeCounts
-    ? customerTypes.map((t) => ({
-        label: t.label,
-        value: typeCounts[t.value] ?? 0,
-        href: `/app/musteriler?type=${encodeURIComponent(t.value)}`,
-      }))
-    : [];
-  const charts = (
-    <>
-      <ColumnChartCard
-        title="Müşteri tipleri"
-        subtitle="Bir müşteri birden çok tipte olabilir"
-        icon={ICONS.musteri}
-        bars={typeBars}
-        href="/app/musteriler"
-      />
-      {weeklyBars ? (
-        <ColumnChartCard
-          title="Yeni müşteri"
-          subtitle="Son 8 hafta · haftalık kayıt"
-          icon={TrendingUp}
-          tone="success"
-          barTone="success"
-          highlight={weeklyBars.length - 1}
-          bars={weeklyBars.map((w) => ({ label: w.label, value: w.count, title: `${w.title}: ${w.count}`, href: `/app/musteriler?from=${w.from}&to=${w.to}` }))}
-          href={`/app/musteriler?from=${growthFromDate}`}
-        />
-      ) : null}
-    </>
-  );
 
   return (
     <ListPage
@@ -333,46 +451,22 @@ export default async function CustomersPage({
         ),
       }}
       // KPI şeridi — hepsi tıklanabilir; çubuk/trend yalnız gerçek haftalık kayıt serisinden
-      kpis={<KpiStrip items={kpis} />}
-      charts={charts}
+      kpis={
+        <Suspense fallback={<SkeletonCard height={92} label="Özet göstergeler yükleniyor" />}>
+          <KpisStream summary={summary} totalAll={totalAll} baseParams={baseParams} />
+        </Suspense>
+      }
+      charts={
+        <Suspense fallback={<SkeletonCard height={220} label="Grafikler yükleniyor" />}>
+          <ChartsStream summary={summary} customerTypes={customerTypes} />
+        </Suspense>
+      }
     >
 
-      {/* Yaklaşan doğum günü / yıldönümü hatırlatma */}
-      {occasions.length > 0 ? (
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <Gift aria-hidden="true" className="h-4 w-4 text-text-muted" />
-            <p className="text-sm font-semibold text-ink-950">
-              Yaklaşan özel günler
-              <span className="ml-1.5 font-normal text-text-muted">· önümüzdeki {WINDOW_DAYS} gün</span>
-            </p>
-          </div>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {occasions.slice(0, 12).map((o) => (
-              <li key={`${o.id}-${o.kind}`}>
-                <Link
-                  href={`/app/musteriler/${o.id}`}
-                  className="focus-ring group inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
-                  title={o.note ?? undefined}
-                >
-                  {o.kind === "birthday" ? (
-                    <Cake aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
-                  ) : (
-                    <Gift aria-hidden="true" className="h-3.5 w-3.5 text-text-muted" />
-                  )}
-                  <span>{o.name}</span>
-                  <StatusPill tone={o.days === 0 ? "warning" : "neutral"} dot={false}>
-                    {o.kind === "birthday" ? "Doğum günü" : "Yıldönümü"} · {occasionLabel(o.days)}
-                  </StatusPill>
-                </Link>
-              </li>
-            ))}
-            {occasions.length > 12 ? (
-              <li className="self-center text-xs font-medium text-text-muted">+{occasions.length - 12} daha</li>
-            ) : null}
-          </ul>
-        </Card>
-      ) : null}
+      {/* Yaklaşan doğum günü / yıldönümü hatırlatma (akışla gelir; liste beklemez) */}
+      <Suspense fallback={null}>
+        <OccasionsStream summary={summary} />
+      </Suspense>
 
       {/* Araç çubuğu: arama + filtre paneli (GET form → URL), yoğunluk, kayıtlı görünümler, aktif filtre çipleri */}
       <ListToolbar
@@ -454,46 +548,29 @@ export default async function CustomersPage({
       <CustomFieldFilterBar path="/app/musteriler" params={baseParams} state={customFilter} />
 
       {totalAll > 0 ? (
-        <div className="space-y-2">
-          {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
-          <CategoryChips
-            options={customerTypes.map((t) => ({ value: t.value, label: t.label }))}
-            counts={typeCounts}
-            total={totalAll}
-            active={typeF}
-            pathname="/app/musteriler"
-            params={baseParams}
-            paramName="type"
-            label="Müşteri tipi"
+        <Suspense
+          fallback={
+            <FilterChipsView
+              summary={null}
+              totalAll={totalAll}
+              customerTypes={customerTypes}
+              typeF={typeF}
+              segmentF={segmentF}
+              baseParams={baseParams}
+            />
+          }
+        >
+          <FilterChipsStream
+            summary={summary}
+            totalAll={totalAll}
+            customerTypes={customerTypes}
+            typeF={typeF}
+            segmentF={segmentF}
+            baseParams={baseParams}
           />
-
-          {/* Sıcaklık segmentleri — akıllı listeler (çip = filtre; aktifken tekrar tıklamak kaldırır) */}
-          <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
-            {segmentCards.map((card) => {
-              const on = segmentF === card.key;
-              return (
-                <Link
-                  key={card.key}
-                  href={on ? hrefWith({ segment: undefined, sayfa: undefined }) : hrefWith({ segment: card.key, sayfa: undefined })}
-                  aria-current={on ? "true" : undefined}
-                  title={on ? "Filtre aktif — kaldır" : `${HEAT_SEGMENTS[card.key].label} müşterileri göster`}
-                  className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "opacity-85 hover:opacity-100"} touch:min-h-11`}
-                >
-                  <card.icon aria-hidden="true" className="h-3.5 w-3.5" />
-                  {HEAT_SEGMENTS[card.key].label}
-                  <span className="numeric">{segmentCounts[card.key]}</span>
-                </Link>
-              );
-            })}
-            {poolLimited ? (
-              <span className="text-xs text-text-faint">
-                Sayılar filtrelenmiş listenin ilk {HEAT_POOL_LIMIT.toLocaleString("tr-TR")} kaydından hesaplanır (yaklaşık).
-              </span>
-            ) : null}
-          </nav>
-        </div>
+        </Suspense>
       ) : null}
+
 
       {totalAll === 0 ? (
         <EmptyState

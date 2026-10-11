@@ -28,6 +28,8 @@ export type StaleListingFact = {
   daysListed: number;
   peerCount: number;
   peerMedian: number | null;
+  /** Mülk sahibinden onay bekleyen bir fiyat revizyonu önerisi var (property_price_proposals, 20261012000800). */
+  pendingProposal?: boolean;
 };
 
 /** `minDays`: ofis tanımı (office.insight.listing_stale_days); verilmezse PRICE_MIN_DAYS. */
@@ -47,15 +49,17 @@ export function evaluatePriceAction(facts: readonly StaleListingFact[], nowMs: n
       kind: "price_action",
       ruleId: PRICE_ACTION_RULE_ID,
       severity: high ? "yuksek" : "orta",
-      title: `Fiyatı gözden geçir: ${name}`,
+      title: f.pendingProposal ? `Fiyat önerisi onay bekliyor: ${name}` : `Fiyatı gözden geçir: ${name}`,
       why:
         `${f.daysListed} gündür yayında ve liste fiyatı benzer ${f.peerCount} aktif ilanın medyanının %${abovePct} üzerinde. ` +
-        `Karşılaştırma aktif ilanların istenen fiyatlarıdır (gerçekleşen satış değil).`,
+        `Karşılaştırma aktif ilanların istenen fiyatlarıdır (gerçekleşen satış değil).` +
+        (f.pendingProposal ? " Mülk sahibine fiyat revizyonu önerisi gönderildi; yanıtı bekleniyor." : ""),
       evidence: [
         { label: "Yayında", value: `${f.daysListed} gün` },
         { label: "Medyanın üstünde", value: `%${abovePct}` },
         { label: "Emsal ilan", value: `${f.peerCount} aktif ilan` },
         { label: "Kaynak", value: "aktif ilan emsali" },
+        ...(f.pendingProposal ? [{ label: "Fiyat önerisi", value: "mülk sahibi onayı bekliyor" }] : []),
       ],
       href: `/app/portfoyler/${f.propertyId}`,
       entityType: "property",

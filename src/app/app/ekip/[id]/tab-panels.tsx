@@ -40,8 +40,8 @@ export type Ctx = {
   /** İzleyici (hedef gerçekleşmesi aynı tek kaynaktan hesaplanır). */
   viewer: MetricsViewer;
   tenantId: string | null;
-  /** Bu ay / önceki ay metrikleri (loadAdvisorMetrics; sayfa bir kez yükler). */
-  month: MemberMonth;
+  /** Bu ay / önceki ay metrikleri (loadAdvisorMetrics; sayfa bir kez başlatır, sekmeler kendi Suspense'inde bekler). */
+  monthP: Promise<MemberMonth>;
 };
 
 function money(n: number) {
@@ -79,9 +79,9 @@ function deltaHint(prev: number, d: Delta, fmt: (n: number) => string = String):
 
 export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ctx; canHandoff: boolean; editableScopes: HandoffScope[] }) {
   const { supabase, id, fullName, showEarnings } = ctx;
-  const kpis = ctx.month.kpis;
 
-  const [customersRes, propertyCountRes, propertiesRes, advisorRes] = await Promise.all([
+  const [month, customersRes, propertyCountRes, propertiesRes, advisorRes] = await Promise.all([
+    ctx.monthP,
     supabase.from("customers").select("id, full_name, phone").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
     supabase.from("properties").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null),
     supabase.from("properties").select("id, property_code, title, list_price").eq("assigned_to", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(8),
@@ -90,7 +90,8 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
       : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ]);
 
-  const customerCount = ctx.month.customerTotal;
+  const kpis = month.kpis;
+  const customerCount = month.customerTotal;
   const propertyCount = propertyCountRes.count ?? 0;
   const customers = (customersRes.data ?? []) as { id: string; full_name: string; phone: string | null }[];
   const properties = (propertiesRes.data ?? []) as { id: string; property_code: string | null; title: string | null; list_price: number | null }[];
@@ -112,8 +113,8 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
     },
   ];
   if (showEarnings) {
-    const cur = ctx.month.revenue.cur ?? 0;
-    const prev = ctx.month.revenue.prev ?? 0;
+    const cur = month.revenue.cur ?? 0;
+    const prev = month.revenue.prev ?? 0;
     items.push({ label: "Tahsil edilen pay (bu ay)", value: money(cur), href: ctx.isSelf ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis", hint: deltaHint(prev, compareMonths(cur, prev), money) });
   }
   items.push(
@@ -510,9 +511,9 @@ export function EarningsTab({ ctx, year }: { ctx: Ctx; year: string }) {
 
 export async function CoachTab({ ctx }: { ctx: Ctx }) {
   const { supabase, id, fullName } = ctx;
-  const kpis = ctx.month.kpis;
   const todayIso = new Date(now()).toISOString();
-  const [lead, overpriced, expiring] = await Promise.all([
+  const [month, lead, overpriced, expiring] = await Promise.all([
+    ctx.monthP,
     loadLeadData(supabase, id),
     supabase.from("properties").select("id", { count: "exact", head: true }).eq("assigned_to", id).is("deleted_at", null).eq("price_health", "red"),
     supabase
@@ -523,13 +524,14 @@ export async function CoachTab({ ctx }: { ctx: Ctx }) {
       .gte("authorization_end", trDayKey(todayIso))
       .lte("authorization_end", trDayKey(now() + 15 * 86_400_000)),
   ]);
+  const kpis = month.kpis;
   const actions: CoachActionWithLink[] = buildCoachActions({
-    customerCount: ctx.month.customerTotal,
+    customerCount: month.customerTotal,
     callCount: kpis.callsCur,
     appointmentCount: kpis.appointments.cur,
     offerCount: kpis.offers.cur,
     dealCount: kpis.deals.cur,
-    revenue: ctx.month.revenue.cur ?? 0,
+    revenue: month.revenue.cur ?? 0,
     staleCustomerCount: lead.staleCustomers,
     hotCustomerCount: 0,
     overpricedCount: overpriced.count ?? 0,

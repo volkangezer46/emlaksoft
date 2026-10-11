@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar } from "@/components/ui/avatar";
 import { loadAvatarMap } from "@/lib/avatar-read";
 import Link from "@/components/ui/smart-link";
@@ -22,7 +24,7 @@ import { canSeeAllEarnings, canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { trMonthContext } from "@/lib/team/scorecard";
 import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
-import { loadMemberMonth } from "./advisor-data";
+import { loadMemberMonth, type MemberMonth } from "./advisor-data";
 import { AdvisorListingOpsCard } from "@/components/listing-control/advisor-ops-card";
 import { AdvisorSurveyCard } from "@/components/surveys/advisor-survey-card";
 import {
@@ -39,6 +41,29 @@ import {
 import { ROLE_LABELS } from "@/lib/role-labels";
 
 
+function TabSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true">
+      <Skeleton className="h-28" />
+      <Skeleton className="h-56" />
+    </div>
+  );
+}
+async function MonthCollectedCard({ monthP, href }: { monthP: Promise<MemberMonth>; href: string }) {
+  const month = await monthP;
+  return (
+    <Link
+      href={href}
+      className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 text-center shadow-[var(--shadow-xs)] hover:border-brand-300"
+    >
+      <p className="flex items-center justify-center gap-1.5 text-xs text-text-muted"><Wallet className="h-3.5 w-3.5" /> Bu ay tahsil edilen pay</p>
+      <p className="mt-1 flex items-center justify-center gap-1 font-display text-xl font-extrabold text-mint-700">
+        {money(month.revenue.cur ?? 0)}
+        <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
+      </p>
+    </Link>
+  );
+}
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -90,14 +115,15 @@ export async function AdvisorDetailView({
   // bağlı DEĞİL (eskiden 4 ardışık tur). Üye görünmüyorsa (RLS/yanlış id) notFound() hiçbir şey çizmeden keser.
   // Aylık sayılar + gelir: tek kaynak. Yıllık komisyon satırları yalnız kazancı görme hakkı varsa çekilir
   // (başkasının kazancı sunucudan bile çıkmaz; kapı fetchCommissionRows içindedir).
-  const [{ data: member }, avatarMap, month, commissionRes, workRes, specialtyReady, privateReady] = await Promise.all([
+  // Aylık sayılar (10+ sorgu) künyeyi BEKLETMEZ: söz burada başlar, sekmeler ve ücret kartı kendi Suspense'inde bekler.
+  const monthP = loadMemberMonth(supabase, { viewer, tenantId, id, nowMs });
+  const [{ data: member }, avatarMap, commissionRes, workRes, specialtyReady, privateReady] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, phone, title, role, is_active, created_at, branch:branches!profiles_branch_id_fkey(name)")
       .eq("id", id)
       .maybeSingle(),
     loadAvatarMap([id], supabase),
-    loadMemberMonth(supabase, { viewer, tenantId, id, nowMs }),
     showEarnings
       ? fetchCommissionRows<CommissionRow>(supabase, {
           tenantId,
@@ -115,7 +141,6 @@ export async function AdvisorDetailView({
   if (!member) notFound();
   const memberAvatar = avatarMap.get(id);
   const commissions = commissionRes.rows;
-  const monthCollected = month.revenue.cur ?? 0;
 
   // P0-11: yönetici üyenin ad/telefon/unvanını düzeltir, erişim bağlantısı gönderir, pasifleştirir.
   const canEditInfo =
@@ -160,7 +185,7 @@ export async function AdvisorDetailView({
     commissions,
     viewer,
     tenantId,
-    month,
+    monthP,
   };
   const branch = relName(member.branch);
   const access = active === "profil" && canEditInfo && tenantId ? await loadMemberAccess(tenantId, id) : null;
@@ -207,16 +232,9 @@ export async function AdvisorDetailView({
         }
         actions={
           !showEarnings ? undefined : (
-            <Link
-              href={id === userId ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis"}
-              className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 text-center shadow-[var(--shadow-xs)] hover:border-brand-300"
-            >
-              <p className="flex items-center justify-center gap-1.5 text-xs text-text-muted"><Wallet className="h-3.5 w-3.5" /> Bu ay tahsil edilen pay</p>
-              <p className="mt-1 flex items-center justify-center gap-1 font-display text-xl font-extrabold text-mint-700">
-                {money(monthCollected)}
-                <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-              </p>
-            </Link>
+            <Suspense fallback={<Skeleton className="h-[68px] w-44" />}>
+              <MonthCollectedCard monthP={monthP} href={id === userId ? "/app/cuzdan" : "/app/cuzdan?sekme=ofis"} />
+            </Suspense>
           )
         }
       />
@@ -241,16 +259,53 @@ export async function AdvisorDetailView({
 
       <DetailSegmentTabs basePath={basePath} tabs={tabs} active={active} label="Danışman 360 sekmeleri" />
 
-      {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} /> : null}
-      {active === "ozet" && effectiveCanAccessModule(perms, "portals") ? <AdvisorListingOpsCard advisorId={id} /> : null}
-      {active === "ozet" && effectiveCanAccessModule(perms, "surveys") ? <AdvisorSurveyCard advisorId={id} /> : null}
-      {active === "aktivite" ? <ActivityTab ctx={ctx} /> : null}
-      {active === "aktivite" ? <ActivityExtra supabase={supabase} id={id} /> : null}
-      {active === "oncul" ? <LeadTab ctx={ctx} /> : null}
-      {active === "pipeline" ? <PipelineTab ctx={ctx} /> : null}
-      {active === "hedef" ? <TargetTab ctx={ctx} /> : null}
-      {active === "kazanc" ? <EarningsTab ctx={ctx} year={year} /> : null}
-      {active === "kosluk" ? <CoachTab ctx={ctx} /> : null}
+      {/* Sekme içerikleri kendi Suspense sınırında akar: künye + sekme şeridi sekme verisini BEKLEMEDEN boyanır. */}
+      {active === "ozet" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} />
+        </Suspense>
+      ) : null}
+      {active === "ozet" && effectiveCanAccessModule(perms, "portals") ? (
+        <Suspense fallback={null}>
+          <AdvisorListingOpsCard advisorId={id} />
+        </Suspense>
+      ) : null}
+      {active === "ozet" && effectiveCanAccessModule(perms, "surveys") ? (
+        <Suspense fallback={null}>
+          <AdvisorSurveyCard advisorId={id} />
+        </Suspense>
+      ) : null}
+      {active === "aktivite" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <ActivityTab ctx={ctx} />
+          <ActivityExtra supabase={supabase} id={id} />
+        </Suspense>
+      ) : null}
+      {active === "oncul" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <LeadTab ctx={ctx} />
+        </Suspense>
+      ) : null}
+      {active === "pipeline" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <PipelineTab ctx={ctx} />
+        </Suspense>
+      ) : null}
+      {active === "hedef" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <TargetTab ctx={ctx} />
+        </Suspense>
+      ) : null}
+      {active === "kazanc" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <EarningsTab ctx={ctx} year={year} />
+        </Suspense>
+      ) : null}
+      {active === "kosluk" ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <CoachTab ctx={ctx} />
+        </Suspense>
+      ) : null}
       {active === "profil" && canEditInfo ? (
         <MemberInfoPanel
           memberId={id}
@@ -264,6 +319,7 @@ export async function AdvisorDetailView({
         />
       ) : null}
       {active === "profil" && tenantId && profileTabVisible ? (
+        <Suspense fallback={<TabSkeleton />}>
         <ProfileTab
           supabase={supabase}
           tenantId={tenantId}
@@ -274,8 +330,13 @@ export async function AdvisorDetailView({
           workAvailable={workRes.available}
           todayKey={todayKey}
         />
+        </Suspense>
       ) : null}
-      {active === "uzmanlik" && tenantId ? <SpecialtyTab supabase={supabase} tenantId={tenantId} memberId={id} viewerRole={role} /> : null}
+      {active === "uzmanlik" && tenantId ? (
+        <Suspense fallback={<TabSkeleton />}>
+          <SpecialtyTab supabase={supabase} tenantId={tenantId} memberId={id} viewerRole={role} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

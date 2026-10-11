@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Image from "next/image";
 import {
@@ -32,6 +33,7 @@ import { OWNER_WEEKLY_REPORT_KEY } from "@/lib/settings/registry/tenant";
 import { OwnerRentStatementSection, OwnerWeeklyReportSection } from "./owner-extras";
 import { OwnerRentStatementView } from "./rent-statement-view";
 import { OwnerPayoutSection } from "./owner-payout-section";
+import { OwnerPriceProposalSection } from "./owner-price-proposal";
 import { BuildingDuesSection } from "@/components/public/building-dues-section";
 import { now as clockNow, trDayKey } from "@/lib/clock";
 import {
@@ -288,6 +290,11 @@ export default async function MalikPortaliPage({
             )}
           </div>
         </section>
+
+        {/* Fiyat önerisi: danışmanın bekleyen önerisi varsa onay kartı (yoksa kısa süre karar özeti) */}
+        <Suspense fallback={null}>
+          <OwnerPriceProposalSection db={admin} tenantId={tenant.id} propertyId={property.id} token={token} />
+        </Suspense>
 
         {/* Haftalık pazarlama raporu (ofis ayarı açıksa) */}
         {weeklyReportOn ? <OwnerWeeklyReportSection db={admin} tenantId={tenant.id} propertyId={property.id} /> : null}

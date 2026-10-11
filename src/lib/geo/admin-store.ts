@@ -350,17 +350,20 @@ async function countOf(table: string, active?: boolean): Promise<number> {
 
 export async function getGeoHealth(): Promise<GeoHealth> {
   const admin = createAdminClient();
-  const [pa, pi, da, di, na, ni] = await Promise.all([
-    countOf("geo_provinces", true), countOf("geo_provinces", false),
-    countOf("geo_districts", true), countOf("geo_districts", false),
-    countOf("geo_neighborhoods", true), countOf("geo_neighborhoods", false),
-  ]);
+  // Sayımlar + istatistik görünümleri + sürüm listesi + bekleyen bildirim birbirinden BAĞIMSIZ → tek tur (önceden 4 sıralı tur).
   // Tutarsızlıklar: mevcut istatistik görünümlerinden (geo_province_stats / geo_district_stats).
-  const [{ data: pstats }, { data: dstats }, { data: provs }, { data: dists }] = await Promise.all([
+  const [[pa, pi, da, di, na, ni], { data: pstats }, { data: dstats }, { data: provs }, { data: dists }, versions, { count: pending, error: pendErr }] = await Promise.all([
+    Promise.all([
+      countOf("geo_provinces", true), countOf("geo_provinces", false),
+      countOf("geo_districts", true), countOf("geo_districts", false),
+      countOf("geo_neighborhoods", true), countOf("geo_neighborhoods", false),
+    ]),
     admin.from("geo_province_stats").select("province_id, district_count"),
     admin.from("geo_district_stats").select("district_id, neighborhood_count"),
     admin.from("geo_provinces").select("id, name").eq("is_active", true),
     admin.from("geo_districts").select("id, name, province_id").eq("is_active", true).limit(5000),
+    listVersions(20),
+    admin.from("geo_change_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
   ]);
   const dc = new Map(((pstats ?? []) as Array<{ province_id: string; district_count: number }>).map((s) => [s.province_id, s.district_count]));
   const nc = new Map(((dstats ?? []) as Array<{ district_id: string; neighborhood_count: number }>).map((s) => [s.district_id, s.neighborhood_count]));
@@ -368,8 +371,6 @@ export async function getGeoHealth(): Promise<GeoHealth> {
   const noNeigh = ((dists ?? []) as Array<{ id: string; name: string; province_id: string }>)
     .filter((d) => (nc.get(d.id) ?? 0) === 0)
     .map((d) => ({ id: d.id, name: d.name, provinceId: d.province_id }));
-  const versions = await listVersions(20);
-  const { count: pending, error: pendErr } = await admin.from("geo_change_requests").select("id", { count: "exact", head: true }).eq("status", "pending");
   return {
     totals: { provinces: pa + pi, districts: da + di, neighborhoods: na + ni },
     active: { provinces: pa, districts: da, neighborhoods: na },

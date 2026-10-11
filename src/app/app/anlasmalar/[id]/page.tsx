@@ -120,7 +120,8 @@ export default async function DealDetailPage({
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
   const supabase = await createClient();
-  const [stageLabels, lossOptions] = await Promise.all([getStageLabels(), getLossReasonOptions()]);
+  // Etiket/neden okumaları anlaşma sorgusuyla AYNI turda başlar (önceden ondan önce ayrı tur).
+  const labelsP = Promise.all([getStageLabels(), getLossReasonOptions()]);
 
   const { data: deal } = await supabase
     .from("deals")
@@ -137,22 +138,14 @@ export default async function DealDetailPage({
   // B1: başkasının anlaşmasında danışman kimliği ve brüt komisyon, earnings_all yoksa gizlenir.
   const ownDeal = deal.assigned_to === userId;
   const earningsVisible = seeAllEarnings || ownDeal;
-  // Proje dairesi bağı (deals.project_unit_id; bileşik FK gömmesi yerine tek ayrı okuma).
-  const unitRow = deal.project_unit_id
-    ? (
-        await supabase
-          .from("project_units")
-          .select("id, unit_no, block, project_id, project:projects!project_units_project_id_fkey(name)")
-          .eq("id", deal.project_unit_id)
-          .maybeSingle()
-      ).data
-    : null;
-  const unitProject = unitRow ? (Array.isArray(unitRow.project) ? unitRow.project[0] : unitRow.project) as { name?: string } | null : null;
-  const unitLabel = unitRow
-    ? [unitProject?.name, unitRow.block ? `${unitRow.block} blok` : null, `No ${unitRow.unit_no}`].filter(Boolean).join(" · ")
-    : null;
-
+  // Proje dairesi bağı (deals.project_unit_id; bileşik FK gömmesi yerine tek ayrı okuma) — aynı turda.
+  const capraz = Boolean(deal.property_id && deal.customer_id);
   const [
+    unitRes,
+    [stageLabels, lossOptions],
+    { data: offers },
+    { data: contracts },
+    { count: gorusmeSayisi },
     { data: property },
     { data: customer },
     { data: assignee },
@@ -160,6 +153,41 @@ export default async function DealDetailPage({
     { data: tasks },
     { data: survey },
   ] = await Promise.all([
+      deal.project_unit_id
+        ? supabase
+            .from("project_units")
+            .select("id, unit_no, block, project_id, project:projects!project_units_project_id_fkey(name)")
+            .eq("id", deal.project_unit_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      labelsP,
+      capraz
+        ? supabase
+            .from("offers")
+            .select("id, amount, status, valid_until, created_at")
+            .eq("property_id", deal.property_id!)
+            .eq("customer_id", deal.customer_id!)
+            .order("created_at", { ascending: false })
+            .limit(10)
+        : Promise.resolve({ data: null }),
+      capraz && tab === "belgeler"
+        ? supabase
+            .from("contracts")
+            .select("id, title, contract_type, status, signed_at, created_at")
+            .eq("property_id", deal.property_id!)
+            .eq("customer_id", deal.customer_id!)
+            .order("created_at", { ascending: false })
+            .limit(10)
+        : Promise.resolve({ data: null }),
+      // Görüşme sayısı kapanma tahmininde kullanılır; randevuda deal_id yok → portföy+müşteri ikilisinden eşleştirilir.
+      capraz
+        ? supabase
+            .from("appointments")
+            .select("id", { count: "exact", head: true })
+            .eq("property_id", deal.property_id!)
+            .eq("customer_id", deal.customer_id!)
+            .neq("status", "cancelled")
+        : Promise.resolve({ count: 0 }),
       deal.property_id
         ? supabase
             .from("properties")
@@ -206,53 +234,18 @@ export default async function DealDetailPage({
     ]);
 
   /*
-   * Teklif ve sözleşmede `deal_id` kolonu YOK. Aynı portföy + müşteri ikilisine
-   * bakarak yaklaşık eşleştirme yapıyoruz. Her ikisi de dolu değilse hiç
-   * sorgu atmıyoruz — tek başına portföy eşleşmesi başka müşterinin teklifini
-   * bu anlaşmaya bağlar, bu yanlış olur.
-   */
-  const capraz = Boolean(deal.property_id && deal.customer_id);
-  const [{ data: offers }, { data: contracts }, { count: gorusmeSayisi }] = await Promise.all([
-    capraz
-      ? supabase
-          .from("offers")
-          .select("id, amount, status, valid_until, created_at")
-          .eq("property_id", deal.property_id!)
-          .eq("customer_id", deal.customer_id!)
-          .order("created_at", { ascending: false })
-          .limit(10)
-      : Promise.resolve({ data: null }),
-    capraz && tab === "belgeler"
-      ? supabase
-          .from("contracts")
-          .select("id, title, contract_type, status, signed_at, created_at")
-          .eq("property_id", deal.property_id!)
-          .eq("customer_id", deal.customer_id!)
-          .order("created_at", { ascending: false })
-          .limit(10)
-      : Promise.resolve({ data: null }),
-    /*
-     * Gorusme sayisi kapanma tahmininde kullaniliyor. Ilk yazimda bu deger
-     * SABIT 0 birakilmisti — yani "gorusme" faktoru hic calismiyordu ve skor
-     * sessizce eksik hesaplaniyordu. Randevuda `deal_id` yok; teklif ve
-     * sozlesmeyle ayni yaklasimla portfoy+musteri ikilisinden eslestiriliyor.
-     */
-    capraz
-      ? supabase
-          .from("appointments")
-          .select("id", { count: "exact", head: true })
-          .eq("property_id", deal.property_id!)
-          .eq("customer_id", deal.customer_id!)
-          .neq("status", "cancelled")
-      : Promise.resolve({ count: 0 }),
-  ]);
-
-  /*
    * Evrak dosyası, işlem dosyası ve not akışı ARTIK BURADA ÇEKİLMİYOR.
    * Üçü de künyeden ve birbirinden bağımsızdı ama ardışık üç `await` olarak
    * duruyor, sayfayı üç ekstra gidiş-dönüş kadar geciktiriyorlardı.
    * `./sections.tsx` içinde kendi `<Suspense>` sınırlarında akıyorlar.
    */
+
+  // Teklif/sözleşme/randevuda deal_id yok: yaklaşık eşleştirme (aynı portföy + müşteri); biri boşsa sorgu atılmaz.
+  const unitRow = unitRes.data;
+  const unitProject = unitRow ? (Array.isArray(unitRow.project) ? unitRow.project[0] : unitRow.project) as { name?: string } | null : null;
+  const unitLabel = unitRow
+    ? [unitProject?.name, unitRow.block ? `${unitRow.block} blok` : null, `No ${unitRow.unit_no}`].filter(Boolean).join(" · ")
+    : null;
 
   const stageIdx = STAGES.findIndex((s) => s.key === deal.stage);
   const kayip = deal.stage === "lost";
@@ -278,12 +271,16 @@ export default async function DealDetailPage({
 
   const canSeeCommission = (perms.commissions ?? []).includes("view") && earningsVisible;
   // e-Fatura (Paket D): komisyon satırlarında "Fatura kes" (yetki: commissions.create + kazanç görünürlüğü; bağlantı yoksa "e-Fatura'yı bağla").
-  const invoiceCtx = await loadInvoiceButtonContext(
-    supabase,
-    canSeeCommission && (perms.commissions ?? []).includes("create"),
-    "commission",
-    komisyonlar.map((c) => c.id as string),
-  );
+  // Yalnız "finans" sekmesindeki komisyon tablosu kullanır → diğer sekmelerde ek tur yok.
+  const invoiceCtx =
+    tab === "finans"
+      ? await loadInvoiceButtonContext(
+          supabase,
+          canSeeCommission && (perms.commissions ?? []).includes("create"),
+          "commission",
+          komisyonlar.map((c) => c.id as string),
+        )
+      : { canInvoice: false, connected: false, existing: {} };
 
   /*
    * Memnuniyet anketi kutusu — createSurveyForDeal action'ı reports.view VE
