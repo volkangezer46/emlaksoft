@@ -1,5 +1,6 @@
 "use server";
 
+import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -59,6 +60,9 @@ export async function dismissLostSaleRisk(formData: FormData): Promise<void> {
     entityId: customerId,
     newValue: { reason, dismissed_until: until },
   });
+
+  // "Arandı" = temas: müşterinin açık "Bugün ara" kartı çağrı kaydı girilsin girilmesin anında kapanır.
+  if (reason === "called") closeCallPriorityAfterContact(gate.tenantId, customerId);
 
   // Opsiyonel çağrı kaydı: "Arandı" + kutu işaretli + geçerli telefon.
   // Ayrı yetki kapısı (calls.create) — yoksa dismiss yine de tamamlanır,

@@ -1,5 +1,6 @@
 "use server";
 
+import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -64,6 +65,7 @@ export async function replyWhatsAppInWindow(communicationId: string, text: strin
     contact_address: msg.contact_address,
   });
   if (error) console.error("replyWhatsAppInWindow log", error.code);
+  else closeCallPriorityAfterContact(gate.tenantId, (msg.customer_id as string | null) ?? null);
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "whatsapp.session_reply", entityType: "communication", entityId: communicationId });
   revalidatePath("/app/gelen-kutusu");
   return { ok: true };

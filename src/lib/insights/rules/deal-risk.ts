@@ -2,8 +2,8 @@ import { computeDealScore } from "@/lib/customer-state/deal";
 import { DEAL_HIGH_IDLE_DAYS, DEAL_MIN_IDLE_DAYS } from "@/lib/customer-state/thresholds";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import { buildDedupeKey, weekPeriod } from "@/lib/insights/dedupe";
-import type { InsightDraft } from "@/lib/insights/types";
-import { capPerUser, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from "@/lib/insights/rules/common";
+import type { InsightDraft, InsightRuleRun } from "@/lib/insights/types";
+import { capPerUser, liveIdsOf, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from "@/lib/insights/rules/common";
 
 /**
  * Kural: deal_risk — kaybedilecek (hareketsiz, düşük puanlı) açık anlaşmalar.
@@ -37,7 +37,7 @@ export type StalledDealFact = {
 const STAGE_TR = stageLabelMap(defaultStageLabels());
 
 /** `minIdleDays`: ofis tanımı (office.alert.deal_stale_days); verilmezse DEAL_MIN_IDLE_DAYS. */
-export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: number, minIdleDays: number = DEAL_MIN_IDLE_DAYS): InsightDraft[] {
+export function evaluateDealRiskRun(facts: readonly StalledDealFact[], nowMs: number, minIdleDays: number = DEAL_MIN_IDLE_DAYS): InsightRuleRun {
   const week = weekPeriod(nowMs);
   const drafts: (InsightDraft & { _idle: number })[] = [];
   for (const f of facts) {
@@ -83,6 +83,9 @@ export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: numbe
       entityId: f.dealId,
       isForecast: true,
       confidence: "dusuk",
+      // Dedupe dönemi BİLİNÇLİ olarak hafta (gün dilimi EKLENMEDİ): gün eklemek aynı hareketsiz anlaşma için her gün yeni satır
+      // (spam + kullanıcı başı 15 sınırının dolması) doğurur; ayrıca anahtar biçimi değişince bu haftanın mevcut açık satırlarıyla
+      // eşleşmez ve aynı anlaşma iki kez görünürdü. Koşul kalkınca satır ARGE-1 kapatmasıyla zaten biter.
       dedupeKey: buildDedupeKey("deal", f.dealId, week),
       validUntilMs: nowMs + dayMs(7),
       audience: { type: "user", userId: f.assignedTo },
@@ -91,8 +94,14 @@ export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: numbe
       _idle: f.idleDays,
     });
   }
-  return capPerUser(drafts, MAX_PER_RECIPIENT_PER_RULE, (a, b) => b._idle - a._idle).map(({ _idle, ...d }) => {
+  const liveEntityIds = liveIdsOf(drafts);
+  const capped = capPerUser(drafts, MAX_PER_RECIPIENT_PER_RULE, (a, b) => b._idle - a._idle).map(({ _idle, ...d }) => {
     void _idle;
     return d;
   });
+  return { drafts: capped, liveEntityIds };
+}
+
+export function evaluateDealRisk(facts: readonly StalledDealFact[], nowMs: number, minIdleDays: number = DEAL_MIN_IDLE_DAYS): InsightDraft[] {
+  return evaluateDealRiskRun(facts, nowMs, minIdleDays).drafts;
 }

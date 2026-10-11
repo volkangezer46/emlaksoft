@@ -1,6 +1,6 @@
 import { buildDedupeKey, weekPeriod } from "@/lib/insights/dedupe";
-import type { InsightDraft } from "@/lib/insights/types";
-import { capPerUser, dayMs, nameOr } from "@/lib/insights/rules/common";
+import type { InsightDraft, InsightRuleRun } from "@/lib/insights/types";
+import { capPerUser, liveIdsOf, dayMs, nameOr } from "@/lib/insights/rules/common";
 
 /**
  * Kural: deadline — yetki belgesi bitişi (geriye sayım) ve gecikmiş portal teyidi (satır bazlı, kayıt adlı).
@@ -24,7 +24,7 @@ export type DeadlineFact = {
   daysLeft: number;
 };
 
-export function evaluateDeadlines(facts: readonly DeadlineFact[], nowMs: number): InsightDraft[] {
+export function evaluateDeadlinesRun(facts: readonly DeadlineFact[], nowMs: number): InsightRuleRun {
   const week = weekPeriod(nowMs);
   const authority: InsightDraft[] = [];
   const confirm: InsightDraft[] = [];
@@ -80,5 +80,14 @@ export function evaluateDeadlines(facts: readonly DeadlineFact[], nowMs: number)
     }
   }
   const rank = (a: InsightDraft, b: InsightDraft) => (a.urgencyDays ?? 0) - (b.urgencyDays ?? 0);
-  return [...capPerUser(authority, AUTHORITY_MAX_PER_USER, rank), ...capPerUser(confirm, CONFIRM_MAX_PER_USER, rank)];
+  // Canlı küme = üst sınırdan ÖNCE (yetki + teyit birlikte; aynı ilan iki türde de olabilir, birleşik küme güvenli taraftır).
+  const liveEntityIds = liveIdsOf([...authority, ...confirm]);
+  return {
+    drafts: [...capPerUser(authority, AUTHORITY_MAX_PER_USER, rank), ...capPerUser(confirm, CONFIRM_MAX_PER_USER, rank)],
+    liveEntityIds,
+  };
+}
+
+export function evaluateDeadlines(facts: readonly DeadlineFact[], nowMs: number): InsightDraft[] {
+  return evaluateDeadlinesRun(facts, nowMs).drafts;
 }

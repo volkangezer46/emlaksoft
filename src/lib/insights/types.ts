@@ -61,6 +61,19 @@ export type InsightDraft = {
   impact?: number | null;
 };
 
+/**
+ * Kural çalıştırma sonucu. `liveEntityIds`: kişi başı üst sınır (capPerUser) UYGULANMADAN ÖNCEKİ, hâlâ geçerli olgu
+ * kümesinin varlık kimlikleri. Engine bunu "bu varlık için artık koşul yok" sinyali olarak kullanır: açık içgörü satırı
+ * bu kümede değilse süresi biter (kapanır). `null` = bu kural için kapatma YOK (olgu kümesi eksik/dönemsel olabilir;
+ * güvenli taraf). Yalnız dizi döndüren eski kural = `liveEntityIds: null`.
+ */
+export type InsightRuleRun = { drafts: InsightDraft[]; liveEntityIds: ReadonlySet<string> | null };
+
+/** Geriye uyum: dizi döndüren kural "kapatma yok" sayılır. */
+export function normalizeRuleRun(r: readonly InsightDraft[] | InsightRuleRun): InsightRuleRun {
+  return Array.isArray(r) ? { drafts: [...(r as readonly InsightDraft[])], liveEntityIds: null } : (r as InsightRuleRun);
+}
+
 /** Okuyucunun döndürdüğü içgörü (DB satırının camelCase karşılığı; ana ekran bunu kullanır). */
 export type Insight = {
   id: string;

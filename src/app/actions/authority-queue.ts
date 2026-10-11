@@ -1,5 +1,6 @@
 "use server";
 
+import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -194,6 +195,8 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
     subject: "Yetki onayı hatırlatması",
     body: text,
   });
+  // Mal sahibine hatırlatma gitti = temas: açık "Bugün ara" kartı kapanır.
+  closeCallPriorityAfterContact(gate.tenantId, ownerId);
 
   await logActivity({
     tenantId: gate.tenantId,

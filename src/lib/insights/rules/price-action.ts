@@ -1,6 +1,6 @@
 import { buildDedupeKey, monthPeriod } from "@/lib/insights/dedupe";
-import type { InsightDraft } from "@/lib/insights/types";
-import { capPerUser, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from "@/lib/insights/rules/common";
+import type { InsightDraft, InsightRuleRun } from "@/lib/insights/types";
+import { capPerUser, liveIdsOf, dayMs, MAX_PER_RECIPIENT_PER_RULE, nameOr } from "@/lib/insights/rules/common";
 
 /**
  * Kural: price_action — uzun süredir yayında VE benzer aktif ilanların medyanından belirgin pahalı portföyler.
@@ -33,7 +33,7 @@ export type StaleListingFact = {
 };
 
 /** `minDays`: ofis tanımı (office.insight.listing_stale_days); verilmezse PRICE_MIN_DAYS. */
-export function evaluatePriceAction(facts: readonly StaleListingFact[], nowMs: number, minDays: number = PRICE_MIN_DAYS): InsightDraft[] {
+export function evaluatePriceActionRun(facts: readonly StaleListingFact[], nowMs: number, minDays: number = PRICE_MIN_DAYS): InsightRuleRun {
   const month = monthPeriod(nowMs);
   const drafts: (InsightDraft & { _days: number })[] = [];
   for (const f of facts) {
@@ -74,8 +74,14 @@ export function evaluatePriceAction(facts: readonly StaleListingFact[], nowMs: n
       _days: f.daysListed,
     });
   }
-  return capPerUser(drafts, MAX_PER_RECIPIENT_PER_RULE, (a, b) => b._days - a._days).map(({ _days, ...d }) => {
+  const liveEntityIds = liveIdsOf(drafts);
+  const capped = capPerUser(drafts, MAX_PER_RECIPIENT_PER_RULE, (a, b) => b._days - a._days).map(({ _days, ...d }) => {
     void _days;
     return d;
   });
+  return { drafts: capped, liveEntityIds };
+}
+
+export function evaluatePriceAction(facts: readonly StaleListingFact[], nowMs: number, minDays: number = PRICE_MIN_DAYS): InsightDraft[] {
+  return evaluatePriceActionRun(facts, nowMs, minDays).drafts;
 }

@@ -1,6 +1,6 @@
 import { buildDedupeKey } from "@/lib/insights/dedupe";
-import type { InsightDraft } from "@/lib/insights/types";
-import { capPerUser, dayMs, nameOr } from "@/lib/insights/rules/common";
+import type { InsightDraft, InsightRuleRun } from "@/lib/insights/types";
+import { capPerUser, liveIdsOf, dayMs, nameOr } from "@/lib/insights/rules/common";
 
 /**
  * Kural: authority_expired@1 — yetki SÜRESİ DOLMUŞ ama hâlâ yayında olan portföy (EİDS yetki kuyruğu).
@@ -26,7 +26,7 @@ export type AuthorityExpiredFact = {
   daysOverdue: number;
 };
 
-export function evaluateAuthorityExpired(facts: readonly AuthorityExpiredFact[], nowMs: number): InsightDraft[] {
+export function evaluateAuthorityExpiredRun(facts: readonly AuthorityExpiredFact[], nowMs: number): InsightRuleRun {
   const drafts: InsightDraft[] = [];
   for (const f of facts) {
     if (!f.assignedTo) continue;
@@ -55,5 +55,13 @@ export function evaluateAuthorityExpired(facts: readonly AuthorityExpiredFact[],
       impact: 4,
     });
   }
-  return capPerUser(drafts, AUTHORITY_EXPIRED_MAX_PER_USER, (a, b) => (a.urgencyDays ?? 0) - (b.urgencyDays ?? 0));
+  const liveEntityIds = liveIdsOf(drafts);
+  return {
+    drafts: capPerUser(drafts, AUTHORITY_EXPIRED_MAX_PER_USER, (a, b) => (a.urgencyDays ?? 0) - (b.urgencyDays ?? 0)),
+    liveEntityIds,
+  };
+}
+
+export function evaluateAuthorityExpired(facts: readonly AuthorityExpiredFact[], nowMs: number): InsightDraft[] {
+  return evaluateAuthorityExpiredRun(facts, nowMs).drafts;
 }

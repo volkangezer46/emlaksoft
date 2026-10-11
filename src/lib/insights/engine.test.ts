@@ -171,7 +171,7 @@ describe("processTenant", () => {
   it("ÖRNEK VERİ ofisi atlanır: kural koşmaz, hiçbir insights yazımı olmaz", async () => {
     const { admin, calls, rpc } = fakeAdmin({ count: 2 });
     const run = vi.fn(async () => [draft()]);
-    const rule: InsightRule = { id: "call_priority@1", kind: "call_priority", run };
+    const rule: InsightRule = { id: "call_priority@1", kind: "call_priority", label: "Test", run };
     const r = await processTenant(admin, "t1", NOW, { rules: [rule] });
     expect(r.skipped).toBe("sample");
     expect(r.inserted).toBe(0);
@@ -182,10 +182,11 @@ describe("processTenant", () => {
 
   it("gerçek veri varsa kuralı koşar; RPC'si olmayan kural 'etkin değil' sayılır, diğerleri sürer", async () => {
     const { admin } = fakeAdmin({ count: 9, rows: { profiles: [{ id: U1, role: "advisor" }] } });
-    const ok: InsightRule = { id: "call_priority@1", kind: "call_priority", run: async () => [draft()] };
+    const ok: InsightRule = { id: "call_priority@1", kind: "call_priority", label: "Test", run: async () => [draft()] };
     const missing: InsightRule = {
       id: "deal_risk@1",
       kind: "deal_risk",
+      label: "Test",
       run: async () => {
         throw new InsightFactsUnavailable("insight_stalled_deals");
       },
@@ -204,7 +205,7 @@ describe("processTenant", () => {
       },
     });
     const run = vi.fn(async () => [draft()]);
-    const rule: InsightRule = { id: "call_priority@1", kind: "call_priority", run };
+    const rule: InsightRule = { id: "call_priority@1", kind: "call_priority", label: "Test", run };
     const r1 = await processTenant(muted.admin, "t1", NOW, { rules: [rule] });
     expect(run).not.toHaveBeenCalled();
     expect(r1.rulesMuted).toBe(1);

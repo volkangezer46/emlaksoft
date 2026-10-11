@@ -28,6 +28,13 @@ export function capPerUser<T extends { audience: InsightDraft["audience"] }>(
   return out;
 }
 
+/** Üst sınırdan ÖNCEKİ taslakların varlık kimlikleri (InsightRuleRun.liveEntityIds). Kimliksiz taslak sayılmaz. */
+export function liveIdsOf(drafts: readonly { entityId: string | null }[]): Set<string> {
+  const ids = new Set<string>();
+  for (const d of drafts) if (d.entityId) ids.add(d.entityId);
+  return ids;
+}
+
 /** Kısa gün metni: 1 gün, 14 gün. */
 export const gunText = (n: number): string => `${Math.max(0, Math.round(n))} gün`;
 
