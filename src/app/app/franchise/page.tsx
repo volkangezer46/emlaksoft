@@ -26,7 +26,7 @@ import { Table, TableFrame, TBody, TD, TFoot, TH, THead, TR } from "@/components
 import { Badge } from "@/components/ui/badge";
 
 import { PageHeader } from "@/components/ui/page-header";
-export const metadata = { title: "Franchise / Şube Analitiği" };
+export const metadata = { title: "Şube karşılaştırma" };
 
 /**
  * Faz 6 / D1 + R8: Franchise BI — gerçek şube rollup, çok şubeli ofis yönetimi.
@@ -192,7 +192,7 @@ export default async function FranchiseBiPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tenant?.name ?? "Ofis ağı"} eyebrow="Şube analitiği" description={isMultiBranch
+      <PageHeader title="Şube karşılaştırma" eyebrow={tenant?.name ?? "Ofis ağı"} description={isMultiBranch
                 ? "Şube bazlı canlı rollup: portföy, müşteri, danışman ve kazanılan işlem hacmi."
                 : "Şu an tek şube aktif. İkinci şubeyi eklediğinizde bu ekran otomatik olarak şube kıyaslamasına geçer."} actions={<><ButtonLink href="/app/ekip#subeler" variant="outline" icon={Plus}>Şube ekle / yönet</ButtonLink></>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">

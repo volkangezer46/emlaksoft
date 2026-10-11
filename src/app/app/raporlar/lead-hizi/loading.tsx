@@ -1,6 +1,6 @@
 import { SkeletonCard } from "@/components/ui/viz";
 
-/** Aday hızı: başlık → süzgeç satırı → 4 KPI → danışman tablosu (içerik yükseklikleriyle eşleşir, CLS yok). */
+/** Yanıt hızı: başlık → süzgeç satırı → 4 KPI → danışman tablosu (içerik yükseklikleriyle eşleşir, CLS yok). */
 export default function Loading() {
   return (
     <div className="space-y-6" role="status" aria-label="Yanıt hızı yükleniyor">

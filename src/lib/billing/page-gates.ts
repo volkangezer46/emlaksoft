@@ -61,7 +61,7 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/ag", title: "Ofisler Arası Ağ", minPlan: "professional", pitch: "Başka ofislerle ilan ve talep paylaşımı, ortak satış." },
   // Kurumsal
   { href: "/app/projeler", title: "Proje Satışı", minPlan: "enterprise", pitch: "Proje ve daire stoğu, ödeme planı ve proje satış yönetimi." },
-  { href: "/app/franchise", title: "Franchise BI", minPlan: "enterprise", pitch: "Şube ve ofis bazlı karşılaştırmalı yönetim raporları." },
+  { href: "/app/franchise", title: "Şube karşılaştırma", minPlan: "enterprise", pitch: "Şube ve ofis bazlı karşılaştırmalı yönetim raporları." },
 ];
 
 const PLAN_ORDER: readonly PlanId[] = ["advisor", "office", "professional", "business", "enterprise"];

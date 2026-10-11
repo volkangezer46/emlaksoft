@@ -2,7 +2,11 @@ import Link from "@/components/ui/smart-link";
 import { Phone, ArrowUpRight, Flame, AlarmClock, TrendingUp, MoonStar } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
-import { now } from "@/lib/clock";
+import { now, daysAgoIso } from "@/lib/clock";
+import { getLossReasonOptions } from "@/lib/definitions";
+import { lossReasonLabels } from "@/lib/loss-reason";
+import { RiskRowActions } from "./risk-row-actions";
+import { LossReasons, type ClosedDeal } from "./loss-reasons";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import type { CustomerState } from "@/lib/customer-state/core";
@@ -36,7 +40,7 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
   const segmentF: SegmentKey | "" = (SEGMENT_KEYS as readonly string[]).includes(sp.segment ?? "") ? (sp.segment as SegmentKey) : "";
   const supabase = await createClient();
 
-  const custRes = await
+  const [custRes, closedDealsRes, lossOptions] = await Promise.all([
     // max_rows (1000) sınırı: tüm müşteriler sayfalı okunur; eksik liste sessizce gösterilmez.
     fetchAllRows((from, to) =>
       supabase
@@ -45,8 +49,20 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
         .is("deleted_at", null)
         .order("id", { ascending: true })
         .range(from, to),
-    );
-  assertQueryBatchSucceeded([custRes], ["akilli-customers"], "Akıllı listeler");
+    ),
+    // Kayıp nedenleri yalnız "Kaybedilme riski yüksek" görünümünde gösterilir: son 12 ayın kaybedilen anlaşmaları.
+    segmentF === "churn"
+      ? supabase
+          .from("deals")
+          .select("stage, deal_value, loss_reason")
+          .eq("tenant_id", tenantId)
+          .eq("stage", "lost")
+          .gte("updated_at", daysAgoIso(365))
+          .limit(1000)
+      : Promise.resolve(null),
+    segmentF === "churn" ? getLossReasonOptions() : Promise.resolve(null),
+  ]);
+  assertQueryBatchSucceeded([custRes, ...(closedDealsRes ? [closedDealsRes] : [])], ["akilli-customers", ...(closedDealsRes ? ["akilli-kayip-anlasmalar"] : [])], "Akıllı listeler");
   const customers = (custRes.data ?? []) as Cust[];
   // Sıcaklık/risk/aday/satıcı: tek okuyucu (müşteri listesi, 360 ve ana ekranla AYNI sonuç).
   const stateMap = await loadCustomerStates(supabase, tenantId, customers, { nowMs: now(), context: "Akıllı listeler" });
@@ -111,8 +127,8 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
       key: "churn",
       icon: AlarmClock,
       tone: "danger",
-      title: "Churn riski yüksek",
-      sub: "Değerli ama sessizleşen müşteriler — bugün kurtar.",
+      title: "Kaybedilme riski yüksek",
+      sub: "Değerli ama sessizleşen müşteriler — bugün kurtar. Aranan ya da ertelenen müşteri bir süre listeden düşer.",
       emptyHint: "Sessizleşen değerli müşteriniz yok; düzenli temas sürüyor.",
       rows: churnRisk,
       reason: (e) => e.churn.action,
@@ -266,6 +282,9 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
                         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset ${tone.chip}`}>
                           {s.metric(e)}
                         </span>
+                        {s.key === "churn" ? (
+                          <RiskRowActions customerId={e.c.id} name={e.c.full_name} phone={e.c.phone} />
+                        ) : (
                         <div className="flex shrink-0 items-center gap-1">
                           {e.c.phone ? (
                             <a
@@ -283,6 +302,7 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
                             Kart <ArrowUpRight className="h-3.5 w-3.5" />
                           </Link>
                         </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -298,6 +318,10 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
               </section>
             );
           })}
+
+          {segmentF === "churn" && closedDealsRes ? (
+            <LossReasons deals={(closedDealsRes.data ?? []) as ClosedDeal[]} reasonLabels={lossReasonLabels(lossOptions ?? [])} />
+          ) : null}
 
           {/* Hızlı eylemler: grup dışı sıradaki adımlar */}
           <aside className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface px-4 py-3 text-xs text-text-muted">

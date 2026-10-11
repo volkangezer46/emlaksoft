@@ -17,10 +17,10 @@ import { useToast } from "@/components/app/toast-provider";
  */
 
 const ROW_BTN =
-  "focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition disabled:cursor-not-allowed disabled:opacity-40";
+  "focus-ring press relative z-10 grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] text-text-faint transition disabled:cursor-not-allowed disabled:opacity-40";
 
 const fieldClass =
-  "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+  "w-full touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /** ISO anı datetime-local girdisinin beklediği yerel "YYYY-MM-DDTHH:mm" biçimine çevirir. */
 function toLocalInput(iso: string): string {
@@ -205,14 +205,14 @@ function TaskForm({
         <button
           type="button"
           onClick={close}
-          className="focus-ring press rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+          className="focus-ring press touch:min-h-11 rounded-[var(--radius-control)] border border-hairline px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
         >
           Vazgeç
         </button>
         <button
           type="submit"
           disabled={pending}
-          className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+          className="btn-shine focus-ring press touch:min-h-11 inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
         >
           <Check className="h-4 w-4" /> {pending ? "Oluşturuluyor…" : "Görevi oluştur"}
         </button>

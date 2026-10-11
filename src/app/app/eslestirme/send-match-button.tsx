@@ -37,7 +37,7 @@ export function SendMatchButton({ demandId, propertyId }: { demandId: string; pr
   };
 
   const chip =
-    "focus-ring press inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600";
+    "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600";
 
   if (!ready) {
     return (

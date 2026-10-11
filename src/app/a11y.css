@@ -224,3 +224,13 @@
 html:not([data-theme="dark"]) .text-mint-600 { color: var(--mint-700); }
 html:not([data-theme="dark"]) .text-amber-600 { color: var(--amber-700); }
 html:not([data-theme="dark"]) .bg-danger-500.text-white { background-color: var(--danger-600); }
+
+/* iOS Safari odaklanınca 16 px'ten küçük yazı alanlarını yakınlaştırır (sayfa zıplar). Dokunmatik/dar ekranda ham alanlar 16 px
+   yazı alır; min-height EKLENMEZ (44 px hedefi `touch:` sınıflarıyla). Katmansızdır, Tailwind `text-sm`'in önüne geçer. */
+@media (max-width: 767.98px), (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=color]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

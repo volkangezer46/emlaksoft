@@ -31,7 +31,7 @@ const LEGACY_HREFS = [
   "/app/yatirim", "/app/yabanci-satis",
   "/app/komisyon", "/app/cuzdan", "/app/performansim", "/app/giderler", "/app/aidat", "/app/kira-artis", "/app/abonelik",
   "/app/raporlar", "/app/danisman-kpi", "/app/lig", "/app/pano-tv", "/app/hedefler",
-  "/app/bolge-analizi", "/app/kayip-kacak", "/app/kayip-satis",
+  "/app/bolge-analizi", "/app/kayip-kacak",
   "/app/ekip", "/app/otomasyonlar", "/app/kampanyalar", "/app/uyum", "/app/onaylar",
   "/app/belgeler", "/app/denetim", "/app/destek", "/app/ayarlar", "/app/ayarlar/is-akislari",
 ];
@@ -87,7 +87,7 @@ describe("menü yapısı", () => {
     // Anahtar Takibi ve Sunumlar Portföyler öğesinin sekmesidir (yol aynı, menü öğesi Portföyler).
     expect(resolveActiveNav("/app/portfoyler/anahtarlar", sections).href).toBe("/app/portfoyler");
     expect(resolveActiveNav("/app/akilli-listeler", sections).href).toBe("/app/musteriler");
-    expect(resolveActiveNav("/app/kayip-satis", sections).href).toBe("/app/musteriler");
+    // /app/kayip-satis artık Akıllı listeler'e yönlenen gizli sayfadır (HIDDEN_APP_PAGES).
     expect(resolveActiveNav("/app/teklifler", sections).href).toBe("/app/anlasmalar");
     expect(resolveActiveNav("/app/portallar", sections).href).toBe("/app/ilan-kontrol");
     expect(resolveActiveNav("/app/portfoyler/42", sections).href).toBe("/app/portfoyler");
@@ -129,12 +129,12 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     const tabsOf = (h: string) => items.find((i) => i.href === h)?.tabs?.map((t) => t.href) ?? [];
     expect(tabsOf("/app/ilan-kontrol")).toEqual(["/app/ilan-kontrol", "/app/portallar"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/kayip-satis", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
   });
-  it("Ofis kataloğu 10 sayfa tutar (yan menüde görünürlük rol bazlı merkezlerle belirlenir, bkz. nav-roles)", () => {
+  it("Ofis kataloğu 9 sayfa tutar (yan menüde görünürlük rol bazlı merkezlerle belirlenir, bkz. nav-roles)", () => {
     const ofis = NAV_SECTIONS.find((s) => s.id === "ofis")!;
     expect(ofis.items.map((i) => i.href).sort()).toEqual(
-      ["/app/abonelik", "/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/denetim", "/app/ekip", "/app/ofis-merkezi", "/app/otomasyonlar", "/app/uyum", "/app/yardim"].sort(),
+      ["/app/abonelik", "/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/denetim", "/app/ekip", "/app/otomasyonlar", "/app/uyum", "/app/yardim"].sort(),
     );
   });
   it("'Ayarlar' adlı ilgisiz sekme kalmadı: sekmeler gerçek adlarıyla anılır", () => {
@@ -143,7 +143,7 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     );
     expect(tabLabels["/app/ayarlar/etiketler"]).toBe("Etiketler");
     expect(tabLabels["/app/ayarlar/filigran"]).toBe("Filigran");
-    expect(tabLabels["/app/ayarlar/sozlesme-sablonlari"]).toBe("Sözleşme şablonları");
+    expect(tabLabels["/app/ayarlar/sozlesme-sablonlari"]).toBe("Sözleşme şablonu");
     expect(tabLabels["/app/ayarlar/mesaj-sablonlari"]).toBe("Mesaj şablonları");
     expect(tabLabels["/app/ayarlar/ai-kullanim"]).toBe("AI kullanımı");
     for (const [href, label] of Object.entries(tabLabels)) if (href !== "/app/ayarlar") expect(label, href).not.toBe("Ayarlar");

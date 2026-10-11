@@ -51,7 +51,7 @@ export function AssignmentRowActions({ assignmentId, currentAdvisorId, advisors 
         <div className="flex flex-wrap items-end gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-2">
           <label className="min-w-56 flex-1 text-xs font-medium text-ink-950">
             İptal gerekçesi
-            <FormInput className="mt-1 h-8 text-xs" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} placeholder="En az 3 karakter" />
+            <FormInput className="mt-1 h-8 touch:h-11 text-xs" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} placeholder="En az 3 karakter" />
           </label>
           <Button type="button" variant="danger" size="sm" loading={pending} disabled={reason.trim().length < 3} onClick={() => run(() => cancelAssignment({ assignmentId, reason }))}>
             Atamayı iptal et
@@ -62,7 +62,7 @@ export function AssignmentRowActions({ assignmentId, currentAdvisorId, advisors 
         <div className="flex flex-wrap items-end gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-2">
           <label className="text-xs font-medium text-ink-950">
             Yeni danışman
-            <FormSelect className="mt-1 h-8 w-auto px-2 py-1 text-xs" value={to} onChange={(e) => setTo(e.target.value)}>
+            <FormSelect className="mt-1 h-8 touch:h-11 w-auto px-2 py-1 text-xs" value={to} onChange={(e) => setTo(e.target.value)}>
               <option value="">Seçin…</option>
               {advisors
                 .filter((a) => a.id !== currentAdvisorId)
@@ -75,7 +75,7 @@ export function AssignmentRowActions({ assignmentId, currentAdvisorId, advisors 
           </label>
           <label className="min-w-48 flex-1 text-xs font-medium text-ink-950">
             Gerekçe (isteğe bağlı)
-            <FormInput className="mt-1 h-8 text-xs" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
+            <FormInput className="mt-1 h-8 touch:h-11 text-xs" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} />
           </label>
           <Button type="button" size="sm" loading={pending} disabled={!to} onClick={() => run(() => reassignAssignment({ assignmentId, advisorId: to, reason }))}>
             Yeniden ata

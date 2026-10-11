@@ -186,7 +186,7 @@ describe("Ekip Merkezi menü ve kapılar", () => {
   it("Ekip Merkezi yönetim sekmeleri; performans TEK 'Ekip performansı' öğesinde (Özet/Lig/Kıyas), tekrar yok", () => {
     const ofis = visibleSections(ALL).find((s) => s.id === "ofis")!;
     const item = ofis.items.find((i) => i.href === "/app/ekip")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Hedefler", "Devir / Atama", "Şubeler", "Takımlar"]);
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Hedefler", "Danışman devri", "Şubeler", "Takımlar"]);
     const perf = visibleSections(ALL).find((s) => s.id === "performans")!;
     expect(perf.items.some((i) => i.href === "/app/hedefler")).toBe(false);
     const ekipPerf = perf.items.find((i) => i.label === "Ekip karnesi")!;
@@ -214,7 +214,7 @@ describe("Ekip Merkezi menü ve kapılar", () => {
 
   it("yetkisiz sekme gizlenir: ekip modülü olan ama hedef izni olmayan rolde Hedefler çıkmaz", () => {
     const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip merkezi")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Devir / Atama", "Şubeler", "Takımlar"]);
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Danışman devri", "Şubeler", "Takımlar"]);
   });
 
   it("Kazanç tek sayfa: Finans > Komisyon sekmesi, Ekip Merkezi'nde ayrı Kazanç sekmesi yok", () => {

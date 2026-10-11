@@ -345,6 +345,9 @@ async function AuditLog({
           <h2 className="font-display font-bold text-ink-950">Denetim günlüğü</h2>
           <p className="text-xs text-text-muted">Yalnız yetki DEĞİŞİKLİKLERİ yazılır (kim, kime, ne, önce/sonra, gerekçe). Okuma izi tutulmaz.</p>
         </div>
+        <Link href="/app/denetim?tur=yetki" className="focus-ring inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11">
+          Tüm değişiklik geçmişi <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
       </div>
       <form method="get" action={PATH} className="border-b border-line bg-canvas/50 px-5 py-3">
         <input type="hidden" name="sekme" value="gunluk" />

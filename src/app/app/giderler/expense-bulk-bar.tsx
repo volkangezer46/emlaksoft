@@ -37,7 +37,7 @@ export function ExpenseBulkBar({
             id="expense-bulk-category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="h-8 rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm"
+            className="h-8 min-w-0 max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm touch:h-11"
           >
             <option value="">Kategori seç…</option>
             {categories.map((c) => (

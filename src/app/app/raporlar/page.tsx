@@ -529,7 +529,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           { href: "/app/talepler?sekme=eslesme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
           { href: "/app/degerleme", icon: Gauge, title: "Değerleme", sub: "Emsal · EmlakFiyati endeksi" },
           { href: "/app/musteriler", icon: ICONS.musteri, title: "Müşteri merkezi", sub: "360 görünüm" },
-          { href: "/app/franchise", icon: ICONS.sube, title: "Şube analitiği", sub: "Şube bazlı konsolide" },
+          { href: "/app/franchise", icon: ICONS.sube, title: "Şube karşılaştırma", sub: "Şube bazlı konsolide" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="focus-ring lift surface-card flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] p-3 transition hover:bg-surface-hover">
             <l.icon className={ICON_ACCENT} aria-hidden="true" />

@@ -52,7 +52,7 @@ export function DealBulkBar({
         id="deal-bulk-stage"
         value={stage}
         onChange={(e) => setStage(e.target.value)}
-        className="h-8 rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm"
+        className="h-8 min-w-0 max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm touch:h-11"
       >
         <option value="">Aşama seç…</option>
         {stages.map((s) => (
@@ -75,7 +75,7 @@ export function DealBulkBar({
             id="deal-bulk-assignee"
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
-            className="h-8 rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm"
+            className="h-8 min-w-0 max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm touch:h-11"
           >
             <option value="">Danışman seç…</option>
             {members.map((m) => (

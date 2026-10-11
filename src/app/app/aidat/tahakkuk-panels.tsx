@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Receipt, Scale } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { createAidatBatch, createExpenseShare, voidBuildingBatch } from "@/app/actions/building-management";
 import { useToast } from "@/components/app/toast-provider";
 import { Badge } from "@/components/ui/badge";
@@ -83,7 +84,7 @@ export function BatchForm({
   if (!canCreate) return null;
   const isAidat = mode === "aidat";
   return (
-    <form action={submit} className="space-y-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]" aria-label={isAidat ? "Dönem aidat tahakkuku" : "Ortak gider paylaştırma"}>
+    <form id="tahakkuk-formu" action={submit} className="space-y-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]" aria-label={isAidat ? "Dönem aidat tahakkuku" : "Ortak gider paylaştırma"}>
       <h3 className="flex items-center gap-2 font-display font-bold text-ink-950">
         {isAidat ? <CalendarPlus className="h-4 w-4 text-brand-600" /> : <Scale className="h-4 w-4 text-brand-600" />}
         {isAidat ? "Dönem aidat tahakkuku" : "Bina gideri paylaştır"}
@@ -170,7 +171,15 @@ export function BatchList({ batches, canDelete }: { batches: BatchRow[]; canDele
   }
 
   if (batches.length === 0) {
-    return <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong p-6 text-center text-sm text-text-muted">Henüz tahakkuk yok. Yukarıdan dönem aidatı oluşturun ya da bir bina giderini paylaştırın.</p>;
+    return (
+      <EmptyState
+        variant="compact"
+        icon={Receipt}
+        title="Henüz tahakkuk yok"
+        description="Yukarıdaki formdan dönem aidatı oluşturun ya da bir bina giderini paylaştırın."
+        action={{ href: "#tahakkuk-formu", label: "Tahakkuk formuna git" }}
+      />
+    );
   }
   return (
     <ul className="divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface" aria-label="Tahakkuk geçmişi">

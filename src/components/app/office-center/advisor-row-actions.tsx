@@ -67,7 +67,7 @@ export function AdvisorRowActions({
         </label>
         <FormSelect
           id={`oc-role-${advisor.id}`}
-          className="h-8 w-auto px-2 py-1 text-xs"
+          className="h-8 touch:h-11 w-auto px-2 py-1 text-xs"
           value={advisor.role}
           disabled={pending || !canAssignRole}
           title={canAssignRole ? "Rolü değiştir" : "Bu rolü yönetme yetkiniz yok"}
@@ -86,7 +86,7 @@ export function AdvisorRowActions({
             </label>
             <FormSelect
               id={`oc-branch-${advisor.id}`}
-              className="h-8 w-auto px-2 py-1 text-xs"
+              className="h-8 touch:h-11 w-auto px-2 py-1 text-xs"
               value={advisor.branchId ?? ""}
               disabled={pending}
               onChange={(e) => run(() => updateAdvisor({ advisorId: advisor.id, branchId: e.target.value }))}
@@ -107,7 +107,7 @@ export function AdvisorRowActions({
             </label>
             <FormSelect
               id={`oc-team-${advisor.id}`}
-              className="h-8 w-auto px-2 py-1 text-xs"
+              className="h-8 touch:h-11 w-auto px-2 py-1 text-xs"
               value={advisor.teamId ?? ""}
               disabled={pending}
               onChange={(e) => run(() => updateAdvisor({ advisorId: advisor.id, teamId: e.target.value }))}
