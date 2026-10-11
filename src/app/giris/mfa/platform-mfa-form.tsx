@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, KeyRound, Loader2, LogOut, QrCode, ShieldCheck } from "lucide-react";
+import { authErrorMessage } from "@/lib/action-errors";
 import { createClient } from "@/lib/supabase/client";
 import { signOut } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
@@ -61,7 +62,7 @@ export function PlatformMfaForm({
       setEnrollment(nextEnrollment);
       setFactorId(nextEnrollment.factorId);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Authenticator kurulumu başlatılamadı.");
+      setError(authErrorMessage(cause, "Authenticator kurulumu başlatılamadı"));
     } finally {
       setBusy(false);
     }
@@ -86,13 +87,13 @@ export function PlatformMfaForm({
 
       const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (assurance.error || assurance.data.currentLevel !== "aal2") {
-        throw assurance.error ?? new Error("AAL2 oturumu oluşturulamadı.");
+        throw assurance.error ?? new Error("aal2 not reached");
       }
       router.replace(next);
       router.refresh();
     } catch (cause) {
       setCode("");
-      setError(cause instanceof Error ? cause.message : "Kod doğrulanamadı.");
+      setError(authErrorMessage(cause, "Kod doğrulanamadı"));
     } finally {
       setBusy(false);
     }
