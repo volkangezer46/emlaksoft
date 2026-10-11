@@ -264,10 +264,12 @@ export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Müşteri bulunamadı." };
   const supabase = await createClient();
-  // Açık anlaşması olan müşteri, bağlı kayıt özeti gösterilip onaylanmadan (confirm_linked=1) silinmez.
+  // Açık anlaşması ya da açık talebi (yeni/aktif/eşleşti) olan müşteri, bağlı kayıt özeti gösterilip onaylanmadan (confirm_linked=1) silinmez.
   if (String(formData.get("confirm_linked") ?? "") !== "1") {
     const impact = await getCustomerDeleteImpact([id]);
+    if (impact.error) return { error: impact.error };
     if (impact.openDeals > 0) return { error: "Açık anlaşması olan müşteri onay olmadan silinemez." };
+    if (impact.openDemands > 0) return { error: "Açık talebi olan müşteri onay olmadan silinemez." };
   }
   const { error } = await supabase
     .from("customers")
