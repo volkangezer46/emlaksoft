@@ -35,7 +35,7 @@ export function InvoiceActions({
         >
           <label className={lbl}>
             Yöntem
-            <select name="method" required defaultValue="havale" className={`mt-1 block ${opFieldClass}`}>
+            <select name="method" required defaultValue="kart_pos" className={`mt-1 block ${opFieldClass}`}>
               {MANUAL_PAYMENT_METHODS.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
@@ -51,7 +51,7 @@ export function InvoiceActions({
           </label>
           <label className={lbl}>
             Dekont / referans
-            <input name="reference" maxLength={120} placeholder="Örn. havale açıklaması" className={`mt-1 block w-48 ${opFieldClass}`} />
+            <input name="reference" maxLength={120} placeholder="Örn. POS slip no" className={`mt-1 block w-48 ${opFieldClass}`} />
           </label>
         </InlineOp>
       ) : null}

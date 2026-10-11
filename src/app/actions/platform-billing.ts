@@ -55,7 +55,7 @@ function refresh(invoiceId?: string) {
 }
 
 /**
- * Havale/EFT/nakit ile alınan ödemeyi faturada "ödendi" işaretler.
+ * Kartla elle (POS) alınan ödemeyi ya da yönetici düzeltmesini faturada "ödendi" işaretler (havale/nakit ile üyelik YOK).
  * Koşullu güncelleme: yalnız ödenmemiş fatura güncellenir; çift tıklama ikinci kez ödeme kaydetmez.
  */
 export async function markInvoicePaid(formData: FormData): Promise<BillingOpResult> {

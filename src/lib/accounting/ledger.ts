@@ -9,7 +9,7 @@
  * İade: meta.refund = { amount_try (BRÜT), reason, at } (recordInvoiceRefund; faturada durum "paid" kalır).
  */
 import { inPeriod, type Period } from "@/lib/accounting/period";
-import { MANUAL_PAYMENT_METHODS } from "@/lib/billing/invoice-ops";
+import { LEGACY_MANUAL_PAYMENT_METHODS, MANUAL_PAYMENT_METHODS } from "@/lib/billing/invoice-ops";
 
 export type InvoiceKind = "plan" | "extra_seats" | "credit_pack" | "other";
 
@@ -34,7 +34,7 @@ export type PaymentMethodCode = "iyzico" | "hesap_kredisi" | "havale" | "nakit" 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethodCode, string> = {
   iyzico: "Kart (iyzico)",
   hesap_kredisi: "Hesap kredisi",
-  havale: MANUAL_PAYMENT_METHODS.find((m) => m.value === "havale")?.label ?? "Havale / EFT",
+  havale: LEGACY_MANUAL_PAYMENT_METHODS.find((m) => m.value === "havale")?.label ?? "Havale / EFT",
   nakit: "Nakit",
   kart_pos: "POS / kart (elle)",
   diger: "Diğer (elle)",
@@ -119,7 +119,7 @@ export function classifyInvoiceKind(meta: unknown, subscriptionId?: string | nul
 export function paymentMethodOf(meta: unknown, iyzicoPaymentId?: string | null): PaymentMethodCode {
   const manual = asRecord(asRecord(meta).manual_payment);
   const m = typeof manual.method === "string" ? manual.method : null;
-  if (m && MANUAL_PAYMENT_METHODS.some((x) => x.value === m)) return m as PaymentMethodCode;
+  if (m && [...MANUAL_PAYMENT_METHODS, ...LEGACY_MANUAL_PAYMENT_METHODS].some((x) => x.value === m)) return m as PaymentMethodCode;
   if (m) return "diger";
   if (asRecord(meta).paidWith === "account_credit") return "hesap_kredisi";
   if (iyzicoPaymentId) return "iyzico";

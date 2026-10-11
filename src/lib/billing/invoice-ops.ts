@@ -1,10 +1,18 @@
 /** Fatura/ödeme işlemleri için saf doğrulama yardımcıları (sunucu ve test ortak). */
 
+/**
+ * Elle tahsilat işaretleme yöntemleri (yalnız platform yöneticisi). Ürün kararı (2026-10-12): abonelik/paket ödemesi
+ * YALNIZ kredi kartıyla alınır — havale/EFT ve nakit ile üyelik yoktur; bu liste yalnız kartla elle tahsilat ve düzeltme içindir.
+ */
 export const MANUAL_PAYMENT_METHODS = [
-  { value: "havale", label: "Havale / EFT" },
-  { value: "nakit", label: "Nakit" },
-  { value: "kart_pos", label: "POS / kart (elle)" },
-  { value: "diger", label: "Diğer" },
+  { value: "kart_pos", label: "Kredi kartı (POS, elle)" },
+  { value: "diger", label: "Yönetici düzeltmesi" },
+] as const;
+
+/** Geçmiş kayıtlarda kalan eski yöntemler: yalnız OKUMA/raporlama için tanınır, yeni kayıtta seçilemez. */
+export const LEGACY_MANUAL_PAYMENT_METHODS = [
+  { value: "havale", label: "Havale / EFT (eski kayıt)" },
+  { value: "nakit", label: "Nakit (eski kayıt)" },
 ] as const;
 
 export type ManualPaymentMethod = (typeof MANUAL_PAYMENT_METHODS)[number]["value"];
