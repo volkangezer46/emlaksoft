@@ -8,9 +8,9 @@ import { loadTufeTable } from "@/lib/tufe-server";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
-import { trDayKey } from "@/lib/clock";
+import { daysAgoIso, trDayKey } from "@/lib/clock";
 import { runOwnerPayoutReminders } from "@/lib/property-management/payout-reminders";
-import { findNotifiedKeys, insertNotifications, insertNotificationsDetailed } from "@/lib/notify-batch";
+import { findNotifiedHrefs, findNotifiedKeys, insertNotifications, insertNotificationsDetailed } from "@/lib/notify-batch";
 import { runBuildingDueReminders } from "@/lib/building-management/reminders";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
@@ -248,14 +248,22 @@ export async function GET(req: NextRequest) {
       tenantIds: [...new Set(candidates.map((c) => c.r.tenant_id))],
       keys: candidates.map((c) => renewKey(c.r.id, c.renewalDate)),
     });
-    if (already === null) {
-      // Mükerrer denetimi okunamadı: kör yazma yapma, hata say (sonraki koşu yeniden dener).
+    // GEÇİŞ DÖNEMİ: dedupe_key'e geçmeden önce yenileme bildirimi href işaretiyle ('?yenileme=<yıl>') tekrar-korumalıydı.
+    // Eski işaretle bildirilmiş kiraya ikinci bildirim gitmesin: anahtar YA DA eski href varsa bildirme.
+    // findNotifiedKeys null dönerse (kolon yok / okunamadı) yalnız eski href yoluna düşülür (kör yazma yok); o da okunamazsa
+    // hata sayılır ve sonraki koşu yeniden dener. Yeni satırlar href işaretini de taşıdığı için bu yol kolonsuz ortamda da tam korur.
+    const legacySeen = await findNotifiedHrefs(admin, {
+      tenantIds: [...new Set(candidates.map((c) => c.r.tenant_id))],
+      hrefs: candidates.map((c) => c.href),
+      sinceIso: daysAgoIso(400),
+    });
+    if (legacySeen === null) {
       console.error("kira-tahakkuk cron yenileme sorgusu");
       failed += 1;
     }
     for (const { r, renewalDate, href } of candidates) {
       const key = renewKey(r.id, renewalDate);
-      if (already === null || already.has(key)) continue;
+      if (legacySeen === null || already?.has(key) || legacySeen.has(href)) continue;
       const prop = Array.isArray(r.property) ? r.property[0] : r.property;
       const propName = prop?.title ?? prop?.property_code ?? "Portföy";
       const increase = computeLegalIncreaseIn(tufeTable, Number(r.monthly_rent), renewalDate.slice(0, 7));

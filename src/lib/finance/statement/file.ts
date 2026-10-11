@@ -4,6 +4,7 @@
  * İstemci paketine GİRMEZ (xlsx kütüphanesi yalnız burada dinamik yüklenir).
  */
 import { createHash } from "node:crypto";
+import { Unzip, UnzipInflate, UnzipPassThrough, zipSync } from "fflate";
 import { decodeCsvBuffer } from "@/app/app/ice-aktarma/import-config";
 import { cellToText } from "@/lib/xlsx-import";
 import { looksLikeOfx, parseOfx } from "./ofx";
@@ -14,7 +15,9 @@ export const MAX_STATEMENT_BYTES = 2 * 1024 * 1024;
 /** .xlsx = ZIP: açılmış boyut / girdi sayısı / sıkıştırma oranı sınırları (zip bombası); kütüphane açmadan ÖNCE merkezi dizinden denetlenir. */
 export const MAX_XLSX_UNPACKED_BYTES = 20 * 1024 * 1024;
 export const MAX_XLSX_ENTRIES = 50;
-export const MAX_XLSX_RATIO = 100;
+/** Yalnız merkezi dizin BEYANI için kaba ön eleme (saldırgan beyanı yalanlayabilir); asıl koruma `safeRepackXlsx` gerçek bayt sayacıdır. */
+export const MAX_XLSX_RATIO = 1000;
+const TOO_BIG = "Excel dosyası açıldığında çok büyük (en çok 20 MB); güvenlik nedeniyle okunmadı.";
 
 /**
  * ZIP merkezi dizinini (EOCD + merkezi girdiler) okur, hiçbir şeyi AÇMADAN sınırları denetler. Yeni bağımlılık yok.
@@ -49,11 +52,72 @@ export function inspectXlsxZip(bytes: Uint8Array): string | null {
     const entryLen = 46 + view.getUint16(pos + 28, true) + view.getUint16(pos + 30, true) + view.getUint16(pos + 32, true);
     if (comp === 0xffffffff || raw === 0xffffffff) return bad;
     unpacked += raw;
-    if (unpacked > MAX_XLSX_UNPACKED_BYTES) return "Excel dosyası açıldığında çok büyük (en çok 20 MB); güvenlik nedeniyle okunmadı.";
+    if (unpacked > MAX_XLSX_UNPACKED_BYTES) return TOO_BIG;
     if (raw > 0 && (comp === 0 || raw / comp > MAX_XLSX_RATIO)) return "Excel dosyasının sıkıştırma oranı olağandışı; güvenlik nedeniyle okunmadı.";
     pos += entryLen;
   }
   return null;
+}
+
+/**
+ * GERÇEK koruma: .xlsx'i fflate ile akışla, küçük (4 KB) sıkıştırılmış dilimlerle açar ve AÇILAN baytı sayar (toplam ≤ 20 MB,
+ * en çok 50 girdi); sınır aşılınca akış durur. Merkezi dizin ya da yerel başlıktaki beyanlara güvenilmez. Sınır içindeyse girdiler
+ * temiz başlıklarla YENİDEN paketlenir ve okuyucuya bu güvenli kopya verilir (okuyucunun kendi ayrıştırması saldırgan başlıklarını görmez).
+ */
+export function safeRepackXlsx(bytes: Uint8Array): { ok: true; bytes: Uint8Array } | { ok: false; error: string } {
+  const bad = "Dosya geçerli bir .xlsx gibi görünmüyor. Bankanızın indirdiği ekstreyi değiştirmeden yükleyin.";
+  const pending: { name: string; chunks: Uint8Array[] }[] = [];
+  let total = 0;
+  let reject: string | null = null;
+  const unzip = new Unzip((file) => {
+    if (reject) return;
+    if (pending.length >= MAX_XLSX_ENTRIES) {
+      reject = "Excel dosyası beklenenden çok iç dosya içeriyor; güvenlik nedeniyle okunmadı.";
+      return;
+    }
+    if (file.name.endsWith("/")) return; // dizin girdisi
+    const entry = { name: file.name, chunks: [] as Uint8Array[] };
+    pending.push(entry);
+    file.ondata = (err, chunk) => {
+      if (reject) return;
+      if (err) {
+        reject = bad;
+        file.terminate();
+        return;
+      }
+      total += chunk.byteLength;
+      if (total > MAX_XLSX_UNPACKED_BYTES) {
+        reject = TOO_BIG;
+        file.terminate();
+        return;
+      }
+      entry.chunks.push(chunk);
+    };
+    file.start();
+  });
+  unzip.register(UnzipInflate);
+  unzip.register(UnzipPassThrough);
+  try {
+    const SLICE = 4096; // dilim başına çıktı ≤ ~4 MB (deflate üst oranı ~1032:1); sayaç her dilimde denetlenir
+    for (let off = 0; off < bytes.byteLength && !reject; off += SLICE) {
+      unzip.push(bytes.subarray(off, Math.min(off + SLICE, bytes.byteLength)), off + SLICE >= bytes.byteLength);
+    }
+  } catch {
+    return { ok: false, error: reject ?? bad };
+  }
+  if (reject) return { ok: false, error: reject };
+  if (pending.length === 0) return { ok: false, error: bad };
+  const files: Record<string, Uint8Array> = {};
+  for (const p of pending) {
+    const out = new Uint8Array(p.chunks.reduce((n, c) => n + c.byteLength, 0));
+    let o = 0;
+    for (const c of p.chunks) {
+      out.set(c, o);
+      o += c.byteLength;
+    }
+    files[p.name] = out;
+  }
+  return { ok: true, bytes: zipSync(files, { level: 1 }) };
 }
 
 export type ParsedStatementFile =
@@ -83,8 +147,10 @@ export async function parseStatementFile(name: string, bytes: Uint8Array): Promi
     if (kind === "xlsx") {
       const zipError = inspectXlsxZip(bytes);
       if (zipError) return { ok: false, error: zipError };
+      const safe = safeRepackXlsx(bytes);
+      if (!safe.ok) return { ok: false, error: safe.error };
       const { readSheet } = await import("read-excel-file/node");
-      const data = (await readSheet(Buffer.from(bytes))) as unknown as unknown[][];
+      const data = (await readSheet(Buffer.from(safe.bytes))) as unknown as unknown[][];
       const raw = data.slice(0, 5000).map((r) => r.map(cellToText));
       return { ok: true, format: "xlsx", fileHash, table: tableFromRawRows(raw) };
     }

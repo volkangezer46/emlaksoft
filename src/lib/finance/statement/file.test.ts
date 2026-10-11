@@ -1,3 +1,4 @@
+import { zipSync } from "fflate";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildXlsx } from "@/lib/report-center/format/xlsx";
 import type { ReportMeta, ReportTable } from "@/lib/report-center/types";
@@ -59,8 +60,8 @@ describe("ekstre .xlsx zip merkezi dizin denetimi", () => {
     expect(readSheet).not.toHaveBeenCalled();
   });
 
-  it("sıkıştırma oranı 1000:1 olan zip reddedilir, readSheet çağrılmaz", async () => {
-    const res = await parseStatementFile("ekstre.xlsx", fakeZip([{ name: "xl/sharedStrings.xml", comp: 1000, raw: 1_000_000 }]));
+  it("beyan edilen sıkıştırma oranı 2000:1 olan zip reddedilir, readSheet çağrılmaz", async () => {
+    const res = await parseStatementFile("ekstre.xlsx", fakeZip([{ name: "xl/sharedStrings.xml", comp: 1000, raw: 2_000_000 }]));
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toContain("sıkıştırma oranı");
     const { readSheet } = await import("read-excel-file/node");
@@ -73,6 +74,49 @@ describe("ekstre .xlsx zip merkezi dizin denetimi", () => {
     expect(inspectXlsxZip(fakeZip([{ name: "a", comp: 0, raw: 5 }]))).not.toBeNull();
     expect(inspectXlsxZip(new Uint8Array(100))).not.toBeNull();
     expect(inspectXlsxZip(new TextEncoder().encode("PK bozuk"))).not.toBeNull();
+  });
+
+  it("merkezi dizin yalan söylese de (comp=1000/raw=5000) gerçek 64 MB açılım GERÇEK bayt sayacıyla reddedilir, readSheet çağrılmaz", async () => {
+    const real = zipSync({ "xl/worksheets/sheet1.xml": new Uint8Array(64 * 1024 * 1024) }, { level: 9 });
+    expect(real.byteLength).toBeLessThan(2 * 1024 * 1024);
+    const buf = Buffer.from(real);
+    const eocd = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+    const cdOffset = buf.readUInt32LE(eocd + 16);
+    expect(buf.readUInt32LE(cdOffset)).toBe(0x02014b50);
+    buf.writeUInt32LE(1000, cdOffset + 20);
+    buf.writeUInt32LE(5000, cdOffset + 24);
+    expect(inspectXlsxZip(new Uint8Array(buf))).toBeNull(); // beyana göre "güvenli"
+    const res = await parseStatementFile("ekstre.xlsx", new Uint8Array(buf));
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain("20 MB");
+    const { readSheet } = await import("read-excel-file/node");
+    expect(readSheet).not.toHaveBeenCalled();
+  });
+
+  it("meşru ama çok tekrarlı 5000 satırlık banka xlsx'i KABUL edilir (yanlış ret yok)", async () => {
+    const meta: ReportMeta = {
+      title: "Hesap Hareketleri",
+      officeName: "Örnek Ofis",
+      filterSummary: [],
+      generatedAt: "08.10.2026 14:05",
+      rowCount: 5000,
+      truncated: false,
+      personalData: false,
+      platform: false,
+    };
+    const table: ReportTable = {
+      columns: [
+        { key: "tarih", label: "Tarih", type: "text" },
+        { key: "aciklama", label: "Açıklama", type: "text" },
+        { key: "tutar", label: "Tutar", type: "number" },
+      ],
+      rows: Array.from({ length: 5000 }, () => ["03.10.2026", "KIRA ODEMESI ORNEK BANKA HAVALE EFT ACIKLAMA", 1500]),
+    };
+    const buf = buildXlsx(meta, table, "2026-10-08T11:05:00Z");
+    expect(inspectXlsxZip(new Uint8Array(buf))).toBeNull();
+    const res = await parseStatementFile("ekstre.xlsx", new Uint8Array(buf));
+    expect(res.ok).toBe(true);
+    if (res.ok && res.format === "xlsx") expect(res.table.rows.length).toBeGreaterThan(1000);
   });
 
   it("geçerli .xlsx ayrıştırılır", async () => {

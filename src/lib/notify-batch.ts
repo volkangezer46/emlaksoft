@@ -81,6 +81,34 @@ export async function findNotifiedKeys(
 }
 
 /**
+ * Verilen href'lerden (tam eşleşme) pencerede zaten bildirim yazılmış olanları döndürür. Geçiş dönemi içindir: dedupe_key'e
+ * geçmeden önce href işaretiyle bildirilmiş kayıtlar tekrar bildirilmesin. Hata/okunamama = `null` (çağıran bildirimi atlar, kör yazmaz).
+ */
+export async function findNotifiedHrefs(
+  admin: SupabaseClient,
+  opts: { tenantIds: string[]; hrefs: string[]; sinceIso: string },
+): Promise<Set<string> | null> {
+  const found = new Set<string>();
+  if (opts.hrefs.length === 0 || opts.tenantIds.length === 0) return found;
+  const unique = [...new Set(opts.hrefs)];
+  for (let i = 0; i < unique.length; i += 200) {
+    const { data, error } = await admin
+      .from("notifications")
+      .select("href")
+      .in("tenant_id", opts.tenantIds)
+      .in("href", unique.slice(i, i + 200))
+      .gte("created_at", opts.sinceIso)
+      .limit(FIND_PAGE);
+    if (error) {
+      console.error("findNotifiedHrefs", error.message);
+      return null;
+    }
+    for (const r of (data ?? []) as { href: string | null }[]) if (r.href) found.add(r.href);
+  }
+  return found;
+}
+
+/**
  * Verilen pencerede zaten bildirilmiş kayıtların id'lerini tek sorguda döndürür.
  *
  * `limit` bilinçli olarak yüksek: pencereye sığmayan bildirim kalırsa aynı

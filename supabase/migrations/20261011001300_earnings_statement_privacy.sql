@@ -334,4 +334,37 @@ create policy finance_statement_mappings_select on public.finance_statement_mapp
     and (select public.finance_account_access(finance_statement_mappings.account_id, 'view'))
   );
 
+-- 3) finance_reconciliation_status: son mutabakat zamani maas hareketini yetkisiz role sizdirmasin; bekleyen (ham banka aciklamali) satir sayisi
+--    yalniz expenses:create sahibine (satir politikasiyla ayni). Imza/ACL ayni.
+create or replace function public.finance_reconciliation_status()
+returns table (account_id uuid, last_reconciled_at timestamptz, unreconciled_count bigint, pending_lines bigint,
+               has_import boolean, coverage_from date, coverage_to date)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select a.id,
+         (select max(e.reconciled_at) from public.cash_entries e where e.account_id = a.id and e.tenant_id = a.tenant_id and e.voided_at is null
+            and (a.owner_scope = 'user' or e.category is distinct from 'maas' or public.finance_is_owner_gm())),
+         case when cov.n = 0 then 0::bigint else
+           (select pg_catalog.count(*) from public.cash_entries e
+             where e.account_id = a.id and e.tenant_id = a.tenant_id and e.voided_at is null and e.reconciled_at is null
+               and e.kind in ('income', 'expense', 'transfer') and e.entry_date between cov.d1 and cov.d2
+               and (a.owner_scope = 'user' or e.category is distinct from 'maas' or public.finance_is_owner_gm())) end,
+         (select pg_catalog.count(*) from public.finance_statement_lines l where l.account_id = a.id and l.tenant_id = a.tenant_id and l.status = 'pending'
+            and (a.owner_scope = 'user' or public.has_effective_permission('expenses', 'create'))),
+         cov.n > 0,
+         cov.d1,
+         cov.d2
+  from public.finance_accounts a
+  cross join lateral (
+    select pg_catalog.count(*) as n, min(l.line_date) as d1, max(l.line_date) as d2
+    from public.finance_statement_lines l where l.account_id = a.id and l.tenant_id = a.tenant_id
+  ) cov
+  where a.tenant_id = public.current_active_tenant_id()
+    and ((a.owner_scope = 'user' and a.owner_user_id = auth.uid())
+         or (a.owner_scope = 'office' and public.has_effective_permission('expenses', 'view')));
+$$;
+
 notify pgrst, 'reload schema';

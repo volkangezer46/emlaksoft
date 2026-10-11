@@ -434,6 +434,17 @@ export default async function CommissionPage({
         ) : null}
       </DashCard>
 
+      {/* Kazanç gizliliği: tüm kazançları görme yetkisi yoksa danışman dağılımı yerine açıklayıcı boş durum */}
+      {!seeAllEarnings ? (
+        <section className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface p-5 text-sm text-text-muted">
+          <h2 className="font-display font-bold text-text">Danışman bazlı dağılım</h2>
+          <p className="mt-1">
+            Diğer danışmanların payları gizlidir; bu sayfada yalnız kendi komisyon payınız ve kayıtlarınız görünür. Ofis geneli dağılım için ofis yöneticinizden
+            &ldquo;tüm kazançları görme&rdquo; yetkisi isteyebilirsiniz.
+          </p>
+        </section>
+      ) : null}
+
       {/* Danışman bazlı dağılım + beklenen vs tahsil edilen trend */}
       {advisorDist.length > 0 || hasAylikSeri ? (
         <div className="grid items-stretch gap-4 lg:grid-cols-2">

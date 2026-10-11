@@ -13,6 +13,7 @@ const state = {
   notifWritten: [] as NotifRow[],
   notifFailed: 0,
   seenKeys: new Set<string>() as Set<string> | null,
+  seenHrefs: new Set<string>() as Set<string> | null,
   reminders: { enabledTenants: 0, office: 0, sms: 0, skippedOptOut: 0, smsFailed: 0, schemaMissing: false },
   remindersThrow: false,
   payoutThrow: false,
@@ -56,6 +57,7 @@ vi.mock("@/lib/building-management/reminders", () => ({
 }));
 vi.mock("@/lib/notify-batch", () => ({
   findNotifiedKeys: async () => state.seenKeys,
+  findNotifiedHrefs: async () => state.seenHrefs,
   insertNotifications: async (_a: unknown, rows: NotifRow[]) => rows.length,
   insertNotificationsDetailed: async (_a: unknown, rows: NotifRow[]) => {
     if (state.notifFailed > 0) return { written: 0, duplicates: 0, failed: rows.length };
@@ -150,6 +152,7 @@ beforeEach(() => {
   state.notifWritten = [];
   state.notifFailed = 0;
   state.seenKeys = new Set();
+  state.seenHrefs = new Set();
   state.reminders = { enabledTenants: 0, office: 0, sms: 0, skippedOptOut: 0, smsFailed: 0, schemaMissing: false };
   state.remindersThrow = false;
   state.payoutThrow = false;
@@ -192,6 +195,30 @@ describe("GET /api/cron/kira-tahakkuk", () => {
     state.seenKeys = new Set(["rent-renew:r1:2026"]);
     await GET(req("Bearer s3cret"));
     expect(state.notifWritten.some((n) => n.title === "Kira yenileme yaklaşıyor")).toBe(false);
+  });
+
+  it("eski href işaretiyle (?yenileme=<yıl>) bildirilmiş kiraya ikinci yenileme bildirimi gitmez (geçiş dönemi)", async () => {
+    state.seenHrefs = new Set(["/app/kiralama/r1?yenileme=2026"]);
+    await GET(req("Bearer s3cret"));
+    expect(state.notifWritten.some((n) => n.title === "Kira yenileme yaklaşıyor")).toBe(false);
+  });
+
+  it("findNotifiedKeys null (kolon yok) ise yalnız eski href yoluna düşer: işaretsizse bildirir, işaretliyse bildirmez", async () => {
+    state.seenKeys = null;
+    await GET(req("Bearer s3cret"));
+    const renew = state.notifWritten.find((n) => n.title === "Kira yenileme yaklaşıyor");
+    expect(renew?.href).toBe("/app/kiralama/r1?yenileme=2026");
+    state.notifWritten = [];
+    state.seenHrefs = new Set(["/app/kiralama/r1?yenileme=2026"]);
+    await GET(req("Bearer s3cret"));
+    expect(state.notifWritten.some((n) => n.title === "Kira yenileme yaklaşıyor")).toBe(false);
+  });
+
+  it("eski href sorgusu okunamazsa kör yazılmaz ve hata sayılır", async () => {
+    state.seenHrefs = null;
+    await GET(req("Bearer s3cret"));
+    expect(state.notifWritten.some((n) => n.title === "Kira yenileme yaklaşıyor")).toBe(false);
+    expect(state.heartbeat.at(-1)?.status).not.toBe("ok");
   });
 
   it("recurring_run_due şema-dışı hata -> heartbeat error", async () => {
