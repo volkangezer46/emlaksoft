@@ -84,6 +84,7 @@ import {
   TimelineSkeleton,
 } from "./sections";
 import { PropertyTimelineSection } from "./property-timeline-section";
+import { PriceProposalSection } from "./price-proposal-section";
 import { PropertyLifecyclePanel } from "@/components/listing-control/property-lifecycle-panel";
 import { PROPERTY_TIMELINE_CATEGORIES } from "./property-events";
 import { resolveCategory } from "@/lib/activity-timeline";
@@ -709,6 +710,11 @@ export default async function PropertyDetailPage({
 
           {tab === "fiyat" ? (
             <div className="space-y-4">
+          {/* Fiyat revizyonu önerisi — mülk sahibi portalında onaylanır */}
+          <Suspense fallback={null}>
+            <PriceProposalSection propertyId={property.id} tenantId={tenantId} canEdit={canEdit} />
+          </Suspense>
+
           {/* Fiyat geçmişi — trigger ile otomatik biriken tarihçe */}
           <div id="fiyat" className="scroll-mt-24">
             <Suspense fallback={<PriceHistorySkeleton />}>

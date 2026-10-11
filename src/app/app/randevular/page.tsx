@@ -111,7 +111,7 @@ function rel(value: Rel) {
 }
 
 /** Liste (tablo) sayfa boyutu — pencere içindeki randevular bellekte sayfalanır (en çok APPT_LIMIT). */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 
 export default async function AppointmentsPage({

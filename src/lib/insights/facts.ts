@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { QuietCustomerFact } from "@/lib/insights/rules/call-priority";
 import type { StalledDealFact } from "@/lib/insights/rules/deal-risk";
 import type { StaleListingFact } from "@/lib/insights/rules/price-action";
+import { daysAgoIso } from "@/lib/clock";
 import type { DeadlineFact } from "@/lib/insights/rules/deadline";
 import type { AnomalyMetric, WeeklySeriesFact } from "@/lib/insights/rules/anomaly";
 
@@ -98,6 +99,18 @@ export async function loadStaleListings(admin: SupabaseClient, tenantId: string,
     p_min_days: minDays,
     p_limit: 200,
   });
+  // Mülk sahibinden onay bekleyen fiyat önerisi olan portföyler (tablo yoksa/okunamazsa boş: kural eskisi gibi çalışır).
+  const pending = new Set<string>();
+  if (rows.length > 0) {
+    const { data, error } = await admin
+      .from("property_price_proposals")
+      .select("property_id")
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending")
+      .gt("expires_at", daysAgoIso(0))
+      .in("property_id", rows.map((r) => String(r.property_id)));
+    if (!error) for (const p of (data ?? []) as { property_id: string }[]) pending.add(p.property_id);
+  }
   return rows.map((r) => ({
     propertyId: String(r.property_id),
     assignedTo: String(r.assigned_to),
@@ -107,6 +120,7 @@ export async function loadStaleListings(admin: SupabaseClient, tenantId: string,
     daysListed: num(r.days_listed),
     peerCount: num(r.peer_count),
     peerMedian: numOrNull(r.peer_median),
+    pendingProposal: pending.has(String(r.property_id)),
   }));
 }
 

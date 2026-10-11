@@ -131,6 +131,16 @@ describe("price_action", () => {
     expect(evaluatePriceAction([{ ...fact, daysListed: 10 }], NOW)).toEqual([]);
   });
 
+  it("mülk sahibinden onay bekleyen fiyat önerisi varsa 'onay bekliyor' durumunu gösterir", () => {
+    const [d] = evaluatePriceAction([{ ...fact, pendingProposal: true }], NOW);
+    expect(d.title).toContain("onay bekliyor");
+    expect(d.why).toContain("yanıtı bekleniyor");
+    expect(d.evidence.some((e) => e.label === "Fiyat önerisi")).toBe(true);
+    const [plain] = evaluatePriceAction([fact], NOW);
+    expect(plain.title).toContain("gözden geçir");
+    expect(plain.dedupeKey).toBe(d.dedupeKey);
+  });
+
   it("emsal sayısı az ise güven düşük", () => {
     const [d] = evaluatePriceAction([{ ...fact, peerCount: 6 }], NOW);
     expect(d.confidence).toBe("dusuk");

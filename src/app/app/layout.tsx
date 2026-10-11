@@ -3,6 +3,7 @@ import Link from "@/components/ui/smart-link";
 import { Shield } from "lucide-react";
 import "@/app/console-base.css";
 import "@/app/console.css";
+import { ConsoleMonoFont } from "@/components/ui/console/mono-font";
 import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";
@@ -373,6 +374,7 @@ async function buildShellModel() {
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
+    <ConsoleMonoFont>
     <ToastProvider>
       <IconSprite />
       <ThemeController />
@@ -411,6 +413,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </ErrorBoundary>
     </ToastProvider>
+    </ConsoleMonoFont>
   );
 }
 

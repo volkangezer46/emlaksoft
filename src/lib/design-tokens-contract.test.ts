@@ -60,22 +60,18 @@ describe("tasarım token sözleşmesi", () => {
   });
 
   it("Türkçe karakterler için Inter ve Manrope kendi sunucumuzdan, Ğ ğ İ Ş ş alt kümesiyle yüklenir", () => {
-    // Eski yol next/font latin-ext (Inter 84 KB) idi; bütçe için latin + yalnız Türkçe'ye özgü harflerin alt kümesi (src/app/fonts).
+    // Eski yol next/font latin-ext (Inter 84 KB) idi; bütçe için latin + Türkçe harfler tek alt küme dosyasında (src/app/fonts).
     const css = readFileSync("src/app/globals.css", "utf8");
     for (const family of ["Inter", "Manrope"]) {
       const lower = family.toLowerCase();
       const faces = css.match(new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*"${family}"[^}]*\\}`, "g")) ?? [];
-      expect(faces.length, family).toBeGreaterThanOrEqual(2);
-      const latin = faces.find((f) => f.includes(`${lower}-latin.woff2`));
-      const tr = faces.find((f) => f.includes(`${lower}-tr.woff2`));
-      expect(latin, `${family} latin`).toBeTruthy();
-      expect(tr, `${family} tr`).toBeTruthy();
-      // ç ö ü ı latin aralığında; Ğ ğ İ Ş ş (U+011E-011F, U+0130, U+015E-015F) tr alt kümesinde.
-      expect(latin).toContain("U+0000-00FF");
-      expect(latin).toContain("U+0131");
-      expect(tr).toMatch(/U\+011E-011F,\s*U\+0130,\s*U\+015E-015F,\s*U\+20BA/); // + ₺ (latin-ext aralığındaydı)
-      expect(existsSync(`src/app/fonts/${lower}-latin.woff2`)).toBe(true);
-      expect(existsSync(`src/app/fonts/${lower}-tr.woff2`)).toBe(true);
+      // Tek dosya: latin + Ğ ğ İ ı Ş ş ₺ birlikte (istek sayısı bütçesi); unicode-range ile bölünmez.
+      expect(faces.length, family).toBe(1);
+      expect(faces[0]).toContain(`${lower}.woff2`);
+      expect(faces[0]).not.toContain("unicode-range");
+      expect(existsSync(`src/app/fonts/${lower}.woff2`)).toBe(true);
+      expect(existsSync(`src/app/fonts/${lower}-latin.woff2`)).toBe(false);
+      expect(existsSync(`src/app/fonts/${lower}-tr.woff2`)).toBe(false);
     }
   });
 });
