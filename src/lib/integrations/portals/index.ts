@@ -13,7 +13,7 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
-import { getPlatformSecret } from "@/lib/settings/secret-read";
+import { getPlatformSecret, getPlatformSecretsMany } from "@/lib/settings/secret-read";
 import {
   normalizeProviderBaseUrl,
   providerAllowedHosts,
@@ -71,13 +71,37 @@ export type PortalPublishResult = {
 // Config okuma
 // ---------------------------------------------------------------------------
 
+/** Bir portalın platform_settings anahtarları (api_key/api_secret şifreli). */
+function portalSettingKeys(portal: PortalName) {
+  return { apiKey: `${portal}_api_key`, apiSecret: `${portal}_api_secret`, agencyId: `${portal}_agency_id`, baseUrl: `${portal}_base_url` };
+}
+
+/** Birden çok portalın yapılandırmasını TEK platform_settings sorgusuyla okur (portal başına 4 tur yerine toplam 1). */
+export async function getPortalConfigs(portals: readonly PortalName[]): Promise<Record<string, PortalPublishConfig | null>> {
+  const keys = portals.flatMap((p) => Object.values(portalSettingKeys(p)));
+  const secretKeys = portals.flatMap((p) => [portalSettingKeys(p).apiKey, portalSettingKeys(p).apiSecret]);
+  const values = await getPlatformSecretsMany(keys, secretKeys);
+  return Object.fromEntries(portals.map((p) => [p, resolvePortalConfig(p, values)]));
+}
+
+/** Tek portal (yayın/güncelle/kaldır yolu): gizli değerler geçiş dönemi çözücüsüyle açılır. */
 export async function getPortalConfig(portal: PortalName): Promise<PortalPublishConfig | null> {
+  const k = portalSettingKeys(portal);
   const [apiKey, apiSecret, agencyId, baseUrl] = await Promise.all([
     getPlatformSecret(`${portal}_api_key`),
     getPlatformSecret(`${portal}_api_secret`),
     getPlatformSetting(`${portal}_agency_id`),
     getPlatformSetting(`${portal}_base_url`),
   ]);
+  return resolvePortalConfig(portal, { [k.apiKey]: apiKey, [k.apiSecret]: apiSecret, [k.agencyId]: agencyId, [k.baseUrl]: baseUrl });
+}
+
+function resolvePortalConfig(portal: PortalName, values: Record<string, string | null>): PortalPublishConfig | null {
+  const k = portalSettingKeys(portal);
+  const apiKey = values[k.apiKey];
+  const apiSecret = values[k.apiSecret];
+  const agencyId = values[k.agencyId];
+  const baseUrl = values[k.baseUrl];
 
   const key = (apiKey ?? process.env[`${portal.toUpperCase()}_API_KEY`] ?? "").trim();
   const configuredBaseUrl = (
