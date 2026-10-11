@@ -247,6 +247,8 @@ const F = {
   einvoiceStateMachine: "20261011000600_einvoice_state_machine.sql",
   // Finans Paket B (2026-10-10): recurring_rules + recurring_occurrences (duzenli odeme/gelir, idempotent uretim) + recurring_* RPC; kira-tahakkuk cron adimi recurring_run_due'yu cagirir (kod sema yokken adimi atlar).
   recurringRules: "20261010000900_recurring_rules.sql",
+  // Finans Paket C (2026-10-11): banka ekstresi taslak tablolari + mutabakat (cash_entries.reconciled_at) + finance_statement_* RPC; kod sema yokken "Ekstre yukle" gizlenir.
+  bankStatementImport: "20261011001200_bank_statement_import.sql",
   // Ilan havuzu yeni ofiste varsayilan ACIK + kaynak extension (2026-10-10).
   poolDefaultOn: "20261010000800_listing_pool_default_on.sql",
   // Ana ekran hizi (2026-10-11): home_snapshot (ben/ofis kapsamli ilk ekran okumalari tek tur); kod RPC yokken eski sorgulara duser.
@@ -403,6 +405,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.buildingManagement]: "davranis", // yeni bina/daire/tahakkuk/tahsilat tablolari + 5 DEFINER RPC + KPI RPC; owner_charge_links kind CHECK'i 'unit_charge' ile genisler, silme politikasi daralir (mahsup elle silinemez)
     [F.platformDashboardRollups]: "ek", // yeni salt-okunur service_role RPC platform_dashboard_rollups (tablo/politika/veri degismez; RPC yokken ilgili paneller "okunamadi" gosterir, uydurma sifir yok)
     [F.recurringRules]: "ek", // yeni recurring_rules/recurring_occurrences tablolari (RLS: kisisel kural yalniz sahibine, maas kurali yalniz owner/gm) + recurring_* RPC; mevcut tablo/davranis degismez (kurala cevir yalniz expenses.recurrence'i bosaltir, kullanici eylemiyle)
+    [F.bankStatementImport]: "ek", // yeni finance_statement_* tablolari (RLS: hesap gorunurlugu) + 5 DEFINER RPC + cash_entries'e nullable reconciled_at; mevcut satir/davranis degismez
     [F.poolDefaultOn]: "davranis", // tenants.listing_pool_enabled sutun varsayilani true (yalniz YENI ofisler; mevcut satirlar degismez) + havuz kaynak CHECK genisler
     [F.realtimeCoreTables]: "ek", // yalniz yayina tablo ekler; tablo/politika/veri degismez
     [F.homeSnapshotRpc]: "ek", // yalniz 1 yeni invoker RPC (home_snapshot); RLS cagiranin yetkisiyle, tablo/politika/veri degismez
@@ -558,6 +561,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "P1-fiyat-2026-10", order: 29.999861, title: "Fiyatlandirma 2026-10: plan_monthly_amount yedek fiyatlari (2790/5490/14900) + dokunulmamis EF kontor tarife/paket/hos geldin seed'i (admin override'ina dokunmaz; sira serbest)", files: [F.planPricesEfTariff] },
     { id: "PB57-tapu-sureci", order: 29.999862, title: "Tapu sureci adim takibi: deal_process_steps tablosu (kod tablo yokken bolumu etkin degil der; sira serbest)", files: [F.dealProcessSteps] },
     { id: "FIN-B-duzenli-odemeler", order: 29.9998685, title: "Finans: duzenli odemeler/gelirler (recurring_rules + donem basina tek uretim; kira-tahakkuk cron adimi; 000600'den SONRA; kod sema yokken sekmeyi gizler)", files: [F.recurringRules] },
+    { id: "FIN-C-banka-ekstresi-mutabakat", order: 29.99986855, title: "Finans: banka ekstresi ice aktarma + mutabakat (finance_statement_* + cash_entries.reconciled_at; 000600'den SONRA; kod sema yokken Ekstre yukle gizlenir; sira serbest, ek)", files: [F.bankStatementImport] },
     { id: "PB60-e-fatura", order: 29.9998671, title: "e-Fatura entegrasyonu: baglanti (sifreli kimlik) + fatura tablolari (kod tablo yokken bolumu etkin degil der; sira serbest, ek)", files: [F.einvoice] },
     { id: "PB62-e-fatura-durum-makinesi", order: 29.9998674, title: "e-Fatura durum makinesi + atomik resmilestirme talebi (000700'den SONRA; yazma yalniz RPC; sira serbest)", files: [F.einvoiceStateMachine] },
     { id: "PB60-havuz-varsayilan-acik", order: 29.9998672, title: "Ilan havuzu yeni ofiste varsayilan acik + kaynak CHECK genislemesi (listing_pool 001500 sonrasi; sira serbest)", files: [F.poolDefaultOn] },
