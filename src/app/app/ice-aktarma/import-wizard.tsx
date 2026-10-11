@@ -84,7 +84,7 @@ const TARGETS: { key: ImportTarget; desc: string; icon: typeof Users2 }[] = [
   { key: "expenses", desc: "Gider başlığı, tutar, kategori, tarih", icon: Receipt },
   {
     key: "rentals",
-    desc: "Aktif kira: portföy kodu, kiracı/malik (telefonla eşleşir, yoksa oluşturulur), kira, başlangıç. Kiralama anlaşması + komisyon birlikte kurulur; geri alınamaz.",
+    desc: "Aktif kira: portföy kodu, kiracı/malik (telefonla eşleşir, yoksa oluşturulur), kira, başlangıç. Kiralık anlaşma + komisyon birlikte kurulur; geri alınamaz.",
     icon: KeyRound,
   },
 ];

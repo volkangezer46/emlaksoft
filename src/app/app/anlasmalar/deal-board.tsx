@@ -1,5 +1,6 @@
 "use client";
 
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import {
   useEffect,
   useId,
@@ -465,7 +466,7 @@ export function DealBoard({
                   <label htmlFor={`deal-${editing.id}-type`} className="mb-1 block text-xs font-semibold text-text-muted">Tür</label>
                   <select id={`deal-${editing.id}-type`} name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
                     <option value="sale">Satış</option>
-                    <option value="rent">Kiralama</option>
+                    <option value="rent">Kiralık</option>
                   </select>
                 </div>
               </div>
@@ -589,7 +590,7 @@ function CardSummary({ deal, busy = false, trailing }: { deal: BoardDeal; busy?:
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink-950">{dealTitle(deal)}</p>
           <p className="mt-0.5 truncate text-xs text-text-muted">
-            {deal.customer_name ?? "Müşteri atanmadı"} · {deal.deal_type === "rent" ? "Kiralama" : "Satış"}
+            {deal.customer_name ?? "Müşteri atanmadı"} · {dealTypeLabel(deal.deal_type)}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">

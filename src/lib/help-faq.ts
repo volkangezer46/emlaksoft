@@ -252,10 +252,10 @@ export const FAQ: readonly FaqItem[] = [
   {
     id: "kiralama-kapanis",
     category: "komisyon",
-    q: "Kiralama anlaşmasını da aynı sihirbazla mı kapatırım?",
-    a: "Hayır. Satış anlaşmaları Kapanış sihirbazıyla kapanır; kiralama kapanışı Kiralama ekranından yapılır.",
+    q: "Kiralık anlaşmayı da aynı sihirbazla mı kapatırım?",
+    a: "Hayır. Satış anlaşmaları Kapanış sihirbazıyla kapanır; kiralık anlaşma kapanışı Mülk Yönetimi ekranından yapılır.",
     href: "/app/kiralama",
-    hrefLabel: "Kiralama",
+    hrefLabel: "Mülk Yönetimi",
   },
   {
     id: "komisyon-csv",

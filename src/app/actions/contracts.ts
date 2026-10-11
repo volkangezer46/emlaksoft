@@ -118,7 +118,7 @@ export async function createContract(
 
   if (error || !data) {
     if (rentalId && isMissingSchemaError(error)) {
-      return { error: "Kiralamadan sözleşme için veritabanı güncellemesi henüz uygulanmamış." };
+      return { error: "Kira kaydından sözleşme için veritabanı güncellemesi henüz uygulanmamış." };
     }
     return { error: actionErrorMessage(error, "Sözleşme oluşturulamadı.") };
   }

@@ -28,7 +28,7 @@ export const MODULE_PREFIX_MAP: Record<string, string> = {
   commission: "Komisyon",
   payment_link: "Komisyon",
   contract: "Sözleşmeler",
-  rental: "Kiralama",
+  rental: "Mülk Yönetimi",
   // Pazarlama / otomasyon
   campaign: "Kampanyalar",
   iys: "Kampanyalar",
@@ -58,7 +58,7 @@ export const CORE_MODULES = [
   "Randevular",
   "Komisyon",
   "Sözleşmeler",
-  "Kiralama",
+  "Mülk Yönetimi",
   "Kampanyalar",
   "Otomasyon",
   "Değerleme",

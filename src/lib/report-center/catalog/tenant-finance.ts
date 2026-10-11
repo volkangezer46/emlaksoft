@@ -132,7 +132,7 @@ export const karZarar = defineReport({
 
 export const kiralamalar = defineReport({
   id: "kiralamalar",
-  title: "Kiralamalar (kira sözleşmeleri)",
+  title: "Kira sözleşmeleri (mülk yönetimi)",
   description: "Aktif ve biten kiralamalar: kiracı, aylık kira, vade günü, depozito ve geciken tahakkuklar.",
   category: "finans",
   scope: "tenant",

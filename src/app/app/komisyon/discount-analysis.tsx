@@ -232,7 +232,7 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
           </>
         )}
         <p className="text-xs leading-relaxed text-text-faint">
-          Uygulanan oran portföy kaydındaki GÜNCEL komisyon oranıdır; kiralama anlaşmaları ve örnek veri hariçtir. Standart oran, Ayarlar &gt; Ofis tanımları&apos;ndaki varsayılan
+          Uygulanan oran portföy kaydındaki GÜNCEL komisyon oranıdır; kiralık anlaşmalar ve örnek veri hariçtir. Standart oran, Ayarlar &gt; Ofis tanımları&apos;ndaki varsayılan
           komisyon oranıdır (sözleşme bazlı liste oranı değildir). Onay kuralı{" "}
           <Link href="/app/ofis-kontrol/kurallar" className="font-semibold underline">Ofis kontrol &gt; Kurallar</Link>&apos;dan yönetilir.
         </p>

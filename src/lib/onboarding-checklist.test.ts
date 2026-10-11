@@ -34,7 +34,7 @@ const full: OnboardingFacts = {
 
 describe("onboarding-steps kaydı", () => {
   it("adım sırası: ofis, sen, ekip, havuz, portallar, giderler ve kasa, paket", () => {
-    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "you", "team", "pool", "portals", "giderler-kasa", "plan"]);
+    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "you", "team", "pool", "portals", "giderler-kasa", "mulk-yonetimi", "plan"]);
     expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_DEFS.length);
   });
 
@@ -54,7 +54,7 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    expect(s.total).toBe(7);
+    expect(s.total).toBe(8);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
@@ -75,7 +75,7 @@ describe("onboarding-checklist", () => {
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
     const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true, poolAdvisorRecords: 1 });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(43);
+    expect(s.percent).toBe(38);
     expect(s.nextId).toBe("team");
   });
 
@@ -94,7 +94,7 @@ describe("onboarding-checklist", () => {
   });
 
   it("tüm adımlar dolu: complete", () => {
-    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true } });
+    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true, "mulk-yonetimi": true } });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(resolveWizardStep(undefined, s)).toBe("bitis");
@@ -121,7 +121,7 @@ describe("onboarding-checklist", () => {
   it("geri/ileri komşuları", () => {
     expect(wizardNeighbors("team")).toEqual({ prev: "you", next: "pool" });
     expect(wizardNeighbors("office")).toEqual({ prev: null, next: "you" });
-    expect(wizardNeighbors("plan")).toEqual({ prev: "giderler-kasa", next: "bitis" });
+    expect(wizardNeighbors("plan")).toEqual({ prev: "mulk-yonetimi", next: "bitis" });
     expect(wizardNeighbors("bitis")).toEqual({ prev: "plan", next: null });
   });
 });

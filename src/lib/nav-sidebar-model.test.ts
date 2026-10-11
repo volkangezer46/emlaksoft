@@ -16,7 +16,7 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
   it("ofis sahibi / genel müdür / şube müdürü: 10 açık satır", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) {
       // Şube müdürünün muhasebe (expenses) yetkisi yok: Muhasebe satırı onun düzeninde yer almaz.
-      const want = ["Bugün", "Müşteriler", "Portföy", "Havuz ve Atama", "Satış", "Komisyon", "Muhasebe", "Kiralama ve Aidat", "Ekibim", "Raporlar"].filter((l) => role !== "branch_manager" || l !== "Muhasebe");
+      const want = ["Bugün", "Müşteriler", "Portföy", "Havuz ve Atama", "Satış", "Komisyon", "Muhasebe", "Mülk Yönetimi", "Ekibim", "Raporlar"].filter((l) => role !== "branch_manager" || l !== "Muhasebe");
       expect(labels(role), role).toEqual(want);
       // Alt sabit satırlar rolün varsayılan yetkisine göre süzülür (şube müdüründe ayar/abonelik izni yoktur).
       const dock = hubNav(accessibleOf(role), { role }).dock.map((h) => h.label);
@@ -35,8 +35,14 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(hubNav([...accessibleOf("advisor"), "targets"], { role: "advisor" }).hubs.find((h) => h.id === "ben")!.pages.map((p) => p.label)).toEqual(["Performansım", "Hedefim", "Profilim"]);
   });
 
+  it("Mülk Yönetimi: sayfa etiketi 'Kira takibi'; rentals modülü kapalıysa satır hiç görünmez", () => {
+    expect(pagesOf("owner", "kiralama").map((p) => p.label)).toContain("Kira takibi");
+    const closedNav = hubNav(accessibleOf("owner"), { role: "owner", closed: ["rentals"] });
+    expect(closedNav.hubs.some((h) => h.label === "Mülk Yönetimi" && h.pages.some((p) => p.href === "/app/kiralama"))).toBe(false);
+  });
+
   it("muhasebe 4 satır, çağrı merkezi 4 satır", () => {
-    expect(labels("accounting")).toEqual(["Bugün", "Muhasebe", "Komisyon", "Kiralama ve Aidat", "Raporlar", "Abonelik"]);
+    expect(labels("accounting")).toEqual(["Bugün", "Muhasebe", "Komisyon", "Mülk Yönetimi", "Raporlar", "Abonelik"]);
     expect(labels("call_center")).toEqual(["Bugün", "Gelen kutusu", "Müşteriler", "Randevu ve Görev"]);
     expect(pagesOf("accounting", "muhasebe").map((p) => p.label)).toContain("Gelir ve gider");
   });

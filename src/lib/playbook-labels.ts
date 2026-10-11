@@ -35,7 +35,7 @@ export const PLAYBOOK_FILTER_HINTS: Record<PlaybookTriggerEvent, { key: string; 
     { key: "transaction_type", label: "İşlem türü", samples: ["Satılık", "Kiralık", "Devren", "Günlük Kiralık"] },
     { key: "property_type", label: "Emlak türü", samples: ["Daire", "Villa", "Arsa", "İş Yeri"] },
   ],
-  anlasma_kazanildi: [{ key: "deal_type", label: "Anlaşma türü", samples: ["Satış", "Kiralama"] }],
+  anlasma_kazanildi: [{ key: "deal_type", label: "Anlaşma türü", samples: ["Satış", "Kiralık"] }],
   kira_sozlesmesi: [],
   talep_olusturuldu: [
     { key: "transaction_type", label: "İşlem türü", samples: ["Satılık", "Kiralık"] },

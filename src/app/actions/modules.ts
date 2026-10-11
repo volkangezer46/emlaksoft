@@ -125,6 +125,41 @@ export async function setModuleEnabled(moduleKey: string, enabled: boolean, casc
   return { ok: true, message: enabled ? `${labelOf(moduleKey)} açıldı.` : `${labelOf(moduleKey)} kapatıldı. Verileriniz silinmedi.` };
 }
 
+/**
+ * Kurulum sihirbazı "Mülk yönetimi yapıyor musunuz?" sorusu: Mülk Yönetimi (rentals) modülünü açar/kapatır ve cevabı
+ * HER DURUMDA satır olarak kaydeder (zaten açıkken bile; böylece adım "yanıtlandı" sayılır). Kapatınca bağlı modüller de
+ * kapanır, veriler silinmez. Sonradan Ayarlar > Modüller ekranından değiştirilebilir.
+ */
+export async function answerPropertyManagement(enabled: boolean): Promise<ModuleActionResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (gate.impersonating || !canManageModules(gate.role)) return { error: DENIED };
+  const key: FeatureKey = "rentals";
+  const state = await getTenantModuleState(gate.tenantId);
+  if (state.status === "unavailable") return { error: UNAVAILABLE };
+  if (state.locked.includes(key)) return { error: `${labelOf(key)} platform tarafından kilitlenmiş; değiştirilemez.` };
+  const planCtx = await getTenantGateContext(gate.tenantId);
+  if (enabled && planLockedKeys(planCtx).includes(key)) return { error: `${labelOf(key)} paketinize dahil değil.` };
+
+  const closed = new Set<string>(state.closed);
+  const changes: Change[] = [{ key, enabled }];
+  if (enabled) {
+    const missing = closedDependencies(key, closed);
+    if (missing.length > 0) return { error: `Önce şunları açın: ${missing.map(labelOf).join(", ")}.` };
+  } else {
+    const dependents = dependentsOf(key).filter((k) => !closed.has(k));
+    const lockedOpen = dependents.filter((k) => state.locked.includes(k));
+    if (lockedOpen.length > 0) return { error: `${lockedOpen.map(labelOf).join(", ")} platform tarafından kilitli olduğu için ${labelOf(key)} kapatılamaz.` };
+    for (const k of dependents) changes.push({ key: k, enabled: false });
+  }
+  const failed = await writeChanges(gate.tenantId, gate.userId, changes);
+  if (failed) return failed;
+  await auditChanges(gate.tenantId, gate.userId, closed, changes);
+  revalidatePath("/app", "layout");
+  revalidatePath("/app/baslangic");
+  return { ok: true, message: enabled ? `${labelOf(key)} açıldı.` : `${labelOf(key)} kapatıldı. Verileriniz silinmedi.` };
+}
+
 /** Ofis tipi ön ayarını uygular (önizleme ile AYNI hesap: computePresetChanges). */
 export async function applyModulePreset(presetId: string): Promise<ModuleActionResult> {
   const gate = await requirePermission("settings", "edit");

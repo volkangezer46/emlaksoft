@@ -100,7 +100,7 @@ export function RemindersPanel({
 
       <p className="text-xs text-text-muted">
         Otomatik hatırlatma varsayılan olarak KAPALIDIR; ofis ayarı{" "}
-        <Link href="/app/kiralama#hatirlatma-ayarlari" className="font-semibold text-brand-600 hover:underline">Kiralama sayfasından</Link> açılır.
+        <Link href="/app/kiralama#hatirlatma-ayarlari" className="font-semibold text-brand-600 hover:underline">Mülk Yönetimi sayfasından</Link> açılır.
         Aşağıdaki WhatsApp bağlantısı ayardan bağımsızdır: mesajı siz kendi WhatsApp’ınızdan gönderirsiniz.
       </p>
 

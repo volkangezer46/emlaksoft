@@ -199,7 +199,7 @@ export function RentalForm({
     <TabbedFormShell
       title="Yeni kira kaydı"
       description="Portföyü kiracısıyla eşleştirin — aylık tahakkuklar vade gününe göre otomatik oluşturulur."
-      breadcrumbs={[{ label: "Kiralama", href: "/app/kiralama" }, { label: "Yeni kira kaydı" }]}
+      breadcrumbs={[{ label: "Mülk Yönetimi", href: "/app/kiralama" }, { label: "Yeni kira kaydı" }]}
       cancelHref="/app/kiralama"
       submitLabel="Kaydet"
       submitIcon={Check}

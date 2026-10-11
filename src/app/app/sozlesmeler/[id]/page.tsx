@@ -236,7 +236,7 @@ export default async function ContractDetailPage({
             <KeyRound className="h-4 w-4 text-brand-700" />
             <span className="text-text-muted">Kira kaydı:</span>
             <Link href={`/app/kiralama/${linkedRentalId}?sekme=sozlesme`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-text hover:underline">
-              Kiralama detayını aç
+              Kira kaydını aç
             </Link>
             {rentalLink?.rent_increase_basis ? <span className="text-xs text-text-muted">· {INCREASE_LABELS[rentalLink.rent_increase_basis] ?? rentalLink.rent_increase_basis}</span> : null}
           </div>

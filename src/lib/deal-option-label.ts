@@ -22,7 +22,7 @@ export function dealOptionLabel(d: DealOptionSource): string {
   const propText = prop?.property_code?.trim() || prop?.title?.trim() || null;
   const parts = [customer, propText].filter((x): x is string => Boolean(x));
   if (parts.length > 0) return parts.join(" · ");
-  return d.deal_type === "rent" ? "Kiralama anlaşması" : "Satış anlaşması";
+  return d.deal_type === "rent" ? "Kiralık anlaşma" : "Satış anlaşması";
 }
 
 /** Gömme seçimi: deals tablosundan etiket için gereken alanlar (FK adlı). */

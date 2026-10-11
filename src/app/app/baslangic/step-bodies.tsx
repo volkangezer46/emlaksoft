@@ -18,6 +18,8 @@ import { PoolStep } from "./pool-step";
 import { TeamStep } from "./team-step";
 import { TitleForm } from "./you-step";
 import { GiderlerKasaStep } from "./steps/giderler-kasa-step";
+import { MulkYonetimiStep } from "./steps/mulk-yonetimi-step";
+import { getTenantModuleState } from "@/lib/modules/state";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
 export type StepBodyProps = {
@@ -150,6 +152,12 @@ function GiderlerKasaBody(p: StepBodyProps) {
   return <GiderlerKasaStep canEdit={canEdit} canSalary={p.role === "owner" || p.role === "gm"} nextHref={p.nextHref} />;
 }
 
+async function MulkYonetimiBody(p: StepBodyProps) {
+  const state = await getTenantModuleState(p.tenantId);
+  const canEdit = p.role === "owner" || p.role === "gm";
+  return <MulkYonetimiStep enabled={!state.closed.includes("rentals")} canEdit={canEdit} nextHref={p.nextHref} />;
+}
+
 async function PlanBody(p: StepBodyProps) {
   const { plans, offers, trialDays, efValuationCost, efLive } = await getPublicPricing();
   return (
@@ -177,6 +185,7 @@ export const STEP_BODIES: Partial<Record<OnboardingStepId, StepBody>> = {
   pool: PoolBody,
   portals: PortalsBody,
   "giderler-kasa": GiderlerKasaBody,
+  "mulk-yonetimi": MulkYonetimiBody,
   plan: PlanBody,
 };
 

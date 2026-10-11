@@ -198,18 +198,18 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/kiralama",
-        label: "Kiralama",
+        label: "Mülk Yönetimi",
         icon: ICONS.anahtar,
         module: "rentals",
         // Kira artışı izin modülü `valuation` (kiralama `rentals`): sekme kendi modülüyle gizlenir/gösterilir.
         tabs: [
-          { href: "/app/kiralama", label: "Kiralama", icon: ICONS.anahtar, module: "rentals" },
+          { href: "/app/kiralama", label: "Kira takibi", icon: ICONS.anahtar, module: "rentals" },
           { href: "/app/kira-artis", label: "Kira artışı", icon: ICONS.oran, module: "valuation", description: "TÜFE'ye göre yasal kira artışı hesabı", keywords: ["tüfe", "zam", "artış"] },
-          // Aidat ayrı menü öğesi değildir: yönettiğiniz kiralık daire/sitelerin aidatı Kiralama'nın sekmesidir (yol sabit; kendi modülü expenses).
+          // Aidat ayrı menü öğesi değildir: yönettiğiniz kiralık daire/sitelerin aidatı Mülk Yönetimi sekmesidir (yol sabit; kendi modülü expenses).
           { href: "/app/aidat", label: "Aidat & site", icon: ICONS.aidat, module: "expenses", description: "Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin", keywords: ["aidat", "ortak gider", "apartman", "site", "bina", "daire cari", "borç"] },
         ],
-        description: "Kira sözleşmeleri, aylık tahakkuk, kira artışı ve site aidatları",
-        keywords: ["kira", "kiracı", "tahakkuk", "depozito", "aidat", "site", "apartman"],
+        description: "Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri",
+        keywords: ["kira takibi", "mülk yönetimi", "kira", "kiracı", "tahakkuk", "depozito", "aidat", "site", "apartman", "mülk sahibi", "hakediş"],
       },
       {
         href: "/app/projeler",

@@ -1,3 +1,4 @@
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TimelineEvent } from "@/lib/activity-timeline";
 import { COMM_CHANNELS } from "@/lib/comm-types";
@@ -227,7 +228,7 @@ export async function buildCustomerEvents(
       id: `deal-${d.id}`,
       at: d.updated_at,
       category: "anlasma",
-      title: `${d.deal_type === "rent" ? "Kiralama" : "Satış"} anlaşması · ${pre.stageNames[d.stage] ?? d.stage}`,
+      title: `${dealTypeLabel(d.deal_type)} anlaşması · ${pre.stageNames[d.stage] ?? d.stage}`,
       detail: d.deal_value != null ? tl(d.deal_value) : undefined,
       icon: "deal",
       tone: d.stage === "won" ? "success" : d.stage === "lost" ? "danger" : "info",

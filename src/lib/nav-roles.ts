@@ -122,10 +122,10 @@ const MUHASEBE: HubDef = {
 
 const KIRALAMA_AIDAT: HubDef = {
   id: "kiralama",
-  label: "Kiralama ve Aidat",
+  label: "Mülk Yönetimi",
   group: "Finans",
   icon: "anahtar",
-  pages: [p("/app/kiralama"), p("/app/aidat", "Aidat & site"), p("/app/kira-artis")],
+  pages: [p("/app/kiralama", "Kira takibi"), p("/app/aidat", "Aidat & site"), p("/app/kira-artis")],
 };
 
 const EKIBIM: HubDef = {

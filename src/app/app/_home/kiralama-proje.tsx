@@ -37,10 +37,10 @@ export async function KiralamaProje({ ctx }: { ctx: HomeCtx }) {
         <section className="pm-bx p-5">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-2 text-xs font-semibold text-cyan-600">
-              <KeyRound className="h-4 w-4" /> Kiralama
+              <KeyRound className="h-4 w-4" /> Mülk yönetimi
             </p>
             <Link href="/app/kiralama" className="text-xs font-semibold text-brand-600 hover:underline">
-              Kira merkezi →
+              Mülk Yönetimi →
             </Link>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">

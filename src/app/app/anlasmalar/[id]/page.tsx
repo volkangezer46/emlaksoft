@@ -1,3 +1,4 @@
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
@@ -377,7 +378,7 @@ export default async function DealDetailPage({
         <ArrowLeft className="h-4 w-4" /> Satış hattına dön
       </Link>
 
-      <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${deal.deal_type === "rent" ? "Kiralama" : "Satış"} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`} />
+      <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
           <ol className="relative mt-6 flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
             {STAGES.map((s, i) => {

@@ -1,3 +1,4 @@
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
@@ -145,7 +146,7 @@ export default async function ForeignSalePage() {
       const parts = [
         customer?.full_name ?? "Müşterisiz",
         property ? property.title ?? property.property_code : "Portföysüz",
-        d.deal_type === "rent" ? "Kiralama" : "Satış",
+        dealTypeLabel(d.deal_type),
       ];
       return { id: d.id, label: parts.join(" · ") };
     })

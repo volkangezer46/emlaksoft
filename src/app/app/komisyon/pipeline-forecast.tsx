@@ -80,7 +80,7 @@ export async function PipelineForecastCard({ tenantId }: { tenantId: string }) {
           </div>
           <p className="mt-3 text-xs leading-relaxed text-text-faint">
             Yöntem: son 12 ayın kazanma oranı{" "}
-            {r.winRates.map((w) => `${w.dealType === "rent" ? "kiralama" : "satış"} %${Math.round(w.rate * 100)} (${w.closed} kapanış)`).join(", ")}
+            {r.winRates.map((w) => `${w.dealType === "rent" ? "kiralık" : "satış"} %${Math.round(w.rate * 100)} (${w.closed} kapanış)`).join(", ")}
             {r.medianCycleDays != null ? `; medyan kapanış süresi ${r.medianCycleDays} gün` : ""}. Aşama bazlı olasılık kullanılmaz (aşama geçmişi tutulmuyor).
             {r.excludedNoValue > 0 ? ` Tutarı girilmemiş ${r.excludedNoValue} anlaşma dahil değil.` : ""}
             {r.excludedLowData > 0 ? ` En az ${MIN_CLOSED} kapanışı olmayan türdeki ${r.excludedLowData} anlaşma dahil değil.` : ""}

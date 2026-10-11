@@ -406,7 +406,7 @@ export function NewContractForm({
         {prefillCustomer || prefillProperty ? (
           <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700 sm:col-span-2">
             {rentalContext
-              ? "Kiralama kaydından gelindi — kiracı, portföy ve kira kaydı bağı sözleşmeye otomatik eklenecek; sözleşme sayfasından kiralamaya geri dönülebilir."
+              ? "Kira kaydından gelindi — kiracı, portföy ve kira kaydı bağı sözleşmeye otomatik eklenecek; sözleşme sayfasından kira kaydına geri dönülebilir."
               : isYerGosterme
               ? "Randevu akışından gelindi — müşteri ve portföy bağı otomatik eklenecek; içerikte yer gösterme tutanağı şablonu hazır."
               : "Teklif akışından gelindi — portföy ve müşteri bağı sözleşmeye otomatik eklenecek."}

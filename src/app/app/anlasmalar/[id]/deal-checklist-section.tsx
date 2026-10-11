@@ -1,5 +1,6 @@
 "use client";
 
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { useActionState, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -146,7 +147,7 @@ export function DealChecklistSection({
       {items.length === 0 ? (
         <div className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-8 text-center">
           <p className="text-sm text-text-muted">
-            Henüz evrak listesi yok. {dealType === "rent" ? "Kiralama" : "Satış"} kapanışının
+            Henüz evrak listesi yok. {dealTypeLabel(dealType)} kapanışının
             standart evraklarıyla başlayın.
           </p>
           {canEdit ? (

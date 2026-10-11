@@ -30,7 +30,7 @@ export const PLAN_GATES: readonly PlanGate[] = [
   // Ofis
   { href: "/app/teklifler", title: "Teklifler", minPlan: "office", pitch: "Teklif turlarını, karşı teklifi ve kabulü tek yerde yönetin; kabul edilen teklif tek tıkla anlaşmaya dönüşür." },
   { href: "/app/sozlesmeler", title: "Sözleşmeler", minPlan: "office", pitch: "Şablondan sözleşme hazırlayın, SMS onaylı dijital imzaya gönderin, imza sonrası dosya otomatik saklansın." },
-  { href: "/app/kiralama", title: "Kiralama", minPlan: "office", pitch: "Kira sözleşmeleri, aylık tahakkuk, gecikme ve depozito takibi tek ekranda." },
+  { href: "/app/kiralama", title: "Mülk Yönetimi", minPlan: "office", pitch: "Kira sözleşmeleri, aylık tahakkuk, gecikme ve depozito takibi tek ekranda." },
   { href: "/app/acik-ev", title: "Açık Ev", minPlan: "office", pitch: "QR ile ziyaretçi kaydı alın, ziyaretçiyi otomatik talebe çevirin." },
   { href: "/app/portallar", title: "Portal Kontrol", minPlan: "office", pitch: "Portal ilanlarınızın teyit, yenileme ve kapanış durumunu takip edin." },
   { href: "/app/ilan-kontrol", title: "İlan Kontrol Merkezi", minPlan: "office", pitch: "Hangi portföy portalda yayında, hangisi kayboldu, kimde açıklama eksik: kayıp ve kaçakları tek ekrandan yakalayın." },

@@ -3,6 +3,7 @@
  * Kullanıcı oturumuyla (RLS) okunur: göremediği kayıttan fatura kesemez. Kimlik/vergi no müşteri kaydında tutulmaz;
  * kullanıcı formda girer.
  */
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_VAT_RATE, inferVatRate, round2 } from "./invoice-math";
 import type { EInvoiceLine, EInvoiceSourceType } from "./types";
@@ -66,7 +67,7 @@ export async function loadSourcePrefill(
     const customer = one(deal?.customer);
     const gross = round2(Number(row.gross_amount));
     const vatRate = inferVatRate(gross, Number(row.vat_amount ?? 0));
-    const kind = deal?.deal_type === "rent" ? "Kiralama" : "Satış";
+    const kind = dealTypeLabel(deal?.deal_type);
     const ref = property?.property_code ?? property?.title ?? null;
     return {
       sourceType: "commission",

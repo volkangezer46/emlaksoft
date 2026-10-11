@@ -81,7 +81,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   if (transition?.outcome === "renter_not_found") return { error: "Kiracı (müşteri) bulunamadı." };
   if (transition?.outcome === "property_unavailable") return { error: "Portföy satılmış, kiralanmış veya aktif kiraya bağlı." };
   if (transition?.outcome === "commission_rate_required") {
-    return { error: "Kiralama kapanışından önce portföyde 0'dan büyük, en çok iki ondalık haneli geçerli bir komisyon oranı tanımlayın." };
+    return { error: "Kiralık anlaşma kapanışından önce portföyde 0'dan büyük, en çok iki ondalık haneli geçerli bir komisyon oranı tanımlayın." };
   }
   if (transition?.outcome !== "created" || typeof transition.rental_id !== "string") {
     return { error: actionErrorMessage(null, "Kira kaydı oluşturulamadı.") };

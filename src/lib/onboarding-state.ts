@@ -59,6 +59,8 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       // Havuz adımı: ofiste gerçek (örnek olmayan) danışman uzmanlık/bölge kaydı var mı (RLS kiracı sınırı).
       supabase.from("advisor_specialties").select("id", { count: "exact", head: true }).eq("is_sample", false),
       supabase.from("advisor_regions").select("id", { count: "exact", head: true }).eq("is_sample", false),
+      // Mülk yönetimi sorusu: rentals modül satırı varsa cevaplanmıştır (RLS kiracı sınırı).
+      supabase.from("tenant_modules").select("module_key", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("module_key", "rentals"),
     ]),
     supabase
       .from("tenants")
@@ -92,7 +94,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const appointments = results[9].count ?? 0;
   const customDefinitions = results[5].count ?? 0;
 
-  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes] = optional;
+  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes, rentalsModRes] = optional;
   const title = String((titleRes.error ? null : (titleRes.data as { title?: string | null } | null)?.title) ?? "").trim();
   const specCount = specRes.error ? 0 : (specRes.count ?? 0);
   const regionCount = regionRes.error ? 0 : (regionRes.count ?? 0);
@@ -100,6 +102,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   // EKSTRA OLGULAR: başka modüllerin sihirbaza eklediği adımlar (bkz. onboarding-steps.ts) olgularını burada doldurur.
   const extra: Record<string, boolean> = {
     "giderler-kasa": (!cashAccRes.error && (cashAccRes.count ?? 0) > 0) || (!ruleRes.error && (ruleRes.count ?? 0) > 0),
+    "mulk-yonetimi": !rentalsModRes.error && (rentalsModRes.count ?? 0) > 0,
   };
 
   const facts: OnboardingFacts = {

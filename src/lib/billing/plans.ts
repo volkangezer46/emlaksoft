@@ -103,7 +103,7 @@ export const PLANS: readonly PlanDef[] = [
       "Sınırsız müşteri ve portföy",
       "Ekip yönetimi ve komisyon paylaşımı",
       "Teklif, sözleşme ve SMS onaylı dijital imza",
-      "Kiralama, açık ev ve portal teyit",
+      "Mülk yönetimi, açık ev ve portal teyit",
       "Kampanya, gider ve raporlar",
     ],
     limits: { seats: 5, customers: null, activeProperties: null, branches: 3 },

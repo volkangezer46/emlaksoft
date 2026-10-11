@@ -1,5 +1,6 @@
 "use client";
 
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
 import { useMemo, useState } from "react";
 import Link from "@/components/ui/smart-link";
@@ -106,7 +107,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
         <FormField label="Tür" htmlFor="deal-type">
           <FormSelect name="deal_type" defaultValue="sale">
             <option value="sale">Satış</option>
-            <option value="rent">Kiralama</option>
+            <option value="rent">Kiralık</option>
           </FormSelect>
         </FormField>
         <FormField label="Aşama" htmlFor="deal-stage" hint={stageMeta.help}>
@@ -165,7 +166,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
         <SummaryGroup title="Anlaşma">
           <SummaryRow label="Portföy" value={prop?.property_code ?? display.property_id ?? "Seçilmedi"} muted={!hasProp} tab="taraflar" field="deal-property" />
           <SummaryRow label="Müşteri" value={cust?.full_name ?? display.customer_id ?? "Seçilmedi"} muted={!hasCust} tab="taraflar" field="deal-customer" />
-          <SummaryRow label="Tür" value={values.deal_type === "rent" ? "Kiralama" : "Satış"} tab="detay" field="deal_type" />
+          <SummaryRow label="Tür" value={dealTypeLabel(values.deal_type)} tab="detay" field="deal_type" />
           <SummaryRow label="Aşama" value={nameOf(stageMeta.value)} tab="detay" field="stage" />
           <SummaryRow label="Liste fiyatı" value={list ? formatTry(list) : "Portföy seçilince"} muted={!list} tab="taraflar" field="deal-property" />
           <SummaryRow

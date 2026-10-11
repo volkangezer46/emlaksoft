@@ -53,7 +53,7 @@ export const STATUS = {
   targetPeriod: { monthly: "Aylık", quarterly: "Üç aylık", yearly: "Yıllık" },
   couponKind: { percent: "Yüzde", amount: "Tutar" },
   ledgerKind: { entry: "Kayıt", correction: "Düzeltme" },
-  dealType: { sale: "Satış", rent: "Kiralama" },
+  dealType: { sale: "Satış", rent: "Kiralık" },
   leadRef: { referral: "Tavsiye", partner: "Ortak", tool: "Araç", powered_by: "Marka bağlantısı", none: "Doğrudan" },
   closureReason: {},
 } satisfies Record<string, Record<string, string>>;

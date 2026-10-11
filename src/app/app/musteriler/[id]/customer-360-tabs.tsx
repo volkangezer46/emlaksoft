@@ -1,3 +1,4 @@
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
@@ -298,7 +299,7 @@ export function Customer360Tabs({
                 >
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
-                      {d.deal_type === "rent" ? "Kiralama" : "Satış"} · {stageLabel[d.stage] ?? d.stage}
+                      {dealTypeLabel(d.deal_type)} · {stageLabel[d.stage] ?? d.stage}
                     </p>
                     <p className="text-xs text-text-muted">{dateTime(d.updated_at)}</p>
                   </div>

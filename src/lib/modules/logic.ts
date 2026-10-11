@@ -93,14 +93,14 @@ export const MODULE_PRESETS: readonly ModulePreset[] = [
   {
     id: "arsa_ticari",
     title: "Arsa ve ticari",
-    desc: "Arsa ve ticari gayrimenkul: açık ev, kiralama, kampanya, şube ve TV panosu kapanır.",
+    desc: "Arsa ve ticari gayrimenkul: açık ev, mülk yönetimi, kampanya, şube ve TV panosu kapanır.",
     close: ["open_house", "rentals", "campaigns", "tv_board", "franchise"],
     open: ["foreign_sale", "projects", "network", "presentations", "valuation"],
   },
   {
     id: "kiralama",
-    title: "Kiralama ve mülk yönetimi",
-    desc: "Kira ağırlıklı ofis: kiralama, gider, sözleşme, belge, anahtar ve portal açık; satış odaklı araçlar kapanır.",
+    title: "Mülk yönetimi (kira ağırlıklı)",
+    desc: "Kira ağırlıklı ofis: mülk yönetimi, gider, sözleşme, belge, anahtar ve portal açık; satış odaklı araçlar kapanır.",
     close: ["projects", "foreign_sale", "network", "franchise", "portals", "leak", "open_house"],
     open: ["rentals", "expenses", "contracts", "documents", "keys", "client_portals", "campaigns"],
   },

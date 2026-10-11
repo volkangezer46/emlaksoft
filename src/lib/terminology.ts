@@ -34,6 +34,16 @@ export const TERMS = {
     canonical: "Anlaşma",
     definition: "Müşteri ile ofis arasındaki satış/kiralama süreci. 'Fırsat' kullanıcıya görünmez.",
   },
+  mulkYonetimi: {
+    canonical: "Mülk Yönetimi",
+    definition:
+      "Kiracı ve mülk sahibi adına kira/aidat takibi modülü (/app/kiralama: kira takibi, aidat & site, mülk sahibine ödeme, kira artışı). " +
+      "Kullanıcı metninde modül için 'Kiralama' yazılmaz; anlaşma türü 'Kiralık' (Satış / Kiralık) diye anılır.",
+    forbidden: [
+      /\bKiralama(?:\s+(?:ekran|sayfa|modül|yönetimi|ve\s+(?:Aidat|mülk|kira)|kaydı|anlaşması|kapanışı|şerid)|\s*[·'’])/i,
+      /\bKiralama(?:dan|ya|nın)\s+(?:sözleşme|gel|geri)/i,
+    ],
+  },
   kazanc: {
     canonical: "Kazanç",
     definition: "Danışmanın komisyon payı toplamı (kişisel sayfa adı). Menüde ve başlıkta 'Cüzdan' değil 'Kazanç'.",

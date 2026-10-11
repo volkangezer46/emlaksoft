@@ -704,12 +704,12 @@ async function runRentalChunk(
   maxRows: number,
 ): Promise<ChunkResult> {
   const policy: DuplicatePolicy = options.duplicatePolicy ?? "skip";
-  if (policy === "update") return { error: "Kiralama aktarımında güncelleme politikası yoktur (atla veya yeni oluştur)." };
+  if (policy === "update") return { error: "Kira aktarımında güncelleme politikası yoktur (atla veya yeni oluştur)." };
   if (!["skip", "create"].includes(policy)) return { error: "Mükerrer politikası geçersiz." };
   const gate = await requirePermission("rentals", "create");
   if (!gate.ok) return { error: gate.error };
   const financial = await requirePermission("commissions", "create");
-  if (!financial.ok) return { error: "Kiralama aktarımı komisyon kaydı da açar; komisyon ekleme yetkisi gerekir." };
+  if (!financial.ok) return { error: "Kira aktarımı komisyon kaydı da açar; komisyon ekleme yetkisi gerekir." };
   const canCreateCustomers = (await requirePermission("customers", "create")).ok;
   const limitError = limitCheck(rawRows, maxRows);
   if (limitError) return { error: limitError };
@@ -854,7 +854,7 @@ async function runRentalChunk(
   for (const part of chunked(toCreate, RENTAL_RPC_PARALLEL)) {
     await Promise.all(
       part.map(async (p) => {
-        if (rpcMissing) return fail(p, "Kiralama içe aktarma henüz etkin değil.");
+        if (rpcMissing) return fail(p, "Kira içe aktarma henüz etkin değil.");
         const d = p.data!;
         const renterId = d.renter_id ?? (d.renter.phone ? customerByPhone.get(d.renter.phone)?.id : undefined);
         if (!renterId) return fail(p, "Kiracı müşteri olarak eklenemedi; telefon ve adı kontrol edip satırı yeniden aktarın.");
@@ -876,11 +876,11 @@ async function runRentalChunk(
         if (error) {
           if (error.code === "PGRST202" || error.code === "42883") rpcMissing = true;
           console.error("import_rental_with_deal", error.code);
-          return fail(p, rpcMissing ? "Kiralama içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Kiralama ekranından ekleyin.");
+          return fail(p, rpcMissing ? "Kira içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Mülk Yönetimi ekranından ekleyin.");
         }
         const res = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
         if (res?.outcome !== "created" || typeof res.rental_id !== "string") {
-          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Kiralama ekranından ekleyin.");
+          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Mülk Yönetimi ekranından ekleyin.");
         }
         createdRentalIds.push(res.rental_id);
       }),

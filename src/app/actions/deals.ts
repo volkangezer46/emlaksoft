@@ -200,7 +200,7 @@ async function updateDealStageWithGate(
   }
   if (stage === "won" && existing.stage !== "won") {
     if (existing.deal_type === "rent") {
-      return { error: "Kiralama kapanışı; kira sözleşmesi, komisyon ve portföy birlikte kaydedilsin diye Kiralama ekranından tamamlanmalıdır." };
+      return { error: "Kiralık anlaşma kapanışı; kira sözleşmesi, komisyon ve portföy birlikte kaydedilsin diye Mülk Yönetimi ekranından tamamlanmalıdır." };
     }
     const createGate = await requirePermission("commissions", "create");
     if (!createGate.ok) return { error: createGate.error };
@@ -233,7 +233,7 @@ async function updateDealStageWithGate(
     return { error: "Bağlı ödeme bağlantısı varken anlaşma geri açılamaz; önce Komisyon ekranında satırın \"Linkler\" bölümünden açık ödeme bağlantısını iptal edin." };
   }
   if (outcome === "rental_lifecycle_required") {
-    return { error: "Kiralama kaydına bağlı anlaşma buradan geri açılamaz; Kiralama ekranındaki yaşam döngüsünü kullanın." };
+    return { error: "Kira kaydına bağlı anlaşma buradan geri açılamaz; Mülk Yönetimi ekranındaki yaşam döngüsünü kullanın." };
   }
   if (outcome === "conflict") return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
   if (outcome === "property_required") return { error: "Kazanmak için anlaşmaya portföy bağlayın." };
@@ -242,7 +242,7 @@ async function updateDealStageWithGate(
   if (outcome === "commission_rate_required") return { error: "Kapanıştan önce portföyde 0'dan büyük geçerli bir komisyon oranı tanımlayın." };
   if (outcome === "property_already_closed") return { error: "Bu portföy için kazanılmış başka bir anlaşma var." };
   if (outcome === "property_unavailable") return { error: "Portföyün mevcut durumu bu kapanış türüyle uyuşmuyor." };
-  if (outcome === "property_active_rental") return { error: "Bu portföy için zaten aktif bir kiralama kaydı var." };
+  if (outcome === "property_active_rental") return { error: "Bu portföy için zaten aktif bir kira kaydı var." };
   if (outcome === "invalid_transition") return { error: "Bu aşama geçişi desteklenmiyor." };
   if (outcome !== "applied" && outcome !== "replay") return { error: "Aşama güncellenemedi." };
 

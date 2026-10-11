@@ -1,3 +1,4 @@
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
@@ -303,7 +304,7 @@ export default async function SatisfactionReportPage() {
                       {cust?.full_name ?? "Müşteri"}
                     </Link>
                     <p className="text-xs text-text-muted">
-                      {d.deal_type === "rent" ? "Kiralama" : "Satış"}
+                      {dealTypeLabel(d.deal_type)}
                       {d.deal_value ? ` · ${money(Number(d.deal_value))}` : ""} · kapanış {fmtDate(String(d.updated_at))}
                       {d.assigned_to ? ` · ${agentName.get(String(d.assigned_to)) ?? "Danışman"}` : ""}
                     </p>

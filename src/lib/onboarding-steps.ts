@@ -52,6 +52,9 @@ export type OnboardingStepDef = {
   href?: string;
 };
 
+/** Mülk Yönetimi (rentals) modülü sorusu; sihirbaz adımı ve Modüller ekranı aynı metni kullanır. */
+export const PROPERTY_MANAGEMENT_QUESTION = "Kiracı ve mülk sahibi adına kira/aidat takibi yapıyor musunuz?";
+
 export const ONBOARDING_STEP_DEFS = [
   {
     id: "office",
@@ -95,6 +98,14 @@ export const ONBOARDING_STEP_DEFS = [
     description: "Kira, muhasebe, portal üyeliği gibi aylık ödemelerini ve ofis kasanı bir kez tanımla; her ay kendiliğinden işlensin.",
     isDone: (f) => f.extra["giderler-kasa"] === true,
     href: "/app/giderler?sekme=duzenli",
+  },
+  {
+    id: "mulk-yonetimi",
+    short: "Mülk yönetimi",
+    title: "Mülk yönetimi (isteğe bağlı)",
+    description: PROPERTY_MANAGEMENT_QUESTION,
+    // Cevap (Evet/Hayır) ofisin rentals modül satırı olarak saklanır; cevap gelene kadar mevcut davranış (modül açık) sürer.
+    isDone: (f) => f.extra["mulk-yonetimi"] === true,
   },
   {
     id: "plan",

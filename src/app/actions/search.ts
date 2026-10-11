@@ -1,5 +1,6 @@
 "use server";
 
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { createClient } from "@/lib/supabase/server";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
@@ -222,7 +223,7 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
       id: d.id,
       kind: "deal",
       title: cust?.full_name || prop?.title || prop?.property_code || "Anlaşma",
-      subtitle: [d.deal_type === "rent" ? "Kiralama" : "Satış", DEAL_STAGE_LABEL[d.stage] ?? d.stage, value]
+      subtitle: [dealTypeLabel(d.deal_type), DEAL_STAGE_LABEL[d.stage] ?? d.stage, value]
         .filter(Boolean)
         .join(" · "),
       href: `/app/anlasmalar/${d.id}`,

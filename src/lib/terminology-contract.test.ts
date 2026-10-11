@@ -92,3 +92,23 @@ describe("yasaklı terim sözleşmesi (kullanıcıya görünen metin)", () => {
     }, 30_000);
   }
 });
+
+describe("Mülk Yönetimi / Kiralık adlandırması", () => {
+  it("anlaşma türü etiketi tek kaynaktan: rent -> Kiralık", async () => {
+    const { dealTypeLabel } = await import("./deal-type-label");
+    expect(dealTypeLabel("rent")).toBe("Kiralık");
+    expect(dealTypeLabel("sale")).toBe("Satış");
+    expect(TERMS.mulkYonetimi.canonical).toBe("Mülk Yönetimi");
+  });
+  it('anlaşma türü için satır içi "Kiralama" : "Satış" üçlüsü kalmaz (dealTypeLabel kullan)', () => {
+    const hits: string[] = [];
+    for (const f of walkSource(ROOT)) {
+      const rel = relative(process.cwd(), f).replace(/\\/g, "/");
+      if (rel.endsWith(".test.ts") || rel.endsWith(".test.tsx")) continue;
+      readCached(f).split("\n").forEach((l, i) => {
+        if (/"Kiralama" : "Satış"|rent: "Kiralama"/.test(l)) hits.push(`${rel}:${i + 1}`);
+      });
+    }
+    expect(hits, hits.join("\n")).toEqual([]);
+  });
+});

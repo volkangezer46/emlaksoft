@@ -1,3 +1,4 @@
+import { dealTypeLabel } from "@/lib/deal-type-label";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import type { ComboboxOption } from "@/components/ui/combobox";
@@ -27,7 +28,7 @@ export default async function YeniOnayTalebiPage() {
       return {
         value: `deal:${dl.id}`,
         label: `Anlaşma · ${prop?.property_code ?? dl.id.slice(0, 8)}${prop?.title ? ` — ${prop.title}` : ""}`,
-        hint: `${dl.deal_type === "rent" ? "Kiralama" : "Satış"} · ${
+        hint: `${dealTypeLabel(dl.deal_type)} · ${
           dl.deal_value ? new Intl.NumberFormat("tr-TR").format(Number(dl.deal_value)) + " ₺" : "tutar yok"
         }`,
       };

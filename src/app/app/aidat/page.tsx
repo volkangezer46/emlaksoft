@@ -93,7 +93,7 @@ export default async function AidatPage({
     return (
       <ListPage>
         <ListHero
-          eyebrow="Kiralama · Aidat & site"
+          eyebrow="Mülk Yönetimi · Aidat & site"
           art="aidat"
           title="Aidat & site"
           description="Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin. Binalar: site/apartman tanımı ve ortak gider paylaştırma; Daire cari: dairenin borç-alacak dökümü."
@@ -283,7 +283,7 @@ export default async function AidatPage({
   return (
     <ListPage>
       <ListHero
-        eyebrow="Kiralama · Aidat & site"
+        eyebrow="Mülk Yönetimi · Aidat & site"
         art="aidat"
         title="Aidat & site"
         description="Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin. Tek tek daire aidatı burada, site/apartman yönetimi Binalar sekmesinde."
