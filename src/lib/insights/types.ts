@@ -106,6 +106,11 @@ export type InsightSettings = {
   mutedRules: string[];
   /** LLM anlatımı: varsayılan false (maliyet + gizlilik). */
   narrativeEnabled: boolean;
+  /**
+   * Yanlış alarm oranı yüksek olduğu için OTOMATİK sessize alınan kurallardan, sahibin "Yeniden aç" dediği taban adlar.
+   * Boşsa alan hiç yazılmaz/okunmaz (varsayılan: otomatik sessize alma geçerli).
+   */
+  qualityReopened?: string[];
 };
 
 export const DEFAULT_INSIGHT_SETTINGS: InsightSettings = { mutedRules: [], narrativeEnabled: false };

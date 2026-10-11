@@ -1,5 +1,5 @@
 import "server-only";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
 import { closeCallPriorityForCustomer } from "@/lib/insights/store";
@@ -20,10 +20,8 @@ export async function closeCallPriorityOnContact(tenantId: string, customerId: s
   }
 }
 
-/** Yanıt gönderildikten SONRA çalıştırır (`after()`); kullanıcı akışını geciktirmez. */
+/** Yanıt gönderildikten SONRA çalıştırır (`afterSafe` = `after()` + hata yakalama); kullanıcı akışını geciktirmez. */
 export function closeCallPriorityAfterContact(tenantId: string, customerId: string | null | undefined): void {
   if (!tenantId || !customerId) return;
-  after(async () => {
-    await closeCallPriorityOnContact(tenantId, customerId);
-  });
+  afterSafe(() => closeCallPriorityOnContact(tenantId, customerId), "call_priority kapatma");
 }

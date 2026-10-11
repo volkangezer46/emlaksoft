@@ -16,10 +16,21 @@ export function normalizeInsightSettings(raw: unknown): InsightSettings {
   const muted = Array.isArray(src.mutedRules)
     ? [...new Set(src.mutedRules.filter((x): x is string => typeof x === "string" && RULE_TOKEN.test(x)))].slice(0, MAX_MUTED)
     : [];
+  const reopened = Array.isArray(src.qualityReopened)
+    ? [...new Set(src.qualityReopened.filter((x): x is string => typeof x === "string" && RULE_TOKEN.test(x)).map(ruleBase))].slice(0, MAX_MUTED)
+    : [];
   return {
     mutedRules: muted,
     narrativeEnabled: src.narrativeEnabled === true,
+    // Boşsa alan hiç eklenmez (kayıtlı ayar biçimi ve eski testler değişmez).
+    ...(reopened.length > 0 ? { qualityReopened: reopened } : {}),
   };
+}
+
+/** Kalite nedeniyle otomatik sessize alınan kural, sahibi tarafından yeniden açılmış mı? */
+export function isQualityReopened(settings: InsightSettings, ruleId: string): boolean {
+  const base = ruleBase(ruleId);
+  return (settings.qualityReopened ?? []).some((m) => ruleBase(m) === base);
 }
 
 /** Kural sessize alınmış mı? Hem tam kimlik ("deal_risk@1") hem taban ad ("deal_risk") eşleşir. */

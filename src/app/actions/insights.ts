@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isMissingSchemaError } from "@/lib/insights/facts";
 import { normalizeInsightSettings } from "@/lib/insights/settings";
-import { INSIGHT_DISMISS_REASONS, type InsightDismissReason, type InsightSettings } from "@/lib/insights/types";
+import { INSIGHT_DISMISS_REASONS, ruleBase, type InsightDismissReason, type InsightSettings } from "@/lib/insights/types";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 export type InsightActionResult = { ok?: boolean; error?: string; taskId?: string };
@@ -148,18 +148,28 @@ export async function acceptInsightAsTask(insightId: string): Promise<InsightAct
   return { ok: true, taskId };
 }
 
-/**
- * İçgörü ofis ayarları: sessize alınan kurallar + LLM anlatımı (varsayılan KAPALI). Yalnız ofis sahibi / genel müdür.
- * `oversight_settings.thresholds.insights` alanına yazar (ayrı tablo yok); diğer eşik alanlarına DOKUNMAZ.
- */
-export async function saveInsightSettings(input: Partial<InsightSettings>): Promise<InsightActionResult> {
-  const gate = await requirePermission("settings", "edit");
-  if (!gate.ok) return { error: gate.error };
-  if (gate.role !== "owner" && gate.role !== "gm") {
-    return { error: "Ayarları yalnızca ofis sahibi veya genel müdür değiştirebilir." };
-  }
-  const next = normalizeInsightSettings(input);
+type SettingsGate = { tenantId: string; userId: string };
 
+/** Ayar yazma yetkisi: `settings:edit` + yalnız ofis sahibi / genel müdür (sunucuda; arayüz gizlemesine güvenilmez). */
+async function requireInsightSettingsEditor(): Promise<{ ok: true; gate: SettingsGate } | { ok: false; error: string }> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  if (gate.role !== "owner" && gate.role !== "gm") {
+    return { ok: false, error: "Ayarları yalnızca ofis sahibi veya genel müdür değiştirebilir." };
+  }
+  return { ok: true, gate: { tenantId: gate.tenantId, userId: gate.userId } };
+}
+
+/**
+ * `oversight_settings.thresholds.insights` alanını okuyup `mutate` ile günceller (ayrı tablo yok); diğer eşik alanlarına
+ * DOKUNMAZ. Mevcut kayıtlı ayar korunur: kısmi girdi (ör. yalnız mutedRules) diğer alanları (qualityReopened,
+ * narrativeEnabled) silmez.
+ */
+async function updateInsightSettings(
+  gate: SettingsGate,
+  mutate: (prev: InsightSettings) => Partial<InsightSettings>,
+  audit: { action: string },
+): Promise<InsightActionResult> {
   const supabase = await createClient();
   const { data: row, error: readError } = await supabase
     .from("oversight_settings")
@@ -168,11 +178,13 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
     .maybeSingle();
   if (readError) return { error: isMissingSchemaError(readError) ? NOT_READY : actionErrorMessage(readError, "Ayarlar okunamadı.") };
 
-  const prev = row?.thresholds && typeof row.thresholds === "object" ? (row.thresholds as Record<string, unknown>) : {};
+  const prevThresholds = row?.thresholds && typeof row.thresholds === "object" ? (row.thresholds as Record<string, unknown>) : {};
+  const prev = normalizeInsightSettings(prevThresholds.insights);
+  const next = normalizeInsightSettings({ ...prev, ...mutate(prev) });
   const { error } = await supabase.from("oversight_settings").upsert(
     {
       tenant_id: gate.tenantId,
-      thresholds: { ...prev, insights: next },
+      thresholds: { ...prevThresholds, insights: next },
       approval_rules: row?.approval_rules ?? {},
       updated_by: gate.userId,
       updated_at: new Date().toISOString(),
@@ -184,10 +196,54 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
-    action: "insight.settings_update",
+    action: audit.action,
     entityType: "oversight_settings",
-    newValue: { muted_rules: next.mutedRules, narrative_enabled: next.narrativeEnabled },
+    newValue: { muted_rules: next.mutedRules, narrative_enabled: next.narrativeEnabled, quality_reopened: next.qualityReopened ?? [] },
   });
   revalidatePath("/app");
+  revalidatePath("/app/ayarlar/merkez");
   return { ok: true };
+}
+
+/**
+ * İçgörü ofis ayarları: sessize alınan kurallar + LLM anlatımı (varsayılan KAPALI). Yalnız ofis sahibi / genel müdür.
+ * Yalnız verilen alanlar değişir (kısmi girdi güvenlidir). AI anlatımı açıldığında bile üretim tarafındaki kota kapısı,
+ * denetim kaydı ve sayı doğrulaması (insight-narrative) aynen geçerlidir.
+ */
+export async function saveInsightSettings(input: Partial<InsightSettings>): Promise<InsightActionResult> {
+  const who = await requireInsightSettingsEditor();
+  if (!who.ok) return { error: who.error };
+  const patch: Partial<InsightSettings> = {};
+  if (input.mutedRules !== undefined) patch.mutedRules = input.mutedRules;
+  if (input.narrativeEnabled !== undefined) patch.narrativeEnabled = input.narrativeEnabled;
+  if (input.qualityReopened !== undefined) patch.qualityReopened = input.qualityReopened;
+  return updateInsightSettings(who.gate, () => patch, { action: "insight.settings_update" });
+}
+
+/**
+ * "Yeniden aç": yanlış alarm oranı yüksek olduğu için OTOMATİK sessize alınan bir kuralı bu ofis için tekrar etkinleştirir
+ * (`qualityReopened` listesine taban ad eklenir; elle kapatma listesinden de çıkarılır). Yalnız owner/gm.
+ */
+export async function reopenInsightRule(ruleId: string): Promise<InsightActionResult> {
+  const who = await requireInsightSettingsEditor();
+  if (!who.ok) return { error: who.error };
+  const base = ruleBase(String(ruleId ?? "").trim());
+  if (!/^[a-z0-9_]{3,40}$/.test(base)) return { error: "Geçersiz öneri kuralı." };
+  return updateInsightSettings(
+    who.gate,
+    (prev) => ({
+      qualityReopened: [...new Set([...(prev.qualityReopened ?? []), base])],
+      mutedRules: prev.mutedRules.filter((m) => ruleBase(m) !== base),
+    }),
+    { action: "insight.rule_reopen" },
+  );
+}
+
+/** "Varsayılana dön": elle kapatmalar, yeniden açma kayıtları ve AI anlatımı sıfırlanır (anlatım KAPALI). Yalnız owner/gm. */
+export async function resetInsightSettings(): Promise<InsightActionResult> {
+  const who = await requireInsightSettingsEditor();
+  if (!who.ok) return { error: who.error };
+  return updateInsightSettings(who.gate, () => ({ mutedRules: [], narrativeEnabled: false, qualityReopened: [] }), {
+    action: "insight.settings_reset",
+  });
 }

@@ -6,7 +6,7 @@ import { computePriority, explainPriority } from "@/lib/insights/priority";
 import { dedupeDrafts, suppressionKey } from "@/lib/insights/dedupe";
 import { InsightFactsUnavailable } from "@/lib/insights/facts";
 import { qualitySuppressedRules } from "@/lib/insights/quality";
-import { isRuleMuted, loadInsightSettings } from "@/lib/insights/settings";
+import { isQualityReopened, isRuleMuted, loadInsightSettings } from "@/lib/insights/settings";
 import {
   InsightsTableMissing,
   expireStaleInsights,
@@ -208,7 +208,9 @@ export async function processTenant(
   if (recipients.length === 0) return result;
 
   const qualityMuted = qualitySuppressedRules(quality);
-  const isMuted = (ruleId: string) => isRuleMuted(settings, ruleId) || qualityMuted.has(ruleBase(ruleId));
+  // Kalite bastırması otomatiktir; sahibi "Yeniden aç" dediyse (qualityReopened) uygulanmaz. Elle kapatma her zaman geçerlidir.
+  const isMuted = (ruleId: string) =>
+    isRuleMuted(settings, ruleId) || (qualityMuted.has(ruleBase(ruleId)) && !isQualityReopened(settings, ruleId));
 
   const drafts: InsightDraft[] = [];
   // Koşulu kalkan içgörüleri kapatma adayları: yalnız HATASIZ ve zaman bütçesi içinde biten, canlı küme veren kurallar.

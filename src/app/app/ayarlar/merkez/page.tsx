@@ -13,6 +13,11 @@ import {
   saveOfficeSettingAction,
 } from "@/app/actions/office-settings";
 import { requireModulePage } from "@/lib/require-module-page";
+import { createClient } from "@/lib/supabase/server";
+import { now } from "@/lib/clock";
+import { loadInsightSettings } from "@/lib/insights/settings";
+import { listInsightRuleCatalog, loadAutoMutedRuleBases, ruleSwitchState } from "@/lib/insights/rule-catalog";
+import { InsightRulesCard, type InsightRuleRowView } from "./insight-rules-card";
 import { getTenantSettingViews } from "@/lib/settings/read";
 import { OFFICE_SETTING_GROUPS, type OfficeSettingGroupId, type SettingView } from "@/lib/settings/types";
 
@@ -55,12 +60,26 @@ const ACTIONS = {
   history: officeSettingHistoryAction,
 };
 
+/** Öneriler kartı verisi: ayar + kural kataloğu (Türkçe adlar kayıt listesinden) + otomatik sessiz kurallar. */
+async function loadInsightCard(tenantId: string): Promise<{ rules: InsightRuleRowView[]; narrativeEnabled: boolean }> {
+  const supabase = await createClient();
+  const [settings, catalog, autoMuted] = await Promise.all([
+    loadInsightSettings(supabase, tenantId),
+    listInsightRuleCatalog(),
+    loadAutoMutedRuleBases(supabase, tenantId, now()),
+  ]);
+  return {
+    narrativeEnabled: settings.narrativeEnabled,
+    rules: catalog.map((r) => ({ ...r, state: ruleSwitchState(settings, autoMuted, r.id) })),
+  };
+}
+
 /**
  * Ofis Tanımları Merkezi: ofise özel eşik, SLA, komisyon ve bildirim varsayılanları (Ayar Kayıt Defteri, kapsam=ofis).
  * Her değişiklik doğrulanır, geçmişe yazılır ve geri alınabilir; varsayılana dönülebilir. Düzenleme `settings:edit` ister.
  */
 export default async function OfficeSettingsCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
-  const { tenantId, perms } = await requireModulePage("settings");
+  const { tenantId, perms, role } = await requireModulePage("settings");
   if (!tenantId) return <StaffNoTenantNotice feature="Ofis tanımları" />;
   const canEdit = (perms.settings ?? []).includes("edit");
   const sp = await searchParams;
@@ -69,7 +88,9 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
   const grup = OFFICE_SETTING_GROUPS.find((g) => g.id === grupParam)?.id as OfficeSettingGroupId | undefined;
   const onlyChanged = first(sp.durum) === "degisen";
 
-  const views = await getTenantSettingViews(tenantId);
+  // Öneriler kartı: yalnız ofis sahibi / genel müdür (sunucu eylemleri yetkiyi ayrıca doğrular); arama/filtre açıkken gizlenir.
+  const showInsights = (role === "owner" || role === "gm") && !q && !grup && !onlyChanged;
+  const [views, insightCard] = await Promise.all([getTenantSettingViews(tenantId), showInsights ? loadInsightCard(tenantId) : Promise.resolve(null)]);
   const changedCount = views.filter((v) => !v.isDefault).length;
   const needle = norm(q);
   const shown = views.filter(
@@ -150,6 +171,8 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
           </Link>
         ) : null}
       </nav>
+
+      {insightCard && canEdit ? <InsightRulesCard rules={insightCard.rules} narrativeEnabled={insightCard.narrativeEnabled} /> : null}
 
       <ReadOnlyGate canEdit={canEdit}>
         {groups.length === 0 ? (
