@@ -7,11 +7,13 @@ import { loadOfficeManagers, type Db } from "./server";
 const POOL_HREF = "/app/ilan-havuzu";
 
 /** Bildirim hataları iş akışını bozmaz. */
-async function safeNotify(input: Parameters<typeof notifyTenant>[0]) {
+async function safeNotify(input: Parameters<typeof notifyTenant>[0]): Promise<boolean> {
   try {
     await notifyTenant(input);
+    return true;
   } catch (e) {
     console.error("pool notify", e);
+    return false;
   }
 }
 
@@ -131,30 +133,46 @@ export async function notifyPoolBatch(
 /** Atama sonrası: atanan danışmana ve (otomatikse) yöneticilere bildirim. */
 export async function notifyPoolAssigned(
   db: Db,
-  input: { tenantId: string; actorId: string | null; assigneeId: string; propertyId: string; label: string; method: string },
-) {
+  input: {
+    tenantId: string;
+    actorId: string | null;
+    assigneeId: string;
+    propertyId: string;
+    label: string;
+    method: string;
+    /** Verilirse (cron süpürmesi: kayıt id'si) her alıcıya `pool-assigned:<kapsam>:<kullanıcı>` anahtarıyla TEK kez yazılır. */
+    dedupeScope?: string;
+  },
+): Promise<number> {
+  let failed = 0;
+  const key = (userId: string) => (input.dedupeScope ? { dedupeKey: `pool-assigned:${input.dedupeScope}:${userId}` } : {});
   if (input.assigneeId !== input.actorId) {
-    await safeNotify({
+    const ok = await safeNotify({
       tenantId: input.tenantId,
       userId: input.assigneeId,
       title: `Sana yeni ilan atandı: ${input.label}`,
       body: "İlan sahibi bilgilerini inceleyip yayına hazırla.",
       href: `/app/portfoyler/${input.propertyId}`,
       kind: "success",
+      ...key(input.assigneeId),
     });
+    if (!ok) failed++;
   }
   if (input.method === "auto" || input.method === "fallback") {
     for (const m of await loadOfficeManagers(db, input.tenantId)) {
       if (m.id === input.assigneeId) continue;
-      await safeNotify({
+      const ok = await safeNotify({
         tenantId: input.tenantId,
         userId: m.id,
         title: `Havuz ilanı ${input.method === "auto" ? "otomatik" : "yedek zincirle"} atandı: ${input.label}`,
         href: POOL_HREF,
         kind: "info",
+        ...key(m.id),
       });
+      if (!ok) failed++;
     }
   }
+  return failed;
 }
 
 /** Yeni ilan eklendi: ofis yöneticilerine bildirim; ilan sahibi bilgisi eksikse görev. */
@@ -196,15 +214,23 @@ export async function notifyNewListing(
 }
 
 /** SLA aşımı / yükseltme uyarısı (yöneticilere). */
-export async function notifyPoolBreach(db: Db, input: { tenantId: string; label: string; kind: "sla" | "escalated" }) {
+export async function notifyPoolBreach(
+  db: Db,
+  input: { tenantId: string; label: string; kind: "sla" | "escalated"; entryId?: string },
+): Promise<number> {
+  let failed = 0;
   for (const m of await loadOfficeManagers(db, input.tenantId)) {
-    await safeNotify({
+    const ok = await safeNotify({
       tenantId: input.tenantId,
       userId: m.id,
       title: input.kind === "sla" ? `Havuz SLA aşıldı: ${input.label}` : `Sahiplenilmedi, yönetime döndü: ${input.label}`,
       body: "İlana hâlâ danışman atanmadı.",
       href: POOL_HREF,
       kind: "danger",
+      // Kayıt verilirse alıcı başına tek kez yazılır (süpürme yeniden denemesi mükerrer üretmez).
+      ...(input.entryId ? { dedupeKey: `pool-${input.kind}:${input.entryId}:${m.id}` } : {}),
     });
+    if (!ok) failed++;
   }
+  return failed;
 }

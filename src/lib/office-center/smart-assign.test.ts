@@ -187,7 +187,10 @@ describe("tek motor (havuz ile ortak alt hesaplar)", () => {
 
   it("akıllı atama kendi iş yükü/performans/müsaitlik/sıralama kopyasını taşımaz; motor çarpanlarını kullanır", () => {
     const src = readFileSync("src/lib/office-center/smart-assign.ts", "utf8");
-    for (const fn of ["workloadFactor(", "performanceFactor(", "availabilityFactor(", "rankScored(", "explainReasons("]) expect(src).toContain(fn);
+    // Konsey #11: çarpanlar artık TEK puanlayıcıda (pool/score.ts scoreWeighted); smart-assign yalnız profil kapısını çağırır.
+    for (const fn of ["scoreForProfile(", "rankForProfile(", "explainReasons("]) expect(src).toContain(fn);
+    const engine = readFileSync("src/lib/pool/score.ts", "utf8");
+    for (const fn of ["workloadFactor(", "performanceFactor(", "availabilityFactor(", "rankScored("]) expect(engine).toContain(fn);
     expect(src).not.toMatch(/function (workloadReason|performanceReason|availabilityReason)\(/);
     expect(src).not.toContain("TIE_WINDOW");
   });

@@ -251,6 +251,28 @@ async function ensureGeo(): Promise<Geo> {
 }
 
 /**
+ * Eski demo sürümünün (modules-seed tek kaynağına geçmeden önce) yazdığı, birbiriyle TUTMAYAN finans satırlarını temizler:
+ * ayrı "Kadıköy ofis bankası" hesabı (ve kaskatla kuralları), 3.200 TL'lik Sahibinden kuralı, 35.000 TL'lik Temmuz kirası gideri ve
+ * kaynaksız kasa hareketleri. Yalnız bilinen eski başlıklara dokunur; gerçek kayıt silinmez. Tablo/sütun yoksa sessizce geçer.
+ */
+async function cleanupLegacyFinanceDemo(tenantId: string): Promise<void> {
+  const steps: Array<[string, PromiseLike<{ error: { message: string } | null }>]> = [
+    ["Eski demo banka hesabı", admin.from("finance_accounts").delete().eq("tenant_id", tenantId).eq("name", "Kadıköy ofis bankası")],
+    ["Eski Sahibinden kuralı", admin.from("recurring_rules").delete().eq("tenant_id", tenantId).eq("title", "Sahibinden.com üyeliği")],
+    ["Eski kira gideri", admin.from("expenses").delete().eq("tenant_id", tenantId).eq("title", "Ofis kirası (Temmuz)").eq("notes", "Demo gider kaydı")],
+    [
+      "Eski kaynaksız kasa hareketleri",
+      admin.from("cash_entries").delete().eq("tenant_id", tenantId).eq("source_type", "manual")
+        .in("title", ["Moda 3+1 satış komisyonu", "Ofis kirası (Kadıköy)", "Şişli yer gösterme yol gideri"]),
+    ],
+  ];
+  for (const [label, run] of steps) {
+    const { error } = await run;
+    if (error) console.log(`- ${label}: atlandı (${error.message})`);
+  }
+}
+
+/**
  * Ürün kararı: demo verisi yalnız İstanbul büyük ilçelerinde. Önceki sürümde Kahramanmaraş (Onikişubat/Dulkadiroğlu) ile
  * yüklenmiş demo-ofis satırlarını İstanbul'a (Ataşehir/Üsküdar) taşır. İdempotent: eski ilçede satır kalmadıysa hiçbir şey yazmaz.
  */
@@ -1101,10 +1123,9 @@ async function main() {
   });
 
   // ---------------- Giderler + aidat ----------------
-  await section("Giderler", "expenses", tenantId, 5, async () => {
+  await section("Giderler", "expenses", tenantId, 4, async () => {
     const rows = [
       { category: "reklam", title: "Sahibinden doping paketi", amount: 4500, days: -3 },
-      { category: "ofis", title: "Ofis kirası (Temmuz)", amount: 35000, days: -20 },
       { category: "ulasim", title: "Gösterim yakıt gideri", amount: 1800, days: -5, prop: "DEMO-008" },
       { category: "egitim", title: "Danışman satış eğitimi", amount: 6000, days: -12 },
       { category: "diger", title: "Tapu harç ödemesi (iade edilecek)", amount: 2250, days: -8, prop: "DEMO-014" },
@@ -1121,72 +1142,9 @@ async function main() {
     return (await insertRows("expenses", rows)).length;
   });
 
-  // ---------------- Düzenli ödemeler (Finans Paket B; tablolar yoksa atlanır) ----------------
-  try {
-    const probe = await admin.from("recurring_rules").select("id", { head: true, count: "exact" }).limit(1);
-    if (probe.error) {
-      console.log("✓ Düzenli ödemeler: migration uygulanmamış (atlandı)");
-    } else {
-      await section("Düzenli ödemeler", "recurring_rules", tenantId, 3, async () => {
-        const todayKey = dateOnly(new Date());
-        let accId: string | null = null;
-        const acc = await admin.from("finance_accounts").select("id").eq("tenant_id", tenantId).eq("owner_scope", "office").is("archived_at", null).limit(1);
-        if (acc.error) return 0;
-        accId = (acc.data?.[0]?.id as string | undefined) ?? null;
-        if (!accId) {
-          const made = await insertRows("finance_accounts", [
-            { tenant_id: tenantId, owner_scope: "office", kind: "bank", name: "Kadıköy ofis bankası", currency: "TRY", opening_balance: 250000, opening_date: todayKey, created_by: ownerId },
-          ]);
-          accId = (made[0]?.id as string | undefined) ?? null;
-        }
-        if (!accId) return 0;
-        const monthStart = `${todayKey.slice(0, 7)}-01`;
-        const dueOf = (period: string, day: number) => {
-          const y = Number(period.slice(0, 4));
-          const m = Number(period.slice(5, 7));
-          const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
-          return `${y}-${String(m).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
-        };
-        const nextMonth = (period: string) => {
-          const y = Number(period.slice(0, 4));
-          const m = Number(period.slice(5, 7));
-          return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-        };
-        const rows = [
-          { category: "kira", title: "Kadıköy ofis kirası", amount: 45000, day: 1, mode: "auto", expense_category: "ofis", portal_key: null },
-          { category: "portal", title: "Sahibinden.com üyeliği", amount: 3200, day: 5, mode: "auto", expense_category: "reklam", portal_key: "sahibinden" },
-          { category: "muhasebe", title: "Muhasebe ücreti", amount: 3500, day: 31, mode: "approve", expense_category: "ofis", portal_key: null },
-        ].map((r) => {
-          // Geçmişe dönük kayıt yok: ilk vade bugünden ileri.
-          let period = monthStart;
-          if (dueOf(period, r.day) < todayKey) period = nextMonth(period);
-          return {
-            tenant_id: tenantId,
-            scope: "office",
-            direction: "out",
-            category: r.category,
-            title: r.title,
-            amount: r.amount,
-            account_id: accId,
-            frequency: "monthly",
-            pay_day: r.day,
-            start_date: todayKey,
-            anchor: monthStart,
-            mode: r.mode,
-            portal_key: r.portal_key,
-            expense_category: r.expense_category,
-            create_expense: true,
-            next_period: period,
-            next_due: dueOf(period, r.day),
-            created_by: ownerId,
-          };
-        });
-        return (await insertRows("recurring_rules", rows)).length;
-      });
-    }
-  } catch (e) {
-    console.log(`✓ Düzenli ödemeler: atlandı (${e instanceof Error ? e.message : "hata"})`);
-  }
+  // Düzenli ödemeler, kasa/banka hesapları ve hareketleri TEK yerde (src/lib/sample-data/modules-seed.ts): kural, gider ve banka
+  // hareketi aynı tutar/vade gününden türer; kasa/banka bakiyesi tahsilat kayıtlarıyla tutarlıdır. Burada ayrıca yazılmaz.
+  await cleanupLegacyFinanceDemo(tenantId);
 
   await section("Aidatlar", "property_dues", tenantId, 3, async () => {
     const rows = [

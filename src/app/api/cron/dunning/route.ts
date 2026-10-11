@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
@@ -23,6 +23,8 @@ import { authorizeCron } from "@/lib/cron-auth";
 
 const DAY_MS = 86_400_000;
 const BILLING_HREF = "/app/abonelik";
+/** Sorgu tavanı: dolarsa liste kesildi sayılır (heartbeat error). */
+const LIST_LIMIT = 500;
 
 /** Vade aşım gününe göre kademe: 1+ gün → 1, 4+ gün → 2, 8+ gün → 3. */
 function stageOf(daysOverdue: number): number {
@@ -65,23 +67,28 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   const nowIso = new Date(now).toISOString();
 
-  const [{ data: overdueInvoices }, { data: pastDueSubs }] = await Promise.all([
+  let failed = 0;
+  const [{ data: overdueInvoices, error: invErr }, { data: pastDueSubs, error: subErr }] = await Promise.all([
     admin
       .from("invoices")
       .select("id, tenant_id, invoice_no, due_at, reminder_count, tenant:tenants(name)")
       .eq("status", "open")
       .not("due_at", "is", null)
       .lt("due_at", nowIso)
-      .limit(500),
+      .limit(LIST_LIMIT),
     admin
       .from("subscriptions")
       .select("id, tenant_id, current_period_end")
       .eq("status", "past_due")
-      .limit(500),
+      .limit(LIST_LIMIT),
   ]);
+  // Sorgu hatası "bildirilecek kimse yok" değildir: sayaca girer, heartbeat error olur.
+  if (invErr) { console.error("dunning invoices", invErr.message); failed += 1; }
+  if (subErr) { console.error("dunning subs", subErr.message); failed += 1; }
 
   const invoices = overdueInvoices ?? [];
   const subs = pastDueSubs ?? [];
+  const truncated = invoices.length >= LIST_LIMIT || subs.length >= LIST_LIMIT;
 
   // ---- 1) Gecikmiş faturalar: reminder_count kademesine göre ----
   const toNotify: NotificationRow[] = [];
@@ -101,6 +108,8 @@ export async function GET(req: NextRequest) {
       body: msg.body,
       href: BILLING_HREF,
       kind: msg.kind,
+      // Aynı fatura+kademe için ikinci bildirim yazılmaz (sayaç güncellemesi başarısız olsa da).
+      dedupe_key: `dunning:${inv.id}:${stage}`,
     });
     idsByStage.set(stage, [...(idsByStage.get(stage) ?? []), inv.id]);
 
@@ -108,13 +117,18 @@ export async function GET(req: NextRequest) {
       suspensionCandidates += 1;
       const t = inv.tenant as { name?: string } | { name?: string }[] | null;
       const tenantName = (Array.isArray(t) ? t[0]?.name : t?.name) ?? "Bir ofis";
-      await notifyPlatformStaff({
+      try {
+        await notifyPlatformStaff({
         title: "Askıya alma adayı",
         body: `${tenantName} · ${inv.invoice_no} faturası ${daysOverdue} gündür ödenmedi (3 hatırlatma tamamlandı).`,
         href: `/admin/tenants/${inv.tenant_id}`,
         kind: "danger",
         meta: { invoice_id: inv.id, tenant_id: inv.tenant_id, days_overdue: daysOverdue },
-      });
+        });
+      } catch (e) {
+        console.error("dunning platform notify", e instanceof Error ? e.message : "error");
+        failed += 1;
+      }
     }
   }
 
@@ -122,16 +136,22 @@ export async function GET(req: NextRequest) {
   // sayaç ilerlemez ve bir sonraki cron aynı kademeyi yeniden dener
   // (tersi sırada bildirim sessizce kaybolurdu). Mükerrer riski yalnız
   // "insert oldu + update olamadı" penceresinde — kayıptan iyidir.
-  const invoiceNotified = await insertNotifications(admin, toNotify);
+  const invoiceResult = await insertNotificationsDetailed(admin, toNotify);
+  const invoiceNotified = invoiceResult.written;
+  failed += invoiceResult.failed;
 
-  if (invoiceNotified > 0 || toNotify.length === 0) {
+  // Kısmi yazımda (failed > 0) sayaç ilerletilmez: dedupe_key sayesinde yeniden deneme mükerrer üretmez.
+  if (invoiceResult.failed === 0) {
     // Sayaç güncellemeleri kademe başına tek UPDATE (en fazla 3 sorgu)
     for (const [stage, ids] of idsByStage) {
       const { error } = await admin
         .from("invoices")
         .update({ reminder_count: stage, last_reminder_at: nowIso })
         .in("id", ids);
-      if (error) console.error("dunning reminder_count update", error.message);
+      if (error) {
+        console.error("dunning reminder_count update", error.message);
+        failed += 1;
+      }
     }
   }
 
@@ -158,8 +178,12 @@ export async function GET(req: NextRequest) {
         body: `Aboneliğinizin ödemesi gecikmiş görünüyor. Hizmet kesintisi yaşamamak için lütfen ödemenizi tamamlayın. · dunsub:${s.id}`,
         href: BILLING_HREF,
         kind: "warning",
+        // 3 günlük pencere anahtarı: gövde izi okunamasa da aynı pencerede ikinci kez yazılmaz.
+        dedupe_key: `dunsub:${s.id}:${Math.floor(now / (3 * DAY_MS))}`,
       }));
-    subNotified = await insertNotifications(admin, subRows);
+    const subResult = await insertNotificationsDetailed(admin, subRows);
+    subNotified = subResult.written;
+    failed += subResult.failed;
   }
 
   // ---- 3) Otomatik yenileme (KAPALI bayrak: billing.auto_renew_enabled; kapalıyken ödeme kod yolu çalışmaz) ----
@@ -172,14 +196,14 @@ export async function GET(req: NextRequest) {
     console.error("dunning auto-renew", e instanceof Error ? e.message : "error");
     renewThrew = 1;
   }
-  const failed = autoRenew.failed + renewThrew;
+  failed += autoRenew.failed + renewThrew;
 
   await recordHeartbeat(
     "dunning",
-    heartbeatFor({ failed }),
+    heartbeatFor({ failed, truncated }),
     `${invoiceNotified} fatura hatırlatması, ${subNotified} abonelik hatırlatması, ${suspensionCandidates} askıya alma adayı` +
       (autoRenew.enabled ? `, otomatik yenileme ${autoRenew.charged}/${autoRenew.attempted}` : "") +
-      failureNote({ failed }),
+      failureNote({ failed, truncated }),
   );
 
   return NextResponse.json({
@@ -187,6 +211,8 @@ export async function GET(req: NextRequest) {
     invoiceNotified,
     subNotified,
     suspensionCandidates,
+    failed,
+    truncated,
     autoRenew,
   });
 }

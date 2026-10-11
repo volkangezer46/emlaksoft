@@ -307,6 +307,28 @@ describe.skipIf(!mod)("recurring_rules + recurring_occurrences (pglite)", () => 
     await expect(db.exec(`update public.recurring_rules set amount = 1`)).rejects.toThrow();
   });
 
+  it("20261012000300: recurring_run_due hata dizisi (errors) döndürür; nedeni, kural ve adım içerir", async () => {
+    await db.exec(`reset role`);
+    await db.exec(read("supabase/migrations/20261012000300_recurring_run_errors.sql"));
+    await as(OWNER, T, FULL, "owner");
+    const rule = await create("office", "out", "ofis", "ARIZA kuralı", 100, OFFICE, { day: 5, start: TODAY });
+    expect(rule.outcome).toBe("created");
+    await db.exec(`reset role`);
+    await db.exec(`create function public.test_boom() returns trigger language plpgsql as $$ begin raise exception 'boom test'; end $$;
+      create trigger test_boom_trg before insert on public.recurring_occurrences for each row when (new.rule_id = '${rule.rule_id}') execute function public.test_boom()`);
+    const res = await runDue(await addDays(TODAY, 40));
+    expect(Number(res.failed)).toBeGreaterThanOrEqual(1);
+    const errors = res.errors as unknown as { rule_id: string; step: string; code: string; message: string }[];
+    expect(Array.isArray(errors)).toBe(true);
+    expect(errors.length).toBeGreaterThanOrEqual(1);
+    expect(errors.find((e) => e.rule_id === rule.rule_id)).toMatchObject({ step: "run", code: "P0001", message: "boom test" });
+    expect(errors.length).toBeLessThanOrEqual(20);
+    await db.exec(`reset role; drop trigger test_boom_trg on public.recurring_occurrences`);
+    // Hatasız koşuda errors boş dizidir (anahtar her zaman vardır).
+    const clean = await runDue(await addDays(TODAY, 40));
+    expect(clean.errors).toEqual(expect.any(Array));
+  });
+
   it("rollback tabloları ve fonksiyonları düşürür; üretilmiş hareketler yerinde kalır", async () => {
     await db.exec(`reset role`);
     await db.exec(read("supabase/rollbacks/20261010000900_recurring_rules.rollback.sql"));

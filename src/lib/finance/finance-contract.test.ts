@@ -36,9 +36,11 @@ describe("gider bütçesi / tekrar / portal sözleşmesi", () => {
 
   it("gider action'ları yeni sütunları yalnız doluyken yazar (şema yokken eski akış çalışır)", () => {
     const src = read("src/app/actions/expenses.ts");
-    expect(src).toContain("...(fin.value.recurrence ? { recurrence: fin.value.recurrence } : {})");
     expect(src).toContain("...(fin.value.portalKey ? { portal_key: fin.value.portalKey } : {})");
-    expect(src).toContain("...(fin.value.hasRecurrence ? { recurrence: fin.value.recurrence } : {})");
+    // Konsey #13+#18: düzenli ödemenin TEK giriş yolu recurring_rules; expenses.recurrence yeni yazılmaz.
+    expect(src).not.toMatch(/recurrence:\s*fin\.value/);
+    expect(read("src/app/app/giderler/expense-create-form.tsx")).not.toContain('name="recurrence"');
+    expect(read("src/app/app/giderler/expense-edit-dialog.tsx")).not.toContain('name="recurrence"');
     // liste okuması şema yoksa eski sütunlarla yeniden denenir
     expect(src).toContain("isMissingFinanceSchema(error)");
   });

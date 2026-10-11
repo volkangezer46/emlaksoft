@@ -50,7 +50,7 @@ function PortalKeyCard({
           <RadioTower className="h-4 w-4" /> {label}
         </p>
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
-          configured ? "bg-mint-500/12 text-mint-600" : "bg-zinc-100 text-text-muted"
+          configured ? "bg-mint-500/12 text-mint-600" : "bg-surface-sunken text-text-muted"
         }`}>
           {configured ? "Bağlı" : "Tanımsız"}
         </span>
@@ -90,7 +90,7 @@ function PortalKeyCard({
             className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm text-ink-950 outline-none focus:border-brand-300"
           />
           {result?.error && (
-            <p className="rounded-[var(--radius-control)] bg-red-50 px-3 py-1.5 text-xs text-red-600">{result.error}</p>
+            <p className="rounded-[var(--radius-control)] bg-danger-50 px-3 py-1.5 text-xs text-danger-600">{result.error}</p>
           )}
           {result?.ok && (
             <p className="rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-1.5 text-xs text-mint-700">Kaydedildi ✓</p>
@@ -109,7 +109,7 @@ function PortalKeyCard({
                   <button
                     type="button"
                     disabled={clearing}
-                    className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-red-50 disabled:opacity-50"
+                    className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-2 text-xs font-semibold text-danger-500 transition hover:bg-danger-50 disabled:opacity-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Sil
                   </button>

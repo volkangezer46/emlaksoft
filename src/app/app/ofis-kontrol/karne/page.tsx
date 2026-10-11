@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { Info, UsersRound } from "lucide-react";
@@ -49,15 +50,50 @@ function Metric({ label, value, href, attention }: { label: string; value: numbe
   );
 }
 
+type Viewer = { tenantId: string; userId: string; role: string; perms: Awaited<ReturnType<typeof requireModulePage>>["perms"] };
+
+/** Danışman karnesi: sayfa kabuğu (başlık + sekmeler) hemen çizilir, ağır veri akışla gelir. */
 export default async function KarnePage() {
   const { tenantId, userId, role, perms } = await requireModulePage("dashboard", PATH);
   if (!tenantId || !hasOfficeWideDataScope(role)) redirect("/app/ofis-kontrol/benim");
 
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Ofis Kontrol Merkezi"
+        title="Danışman karnesi"
+        description="Her danışman için tek bakışta iş yükü ve düzen göstergeleri. Sayılar Karşılaştırma ve Performans ekranlarıyla aynı kaynaktan gelir; her sayı ilgili listeye götürür."
+      />
+      <Suspense
+        fallback={
+          <>
+            <OversightNav active="karne" office />
+            <div aria-busy="true" className="grid animate-pulse gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-52 rounded-[var(--radius-panel)] bg-ink-950/8" />
+              ))}
+            </div>
+          </>
+        }
+      >
+        <KarneBody viewer={{ tenantId, userId, role, perms }} />
+      </Suspense>
+      <p className="text-xs text-text-muted">
+        Yanıt süresi gibi henüz sistemde ölçülmeyen göstergeler bilerek eklenmedi; ölçüm kaynağı oluştuğunda karneye eklenir.
+      </p>
+      <PrivacyNote audience="office" />
+    </div>
+  );
+}
+
+async function KarneBody({ viewer }: { viewer: Viewer }) {
+  const { tenantId, userId, role, perms } = viewer;
   const supabase = await createClient();
   const nowMs = now();
   const todayKey = trDayKey(nowMs);
-  const settings = await loadOversightSettings(supabase, tenantId);
 
+  // Üç bağımsız kol AYNI ANDA başlar: (1) danışman metrikleri, (2) yetki belgeleri, (3) ayar -> uyarılar.
+  // Ayar okuması metrikleri/belgeleri artık beklemez (önceki sıralı bekleme bir tur ekliyordu).
   // TEK HESAP KAYNAĞI: loadAdvisorMetrics (Kıyas, KPI, Lig ve Performansım ile aynı sayılar). Yeni formül yok.
   const [metrics, alerts, certRes] = await Promise.all([
     loadAdvisorMetrics(supabase, {
@@ -67,7 +103,7 @@ export default async function KarnePage() {
       nowMs,
       withLeadSignals: true,
     }),
-    loadAlerts(supabase, tenantId, settings.thresholds, nowMs),
+    loadOversightSettings(supabase, tenantId).then((settings) => loadAlerts(supabase, tenantId, settings.thresholds, nowMs)),
     supabase.from("advisor_profiles").select("profile_id, authority_cert_expires_on").eq("tenant_id", tenantId).limit(300),
   ]);
 
@@ -78,12 +114,7 @@ export default async function KarnePage() {
   for (const a of alerts.open) if (a.advisorId) alertsBy.set(a.advisorId, (alertsBy.get(a.advisorId) ?? 0) + 1);
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        eyebrow="Ofis Kontrol Merkezi"
-        title="Danışman karnesi"
-        description="Her danışman için tek bakışta iş yükü ve düzen göstergeleri. Sayılar Karşılaştırma ve Performans ekranlarıyla aynı kaynaktan gelir; her sayı ilgili listeye götürür."
-      />
+    <>
       <OversightNav active="karne" office openAlerts={alerts.open.length} />
 
       {metrics.failed ? (
@@ -156,11 +187,6 @@ export default async function KarnePage() {
           })}
         </ul>
       )}
-
-      <p className="text-xs text-text-muted">
-        Yanıt süresi gibi henüz sistemde ölçülmeyen göstergeler bilerek eklenmedi; ölçüm kaynağı oluştuğunda karneye eklenir.
-      </p>
-      <PrivacyNote audience="office" />
-    </div>
+    </>
   );
 }

@@ -43,11 +43,11 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
-  draft:    { cls: "bg-zinc-100 text-text-muted", icon: <Clock className="h-3.5 w-3.5" />, label: "Taslak" },
+  draft:    { cls: "bg-surface-sunken text-text-muted", icon: <Clock className="h-3.5 w-3.5" />, label: "Taslak" },
   sent:     { cls: "bg-brand-50 text-brand-700",  icon: <FileSignature className="h-3.5 w-3.5" />, label: "Gönderildi" },
   signed:   { cls: "bg-mint-50 text-mint-700", icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: "İmzalandı" },
-  rejected: { cls: "bg-red-50 text-red-700",    icon: <XCircle className="h-3.5 w-3.5" />, label: "Reddedildi" },
-  cancelled:{ cls: "bg-zinc-50 text-text-muted",  icon: <XCircle className="h-3.5 w-3.5" />, label: "İptal" },
+  rejected: { cls: "bg-danger-50 text-danger-700",    icon: <XCircle className="h-3.5 w-3.5" />, label: "Reddedildi" },
+  cancelled:{ cls: "bg-surface-sunken text-text-muted",  icon: <XCircle className="h-3.5 w-3.5" />, label: "İptal" },
 };
 
 function relDate(iso: string) {
@@ -401,7 +401,7 @@ export default async function ContractDetailPage({
                           {signers.map((s) => (
                             <div key={s.id} className="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-2.5">
                               <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white ${
-                                s.status === "signed" ? "bg-mint-500" : s.status === "rejected" ? "bg-danger-500" : "bg-zinc-400"
+                                s.status === "signed" ? "bg-mint-500" : s.status === "rejected" ? "bg-danger-500" : "bg-text-faint"
                               }`}>
                                 {(s.full_name as string).slice(0, 1).toUpperCase()}
                               </span>
@@ -455,7 +455,7 @@ export default async function ContractDetailPage({
                               <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
                                 s.status === "signed" ? "bg-mint-500/12 text-mint-600" :
                                 s.status === "rejected" ? "bg-danger-500/12 text-danger-500" :
-                                "bg-zinc-100 text-text-muted"
+                                "bg-surface-sunken text-text-muted"
                               }`}>
                                 {s.status === "signed" ? "İmzaladı" : s.status === "rejected" ? "Reddetti" : "Bekliyor"}
                               </span>
