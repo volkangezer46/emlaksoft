@@ -145,7 +145,7 @@ export function ExpenseEditDialog({
                 {expense.recurrence ? (
                   <div>
                     <span className={lbl}>Tekrar dönemi</span>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-text-muted">
                       {RECURRENCE_LABEL[expense.recurrence as keyof typeof RECURRENCE_LABEL] ?? expense.recurrence} tekrarlar (eski seri, yalnız okunur). Yeni düzenli ödeme için Düzenli ödemeler bölümünü kullanın; bu seriyi oradan &quot;Kurala çevir&quot; ile taşıyabilirsiniz.
                     </p>
                   </div>

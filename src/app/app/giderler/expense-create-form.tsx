@@ -107,7 +107,7 @@ export function ExpenseCreateForm({
         <option value="">Portal gideri değil</option>
         {PORTAL_KEYS.map((k) => <option key={k} value={k}>{PORTAL_LABEL[k]} gideri</option>)}
       </select>
-      <p className="text-xs text-slate-500 sm:col-span-2">Her ay/yıl tekrar eden ödeme için bu formu değil, aşağıdaki Düzenli ödemeler bölümünü kullanın.</p>
+      <p className="text-xs text-text-muted sm:col-span-2">Her ay/yıl tekrar eden ödeme için bu formu değil, aşağıdaki Düzenli ödemeler bölümünü kullanın.</p>
         </>
       ) : null}
       {accounts.length > 0 ? (
