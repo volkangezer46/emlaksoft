@@ -1,6 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { guardedFetch } from "./fetch-guard";
-import { NextResponse, type NextRequest } from "next/server";
+// next/server barrel (after/connection/ImageResponse) tum app-page calisma zamanini (~700 KB) proxy paketine ceker;
+// proxy her istekte soguk basladigi icin yalniz NextResponse sinifi dogrudan alinir (next/server ayni dosyayi yeniden disa aktarir).
+import { NextResponse } from "next/dist/server/web/spec-extension/response";
+import type { NextRequest } from "next/server";
 import {
   isTwoFactorCookieValid,
   TWO_FACTOR_COOKIE,
