@@ -86,7 +86,7 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
               action={{ href: "/app/komisyon", label: "Komisyon defteri" }}
             />
           ) : (
-            <TableFrame minWidth={640}>
+            <TableFrame stack minWidth={640}>
               <Table>
                 <THead>
                   <TR>
@@ -100,21 +100,21 @@ export async function OfficeEarnings({ viewer, tenantId }: { viewer: MetricsView
                 <TBody>
                   {table.map(({ m, pending, collected, count }) => (
                     <TR key={m.id}>
-                      <TD>
+                      <TD primary>
                         <Link href={`/app/ekip/${m.id}?sekme=kazanc`} className={`${LINK} font-semibold text-text`}>
                           {m.fullName}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Paylı kayıt" align="right">
                         <Link href="/app/komisyon" className={LINK}>{count}</Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Bekleyen pay" align="right">
                         <Link href="/app/komisyon?durum=bekleyen" className={LINK}>{pending > 0 ? money(pending) : "—"}</Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Tahsil edilen pay" align="right">
                         <Link href="/app/komisyon?durum=tahsil" className={LINK}>{collected > 0 ? money(collected) : "—"}</Link>
                       </TD>
-                      <TD align="right" className="font-bold text-success-strong">
+                      <TD label="Toplam" align="right" className="font-bold text-success-strong">
                         {pending + collected > 0 ? money(pending + collected) : "—"}
                       </TD>
                     </TR>

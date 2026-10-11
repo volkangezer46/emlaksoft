@@ -94,7 +94,7 @@ export async function StatsTab({ ctx }: { ctx: TabContext }) {
         {league.length === 0 ? (
           <EmptyState icon={Trophy} title="Henüz ölçülecek danışman yok" description="Aktif saha danışmanı eklenince lig burada oluşur." action={{ href: tabHref("danismanlar"), label: "Danışmanlar" }} />
         ) : (
-          <TableFrame minWidth={720}>
+          <TableFrame stack minWidth={720}>
             <Table>
               <THead>
                 <TR>
@@ -114,36 +114,36 @@ export async function StatsTab({ ctx }: { ctx: TabContext }) {
                     <TD align="right">
                       <span className="numeric text-xs font-bold text-text-muted">{l.rank}</span>
                     </TD>
-                    <TD>
+                    <TD primary>
                       <Link href={`/app/ekip/${l.advisorId}`} className="font-semibold text-ink-950 hover:text-brand-600">
                         {l.name}
                       </Link>
                     </TD>
-                    <TD align="right">
+                    <TD label="Anlaşma" align="right">
                       <Link href={`/app/anlasmalar?gorunum=liste&asama=won&danisman=${l.advisorId}`} className="numeric font-semibold text-ink-950 hover:text-brand-600">
                         {l.dealCount}
                       </Link>
                     </TD>
-                    <TD align="right">
+                    <TD label="Teklif" align="right">
                       <Link href={`/app/teklifler?danisman=${l.advisorId}`} className="numeric text-ink-950 hover:text-brand-600">
                         {l.offerCount}
                       </Link>
                     </TD>
-                    <TD align="right">
+                    <TD label="Dönüşüm" align="right">
                       <span className="numeric text-ink-950">{l.conversionPct == null ? "—" : `%${l.conversionPct}`}</span>
                     </TD>
-                    <TD align="right">
+                    <TD label="Randevu" align="right">
                       <Link href={`/app/randevular?danisman=${l.advisorId}`} className="numeric text-ink-950 hover:text-brand-600">
                         {l.appointCount}
                       </Link>
                     </TD>
-                    <TD align="right">
+                    <TD label="Çağrı" align="right">
                       <Link href={`/app/ekip/${l.advisorId}`} className="numeric text-ink-950 hover:text-brand-600" aria-label={`${l.name} danışman karnesi (çağrılar)`}>
                         {l.callCount}
                       </Link>
                     </TD>
                     {seeAll ? (
-                      <TD align="right">
+                      <TD label="Kazanç" align="right">
                         <span className="numeric font-semibold text-ink-950">{l.revenue == null ? "—" : formatTry(l.revenue)}</span>
                       </TD>
                     ) : null}

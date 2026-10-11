@@ -201,7 +201,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
               action={{ href: href({ filtre: undefined }), label: "Filtreyi temizle" }}
             />
           ) : (
-            <TableFrame minWidth={960}>
+            <TableFrame stack minWidth={960}>
               <Table>
                 <THead>
                   <TR>
@@ -223,18 +223,18 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                   {rows.map((r) => (
                     <TR key={r.id}>
                       <TD className="text-text-faint">{r.rank > 0 ? r.rank : "—"}</TD>
-                      <TD>
+                      <TD primary>
                         <Link href={`/app/ekip/${r.id}`} className={`${LINK} font-semibold text-ink-950`}>
                           {r.fullName}
                         </Link>
                         <p className="text-xs text-text-faint">{ROLE_LABELS[r.role] ?? r.role}</p>
                       </TD>
-                      <TD align="right">
+                      <TD label="Müşteri" align="right">
                         <Link href={`/app/musteriler?assigned=${r.id}`} className={LINK} aria-label={`${r.fullName} müşterileri`}>
                           {r.customerCount}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Yayında portföy" align="right">
                         <Link
                           href={`/app/portfoyler?status=live&danisman=${r.id}`}
                           className={LINK}
@@ -243,7 +243,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                           {r.activePropertyCount}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Aktif talep" align="right">
                         {leadById.get(r.id)?.activeDemands == null ? (
                           <span className="text-text-faint" title="Tarama sınırı aşıldı">—</span>
                         ) : (
@@ -252,25 +252,25 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                           </Link>
                         )}
                       </TD>
-                      <TD align="right">
+                      <TD label="Randevu" align="right">
                         <Link href={`/app/randevular?danisman=${r.id}`} className={LINK} aria-label={`${r.fullName} randevuları`}>
                           {r.appointCount}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Teklif" align="right">
                         <Link href={`/app/teklifler?danisman=${r.id}`} className={LINK} aria-label={`${r.fullName} teklifleri`}>
                           {r.offerCount}
                         </Link>
                       </TD>
-                      <TD align="right" className="font-semibold text-ink-950">
+                      <TD label="Anlaşma" align="right" className="font-semibold text-ink-950">
                         <Link href={`/app/teklifler?danisman=${r.id}&durum=accepted`} className={LINK} aria-label={`${r.fullName} kabul edilen teklifleri`}>
                           {r.dealCount}
                         </Link>
                       </TD>
-                      <TD align="right" className="text-text-muted">
+                      <TD label="Dönüşüm" align="right" className="text-text-muted">
                         {r.conversionPct === null ? "—" : `%${r.conversionPct}`}
                       </TD>
-                      <TD align="right" className="font-bold text-mint-700">
+                      <TD label="Gelir (komisyon payı)" align="right" className="font-bold text-mint-700">
                         {includeRevenue(r.id) ? (
                           <Link href={r.id === userId ? "/app/cuzdan" : `/app/ekip/${r.id}`} className={LINK}>
                             {r.revenue > 0 ? money(r.revenue) : "—"}
@@ -279,7 +279,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                           <span title="Başkasının kazancını görme izniniz yok" className="text-text-faint">Gizli</span>
                         )}
                       </TD>
-                      <TD align="right">
+                      <TD label="Hedef" align="right">
                         {r.targetPct === null ? (
                           <Link href="/app/hedefler" className={`${LINK} text-xs text-text-faint`}>
                             Hedef yok
@@ -291,7 +291,7 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
                         )}
                       </TD>
                       {canHandoff ? (
-                        <TD align="right">
+                        <TD actions align="right">
                           <Link
                             href={`/app/ekip/devir?from=${r.id}`}
                             className={`${LINK} inline-flex items-center gap-1 text-xs font-semibold text-text-muted`}

@@ -386,7 +386,7 @@ export default async function FranchiseBiPage({
           {/* Şube karşılaştırma tablosu — hacme göre sıralı; lider şube taçlı.
               Hücre linkleri ilgili modül listelerine iner (şube bazlı liste
               filtresi henüz yok; hedef sayfalar tam listeyi açar). */}
-          <TableFrame minWidth={880}>
+          <TableFrame stack minWidth={880}>
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                 <Building2 className="h-4 w-4 text-brand-600" /> Şube karşılaştırma
@@ -414,7 +414,7 @@ export default async function FranchiseBiPage({
                   const sharePct = totalWonValue > 0 ? Math.round((r.wonValue / totalWonValue) * 100) : 0;
                   return (
                     <TR key={r.id}>
-                      <TD className="font-semibold text-ink-950">
+                      <TD primary className="font-semibold text-ink-950">
                         <span className="inline-flex items-center gap-2">
                           <Link href="/app/ekip#subeler" className="focus-ring rounded-[var(--radius-control)] hover:text-brand-600 hover:underline">
                             {r.name}
@@ -426,27 +426,27 @@ export default async function FranchiseBiPage({
                           ) : null}
                         </span>
                       </TD>
-                      <TD align="right">
+                      <TD label="Portföy" align="right">
                         <Link href="/app/portfoyler" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.properties}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Müşteri" align="right">
                         <Link href="/app/musteriler" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.customers}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Danışman" align="right">
                         <Link href="/app/ekip" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.advisors}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Kazanılan işlem" align="right">
                         <Link href="/app/anlasmalar" className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline">
                           {r.won}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Hacim / danışman" align="right">
                         <Link
                           href="/app/danisman-kpi"
                           className="focus-ring rounded-[var(--radius-control)] text-text-muted hover:text-brand-600 hover:underline"
@@ -455,12 +455,12 @@ export default async function FranchiseBiPage({
                           {r.advisors > 0 ? moneyTry(Math.round(r.wonValue / r.advisors)) : "—"}
                         </Link>
                       </TD>
-                      <TD align="right">
+                      <TD label="Kazanılan hacim" align="right">
                         <Link href="/app/anlasmalar" className="focus-ring rounded-[var(--radius-control)] font-bold text-mint-600 hover:underline">
                           {moneyTry(r.wonValue)}
                         </Link>
                       </TD>
-                      <TD>
+                      <TD label="Hacim payı">
                         <span className="flex items-center gap-2">
                           <span className="h-1.5 w-20 overflow-hidden rounded-full bg-ink-950/8">
                             <span className="block h-full rounded-full bg-brand-500" style={{ width: `${sharePct}%` }} />
@@ -474,14 +474,14 @@ export default async function FranchiseBiPage({
               </TBody>
               <TFoot>
                 <TR>
-                  <TD>Konsolide</TD>
-                  <TD align="right">{totalProps}</TD>
-                  <TD align="right">{totalCust}</TD>
-                  <TD align="right">{totalAdv}</TD>
-                  <TD align="right">{totalWon}</TD>
-                  <TD align="right">{totalAdv > 0 ? moneyTry(Math.round(totalWonValue / totalAdv)) : "—"}</TD>
-                  <TD align="right" className="text-mint-600">{moneyTry(totalWonValue)}</TD>
-                  <TD>%100</TD>
+                  <TD primary>Konsolide</TD>
+                  <TD label="Portföy" align="right">{totalProps}</TD>
+                  <TD label="Müşteri" align="right">{totalCust}</TD>
+                  <TD label="Danışman" align="right">{totalAdv}</TD>
+                  <TD label="Kazanılan işlem" align="right">{totalWon}</TD>
+                  <TD label="Hacim / danışman" align="right">{totalAdv > 0 ? moneyTry(Math.round(totalWonValue / totalAdv)) : "—"}</TD>
+                  <TD label="Kazanılan hacim" align="right" className="text-mint-600">{moneyTry(totalWonValue)}</TD>
+                  <TD label="Hacim payı">%100</TD>
                 </TR>
               </TFoot>
             </Table>

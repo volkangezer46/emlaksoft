@@ -365,7 +365,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
         </div>
 
         {hasActivity ? (
-          <TableFrame minWidth={640}>
+          <TableFrame stack minWidth={640}>
             <Table>
               <THead>
                 <TR>
@@ -388,19 +388,19 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
                         {r.rank}
                       </span>
                     </TD>
-                    <TD>
+                    <TD primary>
                       <span className="flex items-center gap-3 font-display text-xl font-bold text-text">
                         <Avatar name={r.agent!.fullName} src={avatars.get(r.staffId)?.avatar_url} preset={avatars.get(r.staffId)?.avatar_preset} size="lg" />
                         {r.agent!.fullName}
                       </span>
                     </TD>
-                    <TD align="right">
+                    <TD label="Puan" align="right">
                       <span className="numeric font-display text-2xl font-extrabold text-accent-text">{r.total}</span>
                     </TD>
-                    <TD align="right">
+                    <TD label="Anlaşma" align="right">
                       <span className="numeric text-xl font-bold text-text">{r.breakdown.deal_won.count}</span>
                     </TD>
-                    <TD align="right">
+                    <TD label="Seri" align="right">
                       <span className="numeric text-xl font-bold text-amber-600">
                         {r.streak > 0 ? `🔥 ${r.streak}` : "—"}
                       </span>

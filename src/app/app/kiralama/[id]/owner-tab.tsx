@@ -89,7 +89,7 @@ export async function OwnerTab({
               </p>
             ) : (
               <div className="mt-4">
-                <TableFrame minWidth={640}>
+                <TableFrame stack minWidth={640}>
                   <Table>
                     <caption className="sr-only">Aylık hakediş defteri</caption>
                     <THead>
@@ -106,13 +106,13 @@ export async function OwnerTab({
                     <TBody>
                       {[...ledger.months].reverse().map((m) => (
                         <TR key={m.month}>
-                          <TD className="font-semibold text-ink-950">{monthTitle(m.month)}</TD>
-                          <TD align="right" className="numeric">{money(m.collected)}</TD>
-                          <TD align="right" className="numeric">{money(m.fee)}</TD>
-                          <TD align="right" className="numeric">{money(m.expenses + m.dues)}</TD>
-                          <TD align="right" className="numeric font-bold text-ink-950">{money(m.entitlement)}</TD>
-                          <TD align="right" className="numeric">{money(m.paidOut)}</TD>
-                          <TD align="right" className="numeric font-bold">
+                          <TD primary className="font-semibold text-ink-950">{monthTitle(m.month)}</TD>
+                          <TD label="Tahsilat" align="right" className="numeric">{money(m.collected)}</TD>
+                          <TD label="Ücret" align="right" className="numeric">{money(m.fee)}</TD>
+                          <TD label="Gider/aidat" align="right" className="numeric">{money(m.expenses + m.dues)}</TD>
+                          <TD label="Hakediş" align="right" className="numeric font-bold text-ink-950">{money(m.entitlement)}</TD>
+                          <TD label="Ödenen" align="right" className="numeric">{money(m.paidOut)}</TD>
+                          <TD label="Bakiye" align="right" className="numeric font-bold">
                             {money(m.closing)}
                             {m.closing < 0 ? <Badge variant="danger" size="sm" className="ml-1">alacak</Badge> : null}
                           </TD>

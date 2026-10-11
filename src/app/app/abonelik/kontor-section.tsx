@@ -480,7 +480,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
           </p>
         ) : (
           <>
-            <TableFrame className="mt-4" minWidth={620}>
+            <TableFrame stack className="mt-4" minWidth={620}>
               <Table>
                 <THead>
                   <TR>
@@ -499,13 +499,13 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                   ) : (
                     page!.rows.map((r) => (
                       <TR key={r.id}>
-                        <TD className="text-text-muted">{r.at && Number.isFinite(Date.parse(r.at)) ? dt.format(Date.parse(r.at)) : "—"}</TD>
-                        <TD>
+                        <TD label="Tarih" className="text-text-muted">{r.at && Number.isFinite(Date.parse(r.at)) ? dt.format(Date.parse(r.at)) : "—"}</TD>
+                        <TD primary>
                           <Link href={hrefOf({ kalem: r.category, kullanici: props.kullanici })} className="font-semibold text-text hover:text-accent-text hover:underline">
                             {r.label}
                           </Link>
                         </TD>
-                        <TD className="text-text-muted">
+                        <TD label="Kullanıcı" className="text-text-muted">
                           {r.userId ? (
                             <Link href={hrefOf({ kalem: category ?? undefined, kullanici: r.userId })} className="hover:text-accent-text hover:underline">
                               {history.userNames[r.userId] ?? "Kullanıcı"}
@@ -514,11 +514,11 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                             "Sistem"
                           )}
                         </TD>
-                        <TD align="right" className={`numeric font-bold ${r.units < 0 ? "text-text" : "text-success-strong"}`}>
+                        <TD align="right" label="Kontör" className={`numeric font-bold ${r.units < 0 ? "text-text" : "text-success-strong"}`}>
                           {r.units > 0 ? "+" : ""}
                           {fmt.format(r.units)}
                         </TD>
-                        <TD align="right" className="numeric text-text-muted">{r.balanceAfter === null ? "—" : fmt.format(r.balanceAfter)}</TD>
+                        <TD align="right" label="Bakiye" className="numeric text-text-muted">{r.balanceAfter === null ? "—" : fmt.format(r.balanceAfter)}</TD>
                       </TR>
                     ))
                   )}

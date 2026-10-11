@@ -592,7 +592,7 @@ export default async function DanismanKpiPage({
       {advisors.length === 0 ? (
         <p className="py-12 text-center text-sm text-text-muted">Danışman kaydı bulunamadı.</p>
       ) : (
-        <TableFrame className="print-sheet" minWidth={760}>
+        <TableFrame stack className="print-sheet" minWidth={760}>
           <Table>
             <THead>
               <TR>
@@ -631,7 +631,7 @@ export default async function DanismanKpiPage({
                       {i + 1}
                     </span>
                   </TD>
-                  <TD>
+                  <TD primary>
                     <Link href={`/app/ekip/${a.id}`} className="absolute inset-0" aria-label={`${a.full_name} danışman detayı`} />
                     <p className="font-semibold text-text group-hover:text-accent-text">
                       {a.full_name}
@@ -644,7 +644,7 @@ export default async function DanismanKpiPage({
                     <p className="text-xs text-text-faint capitalize">{a.role}</p>
                   </TD>
                   {/* Hücre drill-down'ları: relative z-10 ile satır overlay linkinin üstünde */}
-                  <TD align="right" className="text-text-muted">
+                  <TD label="Müşteri" align="right" className="text-text-muted">
                     <Link
                       href={`/app/musteriler?assigned=${a.id}`}
                       className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
@@ -653,7 +653,7 @@ export default async function DanismanKpiPage({
                       {a.customerCount}
                     </Link>
                   </TD>
-                  <TD align="right" className="text-text-muted">
+                  <TD label="Çağrı" align="right" className="text-text-muted">
                     <Link
                       href={`/app/gelen-kutusu?sekme=cagri&danisman=${a.id}`}
                       className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
@@ -662,7 +662,7 @@ export default async function DanismanKpiPage({
                       {a.callCount}
                     </Link>
                   </TD>
-                  <TD align="right" className="text-text-muted">
+                  <TD label="Randevu" align="right" className="text-text-muted">
                     <Link
                       href="/app/randevular"
                       className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
@@ -671,12 +671,12 @@ export default async function DanismanKpiPage({
                       {a.appointCount}
                     </Link>
                   </TD>
-                  <TD align="right" className="text-text-muted">{a.offerCount}</TD>
-                  <TD align="right" className="font-semibold text-text">{a.dealCount}</TD>
-                  <TD align="right" className="text-text-muted">{a.conversionRate}</TD>
+                  <TD label="Teklif" align="right" className="text-text-muted">{a.offerCount}</TD>
+                  <TD label="Satış" align="right" className="font-semibold text-text">{a.dealCount}</TD>
+                  <TD label="Dönüşüm" align="right" className="text-text-muted">{a.conversionRate}</TD>
                   {/* gelir: başarı tonu (viz-pos) */}
-                  <TD align="right" className="font-bold text-[color:var(--viz-pos)]">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
-                  <TD>
+                  <TD label="Gelir (komisyon payı)" align="right" className="font-bold text-[color:var(--viz-pos)]">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
+                  <TD label="Skor">
                     <div className="flex items-center gap-2">
                       <Progress className="w-16" value={(a.score / topScore) * 100} label={`${a.full_name} skoru`} />
                       <span className="numeric text-xs font-bold text-text">{a.score}</span>

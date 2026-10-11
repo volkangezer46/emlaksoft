@@ -676,7 +676,7 @@ export default async function BillingPage({
             Henüz fatura kesilmedi — ilk ödeme sonrası faturalar burada listelenir.
           </p>
         ) : (
-          <TableFrame className="mt-4" minWidth={560}>
+          <TableFrame stack className="mt-4" minWidth={560}>
             <Table>
               <THead>
                 <TR>
@@ -691,11 +691,11 @@ export default async function BillingPage({
               <TBody>
                 {(invoices ?? []).map((inv) => (
                   <TR key={inv.id}>
-                    <TD className="font-semibold text-text"><Link href={`/app/abonelik/fatura/${inv.id}`} className="hover:text-accent-text hover:underline">{inv.invoice_no}</Link></TD>
-                    <TD className="text-text-muted">
+                    <TD primary className="font-semibold text-text"><Link href={`/app/abonelik/fatura/${inv.id}`} className="hover:text-accent-text hover:underline">{inv.invoice_no}</Link></TD>
+                    <TD label="Kesim" className="text-text-muted">
                       {new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.created_at))}
                     </TD>
-                    <TD className="text-text-muted">
+                    <TD label="Ödeme" className="text-text-muted">
                       {inv.paid_at
                         ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(inv.paid_at))
                         : "—"}
@@ -709,10 +709,10 @@ export default async function BillingPage({
                         {{ paid: "Ödendi", open: "Ödeme bekliyor", void: "İptal", uncollectible: "Tahsil edilemedi" }[inv.status as string] ?? inv.status}
                       </span>
                     </TD>
-                    <TD align="right" className="numeric font-display font-bold text-text">
+                    <TD align="right" label="Tutar" className="numeric font-display font-bold text-text">
                       {money(Number(inv.total_try))}
                     </TD>
-                    <TD align="right">
+                    <TD align="right" actions>
                       <Link href={`/app/abonelik/fatura/${inv.id}`} className="text-xs font-semibold text-accent-text hover:underline">
                         Aç / yazdır
                       </Link>

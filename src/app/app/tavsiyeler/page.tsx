@@ -325,7 +325,7 @@ export default async function ReferralsPage({
           </div>
         ) : (
           <>
-            <TableFrame minWidth={980}>
+            <TableFrame stack minWidth={980}>
             <Table>
               <THead>
                 <TR>
@@ -344,7 +344,7 @@ export default async function ReferralsPage({
                   const tel = toTelHref(r.referred_phone);
                   return (
                     <TR key={r.id}>
-                      <TD>
+                      <TD primary>
                         <span className="block font-semibold text-ink-950">{r.referred_name}</span>
                         {tel ? (
                           <a
@@ -369,7 +369,7 @@ export default async function ReferralsPage({
                           </span>
                         ) : null}
                       </TD>
-                      <TD>
+                      <TD label="Tavsiye eden">
                         {r.referrer_customer_id ? (
                           <Link
                             href={`/app/musteriler/${r.referrer_customer_id}`}
@@ -389,7 +389,7 @@ export default async function ReferralsPage({
                           </Link>
                         ) : null}
                       </TD>
-                      <TD>
+                      <TD label="Durum">
                         {canEdit ? (
                           <ReferralStatusPills id={r.id} status={r.status} />
                         ) : (
@@ -398,12 +398,12 @@ export default async function ReferralsPage({
                           </Badge>
                         )}
                       </TD>
-                      <TD>
+                      <TD label="Tarih">
                         <span className="numeric text-xs text-text-muted">
                           {dateFmt.format(new Date(r.created_at))}
                         </span>
                       </TD>
-                      <TD align="right">
+                      <TD actions align="right">
                         <div className="flex flex-wrap items-start justify-end gap-2">
                           {canCreate ? (
                             <ConvertReferralButton id={r.id} done={Boolean(r.created_customer_id)} />
@@ -504,7 +504,7 @@ export default async function ReferralsPage({
                 </p>
               </div>
             ) : (
-              <TableFrame minWidth={820}>
+              <TableFrame stack minWidth={820}>
                 <Table>
                   <THead>
                     <TR>
@@ -523,7 +523,7 @@ export default async function ReferralsPage({
                       const c = rel(l.customer);
                       return (
                         <TR key={l.id}>
-                          <TD>
+                          <TD primary>
                             <Link
                               href={`/app/musteriler/${l.customer_id}`}
                               className="font-semibold text-ink-950 underline-offset-2 hover:text-brand-600 hover:underline"
@@ -536,25 +536,25 @@ export default async function ReferralsPage({
                               </span>
                             ) : null}
                           </TD>
-                          <TD>
+                          <TD label="Danışman">
                             <span className="text-xs text-text-muted">
                               {l.staff_id ? (staffById.get(l.staff_id) ?? "—") : "Atanmadı"}
                             </span>
                           </TD>
-                          <TD align="right">
+                          <TD label="Tıklanma" align="right">
                             <span className="numeric text-sm text-ink-950">
                               {(l.click_count ?? 0).toLocaleString("tr-TR")}
                             </span>
                           </TD>
-                          <TD align="right">
+                          <TD label="Gelen tavsiye" align="right">
                             <span className="numeric text-sm font-semibold text-ink-950">
                               {(perLink.get(l.id) ?? 0).toLocaleString("tr-TR")}
                             </span>
                           </TD>
-                          <TD>
+                          <TD label="Aktif">
                             <ReferralLinkToggle id={l.id} active={l.is_active} />
                           </TD>
-                          <TD align="right">
+                          <TD actions align="right">
                             <CopyReferralLinkButton url={`${base}/tavsiye/${l.public_token}`} />
                           </TD>
                         </TR>

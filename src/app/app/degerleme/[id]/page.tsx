@@ -332,7 +332,7 @@ export default async function ValuationReportPage({
               Bu değerlemede ağırlıklı bir fiyat kaynağı kaydedilmemiş.
             </p>
           ) : (
-            <TableFrame className="mt-3" minWidth={520}>
+            <TableFrame stack className="mt-3" minWidth={520}>
               <Table>
                 <THead>
                   <TR>
@@ -345,10 +345,10 @@ export default async function ValuationReportPage({
                 <TBody>
                   {priceSources.map((s) => (
                     <TR key={s.name}>
-                      <TD className="font-semibold text-ink-950">{s.name}</TD>
-                      <TD align="right">%{Math.round(s.weight * 100)}</TD>
-                      <TD align="right">{money(s.value)}</TD>
-                      <TD className="text-text-muted">{s.note}</TD>
+                      <TD primary className="font-semibold text-ink-950">{s.name}</TD>
+                      <TD label="Ağırlık" align="right">%{Math.round(s.weight * 100)}</TD>
+                      <TD label="Değer" align="right">{money(s.value)}</TD>
+                      <TD label="Açıklama" className="text-text-muted">{s.note}</TD>
                     </TR>
                   ))}
                 </TBody>
@@ -387,7 +387,7 @@ export default async function ValuationReportPage({
               ₺/m², hedefin kat/yaş/ısıtma/cephe farkına göre düzeltilmiştir; ham değerden
               farklıysa altında küçük yazıyla gösterilir.
             </p>
-            <TableFrame className="mt-3" minWidth={640}>
+            <TableFrame stack className="mt-3" minWidth={640}>
               <Table>
                 <THead>
                   <TR>
@@ -403,7 +403,7 @@ export default async function ValuationReportPage({
                 <TBody>
                   {comparableRows.map((c, i) => (
                     <TR key={`${c.property_id}-${c.source}-${i}`}>
-                      <TD className="font-semibold text-ink-950">
+                      <TD primary className="font-semibold text-ink-950">
                         {c.property_code ? (
                           <Link
                             href={`/app/portfoyler/${c.property_id}`}
@@ -415,11 +415,11 @@ export default async function ValuationReportPage({
                           "—"
                         )}
                       </TD>
-                      <TD>{c.district_name ?? district?.name ?? "—"}</TD>
-                      <TD>{c.rooms ?? "—"}</TD>
-                      <TD align="right">{c.sqm != null ? `${c.sqm}` : "—"}</TD>
-                      <TD align="right">{money(c.price)}</TD>
-                      <TD align="right">
+                      <TD label="İlçe">{c.district_name ?? district?.name ?? "—"}</TD>
+                      <TD label="Oda">{c.rooms ?? "—"}</TD>
+                      <TD label="m²" align="right">{c.sqm != null ? `${c.sqm}` : "—"}</TD>
+                      <TD label="Fiyat" align="right">{money(c.price)}</TD>
+                      <TD label="Düzeltilmiş ₺/m²" align="right">
                         {c.adjusted_price_per_sqm != null ? (
                           <>
                             <div>{money(c.adjusted_price_per_sqm)}</div>
@@ -435,7 +435,7 @@ export default async function ValuationReportPage({
                           "—"
                         )}
                       </TD>
-                      <TD className="text-text-muted">{sourceLabel(c.source)}</TD>
+                      <TD label="Kaynak" className="text-text-muted">{sourceLabel(c.source)}</TD>
                     </TR>
                   ))}
                 </TBody>

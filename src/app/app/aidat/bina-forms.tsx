@@ -271,7 +271,7 @@ export function UnitsPanel({
           Henüz daire yok. “Toplu ekle” ile 1-12 gibi bir aralığı tek seferde ekleyebilir, sonra m²/arsa payı ve malik bilgilerini girebilirsiniz.
         </p>
       ) : (
-        <TableFrame minWidth={820}>
+        <TableFrame stack minWidth={820}>
           <Table>
             <THead>
               <TR>
@@ -281,14 +281,14 @@ export function UnitsPanel({
             <TBody>
               {units.map((u) => (
                 <TR key={u.id}>
-                  <TD><span className="font-semibold text-ink-950">{u.label}</span>{!u.active ? <Badge variant="outline" size="sm" className="ml-2">Pasif</Badge> : null}</TD>
-                  <TD>{u.floor ?? "—"}</TD>
-                  <TD align="right">{num(u.areaM2)}</TD>
-                  <TD align="right">{num(u.landShare, 4)}</TD>
-                  <TD>{u.ownerName ?? "—"}</TD>
-                  <TD>{u.tenantName ?? "—"}</TD>
-                  <TD>{PAYER_LABELS[u.payer]}</TD>
-                  <TD align="right">
+                  <TD primary><span className="font-semibold text-ink-950">{u.label}</span>{!u.active ? <Badge variant="outline" size="sm" className="ml-2">Pasif</Badge> : null}</TD>
+                  <TD label="Kat">{u.floor ?? "—"}</TD>
+                  <TD align="right" label="m²">{num(u.areaM2)}</TD>
+                  <TD align="right" label="Arsa payı">{num(u.landShare, 4)}</TD>
+                  <TD label="Malik">{u.ownerName ?? "—"}</TD>
+                  <TD label="Kiracı">{u.tenantName ?? "—"}</TD>
+                  <TD label="Ödeyen">{PAYER_LABELS[u.payer]}</TD>
+                  <TD align="right" actions>
                     {canEdit ? (
                       <span className="inline-flex gap-1">
                         <Button size="sm" variant="ghost" icon={Pencil} onClick={() => startEdit(u)} aria-label={`${u.label} düzenle`}>Düzenle</Button>

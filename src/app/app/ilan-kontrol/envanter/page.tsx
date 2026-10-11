@@ -79,7 +79,7 @@ async function History() {
     );
   return (
     <Panel title="Geçmiş karşılaştırmalar" description="Her sayı ilgili listeye gider. Kayıp, ancak liste tam işaretlendiyse ve doğrulama ikinci kez teyit ettiyse kesinleşir.">
-      <TableFrame minWidth={860}>
+      <TableFrame stack minWidth={860}>
         <Table>
           <caption className="sr-only">Son portal listesi karşılaştırmaları</caption>
           <THead>
@@ -99,24 +99,24 @@ async function History() {
           <TBody>
             {res.rows.map((r) => (
               <TR key={r.id}>
-                <TD>
+                <TD primary>
                   {formatDateTimeTr(r.created_at)}
                   <div className="text-xs text-text-muted">
                     {r.actor_id ? (names.get(r.actor_id) ?? "-") : "-"} · {r.scope === "office" ? "ofis geneli" : "kendi portföyleri"}
                   </div>
                 </TD>
-                <TD className="capitalize">{r.portal}</TD>
-                <TD>
+                <TD label="Portal" className="capitalize">{r.portal}</TD>
+                <TD label="Kaynak">
                   {SOURCE_LABEL[r.source]}
                   <div className="text-xs text-text-muted">{r.complete ? "tam liste" : "kısmi liste"}</div>
                 </TD>
-                <TD align="right"><span className="tabular-nums">{r.total_rows}</span></TD>
-                <TD align="right">{link(r.matched, kpiHref("in_portals"), "Yayındaki portföyler")}</TD>
-                <TD align="right">{link(r.removed, `${CONTROL_BASE}/anomaliler?tur=portal_missing`, "Kayıp uyarıları")}</TD>
-                <TD align="right">{link(r.unregistered, `${CONTROL_BASE}/eslesme`, "Eşleşme kuyruğu")}</TD>
-                <TD align="right">{link(r.never_published, kpiHref("awaiting_publish"), "Yayın bekleyenler")}</TD>
-                <TD align="right">{link(r.price_diff, kpiHref("price_mismatch"), "Fiyat uyuşmazlıkları")}</TD>
-                <TD align="right">{link(r.other_advisor, `${CONTROL_BASE}/anomaliler?tur=advisor_mismatch`, "Danışman uyuşmazlıkları")}</TD>
+                <TD label="Liste" align="right"><span className="tabular-nums">{r.total_rows}</span></TD>
+                <TD label="Eşleşen" align="right">{link(r.matched, kpiHref("in_portals"), "Yayındaki portföyler")}</TD>
+                <TD label="Kaldırılmış" align="right">{link(r.removed, `${CONTROL_BASE}/anomaliler?tur=portal_missing`, "Kayıp uyarıları")}</TD>
+                <TD label="Kayıtsız" align="right">{link(r.unregistered, `${CONTROL_BASE}/eslesme`, "Eşleşme kuyruğu")}</TD>
+                <TD label="Yayınlanmamış" align="right">{link(r.never_published, kpiHref("awaiting_publish"), "Yayın bekleyenler")}</TD>
+                <TD label="Fiyat farkı" align="right">{link(r.price_diff, kpiHref("price_mismatch"), "Fiyat uyuşmazlıkları")}</TD>
+                <TD label="Farklı danışman" align="right">{link(r.other_advisor, `${CONTROL_BASE}/anomaliler?tur=advisor_mismatch`, "Danışman uyuşmazlıkları")}</TD>
               </TR>
             ))}
           </TBody>

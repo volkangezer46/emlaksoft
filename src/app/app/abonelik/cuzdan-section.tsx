@@ -231,7 +231,7 @@ export async function CuzdanSection({
             ))}
           </nav>
         </div>
-        <TableFrame className="mt-4" minWidth={520}>
+        <TableFrame stack className="mt-4" minWidth={520}>
           <Table>
             <THead>
               <TR>
@@ -251,8 +251,8 @@ export async function CuzdanSection({
               ) : (
                 rows.map((m) => (
                   <TR key={m.id}>
-                    <TD className="text-text-muted">{dt.format(new Date(m.at))}</TD>
-                    <TD className="font-semibold text-text">
+                    <TD label="Tarih" className="text-text-muted">{dt.format(new Date(m.at))}</TD>
+                    <TD primary className="font-semibold text-text">
                       {m.kind === "out" ? (
                         <Link href={TRY_WALLET_LINKS.invoices} className="hover:text-accent-text hover:underline">
                           {m.label}
@@ -261,8 +261,8 @@ export async function CuzdanSection({
                         m.label
                       )}
                     </TD>
-                    <TD className="text-text-muted">{m.expiresAt ? expiryText(m.expiresAt, nowMs) : "—"}</TD>
-                    <TD align="right" className={`numeric font-display font-bold ${m.kind === "in" ? "text-success-strong" : "text-text"}`}>
+                    <TD label="Vade" className="text-text-muted">{m.expiresAt ? expiryText(m.expiresAt, nowMs) : "—"}</TD>
+                    <TD align="right" label="Tutar" className={`numeric font-display font-bold ${m.kind === "in" ? "text-success-strong" : "text-text"}`}>
                       {m.kind === "in" ? "+" : "−"}
                       {formatTry(Math.abs(m.amountTry))}
                     </TD>

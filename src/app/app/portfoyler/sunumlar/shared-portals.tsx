@@ -159,7 +159,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
           </div>
         </div>
       ) : (
-        <TableFrame minWidth={760}>
+        <TableFrame stack minWidth={760}>
           <Table>
             <THead>
               <TR>
@@ -174,7 +174,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
             <TBody>
               {rows.map((row) => (
                 <TR key={`${row.kind}-${row.id}`}>
-                  <TD className="font-semibold text-ink-950">
+                  <TD primary className="font-semibold text-ink-950">
                     <span className="inline-flex items-center gap-1.5">
                       {row.kind === "customer" ? (
                         <UserRound className="h-3.5 w-3.5 text-brand-600" />
@@ -189,7 +189,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                       </span>
                     ) : null}
                   </TD>
-                  <TD>
+                  <TD label="Muhatap">
                     {row.href ? (
                       <Link
                         href={row.href}
@@ -201,14 +201,14 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                       <span className="text-text-muted">{row.subject}</span>
                     )}
                   </TD>
-                  <TD className="text-text-muted">
+                  <TD label="Son ziyaret" className="text-text-muted">
                     {row.lastSeenAt ? (
                       tarih(row.lastSeenAt)
                     ) : (
                       <span className="text-text-faint">Hiç açılmadı</span>
                     )}
                   </TD>
-                  <TD>
+                  <TD label="Geçerlilik">
                     {row.expired ? (
                       <span className="rounded-full bg-ink-950/8 px-2.5 py-1 text-xs font-semibold text-text-muted">
                         Süresi doldu / iptal
@@ -219,8 +219,8 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                       </span>
                     )}
                   </TD>
-                  <TD className="text-text-muted">{tarih(row.createdAt)}</TD>
-                  <TD align="right">
+                  <TD label="Oluşturulma" className="text-text-muted">{tarih(row.createdAt)}</TD>
+                  <TD actions align="right">
                     <span className="inline-flex items-center justify-end gap-1.5">
                       {row.expired ? null : (
                         <>

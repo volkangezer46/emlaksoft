@@ -266,7 +266,7 @@ export async function FaturalarTab({ perms, params }: { perms: EffectivePermissi
           tone="brand"
         />
       ) : (
-        <TableFrame minWidth={900}>
+        <TableFrame stack minWidth={900}>
           <Table>
             <THead>
               <TR>

@@ -115,7 +115,7 @@ async function ListBody({
   }
   return (
     <div className="space-y-3">
-      <TableFrame minWidth={820}>
+      <TableFrame stack minWidth={820}>
         <Table>
           <caption className="sr-only">{KPI_LABELS[kpi]} portföy listesi</caption>
           <THead>
@@ -135,20 +135,20 @@ async function ListBody({
               const color = (r.health_color ?? "gray") as keyof typeof HEALTH_VISUAL;
               return (
                 <TR key={r.property_id}>
-                  <TD>
+                  <TD primary>
                     <Link href={`/app/portfoyler/${r.property_id}?sekme=portallar`} className="focus-ring rounded font-medium text-accent-text hover:underline">
                       <span className="font-mono text-xs text-text-muted">{b?.code ?? "-"}</span> {b?.title ?? "Portföy"}
                     </Link>
                     {b?.price != null ? <div className="text-xs text-text-muted">{formatTry(b.price)}</div> : null}
                   </TD>
-                  <TD>{r.advisor_id ? (names.get(r.advisor_id) ?? "-") : "Atanmamış"}</TD>
-                  <TD>{STAGE_LABELS[r.lifecycle_stage as LifecycleStage] ?? r.lifecycle_stage}</TD>
-                  <TD>
+                  <TD label="Danışman">{r.advisor_id ? (names.get(r.advisor_id) ?? "-") : "Atanmamış"}</TD>
+                  <TD label="Aşama">{STAGE_LABELS[r.lifecycle_stage as LifecycleStage] ?? r.lifecycle_stage}</TD>
+                  <TD label="Durum">
                     <VisualChip visual={HEALTH_VISUAL[color] ?? "unverifiable"} label={`${HEALTH_LABEL[color] ?? "Kontrol edilemiyor"}${r.health_score !== null ? ` · ${r.health_score}` : ""}`} />
                   </TD>
-                  <TD align="right"><span className="font-semibold tabular-nums">{r.risk_score}</span></TD>
-                  <TD align="right"><span className="tabular-nums">{r.portals_live}</span></TD>
-                  <TD>{r.last_verified_at ? formatDateTimeTr(r.last_verified_at) : <span className="text-text-muted">Hiç doğrulanmadı</span>}</TD>
+                  <TD label="Risk" align="right"><span className="font-semibold tabular-nums">{r.risk_score}</span></TD>
+                  <TD label="Portalda" align="right"><span className="tabular-nums">{r.portals_live}</span></TD>
+                  <TD label="Son doğrulama">{r.last_verified_at ? formatDateTimeTr(r.last_verified_at) : <span className="text-text-muted">Hiç doğrulanmadı</span>}</TD>
                 </TR>
               );
             })}

@@ -26,35 +26,7 @@ const STRIP_EXCEPTIONS = new Set<string>([
   "src/app/app/talepler/page.tsx",
 ]);
 
-const WIDE_TABLE_EXCEPTIONS = new Set<string>([
-  "src/app/app/abonelik/cuzdan-section.tsx",
-  "src/app/app/abonelik/kontor-section.tsx",
-  "src/app/app/abonelik/page.tsx",
-  "src/app/app/aidat/bina-forms.tsx",
-  "src/app/app/aidat/cari-tab.tsx",
-  "src/app/app/anlasmalar/deal-rows.tsx",
-  "src/app/app/cuzdan/office-earnings.tsx",
-  "src/app/app/danisman-kpi/page.tsx",
-  "src/app/app/degerleme/[id]/page.tsx",
-  "src/app/app/ekip/kiyas/page.tsx",
-  "src/app/app/franchise/page.tsx",
-  "src/app/app/giderler/faturalar/faturalar-tab.tsx",
-  "src/app/app/ilan-havuzu/assignment-section.tsx",
-  "src/app/app/ilan-kontrol/envanter/page.tsx",
-  "src/app/app/ilan-kontrol/liste/page.tsx",
-  "src/app/app/kiralama/[id]/owner-tab.tsx",
-  "src/app/app/kiralama/rental-rows.tsx",
-  "src/app/app/lig/page.tsx",
-  "src/app/app/ofis-merkezi/_tabs/stats-tab.tsx",
-  "src/app/app/portfoyler/sunumlar/page.tsx",
-  "src/app/app/portfoyler/sunumlar/shared-portals.tsx",
-  "src/app/app/randevular/appointment-rows.tsx",
-  "src/app/app/raporlar/kar-zarar/advisor-profit.tsx",
-  "src/app/app/sozlesmeler/contract-rows.tsx",
-  "src/app/app/talepler/demand-rows.tsx",
-  "src/app/app/tavsiyeler/page.tsx",
-  "src/app/app/teklifler/offer-rows.tsx",
-]);
+const WIDE_TABLE_EXCEPTIONS = new Set<string>([]);
 
 const ROOT = process.cwd().replace(/\\/g, "/");
 
@@ -73,7 +45,9 @@ const SKIP = new Set(["src/components/app/detail-tabs.tsx", "src/components/app/
 const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
 
 const SECOND_STRIP = /<(PageTabs|MorphNav|DetailTabs)\b/;
-const WIDE_TABLE = /<TableFrame[^>]*minWidth=\{\d{3,4}/;
+const WIDE_TABLE_TAG = /<TableFrame\b[^>]*minWidth=\{\d{3,4}[^>]*>/g;
+/** `stack`: 768 px altında satırlar karta döner (başlık gizli, TD label hücre önünde; list-page.css `.tbl-stack`). */
+const hasUnstackedWide = (code: string) => (code.match(WIDE_TABLE_TAG) ?? []).some((tag) => !/\bstack\b/.test(tag));
 const MOBILE_ALT = /MobileCard|sm:hidden|md:hidden|lg:hidden|hidden sm:|hidden md:/;
 
 describe("tek şerit ilkesi", () => {
@@ -93,7 +67,7 @@ describe("tek şerit ilkesi", () => {
 });
 
 describe("geniş tablo mobil kart alternatifi", () => {
-  const wide = FILES.filter((f) => WIDE_TABLE.test(read(f)) && !MOBILE_ALT.test(read(f)));
+  const wide = FILES.filter((f) => hasUnstackedWide(read(f)) && !MOBILE_ALT.test(read(f)));
   it("yeni geniş tablo kart alternatifsiz eklenmez", () => {
     expect(wide.filter((f) => !WIDE_TABLE_EXCEPTIONS.has(f))).toEqual([]);
   });

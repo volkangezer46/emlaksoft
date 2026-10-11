@@ -163,7 +163,7 @@ export default async function PresentationsPage({
           </div>
         </div>
       ) : (
-        <TableFrame minWidth={760}>
+        <TableFrame stack minWidth={760}>
           <Table>
             <THead>
               <TR>
@@ -181,7 +181,7 @@ export default async function PresentationsPage({
                 const url = `${base}/sunum/${p.public_token}`;
                 return (
                   <TR key={p.id}>
-                    <TD className="font-semibold text-ink-950">
+                    <TD primary className="font-semibold text-ink-950">
                       <a
                         href={url}
                         target="_blank"
@@ -192,7 +192,7 @@ export default async function PresentationsPage({
                         {p.title}
                       </a>
                     </TD>
-                    <TD>
+                    <TD label="Müşteri">
                       {/* Bağlı müşteri varsa satır kartına gider (sıfır çıkmaz metrik) */}
                       {p.customer_id && canSeeCustomers ? (
                         <Link
@@ -210,15 +210,15 @@ export default async function PresentationsPage({
                         "—"
                       )}
                     </TD>
-                    <TD align="right" className="numeric">{p.property_ids?.length ?? 0}</TD>
-                    <TD align="right">
+                    <TD label="Portföy" align="right" className="numeric">{p.property_ids?.length ?? 0}</TD>
+                    <TD label="Görüntülenme" align="right">
                       <span className="inline-flex items-center gap-1 font-semibold text-ink-950">
                         <Eye className="h-3.5 w-3.5 text-text-faint" /> {p.view_count ?? 0}
                       </span>
                     </TD>
-                    <TD className="text-text-muted">{tarih(p.last_viewed_at)}</TD>
-                    <TD className="text-text-muted">{tarih(p.created_at)}</TD>
-                    <TD align="right">
+                    <TD label="Son görüntüleme" className="text-text-muted">{tarih(p.last_viewed_at)}</TD>
+                    <TD label="Oluşturulma" className="text-text-muted">{tarih(p.created_at)}</TD>
+                    <TD actions align="right">
                       <span className="inline-flex items-center justify-end gap-1.5">
                         <CopyLinkButton url={url} />
                         <WhatsAppShareButton kind="presentation" id={p.id} compact label="WhatsApp" />

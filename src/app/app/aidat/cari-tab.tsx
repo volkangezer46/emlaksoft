@@ -63,7 +63,7 @@ export async function CariTab({ db, tenantId, daireId }: { db: SupabaseClient; t
           {!data.cari.hasData ? (
             <EmptyState icon={Scale} title="Bu dairede henüz hareket yok" description="Dönem aidatı tahakkuk ettirildiğinde ya da gider paylaştırıldığında burada görünür." />
           ) : (
-            <TableFrame minWidth={680}>
+            <TableFrame stack minWidth={680}>
               <Table>
                 <THead>
                   <TR><TH>Tarih</TH><TH>Açıklama</TH><TH align="right">Borç</TH><TH align="right">Alacak</TH><TH align="right">Bakiye</TH></TR>
@@ -71,11 +71,11 @@ export async function CariTab({ db, tenantId, daireId }: { db: SupabaseClient; t
                 <TBody>
                   {data.cari.entries.map((e) => (
                     <TR key={e.id}>
-                      <TD>{dayLabel(e.date)}</TD>
-                      <TD>{e.label}</TD>
-                      <TD align="right">{e.debit > 0 ? money(e.debit) : ""}</TD>
-                      <TD align="right"><span className="text-mint-700">{e.credit > 0 ? money(e.credit) : ""}</span></TD>
-                      <TD align="right"><span className="font-semibold text-ink-950">{money(e.balance)}</span></TD>
+                      <TD label="Tarih">{dayLabel(e.date)}</TD>
+                      <TD primary>{e.label}</TD>
+                      <TD align="right" label="Borç">{e.debit > 0 ? money(e.debit) : ""}</TD>
+                      <TD align="right" label="Alacak"><span className="text-mint-700">{e.credit > 0 ? money(e.credit) : ""}</span></TD>
+                      <TD align="right" label="Bakiye"><span className="font-semibold text-ink-950">{money(e.balance)}</span></TD>
                     </TR>
                   ))}
                 </TBody>
