@@ -25,7 +25,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/billing/plan-support.ts:35` | `getPlanSupport` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/ef-credits/credit-reader.ts:35` | `cachedReady` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/ef-credits/wallet.ts:42` | `efCreditReady` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
-| `src/lib/geo/admin-store.ts:424` | `getChangeRequest` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
+| `src/lib/geo/admin-store.ts:425` | `getChangeRequest` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/geo/admin-store.ts:352` | `getGeoHealth` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/geo/admin-store.ts:216` | `setActive` | Gerekçe doğrulanmadı. | belirsiz | yok (yazma) | P0 |
 | `src/lib/geo/admin-store.ts:252` | `undoMerge` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
@@ -67,7 +67,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/geo/admin-store.ts:57` | `listAdminRows` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/geo/admin-store.ts:240` | `mergeEntity` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/geo/admin-store.ts:229` | `moveEntity` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
-| `src/lib/geo/admin-store.ts:414` | `resolveChangeRequest` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
+| `src/lib/geo/admin-store.ts:415` | `resolveChangeRequest` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/lib/geo/admin-store.ts:191` | `updateEntity` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok (yazma) | P1 |
 | `src/lib/geo/admin-store.ts:110` | `usageBreakdown` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/geo/admin-store.ts:130` | `usageRows` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
@@ -198,9 +198,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/portal-listings.ts:152` | `confirmPortalListing` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/portal-listings.ts:184` | `confirmPortalListingsBulk` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/portal-listings.ts:21` | `createPortalListing` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
-| `src/app/actions/portal-publish.ts:224` | `publishPropertyToPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
-| `src/app/actions/portal-publish.ts:337` | `unpublishPropertyFromPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
-| `src/app/actions/portal-publish.ts:285` | `updatePropertyOnPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
+| `src/app/actions/portal-publish.ts:225` | `publishPropertyToPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/portal-publish.ts:338` | `unpublishPropertyFromPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
+| `src/app/actions/portal-publish.ts:286` | `updatePropertyOnPortal` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/projects.ts:545` | `sellUnit` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/properties.ts:135` | `notifyPriceDropToMatchingDemands` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/actions/properties.ts:749` | `setPropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
@@ -314,7 +314,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/app/ekip/invite-actions.ts:141` | `createAdvisor` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/ekip/invite-actions.ts:31` | `resendInvite` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var | P2 |
 | `src/app/app/ekip/page.tsx:150` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
-| `src/app/app/sozlesmeler/[id]/page.tsx:93` | `ContractDetailPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
+| `src/app/app/sozlesmeler/[id]/page.tsx:92` | `ContractDetailPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
 | `src/app/danisman/[slug]/page.tsx:151` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/danisman/[slug]/page.tsx:116` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/danisman/[slug]/page.tsx:89` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
@@ -327,7 +327,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/giris/dogrulama/actions.ts:57` | `verifyLoginCode` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/imza/[token]/page.tsx:32` | `PublicContractSignPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/lead/[token]/page.tsx:18` | `PublicLeadPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
-| `src/app/malik-portali/[token]/page.tsx:111` | `MalikPortaliPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/malik-portali/[token]/page.tsx:113` | `MalikPortaliPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/musteri-portali/[token]/page.tsx:114` | `CustomerPortalPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/odeme-link/[token]/page.tsx:43` | `PublicPaymentLinkPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/paylas/[token]/page.tsx:78` | `generateMetadata` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
@@ -392,7 +392,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/geo/admin-store.ts:159` | `addAliasInternal` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/lib/geo/admin-store.ts:323` | `applyPlan` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/geo/admin-store.ts:261` | `listAliases` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
-| `src/lib/geo/admin-store.ts:393` | `listChangeRequests` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/geo/admin-store.ts:394` | `listChangeRequests` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/geo/admin-store.ts:289` | `listVersions` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/geo/admin-store.ts:319` | `loadExisting` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/geo/admin-store.ts:275` | `removeAlias` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
