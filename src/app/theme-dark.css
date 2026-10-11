@@ -161,6 +161,16 @@ html[data-theme="dark"] :is(.text-ink-950, .text-ink-900, .text-ink-800):not(.th
 html[data-theme="dark"] .mt-tab:is([data-active="true"], :hover):not(.theme-dark *) {
   color: var(--text);
 }
+/* Önekli (hover:/focus:/group-hover:/data-[..]:) koyu lacivert metin sınıfları da koyu zeminde okunmaz (konsey #29);
+   düz .text-ink-* kuralı bunları yakalamaz. Etkileşim durumunda da --text kullanılır. */
+html[data-theme="dark"] :is(.hover\:text-ink-950, .hover\:text-ink-900, .hover\:text-ink-800):hover:not(.theme-dark *),
+html[data-theme="dark"] :is(.focus\:text-ink-950, .focus\:text-ink-900, .focus\:text-ink-800):focus:not(.theme-dark *),
+html[data-theme="dark"] .group:hover :is(.group-hover\:text-ink-950, .group-hover\:text-ink-900, .group-hover\:text-ink-800):not(.theme-dark *),
+html[data-theme="dark"] .data-\[active\=true\]\:text-ink-950[data-active="true"]:not(.theme-dark *),
+html[data-theme="dark"] .data-\[state\=open\]\:text-ink-950[data-state="open"]:not(.theme-dark *),
+html[data-theme="dark"] .data-\[state\=active\]\:text-ink-950[data-state="active"]:not(.theme-dark *) {
+  color: var(--text);
+}
 html[data-theme="dark"] .bg-amber-50:not(.theme-dark *) {
   background-color: rgba(242, 184, 75, 0.12);
 }
