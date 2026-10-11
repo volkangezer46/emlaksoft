@@ -200,7 +200,7 @@ async function updateDealStageWithGate(
   }
   if (stage === "won" && existing.stage !== "won") {
     if (existing.deal_type === "rent") {
-      return { error: "Kiralık anlaşma kapanışı; kira sözleşmesi, komisyon ve portföy birlikte kaydedilsin diye Mülk Yönetimi ekranından tamamlanmalıdır." };
+      return { error: "Kiralık anlaşma kapanışı; kira sözleşmesi, komisyon ve portföy birlikte kaydedilsin diye Mülk yönetimi ekranından tamamlanmalıdır." };
     }
     const createGate = await requirePermission("commissions", "create");
     if (!createGate.ok) return { error: createGate.error };
@@ -233,7 +233,7 @@ async function updateDealStageWithGate(
     return { error: "Bağlı ödeme bağlantısı varken anlaşma geri açılamaz; önce Komisyon ekranında satırın \"Linkler\" bölümünden açık ödeme bağlantısını iptal edin." };
   }
   if (outcome === "rental_lifecycle_required") {
-    return { error: "Kira kaydına bağlı anlaşma buradan geri açılamaz; Mülk Yönetimi ekranındaki yaşam döngüsünü kullanın." };
+    return { error: "Kira kaydına bağlı anlaşma buradan geri açılamaz; Mülk yönetimi ekranındaki yaşam döngüsünü kullanın." };
   }
   if (outcome === "conflict") return { error: "Anlaşma aşaması başka bir işlemde değişti. Sayfayı yenileyin." };
   if (outcome === "property_required") return { error: "Kazanmak için anlaşmaya portföy bağlayın." };

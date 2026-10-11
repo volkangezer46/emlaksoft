@@ -31,6 +31,8 @@ export type HubDef = {
   icon: HubIconKey;
   /** Yan menüde üstte görünen küçük grup başlığı (ardışık aynı gruptakiler tek başlık altında). */
   group?: string;
+  /** Mobil alt çubukta (360 px, 5 yuva) sığmayan uzun etiketin kısası; yalnız alt çubukta kullanılır. */
+  short?: string;
   /** Şeritteki sıra = dizi sırası. İlk 5 sayfa görünür, kalanı "Diğer" menüsündedir. */
   pages: readonly HubPageRef[];
 };
@@ -58,7 +60,7 @@ const BUGUN: HubDef = {
   label: "Bugün",
   group: "Günlük işler",
   icon: "baslikBugun",
-  pages: [p("/app", "Ana ekran"), p("/app/randevular"), p("/app/gorevler")],
+  pages: [p("/app", "Özet"), p("/app/randevular", "Randevular"), p("/app/gorevler", "Görevler")],
 };
 
 const MUSTERILER: HubDef = {
@@ -67,48 +69,49 @@ const MUSTERILER: HubDef = {
   group: "Günlük işler",
   icon: "baslikMusteri",
   pages: [
-    p("/app/musteriler"),
-    p("/app/talepler"),
+    p("/app/musteriler", "Müşteriler"),
+    p("/app/talepler", "Talepler"),
     p("/app/gelen-kutusu", "Gelen kutusu"),
-    p("/app/akilli-listeler"),
-    p("/app/kayip-satis"),
-    p("/app/tavsiyeler"),
-    p("/app/kampanyalar"),
-    p("/app/ayarlar/etiketler"),
-    p("/app/ayarlar/mesaj-sablonlari"),
+    p("/app/akilli-listeler", "Akıllı listeler"),
+    p("/app/kayip-satis", "Riskli müşteriler"),
+    p("/app/tavsiyeler", "Tavsiyeler"),
+    p("/app/kampanyalar", "Kampanyalar"),
+    p("/app/ayarlar/etiketler", "Etiketler"),
+    p("/app/ayarlar/mesaj-sablonlari", "Şablonlar"),
   ],
 };
 
 const ILANLAR: HubDef = {
   id: "ilanlar",
-  label: "Portföy",
+  label: "Portföyler",
+  short: "Portföy",
   group: "Portföy",
   icon: "baslikPortfoy",
   pages: [
-    p("/app/portfoyler"),
-    p("/app/ilan-havuzu", "Havuz ve Atama"),
-    p("/app/ilan-kontrol"),
-    p("/app/portallar"),
-    p("/app/portfoyler/anahtarlar", "Anahtar"),
-    p("/app/portfoyler/sunumlar"),
-    p("/app/ayarlar/filigran"),
+    p("/app/portfoyler", "Portföyler"),
+    p("/app/ilan-havuzu", "Havuz ve atama"),
+    p("/app/ilan-kontrol", "İlan kontrolü"),
+    p("/app/portallar", "Portallar"),
+    p("/app/portfoyler/anahtarlar", "Anahtarlar"),
+    p("/app/portfoyler/sunumlar", "Sunumlar"),
+    p("/app/ayarlar/filigran", "Filigran"),
   ],
 };
 
 const SATIS: HubDef = {
   id: "satis-para",
-  label: "Satış",
-  group: "Finans",
+  label: "Anlaşmalar",
+  group: "Satış",
   icon: "baslikAnlasma",
-  pages: [p("/app/anlasmalar"), p("/app/teklifler"), p("/app/sozlesmeler"), p("/app/onaylar"), p("/app/ayarlar/sozlesme-sablonlari")],
+  pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/onaylar", "Onaylar"), p("/app/ayarlar/sozlesme-sablonlari", "Şablonlar")],
 };
 
 const KOMISYON: HubDef = {
   id: "komisyon",
   label: "Komisyon",
-  group: "Finans",
+  group: "Satış",
   icon: "baslikFinans",
-  pages: [p("/app/komisyon"), p("/app/cuzdan", "Kazanç")],
+  pages: [p("/app/komisyon", "Komisyon"), p("/app/cuzdan", "Kazanç")],
 };
 
 /** Muhasebe: gelir-gider, kasa/banka, düzenli ödemeler, faturalar (sayfa içi sekmeler). Kullanıcı: "muhasebe nerede?" (2026-10-12). */
@@ -122,10 +125,10 @@ const MUHASEBE: HubDef = {
 
 const KIRALAMA_AIDAT: HubDef = {
   id: "kiralama",
-  label: "Mülk Yönetimi",
+  label: "Mülk yönetimi",
   group: "Finans",
   icon: "anahtar",
-  pages: [p("/app/kiralama", "Kira takibi"), p("/app/aidat", "Aidat & site"), p("/app/kira-artis")],
+  pages: [p("/app/kiralama", "Kiralar"), p("/app/aidat", "Aidatlar"), p("/app/kira-artis", "Kira artışı")],
 };
 
 const EKIBIM: HubDef = {
@@ -135,17 +138,17 @@ const EKIBIM: HubDef = {
   icon: "ekip",
   pages: [
     p("/app/ekip", "Danışmanlar"),
-    p("/app/hedefler"),
-    p("/app/danisman-kpi", "Ekip karnesi"),
-    p("/app/pano-tv", "TV modu"),
-    p("/app/ofis-kontrol"),
-    p("/app/ekip/takimlar"),
-    p("/app/ekip/subeler"),
-    p("/app/ekip/devir"),
-    p("/app/lig"),
+    p("/app/hedefler", "Hedefler"),
+    p("/app/danisman-kpi", "Karne"),
+    p("/app/pano-tv", "TV ekranı"),
+    p("/app/ofis-kontrol", "Ofis kontrolü"),
+    p("/app/ekip/takimlar", "Takımlar"),
+    p("/app/ekip/subeler", "Şubeler"),
+    p("/app/ekip/devir", "Devir"),
+    p("/app/lig", "Lig"),
     p("/app/ekip/kiyas", "Karşılaştır"),
-    p("/app/denetim"),
-    p("/app/ofis-merkezi"),
+    p("/app/denetim", "Denetim"),
+    p("/app/ofis-merkezi", "Ofis merkezi"),
   ],
 };
 
@@ -155,14 +158,14 @@ const RAPORLAR: HubDef = {
   group: "Yönetim",
   icon: "baslikPerformans",
   pages: [
-    p("/app/raporlar", "Ofis"),
-    p("/app/bolge-analizi"),
-    p("/app/raporlar/talep-arz"),
-    p("/app/raporlar/memnuniyet"),
-    p("/app/raporlar/kar-zarar"),
-    p("/app/anketler"),
-    p("/app/raporlar/lead-hizi"),
-    p("/app/franchise"),
+    p("/app/raporlar", "Genel"),
+    p("/app/bolge-analizi", "Bölge"),
+    p("/app/raporlar/talep-arz", "Talep ve arz"),
+    p("/app/raporlar/memnuniyet", "Memnuniyet"),
+    p("/app/raporlar/kar-zarar", "Kâr-zarar"),
+    p("/app/anketler", "Anketler"),
+    p("/app/raporlar/lead-hizi", "Yanıt hızı"),
+    p("/app/franchise", "Franchise"),
   ],
 };
 
@@ -170,26 +173,27 @@ const RAPORLAR: HubDef = {
 
 const SATIS_DANISMAN: HubDef = {
   id: "satis",
-  label: "Satış",
-  group: "Finans",
+  label: "Anlaşmalar",
+  group: "Satış",
   icon: "baslikAnlasma",
-  pages: [p("/app/anlasmalar"), p("/app/teklifler"), p("/app/onaylar"), p("/app/sozlesmeler"), p("/app/kiralama")],
+  pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/onaylar", "Onaylar"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/kiralama", "Kiralar")],
 };
 
 const KOMISYONUM: HubDef = {
   id: "komisyon",
   label: "Komisyonum",
-  group: "Finans",
+  group: "Satış",
   icon: "baslikFinans",
   pages: [p("/app/komisyon", "Komisyonum"), p("/app/cuzdan", "Kazanç")],
 };
 
 const BEN: HubDef = {
   id: "ben",
-  label: "Ben",
-  group: "Ben",
+  label: "Performansım",
+  short: "Ben",
+  group: "Kişisel",
   icon: "rozet",
-  pages: [p("/app/performansim"), p("/app/hedefler", "Hedefim", true), p("/app/hesabim", "Profilim")],
+  pages: [p("/app/performansim", "Performansım"), p("/app/hedefler", "Hedefim", true), p("/app/hesabim", "Profilim")],
 };
 
 /* ------------------------------- Muhasebe / çağrı / salt okunur ------------------------------- */
@@ -198,9 +202,9 @@ const ABONELIK_SATIRI: HubDef = { id: "abonelik", label: "Abonelik", icon: "abon
 const GELEN_KUTUSU: HubDef = { id: "gelen-kutusu", label: "Gelen kutusu", icon: "gelenKutusu", pages: [p("/app/gelen-kutusu", "Gelen kutusu")] };
 const RANDEVU_GOREV: HubDef = {
   id: "randevu-gorev",
-  label: "Randevu ve Görev",
+  label: "Randevular",
   icon: "randevu",
-  pages: [p("/app/randevular"), p("/app/gorevler")],
+  pages: [p("/app/randevular", "Randevular"), p("/app/gorevler", "Görevler")],
 };
 
 /* ------------------------------- Alt sabit merkezler ------------------------------- */
@@ -211,21 +215,21 @@ const AYARLAR: HubDef = {
   icon: "ayar",
   pages: [
     p("/app/ayarlar", "Genel"),
-    p("/app/ayarlar/roller"),
-    p("/app/ayarlar/yetkilendirme"),
-    p("/app/ayarlar/moduller"),
-    p("/app/ayarlar/ozel-alanlar"),
-    p("/app/ayarlar/api-webhook"),
-    p("/app/otomasyonlar"),
-    p("/app/ayarlar/is-akislari"),
-    p("/app/uyum"),
-    p("/app/belgeler"),
-    p("/app/ayarlar/ai-kullanim"),
-    p("/app/ayarlar/sahiplik-devri"),
+    p("/app/ayarlar/roller", "Roller"),
+    p("/app/ayarlar/yetkilendirme", "Yetkiler"),
+    p("/app/ayarlar/moduller", "Modüller"),
+    p("/app/ayarlar/ozel-alanlar", "Özel alanlar"),
+    p("/app/ayarlar/api-webhook", "API"),
+    p("/app/otomasyonlar", "Otomasyonlar"),
+    p("/app/ayarlar/is-akislari", "İş akışları"),
+    p("/app/uyum", "Uyum"),
+    p("/app/belgeler", "Belgeler"),
+    p("/app/ayarlar/ai-kullanim", "AI kullanımı"),
+    p("/app/ayarlar/sahiplik-devri", "Sahiplik devri"),
   ],
 };
 const ABONELIK: HubDef = { id: "abonelik", label: "Abonelik", icon: "abonelik", pages: [p("/app/abonelik")] };
-const YARDIM: HubDef = { id: "yardim", label: "Yardım", icon: "destek", pages: [p("/app/yardim"), p("/app/destek")] };
+const YARDIM: HubDef = { id: "yardim", label: "Yardım", icon: "destek", pages: [p("/app/yardim", "Yardım"), p("/app/destek", "Destek")] };
 
 /* ------------------------------- Araçlar ------------------------------- */
 
@@ -245,7 +249,7 @@ const TOOLS_COMMON = [
 /** Yönetim: havuz ve atama ofisin günlük iş akışının merkezi — kendi menü satırı (kullanıcı kararı 2026-10-11). */
 const HAVUZ_ATAMA: HubDef = {
   id: "havuz",
-  label: "Havuz ve Atama",
+  label: "Havuz ve atama",
   group: "Portföy",
   icon: "ilanHavuzu",
   pages: [p("/app/ilan-havuzu", "Bekleyen ilanlar")],
@@ -270,7 +274,7 @@ const ADVISOR: RoleNav = {
 };
 
 const ACCOUNTING: RoleNav = {
-  hubs: [BUGUN, MUHASEBE, KOMISYON, KIRALAMA_AIDAT, RAPORLAR, ABONELIK_SATIRI],
+  hubs: [BUGUN, KOMISYON, MUHASEBE, KIRALAMA_AIDAT, RAPORLAR, ABONELIK_SATIRI],
   dock: [YARDIM],
   tools: TOOLS_COMMON,
   mobile: ["bugun", "muhasebe", "raporlar", "menu"],
@@ -292,7 +296,7 @@ const READONLY: RoleNav = {
   hubs: [
     BUGUN,
     { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler")] },
-    { id: "ilanlar", label: "İlanlar", icon: "baslikPortfoy", pages: [p("/app/portfoyler")] },
+    { id: "ilanlar", label: "Portföyler", icon: "baslikPortfoy", pages: [p("/app/portfoyler", "Portföyler")] },
     RAPORLAR,
   ],
   dock: [YARDIM],

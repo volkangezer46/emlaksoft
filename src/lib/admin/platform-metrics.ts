@@ -21,7 +21,7 @@ const MONTHS_SHORT = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", 
 export const ADOPTION_MODULES = [
   ["customers", "Müşteriler"], ["demands", "Talepler"], ["properties", "Portföyler"],
   ["deals", "Anlaşmalar"], ["tasks", "Görevler"], ["appointments", "Randevular"],
-  ["commissions", "Komisyon"], ["contracts", "Sözleşmeler"], ["rentals", "Mülk Yönetimi"],
+  ["commissions", "Komisyon"], ["contracts", "Sözleşmeler"], ["rentals", "Mülk yönetimi"],
   ["campaigns", "Kampanyalar"], ["automations", "Otomasyon"], ["valuations", "Değerleme"],
   ["projects", "Projeler"], ["network", "Ofis ağı"],
 ] as const;

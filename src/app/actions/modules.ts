@@ -126,7 +126,7 @@ export async function setModuleEnabled(moduleKey: string, enabled: boolean, casc
 }
 
 /**
- * Kurulum sihirbazı "Mülk yönetimi yapıyor musunuz?" sorusu: Mülk Yönetimi (rentals) modülünü açar/kapatır ve cevabı
+ * Kurulum sihirbazı "Mülk yönetimi yapıyor musunuz?" sorusu: Mülk yönetimi (rentals) modülünü açar/kapatır ve cevabı
  * HER DURUMDA satır olarak kaydeder (zaten açıkken bile; böylece adım "yanıtlandı" sayılır). Kapatınca bağlı modüller de
  * kapanır, veriler silinmez. Sonradan Ayarlar > Modüller ekranından değiştirilebilir.
  */

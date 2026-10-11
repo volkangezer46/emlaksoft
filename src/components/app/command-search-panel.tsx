@@ -252,7 +252,7 @@ export function CommandSearchPanel({
     };
   }, [runSearch]);
 
-  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Havuz ve Atama), sonra eşleşen eylemler ve
+  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Havuz ve atama), sonra eşleşen eylemler ve
   // sayfalar. Eşleşme yoksa liste boş kalır ve "AI Asistan'a sor" satırı görünür.
   const pageRows = useMemo<PaletteEntry[]>(() => {
     if (q.trim().length < 2) return [];

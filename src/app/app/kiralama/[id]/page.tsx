@@ -161,7 +161,7 @@ export default async function KiraDetayPage({
         href="/app/kiralama"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-text-muted transition hover:text-brand-600"
       >
-        <ArrowLeft className="h-4 w-4" /> Mülk Yönetimi
+        <ArrowLeft className="h-4 w-4" /> Mülk yönetimi
       </Link>
 
       {/* Hero — kira künyesi */}

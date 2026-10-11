@@ -35,7 +35,7 @@ export const TERMS = {
     definition: "Müşteri ile ofis arasındaki satış/kiralama süreci. 'Fırsat' kullanıcıya görünmez.",
   },
   mulkYonetimi: {
-    canonical: "Mülk Yönetimi",
+    canonical: "Mülk yönetimi",
     definition:
       "Kiracı ve mülk sahibi adına kira/aidat takibi modülü (/app/kiralama: kira takibi, aidat & site, mülk sahibine ödeme, kira artışı). " +
       "Kullanıcı metninde modül için 'Kiralama' yazılmaz; anlaşma türü 'Kiralık' (Satış / Kiralık) diye anılır.",

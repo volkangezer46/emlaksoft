@@ -129,7 +129,7 @@ export const TARGET_LABEL: Record<ImportTarget, string> = {
   tasks: "Görevler",
   appointments: "Randevular",
   expenses: "Giderler",
-  rentals: "Mülk Yönetimi",
+  rentals: "Mülk yönetimi",
 };
 
 // ---------------------------------------------------------------------------

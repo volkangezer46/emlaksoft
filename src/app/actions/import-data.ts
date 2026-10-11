@@ -876,11 +876,11 @@ async function runRentalChunk(
         if (error) {
           if (error.code === "PGRST202" || error.code === "42883") rpcMissing = true;
           console.error("import_rental_with_deal", error.code);
-          return fail(p, rpcMissing ? "Kira içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Mülk Yönetimi ekranından ekleyin.");
+          return fail(p, rpcMissing ? "Kira içe aktarma henüz etkin değil (veritabanı güncellemesi bekleniyor)." : "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Mülk yönetimi ekranından ekleyin.");
         }
         const res = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
         if (res?.outcome !== "created" || typeof res.rental_id !== "string") {
-          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Mülk Yönetimi ekranından ekleyin.");
+          return fail(p, RENTAL_OUTCOME_MESSAGE[String(res?.outcome ?? "")] ?? "Kira kaydı yazılamadı; satırı düzeltip yeniden aktarın ya da Mülk yönetimi ekranından ekleyin.");
         }
         createdRentalIds.push(res.rental_id);
       }),

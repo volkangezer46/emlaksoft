@@ -40,7 +40,7 @@ export async function KiralamaProje({ ctx }: { ctx: HomeCtx }) {
               <KeyRound className="h-4 w-4" /> Mülk yönetimi
             </p>
             <Link href="/app/kiralama" className="text-xs font-semibold text-brand-600 hover:underline">
-              Mülk Yönetimi →
+              Mülk yönetimi →
             </Link>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">

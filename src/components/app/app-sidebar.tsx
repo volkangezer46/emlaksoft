@@ -469,7 +469,7 @@ export function AppSidebar({
                 <span className={`grid h-7 w-11 place-items-center rounded-full transition ${isActive ? "bg-brand-600/12" : ""}`}>
                   <hub.icon className="h-[18px] w-[18px]" aria-hidden />
                 </span>
-                {hub.label}
+                {hub.short ?? hub.label}
               </Link>
             );
           })}

@@ -15,7 +15,7 @@ import { checkRentalExtension } from "@/lib/workflow-rules";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
- * Mülk Yönetimi (kiralama) server action'ları.
+ * Mülk yönetimi (kiralama) server action'ları.
  *
  * Kiracı = mevcut `customers` kaydı — yeni kişi tablosu yok. Kira kaydı
  * açılırken müşteri 'Kiracı' tip etiketiyle işaretlenir (customer_types

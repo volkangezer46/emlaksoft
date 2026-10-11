@@ -124,7 +124,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "customers",
         tabs: [
           { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
-          { href: "/app/akilli-listeler", label: "Akıllı Listeler", icon: ICONS.akilliListe, module: "customers", description: "Kimi aramalıyım? Risk, sıcak ve sessiz müşteri grupları", keywords: ["segment", "churn", "sıcak"] },
+          { href: "/app/akilli-listeler", label: "Akıllı listeler", icon: ICONS.akilliListe, module: "customers", description: "Kimi aramalıyım? Risk, sıcak ve sessiz müşteri grupları", keywords: ["segment", "churn", "sıcak"] },
           { href: "/app/kayip-satis", label: "Riskli müşteriler", icon: ICONS.dusus, module: "customers", description: "Kaybedilme riski taşıyan müşteriler ve kayıp nedenleri", keywords: ["kayıp", "risk", "churn", "neden"] },
           { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", description: "Müşteri tavsiye bağlantıları ve referans zinciri", keywords: ["referans", "tavsiye"] },
           // Modül ayarı modülün içinde (yol sabit; aynı sayfa Ayarlar dizininden de açılır — tek form, iki giriş).
@@ -147,7 +147,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       // İkinci sekme "Çağrı kaydı" (eski /app/arama, yönlendirir): iki sekme de `calls` modülünde.
       {
         href: "/app/gelen-kutusu",
-        label: "Gelen Kutusu",
+        label: "Gelen kutusu",
         icon: ICONS.gelenKutusu,
         module: "calls",
         description: "WhatsApp, SMS, form başvuruları ve çağrı kaydı",
@@ -171,9 +171,9 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "properties",
         tabs: [
           { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
-          { href: "/app/portfoyler/anahtarlar", label: "Anahtar Takibi", icon: ICONS.anahtarTakip, module: "properties", description: "Anahtar kimde, ne zaman teslim edildi", keywords: ["anahtar", "teslim"] },
+          { href: "/app/portfoyler/anahtarlar", label: "Anahtar takibi", icon: ICONS.anahtarTakip, module: "properties", description: "Anahtar kimde, ne zaman teslim edildi", keywords: ["anahtar", "teslim"] },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", description: "Müşteriye gönderilecek portföy sunumları", keywords: ["sunum", "paylaşım", "pdf"] },
-          { href: "/app/ilan-havuzu", label: "Havuz ve Atama", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama", "ata", "ilan ata", "dağıt", "uzmanlık"] },
+          { href: "/app/ilan-havuzu", label: "Havuz ve atama", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama", "ata", "ilan ata", "dağıt", "uzmanlık"] },
           { href: "/app/ayarlar/filigran", label: "Filigran", icon: ICONS.portfoy, module: "settings", description: "İlan fotoğraflarına otomatik ofis filigranı", keywords: ["filigran", "logo", "fotoğraf", "ayar"] },
         ],
         description: "İlan ve portföy kayıtları, anahtar, sunum ve havuz",
@@ -183,12 +183,12 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       // İlan Kontrol Merkezi: kayıp/kaçak ve portal doğrulama özeti (modül `portals`; yeni izin modülü yok).
       {
         href: "/app/ilan-kontrol",
-        label: "İlan Kontrol",
+        label: "İlan kontrolü",
         icon: ICONS.ilanKontrol,
         module: "portals",
         // Portal ilanları (teyit/yenileme/kapanış kaydı) İlan Kontrol'ün sekmesidir; aynı `portals` modülü, yol sabit.
         tabs: [
-          { href: "/app/ilan-kontrol", label: "İlan Kontrol", icon: ICONS.ilanKontrol, module: "portals" },
+          { href: "/app/ilan-kontrol", label: "İlan kontrolü", icon: ICONS.ilanKontrol, module: "portals" },
           { href: "/app/portallar", label: "Portal ilanları", icon: ICONS.portal, module: "portals", description: "Portal ilanlarının teyit, yenileme ve kapanış kaydı", keywords: ["sahibinden", "hepsiemlak", "emlakjet", "portal", "teyit"] },
         ],
         description: "Portal yayın takibi, kayıp ve kaçak uyarıları, kapanış kayıpları",
@@ -198,14 +198,14 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/kiralama",
-        label: "Mülk Yönetimi",
+        label: "Mülk yönetimi",
         icon: ICONS.anahtar,
         module: "rentals",
         // Kira artışı izin modülü `valuation` (kiralama `rentals`): sekme kendi modülüyle gizlenir/gösterilir.
         tabs: [
           { href: "/app/kiralama", label: "Kira takibi", icon: ICONS.anahtar, module: "rentals" },
           { href: "/app/kira-artis", label: "Kira artışı", icon: ICONS.oran, module: "valuation", description: "TÜFE'ye göre yasal kira artışı hesabı", keywords: ["tüfe", "zam", "artış"] },
-          // Aidat ayrı menü öğesi değildir: yönettiğiniz kiralık daire/sitelerin aidatı Mülk Yönetimi sekmesidir (yol sabit; kendi modülü expenses).
+          // Aidat ayrı menü öğesi değildir: yönettiğiniz kiralık daire/sitelerin aidatı Mülk yönetimi sekmesidir (yol sabit; kendi modülü expenses).
           { href: "/app/aidat", label: "Aidat & site", icon: ICONS.aidat, module: "expenses", description: "Yönettiğiniz kiralık dairelerin ve sitelerin aidatlarını, tahsilatlarını ve borçlarını takip edin", keywords: ["aidat", "ortak gider", "apartman", "site", "bina", "daire cari", "borç"] },
         ],
         description: "Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri",
@@ -221,7 +221,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/acik-ev",
-        label: "Açık Ev",
+        label: "Açık ev",
         icon: ICONS.acikEv,
         module: "open_house",
         description: "Açık ev etkinlikleri ve QR ile ziyaretçi kaydı",
@@ -229,7 +229,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/ag",
-        label: "Ofis Ağı",
+        label: "Ofis ağı",
         icon: ICONS.ag,
         module: "network",
         description: "Başka ofislerle ilan ve talep paylaşımı, ortak satış",
@@ -401,11 +401,11 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/asistan",
-        label: "AI Asistan",
+        label: "AI asistan",
         icon: ICONS.ai,
         module: "dashboard",
         tabs: [
-          { href: "/app/asistan", label: "AI Asistan", icon: ICONS.ai, module: "dashboard" },
+          { href: "/app/asistan", label: "AI asistan", icon: ICONS.ai, module: "dashboard" },
           { href: "/app/ayarlar/ai-kullanim", label: "AI kullanımı", icon: ICONS.ai, module: "settings", description: "Aylık AI kredisi, kalan hak ve kişi bazında kullanım", keywords: ["kredi", "kota", "ai", "ayar"] },
         ],
         description: "Ofis verinizle sohbet eden yardımcı",
@@ -421,7 +421,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/yabanci-satis",
-        label: "Yabancıya Satış",
+        label: "Yabancıya satış",
         icon: ICONS.yabanciSatis,
         module: "properties",
         description: "Yabancı alıcı için belge ve süreç kontrol listesi",
@@ -439,7 +439,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         // Ekip Merkezi: tek kabuk, mevcut sayfalar sekme olarak yeniden kullanılır
         // (Hedefler eskiden Performans başlığındaydı; yolu değişmedi).
         href: "/app/ekip",
-        label: "Ekip Merkezi",
+        label: "Ekip merkezi",
         icon: ICONS.ekip,
         module: "team",
         tabs: [
@@ -526,7 +526,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/belgeler",
-        label: "Belge Merkezi",
+        label: "Belge merkezi",
         icon: ICONS.belge,
         module: "settings",
         description: "Ofis belgeleri, evrak linkleri ve şablonlar",
@@ -540,7 +540,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "settings",
         tabs: [
           { href: "/app/denetim", label: "Denetim kaydı", icon: ICONS.denetim, module: "settings" },
-          { href: "/app/ofis-kontrol", label: "Ofis Kontrol", icon: ICONS.denetim, module: "team", description: "Danışman işlem akışı, uyarılar ve onay kuralları", keywords: ["kontrol", "uyarı", "kural"] },
+          { href: "/app/ofis-kontrol", label: "Ofis kontrolü", icon: ICONS.denetim, module: "team", description: "Danışman işlem akışı, uyarılar ve onay kuralları", keywords: ["kontrol", "uyarı", "kural"] },
         ],
         description: "Kim ne zaman neyi değiştirdi; Ofis Kontrol Merkezi",
         keywords: ["audit", "log", "kayıt", "izleme", "geçmiş"],
@@ -760,6 +760,8 @@ export type NavHub = {
   icon: NavIcon;
   /** Yan menü grup başlığı (isteğe bağlı). */
   group?: string;
+  /** Mobil alt çubukta kullanılan kısa ad (isteğe bağlı). */
+  short?: string;
   /** Merkezin girişi: ilk görünen sayfası. */
   href: string;
   /** Görünen sayfalar (yetki + kapalı modül süzgeci uygulanmış); merkezin TEK sekme şeridi bunlardır. */
@@ -803,7 +805,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
   });
   const first = pages[0];
   if (!first) return null;
-  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.group ? { group: def.group } : {}), href: first.href, pages };
+  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.short ? { short: def.short } : {}), ...(def.group ? { group: def.group } : {}), href: first.href, pages };
 }
 
 /**

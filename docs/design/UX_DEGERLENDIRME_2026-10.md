@@ -44,13 +44,13 @@ Kaynak: ürün sorgulayıcı ajan (salt-okunur kod incelemesi). Kullanıcı şik
 - Ana ekran tepesinde "Ne yapmak istiyorsun?" kutusu → mevcut palet (`OPEN_PALETTE_EVENT`, palette-core `getAppGoItems`/`getAppActions`), örnek çipler; niyet sözcük tablosu ("ata", "havuz", "demo sil", "tv"…); eşleşme yoksa AI Asistan (`/app/asistan?q=`).
 - Altında yalnız "Bugün" (Dikkat/Sıradaki eylem ≤5) + rol bazlı 3-4 büyük kısayol. Sahip için kapsam varsayılanı "Ofis geneli". KPI/gelir/ekip/huni "Ofis özeti" arkasına.
 - Yeni menü (yollar sabit):
-  - Sahip (6): Bugün · Müşteriler · İlanlar (Portföyler, **Havuz ve Atama**, İlan Kontrol, Portal ilanları, Anahtar, Sunumlar…) · Satış ve Para (Anlaşmalar, Teklifler, Sözleşmeler, Komisyon, Kazanç, Onaylar, Finans, Kiralama) · Ekibim (Danışmanlar, Hedefler, Takım/Şube, Devir, Ekip karnesi, TV modu, Ofis Kontrol) · Raporlar. Alt sabit: Ayarlar, Abonelik, Yardım, Menüyü düzenle. Araçlar (Değerleme, Hesaplayıcı, AI Asistan…) palet + "Araçlar" kartı.
+  - Sahip (6): Bugün · Müşteriler · İlanlar (Portföyler, **Havuz ve atama**, İlan Kontrol, Portal ilanları, Anahtar, Sunumlar…) · Satış ve Para (Anlaşmalar, Teklifler, Sözleşmeler, Komisyon, Kazanç, Onaylar, Finans, Kiralama) · Ekibim (Danışmanlar, Hedefler, Takım/Şube, Devir, Ekip karnesi, TV modu, Ofis Kontrol) · Raporlar. Alt sabit: Ayarlar, Abonelik, Yardım, Menüyü düzenle. Araçlar (Değerleme, Hesaplayıcı, AI Asistan…) palet + "Araçlar" kartı.
   - Danışman (5): Bugün · Müşteriler · İlanlar · Satış (Anlaşmalar, Teklifler, Komisyonum, Kazanç) · Ben (Performansım, Hedefim, Profilim).
-  - Muhasebe (4): Bugün · Para · Raporlar · Abonelik. Çağrı (4): Bugün · Gelen kutusu · Müşteriler · Randevu ve Görev.
+  - Muhasebe (4): Bugün · Para · Raporlar · Abonelik. Çağrı (4): Bugün · Gelen kutusu · Müşteriler · Randevular.
 - Mobil alt çubuk rol bazlı, ≤5: Sahip Bugün | Müşteriler | + Yeni | İlanlar | Menü; Danışman Bugün | Müşteriler | + Yeni | İlanlar | Ben.
 
 ## 6. Öncelikli uygulama listesi
-1. Havuz görünür: "İlanlar > Havuz ve Atama", ana ekranda "Atanmamış ilan N" kartı, palette "havuz/ata".
+1. Havuz görünür: "İlanlar > Havuz ve atama", ana ekranda "Atanmamış ilan N" kartı, palette "havuz/ata".
 2. Sahip kapsamı varsayılan ofis geneli; "Bugün" dönemi; "Bugün ofiste olanlar" kartı.
 3. Hero'da "Ne yapmak istiyorsun?" kutusu + rol bazlı kısayollar.
 4. Menü 6/5/4 satır (NAV_SECTIONS, nav-roles NAV_BUDGET/NAV_CORE_BY_ROLE, nav-budget-contract, app-sidebar).

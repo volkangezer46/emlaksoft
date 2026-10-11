@@ -406,7 +406,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Anlaşma kapanış sihirbazı",
     intro: "Anlaşmanın kazanıldığını Kapanış sekmesindeki sihirbaz kaydeder; komisyon buradan doğar.",
     steps: [
-      "Anlaşmalar sayfasında anlaşmayı açın ve Kapanış sekmesine geçin. Portföy ve müşteri bağlı, nihai tutar girilmiş olmalıdır; hazırlık listesi eksikleri gösterir. Kiralık anlaşma kapanışı Mülk Yönetimi ekranından yapılır.",
+      "Anlaşmalar sayfasında anlaşmayı açın ve Kapanış sekmesine geçin. Portföy ve müşteri bağlı, nihai tutar girilmiş olmalıdır; hazırlık listesi eksikleri gösterir. Kiralık anlaşma kapanışı Mülk yönetimi ekranından yapılır.",
       "Kazanıldı sihirbazı yedi adımdır: Tutar, Kazanıldı, Paylar, Vade, Belgeler, Anket, Bitiş.",
       "Paylar adımında danışman ve ofis payı belirlenir; varsayılan pay 50/50'dir. Komisyon oranı portföyde boşsa %3, KDV %20 alınır.",
       "Vade adımında tahsilat vadesi, Belgeler adımında kapanış evrakları, Anket adımında müşteri anketi ayarlanır.",
@@ -449,7 +449,7 @@ export const GUIDES: readonly Guide[] = [
     steps: [
       "Finans bölümünden Giderler sayfasını açın ve gider ekleyin.",
       "Kategori dağılımı grafiği ve tablo giderlerinizi özetler.",
-      "Mülk Yönetimi sayfasındaki \"Aidat & site\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
+      "Mülk yönetimi sayfasındaki \"Aidat & site\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
       "İki sayfa da paketinize bağlıdır; kilitliyse Abonelik sayfası hangi pakette açıldığını söyler.",
       "Muhasebe rolü bu sayfaları varsayılan olarak görmez; ofis sahibi Ayarlar > Roller'den expenses iznini vermelidir.",
     ],

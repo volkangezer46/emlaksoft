@@ -12,7 +12,7 @@ export const LEDGER_TX_TYPES = ["sale", "rental", "deposit", "commission", "serv
 export type LedgerTxType = (typeof LEDGER_TX_TYPES)[number];
 export const LEDGER_TX_LABELS: Record<LedgerTxType, string> = {
   sale: "Satış",
-  rental: "Mülk Yönetimi",
+  rental: "Mülk yönetimi",
   deposit: "Kapora / depozito",
   commission: "Komisyon",
   service_fee: "Hizmet bedeli",

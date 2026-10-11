@@ -58,7 +58,7 @@ import {
   type YonetimFilter,
 } from "./rental-list-logic";
 
-export const metadata = { title: "Mülk Yönetimi" };
+export const metadata = { title: "Mülk yönetimi" };
 
 const PATH = "/app/kiralama";
 
@@ -365,7 +365,7 @@ export default async function KiralamaPage({
     <ListPage>
       <ListHero
         art="kiralama"
-        title="Mülk Yönetimi"
+        title="Mülk yönetimi"
         eyebrow="Kira takibi"
         description="Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri."
         actions={

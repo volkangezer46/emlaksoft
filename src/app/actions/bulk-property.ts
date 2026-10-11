@@ -30,7 +30,7 @@ export async function bulkUpdatePropertyStatus(
   if (!ids.length) return { error: "Güncellenecek portföy seçilmedi." };
   if (ids.length > 50) return { error: "Tek seferde en fazla 50 portföy güncellenebilir." };
   if (!(MANUAL_STATUSES as readonly string[]).includes(newStatus)) {
-    return { error: "Satıldı/kiralandı durumları yalnız anlaşma ve Mülk Yönetimi akışından seçilebilir." };
+    return { error: "Satıldı/kiralandı durumları yalnız anlaşma ve Mülk yönetimi akışından seçilebilir." };
   }
   let uniqueIds = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
   if (!uniqueIds.length) return { error: "Güncellenecek portföy seçilmedi." };
@@ -79,7 +79,7 @@ export async function bulkUpdatePropertyStatus(
   const result = data as { outcome?: string; updated_count?: number } | null;
   if (result?.outcome === "not_found") return { error: "Seçilen portföylerden biri bulunamadı." };
   if (result?.outcome === "terminal_requires_workflow") {
-    return { error: "Satılmış veya kiralanmış portföy yalnız ilgili anlaşma/Mülk Yönetimi iş akışından yeniden açılabilir." };
+    return { error: "Satılmış veya kiralanmış portföy yalnız ilgili anlaşma/Mülk yönetimi iş akışından yeniden açılabilir." };
   }
   if (result?.outcome !== "applied" && result?.outcome !== "replay") return { error: actionErrorMessage(null, "Güncelleme başarısız.") };
 

@@ -208,12 +208,12 @@ describe("Ekip Merkezi menü ve kapılar", () => {
 
   it("ekip modülü olmayan rolde (danışman) Ekip Merkezi çıkmaz, yerine Performansım vardır", () => {
     const items = visibleSections(["dashboard", "reports", "commissions"]).flatMap((s) => s.items);
-    expect(items.some((i) => i.label === "Ekip Merkezi")).toBe(false);
+    expect(items.some((i) => i.label === "Ekip merkezi")).toBe(false);
     expect(items.some((i) => i.href === "/app/performansim" && i.label === "Performansım")).toBe(true);
   });
 
   it("yetkisiz sekme gizlenir: ekip modülü olan ama hedef izni olmayan rolde Hedefler çıkmaz", () => {
-    const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip Merkezi")!;
+    const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip merkezi")!;
     expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Devir / Atama", "Şubeler", "Takımlar"]);
   });
 

@@ -158,7 +158,7 @@ type PaletteIntent = {
 export const PALETTE_INTENTS: readonly PaletteIntent[] = [
   {
     id: "havuz",
-    label: "Havuz ve Atama",
+    label: "Havuz ve atama",
     description: "Atanmamış ilanları danışmanlara dağıt",
     href: "/app/ilan-havuzu",
     icon: ICONS.ilanHavuzu,

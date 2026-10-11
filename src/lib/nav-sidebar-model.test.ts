@@ -16,7 +16,7 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
   it("ofis sahibi / genel müdür / şube müdürü: 10 açık satır", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) {
       // Şube müdürünün muhasebe (expenses) yetkisi yok: Muhasebe satırı onun düzeninde yer almaz.
-      const want = ["Bugün", "Müşteriler", "Portföy", "Havuz ve Atama", "Satış", "Komisyon", "Muhasebe", "Mülk Yönetimi", "Ekibim", "Raporlar"].filter((l) => role !== "branch_manager" || l !== "Muhasebe");
+      const want = ["Bugün", "Müşteriler", "Portföyler", "Havuz ve atama", "Anlaşmalar", "Komisyon", "Muhasebe", "Mülk yönetimi", "Ekibim", "Raporlar"].filter((l) => role !== "branch_manager" || l !== "Muhasebe");
       expect(labels(role), role).toEqual(want);
       // Alt sabit satırlar rolün varsayılan yetkisine göre süzülür (şube müdüründe ayar/abonelik izni yoktur).
       const dock = hubNav(accessibleOf(role), { role }).dock.map((h) => h.label);
@@ -25,8 +25,8 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     }
   });
 
-  it("danışman / takım lideri: 6 satır (Bugün, Müşteriler, Portföy, Satış, Komisyonum, Ben)", () => {
-    for (const role of ["advisor", "team_lead"] as const) expect(labels(role), role).toEqual(["Bugün", "Müşteriler", "Portföy", "Satış", "Komisyonum", "Ben"]);
+  it("danışman / takım lideri: 6 satır (Bugün, Müşteriler, Portföyler, Anlaşmalar, Komisyonum, Performansım)", () => {
+    for (const role of ["advisor", "team_lead"] as const) expect(labels(role), role).toEqual(["Bugün", "Müşteriler", "Portföyler", "Anlaşmalar", "Komisyonum", "Performansım"]);
     // Danışman kendi komisyonunu ayrı "Komisyonum" satırında görür.
     expect(pagesOf("advisor", "satis").map((p) => p.label)).toEqual(expect.arrayContaining(["Anlaşmalar"]));
     expect(pagesOf("advisor", "komisyon").map((p) => p.label)).toEqual(expect.arrayContaining(["Komisyonum", "Kazanç"]));
@@ -35,28 +35,28 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(hubNav([...accessibleOf("advisor"), "targets"], { role: "advisor" }).hubs.find((h) => h.id === "ben")!.pages.map((p) => p.label)).toEqual(["Performansım", "Hedefim", "Profilim"]);
   });
 
-  it("Mülk Yönetimi: sayfa etiketi 'Kira takibi'; rentals modülü kapalıysa satır hiç görünmez", () => {
-    expect(pagesOf("owner", "kiralama").map((p) => p.label)).toContain("Kira takibi");
+  it("Mülk yönetimi: sayfa etiketi 'Kiralar'; rentals modülü kapalıysa satır hiç görünmez", () => {
+    expect(pagesOf("owner", "kiralama").map((p) => p.label)).toContain("Kiralar");
     const closedNav = hubNav(accessibleOf("owner"), { role: "owner", closed: ["rentals"] });
-    expect(closedNav.hubs.some((h) => h.label === "Mülk Yönetimi" && h.pages.some((p) => p.href === "/app/kiralama"))).toBe(false);
+    expect(closedNav.hubs.some((h) => h.label === "Mülk yönetimi" && h.pages.some((p) => p.href === "/app/kiralama"))).toBe(false);
   });
 
   it("muhasebe 4 satır, çağrı merkezi 4 satır", () => {
-    expect(labels("accounting")).toEqual(["Bugün", "Muhasebe", "Komisyon", "Mülk Yönetimi", "Raporlar", "Abonelik"]);
-    expect(labels("call_center")).toEqual(["Bugün", "Gelen kutusu", "Müşteriler", "Randevu ve Görev"]);
+    expect(labels("accounting")).toEqual(["Bugün", "Komisyon", "Muhasebe", "Mülk yönetimi", "Raporlar", "Abonelik"]);
+    expect(labels("call_center")).toEqual(["Bugün", "Gelen kutusu", "Müşteriler", "Randevular"]);
     expect(pagesOf("accounting", "muhasebe").map((p) => p.label)).toContain("Gelir ve gider");
   });
 
-  it("bulunabilirlik: Havuz ve Atama kendi satırında, Muhasebe kendi satırında, TV modu ve Ekip karnesi Ekibim'de", () => {
+  it("bulunabilirlik: Havuz ve atama kendi satırında, Muhasebe kendi satırında, TV modu ve Ekip karnesi Ekibim'de", () => {
     const o = (id: string) => pagesOf("owner", id);
     expect(o("ilanlar").map((p) => [p.href, p.label])).toEqual(
-      expect.arrayContaining([["/app/ilan-kontrol", "İlan Kontrol"], ["/app/portallar", "Portal ilanları"]]),
+      expect.arrayContaining([["/app/ilan-kontrol", "İlan kontrolü"], ["/app/portallar", "Portallar"]]),
     );
     expect(o("muhasebe").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/giderler", "Gelir ve gider"]]));
     expect(o("kiralama").map((p) => p.href)).toEqual(expect.arrayContaining(["/app/kiralama", "/app/aidat"]));
     expect(o("komisyon").map((p) => [p.href, p.label])).toEqual(expect.arrayContaining([["/app/cuzdan", "Kazanç"]]));
     expect(o("ekibim").map((p) => [p.href, p.label])).toEqual(
-      expect.arrayContaining([["/app/pano-tv", "TV modu"], ["/app/danisman-kpi", "Ekip karnesi"], ["/app/ekip", "Danışmanlar"], ["/app/ofis-kontrol", "Ofis Kontrol"]]),
+      expect.arrayContaining([["/app/pano-tv", "TV ekranı"], ["/app/danisman-kpi", "Karne"], ["/app/ekip", "Danışmanlar"], ["/app/ofis-kontrol", "Ofis kontrolü"]]),
     );
   });
 

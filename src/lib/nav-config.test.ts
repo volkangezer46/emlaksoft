@@ -147,7 +147,7 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     expect(tabLabels["/app/ayarlar/mesaj-sablonlari"]).toBe("Mesaj şablonları");
     expect(tabLabels["/app/ayarlar/ai-kullanim"]).toBe("AI kullanımı");
     for (const [href, label] of Object.entries(tabLabels)) if (href !== "/app/ayarlar") expect(label, href).not.toBe("Ayarlar");
-    expect(tabLabels["/app/ilan-havuzu"]).toBe("Havuz ve Atama");
+    expect(tabLabels["/app/ilan-havuzu"]).toBe("Havuz ve atama");
   });
   it("'tv' arama sözcüğü Ekip karnesi'nde değil; TV modu palet sayfasıdır (/app/pano-tv)", () => {
     const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Ekip karnesi")!;

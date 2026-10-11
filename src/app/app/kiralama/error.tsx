@@ -3,5 +3,5 @@
 import { RouteError, type RouteErrorBoundaryProps } from "@/components/ui/route-error";
 
 export default function KiralamaError(props: RouteErrorBoundaryProps) {
-  return <RouteError {...props} moduleName="Mülk Yönetimi" />;
+  return <RouteError {...props} moduleName="Mülk yönetimi" />;
 }

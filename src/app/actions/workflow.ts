@@ -46,7 +46,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
     if (!propertyId) return { error: "Portföy zorunlu." };
     if (!customerId) return { error: "Kapanış için işlem yapılan müşteriyi seçin." };
     if (dealType === "rent") {
-      return { error: "Kiralık anlaşma kapanışı; kira sözleşmesi, komisyon ve portföy tek işlemde oluşsun diye Mülk Yönetimi ekranından tamamlanmalıdır." };
+      return { error: "Kiralık anlaşma kapanışı; kira sözleşmesi, komisyon ve portföy tek işlemde oluşsun diye Mülk yönetimi ekranından tamamlanmalıdır." };
     }
 
     const shield = checkAuthorityShield({ hasWrittenAuthority: hasAuthority });
