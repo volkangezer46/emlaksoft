@@ -6,6 +6,7 @@ import {
   parsePriceInput,
   parseSnapshot,
   positionInRange,
+  PROPOSAL_STATUS_LABEL,
   proposalMessage,
 } from "./model";
 
@@ -65,5 +66,20 @@ describe("yardımcılar", () => {
     expect(proposalMessage("ok").ok).toBe(true);
     expect(proposalMessage("expired").text).toMatch(/süresi dolmuş/);
     expect(proposalMessage("???").ok).toBe(false);
+  });
+});
+
+describe("yönetici onayı bekleyen öneri (GUVENLIK-1)", () => {
+  it("durum etiketi mülk sahibi onayını ve yönetici beklentisini söyler; süre dolumu yalnız pending'i etkiler", () => {
+    expect(PROPOSAL_STATUS_LABEL.awaiting_manager).toBe("Mülk sahibi onayladı, yönetici onayı bekleniyor");
+    expect(effectiveStatus("awaiting_manager", 0, 1_000)).toBe("awaiting_manager");
+  });
+
+  it("apply/ret RPC kodları Türkçe cümleye eşlenir", () => {
+    for (const code of ["not_awaiting", "no_approval", "no_denial"]) {
+      const m = proposalMessage(code);
+      expect(m.ok).toBe(false);
+      expect(m.text).not.toBe(proposalMessage("bilinmeyen").text);
+    }
   });
 });

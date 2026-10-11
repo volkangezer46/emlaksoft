@@ -40,6 +40,7 @@ export type ProposalView = {
 
 const TONE: Record<ProposalStatus, "neutral" | "attention" | "success"> = {
   pending: "attention",
+  awaiting_manager: "attention",
   approved: "success",
   rejected: "neutral",
   expired: "neutral",
@@ -188,7 +189,7 @@ export function PriceProposalPanel({ propertyId, canEdit, items }: { propertyId:
                     </p>
                     <StatusBadge
                       tone={TONE[p.status]}
-                      icon={p.status === "approved" ? <BadgeCheck /> : p.status === "pending" ? <Clock /> : <XCircle />}
+                      icon={p.status === "approved" ? <BadgeCheck /> : p.status === "pending" || p.status === "awaiting_manager" ? <Clock /> : <XCircle />}
                     >
                       {PROPOSAL_STATUS_LABEL[p.status]}
                     </StatusBadge>
