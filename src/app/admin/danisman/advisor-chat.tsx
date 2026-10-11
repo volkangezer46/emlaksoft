@@ -24,6 +24,7 @@ import {
 } from "@/app/actions/ai-advisor";
 import type { AdvisorMessage } from "@/lib/ai-advisor";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -123,7 +124,7 @@ function SessionSidebar({
         {loading ? (
           <p className="px-3 py-6 text-center text-xs text-text-faint">Yükleniyor…</p>
         ) : sessions.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-text-faint">Henüz sohbet yok</p>
+          <EmptyState variant="compact" title="Henüz sohbet yok" />
         ) : (
           sessions.map((s) => (
             // Seçim ayrı bir buton: dialog portalından köpüren tıklamalar
@@ -468,14 +469,13 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
             </div>
           ) : messages.length === 0 ? (
             <div className="mx-auto max-w-md pt-6 text-center">
-              <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[image:var(--grad-brand-soft)]">
-                <Sparkles className="h-7 w-7 text-brand-600" />
-              </span>
-              <h3 className="mt-3 font-display text-lg font-bold text-ink-950">Platformunuzu birlikte büyütelim</h3>
-              <p className="mt-1 text-sm text-text-muted">
-                Canlı verilerinize bakarak gelir, müşteri kaybı, satış ve destek üzerine somut öneriler veririm.
-              </p>
-              <div className="mt-5 grid gap-2">
+              <EmptyState
+                variant="compact"
+                icon={<Sparkles className="h-7 w-7 text-brand-600" />}
+                title="Platformunuzu birlikte büyütelim"
+                description="Canlı verilerinize bakarak gelir, müşteri kaybı, satış ve destek üzerine somut öneriler veririm."
+              />
+              <div className="mt-3 grid gap-2">
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s}

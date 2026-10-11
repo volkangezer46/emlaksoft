@@ -44,12 +44,16 @@ describe("purgeSampleModuleData (RPC'nin bilmediği örnek kayıtlar)", () => {
       "delete:league_challenges",
       "delete:advisor_specialties",
       "delete:advisor_regions",
+      "delete:cash_entries",
+      "delete:recurring_rules",
+      "delete:finance_accounts",
+      "delete:expense_budgets",
     ]);
     for (const c of calls) {
       expect(c.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["tenant_id", "t-1"]))).toBe(true);
     }
-    const [rentals, buildings, league, specialties, regions] = calls;
-    for (const c of [specialties!, regions!]) {
+    const [rentals, buildings, league, specialties, regions, ...finance] = calls;
+    for (const c of [specialties!, regions!, ...finance]) {
       expect(c.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["is_sample", true]))).toBe(true);
     }
     expect(rentals!.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["is_sample", true]))).toBe(true);
@@ -108,6 +112,19 @@ describe("temizlik kapsamı — kaskat zinciri (SQL sözleşmesi)", () => {
     const mig = sqlOf("20261010000800_");
     expect(mig).toMatch(/alter table public\.advisor_specialties add column if not exists is_sample boolean not null default false/);
     expect(mig).toMatch(/alter table public\.advisor_regions add column if not exists is_sample boolean not null default false/);
+  });
+
+  it("finans: 4 tablo is_sample taşır (20261012000400), temizlik hareket → kural → hesap → bütçe sırasıyla siler; hesap kaskatları", () => {
+    const mig = sqlOf("20261012000400_");
+    for (const t of ["finance_accounts", "cash_entries", "recurring_rules", "expense_budgets"]) {
+      expect(mig, t).toMatch(new RegExp(`alter table public\\.${t}\\s+add column if not exists is_sample boolean not null default false`));
+    }
+    const rollback = readFileSync(join(process.cwd(), "supabase/rollbacks/20261012000400_finance_is_sample.rollback.sql"), "utf8");
+    expect(rollback).toMatch(/drop column if exists is_sample/);
+    const accounts = sqlOf("20261010000600_");
+    expect(accounts).toMatch(/references public\.finance_accounts \(id, tenant_id\) on delete cascade/);
+    const rules = sqlOf("20261010000900_");
+    expect(rules).toMatch(/rule_id\s+uuid not null references public\.recurring_rules\(id\) on delete cascade/);
   });
 
   it("purgeSampleData RPC'den ÖNCE ön adımı çağırır", () => {

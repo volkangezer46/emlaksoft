@@ -8,7 +8,7 @@ import { attachUsage, getAdminRow, listAdminRows } from "@/lib/geo/admin-store";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { GeoEntityList, type EntityRowData } from "../entity-list";
 import { NewEntityForm } from "../new-entity-form";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminGeoProvincePage({
   params,
@@ -55,7 +55,7 @@ export default async function AdminGeoProvincePage({
         <ArrowLeft className="h-3.5 w-3.5" /> Tüm iller
       </Link>
 
-      <AdminPageHeader eyebrow={`Plaka ${province.plateCode}`} icon={MapPin} title={`${province.name} · ilçeler`} description={`${rows.length} ilçe listeleniyor.`} />
+      <PageHeader eyebrow={`Plaka ${province.plateCode}`} icon={<MapPin className="h-6 w-6 text-accent" aria-hidden />} title={`${province.name} · ilçeler`} description={`${rows.length} ilçe listeleniyor.`} />
 
       <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3.5">

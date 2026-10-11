@@ -455,7 +455,8 @@ export async function loadAdvisorMetrics(
   opts: LoadAdvisorMetricsOptions,
 ): Promise<AdvisorMetricsResult> {
   const { viewer, tenantId, period, nowMs } = opts;
-  const sample = opts.sample ?? (await loadSampleKpiScope(supabase, tenantId));
+  // Örnek veri kapsamı ile profil sorgusu birbirinden bağımsız: sıralı beklemek bir tur boşa harcar (waterfall).
+  const samplePromise = opts.sample ? Promise.resolve(opts.sample) : loadSampleKpiScope(supabase, tenantId);
   const officeWide = hasOfficeWideDataScope(viewer.role);
   const seeAllEarnings = canSeeAllEarnings(viewer.perms);
   const scope: "office" | "self" = officeWide ? "office" : "self";
@@ -475,7 +476,7 @@ export async function loadAdvisorMetrics(
   if (wanted) pq = pq.in("id", wanted);
   else pq = pq.in("role", [...METRIC_ROLES]);
   if (!wanted && !opts.includeInactive) pq = pq.eq("is_active", true);
-  const profilesRes = await pq;
+  const [sample, profilesRes] = await Promise.all([samplePromise, pq]);
   const profiles = (profilesRes.data ?? []) as MetricsProfile[];
   const ids = profiles.map((p) => p.id);
   const idSet = new Set(ids);
