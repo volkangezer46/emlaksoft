@@ -206,8 +206,10 @@ export default async function AppointmentsPage({
     windowEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 3, 1);
   }
 
-  // Arama: müşteri adı / portföy başlığı-kodu / konum → ana sorgunun or() koşulu
-  const search = await relatedSearchClause(supabase, q, {
+  // Arama: müşteri adı / portföy başlığı-kodu / konum → ana sorgunun or() koşulu.
+  // BEKLENMEZ: arama çözümü yalnız ana randevu listesine ve gerçek-toplam sayımına bağlıdır; sayaçlar, tanımlar,
+  // hafta şeridi vb. bağımsız sorgular aynı turda başlar (waterfall yok). q boşken arama sorgusu atılmaz.
+  const searchP = relatedSearchClause(supabase, q, {
     customerColumn: "customer_id",
     propertyColumn: "property_id",
     extraColumns: ["location"],
@@ -215,7 +217,7 @@ export default async function AppointmentsPage({
 
   const APPT_LIMIT = 500;
   // Liste ve (tavana dayanınca) head-count aynı filtre kurucusunu paylaşır.
-  const buildApptQuery = (select: string, opts?: { count: "exact"; head: true }) => {
+  const buildApptQuery = (search: Awaited<typeof searchP>, select: string, opts?: { count: "exact"; head: true }) => {
     let query = supabase
       .from("appointments")
       .select(select, opts)
@@ -232,9 +234,8 @@ export default async function AppointmentsPage({
     else if (search.clause) query = query.or(search.clause);
     return query;
   };
-  const apptQuery = buildApptQuery(
-    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, signed_at, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)",
-  );
+  const APPT_SELECT =
+    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, signed_at, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)";
 
   // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count; danışman kapsamlı);
   // iptaller hariç. KPI/çip sayıları bu sayıları filtreye çevirir.
@@ -274,13 +275,13 @@ export default async function AppointmentsPage({
 
   // Randevu listesi bir kez başlatılır; izin sorgusu liste biter bitmez DİĞER sorgularla
   // paralel koşar.
-  const apptP = Promise.resolve(apptQuery.order("scheduled_at", { ascending: true }).limit(APPT_LIMIT));
+  const apptP = searchP.then((search) => buildApptQuery(search, APPT_SELECT).order("scheduled_at", { ascending: true }).limit(APPT_LIMIT));
   // Gerçek toplam yalnız liste 500 tavanına dayanırsa sayılır (ListLimitNotice).
-  const apptTotalP = apptP.then((res) =>
+  const apptTotalP = Promise.all([searchP, apptP]).then(([search, res]) =>
     resolveLazyTotal({
       rows: (res.data ?? []).length,
       limit: APPT_LIMIT,
-      count: async () => (await buildApptQuery("id", { count: "exact", head: true })).count,
+      count: async () => (await buildApptQuery(search, "id", { count: "exact", head: true })).count,
     }),
   );
   const leavesP = apptP.then(async (res) => {

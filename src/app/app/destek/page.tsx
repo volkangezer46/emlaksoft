@@ -1,3 +1,4 @@
+import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
@@ -30,7 +31,7 @@ import { PageHeader } from "@/components/ui/page-header";
 const PAGE_SIZE = 50;
 
 /** "Açık / bekleyen" bileşimi — tek doğruluk kaynağı (KPI, ring, liste sorgusu). */
-const ACIK_STATUSES = ["open", "in_progress", "waiting"] as const;
+const ACIK_STATUSES = TICKET_OPEN_STATUSES;
 
 const statusLabel: Record<string, string> = {
   open: "Açık",

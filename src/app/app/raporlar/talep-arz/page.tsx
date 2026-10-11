@@ -1,3 +1,4 @@
+import { OPEN_DEMAND_STATUSES as OPEN_DEMAND_STATUSES_SOURCE } from "@/lib/workflow-state";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
@@ -64,7 +65,7 @@ const DONEM_FILTERS = [
 const DEFAULT_DONEM = "90";
 
 /** Açık sayılan talep durumları (talepler sayfasının varsayılan filtresiyle aynı küme). */
-const OPEN_DEMAND_STATUSES = ["new", "active", "matched"];
+const OPEN_DEMAND_STATUSES: string[] = [...OPEN_DEMAND_STATUSES_SOURCE];
 /** Yayında sayılan portföy durumları (portfoyler status=live filtresiyle uyumlu). */
 const LIVE_PROPERTY_STATUSES = ["live", "Yayında"];
 

@@ -148,18 +148,28 @@ export async function acceptInsightAsTask(insightId: string): Promise<InsightAct
   return { ok: true, taskId };
 }
 
-/**
- * İçgörü ofis ayarları: sessize alınan kurallar + LLM anlatımı (varsayılan KAPALI). Yalnız ofis sahibi / genel müdür.
- * `oversight_settings.thresholds.insights` alanına yazar (ayrı tablo yok); diğer eşik alanlarına DOKUNMAZ.
- */
-export async function saveInsightSettings(input: Partial<InsightSettings>): Promise<InsightActionResult> {
-  const gate = await requirePermission("settings", "edit");
-  if (!gate.ok) return { error: gate.error };
-  if (gate.role !== "owner" && gate.role !== "gm") {
-    return { error: "Ayarları yalnızca ofis sahibi veya genel müdür değiştirebilir." };
-  }
-  const next = normalizeInsightSettings(input);
+type SettingsGate = { tenantId: string; userId: string };
 
+/** Ayar yazma yetkisi: `settings:edit` + yalnız ofis sahibi / genel müdür (sunucuda; arayüz gizlemesine güvenilmez). */
+async function requireInsightSettingsEditor(): Promise<{ ok: true; gate: SettingsGate } | { ok: false; error: string }> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  if (gate.role !== "owner" && gate.role !== "gm") {
+    return { ok: false, error: "Ayarları yalnızca ofis sahibi veya genel müdür değiştirebilir." };
+  }
+  return { ok: true, gate: { tenantId: gate.tenantId, userId: gate.userId } };
+}
+
+/**
+ * `oversight_settings.thresholds.insights` alanını okuyup `mutate` ile günceller (ayrı tablo yok); diğer eşik alanlarına
+ * DOKUNMAZ. Mevcut kayıtlı ayar korunur: kısmi girdi (ör. yalnız mutedRules) diğer alanları (qualityReopened,
+ * narrativeEnabled) silmez.
+ */
+async function updateInsightSettings(
+  gate: SettingsGate,
+  mutate: (prev: InsightSettings) => Partial<InsightSettings>,
+  audit: { action: string },
+): Promise<InsightActionResult> {
   const supabase = await createClient();
   const { data: row, error: readError } = await supabase
     .from("oversight_settings")
@@ -168,11 +178,13 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
     .maybeSingle();
   if (readError) return { error: isMissingSchemaError(readError) ? NOT_READY : actionErrorMessage(readError, "Ayarlar okunamadı.") };
 
-  const prev = row?.thresholds && typeof row.thresholds === "object" ? (row.thresholds as Record<string, unknown>) : {};
+  const prevThresholds = row?.thresholds && typeof row.thresholds === "object" ? (row.thresholds as Record<string, unknown>) : {};
+  const prev = normalizeInsightSettings(prevThresholds.insights);
+  const next = normalizeInsightSettings({ ...prev, ...mutate(prev) });
   const { error } = await supabase.from("oversight_settings").upsert(
     {
       tenant_id: gate.tenantId,
-      thresholds: { ...prev, insights: next },
+      thresholds: { ...prevThresholds, insights: next },
       approval_rules: row?.approval_rules ?? {},
       updated_by: gate.userId,
       updated_at: new Date().toISOString(),
@@ -184,10 +196,27 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
-    action: "insight.settings_update",
+    action: audit.action,
     entityType: "oversight_settings",
-    newValue: { muted_rules: next.mutedRules, narrative_enabled: next.narrativeEnabled },
+    newValue: { muted_rules: next.mutedRules, narrative_enabled: next.narrativeEnabled, quality_reopened: next.qualityReopened ?? [] },
   });
   revalidatePath("/app");
+  revalidatePath("/app/ayarlar/merkez");
   return { ok: true };
+}
+
+/**
+ * İçgörü ofis ayarları: sessize alınan kurallar + LLM anlatımı (varsayılan KAPALI) + `qualityReopened`. Yalnız ofis sahibi /
+ * genel müdür. Yalnız verilen alanlar değişir (kısmi girdi diğer alanları silmez). Aynı eylem "Yeniden aç" (otomatik sessiz
+ * kuralı `qualityReopened`a ekle) ve "Varsayılana dön" (üç alanı sıfırla) için kullanılır; ayrı eylem yoktur (yetki kapısı tek).
+ * AI anlatımı açıldığında bile üretim tarafındaki kota kapısı, denetim kaydı ve sayı doğrulaması (insight-narrative) geçerlidir.
+ */
+export async function saveInsightSettings(input: Partial<InsightSettings>): Promise<InsightActionResult> {
+  const who = await requireInsightSettingsEditor();
+  if (!who.ok) return { error: who.error };
+  const patch: Partial<InsightSettings> = {};
+  if (input.mutedRules !== undefined) patch.mutedRules = input.mutedRules;
+  if (input.narrativeEnabled !== undefined) patch.narrativeEnabled = input.narrativeEnabled;
+  if (input.qualityReopened !== undefined) patch.qualityReopened = input.qualityReopened;
+  return updateInsightSettings(who.gate, () => patch, { action: "insight.settings_update" });
 }

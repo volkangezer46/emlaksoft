@@ -1,5 +1,6 @@
 "use server";
 
+import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
 import { createClient } from "@/lib/supabase/server";
@@ -54,6 +55,9 @@ export async function createCall(formData: FormData): Promise<CallResult> {
     console.error("createCall", error);
     return { error: actionErrorMessage(error, "Çağrı kaydı oluşturulamadı.") };
   }
+
+  // Arama girildi: müşterinin açık "Bugün ara" kartı motor turunu beklemeden kapanır.
+  closeCallPriorityAfterContact(customerId || null);
 
   await logActivity({
     tenantId: gate.tenantId,

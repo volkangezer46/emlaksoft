@@ -34,7 +34,6 @@ const BASELINE: Record<string, { count: number; reason: string }> = {
   "src/app/app/musteriler/tenant-tags.ts": { count: 1, reason: R_LOADER },
   "src/lib/admin/office-360.ts": { count: 1, reason: R_LOADER },
   "src/lib/advisor/advisor-store.ts": { count: 1, reason: R_LOADER },
-  "src/lib/automation-engine.ts": { count: 1, reason: R_CRON },
   "src/lib/building-management/load.ts": { count: 4, reason: R_LOADER },
   "src/lib/building-management/reminders.ts": { count: 1, reason: R_CRON },
   "src/lib/custom-fields/load.ts": { count: 1, reason: R_LOADER },

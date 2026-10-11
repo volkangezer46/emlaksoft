@@ -19,6 +19,12 @@ export class InsightFactsUnavailable extends Error {
   }
 }
 
+/**
+ * Olgu RPC'lerinin satır tavanı. Dönen satır sayısı bu tavana ULAŞTIYSA olgu kümesi kesik olabilir; engine
+ * "koşulu kalktı" kapatmasını o tur yapmaz (eksik küme yüzünden geçerli içgörü kapanmasın).
+ */
+export const INSIGHT_FACT_LIMIT = 200;
+
 type RpcError = { code?: string; message?: string } | null;
 
 /** Şema/fonksiyon yok hatası (migration uygulanmadı). */
@@ -58,7 +64,7 @@ export async function loadQuietCustomers(admin: SupabaseClient, tenantId: string
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_quiet_valuable_customers", {
     p_tenant_id: tenantId,
     p_min_quiet_days: minQuietDays,
-    p_limit: 200,
+    p_limit: INSIGHT_FACT_LIMIT,
   });
   return rows.map((r) => ({
     customerId: String(r.customer_id),
@@ -73,7 +79,7 @@ export async function loadStalledDeals(admin: SupabaseClient, tenantId: string, 
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_stalled_deals", {
     p_tenant_id: tenantId,
     p_min_idle_days: minIdleDays,
-    p_limit: 200,
+    p_limit: INSIGHT_FACT_LIMIT,
   });
   return rows.map((r) => ({
     dealId: String(r.deal_id),
@@ -97,7 +103,7 @@ export async function loadStaleListings(admin: SupabaseClient, tenantId: string,
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_stale_listings", {
     p_tenant_id: tenantId,
     p_min_days: minDays,
-    p_limit: 200,
+    p_limit: INSIGHT_FACT_LIMIT,
   });
   // Mülk sahibinden onay bekleyen fiyat önerisi olan portföyler (tablo yoksa/okunamazsa boş: kural eskisi gibi çalışır).
   const pending = new Set<string>();
@@ -128,7 +134,7 @@ export async function loadDeadlines(admin: SupabaseClient, tenantId: string): Pr
   const rows = await rpcRows<Record<string, unknown>>(admin, "insight_deadlines", {
     p_tenant_id: tenantId,
     p_within_days: 15,
-    p_limit: 200,
+    p_limit: INSIGHT_FACT_LIMIT,
   });
   return rows.map((r) => ({
     kind: r.deadline_kind === "confirm" ? "confirm" : "authority",

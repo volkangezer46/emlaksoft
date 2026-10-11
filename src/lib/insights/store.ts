@@ -217,6 +217,78 @@ export async function markNotified(admin: SupabaseClient, tenantId: string, ids:
   if (error) throw new Error(`insights(notified_at): ${error.code ?? "hata"}`);
 }
 
+/** SAF: açık satırlardan, canlı kümede OLMAYAN varlıkların satır kimlikleri (koşulu kalkanlar). entity_id'siz satıra dokunulmaz. */
+export function selectStaleInsightIds(
+  openRows: readonly { id: string; entity_id: string | null }[],
+  liveEntityIds: ReadonlySet<string>,
+): string[] {
+  return openRows.filter((r) => r.entity_id && !liveEntityIds.has(r.entity_id)).map((r) => r.id);
+}
+
+/**
+ * Koşulu kalkan içgörüleri kapatır (TEK yazıcı): bu kuralın AÇIK (new/seen/snoozed, süresi dolmamış; kullanıcı
+ * yoksaymamış/uygulamamış) satırlarından varlığı bu turun canlı kümesinde olmayanların `valid_until`'i şimdiye çekilir.
+ * `state` ve `state_reason` DEĞİŞMEZ (kalite sayaçları "yoksayıldı/uygulandı" ile kirlenmez). Yeniden koşul oluşursa yeni
+ * dedupe dönemiyle yeni satır doğar. Dönen: kapatılan satır sayısı. Çağıran, kural hatasız ve bütçe içinde bittiyse çağırmalıdır.
+ */
+export async function expireStaleInsights(
+  admin: SupabaseClient,
+  tenantId: string,
+  ruleId: string,
+  liveEntityIds: ReadonlySet<string>,
+  nowMs: number,
+): Promise<number> {
+  const nowIso = new Date(nowMs).toISOString();
+  const { data, error } = await fetchAllRowsKeepError((from, to) =>
+    admin
+      .from("insights")
+      .select("id, entity_id")
+      .eq("tenant_id", tenantId)
+      .eq("rule_id", ruleId)
+      .in("state", ["new", "seen", "snoozed"])
+      .gt("valid_until", nowIso)
+      .not("entity_id", "is", null)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  if (error) {
+    if (isMissingSchemaError(error)) return 0;
+    throw new Error(`insights(stale): ${error.code ?? "hata"}`);
+  }
+  const staleIds = selectStaleInsightIds((data ?? []) as { id: string; entity_id: string | null }[], liveEntityIds);
+  let closed = 0;
+  for (let i = 0; i < staleIds.length; i += 200) {
+    const chunk = staleIds.slice(i, i + 200);
+    const { data: upd, error: uerr } = await admin
+      .from("insights")
+      .update({ valid_until: nowIso })
+      .eq("tenant_id", tenantId)
+      .eq("rule_id", ruleId)
+      .in("state", ["new", "seen", "snoozed"])
+      .in("id", chunk)
+      .select("id");
+    if (uerr) throw new Error(`insights(expire): ${uerr.code ?? "hata"}`);
+    closed += (upd ?? []).length;
+  }
+  return closed;
+}
+
+/**
+ * Olay anında kapatma: müşteriyle temas (arama/iletişim kaydı) girildi → o müşterinin AÇIK "Bugün ara" kartları hemen
+ * biter (motor turunu beklemez). `insights` tablosuna doğrudan yazma yalnız service_role'de olduğundan ve insights kodu
+ * createAdminClient KULLANMADIĞINDAN (insights-contract.test.ts) bu, çağıranın OTURUMUYLA çalışan dar bir RPC'dir
+ * (`insight_close_call_priority`, 20261012001600): ofis oturumdan çözülür, yalnız call_priority + açık satırlar,
+ * yalnız valid_until yazılır (state/state_reason değişmez). RPC henüz yoksa 0 döner (öneri motor turunda kapanır).
+ */
+export async function closeCallPriorityForCustomer(client: SupabaseClient, customerId: string): Promise<number> {
+  const { data, error } = await client.rpc("insight_close_call_priority", { p_customer_id: customerId });
+  if (error) {
+    if (isMissingSchemaError(error)) return 0;
+    throw new Error(`insight_close_call_priority: ${error.code ?? "hata"}`);
+  }
+  return Number(data ?? 0) || 0;
+}
+
 /** Süresi geçmiş/kapanmış satır temizliği (RPC yoksa 0). */
 export async function runHousekeeping(admin: SupabaseClient): Promise<number> {
   const { data, error } = await admin.rpc("insight_housekeeping", { p_closed_retention_days: 90, p_expired_grace_days: 7 });

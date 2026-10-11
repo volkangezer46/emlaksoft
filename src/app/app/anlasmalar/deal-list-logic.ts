@@ -1,3 +1,4 @@
+import { OPEN_DEAL_STAGES } from "@/lib/workflow-state";
 import type { PillTone } from "@/components/ui/list-kit";
 
 /** Anlaşma listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir; zaman dışarıdan verilir). */
@@ -6,7 +7,7 @@ export const DEAL_STAGE_KEYS = ["new", "qualified", "negotiation", "won", "lost"
 export type DealStageKey = (typeof DEAL_STAGE_KEYS)[number];
 
 /** Açık (kazanılmamış/kaybedilmemiş) aşamalar. */
-export const OPEN_STAGES = ["new", "qualified", "negotiation"] as const;
+export const OPEN_STAGES = OPEN_DEAL_STAGES;
 
 /** Bayat açık anlaşma eşiği (gün): bu kadar süredir güncellenmeyen kartlar. */
 export const STALE_DAYS = 14;

@@ -6,9 +6,10 @@ import { computePriority, explainPriority } from "@/lib/insights/priority";
 import { dedupeDrafts, suppressionKey } from "@/lib/insights/dedupe";
 import { InsightFactsUnavailable } from "@/lib/insights/facts";
 import { qualitySuppressedRules } from "@/lib/insights/quality";
-import { isRuleMuted, loadInsightSettings } from "@/lib/insights/settings";
+import { isQualityReopened, isRuleMuted, loadInsightSettings } from "@/lib/insights/settings";
 import {
   InsightsTableMissing,
+  expireStaleInsights,
   insertInsights,
   loadActiveRecipients,
   loadNotifiedToday,
@@ -22,7 +23,7 @@ import {
   type Recipient,
 } from "@/lib/insights/store";
 import { INSIGHT_RULES, buildDigestDraft, DIGEST_RULE_ID, type InsightRule } from "@/lib/insights/rules";
-import { INSIGHT_MANAGEMENT_ROLES, ruleBase, type InsightDraft } from "@/lib/insights/types";
+import { INSIGHT_MANAGEMENT_ROLES, normalizeRuleRun, ruleBase, type InsightDraft } from "@/lib/insights/types";
 
 /**
  * Insight Engine — tenant tarama döngüsü.
@@ -74,6 +75,8 @@ export type EngineSummary = {
   notifyFailed: number;
   rulesUnavailable: string[];
   rulesMuted: number;
+  /** Koşulu kalkan (olgu düşen) ve bu turda kapatılan açık içgörü sayısı. */
+  expired: number;
   housekeepingDeleted: number | null;
   remaining: number;
   timedOut: boolean;
@@ -89,6 +92,7 @@ export type TenantResult = {
   notifyFailed: number;
   rulesUnavailable: string[];
   rulesMuted: number;
+  expired: number;
 };
 
 /** Saf: ofiste içgörü üretilsin mi? Gerçek veri eşiğin altındaysa (hâlâ demo ofis) üretilmez. */
@@ -184,7 +188,7 @@ export async function processTenant(
   deps: EngineDeps = {},
   deadlineMs: number = Number.POSITIVE_INFINITY,
 ): Promise<TenantResult> {
-  const result: TenantResult = { skipped: null, inserted: 0, notified: 0, notifyFailed: 0, rulesUnavailable: [], rulesMuted: 0 };
+  const result: TenantResult = { skipped: null, inserted: 0, notified: 0, notifyFailed: 0, rulesUnavailable: [], rulesMuted: 0, expired: 0 };
 
   // Örnek veri ofiste içgörü üretmez.
   const [realCustomers, realProperties] = await Promise.all([countReal(admin, tenantId, "customers"), countReal(admin, tenantId, "properties")]);
@@ -204,9 +208,13 @@ export async function processTenant(
   if (recipients.length === 0) return result;
 
   const qualityMuted = qualitySuppressedRules(quality);
-  const isMuted = (ruleId: string) => isRuleMuted(settings, ruleId) || qualityMuted.has(ruleBase(ruleId));
+  // Kalite bastırması otomatiktir; sahibi "Yeniden aç" dediyse (qualityReopened) uygulanmaz. Elle kapatma her zaman geçerlidir.
+  const isMuted = (ruleId: string) =>
+    isRuleMuted(settings, ruleId) || (qualityMuted.has(ruleBase(ruleId)) && !isQualityReopened(settings, ruleId));
 
   const drafts: InsightDraft[] = [];
+  // Koşulu kalkan içgörüleri kapatma adayları: yalnız HATASIZ ve zaman bütçesi içinde biten, canlı küme veren kurallar.
+  const closures: { ruleId: string; live: ReadonlySet<string> }[] = [];
   for (const rule of deps.rules ?? INSIGHT_RULES) {
     if (now() >= deadlineMs) break;
     if (isMuted(rule.id)) {
@@ -214,7 +222,10 @@ export async function processTenant(
       continue;
     }
     try {
-      drafts.push(...(await rule.run(admin, tenantId, nowMs)));
+      const run = normalizeRuleRun(await rule.run(admin, tenantId, nowMs));
+      drafts.push(...run.drafts);
+      // InsightFactsUnavailable / hata / zaman aşımında buraya gelinmez: o kural için kapatma atlanır.
+      if (run.liveEntityIds && now() < deadlineMs) closures.push({ ruleId: rule.id, live: run.liveEntityIds });
     } catch (e) {
       if (e instanceof InsightFactsUnavailable) {
         if (!result.rulesUnavailable.includes(rule.id)) result.rulesUnavailable.push(rule.id);
@@ -263,6 +274,15 @@ export async function processTenant(
 
   const inserted = await insertInsights(admin, rows);
   result.inserted = inserted.length;
+
+  // Olgusu düşen (koşulu kalkan) açık içgörüler bu turda kapanır. Bir kuralın kapatma hatası diğerlerini ve bildirimi durdurmaz.
+  for (const c of closures) {
+    try {
+      result.expired += await expireStaleInsights(admin, tenantId, c.ruleId, c.live, nowMs);
+    } catch (e) {
+      console.error("insight-engine expire", c.ruleId, e instanceof Error ? e.message : "hata");
+    }
+  }
 
   // Yüksek şiddet: zile TEK KEZ (yalnız bu çağrıda gerçekten eklenen satırlar; dedupe_key bildirimde de taşınır).
   if (deps.notify) {
@@ -325,6 +345,7 @@ export async function runInsightEngine(admin: SupabaseClient, opts: EngineOption
     notifyFailed: 0,
     rulesUnavailable: [],
     rulesMuted: 0,
+    expired: 0,
     housekeepingDeleted: null,
     remaining: 0,
     timedOut: false,
@@ -369,6 +390,7 @@ export async function runInsightEngine(admin: SupabaseClient, opts: EngineOption
       summary.notified += r.notified;
       summary.notifyFailed += r.notifyFailed;
       summary.rulesMuted += r.rulesMuted;
+      summary.expired += r.expired;
       if (r.skipped === "sample") summary.tenantsSkippedSample += 1;
       for (const u of r.rulesUnavailable) if (!summary.rulesUnavailable.includes(u)) summary.rulesUnavailable.push(u);
     } catch (e) {

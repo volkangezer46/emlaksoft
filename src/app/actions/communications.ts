@@ -1,5 +1,6 @@
 "use server";
 
+import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
@@ -56,6 +57,9 @@ export async function createCommunication(
     .single();
 
   if (error || !data) return { error: actionErrorMessage(error, "İletişim kaydı oluşturulamadı.") };
+
+  // İletişim kaydı girildi: müşterinin açık "Bugün ara" kartı anında kapanır.
+  closeCallPriorityAfterContact(customerId);
 
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -229,6 +233,9 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
     entityId: customerId,
     newValue: { length: text.length, jobid: result.jobid ?? null },
   });
+
+  // Başarılı SMS = iletişim: açık "Bugün ara" kartı anında kapanır.
+  if (comm) closeCallPriorityAfterContact(customerId);
 
   revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app/gelen-kutusu");

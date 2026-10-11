@@ -9,6 +9,8 @@ export const TICKET_CATEGORIES_FALLBACK = [
 
 export const TICKET_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "waiting", "resolved", "closed"] as const;
+/** Açık (çözülmemiş) bilet durumları: SLA, kuyruk ve rozet sayımlarının tek kaynağı. */
+export const TICKET_OPEN_STATUSES = ["open", "in_progress", "waiting"] as const;
 export const TICKET_VISIBILITIES = ["public", "internal"] as const;
 
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];

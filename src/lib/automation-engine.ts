@@ -1,4 +1,6 @@
 import "server-only";
+import { UPCOMING_APPOINTMENT_STATUSES } from "@/lib/workflow-state";
+import { isContactStale, loadLastContactSince } from "@/lib/contact/last-contact";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncPendingEInvoices } from "@/lib/integrations/einvoice/service";
@@ -617,6 +619,7 @@ async function collectScheduledCandidatePage(
         .from("customer_demands")
         .select("id, customer_id, status, transaction_type, created_at, customer:customers!customer_demands_customer_id_fkey(full_name, phone, assigned_to)")
         .eq("tenant_id", automation.tenant_id)
+        // Bilinçli: bayat talep otomasyonu "matched" (eşleşmiş) talebi hatırlatmaz; OPEN_DEMAND_STATUSES'ten dar.
         .in("status", ["new", "active"])
         .lt("created_at", cutoff);
       if (afterId) q = q.gt("id", afterId);
@@ -646,7 +649,7 @@ async function collectScheduledCandidatePage(
     case "no_contact_days": {
       const days = cfgNumber(cfg, ["days"], 14);
       const cutoff = new Date(now - days * DAY_MS).toISOString();
-      // Eski müşteri sayfası + yalnız O SAYFANIN id'leri için pencere içi iletişim sorgusu (anti-join; 5000 tavanı yok).
+      // Eski müşteri sayfası + yalnız O SAYFANIN id'leri için pencere içi son temas (parça parça; 5000 tavanı yok).
       let cq = admin
         .from("customers")
         .select("id, full_name, phone, assigned_to")
@@ -658,25 +661,28 @@ async function collectScheduledCandidatePage(
       const { data: customers, error: custErr } = await cq.order("id", { ascending: true }).limit(PAGE);
       if (custErr) throw new Error(`no_contact_days: ${custErr.message}`);
       const rows = customers ?? [];
-      const contacted = new Set<string>();
+      // Son temas = iletişim kaydı + arama + randevu (src/lib/contact/last-contact.ts). Okuma hatasında
+      // bu tetik BU SAYFA için atlanır ve loglanır: yanlış "uzun süredir görüşmediniz" mesajı gitmesin.
+      let lastContact: Map<string, string> | null = new Map();
       if (rows.length > 0) {
-        const { data: comms, error: commErr } = await admin
-          .from("communications")
-          .select("customer_id")
-          .eq("tenant_id", automation.tenant_id)
-          .gte("created_at", cutoff)
-          .in("customer_id", rows.map((c) => String(c.id)))
-          .limit(5000);
-        if (commErr) throw new Error(`no_contact_days communications: ${commErr.message}`);
-        for (const r of comms ?? []) {
-          const id = String(r.customer_id ?? "").toLowerCase();
-          if (id) contacted.add(id);
+        try {
+          lastContact = await loadLastContactSince(
+            admin,
+            automation.tenant_id,
+            rows.map((c) => String(c.id)),
+            cutoff,
+            new Date(now).toISOString(),
+          );
+        } catch (e) {
+          lastContact = null;
+          console.error("no_contact_days son temas okunamadı; sayfa atlandı", automation.id, e instanceof Error ? e.message : e);
         }
       }
+      const contactMap = lastContact;
       return {
         page: pageInfoOf(rows),
-        payloads: rows
-          .filter((c) => !contacted.has(String(c.id).toLowerCase()))
+        payloads: (contactMap === null ? [] : rows)
+          .filter((c) => isContactStale(contactMap?.get(String(c.id).toLowerCase()) ?? null, cutoff))
           .map((c) => ({
             entityType: "customer" as const,
             entityId: String(c.id),
@@ -697,7 +703,7 @@ async function collectScheduledCandidatePage(
         .from("appointments")
         .select("id, customer_id, property_id, assigned_to, scheduled_at, status, customer:customers!appointments_customer_id_fkey(full_name, phone)")
         .eq("tenant_id", automation.tenant_id)
-        .in("status", ["pending", "confirmed"])
+        .in("status", [...UPCOMING_APPOINTMENT_STATUSES])
         .lt("scheduled_at", graceEnd)
         .gte("scheduled_at", lookback);
       if (afterId) q = q.gt("id", afterId);

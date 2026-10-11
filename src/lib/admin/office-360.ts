@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { getPlan } from "@/lib/billing/plans";
 import { daysAgoIso } from "@/lib/clock";
 import { auditActionLabel } from "@/lib/admin-format";
@@ -494,7 +495,7 @@ export async function loadOfficeKpis(admin: Admin, tenantId: string, access: Off
     head("customers").is("deleted_at", null),
     head("properties").is("deleted_at", null).in("status", ["draft", "live", "reserved"]),
     head("branches"),
-    access.tickets ? head("support_tickets").in("status", ["open", "in_progress", "waiting"]) : Promise.resolve({ count: 0 }),
+    access.tickets ? head("support_tickets").in("status", [...TICKET_OPEN_STATUSES]) : Promise.resolve({ count: 0 }),
     access.billing
       ? admin.from("invoices").select("total_try").eq("tenant_id", tenantId).eq("status", "paid").limit(5000)
       : Promise.resolve({ data: [] as { total_try: number | string }[] }),

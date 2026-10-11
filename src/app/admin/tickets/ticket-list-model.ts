@@ -1,4 +1,6 @@
-import { isTicketTransitionAllowed } from "@/lib/support/ticket-contract";
+import { isTicketTransitionAllowed, TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
+
+export { TICKET_OPEN_STATUSES };
 
 export const TICKET_STATUS_KEYS = [
   "open",
@@ -7,8 +9,6 @@ export const TICKET_STATUS_KEYS = [
   "resolved",
   "closed",
 ] as const;
-
-export const TICKET_OPEN_STATUSES = ["open", "in_progress", "waiting"] as const;
 
 export function bulkStatusTargetsFor(currentStatuses: readonly string[]) {
   // Boş seçim BİLİNÇLİ olarak tüm açık durumları döner (varsayılan dropdown

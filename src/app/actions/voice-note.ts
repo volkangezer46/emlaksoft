@@ -1,5 +1,6 @@
 "use server";
 
+import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -147,6 +148,7 @@ export async function saveVoiceNote(input: { kind: VoiceNoteKind; id: string; su
       body,
     });
     if (error) return { error: actionErrorMessage(error, "Not kaydedilemedi.") };
+    closeCallPriorityAfterContact(customerId);
     revalidatePath(`/app/musteriler/${customerId}`);
   }
 

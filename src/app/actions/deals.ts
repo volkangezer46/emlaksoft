@@ -1,5 +1,6 @@
 "use server";
 
+import { OPEN_DEAL_STAGES } from "@/lib/workflow-state";
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { afterSafe } from "@/lib/after-safe";
@@ -43,7 +44,7 @@ export async function createPipelineDeal(formData: FormData): Promise<DealResult
   const customerId = String(formData.get("customer_id") ?? "").trim() || null;
   const dealType = String(formData.get("deal_type") ?? "sale").trim() === "rent" ? "rent" : "sale";
   const stageRaw = String(formData.get("stage") ?? "new").trim();
-  const creatableStages = new Set<DealStage>(["new", "qualified", "negotiation"]);
+  const creatableStages = new Set<DealStage>(OPEN_DEAL_STAGES);
   const stage = (DEAL_STAGES as readonly string[]).includes(stageRaw)
     ? stageRaw as DealStage
     : "new";
@@ -703,7 +704,8 @@ export async function deleteDealNote(fd: FormData): Promise<void> {
 /** Toplu işlem üst sınırı (liste sayfası 50 satır; birkaç sayfalık seçim için pay). */
 const BULK_DEAL_MAX = 100;
 /** Toplu aşama değişimi YALNIZ açık aşamalar arasında: kazanma (komisyon/portföy) ve kayıp (neden) tek tek yapılır. */
-const BULK_STAGES = ["new", "qualified", "negotiation"] as const;
+// Toplu aşama değişimi yalnız açık aşamalara izinli (kazanıldı/kaybedildi özel akıştan geçer).
+const BULK_STAGES = OPEN_DEAL_STAGES;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type BulkDealResult = { error?: string; updated?: number; failed?: number; firstError?: string };

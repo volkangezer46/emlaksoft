@@ -1,3 +1,4 @@
+import { CLOSED_APPOINTMENT_STATUSES, postgrestInList } from "@/lib/workflow-state";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, trDayKey } from "@/lib/clock";
 import { loadLeagueData, periodOf } from "@/lib/gamification-query";
@@ -52,7 +53,7 @@ export async function loadCoachPlan(
         .select("id, appointment_type, scheduled_at, customer:customers!appointments_customer_id_fkey(full_name)")
         .eq("tenant_id", tenantId)
         .eq("assigned_to", userId)
-        .not("status", "in", "(completed,cancelled)")
+        .not("status", "in", postgrestInList(CLOSED_APPOINTMENT_STATUSES))
         .gte("scheduled_at", sinceIso)
         .lt("scheduled_at", nowIso)
         .order("scheduled_at", { ascending: false })

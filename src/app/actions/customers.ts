@@ -1,5 +1,6 @@
 "use server";
 
+import { OPEN_DEAL_STAGES, OPEN_DEMAND_STATUSES, UNCLOSED_APPOINTMENT_STATUSES } from "@/lib/workflow-state";
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
@@ -219,7 +220,7 @@ export type CustomerDeleteImpact = {
 };
 
 /**
- * Silmeden önce bağlı kayıt özeti: açık anlaşma, aktif talep, açık görev, bekleyen/onaylı randevu, sözleşme.
+ * Silmeden önce bağlı kayıt özeti: açık anlaşma, açık talep (yeni/aktif/eşleşti), açık görev, bekleyen/onaylı randevu, sözleşme.
  * Silme yumuşaktır (çöp kutusundan geri alınır) ama bağlı kayıtlar sahipsiz kalır; kullanıcı bunu görerek onaylar.
  */
 export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDeleteImpact> {
@@ -231,10 +232,10 @@ export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDe
   const supabase = await createClient();
   const head = { count: "exact" as const, head: true };
   const [deals, demands, tasks, appts, contracts] = await Promise.all([
-    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("stage", ["new", "qualified", "negotiation"]),
-    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "active"),
+    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("stage", [...OPEN_DEAL_STAGES]),
+    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", [...OPEN_DEMAND_STATUSES]),
     supabase.from("tasks").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "open"),
-    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["pending", "confirmed"]),
+    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", [...UNCLOSED_APPOINTMENT_STATUSES]),
     supabase.from("contracts").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list),
   ]);
   return {
@@ -263,10 +264,12 @@ export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Müşteri bulunamadı." };
   const supabase = await createClient();
-  // Açık anlaşması olan müşteri, bağlı kayıt özeti gösterilip onaylanmadan (confirm_linked=1) silinmez.
+  // Açık anlaşması ya da açık talebi (yeni/aktif/eşleşti) olan müşteri, bağlı kayıt özeti gösterilip onaylanmadan (confirm_linked=1) silinmez.
   if (String(formData.get("confirm_linked") ?? "") !== "1") {
     const impact = await getCustomerDeleteImpact([id]);
+    if (impact.error) return { error: impact.error };
     if (impact.openDeals > 0) return { error: "Açık anlaşması olan müşteri onay olmadan silinemez." };
+    if (impact.openDemands > 0) return { error: "Açık talebi olan müşteri onay olmadan silinemez." };
   }
   const { error } = await supabase
     .from("customers")

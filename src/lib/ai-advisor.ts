@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSecret } from "@/lib/settings/secret-read";
+import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { getPlan } from "@/lib/billing/plans";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { externalErrorMetadata } from "@/lib/external-fetch";
@@ -67,7 +68,8 @@ export async function buildAdvisorContext(): Promise<AdvisorContext> {
     admin.from("tenants").select("id", { count: "exact", head: true }).gte("created_at", daysAgoIso(30)),
     admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial").gte("trial_ends_at", daysAgoIso(0)).lte("trial_ends_at", daysFromNowIso(7)),
     admin.from("tenants").select("id", { count: "exact", head: true }).eq("status", "trial").lt("trial_ends_at", daysAgoIso(0)),
-    admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting"]),
+    admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", [...TICKET_OPEN_STATUSES]),
+    // Bilinçli fark: acil işte "waiting" (müşteri yanıtı bekleniyor) sayılmaz; TICKET_OPEN_STATUSES'ten dar.
     admin.from("support_tickets").select("id", { count: "exact", head: true }).eq("priority", "urgent").in("status", ["open", "in_progress"]),
     admin.from("profiles").select("id", { count: "exact", head: true }),
   ]);

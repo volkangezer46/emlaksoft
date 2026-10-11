@@ -3,6 +3,7 @@
  * Hesap, sayfaların kullandığı tek kaynak kütüphanelerle yapılır (`response-time`, `talep-arz`, `region_stats` RPC);
  * rapor merkezi aynı sayıları dosyaya yazar.
  */
+import { OPEN_DEMAND_STATUSES as OPEN_DEMAND_STATUSES_SOURCE } from "@/lib/workflow-state";
 import { daysAgoIso, now } from "@/lib/clock";
 import { DEFAULT_SLA_MIN, SLA_OPTIONS_MIN, summarizeByAdvisor, summarizeResponses } from "@/lib/response-time/core";
 import { loadLeadResponses } from "@/lib/response-time/load";
@@ -63,7 +64,7 @@ export const adayHizi = defineReport({
   },
 });
 
-const OPEN_DEMAND_STATUSES = ["new", "active", "matched"];
+const OPEN_DEMAND_STATUSES: string[] = [...OPEN_DEMAND_STATUSES_SOURCE];
 const LIVE_PROPERTY_STATUSES = ["live", "Yayında"];
 
 export const talepArz = defineReport({

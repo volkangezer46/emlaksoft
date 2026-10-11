@@ -1,8 +1,8 @@
 import { callPriorityLevel } from "@/lib/customer-state/core";
 import { CALL_MIN_QUIET_DAYS } from "@/lib/customer-state/thresholds";
 import { buildDedupeKey, weekPeriod } from "@/lib/insights/dedupe";
-import type { InsightDraft } from "@/lib/insights/types";
-import { capPerUser, dayMs, gunText, nameOr } from "@/lib/insights/rules/common";
+import type { InsightDraft, InsightRuleRun } from "@/lib/insights/types";
+import { capPerUser, liveIdsOf, dayMs, gunText, nameOr } from "@/lib/insights/rules/common";
 
 /**
  * Kural: call_priority — "Bugün ara" (neden etiketli aranacak liste).
@@ -27,7 +27,7 @@ export type QuietCustomerFact = {
 };
 
 /** `minQuietDays`: ofis tanımı (office.insight.customer_quiet_days); verilmezse CALL_MIN_QUIET_DAYS. */
-export function evaluateCallPriority(facts: readonly QuietCustomerFact[], nowMs: number, minQuietDays: number = CALL_MIN_QUIET_DAYS): InsightDraft[] {
+export function evaluateCallPriorityRun(facts: readonly QuietCustomerFact[], nowMs: number, minQuietDays: number = CALL_MIN_QUIET_DAYS): InsightRuleRun {
   const week = weekPeriod(nowMs);
   const drafts: InsightDraft[] = [];
   for (const f of facts) {
@@ -57,9 +57,16 @@ export function evaluateCallPriority(facts: readonly QuietCustomerFact[], nowMs:
       impact: Math.min(10, f.activeDemands * 2),
     });
   }
-  return capPerUser(drafts, CALL_MAX_PER_USER, (a, b) => {
+  // Canlı küme = üst sınırdan ÖNCEKİ uygun müşteriler (sınırla elenen kapanmaz).
+  const liveEntityIds = liveIdsOf(drafts);
+  const capped = capPerUser(drafts, CALL_MAX_PER_USER, (a, b) => {
     const ai = a.impact ?? 0;
     const bi = b.impact ?? 0;
     return bi - ai || (a.entityId ?? "").localeCompare(b.entityId ?? "");
   });
+  return { drafts: capped, liveEntityIds };
+}
+
+export function evaluateCallPriority(facts: readonly QuietCustomerFact[], nowMs: number, minQuietDays: number = CALL_MIN_QUIET_DAYS): InsightDraft[] {
+  return evaluateCallPriorityRun(facts, nowMs, minQuietDays).drafts;
 }
