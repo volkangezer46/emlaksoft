@@ -13,6 +13,7 @@ import { FormError, FormField, FormSelect } from "@/components/ui/form-controls"
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { formatDateTr } from "@/lib/format";
 import type { ColumnMapping } from "@/lib/finance/statement/parse";
+import { precheckStatementFile, statementTransportError } from "@/lib/finance/statement/errors";
 
 type CsvPreview = Extract<StatementPreview, { ok: true; format: "csv" | "xlsx" }>;
 type OfxPreview = Extract<StatementPreview, { ok: true; format: "ofx" }>;
@@ -23,7 +24,16 @@ const NONE = "";
 async function postStatement<T>(fd: FormData): Promise<T | { error: string }> {
   try {
     const res = await fetch("/api/app/finans/ekstre", { method: "POST", body: fd, headers: { [BRIDGE_HEADER]: "1" } });
-    return (await res.json()) as T;
+    // Platform katmanı JSON olmayan gövde döndürebilir (413 / 504 HTML): "bağlantı kurulamadı" demek yanıltıcıdır.
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      return { error: statementTransportError(res.status, null) };
+    }
+    const bodyError = body && typeof body === "object" && "error" in body && typeof (body as { error: unknown }).error === "string" ? (body as { error: string }).error : null;
+    if (!res.ok) return { error: statementTransportError(res.status, bodyError) };
+    return body as T;
   } catch {
     return { error: "Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin." };
   }
@@ -57,6 +67,8 @@ function UploadDialog({ accountId, accountName, reviewHref, currency, onClose }:
     setPreview(null);
     setError(null);
     if (!f) return;
+    const pre = precheckStatementFile(f);
+    if (pre) return setError(pre);
     setBusy(true);
     const fd = new FormData();
     fd.set("file", f);
@@ -89,7 +101,7 @@ function UploadDialog({ accountId, accountName, reviewHref, currency, onClose }:
     if (!("ok" in res) || !res.ok) return setError(res.error ?? "Ekstre yüklenemedi.");
     const dup = res.duplicates ? `, ${res.duplicates} satır daha önce yüklenmişti` : "";
     const bad = res.invalid ? `, ${res.invalid} satır okunamadı` : "";
-    push(`${res.inserted} satır taslağa alındı${dup}${bad}`, "ok");
+    push(`${res.inserted} satır taslağa alındı${dup}${bad}${res.truncated ? ", dosya çok uzun olduğu için kalanı alınmadı" : ""}`, "ok");
     onClose();
     router.push(reviewHref);
     router.refresh();
