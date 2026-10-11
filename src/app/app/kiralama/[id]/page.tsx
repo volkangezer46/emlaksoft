@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
@@ -18,6 +19,7 @@ import { loadReminderTab } from "./reminder-data";
 import { now, trDayKey } from "@/lib/clock";
 import { EdevletTransferCard } from "./edevlet-transfer-card";
 import { OwnerTab } from "./owner-tab";
+import { RentNoticesCard } from "./rent-notices-card";
 import { loadLateFeeSettings, loadRentalPayments } from "@/lib/property-management/load";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -254,6 +256,12 @@ export default async function KiraDetayPage({
 
           {tab === "tahakkuk" ? (
             <div className="space-y-4">
+              {/* Kiracı "Ödedim" bildirimi (teyit bekleyen); yoksa hiç çizilmez */}
+              {tenantId ? (
+                <Suspense fallback={null}>
+                  <RentNoticesCard rentalId={rental.id} tenantId={tenantId} canEdit={canEdit} />
+                </Suspense>
+              ) : null}
               {/* Tahakkuklar */}
               <ChargesPanel
                 rentalId={rental.id}

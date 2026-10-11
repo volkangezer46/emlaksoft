@@ -6,11 +6,11 @@ import { portalRequestMessage } from "@/lib/customer-portal/portal-model";
 
 export type PortalRequestResult = { ok: boolean; message: string };
 
-const KINDS = new Set(["offer", "reschedule", "cancel", "maintenance"]);
+const KINDS = new Set(["offer", "reschedule", "cancel", "maintenance", "visit", "demand_update", "rent_paid"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Müşteri portalı yazma isteği (teklif, randevu erteleme/iptal talebi, kiracı bakım talebi). service_role YOK: oturumsuz
+ * Müşteri portalı yazma isteği (teklif, randevu erteleme/iptal talebi, kiracı bakım talebi, gösterim talebi, arayış güncelleme isteği, kiracı "Ödedim" bildirimi). service_role YOK: oturumsuz
  * (anon) istemciyle `portal_customer_request` RPC'si çağrılır; token, sahiplik (yalnız bu kişinin randevusu/kira kaydı),
  * örnek veri ve frenler SQL içinde doğrulanır (20261007000620). Burada yalnız biçim + IP hız sınırı.
  */
@@ -32,6 +32,23 @@ export async function submitPortalRequest(fd: FormData): Promise<PortalRequestRe
     payload.property_id = refId;
     // "4.500.000" / "4500000" / "4 500 000" → sayı (yalnız rakam; kuruş alınmaz).
     payload.amount = Number(text("amount", 20).replace(/\D/g, "")) || null;
+  } else if (kind === "visit") {
+    payload.property_id = refId;
+    payload.preferred = text("preferred", 120);
+  } else if (kind === "demand_update") {
+    payload.demand_id = refId;
+    // Boş alan = değişiklik yok (RPC en az bir alan ister); "4.500.000" gibi girdiler yalnız rakama indirilir.
+    const money = (k: string) => {
+      const digits = text(k, 20).replace(/\D/g, "");
+      return digits ? Number(digits) : null;
+    };
+    payload.budget_min = money("budget_min");
+    payload.budget_max = money("budget_max");
+    payload.rooms = text("rooms", 20);
+    payload.area = text("area", 120);
+  } else if (kind === "rent_paid") {
+    payload.charge_id = refId;
+    payload.reference = text("reference", 120);
   } else if (kind === "maintenance") {
     payload.rental_id = refId;
     payload.title = text("title", 120);

@@ -1,15 +1,33 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CalendarClock, HandCoins, Loader2, Wrench, X } from "lucide-react";
+import { Banknote, CalendarClock, Eye, HandCoins, Loader2, SlidersHorizontal, Wrench, X } from "lucide-react";
 import { submitPortalRequest } from "@/app/actions/customer-portal-requests";
 
-type Variant = "offer" | "appointment" | "maintenance";
+type Variant = "offer" | "appointment" | "maintenance" | "visit" | "demand" | "rent";
 
 const META: Record<Variant, { open: string; icon: typeof HandCoins }> = {
   offer: { open: "Teklif ver", icon: HandCoins },
   appointment: { open: "Ertele / iptal talebi", icon: CalendarClock },
   maintenance: { open: "Bakım / arıza bildir", icon: Wrench },
+  visit: { open: "Görmek istiyorum", icon: Eye },
+  demand: { open: "Arayışımı güncelle", icon: SlidersHorizontal },
+  rent: { open: "Ödedim", icon: Banknote },
+};
+
+const KIND_OF: Record<Exclude<Variant, "appointment">, string> = {
+  offer: "offer",
+  maintenance: "maintenance",
+  visit: "visit",
+  demand: "demand_update",
+  rent: "rent_paid",
+};
+
+/** Başarı metni (RPC kodundan bağımsız, türüne göre basit dil). */
+const DONE: Partial<Record<Variant, string>> = {
+  visit: "Talebiniz danışmanınıza iletildi. Size uygun bir gün için dönüş yapacak.",
+  demand: "İsteğiniz danışmanınıza iletildi. Onaylayınca arayışınız güncellenecek.",
+  rent: "Bildiriminiz alındı. Danışmanınız hesabı kontrol edip ödemeyi teyit edecek.",
 };
 
 const FIELD =
@@ -54,10 +72,10 @@ export function PortalRequestForm({ token, refId, variant }: { token: string; re
         const fd = new FormData(e.currentTarget);
         fd.set("token", token);
         fd.set("ref_id", refId);
-        fd.set("kind", variant === "offer" ? "offer" : variant === "maintenance" ? "maintenance" : kind);
+        fd.set("kind", variant === "appointment" ? kind : KIND_OF[variant]);
         start(async () => {
           const r = await submitPortalRequest(fd);
-          setMsg({ ok: r.ok, text: r.message });
+          setMsg({ ok: r.ok, text: r.ok ? (DONE[variant] ?? r.message) : r.message });
         });
       }}
     >
@@ -103,6 +121,41 @@ export function PortalRequestForm({ token, refId, variant }: { token: string; re
             <textarea name="description" rows={3} maxLength={2000} className={`${FIELD} py-2`} />
           </label>
         </>
+      ) : null}
+      {variant === "visit" ? (
+        <label className="block text-xs font-medium text-ink-950">
+          Size uygun zaman (isteğe bağlı)
+          <input name="preferred" maxLength={120} placeholder="Örn. Cumartesi öğleden sonra" className={FIELD} />
+        </label>
+      ) : null}
+      {variant === "demand" ? (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-xs font-medium text-ink-950">
+              En az bütçe (₺)
+              <input name="budget_min" inputMode="numeric" maxLength={20} placeholder="Örn. 6.000.000" className={FIELD} />
+            </label>
+            <label className="block text-xs font-medium text-ink-950">
+              En çok bütçe (₺)
+              <input name="budget_max" inputMode="numeric" maxLength={20} placeholder="Örn. 8.500.000" className={FIELD} />
+            </label>
+          </div>
+          <label className="block text-xs font-medium text-ink-950">
+            Oda sayısı
+            <input name="rooms" maxLength={20} placeholder="Örn. 3+1" className={FIELD} />
+          </label>
+          <label className="block text-xs font-medium text-ink-950">
+            Bölge
+            <input name="area" maxLength={120} placeholder="Örn. Kadıköy, Ataşehir" className={FIELD} />
+          </label>
+          <p className="text-xs text-text-faint">Yalnız değiştirmek istediklerinizi doldurun.</p>
+        </>
+      ) : null}
+      {variant === "rent" ? (
+        <label className="block text-xs font-medium text-ink-950">
+          Dekont / işlem no (isteğe bağlı)
+          <input name="reference" maxLength={120} placeholder="Örn. Havale açıklaması" className={FIELD} />
+        </label>
       ) : null}
       {variant !== "maintenance" ? (
         <label className="block text-xs font-medium text-ink-950">

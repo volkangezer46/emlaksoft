@@ -393,6 +393,7 @@ export default async function CustomerPortalPage({
                     {/* ✓ seçim (2-3 portföy) → alt çubukta Karşılaştır; beğen/geç aynen kalır */}
                     <CompareToggle item={compareItem} variant="row" />
                     <MatchFeedback token={token} propertyId={m.id} initialVerdict={verdict} />
+                    {requestsEnabled && statusMap.get(m.id) ? <PortalRequestForm token={token} refId={m.id} variant="visit" /> : null}
                     {requestsEnabled && statusMap.get(m.id) ? <PortalRequestForm token={token} refId={m.id} variant="offer" /> : null}
                   </div>
                 );
@@ -407,25 +408,35 @@ export default async function CustomerPortalPage({
           <PortalSection id="arayislar" icon={Search} title="Arayışlarım">
             <div className="space-y-2">
               {demands.map((d) => (
-                <div key={d.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
-                  <div>
-                    <p className="text-sm font-semibold text-ink-950">
-                      {d.type || "Arayış"}
-                      {d.province ? ` — ${d.province}` : ""}
-                    </p>
-                    {(d.minPrice || d.maxPrice) && (
-                      <p className="mt-0.5 text-xs text-text-muted">
-                        {d.minPrice ? money(d.minPrice) : "—"} – {d.maxPrice ? money(d.maxPrice) : "—"}
+                <div key={d.id} className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink-950">
+                        {d.type || "Arayış"}
+                        {d.province ? ` — ${d.province}` : ""}
+                        {d.rooms ? ` · ${d.rooms}` : ""}
                       </p>
-                    )}
+                      {(d.minPrice || d.maxPrice) && (
+                        <p className="mt-0.5 text-xs text-text-muted">
+                          {d.minPrice ? money(d.minPrice) : "—"} – {d.maxPrice ? money(d.maxPrice) : "—"}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                      d.status === "active"
+                        ? "bg-mint-500/12 text-mint-700"
+                        : "bg-canvas text-text-muted"
+                    }`}>
+                      {DEMAND_STATUS_TR[d.status] ?? "Kayıtlı"}
+                    </span>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                    d.status === "active"
-                      ? "bg-mint-500/12 text-mint-700"
-                      : "bg-canvas text-text-muted"
-                  }`}>
-                    {DEMAND_STATUS_TR[d.status] ?? "Kayıtlı"}
-                  </span>
+                  {d.updatePending ? (
+                    <p className="border-t border-line px-4 py-2.5 text-xs font-semibold text-amber-700">
+                      Güncelleme isteğiniz danışmanınızda; onaylayınca arayışınız yenilenecek.
+                    </p>
+                  ) : requestsEnabled && ["new", "active", "matched"].includes(d.status) ? (
+                    <PortalRequestForm token={token} refId={d.id} variant="demand" />
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -586,6 +597,25 @@ export default async function CustomerPortalPage({
                       </div>
                     ) : null}
                   </div>
+                  {requestsEnabled
+                    ? r.charges
+                        .filter((c) => c.status !== "paid")
+                        .slice(0, 2)
+                        .map((c) =>
+                          c.noticePending ? (
+                            <p key={c.id} role="status" className="border-t border-line px-4 py-2.5 text-xs font-semibold text-amber-700">
+                              {formatDateTimeTr(c.period, { month: "long", year: "numeric" })} kirası için ödeme bildiriminiz alındı; teyit bekliyor.
+                            </p>
+                          ) : (
+                            <div key={c.id}>
+                              <p className="border-t border-line px-4 pt-2 text-xs text-text-muted">
+                                {formatDateTimeTr(c.period, { month: "long", year: "numeric" })} kirasını ({money(c.amount)}) ödediniz mi?
+                              </p>
+                              <PortalRequestForm token={token} refId={c.id} variant="rent" />
+                            </div>
+                          ),
+                        )
+                    : null}
                   {requestsEnabled ? <PortalRequestForm token={token} refId={r.id} variant="maintenance" /> : null}
                 </div>
               ))}
