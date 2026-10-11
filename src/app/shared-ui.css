@@ -162,3 +162,9 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
 }
 input[type="range"]:focus-visible { outline: 2px solid var(--brand-600); outline-offset: 3px; border-radius: 9999px; }
+
+/* Yatay kaydırılan şeritlerde (sekme şeridi, SegmentTabs) kenar solma ipucu; işaretleri MorphNavScrollActive yönetir. */
+.strip-fade[data-more-right] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.strip-fade[data-more-left] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent); }
+.strip-fade[data-more-left][data-more-right] { -webkit-mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+.strip-fade { overscroll-behavior-x: contain; }

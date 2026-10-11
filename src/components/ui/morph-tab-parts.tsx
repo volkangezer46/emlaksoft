@@ -155,7 +155,7 @@ export function MorphNav({
       <ul
         data-idle={inactive}
         className={cn(
-          "mt-strip relative flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          "mt-strip strip-fade relative flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           variant === "pill" ? "rounded-[var(--radius-card)] border border-line bg-canvas p-1" : "border-b border-line px-1 pt-1.5",
         )}
       >
