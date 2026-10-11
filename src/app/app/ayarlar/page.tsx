@@ -7,6 +7,7 @@ import { planLabel } from "@/lib/billing/plans";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RadialGauge } from "@/components/ui/viz";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { SETTINGS_TABS, parseSettingsTab, settingsTabHref } from "./_sekmeler/tabs";
 import { HashTabRedirect } from "./_sekmeler/hash-tab-redirect";
 import { EMPTY_SETTINGS_TENANT, SETTINGS_TENANT_COLUMNS, type SettingsTenant } from "./_sekmeler/types";
@@ -120,18 +121,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
       </section>
 
       <HashTabRedirect active={tab} />
-      <nav aria-label="Ayarlar sekmeleri" className="flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-canvas p-1">
-        {SETTINGS_TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={settingsTabHref(t.id)}
-            aria-current={tab === t.id ? "page" : undefined}
-            className={`focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"} touch:min-h-11`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </nav>
+      <SegmentTabs label="Ayarlar sekmeleri" active={tab} items={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label, href: settingsTabHref(t.id) }))} />
 
       {tab === "kimlik" ? <KimlikTab tenant={tenant} canEdit={canEditSettings} /> : null}
       {tab === "eslestirme" ? <EslestirmeTab canEdit={canEditSettings} /> : null}

@@ -2,6 +2,7 @@ import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
 import { ArrowUpRight, PalmtreeIcon } from "lucide-react";
 import { AdvisorRowActions, type Option } from "@/components/app/office-center/advisor-row-actions";
+import { MobileCard } from "@/components/ui/list-kit/mobile-card-list";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { relativeTimeTR } from "@/lib/admin-format";
 import type { AdvisorSortKey, OfficeAdvisorRow } from "@/lib/office-center/types";
@@ -54,6 +55,73 @@ export async function AdvisorTable({
   // Avatarlar ayrı, hata-toleranslı tek IN sorgusu (satır yükleyicisini ve kolon yokken sayfayı bozmaz).
   const avatars = await loadAvatarMap(rows.map((r) => r.id));
   return (
+    <>
+    <ul className="list-stagger space-y-2.5 sm:hidden" aria-label="Danışman kartları">
+      {rows.map((r) => (
+        <MobileCard key={r.id} className={!r.isActive ? "opacity-70" : ""}>
+          <div className="flex items-start gap-2.5">
+            <Avatar name={r.fullName} src={avatars.get(r.id)?.avatar_url} preset={avatars.get(r.id)?.avatar_preset} size="md" />
+            <div className="min-w-0 flex-1">
+              <Link href={`/app/ekip/${r.id}`} className="focus-ring inline-flex min-h-11 items-center gap-1 font-semibold text-ink-950 hover:text-brand-600">
+                {r.fullName}
+              </Link>
+              <p className="-mt-2 text-xs text-text-muted">
+                {r.title ?? "—"}
+                {!r.isActive ? " · Pasif" : ""}
+                {r.onLeaveToday ? " · İzinde" : ""}
+              </p>
+              {extra?.get(r.id) ?? null}
+            </div>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div>
+              <dt className="text-text-faint">Rol</dt>
+              <dd className="font-semibold text-ink-950">{ROLE_LABELS[r.role] ?? r.role}</dd>
+              <dd className="text-text-muted">{[r.teamName, r.branchName].filter(Boolean).join(" · ") || "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-text-faint">Son aktivite</dt>
+              <dd className="text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "90+ gün / kayıt yok"}</dd>
+            </div>
+            <div>
+              <dt className="text-text-faint">Uzmanlık</dt>
+              <dd className="text-text-muted">{r.specialties.length ? r.specialties.join(", ") : "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-text-faint">Bölge</dt>
+              <dd className="text-text-muted">{r.regions.length ? r.regions.join(", ") : "—"}</dd>
+            </div>
+          </dl>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2 text-xs text-text-muted">
+            <span>Portföy <Num value={r.openProperties} href={`/app/portfoyler?danisman=${r.id}`} label={`${r.fullName} açık portföyleri`} dim={r.openProperties === 0} /></span>
+            <span>Talep <Num value={r.openDemands} href={`/app/talepler?danisman=${r.id}`} label={`${r.fullName} açık talepleri`} dim={r.openDemands === 0} /></span>
+            <span>Kapanış <Num value={r.wonThisMonth} href={`/app/anlasmalar?gorunum=liste&asama=won&danisman=${r.id}`} label={`${r.fullName} bu ay kazanılan anlaşmaları`} dim={r.wonThisMonth === 0} /></span>
+            <span>Yanıt <Num value={r.slaWithinPct == null ? "—" : `%${r.slaWithinPct}`} href={`/app/raporlar/lead-hizi?danisman=${r.id}`} label={`${r.fullName} ilk yanıt raporu`} dim={r.slaWithinPct == null} /></span>
+          </div>
+          {actions ? (
+            <div className="mt-2 border-t border-line pt-2">
+              {r.role === "owner" ? (
+                <span className="text-xs text-text-faint">Ofis sahibi</span>
+              ) : r.id === actions.viewerId ? (
+                <Link href="/app/hesabim" className="focus-ring inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
+                  Hesabım
+                </Link>
+              ) : (
+                <AdvisorRowActions
+                  advisor={{ id: r.id, fullName: r.fullName, role: r.role, isActive: r.isActive, branchId: r.branchId, teamId: r.teamId }}
+                  roles={actions.roles}
+                  branches={actions.branches}
+                  teams={actions.teams}
+                  teamsAvailable={actions.teamsAvailable}
+                  handoffTargets={actions.handoffTargets.filter((t) => t.id !== r.id)}
+                />
+              )}
+            </div>
+          ) : null}
+        </MobileCard>
+      ))}
+    </ul>
+    <div className="hidden sm:block">
     <TableFrame stickyFirst minWidth={1120}>
       <Table>
         <THead>
@@ -149,5 +217,7 @@ export async function AdvisorTable({
         </TBody>
       </Table>
     </TableFrame>
+    </div>
+    </>
   );
 }

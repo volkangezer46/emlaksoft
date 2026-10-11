@@ -1,0 +1,109 @@
+import { describe, expect, it } from "vitest";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+/**
+ * TEK ŞERİT + MOBİL KART SÖZLEŞMESİ (konsey UX denetimi, bulgu 2).
+ *  1) Bir /app sayfasında hub şeridine (section-tabs) EK ikinci sekme şeridi (PageTabs / MorphNav / DetailTabs) kullanılmaz;
+ *     sayfanın kendi iç sekmeleri `SegmentTabs` (src/components/ui/segment-tabs.tsx) ile çizilir. Mevcut kullanımlar
+ *     aşağıdaki istisna listesindedir ve YALNIZ AZALABİLİR (dosyayı düzeltince listeden çıkar).
+ *  2) Geniş tablo (TableFrame minWidth >= 100) mobil kart alternatifi (MobileCard ya da kırılımla gizleme) olmadan
+ *     kullanılmaz; mevcutlar istisna listesindedir ve YALNIZ AZALABİLİR.
+ */
+const STRIP_EXCEPTIONS = new Set<string>([
+  "src/app/app/abonelik/page.tsx",
+  "src/app/app/anlasmalar/[id]/page.tsx",
+  "src/app/app/bildirimler/page.tsx",
+  "src/app/app/cuzdan/page.tsx",
+  "src/app/app/ekip/[id]/advisor-view.tsx",
+  "src/app/app/gelen-kutusu/page.tsx",
+  "src/app/app/giderler/_tabs/finance-shell.tsx",
+  "src/app/app/hesabim/page.tsx",
+  "src/app/app/kiralama/[id]/page.tsx",
+  "src/app/app/musteriler/[id]/customer-360-tabs.tsx",
+  "src/app/app/portfoyler/[id]/page.tsx",
+  "src/app/app/sozlesmeler/[id]/page.tsx",
+  "src/app/app/talepler/page.tsx",
+]);
+
+const WIDE_TABLE_EXCEPTIONS = new Set<string>([
+  "src/app/app/abonelik/cuzdan-section.tsx",
+  "src/app/app/abonelik/kontor-section.tsx",
+  "src/app/app/abonelik/page.tsx",
+  "src/app/app/aidat/bina-forms.tsx",
+  "src/app/app/aidat/cari-tab.tsx",
+  "src/app/app/anlasmalar/deal-rows.tsx",
+  "src/app/app/cuzdan/office-earnings.tsx",
+  "src/app/app/danisman-kpi/page.tsx",
+  "src/app/app/degerleme/[id]/page.tsx",
+  "src/app/app/ekip/kiyas/page.tsx",
+  "src/app/app/franchise/page.tsx",
+  "src/app/app/giderler/faturalar/faturalar-tab.tsx",
+  "src/app/app/ilan-havuzu/assignment-section.tsx",
+  "src/app/app/ilan-kontrol/envanter/page.tsx",
+  "src/app/app/ilan-kontrol/liste/page.tsx",
+  "src/app/app/kiralama/[id]/owner-tab.tsx",
+  "src/app/app/kiralama/rental-rows.tsx",
+  "src/app/app/lig/page.tsx",
+  "src/app/app/ofis-merkezi/_tabs/stats-tab.tsx",
+  "src/app/app/portfoyler/sunumlar/page.tsx",
+  "src/app/app/portfoyler/sunumlar/shared-portals.tsx",
+  "src/app/app/randevular/appointment-rows.tsx",
+  "src/app/app/raporlar/kar-zarar/advisor-profit.tsx",
+  "src/app/app/sozlesmeler/contract-rows.tsx",
+  "src/app/app/talepler/demand-rows.tsx",
+  "src/app/app/tavsiyeler/page.tsx",
+  "src/app/app/teklifler/offer-rows.tsx",
+]);
+
+const ROOT = process.cwd().replace(/\\/g, "/");
+
+function walk(dir: string, out: string[] = []): string[] {
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.tsx$/.test(name) && !/\.test\.tsx$/.test(name)) out.push(full.replace(/\\/g, "/"));
+  }
+  return out;
+}
+
+const FILES = ["src/app/app", "src/components/app"].flatMap((d) => walk(join(ROOT, d)).map((f) => f.slice(ROOT.length + 1)));
+const SKIP = new Set(["src/components/app/detail-tabs.tsx", "src/components/app/section-tabs.tsx", "src/components/app/page-tabs.tsx"]);
+const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
+
+const SECOND_STRIP = /<(PageTabs|MorphNav|DetailTabs)\b/;
+const WIDE_TABLE = /<TableFrame[^>]*minWidth=\{\d{3,4}/;
+const MOBILE_ALT = /MobileCard|sm:hidden|md:hidden|lg:hidden|hidden sm:|hidden md:/;
+
+describe("tek şerit ilkesi", () => {
+  const using = FILES.filter((f) => !SKIP.has(f) && SECOND_STRIP.test(read(f)));
+  it("yeni ikinci sekme şeridi eklenmez (SegmentTabs kullan)", () => {
+    expect(using.filter((f) => !STRIP_EXCEPTIONS.has(f))).toEqual([]);
+  });
+  it("istisna listesi güncel: artık kullanmayan dosya listeden çıkarılır", () => {
+    expect([...STRIP_EXCEPTIONS].filter((f) => !using.includes(f))).toEqual([]);
+  });
+  it("SegmentTabs: yatay kaydırma + 44px hedef + aria-current", () => {
+    const code = read("src/components/ui/segment-tabs.tsx");
+    expect(code).toContain("overflow-x-auto");
+    expect(code).toContain("min-h-11");
+    expect(code).toContain("aria-current");
+  });
+});
+
+describe("geniş tablo mobil kart alternatifi", () => {
+  const wide = FILES.filter((f) => WIDE_TABLE.test(read(f)) && !MOBILE_ALT.test(read(f)));
+  it("yeni geniş tablo kart alternatifsiz eklenmez", () => {
+    expect(wide.filter((f) => !WIDE_TABLE_EXCEPTIONS.has(f))).toEqual([]);
+  });
+  it("istisna listesi güncel: düzeltilen dosya listeden çıkarılır", () => {
+    expect([...WIDE_TABLE_EXCEPTIONS].filter((f) => !wide.includes(f))).toEqual([]);
+  });
+  it("danışman tablosu 640 px altında kart listesine döner", () => {
+    const code = read("src/components/app/office-center/advisor-table.tsx");
+    expect(code).toContain("MobileCard");
+    expect(code).toContain("sm:hidden");
+    expect(code).toContain("hidden sm:block");
+  });
+});

@@ -7,7 +7,8 @@ import { msSince, now, DAY_MS, trDayKey, trMonthKey } from "@/lib/clock";
 import { DuesClient } from "./dues-client";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
-import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { Building2, Landmark, Scale } from "lucide-react";
 import { loadBuildingChargesPage, loadBuildingKpi } from "@/lib/building-management/load";
 import { BUILDING_STATUS_LABELS, deriveBuildingChargeStatus } from "@/lib/building-management/charges";
@@ -84,7 +85,7 @@ export default async function AidatPage({
     { id: "binalar", label: "Binalar", icon: Building2 },
     { id: "cari", label: "Daire cari", icon: Scale },
   ];
-  const tabStrip = <DetailTabs basePath="/app/aidat" tabs={tabDefs} active={tab} label="Aidat ve bina yönetimi sekmeleri" />;
+  const tabStrip = <SegmentTabs items={tabDefs.map((t) => ({ id: t.id, label: t.label, icon: t.icon, href: `/app/aidat?sekme=${t.id}` }))} active={tab} label="Aidat ve bina yönetimi sekmeleri" />;
 
   if (tab !== "genel") {
     const supabase = await createClient();

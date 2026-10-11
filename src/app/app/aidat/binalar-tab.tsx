@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, ArrowUpRight, Building2, CalendarClock, Coins, Gauge, Wallet } from "lucide-react";
-import { MorphNav } from "@/components/ui/morph-tab-parts";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -113,11 +113,9 @@ export async function BinalarTab({
 
       <KpiStrip items={kpis} label="Bina özeti" />
 
-      <MorphNav
-        variant="pill"
+      <SegmentTabs
         label="Bina bölümleri"
-        activeId={section}
-        scroll={false}
+        active={section}
         items={SECTIONS.map((s) => ({ id: s.id, href: `${base}&bolum=${s.id}`, label: s.label }))}
       />
 

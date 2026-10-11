@@ -1,4 +1,4 @@
-import Link from "@/components/ui/smart-link";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { CONTROL_BASE } from "./helpers";
 
 /** Kayıp-Kaçak Kalkanı sayfası (yol DEĞİŞMEZ; nav-config kuralı). İlan Kontrol alt gezinmesinin "Kapanış kayıpları" sekmesi. */
@@ -26,21 +26,5 @@ export type ControlTab = (typeof ITEMS)[number]["id"];
  */
 export function ControlSubNav({ active, closures = true }: { active: ControlTab; closures?: boolean }) {
   const items = ITEMS.filter((i) => i.id !== "kapanis" || closures);
-  return (
-    <nav aria-label="İlan kontrol bölümleri" className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
-      {items.map((i) => {
-        const on = i.id === active;
-        return (
-          <Link
-            key={i.id}
-            href={i.href}
-            aria-current={on ? "page" : undefined}
-            className={`focus-ring -mb-px inline-flex min-h-11 shrink-0 items-center border-b-2 px-3 text-sm font-semibold transition ${on ? "border-brand-600 text-text" : "border-transparent text-text-muted hover:text-text"}`}
-          >
-            {i.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  return <SegmentTabs className="mb-5" label="İlan kontrol bölümleri" active={active} items={items} />;
 }

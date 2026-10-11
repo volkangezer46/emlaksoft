@@ -26,6 +26,7 @@ import { loadOfficeDocAlerts } from "@/lib/advisor/advisor-store";
 import type { CSSProperties } from "react";
 
 import { ListHero, ListPage } from "@/components/ui/list-page";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { ButtonLink } from "@/components/ui/button";
 import { DashboardGrid, DashCell, DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
@@ -101,18 +102,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const canOfficeCenterTabs = effectiveCanAccessModule(perms, "office_center");
   const tab = canOfficeCenterTabs ? parseTab(sp.sekme) : "danismanlar";
   const tabNav = canOfficeCenterTabs ? (
-    <nav aria-label="Ekip Merkezi sekmeleri" className="flex gap-1 overflow-x-auto rounded-[var(--radius-card)] border border-line bg-canvas p-1">
-      {OFFICE_CENTER_TABS.map((t) => (
-        <Link
-          key={t.id}
-          href={tabHref(t.id)}
-          aria-current={tab === t.id ? "page" : undefined}
-          className={`focus-ring inline-flex min-h-11 shrink-0 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"}`}
-        >
-          {t.label}
-        </Link>
-      ))}
-    </nav>
+    <SegmentTabs label="Ekip Merkezi sekmeleri" active={tab} items={OFFICE_CENTER_TABS.map((t) => ({ id: t.id, label: t.label, href: tabHref(t.id) }))} />
   ) : null;
 
   if (tab !== "danismanlar" && tenantId) {

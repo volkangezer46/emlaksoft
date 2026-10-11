@@ -11,7 +11,8 @@ import { formatDateTimeTr } from "@/lib/format";
 import { getSetting } from "@/lib/settings/read";
 import { SCOPE_ENFORCEMENT_KEY } from "@/lib/settings/registry/tenant";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageTabs, type PageTab } from "@/components/app/page-tabs";
+import { type PageTab } from "@/components/app/page-tabs";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { StatRow } from "@/components/ui/stat-row";
 import { Alert } from "@/components/ui/alert";
 import { FilterDate, FilterGrid, FilterSelect, ListPager, pageWindow, parsePage } from "@/components/ui/list-kit";
@@ -174,7 +175,7 @@ export default async function AccessControlPage({
         </Alert>
       ) : null}
       <StatRow items={stats} label="Yetkilendirme özeti" />
-      <PageTabs base={PATH} label="Yetkilendirme sekmeleri" tabs={tabs} active={active} />
+      <SegmentTabs label="Yetkilendirme sekmeleri" active={active} items={tabs.map((t, i) => ({ id: t.id, label: t.label, icon: t.icon, href: i === 0 ? PATH : `${PATH}?sekme=${t.id}` }))} />
 
       {active === "kapsamlar" ? (
         <>
