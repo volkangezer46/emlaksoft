@@ -10,6 +10,7 @@ import { Celebrate } from "@/components/ui/celebrate";
 import { FormInput, FormSelect, FormTextarea, fieldClass } from "@/components/ui/form-controls";
 import { updateDeal, updateDealStage } from "@/app/actions/deals";
 import { updateCommissionSplits } from "@/app/actions/commissions";
+import { updatePropertyCommissionRate } from "@/app/actions/property-commission-rate";
 import { createTask } from "@/app/actions/tasks";
 import { calculateCommission } from "@/lib/commission";
 import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
@@ -316,17 +317,10 @@ function ValueStep(p: BodyProps) {
             <p className="text-xs text-text-muted">Tutarı girince komisyon önizlemesi görünür.</p>
           )
         ) : (
-          <Alert tone="warning">
-            Portföyde komisyon oranı tanımlı değil; kazanmadan önce tanımlayın.
-            {p.propertyId ? (
-              <>
-                {" "}
-                <Link className="font-semibold underline" href={`/app/portfoyler/${p.propertyId}`}>
-                  Portföye git
-                </Link>
-              </>
-            ) : null}
-          </Alert>
+          <div className="space-y-2">
+            <Alert tone="warning">Portföyde komisyon oranı tanımlı değil; kazanmadan önce oranı girin.</Alert>
+            {p.propertyId ? <RateField propertyId={p.propertyId} canEdit={p.canEdit} go={p.go} /> : null}
+          </div>
         )
       ) : null}
       {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
@@ -337,6 +331,41 @@ function ValueStep(p: BodyProps) {
         </Button>
       ) : (
         <p className="text-xs text-text-muted">Tutarı düzenlemek için anlaşma düzenleme yetkisi gerekir.</p>
+      )}
+    </div>
+  );
+}
+
+/** Portföyde oran yokken kapanış ekranından oranı girer; kaydedince kazanma adımı aynı ekranda açılır. */
+function RateField({ propertyId, canEdit, go }: { propertyId: string; canEdit: boolean; go: (s: ClosingStep) => void }) {
+  const r = useRun();
+  const [rate, setRate] = useState("");
+
+  function save() {
+    r.setError(null);
+    r.startTransition(async () => {
+      const res = await updatePropertyCommissionRate(propertyId, rate);
+      if (!res.ok) return r.setError(res.error);
+      r.router.refresh();
+      go("onay");
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="max-w-xs">
+        <label htmlFor="kap-oran" className="mb-1 block text-xs font-semibold text-text-muted">
+          Komisyon oranı (%)
+        </label>
+        <FormInput id="kap-oran" inputMode="decimal" placeholder="örn. 2,5" value={rate} onChange={(e) => setRate(e.target.value)} disabled={!canEdit} />
+      </div>
+      {r.error ? <Alert tone="danger">{r.error}</Alert> : null}
+      {canEdit ? (
+        <Button type="button" loading={r.pending} disabled={!rate.trim()} onClick={save}>
+          Oranı kaydet ve ilerle
+        </Button>
+      ) : (
+        <p className="text-xs text-text-muted">Oranı girmek için portföy düzenleme yetkisi gerekir.</p>
       )}
     </div>
   );

@@ -24,6 +24,8 @@ export type OnboardingFacts = {
   members: number;
   /** İlan havuzu ofiste açık mı (tenants.listing_pool_enabled). */
   poolEnabled: boolean;
+  /** Ofisteki gerçek (örnek olmayan) danışman uzmanlık + bölge kayıt sayısı; havuz ancak buna göre atama yapabilir. */
+  poolAdvisorRecords: number;
   /** Yayın tarihi dolu, örnek olmayan portföy sayısı. */
   publishedProperties: number;
   /** Aktif mesajlaşma entegrasyonu (netgsm/whatsapp) sayısı. */
@@ -77,7 +79,7 @@ export const ONBOARDING_STEP_DEFS = [
     short: "Havuz",
     title: "İlan havuzu ve atama",
     description: "Havuz açıkken gelen ilanlar uzmanlığa göre danışmanlara önerilir ve atanır.",
-    isDone: (f) => f.poolEnabled,
+    isDone: (f) => f.poolEnabled && f.poolAdvisorRecords > 0,
   },
   {
     id: "portals",

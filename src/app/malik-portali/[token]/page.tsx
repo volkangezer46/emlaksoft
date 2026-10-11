@@ -443,7 +443,7 @@ export default async function MalikPortaliPage({
           </section>
         )}
 
-        <PortalFooterNote office={tenant.name} />
+        <PortalFooterNote office={tenant.name} asOf={formatDateTimeTr(clockNow())} />
         <PortalStickySpacer active={Boolean(contactTel || contactWhatsApp)} />
       </main>
       <PortalContactBar telHref={contactTel} whatsAppHref={contactWhatsApp} callLabel={contactLabel} />

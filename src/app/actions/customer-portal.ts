@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { getBaseUrl } from "@/lib/base-url";
-import { buildPortalTabs, signerMatchesCustomer, type PortalDealProcess, type PortalOwnerProperty, type PortalRental, type PortalDocuments, type PortalTab } from "@/lib/customer-portal/portal-model";
+import { buildPortalTabs, signerMatchesCustomer, topPortalReasons, type PortalDealProcess, type PortalOwnerProperty, type PortalRental, type PortalDocuments, type PortalTab } from "@/lib/customer-portal/portal-model";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { buildDealProcess, toPortalSteps } from "@/lib/deal-process";
 import { now as clockNow } from "@/lib/clock";
@@ -152,6 +152,8 @@ export type CustomerPortalData = {
   matches: {
     id:         string;
     score:      number | null;
+    /** Hesaplanmış, uyan en çok 3 gerekçe (belirsiz yok); skor tek başına gösterilmez. */
+    reasons:    string[];
     property: {
       title:    string | null;
       code:     string;
@@ -251,7 +253,7 @@ export async function getCustomerPortalData(
 
   // Aktif taleplere göre portföyleri anlık skorla — en iyi 6 eşleşme
   const activeDemands = demandRows.filter((d) => ["new", "active", "matched"].includes(d.status));
-  const scored: { id: string; score: number; title: string | null; code: string; price: number | null; province: string | null }[] = [];
+  const scored: { id: string; score: number; reasons: string[]; title: string | null; code: string; price: number | null; province: string | null }[] = [];
   const seen = new Set<string>();
   for (const d of activeDemands) {
     for (const p of propRows ?? []) {
@@ -261,6 +263,7 @@ export async function getCustomerPortalData(
         scored.push({
           id: p.id,
           score: result.score,
+          reasons: topPortalReasons(result.reasons),
           title: p.title,
           code: p.property_code,
           price: p.list_price,
@@ -303,6 +306,7 @@ export async function getCustomerPortalData(
     matches: topMatches.map((m) => ({
       id:    m.id,
       score: m.score,
+      reasons: m.reasons,
       property: {
         title:    m.title,
         code:     m.code,
