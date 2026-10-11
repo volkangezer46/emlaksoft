@@ -8,7 +8,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
 import { ExpenseReceiptFileControl, type ReceiptFileRef } from "./expense-receipt-file";
 import { PORTAL_KEYS, PORTAL_LABEL } from "@/lib/finance/portal-roi";
-import { RECURRENCES, RECURRENCE_LABEL } from "@/lib/finance/recurring-expenses";
+import { RECURRENCE_LABEL } from "@/lib/finance/recurring-expenses";
 
 type Category = { value: string; label: string };
 export type Expense = {
@@ -95,7 +95,7 @@ export function ExpenseEditDialog({
             )
           : undefined
       }
-      tabs={[{ id: "gider", label: "Gider", fields: ["title", "amount", "expense_date", "category", "notes", "property_id", "receipt_url", "recurrence", "portal_key"] }]}
+      tabs={[{ id: "gider", label: "Gider", fields: ["title", "amount", "expense_date", "category", "notes", "property_id", "receipt_url", "portal_key"] }]}
       panels={{
         gider: (
           <>
@@ -142,13 +142,14 @@ export function ExpenseEditDialog({
             </div>
             {financeFields ? (
               <>
-                <div>
-                  <label htmlFor={`expense-recurrence-${expense.id}`} className={lbl}>Tekrar dönemi</label>
-                  <select id={`expense-recurrence-${expense.id}`} name="recurrence" defaultValue={expense.recurrence ?? ""} className={fieldClass}>
-                    <option value="">Tek seferlik</option>
-                    {RECURRENCES.map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]} tekrarlar</option>)}
-                  </select>
-                </div>
+                {expense.recurrence ? (
+                  <div>
+                    <span className={lbl}>Tekrar dönemi</span>
+                    <p className="text-sm text-slate-600">
+                      {RECURRENCE_LABEL[expense.recurrence as keyof typeof RECURRENCE_LABEL] ?? expense.recurrence} tekrarlar (eski seri, yalnız okunur). Yeni düzenli ödeme için Düzenli ödemeler bölümünü kullanın; bu seriyi oradan &quot;Kurala çevir&quot; ile taşıyabilirsiniz.
+                    </p>
+                  </div>
+                ) : null}
                 <div>
                   <label htmlFor={`expense-portal-${expense.id}`} className={lbl}>Portal gideri</label>
                   <select id={`expense-portal-${expense.id}`} name="portal_key" defaultValue={expense.portal_key ?? ""} className={fieldClass}>

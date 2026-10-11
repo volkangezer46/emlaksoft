@@ -375,6 +375,7 @@ export async function GET(req: NextRequest) {
   // ---- 6) Düzenli ödemeler (Finans Paket B): vadesi gelen kural için hareket (+ ofis gideri) ya da onay taslağı, vade -3 gün hatırlatma.
   //   Dönem başına tek üretim SQL'de garantilidir (unique(rule_id, period)); migration yoksa adım sessizce atlanır; hata asıl işi bozmaz.
   let recurringNote = "";
+  let recurringErrorNote = "";
   try {
     const { data: rec, error: recErr } = await admin.rpc("recurring_run_due", {
       p_today: trDayKey(Date.now()),
@@ -387,8 +388,12 @@ export async function GET(req: NextRequest) {
         failed += 1;
       }
     } else {
-      const r = (rec ?? {}) as { posted?: number; drafts?: number; reminded?: number; failed?: number };
+      const r = (rec ?? {}) as { posted?: number; drafts?: number; reminded?: number; failed?: number; errors?: { rule_id?: string; step?: string; code?: string; message?: string }[] };
       failed += Number(r.failed) || 0;
+      // 20261012000300: SQL hata dizisi döndürür; ilk nedenler heartbeat notuna ve loga yazılır (yalnız kural no + SQLSTATE; kişisel veri yok).
+      const errs = Array.isArray(r.errors) ? r.errors : [];
+      for (const er of errs.slice(0, 5)) console.error("kira-tahakkuk cron duzenli odeme hata", er.step, er.code, er.rule_id);
+      if (errs.length > 0) recurringErrorNote = ` [düzenli ödeme hata: ${errs.slice(0, 3).map((er) => `${er.step ?? "?"}/${er.code ?? "?"}`).join(", ")}]`;
       if ((r.posted ?? 0) + (r.drafts ?? 0) + (r.reminded ?? 0) + (r.failed ?? 0) > 0) {
         recurringNote = `, düzenli ödeme: ${r.posted ?? 0} kayıt / ${r.drafts ?? 0} taslak / ${r.reminded ?? 0} hatırlatma${r.failed ? ` (${r.failed} hata)` : ""}`;
       }
@@ -401,7 +406,7 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat(
     "kira-tahakkuk",
     heartbeatFor({ failed, truncated }),
-    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${recurringNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}${failureNote({ failed, truncated })}`,
+    `${created} tahakkuk, ${overdueCount} gecikme, ${renewalNotified} yenileme bildirimi${reminderNote}${payoutNote}${buildingNote}${recurringNote}${recurringErrorNote}${declarationNotified ? `, ${declarationNotified} beyan hatırlatması` : ""}${skippedTenantsNote(disabledModules, "rentals")}${failureNote({ failed, truncated })}`,
   );
 
   return NextResponse.json({

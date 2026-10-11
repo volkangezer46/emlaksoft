@@ -7,6 +7,8 @@ import { revalidateTenantData } from "@/lib/revalidate";
 import { expenseCategoryFor, isCashCategory } from "@/lib/finance/cash/categories";
 import { financeOutcomeMessage, isUuid } from "@/lib/finance/cash/input";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
+import { explainApplyFailures } from "@/lib/finance/statement/errors";
+import { now, trDayKey } from "@/lib/clock";
 
 /**
  * Banka ekstresi içe aktarma + mutabakat server action'ları (Paket C).
@@ -51,6 +53,30 @@ function rpcFailure(error: { code?: string | null; message?: string | null } | n
   return { error: actionErrorMessage(error, fallback) };
 }
 
+/** Başarısız satırların nedenini (açılış tarihi, gelecek tarih, maaş yetkisi) kullanıcıya açık cümleyle verir. */
+async function failureText(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  accountId: string,
+  scope: "office" | "user",
+  role: string,
+  decisions: readonly StatementDecision[],
+  lineList: { id: string; direction: "in" | "out"; line_date: string }[],
+  failed: number,
+): Promise<string> {
+  const { data } = await supabase.from("finance_accounts").select("opening_date").eq("id", accountId).maybeSingle();
+  return explainApplyFailures(
+    {
+      decisions,
+      lines: new Map(lineList.map((l) => [l.id, { date: String(l.line_date), direction: l.direction }])),
+      openingDate: (data as { opening_date?: string } | null)?.opening_date ?? null,
+      today: trDayKey(now()),
+      canBookSalary: role === "owner" || role === "gm",
+      isOfficeAccount: scope === "office",
+    },
+    failed,
+  );
+}
+
 /** Adım 3: kullanıcının onay/düzeltme kararlarını uygular (hareket üret / mevcutla eşle / atla). */
 export async function applyStatementDecisions(accountId: string, decisions: readonly StatementDecision[]): Promise<StatementResult> {
   const scope = await accountScope(accountId);
@@ -63,9 +89,10 @@ export async function applyStatementDecisions(accountId: string, decisions: read
   const supabase = await createClient();
   const ids = decisions.map((d) => String(d.lineId));
   if (ids.some((id) => !isUuid(id))) return { error: "Satır bilgisi geçersiz. Sayfayı yenileyip tekrar deneyin." };
-  const { data: lineRows, error: lineErr } = await supabase.from("finance_statement_lines").select("id, direction").eq("account_id", accountId).in("id", ids);
+  const { data: lineRows, error: lineErr } = await supabase.from("finance_statement_lines").select("id, direction, line_date").eq("account_id", accountId).in("id", ids);
   if (lineErr) return rpcFailure(lineErr, "Ekstre satırları okunamadı.");
-  const dirById = new Map(((lineRows ?? []) as { id: string; direction: "in" | "out" }[]).map((r) => [r.id, r.direction]));
+  const lineList = (lineRows ?? []) as { id: string; direction: "in" | "out"; line_date: string }[];
+  const dirById = new Map(lineList.map((r) => [r.id, r.direction]));
 
   const payload: Record<string, unknown>[] = [];
   for (const d of decisions) {
@@ -109,9 +136,9 @@ export async function applyStatementDecisions(accountId: string, decisions: read
   const failed = Number(res.failed ?? 0);
   const parts = [created ? `${created} hareket oluşturuldu` : "", matched ? `${matched} hareket mutabık işaretlendi` : "", skipped ? `${skipped} satır atlandı` : ""].filter(Boolean);
   if (failed > 0 && parts.length === 0) {
-    return { error: `${failed} satır işlenemedi (kategori, yetki, hesap açılış tarihi veya tahsilat bağını kontrol edin).` };
+    return { error: await failureText(supabase, accountId, scope, gate.role, decisions, lineList, failed) };
   }
-  const tail = failed > 0 ? `; ${failed} satır işlenemedi ve taslakta bekliyor` : "";
+  const tail = failed > 0 ? `; ${failed} satır işlenemedi ve taslakta bekliyor (${(await failureText(supabase, accountId, scope, gate.role, decisions, lineList, failed)).replace(/^\d+ satır işlenemedi:? ?/, "").replace(/\.$/, "")})` : "";
   return { ok: true, info: `${parts.join(", ")}${tail}.` };
 }
 
