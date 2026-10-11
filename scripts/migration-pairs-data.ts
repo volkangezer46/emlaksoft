@@ -260,6 +260,8 @@ const F = {
   financeSalaryPrivacy: "20261011001100_finance_salary_privacy_void_audit.sql",
   // Konsey Tur 2 P2 (2026-10-11): finance_statement_apply govdesi: recurring eylemi (duzenli odeme tek gerçek) + komisyon tahsil edildi ayni işlemde.
   statementApplyRecurringCommission: "20261011001400_statement_apply_recurring_commission.sql",
+  // Konsey Tur 2 #38+#39: komisyon/rapor toplulastirmasi earnings_all kapisi + ekstre satiri hesap/maas suzgeci.
+  earningsStatementPrivacy: "20261011001300_earnings_statement_privacy.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
@@ -416,6 +418,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.commissionSplitProfile]: "davranis", // commission_splits'e 2 sutun + commissions.splits yazimini normallestiren BEFORE/AFTER tetikleyici; mevcut paylasim kayitlari ad->profil eslenir (jsonb'ye profile_id/kind eklenir), tablo esitlenir
     [F.financeSalaryPrivacy]: "davranis", // finance_account_balances: yetkisiz rol icin maas hareketleri bakiyeden haric; finance_void_source_entries audit_logs yazar (imza/ACL degismez)
     [F.statementApplyRecurringCommission]: "davranis", // finance_statement_apply govdesi: yeni "recurring" eylemi + komisyon kaynakli hareket komisyonu tahsil edildi yapar; imza/ACL degismez
+    [F.earningsStatementPrivacy]: "siki", // tenant_commission/reporting_aggregates earnings_all yoksa yalniz kendi kayitlari (advisors=[]); finance_statement_lines/imports/mappings SELECT politikalari hesap + maas suzgeci (imza/ACL ayni)
     [F.homeSnapshotRpc]: "ek", // yalniz 1 yeni invoker RPC (home_snapshot); RLS cagiranin yetkisiyle, tablo/politika/veri degismez
     [F.einvoice]: "ek", // yeni einvoice_connections + einvoices tablolari (RLS ofis kapsamli, yazma commissions.create/settings.edit) + 2 DEFINER RPC; mevcut tablo/politika degismez
     [F.einvoiceStateMachine]: "davranis", // einvoices'te authenticated INSERT/UPDATE/DELETE kapanir (yazma yalniz DEFINER RPC); guard durum matrisi eklenir; veri degismez
@@ -577,6 +580,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "KONSEY-komisyon-taraf-kimligi", order: 29.99986746, title: "Komisyon paylasimi taraf kimligi: profile_id esleme + commission_splits esitleme (20260816000200 ve 000400 sonrasi; sira serbest)", files: [F.commissionSplitProfile] },
     { id: "KONSEY-kasa-maas-gizliligi", order: 29.99986747, title: "Kasa: maas hareketleri bakiyeden yetkisiz rol icin haric + kaynak bagli iptal audit (20261010000600 sonrasi; sira serbest)", files: [F.financeSalaryPrivacy] },
     { id: "KONSEY-ekstre-duzenli-komisyon", order: 29.99986748, title: "Ekstre uygulama: duzenli odeme tek gercek + komisyon tahsil edildi (001200 ve 000900 sonrasi; sira serbest)", files: [F.statementApplyRecurringCommission] },
+    { id: "KONSEY-kazanc-ekstre-gizliligi", order: 29.99986749, title: "Kazanc gizliligi: komisyon/rapor toplulastirmasi earnings_all kapisi + ekstre satiri maas/hesap suzgeci (20260816000200, 20261011001000 ve 001200 sonrasi; sira serbest)", files: [F.earningsStatementPrivacy] },
     { id: "PB61-ana-ekran-home-snapshot", order: 29.9998673, title: "Ana ekran home_snapshot RPC'si (ben/ofis ilk ekran okumalari tek tur; kod RPC yokken eski sorgulara duser; sira serbest, ek)", files: [F.homeSnapshotRpc] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
     { id: "PB58-vitrin-sohbet-kapali", order: 29.999866, title: "vitrin_chat_context: kapali portfoy sizintisi duzeltmesi (000330 govdesi + suzgec; sira serbest)", files: [F.vitrinChatClosedListing] },
