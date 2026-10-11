@@ -13,6 +13,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 import type { SlaState } from "./sla";
 import { SlaBadge } from "./sla-badge";
@@ -169,29 +170,6 @@ function SortHeader({
   );
 }
 
-function EmptyQueue({ filtered }: { filtered: boolean }) {
-  return (
-    <div className="grid place-items-center px-6 py-16 text-center">
-      <span className="grid h-14 w-14 place-items-center rounded-[var(--radius-card)] bg-brand-600/[0.07] text-brand-600">
-        <MessageSquareText className="h-6 w-6" aria-hidden />
-      </span>
-      <h2 className="mt-4 font-display text-base font-extrabold text-ink-950">
-        {filtered ? "Bu görünümde talep bulunamadı" : "Destek kuyruğu boş"}
-      </h2>
-      <p className="mt-1 max-w-md text-sm text-text-muted">
-        {filtered
-          ? "Arama veya filtreleri değiştirerek diğer destek taleplerini görüntüleyebilirsiniz."
-          : "Yeni destek talepleri oluşturulduğunda burada görünecek."}
-      </p>
-      {filtered ? (
-        <ButtonLink href="/admin/tickets" variant="secondary" size="sm" className="mt-4">
-          Filtreleri temizle
-        </ButtonLink>
-      ) : null}
-    </div>
-  );
-}
-
 export function TicketQueueView({
   rows,
   staff,
@@ -226,7 +204,28 @@ export function TicketQueueView({
   if (rows.length === 0) {
     return (
       <section className="surface-card overflow-hidden rounded-[var(--radius-panel)]">
-        <EmptyQueue filtered={filtered} />
+        <EmptyState
+          variant="full"
+          bare
+          icon={MessageSquareText}
+          title={filtered ? "Bu görünümde talep bulunamadı" : "Destek kuyruğu boş"}
+          description={
+            filtered
+              ? "Arama veya filtreleri değiştirerek diğer destek taleplerini görüntüleyebilirsiniz."
+              : "Yeni destek talepleri oluşturulduğunda burada görünecek."
+          }
+          action={
+            filtered
+              ? {
+                  node: (
+                    <ButtonLink href="/admin/tickets" variant="secondary" size="sm">
+                      Filtreleri temizle
+                    </ButtonLink>
+                  ),
+                }
+              : undefined
+          }
+        />
       </section>
     );
   }

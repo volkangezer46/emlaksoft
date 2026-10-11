@@ -7,7 +7,7 @@ import { attachUsage, getAdminRow, listAdminRows } from "@/lib/geo/admin-store";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { GeoEntityList, type EntityRowData } from "../../entity-list";
 import { NewEntityForm } from "../../new-entity-form";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 
 const PAGE_SIZE = 300;
 
@@ -52,9 +52,9 @@ export default async function AdminGeoDistrictPage({
         <ArrowLeft className="h-3.5 w-3.5" /> {province.name} · ilçeler
       </Link>
 
-      <AdminPageHeader
+      <PageHeader
         eyebrow={province.name}
-        icon={MapPinned}
+        icon={<MapPinned className="h-6 w-6 text-accent" aria-hidden />}
         title={`${district.name} · mahalleler`}
         description={`${total.toLocaleString("tr-TR")} mahalle${truncated ? ` (ilk ${PAGE_SIZE} gösteriliyor — daraltmak için arayın)` : ""}`}
       />

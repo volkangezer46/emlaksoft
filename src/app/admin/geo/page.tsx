@@ -6,7 +6,7 @@ import { attachUsage, listAdminRows } from "@/lib/geo/admin-store";
 import { NewEntityForm } from "./new-entity-form";
 import { GeoSyncAutoRefresh } from "./geo-sync-auto-refresh";
 import { ProvinceRow, type ProvinceRowData } from "./province-row";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminGeoPage({
   searchParams,
@@ -56,9 +56,9 @@ export default async function AdminGeoPage({
   return (
     <div className="space-y-6">
       <GeoSyncAutoRefresh active={hasActiveSync} />
-      <AdminPageHeader
+      <PageHeader
         eyebrow="Coğrafya yönetimi"
-        icon={MapPin}
+        icon={<MapPin className="h-6 w-6 text-accent" aria-hidden />}
         title="İl · ilçe · mahalle"
         description={`TurkiyeAPI kaynağıyla il bazlı doğrulama ve eksik tamamlama. Seçilen il öne alınır; diğer il taramaları bekler. Kayıtlı: ${rows.length}/81 il · ${totalDistricts.toLocaleString("tr-TR")} ilçe · ${totalNeighborhoods.toLocaleString("tr-TR")} mahalle.`}
       />

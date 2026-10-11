@@ -18,7 +18,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { listProjects } from "@/app/actions/projects";
 import { msUntil, DAY_MS } from "@/lib/clock";
 import { StatCard } from "@/components/app/stat-card";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { PROJECT_STATUS_LABELS } from "@/lib/status-labels";
