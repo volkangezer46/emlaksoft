@@ -13,13 +13,13 @@
  * (ölçüm). 20 sn: sık gezinmede anında, durup beklenen sayfada tazeleme; dış değişiklikleri realtime, kendi
  * değişikliklerini mutasyon revalidate eder.
  */
-export const REVALIDATE_AFTER_MS = 20_000;
+export const REVALIDATE_AFTER_MS = 60_000;
 /** İki arka plan tazelemesi arası en az süre (tazeleme TÜM segment önbelleğini geçersiz kılar). */
-export const BG_REFRESH_MIN_GAP_MS = 15_000;
+export const BG_REFRESH_MIN_GAP_MS = 60_000;
 /** Arka plan tazelemesinden sonra kapı yönlendirmesi sayılan pencere. */
 export const GATE_REDIRECT_WINDOW_MS = 15_000;
 /** Aynı adres bu süre içinde yeniden önceden yüklenmez. */
-export const PREFETCH_MIN_REPEAT_MS = 30_000;
+export const PREFETCH_MIN_REPEAT_MS = 120_000;
 /** Aynı anda en çok bu kadar önceden yükleme isteği (sırayla, aralıklı). */
 export const PREFETCH_CONCURRENCY = 2;
 export const PREFETCH_SLOT_MS = 700;
@@ -27,7 +27,7 @@ export const PREFETCH_SLOT_MS = 700;
 export const REWARM_DELAY_MS = 1_500;
 export const REWARM_MIN_GAP_MS = 10_000;
 /** Liste satırlarında görünür alanda tam önceden yüklenen ilk detay bağlantısı sayısı. */
-export const VIEWPORT_PREFETCH_BUDGET = 5;
+export const VIEWPORT_PREFETCH_BUDGET = 2;
 
 export type ArrivalDecision = "mark" | "fresh" | "refresh";
 
@@ -74,3 +74,6 @@ export function networkAllowsPrefetch(conn: NetworkInfo | null | undefined): boo
   if (conn.saveData) return false;
   return !/^(slow-)?(2g|3g)$/.test(conn.effectiveType ?? "");
 }
+
+/** Boşta tam önceden yükleme oturum başına en çok bu kadar adres (Supabase API yükü — 2026-10-11 canlı tıkanma dersi). */
+export const IDLE_PREFETCH_SESSION_CAP = 4;
