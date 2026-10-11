@@ -3,15 +3,22 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff, X } from "lucide-react";
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
 import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
 import { activeTabHref, adminSidebarModel, isAdminNavActive, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } from "@/components/ui/console/quick-access";
-import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
+import { useDeferredPanel } from "@/hooks/use-deferred-panel";
+import { runWhenIdle } from "@/lib/idle";
+import { lazyPanel } from "@/lib/lazy-panel";
+
+// Radix Dialog gövdesi (mobil çekmece) yalnız küçük ekranda gerekir: masaüstü kabuk paketine girmez.
+const drawerPanel = lazyPanel(() => import("@/components/admin/admin-sidebar-drawer").then((m) => m.AdminSidebarDrawer));
+/** Tailwind `md` altı (çekmece kırılımı): yalnız burada boşta önceden yükleme yapılır. */
+const SMALL_SCREEN_QUERY = "(max-width: 767.98px)";
 
 type Item = AdminNavItem;
 const isActive = (pathname: string, item: Item) => isAdminNavActive(pathname, item);
@@ -31,6 +38,17 @@ export function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const { Panel: Drawer, open: mountDrawer, warm: warmDrawer } = useDeferredPanel(drawerPanel, { idle: false });
+  const drawerOpenerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!window.matchMedia(SMALL_SCREEN_QUERY).matches) return;
+    return runWhenIdle(drawerPanel.preload);
+  }, []);
+  const openDrawer = () => {
+    drawerOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    mountDrawer();
+    setOpen(true);
+  };
   const allowed = platformModulesFor(role);
 
   // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, her grupta çekirdek öğeler görünür, kalanı "+N daha".
@@ -275,29 +293,32 @@ export function AdminSidebar({
   );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
       {/* Mobil: hamburger (amber, admin teması) — masaüstünde gizli */}
-      <DialogTrigger asChild>
-        <button
-          type="button"
-          aria-label="Admin menüsünü aç"
-          className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-[var(--navy-800)] text-white shadow-[var(--elev-3)] md:hidden"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </DialogTrigger>
+      <button
+        type="button"
+        onClick={openDrawer}
+        onPointerEnter={warmDrawer}
+        onFocus={warmDrawer}
+        onTouchStart={warmDrawer}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls="admin-mobile-navigation"
+        aria-label="Admin menüsünü aç"
+        className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-[var(--navy-800)] text-white shadow-[var(--elev-3)] md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
       {/* Masaüstü sabit sidebar */}
       <div className="shell-aside sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden md:block">{renderContent("desktop")}</div>
 
-      {/* Mobil çekmece — focus trap, Escape, scroll lock ve focus restore Radix'ten gelir. */}
-      <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>
-        <DialogTitleHidden>Admin menüsü</DialogTitleHidden>
-        <DialogClose asChild>
-          <button type="button" className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
-        </DialogClose>
-        {renderContent("drawer")}
-      </DialogDrawerContent>
+      {/* Mobil çekmece — focus trap, Escape ve scroll lock Radix'ten gelir (parça ilk dokunuşta yüklenir); odak açan düğmeye döner. */}
+      {Drawer ? (
+        <Suspense fallback={null}>
+          <Drawer open={open} onOpenChange={setOpen} render={() => renderContent("drawer")} restoreFocusTo={() => drawerOpenerRef.current} />
+        </Suspense>
+      ) : null}
 
       {/* Mobil alt gezinme */}
       <nav
@@ -323,14 +344,22 @@ export function AdminSidebar({
               </Link>
             );
           })}
-          <DialogTrigger asChild>
-            <button type="button" className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-white/70 transition hover:text-white">
-              <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
-              Menü
-            </button>
-          </DialogTrigger>
+          <button
+            type="button"
+            onClick={openDrawer}
+            onPointerEnter={warmDrawer}
+            onFocus={warmDrawer}
+            onTouchStart={warmDrawer}
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-controls="admin-mobile-navigation"
+            className="flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold text-white/70 transition hover:text-white"
+          >
+            <span className="grid h-7 w-11 place-items-center rounded-full"><Menu className="h-[18px] w-[18px]" /></span>
+            Menü
+          </button>
         </div>
       </nav>
-    </Dialog>
+    </>
   );
 }

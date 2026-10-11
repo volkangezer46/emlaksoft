@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { AppModule } from "@/lib/permissions";
-import { tourIdForRole } from "@/lib/product-tour-data";
+import { tourIdForRole } from "@/lib/product-tour-roles";
 import { TOUR_PARAM, isTourDone } from "@/lib/product-tour-storage";
 
 // Tur kodu (Radix Dialog dahil) yalnız tur gerçekten açılacaksa indirilir.

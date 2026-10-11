@@ -1,5 +1,6 @@
 import { visibleSections } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
+import { TOUR_ROLES, tourIdForRole, type TourId } from "@/lib/product-tour-roles";
 
 /**
  * Ürün turları — TEK veri dosyası. Tek uzun tur yerine rol bazlı kısa turlar (her biri 4-6 adım).
@@ -13,7 +14,8 @@ import type { AppModule } from "@/lib/permissions";
  * Seçiciler sıralı denenir: önce özel `data-tour` işareti, yoksa sayfa başlığı (`#main-content h1`).
  */
 
-export type TourId = "ofis-sahibi" | "yonetici" | "muhasebe" | "danisman";
+export { tourIdForRole };
+export type { TourId };
 
 export type TourStepDef = {
   /** Adımın sayfası (`/app` = ana ekran). Menüde yoksa (çekirdek `/app` hariç) adım elenir. */
@@ -41,7 +43,7 @@ export const TOURS: readonly TourDef[] = [
     id: "ofis-sahibi",
     label: "Ofis sahibi turu",
     description: "Ofisi kurun, ekibi ekleyin, ilan havuzunu ve ofis kontrolünü tanıyın.",
-    roles: ["owner"],
+    roles: TOUR_ROLES["ofis-sahibi"],
     steps: [
       {
         path: "/app",
@@ -91,7 +93,7 @@ export const TOURS: readonly TourDef[] = [
     id: "yonetici",
     label: "Yönetici turu",
     description: "Ekibin performansını, hedefleri ve ofis panosunu izleyin.",
-    roles: ["gm", "branch_manager", "team_lead"],
+    roles: TOUR_ROLES.yonetici,
     steps: [
       {
         path: "/app",
@@ -135,7 +137,7 @@ export const TOURS: readonly TourDef[] = [
     id: "muhasebe",
     label: "Muhasebe turu",
     description: "Komisyon defterini, kazançları ve EmlakSoft aboneliği ile faturalarını tanıyın.",
-    roles: ["accounting"],
+    roles: TOUR_ROLES.muhasebe,
     steps: [
       {
         path: "/app",
@@ -167,7 +169,7 @@ export const TOURS: readonly TourDef[] = [
     id: "danisman",
     label: "Danışman turu",
     description: "Müşteri, talep, randevu ve ilanlarla günlük işinizi öğrenin.",
-    roles: ["advisor", "call_center", "readonly"],
+    roles: TOUR_ROLES.danisman,
     steps: [
       {
         path: "/app",
@@ -214,11 +216,6 @@ export function getTour(id: string): TourDef | null {
   return TOURS.find((t) => t.id === id) ?? null;
 }
 
-/** Rolün varsayılan turu; bilinmeyen rol en kısıtlı olan danışman turunu alır. */
-export function tourIdForRole(role: string | null | undefined): TourId {
-  const hit = TOURS.find((t) => t.roles.includes(String(role ?? "")));
-  return hit?.id ?? "danisman";
-}
 
 /**
  * Turun çalıştırılacak adımları: yetkisiz, ofisin kapattığı ve menüde olmayan sayfaların adımları elenir

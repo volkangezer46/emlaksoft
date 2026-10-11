@@ -3,8 +3,8 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, Lock, Menu, Plus, X } from "lucide-react";
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronDown, Lock, Menu, Plus } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { hubNav, resolveActiveHub, type HubPage, type NavHub } from "@/lib/nav-config";
@@ -13,16 +13,25 @@ import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { useClosedModules } from "@/components/app/closed-modules-context";
-import { MobileNewSheet, mobileNewActions } from "@/components/app/mobile-new-sheet";
+import { mobileNewActions } from "@/components/app/mobile-new-sheet";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
 import { DrawerGroup } from "@/components/ui/console/drawer-kit";
 import { MenuSearchButton } from "@/components/ui/console/quick-access";
-import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
+import { runWhenIdle } from "@/lib/idle";
+import { useDeferredPanel } from "@/hooks/use-deferred-panel";
+import { lazyPanel } from "@/lib/lazy-panel";
 import { announceScope, useNavRole } from "@/lib/ui/use-nav-role";
 import { SCOPE_COOKIE, SCOPE_COOKIE_MAX_AGE } from "@/lib/ui/scope";
+
+// Radix Dialog gövdeleri (menü çekmecesi, "+ Yeni" sayfası) yalnız mobil/tablette gerekir: masaüstü kabuk paketine
+// girmez; küçük ekranda boşta önceden iner, ilk dokunuşta (hover/odak/dokunma ısıtması dahil) açık gelir.
+const drawerPanel = lazyPanel(() => import("@/components/app/app-sidebar-drawer").then((m) => m.AppSidebarDrawer));
+const newSheetPanel = lazyPanel(() => import("@/components/app/mobile-new-sheet-dialog").then((m) => m.MobileNewSheet));
+/** Tailwind `lg` altı (çekmece kırılımı): yalnız burada boşta önceden yükleme yapılır. */
+const SMALL_SCREEN_QUERY = "(max-width: 1023.98px)";
 
 const VitrinIcon = ICONS.portal;
 const ToolsIcon = ICONS.baslikArac;
@@ -108,6 +117,25 @@ export function AppSidebar({
   // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
   const [open, setOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const { Panel: Drawer, open: mountDrawer, warm: warmDrawer } = useDeferredPanel(drawerPanel, { idle: false });
+  const { Panel: NewSheet, open: mountNewSheet, warm: warmNewSheet } = useDeferredPanel(newSheetPanel, { idle: false });
+  const drawerOpenerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!window.matchMedia(SMALL_SCREEN_QUERY).matches) return;
+    return runWhenIdle(() => {
+      drawerPanel.preload();
+      newSheetPanel.preload();
+    });
+  }, []);
+  const openDrawer = () => {
+    drawerOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    mountDrawer();
+    setOpen(true);
+  };
+  const openNewSheet = () => {
+    mountNewSheet();
+    setNewOpen(true);
+  };
 
   // Ofisin kapattığı modüller menüden çıkar (veri silinmez).
   const closedModules = useClosedModules();
@@ -499,25 +527,41 @@ export function AppSidebar({
   const slotClass = "focus-ring flex min-h-14 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-xs font-semibold leading-tight transition";
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button type="button" className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-ink-950 text-white shadow-[var(--shadow-card)] lg:hidden" aria-label="Panel menüsünü aç">
-          <Menu className="h-5 w-5" />
-        </button>
-      </DialogTrigger>
+    <>
+      <button
+        type="button"
+        onClick={openDrawer}
+        onPointerEnter={warmDrawer}
+        onFocus={warmDrawer}
+        onTouchStart={warmDrawer}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls="app-mobile-navigation"
+        className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-ink-950 text-white shadow-[var(--shadow-card)] lg:hidden"
+        aria-label="Panel menüsünü aç"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       <aside className="shell-aside sb-surface sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-hidden lg:flex">
         {renderContent("desktop")}
       </aside>
-      <DialogDrawerContent id="app-mobile-navigation" aria-describedby={undefined} responsiveClassName="lg:hidden">
-        <DialogTitleHidden>Panel menüsü</DialogTitleHidden>
-        <aside className="sb-surface flex h-full min-h-0 flex-col pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)]">
-          <DialogClose asChild>
-            <button type="button" className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
-          </DialogClose>
-          {renderContent("drawer")}
-        </aside>
-      </DialogDrawerContent>
-      <MobileNewSheet open={newOpen} onOpenChange={setNewOpen} actions={newActions} />
+      {Drawer ? (
+        <Suspense fallback={null}>
+          <Drawer
+            open={open}
+            onOpenChange={setOpen}
+            responsiveClassName="lg:hidden"
+            render={() => renderContent("drawer")}
+            restoreFocusTo={() => drawerOpenerRef.current}
+          />
+        </Suspense>
+      ) : null}
+      {NewSheet ? (
+        <Suspense fallback={null}>
+          {/* MobileNewSheet: "+ Yeni" eylem sayfası (ilk dokunuşta yüklenen Radix Dialog gövdesi) */}
+          <NewSheet open={newOpen} onOpenChange={setNewOpen} actions={newActions} />
+        </Suspense>
+      ) : null}
       <nav
         aria-label="Mobil hızlı gezinme"
         // Cam bütçesi: alt çubuk opak (cam yalnız sabit ÜST çubukta; mobil kaydırmada bulanıklık pahalı).
@@ -530,7 +574,10 @@ export function AppSidebar({
                 <button
                   key="new"
                   type="button"
-                  onClick={() => setNewOpen(true)}
+                  onClick={openNewSheet}
+                  onPointerEnter={warmNewSheet}
+                  onFocus={warmNewSheet}
+                  onTouchStart={warmNewSheet}
                   aria-haspopup="dialog"
                   aria-label="Yeni kayıt ekle"
                   className={`${slotClass} text-brand-700`}
@@ -544,9 +591,16 @@ export function AppSidebar({
             }
             if (slot.kind === "menu") {
               return (
-                <DialogTrigger asChild key="menu">
-                  <button
+                <button
+                    key="menu"
                     type="button"
+                    onClick={openDrawer}
+                    onPointerEnter={warmDrawer}
+                    onFocus={warmDrawer}
+                    onTouchStart={warmDrawer}
+                    aria-haspopup="dialog"
+                    aria-expanded={open}
+                    aria-controls="app-mobile-navigation"
                     aria-label={totalBadges > 0 ? `Menü: tüm sayfalar, ${totalBadges} bekleyen iş` : "Menü: tüm sayfalar"}
                     className={`${slotClass} text-text-faint hover:text-ink-950`}
                   >
@@ -560,7 +614,6 @@ export function AppSidebar({
                     </span>
                     Menü
                   </button>
-                </DialogTrigger>
               );
             }
             const { hub } = slot;
@@ -583,6 +636,6 @@ export function AppSidebar({
           })}
         </div>
       </nav>
-    </Dialog>
+    </>
   );
 }
