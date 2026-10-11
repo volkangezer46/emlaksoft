@@ -1,19 +1,25 @@
+import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { ArrowDownCircle, ArrowUpCircle, Banknote, CreditCard, Landmark, Lock, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Banknote, CreditCard, Landmark, Lock, ScanLine, Wallet } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/list-kit";
 import { formatDateTr } from "@/lib/format";
+import { loadReconStatus, type ReconStatus } from "@/lib/finance/statement/load";
 import { cashCategoryLabel } from "@/lib/finance/cash/categories";
 import { ACCOUNT_KIND_LABEL } from "@/lib/finance/cash/input";
 import { loadRecentEntriesByAccount, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { AccountFormButton, ArchiveAccountButton, TransferButton } from "../accounts-panel";
+import { StatementReview } from "../statement-review";
+import { StatementUploadButton } from "../statement-upload";
 import { FINANCE_BASE } from "./finance-shell";
 
 const KIND_ICON = { cash: Banknote, bank: Landmark, card: CreditCard } as const;
 
 const hareketlerHref = (accountId: string) => `${FINANCE_BASE}?sekme=hareketler&hesap=${accountId}`;
+const ekstreHref = (accountId: string) => `${FINANCE_BASE}?sekme=kasa-banka&ekstre=${accountId}`;
 
 /**
  * Kasa ve banka sekmesi: hesap kartları (bakiye, son hareketler). Bakiye ve her hareket filtreli Hareketler sekmesine gider
@@ -25,7 +31,16 @@ export async function KasaBankaTab({
   today,
   canOffice,
   entriesHref = hareketlerHref,
+  statementHref = ekstreHref,
+  reviewAccountId = null,
+  canSalary = false,
 }: {
+  /** Hesap -> ekstre onay ekranı adresi (Kasam kendi sayfasına yönlendirir). */
+  statementHref?: (accountId: string) => string;
+  /** ?ekstre= ile açılan hesap: üstte ekstre taslağı gösterilir. */
+  reviewAccountId?: string | null;
+  /** Maaş kategorisi önerilebilir/seçilebilir mi (yalnız ofis sahibi / GM). */
+  canSalary?: boolean;
   /** Hesap -> hareketler adresi (Kasam kendi sayfasına yönlendirir). */
   entriesHref?: (accountId: string) => string;
   supabase: SupabaseClient;
@@ -38,7 +53,11 @@ export async function KasaBankaTab({
   const archived = accounts.filter((a) => a.archived_at);
   const office = active.filter((a) => a.owner_scope === "office");
   const personal = active.filter((a) => a.owner_scope === "user");
-  const recent = await loadRecentEntriesByAccount(supabase, active.map((a) => a.id), 3);
+  const [recent, recon] = await Promise.all([
+    loadRecentEntriesByAccount(supabase, active.map((a) => a.id), 3),
+    loadReconStatus(supabase),
+  ]);
+  const reviewAccount = reviewAccountId && recon.available ? active.find((a) => a.id === reviewAccountId && (a.owner_scope === "user" || canOffice)) ?? null : null;
   const transferable = active.filter((a) => a.owner_scope === "user" || canOffice).map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
 
   return (
@@ -48,6 +67,12 @@ export async function KasaBankaTab({
         <TransferButton accounts={transferable} today={today} />
         <p className="text-xs text-text-muted">Bakiye = açılış bakiyesi + girişler − çıkışlar. Hesap bakiyesi hareketlerden hesaplanır, elle değiştirilmez.</p>
       </div>
+
+      {reviewAccount ? (
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+          <StatementReview supabase={supabase} account={reviewAccount} canSalary={canSalary} />
+        </Suspense>
+      ) : null}
 
       {active.length === 0 ? (
         <EmptyState
@@ -62,7 +87,7 @@ export async function KasaBankaTab({
       {office.length > 0 ? (
         <Section title="Ofis hesapları" hint="Ofis kasası ve bankaları. Gelir ve giderleri ofis kâr-zararına yansır.">
           {office.map((a) => (
-            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage={canOffice} canOffice={canOffice} entriesHref={entriesHref} />
+            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage={canOffice} canOffice={canOffice} entriesHref={entriesHref} statementHref={statementHref} recon={recon.available ? recon.byAccount.get(a.id) ?? null : undefined} />
           ))}
         </Section>
       ) : null}
@@ -70,7 +95,7 @@ export async function KasaBankaTab({
       {personal.length > 0 ? (
         <Section title="Kişisel hesaplarım" hint="Yalnız siz görürsünüz; ofis sahibi dahil kimse göremez ve ofis kâr-zararına girmez." icon={<Lock className="h-3.5 w-3.5" aria-hidden="true" />}>
           {personal.map((a) => (
-            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage canOffice={canOffice} entriesHref={entriesHref} />
+            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage canOffice={canOffice} entriesHref={entriesHref} statementHref={statementHref} recon={recon.available ? recon.byAccount.get(a.id) ?? null : undefined} />
           ))}
         </Section>
       ) : null}
@@ -110,8 +135,13 @@ function AccountCard({
   canManage,
   canOffice,
   entriesHref,
+  statementHref,
+  recon,
 }: {
   entriesHref: (accountId: string) => string;
+  statementHref: (accountId: string) => string;
+  /** undefined = ekstre özelliği etkin değil (şema yok); null = hesap için durum yok. */
+  recon: ReconStatus | null | undefined;
   account: AccountWithBalance;
   recent: CashEntry[];
   today: string;
@@ -152,6 +182,8 @@ function AccountCard({
         </Link>
       </dl>
 
+      {recon !== undefined ? <ReconLine account={a} recon={recon} entriesHref={entriesHref} statementHref={statementHref} /> : null}
+
       <div>
         <p className="mb-1 text-xs font-semibold text-text-muted">Son hareketler</p>
         {recent.length === 0 ? (
@@ -179,9 +211,38 @@ function AccountCard({
             today={today}
             account={{ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope, ibanLast4: a.iban_last4, openingBalance: a.opening_balance, openingDate: a.opening_date }}
           />
+          {recon !== undefined && a.kind !== "cash" ? <StatementUploadButton accountId={a.id} accountName={a.name} reviewHref={statementHref(a.id)} currency={a.currency} /> : null}
           <ArchiveAccountButton accountId={a.id} name={a.name} archived={false} />
         </footer>
       ) : null}
     </article>
+  );
+}
+
+/** Mutabakat özeti: son mutabakat tarihi, mutabık olmayan hareket sayısı ve onay bekleyen ekstre satırları (hepsi filtreli hedefe bağlı). */
+function ReconLine({ account: a, recon, entriesHref, statementHref }: { account: AccountWithBalance; recon: ReconStatus | null; entriesHref: (accountId: string) => string; statementHref: (accountId: string) => string }) {
+  if (!recon || (!recon.has_import && recon.pending_lines === 0)) {
+    return a.kind === "cash" ? null : <p className="text-xs text-text-faint">Ekstre yükleyerek hesabı bankanızla mutabık hale getirin.</p>;
+  }
+  const window = recon.coverage_from && recon.coverage_to ? `&from=${recon.coverage_from}&to=${recon.coverage_to}` : "";
+  return (
+    <div className="grid gap-1 rounded-[var(--radius-control)] bg-canvas px-2.5 py-2 text-xs">
+      <p className="flex items-center gap-1 font-semibold text-text"><ScanLine className="h-3 w-3 text-accent-text" aria-hidden="true" /> Mutabakat</p>
+      <p className="text-text-muted">
+        Son mutabakat: {recon.last_reconciled_at ? formatDateTr(recon.last_reconciled_at) : "henüz yok"}
+      </p>
+      {recon.unreconciled_count > 0 ? (
+        <Link href={`${entriesHref(a.id)}&mutabik=hayir${window}`} className="focus-ring font-semibold text-warning-strong hover:underline">
+          {recon.unreconciled_count} hareket mutabık değil
+        </Link>
+      ) : recon.has_import ? (
+        <p className="text-success-strong">Ekstre dönemindeki tüm hareketler mutabık.</p>
+      ) : null}
+      {recon.pending_lines > 0 ? (
+        <Link href={statementHref(a.id)} className="focus-ring font-semibold text-accent-text hover:underline">
+          {recon.pending_lines} ekstre satırı onay bekliyor
+        </Link>
+      ) : null}
+    </div>
   );
 }

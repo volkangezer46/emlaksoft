@@ -118,6 +118,8 @@ export type EntryFilters = {
   /** 1 tabanlı sayfa. */
   page?: number;
   includeVoided?: boolean;
+  /** Yalnız mutabakat işareti olmayan hareketler (ekstre mutabakatı, Paket C). */
+  unreconciled?: boolean;
 };
 
 export async function loadCashEntries(
@@ -132,6 +134,7 @@ export async function loadCashEntries(
     .order("created_at", { ascending: false })
     .range((page - 1) * ENTRY_PAGE_SIZE, page * ENTRY_PAGE_SIZE - 1);
   if (!filters.includeVoided) q = q.is("voided_at", null);
+  if (filters.unreconciled) q = q.is("reconciled_at", null).in("kind", ["income", "expense", "transfer"]);
   if (filters.accountId) q = q.eq("account_id", filters.accountId);
   else if (filters.accountIds) q = q.in("account_id", filters.accountIds as string[]);
   if (filters.tur === "gelir") q = q.eq("kind", "income");

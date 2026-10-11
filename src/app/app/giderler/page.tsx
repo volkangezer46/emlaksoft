@@ -33,6 +33,7 @@ import { KasaBankaTab } from "./_tabs/kasa-banka";
 import { DuzenliTab } from "./_tabs/duzenli";
 import { PendingApprovalsCard } from "./_tabs/pending-card";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
+import { isUuid } from "@/lib/finance/cash/input";
 import { loadAccountsWithBalances, loadCashSummary } from "@/lib/finance/cash/load";
 import { CashOverview } from "./_tabs/cash-overview";
 import type { AccountOption } from "./quick-entry";
@@ -81,7 +82,7 @@ function tarihKisa(iso: string) {
 export default async function GiderlerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string; hesap?: string; tur?: string; q?: string; sayfa?: string; durum?: string } & FaturalarParams>;
+  searchParams?: Promise<{ kategori?: string; from?: string; to?: string; adet?: string; portfoy?: string; portal?: string; sekme?: string; hesap?: string; ekstre?: string; tur?: string; q?: string; sayfa?: string; durum?: string } & FaturalarParams>;
 }) {
   const { perms, tenantId, userId, role } = await requireModulePage("expenses", "/app/giderler");
   const params = (await searchParams) ?? {};
@@ -152,7 +153,7 @@ export default async function GiderlerPage({
             onlyPending={params.durum === "bekleyen"}
           />
         ) : (
-          <KasaBankaTab supabase={supabase} accounts={cash.accounts} today={today} canOffice={canCreate} />
+          <KasaBankaTab supabase={supabase} accounts={cash.accounts} today={today} canOffice={canCreate} canSalary={canSalary} reviewAccountId={isUuid(params.ekstre) ? params.ekstre : null} />
         )}
       </ListPage>
     );
