@@ -21,8 +21,9 @@ const cookie = [...jar].map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join(";
 const pages = (process.argv[2] || "/app,/app/musteriler,/app/portfoyler,/app/talepler,/app/anlasmalar,/app/randevular,/app/gorevler,/app/komisyon,/app/raporlar,/app/lig,/app/giderler,/app/kiralama,/app/aidat,/app/ekip").split(",");
 console.log("sayfa | KB (çözülmüş) | ttfb ms | toplam ms");
 for (const p of pages) {
+  await new Promise((r) => setTimeout(r, 1000));
   const t0 = performance.now();
-  const res = await fetch(BASE + p, { headers: { cookie, rsc: "1", "next-url": p, "user-agent": "emlaksoft-perf-probe" }, redirect: "manual" });
+  const res = await fetch(BASE + p + (p.includes("?") ? "&" : "?") + "_rsc=probe", { headers: { cookie, rsc: "1", "next-url": p, "user-agent": "emlaksoft-perf-probe" }, redirect: "follow" });
   const t1 = performance.now();
   const buf = await res.arrayBuffer();
   const t2 = performance.now();

@@ -40,6 +40,7 @@ for (const p of pages) {
   let st = "";
   let status = 0;
   for (let i = 0; i < REPS; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
     const t0 = performance.now();
     const res = await fetch(BASE + p, { headers: { cookie, "user-agent": "emlaksoft-perf-probe" }, redirect: "manual" });
     const t1 = performance.now();
