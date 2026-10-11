@@ -251,7 +251,7 @@ export async function deleteExpense(id: string): Promise<ExpenseResult> {
 
 export async function listExpenses(
   month?: string,
-  range?: { from?: string; to?: string; propertyId?: string; portalKey?: string },
+  range?: { from?: string; to?: string; propertyId?: string; portalKey?: string; category?: string },
   limit = 200,
 ) {
   const gate = await requirePermission("expenses", "view");
@@ -279,6 +279,7 @@ export async function listExpenses(
     if (range?.from) query = query.gte("expense_date", range.from);
     if (range?.to) query = query.lte("expense_date", range.to);
     if (range?.propertyId && isExpenseId(range.propertyId)) query = query.eq("property_id", range.propertyId);
+    if (range?.category) query = query.eq("category", range.category);
     if (withPortalFilter && range?.portalKey) query = query.eq("portal_key", range.portalKey);
     return query;
   };

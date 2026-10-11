@@ -84,7 +84,7 @@ function rel<T>(v: Rel<T>): T | null {
 }
 
 /** Sayfa başına kayıt (bellek içi sayfalama: evre/tahsilat süzgeçleri türetilmiş veriye dayanır). */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 /** Kira kaydı tarama sınırı; aşılırsa ListLimitNotice açıkça söyler, evre sayaçları gizlenir. */
 const RENTAL_LIMIT = 300;
 const CHARGE_LIMIT = 2000;
