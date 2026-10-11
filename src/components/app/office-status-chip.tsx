@@ -37,7 +37,7 @@ export function OfficeStatusChip({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Ofis durumu: ${plan}${s.short ? `, ${s.short}` : ""}. Ayrıntıyı aç`}
+          aria-label={`Ofis durumu: ${plan}${s.short ? `, ${s.short}` : ""}${s.detail ? `, ${s.detail}` : ""}. Ayrıntıyı aç`}
           title={`${officeName} · ${plan}`}
           className="sb-row focus-ring group flex min-h-9 w-full items-center gap-2.5 rounded-[var(--radius-control)] px-3 text-left text-white/85 transition-colors hover:bg-white/8 hover:text-white touch:min-h-11"
         >
@@ -47,6 +47,7 @@ export function OfficeStatusChip({
               <span className="truncate font-semibold">{plan}</span>
               {s.short ? <span className="num shrink-0 text-xs font-semibold text-white/70">{s.short}</span> : null}
             </span>
+            {s.detail ? <span className="num mt-0.5 block truncate text-xs text-white/65">{s.detail}</span> : null}
             {s.ratio != null ? (
               <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
                 <span className={`block h-full rounded-full ${bar}`} style={{ width: `${Math.max(s.ratio * 100, 3)}%` }} />
@@ -109,7 +110,7 @@ export function OfficeStatusChip({
         <Link
           href="/app/abonelik"
           onClick={onNavigate}
-          className="focus-ring mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
+          className="focus-ring mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink-950 transition hover:bg-canvas touch:min-h-11"
         >
           {canUpgrade || trial ? "Paketi yönet" : "Abonelik ve kullanım"}
           <ArrowUpRight className="h-3.5 w-3.5 text-text-muted" aria-hidden />

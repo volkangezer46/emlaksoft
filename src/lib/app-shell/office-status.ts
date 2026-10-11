@@ -15,6 +15,8 @@ export type OfficeStatus = {
   short: string | null;
   /** En dolu kullanım oranı (0..1); kullanım kalemi yoksa null (çubuk çizilmez). */
   ratio: number | null;
+  /** En dolu kalemin AÇIKLAMALI metni ("Kullanıcı: 5/15"); yüzde tek başına anlamsızdı. Kalem yoksa null. */
+  detail: string | null;
 };
 
 export function usageRatio(u: Pick<PlanUsageRow, "used" | "limit">): number {
@@ -32,6 +34,7 @@ export function officeStatusOf(input: {
     expired || (ratio ?? 0) >= 0.9 ? "danger" : (ratio ?? 0) >= 0.75 || input.trial ? "warn" : "ok";
   let short: string | null = null;
   if (input.trial) short = input.trialDaysLeft == null ? "Deneme" : expired ? "Doldu" : `${input.trialDaysLeft} gün`;
-  else if (ratio != null) short = `%${Math.round(ratio * 100)}`;
-  return { level, short, ratio };
+  const top = input.usage.length > 0 ? input.usage.reduce((a, b) => (usageRatio(b) > usageRatio(a) ? b : a)) : null;
+  const detail = top ? `${top.label}: ${top.used.toLocaleString("tr-TR")}/${top.limit.toLocaleString("tr-TR")}` : null;
+  return { level, short, ratio, detail };
 }
