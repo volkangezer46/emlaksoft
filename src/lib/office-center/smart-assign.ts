@@ -88,7 +88,8 @@ function officeProfile(ctx: SmartContext): ScoreProfile {
 }
 
 export function scoreSmartCandidate(c: SmartCandidate, p: PoolProperty, ctx: SmartContext): SmartSuggestion {
-  return scoreForProfile(officeProfile(ctx), c, p, ctx);
+  const r = scoreForProfile(officeProfile(ctx), c, p, ctx);
+  return { ...r, summary: r.summary ?? "" };
 }
 
 /**
@@ -96,7 +97,7 @@ export function scoreSmartCandidate(c: SmartCandidate, p: PoolProperty, ctx: Sma
  * sonra yüksek kural ağırlığı, sonra ad. Elenenler sona, nedenleriyle.
  */
 export function rankAdvisorsForProperty(property: PoolProperty, advisors: readonly SmartCandidate[], ctx: SmartContext): SmartSuggestion[] {
-  return rankForProfile(officeProfile(ctx), advisors, property, ctx);
+  return rankForProfile(officeProfile(ctx), advisors, property, ctx).map((r) => ({ ...r, summary: r.summary ?? "" }));
 }
 
 /** İlk N uygun öneri (elenenler hariç). */
