@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { loadOwnerFinance } from "@/lib/property-management/load";
+import { loadInvoiceButtonContext } from "@/lib/integrations/einvoice/service";
+import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
 import { OWNER_BALANCE_NOTE, balanceLabel } from "@/lib/property-management/ledger";
 import { AgreementCard, ChargeLinksPanel, PayoutPanel } from "./owner-panels";
 
@@ -24,6 +26,7 @@ export async function OwnerTab({
   today,
   canEdit,
   canDelete,
+  canInvoice = false,
 }: {
   supabase: SupabaseClient;
   tenantId: string;
@@ -32,6 +35,8 @@ export async function OwnerTab({
   today: string;
   canEdit: boolean;
   canDelete: boolean;
+  /** commissions.create: yönetim ücreti satırlarında "Fatura kes" (e-Fatura bağlantısı yoksa "e-Fatura'yı bağla"). */
+  canInvoice?: boolean;
 }) {
   const fin = await loadOwnerFinance(supabase, { tenantId, rentalId, propertyId });
   if (!fin.available) {
@@ -46,6 +51,11 @@ export async function OwnerTab({
   const { agreement, ledger } = fin;
   const managed = agreement?.managed === true;
   const t = ledger.totals;
+  // Yönetim ücreti faturası: kaynak = tahsilat kaydı (rent_payments.id; defter satırı kimliği "fee:<id>").
+  const feeEntries = [...ledger.entries].filter((e) => e.kind === "fee").reverse();
+  const invoiceCtx = managed && feeEntries.length > 0
+    ? await loadInvoiceButtonContext(supabase, canInvoice, "rent_management_fee", feeEntries.map((e) => e.id.slice(4)))
+    : null;
 
   return (
     <div className="space-y-4">
@@ -125,6 +135,36 @@ export async function OwnerTab({
             )}
             <p className="mt-3 text-xs text-text-muted">{OWNER_BALANCE_NOTE}</p>
           </section>
+
+          {invoiceCtx?.canInvoice ? (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <h2 className="font-display font-bold text-ink-950">Yönetim ücreti faturaları</h2>
+              <p className="mt-1 text-xs text-text-muted">Her tahsilattan kesilen yönetim ücreti için e-Fatura kesin; kesilmişse faturaya gidin.</p>
+              <TableFrame stack minWidth={480} className="mt-3">
+                <Table>
+                  <caption className="sr-only">Yönetim ücreti faturaları</caption>
+                  <THead>
+                    <TR>
+                      <TH>Tarih</TH>
+                      <TH align="right">Ücret</TH>
+                      <TH align="right">Fatura</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {feeEntries.map((e) => (
+                      <TR key={e.id}>
+                        <TD primary className="font-semibold text-ink-950">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${e.date}T00:00:00`))}</TD>
+                        <TD label="Ücret" align="right" className="numeric">{money(Math.abs(e.signed))}</TD>
+                        <TD label="Fatura" align="right">
+                          <InvoiceCutButton ctx={invoiceCtx} sourceId={e.id.slice(4)} kaynak="kira_ucret" />
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              </TableFrame>
+            </section>
+          ) : null}
 
           <PayoutPanel rentalId={rentalId} today={today} payable={ledger.payable} payouts={fin.payouts} canEdit={canEdit} canDelete={canDelete} />
           <ChargeLinksPanel rentalId={rentalId} candidates={fin.candidates} canEdit={canEdit} />

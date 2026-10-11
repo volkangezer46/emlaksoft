@@ -245,6 +245,8 @@ const F = {
   einvoice: "20261010000700_einvoice.sql",
   // e-Fatura butunlugu (2026-10-11, Konsey P2): durum makinesi + atomik talep RPC'leri; dogrudan yazma yetkisi kapanir.
   einvoiceStateMachine: "20261011000600_einvoice_state_machine.sql",
+  // e-Fatura belirsiz sonuc kurtarma (Konsey Tur 3): issue_stage isareti + kurtarma RPC'leri; 000600'den SONRA.
+  einvoiceRecovery: "20261012000100_einvoice_recovery.sql",
   // Finans Paket B (2026-10-10): recurring_rules + recurring_occurrences (duzenli odeme/gelir, idempotent uretim) + recurring_* RPC; kira-tahakkuk cron adimi recurring_run_due'yu cagirir (kod sema yokken adimi atlar).
   recurringRules: "20261010000900_recurring_rules.sql",
   // Finans Paket C (2026-10-11): banka ekstresi taslak tablolari + mutabakat (cash_entries.reconciled_at) + finance_statement_* RPC; kod sema yokken "Ekstre yukle" gizlenir.
@@ -421,6 +423,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.earningsStatementPrivacy]: "siki", // tenant_commission/reporting_aggregates earnings_all yoksa yalniz kendi kayitlari (advisors=[]); finance_statement_lines/imports/mappings SELECT politikalari hesap + maas suzgeci (imza/ACL ayni)
     [F.homeSnapshotRpc]: "ek", // yalniz 1 yeni invoker RPC (home_snapshot); RLS cagiranin yetkisiyle, tablo/politika/veri degismez
     [F.einvoice]: "ek", // yeni einvoice_connections + einvoices tablolari (RLS ofis kapsamli, yazma commissions.create/settings.edit) + 2 DEFINER RPC; mevcut tablo/politika degismez
+    [F.einvoiceRecovery]: "davranis", // einvoices.issue_stage + 6 fonksiyon imzasiz yeniden tanim + service_role EXECUTE daralir; veri degismez
     [F.einvoiceStateMachine]: "davranis", // einvoices'te authenticated INSERT/UPDATE/DELETE kapanir (yazma yalniz DEFINER RPC); guard durum matrisi eklenir; veri degismez
     [F.listingAnalyses]: "ek", // yeni listing_analyses tablosu (RLS: okuma ofis, yazma valuation.create); mevcut tablo/politika degismez
     [F.vitrinChatClosedListing]: "davranis", // vitrin_chat_context govdesi yeniden tanimi: kapali portfoy artik sohbet baglamina GIRMEZ (govde+ACL baska degismez)
@@ -575,6 +578,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "FIN-C-banka-ekstresi-mutabakat", order: 29.99986855, title: "Finans: banka ekstresi ice aktarma + mutabakat (finance_statement_* + cash_entries.reconciled_at; 000600'den SONRA; kod sema yokken Ekstre yukle gizlenir; sira serbest, ek)", files: [F.bankStatementImport] },
     { id: "PB60-e-fatura", order: 29.9998671, title: "e-Fatura entegrasyonu: baglanti (sifreli kimlik) + fatura tablolari (kod tablo yokken bolumu etkin degil der; sira serbest, ek)", files: [F.einvoice] },
     { id: "PB62-e-fatura-durum-makinesi", order: 29.9998674, title: "e-Fatura durum makinesi + atomik resmilestirme talebi (000700'den SONRA; yazma yalniz RPC; sira serbest)", files: [F.einvoiceStateMachine] },
+    { id: "KONSEY3-e-fatura-kurtarma", order: 29.99986749, title: "e-Fatura belirsiz sonuc kurtarma: issue_stage + kurtarma RPC'leri (000600'den SONRA; sira serbest)", files: [F.einvoiceRecovery] },
     { id: "PB60-havuz-varsayilan-acik", order: 29.9998672, title: "Ilan havuzu yeni ofiste varsayilan acik + kaynak CHECK genislemesi (listing_pool 001500 sonrasi; sira serbest)", files: [F.poolDefaultOn] },
     { id: "PB61-realtime-cekirdek-tablolar", order: 29.99986745, title: "Realtime yayinina cekirdek tablolar (portfoy, talep, randevu, gorev, havuz, kasa; sira serbest, ek)", files: [F.realtimeCoreTables] },
     { id: "KONSEY-komisyon-taraf-kimligi", order: 29.99986746, title: "Komisyon paylasimi taraf kimligi: profile_id esleme + commission_splits esitleme (20260816000200 ve 000400 sonrasi; sira serbest)", files: [F.commissionSplitProfile] },

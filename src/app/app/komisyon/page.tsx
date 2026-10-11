@@ -43,6 +43,8 @@ import { PipelineForecastCard } from "./pipeline-forecast";
 import { DiscountAnalysisCard } from "./discount-analysis";
 import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
+import { loadInvoiceButtonContext } from "@/lib/integrations/einvoice/service";
+import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
 
 export const metadata = { title: "Komisyon" };
 type CommissionRow = {
@@ -220,6 +222,13 @@ export default async function CommissionPage({
   const simShare = Number(simDefaults["office.commission.simulator_advisor_share"] ?? 60);
 
   const rows = requireReportingData("commission-ledger", ledgerResult) as CommissionRow[];
+  // e-Fatura: satırda "Fatura kes" / "Faturayı gör" / "e-Fatura'yı bağla" (commissions.create; sayfa başına tek tur).
+  const invoiceCtx = await loadInvoiceButtonContext(
+    supabase,
+    (perms.commissions ?? []).includes("create"),
+    "commission",
+    rows.map((r) => r.id),
+  );
   const commissionTotal = requireReportingCount("commission-ledger-count", ledgerResult);
   const memberRows = requireReportingData("commission-members", memberResult);
   const bekleyenOnay = requireReportingCount("pending-approvals", approvalResult);
@@ -665,7 +674,7 @@ export default async function CommissionPage({
                         </p>
                       ) : null}
                     </div>
-                    <div><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${rowPaid ? "bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] text-[color:var(--viz-pos)]" : "bg-[color-mix(in_srgb,var(--viz-5)_16%,transparent)] text-[color:var(--pm-warn-text)]"}`}>{rowPaid ? "Tahsil edildi" : "Hesaplandı"}</span></div>
+                    <div className="flex flex-col items-start gap-1.5"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${rowPaid ? "bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] text-[color:var(--viz-pos)]" : "bg-[color-mix(in_srgb,var(--viz-5)_16%,transparent)] text-[color:var(--pm-warn-text)]"}`}>{rowPaid ? "Tahsil edildi" : "Hesaplandı"}</span><InvoiceCutButton ctx={invoiceCtx} sourceId={row.id} /></div>
                     {canEdit ? (
                       <div className="relative z-10 flex flex-col items-end gap-1.5">
                         {seeAllEarnings ? (

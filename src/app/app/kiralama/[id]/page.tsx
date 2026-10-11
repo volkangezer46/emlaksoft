@@ -279,6 +279,7 @@ export default async function KiraDetayPage({
               today={today}
               canEdit={canEdit}
               canDelete={canDelete}
+              canInvoice={perms.commissions?.includes("create") ?? false}
             />
           ) : null}
 

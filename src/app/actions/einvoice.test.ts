@@ -102,7 +102,7 @@ describe("issueInvoice atomik talep", () => {
     expect(res.message).not.toContain("Birkaç dakika içinde görünür");
     expect(res.message).toContain("Durumu yenile");
     const names = h.rpc.mock.calls.map((c) => c[0]);
-    expect(names).toEqual(["einvoice_claim_issue", "einvoice_record_progress", "einvoice_mark_issued"]);
+    expect(names).toEqual(["einvoice_claim_issue", "einvoice_record_progress", "einvoice_mark_issue_sent", "einvoice_mark_issued"]);
     expect(h.rpc.mock.calls[1]![1]).toMatchObject({ p_id: INV_ID, p_ref: REF });
   });
 
@@ -123,7 +123,36 @@ describe("issueInvoice atomik talep", () => {
     h.issue.mockResolvedValue({ ok: false, error: { code: "rejected", message: "Sağlayıcı reddetti." } });
     const res = await issueInvoice(INV_ID, true);
     expect(res.error).toBe("Sağlayıcı reddetti.");
-    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual(["einvoice_claim_issue", "einvoice_record_progress"]);
+    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual(["einvoice_claim_issue", "einvoice_mark_issue_sent", "einvoice_record_progress"]);
+    expect(h.createDraft).not.toHaveBeenCalled();
+  });
+
+  it("belirsiz hata (zaman aşımı/5xx): kilit ve işaret KORUNUR (release yok), tekrar gönderilmez, açık mesaj verilir", async () => {
+    rpcMap({ einvoice_claim_issue: { data: [claimedRow({ provider_ref: REF })], error: null } });
+    h.issue.mockResolvedValue({ ok: false, error: { code: "unavailable", message: "Nilvera zamanında yanıt vermedi." } });
+    const res = await issueInvoice(INV_ID, true);
+    expect(res.error).toContain("doğrulanıyor");
+    expect(res.error).toContain("tekrar gönderilmeyecek");
+    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual(["einvoice_claim_issue", "einvoice_mark_issue_sent"]);
+    expect(h.issue).toHaveBeenCalledTimes(1);
+  });
+
+  it("işaret yazılamazsa sağlayıcıya resmileştirme İSTEĞİ GİTMEZ", async () => {
+    rpcMap({
+      einvoice_claim_issue: { data: [claimedRow({ provider_ref: REF })], error: null },
+      einvoice_mark_issue_sent: { data: false, error: null },
+    });
+    const res = await issueInvoice(INV_ID, true);
+    expect(res.error).toBeTruthy();
+    expect(h.issue).not.toHaveBeenCalled();
+  });
+
+  it("sonucu doğrulanan (issue_stage dolu) taslak yeniden talep edilirse sağlayıcıya GİDİLMEZ ve belirsizlik mesajı döner", async () => {
+    rpcMap({ einvoice_claim_issue: { data: [], error: null } });
+    h.loadedRow = claimedRow({ issue_stage: "issue_sent", provider_ref: REF });
+    const res = await issueInvoice(INV_ID, true);
+    expect(res.error).toContain("doğrulanıyor");
+    expect(h.issue).not.toHaveBeenCalled();
     expect(h.createDraft).not.toHaveBeenCalled();
   });
 

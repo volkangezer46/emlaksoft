@@ -101,6 +101,11 @@ export interface EInvoiceAdapter {
   createDraft(draft: InvoiceDraft): Promise<Result<{ ref: EInvoiceRef; number?: string }>>;
   issue(ref: EInvoiceRef): Promise<Result<{ ref: EInvoiceRef; number?: string }>>;
   getStatus(ref: EInvoiceRef): Promise<Result<{ state: RemoteState; number?: string; reason?: string; ref: EInvoiceRef }>>;
+  /**
+   * Belirsiz resmileştirme kurtarma: sağlayıcıda bu belge için resmi gönderim izi VAR MI (UUID / trackable job ile arar).
+   * found:false yalnız sağlayıcının "böyle bir gönderim yok" dediği KANITLI durumdur; ağ/5xx hatası found:false SAYILMAZ (hata döner).
+   */
+  findIssued(ref: EInvoiceRef): Promise<Result<{ found: boolean; state?: RemoteState; number?: string; reason?: string; ref: EInvoiceRef }>>;
   getPdf(ref: EInvoiceRef): Promise<Result<{ bytes?: Uint8Array; url?: string }>>;
   /** Yalnız `capabilities.cancelDocTypes` içindeki türler için. */
   cancel?(ref: EInvoiceRef, reason: string): Promise<Result<void>>;
