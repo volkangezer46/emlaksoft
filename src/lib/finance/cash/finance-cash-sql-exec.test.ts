@@ -64,6 +64,8 @@ describe.skipIf(!mod)("finance_accounts + cash_entries (pglite)", () => {
     ACC = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
     OTHER = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T2]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261010000600_finance_accounts_cash_entries.sql"));
+    // Maaş bakiye gizliliği + kaynak bağlı iptal audit'i (Konsey #55+#56).
+    await db.exec(read("supabase/migrations/20261011001100_finance_salary_privacy_void_audit.sql"));
   });
 
   it("ofis hesabı yetkiye bağlı açılır; danışman ofis hesabı açamaz, kişisel hesap açabilir", async () => {
@@ -165,6 +167,12 @@ describe.skipIf(!mod)("finance_accounts + cash_entries (pglite)", () => {
     // düzenleme/elle iptal dışında: kaynak bağlı hareketin tutarı kilitli
     expect((await rpc(`public.finance_update_entry($1::uuid, 1::numeric, '2026-10-05'::date, 'komisyon', 'x', null, null, null, null)`, [first.entry_id])).outcome).toBe("locked");
     expect((await rpc(`public.finance_void_source_entries('commission', $1::uuid, 'Tahsilat geri alındı')`, [com])).count).toBe(1);
+    // iptal audit_logs'a yazılır (Konsey #56).
+    await db.exec(`reset role`);
+    const aud = await q(`select action, entity_id, new_value from public.audit_logs where action = 'cash_entry.void_source' and entity_id = $1`, [com]);
+    expect(aud).toHaveLength(1);
+    expect(aud[0]!.new_value).toMatchObject({ legs: 1 });
+    await as(OWNER, T, FULL, "owner");
     expect((await record(BANK, "in", 42000, "komisyon", "Komisyon tahsilatı", { src: "commission", srcId: com })).outcome).toBe("recorded");
   });
 
@@ -177,10 +185,14 @@ describe.skipIf(!mod)("finance_accounts + cash_entries (pglite)", () => {
     expect((await record(OFFICE, "out", 100, "maas", "Maaş denemesi")).outcome).toBe("forbidden");
     expect((await q(`select id from public.cash_entries where id = $1`, [sal.entry_id]))).toHaveLength(0);
     expect((await q(`select id from public.cash_entries where category <> 'maas'`)).length).toBeGreaterThan(0);
-    // bakiye yine doğru (maaş çıkışı dahil)
+    // bakiye "maaş hariç": yetkisiz rol maaş tutarını (bakiye farkından) çıkaramaz; owner/gm tam bakiyeyi görür.
     const accBal = await balance(OFFICE);
+    const accTotals = (await q(`select total_out::float8 as o, entry_count::int as n from public.finance_account_balances() where account_id = $1`, [OFFICE]))[0]!;
     await as(OWNER, T, FULL, "owner");
-    expect(await balance(OFFICE)).toBeCloseTo(accBal, 2);
+    expect(await balance(OFFICE)).toBeCloseTo(accBal - 30000, 2);
+    const ownerTotals = (await q(`select total_out::float8 as o, entry_count::int as n from public.finance_account_balances() where account_id = $1`, [OFFICE]))[0]!;
+    expect(ownerTotals.o).toBeCloseTo((accTotals.o as number) + 30000, 2);
+    expect(ownerTotals.n).toBe((accTotals.n as number) + 1);
     expect((await rpc(`public.finance_void_entry($1::uuid, 'Deneme iptali')`, [sal.entry_id])).outcome).toBe("voided");
   });
 
