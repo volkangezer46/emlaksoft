@@ -90,7 +90,7 @@ export function ChecklistFileControl({
             }
             aria-label={`${label} dosya bağını kaldır`}
             title="Dosya bağını kaldır (dosya müşteri belgelerinde kalır)"
-            className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+            className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 touch:min-h-11 touch:min-w-11"
           >
             <Unlink className="h-3.5 w-3.5" />
           </button>
@@ -116,7 +116,7 @@ export function ChecklistFileControl({
         onClick={() => inputRef.current?.click()}
         title="Dosya yükle (PDF, görsel, Word, Excel; en fazla 10 MB)"
         aria-label={`${label} için dosya yükle`}
-        className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600 disabled:opacity-50"
+        className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
       </button>

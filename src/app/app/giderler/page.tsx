@@ -1,4 +1,5 @@
 import { measureAll } from "@/lib/server-timing";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, CalendarRange, Plus, Receipt, Wallet, X } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -308,18 +309,9 @@ export default async function GiderlerPage({
         {presets.map((p) => {
           const active = fromF === p.from && toF === p.to;
           return (
-            <Link
-              key={p.label}
-              href={href({ from: p.from, to: p.to })}
-              aria-current={active ? "page" : undefined}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                active
-                  ? "border-brand-400/50 bg-surface-accent-soft text-accent-text"
-                  : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-accent-text"
-              }`}
-            >
+            <FilterChip key={p.label} href={href({ from: p.from, to: p.to })} active={active}>
               {p.label}
-            </Link>
+            </FilterChip>
           );
         })}
         <form action="/app/giderler" className="flex flex-wrap items-center gap-2">

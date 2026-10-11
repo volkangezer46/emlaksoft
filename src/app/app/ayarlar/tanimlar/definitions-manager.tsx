@@ -107,7 +107,7 @@ function DefinitionRowMore({
             disabled={disabled}
             aria-label={`Diğer işlemler: ${label}`}
             title="Diğer işlemler"
-            className="focus-ring press grid h-8 w-8 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 disabled:opacity-50"
+            className="focus-ring press grid h-8 w-8 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
           >
             <MoreVertical className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -304,10 +304,10 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                       aria-label="Yeni etiket"
                       className="w-full min-w-0 flex-1 rounded-[var(--radius-control)] border border-brand-400 bg-canvas px-2.5 py-1.5 text-sm outline-none"
                     />
-                    <button type="button" onClick={() => onRename(d.id)} disabled={busy === d.id || !editLabel.trim()} aria-label="Kaydet" className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-50">
+                    <button type="button" onClick={() => onRename(d.id)} disabled={busy === d.id || !editLabel.trim()} aria-label="Kaydet" className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-50 touch:min-h-11 touch:min-w-11">
                       {busy === d.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                     </button>
-                    <button type="button" onClick={() => setEditingId(null)} aria-label="Vazgeç" className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950">
+                    <button type="button" onClick={() => setEditingId(null)} aria-label="Vazgeç" className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 touch:min-h-11 touch:min-w-11">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -333,7 +333,7 @@ function CategoryPanel({ category, tenantId }: { category: Category; tenantId: s
                       onBlur={(e) => { if (e.target.value.toLowerCase() !== (d.color ?? "").toLowerCase()) onColor(d.id, e.target.value); }}
                       className="h-7 w-7 min-h-9 min-w-9 shrink-0 cursor-pointer rounded-[var(--radius-control)] border border-line bg-canvas p-1 disabled:opacity-50"
                     />
-                    <button type="button" onClick={() => startEdit(d)} disabled={busy === d.id} aria-label="Yeniden adlandır" title="Yeniden adlandır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-50">
+                    <button type="button" onClick={() => startEdit(d)} disabled={busy === d.id} aria-label="Yeniden adlandır" title="Yeniden adlandır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-brand-600 disabled:opacity-50 touch:min-h-11 touch:min-w-11">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <span className="inline-flex items-center gap-1.5" title={isSystem && d.is_active ? "Sistem anahtarı gizlenemez" : undefined}>

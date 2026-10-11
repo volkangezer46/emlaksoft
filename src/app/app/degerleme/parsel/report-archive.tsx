@@ -92,7 +92,7 @@ export function ReportArchive({
             </select>
           </label>
         ) : null}
-        <button type="submit" className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-1.5 text-sm font-semibold text-white">
+        <button type="submit" className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-1.5 text-sm font-semibold text-white touch:min-h-11">
           Süz
         </button>
         {filtered ? (

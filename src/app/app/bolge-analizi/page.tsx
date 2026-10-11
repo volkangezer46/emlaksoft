@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Building2, Info, LineChart, MapPinned, Minus, Sparkles, Trophy, TrendingDown, TrendingUp, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -322,29 +323,21 @@ export default async function RegionAnalysisPage({
       >
         <span className="mr-1 text-xs font-semibold text-text-faint">İşlem</span>
         {TX_FILTERS.map((f) => (
-          <Link
+          <FilterChip active={tx === f.value}
             key={f.value || "all"}
             href={`/app/bolge-analizi?tx=${encodeURIComponent(f.value)}&months=${months}`}
-            aria-current={tx === f.value ? "page" : undefined}
-            className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
-              tx === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-            }`}
           >
             {f.label}
-          </Link>
+          </FilterChip>
         ))}
         <span className="ml-3 mr-1 text-xs font-semibold text-text-faint">Dönem</span>
         {PERIODS.map((p) => (
-          <Link
+          <FilterChip active={String(months) === p.value}
             key={p.value}
             href={`/app/bolge-analizi?tx=${encodeURIComponent(tx)}&months=${p.value}`}
-            aria-current={String(months) === p.value ? "page" : undefined}
-            className={`focus-ring press rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold transition ${
-              String(months) === p.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-            }`}
           >
             {p.label}
-          </Link>
+          </FilterChip>
         ))}
       </nav>
 

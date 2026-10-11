@@ -79,7 +79,7 @@ export function TargetFormDialog({
           {...aria}
           aria-label="Hedefi düzenle"
           // relative z-10: kartı kaplayan overlay linkin üstünde kalması için
-          className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-accent-text"
+          className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-text-muted transition hover:border-brand-300 hover:text-accent-text touch:min-h-11 touch:min-w-11"
         >
           <Pencil className="h-4 w-4" />
         </button>

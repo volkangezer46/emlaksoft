@@ -105,7 +105,7 @@ export function EfCreditsSection({
                 <Button variant="navy" size="sm" type="button" disabled={pending} onClick={submit}>
                   {pending ? "Kaydediliyor…" : "Onayla"}
                 </Button>
-                <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted">
+                <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted touch:min-h-11">
                   Vazgeç
                 </button>
               </>

@@ -478,7 +478,7 @@ export default async function CustomersPage({
                   href={on ? hrefWith({ segment: undefined, sayfa: undefined }) : hrefWith({ segment: card.key, sayfa: undefined })}
                   aria-current={on ? "true" : undefined}
                   title={on ? "Filtre aktif — kaldır" : `${HEAT_SEGMENTS[card.key].label} müşterileri göster`}
-                  className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "opacity-85 hover:opacity-100"}`}
+                  className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "opacity-85 hover:opacity-100"} touch:min-h-11`}
                 >
                   <card.icon aria-hidden="true" className="h-3.5 w-3.5" />
                   {HEAT_SEGMENTS[card.key].label}

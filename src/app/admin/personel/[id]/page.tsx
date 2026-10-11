@@ -133,7 +133,7 @@ export default function PersonelDetayPage() {
                 }}
               />
             ) : (
-              <button type="button" onClick={() => run(reactivateStaff)} disabled={pending} className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] bg-accent px-3 text-xs font-semibold text-accent-fg disabled:opacity-50">
+              <button type="button" onClick={() => run(reactivateStaff)} disabled={pending} className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] bg-accent px-3 text-xs font-semibold text-accent-fg disabled:opacity-50 touch:min-h-11">
                 {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <UserPlus className="h-3.5 w-3.5" aria-hidden />} Aktif yap
               </button>
             )}

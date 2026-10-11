@@ -252,7 +252,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     onClick={() => setLightboxKey(row.key)}
                     aria-label={`${row.name} önizle`}
                     title="Önizle"
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
@@ -263,7 +263,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     rel="noopener noreferrer"
                     aria-label={`${row.name} yeni sekmede aç`}
                     title={row.source === "sozlesme" ? "Sözleşmeyi aç" : "Yeni sekmede aç"}
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                   >
                     {row.source === "sozlesme" || row.source === "evrak" ? (
                       <Link2 className="h-4 w-4" />
@@ -279,7 +279,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                     download={row.name}
                     aria-label={`${row.name} indir`}
                     title="İndir"
-                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                    className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                   >
                     <Download className="h-4 w-4" />
                   </a>
@@ -292,7 +292,7 @@ export function DocumentList({ rows }: { rows: DocumentRow[] }) {
                         type="button"
                         aria-label={`${row.name} ${row.source === "sozlesme" ? "iptal et" : "kaldır"}`}
                         title={row.source === "sozlesme" ? "Sözleşmeyi iptal et" : "Kaldır"}
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

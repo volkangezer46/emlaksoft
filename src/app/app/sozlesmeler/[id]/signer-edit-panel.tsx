@@ -68,7 +68,7 @@ export function SignerEditPanel({
             {...aria}
             title="İmzalayanı düzenle"
             aria-label={`${signer.full_name} bilgilerini düzenle`}
-            className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+            className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -100,7 +100,7 @@ export function SignerEditPanel({
           disabled={sending}
           title="İmza linkini SMS ile yeniden gönder"
           aria-label={`${signer.full_name} için imza linkini SMS ile yeniden gönder`}
-          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+          className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
         >
           <MessageSquare className="h-3.5 w-3.5" />
         </button>

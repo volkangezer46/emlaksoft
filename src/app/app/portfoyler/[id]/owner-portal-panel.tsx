@@ -136,7 +136,7 @@ export function OwnerPortalPanel({
                     href={toWhatsAppLink(t.ownerPhone, WA_OWNER(t.ownerName, propertyLabel, t.url)) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/40 bg-mint-500/10 px-3 text-xs font-semibold text-mint-700 hover:bg-mint-500/20"
+                    className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/40 bg-mint-500/10 px-3 text-xs font-semibold text-mint-700 hover:bg-mint-500/20 touch:min-h-11"
                   >
                     <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                   </a>
@@ -145,7 +145,7 @@ export function OwnerPortalPanel({
                   href={t.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
+                  className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas touch:min-h-11"
                 >
                   <ExternalLink className="h-3.5 w-3.5" /> Önizle
                 </a>

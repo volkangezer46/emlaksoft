@@ -136,7 +136,7 @@ export function KontorPanel({
                       type="button"
                       disabled={pending}
                       onClick={() => buy(p)}
-                      className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-60"
+                      className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-60 touch:min-h-11"
                     >
                       {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Onayla ve öde
                     </button>
@@ -147,7 +147,7 @@ export function KontorPanel({
                         setConfirmId(null);
                         setError(null);
                       }}
-                      className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 font-semibold text-text disabled:opacity-60"
+                      className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-1.5 font-semibold text-text disabled:opacity-60 touch:min-h-11"
                     >
                       Vazgeç
                     </button>
@@ -161,7 +161,7 @@ export function KontorPanel({
                     setError(null);
                     setConfirmId(p.id);
                   }}
-                  className="focus-ring press mt-3 min-h-9 w-full rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="focus-ring press mt-3 min-h-9 w-full rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11"
                 >
                   Satın al
                 </button>

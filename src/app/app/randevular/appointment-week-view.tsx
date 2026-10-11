@@ -108,7 +108,7 @@ export function AppointmentWeekView({
         <div className="flex items-center gap-1">
           <Link
             href={prevHref}
-            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
             aria-label={mode === "hafta" ? "Önceki hafta" : "Önceki gün"}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function AppointmentWeekView({
           </Link>
           <Link
             href={nextHref}
-            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
             aria-label={mode === "hafta" ? "Sonraki hafta" : "Sonraki gün"}
           >
             <ChevronRight className="h-4 w-4" />

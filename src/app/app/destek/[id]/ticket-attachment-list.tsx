@@ -96,7 +96,7 @@ function AttachmentRow({
       </span>
       <a
         href={attachmentDownloadHref(attachment.id)}
-        className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-700"
+        className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-700 touch:min-h-11 touch:min-w-11"
         aria-label={`${attachment.file_name} dosyasını indir`}
       >
         <Download className="h-3.5 w-3.5" aria-hidden />
@@ -107,7 +107,7 @@ function AttachmentRow({
             <button
               type="button"
               disabled={pending}
-              className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50"
+              className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
               aria-label={`${attachment.file_name} dosyasını sil`}
             >
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Trash2 className="h-3.5 w-3.5" aria-hidden />}

@@ -83,7 +83,7 @@ export function AccountCreditPanel({
                 setConfirming(false);
                 setResult(null);
               }}
-              className={`focus-ring min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${mode === m ? "bg-accent text-accent-fg" : "text-text-muted hover:text-ink-950"}`}
+              className={`focus-ring min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${mode === m ? "bg-accent text-accent-fg" : "text-text-muted hover:text-ink-950"} touch:min-h-11`}
             >
               {m === "grant" ? "Kredi yükle" : "Geri al"}
             </button>
@@ -176,7 +176,7 @@ export function AccountCreditPanel({
             disabled={pending}
             className={`focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] px-4 text-sm font-semibold transition disabled:opacity-60 ${
               mode === "reverse" ? "bg-danger-600 text-white hover:bg-danger-700" : "bg-accent text-accent-fg hover:bg-accent-hover"
-            }`}
+            } touch:min-h-11`}
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : mode === "reverse" ? <Undo2 className="h-4 w-4" aria-hidden /> : <Coins className="h-4 w-4" aria-hidden />}
             {confirming ? (mode === "grant" ? "Evet, yükle" : "Evet, geri al") : mode === "grant" ? "Kredi yükle" : "Krediyi geri al"}

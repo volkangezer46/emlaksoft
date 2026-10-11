@@ -47,7 +47,7 @@ export function InlineOp({
             setMsg(null);
             setOpen(true);
           }}
-          className={`focus-ring press min-h-9 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition ${btn}`}
+          className={`focus-ring press min-h-9 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition ${btn} touch:min-h-11`}
         >
           {label}
         </button>
@@ -90,7 +90,7 @@ export function InlineOp({
       <button
         type="submit"
         disabled={pending}
-        className={`focus-ring press min-h-9 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-bold transition disabled:opacity-60 ${btn}`}
+        className={`focus-ring press min-h-9 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-bold transition disabled:opacity-60 ${btn} touch:min-h-11`}
       >
         {pending ? "İşleniyor…" : confirmLabel}
       </button>

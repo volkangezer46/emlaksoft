@@ -134,7 +134,7 @@ function StageRow({
           className="h-7 w-7 min-h-9 min-w-9 shrink-0 cursor-pointer rounded-[var(--radius-control)] border border-line bg-canvas p-1"
         />
         {color ? (
-          <button type="button" onClick={() => rowDraft.set("color", "")} disabled={rowDraft.locked} aria-label="Rengi kaldır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950">
+          <button type="button" onClick={() => rowDraft.set("color", "")} disabled={rowDraft.locked} aria-label="Rengi kaldır" className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 touch:min-h-11 touch:min-w-11">
             <X className="h-3.5 w-3.5" />
           </button>
         ) : null}

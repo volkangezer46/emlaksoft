@@ -128,7 +128,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => remove(t.id)}
                 aria-label="Kapat"
-                className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+                className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 touch:min-h-11 touch:min-w-11"
               >
                 <X className="h-4 w-4" />
               </button>

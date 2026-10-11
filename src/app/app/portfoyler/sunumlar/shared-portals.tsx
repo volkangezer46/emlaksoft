@@ -46,7 +46,7 @@ function CopyButton({ url }: { url: string }) {
       }}
       title="Linki kopyala"
       aria-label="Portal linkini kopyala"
-      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
@@ -97,7 +97,7 @@ function RevokeButton({ row }: { row: SharedPortalRow }) {
       onClick={() => setConfirming(true)}
       title="Linki iptal et"
       aria-label={`${row.subject} portal linkini iptal et`}
-      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-faint transition hover:border-danger-500/40 hover:text-danger-500"
+      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-faint transition hover:border-danger-500/40 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
     >
       <XCircle className="h-3.5 w-3.5" />
     </button>
@@ -231,7 +231,7 @@ export function SharedPortals({ rows }: { rows: SharedPortalRow[] }) {
                             rel="noopener noreferrer"
                             title="Portalı yeni sekmede aç"
                             aria-label="Portalı yeni sekmede aç"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>

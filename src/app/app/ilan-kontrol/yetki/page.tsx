@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Suspense } from "react";
 import { ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -83,17 +84,15 @@ async function QueueBody({ kova, page, canEdit, tenantId }: { kova: AuthorityQue
   if (!res.available) return <ControlUnavailable />;
 
   const nowMs = now();
-  const chip = (on: boolean) =>
-    `focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition ${on ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`;
   const filters = (
     <nav aria-label="Kuyruk türü" className="mb-4 flex flex-wrap gap-1.5">
-      <Link href={hrefFor(null)} aria-current={kova === null ? "page" : undefined} className={chip(kova === null)}>
-        Tümü <span className="tabular-nums">{res.summary.total}</span>
-      </Link>
+      <FilterChip href={hrefFor(null)} active={kova === null} count={res.summary.total}>
+        Tümü
+      </FilterChip>
       {AUTHORITY_QUEUE_FILTERS.map((f) => (
-        <Link key={f} href={hrefFor(f)} aria-current={kova === f ? "page" : undefined} className={chip(kova === f)}>
-          {AUTHORITY_QUEUE_LABELS[f]} <span className="tabular-nums">{res.summary.counts[f]}</span>
-        </Link>
+        <FilterChip key={f} href={hrefFor(f)} active={kova === f} count={res.summary.counts[f]}>
+          {AUTHORITY_QUEUE_LABELS[f]}
+        </FilterChip>
       ))}
     </nav>
   );

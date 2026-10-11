@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowRight, CheckCircle2, Circle, LifeBuoy, ListChecks } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
@@ -40,18 +41,9 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
 
       <nav aria-label="Yardım bölümleri" className="flex flex-wrap gap-2">
         {HELP_TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={tabHref(t.id)}
-            aria-current={t.id === tab ? "page" : undefined}
-            className={`focus-ring inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold transition ${
-              t.id === tab
-                ? "bg-ink-950 text-white"
-                : "border border-line bg-surface text-text-muted hover:border-brand-300 hover:text-ink-950"
-            }`}
-          >
+          <FilterChip key={t.id} href={tabHref(t.id)} active={t.id === tab}>
             {t.label}
-          </Link>
+          </FilterChip>
         ))}
       </nav>
 

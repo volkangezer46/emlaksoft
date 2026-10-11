@@ -79,7 +79,7 @@ export function CustomerTagChips({
                 onClick={() => remove(tag)}
                 disabled={pending}
                 aria-label={`${tag} etiketini kaldır`}
-                className="grid h-4 w-4 place-items-center rounded-full text-cyan-300/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                className="grid h-4 w-4 place-items-center rounded-full text-cyan-300/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50 touch:min-h-11 touch:min-w-11"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -134,7 +134,7 @@ export function CustomerTagChips({
                 setError(null);
               }}
               aria-label="Etiket eklemeyi kapat"
-              className="absolute right-1.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+              className="absolute right-1.5 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white touch:min-h-11 touch:min-w-11"
             >
               <X className="h-3 w-3" />
             </button>

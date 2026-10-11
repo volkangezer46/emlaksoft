@@ -42,7 +42,7 @@ function walk(dir: string, out: string[] = []) {
 }
 let pages = only ?? walk("src/app/app").map((f) => f.replace(/\\/g, "/").replace("src/app", "").replace(/\/page\.tsx$/, ""));
 // Detay sayfaları: liste sayfasındaki ilk kaydın yolu.
-if (!only) {
+if (!only || process.env.DETAILS) {
   for (const base of ["/app/musteriler", "/app/portfoyler", "/app/anlasmalar", "/app/kiralama", "/app/ekip", "/app/talepler", "/app/projeler"]) {
     const html = await (await fetch(BASE + base, { headers: { cookie: cookieHeader }, redirect: "manual" })).text();
     const hit = new RegExp(`${base}/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`).exec(html);
@@ -96,21 +96,22 @@ const PROBE = `(() => {
 type Issue = { k: string; d: string };
 const results: Record<string, Issue[]> = {};
 const browser = await chromium.launch();
-const jobs: Array<[string, number, string]> = [];
-for (const p of pages) for (const w of WIDTHS) for (const t of THEMES) jobs.push([p, w, t]);
-let idx = 0;
-async function worker() {
-  while (idx < jobs.length) {
-    const [p, w, t] = jobs[idx++];
-    const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, hasTouch: w < 768, isMobile: w < 768 });
-    await ctx.addCookies(cookies);
-    await ctx.addInitScript((th) => { try { localStorage.setItem("es-theme", th); } catch {} }, t);
-    const page = await ctx.newPage();
+const combos: Array<[number, string]> = [];
+for (const w of WIDTHS) for (const t of THEMES) combos.push([w, t]);
+let done = 0;
+const total = combos.length * pages.length;
+/** Genişlik+tema başına TEK bağlam; sayfalar sırayla gezilir (bağlam açma maliyeti yok), sonuçlar artımlı yazılır. */
+async function runCombo([w, t]: [number, string]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: 800 }, hasTouch: w < 768, isMobile: w < 768 });
+  await ctx.addCookies(cookies);
+  await ctx.addInitScript((th) => { try { localStorage.setItem("es-theme", th); } catch {} }, t);
+  const page = await ctx.newPage();
+  for (const p of pages) {
     const key = `${p} | ${w} | ${t}`;
     try {
-      const res = await page.goto(BASE + p, { waitUntil: "load", timeout: 45000 });
-      await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
-      await page.waitForTimeout(400);
+      const res = await page.goto(BASE + p, { waitUntil: "domcontentloaded", timeout: 120000 });
+      await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+      await page.waitForTimeout(900);
       const status = res?.status() ?? 0;
       const found: Issue[] = status >= 400 ? [{ k: "http", d: String(status) }] : ((await page.evaluate(PROBE)) as Issue[]);
       results[key] = found;
@@ -118,12 +119,14 @@ async function worker() {
     } catch (e) {
       results[key] = [{ k: "hata", d: (e as Error).message.slice(0, 80) }];
     }
-    await ctx.close();
+    if (++done % 25 === 0) { writeFileSync(outFile, JSON.stringify(results, null, 1)); console.log("ilerleme", done, "/", total); }
   }
+  await ctx.close();
 }
-await Promise.all(Array.from({ length: CONC }, worker));
+let ci = 0;
+await Promise.all(Array.from({ length: CONC }, async () => { while (ci < combos.length) await runCombo(combos[ci++]); }));
 await browser.close();
 writeFileSync(outFile, JSON.stringify(results, null, 1));
 const tot: Record<string, number> = {};
 for (const v of Object.values(results)) for (const i of v) tot[i.k] = (tot[i.k] || 0) + 1;
-console.log("sayfa-ölçüm:", jobs.length, "| sorun türü sayıları:", JSON.stringify(tot));
+console.log("sayfa-ölçüm:", total, "| sorun türü sayıları:", JSON.stringify(tot));

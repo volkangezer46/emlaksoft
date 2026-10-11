@@ -1,4 +1,5 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
@@ -223,16 +224,9 @@ export default async function BuyumePage({ searchParams }: { searchParams: Promi
             <CardContent className="space-y-3">
               <nav aria-label="Davet filtresi" className="flex flex-wrap gap-2">
                 {INVITE_FILTERS.map((f) => (
-                  <Link
-                    key={f}
-                    href={inviteFilterHref(f)}
-                    aria-current={durum === f ? "page" : undefined}
-                    className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                      durum === f ? "border-accent bg-surface-accent-soft text-accent-text" : "border-hairline bg-surface text-text-muted hover:bg-surface-hover"
-                    }`}
-                  >
+                  <FilterChip key={f} href={inviteFilterHref(f)} active={durum === f}>
                     {INVITE_FILTER_LABEL[f]}
-                  </Link>
+                  </FilterChip>
                 ))}
               </nav>
               {!d ? (

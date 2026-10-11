@@ -230,31 +230,31 @@ export default async function AdminGrowthPage({
                 </div>
                 <ul className="divide-y divide-line text-sm">
                   <li>
-                    <Link href={hrefFor({ kaynak: "odeyen" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                    <Link href={hrefFor({ kaynak: "odeyen" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                       <span className="text-text-muted">Deneme → ödeme dönüşümü</span>
                       <span className="font-semibold tabular-nums text-ink-950">{formatPercent(m.signupToPaid)}</span>
                     </Link>
                   </li>
                   <li>
-                    <Link href={hrefFor({ kaynak: "referral" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                    <Link href={hrefFor({ kaynak: "referral" })} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                       <span className="text-text-muted">Davetçi başına ödeyen</span>
                       <span className="font-semibold tabular-nums text-ink-950">{formatDecimal(m.payersPerReferrer)}</span>
                     </Link>
                   </li>
                   <li>
-                    <Link href={queueHref("paid")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                    <Link href={queueHref("paid")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                       <span className="text-text-muted">Ödül maliyeti ({formatPercent(m.costRatio)} gelir payı)</span>
                       <span className="font-semibold tabular-nums text-[color:var(--viz-gold)]">{formatTry(m.rewardCostTry)}</span>
                     </Link>
                   </li>
                   <li>
-                    <Link href={queueHref("paid")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                    <Link href={queueHref("paid")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                       <span className="text-text-muted">CAC geri dönüşü (ilk ödeme {formatTry(m.firstPaymentRevenueTry)})</span>
                       <span className="font-semibold tabular-nums text-[color:var(--viz-gold)]">{m.paybackMultiple == null ? "-" : `${formatDecimal(m.paybackMultiple, 1)}x`}</span>
                     </Link>
                   </li>
                   <li>
-                    <Link href={queueHref("flagged")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+                    <Link href={queueHref("flagged")} className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                       <span className="text-text-muted">Kötüye kullanım oranı</span>
                       <span className={`font-semibold tabular-nums ${m.abuseRate != null && m.abuseRate > 0 ? "text-danger-500" : "text-ink-950"}`}>{formatPercent(m.abuseRate)}</span>
                     </Link>

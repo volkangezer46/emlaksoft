@@ -21,7 +21,7 @@ export function SystemStatusChip({ health }: { health: AdminHealth }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`focus-ring inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-bold ${tone}`}
+          className={`focus-ring inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-bold ${tone} touch:min-h-11`}
           aria-label={`Sistem durumu: ${s.label}. Ayrıntıyı aç`}
         >
           <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
@@ -64,7 +64,7 @@ export function SystemStatusChip({ health }: { health: AdminHealth }) {
         ) : null}
         <Link
           href="/admin/sistem"
-          className="focus-ring mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink-950 transition hover:bg-canvas"
+          className="focus-ring mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink-950 transition hover:bg-canvas touch:min-h-11"
         >
           Sistemi görüntüle
           <ArrowUpRight className="h-3.5 w-3.5 text-text-muted" aria-hidden />

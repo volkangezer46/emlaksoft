@@ -119,7 +119,7 @@ export function PropertyBulkBar() {
               onClick={() => setOpen((s) => !s)}
               disabled={pending}
               aria-expanded={open}
-              className="focus-ring press inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+              className="focus-ring press inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50 touch:min-h-11"
             >
               {pending ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : null}
               Durum değiştir

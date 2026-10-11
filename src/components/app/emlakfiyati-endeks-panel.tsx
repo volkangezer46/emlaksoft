@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowUpRight, Landmark } from "lucide-react";
 import { AreaTrend, ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
@@ -67,16 +68,12 @@ export async function EmlakFiyatiEndeksPanel({
       {tipLinks && tipLinks.length > 1 ? (
         <nav aria-label="Endeks türü" className="flex gap-1.5">
           {tipLinks.map((l) => (
-            <Link
+            <FilterChip active={l.tip === tip}
               key={l.tip}
               href={l.href}
-              aria-current={l.tip === tip ? "page" : undefined}
-              className={`focus-ring press rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
-                l.tip === tip ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-              }`}
             >
               {EMLAKFIYATI_TIP_LABEL[l.tip]}
-            </Link>
+            </FilterChip>
           ))}
         </nav>
       ) : null}

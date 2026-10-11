@@ -1,4 +1,5 @@
 import { ListHero, ListPage } from "@/components/ui/list-page";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { HelpTip } from "@/components/ui/help-tip";
 import { StatRow } from "@/components/ui/stat-row";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -188,17 +189,13 @@ export default async function OtomasyonlarPage({
           <div className="flex items-center gap-2">
             <div className="flex gap-1.5">
               {DURUM_FILTERS.map((f) => (
-                <Link
+                <FilterChip
                   key={f.value}
                   href={f.value ? `/app/otomasyonlar?durum=${f.value}` : "/app/otomasyonlar"}
-                  className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-semibold transition ${
-                    durum === f.value
-                      ? "bg-ink-950 text-white"
-                      : "border border-line text-text-muted hover:text-ink-950"
-                  }`}
+                  active={durum === f.value}
                 >
                   {f.label}
-                </Link>
+                </FilterChip>
               ))}
             </div>
             <span className="text-xs text-text-faint">

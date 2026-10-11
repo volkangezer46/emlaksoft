@@ -1,4 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
@@ -263,17 +264,12 @@ export default async function PropertyKeysBoardPage({
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               {KEY_BOARD_FILTERS.map((f) => (
-                <Link
+                <FilterChip active={durum === f.value}
                   key={f.value || "all"}
                   href={href({ durum: f.value, sayfa: 1 })}
-                  className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                    durum === f.value
-                      ? "bg-ink-950 text-white"
-                      : "border border-line text-text-muted hover:text-ink-950"
-                  }`}
                 >
                   {f.label}
-                </Link>
+                </FilterChip>
               ))}
               {activeStaff ? (
                 <Link

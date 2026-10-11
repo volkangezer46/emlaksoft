@@ -246,15 +246,15 @@ export async function SystemView() {
               </RadialGauge>
             </Link>
             <dl className="m-0 min-w-0 flex-1 divide-y divide-line text-sm">
-              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                 <dt className="text-text-muted">İl</dt>
                 <dd className="m-0 font-semibold tabular-nums text-ink-950">{provinces ?? 0}/{TOTAL_PROVINCES}</dd>
               </Link>
-              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                 <dt className="text-text-muted">İlçe</dt>
                 <dd className="m-0 font-semibold tabular-nums text-ink-950">{(districts ?? 0).toLocaleString("tr-TR")}</dd>
               </Link>
-              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover">
+              <Link href="/admin/geo" className="flex h-10 items-center justify-between gap-3 hover:bg-surface-hover touch:min-h-11">
                 <dt className="text-text-muted">Mahalle</dt>
                 <dd className="m-0 font-semibold tabular-nums text-ink-950">{(neighborhoods ?? 0).toLocaleString("tr-TR")}</dd>
               </Link>

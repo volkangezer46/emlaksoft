@@ -90,7 +90,7 @@ export async function DanismanAra({ ctx }: { ctx: HomeCtx }) {
                         href={`tel:${r.phone}`}
                         aria-label={`${r.name} ara`}
                         title="Müşteriyi ara"
-                        className="focus-ring press inline-grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-[var(--pm-success-text)] transition hover:bg-[var(--surface-hover)]"
+                        className="focus-ring press inline-grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-[var(--pm-success-text)] transition hover:bg-[var(--surface-hover)] touch:min-h-11 touch:min-w-11"
                       >
                         <Phone className="h-4 w-4" aria-hidden="true" />
                       </a>

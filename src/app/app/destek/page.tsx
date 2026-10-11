@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import {
@@ -432,29 +433,20 @@ canCreateTicket ? <ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>Yeni talep
           {grandTotal > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               {[{ label: "Tümü", value: "" }, ...statusKeys.map((k) => ({ label: statusLabel[k], value: k as string }))].map((f) => (
-                <Link
+                <FilterChip active={durum === f.value}
                   key={f.value}
                   href={buildHref({ durum: f.value || null })}
-                  className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                    durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-                  }`}
                 >
                   {f.label}
-                </Link>
+                </FilterChip>
               ))}
               {categoryChips.length > 1 ? (
                 <>
                   <span aria-hidden className="mx-1 h-4 w-px bg-line" />
                   {categoryChips.map(([cat, n]) => (
-                    <Link
-                      key={cat}
-                      href={buildHref({ kategori: kategori === cat ? null : cat })}
-                      className={`focus-ring inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                        kategori === cat ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:text-ink-950"
-                      }`}
-                    >
+                    <FilterChip key={cat} href={buildHref({ kategori: kategori === cat ? null : cat })} active={kategori === cat}>
                       <Tag className="h-3 w-3" /> {catName(cat)} · {n}
-                    </Link>
+                    </FilterChip>
                   ))}
                 </>
               ) : null}

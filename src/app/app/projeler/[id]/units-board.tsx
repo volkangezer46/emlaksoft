@@ -270,7 +270,7 @@ export function UnitsBoard({
                     type="button"
                     onClick={closeUnit}
                     aria-label="Paneli kapat"
-                    className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-ink-950"
+                    className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-surface-hover hover:text-ink-950 touch:min-h-11 touch:min-w-11"
                   >
                     <X className="h-5 w-5" aria-hidden="true" />
                   </button>

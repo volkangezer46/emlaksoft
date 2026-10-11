@@ -160,7 +160,7 @@ export function CustomerSatisfactionSection({
                       rel="noopener noreferrer"
                       title="Sunumu yeni sekmede aç"
                       aria-label="Sunumu yeni sekmede aç"
-                      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline-strong bg-surface text-text-muted transition hover:bg-canvas hover:text-ink-950"
+                      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline-strong bg-surface text-text-muted transition hover:bg-canvas hover:text-ink-950 touch:min-h-11 touch:min-w-11"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                     </a>

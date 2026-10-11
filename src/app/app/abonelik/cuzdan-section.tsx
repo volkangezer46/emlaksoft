@@ -147,7 +147,7 @@ export async function CuzdanSection({
         <div className="mt-4 grid gap-1 sm:grid-cols-2">
           <Link
             href={hrefOf("giren")}
-            className="focus-ring group flex min-h-10 items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 hover:bg-surface-hover"
+            className="focus-ring group flex min-h-10 items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 hover:bg-surface-hover touch:min-h-11"
           >
             <span className="flex items-center gap-2 text-sm text-text-muted">
               <CalendarClock className="h-4 w-4 text-text-faint" aria-hidden="true" /> Vadesi yaklaşan
@@ -161,7 +161,7 @@ export async function CuzdanSection({
           </Link>
           <Link
             href={hrefOf("giren")}
-            className="focus-ring group flex min-h-10 items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 hover:bg-surface-hover"
+            className="focus-ring group flex min-h-10 items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 hover:bg-surface-hover touch:min-h-11"
           >
             <span className="flex items-center gap-2 text-sm text-text-muted">
               <Clock3 className="h-4 w-4 text-text-faint" aria-hidden="true" /> Toplam yüklenen

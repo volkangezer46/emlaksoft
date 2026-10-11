@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { AlertTriangle } from "lucide-react";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,16 +89,12 @@ export function EconomicsSection({
       <CardContent className="space-y-5">
         <nav aria-label="Dönem" className="flex flex-wrap gap-1">
           {PERIODS.map((p) => (
-            <Link
+            <FilterChip active={donem === p.id}
               key={p.id}
               href={`${BASE}?donem=${p.id}#ekonomi`}
-              aria-current={donem === p.id ? "page" : undefined}
-              className={`focus-ring min-h-9 rounded-[var(--radius-control)] px-3 py-1.5 text-sm font-semibold ${
-                donem === p.id ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-              }`}
             >
               {p.label}
-            </Link>
+            </FilterChip>
           ))}
         </nav>
 
@@ -268,7 +265,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
             <ul className="mt-2 divide-y divide-line text-sm">
               {segments.map((g, i) => (
                 <li key={g.kind}>
-                  <Link href="#bakiyeler" className="flex h-10 items-center gap-3 hover:bg-surface-hover">
+                  <Link href="#bakiyeler" className="flex h-10 items-center gap-3 hover:bg-surface-hover touch:min-h-11">
                     <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: VIZ_SERIES[i % VIZ_SERIES.length] }} />
                     <span className="min-w-0 flex-1 truncate font-semibold text-ink-950">{g.label}</span>
                     <span className="tabular-nums text-text-muted">{fmt.format(grantCounts[g.kind] ?? 0)} yükleme</span>
@@ -291,7 +288,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
               const row = shown.find((x) => x.tenantId === o.tenantId);
               return (
                 <li key={o.tenantId}>
-                  <Link href={`${BASE}?ofis=${o.tenantId}#ofis`} className="grid h-10 grid-cols-[minmax(6rem,12rem)_1fr_auto] items-center gap-3 hover:bg-surface-hover">
+                  <Link href={`${BASE}?ofis=${o.tenantId}#ofis`} className="grid h-10 grid-cols-[minmax(6rem,12rem)_1fr_auto] items-center gap-3 hover:bg-surface-hover touch:min-h-11">
                     <span className="truncate text-sm font-semibold text-ink-950" title={o.label}>{o.label}</span>
                     <span aria-hidden="true" className="relative block h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
                       <span className="viz-grow-x absolute inset-y-0 left-0 block rounded-full" style={{ width: `${o.pct}%`, background: "var(--viz-1)" }} />

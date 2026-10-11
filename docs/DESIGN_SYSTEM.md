@@ -199,8 +199,17 @@ olduğundan `<Button className="bg-mint-600">` gibi ton ezmeleri çalışır.
 
 ### FilterChip (`ui/filter-chip.tsx`)
 
-Kategori/sekme/durum çipi: bağlantıdır (sunucu filtresi, değer URL'de). `<FilterChip href active>`; seçiliyse
-`aria-current="page"` otomatik. Dokunmada 44 px (`touch:min-h-11`), odak halkası ve basma tabandan gelir.
+Kategori/sekme/durum çipi: TEK bileşen (2026-10-11; /app + /admin + `list-kit` `CategoryChips` buna geçti).
+`<FilterChip href active count>` bağlantıdır (sunucu filtresi, değer URL'de; seçiliyse `aria-current="page"` otomatik);
+`href` yoksa düğmedir (`onClick`, `aria-pressed`). Sayaç `count` ile (iç içe tıklanabilir öğe koyma).
+Dokunmada 44 px (`touch:min-h-11`), odak halkası ve basma tabandan gelir.
+
+**44 px kuralı ve kök yazı boyutu:** /app ve /admin kabuğu kök yazı boyutunu 15 px yapar; Tailwind boşlukları rem olduğundan
+`h-11` gerçekte 41 px çıkardı. `src/app/a11y.css` `touch:h-11 / touch:min-h-11 / touch:w-11 / touch:min-w-11` (ve <640 px'te
+düz `h-11/w-11`) sınıflarını PİKSELE sabitler; tıklanabilir öğeye her zaman `touch:min-h-11` (kare ikon düğmesine
+`touch:min-w-11` de) yaz. Ratchet: `src/lib/ui-ratchet-contract.test.ts` yeni ham renk / ham `<button>` / 44 px altı hedef
+eklenmesini engeller; mevcut borç `src/lib/ui-ratchet-baseline.json`'dadır ve yalnız azalır
+(`UI_RATCHET_WRITE=1 npx vitest run src/lib/ui-ratchet-contract.test.ts` azalan sayıları yazar).
 Düğme olmayan öğeye aynı görünüm: `filterChipClass({ active })`. Admin'de ham `<Link className="focus-ring ... rounded-full">`
 çip reçetesi yazma. Ham `<button className="focus-ring press ... bg-ink-950 text-white">` da yasak: `Button`/`ButtonLink`
 (`navy`/`outline`/`ghost`, ikon düğmesi `size="icon"` + `aria-label`). Admin filtre formlarında ham `<input>` yerine `Input`.

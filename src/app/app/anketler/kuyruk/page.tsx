@@ -1,4 +1,4 @@
-import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Headphones, Lock, PartyPopper } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -225,17 +225,9 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
         {tabs
           .filter((t) => !t.hidden)
           .map((t) => (
-            <Link
-              key={t.key}
-              href={link({ durum: t.key })}
-              aria-current={durum === t.key ? "page" : undefined}
-              className={`focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition ${
-                durum === t.key ? "border-brand-600 bg-brand-600 text-white" : "border-line text-text-muted hover:border-brand-400"
-              }`}
-            >
+            <FilterChip key={t.key} href={link({ durum: t.key })} active={durum === t.key} count={t.count}>
               {t.label}
-              {t.count !== null ? <span className="tabular-nums opacity-80">{t.count}</span> : null}
-            </Link>
+            </FilterChip>
           ))}
         {canManage && assigneeOptions.length > 0 ? (
           <form method="get" action={BASE} className="ml-auto flex items-center gap-2">
@@ -252,7 +244,7 @@ export default async function SurveyQueuePage({ searchParams }: { searchParams: 
                 </option>
               ))}
             </select>
-            <button type="submit" className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold">
+            <button type="submit" className="focus-ring press min-h-9 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold touch:min-h-11">
               Süz
             </button>
           </form>

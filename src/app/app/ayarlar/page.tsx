@@ -126,7 +126,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
             key={t.id}
             href={settingsTabHref(t.id)}
             aria-current={tab === t.id ? "page" : undefined}
-            className={`focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"}`}
+            className={`focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950"} touch:min-h-11`}
           >
             {t.label}
           </Link>

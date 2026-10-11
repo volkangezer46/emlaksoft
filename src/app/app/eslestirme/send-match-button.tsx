@@ -63,7 +63,7 @@ export function SendMatchButton({ demandId, propertyId }: { demandId: string; pr
         <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Kopyala
       </button>
       {!ready.hasPhone ? <span className="text-xs text-text-muted">Müşterinin telefonu kayıtlı değil</span> : null}
-      <button type="button" onClick={() => setReady(null)} aria-label="Kapat" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-surface-hover">
+      <button type="button" onClick={() => setReady(null)} aria-label="Kapat" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-surface-hover touch:min-h-11 touch:min-w-11">
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>

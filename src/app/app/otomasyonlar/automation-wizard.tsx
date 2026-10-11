@@ -327,7 +327,7 @@ export function AutomationWizard({
                         type="button"
                         onClick={() => setConds((prev) => prev.filter((_, j) => j !== i))}
                         aria-label="Koşulu kaldır"
-                        className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500"
+                        className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

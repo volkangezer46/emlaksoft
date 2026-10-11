@@ -68,7 +68,7 @@ export function ResultPanel({
             href={waHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/40 bg-mint-500/10 px-3 text-xs font-semibold text-mint-700 hover:bg-mint-500/20"
+            className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-mint-500/40 bg-mint-500/10 px-3 text-xs font-semibold text-mint-700 hover:bg-mint-500/20 touch:min-h-11"
           >
             <MessageCircle className="h-3.5 w-3.5" /> WhatsApp&apos;ta gönder
           </a>
@@ -77,7 +77,7 @@ export function ResultPanel({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
+          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas touch:min-h-11"
         >
           <ExternalLink className="h-3.5 w-3.5" /> Önizle
         </a>
@@ -107,7 +107,7 @@ export function OwnerPortalLinkButton({
   return (
     <Link
       href={`/app/portfoyler/${propertyId}?sekme=portallar#malik-portali`}
-      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600"
+      className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-[var(--shadow-xs)] transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
       aria-label={`${propertyLabel} için malik portalı linki`}
       title="Malik portalı linki"
     >

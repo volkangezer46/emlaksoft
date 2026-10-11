@@ -1,4 +1,4 @@
-import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { formatCount, type ParamRecord } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { buildCategoryChips, type CategoryOption } from "./list-logic";
@@ -39,29 +39,14 @@ export function CategoryChips({
   return (
     <nav aria-label={label} className={cn("-mx-1 flex gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]", className)}>
       {chips.map((c) => (
-        <Link
+        <FilterChip
           key={c.value || "all"}
           href={c.href}
-          aria-current={c.active ? "page" : undefined}
-          className={cn(
-            "focus-ring press inline-flex min-h-9 touch:min-h-11 shrink-0 items-center gap-2 rounded-full px-3.5 text-sm font-semibold transition",
-            c.active
-              ? "bg-surface-selected text-brand-700 ring-1 ring-inset ring-brand-600/25"
-              : "text-text-muted hover:bg-surface-hover hover:text-text active:bg-surface-pressed",
-          )}
+          active={c.active}
+          count={c.count !== undefined ? formatCount(c.count) : null}
         >
           {c.label}
-          {c.count !== undefined ? (
-            <span
-              className={cn(
-                "numeric rounded-full px-1.5 text-xs font-semibold",
-                c.active ? "bg-brand-600/15 text-brand-700" : "bg-canvas text-text-faint",
-              )}
-            >
-              {formatCount(c.count)}
-            </span>
-          ) : null}
-        </Link>
+        </FilterChip>
       ))}
     </nav>
   );

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeftRight, Info, UsersRound } from "lucide-react";
 import { SkeletonCard } from "@/components/ui/viz";
@@ -172,18 +173,9 @@ export default async function TeamBenchmarkPage({ searchParams }: { searchParams
           <nav aria-label="Sıralama" className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-semibold text-text-muted">Sırala:</span>
             {SCORECARD_SORTS.filter((s) => s.value !== "kazanc" || seeAllEarnings).map((s) => (
-              <Link
-                key={s.value}
-                href={href({ sirala: s.value === "anlasma" ? undefined : s.value })}
-                aria-current={sort === s.value ? "true" : undefined}
-                className={`focus-ring rounded-full border px-3 py-1 font-semibold transition ${
-                  sort === s.value
-                    ? "border-brand-600 bg-brand-600/10 text-brand-700"
-                    : "border-line text-text-muted hover:border-line-strong hover:text-text"
-                }`}
-              >
+              <FilterChip key={s.value} href={href({ sirala: s.value === "anlasma" ? undefined : s.value })} active={sort === s.value}>
                 {s.label}
-              </Link>
+              </FilterChip>
             ))}
             {filter ? (
               <Link href={href({ filtre: undefined })} className="focus-ring ml-auto rounded-full px-3 py-1 font-semibold text-brand-700 hover:underline">

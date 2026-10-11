@@ -85,7 +85,7 @@ export function RemindSigner({
       disabled={busy}
       title={viaSms ? "SMS ile imza hatırlatması gönder" : phone ? "WhatsApp ile imza hatırlatması gönder" : "Hatırlatma mesajını kopyala"}
       aria-label={`${fullName} kişisine imza hatırlatması`}
-      className="focus-ring press inline-flex h-7 shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-60"
+      className="focus-ring press inline-flex h-7 shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-60 touch:min-h-11"
     >
       {busy ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />

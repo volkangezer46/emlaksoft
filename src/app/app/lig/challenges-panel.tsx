@@ -148,7 +148,7 @@ export function ChallengesPanel({
                         <button
                           type="button"
                           aria-label="Meydan okumayı iptal et"
-                          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 text-xs font-semibold text-danger-strong transition hover:border-danger-500/40"
+                          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 text-xs font-semibold text-danger-strong transition hover:border-danger-500/40 touch:min-h-11"
                         >
                           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> İptal et
                         </button>

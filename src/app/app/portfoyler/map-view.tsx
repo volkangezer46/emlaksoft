@@ -239,7 +239,7 @@ export function MapView({
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + 1))}
-            className="grid h-8 w-8 place-items-center text-ink-950 transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center text-ink-950 transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
             aria-label="Yakınlaştır"
           >
             <Plus className="h-4 w-4" />
@@ -248,7 +248,7 @@ export function MapView({
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - 1))}
-            className="grid h-8 w-8 place-items-center border-t border-line text-ink-950 transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center border-t border-line text-ink-950 transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
             aria-label="Uzaklaştır"
           >
             <Minus className="h-4 w-4" />

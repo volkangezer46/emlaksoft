@@ -110,7 +110,7 @@ export function TaskEditDialog({
             onClick={onClick}
             {...aria}
             aria-label="Görevi düzenle"
-            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline text-text-muted transition hover:border-brand-300"
+            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline text-text-muted transition hover:border-brand-300 touch:min-h-11 touch:min-w-11"
           >
             <Pencil className="h-4 w-4" />
           </button>

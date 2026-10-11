@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { AlertTriangle, Clock, Hand, Inbox, Layers, Settings2 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
@@ -353,14 +354,9 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
               {FILTERS.map((f) => {
                 const on = durum === f.value;
                 return (
-                  <Link
-                    key={f.value || "hepsi"}
-                    href={tabHref("bekleyen", f.value)}
-                    aria-current={on ? "page" : undefined}
-                    className={`inline-flex min-h-9 touch:min-h-11 items-center rounded-full border px-3 text-xs font-semibold transition ${on ? "border-brand-400 bg-brand-50 text-brand-700" : "border-line bg-surface text-text-muted hover:bg-canvas"}`}
-                  >
+                  <FilterChip key={f.value || "hepsi"} href={tabHref("bekleyen", f.value)} active={on}>
                     {f.label}
-                  </Link>
+                  </FilterChip>
                 );
               })}
               <span className="ml-auto text-xs text-text-muted">

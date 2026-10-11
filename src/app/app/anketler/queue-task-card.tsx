@@ -233,7 +233,7 @@ export function QueueTaskCard({
                         role="radio"
                         aria-checked={answers[q.id] === String(n)}
                         onClick={() => setAnswer(q.id, String(n))}
-                        className={`focus-ring press grid h-10 place-items-center rounded-[var(--radius-control)] border text-sm font-extrabold tabular-nums transition ${scoreTone(n, answers[q.id] === String(n))}`}
+                        className={`focus-ring press grid h-10 place-items-center rounded-[var(--radius-control)] border text-sm font-extrabold tabular-nums transition ${scoreTone(n, answers[q.id] === String(n))} touch:min-h-11`}
                       >
                         {n}
                       </button>
@@ -254,7 +254,7 @@ export function QueueTaskCard({
                         onClick={() => setAnswer(q.id, o.v)}
                         className={`focus-ring press min-h-10 rounded-[var(--radius-control)] border px-4 text-sm font-semibold transition ${
                           answers[q.id] === o.v ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface text-ink-950 hover:border-brand-400"
-                        }`}
+                        } touch:min-h-11`}
                       >
                         {o.t}
                       </button>
@@ -272,7 +272,7 @@ export function QueueTaskCard({
                         onClick={() => setAnswer(q.id, answers[q.id] === o ? "" : o)}
                         className={`focus-ring press min-h-10 rounded-[var(--radius-control)] border px-3 py-2 text-left text-sm transition ${
                           answers[q.id] === o ? "border-brand-600 bg-brand-600/10 font-semibold text-brand-700" : "border-line bg-surface text-ink-950 hover:border-brand-400"
-                        }`}
+                        } touch:min-h-11`}
                       >
                         {o}
                       </button>

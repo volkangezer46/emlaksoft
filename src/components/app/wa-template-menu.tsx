@@ -123,7 +123,7 @@ export function WaTemplateMenu({
       <button
         type="button"
         aria-label="Şablonla WhatsApp mesajı"
-        className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-mint-500/10 hover:text-mint-600"
+        className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-mint-500/10 hover:text-mint-600 touch:min-h-11 touch:min-w-11"
       >
         <MessageCircle className="h-4 w-4" />
       </button>

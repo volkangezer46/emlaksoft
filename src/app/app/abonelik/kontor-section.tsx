@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowUpRight, Coins, History, Info } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -385,7 +386,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             {canOneClick ? (
               <Link
                 href={oneClickHref}
-                className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white"
+                className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white touch:min-h-11"
               >
                 <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {suggested.name} ({fmt.format(suggested.units)} kontör)
               </Link>
@@ -394,7 +395,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <button
                   type="button"
                   disabled
-                  className="inline-flex min-h-9 cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white opacity-50"
+                  className="inline-flex min-h-9 cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white opacity-50 touch:min-h-11"
                 >
                   <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {suggested.name}
                 </button>
@@ -458,16 +459,9 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
           </div>
           <nav aria-label="Kalem süzgeci" className="flex flex-wrap gap-1.5">
             {([null, "degerleme", "satin-alma", "sona-erme", "iade"] as const).map((k) => (
-              <Link
-                key={k ?? "hepsi"}
-                href={hrefOf({ kalem: k ?? undefined, kullanici: props.kullanici })}
-                aria-current={(category ?? null) === k ? "true" : undefined}
-                className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold ${
-                  (category ?? null) === k ? "bg-ink-950 text-white" : "bg-surface-accent-soft text-accent-text hover:bg-brand-600/15"
-                }`}
-              >
+              <FilterChip key={k ?? "hepsi"} href={hrefOf({ kalem: k ?? undefined, kullanici: props.kullanici })} active={(category ?? null) === k}>
                 {k ? EF_CATEGORY_LABEL[k] : "Hepsi"}
-              </Link>
+              </FilterChip>
             ))}
             {props.kullanici ? (
               <Link href={hrefOf({ kalem: category ?? undefined })} className="focus-ring rounded-full bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-warning-strong">

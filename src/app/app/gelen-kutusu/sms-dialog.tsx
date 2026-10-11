@@ -79,7 +79,7 @@ export function SmsDialog({
       // Gelen kutusu satırı: overlay linkin üstünde kalmalı → relative z-10
       <button
         type="button"
-        className="focus-ring press relative z-10 inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+        className="focus-ring press relative z-10 inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11"
         aria-label={`${customerName} kişisine SMS ile yanıt ver`}
       >
         <Reply className="h-3.5 w-3.5" /> Yanıtla

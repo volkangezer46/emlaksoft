@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Bell, BellRing, CheckCheck, Gauge, Inbox, Sparkles } from "lucide-react";
@@ -42,11 +43,6 @@ const kindLabel: Record<string, string> = {
 };
 
 const PAGE_SIZE = 50;
-
-const chipCls = (active: boolean) =>
-  `focus-ring press inline-flex min-h-[36px] items-center gap-1.5 rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${
-    active ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-  }`;
 
 export async function NotificationsView({
   searchParams,
@@ -207,28 +203,19 @@ export async function NotificationsView({
 
       {/* Filtre çipleri: durum + tür — URL iki yönlü (aktifken tıklama kaldırır) */}
       <nav aria-label="Bildirim filtresi" className="flex flex-wrap items-center gap-2">
-        <Link href={buildHref({ durum: null, tur: null })} aria-current={!filtersActive ? "page" : undefined} className={chipCls(!filtersActive)}>
+        <FilterChip href={buildHref({ durum: null, tur: null })} active={!filtersActive}>
           Tümü{totalAll > 0 ? ` (${totalAll})` : ""}
-        </Link>
-        <Link
-          href={buildHref({ durum: durum ? null : "okunmamis" })}
-          aria-current={durum ? "page" : undefined}
-          className={chipCls(Boolean(durum))}
-        >
+        </FilterChip>
+        <FilterChip href={buildHref({ durum: durum ? null : "okunmamis" })} active={Boolean(durum)}>
           Okunmamış{unread > 0 ? ` (${unread})` : ""}
-        </Link>
+        </FilterChip>
         <span aria-hidden className="mx-1 h-4 w-px bg-line" />
         {Object.entries(kindLabel).map(([v, l]) => (
-          <Link
-            key={v}
-            href={buildHref({ tur: tur === v ? null : v })}
-            aria-current={tur === v ? "page" : undefined}
-            className={chipCls(tur === v)}
-          >
+          <FilterChip key={v} href={buildHref({ tur: tur === v ? null : v })} active={tur === v}>
             <span className={`h-2 w-2 rounded-full ${dotColor[v]}`} />
             {l}
             {kindCounts[v] > 0 ? ` (${kindCounts[v]})` : ""}
-          </Link>
+          </FilterChip>
         ))}
       </nav>
 
@@ -313,7 +300,7 @@ export async function NotificationsView({
                       type="submit"
                       title="Okundu işaretle"
                       aria-label={`${n.title} bildirimini okundu işaretle`}
-                      className="focus-ring press grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                      className="focus-ring press grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                     >
                       <CheckCheck className="h-3.5 w-3.5" />
                     </button>
@@ -328,7 +315,7 @@ export async function NotificationsView({
         {totalPages > 1 ? (
           <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
             {page > 1 ? (
-              <Link href={buildHref({ sayfa: page - 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={buildHref({ sayfa: page - 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11">
                 ← Önceki
               </Link>
             ) : (
@@ -336,7 +323,7 @@ export async function NotificationsView({
             )}
             <span className="text-xs tabular-nums text-text-muted">Sayfa {page} / {totalPages}</span>
             {page < totalPages ? (
-              <Link href={buildHref({ sayfa: page + 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+              <Link href={buildHref({ sayfa: page + 1 })} className="focus-ring press inline-flex min-h-[40px] items-center rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11">
                 Sonraki →
               </Link>
             ) : (

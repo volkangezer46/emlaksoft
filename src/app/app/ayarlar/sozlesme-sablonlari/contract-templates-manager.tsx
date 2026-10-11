@@ -153,7 +153,7 @@ function Row({ t, canEdit }: { t: ContractTemplateRow; canEdit: boolean }) {
             open={editOpen}
             onOpenChange={setEditOpen}
             trigger={({ onClick, ...aria }) => (
-              <button type="button" onClick={onClick} {...aria} className="focus-ring press inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-text-muted hover:border-brand-300">
+              <button type="button" onClick={onClick} {...aria} className="focus-ring press inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-text-muted hover:border-brand-300 touch:min-h-11">
                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Düzenle
               </button>
             )}
@@ -162,7 +162,7 @@ function Row({ t, canEdit }: { t: ContractTemplateRow; canEdit: boolean }) {
             type="button"
             onClick={toggle}
             disabled={busy}
-            className="focus-ring press inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-text-muted hover:border-brand-300 disabled:opacity-50"
+            className="focus-ring press inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-text-muted hover:border-brand-300 disabled:opacity-50 touch:min-h-11"
           >
             {t.isActive ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
             {t.isActive ? "Pasife al" : "Aktif et"}
@@ -173,7 +173,7 @@ function Row({ t, canEdit }: { t: ContractTemplateRow; canEdit: boolean }) {
             confirmLabel="Sil"
             onConfirm={remove}
             trigger={
-              <button type="button" aria-label="Şablonu sil" className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 hover:border-danger-500">
+              <button type="button" aria-label="Şablonu sil" className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 hover:border-danger-500 touch:min-h-11 touch:min-w-11">
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             }

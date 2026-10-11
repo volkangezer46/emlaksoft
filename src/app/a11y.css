@@ -27,6 +27,10 @@
   .touch\:min-w-11 { min-width: 44px; }
   .touch\:size-11 { width: 44px; height: 44px; }
 }
+/* Kart başlığı "Tümü →" bağlantıları (premium.css .ds-link, 2rem): dokunmatikte 44 px. */
+@media (max-width: 767.98px), (pointer: coarse) {
+  html .ds-link { min-height: 44px; padding-inline: 0.6rem; }
+}
 @media (max-width: 639.98px) {
   .h-11 { height: 44px; }
   .min-h-11 { min-height: 44px; }

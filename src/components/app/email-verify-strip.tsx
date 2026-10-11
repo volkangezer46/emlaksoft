@@ -31,7 +31,7 @@ export function EmailVerifyStrip() {
             setNote(r.error ? { tone: "err", text: r.error } : { tone: "ok", text: r.message ?? "Gönderildi." });
           })
         }
-        className="focus-ring rounded-[var(--radius-control)] underline underline-offset-2 hover:no-underline disabled:opacity-60"
+        className="focus-ring rounded-[var(--radius-control)] underline underline-offset-2 hover:no-underline disabled:opacity-60 touch:min-h-11"
       >
         {pending ? "Gönderiliyor…" : "Doğrulama e-postasını yeniden gönder"}
       </button>
@@ -44,7 +44,7 @@ export function EmailVerifyStrip() {
         type="button"
         onClick={() => setHidden(true)}
         aria-label="Şeridi kapat"
-        className="focus-ring grid h-5 w-5 place-items-center rounded-full hover:bg-black/5"
+        className="focus-ring grid h-5 w-5 place-items-center rounded-full hover:bg-black/5 touch:min-h-11 touch:min-w-11"
       >
         <X className="h-3 w-3" aria-hidden />
       </button>

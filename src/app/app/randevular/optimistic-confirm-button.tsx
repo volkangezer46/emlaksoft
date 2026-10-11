@@ -47,7 +47,7 @@ export function OptimisticConfirmButton({ id, className }: { id: string; classNa
       disabled={pending}
       aria-label={label}
       title={label}
-      className={`focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent transition hover:border-line hover:bg-canvas ${className}`}
+      className={`focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent transition hover:border-line hover:bg-canvas ${className} touch:min-h-11 touch:min-w-11`}
     >
       <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
     </button>

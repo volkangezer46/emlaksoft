@@ -136,7 +136,7 @@ export function Widget({
           onClick={() => toggle(id)}
           title={isHidden ? "Paneli göster" : "Paneli gizle"}
           aria-label={isHidden ? "Paneli göster" : "Paneli gizle"}
-          className="focus-ring press absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-elev-2 transition hover:border-brand-300 hover:text-brand-600"
+          className="focus-ring press absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted shadow-elev-2 transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
         >
           {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </button>

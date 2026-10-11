@@ -135,7 +135,7 @@ export async function NlPanel({ q, haric }: { q: string; haric?: string }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link
           href={href}
-          className="focus-ring press inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring press inline-flex min-h-[40px] items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 touch:min-h-11"
         >
           {NL_TARGET_LABEL[result.target]} listesinde göster ({usable > 0 ? `${usable} filtre` : "filtresiz"})
           <ArrowUpRight className="h-4 w-4" />

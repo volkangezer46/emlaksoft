@@ -70,7 +70,7 @@ export function ContractSignPanel({
                 <button
                   type="button"
                   onClick={() => removeSigner(i)}
-                  className="grid h-6 w-6 place-items-center rounded-[var(--radius-control)] text-text-faint hover:text-danger-500"
+                  className="grid h-6 w-6 place-items-center rounded-[var(--radius-control)] text-text-faint hover:text-danger-500 touch:min-h-11 touch:min-w-11"
                   aria-label="Sil"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

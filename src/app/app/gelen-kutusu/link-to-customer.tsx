@@ -84,7 +84,7 @@ export function LinkToCustomer({
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Paneli kapat"
-              className="focus-ring grid h-6 w-6 place-items-center rounded text-text-faint hover:text-ink-950"
+              className="focus-ring grid h-6 w-6 place-items-center rounded text-text-faint hover:text-ink-950 touch:min-h-11 touch:min-w-11"
             >
               <X className="h-4 w-4" />
             </button>

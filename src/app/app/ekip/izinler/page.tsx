@@ -299,7 +299,7 @@ export default async function LeavesPage({
               <Link
                 href={monthHref({ ay: shiftMonth(monthKey, -1) })}
                 aria-label="Önceki ay"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Link>
@@ -314,7 +314,7 @@ export default async function LeavesPage({
               <Link
                 href={monthHref({ ay: shiftMonth(monthKey, 1) })}
                 aria-label="Sonraki ay"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
               >
                 <ChevronRight className="h-4 w-4" />
               </Link>

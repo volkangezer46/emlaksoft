@@ -21,7 +21,7 @@ export function ClosureDataPanel() {
           <li key={e.slug}>
             <a
               href={`/api/export/kapanis/${e.slug}`}
-              className="focus-ring press flex min-h-[42px] items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-sm font-semibold text-text transition hover:border-brand-300 hover:text-brand-600"
+              className="focus-ring press flex min-h-[42px] items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2 text-sm font-semibold text-text transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11"
             >
               <span className="capitalize">{e.filenameBase.replace(/-/g, " ")}</span>
               <Download className="h-3.5 w-3.5 text-text-muted" aria-hidden />

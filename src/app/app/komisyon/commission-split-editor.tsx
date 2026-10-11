@@ -116,7 +116,7 @@ export function CommissionSplitEditor({
                         <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-faint">%</span>
                       </div>
                       <span className="w-24 shrink-0 text-right text-xs font-semibold tabular-nums text-text"><AnimatedNumber value={amt} kind="currency" /></span>
-                      <button type="button" onClick={() => removeRow(i)} aria-label="Sil" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint hover:bg-[color-mix(in_srgb,var(--viz-neg)_12%,transparent)] hover:text-[color:var(--viz-neg)]">
+                      <button type="button" onClick={() => removeRow(i)} aria-label="Sil" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint hover:bg-[color-mix(in_srgb,var(--viz-neg)_12%,transparent)] hover:text-[color:var(--viz-neg)] touch:min-h-11 touch:min-w-11">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>

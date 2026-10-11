@@ -1,4 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
@@ -343,16 +344,9 @@ export default async function OnaylarPage({
             ].map((o) => {
               const aktif = kim === o.v;
               return (
-                <Link
-                  key={o.label}
-                  href={href({ kim: o.v || null, sayfa: 1 })}
-                  aria-current={aktif ? "page" : undefined}
-                  className={`focus-ring press rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    aktif ? "bg-ink-950 text-white" : "bg-canvas text-text-muted hover:text-brand-600"
-                  }`}
-                >
+                <FilterChip key={o.label} href={href({ kim: o.v || null, sayfa: 1 })} active={aktif}>
                   {o.label}
-                </Link>
+                </FilterChip>
               );
             })}
           </span>

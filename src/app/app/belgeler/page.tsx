@@ -1,4 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import {
   AlertTriangle,
@@ -641,11 +642,6 @@ export default async function DocumentsPage({
     return qs ? `/app/belgeler?${qs}` : "/app/belgeler";
   };
 
-  const chipBase =
-    "focus-ring press rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition border";
-  const chipOn = "border-transparent bg-ink-950 text-white";
-  const chipOff = "border-line text-text-muted hover:border-brand-300 hover:text-brand-600";
-
   return (
     <ListPage>
       <ListHero
@@ -791,34 +787,26 @@ export default async function DocumentsPage({
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Kaynak</span>
-          <Link href={buildHref({ kaynak: "", sayfa: "1" })} className={`${chipBase} ${kaynakF ? chipOff : chipOn}`}>
+          <FilterChip href={buildHref({ kaynak: "", sayfa: "1" })} active={!kaynakF}>
             Tümü ({total.toLocaleString("tr-TR")})
-          </Link>
+          </FilterChip>
           {DOC_SOURCES.map((s) => (
-            <Link
-              key={s}
-              href={buildHref({ kaynak: s, sayfa: "1" })}
-              className={`${chipBase} ${kaynakF === s ? chipOn : chipOff}`}
-            >
+            <FilterChip key={s} href={buildHref({ kaynak: s, sayfa: "1" })} active={kaynakF === s}>
               {SOURCE_LABEL[s]}
               {kaynakF === s || !kaynakF ? ` (${sourceCounts[s].toLocaleString("tr-TR")})` : ""}
-            </Link>
+            </FilterChip>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Tür</span>
-          <Link href={buildHref({ tur: "", sayfa: "1" })} className={`${chipBase} ${turF ? chipOff : chipOn}`}>
+          <FilterChip href={buildHref({ tur: "", sayfa: "1" })} active={!turF}>
             Tümü
-          </Link>
+          </FilterChip>
           {DOC_KINDS.map((k) => (
-            <Link
-              key={k}
-              href={buildHref({ tur: k, sayfa: "1" })}
-              className={`${chipBase} ${turF === k ? chipOn : chipOff}`}
-            >
+            <FilterChip key={k} href={buildHref({ tur: k, sayfa: "1" })} active={turF === k}>
               {KIND_LABEL[k]}
-            </Link>
+            </FilterChip>
           ))}
         </div>
 
