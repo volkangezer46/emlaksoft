@@ -23,6 +23,13 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/require-permission", () => ({ requirePermission: async () => h.gate }));
 vi.mock("@/lib/activity", () => ({ logActivity: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: (...a: unknown[]) => h.rate(...a) }));
+vi.mock("@/lib/integrations/einvoice/server-writes", () => ({
+  writeEInvoiceResult: async (ctx: { tenantId: string; actorId: string }, call: { fn: string; args: Record<string, unknown> }) => {
+    // Sağlayıcı sonucu yazımı kullanıcı istemcisinden DEĞİL, açık ofis ile sunucu yolundan gider.
+    expect(ctx.tenantId).toBe("12345678-aaaa-bbbb-cccc-000000000000");
+    return h.rpc(call.fn, { p_tenant: ctx.tenantId, ...call.args });
+  },
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     rpc: (...a: unknown[]) => h.rpc(...a),
@@ -102,19 +109,19 @@ describe("issueInvoice atomik talep", () => {
     expect(res.message).not.toContain("Birkaç dakika içinde görünür");
     expect(res.message).toContain("Durumu yenile");
     const names = h.rpc.mock.calls.map((c) => c[0]);
-    expect(names).toEqual(["einvoice_claim_issue", "einvoice_record_progress", "einvoice_mark_issue_sent", "einvoice_mark_issued"]);
+    expect(names).toEqual(["einvoice_claim_issue", "einvoice_srv_record_progress", "einvoice_mark_issue_sent", "einvoice_srv_mark_issued"]);
     expect(h.rpc.mock.calls[1]![1]).toMatchObject({ p_id: INV_ID, p_ref: REF });
   });
 
   it("provider_ref yazımı başarısızsa resmileştirme ÇAĞRILMAZ, kilit bırakılır", async () => {
     rpcMap({
       einvoice_claim_issue: { data: [claimedRow()], error: null },
-      einvoice_record_progress: { data: false, error: null },
+      einvoice_srv_record_progress: { data: false, error: null },
     });
     const res = await issueInvoice(INV_ID, true);
     expect(res.error).toBeTruthy();
     expect(h.issue).not.toHaveBeenCalled();
-    const releases = h.rpc.mock.calls.filter((c) => c[0] === "einvoice_record_progress" && (c[1] as { p_release?: boolean }).p_release === true);
+    const releases = h.rpc.mock.calls.filter((c) => c[0] === "einvoice_srv_record_progress" && (c[1] as { p_release?: boolean }).p_release === true);
     expect(releases.length).toBe(1);
   });
 
@@ -123,7 +130,7 @@ describe("issueInvoice atomik talep", () => {
     h.issue.mockResolvedValue({ ok: false, error: { code: "rejected", message: "Sağlayıcı reddetti." } });
     const res = await issueInvoice(INV_ID, true);
     expect(res.error).toBe("Sağlayıcı reddetti.");
-    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual(["einvoice_claim_issue", "einvoice_mark_issue_sent", "einvoice_record_progress"]);
+    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual(["einvoice_claim_issue", "einvoice_mark_issue_sent", "einvoice_srv_record_progress"]);
     expect(h.createDraft).not.toHaveBeenCalled();
   });
 
@@ -159,7 +166,7 @@ describe("issueInvoice atomik talep", () => {
   it("mark_issued başarısızsa açık hata döner (sessiz başarı yok)", async () => {
     rpcMap({
       einvoice_claim_issue: { data: [claimedRow({ provider_ref: REF })], error: null },
-      einvoice_mark_issued: { data: false, error: null },
+      einvoice_srv_mark_issued: { data: false, error: null },
     });
     const res = await issueInvoice(INV_ID, true);
     expect(res.ok).toBeUndefined();
