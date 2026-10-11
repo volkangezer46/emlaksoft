@@ -44,11 +44,11 @@ export type PlanDef = {
   /** Aylık profesyonel değerleme raporu kotası (yalnız alan). */
   valuationReportsMonthly?: number | null;
   /**
-   * Aylık dahil EmlakFiyati kontörü (null/0 = hak yok). Cron `ef-kontor-hak` her ay `plan_monthly` hibesi verir;
-   * kontör tarifesi `src/lib/ef-credits/config.ts`te, "yaklaşık N değerleme" ondan hesaplanır.
+   * Aylık dahil EmlakFiyati analiz bakiyesi (null/0 = hak yok). Cron `ef-kontor-hak` her ay `plan_monthly` hibesi verir;
+   * analiz tarifesi `src/lib/ef-credits/config.ts`te, "yaklaşık N değerleme" ondan hesaplanır.
    */
   efCreditsMonthly?: number | null;
-  /** Satın alınan HER EK kullanıcı başına aylık ek EmlakFiyati kontörü (ek kullanıcı sayısı x bu değer, plan hakkına eklenir). */
+  /** Satın alınan HER EK kullanıcı başına aylık ek EmlakFiyati analiz bakiyesi (ek kullanıcı sayısı x bu değer, plan hakkına eklenir). */
   efCreditsPerExtraSeat?: number | null;
   /** true: kayıt/fiyat sayfası ve yeni ödemede gizli; mevcut aboneler etkilenmez. */
   hidden?: boolean;
@@ -63,7 +63,7 @@ export type PlanDef = {
  * Sahibin onayladığı katalog (2026-10-08, rakiplerin %25-30 altı; ek kullanıcı dahil tüm özellikler her pakette):
  * Danışman 749 (ek kullanıcı 559), Ofis 2.790 (5 dahil; ek kullanıcı kademeli 499/449/399),
  * Profesyonel 5.490 (15 dahil; ek 449/399), Business 8.990 (gizli), Kurumsal 14.900 (50 dahil; ek 289/249/199, 500'e kadar).
- * Aylık EmlakFiyati kontörü (1 kontör = 1 TL): 100 / 700 / 2.100 / 7.000; ek kullanıcı başı 50.
+ * Aylık EmlakFiyati analiz bakiyesi (1 birim = 1 TL): 100 / 700 / 2.100 / 7.000; ek kullanıcı başı 50.
  * `RECOMMENDED_CATALOG_OVERRIDES` (plan-overrides.ts) ile AYNI değerleri taşır; ikisinin
  * uyumu plan-default-catalog.test.ts ile korunur. Fiyat değişikliği yalnız yeni satışları etkiler.
  * Yalnızca bugün çalışan özellikler burada listelenir; yol haritasındaki

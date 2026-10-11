@@ -301,19 +301,19 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
       <section aria-labelledby="ef-baslik" className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <div>
           <h2 id="ef-baslik" className="flex items-center gap-2 font-display font-bold text-ink-950">
-            <FileSpreadsheet className="h-4 w-4 text-brand-600" /> EmlakFiyatı kontör geliri ve maliyeti
+            <FileSpreadsheet className="h-4 w-4 text-brand-600" /> EmlakFiyatı analiz bakiyesi geliri ve maliyeti
           </h2>
           <p className="mt-1 text-xs text-text-faint">
-            Gelir: dönemde satılan kontör paketlerinin net tutarı. Maliyet: dönemde kesinleşen işlem sayısı × kardeş firma toptan tarifesi (KDV hariç).
+            Gelir: dönemde satılan analiz paketlerinin net tutarı. Maliyet: dönemde kesinleşen işlem sayısı × kardeş firma toptan tarifesi (KDV hariç).
             Satış ve kullanım aynı dönemde olmak zorunda değildir; marj dönem içi brüt göstergedir.
           </p>
         </div>
 
         <StatRow
-          label="Kontör geliri"
+          label="Analiz bakiyesi geliri"
           items={[
             {
-              label: "Kontör satış geliri (net)",
+              label: "Analiz bakiyesi satış geliri (net)",
               value: formatKurusShort(creditSoldNet),
               href: defterHref(period, { durum: "paid", tur: "credit_pack" }),
               hint: `${summary.byKind.credit_pack.count} paket faturası`,
@@ -324,7 +324,7 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
         {!efUsage.enabled ? (
           <div className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas p-3 text-sm text-text-muted">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-            <p>Etkin değil: cüzdan hazır değil. Kontör kullanım kayıtları (ef_credit_reservations) oluşunca harcanan kontör, maliyet ve marj burada görünür.</p>
+            <p>Etkin değil: cüzdan hazır değil. Analiz bakiyesi kullanım kayıtları (ef_credit_reservations) oluşunca harcanan analiz bakiyesi, maliyet ve marj burada görünür.</p>
           </div>
         ) : (
           <>
@@ -332,23 +332,23 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
               <p role="alert" className="text-xs font-semibold text-warn-600">Kullanım kaydı sınırı aşıldı; sayılar eksik. Dönemi daraltın.</p>
             ) : null}
             <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Metric label="Harcanan kontör" value={econ.units.toLocaleString("tr-TR")} />
+              <Metric label="Harcanan analiz bakiyesi" value={econ.units.toLocaleString("tr-TR")} />
               <Metric label="İşlem sayısı" value={econ.transactions.toLocaleString("tr-TR")} />
               <Metric label="Toptan maliyet" value={formatKurus(econ.costKurus)} />
               <Metric label="Brüt marj" value={formatKurus(econ.marginKurus)} tone={econ.marginKurus < 0 ? "danger" : "default"} />
               <Metric
-                label="Harcanan kontör başına ortalama gelir"
+                label="Harcanan TL başına ortalama gelir"
                 value={econ.revenuePerSpentUnitKurus === null ? "—" : formatKurus(econ.revenuePerSpentUnitKurus)}
               />
             </dl>
             <div className="overflow-x-auto">
               <Table className="w-full min-w-[32rem] text-left text-xs">
-                <caption className="sr-only">Kontör kullanımı kalem bazında</caption>
+                <caption className="sr-only">Analiz bakiyesi kullanımı kalem bazında</caption>
                 <THead className="text-text-faint">
                   <TR>
                     <TH scope="col" className="py-1.5 pr-3 font-semibold">Kalem</TH>
                     <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">İşlem</TH>
-                    <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">Kontör</TH>
+                    <TH scope="col" className="py-1.5 pr-3 text-right font-semibold">Analiz bakiyesi</TH>
                     <TH scope="col" className="py-1.5 text-right font-semibold">Maliyet</TH>
                   </TR>
                 </THead>

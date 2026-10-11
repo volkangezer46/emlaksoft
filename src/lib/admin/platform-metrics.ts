@@ -9,7 +9,7 @@
  * - ARPA serisi (aktif ofis başına aylık gelir)
  * - MRR tahmini (doğrusal eğilim; ETİKETLİ tahmin, en az 3 ay gerçek veri)
  * - Churn nedenleri (abonelik iptal nedeni serbest metni; normalize edilip gruplanır)
- * - Aylık tüketim kovaları (AI kredisi, değerleme raporu, EmlakFiyati kontörü)
+ * - Aylık tüketim kovaları (AI kredisi, değerleme raporu, EmlakFiyati analiz bakiyesi)
  */
 import { trMonthKey } from "@/lib/clock";
 

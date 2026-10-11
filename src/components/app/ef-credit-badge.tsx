@@ -7,7 +7,7 @@ import { getEfPublicState } from "@/lib/ef-credits/public-state";
 import { shouldShowEfBadge } from "@/lib/ef-credits/visibility";
 
 /**
- * Uygulama başlığındaki KONTÖR ROZETİ (sunucu bileşeni). Yalnız: owner/gm veya valuation yetkisi olan kullanıcı,
+ * Uygulama başlığındaki ANALİZ BAKİYESİ ROZETİ (sunucu bileşeni). Yalnız: owner/gm veya valuation yetkisi olan kullanıcı,
  * valuation modülü açık, EmlakFiyati "live". Okuma ~30 sn önbellekli ve tenant anahtarlı; HER hata rozeti gizler (başlık kırılmaz).
  * Yeni service_role kullanımı yok: mevcut allowlist'li `readEfBalance` / `getEfCatalog` okuyucuları.
  */
@@ -61,12 +61,12 @@ export async function EfCreditBadge({
   }
   if (!data) return null;
   const label =
-    data.state === "empty" ? "Kontör bitti" : data.state === "low" ? `Kontör azalıyor: ${fmt.format(data.available)}` : `${fmt.format(data.available)} kontör`;
+    data.state === "empty" ? "Analiz bakiyesi bitti" : data.state === "low" ? `Analiz bakiyesi azalıyor: ${fmt.format(data.available)}` : `${fmt.format(data.available)} TL`;
   return (
     <Link
       href="/app/abonelik?sekme=kontor"
-      title="EmlakFiyati kontör bakiyeniz. Ayrıntı, aylık hak ve paketler için tıklayın."
-      aria-label={`${label}. Kontör merkezini aç`}
+      title="EmlakFiyati analiz bakiyeniz. Ayrıntı, aylık hak ve paketler için tıklayın."
+      aria-label={`${label}. Analiz bakiyesi merkezini aç`}
       className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition ${TONE[data.state]}`}
     >
       <Coins className="h-3.5 w-3.5" aria-hidden="true" />

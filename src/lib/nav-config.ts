@@ -487,8 +487,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Abonelik",
         icon: ICONS.abonelik,
         module: "billing",
-        description: "Paket, fatura, kontör ve hesap kredisi",
-        keywords: ["fatura", "ödeme", "plan", "kontör", "kredi", "kart", "koltuk"],
+        description: "Paket, fatura, analiz bakiyesi ve hesap kredisi",
+        keywords: ["fatura", "ödeme", "plan", "analiz bakiyesi", "kredi", "kart", "koltuk"],
       },
       {
         // Yardım ve Destek: tek menü öğesi; yardım merkezi + mevcut destek talepleri sekme.

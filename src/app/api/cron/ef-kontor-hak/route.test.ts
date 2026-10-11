@@ -181,8 +181,8 @@ describe("cron ef-kontor-hak", () => {
     expect(await res.json()).toMatchObject({ offices: 0, skipped: 2, skippedModuleClosed: 1 });
   });
 
-  it("hoş geldin kontörü tek sefer (welcome:<tenant>), 0 = kapalı", async () => {
-    // Plan kontör hakkı olmayan (kataloğa girmeyen eski) paket de hoş geldin alır.
+  it("hoş geldin analiz bakiyesi tek sefer (welcome:<tenant>), 0 = kapalı", async () => {
+    // Plan analiz bakiyesi hakkı olmayan (kataloğa girmeyen eski) paket de hoş geldin alır.
     state.subs = [{ tenant_id: "t4", plan: "legacy", status: "active" }];
     state.tenants = { t4: "active" };
     state.settings = { "ef.welcome_units": "0", "ef.welcome_since": "2026-10-06T00:00:00Z" };
@@ -238,7 +238,7 @@ describe("cron ef-kontor-hak", () => {
     expect(state.grants).toEqual([]);
   });
 
-  it("SÜRELİ KONTÖR: koşu sonunda süresi dolan partileri yakar (ef_credit_burn_expired); eski devir tavanı RPC'si çağrılmaz", async () => {
+  it("SÜRELİ ANALİZ BAKİYESİ: koşu sonunda süresi dolan partileri yakar (ef_credit_burn_expired); eski devir tavanı RPC'si çağrılmaz", async () => {
     state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
     state.tenants = { t1: "active" };
     state.burnResult = { ok: true, burned_lots: 2, burned_units: 130 };
@@ -252,7 +252,7 @@ describe("cron ef-kontor-hak", () => {
       expect(await res.json()).toMatchObject({ ok: true, burnedUnits: 130, burnedLots: 2, burnFailed: 0 });
     }
     expect(state.expireCalls).toBe(0);
-    expect(state.heartbeat.at(-1)?.detail).toContain("130 kontör süresi dolduğu için yandı (2 parti)");
+    expect(state.heartbeat.at(-1)?.detail).toContain("130 TL süresi dolduğu için yandı (2 parti)");
   });
 
   it("yakma: şema yoksa (fonksiyon yok) sessizce atlanır; DB hatası sayılır ama cron düşmez", async () => {

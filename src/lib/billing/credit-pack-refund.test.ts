@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { efPackClawbackUnits, efPackRefundIdem } from "./credit-pack-refund";
 
 describe("credit-pack-refund", () => {
-  it("tam iade tüm kontörü geri alır", () => {
+  it("tam iade tüm analiz bakiyesi geri alır", () => {
     expect(efPackClawbackUnits(50, 1200, 1200)).toBe(50);
   });
   it("kısmi iade orantılı ve yukarı yuvarlanır", () => {

@@ -86,7 +86,7 @@ export async function ortakDegerleme(p: OrtakActor & { idempotencyKey: string; i
   if (!raw.ok) return failFrom(raw);
   const result = parseOrtakValuation(raw.json);
   if (!result.ok) return fail("invalid_response", null, { requestId: raw.requestId, status: raw.status, attempts: raw.attempts });
-  // Ücretlendirilen değerlemede rapor_id olmadan kontör kesinleştirilemez/izlenemez.
+  // Ücretlendirilen değerlemede rapor_id olmadan analiz bakiyesi kesinleştirilemez/izlenemez.
   if (result.value.durum === "deger" && !result.value.raporId) {
     return fail("invalid_response", "rapor_id_yok", { requestId: raw.requestId, status: raw.status, attempts: raw.attempts });
   }

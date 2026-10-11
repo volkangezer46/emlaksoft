@@ -84,7 +84,7 @@ export function evaluateEfDrift(run: EfRunFact | null, nowMs: number): PlatformD
       kind: "revenue_anomaly",
       ruleId: PLATFORM_EF_RULE_ID,
       severity: total >= 10 ? "yuksek" : "orta",
-      title: "EmlakFiyatı kontör mutabakatında sapma var",
+      title: "EmlakFiyatı analiz bakiyesi mutabakatında sapma var",
       why: `Son mutabakat çalışması defter ile EmlakFiyatı kullanımı arasında fark buldu (değerleme ${dd >= 0 ? "+" : ""}${dd}, PDF ${dp >= 0 ? "+" : ""}${dp}). Fark gözlemdir; nedeni (gecikmiş kayıt, iade, çift sayım) elle incelenmelidir.`,
       evidence: [
         { label: "Değerleme farkı", value: String(dd), href: "/admin/ef-kontor" },

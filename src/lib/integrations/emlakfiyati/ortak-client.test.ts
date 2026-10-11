@@ -177,7 +177,7 @@ describe("EmlakFiyati ortak istemcisi (fetch mock — gerçek anahtar ve gerçek
       expect(r).toMatchObject({ ok: true, data: { durum: "yetersiz", ucretlendirilir: false, nedenler: ["deger_yok"] } });
     });
 
-    it("deger ama rapor_id yok → invalid_response (kontör izlenemez)", async () => {
+    it("deger ama rapor_id yok → invalid_response (analiz bakiyesi izlenemez)", async () => {
       fetchMock.mockResolvedValueOnce(json(valuation({ rapor_id: null })));
       const r = await ortakDegerleme({ tenantId: TENANT, userId: USER, idempotencyKey: IDEM, input: INPUT });
       expect(r).toMatchObject({ ok: false, kind: "invalid_response", code: "rapor_id_yok", requestId: "req-ok-1" });

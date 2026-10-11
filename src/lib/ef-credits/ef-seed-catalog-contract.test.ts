@@ -20,7 +20,9 @@ describe("20261008001000: kontör seed'i = config.ts varsayılanları", () => {
   it("paket kataloğu (12 süreli paket) TS varsayılanıyla birebir", () => {
     const [target] = setValueJson(SQL);
     const parsed = efPacksSchema.parse(JSON.parse(target!));
-    expect(parsed).toEqual([...EF_DEFAULT_PACKS]);
+    // Tarihsel seed adları "... kontör" biter; 20261012000600 bunları TL diline çevirir (kullanıcı metni). Sayısal alanlar birebir.
+    const withTlNames = parsed.map((p) => ({ ...p, name: p.name.replace(/ kontör$/, " TL") }));
+    expect(withTlNames).toEqual([...EF_DEFAULT_PACKS]);
     expect(parsed.every((p) => [1, 3, 6, 12].includes(p.months))).toBe(true);
   });
 

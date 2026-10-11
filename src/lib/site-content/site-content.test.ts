@@ -163,7 +163,7 @@ describe("SSS <-> JSON-LD tutarlılığı", () => {
     expect(q?.a).toMatch(/bilgilendirme amaçlı/);
     expect(q?.a).toMatch(/ilan ve emsal verisine dayanır/);
     expect(faqs.some((f) => /Değerleme nasıl/.test(f.q))).toBe(true);
-    expect(faqs.some((f) => /Kontör/.test(f.q))).toBe(true);
+    expect(faqs.some((f) => /Analiz bakiyesi/.test(f.q))).toBe(true);
   });
 });
 
@@ -315,7 +315,7 @@ describe("site yönetimi merkezi", () => {
     }
   });
 
-  it("kapsamdaki alanların hepsi var; olmayan EmlakFiyati kontör ekranı için kart yok", () => {
+  it("kapsamdaki alanların hepsi var; olmayan EmlakFiyati analiz bakiyesi ekranı için kart yok", () => {
     const hrefs = HUB_CARDS.map((c) => c.href);
     for (const h of ["/admin/site-menu", "/admin/site-icerik", "/admin/seo", "/admin/sistem#ayarlar", "/admin/duyuru", "/admin/billing/planlar", "/admin/billing/kuponlar", "/admin/personel", "/admin/sistem", "/admin/billing"]) {
       expect(hrefs, h).toContain(h);

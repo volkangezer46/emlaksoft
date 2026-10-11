@@ -8,8 +8,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * EmlakFiyati kontör rezerv süpürmesi (10 dakikada bir): 15 dakikadan eski AÇIK rezervleri `ef_credit_sweep()` ile serbest
- * bırakır (rapor isteği yarıda kalırsa kontör sonsuza dek rezervde kalmaz). İdempotent; cüzdan SQL'i uygulanmamışsa
+ * EmlakFiyati analiz bakiyesi rezerv süpürmesi (10 dakikada bir): 15 dakikadan eski AÇIK rezervleri `ef_credit_sweep()` ile serbest
+ * bırakır (rapor isteği yarıda kalırsa analiz bakiyesi sonsuza dek rezervde kalmaz). İdempotent; cüzdan SQL'i uygulanmamışsa
  * "etkin değil" kaydı düşer, hata vermez. service_role istemcisi mevcut allowlist'li faturalama işleyicisinden gelir
  * (yeni createAdminClient kullanımı yok).
  */

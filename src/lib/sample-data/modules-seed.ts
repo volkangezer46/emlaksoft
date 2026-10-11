@@ -803,7 +803,7 @@ async function seedAuthority(ctx: ModuleSeedContext): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// 6) İlan analizi (kontör düşmez: units_charged = 0)
+// 6) İlan analizi (bakiye düşmez: units_charged = 0)
 // ---------------------------------------------------------------------------
 async function seedListingAnalyses(ctx: ModuleSeedContext): Promise<number> {
   const { db, tenantId } = ctx;

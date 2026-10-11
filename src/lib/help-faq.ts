@@ -3,7 +3,7 @@
  * AI asistanın ürün sorusu örnekleri de buradan beslenebilir.
  *
  * KURAL: Yalnız gerçek ürün davranışı yazılır (kaynak: help-content.ts rehberleri ve ilgili ekranlar).
- * Fiyat, tarife ve kontör rakamı SABİT YAZILMAZ: güncel fiyat /fiyatlar ve Abonelik'tedir.
+ * Fiyat, tarife ve analiz bakiyesi rakamı SABİT YAZILMAZ: güncel fiyat /fiyatlar ve Abonelik'tedir.
  *
  * AI notu: bu veri yapay zekaya gönderilecekse çağrı yalnız src/lib/ai/openai-client.ts üzerinden gider
  * ve kişisel veri src/lib/ai/redact.ts ile maskelenir. Bu dosyada hiçbir ağ/AI çağrısı yoktur.
@@ -27,7 +27,7 @@ export const FAQ_CATEGORIES: readonly { id: FaqCategory; label: string }[] = [
   { id: "komisyon", label: "Anlaşma, komisyon ve finans" },
   { id: "paket", label: "Paket, ödeme ve fatura" },
   { id: "iletisim", label: "İletişim ve mesajlaşma" },
-  { id: "ai", label: "AI Asistan, kontör ve destek" },
+  { id: "ai", label: "AI Asistan, analiz bakiyesi ve destek" },
 ];
 
 const PRICE_NOTE = "Güncel fiyat /fiyatlar ve Abonelik sayfasındadır.";
@@ -310,7 +310,7 @@ export const FAQ: readonly FaqItem[] = [
     id: "faturalarim",
     category: "paket",
     q: "EmlakSoft faturalarımı nereden indiririm?",
-    a: "Abonelik > Faturalar sekmesinde paket, ek kullanıcı ve kontör faturalarınız listelenir; faturayı açıp yazdırabilirsiniz.",
+    a: "Abonelik > Faturalar sekmesinde paket, ek kullanıcı ve analiz bakiyesi faturalarınız listelenir; faturayı açıp yazdırabilirsiniz.",
     href: "/app/abonelik?sekme=faturalar",
     hrefLabel: "Faturalar",
   },
@@ -373,16 +373,16 @@ export const FAQ: readonly FaqItem[] = [
   {
     id: "kontor",
     category: "ai",
-    q: "Kontör nedir, ne zaman harcanır?",
-    a: "Yalnız Ada/Parsel değerlemede harcanan bakiyedir; PDF indirme, rapor detayı ve ilan analizi kontör düşürmez. Harcanacak miktar işlem öncesi ekranda gösterilir; sonuç üretilemezse veya hata olursa düşmez. Kontör süreli geçerlidir (aylık hak ay sonunda, paket seçtiğiniz 1/3/6/12 ay sonunda yanar). Yetmezse Abonelik > Kontör sekmesinden paket alınır. " + PRICE_NOTE,
+    q: "Analiz bakiyesi nedir, ne zaman harcanır?",
+    a: "Yalnız Ada/Parsel değerlemede harcanan bakiyedir; PDF indirme, rapor detayı ve ilan analizi bakiye düşmez. Harcanacak miktar işlem öncesi ekranda gösterilir; sonuç üretilemezse veya hata olursa düşmez. Analiz bakiyesi süreli geçerlidir (aylık hak ay sonunda, paket seçtiğiniz 1/3/6/12 ay sonunda yanar). Yetmezse Abonelik > Analiz bakiyesi sekmesinden paket alınır. " + PRICE_NOTE,
     href: "/app/abonelik?sekme=kontor",
-    hrefLabel: "Kontör",
+    hrefLabel: "Analiz bakiyesi",
   },
   {
     id: "uc-bakiye",
     category: "ai",
-    q: "Hesap kredisi, kontör ve AI kotası aynı şey mi?",
-    a: "Hayır, üç ayrı bakiyedir ve birbirine dönüşmez. Hesap kredisi (TL) faturalarınızdan düşer; kontör değerleme ve rapor işlemlerinde harcanır; AI kullanımı paketinizin aylık AI kotasına göre izlenir ve kontörden ya da krediden düşmez.",
+    q: "Hesap kredisi, analiz bakiyesi ve AI kotası aynı şey mi?",
+    a: "Hayır, üç ayrı bakiyedir ve birbirine dönüşmez. Hesap kredisi (TL) faturalarınızdan düşer; analiz bakiyesi değerleme ve rapor işlemlerinde harcanır; AI kullanımı paketinizin aylık AI kotasına göre izlenir ve analiz bakiyesinden ya da krediden düşmez.",
     href: "/app/abonelik?sekme=kontor",
     hrefLabel: "Abonelik",
   },

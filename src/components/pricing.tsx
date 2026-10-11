@@ -64,9 +64,9 @@ export function Pricing({
   efValuationCost,
   efLive = false,
 }: {
-  /** Bir değerlemenin kontör bedeli (sunucuda tarifeden okunur); verilmezse "yaklaşık değerleme" kısmı yazılmaz. */
+  /** Bir değerlemenin analiz bakiyesi bedeli (sunucuda tarifeden okunur); verilmezse "yaklaşık değerleme" kısmı yazılmaz. */
   efValuationCost?: number;
-  /** EmlakFiyati canlı mı (public-state). Değilse kontör satırı "(planlanan)" etiketlenir. */
+  /** EmlakFiyati canlı mı (public-state). Değilse analiz bakiyesi satırı "(planlanan)" etiketlenir. */
   efLive?: boolean;
   /**
    * Plan kimliğine göre ek kullanıcı kademe metni; SUNUCUDA `extraSeatSummary` ile üretilir (fiyat motoru
@@ -246,8 +246,8 @@ export function Pricing({
       {anyCredits ? (
         <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-text-muted">
           {efLive
-            ? "Kontör yalnız EmlakFiyati değerleme içindir ve ay sonunda yanar. Paket kontörü bittiğinde süreli ek kontör paketi satın alınabilir."
-            : "Kontör yalnız EmlakFiyati değerleme içindir. EmlakFiyati değerleme henüz etkinleştirilmedi; kontör satırları planlanan değerlerdir."}
+            ? "Analiz bakiyesi yalnız EmlakFiyati değerleme içindir ve ay sonunda yanar. Paket analiz bakiyesi bittiğinde süreli ek analiz paketi satın alınabilir."
+            : "Analiz bakiyesi yalnız EmlakFiyati değerleme içindir. EmlakFiyati değerleme henüz etkinleştirilmedi; analiz bakiyesi satırları planlanan değerlerdir."}
         </p>
       ) : null}
     </div>

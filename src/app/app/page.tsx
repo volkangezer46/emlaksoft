@@ -387,7 +387,7 @@ export default async function AppHomePage({
           <NeYapmak chips={neYapmakChips(layout.variant, role === "owner")} />
           {layout.statusBar ? (
             <DurumCubugu>
-              {/* En çok 2 bant, öncelik sırasıyla: kontör (para/engel) > hoş geldin kredisi. Kurulum, profil, örnek veri ve duyurular
+              {/* En çok 2 bant, öncelik sırasıyla: analiz bakiyesi (para/engel) > hoş geldin kredisi. Kurulum, profil, örnek veri ve duyurular
                   burada DEĞİL: Başlangıç kartı / Bildirimler > Duyurular. */}
               <Suspense fallback={null}>
                 <KontorBandi ctx={ctx} valuationClosed={off("valuation")} />

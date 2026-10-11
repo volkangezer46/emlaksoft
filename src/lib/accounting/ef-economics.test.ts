@@ -52,7 +52,7 @@ describe("computeEfEconomics", () => {
     { item: "icat_edilmis", units: 9 },
   ];
 
-  it("maliyet = işlem sayısı × tarife (kontör sayısı değil)", () => {
+  it("maliyet = işlem sayısı × tarife (analiz bakiyesi sayısı değil)", () => {
     const e = computeEfEconomics(usage, { valuationTl: 2, pdfTl: 1 }, 100000);
     expect(e.transactions).toBe(5);
     expect(e.units).toBe(17);
@@ -68,7 +68,7 @@ describe("computeEfEconomics", () => {
     expect(e.marginKurus).toBe(50000);
   });
 
-  it("harcanan kontör başına ortalama gelir; harcama yoksa null", () => {
+  it("harcanan TL başına ortalama gelir; harcama yoksa null", () => {
     expect(computeEfEconomics(usage, EF_WHOLESALE_DEFAULT, 17000).revenuePerSpentUnitKurus).toBe(1000);
     expect(computeEfEconomics([], EF_WHOLESALE_DEFAULT, 17000).revenuePerSpentUnitKurus).toBeNull();
   });
@@ -83,7 +83,7 @@ describe("computeEfEconomics", () => {
   });
 });
 
-describe("kontör ekonomisi (ofis, yükümlülük, hak dağılımı)", () => {
+describe("analiz bakiyesi ekonomisi (ofis, yükümlülük, hak dağılımı)", () => {
   const allTime = { fromIso: null, toIso: null };
 
   it("toptan maliyet bilinmiyor: iki tarife de 0", () => {
@@ -118,14 +118,14 @@ describe("kontör ekonomisi (ofis, yükümlülük, hak dağılımı)", () => {
     expect(sumUnusedUnits(bal)).toEqual({ units: 70, tenantCount: 1 });
   });
 
-  it("ağırlıklı ortalama net fiyat = Σnet ÷ Σkontör; satış yoksa null", () => {
+  it("ağırlıklı ortalama net fiyat = Σnet ÷ Σanaliz bakiyesi; satış yoksa null", () => {
     expect(weightedAvgNetUnitPriceKurus([])).toBeNull();
-    // 100 kontör 10.000 kuruş (1,00) + 400 kontör 20.000 kuruş (0,50) -> 30.000 / 500 = 60
+    // 100 TL 10.000 kuruş (1,00) + 400 TL 20.000 kuruş (0,50) -> 30.000 / 500 = 60
     expect(weightedAvgNetUnitPriceKurus([{ units: 100, netKurus: 10000 }, { units: 400, netKurus: 20000 }])).toBe(60);
     expect(weightedAvgNetUnitPriceKurus([{ units: 0, netKurus: 500 }])).toBeNull();
   });
 
-  it("yükümlülük = kullanılmamış kontör × ortalama; fiyat yoksa tutar null", () => {
+  it("yükümlülük = kullanılmamış analiz bakiyesi × ortalama; fiyat yoksa tutar null", () => {
     expect(computeEfLiability(500, 60)).toEqual({ unusedUnits: 500, avgUnitPriceKurus: 60, liabilityKurus: 30000 });
     expect(computeEfLiability(500, null).liabilityKurus).toBeNull();
     expect(computeEfLiability(0, 60).liabilityKurus).toBe(0);
@@ -177,7 +177,7 @@ describe("kontör ekonomisi (ofis, yükümlülük, hak dağılımı)", () => {
     expect(view.econ.costKurus).toBe(100);
     expect(view.econ.marginKurus).toBe(9900);
     expect(view.wholesaleUnknown).toBe(false);
-    // kullanılmamış: a=93, c=20 -> 113 kontör × (30000/200=150) = 16950
+    // kullanılmamış: a=93, c=20 -> 113 TL × (30000/200=150) = 16950
     expect(view.liability).toEqual({ unusedUnits: 113, avgUnitPriceKurus: 150, liabilityKurus: 16950 });
     expect(view.grants.map((g) => g.kind)).toEqual(["purchase"]); // c'nin yüklemesi dönem dışı
     expect(view.offices.map((o) => o.tenantId)).toEqual(["a", "c"]);

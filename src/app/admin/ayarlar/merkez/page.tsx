@@ -39,7 +39,7 @@ const CATEGORY_LINKS: Partial<Record<SettingCategoryId, { label: string; href: s
   ],
 };
 
-/** Merkez: ayarların TEK vitrini. Mevcut ekranlar (planlar, ef-kontör, growth, seo, site, marka) kalır; merkez köprü + arama. */
+/** Merkez: ayarların TEK vitrini. Mevcut ekranlar (planlar, ef-analiz bakiyesi, growth, seo, site, marka) kalır; merkez köprü + arama. */
 export default async function SettingsCenterPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const staff = await requirePlatformModule("sistem");
   const sp = await searchParams;
@@ -177,7 +177,7 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
         <ul className="grid gap-1 text-xs sm:grid-cols-2">
           {[
             ["Plan fiyatları, koltuk, kampanya", "/admin/billing/planlar"],
-            ["EmlakFiyatı kontör tarifesi ve paketler", "/admin/ef-kontor"],
+            ["EmlakFiyatı analiz tarifesi ve paketler", "/admin/ef-kontor"],
             ["Büyüme bayrakları ve kurallar", "/admin/growth"],
             ["SEO merkezi (taslak/yayın)", "/admin/seo"],
             ["Site içeriği", "/admin/site-icerik"],

@@ -110,7 +110,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
   {
     key: "ef_ortak",
     label: "EmlakFiyati ortak uçları",
-    description: "Değerleme/rapor için EmlakFiyati ortak API'si ve kontör akışı.",
+    description: "Değerleme/rapor için EmlakFiyati ortak API'si ve analiz bakiyesi akışı.",
     impact: "Açılsa bile son bağlantı denemesi başarılı ve taze değilse kullanıcıya açılmaz.",
     source: "platform",
     storageKey: "emlakfiyati_ortak_enabled",

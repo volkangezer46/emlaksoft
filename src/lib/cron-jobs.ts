@@ -46,10 +46,10 @@ export const CRON_JOBS = [
   { job: "geo-province-sync", label: "İl bazlı coğrafya tarama kuyruğu", path: "/api/cron/geo-province-sync", schedule: "*/5 * * * *", cadenceLabel: "5 dakikada bir", staleAfterMinutes: 20 },
   { job: "seo-robot", label: "SEO robotu (site denetimi ve IndexNow)", path: "/api/cron/seo-robot", schedule: "20 4 * * *", cadenceLabel: "her gün 04:20 UTC (07:20 TR)", staleAfterMinutes: 2_160 },
   { job: "havuz-atama", label: "İlan havuzu atama süpürmesi", path: "/api/cron/havuz-atama", schedule: "6-59/10 * * * *", cadenceLabel: "10 dakikada bir", staleAfterMinutes: 40 },
-  { job: "ef-kontor-hak", label: "EmlakFiyati aylık kontör hakkı", path: "/api/cron/ef-kontor-hak", schedule: "10 1 * * *", cadenceLabel: "her gün 01:10 UTC (04:10 TR)", staleAfterMinutes: 2_160 },
+  { job: "ef-kontor-hak", label: "EmlakFiyati aylık analiz bakiyesi hakkı", path: "/api/cron/ef-kontor-hak", schedule: "10 1 * * *", cadenceLabel: "her gün 01:10 UTC (04:10 TR)", staleAfterMinutes: 2_160 },
   { job: "growth-claims", label: "Referans/ortak ödül işleyicisi", path: "/api/cron/growth-claims", schedule: "40 3 * * *", cadenceLabel: "her gün 03:40 UTC (06:40 TR)", staleAfterMinutes: 2_160 },
-  { job: "ef-kontor-sweep", label: "EmlakFiyati kontör rezerv süpürmesi", path: "/api/cron/ef-kontor-sweep", schedule: "8-59/10 * * * *", cadenceLabel: "10 dakikada bir", staleAfterMinutes: 40 },
+  { job: "ef-kontor-sweep", label: "EmlakFiyati analiz bakiyesi rezerv süpürmesi", path: "/api/cron/ef-kontor-sweep", schedule: "8-59/10 * * * *", cadenceLabel: "10 dakikada bir", staleAfterMinutes: 40 },
   { job: "ef-kontor-saglik", label: "EmlakFiyati bağlantı sağlık yoklaması", path: "/api/cron/ef-kontor-saglik", schedule: "50 1 * * *", cadenceLabel: "her gün 01:50 UTC (04:50 TR)", staleAfterMinutes: 2_160 },
-  { job: "ef-kontor-mutabakat", label: "EmlakFiyati kontör mutabakatı", path: "/api/cron/ef-kontor-mutabakat", schedule: "10 2 * * *", cadenceLabel: "her gün 02:10 UTC (05:10 TR)", staleAfterMinutes: 2_160 },
+  { job: "ef-kontor-mutabakat", label: "EmlakFiyati analiz bakiyesi mutabakatı", path: "/api/cron/ef-kontor-mutabakat", schedule: "10 2 * * *", cadenceLabel: "her gün 02:10 UTC (05:10 TR)", staleAfterMinutes: 2_160 },
   { job: "insight-engine", label: "Zeka katmanı içgörü motoru", path: "/api/cron/insight-engine", schedule: "12,42 * * * *", cadenceLabel: "30 dakikada bir (:12 ve :42)", staleAfterMinutes: 120 },
 ] as const satisfies readonly CronJobDefinition[];

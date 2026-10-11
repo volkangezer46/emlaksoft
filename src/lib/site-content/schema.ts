@@ -77,7 +77,7 @@ export const LANDING_SECTIONS = [
   { id: "tur", label: "Ürün turu" },
   { id: "ozellikler", label: "Özellik ızgarası (bento)" },
   { id: "degerleme", label: "Değerleme (EmlakFiyati)" },
-  { id: "emlakfiyati", label: "EmlakFiyati kontör bölümü" },
+  { id: "emlakfiyati", label: "EmlakFiyati analiz bakiyesi bölümü" },
   { id: "diger", label: "Ayrıntılar" },
   { id: "neden", label: "Neden EmlakSoft (karşılaştırma)" },
   { id: "nasil", label: "Nasıl çalışır" },
@@ -201,7 +201,7 @@ export const siteContentSchema = z.strictObject({
       .max(LIMITS.maxList),
     note: text(LIMITS.note, "Dipnot"),
   }),
-  /** EmlakFiyati kontör bölümü metinleri (sayılar plan/tarife/paket kataloğundan gelir; burada sayı yazılmaz). */
+  /** EmlakFiyati analiz bakiyesi bölümü metinleri (sayılar plan/tarife/paket kataloğundan gelir; burada sayı yazılmaz). */
   efSection: z.strictObject({
     eyebrow: text(LIMITS.eyebrow, "Üst başlık"),
     title: text(LIMITS.title, "Başlık"),
@@ -210,8 +210,8 @@ export const siteContentSchema = z.strictObject({
     liveText: text(LIMITS.lead, "Canlıyken açıklama"),
     soonText: text(LIMITS.lead, "Canlı değilken açıklama"),
     steps: z.array(itemSchema).max(LIMITS.maxChecks),
-    plansTitle: text(LIMITS.title, "Paket kontörü başlığı"),
-    plansNote: text(LIMITS.note, "Paket kontörü dipnotu"),
+    plansTitle: text(LIMITS.title, "Paket analiz bakiyesi başlığı"),
+    plansNote: text(LIMITS.note, "Paket analiz bakiyesi dipnotu"),
     packsTitle: text(LIMITS.title, "Ek paket başlığı"),
     packsText: text(LIMITS.text, "Ek paket açıklaması"),
     packsEmpty: text(LIMITS.text, "Paket yokken metin"),

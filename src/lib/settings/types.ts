@@ -17,7 +17,7 @@ export type SettingValueType = "bool" | "int" | "number" | "string" | "enum" | "
 /** Sistem Ayarlari Merkezi kategorileri (12; sira ekran sirasidir). */
 export const SETTING_CATEGORIES = [
   { id: "faturalama", label: "Faturalama ve planlar", description: "Plan fiyatları, koltuk, deneme ve otomatik yenileme." },
-  { id: "emlakfiyati", label: "EmlakFiyatı ve kontör", description: "Kontör tarifesi, paketler, hoş geldin kontörü ve mutabakat." },
+  { id: "emlakfiyati", label: "EmlakFiyatı ve analiz bakiyesi", description: "Analiz tarifesi, paketler, hoş geldin analiz bakiyesi ve mutabakat." },
   { id: "buyume", label: "Büyüme ve davet", description: "Referans ve ortak programı bayrakları, kurallar, TL kredi." },
   { id: "uyum", label: "Uyum ve mevzuat", description: "TÜFE, KVKK, KDV ve yetki belgesi sabitleri." },
   { id: "bildirim", label: "Bildirimler ve şablonlar", description: "SMS ve WhatsApp sağlayıcı ayarları." },

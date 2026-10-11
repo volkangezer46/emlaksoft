@@ -19,7 +19,7 @@ const SUB_STATUS: Record<string, string> = {
 
 /**
  * Ofis 360 > Abonelik ve ödemeler: finans özeti (yalnız okuma; çağıran sayfa `billing` erişimini doğrular).
- * Rakamlar muhasebe defteriyle aynı saf hesaptan gelir (`summarizeOffice`). Kontör bakiyesi cüzdan RPC'si yoksa "etkin değil".
+ * Rakamlar muhasebe defteriyle aynı saf hesaptan gelir (`summarizeOffice`). Analiz bakiyesi cüzdan RPC'si yoksa "etkin değil".
  */
 export async function OfficeFinanceCard({
   admin,
@@ -63,7 +63,7 @@ export async function OfficeFinanceCard({
       href: fin && fin.overdueCount > 0 ? overdueLedger : `${ledger}&durum=open`,
     },
     {
-      label: "Kontör bakiyesi",
+      label: "Analiz bakiyesi",
       value: balance.enabled ? balance.available.toLocaleString("tr-TR") : "Etkin değil",
       hint: balance.enabled
         ? `${balance.reserved.toLocaleString("tr-TR")} rezerve · ${balance.committedTotal.toLocaleString("tr-TR")} harcanan`

@@ -1,8 +1,8 @@
 /**
- * EmlakFiyati kontör GELİR / MALİYET hesabı (SAF: DB yok).
+ * EmlakFiyati analiz bakiyesi GELİR / MALİYET hesabı (SAF: DB yok).
  * Toptan maliyet (kardeş firma tarifesi) `platform_settings` içinde `ef.wholesale` anahtarında tutulur:
  * { valuationTl, pdfTl } = işlem başına TL, KDV HARİÇ. Varsayılan 0/0 (EmlakFiyati kullanım tarifesi 0 TL).
- * Kontör kullanımı `ef_credit_reservations` (state='committed') kayıtlarından sayılır; rapor detayı (JSON)
+ * Analiz bakiyesi kullanımı `ef_credit_reservations` (state='committed') kayıtlarından sayılır; rapor detayı (JSON)
  * çağrısının toptan maliyeti yoktur (kardeş firma tarifesinde ayrı kalem değil).
  */
 import { z } from "zod";
@@ -71,17 +71,17 @@ export type EfEconomics = {
   transactions: number;
   units: number;
   costKurus: number;
-  /** Dönemde satılan kontör paketlerinin net geliri (kuruş). */
+  /** Dönemde satılan analiz paketlerinin net geliri (kuruş). */
   revenueNetKurus: number;
   /** Brüt marj = gelir − maliyet (kuruş). */
   marginKurus: number;
-  /** Net gelir ÷ harcanan kontör (kuruş); harcama yoksa null. */
+  /** Net gelir ÷ harcanan analiz bakiyesi (kuruş); harcama yoksa null. */
   revenuePerSpentUnitKurus: number | null;
 };
 
 /**
  * `usage`: kesinleşmiş rezervasyon satırları (item + units). Bilinmeyen item sayılmaz (sessiz kayıp olmasın diye
- * `unknownItems` ayrı döner). Maliyet = işlem sayısı × toptan tarife (kontör sayısı değil).
+ * `unknownItems` ayrı döner). Maliyet = işlem sayısı × toptan tarife (analiz bakiyesi sayısı değil).
  */
 export function computeEfEconomics(
   usage: readonly EfUsageRow[],
@@ -117,7 +117,7 @@ export function computeEfEconomics(
 }
 
 // ---------------------------------------------------------------------------
-// Kontör ekonomisi (admin /admin/ef-kontor): ofis bazlı kullanım, yükümlülük, hak dağılımı. Hepsi SAF.
+// Analiz bakiyesi ekonomisi (admin /admin/ef-kontor): ofis bazlı kullanım, yükümlülük, hak dağılımı. Hepsi SAF.
 // ---------------------------------------------------------------------------
 
 /** İki toptan tarife de 0 ise maliyet BİLİNMİYOR demektir (varsayılan 0 gerçek maliyet değildir): arayüz açıkça uyarır. */
@@ -127,7 +127,7 @@ export function isWholesaleUnknown(w: EfWholesale): boolean {
 
 export type EfOfficeUsage = { tenantId: string; transactions: number; units: number; costKurus: number };
 
-/** Kesinleşmiş kullanımı ofise göre toplar. Ofis kimliği olmayan satırlar `untagged` sayılır (sessiz kayıp yok). Kontöre göre azalan. */
+/** Kesinleşmiş kullanımı ofise göre toplar. Ofis kimliği olmayan satırlar `untagged` sayılır (sessiz kayıp yok). Analiz bakiyesine göre azalan. */
 export function groupUsageByTenant(
   usage: readonly EfUsageRow[],
   wholesale: EfWholesale,
@@ -158,7 +158,7 @@ export function ledgerBalanceByTenant(entries: readonly EfLedgerEntry[]): Map<st
   return m;
 }
 
-/** Kullanılmamış kontör toplamı: yalnız pozitif ofis bakiyeleri (eksi bakiye yükümlülük değildir). */
+/** Kullanılmamış analiz bakiyesi toplamı: yalnız pozitif ofis bakiyeleri (eksi bakiye yükümlülük değildir). */
 export function sumUnusedUnits(balances: ReadonlyMap<string, number>): { units: number; tenantCount: number } {
   let units = 0;
   let tenantCount = 0;
@@ -173,7 +173,7 @@ export function sumUnusedUnits(balances: ReadonlyMap<string, number>): { units: 
 
 export type EfPackSale = { units: number; netKurus: number };
 
-/** Satılan paketlerin kontör başına AĞIRLIKLI ortalama net fiyatı (kuruş) = Σnet ÷ Σkontör; satış yoksa null. */
+/** Satılan paketlerin TL başına AĞIRLIKLI ortalama net fiyatı (kuruş) = Σnet ÷ Σanaliz bakiyesi; satış yoksa null. */
 export function weightedAvgNetUnitPriceKurus(sales: readonly EfPackSale[]): number | null {
   let units = 0;
   let net = 0;
@@ -188,8 +188,8 @@ export function weightedAvgNetUnitPriceKurus(sales: readonly EfPackSale[]): numb
 export type EfLiability = { unusedUnits: number; avgUnitPriceKurus: number | null; liabilityKurus: number | null };
 
 /**
- * Kullanılmamış kontör yükümlülüğü = toplam kullanılmamış kontör × ağırlıklı ortalama net kontör fiyatı.
- * ÜST SINIR: ücretsiz verilen (hoş geldin, plan hakkı) kontör de çarpıma girer. Satış yoksa fiyat bilinmez: tutar null.
+ * Kullanılmamış analiz bakiyesi yükümlülüğü = toplam kullanılmamış analiz bakiyesi × ağırlıklı ortalama net analiz bakiyesi fiyatı.
+ * ÜST SINIR: ücretsiz verilen (hoş geldin, plan hakkı) TL de çarpıma girer. Satış yoksa fiyat bilinmez: tutar null.
  */
 export function computeEfLiability(unusedUnits: number, avgUnitPriceKurus: number | null): EfLiability {
   return {
@@ -216,7 +216,7 @@ export function grantKindOfFeature(feature: string | null | undefined): string {
   return m && m[1] && m[1] in EF_GRANT_KIND_LABELS ? m[1] : "other";
 }
 
-/** Türe göre yükleme dağılımı (yalnız pozitif satırlar; dönem süzgeci çağıranda). Kontöre göre azalan. */
+/** Türe göre yükleme dağılımı (yalnız pozitif satırlar; dönem süzgeci çağıranda). Analiz bakiyesine göre azalan. */
 export function summarizeEfGrants(entries: readonly Pick<EfLedgerEntry, "amount" | "feature">[]): EfGrantBreakdownRow[] {
   const map = new Map<string, EfGrantBreakdownRow>();
   for (const e of entries) {
@@ -293,7 +293,7 @@ export function buildEfEconomicsView(input: {
   };
 }
 
-/** Fatura satırından kontör paketi satışı (meta.units + net tutar). Paket değilse, geçersizse ya da iade edilmişse null. */
+/** Fatura satırından analiz paketi satışı (meta.units + net tutar). Paket değilse, geçersizse ya da iade edilmişse null. */
 export function packSaleOfInvoice(row: { amount_try: unknown; meta?: unknown }): EfPackSale | null {
   const meta = row.meta && typeof row.meta === "object" && !Array.isArray(row.meta) ? (row.meta as Record<string, unknown>) : {};
   if (meta.kind !== "credit_pack" || meta.refund) return null;

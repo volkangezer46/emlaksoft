@@ -74,7 +74,7 @@ import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
  *
  * Ek okumalar (okunamayan `null` kalır; sıfır gibi GÖSTERİLMEZ): ödeme mutabakatı, riskli ofis
  * listesi + son 14 gün denetim hareketi, aktivasyon (örnek veri hariç gömülü sayım), ücretli aktif
- * abonelikler, iptal nedenleri, AI/değerleme/EF kontör harcama defteri (6 ay).
+ * abonelikler, iptal nedenleri, AI/değerleme/EF analiz bakiyesi harcama defteri (6 ay).
  * Hesaplar saf modüllerde: `dashboard-layout.ts`, `platform-metrics.ts` (testli).
  */
 const LEDGER_UNITS = ["ai", "valuation", "ef"] as const;
@@ -631,17 +631,17 @@ async function UnitEconomicsSection({ period }: { period: Period }) {
   );
 }
 
-/** AI kredisi, değerleme raporu ve EmlakFiyati kontörü tüketimi (son 6 TR ayı, harcama defteri). */
+/** AI kredisi, değerleme raporu ve EmlakFiyati analiz bakiyesi tüketimi (son 6 TR ayı, harcama defteri). */
 async function UsageSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const usage = data.ledger ? monthlyUsageFromSums(data.ledger, LEDGER_UNITS, now()) : null;
   const rows = usage ? usage.months.map((m, i) => ({ ay: m.label, ai: usage.byUnit.ai![i]!, valuation: usage.byUnit.valuation![i]!, ef: usage.byUnit.ef![i]! })) : [];
   return (
-    <ChartCard as="h2" title="AI ve kontör tüketimi" subtitle="Son 6 ay · harcanan birim" icon={BrainCircuit} tone="gold" href="/admin/ai-kullanim" hrefLabel="AI kullanımı" height={0} className="h-full">
+    <ChartCard as="h2" title="AI ve analiz bakiyesi tüketimi" subtitle="Son 6 ay · harcanan birim" icon={BrainCircuit} tone="gold" href="/admin/ai-kullanim" hrefLabel="AI kullanımı" height={0} className="h-full">
       {usage === null ? (
         <EmptyState variant="compact" illustration="rapor" title="Tüketim defteri okunamadı" description="Kredi defteri bu ortamda etkin değil veya sorgu yanıt vermedi." action={{ href: "/admin/ai-kullanim", label: "AI kullanımını aç" }} />
       ) : usage.total === 0 ? (
-        <EmptyState variant="compact" illustration="rapor" title="Son 6 ayda tüketim yok" description="Ofisler AI asistanı, değerleme raporu veya EmlakFiyati kontörü kullandıkça burada görünür." action={{ href: "/admin/ai-kullanim", label: "AI kullanımını aç" }} />
+        <EmptyState variant="compact" illustration="rapor" title="Son 6 ayda tüketim yok" description="Ofisler AI asistanı, değerleme raporu veya EmlakFiyati analiz bakiyesi kullandıkça burada görünür." action={{ href: "/admin/ai-kullanim", label: "AI kullanımını aç" }} />
       ) : (
         <div className="h-52">
           <BarCompare
@@ -650,7 +650,7 @@ async function UsageSection({ period }: { period: Period }) {
             series={[
               { key: "ai", label: "AI kredisi", color: "var(--viz-1)" },
               { key: "valuation", label: "Değerleme raporu", color: "var(--viz-2)" },
-              { key: "ef", label: "EF kontörü", color: "var(--viz-5)" },
+              { key: "ef", label: "EF analiz bakiyesi", color: "var(--viz-5)" },
             ]}
           />
         </div>

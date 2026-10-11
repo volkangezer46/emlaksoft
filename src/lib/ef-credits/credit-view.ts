@@ -2,7 +2,7 @@ import { z } from "zod";
 import { EF_GRANT_KINDS, type EfBalance } from "@/lib/ef-credits/config";
 
 /**
- * Kontör defteri GÖRÜNÜM mantığı (SAF; istemci/sunucu güvenli). Cüzdan SQL'i ayrı ajanda yazıldığından
+ * Analiz bakiyesi defteri GÖRÜNÜM mantığı (SAF; istemci/sunucu güvenli). Cüzdan SQL'i ayrı ajanda yazıldığından
  * satır okuyucusu sütun adlarında HOŞGÖRÜLÜDÜR (kind/entry_type, units/amount, item/feature, created_at/available_at).
  * Kişisel veri alanı (meta, ref) HİÇ okunmaz.
  */
@@ -16,7 +16,7 @@ export type EfMovement = {
   at: string | null;
   category: EfMovementCategory;
   label: string;
-  /** Kontör (artı = yükleme/iade, eksi = harcama). */
+  /** Analiz bakiyesi (artı = yükleme/iade, eksi = harcama). */
   units: number;
   userId: string | null;
   balanceAfter: number | null;
@@ -49,7 +49,7 @@ export function parseEfBalance(data: unknown): EfBalance | null {
 
 const GRANT_LABEL: Record<string, string> = {
   purchase: "Paket satın alma",
-  plan_monthly: "Plan kontörü",
+  plan_monthly: "Plan analiz bakiyesi",
   bonus: "Bonus",
   admin: "Yönetici yüklemesi",
 };

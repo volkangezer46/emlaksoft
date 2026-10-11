@@ -16,14 +16,14 @@ import {
 import { normalizeLedgerRow, parseEfBalance, type EfMovement } from "@/lib/ef-credits/credit-view";
 
 /**
- * Kontör OKUYUCULARI (ofis + admin). Cüzdan SQL'i yoksa/hata verirse hepsi "etkin değil" döner, ASLA fırlatmaz.
+ * Analiz bakiyesi OKUYUCULARI (ofis + admin). Cüzdan SQL'i yoksa/hata verirse hepsi "etkin değil" döner, ASLA fırlatmaz.
  * `wallet.ts`/`service.ts` başka ajanın dosyalarıdır; bu dosya yalnız okuma ve hazırlık yoklamasıdır.
  * Okuma service_role ile yapılır; çağıran sayfa kendi yetki kapısını geçmiştir ve tenant kimliği oturumdan gelir.
  */
 
 /** Cüzdan hazır mı? SQL tarafındaki `ef_credit_ready()` (true = RPC'ler + fulfill credit_pack dalı hazır). */
 export const EF_READY_RPC = "ef_credit_ready";
-/** Süreli kontör partileri hazır mı (20261010000300)? false iken paket SATIŞI kapalı kalır; bakiye/harcama eski akışla sürer. */
+/** Süreli analiz bakiyesi partileri hazır mı (20261010000300)? false iken paket SATIŞI kapalı kalır; bakiye/harcama eski akışla sürer. */
 export const EF_LOTS_READY_RPC = "ef_credit_lots_ready";
 export const EF_CONFIG_CACHE_TAG = "ef-credit-config";
 const HISTORY_FETCH_LIMIT = 1000;
@@ -62,7 +62,7 @@ export async function getEfCreditReady(): Promise<boolean> {
   return (await readReadiness()).wallet;
 }
 
-/** Süreli kontör partileri (20261010000300) hazır mı? Paket satışı bunu bekler; hata/şema yok = false. */
+/** Süreli analiz bakiyesi partileri (20261010000300) hazır mı? Paket satışı bunu bekler; hata/şema yok = false. */
 export async function getEfLotsReady(): Promise<boolean> {
   return (await readReadiness()).lots;
 }
@@ -90,12 +90,12 @@ export async function getEfCatalog(): Promise<EfCatalog> {
   }
 }
 
-/** Süresi dolmamış kontör partisi (görünüm; kişisel veri yok). */
+/** Süresi dolmamış analiz bakiyesi partisi (görünüm; kişisel veri yok). */
 export type EfLot = { id: string; kind: string; units: number; remaining: number; expiresAt: string };
 /** Bakiye + (şema varsa) süreli partiler. `lots` null = partiler şeması yok/okunamadı (eski akış; son kullanma gösterilmez). */
 export type EfBalanceWithLots = EfBalance & { lots: EfLot[] | null };
 
-/** Ofisin kontör bakiyesi ve süreli partileri; cüzdan yoksa null. */
+/** Ofisin analiz bakiyesi ve süreli partileri; cüzdan yoksa null. */
 export async function readEfBalance(tenantId: string): Promise<EfBalanceWithLots | null> {
   try {
     const admin = createAdminClient();
@@ -133,7 +133,7 @@ export async function readEfBalance(tenantId: string): Promise<EfBalanceWithLots
 
 export type EfHistory = { enabled: boolean; rows: EfMovement[]; userNames: Record<string, string>; truncated: boolean };
 
-/** Ofisin kontör hareketleri (yeniden eskiye, en çok 1000 satır; süzgeç/sayfalama saf `filterAndPage`). */
+/** Ofisin bakiye hareketleri (yeniden eskiye, en çok 1000 satır; süzgeç/sayfalama saf `filterAndPage`). */
 export async function readEfHistory(tenantId: string): Promise<EfHistory> {
   const empty: EfHistory = { enabled: false, rows: [], userNames: {}, truncated: false };
   try {
@@ -161,7 +161,7 @@ export async function readEfHistory(tenantId: string): Promise<EfHistory> {
   }
 }
 
-/** Ofisin en son kontör paketi faturası (RLS'li istemci): ödeme sonrası dönüş mesajı için. */
+/** Ofisin en son analiz paketi faturası (RLS'li istemci): ödeme sonrası dönüş mesajı için. */
 export async function loadLatestPackInvoice(
   supabase: SupabaseClient,
   tenantId: string,

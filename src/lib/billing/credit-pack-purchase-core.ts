@@ -1,21 +1,21 @@
 import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
-import { EF_PACK_MONTHS_LABEL, efPackMonthlyUnits, efPackUnitPriceTry, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
+import { EF_PACK_MONTHS_LABEL, efPackDisplayName, efPackMonthlyUnits, efPackUnitPriceTry, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
 
 /**
- * KONTÖR PAKETİ SATIN ALMA: SAF ÇEKİRDEK (I/O yok).
- * Ekran önizlemesi ve bağlayıcı sunucu hesabı AYNI fonksiyonları kullanır; istemciden tutar/kontör alınmaz.
+ * ANALİZ PAKETİ SATIN ALMA: SAF ÇEKİRDEK (I/O yok).
+ * Ekran önizlemesi ve bağlayıcı sunucu hesabı AYNI fonksiyonları kullanır; istemciden tutar/analiz bakiyesi alınmaz.
  * KDV kuralı tek kaynaktan gelir: `invoiceAmountsTry` (net x 1,20).
  */
 
 export type CreditPackQuote = {
   packId: string;
   units: number;
-  /** Geçerlilik (ay): süre sonunda kullanılmayan kontör yanar. */
+  /** Geçerlilik (ay): süre sonunda kullanılmayan bakiye sona erer. */
   months: number;
   netTry: number;
   taxTry: number;
   totalTry: number;
-  /** Kontör başı net / KDV dahil fiyat. */
+  /** 1 TL bakiye başı net / KDV dahil fiyat. */
   unitNetTry: number;
   unitGrossTry: number;
 };
@@ -41,7 +41,7 @@ export function findPurchasablePack(packs: EfPack[], packId: string): EfPack | n
 
 /**
  * Fatura meta sözleşmesi: fulfill SQL'i { kind, packId, units, priceNetTry } okur; `validityMonths` ise ef_credit_grant
- * tarafından faturadan okunur ve kontörün son kullanma tarihini belirler (20261010000300).
+ * tarafından faturadan okunur ve analiz bakiyesinin son kullanma tarihini belirler (20261010000300).
  */
 export function buildCreditPackMeta(pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">) {
   return { kind: "credit_pack" as const, packId: pack.id, units: pack.units, priceNetTry: pack.priceNetTry, validityMonths: pack.months };
@@ -51,7 +51,7 @@ export function activePacks(packs: EfPack[]): EfPack[] {
   return packs.filter((p) => p.active);
 }
 
-/** Tarifedeki en ucuz ÜCRETLİ (>0) işlemin kontörü (yalnız değerleme kalemleri); hiç ücretli kalem yoksa null. */
+/** Tarifedeki en ucuz ÜCRETLİ (>0) işlemin analiz bakiyesi (yalnız değerleme kalemleri); hiç ücretli kalem yoksa null. */
 export function cheapestPaidUnits(tariff: EfTariff): number | null {
   const paid = [tariff.valuationArsa, tariff.valuationKonut].filter((n) => n > 0);
   return paid.length > 0 ? Math.min(...paid) : null;
@@ -68,7 +68,7 @@ export function lowBalanceState(available: number, tariff: EfTariff): { state: L
   return { state: "ok", threshold };
 }
 
-/** Paket önerisi: işaretli "popüler" aktif paket; yoksa eşiği en az 5 kez karşılayan en küçük paket; yoksa en büyük. Aynı toplam kontörde kısa süre önce gelir. */
+/** Paket önerisi: işaretli "popüler" aktif paket; yoksa eşiği en az 5 kez karşılayan en küçük paket; yoksa en büyük. Aynı toplam analiz bakiyeside kısa süre önce gelir. */
 export function suggestPack(packs: EfPack[], tariff: EfTariff): EfPack | null {
   const act = activePacks(packs).sort((a, b) => a.units - b.units || a.months - b.months);
   if (act.length === 0) return null;
@@ -79,11 +79,11 @@ export function suggestPack(packs: EfPack[], tariff: EfTariff): EfPack | null {
 }
 
 export function creditPackBasketName(pack: Pick<EfPack, "name" | "units" | "months">): string {
-  return `EmlakSoft kontör paketi: ${pack.name} (${pack.units} kontör, ${pack.months} ay geçerli)`;
+  return `EmlakSoft analiz paketi: ${efPackDisplayName(pack)} (${pack.units.toLocaleString("tr-TR")} TL analiz bakiyesi, ${pack.months} ay geçerli)`;
 }
 
-/** Ekran özeti: "3 aylık · aylık ~1.000 kontör · toplam 3.000 kontör, 3 ay içinde kullanılmazsa yanar". */
+/** Ekran özeti: "3 aylık · aylık 1.000 TL analiz bakiyesi · toplam 3.000 TL; süre sonunda kullanılmayan bakiye sona erer". */
 export function creditPackValidityLine(pack: Pick<EfPack, "units" | "months">): string {
   const label = EF_PACK_MONTHS_LABEL[pack.months] ?? `${pack.months} aylık`;
-  return `${label} · toplam ${pack.units.toLocaleString("tr-TR")} kontör (aylık ~${efPackMonthlyUnits(pack).toLocaleString("tr-TR")}); süre sonunda kullanılmayan kontör yanar`;
+  return `${label} · aylık ${efPackMonthlyUnits(pack).toLocaleString("tr-TR")} TL analiz bakiyesi · toplam ${pack.units.toLocaleString("tr-TR")} TL; süre sonunda kullanılmayan bakiye sona erer`;
 }

@@ -24,7 +24,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "bento", label: "Özellik ızgarası" },
   { id: "why", label: "Karşılaştırma" },
   { id: "valuation", label: "Değerleme" },
-  { id: "ef", label: "EmlakFiyati kontör" },
+  { id: "ef", label: "EmlakFiyati analiz bakiyesi" },
   { id: "faq", label: "SSS" },
   { id: "final", label: "Son çağrı" },
   { id: "pages", label: "Demo ve kayıt" },

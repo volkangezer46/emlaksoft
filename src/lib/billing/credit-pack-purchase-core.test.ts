@@ -17,8 +17,8 @@ const pack = (o: Partial<EfPack> & Pick<EfPack, "id" | "units" | "priceNetTry">)
   ...o,
 });
 
-describe("kontör paketi fiyat/KDV", () => {
-  it("net x %20 KDV, kontör başı net ve brüt", () => {
+describe("analiz paketi fiyat/KDV", () => {
+  it("net x %20 KDV, 1 TL bakiye başı net ve brüt", () => {
     const q = quoteCreditPack({ id: "std", units: 25, months: 3, priceNetTry: 390 });
     expect(q).toMatchObject({ months: 3, netTry: 390, taxTry: 78, totalTry: 468, unitNetTry: 15.6, unitGrossTry: 18.72 });
   });
@@ -38,7 +38,7 @@ describe("kontör paketi fiyat/KDV", () => {
       packId: "std",
       units: 25,
       priceNetTry: 390,
-      // ef_credit_grant faturadan okur: kontörün son kullanma tarihini belirler.
+      // ef_credit_grant faturadan okur: analiz bakiyesinin son kullanma tarihini belirler.
       validityMonths: 6,
     });
   });

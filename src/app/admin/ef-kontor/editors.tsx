@@ -116,12 +116,12 @@ export function TariffForm({ tariff, canWrite }: { tariff: EfTariff; canWrite: b
   return (
     <div className="space-y-4">
       <p className="text-xs text-text-muted">
-        Kontör yalnız değerleme için harcanır. İlan analizi, PDF indirme ve rapor detayı kontör düşmez (sahip kararı 2026-10-10).
+        Analiz bakiyesi yalnız değerleme için harcanır. İlan analizi, PDF indirme ve rapor detayı bakiye düşmez (sahip kararı 2026-10-10).
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {items.map((i) => (
           <label key={i.k} className="space-y-1">
-            <span className={lbl}>{i.label} (kontör)</span>
+            <span className={lbl}>{i.label} (analiz bakiyesi)</span>
             <input
               type="number"
               min={0}
@@ -216,7 +216,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
       ) : null}
       {rows.length === 0 ? (
         <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-          Katalog boş: ofisler kontör satın alamaz. Fiyat sahibin kararıdır; &quot;Paket ekle&quot; ile başlayın ya da örnek ön ayarı taslak olarak görün.
+          Katalog boş: ofisler analiz bakiyesi satın alamaz. Fiyat sahibin kararıdır; &quot;Paket ekle&quot; ile başlayın ya da örnek ön ayarı taslak olarak görün.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -241,7 +241,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className={lbl}>Süre (kullanılmayan kontör yanar)</span>
+                    <span className={lbl}>Süre (kullanılmayan bakiye sona erer)</span>
                     <select
                       disabled={!canWrite}
                       value={r.months}
@@ -254,7 +254,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     </select>
                   </label>
                   <label className="space-y-1">
-                    <span className={lbl}>Toplam kontör</span>
+                    <span className={lbl}>Toplam analiz bakiyesi</span>
                     <input type="number" min={1} max={100000} disabled={!canWrite} value={r.units} onChange={(e) => update(i, { units: Number(e.target.value) })} className={field} />
                   </label>
                   <label className="space-y-1">
@@ -283,10 +283,10 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     />{" "}
                     Popüler
                   </label>
-                  <span className="numeric">Aylık ~{efPackMonthlyUnits({ units: Number(r.units), months: r.months })} kontör</span>
-                  <span className="numeric">Kontör başı net: {fmt2.format(unit)} ₺</span>
+                  <span className="numeric">Aylık ~{efPackMonthlyUnits({ units: Number(r.units), months: r.months })} TL</span>
+                  <span className="numeric">1 TL bakiye başı net: {fmt2.format(unit)} ₺</span>
                   <span>
-                    1 değerleme = {retailUnits} kontör ≈ {fmt2.format(unit * retailUnits)} ₺ net (bu paketten). Karşılaştırma için EmlakFiyati perakende fiyatına bakın; bilgi amaçlıdır.
+                    1 değerleme = {retailUnits} TL ≈ {fmt2.format(unit * retailUnits)} ₺ net (bu paketten). Karşılaştırma için EmlakFiyati perakende fiyatına bakın; bilgi amaçlıdır.
                   </span>
                 </div>
               </li>
@@ -295,7 +295,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
         </ul>
       )}
       {invalid ? (
-        <p role="alert" className="text-xs font-semibold text-danger-600">Eksik/geçersiz alan var (ad en az 2 karakter, kontör ve net fiyat en az 1, kimlikler benzersiz).</p>
+        <p role="alert" className="text-xs font-semibold text-danger-600">Eksik/geçersiz alan var (ad en az 2 karakter, analiz bakiyesi ve net fiyat en az 1, kimlikler benzersiz).</p>
       ) : null}
       {warnings.length > 0 ? (
         <ul role="status" className="space-y-1 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-700">
@@ -377,7 +377,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
           </select>
         </label>
         <label className="space-y-1">
-          <span className={lbl}>Kontör (yalnız artı)</span>
+          <span className={lbl}>Analiz bakiyesi (yalnız artı)</span>
           <input type="number" min={1} max={100000} step={1} disabled={off} value={units} onChange={(e) => { setUnits(e.target.value); setIdemKey(crypto.randomUUID()); setConfirming(false); }} className={field} required />
         </label>
         <label className="space-y-1">
@@ -396,7 +396,7 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
       <div className="flex flex-wrap items-center gap-2">
         {confirming ? (
           <>
-            <p className="text-xs font-semibold text-ink-950">{tenantName} ofisine {units} kontör ({ADMIN_GRANT_KIND_LABEL[kind]}, {validity} ay geçerli) yüklensin mi?</p>
+            <p className="text-xs font-semibold text-ink-950">{tenantName} ofisine {units} TL ({ADMIN_GRANT_KIND_LABEL[kind]}, {validity} ay geçerli) yüklensin mi?</p>
             <button type="submit" disabled={pending} className={primary}>Onayla</button>
             <button type="button" disabled={pending} className={ghost} onClick={() => setConfirming(false)}>Vazgeç</button>
           </>

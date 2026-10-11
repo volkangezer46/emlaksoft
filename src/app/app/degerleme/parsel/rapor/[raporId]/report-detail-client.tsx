@@ -6,7 +6,7 @@ import { loadParcelReportDetail } from "@/app/actions/ef-valuation";
 import type { ReportDetailResult } from "@/lib/ef-credits/types";
 import { EfResultView } from "../../result-view";
 
-/** Rapor detayı: yalnız kullanıcı isteyince yüklenir (kontör düşmez; yine de gereksiz EmlakFiyati çağrısı için otomatik çağrılmaz). */
+/** Rapor detayı: yalnız kullanıcı isteyince yüklenir (bakiye düşmez; yine de gereksiz EmlakFiyati çağrısı için otomatik çağrılmaz). */
 export function ReportDetailClient({ raporId }: { raporId: string }) {
   const [pending, start] = useTransition();
   const [detail, setDetail] = useState<ReportDetailResult | null>(null);
@@ -31,7 +31,7 @@ export function ReportDetailClient({ raporId }: { raporId: string }) {
           className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          Rapor detayını göster (kontör düşmez)
+          Rapor detayını göster (bakiye düşmez)
         </button>
       ) : null}
       {error ? <p role="alert" className="text-sm font-medium text-danger-600">{error}</p> : null}

@@ -4,7 +4,7 @@ import { parseEfBalance } from "@/lib/ef-credits/credit-view";
 import type { EfAdminGrantInput } from "@/lib/ef-credits/admin-grant";
 
 /**
- * Admin kontör verisi (service_role; çağıran action/sayfa requirePlatformModule geçmiştir).
+ * Admin analiz bakiyesi verisi (service_role; çağıran action/sayfa requirePlatformModule geçmiştir).
  * Cüzdan yoksa hepsi "etkin değil" döner, fırlatmaz.
  */
 
@@ -13,7 +13,7 @@ export const ADMIN_BALANCE_PAGE_SIZE = 25;
 export type TenantBalanceRow = { tenantId: string; name: string; balance: EfBalance | null };
 
 /**
- * Ofis bazlı bakiye listesi. Varsayılan: kontör hareketi olan ofisler; `q` verilirse ad araması (tüm ofisler).
+ * Ofis bazlı bakiye listesi. Varsayılan: bakiye hareketi olan ofisler; `q` verilirse ad araması (tüm ofisler).
  * Sayfalama ofis listesi üzerindedir; her sayfa için bakiye RPC'si çağrılır (en çok 25).
  */
 export async function listTenantEfBalances<X = null>(
@@ -23,7 +23,7 @@ export async function listTenantEfBalances<X = null>(
   },
   /**
    * Aynı service_role istemcisini (yeni createAdminClient çağrısı AÇMADAN) salt-okunur raporlara ödünç verir
-   * (Kontör ekonomisi bölümü). Hata fırlatırsa `extra` null kalır; liste etkilenmez.
+   * (Analiz bakiyesi ekonomisi bölümü). Hata fırlatırsa `extra` null kalır; liste etkilenmez.
    */
   withAdmin?: (admin: ReturnType<typeof createAdminClient>) => Promise<X>,
 ): Promise<{ enabled: boolean; rows: TenantBalanceRow[]; total: number; extra: X | null }> {
@@ -113,13 +113,13 @@ export async function grantEfCredit(
     });
     if (error) {
       console.error("grantEfCredit", error.code, error.message);
-      return { ok: false, error: "Kontör yüklenemedi: cüzdan henüz etkin olmayabilir." };
+      return { ok: false, error: "Bakiye yüklenemedi: cüzdan henüz etkin olmayabilir." };
     }
     const r = (data ?? {}) as { ok?: boolean; available?: number };
-    if (!r.ok) return { ok: false, error: "Kontör yüklenemedi." };
+    if (!r.ok) return { ok: false, error: "Bakiye yüklenemedi." };
     return { ok: true, available: Number(r.available ?? 0) };
   } catch (e) {
     console.error("grantEfCredit", e);
-    return { ok: false, error: "Kontör yüklenemedi." };
+    return { ok: false, error: "Bakiye yüklenemedi." };
   }
 }

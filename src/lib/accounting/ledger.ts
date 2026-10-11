@@ -16,7 +16,7 @@ export type InvoiceKind = "plan" | "extra_seats" | "credit_pack" | "other";
 export const INVOICE_KIND_LABELS: Record<InvoiceKind, string> = {
   plan: "Abonelik planı",
   extra_seats: "Ek koltuk",
-  credit_pack: "Kontör paketi",
+  credit_pack: "Analiz paketi",
   other: "Diğer",
 };
 export const INVOICE_KINDS = Object.keys(INVOICE_KIND_LABELS) as InvoiceKind[];

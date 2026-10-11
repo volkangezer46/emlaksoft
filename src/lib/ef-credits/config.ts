@@ -1,9 +1,9 @@
 /**
- * EmlakFiyati KONTÖR yapılandırması (tarife + paket kataloğu) — SAF dosya (sunucu/istemci güvenli, DB yok).
+ * EmlakFiyati ANALİZ BAKİYESİ yapılandırması (tarife + paket kataloğu) — SAF dosya (sunucu/istemci güvenli, DB yok).
  * Tek merkez: admin düzenler, değerler `platform_settings` içinde saklanır; kodda SABİT FİYAT YOK (yalnız tarife
  * VARSAYILANI var; paket kataloğu varsayılan BOŞTUR: fiyatlar sahibin kararıdır).
  *
- * Kontör mantığı Emlaksoft'ta, EmlakFiyati yalnız sayar (docs/integrations/EMLAKFIYATI_ORTAK_API_TASLAK.md, v1 kılavuzu §7).
+ * Analiz bakiyesi mantığı Emlaksoft'ta, EmlakFiyati yalnız sayar (docs/integrations/EMLAKFIYATI_ORTAK_API_TASLAK.md, v1 kılavuzu §7).
  * Cüzdan: `account_credit_ledger` birim `ef` (rezerve → kesinleştir/iade; ayrıntı RPC sözleşmesi aşağıda).
  */
 import { z } from "zod";
@@ -18,19 +18,19 @@ export const EF_ORTAK_PROBE_OK_SETTING_KEY = "emlakfiyati_ortak_probe_ok_at";
 export const EF_UNIT = "ef" as const;
 
 /**
- * Yeni ofise TEK SEFER verilen hoş geldin kontörü; 0 = kapalı. 1 kontör = 1 TL (2026-10-08 fiyat kararı): 100 kontör;
- * değerleme raporu (700+) için plan hakkı/paket gerekir. Kontör YALNIZ değerleme için harcanır (2026-10-10 kararı).
- * SÜRELİDİR: hoş geldin kontörü `EF_WELCOME_VALID_DAYS` gün sonra yanar (SQL `ef_credit_grant` aynı sabiti kullanır).
+ * Yeni ofise TEK SEFER verilen hoş geldin analiz bakiyesi; 0 = kapalı. 1 birim = 1 TL (2026-10-08 fiyat kararı): 100 TL;
+ * değerleme raporu (700+) için plan hakkı/paket gerekir. Analiz bakiyesi YALNIZ değerleme için harcanır (2026-10-10 kararı).
+ * SÜRELİDİR: hoş geldin analiz bakiyesi `EF_WELCOME_VALID_DAYS` gün sonra yanar (SQL `ef_credit_grant` aynı sabiti kullanır).
  */
 export const EF_WELCOME_SETTING_KEY = "ef.welcome_units";
 export const EF_WELCOME_DEFAULT_UNITS = 100;
-/** Hoş geldin kontörünün geçerlilik süresi (gün; deneme süresiyle uyumlu). SQL `ef_credit_grant` bonus dalı ile AYNI. */
+/** Hoş geldin analiz bakiyesinin geçerlilik süresi (gün; deneme süresiyle uyumlu). SQL `ef_credit_grant` bonus dalı ile AYNI. */
 export const EF_WELCOME_VALID_DAYS = 30;
 /** Admin/iade yüklemesinde ay seçilmezse geçerlilik (ay). SQL `ef_credit_grant` varsayılanı ile AYNI. */
 export const EF_DEFAULT_GRANT_VALID_MONTHS = 12;
 
 /**
- * Hoş geldin kontörünün başlangıç anı (ISO; migration 20260826001200 uygulama zamanı yazar): yalnız `tenants.created_at`
+ * Hoş geldin analiz bakiyesinin başlangıç anı (ISO; migration 20260826001200 uygulama zamanı yazar): yalnız `tenants.created_at`
  * bu andan SONRA/eşit olan ofisler alır, mevcut ofislere GERİYE DÖNÜK dağıtım yok. Ayar yok/geçersizse null = kimse almaz.
  */
 export const EF_WELCOME_SINCE_SETTING_KEY = "ef.welcome_since";
@@ -48,14 +48,14 @@ export function parseEfWelcomeUnits(raw: string | null | undefined): number {
 }
 
 // ---------------------------------------------------------------------------
-// Tarife: hangi işlem kaç kontör (admin düzenler)
+// Tarife: hangi işlem kaç TL (admin düzenler)
 // ---------------------------------------------------------------------------
-/** Tek işlem üst sınırı: 10.000 kontör (1 kontör = 1 TL). */
+/** Tek işlem üst sınırı: 10.000 TL (1 birim = 1 TL). */
 const EF_TARIFF_MAX = 10_000;
 const tariffUnits = (fallback: number) => z.number().int().min(0).max(EF_TARIFF_MAX).default(fallback);
 
 /**
- * Tarife: KONTÖR YALNIZ DEĞERLEME İÇİN harcanır (sahip kararı 2026-10-10). İlan analizi, PDF, rapor detayı vb. kontörsüzdür;
+ * Tarife: ANALİZ BAKİYESİ YALNIZ DEĞERLEME İÇİN harcanır (sahip kararı 2026-10-10). İlan analizi, PDF, rapor detayı vb. bakiye harcamaz;
  * eski kayıtlardaki `pdfFirst`/`reportDetail`/`listingAnalysis` alanları okunurken yok sayılır (zod fazlalığı atar).
  */
 export const efTariffSchema = z.object({
@@ -69,8 +69,8 @@ export const efTariffSchema = z.object({
 export type EfTariff = z.infer<typeof efTariffSchema>;
 
 /**
- * Varsayılan tarife (2026-10-08 fiyat kararı; 1 kontör = 1 TL; admin /admin/ef-kontor'dan değiştirir).
- * Konut raporu 700, arsa 850, ticari 1.050 kontör. Başka hiçbir özellik kontör düşmez.
+ * Varsayılan tarife (2026-10-08 fiyat kararı; 1 birim = 1 TL; admin /admin/ef-kontor'dan değiştirir).
+ * Konut raporu 700, arsa 850, ticari 1.050 TL. Başka hiçbir özellik bakiye düşmez.
  */
 export const EF_DEFAULT_TARIFF: EfTariff = {
   valuationArsa: 850,
@@ -78,7 +78,7 @@ export const EF_DEFAULT_TARIFF: EfTariff = {
   valuationTicari: 1050,
 };
 
-/** Kontör düşen (ücretlendirilen) kalemler: yalnız değerleme. */
+/** Analiz bakiyesi düşen (ücretlendirilen) kalemler: yalnız değerleme. */
 export type EfBillableItem = "valuation_arsa" | "valuation_konut" | "valuation_ticari";
 /** Geçmiş kayıtlarda görülebilen tüm kalemler (eski `listing_analysis`/`pdf_first`/`report_detail` artık ücretlendirilmez). */
 export type EfItem = EfBillableItem | "listing_analysis" | "pdf_first" | "report_detail";
@@ -115,9 +115,9 @@ export function serializeEfTariff(tariff: EfTariff): string {
 }
 
 // ---------------------------------------------------------------------------
-// Kontör paketleri (satış kataloğu; admin düzenler; varsayılan BOŞ)
+// Analiz paketleri (satış kataloğu; admin düzenler; varsayılan BOŞ)
 // ---------------------------------------------------------------------------
-/** Paket süreleri (ay): satın alınan kontör bu süre sonunda yanar, devretmez. */
+/** Paket süreleri (ay): satın alınan analiz bakiyesi bu süre sonunda yanar, devretmez. */
 export const EF_PACK_MONTHS = [1, 3, 6, 12] as const;
 export type EfPackMonths = (typeof EF_PACK_MONTHS)[number];
 export const EF_PACK_MONTHS_LABEL: Record<EfPackMonths, string> = { 1: "1 aylık", 3: "3 aylık", 6: "6 aylık", 12: "12 aylık" };
@@ -128,7 +128,7 @@ export const efPackSchema = z.object({
   /** Kararlı kimlik (a-z0-9-), faturada `meta.packId` olarak gider. */
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{1,31}$/),
   name: z.string().trim().min(2).max(60),
-  /** Satın alınınca eklenen TOPLAM kontör (aylık hak x süre; bonus dahil). Süre sonunda kullanılmayan kısmı yanar. */
+  /** Satın alınınca eklenen TOPLAM analiz bakiyesi (aylık hak x süre; bonus dahil). Süre sonunda kullanılmayan kısmı yanar. */
   units: z.number().int().min(1).max(100000),
   /** Geçerlilik süresi (ay): 1 | 3 | 6 | 12. Eski kayıtta alan yoksa 12 (süresiz satış kalmasın). */
   months: packMonthsSchema.default(12),
@@ -142,14 +142,14 @@ export type EfPack = z.infer<typeof efPackSchema>;
 
 export const efPacksSchema = z.array(efPackSchema).max(12);
 
-/** Varsayılan katalog: aylık kontör seçenekleri (1 kontör = 1 TL tabanı). */
+/** Varsayılan katalog: aylık analiz bakiyesi seçenekleri (1 birim = 1 TL tabanı). */
 export const EF_DEFAULT_PACK_MONTHLY_TIERS = [1000, 2500, 5000] as const;
 /** Uzun süreye indirim (%), süre bazında: 1 ay yok, 3 ay %5, 6 ay %10, 12 ay %15. Admin paket fiyatını düzenleyerek değiştirir. */
 export const EF_DEFAULT_PACK_DISCOUNT_PCT: Record<EfPackMonths, number> = { 1: 0, 3: 5, 6: 10, 12: 15 };
 
 const trNum = (n: number) => n.toLocaleString("tr-TR");
 
-/** Varsayılan paket kataloğu (2026-10-10 kararı): 3 aylık-kontör kademesi x 4 süre = 12 paket. SQL seed'i (20261008001000) birebir bunu yazar. */
+/** Varsayılan paket kataloğu (2026-10-10 kararı): 3 aylık-analiz bakiyesi kademesi x 4 süre = 12 paket. SQL seed'i (20261008001000) birebir bunu yazar. */
 export function buildDefaultEfPacks(): EfPack[] {
   const out: EfPack[] = [];
   EF_DEFAULT_PACK_MONTHLY_TIERS.forEach((monthly, ti) => {
@@ -158,7 +158,7 @@ export function buildDefaultEfPacks(): EfPack[] {
       const price = Math.round((units * (100 - EF_DEFAULT_PACK_DISCOUNT_PCT[months])) / 100);
       out.push({
         id: `ef-${monthly}-${months}a`,
-        name: `${EF_PACK_MONTHS_LABEL[months]} · aylık ${trNum(monthly)} kontör`,
+        name: `${EF_PACK_MONTHS_LABEL[months]} · aylık ${trNum(monthly)} TL`,
         units,
         months,
         priceNetTry: price,
@@ -172,7 +172,7 @@ export function buildDefaultEfPacks(): EfPack[] {
 }
 
 /**
- * Varsayılan kontör paketleri. Ayar (`ef.packs`) hiç yoksa/boşsa bunlar geçerlidir; admin /admin/ef-kontor'dan düzenler
+ * Varsayılan analiz paketleri. Ayar (`ef.packs`) hiç yoksa/boşsa bunlar geçerlidir; admin /admin/ef-kontor'dan düzenler
  * (kayıt varsa yalnız o geçerli).
  */
 export const EF_DEFAULT_PACKS: readonly EfPack[] = buildDefaultEfPacks();
@@ -199,12 +199,20 @@ export function serializeEfPacks(packs: EfPack[]): string {
   return JSON.stringify(efPacksSchema.parse(packs));
 }
 
-/** Paketin AYLIK ortalama kontörü (toplam / süre; gösterim). */
+/** Paketin AYLIK ortalama analiz bakiyesi (toplam / süre; gösterim). */
 export function efPackMonthlyUnits(pack: Pick<EfPack, "units" | "months">): number {
   return pack.months > 0 ? Math.round(pack.units / pack.months) : pack.units;
 }
 
-/** Kontör başına net birim fiyat (gösterim/doğrulama). */
+/**
+ * Kullanıcıya görünen paket adı: units/months alanlarından üretilir (DB'deki ad alanına güvenilmez; eski seed adları tarihsel yazımlı olabilir).
+ * Örn. "6 aylık · aylık 2.500 TL".
+ */
+export function efPackDisplayName(pack: Pick<EfPack, "units" | "months">): string {
+  return `${EF_PACK_MONTHS_LABEL[pack.months]} · aylık ${trNum(efPackMonthlyUnits(pack))} TL`;
+}
+
+/** TL başına net birim fiyat (gösterim/doğrulama). */
 export function efPackUnitPriceTry(pack: Pick<EfPack, "units" | "priceNetTry">): number {
   return pack.units > 0 ? Math.round((pack.priceNetTry / pack.units) * 100) / 100 : 0;
 }
@@ -219,21 +227,21 @@ export function efPackWarnings(packs: EfPack[]): string[] {
     for (let i = 1; i < same.length; i++) {
       const prev = efPackUnitPriceTry(same[i - 1]!);
       const cur = efPackUnitPriceTry(same[i]!);
-      if (cur > prev) out.push(`"${same[i]!.name}" paketinin kontör başı fiyatı (${cur}) aynı süreli daha küçük paketten (${prev}) pahalı: büyük paket mantıksız.`);
+      if (cur > prev) out.push(`"${same[i]!.name}" paketinin 1 TL bakiye başı fiyatı (${cur}) aynı süreli daha küçük paketten (${prev}) pahalı: büyük paket mantıksız.`);
     }
   }
-  // Aynı aylık kontörde uzun süre kısadan pahalı olmamalı.
+  // Aynı aylık analiz bakiyeside uzun süre kısadan pahalı olmamalı.
   const byMonthly = new Map<number, EfPack[]>();
   for (const p of active) byMonthly.set(efPackMonthlyUnits(p), [...(byMonthly.get(efPackMonthlyUnits(p)) ?? []), p]);
   for (const group of byMonthly.values()) {
     const sorted = [...group].sort((a, b) => a.months - b.months);
     for (let i = 1; i < sorted.length; i++) {
       if (efPackUnitPriceTry(sorted[i]!) > efPackUnitPriceTry(sorted[i - 1]!)) {
-        out.push(`"${sorted[i]!.name}" daha uzun süreli ama kontör başı fiyatı "${sorted[i - 1]!.name}" paketinden yüksek: uzun süre indirimli olmalı.`);
+        out.push(`"${sorted[i]!.name}" daha uzun süreli ama 1 TL bakiye başı fiyatı "${sorted[i - 1]!.name}" paketinden yüksek: uzun süre indirimli olmalı.`);
       }
     }
   }
-  if (packs.length > 0 && active.length === 0) out.push("Aktif paket yok: ofisler kontör satın alamaz.");
+  if (packs.length > 0 && active.length === 0) out.push("Aktif paket yok: ofisler analiz bakiyesi satın alamaz.");
   return out;
 }
 
@@ -250,7 +258,7 @@ export type EfBalance = {
   committed_total: number;
   /** Süresi dolup yanan toplam (partiler şeması 20261010000300 sonrası; eski şemada yok). */
   expired_total?: number;
-  /** Sonraki yanma: süresi dolmamış en yakın partinin son kullanma anı (ISO) ve o anda yanacak kontör; yoksa null/0. */
+  /** Sonraki yanma: süresi dolmamış en yakın partinin son kullanma anı (ISO) ve o anda yanacak analiz bakiyesi; yoksa null/0. */
   next_expiry_at?: string | null;
   next_expiry_units?: number;
 };

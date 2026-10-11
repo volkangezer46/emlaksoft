@@ -32,7 +32,7 @@ const base = {
   welcomeGranted: new Set<string>(),
 };
 
-describe("plan kontör hakkı: anahtarlar ve ay sınırı", () => {
+describe("plan analiz bakiyesi hakkı: anahtarlar ve ay sınırı", () => {
   it("idempotency anahtarları sözleşmeye uyar", () => {
     expect(planMonthlyIdempotencyKey("abc", "2026-10")).toBe("plan:abc:2026-10");
     expect(welcomeIdempotencyKey("abc")).toBe("welcome:abc");
@@ -44,7 +44,7 @@ describe("plan kontör hakkı: anahtarlar ve ay sınırı", () => {
   });
 });
 
-describe("plan kontör hakkı: hesap ve metin", () => {
+describe("plan analiz bakiyesi hakkı: hesap ve metin", () => {
   it("null/0/geçersiz = hak yok", () => {
     for (const v of [null, undefined, 0, -3, 1.5]) expect(monthlyUnitsOf(v)).toBe(0);
     expect(monthlyUnitsOf(120)).toBe(120);
@@ -58,10 +58,10 @@ describe("plan kontör hakkı: hesap ve metin", () => {
   it("satır: hak yoksa gizli, bedel yoksa parantezsiz", () => {
     expect(efCreditsLine(null, 5)).toBeNull();
     expect(efCreditsLine(0, 5)).toBeNull();
-    expect(efCreditsLine(40, 5)).toBe("Aylık 40 kontör (yaklaşık 8 değerleme)");
-    expect(efCreditsLine(2100, 700)).toBe("Aylık 2.100 kontör (yaklaşık 3 değerleme)");
-    expect(efCreditsLine(3, 5)).toBe("Aylık 3 kontör");
-    expect(efCreditsLine(40, 0)).toBe("Aylık 40 kontör");
+    expect(efCreditsLine(40, 5)).toBe("Her ay 40 TL analiz bakiyesi dahil (yaklaşık 8 değerleme)");
+    expect(efCreditsLine(2100, 700)).toBe("Her ay 2.100 TL analiz bakiyesi dahil (yaklaşık 3 değerleme)");
+    expect(efCreditsLine(3, 5)).toBe("Her ay 3 TL analiz bakiyesi dahil");
+    expect(efCreditsLine(40, 0)).toBe("Her ay 40 TL analiz bakiyesi dahil");
   });
 });
 
@@ -79,7 +79,7 @@ describe("hak verme kararı", () => {
     expect(d.grants).toEqual([]);
     expect(d.skipped).toEqual([{ tenantId: "t1", reason: "plan_hakki_yok" }]);
   });
-  it("deneme ofisi hoş geldin kontörünü alır (yeni ofis); aylık hak ilk ödemeden (active) sonra", () => {
+  it("deneme ofisi hoş geldin analiz bakiyesini alır (yeni ofis); aylık hak ilk ödemeden (active) sonra", () => {
     const trial = decideGrants({
       ...base,
       welcomeUnits: 10,
@@ -163,7 +163,7 @@ describe("kullanıcı sayısıyla ölçeklenen aylık hak (Kurumsal)", () => {
     ]);
   });
   it("satır metni ek kullanıcı hakkını yazar", () => {
-    expect(efCreditsLine(400, 5, 6)).toBe("Aylık 400 kontör (yaklaşık 80 değerleme) + her ek kullanıcı için 6 kontör");
+    expect(efCreditsLine(400, 5, 6)).toBe("Her ay 400 TL analiz bakiyesi dahil (yaklaşık 80 değerleme) + her ek kullanıcı için 6 TL");
   });
 });
 

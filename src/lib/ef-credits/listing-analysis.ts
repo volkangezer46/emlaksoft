@@ -11,7 +11,7 @@ import { loadPhotoQuality } from "@/lib/photo-quality/load";
 import { readVirtualTour } from "@/lib/virtual-tour";
 
 /**
- * İLAN ANALİZİ — orkestrasyon. KONTÖRSÜZ (sahip kararı 2026-10-10: kontör yalnız değerleme için harcanır).
+ * İLAN ANALİZİ — orkestrasyon. BAKİYE HARCAMAYAN (sahip kararı 2026-10-10: analiz bakiyesi yalnız değerleme için harcanır).
  *
  * Akış: portföy (RLS + tenant) → 24 saatlik önbellek (aynı girdi = aynı sonuç) → hesap (emsal yoksa DUR) → sonucu yaz.
  * Hesap saf (`src/lib/listing-analysis.ts`); burada yalnız veri toplanır. Yetki/hız sınırı çağıran action'dadır

@@ -46,9 +46,9 @@ export function PlanExplorer({
   trialText: string;
   initialSeats?: number;
   initialCycle?: BillingCycle;
-  /** Bir değerlemenin kontör bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
+  /** Bir değerlemenin analiz bakiyesi bedeli (sunucuda tarifeden); "yaklaşık N değerleme" metni için. */
   efValuationCost?: number;
-  /** EmlakFiyati canlı mı (tek durum kaynağı); değilse kontör satırı "(planlanan)" ve satın alma cümlesi yok. */
+  /** EmlakFiyati canlı mı (tek durum kaynağı); değilse analiz bakiyesi satırı "(planlanan)" ve satın alma cümlesi yok. */
   efLive?: boolean;
   /** Seçili paketi alıp eylem düğmelerini çizen alan. */
   footer?: (sel: PlanExplorerSelection) => ReactNode;
@@ -91,7 +91,7 @@ export function PlanExplorer({
       {efLine ? (
         <p className="text-xs font-semibold text-mint-700">
           {efLine}
-          {efLive ? "; kontör ile ek sorgu satın alınabilir." : "."}
+          {efLive ? "; analiz bakiyesi ile ek sorgu satın alınabilir." : "."}
         </p>
       ) : null}
       <p className="text-center text-xs text-text-muted" aria-live="polite">

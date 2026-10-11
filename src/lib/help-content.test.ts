@@ -92,7 +92,7 @@ describe("arama süzgeci", () => {
   });
 
   it("gerçek rehberlerde arama sonuç döndürür", () => {
-    const hits = GUIDES.filter((g) => matchesQuery([g.title, g.intro, ...g.steps], "kontör"));
+    const hits = GUIDES.filter((g) => matchesQuery([g.title, g.intro, ...g.steps], "analiz bakiyesi"));
     expect(hits.length).toBeGreaterThanOrEqual(2);
   });
 });

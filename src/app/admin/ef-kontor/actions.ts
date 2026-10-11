@@ -18,12 +18,12 @@ import { efAdminGrantSchema } from "@/lib/ef-credits/admin-grant";
 import { grantEfCredit } from "@/lib/ef-credits/admin-data";
 
 /**
- * EmlakFiyati kontör yönetimi action'ları. YETKİ: `billing` modülü + YAZMA yalnız super_admin (ops yalnız okur).
+ * EmlakFiyati analiz bakiyesi yönetimi action'ları. YETKİ: `billing` modülü + YAZMA yalnız super_admin (ops yalnız okur).
  * Her yazma logPlatformActivity ile denetim kaydı bırakır; kayıt sonrası önbellek updateTag ile anında düşer.
  */
 export type EfKontorResult = { ok?: boolean; error?: string; message?: string };
 
-const DENIED = "Kontör ayarlarını yalnız süper admin değiştirebilir.";
+const DENIED = "Analiz bakiyesi ayarlarını yalnız süper admin değiştirebilir.";
 
 async function writer(): Promise<{ staff: PlatformStaff } | { error: string }> {
   const staff = await requirePlatformModule("billing");
@@ -109,9 +109,9 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
   if (!parsed.success) return { error: firstIssue(parsed.error) };
   const { allowed } = await checkRateLimit(`efgrant:${w.staff.id}`, { limit: 10, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla yükleme denemesi. Birkaç dakika sonra tekrar deneyin." };
-  if (!(await getEfCreditReady())) return { error: "Kontör bakiyesi henüz etkin değil." };
+  if (!(await getEfCreditReady())) return { error: "Analiz bakiyesi henüz etkin değil." };
   const r = await grantEfCredit(parsed.data, w.staff.id);
-  if (!r.ok) return { error: r.error ?? "Kontör yüklenemedi." };
+  if (!r.ok) return { error: r.error ?? "Bakiye yüklenemedi." };
   await logPlatformActivity({
     actorId: w.staff.id,
     action: "ef_credits.manual_grant",
@@ -120,5 +120,5 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
     meta: { units: parsed.data.units, kind: parsed.data.kind, validity_months: parsed.data.validityMonths, reason: parsed.data.reason },
   });
   revalidatePath("/admin/ef-kontor");
-  return { ok: true, message: `${parsed.data.units} kontör yüklendi. Yeni bakiye: ${r.available ?? "-"}.` };
+  return { ok: true, message: `${parsed.data.units} TL yüklendi. Yeni bakiye: ${r.available ?? "-"}.` };
 }

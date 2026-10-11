@@ -41,7 +41,7 @@ beforeEach(() => {
   db.lots = [{ id: "l1", kind: "purchase", units: 3000, remaining: 80, expires_at: "2027-01-10T00:00:00.000Z" }];
 });
 
-describe("süreli kontör: şema yokken eski akışa güvenli düşüş (rpc-probe)", () => {
+describe("süreli analiz bakiyesi: şema yokken eski akışa güvenli düşüş (rpc-probe)", () => {
   it("cüzdan hazır + parti sistemi hazır: ikisi de true", async () => {
     expect(await getEfCreditReady()).toBe(true);
     expect(await getEfLotsReady()).toBe(true);

@@ -50,7 +50,7 @@ export function KontorBandiKutu({
       </Link>
       <button
         type="button"
-        aria-label="Kontör uyarısını kapat"
+        aria-label="Analiz bakiyesi uyarısını kapat"
         onClick={() => {
           try {
             window.localStorage.setItem(storageKey, "1");

@@ -65,7 +65,7 @@ describe("efCreditsMonthly plan alanı", () => {
     expect(diffAgainstDefault(office, { ...office, efCreditsMonthly: 25 })).toEqual({ efCreditsMonthly: 25 });
     expect(diffAgainstDefault(office, office)).toEqual({});
   });
-  it("kontör alanı koltuk kataloğu doğrulamasını bozmaz", () => {
+  it("analiz bakiyesi alanı koltuk kataloğu doğrulamasını bozmaz", () => {
     const defs = applyPlanOverrides({ office: { efCreditsMonthly: 99 } });
     expect(validateSeatCatalog(defs).errors).toEqual([]);
   });

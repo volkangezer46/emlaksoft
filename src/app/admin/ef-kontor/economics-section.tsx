@@ -81,9 +81,9 @@ export function EconomicsSection({
   return (
     <Card id="ekonomi">
       <CardHeader>
-        <CardTitle>Kontör ekonomisi</CardTitle>
+        <CardTitle>Analiz bakiyesi ekonomisi</CardTitle>
         <CardDescription>
-          Kullanım, gelir, toptan maliyet ve marj; ofis bazlı bakiye ve kullanılmamış kontör yükümlülüğü. Dönem: <strong>{period.label}</strong>.
+          Kullanım, gelir, toptan maliyet ve marj; ofis bazlı bakiye ve kullanılmamış analiz bakiyesi yükümlülüğü. Dönem: <strong>{period.label}</strong>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -164,9 +164,9 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
       ) : null}
 
       <StatRow
-        label="Kontör ekonomisi özeti"
+        label="Analiz bakiyesi ekonomisi özeti"
         items={[
-          { label: "Harcanan kontör", value: fmt.format(econ.units), href: "#ekonomi-kalem", hint: `${fmt.format(econ.transactions)} işlem` },
+          { label: "Harcanan analiz bakiyesi", value: fmt.format(econ.units), href: "#ekonomi-kalem", hint: `${fmt.format(econ.transactions)} işlem` },
           { label: "Net gelir (paket)", value: formatKurusShort(econ.revenueNetKurus), href: ledgerHref, hint: `${view.packCount} paket faturası` },
           { label: "Toptan maliyet", value: formatKurusShort(econ.costKurus), href: "#ekonomi-maliyet", hint: view.wholesaleUnknown ? "bilinmiyor (0)" : undefined },
           { label: "Brüt marj", value: formatKurusShort(econ.marginKurus), href: muhasebeHref, hint: view.wholesaleUnknown ? "maliyet bilinmeden gerçek değil" : undefined },
@@ -207,7 +207,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
               <TR>
                 <TH>Kalem</TH>
                 <TH align="right">İşlem</TH>
-                <TH align="right">Kontör</TH>
+                <TH align="right">Analiz bakiyesi</TH>
                 <TH align="right">Maliyet</TH>
               </TR>
             </THead>
@@ -228,35 +228,35 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
         {econ.unknownItems > 0 ? <p className="mt-1 text-xs text-warn-600">{econ.unknownItems} kayıt bilinmeyen kalemde olduğu için sayılmadı.</p> : null}
       </div>
       <p id="ekonomi-maliyet" className="text-xs text-text-muted">
-        Maliyet = işlem sayısı × toptan tarife (kontör sayısı değil). Harcanan kontör başına ortalama net gelir:{" "}
+        Maliyet = işlem sayısı × toptan tarife (analiz bakiyesi sayısı değil). Harcanan TL başına ortalama net gelir:{" "}
         <strong>{econ.revenuePerSpentUnitKurus === null ? "—" : formatKurus(econ.revenuePerSpentUnitKurus)}</strong>.
       </p>
 
       <div id="ekonomi-yukumluluk" className="@container py-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-text-faint">Kullanılmamış kontör yükümlülüğü (üst sınır)</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-text-faint">Kullanılmamış analiz bakiyesi yükümlülüğü (üst sınır)</p>
         <p className="mt-1 text-3xl font-bold tabular-nums text-[color:var(--viz-gold)]">
           {liability.liabilityKurus === null ? "—" : formatKurus(liability.liabilityKurus)}
         </p>
         <p className="mt-1 text-xs text-text-muted">
-          <Link href="#bakiyeler" className="font-semibold text-brand-600 hover:underline">{fmt.format(liability.unusedUnits)} kullanılmamış kontör</Link>
+          <Link href="#bakiyeler" className="font-semibold text-brand-600 hover:underline">{fmt.format(liability.unusedUnits)} kullanılmamış analiz bakiyesi</Link>
           {" × "}
-          {liability.avgUnitPriceKurus === null ? "ortalama net fiyat yok (henüz paket satışı yok)" : `${formatKurus(liability.avgUnitPriceKurus)} ağırlıklı ortalama net kontör fiyatı`}.
-          Üst sınırdır: ücretsiz verilen (hoş geldin, plan hakkı) kontör de bu fiyatla çarpılır; güncel durumdur, dönemden bağımsızdır.
+          {liability.avgUnitPriceKurus === null ? "ortalama net fiyat yok (henüz paket satışı yok)" : `${formatKurus(liability.avgUnitPriceKurus)} ağırlıklı ortalama net analiz bakiyesi fiyatı`}.
+          Üst sınırdır: ücretsiz verilen (hoş geldin, plan hakkı) TL de bu fiyatla çarpılır; güncel durumdur, dönemden bağımsızdır.
         </p>
       </div>
 
       <div>
         <h3 className="mb-2 text-sm font-bold text-ink-950">Plan hakkı ve yükleme dağılımı (dönemdeki yüklemeler)</h3>
         {segments.length === 0 ? (
-          <p className="text-sm text-text-muted">Bu dönemde kontör yüklemesi yok.</p>
+          <p className="text-sm text-text-muted">Bu dönemde bakiye yüklemesi yok.</p>
         ) : (
           <>
-            <div role="img" aria-label="Yükleme dağılımı (kontör payı)" className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+            <div role="img" aria-label="Yükleme dağılımı (analiz bakiyesi payı)" className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">
               {segments.map((g, i) => (
                 <Link
                   key={g.kind}
                   href="#bakiyeler"
-                  title={`${g.label}: ${fmt.format(g.units)} kontör (%${g.pct})`}
+                  title={`${g.label}: ${fmt.format(g.units)} TL (%${g.pct})`}
                   className="block h-full"
                   style={{ width: `${g.pct}%`, background: VIZ_SERIES[i % VIZ_SERIES.length] }}
                 />
@@ -269,7 +269,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
                     <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: VIZ_SERIES[i % VIZ_SERIES.length] }} />
                     <span className="min-w-0 flex-1 truncate font-semibold text-ink-950">{g.label}</span>
                     <span className="tabular-nums text-text-muted">{fmt.format(grantCounts[g.kind] ?? 0)} yükleme</span>
-                    <span className="w-24 text-right font-bold tabular-nums text-ink-950">{fmt.format(g.units)} kontör</span>
+                    <span className="w-24 text-right font-bold tabular-nums text-ink-950">{fmt.format(g.units)} TL</span>
                   </Link>
                 </li>
               ))}
@@ -281,7 +281,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
       <div>
         <h3 className="mb-2 text-sm font-bold text-ink-950">Ofis bazlı kullanım (en çok harcayan {OFFICE_ROWS_SHOWN})</h3>
         {bars.length === 0 ? (
-          <p className="text-sm text-text-muted">Kontör hareketi olan ofis yok.</p>
+          <p className="text-sm text-text-muted">Bakiye hareketi olan ofis yok.</p>
         ) : (
           <ol className="m-0 list-none divide-y divide-line p-0">
             {bars.map((o) => {
@@ -295,7 +295,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
                     </span>
                     <span className="text-right text-sm tabular-nums">
                       <strong className="text-ink-950">{fmt.format(o.value)}</strong>
-                      <span className="text-text-faint"> kontör{row ? ` · bakiye ${fmt.format(row.balance)}` : ""}</span>
+                      <span className="text-text-faint"> analiz bakiyesi{row ? ` · bakiye ${fmt.format(row.balance)}` : ""}</span>
                     </span>
                   </Link>
                 </li>

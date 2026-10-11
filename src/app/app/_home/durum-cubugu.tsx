@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * TEK "Durum çubuğu": en çok 2 bant (öncelik: düşük kontör, hoş geldin kredisi). Kurulum/profil/örnek veri
+ * TEK "Durum çubuğu": en çok 2 bant (öncelik: düşük analiz bakiyesi, hoş geldin kredisi). Kurulum/profil/örnek veri
  * Başlangıç kartında, duyurular Bildirimler > Duyurular'dadır.
  * Her çocuk kendi Suspense sınırında akar ve boşsa hiçbir şey çizmez; çubuk öğe yokken yükseklik 0'dır.
  * Birden çok öğe varsa yalnız ilki görünür, "+N bildirim daha" düğmesi kalanları açar — asıl içerik

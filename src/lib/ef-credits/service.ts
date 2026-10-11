@@ -40,7 +40,7 @@ import { canViewAllEfReports, canViewReport, filterVisibleReports, type EfViewer
 export type { EfReportRow, ReportDetailResult, RunValuationResult } from "./types";
 
 /**
- * EF KONTÖR SERVİSİ — ada/parsel değerleme, rapor detayı ve PDF akışının TEK orkestrasyonu.
+ * EF ANALİZ BAKİYESİ SERVİSİ — ada/parsel değerleme, rapor detayı ve PDF akışının TEK orkestrasyonu.
  *
  * FAIL-CLOSED: cüzdan yazılamazsa (reserve null) EmlakFiyati ÇAĞRILMAZ. Akış: tarife → rezerve → ortak çağrı →
  * (deger + ucretlendirilir:true → commit | yetersiz/hata/429/zaman aşımı/ucretlendirilir:false → release).
@@ -88,7 +88,7 @@ export async function getEfFeatureState(tenantId: string): Promise<EfFeatureStat
   if (!key) details.push("EmlakFiyati anahtarı tanımlı değil (yönetici: Sistem > EmlakFiyati).");
   if (!flag) details.push("Ortak uçlar yönetici tarafından etkinleştirilmemiş.");
   if (!prerequisites.probe) details.push("Ortak bağlantı yoklaması başarılı değil (yönetici: 'Ortak bağlantıyı dene').");
-  if (!wallet) details.push("Kontör bakiyesi henüz hazır değil (veritabanı şeması uygulanmamış).");
+  if (!wallet) details.push("Analiz bakiyesi henüz hazır değil (veritabanı şeması uygulanmamış).");
   const missing = details.length > 0 ? [EF_NOT_ENABLED_MESSAGE] : [];
   const ready = key && flag && prerequisites.probe && wallet;
   const balance = ready ? await efBalance(tenantId) : null;
@@ -105,31 +105,31 @@ export function efFailureMessage(kind: OrtakErrorKind, code: string | null): str
       return "Ada/parsel değerleme şu an etkin değil.";
     case "auth":
     case "forbidden":
-      return "Değerleme servisi şu an kullanılamıyor. Kontörünüz düşülmedi; yönetici bilgilendirildi.";
+      return "Değerleme servisi şu an kullanılamıyor. Bakiyeniz düşülmedi; yönetici bilgilendirildi.";
     case "bad_request":
     case "invalid_input":
       if (code === "kullanici_ref_kisisel_veri" || code === "kullanici_ref_gecersiz" || code === "kullanici_ref_gerekli") {
-        return "Değerleme isteği reddedildi. Kontörünüz düşülmedi; lütfen destekle iletişime geçin.";
+        return "Değerleme isteği reddedildi. Bakiyeniz düşülmedi; lütfen destekle iletişime geçin.";
       }
-      return "Girdiler değerleme servisi tarafından kabul edilmedi (ada, parsel veya konut bilgilerini kontrol edin). Kontörünüz düşülmedi.";
+      return "Girdiler değerleme servisi tarafından kabul edilmedi (ada, parsel veya konut bilgilerini kontrol edin). Bakiyeniz düşülmedi.";
     case "not_found":
       return "Rapor bulunamadı veya süresi doldu. Yeniden değerleme gerekir.";
     case "busy":
-      return "İstek hâlâ işleniyor; birkaç saniye sonra tekrar deneyin. Kontörünüz düşülmedi.";
+      return "İstek hâlâ işleniyor; birkaç saniye sonra tekrar deneyin. Bakiyeniz düşülmedi.";
     case "too_large":
-      return "İstek çok büyük. Kontörünüz düşülmedi.";
+      return "İstek çok büyük. Bakiyeniz düşülmedi.";
     case "rate_limited":
     case "unavailable":
     case "too_many_local":
-      return "Sistem şu an yoğun. Lütfen biraz sonra tekrar deneyin. Kontörünüz düşülmedi.";
+      return "Sistem şu an yoğun. Lütfen biraz sonra tekrar deneyin. Bakiyeniz düşülmedi.";
     case "pdf_failed":
-      return "PDF şu an üretilemedi; rapor detayını ekranda görebilirsiniz. Kontörünüz düşülmedi.";
+      return "PDF şu an üretilemedi; rapor detayını ekranda görebilirsiniz. Bakiyeniz düşülmedi.";
     case "timeout":
     case "network":
     case "server":
-      return "Geçici bir hata oluştu. Kontörünüz düşülmedi (iade edildi); lütfen tekrar deneyin.";
+      return "Geçici bir hata oluştu. Bakiyeniz düşülmedi (iade edildi); lütfen tekrar deneyin.";
     case "invalid_response":
-      return "Servisten beklenmeyen bir yanıt geldi. Kontörünüz düşülmedi (iade edildi).";
+      return "Servisten beklenmeyen bir yanıt geldi. Bakiyeniz düşülmedi (iade edildi).";
   }
 }
 
@@ -175,7 +175,7 @@ async function holdUnits(a: EfActor, units: number, item: EfBillableItem): Promi
   return { kind: "held", reservationId: r.reservation_id };
 }
 
-const WALLET_ERROR_MESSAGE = "Kontör bakiyesine şu an yazılamadı; işlem yapılmadı ve kontörünüz düşülmedi. Lütfen tekrar deneyin.";
+const WALLET_ERROR_MESSAGE = "Analiz bakiyesine şu an yazılamadı; işlem yapılmadı ve bakiyeniz düşülmedi. Lütfen tekrar deneyin.";
 
 // ---------------------------------------------------------------------------
 // Ada/parsel değerleme
@@ -241,7 +241,7 @@ async function settleValuation(
     if (ok) unitsCharged = units;
     else settlementPending = true;
   } else {
-    // ucretlendirilir:false → rapor üretildi ama kontör KESİLMEZ (iade).
+    // ucretlendirilir:false → rapor üretildi ama analiz bakiyesi KESİLMEZ (iade).
     await releaseSafely(p.tenantId, reservationId, "valuation_ucretlendirilmedi");
   }
 
@@ -300,7 +300,7 @@ export async function getOwnedReport(tenantId: string, raporId: string, viewer?:
   return { ok: true, row };
 }
 
-/** Rapor detayı (JSON). KONTÖRSÜZ (sahip kararı 2026-10-10: kontör yalnız değerleme için harcanır). */
+/** Rapor detayı (JSON). BAKİYE HARCAMAYAN (sahip kararı 2026-10-10: analiz bakiyesi yalnız değerleme için harcanır). */
 export async function getReportDetail(p: EfActor & { raporId: string; role?: string | null }): Promise<ReportDetailResult> {
   const owned = await getOwnedReport(p.tenantId, p.raporId, p.role === undefined ? undefined : { userId: p.userId, role: p.role });
   if (!owned.ok) return { status: owned.status, message: efFailureMessage("not_found", "rapor_yok") };
@@ -317,7 +317,7 @@ export async function getReportDetail(p: EfActor & { raporId: string; role?: str
 }
 
 // ---------------------------------------------------------------------------
-// PDF (KONTÖRSÜZ: ilk indirme dahil)
+// PDF (BAKİYE HARCAMAYAN: ilk indirme dahil)
 // ---------------------------------------------------------------------------
 
 export type ReportPdfResult =

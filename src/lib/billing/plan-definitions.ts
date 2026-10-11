@@ -53,7 +53,7 @@ const loadEfTariff = unstable_cache(
   { tags: [PLAN_DEFINITIONS_TAG], revalidate: 300 },
 );
 
-/** EmlakFiyati kontör tarifesi (platform_settings; yoksa varsayılan). Plan kartlarındaki "yaklaşık N değerleme" hesabı için. */
+/** EmlakFiyati analiz tarifesi (platform_settings; yoksa varsayılan). Plan kartlarındaki "yaklaşık N değerleme" hesabı için. */
 export async function getEfTariff(): Promise<EfTariff> {
   return loadEfTariff();
 }

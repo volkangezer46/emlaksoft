@@ -201,7 +201,7 @@ describe("K10 yanıt ayrıştırma", () => {
     expect(r).toEqual({ ok: true, value: { durum: "yetersiz", ucretlendirilir: false, mesaj: "Veri yok", nedenler: ["deger_yok"] } });
   });
 
-  it("ucretlendirilir eksikse FALSE sayılır (kontör kesinleşmez); geçersiz rapor_id null", () => {
+  it("ucretlendirilir eksikse FALSE sayılır (analiz bakiyesi kesinleşmez); geçersiz rapor_id null", () => {
     const r = parseOrtakValuation({ ...base, ucretlendirilir: undefined, rapor_id: "../x" });
     if (!r.ok || r.value.durum !== "deger") throw new Error("beklenmeyen");
     expect(r.value.ucretlendirilir).toBe(false);

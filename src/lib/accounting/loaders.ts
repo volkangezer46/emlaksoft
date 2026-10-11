@@ -176,7 +176,7 @@ export async function loadSubscriptionMovement(admin: Admin, period: Period, col
 
 export type EfUsageLoad = { enabled: boolean; rows: EfUsageRow[]; truncated: boolean };
 
-/** Kesinleşmiş kontör kullanımı (ef_credit_reservations). Tablo yoksa/okunamazsa `enabled:false` (hata atmaz). */
+/** Kesinleşmiş analiz bakiyesi kullanımı (ef_credit_reservations). Tablo yoksa/okunamazsa `enabled:false` (hata atmaz). */
 export async function loadEfUsage(admin: Admin, period: Pick<Period, "fromIso" | "toIso">): Promise<EfUsageLoad> {
   const rows: EfUsageRow[] = [];
   let offset = 0;
@@ -201,7 +201,7 @@ export async function loadEfUsage(admin: Admin, period: Pick<Period, "fromIso" |
 
 export type EfLedgerLoad = { enabled: boolean; entries: EfLedgerEntry[]; truncated: boolean };
 
-/** EF kontör defteri (account_credit_ledger, unit='ef'): tüm zamanlar; bakiye/yükümlülük ve hak dağılımı için. Hata: enabled:false. */
+/** EF analiz bakiyesi defteri (account_credit_ledger, unit='ef'): tüm zamanlar; bakiye/yükümlülük ve hak dağılımı için. Hata: enabled:false. */
 export async function loadEfLedgerEntries(admin: Admin): Promise<EfLedgerLoad> {
   const entries: EfLedgerEntry[] = [];
   let offset = 0;
@@ -223,7 +223,7 @@ export async function loadEfLedgerEntries(admin: Admin): Promise<EfLedgerLoad> {
 
 export type EfPackSaleLoad = { enabled: boolean; sales: (EfPackSale & { paidAt: string | null })[]; truncated: boolean };
 
-/** Ödenmiş, iade edilmemiş kontör paketi faturaları (tüm zamanlar): net tutar + kontör. Hata: enabled:false. */
+/** Ödenmiş, iade edilmemiş analiz paketi faturaları (tüm zamanlar): net tutar + analiz bakiyesi. Hata: enabled:false. */
 export async function loadEfPackSales(admin: Admin): Promise<EfPackSaleLoad> {
   const sales: EfPackSaleLoad["sales"] = [];
   let offset = 0;
@@ -249,7 +249,7 @@ export async function loadEfPackSales(admin: Admin): Promise<EfPackSaleLoad> {
 
 export type EfBalanceLoad = { enabled: false } | { enabled: true; available: number; reserved: number; grantedTotal: number; committedTotal: number };
 
-/** Ofisin kontör bakiyesi (ef_credit_balance RPC). RPC yoksa/hata verirse etkin değil. */
+/** Ofisin analiz bakiyesi (ef_credit_balance RPC). RPC yoksa/hata verirse etkin değil. */
 export async function loadEfBalance(admin: Admin, tenantId: string): Promise<EfBalanceLoad> {
   const { data, error } = await admin.rpc(EF_RPC.balance, { p_tenant: tenantId });
   if (error || !data || typeof data !== "object") return { enabled: false };

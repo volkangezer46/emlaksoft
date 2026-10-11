@@ -313,12 +313,12 @@ export async function saveSeatSettings(formData: FormData): Promise<PlanOpResult
   return { ok: true, notice: `Uyarı eşiği %${n} olarak kaydedildi; %100'de "dolu" gösterilir.` };
 }
 
-/** Hoş geldin kontörü (yeni ofis, tek sefer; 0 = kapalı). platform_settings `ef.welcome_units`; yalnız süper admin. */
+/** Hoş geldin analiz bakiyesi (yeni ofis, tek sefer; 0 = kapalı). platform_settings `ef.welcome_units`; yalnız süper admin. */
 export async function saveEfWelcomeUnits(formData: FormData): Promise<PlanOpResult> {
   const g = await guard("ef-welcome");
   if ("error" in g) return { error: g.error };
   const raw = String(formData.get("welcome_units") ?? "").trim();
-  if (!/^\d+$/.test(raw) || Number(raw) > 1000) return { error: "Hoş geldin kontörü 0-1000 arasında tam sayı olmalı (0 = kapalı)." };
+  if (!/^\d+$/.test(raw) || Number(raw) > 1000) return { error: "Hoş geldin analiz bakiyesi 0-1000 arasında tam sayı olmalı (0 = kapalı)." };
   const units = Number(raw);
   const before = await getPlatformSetting(EF_WELCOME_SETTING_KEY);
   if (!(await setPlatformSetting(EF_WELCOME_SETTING_KEY, String(units), g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
@@ -330,5 +330,5 @@ export async function saveEfWelcomeUnits(formData: FormData): Promise<PlanOpResu
     entityType: "plan",
     meta: { before, units },
   });
-  return { ok: true, notice: units === 0 ? "Hoş geldin kontörü kapatıldı." : `Hoş geldin kontörü ${units} olarak kaydedildi; yalnız deneme/yeni ofise tek sefer verilir, mevcut ofislere geriye dönük dağıtılmaz.` };
+  return { ok: true, notice: units === 0 ? "Hoş geldin analiz bakiyesi kapatıldı." : `Hoş geldin analiz bakiyesi ${units} olarak kaydedildi; yalnız deneme/yeni ofise tek sefer verilir, mevcut ofislere geriye dönük dağıtılmaz.` };
 }

@@ -194,9 +194,9 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
           <Link
             href="#gecmis-raporlar"
             className="focus-ring press inline-flex items-center gap-1.5 rounded-full border border-mint-500/30 bg-mint-500/10 px-3 py-1 text-xs font-bold text-mint-700"
-            aria-label={`Kalan kontör ${balance}; geçmiş raporlara git`}
+            aria-label={`Kalan analiz bakiyesi ${balance}; geçmiş raporlara git`}
           >
-            <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Kalan kontör: <span className="numeric">{balance}</span>
+            <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Kalan analiz bakiyesi: <span className="numeric">{balance}</span>
           </Link>
         </div>
 
@@ -347,10 +347,10 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
           {confirming ? (
             <div role="group" aria-label="İşlem onayı" className="rounded-[var(--radius-card)] border border-brand-600/25 bg-brand-600/6 p-4">
               <p className="text-sm font-semibold text-ink-950">
-                Bu işlem <span className="numeric">{units}</span> kontör{units === 0 ? " (ücretsiz)" : ""}.
+                Bu işlem <span className="numeric">{units}</span> analiz bakiyesi{units === 0 ? " (ücretsiz)" : ""}.
               </p>
               <p className="mt-1 text-xs text-text-muted">
-                Kalan kontör: <span className="numeric">{balance}</span>. Sonuç üretilemezse (yetersiz veri) veya hata olursa kontör düşmez. Rapor PDF&apos;i ve rapor detayı kontör düşürmez.
+                Kalan analiz bakiyesi: <span className="numeric">{balance}</span>. Sonuç üretilemezse (yetersiz veri) veya hata olursa bakiye düşmez. Rapor PDF&apos;i ve rapor detayı bakiye düşmez.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={onConfirm} disabled={pending} className={`${btn} bg-ink-950 text-white`}>
@@ -394,11 +394,11 @@ function RunOutcome({ run }: { run: RunValuationResult }) {
       return (
         <div className="mt-4 space-y-3">
           <p role="status" className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-3 py-2 text-sm font-semibold text-mint-700">
-            Rapor hazır. {run.unitsCharged > 0 ? `${run.unitsCharged} kontör düşüldü.` : "Kontör düşülmedi."}
+            Rapor hazır. {run.unitsCharged > 0 ? `${run.unitsCharged} TL düşüldü.` : "Bakiye düşülmedi."}
             {run.replayed ? " (Aynı istek tekrarı: ikinci kez ücretlendirilmedi.)" : ""}
           </p>
           {run.settlementPending ? (
-            <p role="note" className="text-xs text-amber-800">Kontör kaydı şu an tamamlanamadı; rapor verildi, mutabakat yöneticide izlenir.</p>
+            <p role="note" className="text-xs text-amber-800">Analiz bakiyesi kaydı şu an tamamlanamadı; rapor verildi, mutabakat yöneticide izlenir.</p>
           ) : null}
           <EfResultView result={run.result} raporId={run.raporId} />
         </div>
@@ -415,14 +415,14 @@ function RunOutcome({ run }: { run: RunValuationResult }) {
               ))}
             </ul>
           ) : null}
-          <p className="text-sm font-semibold text-mint-700">Ücretlendirilmedi{run.refunded ? " (kontör iade edildi)" : ""}.</p>
+          <p className="text-sm font-semibold text-mint-700">Ücretlendirilmedi{run.refunded ? " (analiz bakiyesi iade edildi)" : ""}.</p>
         </div>
       );
     case "no_credit":
       return (
         <div role="alert" className="mt-4 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-800">
-          <p className="font-semibold">Yetersiz kontör: bu işlem {run.needed} kontör, kalan {run.available}.</p>
-          <p className="mt-1">Kontör paketlerini <Link href="/app/abonelik?sekme=kontor#paketler" className="font-semibold underline">Abonelik &gt; Kontör</Link> sayfasından alabilirsiniz (satın alma yalnızca ofis sahibi veya genel müdür içindir; değilseniz yöneticinize başvurun).</p>
+          <p className="font-semibold">Yetersiz analiz bakiyesi: bu işlem {run.needed} TL, kalan {run.available}.</p>
+          <p className="mt-1">Analiz paketlerini <Link href="/app/abonelik?sekme=kontor#paketler" className="font-semibold underline">Abonelik &gt; Analiz bakiyesi</Link> sayfasından alabilirsiniz (satın alma yalnızca ofis sahibi veya genel müdür içindir; değilseniz yöneticinize başvurun).</p>
         </div>
       );
     case "disabled":

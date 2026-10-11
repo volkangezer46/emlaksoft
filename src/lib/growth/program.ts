@@ -500,7 +500,7 @@ export const NUDGE_COPY: Record<NudgeMoment, { title: string; text: string; cta:
     cta: "Davet et ve kazan",
   },
   credit_purchase: {
-    title: "Kontör aldınız",
+    title: "Analiz bakiyesi aldınız",
     text: "Ofisinizin bu işi nasıl hızlandırdığını bir meslektaşınıza anlatın; davet bağlantınız hazır.",
     cta: "Davet et ve kazan",
   },

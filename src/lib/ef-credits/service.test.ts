@@ -117,7 +117,7 @@ function seedReport(tenant = T1, over: Partial<Row> = {}) {
   });
 }
 
-describe("EF kontör servisi", () => {
+describe("EF analiz bakiyesi servisi", () => {
   beforeEach(() => {
     w.ready = true; w.walletDown = false; w.commitFail = false; w.balance = 100;
     w.res.clear(); w.reports.clear(); w.commitCalls = 0; w.releaseCalls = 0; w.reserveCalls = 0;
@@ -152,7 +152,7 @@ describe("EF kontör servisi", () => {
       expect(w.balance).toBe(92);
     });
 
-    it("ayar yoksa varsayılan tarife (1 kontör = 1 TL): konut 700, arsa 850", async () => {
+    it("ayar yoksa varsayılan tarife (1 birim = 1 TL): konut 700, arsa 850", async () => {
       settings.values.clear();
       w.balance = 3000;
       ef.degerleme.mockResolvedValue(okValue({ tip: "konut" }));
@@ -206,7 +206,7 @@ describe("EF kontör servisi", () => {
       ["forbidden", "kapsam_yok"],
       ["auth", null],
       ["invalid_response", null],
-    ] as const)("hata/429/zaman aşımı (%s) → İADE, kontör düşmez, kullanıcı mesajı anahtar/URL içermez", async (kind, code) => {
+    ] as const)("hata/429/zaman aşımı (%s) → İADE, bakiye düşmez, kullanıcı mesajı anahtar/URL içermez", async (kind, code) => {
       ef.degerleme.mockResolvedValue(fail(kind, code));
       const r = await runParcelValuation({ tenantId: T1, userId: U, input: INPUT });
       expect(r).toMatchObject({ status: "error", kind, refunded: true, requestId: "req-err" });
@@ -233,7 +233,7 @@ describe("EF kontör servisi", () => {
       expect(w.balance).toBe(95);
     });
 
-    it("yetersiz kontör → sorgu YAPILMAZ", async () => {
+    it("yetersiz analiz bakiyesi → sorgu YAPILMAZ", async () => {
       w.balance = 3;
       const r = await runParcelValuation({ tenantId: T1, userId: U, input: INPUT });
       expect(r).toEqual({ status: "no_credit", available: 3, needed: 5 });
@@ -266,7 +266,7 @@ describe("EF kontör servisi", () => {
     it.each([
       ["bayrak kapalı", () => { settings.flag = false; }, /etkinleştirilmemiş/],
       ["yoklama yok", () => { settings.probe = null; }, /yoklaması/],
-      ["kontör bakiyesi hazır değil", () => { w.ready = false; }, /Kontör bakiyesi/],
+      ["analiz bakiyesi hazır değil", () => { w.ready = false; }, /Analiz bakiyesi/],
       ["anahtar yok", () => { settings.configured = false; }, /anahtarı/],
     ] as const)("etkin değil (%s): açık eksik ön koşul, sorgu/rezerve yok", async (_n, setup, re) => {
       setup();
@@ -324,9 +324,9 @@ describe("EF kontör servisi", () => {
     });
   });
 
-  describe("PDF (KONTÖRSÜZ, 2026-10-10)", () => {
+  describe("PDF (BAKİYE HARCAMAYAN, 2026-10-10)", () => {
     const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
-    it("ilk indirme dahil kontör düşmez, rezerve açılmaz; pdf_charged 'PDF alındı' işareti konur", async () => {
+    it("ilk indirme dahil bakiye düşmez, rezerve açılmaz; pdf_charged 'PDF alındı' işareti konur", async () => {
       seedReport(T1);
       ef.pdf.mockResolvedValue({ ok: true, requestId: "req-pdf", replayed: false, attempts: 1, data: { bytes } });
       const first = await getReportPdf({ tenantId: T1, userId: U, raporId: RID });
@@ -340,14 +340,14 @@ describe("EF kontör servisi", () => {
       expect(ef.pdf).toHaveBeenCalledTimes(2); // önbellek yok
     });
 
-    it("bakiye 0 olsa da PDF indirilir (yetersiz kontör yok)", async () => {
+    it("bakiye 0 olsa da PDF indirilir (yetersiz analiz bakiyesi yok)", async () => {
       seedReport(T1);
       w.balance = 0;
       ef.pdf.mockResolvedValue({ ok: true, requestId: "r", replayed: false, attempts: 1, data: { bytes } });
       expect(await getReportPdf({ tenantId: T1, userId: U, raporId: RID })).toMatchObject({ status: "ok", unitsCharged: 0 });
     });
 
-    it("PDF 200 değilse hata döner ve pdf_charged işaretlenmez; kontöre dokunulmaz", async () => {
+    it("PDF 200 değilse hata döner ve pdf_charged işaretlenmez; analiz bakiyesine dokunulmaz", async () => {
       seedReport(T1);
       ef.pdf.mockResolvedValue(fail("pdf_failed", "pdf_uretilemedi"));
       const r = await getReportPdf({ tenantId: T1, userId: U, raporId: RID });
@@ -371,8 +371,8 @@ describe("EF kontör servisi", () => {
     });
   });
 
-  describe("rapor detayı (KONTÖRSÜZ)", () => {
-    it("kontör düşmez, rezerve açılmaz; eski tarife kaydında reportDetail > 0 olsa da yok sayılır", async () => {
+  describe("rapor detayı (BAKİYE HARCAMAYAN)", () => {
+    it("bakiye düşmez, rezerve açılmaz; eski tarife kaydında reportDetail > 0 olsa da yok sayılır", async () => {
       seedReport(T1);
       settings.values.set(EF_TARIFF_SETTING_KEY, JSON.stringify({ valuationArsa: 5, valuationKonut: 5, pdfFirst: 3, reportDetail: 1 }));
       ef.rapor.mockResolvedValue({ ok: true, requestId: "r1", replayed: false, attempts: 1, data: { durum: "deger", ucretlendirilir: true, raporId: RID } });
@@ -382,7 +382,7 @@ describe("EF kontör servisi", () => {
       expect(w.balance).toBe(100);
     });
 
-    it("EmlakFiyati hatasında hata döner; kontöre dokunulmaz", async () => {
+    it("EmlakFiyati hatasında hata döner; analiz bakiyesine dokunulmaz", async () => {
       seedReport(T1);
       ef.rapor.mockResolvedValueOnce(fail("not_found", "rapor_yok"));
       expect(await getReportDetail({ tenantId: T1, userId: U, raporId: RID })).toMatchObject({ status: "error", kind: "not_found" });

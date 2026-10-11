@@ -240,7 +240,7 @@ export async function runBillingReconciliation(
     return { expiredCheckouts: 0, inspected: 0, fulfilled: 0, retryPending: 0, manualReview: 0, refundRequired: 0, platformInsights };
   }
   if (job === "ef_sweep") {
-    // EF kontör: 15 dakikadan eski açık rezervleri serbest bırakır. Cüzdan yoksa/RPC hata verirse null (etkin değil).
+    // EF analiz bakiyesi: 15 dakikadan eski açık rezervleri serbest bırakır. Cüzdan yoksa/RPC hata verirse null (etkin değil).
     const { data, error } = await admin.rpc(EF_RPC.sweep, { p_older_than: "15 minutes" });
     // Yalnız şema/fonksiyon yok (PGRST202 / 42883 / PGRST205) "etkin değil"dir; diğer hatalar efSweepError olarak döner.
     const missing = !!error && ["PGRST202", "42883", "PGRST205"].includes(String(error.code ?? ""));

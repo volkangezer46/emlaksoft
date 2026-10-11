@@ -1,5 +1,5 @@
 /**
- * EF kontör servisi — paylaşılan SONUÇ tipleri (SAF: sunucu/istemci güvenli; yalnız tip, çalışma zamanı kodu yok).
+ * EF analiz bakiyesi servisi — paylaşılan SONUÇ tipleri (SAF: sunucu/istemci güvenli; yalnız tip, çalışma zamanı kodu yok).
  * İstemci bileşenleri `service.ts`/`wallet.ts` (server-only) yerine BURADAN tip alır.
  */
 import type {
@@ -36,7 +36,7 @@ export type RunValuationResult =
       unitsCharged: number;
       replayed: boolean;
       requestId: string | null;
-      /** commit yazılamadı (rapor verildi; kontör süpürücüde serbest kalır, mutabakatta izlenir). */
+      /** commit yazılamadı (rapor verildi; bakiye süpürücüde serbest kalır, mutabakatta izlenir). */
       settlementPending: boolean;
     }
   | { status: "insufficient"; result: OrtakValuationInsufficient; requestId: string | null; refunded: boolean }

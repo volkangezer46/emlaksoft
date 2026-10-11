@@ -287,7 +287,7 @@ export default async function ValuationPage({
         </div>
       </section>
 
-      {/* İlan analizi (kontörsüz): portföy seçiliyse (?property=) fiyat konumu + kalite kontrol listesi */}
+      {/* İlan analizi (bakiye harcamayan): portföy seçiliyse (?property=) fiyat konumu + kalite kontrol listesi */}
       {gateTenantId && preselectedPropertyId && /^[0-9a-f-]{36}$/i.test(preselectedPropertyId) ? (
         <ListingAnalysisCard propertyId={preselectedPropertyId} tenantId={gateTenantId} canRun={(gatePerms.valuation ?? []).includes("create")} />
       ) : null}

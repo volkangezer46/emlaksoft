@@ -50,7 +50,7 @@ export default async function ParselValuationPage({ searchParams }: { searchPara
           </h2>
           <p className="mt-1 text-sm text-text-muted">Ada/parsel değerleme şu an kullanılamıyor.</p>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-ink-950">
-            {state.missing.length > 0 ? state.missing.map((m) => <li key={m}>{m}</li>) : <li>Kontör bakiyesi okunamadı; lütfen daha sonra tekrar deneyin.</li>}
+            {state.missing.length > 0 ? state.missing.map((m) => <li key={m}>{m}</li>) : <li>Analiz bakiyesi okunamadı; lütfen daha sonra tekrar deneyin.</li>}
           </ul>
           <Link href="/app/degerleme" className="focus-ring mt-4 inline-block text-sm font-semibold text-brand-600 hover:underline">
             Değerleme motoruna dön →

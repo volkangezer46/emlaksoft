@@ -225,9 +225,9 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
   const amount = validateRefundAmount(String(formData.get("amount_try") ?? ""), Number(inv.total_try));
   if ("error" in amount) return { error: amount.error };
 
-  // Kontör paketi faturası: verilen EF kontörü GERİ ALINIR (clawback = rezerv + commit, kalem pack_refund; idem fatura+birim).
-  // Kontör kullanılmışsa bakiye yetmez ve iade ENGELLENİR (para iadesi + kontör birlikte kalamaz). İade kaydı düşmezse
-  // aynı işlem tekrarlanabilir: idem anahtarı aynı olduğundan kontör iki kez düşmez.
+  // Analiz paketi faturası: verilen EF analiz bakiyesi GERİ ALINIR (clawback = rezerv + commit, kalem pack_refund; idem fatura+birim).
+  // Analiz bakiyesi kullanılmışsa bakiye yetmez ve iade ENGELLENİR (para iadesi + analiz bakiyesi birlikte kalamaz). İade kaydı düşmezse
+  // aynı işlem tekrarlanabilir: idem anahtarı aynı olduğundan analiz bakiyesi iki kez düşmez.
   if (meta.kind === "credit_pack") {
     const claw = efPackClawbackUnits(Number(meta.units ?? 0), amount.value, Number(inv.total_try));
     if (claw > 0) {
@@ -238,15 +238,15 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
         idem: efPackRefundIdem(invoiceId, claw),
         item: EF_PACK_REFUND_ITEM,
       });
-      if (!reserved) return { error: "Kontör geri alınamadı (EmlakFiyati cüzdanı yazılamadı); iade kaydı düşülmedi. Tekrar deneyin." };
+      if (!reserved) return { error: "Analiz bakiyesi geri alınamadı (EmlakFiyati cüzdanı yazılamadı); iade kaydı düşülmedi. Tekrar deneyin." };
       if (!reserved.ok) {
         return {
-          error: `Bu paketin kontörü kullanılmış (kalan ${reserved.available} < geri alınacak ${claw}); iade kaydı düşülmedi. Kullanılan kısım için tutarı düşürüp tekrar deneyin ya da işlemi elle değerlendirin.`,
+          error: `Bu paketin analiz bakiyesi kullanılmış (kalan ${reserved.available} < geri alınacak ${claw}); iade kaydı düşülmedi. Kullanılan kısım için tutarı düşürüp tekrar deneyin ya da işlemi elle değerlendirin.`,
         };
       }
       if (reserved.state !== "committed") {
         const done = await efCommit(inv.tenant_id as string, reserved.reservation_id, { kind: EF_PACK_REFUND_ITEM, invoice_id: invoiceId });
-        if (!done || !done.ok) return { error: "Kontör geri alma kesinleştirilemedi; iade kaydı düşülmedi. Tekrar deneyin." };
+        if (!done || !done.ok) return { error: "Analiz bakiyesi geri alma kesinleştirilemedi; iade kaydı düşülmedi. Tekrar deneyin." };
       }
     }
   }

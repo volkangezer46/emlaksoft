@@ -29,7 +29,7 @@ describe("kutlama koşulları (yalnız gerçek olay)", () => {
     expect(isTargetReachedMoment(5, 0)).toBe(false);
     expect(isTargetReachedMoment(Number.NaN, 10)).toBe(false);
   });
-  it("kontör satın alma: ödenmiş ve yeni", () => {
+  it("analiz bakiyesi satın alma: ödenmiş ve yeni", () => {
     expect(isCreditPurchaseMoment({ status: "paid" }, true)).toBe(true);
     expect(isCreditPurchaseMoment({ status: "paid" }, false)).toBe(false);
     expect(isCreditPurchaseMoment({ status: "open" }, true)).toBe(false);

@@ -25,8 +25,8 @@ const VERDICT_TONE: Record<ListingAnalysisResult["position"]["verdict"], string>
 type Notice = { tone: "info" | "warning" | "danger" | "success"; text: string };
 
 /**
- * İlan analizi kartı (istemci kısmı): sonucu gösterir, "Analiz et" düğmesi action'ı çağırır. Kontör düşmez (yalnız
- * değerleme kontör harcar); aynı girdiyle 24 saat içinde kayıtlı sonuç gösterilir. Her sayı bir hedefe bağlıdır.
+ * İlan analizi kartı (istemci kısmı): sonucu gösterir, "Analiz et" düğmesi action'ı çağırır. Bakiye düşmez (yalnız
+ * değerleme analiz bakiyesi harcar); aynı girdiyle 24 saat içinde kayıtlı sonuç gösterilir. Her sayı bir hedefe bağlıdır.
  */
 export function ListingAnalysisPanel({
   propertyId,
@@ -90,7 +90,7 @@ export function ListingAnalysisPanel({
             <ScanSearch className="h-4 w-4 text-brand-600" aria-hidden /> İlan analizi
           </CardTitle>
           <CardDescription>
-            Emsal motoru ve (varsa) EmlakFiyati bölge verisiyle fiyat konumu. Kontör gerektirmez; aynı veriyle 24 saat içinde kayıtlı sonuç gösterilir.
+            Emsal motoru ve (varsa) EmlakFiyati bölge verisiyle fiyat konumu. Analiz bakiyesi gerektirmez; aynı veriyle 24 saat içinde kayıtlı sonuç gösterilir.
           </CardDescription>
         </div>
         {canRun ? (

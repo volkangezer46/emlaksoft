@@ -13,7 +13,7 @@ function jsonError(error: string, status: number, headers?: Record<string, strin
 
 /**
  * GET /api/app/ef-rapor/[raporId]/pdf — kendi sunucumuz üzerinden PDF (kullanıcıya EmlakFiyati anahtarı/URL'si ASLA gitmez).
- * Kimlik: oturum çerezi; yetki: valuation/create (PDF indirme KONTÖRSÜZ; sahip kararı 2026-10-10). rapor_id bir ERİŞİM ANAHTARIDIR:
+ * Kimlik: oturum çerezi; yetki: valuation/create (PDF indirme BAKİYE HARCAMAYAN; sahip kararı 2026-10-10). rapor_id bir ERİŞİM ANAHTARIDIR:
  * rapor BU ofise ait değilse 404. Yanıt önbelleğe ALINMAZ.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ raporId: string }> }) {

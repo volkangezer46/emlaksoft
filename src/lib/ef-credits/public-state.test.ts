@@ -54,8 +54,8 @@ describe("decideEfPublicState karar tablosu", () => {
     }
   });
   it("efPlannedLine: live değilse (planlanan) etiketi, satır yoksa null", () => {
-    expect(efPlannedLine("Aylık 40 kontör", true)).toBe("Aylık 40 kontör");
-    expect(efPlannedLine("Aylık 40 kontör", false)).toBe(`Aylık 40 kontör ${EF_PLANNED_SUFFIX}`);
+    expect(efPlannedLine("Aylık 40 TL", true)).toBe("Aylık 40 TL");
+    expect(efPlannedLine("Aylık 40 TL", false)).toBe(`Aylık 40 TL ${EF_PLANNED_SUFFIX}`);
     expect(efPlannedLine(null, false)).toBeNull();
   });
 });
@@ -75,7 +75,7 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
   const billing = read("src/app/actions/billing.ts");
   const body = billing.slice(billing.indexOf("export async function startCreditPackPurchase"));
 
-  it("kontör faturası/ödeme yalnız startCreditPackPurchase içinden, durum kapısından SONRA açılır", () => {
+  it("analiz bakiyesi faturası/ödeme yalnız startCreditPackPurchase içinden, durum kapısından SONRA açılır", () => {
     const gate = body.indexOf("getEfPublicState()");
     expect(gate).toBeGreaterThan(0);
     expect(body).toContain("EF_PURCHASE_CLOSED_MESSAGE");
@@ -85,7 +85,7 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
     const users = walk(join(root, "src")).filter((f) => /\bcreateCreditPackInvoice\(/.test(readFileSync(f, "utf8")) && !/credit-pack-purchase\.ts$/.test(f));
     expect(users.map((f) => f.replace(root, "").replaceAll("\\", "/"))).toEqual(["/src/app/actions/billing.ts"]);
   });
-  it("ofis kontör ekranı aynı kapıyı blockReason olarak kullanır", () => {
+  it("ofis analiz bakiyesi ekranı aynı kapıyı blockReason olarak kullanır", () => {
     const s = read("src/app/app/abonelik/kontor-section.tsx");
     expect(s).toContain("getEfPublicState()");
     expect(s).toContain("efState.purchasable");
@@ -94,7 +94,7 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
     expect(read("src/lib/site-content/ef-status.ts")).toContain("getEfPublicState");
     expect(read("src/lib/billing/public-pricing.ts")).toContain("getEfPublicState");
   });
-  it("fiyat yüzeyleri live değilse kontör satırını '(planlanan)' yazar; satın alma cümlesi yalnız live'da", () => {
+  it("fiyat yüzeyleri live değilse analiz bakiyesi satırını '(planlanan)' yazar; satın alma cümlesi yalnız live'da", () => {
     for (const f of ["src/components/pricing.tsx", "src/components/billing/plan-explorer.tsx"]) {
       const s = read(f);
       expect(s, f).toContain("efPlannedLine(");
@@ -103,7 +103,7 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
     expect(read("src/lib/pricing-page-model.ts")).toContain("EF_PLANNED_SUFFIX");
     expect(read("src/lib/site-content/tokens.ts")).toContain("EF_PLANNED_SUFFIX");
     const reg = read("src/components/billing/plan-explorer.tsx");
-    expect(reg).toMatch(/efLive \? "; kontör ile ek sorgu satın alınabilir\."/);
+    expect(reg).toMatch(/efLive \? "; analiz bakiyesi ile ek sorgu satın alınabilir\."/);
   });
   it("sağlık cron'u: Bearer + heartbeat + ortak probe, service_role istemcisi yok", () => {
     const s = read("src/app/api/cron/ef-kontor-saglik/route.ts");

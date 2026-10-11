@@ -52,7 +52,7 @@ export function PlanEditor({
   plans,
   efValuationCost,
 }: {
-  /** Bir değerlemenin kontör bedeli (tarifeden; sunucuda okunur): "yaklaşık N değerleme" canlı hesabı için. */
+  /** Bir değerlemenin analiz bakiyesi bedeli (tarifeden; sunucuda okunur): "yaklaşık N değerleme" canlı hesabı için. */
   efValuationCost: number;
   plan: PlanDef;
   /** Katalogun tamamı: kademe doğrulaması ve çapraz nokta uyarıları için. */
@@ -133,17 +133,17 @@ export function PlanEditor({
           </fieldset>
 
           <fieldset className="grid gap-3 sm:grid-cols-4">
-            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Kontör hakkı (EmlakFiyati; mevcut aboneler kendi hakkını aylık alır)</legend>
+            <legend className="mb-2 text-xs font-bold uppercase tracking-wide text-text-faint">Analiz bakiyesi hakkı (EmlakFiyati; mevcut aboneler kendi hakkını aylık alır)</legend>
             <label className={lbl}>
-              Aylık kontör hakkı
+              Aylık analiz bakiyesi hakkı
               <input name="ef_credits_monthly" inputMode="numeric" value={efText} onChange={(e) => setEfText(e.target.value)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
             </label>
             <label className={lbl}>
-              Her ek kullanıcı için ek kontör (aylık)
+              Her ek kullanıcı için ek analiz bakiyesi (aylık)
               <input name="ef_credits_per_extra_seat" inputMode="numeric" defaultValue={num(plan.efCreditsPerExtraSeat)} placeholder="yok" className={`mt-1 w-full ${opFieldClass}`} />
             </label>
             <p className="self-end pb-2 text-xs text-text-muted" aria-live="polite">
-              {efNumber > 0 ? (efCreditsLine(efNumber, efValuationCost) ?? "Hak yok") : "Boş veya 0: bu pakete aylık kontör verilmez."}
+              {efNumber > 0 ? (efCreditsLine(efNumber, efValuationCost) ?? "Hak yok") : "Boş veya 0: bu pakete aylık analiz bakiyesi verilmez."}
               {efNumber > 0 && efValuationCost <= 0 ? " Tarifede değerleme bedeli 0: yaklaşık değerleme hesaplanamaz." : ""}
             </p>
           </fieldset>

@@ -22,7 +22,7 @@ import { getPlatformSetting } from "@/lib/platform-settings";
 import { resolvePeriod } from "@/lib/accounting/period";
 import { EF_WHOLESALE_SETTING_KEY, parseEfWholesale } from "@/lib/accounting/ef-economics";
 
-export const metadata = { title: "EmlakFiyati kontör" };
+export const metadata = { title: "EmlakFiyati analiz bakiyesi" };
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
@@ -59,13 +59,13 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       <AdminPageHeader
         art="coins"
         icon={Coins}
-        eyebrow="Faturalama · kontör"
-        title="EmlakFiyati kontör"
-        description="Tarife, paket kataloğu, ofis bakiyeleri ve manuel yükleme tek merkezde. Kontör YALNIZ Emlaksoft'ta tutulur."
+        eyebrow="Faturalama · analiz bakiyesi"
+        title="EmlakFiyati analiz bakiyesi"
+        description="Tarife, paket kataloğu, ofis bakiyeleri ve manuel yükleme tek merkezde. Analiz bakiyesi YALNIZ Emlaksoft'ta tutulur."
       />
 
       {!ready ? (
-        <Alert tone="info" title="Kontör bakiyesi henüz etkin değil">
+        <Alert tone="info" title="Analiz bakiyesi henüz etkin değil">
           Cüzdan SQL&apos;i (ef_credit_ready) hazır olana kadar bakiye, yükleme ve ofis satışı kapalıdır. Tarife ve paket kataloğunu şimdiden
           hazırlayabilirsiniz.
         </Alert>
@@ -73,7 +73,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       {!canWrite ? <Alert tone="info" title="Salt okunur">Bu bölümü yalnız süper admin değiştirebilir; operasyon rolü okur.</Alert> : null}
 
       <StatRow
-        label="Kontör özeti"
+        label="Analiz bakiyesi özeti"
         items={[
           { label: "Satıştaki paket", value: activeCount, href: "#paketler", hint: `${catalog.packs.length} tanımlı` },
           { label: "Listelenen ofis", value: list?.total ?? 0, href: "#bakiyeler" },
@@ -89,7 +89,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       <Card id="tarife">
         <CardHeader>
           <CardTitle>Tarife</CardTitle>
-          <CardDescription>Hangi işlem kaç kontör. Kayıt sonrası yeni işlemlere uygulanır.</CardDescription>
+          <CardDescription>Hangi işlem kaç TL. Kayıt sonrası yeni işlemlere uygulanır.</CardDescription>
         </CardHeader>
         <CardContent>
           <TariffForm tariff={catalog.tariff} canWrite={canWrite} />
@@ -109,7 +109,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       <Card id="bakiyeler">
         <CardHeader>
           <CardTitle>Ofis bakiyeleri</CardTitle>
-          <CardDescription>Kontör hareketi olan ofisler; ofis adı araması tüm ofisleri bulur. Satıra tıklayınca hareketler ve yükleme açılır.</CardDescription>
+          <CardDescription>Bakiye hareketi olan ofisler; ofis adı araması tüm ofisleri bulur. Satıra tıklayınca hareketler ve yükleme açılır.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <form action={BASE} method="get" className="flex flex-wrap gap-2">
@@ -144,7 +144,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
                   </THead>
                   <TBody>
                     {list.rows.length === 0 ? (
-                      <TableEmptyRow colSpan={5}>{q ? "Aramaya uyan ofis yok." : "Henüz kontör hareketi olan ofis yok. Ofis adıyla arayıp manuel yükleme yapabilirsiniz."}</TableEmptyRow>
+                      <TableEmptyRow colSpan={5}>{q ? "Aramaya uyan ofis yok." : "Henüz bakiye hareketi olan ofis yok. Ofis adıyla arayıp manuel yükleme yapabilirsiniz."}</TableEmptyRow>
                     ) : (
                       list.rows.map((r) => (
                         <TR key={r.tenantId}>
@@ -177,7 +177,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       {officeId ? (
         <Card id="ofis">
           <CardHeader>
-            <CardTitle>{detail?.name ?? "Ofis"}: kontör hareketleri</CardTitle>
+            <CardTitle>{detail?.name ?? "Ofis"}: bakiye hareketleri</CardTitle>
             <CardDescription>
               <Link href={`/admin/tenants/${officeId}`} className="font-semibold text-brand-600 hover:underline">Ofis kartını aç</Link>
             </CardDescription>
@@ -190,7 +190,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
                 <p className="numeric text-sm text-ink-950">
                   Bakiye <strong>{detail.balance ? fmt.format(detail.balance.available) : "—"}</strong> · rezerve {detail.balance ? fmt.format(detail.balance.reserved) : "—"}
                 </p>
-                <GrantForm tenantId={officeId} tenantName={detail.name ?? "Ofis"} disabledReason={canWrite ? null : "Yalnız süper admin kontör yükleyebilir."} />
+                <GrantForm tenantId={officeId} tenantName={detail.name ?? "Ofis"} disabledReason={canWrite ? null : "Yalnız süper admin bakiye yükleyebilir."} />
                 <TableFrame minWidth={560}>
                   <Table>
                     <THead>
@@ -198,12 +198,12 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
                         <TH>Tarih</TH>
                         <TH>Kalem</TH>
                         <TH>Kullanıcı</TH>
-                        <TH align="right">Kontör</TH>
+                        <TH align="right">Analiz bakiyesi</TH>
                       </TR>
                     </THead>
                     <TBody>
                       {detail.page.rows.length === 0 ? (
-                        <TableEmptyRow colSpan={4}>Bu ofiste kontör hareketi yok.</TableEmptyRow>
+                        <TableEmptyRow colSpan={4}>Bu ofiste bakiye hareketi yok.</TableEmptyRow>
                       ) : (
                         detail.page.rows.map((r) => (
                           <TR key={r.id}>

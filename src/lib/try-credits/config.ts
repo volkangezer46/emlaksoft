@@ -4,7 +4,7 @@
  * RPC adı, parametre adı/sırası ve dönüş JSON anahtarları SQL ile BİREBİR (sözleşme testi:
  * try-wallet-sql-contract.test.ts). DEĞİŞTİRİLİRSE iki migration da yeni dosyayla güncellenir.
  *
- * Kredi PARA DEĞİLDİR: yalnız EmlakSoft faturalarından (plan / ek kullanıcı / kontör paketi) düşer, nakde çevrilmez.
+ * Kredi PARA DEĞİLDİR: yalnız EmlakSoft faturalarından (plan / ek kullanıcı / analiz paketi) düşer, nakde çevrilmez.
  * Bakiye: balance = canlı kovalar − borç (EKSİ olabilir: clawback); available = max(balance − açık rezerv, 0).
  * Eksi bakiye HARCANAMAZ.
  */
