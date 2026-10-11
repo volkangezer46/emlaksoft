@@ -158,12 +158,17 @@ export function AdminSidebar({
       <div className="sb-head relative flex min-h-16 shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3">
         <Brand variant="mark" tone="dark" height={38} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
-          <p className="truncate font-display text-base font-extrabold leading-5 text-white">EmlakSoft</p>
-          <p className="truncate text-xs leading-4 text-white/75">Platform</p>
-          <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-bold uppercase tracking-[0.1em] text-[var(--gold-300)]">
-            <Crown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            {roleLabel}
-          </p>
+          <p className="truncate font-display text-base font-extrabold leading-5 tracking-tight text-white">EmlakSoft</p>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-xs font-medium leading-4 text-white/70">Platform</span>
+            <span
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--gold-300)]/35 bg-gradient-to-r from-[var(--gold-300)]/20 to-[var(--gold-300)]/5 px-2 py-0.5 text-xs font-semibold leading-4 text-[var(--gold-300)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+              title={roleLabel}
+            >
+              <Crown className="h-3 w-3 shrink-0" aria-hidden />
+              {roleLabel}
+            </span>
+          </div>
         </div>
         <SidebarCollapseButton />
       </div>
