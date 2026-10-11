@@ -30,6 +30,7 @@ import {
   rowToRef,
   type EInvoiceRow,
 } from "@/lib/integrations/einvoice/service";
+import { writeEInvoiceResult } from "@/lib/integrations/einvoice/server-writes";
 import { loadSourcePrefill } from "@/lib/integrations/einvoice/source-prefill";
 import { applyRemoteStatus } from "@/lib/integrations/einvoice/status-sync";
 import {
@@ -382,9 +383,10 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
     return { error: BUSY };
   }
   const row = claimed;
+  const ctx = { tenantId: gate.tenantId, actorId: gate.userId };
 
   const release = async (message: string) => {
-    const { error: e } = await supabase.rpc("einvoice_record_progress", { p_id: row.id, p_error: message.slice(0, 500), p_release: true });
+    const { error: e } = await writeEInvoiceResult(ctx, { fn: "einvoice_srv_record_progress", args: { p_id: row.id, p_error: message.slice(0, 500), p_release: true } });
     if (e) console.error("issueInvoice release", e.code);
   };
 
@@ -411,7 +413,7 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
     }
     ref = created.value.ref;
     number = created.value.number ?? number;
-    const saved = await supabase.rpc("einvoice_record_progress", { p_id: row.id, p_ref: ref, p_number: number });
+    const saved = await writeEInvoiceResult(ctx, { fn: "einvoice_srv_record_progress", args: { p_id: row.id, p_ref: ref, p_number: number } });
     if (saved.error || saved.data !== true) {
       console.error("issueInvoice provider_ref", saved.error?.code);
       await release("Sağlayıcı kimliği kaydedilemedi, birazdan yeniden deneyin.");
@@ -434,7 +436,7 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
     await release(adapterMessage(issued.error));
     return { error: adapterMessage(issued.error) };
   }
-  const marked = await supabase.rpc("einvoice_mark_issued", { p_id: row.id, p_ref: issued.value.ref, p_number: issued.value.number ?? number });
+  const marked = await writeEInvoiceResult(ctx, { fn: "einvoice_srv_mark_issued", args: { p_id: row.id, p_ref: issued.value.ref, p_number: issued.value.number ?? number } });
   if (marked.error || marked.data !== true) {
     console.error("issueInvoice mark_issued", marked.error?.code);
     return { error: "Fatura sağlayıcıya gönderildi ancak kayıt güncellenemedi. Sayfayı yenileyip Durumu yenile ile sorgulayın." };
@@ -452,7 +454,7 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
 }
 
 /** Belirsiz resmileştirmeyi sağlayıcıdan kanıtla çözer (yalnız sorgu; ASLA yeniden göndermez). */
-async function recoverUncertainIssue(row: EInvoiceRow, tenantId: string): Promise<EInvoiceActionResult> {
+async function recoverUncertainIssue(row: EInvoiceRow, tenantId: string, actorId: string): Promise<EInvoiceActionResult> {
   if (!issueLockExpired(row)) return { error: UNCERTAIN };
   const supabase = await createClient();
   const loaded = await loadAdapterForUser(supabase, tenantId);
@@ -460,12 +462,18 @@ async function recoverUncertainIssue(row: EInvoiceRow, tenantId: string): Promis
   if (loaded.value.connection.provider !== row.provider) return { error: "Bu fatura başka bir sağlayıcıyla kesilmiş; durum sorgulanamaz." };
   const res = await resolveIssueOutcome(loaded.value.adapter, row);
   if (res.outcome === "unknown") return { error: UNCERTAIN };
-  const applied = await supabase.rpc("einvoice_recover_issue_mine", {
-    p_id: row.id,
-    p_outcome: res.outcome,
-    p_ref: res.outcome === "sent" ? res.ref : null,
-    p_number: res.outcome === "sent" ? res.number : null,
-  });
+  const applied = await writeEInvoiceResult(
+    { tenantId, actorId },
+    {
+      fn: "einvoice_srv_recover_issue",
+      args: {
+        p_id: row.id,
+        p_outcome: res.outcome,
+        p_ref: res.outcome === "sent" ? res.ref : null,
+        p_number: res.outcome === "sent" ? res.number : null,
+      },
+    },
+  );
   if (applied.error || applied.data !== true) return { error: rpcFailure(applied.error ?? {}, "Sonuç kaydedilemedi.") };
   refresh();
   return {
@@ -486,7 +494,7 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
   const row = await loadRow(id, gate.tenantId);
   if (!row) return { error: "Fatura bulunamadı." };
   const ref = rowToRef(row);
-  if (row.status === "draft" && row.issue_stage === "issue_sent" && ref) return recoverUncertainIssue(row, gate.tenantId);
+  if (row.status === "draft" && row.issue_stage === "issue_sent" && ref) return recoverUncertainIssue(row, gate.tenantId, gate.userId);
   if (row.status === "draft" || !ref) return { error: "Bu fatura henüz resmileştirilmedi." };
   if (row.status !== "issued") return { error: "Bu fatura için durum sorgulanamaz. Hatalıysa Taslağa çevirip yeniden deneyin." };
   const supabase = await createClient();
@@ -499,14 +507,20 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
     { status: row.status, provider_state: row.provider_state, number: row.number, error: row.error },
     res.value,
   );
-  const saved = await supabase.rpc("einvoice_record_status", {
-    p_id: row.id,
-    p_status: patch.status,
-    p_provider_state: patch.provider_state,
-    p_number: patch.number,
-    p_error: patch.error,
-    p_ref: patch.provider_ref,
-  });
+  const saved = await writeEInvoiceResult(
+    { tenantId: gate.tenantId, actorId: gate.userId },
+    {
+      fn: "einvoice_srv_record_status",
+      args: {
+        p_id: row.id,
+        p_status: patch.status,
+        p_provider_state: patch.provider_state,
+        p_number: patch.number,
+        p_error: patch.error,
+        p_ref: patch.provider_ref,
+      },
+    },
+  );
   if (saved.error) return { error: rpcFailure(saved.error, "Durum kaydedilemedi.") };
   refresh();
   return { ok: true, message: "Durum güncellendi." };
@@ -545,7 +559,7 @@ export async function cancelInvoice(id: string, reason: string): Promise<EInvoic
   }
   const res = await adapter.cancel(ref, cleanReason);
   if (!res.ok) return { error: adapterMessage(res.error) };
-  const marked = await supabase.rpc("einvoice_mark_cancelled", { p_id: row.id, p_reason: cleanReason });
+  const marked = await writeEInvoiceResult({ tenantId: gate.tenantId, actorId: gate.userId }, { fn: "einvoice_srv_mark_cancelled", args: { p_id: row.id, p_reason: cleanReason } });
   if (marked.error || marked.data !== true) {
     console.error("cancelInvoice mark_cancelled", marked.error?.code);
     return { error: "İptal sağlayıcıda yapıldı ancak kayıt güncellenemedi. Durumu yenile ile sorgulayın." };

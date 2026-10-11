@@ -18,7 +18,7 @@ export async function RentNoticesCard({ rentalId, tenantId, canEdit }: { rentalI
   const supabase = await createClient();
   const { data: notices, error } = await supabase
     .from("rent_payment_notices")
-    .select("id, amount, reference, note, created_at, charge:rent_charges!rent_payment_notices_charge_id_fkey(period)")
+    .select("id, amount, reference, note, created_at, receipt_status, charge:rent_charges!rent_payment_notices_charge_id_fkey(period)")
     .eq("tenant_id", tenantId)
     .eq("rental_id", rentalId)
     .eq("status", "pending")
@@ -70,6 +70,13 @@ export async function RentNoticesCard({ rentalId, tenantId, canEdit }: { rentalI
                 {n.reference ? ` · Dekont/işlem no: ${n.reference}` : ""}
                 {n.note ? ` · Not: ${n.note}` : ""}
               </p>
+              {n.receipt_status === "verified" ? (
+                <p className="mt-2 text-xs font-semibold">
+                  <a href={`/api/rent-receipts/${n.id as string}`} target="_blank" rel="noopener noreferrer" className="focus-ring text-brand-600 hover:text-brand-700">
+                    Kiracının yüklediği dekontu gör
+                  </a>
+                </p>
+              ) : null}
               {match ? (
                 <p className="mt-2 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-700">
                   Banka ekstresinde aynı tutarlı giriş bulundu ({day(match.line.date)}
